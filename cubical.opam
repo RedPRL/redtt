@@ -1,0 +1,19 @@
+opam-version: "1.2.2"
+name: "cubical"
+version: "0.0"
+maintainer: "jonsterling@users.noreply.github.com"
+authors: ["Jon Sterling"]
+homepage: "https://github.com/jonsterling/tt"
+bug-reports: "https://github.com/jonsterling/tt/issues"
+dev-repo: "https://github.com/jonsterling/tt.git"
+license: "Apache-2.0"
+depends: [
+  "cmdliner" {= "1.0.2"}
+  "jbuilder" {build & = "1.0+beta17"}
+  "lwt" {= "3.2.1"}
+  "menhir" {>= "20171013"}
+  "topkg" {= "0.9.1"}
+]
+build: [
+  ["make"]
+]
