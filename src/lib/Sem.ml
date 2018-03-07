@@ -112,13 +112,13 @@ let eval_ctx cx =
 
 module Variance = 
 struct
-  type t = Co | Contra | Inv | None
+  type t = Co | Contra | Iso | None
 
   let flip v = 
     match v with 
     | Co -> Contra 
     | Contra -> Co
-    | Inv -> Inv
+    | Iso -> Iso
     | None -> None
 end
 
@@ -141,19 +141,22 @@ struct
       if leq l0 l1 then as_const l1 else failwith "Level.approx"
     | Variance.Contra ->
       if leq l1 l0 then as_const l1 else failwith "Level.approx"
-    | Variance.Inv ->
+    | Variance.Iso ->
       if l0 = l1 then as_const l0 else failwith "Level.approx"
     | Variance.None -> 
       try as_const l0 with _ -> as_const l1
 end
 
-let rec approx_nf vr ctx dty d0 d1 =
+(* Simultaneously check approximation relative to a variance, and quote a normal form *)
+let rec approx_nf ~vr ~ctx ~ty:dty ~lhs:d0 ~rhs:d1 =
   match vr with 
   | Variance.None -> 
+    (* Don't care about approximation, just want a quote *)
     begin
-      try approx_nf Variance.Inv ctx dty d0 d0 with
-      | _ -> approx_nf Variance.Inv ctx dty d1 d1
+      try approx_nf ~vr:Variance.Iso ~ctx ~ty:dty ~lhs:d0 ~rhs:d0 with
+      | _ -> approx_nf ~vr:Variance.Iso ~ctx ~ty:dty ~lhs:d1 ~rhs:d1
     end
+
   | _ ->
     match dty, d0, d1 with 
     | D.U _, D.U l0, D.U l1 ->
@@ -220,120 +223,59 @@ let rec approx_nf vr ctx dty d0 d1 =
 
     | _, D.Dim0, D.Dim0 ->
       Tm.Dim0
-  
+
     | _, D.Dim1, D.Dim1 ->
       Tm.Dim1
 
-    | _, D.Up (_, dne0), D.Up (_, dne1) -> failwith "TODO"
+    | _, D.Up (_, dne0), D.Up (_, dne1) ->
+      Tm.Up (snd (approx_neu vr ctx dne0 dne1))
 
-    | _ -> failwith ""
+    | _ -> failwith "approx_nf: no match"
 
+and approx_neu ~vr ~ctx ~lhs:dne0 ~rhs:dne1 = 
+  match dne0, dne1 with 
+  | D.Atom lvl0, D.Atom lvl1 -> 
+    if lvl0 = lvl1 then 
+      let ix = Ctx.len ctx - (lvl0 + 1) in
+      let ty = List.nth (Ctx.tys ctx) ix in
+      ty, Tm.Var ix
+    else 
+      failwith "[approx_neu]: atom"
 
-(* TODO: replace this with instance of approx_nf above *)
-let rec quo_nf (ctx : Ctx.t) dnf =
-  let D.Down (dty, d) = dnf in
-  match dty, d with
-
-  | D.Pi (dom, cod), _ ->
-    let ctx', atom = Ctx.add ctx dom in
-    let app = D.Down (apply cod atom, apply d atom) in
-    let body = quo_nf ctx' app in
-    Tm.Lam (Tm.B body)
-
-  | D.Sg (dom, cod), _ ->
-    let d1 = proj1 d in
-    let d2 = proj2 d in
-    let t1 = quo_nf ctx (D.Down (dom, d1)) in
-    let t2 = quo_nf ctx (D.Down (apply cod d1, d2)) in
-    Tm.Pair (t1, t2)
-
-  | D.Eq (cod, _d1, _d2), _ ->
-    let ctx', atom = Ctx.add ctx D.Interval in
-    let app = D.Down (apply cod atom, apply d atom) in
-    let body = quo_nf ctx' app in
-    Tm.Lam (Tm.B body)
-
-  | D.Unit, _ -> Tm.Ax
-
-  | _, D.U (`Const i) -> Tm.U i
-  | _, D.U _ -> failwith "Cannot quote virtual universe U[omega]"
-
-  | univ, D.Pi (dom, cod) ->
-    let tdom = quo_nf ctx (D.Down (univ, dom)) in
-    let ctx', atom = Ctx.add ctx dom in
-    let tcod = quo_nf ctx' (D.Down (univ, apply cod atom)) in
-    Tm.Pi (tdom, Tm.B tcod)
-
-  | univ, D.Sg (dom, cod) ->
-    let tdom = quo_nf ctx (D.Down (univ, dom)) in
-    let ctx', atom = Ctx.add ctx dom in
-    let tcod = quo_nf ctx' (D.Down (univ, apply cod atom)) in
-    Tm.Sg (tdom, Tm.B tcod)
-
-  | univ, D.Eq (cod, d1, d2) ->
-    let ctx', atom = Ctx.add ctx D.Interval in
-    let tcod = quo_nf ctx' (D.Down (univ, apply cod atom)) in
-    let t1 = quo_nf ctx (D.Down (apply cod D.Dim0, d1)) in
-    let t2 = quo_nf ctx (D.Down (apply cod D.Dim1, d2)) in
-    Tm.Eq (Tm.B tcod, t1, t2)
-
-  | _, D.Unit -> Tm.Unit
-  | _, D.Bool -> Tm.Bool
-  | _, D.Tt -> Tm.Tt
-  | _, D.Ff -> Tm.Ff
-  | _, D.Dim0 -> Tm.Dim0
-  | _, D.Dim1 -> Tm.Dim1
-  | _, D.Up (_ty, dne) -> let _, t = quo_neu ctx dne in Tm.Up t
-  | _, d -> failwith "quo_nf"
-
-
-and quo_neu ctx dne =
-  match dne with 
-  | D.Atom lvl -> 
-    let ix = Ctx.len ctx - (lvl + 1) in
-    let ty = List.nth (Ctx.tys ctx) ix in
-    ty, Tm.Var ix
-
-  | D.App (d1, d2) -> 
+  | D.App (d00, D.Down (_, d01)), D.App (d10, D.Down (_, d11)) -> 
     begin
-      match quo_neu ctx d1 with 
-      | D.Pi (vdom, vcod), t1 ->
-        let t2 = quo_nf ctx d2 in
-        let D.Down (_, d2) = d2 in
-        apply vcod d2, Tm.App (t1, t2)
-      | D.Eq (vcod, dp0, dp1), t1 -> 
-        let t2 = quo_nf ctx d2 in
-        let D.Down (_, d2) = d2 in
-        apply vcod d2, Tm.App (t1, t2)
-      | _ -> failwith "quo_neu/app"
+      match approx_neu vr ctx d00 d10 with 
+      | D.Pi (dom, cod), t0 ->
+        let t1 = approx_nf vr ctx dom d01 d11 in
+        apply cod d01, Tm.App (t0, t1)
+      | D.Eq (cod, dp0, dp1), t0 -> 
+        let t1 = approx_nf vr ctx D.Interval d01 d11 in
+        apply cod d01, Tm.App (t0, t1)
+      | _ -> failwith "approx_neu/app"
     end
 
-  | D.Proj1 d -> 
+  | D.Proj1 d0, D.Proj1 d1 -> 
     begin
-      match quo_neu ctx d with
-      | D.Sg (vdom, vcod), t -> 
-        vdom, Tm.Proj1 t
-      | _ -> failwith "quo_neu/proj1"
+      match approx_neu vr ctx d0 d1 with 
+      | D.Sg (dom, _), t -> 
+        dom, Tm.Proj1 t
+      | _ -> failwith "approx_neu/proj1"
     end
 
-  | D.Proj2 d -> 
+  | D.Proj2 d0, D.Proj2 d1 -> 
     begin
-      match quo_neu ctx d with
-      | D.Sg (vdom, vcod) as vsg, t -> 
-        apply vcod (proj1 (D.Up (vsg, d))), Tm.Proj1 t
-      | _ -> failwith "quo_neu/proj2"
+      match approx_neu vr ctx d0 d1 with 
+      | D.Sg (dom, cod) as vsg, t -> 
+        apply cod (proj1 (D.Up (vsg, d0))), Tm.Proj2 t
+      | _ -> failwith "approx_neu/proj1"
     end
 
-  | D.If (mot, db, d1, d2) -> 
-    let ctx', atom = Ctx.add ~ctx ~ty:D.Bool in 
-    let tmot = quo_nf ctx' (D.Down (D.U `Omega, apply mot atom)) in
-    let _, tb = quo_neu ctx db in
-    let t1 = quo_nf ctx d1 in
-    let t2 = quo_nf ctx d2 in
-    apply mot (D.Up (D.Bool, db)), Tm.If (Tm.B tmot, tb, t1, t2)
+  | D.If (mot0, db0, D.Down (_, dt0), D.Down (_, df0)), D.If (mot1, db1, D.Down (_, dt1), D.Down (_, df1)) ->
+    let ctx', atom = Ctx.add ~ctx ~ty:D.Bool in
+    let tmot = approx_nf vr ctx' (D.U `Omega) (apply mot0 atom) (apply mot1 atom) in
+    let _, tb = approx_neu vr ctx db0 db1 in
+    let tt = approx_nf vr ctx (apply mot0 D.Tt) dt0 dt1 in
+    let tf = approx_nf vr ctx (apply mot0 D.Ff) df0 df1 in
+    apply mot0 (D.Up (D.Bool, db0)), Tm.If (Tm.B tmot, tb, tt, tf)
 
-(* let nbe cx ~tm ~ty =
-   let n, rho = eval_ctx_aux cx in
-   let dty = eval rho ty in
-   let dtm = eval rho tm in
-   quo_nf n (D.Down (dty, dtm)) *)
+  | _ -> failwith "approx_neu: no match"

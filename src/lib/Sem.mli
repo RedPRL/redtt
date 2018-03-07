@@ -1,12 +1,18 @@
 open Tm
 open Val
 
+module Variance :
+sig
+  type t = Co | Contra | Iso | None
+
+  val flip : t -> t
+end
+
+
+
 val apply : d -> d -> d
 
 val eval : env -> chk -> d
 val eval_inf : env -> inf -> d
-(* val eval_ctx : ctx -> env *)
 
-val quo_nf : Ctx.t -> dnf -> chk
-
-(* val nbe : ctx -> tm:chk -> ty:chk -> chk *)
+val approx_nf : vr:Variance.t -> ctx:Ctx.t -> ty:d -> lhs:d -> rhs:d -> Tm.chk
