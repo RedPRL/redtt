@@ -227,19 +227,6 @@ and quo_neu ctx dne =
     let t2 = quo_nf ctx d2 in
     apply mot (D.Up (D.Bool, db)), Tm.If (Tm.B tmot, tb, t1, t2)
 
-(* match dne with
-   | D.Atom k -> Tm.var (n - (k + 1))
-   | D.App (d1, d2) -> Tm.App (quo_neu n d1, quo_nf n d2)
-   | D.Proj1 d -> Tm.Proj1 (quo_neu n d)
-   | D.Proj2 d -> Tm.Proj2 (quo_neu n d)
-   | D.If (mot, db, d1, d2) ->
-   let atom = D.Up (D.Bool, D.Atom n) in
-   let tmot = quo_nf (n + 1) (D.Down (D.U, apply mot atom)) in
-   let tb = quo_neu n db in
-   let t1 = quo_nf n d1 in
-   let t2 = quo_nf n d2 in
-   Tm.If (Tm.B tmot, tb, t1, t2) *)
-
 (* let nbe cx ~tm ~ty =
    let n, rho = eval_ctx_aux cx in
    let dty = eval rho ty in

@@ -48,10 +48,8 @@ and check ~ctx ~ty ~tm =
     let ctxi, atom = Ctx.add ~ctx ~ty:D.Interval in
     let vcodi = Sem.apply vcod atom in
     check ~ctx:ctxi ~ty:vcodi ~tm:bdy;
-    let ctx0 = Ctx.define ~ctx ~ty:D.Interval ~tm:D.Dim0 in
-    let ctx1 = Ctx.define ~ctx ~ty:D.Interval ~tm:D.Dim1 in
-    let vbdy0 = Sem.eval (Ctx.env ctx0) bdy in
-    let vbdy1 = Sem.eval (Ctx.env ctx1) bdy in
+    let vbdy0 = Sem.eval (D.Dim0 :: Ctx.env ctx) bdy in
+    let vbdy1 = Sem.eval (D.Dim1 :: Ctx.env ctx) bdy in
     check_eq ~ctx:ctx ~ty:(Sem.apply vcod D.Dim0) ~lhs:v0 ~rhs:vbdy0;
     check_eq ~ctx:ctx ~ty:(Sem.apply vcod D.Dim1) ~lhs:v1 ~rhs:vbdy1
 
