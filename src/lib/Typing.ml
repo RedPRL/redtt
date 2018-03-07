@@ -42,6 +42,12 @@ let rec check ~ctx ~ty ~tm =
   | D.Bool, Tm.Ff -> 
     ()
 
+  | D.Interval, Tm.Dim0 -> 
+    ()
+
+  | D.Interval, Tm.Dim1 -> 
+    ()
+
   | D.Pi (vdom, vcod), Tm.Lam (Tm.B bdy) ->
     let ctx', atom = Ctx.add ~ctx ~ty:vdom in
     let vcod' = Sem.apply vcod atom in
@@ -68,7 +74,48 @@ let rec check ~ctx ~ty ~tm =
   | _ -> failwith ""
 
 and infer ~ctx ~tm = 
-  failwith ""
+  match tm with 
+  | Tm.Var ix -> 
+    List.nth (Ctx.tys ctx) ix
+  | Tm.App (tf, ta) -> 
+    begin
+      match infer ~ctx ~tm:tf with 
+      | D.Pi (dom, cod) ->
+        let v = check_eval ~ctx ~ty:dom ~tm:ta in
+        Sem.apply cod v
+      | D.Eq (cod, _, _) ->
+        let v = check_eval ~ctx ~ty:D.Interval ~tm:ta in
+        Sem.apply cod v
+      | _ -> failwith "infer/app"
+    end
+  | Tm.Proj1 t -> 
+    begin
+      match infer ~ctx ~tm:t with
+      | D.Sg (dom, _) -> dom
+      | _ -> failwith "infer/proj1"
+    end
+  | Tm.Proj2 t -> 
+    begin
+      match infer ~ctx ~tm:t with 
+      | D.Sg (dom, cod) -> 
+        let v = Sem.eval_inf (Ctx.env ctx) (Tm.Proj1 t) in
+        Sem.apply cod v
+      | _ -> failwith "infer/proj2"
+    end
+  | Tm.If (Tm.B mot, tb, tt, tf) -> 
+    let vb = check_eval ~ctx ~ty:D.Bool ~tm:(Tm.Up tb) in
+    let ctx', atom = Ctx.add ctx D.Bool in
+    check ~ctx:ctx' ~ty:(D.U `Omega) ~tm:mot;
+    let rho = Ctx.env ctx in
+    let vmott = Sem.eval (D.Tt :: rho) mot in
+    check ~ctx ~ty:vmott ~tm:tt;
+    let vmotf = Sem.eval (D.Ff :: rho) mot in
+    check ~ctx ~ty:vmotf ~tm:tf;
+    Sem.eval (vb :: rho) mot
+  | Tm.Down (ty, tm) -> 
+    let vty = check_eval ~ctx ~ty:(D.U `Omega) ~tm:ty in
+    check ~ctx ~ty:vty ~tm;
+    vty
 
 and check_subtype ~ctx ~lhs ~rhs =
   let _ = Sem.approx_nf ~vr:Sem.Variance.Co ~ctx ~ty:(D.U `Omega) ~lhs ~rhs in
