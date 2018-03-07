@@ -67,18 +67,21 @@ and apply d1 d2 =
         let app = D.App (dne, D.Down (dom, d2)) in
         D.Up (cod', app)
       | D.Eq (cod, p0, p1) ->
-        let cod' = apply cod d2 in
-        begin
-          match d2 with
-          | D.Dim0 -> p0
-          | D.Dim1 -> p1
-          | _ ->
-            let app = D.App (dne, D.Down (D.Interval, d2)) in
-            D.Up (cod', app)
-        end
+        proj_dim (cod, p0, p1) dne d2
       | _ -> failwith "apply/up: unexpected type"
     end
   | _ -> failwith "apply"
+
+and proj_dim (cod, p0, p1) dne dim = 
+  let cod' = apply cod dim in
+  match dim with 
+  | D.Dim0 -> p0 
+  | D.Dim1 -> p1
+  | _ -> 
+    let dim' = D.Down (D.Interval, dim) in
+    let app = D.App (dne, dim') in
+    D.Up (cod', app)
+
 
 and proj1 d =
   match d with
