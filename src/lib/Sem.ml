@@ -110,6 +110,126 @@ and if_ mot db d1 d2 =
 let eval_ctx cx =
   snd (eval_ctx_aux cx) *)
 
+module Variance = 
+struct
+  type t = Co | Contra | Inv | None
+
+  let flip v = 
+    match v with 
+    | Co -> Contra 
+    | Contra -> Co
+    | Inv -> Inv
+    | None -> None
+end
+
+module Level = 
+struct
+  let leq l0 l1 = 
+    match l0, l1 with
+    | _, `Omega -> true
+    | `Const i, `Const j -> i <= j
+    | _ -> false
+
+  let as_const l = 
+    match l with 
+    | `Const i -> i
+    | _ -> failwith "Level.as_const"
+
+  let approx v l0 l1 = 
+    match v with 
+    | Variance.Co ->
+      if leq l0 l1 then as_const l1 else failwith "Level.approx"
+    | Variance.Contra ->
+      if leq l1 l0 then as_const l1 else failwith "Level.approx"
+    | Variance.Inv ->
+      if l0 = l1 then as_const l0 else failwith "Level.approx"
+    | Variance.None -> 
+      try as_const l0 with _ -> as_const l1
+end
+
+let rec approx_nf vr ctx dty d0 d1 =
+  match vr with 
+  | Variance.None -> 
+    begin
+      try approx_nf Variance.Inv ctx dty d0 d0 with
+      | _ -> approx_nf Variance.Inv ctx dty d1 d1
+    end
+  | _ ->
+    match dty, d0, d1 with 
+    | D.U _, D.U l0, D.U l1 ->
+      let i = Level.approx vr l0 l1 in
+      Tm.U i
+
+    | D.U _, D.Unit, D.Unit -> 
+      Tm.Unit
+
+    | D.U _, D.Bool, D.Bool -> 
+      Tm.Bool
+
+    | D.U _, D.Pi (dom0, cod0), D.Pi (dom1, cod1) -> 
+      let tdom = approx_nf (Variance.flip vr) ctx dty dom0 dom1 in
+      let ctx', atom = Ctx.add ctx dom0 in
+      let tcod = approx_nf vr ctx' dty (apply cod0 atom) (apply cod1 atom) in
+      Tm.Pi (tdom, Tm.B tcod)
+
+    | D.U _, D.Sg (dom0, cod0), D.Sg (dom1, cod1) -> 
+      let tdom = approx_nf (Variance.flip vr) ctx dty dom0 dom1 in
+      let ctx', atom = Ctx.add ctx dom0 in
+      let tcod = approx_nf vr ctx' dty (apply cod0 atom) (apply cod1 atom) in
+      Tm.Sg (tdom, Tm.B tcod)
+
+
+    | D.U _, D.Eq (cod0, p00, p01), D.Eq (cod1, p10, p11) ->
+      let ctx', atom = Ctx.add ctx D.Interval in
+      let tcod = approx_nf vr ctx' dty (apply cod0 atom) (apply cod1 atom) in
+      let p0 = approx_nf vr ctx (apply cod0 D.Dim0) p00 p10 in
+      let p1 = approx_nf vr ctx (apply cod1 D.Dim1) p01 p11 in
+      Tm.Eq (Tm.B tcod, p0, p1)
+
+    | D.Pi (dom, cod), _, _ ->
+      let ctx', atom = Ctx.add ctx dom in
+      let cod' = apply cod atom in
+      let bdy = approx_nf vr ctx' cod' (apply d0 atom) (apply d1 atom) in
+      Tm.Lam (Tm.B bdy)
+
+    | D.Sg (dom, cod), _, _ -> 
+      let d00 = proj1 d0 in
+      let d11 = proj1 d1 in    
+      let t0 = approx_nf vr ctx dom d00 d11 in
+      let d02 = proj2 d0 in
+      let d12 = proj2 d1 in    
+      let t1 = approx_nf vr ctx (apply cod d00) d02 d12 in
+      Tm.Pair (t0, t1)
+
+    | D.Eq (cod, p0, p1), _, _ ->
+      let ctx', atom = Ctx.add ctx D.Interval in
+      let cod' = apply cod atom in
+      let d0' = apply d0 atom in
+      let d1' = apply d1 atom in
+      let bdy = approx_nf Variance.None ctx' cod' d0' d1' in
+      Tm.Lam (Tm.B bdy)
+
+    | _, D.Ax, D.Ax -> 
+      Tm.Ax
+
+    | _, D.Tt, D.Tt -> 
+      Tm.Tt
+
+    | _, D.Ff, D.Ff -> 
+      Tm.Ff
+
+    | _, D.Dim0, D.Dim0 ->
+      Tm.Dim0
+  
+    | _, D.Dim1, D.Dim1 ->
+      Tm.Dim1
+
+    | _, D.Up (_, dne0), D.Up (_, dne1) -> failwith "TODO"
+
+    | _ -> failwith ""
+
+
+(* TODO: replace this with instance of approx_nf above *)
 let rec quo_nf (ctx : Ctx.t) dnf =
   let D.Down (dty, d) = dnf in
   match dty, d with
