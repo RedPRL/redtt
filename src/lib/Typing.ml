@@ -8,15 +8,29 @@ let rec check ~ctx ~ty ~tm =
   | D.U (`Const lvl), Tm.U lvl' -> 
     if lvl' < lvl then () else failwith "[check]: universe level error"
 
-  | D.U lvl, Tm.Pi (dom, Tm.B cod) -> 
+  | D.U _, Tm.Unit -> 
+    ()
+
+  | D.U _, Tm.Bool -> 
+    ()
+
+  | D.U _, Tm.Pi (dom, Tm.B cod) -> 
     let vdom = check_eval ~ctx ~ty ~tm:dom in
     let ctx', _ = Ctx.add ~ctx ~ty:vdom in
     check ~ctx:ctx' ~ty ~tm:cod
 
-  | D.U lvl, Tm.Sg (dom, Tm.B cod) -> 
+  | D.U _, Tm.Sg (dom, Tm.B cod) -> 
     let vdom = check_eval ~ctx ~ty ~tm:dom in
     let ctx', _ = Ctx.add ~ctx ~ty:vdom in
     check ~ctx:ctx' ~ty ~tm:cod
+
+  | D.U _, Tm.Eq (Tm.B cod, t0, t1) ->
+    let ctxi, _ = Ctx.add ~ctx ~ty:D.Interval in
+    check ~ctx:ctxi ~ty ~tm:cod;
+    let vcod0 = Sem.eval (D.Dim0 :: Ctx.env ctx) cod in
+    check ~ctx:ctx ~ty:vcod0 ~tm:t0;
+    let vcod1 = Sem.eval (D.Dim1 :: Ctx.env ctx) cod in
+    check ~ctx:ctx ~ty:vcod1 ~tm:t1
 
 
   | D.Unit, Tm.Ax ->
