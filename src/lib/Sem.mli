@@ -9,6 +9,7 @@ sig
 end
 
 
+(* Invariant: all these functions should be called on things which are already typechecked. *)
 
 val apply : d -> d -> d
 
