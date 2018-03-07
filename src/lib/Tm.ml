@@ -26,8 +26,6 @@ and inf =
 
 module Pretty =
 struct
-  type 'a t = Format.formatter -> 'a -> unit
-
   module Env : 
   sig
     type t
@@ -99,7 +97,7 @@ struct
       Format.fprintf fmt "%s" @@ Env.var i rho
 
     | App (r, t) ->
-      Format.fprintf fmt "(app %a %a)" (pp_inf rho) r (pp_chk rho) t
+      Format.fprintf fmt "(@ %a %a)" (pp_inf rho) r (pp_chk rho) t
 
     | Proj1 r ->
       Format.fprintf fmt "(car %a)" (pp_inf rho) r
