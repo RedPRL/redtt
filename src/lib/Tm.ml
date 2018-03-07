@@ -26,24 +26,24 @@ and inf =
 
 module Pretty =
 struct
-  module Env : 
+  module Env :
   sig
     type t
     val emp : t
     val var : int -> t -> string
     val bind : t -> string * t
-  end = 
+  end =
   struct
     type t = int * string list
 
     let emp = 0, []
     let var i (_, xs) = List.nth xs i
     let bind (i, xs) =
-      let x = "_" ^ string_of_int i in 
+      let x = "_" ^ string_of_int i in
       x, (i + 1, x :: xs)
   end
 
-  let rec pp_chk rho fmt t = 
+  let rec pp_chk rho fmt t =
     match t with
     | Up t ->
       Format.fprintf fmt "%a" (pp_inf rho) t
@@ -54,7 +54,7 @@ struct
     | Bool ->
       Format.fprintf fmt "bool"
 
-    | U i -> 
+    | U i ->
       Format.fprintf fmt "(U %i)" i
 
     | Pi (dom, B cod) ->
@@ -62,33 +62,33 @@ struct
       Format.fprintf fmt "(-> %a [%s] %a)" (pp_chk rho) dom x (pp_chk rho') cod
 
     | Sg (dom, B cod) ->
-      let x, rho' = Env.bind rho in 
+      let x, rho' = Env.bind rho in
       Format.fprintf fmt "(* %a [%s] %a)" (pp_chk rho) dom x (pp_chk rho') cod
 
-    | Eq (B cod, t1, t2) -> 
+    | Eq (B cod, t1, t2) ->
       let x, rho' = Env.bind rho in
-      Format.fprintf fmt "(eq [%s] %a %a %a)" x (pp_chk rho') cod (pp_chk rho) t1 (pp_chk rho) t2
+      Format.fprintf fmt "(= [%s] %a %a %a)" x (pp_chk rho') cod (pp_chk rho) t1 (pp_chk rho) t2
 
     | Lam (B t) ->
       let x, rho' = Env.bind rho in
       Format.fprintf fmt "(lam [%s] %a)" x (pp_chk rho') t
 
-    | Pair (t1, t2) -> 
+    | Pair (t1, t2) ->
       Format.fprintf fmt "(cons %a %a)" (pp_chk rho) t1 (pp_chk rho) t2
 
-    | Ax -> 
+    | Ax ->
       Format.fprintf fmt "ax"
 
-    | Tt -> 
+    | Tt ->
       Format.fprintf fmt "tt"
 
-    | Ff -> 
+    | Ff ->
       Format.fprintf fmt "ff"
 
-    | Dim0 -> 
+    | Dim0 ->
       Format.fprintf fmt "0"
 
-    | Dim1 -> 
+    | Dim1 ->
       Format.fprintf fmt "1"
 
   and pp_inf rho fmt r =
@@ -97,7 +97,7 @@ struct
       Format.fprintf fmt "%s" @@ Env.var i rho
 
     | App (r, t) ->
-      Format.fprintf fmt "(@ %a %a)" (pp_inf rho) r (pp_chk rho) t
+      Format.fprintf fmt "(%a %a)" (pp_inf rho) r (pp_chk rho) t
 
     | Proj1 r ->
       Format.fprintf fmt "(car %a)" (pp_inf rho) r
@@ -109,6 +109,6 @@ struct
       let x, rho' = Env.bind rho  in
       Format.fprintf fmt "(if [%s] %a %a %a %a)" x (pp_chk rho') mot (pp_inf rho) r (pp_chk rho) t1 (pp_chk rho) t2
 
-    | Down (ty, t) -> 
+    | Down (ty, t) ->
       Format.fprintf fmt "(: %a %a)" (pp_chk rho) ty (pp_chk rho) t
 end
