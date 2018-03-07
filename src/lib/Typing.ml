@@ -65,8 +65,8 @@ let rec check ~ctx ~ty ~tm =
 
 (* TODO: replace with incremental conversion check *)
 and check_eq ~ctx ~ty ~lhs ~rhs =
-  let lhs' = Sem.quo_nf ctx (D.Down (ty, lhs)) in
-  let rhs' = Sem.quo_nf ctx (D.Down (ty, rhs)) in
+  let lhs' = Sem.quo_nf ctx @@ D.Down (ty, lhs) in
+  let rhs' = Sem.quo_nf ctx @@ D.Down (ty, rhs) in
   if Tm.equal_chk lhs' rhs' then () else failwith "check_eq_val"
 
 and check_eval ~ctx ~ty ~tm = 
