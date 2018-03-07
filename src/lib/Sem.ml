@@ -5,7 +5,7 @@ let rec eval rho t =
   | Tm.Pi (dom, cod) -> D.Pi (eval rho dom, D.Clo (cod, rho))
   | Tm.Sg (dom, cod) -> D.Sg (eval rho dom, D.Clo (cod, rho))
   | Tm.Eq (cod, t1, t2) -> D.Eq (D.Clo (cod, rho), eval rho t1, eval rho t2)
-  | Tm.U -> D.U
+  | Tm.U i -> D.U (`Const i)
   | Tm.Unit -> D.Unit
   | Tm.Bool -> D.Bool
   | Tm.Lam bnd -> D.Clo (bnd, rho)
@@ -135,7 +135,8 @@ let rec quo_nf (ctx : Ctx.t) dnf =
 
   | D.Unit, _ -> Tm.Ax
 
-  | _, D.U -> Tm.U
+  | _, D.U (`Const i) -> Tm.U i
+  | _, D.U _ -> failwith "Cannot quote virtual universe U[omega]"
 
   | univ, D.Pi (dom, cod) ->
     let tdom = quo_nf ctx (D.Down (univ, dom)) in
@@ -205,7 +206,7 @@ and quo_neu ctx dne =
 
   | D.If (mot, db, d1, d2) -> 
     let ctx', atom = Ctx.add ~ctx ~ty:D.Bool in 
-    let tmot = quo_nf ctx' (D.Down (D.U, apply mot atom)) in
+    let tmot = quo_nf ctx' (D.Down (D.U `Omega, apply mot atom)) in
     let _, tb = quo_neu ctx db in
     let t1 = quo_nf ctx d1 in
     let t2 = quo_nf ctx d2 in

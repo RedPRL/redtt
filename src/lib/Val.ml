@@ -7,7 +7,7 @@ type d =
   | Sg of d * d
   | Eq of d * d * d
   | Interval
-  | U
+  | U of [`Const of int | `Omega]
   | Pair of d * d
   | Ax
   | Tt

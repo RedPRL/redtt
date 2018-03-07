@@ -14,7 +14,7 @@ type chk =
   | Ff
   | Dim0
   | Dim1
-  | U
+  | U of int
 
 and inf =
   | Var of int

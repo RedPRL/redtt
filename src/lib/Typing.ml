@@ -1,29 +1,23 @@
 module D = Val
 
-let rec check_ty ~ctx ~lvl ~ty = 
-  match ty with 
-  | Tm.U ->
-    () 
-    (* TODO *)
-
-  | Tm.Pi (dom, Tm.B cod) ->
-    let vdom = check_ty_eval ~ctx ~lvl ~ty:dom in
-    let ctx', _ = Ctx.add ~ctx ~ty:vdom in
-    check_ty ~ctx:ctx' ~lvl ~ty:cod
-
-  | Tm.Sg (dom, Tm.B cod) ->
-    let vdom = check_ty_eval ~ctx ~lvl ~ty:dom in
-    let ctx', _ = Ctx.add ~ctx ~ty:vdom in
-    check_ty ~ctx:ctx' ~lvl ~ty:cod
-
-  | _ -> failwith ""
-
-
-and check ~ctx ~ty ~tm = 
+let rec check ~ctx ~ty ~tm = 
   match ty, tm with 
-  | D.U, _ -> 
-    check_ty ~ctx ~ty:tm ~lvl:0
-    (* TODO *)
+  | D.U `Omega, Tm.U _ ->
+    ()
+
+  | D.U (`Const lvl), Tm.U lvl' -> 
+    if lvl' < lvl then () else failwith "[check]: universe level error"
+
+  | D.U lvl, Tm.Pi (dom, Tm.B cod) -> 
+    let vdom = check_eval ~ctx ~ty ~tm:dom in
+    let ctx', _ = Ctx.add ~ctx ~ty:vdom in
+    check ~ctx:ctx' ~ty ~tm:cod
+
+  | D.U lvl, Tm.Sg (dom, Tm.B cod) -> 
+    let vdom = check_eval ~ctx ~ty ~tm:dom in
+    let ctx', _ = Ctx.add ~ctx ~ty:vdom in
+    check ~ctx:ctx' ~ty ~tm:cod
+
 
   | D.Unit, Tm.Ax ->
     ()
@@ -60,10 +54,6 @@ and check_eq ~ctx ~ty ~lhs ~rhs =
   let lhs' = Sem.quo_nf ctx (D.Down (ty, lhs)) in
   let rhs' = Sem.quo_nf ctx (D.Down (ty, rhs)) in
   if Tm.equal_chk lhs' rhs' then () else failwith "check_eq_val"
-
-and check_ty_eval ~ctx ~lvl ~ty = 
-  check_ty ~ctx ~lvl ~ty;
-  Sem.eval (Ctx.env ctx) ty
 
 and check_eval ~ctx ~ty ~tm = 
   check ~ctx ~ty ~tm;
