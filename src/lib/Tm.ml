@@ -44,4 +44,4 @@ and pp_inf fmt r =
   | If (B mot, r, t1, t2) -> Format.fprintf fmt "(if [] %a %a %a %a)" pp_chk mot pp_inf r pp_chk t1 pp_chk t2
   | _ -> failwith ""
  
- let rec equal_chk t1 t2 = failwith ""
+ let rec equal_chk t1 t2 = t1 = t2
