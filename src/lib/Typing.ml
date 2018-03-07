@@ -61,7 +61,18 @@ let rec check ~ctx ~ty ~tm =
     check_eq ~ctx:ctx ~ty:(Sem.apply vcod D.Dim0) ~lhs:v0 ~rhs:vbdy0;
     check_eq ~ctx:ctx ~ty:(Sem.apply vcod D.Dim1) ~lhs:v1 ~rhs:vbdy1
 
+  | _, Tm.Up t -> 
+    let ty' = infer ~ctx ~tm:t in
+    check_subtype ~ctx ~lhs:ty' ~rhs:ty
+
   | _ -> failwith ""
+
+and infer ~ctx ~tm = 
+  failwith ""
+
+and check_subtype ~ctx ~lhs ~rhs =
+  let _ = Sem.approx_nf ~vr:Sem.Variance.Co ~ctx ~ty:(D.U `Omega) ~lhs ~rhs in
+  ()
 
 and check_eq ~ctx ~ty ~lhs ~rhs =
   let _ = Sem.approx_nf ~vr:Sem.Variance.Iso ~ctx ~ty ~lhs ~rhs in
