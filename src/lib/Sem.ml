@@ -16,13 +16,10 @@ let rec eval rho t =
   | Tm.Dim0 -> D.Dim0
   | Tm.Dim1 -> D.Dim1
   | Tm.Up t -> eval_inf rho t
-  | Tm.ChkSub (t, s) ->
-    let rho' = eval_sub rho s in
-    eval rho' t
 
 and eval_inf rho t =
   match t with
-  | Tm.Var -> List.hd rho
+  | Tm.Var i -> List.nth rho i
   | Tm.App (t1, t2) ->
     let d1 = eval_inf rho t1 in
     let d2 = eval rho t2 in
@@ -39,22 +36,6 @@ and eval_inf rho t =
     if_ mot db d1 d2
   | Tm.Down (_, tm) ->
     eval rho tm
-  | Tm.InfSub (t, s) ->
-    let rho' = eval_sub rho s in
-    eval_inf rho' t
-
-and eval_sub rho s =
-  match s with
-  | Tm.Id -> rho
-  | Tm.Wk -> List.tl rho
-  | Tm.Cmp (s1, s2) ->
-    let rho' = eval_sub rho s2 in
-    let rho'' = eval_sub rho' s1 in
-    rho''
-  | Tm.Ext (s, t) ->
-    let rho' = eval_sub rho s in
-    let d = eval rho t in
-    d :: rho'
 
 and apply d1 d2 =
   match d1 with
@@ -190,7 +171,7 @@ and quo_neu ctx dne =
   | D.Atom lvl -> 
     let ix = Ctx.len ctx - (lvl + 1) in
     let ty = List.nth (Ctx.tys ctx) ix in
-    ty, Tm.var ix
+    ty, Tm.Var ix
 
   | D.App (d1, d2) -> 
     begin
