@@ -17,7 +17,6 @@ let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
 let atom = "->" | "*" | ['a'-'z' 'A'-'Z' '_' ':' '+'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 
-(* part 4 *)
 rule read =
   parse
   | white    { read lexbuf }
