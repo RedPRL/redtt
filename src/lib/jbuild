@@ -1,5 +1,8 @@
 (jbuild_version 1)
 
+
 (library
  ((name Cubical)
   (public_name cubical)))
+  
+(ocamllex (Lex))
