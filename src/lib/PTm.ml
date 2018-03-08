@@ -21,8 +21,6 @@ sig
   val inf : R.t -> 'a t -> Tm.inf
 end =
 struct
-  type 'a m = 'a
-
   let rec chk env p =
     let Node pf = p in
     match pf.con with
