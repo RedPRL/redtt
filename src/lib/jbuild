@@ -1,8 +1,11 @@
 (jbuild_version 1)
 
+(menhir
+ ((modules (Parse))))
+
+(ocamllex (Lex))
+
 
 (library
  ((name Cubical)
   (public_name cubical)))
-  
-(ocamllex (Lex))

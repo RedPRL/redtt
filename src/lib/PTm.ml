@@ -6,7 +6,8 @@ type 'a f =
   | List of 'a list
   | Bind of name * 'a
 
-type 'a t = Node of {info : 'a; con : 'a t f}
+type info = Lexing.position * Lexing.position
+type t = Node of {info : info; con : t f}
 
 module type ResEnv =
 sig
@@ -17,8 +18,8 @@ end
 
 module Resolver (R : ResEnv) :
 sig
-  val chk : R.t -> 'a t -> Tm.chk
-  val inf : R.t -> 'a t -> Tm.inf
+  val chk : R.t -> t -> Tm.chk
+  val inf : R.t -> t -> Tm.inf
 end =
 struct
   let rec chk env p =
