@@ -14,10 +14,14 @@ let parse_with_error lexbuf =
     Format.fprintf Format.err_formatter "%a: syntax error\n" print_position lexbuf;
     exit (-1)
 
+module Resolver = PTm.Resolver (PTm.ResEnv)
+
 let rec parse_and_print lexbuf =
   match parse_with_error lexbuf with
-  | Some value ->
+  | Some ptree ->
     Format.printf "foo\n";
+    let tm = Resolver.inf PTm.ResEnv.init ptree in
+    Format.printf "%a\n" (Tm.Pretty.pp_inf Tm.Pretty.Env.emp) tm;
     (* Format.printf "%a\n" Json.output_value value; *)
     parse_and_print lexbuf
   | None -> ()

@@ -12,8 +12,23 @@ type t = Node of {info : info; con : t f}
 module type ResEnv =
 sig
   type t
+  val init : t
   val bind : string -> t -> t
   val var : string -> t -> int
+end
+
+module ResEnv : ResEnv = 
+struct
+  type t = string list
+
+  let init = []
+
+  let bind x env = x :: env
+
+  let rec var x env =
+    match env with 
+    | [] -> failwith "variable not found"
+    | y::ys -> if x = y then 0 else 1 + var x ys
 end
 
 module Resolver (R : ResEnv) :
@@ -66,7 +81,7 @@ struct
       Tm.Proj2 (inf env p)
     | List [Node {con = Atom "if"}; pmot; pb; pt; pf] ->
       Tm.If (binder env pmot, inf env pb, chk env pt, chk env pf)
-    | List [Node {con = Atom ":"}; ptm; pty] ->
+    | List [Node {con = Atom ":"}; pty; ptm] ->
       Tm.Down (chk env pty, chk env ptm)
     | List [p1; p2] ->
       Tm.App (inf env p1, chk env p2)

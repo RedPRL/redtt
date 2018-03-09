@@ -39,7 +39,7 @@ struct
     let emp = 0, []
     let var i (_, xs) = List.nth xs i
     let bind (i, xs) =
-      let x = "_" ^ string_of_int i in
+      let x = "x" ^ string_of_int i in
       x, (i + 1, x :: xs)
   end
 
