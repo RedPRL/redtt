@@ -10,7 +10,7 @@ let cmd_help: unit Lwt.t Term.t * Term.info =
 let cmd_default =
   Term.
     ( ret @@ pure @@ `Help ( `Pager, None )
-    , info "tt" ~version:"0.0.0"
+    , info "cubical" ~version:"0.1.0"
     )
 
 let cmds = [
