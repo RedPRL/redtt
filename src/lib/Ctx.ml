@@ -2,10 +2,15 @@ module D = Val
 
 type t = {len : int; tys : D.d list; vals: D.d list}
 
+let emp = 
+  {len = 0;
+   tys = [];
+   vals = []}
+
 let define ~ctx ~ty ~tm =
   {len = ctx.len + 1;
-    tys = ty :: ctx.tys;
-    vals = tm :: ctx.vals}
+   tys = ty :: ctx.tys;
+   vals = tm :: ctx.vals}
 
 let add ~ctx ~ty =
   let tm = D.Up (ty, D.Atom ctx.len) in

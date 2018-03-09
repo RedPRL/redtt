@@ -19,9 +19,11 @@ module Resolver = PTm.Resolver (PTm.ResEnv)
 let rec parse_and_print lexbuf =
   match parse_with_error lexbuf with
   | Some ptree ->
-    Format.printf "foo\n";
     let tm = Resolver.inf PTm.ResEnv.init ptree in
-    Format.printf "%a\n" (Tm.Pretty.pp_inf Tm.Pretty.Env.emp) tm;
+    Format.printf "> %a\n" (Tm.Pretty.pp_inf Tm.Pretty.Env.emp) tm;
+    let vty = Typing.infer ~ctx:Ctx.emp ~tm in
+    let ty = Sem.approx_nf ~vr:Sem.Variance.None ~ctx:Ctx.emp ~ty:(Val.U `Omega) ~lhs:vty ~rhs:vty in
+    Format.printf "- : %a\n\n" (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) ty;
     (* Format.printf "%a\n" Json.output_value value; *)
     parse_and_print lexbuf
   | None -> ()

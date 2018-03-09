@@ -1,4 +1,6 @@
 type t
+val emp : t
+
 val define : ctx:t -> ty:Val.d -> tm:Val.d -> t
 val add : ctx:t -> ty:Val.d -> t * Val.d
 
