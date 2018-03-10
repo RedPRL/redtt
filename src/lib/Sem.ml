@@ -201,7 +201,7 @@ let rec approx_nf ~vr ~ctx ~ty:dty ~lhs:d0 ~rhs:d1 =
       let bdy = approx_nf Variance.None ctx' cod' d0' d1' in
       Tm.Lam (Tm.B bdy)
 
-    | _, D.Ax, D.Ax -> 
+    | D.Unit, _, _ -> 
       Tm.Ax
 
     | _, D.Tt, D.Tt -> 
