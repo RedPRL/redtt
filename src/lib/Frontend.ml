@@ -23,8 +23,9 @@ let rec parse_and_print lexbuf =
     Format.printf "> %a\n" (Tm.Pretty.pp_inf Tm.Pretty.Env.emp) tm;
     let vty = Typing.infer ~ctx:Ctx.emp ~tm in
     let ty = Sem.approx_nf ~vr:Sem.Variance.None ~ctx:Ctx.emp ~ty:(Val.U `Omega) ~lhs:vty ~rhs:vty in
-    Format.printf "- : %a\n\n" (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) ty;
-    (* Format.printf "%a\n" Json.output_value value; *)
+    let vtm = Sem.eval_inf [] tm in
+    let ntm = Sem.approx_nf ~vr:Sem.Variance.None ~ctx:Ctx.emp ~ty:vty ~lhs:vtm ~rhs:vtm in
+    Format.printf "%a => %a\n\n" (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) ntm (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) ty;
     parse_and_print lexbuf
   | None -> ()
 
