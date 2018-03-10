@@ -10,3 +10,6 @@
 
 (: (-> unit unit)
    (lam [x] x))
+
+(: (let (: (U 0) unit) [A] (-> (U 0) [B] (-> (* A B) (* A B))))
+   (lam [B] (lam [x] x)))

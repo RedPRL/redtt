@@ -122,7 +122,7 @@ struct
   let as_const l = 
     match l with 
     | `Const i -> i
-    | _ -> failwith "Level.as_const"
+    | _ -> -1
 
   let approx v l0 l1 = 
     match v with 
