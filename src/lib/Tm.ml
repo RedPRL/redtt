@@ -60,22 +60,22 @@ struct
 
     | Pi (dom, B cod) ->
       let x, rho' = Env.bind rho in
-      Format.fprintf fmt "(-> %a [%s] %a)" (pp_chk rho) dom x (pp_chk rho') cod
+      Format.fprintf fmt "@[<1>(->@ %a@ [%s] %a)@]" (pp_chk rho) dom x (pp_chk rho') cod
 
     | Sg (dom, B cod) ->
       let x, rho' = Env.bind rho in
-      Format.fprintf fmt "(* %a [%s] %a)" (pp_chk rho) dom x (pp_chk rho') cod
+      Format.fprintf fmt "@[<1>(*@ %a@ [%s] %a)@]" (pp_chk rho) dom x (pp_chk rho') cod
 
     | Eq (B cod, t1, t2) ->
       let x, rho' = Env.bind rho in
-      Format.fprintf fmt "(= [%s] %a %a %a)" x (pp_chk rho') cod (pp_chk rho) t1 (pp_chk rho) t2
+      Format.fprintf fmt "@[<1>(=@ [%s] %a@ %a@ %a)@]" x (pp_chk rho') cod (pp_chk rho) t1 (pp_chk rho) t2
 
     | Lam (B t) ->
       let x, rho' = Env.bind rho in
-      Format.fprintf fmt "(lam [%s] %a)" x (pp_chk rho') t
+      Format.fprintf fmt "@[<1>(lam [%s]@ %a)@]" x (pp_chk rho') t
 
     | Pair (t1, t2) ->
-      Format.fprintf fmt "(cons %a %a)" (pp_chk rho) t1 (pp_chk rho) t2
+      Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp_chk rho) t1 (pp_chk rho) t2
 
     | Ax ->
       Format.fprintf fmt "ax"
@@ -94,7 +94,7 @@ struct
 
     | Let (t1, B t2) ->
       let x, rho' = Env.bind rho in
-      Format.fprintf fmt "(let %a [%s] %a)" (pp_inf rho) t1 x (pp_chk rho') t2
+      Format.fprintf fmt "@[<1>(let@ %a@ [%s] %a)@]" (pp_inf rho) t1 x (pp_chk rho') t2
 
   and pp_inf rho fmt r =
     match r with
@@ -102,18 +102,18 @@ struct
       Format.fprintf fmt "%s" @@ Env.var i rho
 
     | App (r, t) ->
-      Format.fprintf fmt "(%a %a)" (pp_inf rho) r (pp_chk rho) t
+      Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp_inf rho) r (pp_chk rho) t
 
     | Proj1 r ->
-      Format.fprintf fmt "(car %a)" (pp_inf rho) r
+      Format.fprintf fmt "@[<1>(car %a)@]" (pp_inf rho) r
 
     | Proj2 r ->
-      Format.fprintf fmt "(cdr %a)" (pp_inf rho) r
+      Format.fprintf fmt "@[<1>(cdr %a)@]" (pp_inf rho) r
 
     | If (B mot, r, t1, t2) ->
       let x, rho' = Env.bind rho  in
-      Format.fprintf fmt "(if [%s] %a %a %a %a)" x (pp_chk rho') mot (pp_inf rho) r (pp_chk rho) t1 (pp_chk rho) t2
+      Format.fprintf fmt "@[<1>(if@ @[[%s] %a@]@ %a@ %a@ %a)@]" x (pp_chk rho') mot (pp_inf rho) r (pp_chk rho) t1 (pp_chk rho) t2
 
     | Down (ty, t) ->
-      Format.fprintf fmt "(: %a %a)" (pp_chk rho) ty (pp_chk rho) t
+      Format.fprintf fmt "@[<1>(:@ %a@ %a)@]" (pp_chk rho) ty (pp_chk rho) t
 end
