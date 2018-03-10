@@ -115,7 +115,7 @@ and infer ~ctx ~tm =
 
   | Tm.If (Tm.B mot, tb, tt, tf) ->
     let vb = check_eval ~ctx ~ty:D.Bool ~tm:(Tm.Up tb) in
-    let ctx', atom = Ctx.add ctx D.Bool in
+    let ctx', _ = Ctx.add ctx D.Bool in
     check ~ctx:ctx' ~ty:(D.U `Omega) ~tm:mot;
     let rho = Ctx.env ctx in
     let vmott = Sem.eval (D.Tt :: rho) mot in
@@ -123,6 +123,16 @@ and infer ~ctx ~tm =
     let vmotf = Sem.eval (D.Ff :: rho) mot in
     check ~ctx ~ty:vmotf ~tm:tf;
     Sem.eval (vb :: rho) mot
+
+  | Tm.Coe (d0, d1, Tm.B ty, tm) -> 
+    let vd0 = check_eval ~ctx ~ty:D.Interval ~tm:d0 in
+    let vd1 = check_eval ~ctx ~ty:D.Interval ~tm:d1 in
+    let ctx', _ = Ctx.add ctx D.Interval in
+    check ~ctx:ctx' ~ty:(D.U `Omega) ~tm:ty;
+    let vty0 = Sem.eval (vd0 :: Ctx.env ctx) ty in
+    check ~ctx:ctx ~ty:vty0 ~tm;
+    Sem.eval (vd1 :: Ctx.env ctx) ty
+    
 
   | Tm.Down (ty, tm) ->
     let vty = check_eval ~ctx ~ty:(D.U `Omega) ~tm:ty in

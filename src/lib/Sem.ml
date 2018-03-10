@@ -35,6 +35,8 @@ and eval_inf rho t =
     let d1 = eval rho t1 in
     let d2 = eval rho t2 in
     if_ mot db d1 d2
+  | Tm.Coe (d0, d1, bnd, t) ->
+    failwith "not sure how to do coe yet"
   | Tm.Down (_, tm) ->
     eval rho tm
 

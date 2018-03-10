@@ -23,6 +23,7 @@ and inf =
   | Proj1 of inf
   | Proj2 of inf
   | If of chk b * inf * chk * chk
+  | Coe of chk * chk * chk b * chk
   | Down of chk * chk
 
 module Pretty =
@@ -111,8 +112,12 @@ struct
       Format.fprintf fmt "@[<1>(cdr %a)@]" (pp_inf rho) r
 
     | If (B mot, r, t1, t2) ->
-      let x, rho' = Env.bind rho  in
+      let x, rho' = Env.bind rho in
       Format.fprintf fmt "@[<1>(if@ @[[%s] %a@]@ %a@ %a@ %a)@]" x (pp_chk rho') mot (pp_inf rho) r (pp_chk rho) t1 (pp_chk rho) t2
+
+    | Coe (d0, d1, B ty, t) -> 
+      let x, rho' = Env.bind rho in 
+      Format.fprintf fmt "@[<1>(coe %a %a [%s] %a %a)@]" (pp_chk rho) d0 (pp_chk rho) d1 x (pp_chk rho') ty (pp_chk rho) t
 
     | Down (ty, t) ->
       Format.fprintf fmt "@[<1>(:@ %a@ %a)@]" (pp_chk rho) ty (pp_chk rho) t
