@@ -15,6 +15,7 @@ type chk =
   | Dim0
   | Dim1
   | U of int
+  | Let of inf * chk b
 
 and inf =
   | Var of int
@@ -90,6 +91,10 @@ struct
 
     | Dim1 ->
       Format.fprintf fmt "1"
+
+    | Let (t1, B t2) ->
+      let x, rho' = Env.bind rho in
+      Format.fprintf fmt "(let %a [%s] %a)" (pp_inf rho) t1 x (pp_chk rho') t2
 
   and pp_inf rho fmt r =
     match r with

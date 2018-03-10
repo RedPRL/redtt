@@ -16,6 +16,7 @@ let rec eval rho t =
   | Tm.Dim0 -> D.Dim0
   | Tm.Dim1 -> D.Dim1
   | Tm.Up t -> eval_inf rho t
+  | Tm.Let (t1, Tm.B t2) -> eval (eval_inf rho t1 :: rho) t2
 
 and eval_inf rho t =
   match t with

@@ -67,11 +67,18 @@ let rec check ~ctx ~ty ~tm =
     check_eq ~ctx:ctx ~ty:(Sem.apply vcod D.Dim0) ~lhs:v0 ~rhs:vbdy0;
     check_eq ~ctx:ctx ~ty:(Sem.apply vcod D.Dim1) ~lhs:v1 ~rhs:vbdy1
 
+  | _, Tm.Let (t, Tm.B bdy) ->
+    let ty' = infer ~ctx ~tm:t in
+    let v = Sem.eval_inf (Ctx.env ctx) t in
+    check ~ctx:(Ctx.define ~ctx ~tm:v ~ty:ty') ~ty:ty ~tm:bdy
+
   | _, Tm.Up t ->
     let ty' = infer ~ctx ~tm:t in
     check_subtype ~ctx ~lhs:ty' ~rhs:ty
 
-  | _ -> failwith ""
+  | vty, tm ->
+    let ty = Sem.approx_nf Sem.Variance.None ctx (D.U `Omega) vty vty in
+    Format.fprintf Format.err_formatter "Failed to check %a <= %a\n" (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) tm (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) ty
 
 and infer ~ctx ~tm =
   match tm with

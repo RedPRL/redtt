@@ -59,6 +59,8 @@ struct
       Tm.Pair (chk env hd, chk env tl)
     | List [Node {con = Atom "U"}; Node {con = Numeral i}] ->
       Tm.U i
+    | List [Node {con = Atom "let"}; def; bdy] ->
+      Tm.Let (inf env def, binder env bdy)
     | _ ->
       Tm.Up (inf env p)
 
