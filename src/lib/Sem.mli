@@ -17,3 +17,4 @@ val eval : env -> chk -> d
 val eval_inf : env -> inf -> d
 
 val approx_nf : vr:Variance.t -> ctx:Ctx.t -> ty:d -> lhs:d -> rhs:d -> Tm.chk
+val quo_nf : ctx:Ctx.t -> ty:d -> tm:d -> Tm.chk

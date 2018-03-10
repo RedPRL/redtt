@@ -268,3 +268,7 @@ and approx_neu ~vr ~ctx ~lhs:dne0 ~rhs:dne1 =
     apply mot0 (D.Up (D.Bool, db0)), Tm.If (Tm.B tmot, tb, tt, tf)
 
   | _ -> failwith "approx_neu: no match"
+
+
+let quo_nf ~ctx ~ty ~tm = 
+  approx_nf ~vr:Variance.None ~ctx ~ty ~lhs:tm ~rhs:tm

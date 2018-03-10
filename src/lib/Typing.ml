@@ -77,7 +77,7 @@ let rec check ~ctx ~ty ~tm =
     check_subtype ~ctx ~lhs:ty' ~rhs:ty
 
   | vty, tm ->
-    let ty = Sem.approx_nf Sem.Variance.None ctx (D.U `Omega) vty vty in
+    let ty = Sem.quo_nf ctx (D.U `Omega) vty in
     Format.fprintf Format.err_formatter "Failed to check %a <= %a\n" (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) tm (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) ty
 
 and infer ~ctx ~tm =

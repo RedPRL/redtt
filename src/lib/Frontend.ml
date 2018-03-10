@@ -22,9 +22,9 @@ let rec parse_and_print lexbuf =
     let tm = Resolver.inf PTm.ResEnv.init ptree in
     Format.printf "> %a\n" (Tm.Pretty.pp_inf Tm.Pretty.Env.emp) tm;
     let vty = Typing.infer ~ctx:Ctx.emp ~tm in
-    let ty = Sem.approx_nf ~vr:Sem.Variance.None ~ctx:Ctx.emp ~ty:(Val.U `Omega) ~lhs:vty ~rhs:vty in
+    let ty = Sem.quo_nf ~ctx:Ctx.emp ~ty:(Val.U `Omega) ~tm:vty in
     let vtm = Sem.eval_inf [] tm in
-    let ntm = Sem.approx_nf ~vr:Sem.Variance.None ~ctx:Ctx.emp ~ty:vty ~lhs:vtm ~rhs:vtm in
+    let ntm = Sem.quo_nf ~ctx:Ctx.emp ~ty:vty ~tm:vtm in
     Format.printf "%a => %a\n\n" (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) ntm (Tm.Pretty.pp_chk Tm.Pretty.Env.emp) ty;
     parse_and_print lexbuf
   | None -> ()
