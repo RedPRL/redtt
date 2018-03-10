@@ -35,17 +35,33 @@ and eval_inf rho t =
     let d1 = eval rho t1 in
     let d2 = eval rho t2 in
     if_ mot db d1 d2
-  | Tm.Coe (d0, d1, bnd, t) ->
-    failwith "not sure how to do coe yet"
   | Tm.Down (_, tm) ->
     eval rho tm
-
+  | Tm.Coe (r, s, Tm.B bdy, t) ->
+    (* TODO *)
+    let n = List.length rho in
+    let atom = D.Atom n in
+    D.Coe (eval rho r, eval rho s, n, eval (D.Up (D.Interval, atom) :: rho) bdy, eval rho t)  
+    
 and apply d1 d2 =
   match d1 with
   | D.Clo (Tm.B t, rho) ->
     eval (d2 :: rho) t
+
+  | D.Coe (r, s, n, ty, dr) ->
+    begin
+      match ty with 
+      | D.Pi (dom, cod) ->
+        let coe_dom s' = D.Coe (s, s', n, dom, d2) in
+        let cod_coe = apply cod @@ coe_dom (D.Up (D.Interval, D.Atom n)) in
+        D.Coe (r, s, n, cod_coe, apply dr @@ coe_dom r)
+      (* TODO: coe in equality type: need hetergeneous composition *)
+      | _ -> failwith "apply/coe: unexpected type"
+    end
+
   | D.Up (ty, dne) ->
-    begin match ty with
+    begin
+      match ty with
       | D.Pi (dom, cod) ->
         let cod' = apply cod d2 in
         let app = D.App (dne, D.Down (dom, d2)) in
@@ -54,6 +70,7 @@ and apply d1 d2 =
         proj_dim (cod, p0, p1) dne d2
       | _ -> failwith "apply/up: unexpected type"
     end
+
   | _ -> failwith "apply"
 
 and proj_dim (cod, p0, p1) dne dim = 
@@ -70,8 +87,16 @@ and proj_dim (cod, p0, p1) dne dim =
 and proj1 d =
   match d with
   | D.Pair (d1, _d2) -> d1
+  | D.Coe (r, s, n, ty, dr) -> 
+    begin
+      match ty with
+      | D.Sg (dom, cod) ->
+        D.Coe (r, s, n, dom, proj1 dr)
+      | _ -> failwith "proj1/coe: unexpected type"
+    end
   | D.Up (ty, dne) ->
-    begin match ty with
+    begin
+      match ty with
       | D.Sg (dom, _cod) -> D.Up (dom, D.Proj1 dne)
       | _ -> failwith "proj1/up: unexpected type"
     end
@@ -80,6 +105,15 @@ and proj1 d =
 and proj2 d =
   match d with
   | D.Pair (_d1, d2) -> d2
+  | D.Coe (r, s, n, ty, dr) -> 
+    begin
+      match ty with
+      | D.Sg (dom, cod) ->
+        let atom = D.Up (D.Interval, D.Atom n) in
+        let cod_coe = apply cod @@ D.Coe (r, atom, n, dom, proj1 dr) in
+        D.Coe (r, s, n, cod_coe, proj2 dr)
+      | _ -> failwith "proj1/coe: unexpected type"
+    end
   | D.Up (ty, dne) ->
     begin match ty with
       | D.Sg (_dom, cod) ->
@@ -220,6 +254,16 @@ let rec approx_nf ~vr ~ctx ~ty:dty ~lhs:d0 ~rhs:d1 =
 
     | _, D.Up (_, dne0), D.Up (_, dne1) ->
       Tm.Up (snd (approx_neu vr ctx dne0 dne1))
+
+    (* TODO: case for D.Coe; conjecture: here we will see only coes at neutral and base type
+       We can deal with these simultaneously in the same way:
+       
+         1. If both endpoints of the type line are the same, then the coe should disappear
+         2. Otherwise, we have a neutral coe which is not degenerate; quote it as syntactic
+            coe.
+
+       May need to change the "value-form" of coe in order to enable this testing.
+     *)
 
     | _ -> failwith "approx_nf: no match"
 

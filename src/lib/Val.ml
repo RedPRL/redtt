@@ -14,6 +14,7 @@ type d =
   | Ff
   | Dim0
   | Dim1
+  | Coe of d * d * int * d * d
 
 and dne =
   | Atom of int
