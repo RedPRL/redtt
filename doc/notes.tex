@@ -1,0 +1,458 @@
+\documentclass{article}
+
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage[tt=false]{libertine}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{mathpartir}
+\usepackage[dvipsnames]{xcolor}
+
+\usepackage{mathtools}
+
+\DeclarePairedDelimiter\Parens{\lparen}{\rparen}
+\DeclarePairedDelimiter\Angles{\langle}{\rangle}
+\DeclarePairedDelimiter\Braces{\lbrace}{\rbrace}
+
+
+\usepackage{xinttools}
+
+\newcommand\FormatList[3]{%
+  \xintFor ##1 in {#3} \do{%
+    #1{##1}%
+    \xintifForLast{}{#2}
+  }
+}
+
+\newcommand\Interval{\mathbb{I}}
+
+
+\newcommand\FmtTm[1]{{\color{Violet}{#1}}}
+\newcommand\FmtVal[1]{{\color{Red}{#1}}}
+\newcommand\FmtClo[1]{{\color{Green}{#1}}}
+
+\newcommand\Ann[2]{{#2}_{\mathsf{#1}}}
+
+\newcommand\Eval[3]{%
+  \FmtVal{#1}\vDash\FmtTm{#2}\searrow\FmtVal{#3}
+}
+
+\newcommand\FmtKwd[1]{\mathsf{#1}}
+
+\newcommand\TExp[2]{
+  \FmtTm{
+    \Parens*{
+      \FmtKwd{#1}\
+      \FormatList{}{\ }{#2}
+    }
+  }
+}
+
+\newcommand\VExp[2]{
+  \FmtVal{
+    \Parens*{
+      \FmtKwd{#1}\
+      \FormatList{}{\ }{#2}
+    }
+  }
+}
+
+\newcommand\BClo[2]{
+  \FmtClo{
+    \Angles*{
+      \FmtTm{#1}\mathbin{\triangleleft^\uparrow}\FmtVal{#2}
+    }
+  }
+}
+
+\newcommand\Clo[2]{
+  \FmtClo{
+    \Angles*{
+      \FmtTm{#1}\mathbin{\triangleleft}\FmtVal{#2}
+    }
+  }
+}
+
+\newcommand\Apply[3]{
+  \FmtVal{#1}\mathrel{@}\FmtVal{#2}\leadsto\FmtVal{#3}
+}
+
+\newcommand\Car[2]{
+  \FmtVal{#1}\ \mathbf{car}\leadsto\FmtVal{#2}
+}
+
+\newcommand\Cdr[2]{
+  \FmtVal{#1}\ \mathbf{cdr}\leadsto\FmtVal{#2}
+}
+
+
+\newcommand\InstClo[3]{
+  \FmtClo{#1}\mathrel{\bullet}\FmtVal{#2}\leadsto\FmtVal{#3}
+}
+\newcommand\EvalClo[2]{
+  \FmtClo{#1}\leadsto\FmtVal{#2}
+}
+
+
+\title{Cubical Equality}
+\author{Jon Sterling}
+
+
+\begin{document}
+\maketitle
+
+\section{Evaluation}
+\begin{mathparpagebreakable}
+  \framebox{
+    $\Eval{\rho^+}{M^+}{M^-}$
+  }
+  \\
+  \inferrule[EvalVar]{}{
+    \Eval{\rho}{
+      \TExp{v}{i}
+    }{
+      \rho_i
+    }
+  }
+  \and
+  \inferrule[EvalPi]{}{
+    \Eval{\rho}{
+      \TExp{\Pi}{A,B}
+    }{
+      \VExp{\Pi}{\Clo{A}{\rho},\BClo{B}{\rho}}
+    }
+  }
+  \and
+  \inferrule[EvalSg]{}{
+    \Eval{\rho}{
+      \TExp{\Pi}{A,B}
+    }{
+      \VExp{\Pi}{\Clo{A}{\rho},\BClo{A}{\rho}}
+    }
+  }
+  \and
+  \inferrule[EvalEq]{}{
+    \Eval{\rho}{
+      \TExp{Eq}{A,M_0,M_1}
+    }{
+      \VExp{Eq}{
+        \BClo{A}{\rho},
+        \Clo{M_0}{\rho},
+        \Clo{M_1}{\rho}
+      }
+    }
+  }
+  \and
+  \inferrule[EvalLam]{}{
+    \Eval{\rho}{
+      \TExp{\lambda}{M}
+    }{
+      \VExp{\lambda}{
+        \BClo{M}{\rho}
+      }
+    }
+  }
+  \and
+  \inferrule[EvalApp]{
+    \Eval{\rho}{R}{\Ann{fun}{M}}
+    \\
+    \Eval{\rho}{M}{\Ann{arg}{M}}
+    \\
+    \Apply{\Ann{fun}{M}}{\Ann{arg}{M}}{N}
+  }{
+    \Eval{\rho}{
+      \TExp{@}{R,M}
+    }{
+      N
+    }
+  }
+  \and
+  \inferrule[EvalCons]{}{
+    \Eval{\rho}{
+      \TExp{cons}{M,N}
+    }{
+      \VExp{cons}{
+        \Clo{M}{\rho},
+        \Clo{N}{\rho}
+      }
+    }
+  }
+  \and
+  \inferrule[EvalCar]{
+    \Eval{\rho}{R}{M}
+    \\
+    \Car{M}{N}
+  }{
+    \Eval{\rho}{
+      \TExp{car}{R}
+    }{
+      N
+    }
+  }
+  \and
+  \inferrule[EvalCdr]{
+    \Eval{\rho}{R}{M}
+    \\
+    \Cdr{M}{N}
+  }{
+    \Eval{\rho}{
+      \TExp{car}{R}
+    }{
+      N
+    }
+  }
+  \and
+  \inferrule[EvalCoe]{
+  }{
+    \Eval{\rho}{
+      \TExp{coe}{
+        I,
+        J,
+        A,
+        M
+      }
+    }{
+      \VExp{coe}{
+        \Clo{I}{\rho},
+        \Clo{J}{\rho},
+        \BClo{A}{\rho},
+        \Clo{M}{\rho}
+      }
+    }
+  }
+\end{mathparpagebreakable}
+
+\subsection{Application}
+\begin{mathparpagebreakable}
+  \framebox{
+    $\Apply{M^+}{N^+}{O^-}$
+  }
+  \\
+  \inferrule[ApLam]{
+    \InstClo{M}{N}{O}
+  }{
+    \Apply{
+      \VExp{\lambda}{\FmtClo{M}}
+    }{N}{
+      O
+    }
+  }
+  \and
+  \inferrule[ApNeuPi]{
+    \EvalClo{A}{A}
+    \\
+    \InstClo{B}{M}{B_M}
+  }{
+    \Apply{
+      \VExp{\uparrow}{
+        \VExp{\Pi}{\FmtClo{A},\FmtClo{B}},
+        R
+      }
+    }{M}{
+      \VExp{\uparrow}{
+        B_M,
+        \VExp{@}{
+          R,
+          \VExp{\downarrow}{
+            A,
+            M
+          }
+        }
+      }
+    }
+  }
+  \and
+  \inferrule[ApCoePi]{
+    \Eval{\rho_A,\VExp{v}{l}}{
+      A
+    }{
+      \VExp{\Pi}{
+        \FmtClo{\Ann{dom}{A}},
+        \FmtClo{\Ann{cod}{A}}
+      }
+    }
+    \\
+    \Apply{M}{
+      \VExp{coe}{
+        \FmtClo{J},
+        \FmtClo{I},
+        ?,
+        \Clo{N}{[]}
+      }
+    }{?}
+  }{
+    \Apply{
+      \VExp{coe}{
+        \FmtClo{I},
+        \FmtClo{J},
+        \BClo{A}{\rho_A},
+        \FmtClo{M}
+      }
+    }{N}{
+      \VExp{coe}{
+        \FmtClo{I},
+        \FmtClo{J},
+        \BClo{?}{?},
+        foo
+      }
+    }
+  }
+  \and
+  \inferrule[ApNeuEqGen]{
+    \InstClo{A}{
+      \VExp{\uparrow}{\Interval,R'}
+    }{
+      A_{R'}
+    }
+  }{
+    \Apply{
+      \VExp{\uparrow}{
+        \VExp{Eq}{
+          \FmtClo{A},
+          \FmtClo{M_0},
+          \FmtClo{M_1}
+        },
+        R
+      }
+    }{
+      \VExp{\uparrow}{
+        \Interval,
+        R'
+      }
+    }{
+      \VExp{\uparrow}{
+        A_{R'},
+        \VExp{@}{
+          R,
+          \VExp{\downarrow}{
+            \Interval,
+            \VExp{\uparrow}{
+              \Interval,
+              R'
+            }
+          }
+        }
+      }
+    }
+  }
+  \and
+  \inferrule[ApNeuEqConst]{
+    \Parens*{\FmtVal{\epsilon}\in\Braces*{\FmtVal{0},\FmtVal{1}}}
+  }{
+    \Apply{
+      \VExp{\uparrow}{
+        \VExp{Eq}{
+          \FmtClo{A},
+          \FmtClo{M_0},
+          \FmtClo{N_1}
+        }
+      }
+    }{
+      \epsilon%
+    }{
+      M_\epsilon%
+    }
+  }
+\end{mathparpagebreakable}
+
+\subsection{Projection}
+\begin{mathparpagebreakable}
+  \framebox{
+    $\Car{M^+}{N^-}$
+  }
+  \and
+  \framebox{
+    $\Cdr{M^+}{N^-}$
+  }
+  \\
+  \inferrule[CarCons]{
+    \EvalClo{M_0}{M_0}
+  }{
+    \Car{
+      \VExp{cons}{\FmtClo{M_0},\FmtClo{M_1}}
+    }{
+      M_0
+    }
+  }
+  \and
+  \inferrule[CarNeu]{
+    \EvalClo{A}{A}
+  }{
+    \Car{
+      \VExp{\uparrow}{
+        \VExp{\Sigma}{\FmtClo{A},\FmtClo{B}},
+        R
+      }
+    }{
+      \VExp{\uparrow}{
+        A,
+        \VExp{car}{R}
+      }
+    }
+  }
+  \and
+  \inferrule[CdrCons]{
+    \EvalClo{M_1}{M_1}
+  }{
+    \Cdr{
+      \VExp{cons}{\FmtClo{M_0},\FmtClo{M_1}}
+    }{
+      M_1
+    }
+  }
+  \and
+  \inferrule[CdrNeu]{
+    \Car{
+      \VExp{\uparrow}{
+        \VExp{\Sigma}{
+          \FmtClo{A},
+          \FmtClo{B}
+        },
+        R
+      }
+    }{M}
+    \\
+    \InstClo{B}{M}{B_M}
+  }{
+    \Cdr{
+      \VExp{\uparrow}{
+        \VExp{\Sigma}{
+          \FmtClo{A},
+          \FmtClo{B}
+        },
+        R
+      }
+    }{
+      \VExp{\uparrow}{
+        B_M,
+        \VExp{cdr}{R}
+      }
+    }
+  }
+\end{mathparpagebreakable}
+
+\subsection{Closures}
+\begin{mathparpagebreakable}
+  \framebox{
+    $\InstClo{M^+}{N^+}{O^-}$
+  }
+  \and
+  \framebox{
+    $\EvalClo{M^+}{M^-}$
+  }
+  \\
+  \inferrule[InstClo]{
+    \Eval{\rho,M}{N}{O}
+  }{
+    \InstClo{\BClo{M}{\rho}}{N}{O}
+  }
+  \and
+  \inferrule[EvalClo]{
+    \Eval{\rho}{M}{N}
+  }{
+    \EvalClo{\Clo{M}{\rho}}{N}
+  }
+\end{mathparpagebreakable}
+
+\section{Quotation}
+
+\end{document}
