@@ -265,7 +265,27 @@ let rec approx_nf ~vr ~ctx ~ty:dty ~lhs:d0 ~rhs:d1 =
        May need to change the "value-form" of coe in order to enable this testing.
      *)
 
+    | _, D.Coe (r0, s0, n0, ty0, dr0), D.Coe (r1, s1, n1, ty1, dr1) -> 
+      failwith ""
+
+    | _, D.Coe (r, s, n, ty, dr), _ -> failwith ""
+    
     | _ -> failwith "approx_nf: no match"
+
+and quote_coe ctx (r, s, n, dty, dr) = 
+  (* I don't know if this works *)
+  let atom = D.Up (D.Interval, D.Atom n) in
+  let ty = quo_nf ~ctx:(Ctx.define ~ctx ~ty:D.Interval ~tm:atom) ~ty:(D.U `Omega) ~tm:dty in
+  let ty_clo = D.Clo (Tm.B ty, Ctx.env ctx) in
+  let dty_r = apply ty_clo r in
+  let dty_s = apply ty_clo s in
+  match approx_nf ~vr:Variance.Iso ~ctx ~ty:(D.U `Omega) ~lhs:dty_r ~rhs:dty_s with 
+  | _ -> quo_nf ~ctx ~ty:dty_r ~tm:dr
+  | exception _ ->
+    let tr = quo_nf ~ctx ~ty:D.Interval ~tm:r in
+    let ts = quo_nf ~ctx ~ty:D.Interval ~tm:r in
+    let t = quo_nf ~ctx ~ty:(apply ty_clo r) ~tm:dr in
+    Tm.Up (Tm.Coe (tr, ts, Tm.B ty, t))
 
 and approx_neu ~vr ~ctx ~lhs:dne0 ~rhs:dne1 = 
   match dne0, dne1 with 
@@ -316,5 +336,5 @@ and approx_neu ~vr ~ctx ~lhs:dne0 ~rhs:dne1 =
   | _ -> failwith "approx_neu: no match"
 
 
-let quo_nf ~ctx ~ty ~tm = 
+and quo_nf ~ctx ~ty ~tm = 
   approx_nf ~vr:Variance.None ~ctx ~ty ~lhs:tm ~rhs:tm
