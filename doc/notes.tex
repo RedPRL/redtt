@@ -12,7 +12,9 @@
 \DeclarePairedDelimiter\Parens{\lparen}{\rparen}
 \DeclarePairedDelimiter\Angles{\langle}{\rangle}
 \DeclarePairedDelimiter\Braces{\lbrace}{\rbrace}
+\DeclarePairedDelimiter\Pipes{\lvert}{\rvert}
 
+\newcommand\Len[1]{\Pipes{#1}}
 
 \usepackage{xinttools}
 
@@ -202,6 +204,13 @@
   }
   \and
   \inferrule[EvalCoe]{
+    \Eval{\rho}{I}{I}
+    \\
+    \Eval{\rho}{J}{J}
+    \\
+    \Eval{\rho,\VExp{v}{\Len{\rho}}}{A}{A}
+    \\
+    \Eval{\rho}{M}{M}
   }{
     \Eval{\rho}{
       \TExp{coe}{
@@ -212,10 +221,11 @@
       }
     }{
       \VExp{coe}{
-        \Clo{I}{\rho},
-        \Clo{J}{\rho},
-        \BClo{A}{\rho},
-        \Clo{M}{\rho}
+        I,
+        J,
+        \Len{\rho},
+        A,
+        M
       }
     }
   }
@@ -262,37 +272,45 @@
   }
   \and
   \inferrule[ApCoePi]{
-    \Eval{\rho_A,\VExp{v}{l}}{
-      A
-    }{
-      \VExp{\Pi}{
-        \FmtClo{\Ann{dom}{A}},
-        \FmtClo{\Ann{cod}{A}}
+    \EvalClo{A}{A}
+    \\
+    \InstClo{B}{
+      \VExp{coe}{
+        J,
+        \VExp{v}{n},
+        n,
+        A,
+        N
       }
-    }
+    }{B_N}
     \\
     \Apply{M}{
       \VExp{coe}{
-        \FmtClo{J},
-        \FmtClo{I},
-        ?,
-        \Clo{N}{[]}
+        J,
+        I,
+        n,
+        A
       }
-    }{?}
+    }{O}
   }{
     \Apply{
       \VExp{coe}{
-        \FmtClo{I},
-        \FmtClo{J},
-        \BClo{A}{\rho_A},
-        \FmtClo{M}
+        I,
+        J,
+        n,
+        \VExp{\Pi}{
+          \FmtClo{A},
+          \FmtClo{B}
+        },
+        M
       }
     }{N}{
       \VExp{coe}{
-        \FmtClo{I},
-        \FmtClo{J},
-        \BClo{?}{?},
-        foo
+        I,
+        J,
+        n,
+        B_N,
+        O
       }
     }
   }
@@ -374,6 +392,33 @@
     }
   }
   \and
+  \inferrule[CarCoe]{
+    \EvalClo{A}{A}
+    \\
+    \Car{M}{M_0}
+  }{
+    \Car{
+      \VExp{coe}{
+        I,
+        J,
+        n,
+        \VExp{\Sigma}{
+          \FmtClo{A},
+          \FmtClo{B}
+        },
+        M
+      }
+    }{
+      \VExp{coe}{
+        I,
+        J,
+        n,
+        A,
+        M_0
+      }
+    }
+  }
+  \and
   \inferrule[CarNeu]{
     \EvalClo{A}{A}
   }{
@@ -397,6 +442,45 @@
       \VExp{cons}{\FmtClo{M_0},\FmtClo{M_1}}
     }{
       M_1
+    }
+  }
+  \and
+  \inferrule[CdrCoe]{
+    \Car{M}{M_0}
+    \\
+    \InstClo{B}{
+      \VExp{coe}{
+        I,
+        \VExp{v}{n},
+        n,
+        A,
+        M_0
+      }
+    }{
+      B_{M_0}
+    }
+    \\
+    \Cdr{M}{M_1}
+  }{
+    \Cdr{
+      \VExp{coe}{
+        I,
+        J,
+        n,
+        \VExp{\Sigma}{
+          \FmtClo{A},
+          \FmtClo{B}
+        },
+        M
+      }
+    }{
+      \VExp{coe}{
+        I,
+        J,
+        n,
+        B_{M_0},
+        M_1
+      }
     }
   }
   \and
