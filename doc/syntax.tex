@@ -750,5 +750,62 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
 \end{mathparpagebreakable}
 
 
+\section{Quotation}
+
+\newcommand\QuoteCan[4]{
+  \FmtVal{#1}\vdash\FmtVal{#2}\ni\FmtVal{#3}\Uparrow\FmtTm{#4}
+}
+
+\newcommand\SortCtx[1]{\FmtKwd{ctx}_{#1}}
+
+Need to explain how semantic contexts are formed, and how their length
+is calculated. The basic ideas is that contexts are sequences of
+semantic values (types) which may be interrupted by bindings of atoms;
+the length of a context is the number of values in it. It would
+ordinarily be possible to replace the context with a numeral $l$, but
+we want the quotation operation to be type-directed in order to enable
+eta expansion and proof irrelevance; later the quotation algorithm
+will be generalized to calculate definitional equivalence in a
+syntax-directed way.
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgQuoteCan]{
+      \IsVal{n}{\Gamma}{\SortCtx{l}}
+      \\
+      \IsVal{n}{A}{\SortCan}
+      \\
+      \IsVal{n}{M}{\SortCan}
+      \\
+      \IsTm{n}{l}{M}{\SortChk}
+    }{
+      \DeclBox{\QuoteCan{\Gamma}{A}{M}{M}}
+    }
+  }
+  \\
+  \inferrule[QuotePi]{
+    \EvalClo{A_\SortClo}{A_\SortCan}
+    \\
+    \QuoteCan{\Gamma}{C}{A_\SortCan}{A}
+    \\
+    \InstClo{B_\SortClo}{
+      \Var{\Len{\Gamma}}
+    }{
+      B_\SortCan{}
+    }
+    \\
+    \QuoteCan{\Gamma.A_\SortCan}{C}{B_\SortCan}{B}
+  }{
+    \QuoteCan{\Gamma}{C}{
+      \VExp{\Pi}{A_\SortClo,B_\SortBClo}
+    }{
+      \TExp{\Pi}{
+        A,
+        B
+      }
+    }
+  }
+  \and
+\end{mathparpagebreakable}
 
 \end{document}
