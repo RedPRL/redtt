@@ -834,6 +834,8 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
 \end{mathparpagebreakable}
 
 \subsection{Quotation}
+\newcommand\LookupAtom[4]{\FmtVal{#1}\ni\Atom{\FmtVal{#2}}:\Squares*{\FmtThin{#4}*\FmtVal{#3}}}
+\newcommand\LookupVar[4]{\FmtVal{#1}\ni\Var{\FmtTm{#2}}:\Squares*{\FmtThin{#4}*\FmtVal{#3}}}
 
 \begin{mathparpagebreakable}
   \DeclBox{
@@ -948,6 +950,86 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
         }
       }
     }
+  }
+  \and
+  \inferrule[QuoteAtom]{
+    \LookupAtom{\Gamma}{i}{A}{f}
+  }{
+    \QuoteNeu{\Gamma}{\Atom{i}}{\Atom{i}}{\ThinVal{f}{A}}
+  }
+  \and
+  \inferrule[QuoteVar]{
+    \FmtTm{i}\equiv{\FmtTm{\Len{\FmtVal{\Gamma}}-\Parens*{\FmtVal{l}+1}}}
+    \\
+    \LookupVar{\Gamma}{i}{A}{f}
+  }{
+    \QuoteNeu{\Gamma}{\Var{l}}{
+      \Var{i}
+    }{
+      \ThinVal{f}{A}
+    }
+  }
+\end{mathparpagebreakable}
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgLookupAtom]{
+      \IsVal{n}{\Gamma}{\SortCtx{l}}
+      \\
+      i<n
+      \\
+      \IsThin{f}{n}{m}
+      \\
+      \IsVal{m}{A}{\SortCan}
+    }{
+      \DeclBox{\LookupAtom{\Gamma^+}{i^+}{A^-}{f^-}}
+    }
+  }
+  \quad
+  \DeclBox{
+    \inferrule[JdgLookupVar]{
+      \IsVal{n}{\Gamma}{\SortCtx{l}}
+      \\
+      i<l
+      \\
+      \IsThin{f}{n}{m}
+      \\
+      \IsVal{m}{A}{\SortCan}
+    }{
+      \DeclBox{\LookupVar{\Gamma^+}{i^+}{A^-}{f^-}}
+    }
+  }
+  \\
+  \inferrule[LookupAtomVar]{
+    \LookupAtom{\Gamma}{i}{A}{f}
+  }{
+    \LookupAtom{\Gamma.B}{i}{A}{f}
+  }
+  \and
+  \inferrule[LookupAtomHere]{}{
+    \LookupAtom{\Gamma.\nabla{}A}{0}{A}{\ThinId}
+  }
+  \and
+  \inferrule[LookupAtomThere]{
+    \LookupAtom{\Gamma}{n}{A}{f}
+  }{
+    \LookupAtom{\Gamma.\nabla{}A}{n+1}{A}{\ThinSkip{f}}
+  }
+  \\
+  \inferrule[LookupVarAtom]{
+    \LookupVar{\Gamma}{n}{A}{f}
+  }{
+    \LookupVar{\Gamma.\nabla{}B}{n}{A}{\ThinSkip{f}}
+  }
+  \and
+  \inferrule[LookupVarHere]{}{
+    \LookupVar{\Gamma.A}{0}{A}{\ThinId}
+  }
+  \and
+  \inferrule[LookupVarThere]{
+    \LookupVar{\Gamma}{n}{A}{f}
+  }{
+    \LookupVar{\Gamma.B}{n+1}{A}{f}
   }
 \end{mathparpagebreakable}
 
