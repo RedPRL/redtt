@@ -203,6 +203,7 @@ given operational meaning through substitution, whereas atom binders
 are subject to open evaluation. Most binders are variable binders; the
 only atom binder in our language comes from $\FmtKwd{coe}$.
 
+
 \begin{remark}
   This is a matter of some subtlety in the context of
   \emph{normalization-by-evaluation} in which the evaluation and
@@ -213,6 +214,17 @@ only atom binder in our language comes from $\FmtKwd{coe}$.
   transforming the interior of the binder, this is still done through
   substitution. In contrast, we do evaluate underneath atom binders.
 \end{remark}
+
+\begin{remark}
+  Note that the atom/variable distinction does not align with the
+  distinction of dimension variables from other variables. Dimensions
+  in our formal language are treated the same as other terms, and some
+  dimensions are bound as atoms (such as in $\FmtKwd{coe}$) and others
+  are bound as variables (as in path types and path
+  abstractions). Note that we also treat path abstraction and
+  functional abstraction uniformly using $\FmtKwd{lam}$.
+\end{remark}
+
 
 Terms are classified by sorts $\tau\in\Braces*{\SortChk,\SortInf}$; we
 will write the judgment $\IsTm{n}{l}{M}{\tau}$ to mean that
