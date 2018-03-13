@@ -151,9 +151,9 @@ thinnings in order to be well-defined.
   }
 \end{mathparpagebreakable}
 
-We will write $\THIN_X$ for the category of thinnings induced by the
-above. To simplify notation, we write $\THIN$ for $\THIN_\varnothing$
-and $\Thin{m}{n}$ for $\XThin{\varnothing}{m}{n}$.
+We will write $\THIN$ for the category of $\varnothing$-thinnings
+induced by the above. To simplify notation, we write $\Thin{m}{n}$ for
+$\XThin{\varnothing}{m}{n}$.
 
 \section{Terms}
 
@@ -499,11 +499,24 @@ reference).
   }
 \end{mathparpagebreakable}
 
-As with terms, the definitions above induce a family of functors
-$\Parens*{\Val{\square}{\tau}}:\OpCat{\THIN_{\Val{\square}{\SortCan}}}\to\SET$. The functorial
-action of thinnings on closures is composition, which comports with
-the view of closures as a left Kan extension which suspends a
-thinning.
+
+The syntax of values can be reindexed contravariantly along
+value-thinnings $\IsXThin{f}{\Val{\square}{\SortCan}}{m}{n}$; the
+reindexing action is substitution; this also renders the collection of
+value-thinnings into a category.
+
+\begin{remark}
+  It may seem strange that we have a substitution operation on
+  semantic values, since values usually come from an environment, and
+  also embed an environment in their closures. However, the
+  substitution action is necessary to explain descent under
+  \emph{atom} binders such as those found in $\FmtKwd{coe}$ values.
+
+  Substitution on values is very inexpensive, because in each case,
+  the substitution hits a closure and gets suspended: the action of
+  substitution on closures is composition with the suspended thinning.
+\end{remark}
+
 
 
 \section{Evaluation}
