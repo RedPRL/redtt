@@ -1,5 +1,11 @@
 \documentclass{article}
+
+% for dumb dingbats
+\usepackage{fontawesome}
+\usepackage{dingbat}
+
 \usepackage{amssymb}
+
 
 \usepackage[tt=false]{libertine}
 \usepackage{microtype}
@@ -39,8 +45,8 @@
 \newcommand\IsXThin[4]{\FmtThin{#1}:\XThin{#2}{#3}{#4}}
 
 \newcommand\ThinId{\mathsf{id}}
-\newcommand\ThinKeep[1]{{#1}.\mathsf{c}}
-\newcommand\ThinSkip[1]{{#1}.\mathsf{p}}
+\newcommand\ThinKeep[1]{\mbox{\leftthumbsdown}\!\!\rangle\!{#1}\!\langle\!\!\mbox{\rightthumbsdown}}
+\newcommand\ThinSkip[1]{{#1}.\mbox{\faTrashO}}
 \newcommand\ThinRep[2]{{#1}.\Squares*{{\normalcolor{}#2}}}
 
 \usepackage{xinttools}
