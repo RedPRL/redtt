@@ -782,15 +782,37 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
 
 \newcommand\SortCtx[1]{\FmtKwd{ctx}_{#1}}
 
-Need to explain how semantic contexts are formed, and how their length
-is calculated. The basic ideas is that contexts are sequences of
-semantic values (types) which may be interrupted by bindings of atoms;
-the length of a context is the number of values in it. It would
-ordinarily be possible to replace the context with a numeral $l$, but
-we want the quotation operation to be type-directed in order to enable
-eta expansion and proof irrelevance; later the quotation algorithm
-will be generalized to calculate definitional equivalence in a
-syntax-directed way.
+\subsection{Semantic contexts}
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgCtx]{}{
+      \DeclBox{\IsVal{n^-}{\Gamma}{\SortCtx{l^-}}}
+    }
+  }
+  \\
+  \inferrule[CtxNil]{}{
+    \IsVal{0}{\cdot}{\SortCtx{0}}
+  }
+  \and
+  \inferrule[CtxExtVar]{
+    \IsVal{n}{\Gamma}{\SortCtx{l}}
+    \\
+    \IsVal{n}{A}{\SortCan}
+  }{
+    \IsVal{n}{\Gamma.A}{\SortCtx{l+1}}
+  }
+  \and
+  \inferrule[CtxExtAtom]{
+    \IsVal{n}{\Gamma}{\SortCtx{l}}
+    \\
+    \IsVal{n}{A}{\SortCan}
+  }{
+    \IsVal{n+1}{\Gamma.\nabla{}A}{\SortCtx{l}}
+  }
+\end{mathparpagebreakable}
+
+\subsection{Quotation}
 
 \begin{mathparpagebreakable}
   \DeclBox{
