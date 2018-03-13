@@ -581,6 +581,25 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
     }
   }
   \and
+  \and
+  \inferrule[EvalUp]{
+    \Eval{g}{f}{\rho}{R}{M}
+  }{
+    \Eval{g}{f}{\rho}{
+      \TExp{\uparrow}{R}
+    }{
+      M
+    }
+  }
+  \and
+  \inferrule[EvalDown]{
+    \Eval{g}{f}{\rho}{M}{M}
+  }{
+    \Eval{g}{f}{\rho}{
+      \TExp{\downarrow}{A,M}
+    }{M}
+  }
+  \and
   \inferrule[EvalCoe]{
     \Eval{g}{f}{\rho}{I}{I}
     \\
