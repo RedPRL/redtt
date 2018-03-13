@@ -409,7 +409,7 @@ reference).
   \inferrule[ValClo]{
     \IsXThin{g}{\Parens*{\Val{\square}{\SortCan}}}{o}{n}
     \\
-    \IsThin{f}{n}{m}
+    \IsXThin{f}{\Parens*{\Val{\square}{\SortCan}}}{n}{m}
     \\
     \IsVal{m}{\rho}{\SortEnv{l}}
     \\
@@ -423,7 +423,7 @@ reference).
   \inferrule[ValBClo]{
     \IsXThin{g}{\Parens*{\Val{\square}{\SortCan}}}{o}{n}
     \\
-    \IsThin{f}{n}{m}
+    \IsXThin{f}{\Parens*{\Val{\square}{\SortCan}}}{n}{m}
     \\
     \IsVal{m}{\rho}{\SortEnv{l}}
     \\
@@ -529,9 +529,9 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
 \begin{mathparpagebreakable}
   \DeclBox{
     \inferrule[JdgEval]{
-      \IsThin{g}{o}{n}
+      \IsXThin{g}{\Parens*{\Val{\square}{\SortCan}}}{o}{n}
       \\
-      \IsThin{f}{n}{m}
+      \IsXThin{f}{\Parens*{\Val{\square}{\SortCan}}}{n}{m}
       \\
       \IsVal{m}{\rho}{\SortEnv{l}}
       \\
