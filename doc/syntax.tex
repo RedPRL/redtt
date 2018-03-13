@@ -53,7 +53,8 @@
 \newcommand\OpCat[1]{{#1}^{\mathsf{op}}}
 \newcommand\SET{\mathbf{Set}}
 
-
+\newcommand\Interval{\FmtKwd{dim}}
+\newcommand\Bool{\FmtKwd{bool}}
 \newcommand\Atom[1]{{\boldsymbol\alpha}_{#1}}
 \newcommand\Var[1]{\mathsf{v}_{#1}}
 
@@ -753,11 +754,11 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
 \section{Quotation}
 
 \newcommand\QuoteCan[4]{
-  \FmtVal{#1}\vdash\FmtVal{#2}\ni\FmtVal{#3}\Uparrow\FmtTm{#4}
+  \FmtVal{#1}\vDash\FmtVal{#2}\ni\FmtVal{#3}\Uparrow\FmtTm{#4}
 }
 
 \newcommand\QuoteNeu[4]{
-  \FmtVal{#1}\vdash\FmtVal{#2}\Uparrow\FmtTm{#3}\in\FmtVal{#4}
+  \FmtVal{#1}\vDash\FmtVal{#2}\Uparrow\FmtTm{#3}\in\FmtVal{#4}
 }
 
 \newcommand\SortCtx[1]{\FmtKwd{ctx}_{#1}}
@@ -795,7 +796,7 @@ syntax-directed way.
       \\
       \IsTm{n}{l}{M}{\SortNeu}
       \\
-      \IsVal{n}{l}{A}{\SortCan}
+      \IsVal{n}{l}{A_\SortCan}
     }{
       \DeclBox{\QuoteNeu{\Gamma^+}{R^+}{R^-}{A^-}}
     }
@@ -824,6 +825,70 @@ syntax-directed way.
     }
   }
   \and
+  \inferrule[QuoteLam]{
+    \EvalClo{A}{A_\SortCan}
+    \\
+    \InstClo{B}{\Var{\Len{\Gamma}}}{B_\SortCan}
+    \\
+    \Apply{M}{\Var{\Len{\Gamma}}}{N}
+    \\
+    \QuoteCan{\Gamma.A_\SortCan}{B_\SortCan}{N}{N}
+  }{
+    \QuoteCan{\Gamma}{
+      \VExp{\Pi}{A,B}
+    }{M}{
+      \TExp{\lambda}{N}
+    }
+  }
+  \and
+  \inferrule[QuoteCoeBool]{
+    \QuoteCan{\Gamma}{\Bool}{M}{M}
+  }{
+    \QuoteCan{\Gamma}{C}{
+      \VExp{coe}{
+        I,
+        J,
+        \Bool,
+        M
+      }
+    }{
+      M
+    }
+  }
+  \and
+  \inferrule[QuoteCoeUp]{
+    \QuoteCan{\Gamma}{\Interval}{I}{I}
+    \\
+    \QuoteCan{\Gamma}{\Interval}{J}{J}
+    \\
+    \QuoteNeu{\Gamma.\nabla\Interval}{R}{R}{A'}
+    \\
+    \QuoteCan{\Gamma}{
+      \ThinVal{?}{A'}
+    }{M}{M}
+  }{
+    \QuoteCan{\Gamma}{C}{
+      \VExp{coe}{
+        I,
+        J,
+        \VExp{\uparrow}{A,R},
+        M
+      }
+    }{
+      \TExp{\uparrow}{
+        \TExp{coe}{
+          I,
+          J,
+          \TExp{\uparrow}{R},
+          M
+        }
+      }
+    }
+  }
 \end{mathparpagebreakable}
+
+Above is where we have a problem! We need to be able to instantiate
+the atom from $\FmtVal{A}$ with $\FmtVal{I}$. To achieve this, we need
+to extend thinnings to genuine substitutions.
 
 \end{document}
