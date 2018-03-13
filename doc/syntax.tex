@@ -540,6 +540,39 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
     }
   }
   \and
+  \inferrule[EvalSg]{}{
+    \Eval{g}{f}{\rho}{
+      \TExp{\Sigma}{A,B}
+    }{
+      \VExp{\Sigma}{
+        \Clo{g}{f}{\rho}{A},
+        \BClo{g}{f}{\rho}{B}
+      }
+    }
+  }
+  \and
+  \inferrule[EvalEq]{}{
+    \Eval{g}{f}{\rho}{
+      \TExp{eq}{A,M,N}
+    }{
+      \VExp{eq}{
+        \BClo{g}{f}{\rho}{A},
+        \Clo{g}{f}{\rho}{M},
+        \Clo{g}{f}{\rho}{N}
+      }
+    }
+  }
+  \and
+  \inferrule[EvalLam]{}{
+    \Eval{g}{f}{\rho}{
+      \TExp{\lambda}{M}
+    }{
+      \VExp{\lambda}{
+        \BClo{g}{f}{\rho}{M}
+      }
+    }
+  }
+  \and
   \inferrule[EvalCoe]{
     \Eval{g}{f}{\rho}{I}{I}
     \\
