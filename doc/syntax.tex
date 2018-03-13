@@ -128,7 +128,7 @@ on thinnings must be proved to be respect the algebraic laws of
 thinnings in order to be well-defined.
 \begin{mathparpagebreakable}
   \DeclBox{
-    \IsXThin{f}{X}{m}{n}
+    \IsXThin{f}{X}{n}{m}
   }
   \\
   \inferrule{
@@ -137,29 +137,29 @@ thinnings in order to be well-defined.
   }
   \and
   \inferrule{
-    \IsXThin{f}{X}{m}{n}
+    \IsXThin{f}{X}{n}{m}
   }{
-    \IsXThin{\ThinKeep{f}}{X}{m+1}{n+1}
+    \IsXThin{\ThinKeep{f}}{X}{n+1}{m+1}
   }
   \and
   \inferrule{
-    \IsXThin{f}{X}{m}{n}
+    \IsXThin{f}{X}{n}{m}
   }{
-    \IsXThin{\ThinSkip{f}}{X}{m+1}{n}
+    \IsXThin{\ThinSkip{f}}{X}{n+1}{m}
   }
   \and
   \inferrule{
-    \IsXThin{f}{X}{m}{n}
+    \IsXThin{f}{X}{n}{m}
     \\
-    a:X_m
+    a:X_n
   }{
-    \IsXThin{\ThinRep{f}{a}}{X}{m}{n+1}
+    \IsXThin{\ThinRep{f}{a}}{X}{n}{m+1}
   }
 \end{mathparpagebreakable}
 
 We will write $\THIN$ for the category of $\varnothing$-thinnings
-induced by the above. To simplify notation, we write $\Thin{m}{n}$ for
-$\XThin{\varnothing}{m}{n}$.
+induced by the above. To simplify notation, we write $\Thin{n}{m}$ for
+$\XThin{\varnothing}{n}{m}$.
 
 \section{Terms}
 
