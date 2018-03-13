@@ -872,11 +872,11 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
 To start with, I define a quotation from semantic values to syntactic
 terms; together with evaluation, this generates a theory of
 definitional equivalence. However, this is an inefficient way to
-calculate definitional equivalence; worse, later on we will introduce
-constructs (such as systems) which resist a sensible notion of normal
-form. As such, the quotation algorithm defined below will serve as a
-template for a binary generalization that checks definitional
-equivalence.
+calculate definitional equivalence (the negative cases can be
+devastating); worse, later on we will introduce programming constructs
+(such as systems) which resist a sensible notion of normal form. As
+such, the quotation algorithm defined below will serve as a template
+for a binary generalization that checks definitional equivalence.
 
 \newcommand\LookupAtom[4]{\FmtVal{#1}\ni\Atom{#2}:\Squares*{\FmtThin{#4}*\FmtVal{#3}}}
 \newcommand\LookupVar[4]{\FmtVal{#1}\ni\Var{#2}:\Squares*{\FmtThin{#4}*\FmtVal{#3}}}
