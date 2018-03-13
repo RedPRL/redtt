@@ -366,7 +366,6 @@ using environments, we must naturally employ a notion of
 
 \newcommand\SortCan{\FmtKwd{can}}
 \newcommand\SortNeu{\FmtKwd{neu}}
-\newcommand\SortNf{\FmtKwd{nf}}
 \newcommand\SortClo{\FmtKwd{clo}}
 \newcommand\SortBClo{\FmtKwd{bclo}}
 \newcommand\SortEnv[1]{\FmtKwd{env}_{#1}}
@@ -403,7 +402,7 @@ using environments, we must naturally employ a notion of
 
 
 Values are classified by sorts
-$\tau\in\Braces*{\SortCan,\SortNeu,\SortNf,\SortEnv{l},\SortClo,\SortBClo}$; for
+$\tau\in\Braces*{\SortCan,\SortNeu,\SortEnv{l},\SortClo,\SortBClo}$; for
 such a sort $\tau$, we will write $\IsVal{n}{M}{\tau}$ to mean that
 $\FmtVal{M}$ is a value of sort $\tau$ with $n$ atoms. We no longer
 track the number of variables, because these are replaced by
@@ -424,16 +423,6 @@ reference).
   \inferrule[ValGen]{
   }{
     \IsVal{n}{\Var{l}}{\SortNeu}
-  }
-  \and
-  \inferrule[ValDown]{
-    \IsVal{n}{A}{\SortCan}
-    \\
-    \IsVal{n}{M}{\SortCan}
-  }{
-    \IsVal{n}{
-      \VExp{\downarrow}{A,M}
-    }{\SortNf}
   }
   \and
   \inferrule[ValUp]{
@@ -499,7 +488,7 @@ reference).
   \inferrule[ValApp]{
     \IsVal{n}{R}{\SortNeu}
     \\
-    \IsVal{n}{M}{\SortNf}
+    \IsVal{n}{M}{\SortCan}
   }{
     \IsVal{n}{\VExp{@}{R,M}}{\SortNeu}
   }
@@ -772,10 +761,7 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
         B_\SortCan,
         \VExp{@}{
           R,
-          \VExp{\downarrow}{
-            A_\SortCan,
-            N
-          }
+          N
         }
       }
     }
@@ -1011,6 +997,26 @@ for a binary generalization that checks definitional equivalence.
       \Var{i}
     }{
       \ThinVal{f}{A}
+    }
+  }
+  \and
+  \inferrule[QuoteApPi]{
+    \QuoteNeu{\Gamma}{R}{R}{
+      \VExp{\Pi}{A_\SortClo,B_\SortBClo}
+    }
+    \\
+    \EvalClo{A_\SortClo}{A_\SortCan}
+    \\
+    \InstClo{B_\SortBClo}{N}{B_\SortCan}
+    \\
+    \QuoteCan{\Gamma}{A_\SortCan}{N}{N}
+  }{
+    \QuoteNeu{\Gamma}{
+      \VExp{@}{R,N}
+    }{
+      \TExp{@}{R,N}
+    }{
+      B_\SortCan%
     }
   }
 \end{mathparpagebreakable}
