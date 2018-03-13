@@ -6,6 +6,7 @@
 \usepackage{hyperref}
 \usepackage{mathpartir}
 \usepackage[dvipsnames]{xcolor}
+\usepackage{fullpage}
 
 \usepackage{mathtools}
 
@@ -15,6 +16,8 @@
 
 \DeclarePairedDelimiter\Braces{\lbrace}{\rbrace}
 \DeclarePairedDelimiter\Pipes{\lvert}{\rvert}
+
+\newcommand\Len[1]{\Pipes*{#1}}
 
 \newtheorem{remark}{Remark}
 
@@ -307,26 +310,30 @@ using environments, we must naturally employ a notion of
 \newcommand\SortEnv[1]{\FmtKwd{env}_{#1}}
 \newcommand\IsVal[3]{{#1}\Vdash\FmtVal{#2}:{#3}}
 \newcommand\Clo[4]{
-  \FmtThin{#1}%
-  \mathbin{\color{gray}*}%
-  \Angles*{
-    \FmtTm{#4}
-    \mathbin{\color{gray}\triangleleft}%
-    \FmtThin{#2}
+  \Squares*{
+    \FmtThin{#1}%
     \mathbin{\color{gray}*}%
-    \FmtVal{#3}
+    \Angles*{
+      \FmtTm{#4}
+      \mathbin{\color{gray}\triangleleft}%
+      \FmtThin{#2}
+      \mathbin{\color{gray}*}%
+      \FmtVal{#3}
+    }
   }
 }
 
 \newcommand\BClo[4]{
-  \FmtThin{#1}%
-  \mathbin{\color{gray}*}%
-  \Angles*{
-    \FmtTm{#4}
-    \mathbin{\color{gray}\triangleleft^+}%
-    \FmtThin{#2}
+  \Squares*{
+    \FmtThin{#1}%
     \mathbin{\color{gray}*}%
-    \FmtVal{#3}
+    \Angles*{
+      \FmtTm{#4}
+      \mathbin{\color{gray}\triangleleft^+}%
+      \FmtThin{#2}
+      \mathbin{\color{gray}*}%
+      \FmtVal{#3}
+    }
   }
 }
 
@@ -365,12 +372,22 @@ reference).
     }{\SortNf}
   }
   \and
+  \inferrule[ValUp]{
+    \IsVal{n}{A}{\SortCan}
+    \\
+    \IsVal{n}{R}{\SortNeu}
+  }{
+    \IsVal{n}{
+      \VExp{\uparrow}{A,R}
+    }{\SortCan}
+  }
+  \and
   \inferrule[ValClo]{
-    \IsThin{g}{o}{m}
+    \IsThin{g}{o}{n}
     \\
-    \IsThin{f}{m}{n}
+    \IsThin{f}{n}{m}
     \\
-    \IsVal{n}{\rho}{\SortEnv{l}}
+    \IsVal{m}{\rho}{\SortEnv{l}}
     \\
     \IsTm{n}{l}{M}{\SortChk}
   }{
@@ -380,11 +397,11 @@ reference).
   }
   \and
   \inferrule[ValBClo]{
-    \IsThin{g}{o}{m}
+    \IsThin{g}{o}{n}
     \\
-    \IsThin{f}{m}{n}
+    \IsThin{f}{n}{m}
     \\
-    \IsVal{n}{\rho}{\SortEnv{l}}
+    \IsVal{m}{\rho}{\SortEnv{l}}
     \\
     \IsTm{n}{l+1}{M}{\SortChk}
   }{
@@ -444,13 +461,13 @@ reference).
   }
   \and
   \inferrule[ValCoe]{
-    \IsVal{n}{I}{\SortClo}
+    \IsVal{n}{I}{\SortCan}
     \\
-    \IsVal{n}{J}{\SortClo}
+    \IsVal{n}{J}{\SortCan}
     \\
     \IsVal{n+1}{A}{\SortCan}
     \\
-    \IsVal{n}{M}{\SortClo}
+    \IsVal{n}{M}{\SortCan}
   }{
     \IsVal{n}{
       \VExp{coe}{I,J,A,M}
@@ -460,8 +477,218 @@ reference).
 
 
 \section{Evaluation}
+\newcommand\EvalClo[2]{\FmtVal{#1}\Downarrow\FmtVal{#2}}
+\newcommand\Eval[5]{\FmtThin{#2}*\FmtVal{#3}\vDash\FmtTm{#4}\mathrel{\Downarrow_{\FmtThin{#1}}}\FmtVal{#5}}
+\newcommand\Apply[3]{\FmtVal{#1}\mathrel{@}\FmtVal{#2}\Downarrow\FmtVal{#3}}
+\newcommand\InstClo[3]{\FmtVal{#1}\bullet\FmtVal{#2}\Downarrow\FmtVal{#3}}
+\newcommand\ThinVal[2]{\widehat{\FmtThin{#1}}\Parens*{\FmtVal{#2}}}
 
 At a high level, evaluation takes terms to values; at a finer-grained
-level, however, we will evaluate with respect to a thinning and a
-thinned environment.
+level, however, we will evaluate with respect to a thinning
+$\FmtThin{g}$ and an environment $\FmtVal{\rho}$ together with a
+thinning $\FmtThin{f}$; this allows us to avoid actually executing
+thinnings and substitutions until the last moment possible. In fact,
+the preceding sentence can be rephrased as construing evaluation as a
+relation $\EvalClo{M_\SortClo}{M_\SortCan}$ where
+$\IsVal{n}{M_\SortClo}{\SortClo}$ and
+$\IsVal{n}{M_\SortCan}{\SortCan}$.
+
+We will write $\Eval{g}{f}{\rho}{M}{M}$ as a notation for
+$\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgEval]{
+      \IsThin{g}{o}{n}
+      \\
+      \IsThin{f}{n}{m}
+      \\
+      \IsVal{m}{\rho}{\SortEnv{l}}
+      \\
+      \IsTm{n}{l}{M}{\tau}
+      \\
+      \IsVal{o}{M}{\SortCan}
+    }{
+      \DeclBox{
+        \Eval{g}{f}{\rho}{M}{M}
+      }
+    }
+  }
+  \\
+  \inferrule[EvalAtom]{}{
+    \Eval{g}{f}{\rho}{\Atom{i}}{
+      \ThinVal{g}{\Atom{i}}
+    }
+  }
+  \and
+  \inferrule[EvalVar]{}{
+    \Eval{g}{f}{\rho}{\Var{l}}{
+      \ThinVal{
+        g\circ{}f
+      }{\rho_l}
+    }
+  }
+  \and
+  \inferrule[EvalPi]{}{
+    \Eval{g}{f}{\rho}{
+      \TExp{\Pi}{A,B}
+    }{
+      \VExp{\Pi}{
+        \Clo{g}{f}{\rho}{A},
+        \BClo{g}{f}{\rho}{B}
+      }
+    }
+  }
+  \and
+  \inferrule[EvalCoe]{
+    \Eval{g}{f}{\rho}{I}{I}
+    \\
+    \Eval{g}{f}{\rho}{J}{J}
+    \\
+    \Eval{\ThinKeep{g}}{\ThinSkip{f}}{\rho}{A}{A}
+    \\
+    \Eval{g}{f}{\rho}{M}{M}
+  }{
+    \Eval{g}{f}{\rho}{
+      \TExp{coe}{I,J,A,M}
+    }{
+      \VExp{coe}{
+        I,
+        J,
+        A,
+        M
+      }
+    }
+  }
+  \and
+  \inferrule[EvalApp]{
+    \Eval{g}{f}{\rho}{R}{M_{\mathsf{fun}}}
+    \\
+    \Eval{g}{f}{\rho}{M}{M_{\mathsf{arg}}}
+    \\
+    \Apply{M_{\mathsf{fun}}}{M_{\mathsf{arg}}}{N}
+  }{
+    \Eval{g}{f}{\rho}{
+      \TExp{@}{
+        R,
+        M
+      }
+    }{
+      N
+    }
+  }
+\end{mathparpagebreakable}
+
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgInst]{
+      \IsVal{n}{M}{\SortBClo}
+      \\
+      \IsVal{n}{N}{\SortCan}
+      \\
+      \IsVal{n}{O}{\SortCan}
+    }{
+      \DeclBox{\InstClo{M}{N}{O}}
+    }
+  }
+  \and
+  \inferrule[InstBClo]{
+    \Eval{g}{f}{\Squares*{N,\rho}}{M}{O}
+  }{
+    \InstClo{
+      \BClo{g}{f}{\rho}{M}
+    }{N}{O}
+  }
+\end{mathparpagebreakable}
+
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgApply]{
+      \IsVal{n}{M}{\SortCan}
+      \\
+      \IsVal{n}{N}{\SortCan}
+      \\
+      \IsVal{n}{O}{\SortCan}
+    }{
+      \DeclBox{\Apply{M}{N}{O}}
+    }
+  }
+  \\
+  \inferrule[ApplyLam]{
+    \InstClo{M}{N}{O}
+  }{
+    \Apply{\VExp{\lambda}{M}}{N}{O}
+  }
+  \and
+  \inferrule[ApplyUpPi]{
+    \EvalClo{A_\SortClo}{A_\SortCan}
+    \\
+    \InstClo{B_\SortClo}{N}{B_\SortCan}
+  }{
+    \Apply{
+      \VExp{\uparrow}{
+        \VExp{\Pi}{A_\SortClo,B_\SortBClo},
+        R
+      }
+    }{N}{
+      \VExp{\uparrow}{
+        B_\SortCan,
+        \VExp{@}{
+          R,
+          \VExp{\downarrow}{
+            A_\SortCan,
+            N
+          }
+        }
+      }
+    }
+  }
+  \and
+  \inferrule[ApplyCoePi]{
+    \EvalClo{A_\SortClo}{A_\SortCan}
+    \\
+    \InstClo{B_\SortBClo}{
+      \VExp{coe}{
+        \ThinVal{\ThinSkip{\ThinId}}{J},
+        \Atom{0},
+        \ThinVal{
+          \ThinKeep{\ThinSkip{\ThinId}}
+        }{A_\SortCan},
+        \ThinVal{\ThinSkip{\ThinId}}{N}
+      }
+    }{
+      B_\SortCan{}
+    }
+    \\
+    \Apply{M}{
+      \VExp{coe}{
+        J,
+        I,
+        A_\SortCan,
+        N
+      }
+    }{O}
+  }{
+    \Apply{
+      \VExp{coe}{
+        I,
+        J,
+        \VExp{\Pi}{A_\SortClo,B_\SortBClo},
+        M
+      }
+    }{N}{
+      \VExp{coe}{
+        I,
+        J,
+        B_\SortCan,
+        O
+      }
+    }
+  }
+\end{mathparpagebreakable}
+
+
+
 \end{document}
