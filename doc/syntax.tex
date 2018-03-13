@@ -821,6 +821,22 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
   }
 \end{mathparpagebreakable}
 
+Observe how in \textsc{ApplyCoePi}, we used in an essential way the
+fact that the dimension binder of $\FmtKwd{coe}$ abstracts an
+\emph{atom} rather than a \emph{variable}; in the semantic domain,
+this means that we may name this dimension using an atom of the $0$th
+De Bruijn index. This is essential: if we had bound a variable rather
+than an atom, it would be impossible from this point of view of the
+application judgment to know the De Bruijn level of the bound
+dimension.
+
+The cost of this solution to the problem of evaluating under binders
+is that we must be careful to apply thinnings in all the right
+places. It is easy to verify that the semantic term is well-formed
+using the strongly-scoepd term formation rules given; moreover, the
+thinnings will generally be inexpensive, since they tend to pile up on
+closures.
+
 
 \section{Quotation}
 
