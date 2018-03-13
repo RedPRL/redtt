@@ -31,8 +31,8 @@
 
 \usepackage{stmaryrd}
 
-\title{Cubical Equality: Syntax}
-\author{Jon Sterling}
+\title{Cartesian Cubical Type Theory:\\ Operational Semantics and
+  Definitional Equivalence} \author{Jon Sterling}
 
 \newcommand\FmtKwd[1]{\mathsf{#1}}
 
@@ -104,14 +104,14 @@
 \begin{document}
 \maketitle
 
-The purpose of these notes is to develop a syntax and normalization
-algorithm for cartesian cubical type theory which is as efficient and
-carefully organized as possible: in particular, we arrange to
-calculate all substitutions and renamings lazily using environments
-and closures. Our definition of both the syntactic and the semantic
-domain is strongly scoped, which makes it easier to verify the that we
-have correctly resolved the contradiction between the name and the
-location of a bound variable.
+The purpose of these notes is to develop an operational semantics and
+algorithmic theory of definitional equivalence for cartesian cubical
+type theory which is as efficient and carefully organized as possible:
+in particular, we arrange to calculate all substitutions and renamings
+lazily using environments and closures. Our definition of both the
+syntactic and the semantic domain is strongly scoped, which makes it
+easier to verify the that we have correctly resolved the contradiction
+between the name and the location of a bound variable.
 
 In these notes, we use colors to distinguish objects of different
 (meta) sorts from each other, in order to avoid getting lost in a
