@@ -623,11 +623,11 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
     }
   }
   \and
-  \inferrule[EvalEq]{}{
+  \inferrule[EvalPath]{}{
     \Eval{g}{f}{\rho}{
-      \TExp{eq}{A,M,N}
+      \TExp{path}{A,M,N}
     }{
-      \VExp{eq}{
+      \VExp{path}{
         \BClo{g}{f}{\rho}{A},
         \Clo{g}{f}{\rho}{M},
         \Clo{g}{f}{\rho}{N}
@@ -1017,6 +1017,24 @@ for a binary generalization that checks definitional equivalence.
       \TExp{@}{R,N}
     }{
       B_\SortCan%
+    }
+  }
+  \and
+  \inferrule[QuoteApPath]{
+    \QuoteNeu{\Gamma}{R}{R}{
+      \VExp{path}{A_\SortBClo,M_0,M_1}
+    }
+    \\
+    \InstClo{A_\SortClo}{N}{A_\SortCan}
+    \\
+    \QuoteCan{\Gamma}{\Interval}{N}{N}
+  }{
+    \QuoteNeu{\Gamma}{
+      \VExp{@}{R,N}
+    }{
+      \TExp{@}{R,N}
+    }{
+      A_\SortCan%
     }
   }
 \end{mathparpagebreakable}
