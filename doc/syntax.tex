@@ -309,6 +309,8 @@ using environments, we must naturally employ a notion of
 \newcommand\SortBClo{\FmtKwd{bclo}}
 \newcommand\SortEnv[1]{\FmtKwd{env}_{#1}}
 \newcommand\IsVal[3]{{#1}\Vdash\FmtVal{#2}:{#3}}
+\newcommand\Val[2]{{#1}\Vdash{#2}}
+
 \newcommand\Clo[4]{
   \Squares*{
     \FmtThin{#1}%
@@ -474,6 +476,12 @@ reference).
     }{\SortCan}
   }
 \end{mathparpagebreakable}
+
+As with terms, the definitions above induce a family of functors
+$\Parens*{\Val{\square}{\tau}}:\OpCat{\THIN}\to\SET$. The functorial
+action of thinnings on closures is composition, which comports with
+the view of closures as a left Kan extension which suspends a
+thinning.
 
 
 \section{Evaluation}
