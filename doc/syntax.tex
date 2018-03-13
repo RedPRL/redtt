@@ -518,7 +518,7 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
       \IsVal{o}{M}{\SortCan}
     }{
       \DeclBox{
-        \Eval{g}{f}{\rho}{M}{M}
+        \Eval{g^+}{f^+}{\rho^+}{M^+}{M^-}
       }
     }
   }
@@ -649,7 +649,7 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
       \\
       \IsVal{n}{O}{\SortCan}
     }{
-      \DeclBox{\InstClo{M}{N}{O}}
+      \DeclBox{\InstClo{M^+}{N^+}{O^-}}
     }
   }
   \and
@@ -672,7 +672,7 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
       \\
       \IsVal{n}{O}{\SortCan}
     }{
-      \DeclBox{\Apply{M}{N}{O}}
+      \DeclBox{\Apply{M^+}{N^+}{O^-}}
     }
   }
   \\
@@ -756,6 +756,10 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
   \FmtVal{#1}\vdash\FmtVal{#2}\ni\FmtVal{#3}\Uparrow\FmtTm{#4}
 }
 
+\newcommand\QuoteNeu[4]{
+  \FmtVal{#1}\vdash\FmtVal{#2}\Uparrow\FmtTm{#3}\in\FmtVal{#4}
+}
+
 \newcommand\SortCtx[1]{\FmtKwd{ctx}_{#1}}
 
 Need to explain how semantic contexts are formed, and how their length
@@ -779,7 +783,21 @@ syntax-directed way.
       \\
       \IsTm{n}{l}{M}{\SortChk}
     }{
-      \DeclBox{\QuoteCan{\Gamma}{A}{M}{M}}
+      \DeclBox{\QuoteCan{\Gamma^+}{A^+}{M^+}{M^-}}
+    }
+  }
+  \and
+  \DeclBox{
+    \inferrule[JdgQuoteNeu]{
+      \IsVal{n}{\Gamma}{\SortCtx{l}}
+      \\
+      \IsVal{n}{R}{\SortNeu}
+      \\
+      \IsTm{n}{l}{M}{\SortNeu}
+      \\
+      \IsVal{n}{l}{A}{\SortCan}
+    }{
+      \DeclBox{\QuoteNeu{\Gamma^+}{R^+}{R^-}{A^-}}
     }
   }
   \\
