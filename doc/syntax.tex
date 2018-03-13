@@ -104,14 +104,22 @@
 \begin{document}
 \maketitle
 
+The purpose of these notes is to develop a syntax and normalization
+algorithm for cartesian cubical type theory which is as efficient and
+carefully organized as possible: in particular, we arrange to
+calculate all substitutions and renamings lazily using environments
+and closures. Our definition of both the syntactic and the semantic
+domain is strongly scoped, which makes it easier to verify the that we
+have correctly resolved the contradiction between the name and the
+location of a bound variable.
+
 In these notes, we use colors to distinguish objects of different
 (meta) sorts from each other, in order to avoid getting lost in a
 hurricane of superscripts. As such, $\FmtTm{M}$ and $\FmtVal{M}$ are
-to be understood as distinct schematic variables.
-
-Some of the ideas for dealing with evaluation under dimension binders
-come from joint work with Favonia; the idea of generalized thinnings
-comes from Conor McBride (as far as I am aware).
+to be understood as distinct schematic variables. Some of the ideas
+for dealing with evaluation under dimension binders come from joint
+work with Favonia; the idea of generalized thinnings comes from Conor
+McBride (as far as I am aware).
 
 
 \section{Thinnings}
