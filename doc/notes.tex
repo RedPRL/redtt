@@ -11,10 +11,13 @@
 
 \DeclarePairedDelimiter\Parens{\lparen}{\rparen}
 \DeclarePairedDelimiter\Angles{\langle}{\rangle}
+\DeclarePairedDelimiter\Squares{[}{]}
+
 \DeclarePairedDelimiter\Braces{\lbrace}{\rbrace}
 \DeclarePairedDelimiter\Pipes{\lvert}{\rvert}
 
 \newcommand\Len[1]{\Pipes{#1}}
+\newcommand\GetEnv[1]{\mathrm{env}\Parens{#1}}
 
 \usepackage{xinttools}
 
@@ -24,9 +27,6 @@
     \xintifForLast{}{#2}
   }
 }
-
-\newcommand\Interval{\mathbb{I}}
-
 
 \newcommand\FmtTm[1]{{\color{Violet}{#1}}}
 \newcommand\FmtVal[1]{{\color{Red}{#1}}}
@@ -38,7 +38,18 @@
   \FmtVal{#1}\vDash\FmtTm{#2}\searrow\FmtVal{#3}
 }
 
+\newcommand\Quo[4]{%
+  \FmtVal{#1}\vDash\FmtVal{#2}\ni\FmtVal{#3}\nearrow\FmtTm{#4}
+}
+
 \newcommand\FmtKwd[1]{\mathsf{#1}}
+
+\newcommand\Interval{\mathbb{I}}
+\newcommand\Univ{\mathbb{U}}
+\newcommand\Bool{\mathbb{B}}
+\newcommand\Tt{\FmtKwd{tt}}
+\newcommand\Ff{\FmtKwd{ff}}
+\newcommand\Wk[2]{{\normalcolor\mathbf{wk}}\Squares*{#1}}
 
 \newcommand\TExp[2]{
   \FmtTm{
@@ -197,22 +208,22 @@
     \Cdr{M}{N}
   }{
     \Eval{\rho}{
-      \TExp{car}{R}
+      \TExp{cdr}{R}
     }{
       N
     }
   }
   \and
   \inferrule[EvalCoe]{
-    \Eval{\rho}{I}{I}
+    \Eval{\rho;n}{I}{I}
     \\
-    \Eval{\rho}{J}{J}
+    \Eval{\rho;n}{J}{J}
     \\
-    \Eval{\rho,\VExp{v}{\Len{\rho}}}{A}{A}
+    \Eval{\rho;n+1}{A}{A}
     \\
-    \Eval{\rho}{M}{M}
+    \Eval{\rho;n}{M}{M}
   }{
-    \Eval{\rho}{
+    \Eval{\rho;n}{
       \TExp{coe}{
         I,
         J,
@@ -223,7 +234,6 @@
       \VExp{coe}{
         I,
         J,
-        \Len{\rho},
         A,
         M
       }
@@ -272,49 +282,71 @@
   }
   \and
   \inferrule[ApCoePi]{
-    \EvalClo{A}{A}
-    \\
     \InstClo{B}{
-      \VExp{coe}{
-        J,
-        \VExp{v}{n},
-        n,
-        A,
-        N
-      }
-    }{B_N}
-    \\
-    \Apply{M}{
-      \VExp{coe}{
-        J,
-        I,
-        n,
-        A
-      }
-    }{O}
+      \VExp{coe}{?}
+    }{?}
   }{
     \Apply{
       \VExp{coe}{
         I,
         J,
-        n,
         \VExp{\Pi}{
           \FmtClo{A},
           \FmtClo{B}
         },
         M
       }
-    }{N}{
-      \VExp{coe}{
-        I,
-        J,
-        n,
-        B_N,
-        O
-      }
+    }{
+      N
+    }{
     }
   }
   \and
+  %%% WRONG!!
+  % \inferrule[ApCoePi]{
+  %   \EvalClo{A}{A}
+  %   \\
+  %   \InstClo{B}{
+  %     \VExp{coe}{
+  %       J,
+  %       \VExp{v}{n},
+  %       n,
+  %       A,
+  %       N
+  %     }
+  %   }{B_N}
+  %   \\
+  %   \Apply{M}{
+  %     \VExp{coe}{
+  %       J,
+  %       I,
+  %       n,
+  %       A
+  %     }
+  %   }{O}
+  % }{
+  %   \Apply{
+  %     \VExp{coe}{
+  %       I,
+  %       J,
+  %       n,
+  %       \VExp{\Pi}{
+  %         \FmtClo{A},
+  %         \FmtClo{B}
+  %       },
+  %       M
+  %     }
+  %   }{N}{
+  %     \VExp{coe}{
+  %       I,
+  %       J,
+  %       n,
+  %       B_N,
+  %       O
+  %     }
+  %   }
+  % }
+  % \and
   \inferrule[ApNeuEqGen]{
     \InstClo{A}{
       \VExp{\uparrow}{\Interval,R'}
@@ -445,45 +477,45 @@
     }
   }
   \and
-  \inferrule[CdrCoe]{
-    \Car{M}{M_0}
-    \\
-    \InstClo{B}{
-      \VExp{coe}{
-        I,
-        \VExp{v}{n},
-        n,
-        A,
-        M_0
-      }
-    }{
-      B_{M_0}
-    }
-    \\
-    \Cdr{M}{M_1}
-  }{
-    \Cdr{
-      \VExp{coe}{
-        I,
-        J,
-        n,
-        \VExp{\Sigma}{
-          \FmtClo{A},
-          \FmtClo{B}
-        },
-        M
-      }
-    }{
-      \VExp{coe}{
-        I,
-        J,
-        n,
-        B_{M_0},
-        M_1
-      }
-    }
-  }
-  \and
+  % \inferrule[CdrCoe]{
+  %   \Car{M}{M_0}
+  %   \\
+  %   \InstClo{B}{
+  %     \VExp{coe}{
+  %       I,
+  %       \VExp{v}{n},
+  %       n,
+  %       A,
+  %       M_0
+  %     }
+  %   }{
+  %     B_{M_0}
+  %   }
+  %   \\
+  %   \Cdr{M}{M_1}
+  % }{
+  %   \Cdr{
+  %     \VExp{coe}{
+  %       I,
+  %       J,
+  %       n,
+  %       \VExp{\Sigma}{
+  %         \FmtClo{A},
+  %         \FmtClo{B}
+  %       },
+  %       M
+  %     }
+  %   }{
+  %     \VExp{coe}{
+  %       I,
+  %       J,
+  %       n,
+  %       B_{M_0},
+  %       M_1
+  %     }
+  %   }
+  % }
+  % \and
   \inferrule[CdrNeu]{
     \Car{
       \VExp{\uparrow}{
@@ -538,5 +570,102 @@
 \end{mathparpagebreakable}
 
 \section{Quotation}
+
+\begin{mathparpagebreakable}
+  \framebox{
+    $\Quo{\Gamma}{A}{M}{M}$
+  }
+  \\
+  \inferrule[QuoPi]{
+    \EvalClo{A}{A}
+    \\
+    \InstClo{B}{\VExp{v}{\Len{\Gamma}}}{B}
+    \\\\
+    \Quo{\Gamma}{\Univ}{A}{A}
+    \\
+    \Quo{\Gamma,A\ni\VExp{v}{\Len{\Gamma}}}{\Univ}{B}{B}
+  }{
+    \Quo{\Gamma}{\Univ}{
+      \VExp{\Pi}{
+        \FmtClo{A},
+        \FmtClo{B}
+      }
+    }{
+      \TExp{\Pi}{
+        A,
+        B
+      }
+    }
+  }
+  \and
+  \inferrule[QuoLam]{
+    \EvalClo{A}{A}
+    \\
+    \InstClo{B}{\VExp{v}{\Len{\Gamma}}}{B}
+    \\\\
+    \Apply{M}{\VExp{v}{\Len{\Gamma}}}{N}
+    \\
+    \Quo{\Gamma,A\ni\VExp{v}{\Len{\Gamma}}}{B}{N}{N}
+  }{
+    \Quo{\Gamma}{
+      \VExp{\Pi}{
+        \FmtClo{A},
+        \FmtClo{B}
+      }
+    }{
+      M
+    }{
+      \TExp{\lambda}{N}
+    }
+  }
+  \and
+  \inferrule[QuoCoeBool]{
+    \Quo{\Gamma}{\Bool}{M}{M}
+  }{
+    \Quo{\Gamma}{\Bool}{
+      \VExp{coe}{
+        I,
+        J,
+        n,
+        A,
+        M
+      }
+    }{M}
+  }
+  \and
+  \inferrule[QuoCoeNeu]{
+    \Quo{\Gamma}{\Interval}{I}{I}
+    \\
+    \Quo{\Gamma}{\Interval}{J}{J}
+    \\
+    \Quo{\Gamma,\Interval\ni\VExp{v}{\Len{\Gamma}}}{\Univ}{A}{A}
+    \\\\
+    \Eval{\GetEnv{\Gamma},I}{A}{A_I}
+    \\
+    \Quo{\Gamma}{A_I}{M}{M}
+  }{
+    \Quo{\Gamma}{
+      \VExp{\uparrow}{
+        \Univ,
+        R
+      }
+    }{
+      \VExp{coe}{
+        I,
+        J,
+        n,
+        A,
+        M
+      }
+    }{
+      \TExp{coe}{
+        I,
+        J,
+        A,
+        M
+      }
+    }
+  }
+\end{mathparpagebreakable}
 
 \end{document}

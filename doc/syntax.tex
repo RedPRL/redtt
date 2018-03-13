@@ -1,0 +1,467 @@
+\documentclass{article}
+\usepackage{amssymb}
+
+\usepackage[tt=false]{libertine}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{mathpartir}
+\usepackage[dvipsnames]{xcolor}
+
+\usepackage{mathtools}
+
+\DeclarePairedDelimiter\Parens{\lparen}{\rparen}
+\DeclarePairedDelimiter\Angles{\langle}{\rangle}
+\DeclarePairedDelimiter\Squares{[}{]}
+
+\DeclarePairedDelimiter\Braces{\lbrace}{\rbrace}
+\DeclarePairedDelimiter\Pipes{\lvert}{\rvert}
+
+\newtheorem{remark}{Remark}
+
+
+
+\usepackage{stmaryrd}
+
+\title{Cubical Equality: Syntax}
+\author{Jon Sterling}
+
+\newcommand\FmtKwd[1]{\mathsf{#1}}
+
+\newcommand\DeclBox[1]{\framebox{$\displaystyle{}#1$}}
+\newcommand\FmtThin[1]{{\color{ProcessBlue}#1}}
+\newcommand\Thin[2]{{#1}\rightarrowtriangle{#2}}
+\newcommand\IsThin[3]{\FmtThin{#1}:\Thin{#2}{#3}}
+\newcommand\ThinId{\mathsf{id}}
+\newcommand\ThinKeep[1]{{#1}.\mathsf{c}}
+\newcommand\ThinSkip[1]{{#1}.\mathsf{p}}
+
+\usepackage{xinttools}
+
+\newcommand\FormatList[3]{%
+  \xintFor ##1 in {#3} \do{%
+    #1{##1}%
+    \xintifForLast{}{#2}
+  }
+}
+
+
+
+\newcommand\THIN{\mathbf{Thin}}
+\newcommand\OpCat[1]{{#1}^{\mathsf{op}}}
+\newcommand\SET{\mathbf{Set}}
+
+
+\newcommand\Atom[1]{{\boldsymbol\alpha}_{#1}}
+\newcommand\Var[1]{\mathsf{v}_{#1}}
+
+\newcommand\SortChk{\FmtKwd{chk}}
+\newcommand\SortInf{\FmtKwd{inf}}
+
+\newcommand\Tm[3]{{#1}\mid{#2}\vdash{#3}}
+\newcommand\FmtTm[1]{{\color{Violet}#1}}
+\newcommand\IsTm[4]{{#1}\mid{#2}\vdash\FmtTm{#3}:{#4}}
+\newcommand\IsChk[3]{\IsTm{#1}{#2}{#3}{\SortChk}}
+\newcommand\IsInf[3]{\IsTm{#1}{#2}{#3}{\SortInf}}
+
+\newcommand\TExp[2]{
+  \FmtTm{
+    \Parens*{
+      \FmtKwd{#1}\
+      \FormatList{}{\ }{#2}
+    }
+  }
+}
+
+
+\newcommand\FmtVal[1]{{\color{Red}{#1}}}
+
+\newcommand\VExp[2]{
+  \FmtVal{
+    \Parens*{
+      \FmtKwd{#1}\
+      \FormatList{}{\ }{#2}
+    }
+  }
+}
+
+
+
+\begin{document}
+\maketitle
+
+In these notes, we use colors to distinguish objects of different
+(meta) sorts from each other, in order to avoid getting lost in a
+hurricane of superscripts. As such, $\FmtTm{M}$ and $\FmtVal{M}$ are
+to be understood as distinct schematic variables.
+
+\section{Thinnings}
+
+Thinnings, also known as \emph{order-preserving embeddings} are a
+defunctionalized representation of renamings which capture the idea of
+deleting some variables from within a context.
+%
+We choose a representation of thinnings which lends itself to
+efficient calculation, but is not canonical; therefore, any operation
+on thinnings must be proved to be respect the algebraic laws of
+thinnings in order to be well-defined.
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \IsThin{f}{m}{n}
+  }
+  \\
+  \inferrule{
+  }{
+    \IsThin{\ThinId}{n}{n}
+  }
+  \and
+  \inferrule{
+    \IsThin{f}{m}{n}
+  }{
+    \IsThin{\ThinKeep{f}}{m+1}{n+1}
+  }
+  \and
+  \inferrule{
+    \IsThin{f}{m}{n}
+  }{
+    \IsThin{\ThinSkip{f}}{m+1}{n}
+  }
+\end{mathparpagebreakable}
+
+We will write $\THIN$ for the category of thinnings induced by the
+above.
+
+\section{Terms}
+
+
+In our term language, we distinguish between \emph{atoms} and
+\emph{variables}, and their respective binders. Variable binders are
+given operational meaning through substitution, whereas atom binders
+are subject to open evaluation. Most binders are variable binders; the
+only atom binder in our language comes from $\FmtKwd{coe}$.
+
+\begin{remark}
+  This is a matter of some subtlety in the context of
+  \emph{normalization-by-evaluation} in which the evaluation and
+  quotation phases of computation are distinguished: while we do not
+  evaluate underneath a variable binder, during the quotation phase we
+  \emph{do} instantiate such a variable binder with a semantic
+  indeterminate or generic element: so, even though we end up
+  transforming the interior of the binder, this is still done through
+  substitution. In contrast, we do evaluate underneath atom binders.
+\end{remark}
+
+Terms are classified by sorts $\tau\in\Braces*{\SortChk,\SortInf}$; we
+will write the judgment $\IsTm{n}{l}{M}{\tau}$ to mean that
+$\FmtTm{M}$ is a term of sort $\tau$ with $n$ atoms and $l$
+variables. In the term language, both atoms and variables are managed
+using De Bruijn indices. An illustrative fragment of the syntax is
+presented below.
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \IsTm{n}{l}{M}{\tau}
+  }
+  \\
+  \and
+  \inferrule[TmAtom]{
+    i<n
+  }{
+    \IsInf{n}{l}{\Atom{i}}
+  }
+  \and
+  \inferrule[TmVar]{
+    i<l
+  }{
+    \IsInf{n}{l}{\Var{i}}
+  }
+  \and
+  \inferrule[TmPi]{
+    \IsChk{n}{l}{A}
+    \\
+    \IsChk{n}{l+1}{B}
+  }{
+    \IsChk{n}{l}{
+      \TExp{\Pi}{A,B}
+    }
+  }
+  \and
+  \inferrule[TmSg]{
+    \IsChk{n}{l}{A}
+    \\
+    \IsChk{n}{l+1}{B}
+  }{
+    \IsChk{n}{l}{
+      \TExp{\Sigma}{A,B}
+    }
+  }
+  \and
+  \inferrule[TmEq]{
+    \IsChk{n}{l+1}{A}
+    \\
+    \IsChk{n}{l}{M}
+    \\
+    \IsChk{n}{l}{N}
+  }{
+    \IsChk{n}{l}{
+      \TExp{eq}{A,M,N}
+    }
+  }
+  \and
+  \inferrule[TmLam]{
+    \IsChk{n}{l+1}{M}
+  }{
+    \IsChk{n}{l}{\TExp{\lambda}{M}}
+  }
+  \and
+  \inferrule[TmCons]{
+    \IsChk{n}{l}{M}
+    \\
+    \IsChk{n}{l}{N}
+  }{
+    \IsChk{n}{l}{\TExp{cons}{M,N}}
+  }
+  \and
+  \inferrule[TmCar]{
+    \IsInf{n}{l}{R}
+  }{
+    \IsInf{n}{l}{\TExp{car}{R}}
+  }
+  \and
+  \inferrule[TmCdr]{
+    \IsInf{n}{l}{R}
+  }{
+    \IsInf{n}{l}{\TExp{cdr}{R}}
+  }
+  \and
+  \inferrule[TmDim0]{
+  }{
+    \IsChk{n}{l}{0}
+  }
+  \and
+  \inferrule[TmDim1]{
+  }{
+    \IsChk{n}{l}{1}
+  }
+  \and
+  \inferrule[TmUp]{
+    \IsInf{n}{l}{R}
+  }{
+    \IsChk{n}{l}{\TExp{\uparrow}{R}}
+  }
+  \and
+  \inferrule[TmApp]{
+    \IsInf{n}{l}{R}
+    \\
+    \IsChk{n}{l}{M}
+  }{
+    \IsInf{n}{l}{\TExp{@}{R,M}}
+  }
+  \and
+  \inferrule[TmDown]{
+    \IsChk{n}{l}{A}
+    \\
+    \IsChk{n}{l}{M}
+  }{
+    \IsInf{n}{l}{\TExp{\downarrow}{A,M}}
+  }
+  \and
+  \inferrule[TmCoe]{
+    \IsChk{n}{l}{I}
+    \\
+    \IsChk{n}{l}{J}
+    \\
+    \IsChk{n+1}{l}{A}
+    \\
+    \IsChk{n}{l}{M}
+  }{
+    \IsInf{n}{l}{
+      \TExp{coe}{
+        I,
+        J,
+        A,
+        M
+      }
+    }
+  }
+\end{mathparpagebreakable}
+
+Note that altogether the definition above forms a family of functors
+$\Parens*{\Tm{\square}{l}{\tau}}:\OpCat{\THIN}\to\SET$, whose
+functorial action is the renaming of atoms.
+
+\section{Semantic Domain}
+
+The semantic domain of our language is really another syntax, in which
+variables are replaced by semantic indeterminates (represented as De
+Bruijn levels), and atoms remain represented as De Bruijn indices. The
+semantic domain captures the weak-head normal forms of our language;
+because we intend to develop a substitution-free operational semantics
+using environments, we must naturally employ a notion of
+\emph{closure}.
+
+\newcommand\SortCan{\FmtKwd{can}}
+\newcommand\SortNeu{\FmtKwd{neu}}
+\newcommand\SortNf{\FmtKwd{nf}}
+\newcommand\SortClo{\FmtKwd{clo}}
+\newcommand\SortBClo{\FmtKwd{bclo}}
+\newcommand\SortEnv[1]{\FmtKwd{env}_{#1}}
+\newcommand\IsVal[3]{{#1}\Vdash\FmtVal{#2}:{#3}}
+\newcommand\Clo[4]{
+  \FmtThin{#1}%
+  \mathbin{\color{gray}*}%
+  \Angles*{
+    \FmtTm{#4}
+    \mathbin{\color{gray}\triangleleft}%
+    \FmtThin{#2}
+    \mathbin{\color{gray}*}%
+    \FmtVal{#3}
+  }
+}
+
+\newcommand\BClo[4]{
+  \FmtThin{#1}%
+  \mathbin{\color{gray}*}%
+  \Angles*{
+    \FmtTm{#4}
+    \mathbin{\color{gray}\triangleleft^+}%
+    \FmtThin{#2}
+    \mathbin{\color{gray}*}%
+    \FmtVal{#3}
+  }
+}
+
+
+Values are classified by sorts
+$\tau\in\Braces*{\SortCan,\SortNeu,\SortNf,\SortEnv{l},\SortClo,\SortBClo}$; for
+such a sort $\tau$, we will write $\IsVal{n}{M}{\tau}$ to mean that
+$\FmtVal{M}$ is a value of sort $\tau$ with $n$ atoms. We no longer
+track the number of variables, because these are replaced by
+indeterminates in the form of De Bruijn levels (which have an absolute
+reference).
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \IsVal{n}{M}{\tau}
+  }
+  \\
+  \inferrule[ValAtom]{
+    i<n
+  }{
+    \IsVal{n}{\Atom{i}}{\SortCan}
+  }
+  \and
+  \inferrule[ValGen]{
+  }{
+    \IsVal{n}{\Var{l}}{\SortNeu}
+  }
+  \and
+  \inferrule[ValDown]{
+    \IsVal{n}{A}{\SortCan}
+    \\
+    \IsVal{n}{M}{\SortCan}
+  }{
+    \IsVal{n}{
+      \VExp{\downarrow}{A,M}
+    }{\SortNf}
+  }
+  \and
+  \inferrule[ValClo]{
+    \IsThin{g}{o}{m}
+    \\
+    \IsThin{f}{m}{n}
+    \\
+    \IsVal{n}{\rho}{\SortEnv{l}}
+    \\
+    \IsTm{n}{l}{M}{\SortChk}
+  }{
+    \IsVal{o}{
+      \Clo{g}{f}{\rho}{M}
+    }{\SortClo}
+  }
+  \and
+  \inferrule[ValBClo]{
+    \IsThin{g}{o}{m}
+    \\
+    \IsThin{f}{m}{n}
+    \\
+    \IsVal{n}{\rho}{\SortEnv{l}}
+    \\
+    \IsTm{n}{l+1}{M}{\SortChk}
+  }{
+    \IsVal{o}{
+      \BClo{g}{f}{\rho}{M}
+    }{\SortBClo}
+  }
+  \and
+  \inferrule[ValEnv]{
+    \forall{i<l}.\ \IsVal{n}{M_i}{\SortCan}
+  }{
+    \IsVal{n}{\Squares{M_i}_{i<l}}{\SortEnv{l}}
+  }
+  \\
+  \inferrule[ValPi]{
+    \IsVal{n}{A}{\SortClo}
+    \\
+    \IsVal{n}{A}{\SortBClo}
+  }{
+    \IsVal{n}{
+      \VExp{\Pi}{A,B}
+    }{\SortCan}
+  }
+  \and
+  \inferrule[ValLam]{
+    \IsVal{n}{M}{\SortClo}
+  }{
+    \IsVal{n}{\VExp{\lambda}{M}}{\SortCan}
+  }
+  \and
+  \inferrule[ValApp]{
+    \IsVal{n}{R}{\SortNeu}
+    \\
+    \IsVal{n}{M}{\SortNf}
+  }{
+    \IsVal{n}{\VExp{@}{R,M}}{\SortNeu}
+  }
+  \and
+  \inferrule[ValCons]{
+    \IsVal{n}{M}{\SortClo}
+    \\
+    \IsVal{n}{N}{\SortClo}
+  }{
+    \IsVal{n}{\VExp{cons}{M,N}}{\SortCan}
+  }
+  \and
+  \inferrule[ValCar]{
+    \IsVal{n}{R}{\SortNeu}
+  }{
+    \IsVal{n}{\VExp{car}{R}}{\SortNeu}
+  }
+  \and
+  \inferrule[ValCdr]{
+    \IsVal{n}{R}{\SortNeu}
+  }{
+    \IsVal{n}{\VExp{cdr}{R}}{\SortNeu}
+  }
+  \and
+  \inferrule[ValCoe]{
+    \IsVal{n}{I}{\SortClo}
+    \\
+    \IsVal{n}{J}{\SortClo}
+    \\
+    \IsVal{n+1}{A}{\SortCan}
+    \\
+    \IsVal{n}{M}{\SortClo}
+  }{
+    \IsVal{n}{
+      \VExp{coe}{I,J,A,M}
+    }{\SortCan}
+  }
+\end{mathparpagebreakable}
+
+
+\section{Evaluation}
+
+At a high level, evaluation takes terms to values; at a finer-grained
+level, however, we will evaluate with respect to a thinning and a
+thinned environment.
+\end{document}
