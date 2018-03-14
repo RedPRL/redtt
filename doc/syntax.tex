@@ -968,6 +968,49 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
     }
   }
   \and
+  \inferrule[ApplyUpPathConst]{
+    \EvalClo{M_\SortClo^\epsilon}{M_\SortCan^\epsilon}
+  }{
+    \Apply{
+      \VExp{\uparrow}{
+        \VExp{path}{A,M_\SortClo^0,M_\SortClo^1},
+        R
+      }
+    }{\epsilon}{M_\SortCan^\epsilon}
+  }
+  \and
+  \inferrule[ApplyUpPathNeu]{
+    \InstClo{A_\SortBClo}{
+      \VExp{\uparrow}{
+        \Interval,
+        S
+      }
+    }{A_\SortCan}
+  }{
+    \Apply{
+      \VExp{\uparrow}{
+        \VExp{path}{A_\SortBClo,M_\SortClo^0,M_\SortClo^1},
+        R
+      }
+    }{
+      \VExp{\uparrow}{
+        \Interval,
+        S
+      }
+    }{
+      \VExp{\uparrow}{
+        A_\SortCan,
+        \VExp{@}{
+          R,
+          \VExp{\uparrow}{
+            \Interval,
+            S
+          }
+        }
+      }
+    }
+  }
+  \and
   \inferrule[ApplyCoePi]{
     \EvalClo{A_\SortClo}{A_\SortCan}
     \\
