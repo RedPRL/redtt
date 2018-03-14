@@ -209,7 +209,7 @@ $\XThin{\varnothing}{n}{m}$.
 \newcommand\TSubstA[3]{
   \TExp{subst_{\Atom{}}}{
     \FmtThin{#1}%
-    \mathbin{{\color{gray}\triangleright}}%
+    \mathbin{{\color{gray}*}}%
     \FmtThin{#2},
     \FmtThin{#3}
   }
@@ -410,7 +410,7 @@ presented below.
 \end{mathparpagebreakable}
 
 
-\newcommand\PushSubstA[4]{\Squares*{\FmtThin{#1}\triangleright\FmtThin{#2}}*\FmtTm{#3}\leadsto\FmtTm{#4}}
+\newcommand\PushSubstA[4]{\Squares*{\FmtThin{#1}*\FmtThin{#2}}*\FmtTm{#3}\leadsto\FmtTm{#4}}
 \newcommand\PushThinV[3]{\FmtThin{#1}*\FmtTm{#2}\leadsto\FmtTm{#3}}
 
 \subsection{Explicit Substitutions}
