@@ -100,6 +100,16 @@
 }
 
 
+\newcommand\EvalClo[2]{\FmtVal{#1}\Downarrow\FmtVal{#2}}
+\newcommand\Eval[5]{\FmtThin{#2}*\FmtVal{#3}\vDash\FmtTm{#4}\mathrel{\Downarrow_{\FmtThin{#1}}}\FmtVal{#5}}
+\newcommand\Apply[3]{\FmtVal{#1}\mathrel{@}\FmtVal{#2}\Downarrow\FmtVal{#3}}
+\newcommand\InstClo[3]{\FmtVal{#1}\bullet\FmtVal{#2}\Downarrow\FmtVal{#3}}
+\newcommand\ThinVal[2]{\widehat{\FmtThin{#1}}\Parens*{\FmtVal{#2}}}
+\newcommand\ThinTmAtom[2]{\widehat{\FmtThin{#1}}_{\Atom{}}\Parens*{\FmtTm{#2}}}
+\newcommand\ThinTmVar[2]{\widehat{\FmtThin{#1}}_{\Var{}}\Parens*{\FmtTm{#2}}}
+
+
+
 
 \begin{document}
 \maketitle
@@ -195,6 +205,22 @@ induced by the above. To simplify notation, we write $\Thin{n}{m}$ for
 $\XThin{\varnothing}{n}{m}$.
 
 \section{Terms}
+
+\newcommand\TSubstA[3]{
+  \TExp{subst_{\Atom{}}}{
+    \FmtThin{#1}%
+    \mathbin{{\color{gray}\triangleright}}%
+    \FmtThin{#2},
+    \FmtThin{#3}
+  }
+}
+
+\newcommand\TThinV[2]{
+  \TExp{thin_{\Var{}}}{
+    \FmtThin{#1},
+    #2
+  }
+}
 
 
 In our term language, we distinguish between \emph{atoms} and
@@ -359,11 +385,171 @@ presented below.
       }
     }
   }
+  \and
+  \inferrule[TmSubstAtom]{
+    \IsTm{m}{l}{M}{\tau}
+    \\
+    \IsXThin{f}{\Parens*{\Tm{\square}{k}{\SortInf}}}{n}{m}
+    \\
+    \IsThin{g}{l}{k}
+  }{
+    \IsTm{n}{l}{
+      \TSubstA{g}{f}{M}
+    }{\tau}
+  }
+  \and
+  \inferrule[TmThinVar]{
+    \IsTm{m}{k}{M}{\tau}
+    \\
+    \IsThin{f}{l}{k}
+  }{
+    \IsTm{n}{l}{
+      \TThinV{f}{M}
+    }{\tau}
+  }
 \end{mathparpagebreakable}
 
-Note that altogether the definition above forms a family of functors
-$\Parens*{\Tm{\square}{l}{\tau}}:\OpCat{\THIN}\to\SET$, whose
-functorial action is the renaming of atoms.
+
+\newcommand\PushSubstA[4]{\Squares*{\FmtThin{#1}\triangleright\FmtThin{#2}}*\FmtTm{#3}\leadsto\FmtTm{#4}}
+\newcommand\PushThinV[3]{\FmtThin{#1}*\FmtTm{#2}\leadsto\FmtTm{#3}}
+
+\subsection{Explicit Substitutions}
+
+In the term language, we have explicit substitutions of atoms
+$\TSubstA{g}{f}{M}$ and thinnings of variables $\TThinV{f}{M}$; these
+can be cheaply \emph{pushed} inward in the following way:
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgSubstA]{
+      \IsTm{m}{l}{M}{\tau}
+      \\
+      \IsXThin{f}{\Parens*{\Tm{\square}{l'}{\SortInf}}}{n}{m}
+      \\
+      \IsThin{g}{l}{l'}
+      \\
+      \IsTm{n}{l}{N}{\tau}
+    }{
+      \DeclBox{
+        \PushSubstA{g^+}{f^+}{M^+}{N^-}
+      }
+    }
+  }
+  \\
+  \inferrule[SubstAId]{}{
+    \PushSubstA{g}{\ThinId}{M}{M}
+  }
+  \and
+  \inferrule[SubstASubstAtom]{
+    \PushSubstA{g'}{f'}{M}{M'}
+    \\
+    \PushSubstA{g}{f}{M'}{M''}
+  }{
+    \PushSubstA{g}{f}{
+      \TSubstA{g'}{f'}{M}
+    }{
+      M''
+    }
+  }
+  \and
+  \inferrule[SubstAThinV]{
+    \PushThinV{h}{M}{M'}
+    \\
+    \PushSubstA{g}{f}{M'}{M''}
+  }{
+    \PushSubstA{g}{f}{\TThinV{h}{M}}{M''}
+  }
+  \and
+  \inferrule[SubstAAtom]{
+    \PushSubstA{\ThinId}{\ThinId}{f_{\Atom{}}\Parens{i}}{M}
+  }{
+    \PushSubstA{g}{f}{\Atom{i}}{
+      \ThinTmVar{g}{M}
+    }
+  }
+  \and
+  \inferrule[SubstAVar]{}{
+    \PushSubstA{g}{f}{\Var{i}}{g_{\Var{\square}}\Parens{i}}
+  }
+  \and
+  \inferrule[SubstALam]{}{
+    \PushSubstA{g}{f}{
+      \TExp{\lambda}{M}
+    }{
+      \TExp{\lambda}{
+        \TSubstA{\ThinSkip{g}}{f}{M}
+      }
+    }
+  }
+  \\
+  \inferrule[SubstACoe]{}{
+    \PushSubstA{g}{f}{
+      \TExp{coe}{
+        I,
+        J,
+        A,
+        M
+      }
+    }{
+      \TExp{coe}{
+        \TSubstA{g}{f}{I},
+        \TSubstA{g}{f}{J},
+        \TSubstA{g}{\ThinSkip{f}}{A},
+        \TSubstA{g}{f}{M}
+      }
+    }
+  }
+\end{mathparpagebreakable}
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgThinV]{
+      \IsTm{n}{k}{M}{\tau}
+      \\
+      \IsThin{f}{l}{k}
+      \\
+      \IsTm{n}{l}{N}{\tau}
+    }{
+      \DeclBox{
+        \PushThinV{f^+}{M^+}{N^-}
+      }
+    }
+  }
+  \\
+  \inferrule[ThinVId]{}{
+    \PushThinV{\ThinId}{M}{M}
+  }
+  \and
+  \inferrule[ThinVSubstA]{
+    \PushSubstA{g}{f}{M}{M'}
+    \\
+    \PushThinV{h}{M'}{M''}
+  }{
+    \PushThinV{h}{
+      \TSubstA{g}{f}{M}
+    }{M''}
+  }
+  \and
+  \inferrule[ThinVThinV]{
+    \PushThinV{f}{M}{M'}
+    \\
+    \PushThinV{g}{M'}{M''}
+  }{
+    \PushThinV{g}{
+      \TThinV{f}{M}
+    }{M''}
+  }
+  \and
+  \inferrule[ThinVLam]{}{
+    \PushThinV{f}{
+      \TExp{\lambda}{M}
+    }{
+      \TExp{\lambda}{
+        \TThinV{\ThinSkip{f}}{M}
+      }
+    }
+  }
+\end{mathparpagebreakable}
 
 \section{Semantic Domain}
 
@@ -447,9 +633,9 @@ reference).
   }
   \and
   \inferrule[ValClo]{
-    \IsXThin{g}{\Parens*{\Val{\square}{\SortCan}}}{o}{n}
+    \IsThin{g}{o}{n}
     \\
-    \IsXThin{f}{\Parens*{\Val{\square}{\SortCan}}}{n}{m}
+    \IsThin{f}{n}{m}
     \\
     \IsVal{m}{\rho}{\SortEnv{l}}
     \\
@@ -461,9 +647,9 @@ reference).
   }
   \and
   \inferrule[ValBClo]{
-    \IsXThin{g}{\Parens*{\Val{\square}{\SortCan}}}{o}{n}
+    \IsThin{g}{o}{n}
     \\
-    \IsXThin{f}{\Parens*{\Val{\square}{\SortCan}}}{n}{m}
+    \IsThin{f}{n}{m}
     \\
     \IsVal{m}{\rho}{\SortEnv{l}}
     \\
@@ -541,30 +727,13 @@ reference).
 
 
 The syntax of values can be reindexed contravariantly along
-value-thinnings $\IsXThin{f}{\Val{\square}{\SortCan}}{m}{n}$; the
-reindexing action is substitution; this also renders the collection of
-value-thinnings into a category.
-
-\begin{remark}
-  It may seem strange that we have a substitution operation on
-  semantic values, since values usually come from an environment, and
-  also embed an environment in their closures. However, the
-  substitution action is necessary to explain descent under
-  \emph{atom} binders such as those found in $\FmtKwd{coe}$ values.
-
-  Substitution on values is very inexpensive, because in each case,
-  the substitution hits a closure and gets suspended: the action of
-  substitution on closures is composition with the suspended thinning.
-\end{remark}
+thinnings $\IsThin{f}{m}{n}$; the
+reindexing action is renaming.
 
 
 
 \section{Evaluation}
-\newcommand\EvalClo[2]{\FmtVal{#1}\Downarrow\FmtVal{#2}}
-\newcommand\Eval[5]{\FmtThin{#2}*\FmtVal{#3}\vDash\FmtTm{#4}\mathrel{\Downarrow_{\FmtThin{#1}}}\FmtVal{#5}}
-\newcommand\Apply[3]{\FmtVal{#1}\mathrel{@}\FmtVal{#2}\Downarrow\FmtVal{#3}}
-\newcommand\InstClo[3]{\FmtVal{#1}\bullet\FmtVal{#2}\Downarrow\FmtVal{#3}}
-\newcommand\ThinVal[2]{\widehat{\FmtThin{#1}}\Parens*{\FmtVal{#2}}}
+
 
 At a high level, evaluation takes terms to values; at a finer-grained
 level, however, we will evaluate with respect to a thinning
@@ -579,12 +748,13 @@ $\IsVal{n}{M_\SortCan}{\SortCan}$.
 We will write $\Eval{g}{f}{\rho}{M}{M}$ as a notation for
 $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
 
+
 \begin{mathparpagebreakable}
   \DeclBox{
     \inferrule[JdgEval]{
-      \IsXThin{g}{\Parens*{\Val{\square}{\SortCan}}}{o}{n}
+      \IsThin{g}{o}{n}
       \\
-      \IsXThin{f}{\Parens*{\Val{\square}{\SortCan}}}{n}{m}
+      \IsThin{f}{n}{m}
       \\
       \IsVal{m}{\rho}{\SortEnv{l}}
       \\
@@ -598,6 +768,26 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
     }
   }
   \\
+  \inferrule[EvalSubstA]{
+    \PushSubstA{j}{h}{M}{M'}
+    \\
+    \Eval{g}{f}{\rho}{M'}{M'}
+  }{
+    \Eval{g}{f}{\rho}{
+      \TSubstA{j}{h}{M}
+    }{M'}
+  }
+  \and
+  \inferrule[EvalThinV]{
+    \PushThinV{h}{M}{M'}
+    \\
+    \Eval{g}{f}{\rho}{M'}{M'}
+  }{
+    \Eval{g}{f}{\rho}{
+      \TThinV{h}{M}
+    }{M'}
+  }
+  \and
   \inferrule[EvalAtom]{}{
     \Eval{g}{f}{\rho}{\Atom{i}}{
       \ThinVal{g}{\Atom{i}}
@@ -977,38 +1167,48 @@ for a binary generalization that checks definitional equivalence.
     }
   }
   \and
-  % \inferrule[QuoteCoeUp]{
-  %   \QuoteCan{\Gamma}{\Interval}{I}{I}
-  %   \\
-  %   \QuoteCan{\Gamma}{\Interval}{J}{J}
-  %   \\
-  %   \QuoteNeu{\Gamma.\nabla\Interval}{R}{R}{A'}
-  %   \\
-  %   \QuoteCan{\Gamma}{
-  %     \ThinVal{
-  %       \ThinRep{\ThinId}{\FmtVal{I}}
-  %     }{A'}
-  %   }{M}{M}
-  % }{
-  %   \QuoteCan{\Gamma}{C}{
-  %     \VExp{coe}{
-  %       I,
-  %       J,
-  %       \VExp{\uparrow}{A,R},
-  %       M
-  %     }
-  %   }{
-  %     \TExp{\uparrow}{
-  %       \TExp{coe}{
-  %         I,
-  %         J,
-  %         \TExp{\uparrow}{R},
-  %         M
-  %       }
-  %     }
-  %   }
-  % }
-  % \and
+  \inferrule[QuoteCoeUp]{
+    \QuoteCan{\Gamma}{\Interval}{I}{I}
+    \\
+    \QuoteCan{\Gamma}{\Interval}{J}{J}
+    \\\\
+    \QuoteNeu{\Gamma.\nabla\Interval}{R}{R}{A'}
+    \\
+    \QuoteCan{\Gamma.\nabla\Interval}{\FmtKwd{U}}{A'}{A'}
+    \\\\
+    \Eval{\ThinId}{\ThinId}{\parallel\Gamma\parallel}{
+      \TExp{subst}{
+        \ThinRep{\ThinId}{
+          \TExp{\downarrow}{
+            \Interval,
+            I
+          }
+        },
+        A'
+      }
+    }{A_I}
+    \\
+    \QuoteCan{\Gamma}{A_I}{M}{M}
+  }{
+    \QuoteCan{\Gamma}{C}{
+      \VExp{coe}{
+        I,
+        J,
+        \VExp{\uparrow}{A,R},
+        M
+      }
+    }{
+      \TExp{\uparrow}{
+        \TExp{coe}{
+          I,
+          J,
+          \TExp{\uparrow}{R},
+          M
+        }
+      }
+    }
+  }
+  \and
   \inferrule[QuoteAtom]{
     \LookupAtom{\Gamma}{i}{A}{f}
   }{
@@ -1065,13 +1265,6 @@ for a binary generalization that checks definitional equivalence.
     }
   }
 \end{mathparpagebreakable}
-
-\paragraph{Problem with substitution}
-
-It's actually not good that we allow substitution of $\SortCan$-values
-for atoms; I think this is actually not well-defined. One almost wants
-some kind of hereditary substitution, but this is partly what we were
-trying to avoid with this setup.
 
 \begin{mathparpagebreakable}
   \DeclBox{
