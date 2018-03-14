@@ -977,38 +977,38 @@ for a binary generalization that checks definitional equivalence.
     }
   }
   \and
-  \inferrule[QuoteCoeUp]{
-    \QuoteCan{\Gamma}{\Interval}{I}{I}
-    \\
-    \QuoteCan{\Gamma}{\Interval}{J}{J}
-    \\
-    \QuoteNeu{\Gamma.\nabla\Interval}{R}{R}{A'}
-    \\
-    \QuoteCan{\Gamma}{
-      \ThinVal{
-        \ThinRep{\ThinId}{\FmtVal{I}}
-      }{A'}
-    }{M}{M}
-  }{
-    \QuoteCan{\Gamma}{C}{
-      \VExp{coe}{
-        I,
-        J,
-        \VExp{\uparrow}{A,R},
-        M
-      }
-    }{
-      \TExp{\uparrow}{
-        \TExp{coe}{
-          I,
-          J,
-          \TExp{\uparrow}{R},
-          M
-        }
-      }
-    }
-  }
-  \and
+  % \inferrule[QuoteCoeUp]{
+  %   \QuoteCan{\Gamma}{\Interval}{I}{I}
+  %   \\
+  %   \QuoteCan{\Gamma}{\Interval}{J}{J}
+  %   \\
+  %   \QuoteNeu{\Gamma.\nabla\Interval}{R}{R}{A'}
+  %   \\
+  %   \QuoteCan{\Gamma}{
+  %     \ThinVal{
+  %       \ThinRep{\ThinId}{\FmtVal{I}}
+  %     }{A'}
+  %   }{M}{M}
+  % }{
+  %   \QuoteCan{\Gamma}{C}{
+  %     \VExp{coe}{
+  %       I,
+  %       J,
+  %       \VExp{\uparrow}{A,R},
+  %       M
+  %     }
+  %   }{
+  %     \TExp{\uparrow}{
+  %       \TExp{coe}{
+  %         I,
+  %         J,
+  %         \TExp{\uparrow}{R},
+  %         M
+  %       }
+  %     }
+  %   }
+  % }
+  % \and
   \inferrule[QuoteAtom]{
     \LookupAtom{\Gamma}{i}{A}{f}
   }{
@@ -1065,6 +1065,13 @@ for a binary generalization that checks definitional equivalence.
     }
   }
 \end{mathparpagebreakable}
+
+\paragraph{Problem with substitution}
+
+It's actually not good that we allow substitution of $\SortCan$-values
+for atoms; I think this is actually not well-defined. One almost wants
+some kind of hereditary substitution, but this is partly what we were
+trying to avoid with this setup.
 
 \begin{mathparpagebreakable}
   \DeclBox{
