@@ -1176,17 +1176,16 @@ for a binary generalization that checks definitional equivalence.
     \\
     \QuoteCan{\Gamma.\nabla\Interval}{\FmtKwd{U}}{A'}{A'}
     \\\\
-    \Eval{\ThinId}{\ThinId}{\parallel\Gamma\parallel}{
-      \TExp{subst}{
-        \ThinRep{\ThinId}{
-          \TExp{\downarrow}{
-            \Interval,
-            I
-          }
-        },
-        A'
+    \PushSubstA{\ThinId}{
+      \ThinRep{\ThinId}{
+        \TExp{\downarrow}{
+          \Interval,
+          I
+        }
       }
-    }{A_I}
+    }{A'}{A_I}
+    \\
+    \Eval{\ThinId}{\ThinId}{\parallel\Gamma\parallel}{A_I}{A_I}
     \\
     \QuoteCan{\Gamma}{A_I}{M}{M}
   }{
