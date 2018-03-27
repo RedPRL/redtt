@@ -1466,6 +1466,43 @@ for a binary generalization that checks definitional equivalence.
       A_\SortCan%
     }
   }
+  \and
+  \inferrule[QuoteCar]{
+    \QuoteNeu{\Gamma}{R}{R}{
+      \VExp{\Sigma}{A_\SortClo,B_\SortBClo}
+    }
+    \\
+    \EvalClo{A_\SortClo}{A_\SortCan}
+  }{
+    \QuoteNeu{\Gamma}{
+      \VExp{car}{R}
+    }{
+      \TExp{car}{R}
+    }{A_\SortCan}
+  }
+  \and
+  \inferrule[QuoteCdr]{
+    \QuoteNeu{\Gamma}{R}{R}{
+      \VExp{\Sigma}{A_\SortClo,B_\SortBClo}
+    }
+    \\
+    \EvalClo{A_\SortClo}{A_\SortCan}
+    \\
+    \InstClo{B_\SortBClo}{
+      \VExp{\uparrow}{
+        A_\SortCan,
+        \VExp{car}{R}
+      }
+    }{B_\SortCan}
+  }{
+    \QuoteNeu{\Gamma}{
+      \VExp{cdr}{R}
+    }{
+      \TExp{cdr}{R}
+    }{
+      B_\SortCan%
+    }
+  }
 \end{mathparpagebreakable}
 
 \begin{mathparpagebreakable}
