@@ -107,8 +107,8 @@
 \newcommand\ThinVal[2]{\widehat{\FmtThin{#1}}\Parens*{\FmtVal{#2}}}
 \newcommand\ThinTmAtom[2]{\widehat{\FmtThin{#1}}_{\Atom{}}\Parens*{\FmtTm{#2}}}
 \newcommand\ThinTmVar[2]{\widehat{\FmtThin{#1}}_{\Var{}}\Parens*{\FmtTm{#2}}}
-
-
+\newcommand\Car[2]{\FmtVal{#1}\ \mathbf{car}\Downarrow\FmtVal{#2}}
+\newcommand\Cdr[2]{\FmtVal{#1}\ \mathbf{cdr}\Downarrow\FmtVal{#2}}
 
 
 \begin{document}
@@ -902,6 +902,26 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
       N
     }
   }
+  \and
+  \inferrule[EvalCar]{
+    \Eval{g}{f}{\rho}{R}{M}
+    \\
+    \Car{M}{N}
+  }{
+    \Eval{g}{f}{\rho}{
+      \TExp{car}{R}
+    }{N}
+  }
+  \and
+  \inferrule[EvalCdr]{
+    \Eval{g}{f}{\rho}{R}{M}
+    \\
+    \Cdr{M}{N}
+  }{
+    \Eval{g}{f}{\rho}{
+      \TExp{cdr}{R}
+    }{N}
+  }
 \end{mathparpagebreakable}
 
 
@@ -1069,6 +1089,146 @@ places. It is easy to verify that the semantic term is well-formed
 using the strongly-scoepd term formation rules given; moreover, the
 thinnings will generally be inexpensive, since they tend to pile up on
 closures.
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgCar]{
+      \IsVal{n}{M}{\SortCan}
+      \\
+      \IsVal{n}{N}{\SortCan}
+    }{
+      \DeclBox{
+        \Car{M^+}{N^-}
+      }
+    }
+  }
+  \\
+  \inferrule[CarCons]{}{
+    \Car{
+      \VExp{cons}{M,N}
+    }{M}
+  }
+  \and
+  \inferrule[CarUpSg]{
+    \EvalClo{A_\SortClo}{A_\SortCan}
+  }{
+    \Car{
+      \VExp{\uparrow}{
+        \VExp{\Sigma}{A_\SortClo,B_\SortBClo},
+        R
+      }
+    }{
+      \VExp{\uparrow}{
+        A_\SortCan,
+        \VExp{car}{R}
+      }
+    }
+  }
+  \and
+  \inferrule[CarCoeSg]{
+    \EvalClo{A_\SortClo}{A_\SortCan}
+    \\
+    \Car{M}{N}
+  }{
+    \Car{
+      \VExp{coe}{
+        I,
+        J,
+        \VExp{\Sigma}{
+          A_\SortClo,
+          B_\SortBClo%
+        },
+        M
+      }
+    }{
+      \VExp{coe}{
+        I,
+        J,
+        A_\SortCan,
+        N
+      }
+    }
+  }
+\end{mathparpagebreakable}
+
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgCdr]{
+      \IsVal{n}{M}{\SortCan}
+      \\
+      \IsVal{n}{N}{\SortCan}
+    }{
+      \DeclBox{
+        \Cdr{M^+}{N^-}
+      }
+    }
+  }
+  \\
+  \inferrule[CdrCons]{}{
+    \Cdr{
+      \VExp{cons}{M,N}
+    }{N}
+  }
+  \and
+  \inferrule[CdrUpSg]{
+    \EvalClo{A_\SortClo}{A_\SortCan}
+    \\
+    \InstClo{B_\SortBClo}{
+      \VExp{\uparrow}{
+        A_\SortCan,
+        \VExp{car}{R}
+      }
+    }{B_\SortCan}
+  }{
+    \Cdr{
+      \VExp{\uparrow}{
+        \VExp{\Sigma}{A_\SortClo,B_\SortBClo},
+        R
+      }
+    }{
+      \VExp{\uparrow}{
+        B_\SortCan,
+        \VExp{cdr}{R}
+      }
+    }
+  }
+  \and
+  \inferrule[CdrCoeSg]{
+    \Car{M}{M_0}
+    \\
+    \Cdr{M}{M_1}
+    \\
+    \EvalClo{A_\SortClo}{A_\SortCan}
+    \\\\
+    \InstClo{B_\SortBClo}{
+      \VExp{coe}{
+        \ThinVal{\ThinSkip{\ThinId}}{I},
+        \Atom{0},
+        \ThinVal{\ThinKeep{\ThinSkip{\ThinId}}}{A_\SortCan},
+        \ThinVal{\ThinSkip{\ThinId}}{M_0}
+      }
+    }{B_\SortCan}
+  }{
+    \Cdr{
+      \VExp{coe}{
+        I,
+        J,
+        \VExp{\Sigma}{
+          A_\SortClo,
+          B_\SortBClo%
+        },
+        M
+      }
+    }{
+      \VExp{coe}{
+        I,
+        J,
+        B_\SortCan,
+        M_1
+      }
+    }
+  }
+\end{mathparpagebreakable}
 
 
 \section{Quotation}
