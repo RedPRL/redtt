@@ -31,7 +31,7 @@
 
 \usepackage{stmaryrd}
 
-\title{Cartesian Cubical Type Theory:\\ Operational Semantics and
+\title{Cartesian Cubical Type Theory:\\ Reduction-Free Semantics and
   Definitional Equivalence} \author{Jon Sterling}
 
 \newcommand\FmtKwd[1]{\mathsf{#1}}
@@ -114,14 +114,14 @@
 \begin{document}
 \maketitle
 
-The purpose of these notes is to develop an operational semantics and
-algorithmic theory of definitional equivalence for cartesian cubical
-type theory which is as efficient and carefully organized as possible:
-in particular, we arrange to calculate all substitutions and renamings
-lazily using environments and closures. Our definition of both the
-syntactic and the semantic domain is strongly scoped, which makes it
-easier to verify the that we have correctly resolved the contradiction
-between the name and the location of a bound variable.
+The purpose of these notes is to develop a reduction-free semantics
+and algorithmic theory of definitional equivalence for cartesian
+cubical type theory which is as efficient and carefully organized as
+possible: in particular, we arrange to calculate all substitutions and
+renamings lazily using environments and closures. Our definition of
+both the syntactic and the semantic domain is strongly scoped, which
+makes it easier to verify the that we have correctly resolved the
+contradiction between the name and the location of a bound variable.
 
 In these notes, we use colors to distinguish objects of different
 (meta) sorts from each other, in order to avoid getting lost in a
@@ -133,8 +133,8 @@ generalized thinnings comes from Conor McBride (as far as I am aware).
 
 \section{Defunctionalized NbE}
 
-I develop an open operational semantics for Cartesian Cubical Type
-Theory inspired by normalization-by-evaluation (NbE), in its
+We develop evaluation and quotation judgments for Cartesian Cubical
+Type Theory inspired by normalization-by-evaluation (NbE), in its
 \emph{defunctionalized} variant. Often NbE is presented using domain
 models and binding is represented using meta-level functions, and
 evaluation and quotation are intertwined. My perspective is that the
@@ -225,9 +225,9 @@ $\XThin{\varnothing}{n}{m}$.
 
 In our term language, we distinguish between \emph{atoms} and
 \emph{variables}, and their respective binders. Variable binders are
-given operational meaning through substitution, whereas atom binders
-are subject to open evaluation. Most binders are variable binders; the
-only atom binder in our language comes from $\FmtKwd{coe}$.
+given meaning through substitution, whereas atom binders are subject
+to open evaluation. Most binders are variable binders; the only atom
+binder in our language comes from $\FmtKwd{coe}$.
 
 
 \begin{remark}
@@ -557,9 +557,8 @@ The semantic domain of our language is really another syntax, in which
 variables are replaced by semantic indeterminates (represented as De
 Bruijn levels), and atoms remain represented as De Bruijn indices. The
 semantic domain captures the weak-head normal forms of our language;
-because we intend to develop a substitution-free operational semantics
-using environments, we must naturally employ a notion of
-\emph{closure}.
+because we intend to develop a substitution-free evaluation semantics using
+environments, we must naturally employ a notion of \emph{closure}.
 
 \newcommand\SortCan{\FmtKwd{can}}
 \newcommand\SortNeu{\FmtKwd{neu}}
