@@ -433,6 +433,28 @@ presented below.
     }
   }
   \and
+  \inferrule[TmHCom]{
+    \IsChk{n}{l}{I}
+    \\
+    \IsChk{n}{l}{J}
+    \\
+    \IsChk{n}{l}{A}
+    \\
+    \IsChk{n}{l}{M}
+    \\
+    \IsTm{n}{l}{S}{\SortSys}
+  }{
+    \IsInf{n}{l}{
+      \TExp{hcom}{
+        I,
+        J,
+        A,
+        M,
+        S
+      }
+    }
+  }
+  \and
   \inferrule[TmSubstAtom]{
     \IsTm{m}{l}{M}{\tau}
     \\
