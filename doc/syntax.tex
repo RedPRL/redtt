@@ -1,6 +1,7 @@
 \documentclass{article}
+\usepackage[colorlinks]{hyperref}
+\usepackage{natbib}
 
-% for dumb dingbats
 \usepackage{fontawesome}
 \usepackage{dingbat}
 
@@ -13,6 +14,7 @@
 \usepackage{mathpartir}
 \usepackage[dvipsnames]{xcolor}
 \usepackage{fullpage}
+\usepackage{manfnt}
 
 \usepackage{mathtools}
 
@@ -134,7 +136,7 @@ generalized thinnings comes from Conor McBride (as far as I am aware).
 \section{Defunctionalized NbE}
 
 We develop evaluation and quotation judgments for Cartesian Cubical
-Type Theory inspired by normalization-by-evaluation (NbE), in its
+Type Theory inspired by normalization by evaluation (NbE), in its
 \emph{defunctionalized} variant. Often NbE is presented using domain
 models and binding is represented using meta-level functions, and
 evaluation and quotation are intertwined. My perspective is that the
@@ -143,6 +145,9 @@ implementation; therefore, we choose to suspend in syntax the
 structure of the NbE algorithm, using closures and shifts in the
 semantic domain. In this style of NbE, the evaluation function is
 called from the quotation function, but not vice versa.
+
+The state of the art in the science of normalization by evaluation is found in
+Andreas Abel's habilitation thesis~\citep{abel:2013}; other relevant sources are included in the bibliography of these notes.
 
 \paragraph{Why NbE?}
 
@@ -155,6 +160,11 @@ with rewriting rules; it is typical of \emph{rewriting-theory
 of open term behavior: indeed, any account of computation for open
 terms of negative type must explain not only reduction, but also
 expansion.
+
+\textbf{I want to clarify that my main goal is not to acquire a normalization
+function.} I am trying to decide definitional equivalence, and the simplest way
+to do this algorithmically follows the structure of NbE very closely
+(regardless of whether it is instantiated to yield a normalization function).
 
 
 \section{Thinnings}
@@ -232,7 +242,7 @@ binder in our language comes from $\FmtKwd{coe}$.
 
 \begin{remark}
   This is a matter of some subtlety in the context of
-  \emph{normalization-by-evaluation} in which the evaluation and
+  \emph{normalization by evaluation} in which the evaluation and
   quotation phases of computation are distinguished: while we do not
   evaluate underneath a variable binder, during the quotation phase we
   \emph{do} instantiate such a variable binder with a semantic
@@ -729,6 +739,37 @@ The syntax of values can be reindexed contravariantly along
 thinnings $\IsThin{f}{m}{n}$; the
 reindexing action is renaming.
 
+\begin{remark}[Reification and reflection]
+
+  In modern NbE, eta expansion is divided into two phases called
+  ``reification'' and ``reflection'', which occur entirely at the level of the
+  semantic domain. Reflection $\uparrow$ embeds the neutral values into the
+  canonical values, and reification $\downarrow$ embeds the canonical values
+  into the normal values.
+%
+  In this presentation so far, we have not yet phrased things in terms of
+  reification and ``normal values''; I will change this shortly.
+
+\end{remark}
+
+
+\begin{remark}[Extension with singleton and extension types]
+
+  Reflection of neutral values into canonical values is present in the semantic
+  domain as a ``free'' constructor, rather than as an operation. This is
+  because reflection is calculated lazily.
+
+  To extend with constructs like singleton-type (and extension types), it is
+  necessary to impose an equational law on reflection: basically, reflecting a
+  neutral of singleton type should project out a canonical value from the
+  singleton type.
+
+  There are a couple of ways to enact this equation. One is to change
+  reflection into a ``smart operation''; another way, however, would be to add
+  cases to each of the rules that match suspended reflections, and perform the
+  expansion in-line. It's not yet clear to me which style is best.
+
+\end{remark}
 
 
 \section{Evaluation}
@@ -1565,5 +1606,11 @@ for a binary generalization that checks definitional equivalence.
     \LookupVar{\Gamma.B}{n+1}{A}{f}
   }
 \end{mathparpagebreakable}
+
+
+\nocite{abel-coquand-pagano:2009, abel-vezzosi-winterhalter:2017, abcfhl:2017, cchm:2017, altenkirch-mcbride:2006, altenkirch-mcbride-swierstra:2007, stone-harper:2006}
+
+\bibliographystyle{plainnat}
+\bibliography{references/refs}
 
 \end{document}

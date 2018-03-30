@@ -1,0 +1,3 @@
+[submodule "doc/references"]
+	path = doc/references
+	url = git@github.com:jonsterling/bibtex-references.git
