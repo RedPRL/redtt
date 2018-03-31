@@ -1239,18 +1239,17 @@ closures.
   \and
   \inferrule[CarUpSg]{
     \EvalClo{A_\SortClo}{A_\SortCan}
+    \\
+    \Reflect{A_\SortCan}{
+      \VExp{car}{R}
+    }{M}
   }{
     \Car{
       \VExp{\uparrow}{
         \VExp{\Sigma}{A_\SortClo,B_\SortBClo},
         R
       }
-    }{
-      \VExp{\uparrow}{
-        A_\SortCan,
-        \VExp{car}{R}
-      }
-    }
+    }{M}
   }
   \and
   \inferrule[CarCoeSg]{
@@ -1301,24 +1300,25 @@ closures.
   \inferrule[CdrUpSg]{
     \EvalClo{A_\SortClo}{A_\SortCan}
     \\
-    \InstClo{B_\SortBClo}{
+    \Car{
       \VExp{\uparrow}{
-        A_\SortCan,
-        \VExp{car}{R}
+        \VExp{\Sigma}{A_\SortClo,B_\SortBClo},
+        R
       }
-    }{B_\SortCan}
+    }{M}
+    \\
+    \InstClo{B_\SortBClo}{M}{B_\SortCan}
+    \\
+    \Reflect{B_\SortCan}{
+      \VExp{cdr}{R}
+    }{N}
   }{
     \Cdr{
       \VExp{\uparrow}{
         \VExp{\Sigma}{A_\SortClo,B_\SortBClo},
         R
       }
-    }{
-      \VExp{\uparrow}{
-        B_\SortCan,
-        \VExp{cdr}{R}
-      }
-    }
+    }{N}
   }
   \and
   \inferrule[CdrCoeSg]{
