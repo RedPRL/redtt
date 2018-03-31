@@ -1,8 +1,8 @@
 type ('i, 'a) tube = 'i * 'i * 'a
 type ('i, 'a) system = ('i, 'a) tube list
 
-type atm = A of int
-type var = V of int
+type atm = int
+type var = int
 
 type 'a vbnd = VB of 'a
 type 'a abnd = AB of 'a
@@ -42,6 +42,6 @@ type _ t =
 | Dim1 : chk t
 
 let path (VB ty, tm0, tm1) = 
-  let tube0 = (Up (Var (V 0)), Dim0, ThinVar (tm0, Thin.skip Thin.id)) in
-  let tube1 = (Up (Var (V 0)), Dim1, ThinVar (tm1, Thin.skip Thin.id)) in
+  let tube0 = (Up (Var 0), Dim0, ThinVar (tm0, Thin.skip Thin.id)) in
+  let tube1 = (Up (Var 0), Dim1, ThinVar (tm1, Thin.skip Thin.id)) in
   Pi (Interval, VB (Ext (ty, [tube0; tube1])))
