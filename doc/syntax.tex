@@ -728,7 +728,7 @@ reference).
   \inferrule[ValAtom]{
     i<n
   }{
-    \IsVal{n}{\Atom{i}}{\SortCan}
+    \IsVal{n}{\Atom{i}}{\SortNeu}
   }
   \and
   \inferrule[ValGen]{
@@ -1331,7 +1331,10 @@ closures.
     \InstClo{B_\SortBClo}{
       \VExp{coe}{
         \ThinVal{\ThinSkip{\ThinId}}{I},
-        \Atom{0},
+        \VExp{\uparrow}{
+          \Interval,
+          \Atom{0}
+        },
         \ThinVal{\ThinKeep{\ThinSkip{\ThinId}}}{A_\SortCan},
         \ThinVal{\ThinSkip{\ThinId}}{M_0}
       }
