@@ -509,10 +509,14 @@ Path types can be defined in terms of dependent function and extension types as 
     \TExp{ext}{
       A,
       \Squares*{
-        \Tube{\Var{0}}{0}{
+        \Tube{
+          \TExp{\uparrow}{\Var{0}}
+        }{0}{
           \ThinTmVar{\ThinSkip{\ThinId}}{M}
         },
-        \Tube{\Var{0}}{1}{
+        \Tube{
+          \TExp{\uparrow}{\Var{0}}
+        }{1}{
           \ThinTmVar{\ThinSkip{\ThinId}}{N}
         }
       }
