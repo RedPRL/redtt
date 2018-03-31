@@ -1143,8 +1143,6 @@ with an \emph{abort}. (TODO)
   }
   \and
   \inferrule[ApplyUpPi]{
-    \EvalClo{A_\SortClo}{A_\SortCan}
-    \\
     \InstClo{B_\SortClo}{N}{B_\SortCan}
     \\
     \Reflect{B_\SortCan}{
@@ -1165,7 +1163,7 @@ with an \emph{abort}. (TODO)
     \InstClo{B_\SortBClo}{
       \VExp{coe}{
         \ThinVal{\ThinSkip{\ThinId}}{J},
-        \Atom{0},
+        \VExp{\uparrow}{\Interval,\Atom{0}},
         \ThinVal{
           \ThinKeep{\ThinSkip{\ThinId}}
         }{A_\SortCan},
