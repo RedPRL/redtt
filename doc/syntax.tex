@@ -32,6 +32,7 @@
 
 
 \usepackage{stmaryrd}
+\usepackage{wasysym}
 
 \title{Cartesian Cubical Type Theory:\\ Reduction-Free Semantics and
   Definitional Equivalence} \author{Jon Sterling}
@@ -50,6 +51,9 @@
 \newcommand\ThinKeep[1]{\mbox{\leftthumbsdown}\!\!\rangle\!{#1}\!\langle\!\!\mbox{\rightthumbsdown}}
 \newcommand\ThinSkip[1]{{#1}.\mbox{\faTrashO}}
 \newcommand\ThinRep[2]{{#1}.\Squares*{{\normalcolor{}#2}}}
+
+\newcommand\Tube[3]{{#1}={#2}\triangleright{#3}}
+\newcommand\BTube[3]{{#1}={#2}\mathbin{\triangleright^+}{#3}}
 
 \usepackage{xinttools}
 
@@ -76,6 +80,7 @@
 
 \newcommand\SortCofib{\FmtKwd{cofig}}
 \newcommand\SortSys{\FmtKwd{sys}}
+\newcommand\SortBSys{\FmtKwd{bsys}}
 
 
 \newcommand\Tm[3]{{#1}\mid{#2}\vdash{#3}}
@@ -108,6 +113,7 @@
 
 \newcommand\EvalClo[2]{\FmtVal{#1}\Downarrow\FmtVal{#2}}
 \newcommand\Eval[5]{\FmtThin{#2}*\FmtVal{#3}\vDash\FmtTm{#4}\mathrel{\Downarrow_{\FmtThin{#1}}}\FmtVal{#5}}
+\newcommand\Reflect[3]{\FmtVal{#1}\ni\FmtVal{#2}\uparrow\FmtVal{#3}}
 \newcommand\Apply[3]{\FmtVal{#1}\mathrel{@}\FmtVal{#2}\Downarrow\FmtVal{#3}}
 \newcommand\InstClo[3]{\FmtVal{#1}\bullet\FmtVal{#2}\Downarrow\FmtVal{#3}}
 \newcommand\ThinVal[2]{\widehat{\FmtThin{#1}}\Parens*{\FmtVal{#2}}}
@@ -415,9 +421,33 @@ presented below.
   }{
     \IsTm{n}{l}{
       \Squares*{
-        \overline{I_i=J_i\mapsto M_i}
+        \overline{
+          \Tube{I_i}{J_i}{M_i}
+        }
       }
     }{\SortSys}
+  }
+  \and
+  \inferrule[TmBSys]{
+    \overline{
+      \IsChk{n}{l}{I_i}
+    }
+    \\
+    \overline{
+      \IsChk{n}{l}{J_i}
+    }
+    \\
+    \overline{
+      \IsChk{n}{l+1}{M_i}
+    }
+  }{
+    \IsTm{n}{l}{
+      \Squares*{
+        \overline{
+          \BTube{I_i}{J_i}{M_i}
+        }
+      }
+    }{\SortBSys}
   }
   \and
   \inferrule[TmExtend]{
@@ -442,7 +472,7 @@ presented below.
     \\
     \IsChk{n}{l}{M}
     \\
-    \IsTm{n}{l}{S}{\SortSys}
+    \IsTm{n}{l}{S}{\SortBSys}
   }{
     \IsInf{n}{l}{
       \TExp{hcom}{
@@ -1046,6 +1076,48 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
   }
 \end{mathparpagebreakable}
 
+\begin{mathparpagebreakable}
+  \DeclBox{
+    \inferrule[JdgReflect]{
+      \IsVal{n}{A}{\SortCan}
+      \\
+      \IsVal{n}{R}{\SortNeu}
+      \\
+      \IsVal{n}{M}{\SortCan}
+    }{
+      \DeclBox{\Reflect{A^+}{R^+}{M^-}}
+    }
+  }
+  \\
+  \inferrule[ReflectExtTrue]{
+    k \text{ minimal such that } \FmtVal{I_k}\equiv\FmtVal{J_k}
+    \\
+    \EvalClo{M_k^\SortClo}{M_k^\SortCan}
+  }{
+    \Reflect{
+      \VExp{ext}{
+        A,
+        \Squares*{
+          \overline{
+            \Tube{I_i}{J_i}{M_i^\SortClo}
+          }
+        }
+      }
+    }{
+      R
+    }{
+      M_k^\SortCan
+    }
+  }
+  \and
+  \inferrule[ReflectOtherwise]{
+    \text{(otherwise)}
+  }{
+    \Reflect{A}{R}{
+      \VExp{\uparrow}{A,R}
+    }
+  }
+\end{mathparpagebreakable}
 
 \begin{mathparpagebreakable}
   \DeclBox{
@@ -1070,21 +1142,17 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
     \EvalClo{A_\SortClo}{A_\SortCan}
     \\
     \InstClo{B_\SortClo}{N}{B_\SortCan}
+    \\
+    \Reflect{B_\SortCan}{
+      \VExp{@}{R,N}
+    }{M}
   }{
     \Apply{
       \VExp{\uparrow}{
         \VExp{\Pi}{A_\SortClo,B_\SortBClo},
         R
       }
-    }{N}{
-      \VExp{\uparrow}{
-        B_\SortCan,
-        \VExp{@}{
-          R,
-          N
-        }
-      }
-    }
+    }{N}{M}
   }
   \and
   \inferrule[ApplyUpPathConst]{
@@ -1102,9 +1170,13 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
     \InstClo{A_\SortBClo}{
       \VExp{\uparrow}{
         \Interval,
-        S
+        R'
       }
     }{A_\SortCan}
+    \\
+    \Reflect{A_\SortCan}{
+      \VExp{@}{R,\VExp{\uparrow}{\Interval,R'}}
+    }{M}
   }{
     \Apply{
       \VExp{\uparrow}{
@@ -1114,19 +1186,10 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
     }{
       \VExp{\uparrow}{
         \Interval,
-        S
+        R'
       }
     }{
-      \VExp{\uparrow}{
-        A_\SortCan,
-        \VExp{@}{
-          R,
-          \VExp{\uparrow}{
-            \Interval,
-            S
-          }
-        }
-      }
+      M
     }
   }
   \and

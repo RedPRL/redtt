@@ -1,5 +1,6 @@
 _opam
 *.install
+doc/syntax.pdf
 
 ### https://raw.github.com/github/gitignore/fad779220742a6d54ccfc0c1a0e5b3d820253de6/Global/Emacs.gitignore
 
@@ -31,7 +32,7 @@ tramp
 *.rel
 
 # AUCTeX auto folder
-/auto/
+auto/
 
 # cask packages
 .cask/
