@@ -5,6 +5,8 @@ type neu = [`Neu]
 
 type 'a bnd = B of 'a
 
+(* TODO: add systems, extension types *)
+
 type _ t = 
   | Idx : int -> can t
   | Lvl : int -> neu t
