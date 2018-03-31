@@ -317,18 +317,6 @@ presented below.
     }
   }
   \and
-  \inferrule[TmEq]{
-    \IsChk{n}{l+1}{A}
-    \\
-    \IsChk{n}{l}{M}
-    \\
-    \IsChk{n}{l}{N}
-  }{
-    \IsChk{n}{l}{
-      \TExp{eq}{A,M,N}
-    }
-  }
-  \and
   \inferrule[TmLam]{
     \IsChk{n}{l+1}{M}
   }{
