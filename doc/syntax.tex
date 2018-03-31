@@ -1229,10 +1229,12 @@ closures.
     }
   }
   \\
-  \inferrule[CarCons]{}{
+  \inferrule[CarCons]{
+    \EvalClo{M_\SortClo}{M_\SortCan}
+  }{
     \Car{
-      \VExp{cons}{M,N}
-    }{M}
+      \VExp{cons}{M_\SortClo,N_\SortClo}
+    }{M_\SortCan}
   }
   \and
   \inferrule[CarUpSg]{
@@ -1289,15 +1291,15 @@ closures.
     }
   }
   \\
-  \inferrule[CdrCons]{}{
+  \inferrule[CdrCons]{
+    \EvalClo{N_\SortClo}{N_\SortCan}
+  }{
     \Cdr{
-      \VExp{cons}{M,N}
-    }{N}
+      \VExp{cons}{M_\SortClo,N_\SortClo}
+    }{N_\SortCan}
   }
   \and
   \inferrule[CdrUpSg]{
-    \EvalClo{A_\SortClo}{A_\SortCan}
-    \\
     \Car{
       \VExp{\uparrow}{
         \VExp{\Sigma}{A_\SortClo,B_\SortBClo},

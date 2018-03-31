@@ -62,6 +62,12 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
       let vfun = eval g (tm0, rho, f) in
       let varg = eval g (tm1, rho, f) in
       apply vfun varg
+    | Tm.Car tm -> 
+      let v = eval g (tm, rho, f) in
+      car v
+    | Tm.Cdr tm -> 
+      let v = eval g (tm, rho, f) in
+      cdr v
     | _ -> failwith "TODO"
 
 and eval_abnd g (Tm.AB tm, rho, f) = 
@@ -83,6 +89,39 @@ and apply vfun varg =
     let vapp = apply v (Coe (vd1, vd0, B vdom, varg)) in
     Coe (vd0, vd1, B vcod, vapp)
   | _ -> failwith "apply"
+
+
+and car v = 
+  match v with 
+  | Cons (clo, _) -> eval_clo clo
+  | Up (Sg (dom, cod), vneu) -> 
+    let vdom = eval_clo dom in
+    reflect vdom (Car vneu)
+  | Coe (vd0, vd1, B (Sg (dom, cod)), v) ->
+    let vdom = eval_clo dom in
+    let v' = car v in
+    Coe (vd0, vd1, B vdom, v')
+  | _ -> failwith "car"
+
+and cdr v = 
+  match v with 
+  | Cons (_, clo) -> eval_clo clo
+  | Up (Sg (dom, cod), vneu) ->
+    let vcar = car v in
+    let vcod = inst_bclo cod vcar in
+    reflect vcod (Cdr vneu)
+  | Coe (vd0, vd1, B (Sg (dom, cod)), v) -> 
+    let vcar = car v in
+    let vcdr = cdr v in
+    let vdom = eval_clo dom in
+    let vd0' = thin (Thin.skip Thin.id) vd0 in
+    let vgen = reflect Interval (Idx 0) in
+    let vdom' = thin (Thin.keep (Thin.skip Thin.id)) vdom in
+    let vcar' = thin (Thin.skip Thin.id) vcar in
+    let vcoe = Coe (vd0', vgen, B vdom', vcar') in
+    let vcod = inst_bclo cod vcoe in
+    Coe (vd0, vd1, B vcod, vcdr)
+  | _ -> failwith "cdr"
 
 and reflect vty v = failwith "reflect"
 
