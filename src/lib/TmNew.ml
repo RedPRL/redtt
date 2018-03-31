@@ -10,12 +10,12 @@ type 'a abnd = AB of 'a
 type chk = [`Chk]
 type inf = [`Inf]
 
-module Lvl = 
+module Lvl =
 struct
   type t = Omega | Const of int
 end
 
-type _ t = 
+type _ t =
 | ThinAtom : 'a t * inf t Thin.t * Thin.t0 -> 'a t
 | ThinVar : 'a t * Thin.t0 -> 'a t
 
@@ -41,7 +41,7 @@ type _ t =
 | Dim0 : chk t
 | Dim1 : chk t
 
-let path (VB ty, tm0, tm1) = 
+let path (VB ty, tm0, tm1) =
   let tube0 = (Up (Var 0), Dim0, ThinVar (tm0, Thin.skip Thin.id)) in
   let tube1 = (Up (Var 0), Dim1, ThinVar (tm1, Thin.skip Thin.id)) in
   Pi (Interval, VB (Ext (ty, [tube0; tube1])))
