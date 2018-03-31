@@ -32,6 +32,8 @@ and env = can t list
 and clo = Clo of Thin.t0 * (Tm.chk Tm.t * env * Thin.t0)
 and bclo = BClo of Thin.t0 * (Tm.chk Tm.t Tm.vbnd * env * Thin.t0)
 
+(* This should be cheap, because we bottom out at a closure very quickly; the action of
+   thinning on a closure is just composition with the closure's outer thinning. *)
 let thin : type a. Thin.t0 -> a t -> a t = 
   fun _ -> failwith "TODO: thin"
 

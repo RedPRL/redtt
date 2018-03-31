@@ -12,4 +12,6 @@ val keep : 'x t -> 'x t
 val skip : 'x t -> 'x t
 val sub : 'x t -> 'x -> 'x t
 
+(* TODO: add composition *)
+
 val out : 'x t -> ('x, 'x t) f
