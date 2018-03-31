@@ -6,7 +6,7 @@ type neu = [`Neu]
 type 'a bnd = B of 'a
 
 type _ t = 
-  | Idx : int -> neu t
+  | Idx : int -> can t
   | Lvl : int -> neu t
 
   | Up : can t * neu t -> can t
@@ -45,7 +45,7 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
     match tm with 
     | Tm.ThinAtom _ -> failwith "todo"
     | Tm.ThinVar _ -> failwith "todo"
-    | Tm.Atom i -> failwith "todo"
+    | Tm.Atom i -> thin g (Idx i)
     | Tm.Var i -> failwith "todo"
     | Tm.Pi (dom, cod) -> Pi (clo g (dom, rho, f), bclo g (cod, rho, f))
     | Tm.Sg (dom, cod) -> Sg (clo g (dom, rho, f), bclo g (cod, rho, f))
@@ -82,7 +82,7 @@ and apply vfun varg =
   | Coe (vd0, vd1, B (Pi (dom, cod)), v) ->
     let vdom = eval_clo dom in
     let vd1' = thin (Thin.skip Thin.id) vd1 in
-    let vgen = reflect Interval (Idx 0) in
+    let vgen = Idx 0 in
     let vdom' = thin (Thin.keep (Thin.skip Thin.id)) vdom in
     let varg' = thin (Thin.skip Thin.id) varg in
     let vcod = inst_bclo cod (Coe (vd1', vgen, B vdom', varg')) in
@@ -115,7 +115,7 @@ and cdr v =
     let vcdr = cdr v in
     let vdom = eval_clo dom in
     let vd0' = thin (Thin.skip Thin.id) vd0 in
-    let vgen = reflect Interval (Idx 0) in
+    let vgen = Idx 0 in
     let vdom' = thin (Thin.keep (Thin.skip Thin.id)) vdom in
     let vcar' = thin (Thin.skip Thin.id) vcar in
     let vcoe = Coe (vd0', vgen, B vdom', vcar') in

@@ -728,7 +728,7 @@ reference).
   \inferrule[ValAtom]{
     i<n
   }{
-    \IsVal{n}{\Atom{i}}{\SortNeu}
+    \IsVal{n}{\Atom{i}}{\SortCan}
   }
   \and
   \inferrule[ValGen]{
@@ -1163,7 +1163,7 @@ with an \emph{abort}. (TODO)
     \InstClo{B_\SortBClo}{
       \VExp{coe}{
         \ThinVal{\ThinSkip{\ThinId}}{J},
-        \VExp{\uparrow}{\Interval,\Atom{0}},
+        \Atom{0},
         \ThinVal{
           \ThinKeep{\ThinSkip{\ThinId}}
         }{A_\SortCan},
@@ -1331,10 +1331,7 @@ closures.
     \InstClo{B_\SortBClo}{
       \VExp{coe}{
         \ThinVal{\ThinSkip{\ThinId}}{I},
-        \VExp{\uparrow}{
-          \Interval,
-          \Atom{0}
-        },
+        \Atom{0},
         \ThinVal{\ThinKeep{\ThinSkip{\ThinId}}}{A_\SortCan},
         \ThinVal{\ThinSkip{\ThinId}}{M_0}
       }
@@ -1537,10 +1534,8 @@ definitional equivalence.
     }
   }
   \and
-  \inferrule[QuoteAtom]{
-    \LookupAtom{\Gamma}{i}{A}{f}
-  }{
-    \QuoteNeu{\Gamma}{\Atom{i}}{\Atom{i}}{\ThinVal{f}{A}}
+  \inferrule[QuoteAtom]{}{
+    \QuoteCan{\Gamma}{A}{\Atom{i}}{\Atom{i}}
   }
   \and
   \inferrule[QuoteVar]{
