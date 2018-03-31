@@ -872,15 +872,11 @@ reindexing action is renaming.
   domain as a ``free'' constructor, rather than as an operation. This is
   because reflection is calculated lazily.
 
-  To extend with constructs like singleton-type (and extension types), it is
-  necessary to impose an equational law on reflection: basically, reflecting a
-  neutral of singleton type should project out a canonical value from the
-  singleton type.
+  To extend with constructs like singleton and extension types, it is necessary
+  to impose an equational law on reflection: basically, reflecting a neutral of
+  singleton type should project out a canonical value from the singleton type.
+  This is done using an auxiliary judgment to reflect neutral values.
 
-  There are a couple of ways to enact this equation. One is to change
-  reflection into a ``smart operation''; another way, however, would be to add
-  cases to each of the rules that match suspended reflections, and perform the
-  expansion in-line. It's not yet clear to me which style is best.
 
 \end{remark}
 
