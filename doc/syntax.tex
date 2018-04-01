@@ -1407,7 +1407,6 @@ To start with, I define a quotation from semantic values to syntactic
 terms; together with evaluation, this generates a theory of
 definitional equivalence.
 
-\newcommand\LookupAtom[4]{\FmtVal{#1}\ni\Atom{#2}:\Squares*{\FmtThin{#4}*\FmtVal{#3}}}
 \newcommand\LookupVar[4]{\FmtVal{#1}\ni\Var{#2}:\Squares*{\FmtThin{#4}*\FmtVal{#3}}}
 
 \begin{mathparpagebreakable}
@@ -1609,20 +1608,6 @@ definitional equivalence.
 
 \begin{mathparpagebreakable}
   \DeclBox{
-    \inferrule[JdgLookupAtom]{
-      \IsVal{n}{\Gamma}{\SortCtx{l}}
-      \\
-      i<n
-      \\
-      \IsThin{f}{n}{m}
-      \\
-      \IsVal{m}{A}{\SortCan}
-    }{
-      \DeclBox{\LookupAtom{\Gamma^+}{i^+}{A^-}{f^-}}
-    }
-  }
-  \quad
-  \DeclBox{
     \inferrule[JdgLookupVar]{
       \IsVal{n}{\Gamma}{\SortCtx{l}}
       \\
@@ -1634,22 +1619,6 @@ definitional equivalence.
     }{
       \DeclBox{\LookupVar{\Gamma^+}{i^+}{A^-}{f^-}}
     }
-  }
-  \\
-  \inferrule[LookupAtomVar]{
-    \LookupAtom{\Gamma}{i}{A}{f}
-  }{
-    \LookupAtom{\Gamma.B}{i}{A}{f}
-  }
-  \and
-  \inferrule[LookupAtomHere]{}{
-    \LookupAtom{\Gamma.\nabla{}A}{0}{A}{\ThinId}
-  }
-  \and
-  \inferrule[LookupAtomThere]{
-    \LookupAtom{\Gamma}{n}{A}{f}
-  }{
-    \LookupAtom{\Gamma.\nabla{}A}{n+1}{A}{\ThinSkip{f}}
   }
   \\
   \inferrule[LookupVarAtom]{
