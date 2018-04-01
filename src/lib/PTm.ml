@@ -19,6 +19,7 @@ end
 
 module ResEnv : ResEnv = 
 struct
+  (* TODO: variables and atoms *)
   type t = string list
 
   let init = []
@@ -39,16 +40,24 @@ end =
 struct
   let rec chk env p =
     let Node pf = p in
+    Tm.into_info pf.info @@
     match pf.con with
-    | _ -> failwith ""
+    | List [Node {con = Atom "lam"}; bdy] ->
+      Tm.Lam (vbinder env bdy)
+    | _ ->
+      Tm.Up (inf env p)
 
-  and binder env p =
+  and vbinder env p =
     let Node pf = p in
     match pf.con with
-    | _ -> failwith ""
-    
+    | Bind (x, p) ->
+      Tm.VB (chk (R.bind x env) p)
+    | _ ->
+      Tm.VB (chk (R.bind "_" env) p)
+
   and inf env p =
     let Node pf = p in
+    Tm.into_info pf.info @@
     match pf.con with
     | _ -> failwith ""
 end

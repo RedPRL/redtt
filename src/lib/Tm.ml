@@ -10,6 +10,8 @@ type 'a abnd = AB of 'a
 type chk = [`Chk]
 type inf = [`Inf]
 
+type info = Lexing.position * Lexing.position
+
 type _ f =
   | Atom : atm -> inf f
   | Var : var -> inf f
@@ -34,11 +36,12 @@ type _ f =
   | Dim1 : chk f
 
 (* TODO: add explicit thinnings here *)
-and 'a t = In of 'a f
+and 'a t = In of {info : info option; con : 'a f}
 
-let into tf = In tf
+let into tf = In {info = None; con = tf}
+let into_info info tf = In {info = Some info; con = tf}
 
-let out (In tf) = tf
+let out (In node) = node.con
 
 
 let thin_var th t = failwith "todo"

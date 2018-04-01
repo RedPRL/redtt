@@ -39,6 +39,9 @@ type _ f =
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
 
+type info = Lexing.position * Lexing.position
+val into_info : info -> 'a f -> 'a t
+
 
 module Pretty :
 sig
