@@ -42,6 +42,8 @@ val out : 'a t -> 'a f
 type info = Lexing.position * Lexing.position
 val into_info : info -> 'a f -> 'a t
 
+val info : 'a t -> info option
+
 
 module Pretty :
 sig

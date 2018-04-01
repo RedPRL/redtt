@@ -40,6 +40,7 @@ and 'a t = In of {info : info option; con : 'a f}
 
 let into tf = In {info = None; con = tf}
 let into_info info tf = In {info = Some info; con = tf}
+let info (In node) = node.info
 
 let out (In node) = node.con
 
