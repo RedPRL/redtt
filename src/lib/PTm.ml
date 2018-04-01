@@ -22,8 +22,6 @@ end
 module ResEnv : ResEnv = 
 struct
   type 'a el = Var of 'a | Atom of 'a
-
-  (* TODO: variables and atoms *)
   type t = string el list
 
   let init = []
