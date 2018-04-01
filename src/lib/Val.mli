@@ -28,6 +28,7 @@ type _ t =
   | Car : neu t -> neu t
   | Cdr : neu t -> neu t
 
+val thin : Thin.t0 -> 'a t -> 'a t
 
 val eval_clo : clo -> can t
 val inst_bclo : bclo -> can t -> can t
