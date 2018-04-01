@@ -7,8 +7,11 @@ type var = int
 type 'a vbnd = VB of 'a
 type 'a abnd = AB of 'a
 
-type chk = [`Chk]
-type inf = [`Inf]
+(* sorts *)
+type chk
+type inf
+
+type 'a t
 
 type _ f =
   | Atom : atm -> inf f
@@ -33,42 +36,19 @@ type _ f =
   | Dim0 : chk f
   | Dim1 : chk f
 
-(* TODO: add explicit thinnings here *)
-and 'a t = In of 'a f
-
-let into tf = In tf
-
-let out (In tf) = tf
+val into : 'a f -> 'a t
+val out : 'a t -> 'a f
 
 
-let thin_var th t = failwith "todo"
-let thin_atom th t = failwith "todo"
-
-let path (VB ty, tm0, tm1) =
-  let tube0 = (into @@ Up (into @@ Var 0), into Dim0, thin_var (Thin.skip Thin.id) tm0) in
-  let tube1 = (into @@ Up (into @@ Var 0), into Dim1, thin_var (Thin.skip Thin.id) tm1) in
-  into @@ Pi (into Interval, VB (into @@ Ext (ty, [tube0; tube1])))
-
-
-module Pretty =
-struct
+module Pretty :
+sig
   module Env :
   sig
     type t
     val emp : t
     val var : int -> t -> string
     val bind : t -> string * t
-  end =
-  struct
-    type t = int * string list
-
-    let emp = 0, []
-    let var i (_, xs) = List.nth xs i
-    let bind (i, xs) =
-      let x = "x" ^ string_of_int i in
-      x, (i + 1, x :: xs)
   end
 
-  let pp : type a. Env.t -> Format.formatter -> a t -> unit = 
-    fun _ _ -> failwith "pp"
+  val pp : Env.t -> Format.formatter -> 'a t -> unit
 end

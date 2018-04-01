@@ -13,7 +13,7 @@ type _ t =
 
   | Pi : clo * bclo -> can t
   | Sg : clo * bclo -> can t
-  | Univ : Tm.Lvl.t -> can t
+  | Univ : Lvl.t -> can t
   | Interval : can t
 
   | Lam : bclo -> can t
@@ -44,9 +44,7 @@ let bclo g (bnd, rho, f) =
 
 let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
   fun g (tm, rho, f) ->
-    match tm with 
-    | Tm.ThinAtom _ -> failwith "todo"
-    | Tm.ThinVar _ -> failwith "todo"
+    match Tm.out tm with 
     | Tm.Atom i -> thin g (Idx i)
     | Tm.Var i -> failwith "todo"
     | Tm.Pi (dom, cod) -> Pi (clo g (dom, rho, f), bclo g (cod, rho, f))
