@@ -1,30 +1,51 @@
-type 'a b = B of 'a
+type ('i, 'a) tube = 'i * 'i * 'a
+type ('i, 'a) system = ('i, 'a) tube list
 
-type chk =
-  | Up of inf
-  | Unit
-  | Bool
-  | Pi of chk * chk b
-  | Sg of chk * chk b
-  | Eq of chk b * chk * chk
-  | Lam of chk b
-  | Pair of chk * chk
-  | Ax
-  | Tt
-  | Ff
-  | Dim0
-  | Dim1
-  | U of int
-  | Let of inf * chk b
+type atm = int
+type var = int
 
-and inf =
-  | Var of int
-  | App of inf * chk
-  | Proj1 of inf
-  | Proj2 of inf
-  | If of chk b * inf * chk * chk
-  | Coe of chk * chk * chk b * chk
-  | Down of chk * chk
+type 'a vbnd = VB of 'a
+type 'a abnd = AB of 'a
+
+type chk = [`Chk]
+type inf = [`Inf]
+
+module Lvl =
+struct
+  type t = Omega | Const of int
+end
+
+type _ t =
+| ThinAtom : 'a t * inf t Thin.t * Thin.t0 -> 'a t
+| ThinVar : 'a t * Thin.t0 -> 'a t
+
+| Atom : atm -> inf t
+| Var : var -> inf t
+| Car : inf t -> inf t
+| Cdr : inf t -> inf t
+| App : inf t * chk t -> inf t
+| Down : {ty : chk t; tm : chk t} -> inf t
+| Coe : chk t * chk t * chk t abnd * chk t -> inf t
+| HCom : chk t * chk t * chk t * chk t * (chk t, chk t vbnd) system -> inf t
+
+| Up : inf t -> chk t
+
+| Univ : Lvl.t -> chk t
+| Pi : chk t * chk t vbnd -> chk t
+| Sg : chk t * chk t vbnd -> chk t
+| Ext : chk t * (chk t, chk t) system -> chk t
+| Interval : chk t
+
+| Lam : chk t vbnd -> chk t
+| Cons : chk t * chk t -> chk t
+| Dim0 : chk t
+| Dim1 : chk t
+
+let path (VB ty, tm0, tm1) =
+  let tube0 = (Up (Var 0), Dim0, ThinVar (tm0, Thin.skip Thin.id)) in
+  let tube1 = (Up (Var 0), Dim1, ThinVar (tm1, Thin.skip Thin.id)) in
+  Pi (Interval, VB (Ext (ty, [tube0; tube1])))
+
 
 module Pretty =
 struct
@@ -45,80 +66,6 @@ struct
       x, (i + 1, x :: xs)
   end
 
-  let rec pp_chk rho fmt t =
-    match t with
-    | Up t ->
-      Format.fprintf fmt "%a" (pp_inf rho) t
-
-    | Unit ->
-      Format.fprintf fmt "unit"
-
-    | Bool ->
-      Format.fprintf fmt "bool"
-
-    | U i ->
-      Format.fprintf fmt "(U %i)" i
-
-    | Pi (dom, B cod) ->
-      let x, rho' = Env.bind rho in
-      Format.fprintf fmt "@[<1>(->@ %a@ [%s] %a)@]" (pp_chk rho) dom x (pp_chk rho') cod
-
-    | Sg (dom, B cod) ->
-      let x, rho' = Env.bind rho in
-      Format.fprintf fmt "@[<1>(*@ %a@ [%s] %a)@]" (pp_chk rho) dom x (pp_chk rho') cod
-
-    | Eq (B cod, t1, t2) ->
-      let x, rho' = Env.bind rho in
-      Format.fprintf fmt "@[<1>(=@ [%s] %a@ %a@ %a)@]" x (pp_chk rho') cod (pp_chk rho) t1 (pp_chk rho) t2
-
-    | Lam (B t) ->
-      let x, rho' = Env.bind rho in
-      Format.fprintf fmt "@[<1>(lam [%s]@ %a)@]" x (pp_chk rho') t
-
-    | Pair (t1, t2) ->
-      Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp_chk rho) t1 (pp_chk rho) t2
-
-    | Ax ->
-      Format.fprintf fmt "ax"
-
-    | Tt ->
-      Format.fprintf fmt "tt"
-
-    | Ff ->
-      Format.fprintf fmt "ff"
-
-    | Dim0 ->
-      Format.fprintf fmt "0"
-
-    | Dim1 ->
-      Format.fprintf fmt "1"
-
-    | Let (t1, B t2) ->
-      let x, rho' = Env.bind rho in
-      Format.fprintf fmt "@[<1>(let@ %a@ [%s] %a)@]" (pp_inf rho) t1 x (pp_chk rho') t2
-
-  and pp_inf rho fmt r =
-    match r with
-    | Var i ->
-      Format.fprintf fmt "%s" @@ Env.var i rho
-
-    | App (r, t) ->
-      Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp_inf rho) r (pp_chk rho) t
-
-    | Proj1 r ->
-      Format.fprintf fmt "@[<1>(car %a)@]" (pp_inf rho) r
-
-    | Proj2 r ->
-      Format.fprintf fmt "@[<1>(cdr %a)@]" (pp_inf rho) r
-
-    | If (B mot, r, t1, t2) ->
-      let x, rho' = Env.bind rho in
-      Format.fprintf fmt "@[<1>(if@ @[[%s] %a@]@ %a@ %a@ %a)@]" x (pp_chk rho') mot (pp_inf rho) r (pp_chk rho) t1 (pp_chk rho) t2
-
-    | Coe (d0, d1, B ty, t) -> 
-      let x, rho' = Env.bind rho in 
-      Format.fprintf fmt "@[<1>(coe %a %a [%s] %a %a)@]" (pp_chk rho) d0 (pp_chk rho) d1 x (pp_chk rho') ty (pp_chk rho) t
-
-    | Down (ty, t) ->
-      Format.fprintf fmt "@[<1>(:@ %a@ %a)@]" (pp_chk rho) ty (pp_chk rho) t
+  let pp : type a. Env.t -> Format.formatter -> a t -> unit = 
+    fun _ _ -> failwith "pp"
 end

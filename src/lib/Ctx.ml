@@ -1,6 +1,4 @@
-module D = Val
-
-type t = {len : int; tys : D.d list; vals: D.d list}
+type t = {len : int; tys : Val.can Val.t list; vals: Val.can Val.t list}
 
 let emp = 
   {len = 0;
@@ -13,7 +11,7 @@ let define ~ctx ~ty ~tm =
    vals = tm :: ctx.vals}
 
 let add ~ctx ~ty =
-  let tm = D.Up (ty, D.Atom ctx.len) in
+  let tm = Val.Up (ty, Val.Lvl ctx.len) in
   define ~ctx ~ty ~tm, tm
 
 let env ~ctx = ctx.vals
