@@ -16,7 +16,7 @@ sig
   type 'a r = V of int | R of 'a
 
   val proj : ('a t -> 'a -> 'a) -> 'a t -> int -> 'a r
-  val proj0 : t0 -> int -> int
 
   val from_ix : int -> 'a t
+  val to_ix : t0 -> int
 end

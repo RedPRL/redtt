@@ -70,7 +70,7 @@ let rec thin_f : type a. thin -> a f -> a f =
     match tf with 
     | Atom g ->
       begin
-        match Thin.Ix.proj thin_atom th.athin @@ Thin.Ix.proj0 g 0 with
+        match Thin.Ix.proj thin_atom th.athin @@ Thin.Ix.to_ix g with
         | Thin.Ix.V i -> Atom (Thin.Ix.from_ix i)
         | Thin.Ix.R (t : inf t) -> thin_f t.thin t.con
       end

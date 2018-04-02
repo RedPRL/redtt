@@ -66,6 +66,8 @@ struct
     | 0 -> id
     | _ -> skip (from_ix (i - 1))
 
+  let to_ix f = proj0 f 0
+
 end
 
 

@@ -107,7 +107,7 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
   fun g (tm, rho, f) ->
     match Tm.out tm with 
     | Tm.Atom i ->
-      thin g @@ into @@ (failwith "TODO")
+      thin g @@ into @@ Idx i
 
     | Tm.Var i ->
       let v = failwith "todo" in
