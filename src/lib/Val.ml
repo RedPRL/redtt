@@ -3,8 +3,6 @@ type neu = [`Neu]
 
 type 'a bnd = B of 'a
 
-(* TODO: add systems, extension types *)
-
 type ('i, 'a) tube = 'i * 'i * 'a
 type ('i, 'a) system = ('i, 'a) tube list
 
