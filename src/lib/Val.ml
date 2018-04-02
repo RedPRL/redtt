@@ -5,6 +5,7 @@ type 'a bnd = B of 'a
 
 (* TODO: add systems, extension types *)
 
+(* TODO: abstract this and develop explicit thinnings *)
 type _ t = 
   | Idx : int -> can t
   | Lvl : int -> neu t
@@ -15,6 +16,8 @@ type _ t =
   | Sg : clo * bclo -> can t
   | Univ : Lvl.t -> can t
   | Interval : can t
+  | Dim0 : can t
+  | Dim1 : can t
 
   | Lam : bclo -> can t
   | Cons : clo * clo -> can t
@@ -40,6 +43,8 @@ let rec thin : type a. Thin.t0 -> a t -> a t =
     | Sg (dom, cod) -> Sg (thin_clo f dom, thin_bclo f cod)
     | Univ l -> v
     | Interval -> v
+    | Dim0 -> v
+    | Dim1 -> v
     | Lam bdy -> Lam (thin_bclo f bdy)
     | Cons (clo1, clo2) -> Cons (thin_clo f clo1, thin_clo f clo2)
     | Coe (vd0, vd1, bnd, v) -> Coe (thin f vd0, thin f vd1, thin_bnd f bnd, thin f v)
@@ -48,9 +53,9 @@ let rec thin : type a. Thin.t0 -> a t -> a t =
     | Cdr vneu -> Cdr (thin f vneu)
 
 
-and thin_clo f (Clo (g, (tm, rho, f))) = failwith "TODO: thin_clo"
-and thin_bclo f (BClo (g, (tm, rho, f))) = failwith "TODO: thin_bclo"
-and thin_bnd f (B _) = failwith "TODO: thin_bnd"
+and thin_clo h (Clo (g, (tm, rho, f))) = Clo (Thin.cmp g h, (tm, rho, f))
+and thin_bclo h (BClo (g, (tm, rho, f))) = BClo (Thin.cmp g h, (tm, rho, f))
+and thin_bnd f (B v) = B (thin (Thin.skip f) v)
 
 
 let clo g (tm, rho, f) = 
@@ -62,30 +67,69 @@ let bclo g (bnd, rho, f) =
 let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
   fun g (tm, rho, f) ->
     match Tm.out tm with 
-    | Tm.Atom i -> thin g (Idx i)
-    | Tm.Var i -> failwith "todo"
-    | Tm.Pi (dom, cod) -> Pi (clo g (dom, rho, f), bclo g (cod, rho, f))
-    | Tm.Sg (dom, cod) -> Sg (clo g (dom, rho, f), bclo g (cod, rho, f))
-    | Tm.Lam bnd -> Lam (bclo g (bnd, rho, f))
-    | Tm.Up tm -> eval g (tm, rho, f)
-    | Tm.Down {ty; tm} -> eval g (tm, rho, f)
+    | Tm.Atom i ->
+      thin g (Idx i)
+
+    | Tm.Var i ->
+      let v = List.nth rho i in
+      thin (Thin.cmp g f) v
+
+    | Tm.Pi (dom, cod) ->
+      Pi (clo g (dom, rho, f), bclo g (cod, rho, f))
+
+    | Tm.Sg (dom, cod) ->
+      Sg (clo g (dom, rho, f), bclo g (cod, rho, f))
+    
+    | Tm.Ext _ ->
+      failwith "TODO: eval Ext"
+
+    | Tm.Lam bnd ->
+      Lam (bclo g (bnd, rho, f))
+
+    | Tm.Cons (tm1, tm2) -> 
+      Cons (clo g (tm1, rho, f), clo g (tm2, rho, f))
+
+    | Tm.Up tm ->
+      eval g (tm, rho, f)
+
+    | Tm.Down {tm; _} ->
+      eval g (tm, rho, f)
+
     | Tm.Coe (d0, d1, bnd, tm) ->
       let vd0 = eval g (d0, rho, f) in
       let vd1 = eval g (d1, rho, f) in
       let vty = eval_abnd g (bnd, rho, f) in
       let vtm = eval g (tm, rho, f) in
       Coe (vd0, vd1, vty, vtm)
+
+    | Tm.HCom _ ->
+      failwith "TODO: eval hcom"
+
     | Tm.App (tm0, tm1) ->
       let vfun = eval g (tm0, rho, f) in
       let varg = eval g (tm1, rho, f) in
       apply vfun varg
+
     | Tm.Car tm -> 
       let v = eval g (tm, rho, f) in
       car v
+
     | Tm.Cdr tm -> 
       let v = eval g (tm, rho, f) in
       cdr v
-    | _ -> failwith "TODO"
+
+    | Tm.Univ lvl ->
+      Univ lvl
+
+    | Tm.Interval -> 
+      Interval
+
+    | Tm.Dim0 ->
+      Dim0
+
+    | Tm.Dim1 ->
+      Dim1
+
 
 and eval_abnd g (Tm.AB tm, rho, f) = 
   B (eval (Thin.keep g) (tm, rho, Thin.skip f))

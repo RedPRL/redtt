@@ -13,3 +13,5 @@ let id = In Id
 let keep t = In (Keep t)
 let skip t = In (Skip t)
 let sub t a = In (Sub (t, a))
+
+let cmp _ _ = failwith "TODO: Thin.cmp"

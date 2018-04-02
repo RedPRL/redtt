@@ -18,6 +18,8 @@ type _ t =
   | Sg : clo * bclo -> can t
   | Univ : Lvl.t -> can t
   | Interval : can t
+  | Dim0 : can t
+  | Dim1 : can t
 
   | Lam : bclo -> can t
   | Cons : clo * clo -> can t
