@@ -210,7 +210,7 @@ and eval_abnd g (Tm.AB tm, rho, f) =
 and apply vfun varg = 
   match out vfun with 
   | Lam bclo -> inst_bclo bclo varg
-  | Up (vty (* Pi (dom, cod) *), vneu) ->
+  | Up (vty, vneu) ->
     begin 
       match out vty with 
       | Pi (dom, cod) -> 
