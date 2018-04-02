@@ -16,7 +16,7 @@ sig
   type t
   val init : t
   val bind : string el -> t -> t
-  val var : string -> t -> int el
+  val get : string -> t -> Thin.t0 el
 end
 
 module ResEnv : ResEnv = 
@@ -38,10 +38,10 @@ struct
     | Var i -> i
     | Atom i -> i
 
-  let rec var x (env : t) =
+  let rec get x (env : t) =
     match env with 
     | [] -> failwith "variable not found"
-    | y :: ys -> if x = proj y then map (fun _ -> 0) y else map (fun i -> i + 1) @@ var x ys
+    | y :: ys -> if x = proj y then map (fun _ -> Thin.id) y else map Thin.skip @@ get x ys
 end
 
 module Resolver (R : ResEnv) :
@@ -73,9 +73,10 @@ struct
     match pf.con with
     | Atom x -> 
       begin
-        match R.var x env with 
+        match R.get x env with 
         | R.Atom i -> Tm.Atom i
         | R.Var i -> Tm.Var i
       end
     | _ -> failwith ""
+
 end

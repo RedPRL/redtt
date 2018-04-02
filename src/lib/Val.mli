@@ -10,7 +10,7 @@ type bclo
 
 type 'a t
 type _ f = 
-  | Idx : int -> can f
+  | Idx : Thin.t0 -> can f
   | Lvl : int -> neu f
 
   | Up : can t * neu t -> can f

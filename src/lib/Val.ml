@@ -6,7 +6,7 @@ type 'a bnd = B of 'a
 (* TODO: add systems, extension types *)
 
 type _ f = 
-  | Idx : int -> can f
+  | Idx : Thin.t0 -> can f
   | Lvl : int -> neu f
 
   | Up : can t * neu t -> can f
@@ -27,20 +27,20 @@ type _ f =
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
 
-and 'a t = In of { thin : Thin.t0; con : 'a f }
+and 'a t = { thin : Thin.t0; con : 'a f }
 
 and env = can t list
 and clo = Clo of Thin.t0 * (Tm.chk Tm.t * env * Thin.t0)
 and bclo = BClo of Thin.t0 * (Tm.chk Tm.t Tm.vbnd * env * Thin.t0)
 
 let thin : type a. Thin.t0 -> a t -> a t = 
-  fun f v -> 
-    failwith "TODO: thin"
+  fun f node -> 
+    { thin = Thin.cmp node.thin f; con = node.con }
 
 let rec thin_f : type a. Thin.t0 -> a f -> a f = 
   fun f v ->
     match v with 
-    | Idx ix -> failwith "TODO: thin/idx"
+    | Idx ix -> Idx (Thin.cmp ix f)
     | Lvl i -> v
     | Up (vty, vneu) -> Up (thin f vty, thin f vneu)
     | Pi (dom, cod) -> Pi (thin_clo f dom, thin_bclo f cod)
@@ -61,10 +61,10 @@ and thin_bclo h (BClo (g, (tm, rho, f))) = BClo (Thin.cmp g h, (tm, rho, f))
 and thin_bnd f (B v) = B (thin (Thin.skip f) v)
 
 let into vf = 
-  In {thin = Thin.id; con = vf}
+  {thin = Thin.id; con = vf}
 
-let out (In {thin; con}) = 
-  thin_f thin con
+let out node = 
+  thin_f node.thin node.con
 
 
 let clo g (tm, rho, f) = 
@@ -73,6 +73,7 @@ let clo g (tm, rho, f) =
 let bclo g (bnd, rho, f) =
   BClo (g, (bnd, rho, f))
 
+
 let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
   fun g (tm, rho, f) ->
     match Tm.out tm with 
@@ -80,7 +81,7 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
       thin g @@ into @@ Idx i
 
     | Tm.Var i ->
-      let v = List.nth rho i in
+      let v = List.hd @@ Thin.act i rho in
       thin (Thin.cmp g f) v
 
     | Tm.Pi (dom, cod) ->
@@ -160,7 +161,7 @@ and apply vfun varg =
       | Pi (dom, cod) ->
         let vdom = eval_clo dom in
         let vd1' = thin (Thin.skip Thin.id) vd1 in
-        let vgen = into @@ Idx 0 in
+        let vgen = into @@ Idx Thin.id in
         let vdom' = thin (Thin.keep (Thin.skip Thin.id)) vdom in
         let varg' = thin (Thin.skip Thin.id) varg in
         let vcod = inst_bclo cod (into @@ Coe (vd1', vgen, B vdom', varg')) in
@@ -213,7 +214,7 @@ and cdr v =
         let vcdr = cdr v in
         let vdom = eval_clo dom in
         let vd0' = thin (Thin.skip Thin.id) vd0 in
-        let vgen = into @@ Idx 0 in
+        let vgen = into @@ Idx Thin.id in
         let vdom' = thin (Thin.keep (Thin.skip Thin.id)) vdom in
         let vcar' = thin (Thin.skip Thin.id) vcar in
         let vcoe = into @@ Coe (vd0', vgen, B vdom', vcar') in

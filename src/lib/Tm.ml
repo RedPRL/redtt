@@ -1,8 +1,8 @@
 type ('i, 'a) tube = 'i * 'i * 'a
 type ('i, 'a) system = ('i, 'a) tube list
 
-type atm = int
-type var = int
+type atm = Thin.t0
+type var = Thin.t0
 
 type 'a vbnd = VB of 'a
 type 'a abnd = AB of 'a
@@ -49,8 +49,8 @@ let thin_var th t = failwith "todo"
 let thin_atom th t = failwith "todo"
 
 let path (VB ty, tm0, tm1) =
-  let tube0 = (into @@ Up (into @@ Var 0), into Dim0, thin_var (Thin.skip Thin.id) tm0) in
-  let tube1 = (into @@ Up (into @@ Var 0), into Dim1, thin_var (Thin.skip Thin.id) tm1) in
+  let tube0 = (into @@ Up (into @@ Var Thin.id), into Dim0, thin_var (Thin.skip Thin.id) tm0) in
+  let tube1 = (into @@ Up (into @@ Var Thin.id), into Dim1, thin_var (Thin.skip Thin.id) tm1) in
   into @@ Pi (into Interval, VB (into @@ Ext (ty, [tube0; tube1])))
 
 

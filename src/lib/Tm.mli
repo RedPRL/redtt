@@ -1,8 +1,8 @@
 type ('i, 'a) tube = 'i * 'i * 'a
 type ('i, 'a) system = ('i, 'a) tube list
 
-type atm = int
-type var = int
+type atm = Thin.t0
+type var = Thin.t0
 
 type 'a vbnd = VB of 'a
 type 'a abnd = AB of 'a
