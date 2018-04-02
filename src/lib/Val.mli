@@ -8,27 +8,33 @@ type 'a bnd = B of 'a
 type clo
 type bclo
 
-type _ t = 
-  | Idx : int -> can t
-  | Lvl : int -> neu t
+type 'a t
+type _ f = 
+  | Idx : int -> can f
+  | Lvl : int -> neu f
 
-  | Up : can t * neu t -> can t
+  | Up : can t * neu t -> can f
 
-  | Pi : clo * bclo -> can t
-  | Sg : clo * bclo -> can t
-  | Univ : Lvl.t -> can t
-  | Interval : can t
-  | Dim0 : can t
-  | Dim1 : can t
+  | Pi : clo * bclo -> can f
+  | Sg : clo * bclo -> can f
+  | Univ : Lvl.t -> can f
+  | Interval : can f
+  | Dim0 : can f
+  | Dim1 : can f
 
-  | Lam : bclo -> can t
-  | Cons : clo * clo -> can t
+  | Lam : bclo -> can f
+  | Cons : clo * clo -> can f
 
-  | Coe : can t * can t * can t bnd * can t -> can t
+  | Coe : can t * can t * can t bnd * can t -> can f
 
-  | App : neu t * can t -> neu t
-  | Car : neu t -> neu t
-  | Cdr : neu t -> neu t
+  | App : neu t * can t -> neu f
+  | Car : neu t -> neu f
+  | Cdr : neu t -> neu f
+
+
+val into : 'a f -> 'a t
+val out : 'a t -> 'a f
+
 
 val thin : Thin.t0 -> 'a t -> 'a t
 

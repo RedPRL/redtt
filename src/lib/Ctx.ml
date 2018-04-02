@@ -11,7 +11,7 @@ let define ~ctx ~ty ~tm =
    vals = tm :: ctx.vals}
 
 let add ~ctx ~ty =
-  let tm = Val.Up (ty, Val.Lvl ctx.len) in
+  let tm = Val.into @@ Val.Up (ty, Val.into @@ Val.Lvl ctx.len) in
   define ~ctx ~ty ~tm, tm
 
 let env ~ctx = ctx.vals
