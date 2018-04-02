@@ -5,7 +5,6 @@ type 'a bnd = B of 'a
 
 (* TODO: add systems, extension types *)
 
-(* TODO: abstract this and develop explicit thinnings *)
 type _ f = 
   | Idx : int -> can f
   | Lvl : int -> neu f
@@ -56,7 +55,6 @@ let rec thin_f : type a. Thin.t0 -> a f -> a f =
     | App (vneu, varg) -> App (thin f vneu, thin f varg)
     | Car vneu -> Car (thin f vneu)
     | Cdr vneu -> Cdr (thin f vneu)
-
 
 and thin_clo h (Clo (g, (tm, rho, f))) = Clo (Thin.cmp g h, (tm, rho, f))
 and thin_bclo h (BClo (g, (tm, rho, f))) = BClo (Thin.cmp g h, (tm, rho, f))
