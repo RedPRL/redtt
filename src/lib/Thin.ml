@@ -23,3 +23,7 @@ let rec act f xs =
   | Sub (_, void), _ -> Void.abort void
   | Cmp (g, f), _ -> act g (act f xs)
   | _ -> failwith "Thin.act: invalid arguments"
+
+(* TODO: more efficient version possible *)
+let proj f xs = 
+  List.hd @@ act f xs

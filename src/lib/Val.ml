@@ -81,7 +81,7 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
       thin g @@ into @@ Idx i
 
     | Tm.Var i ->
-      let v = List.hd @@ Thin.act i rho in
+      let v = Thin.proj i rho in
       thin (Thin.cmp g f) v
 
     | Tm.Pi (dom, cod) ->
