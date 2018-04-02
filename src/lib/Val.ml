@@ -40,8 +40,8 @@ let thin : type a. Thin.t0 -> a t -> a t =
 let rec thin_f : type a. Thin.t0 -> a f -> a f = 
   fun f v ->
     match v with 
-    | Idx ix ->
-      failwith "TODO"
+    | Idx g ->
+      Idx (Thin.cmp g f)
 
     | Lvl i ->
       v
