@@ -8,7 +8,7 @@ val sub : 'x t -> 'x -> 'x t
 val cmp : 'x t -> 'x t -> 'x t
 
 val act : t0 -> 'a list -> 'a list
-(* val proj : t0 -> 'a list -> 'a *)
+val proj : t0 -> 'a list -> 'a
 
 
 module Ix :

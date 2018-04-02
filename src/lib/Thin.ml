@@ -26,6 +26,10 @@ let rec act f xs =
   | Cmp (g, f), _ -> act g (act f xs)
   | _ -> failwith "Thin.act: invalid arguments"
 
+(* TODO: more efficient version possible *)
+let proj f xs = 
+  List.hd @@ act f xs
+
 
 module Ix =
 struct
@@ -69,8 +73,3 @@ struct
   let to_ix f = proj0 f 0
 
 end
-
-
-(* TODO: more efficient version possible *)
-let proj f xs = 
-  List.hd @@ act f xs
