@@ -65,15 +65,18 @@ let thin_sys : type a. thin -> (a t, a t) system -> (a t, a t) system =
     failwith "todo: thin_sys"
 
 
-let thin_f : type a. thin -> a f -> a f = 
+let rec thin_f : type a. thin -> a f -> a f = 
   fun th tf ->
     match tf with 
     | Atom g ->
-      failwith "hard case"
+      begin
+        match Thin.Ix.proj thin_atom th.athin @@ Thin.Ix.proj0 g 0 with
+        | Thin.Ix.V i -> Atom (Thin.Ix.from_ix i)
+        | Thin.Ix.R (t : inf t) -> thin_f t.thin t.con
+      end
 
     | Var g ->
-      let h = Thin.cmp g th.vthin in
-      Var h
+      Var (Thin.cmp g th.vthin)
 
     | Car t ->
       Car (thin th t)
@@ -123,18 +126,24 @@ let thin_f : type a. thin -> a f -> a f =
     | Dim1 ->
       tf
 
+and thin_var f =
+  thin {vthin = f; athin = Thin.id}
+
+and thin_atom f =
+  thin {athin = f; vthin = Thin.id}
+
 
 let out node = thin_f node.thin node.con
 
-let thin_var f =
-  thin {vthin = f; athin = Thin.id}
-
-let thin_atom f =
-  thin {athin = f; vthin = Thin.id}
 
 let path (VB ty, tm0, tm1) =
-  let tube0 = (into @@ Up (into @@ Var Thin.id), into Dim0, thin_var (Thin.skip Thin.id) tm0) in
-  let tube1 = (into @@ Up (into @@ Var Thin.id), into Dim1, thin_var (Thin.skip Thin.id) tm1) in
+  let tube td tm = 
+    into @@ Up (into @@ Var Thin.id),
+    td,
+    thin_var (Thin.skip Thin.id) tm
+  in
+  let tube0 = tube (into Dim0) tm0 in
+  let tube1 = tube (into Dim1) tm1 in
   into @@ Pi (into Interval, VB (into @@ Ext (ty, [tube0; tube1])))
 
 module Pretty =

@@ -40,21 +40,50 @@ let thin : type a. Thin.t0 -> a t -> a t =
 let rec thin_f : type a. Thin.t0 -> a f -> a f = 
   fun f v ->
     match v with 
-    | Idx ix -> Idx (Thin.cmp ix f)
-    | Lvl i -> v
-    | Up (vty, vneu) -> Up (thin f vty, thin f vneu)
-    | Pi (dom, cod) -> Pi (thin_clo f dom, thin_bclo f cod)
-    | Sg (dom, cod) -> Sg (thin_clo f dom, thin_bclo f cod)
-    | Univ l -> v
-    | Interval -> v
-    | Dim0 -> v
-    | Dim1 -> v
-    | Lam bdy -> Lam (thin_bclo f bdy)
-    | Cons (clo1, clo2) -> Cons (thin_clo f clo1, thin_clo f clo2)
-    | Coe (vd0, vd1, bnd, v) -> Coe (thin f vd0, thin f vd1, thin_bnd f bnd, thin f v)
-    | App (vneu, varg) -> App (thin f vneu, thin f varg)
-    | Car vneu -> Car (thin f vneu)
-    | Cdr vneu -> Cdr (thin f vneu)
+    | Idx ix ->
+      failwith "TODO"
+
+    | Lvl i ->
+      v
+
+    | Up (vty, vneu) ->
+      Up (thin f vty, thin f vneu)
+
+    | Pi (dom, cod) ->
+      Pi (thin_clo f dom, thin_bclo f cod)
+
+    | Sg (dom, cod) ->
+      Sg (thin_clo f dom, thin_bclo f cod)
+
+    | Univ _ ->
+      v
+
+    | Interval ->
+      v
+
+    | Dim0 ->
+      v
+
+    | Dim1 ->
+      v
+
+    | Lam bdy ->
+      Lam (thin_bclo f bdy)
+
+    | Cons (clo1, clo2) ->
+      Cons (thin_clo f clo1, thin_clo f clo2)
+
+    | Coe (vd0, vd1, bnd, v) ->
+      Coe (thin f vd0, thin f vd1, thin_bnd f bnd, thin f v)
+
+    | App (vneu, varg) ->
+      App (thin f vneu, thin f varg)
+
+    | Car vneu ->
+      Car (thin f vneu)
+
+    | Cdr vneu ->
+      Cdr (thin f vneu)
 
 and thin_clo h (Clo (g, (tm, rho, f))) = Clo (Thin.cmp g h, (tm, rho, f))
 and thin_bclo h (BClo (g, (tm, rho, f))) = BClo (Thin.cmp g h, (tm, rho, f))
@@ -78,10 +107,10 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
   fun g (tm, rho, f) ->
     match Tm.out tm with 
     | Tm.Atom i ->
-      thin g @@ into @@ Idx i
+      thin g @@ into @@ (failwith "TODO")
 
     | Tm.Var i ->
-      let v = Thin.proj i rho in
+      let v = failwith "todo" in
       thin (Thin.cmp g f) v
 
     | Tm.Pi (dom, cod) ->

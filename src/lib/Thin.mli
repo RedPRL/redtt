@@ -8,4 +8,15 @@ val sub : 'x t -> 'x -> 'x t
 val cmp : 'x t -> 'x t -> 'x t
 
 val act : t0 -> 'a list -> 'a list
-val proj : t0 -> 'a list -> 'a
+(* val proj : t0 -> 'a list -> 'a *)
+
+
+module Ix :
+sig
+  type 'a r = V of int | R of 'a
+
+  val proj : ('a t -> 'a -> 'a) -> 'a t -> int -> 'a r
+  val proj0 : t0 -> int -> int
+
+  val from_ix : int -> 'a t
+end
