@@ -7,6 +7,7 @@ type 'a bnd = B of 'a
 
 type clo
 type bclo
+type ('i, 'a) system
 
 type 'a t
 type _ f = 
@@ -17,8 +18,11 @@ type _ f =
 
   | Pi : clo * bclo -> can f
   | Sg : clo * bclo -> can f
+  | Ext : clo * (can t, clo) system -> can f
+
   | Univ : Lvl.t -> can f
   | Interval : can f
+
   | Dim0 : can f
   | Dim1 : can f
 
@@ -30,6 +34,8 @@ type _ f =
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
+
+  | Abort : can f
 
 
 val into : 'a f -> 'a t

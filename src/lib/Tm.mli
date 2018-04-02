@@ -36,6 +36,8 @@ type _ f =
   | Dim0 : chk f
   | Dim1 : chk f
 
+  | Abort : chk f
+
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
 

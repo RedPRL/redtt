@@ -35,6 +35,8 @@ type _ f =
   | Dim0 : chk f
   | Dim1 : chk f
 
+  | Abort : chk f
+
 and thin = {vthin : Thin.t0; athin : inf t Thin.t}
 
 and 'a node = {info : info option; con : 'a f; thin : thin}
@@ -133,6 +135,9 @@ let rec thin_f : type a. thin -> a f -> a f =
 
     | Dim1 ->
       tf
+
+    | Abort ->
+      Abort
 
 and thin_var f =
   thin {vthin = f; athin = Thin.id}

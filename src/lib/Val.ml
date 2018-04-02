@@ -5,6 +5,9 @@ type 'a bnd = B of 'a
 
 (* TODO: add systems, extension types *)
 
+type ('i, 'a) tube = 'i * 'i * 'a
+type ('i, 'a) system = ('i, 'a) tube list
+
 type _ f = 
   | Idx : Thin.t0 -> can f
   | Lvl : int -> neu f
@@ -13,8 +16,10 @@ type _ f =
 
   | Pi : clo * bclo -> can f
   | Sg : clo * bclo -> can f
+  | Ext : clo * (can t, clo) system -> can f
   | Univ : Lvl.t -> can f
   | Interval : can f
+
   | Dim0 : can f
   | Dim1 : can f
 
@@ -26,6 +31,8 @@ type _ f =
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
+
+  | Abort : can f
 
 and 'a t = { thin : Thin.t0; con : 'a f }
 
@@ -54,6 +61,9 @@ let rec thin_f : type a. Thin.t0 -> a f -> a f =
 
     | Sg (dom, cod) ->
       Sg (thin_clo f dom, thin_bclo f cod)
+
+    | Ext (dom, sys) ->
+      Ext (thin_clo f dom, thin_sys f sys)
 
     | Univ _ ->
       v
@@ -85,9 +95,14 @@ let rec thin_f : type a. Thin.t0 -> a f -> a f =
     | Cdr vneu ->
       Cdr (thin f vneu)
 
+    | Abort ->
+      v
+
 and thin_clo h (Clo (g, (tm, rho, f))) = Clo (Thin.cmp g h, (tm, rho, f))
 and thin_bclo h (BClo (g, (tm, rho, f))) = BClo (Thin.cmp g h, (tm, rho, f))
 and thin_bnd f (B v) = B (thin (Thin.skip f) v)
+and thin_sys f sys = List.map (thin_tube f) sys
+and thin_tube f (vd0, vd1, clo) = (thin f vd0, thin f vd1, thin_clo f clo)
 
 let into vf = 
   {thin = Thin.id; con = vf}
@@ -119,8 +134,8 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
     | Tm.Sg (dom, cod) ->
       into @@ Sg (clo g (dom, rho, f), bclo g (cod, rho, f))
 
-    | Tm.Ext _ ->
-      failwith "TODO: eval Ext"
+    | Tm.Ext (dom, sys) ->
+      into @@ Ext (clo g (dom, rho, f), eval_sys g (sys, rho, f))
 
     | Tm.Lam bnd ->
       into @@ Lam (bclo g (bnd, rho, f))
@@ -169,6 +184,25 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
     | Tm.Dim1 ->
       into Dim1
 
+    | Tm.Abort ->
+      into Abort
+
+
+and eval_sys g (sys, rho, f) = 
+  List.map (fun tb -> eval_tube g (tb, rho, f)) sys
+
+and eval_tube g ((t0, t1, tm), rho, f) =
+  let vd0 = eval g (t0, rho, f) in
+  let vd1 = eval g (t1, rho, f) in
+  let bdy =
+    begin 
+      match out vd0, out vd1 with 
+      | Dim0, Dim1 -> clo Thin.id (Tm.into Tm.Abort, [], Thin.id)
+      | Dim1, Dim0 -> clo Thin.id (Tm.into Tm.Abort, [], Thin.id)
+      | _ -> clo g (tm, rho, f)
+    end
+  in
+  (vd0, vd1, bdy)
 
 and eval_abnd g (Tm.AB tm, rho, f) = 
   B (eval (Thin.keep g) (tm, rho, Thin.skip f))
@@ -253,7 +287,39 @@ and cdr v =
     end
   | _ -> failwith "cdr"
 
-and reflect vty v = failwith "reflect"
+and reflect vty vneu =
+  match out vty with
+  | Ext (dom, sys) ->
+    reflect_ext dom sys vneu
+  | _ -> into @@ Up (vty, vneu)
+
+and reflect_ext dom sys vneu = 
+  match sys with 
+  | [] -> reflect (eval_clo dom) vneu
+  | (vd0, vd1, clo) :: sys ->
+    if dim_eq vd0 vd1 then 
+      eval_clo clo
+    else
+      reflect_ext dom sys vneu
+
+and dim_eq vd0 vd1 =
+  match out vd0, out vd1 with
+  | Dim0, Dim0 -> true
+  | Dim1, Dim1 -> true
+  | Idx f, Idx g -> Thin.Ix.to_ix f = Thin.Ix.to_ix g
+  | Up (_, vnd0), Up (_, vnd1) ->
+    dim_eq_neu vnd0 vnd1
+  | _ -> false
+
+(* The only reason this makes sense is that the neutral form of dimensions
+   can only be variables or atoms. This does *not* work if we allow dimensions
+   to appear in sigma types, or on the rhs of pi types, etc. *)
+and dim_eq_neu vnd0 vnd1 = 
+  match out vnd0, out vnd1 with 
+  | Lvl i, Lvl j -> i = j
+  | _ -> false
+
+
 
 and inst_bclo bclo v =
   let BClo (g, (Tm.VB tm, rho, f)) = bclo in
