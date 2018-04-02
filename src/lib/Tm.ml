@@ -49,20 +49,28 @@ let thin : type a. thin -> a t -> a t =
     {info; con; thin = {vthin = Thin.cmp thin.vthin th.vthin; athin = Thin.cmp thin.athin th.athin}}
 
 let thin_abnd : type a. thin -> a t abnd -> a t abnd = 
-  fun th _ ->
-    failwith "todo: thin_abnd"
+  fun th (AB t) ->
+    AB (thin {vthin = th.vthin; athin = Thin.skip th.athin} t)
 
 let thin_vbnd : type a. thin -> a t vbnd -> a t vbnd = 
-  fun th _ ->
-    failwith "todo: thin_vbnd"
+  fun th (VB t) ->
+    VB (thin {vthin = Thin.skip th.vthin; athin = th.athin} t)
+
+let thin_tube : type a b. thin -> (a t, b t) tube -> (a t, b t) tube = 
+  fun th (td0, td1, tm) ->
+    (thin th td0, thin th td1, thin th tm)
+
+let thin_btube : type a b. thin -> (a t, b t vbnd) tube -> (a t, b t vbnd) tube = 
+  fun th (td0, td1, tm) ->
+    (thin th td0, thin th td1, thin_vbnd th tm)
 
 let thin_bsys : type a. thin -> (a t, a t vbnd) system -> (a t, a t vbnd) system = 
-  fun th _ ->
-    failwith "todo: thin_bsys"
+  fun th ->
+    List.map (thin_btube th)
 
 let thin_sys : type a. thin -> (a t, a t) system -> (a t, a t) system = 
-  fun th _ ->
-    failwith "todo: thin_sys"
+  fun th ->
+    List.map (thin_tube th)
 
 
 let rec thin_f : type a. thin -> a f -> a f = 
