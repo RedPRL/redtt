@@ -30,10 +30,27 @@ and env = can t list
 and clo = Clo of Thin.t0 * (Tm.chk Tm.t * env * Thin.t0)
 and bclo = BClo of Thin.t0 * (Tm.chk Tm.t Tm.vbnd * env * Thin.t0)
 
-(* This should be cheap, because we bottom out at a closure very quickly; the action of
-   thinning on a closure is just composition with the closure's outer thinning. *)
-let thin : type a. Thin.t0 -> a t -> a t = 
-  fun _ -> failwith "TODO: thin"
+let rec thin : type a. Thin.t0 -> a t -> a t = 
+  fun f v ->
+    match v with 
+    | Idx ix -> failwith "TODO: thin/idx"
+    | Lvl i -> v
+    | Up (vty, vneu) -> Up (thin f vty, thin f vneu)
+    | Pi (dom, cod) -> Pi (thin_clo f dom, thin_bclo f cod)
+    | Sg (dom, cod) -> Sg (thin_clo f dom, thin_bclo f cod)
+    | Univ l -> v
+    | Interval -> v
+    | Lam bdy -> Lam (thin_bclo f bdy)
+    | Cons (clo1, clo2) -> Cons (thin_clo f clo1, thin_clo f clo2)
+    | Coe (vd0, vd1, bnd, v) -> Coe (thin f vd0, thin f vd1, thin_bnd f bnd, thin f v)
+    | App (vneu, varg) -> App (thin f vneu, thin f varg)
+    | Car vneu -> Car (thin f vneu)
+    | Cdr vneu -> Cdr (thin f vneu)
+
+
+and thin_clo f (Clo (g, (tm, rho, f))) = failwith "TODO: thin_clo"
+and thin_bclo f (BClo (g, (tm, rho, f))) = failwith "TODO: thin_bclo"
+and thin_bnd f (B _) = failwith "TODO: thin_bnd"
 
 
 let clo g (tm, rho, f) = 
