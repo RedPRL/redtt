@@ -1,4 +1,4 @@
-type ('i, 'a) tube = 'i * 'i * 'a
+type ('i, 'a) tube = 'i * 'i * 'a option
 type ('i, 'a) system = ('i, 'a) tube list
 
 type atm = Thin.t0
@@ -35,8 +35,6 @@ type _ f =
   | Cons : chk t * chk t -> chk f
   | Dim0 : chk f
   | Dim1 : chk f
-
-  | Abort : chk f
 
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f

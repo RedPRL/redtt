@@ -35,12 +35,8 @@ type _ f =
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
 
-  | Abort : can f
-
-
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
-
 
 val thin : Thin.t0 -> 'a t -> 'a t
 

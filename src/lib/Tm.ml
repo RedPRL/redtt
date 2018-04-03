@@ -1,4 +1,4 @@
-type ('i, 'a) tube = 'i * 'i * 'a
+type ('i, 'a) tube = 'i * 'i * 'a option
 type ('i, 'a) system = ('i, 'a) tube list
 
 type atm = Thin.t0
@@ -35,8 +35,6 @@ type _ f =
   | Dim0 : chk f
   | Dim1 : chk f
 
-  | Abort : chk f
-
 and thin = {vthin : Thin.t0; athin : inf t Thin.t}
 
 and 'a node = {info : info option; con : 'a f; thin : thin}
@@ -60,11 +58,11 @@ let thin_vbnd : type a. thin -> a t vbnd -> a t vbnd =
 
 let thin_tube : type a b. thin -> (a t, b t) tube -> (a t, b t) tube = 
   fun th (td0, td1, tm) ->
-    (thin th td0, thin th td1, thin th tm)
+    (thin th td0, thin th td1, Option.map (thin th) tm)
 
 let thin_btube : type a b. thin -> (a t, b t vbnd) tube -> (a t, b t vbnd) tube = 
   fun th (td0, td1, tm) ->
-    (thin th td0, thin th td1, thin_vbnd th tm)
+    (thin th td0, thin th td1, Option.map (thin_vbnd th) tm)
 
 let thin_bsys : type a. thin -> (a t, a t vbnd) system -> (a t, a t vbnd) system = 
   fun th ->
@@ -136,9 +134,6 @@ let rec thin_f : type a. thin -> a f -> a f =
     | Dim1 ->
       tf
 
-    | Abort ->
-      Abort
-
 and thin_var f =
   thin {vthin = f; athin = Thin.id}
 
@@ -153,7 +148,7 @@ let path (VB ty, tm0, tm1) =
   let tube td tm = 
     into @@ Up (into @@ Var Thin.id),
     td,
-    thin_var (Thin.skip Thin.id) tm
+    Some (thin_var (Thin.skip Thin.id) tm)
   in
   let tube0 = tube (into Dim0) tm0 in
   let tube1 = tube (into Dim1) tm1 in

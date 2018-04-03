@@ -3,7 +3,7 @@ type neu = [`Neu]
 
 type 'a bnd = B of 'a
 
-type ('i, 'a) tube = 'i * 'i * 'a
+type ('i, 'a) tube = 'i * 'i * 'a option
 type ('i, 'a) system = ('i, 'a) tube list
 
 type _ f = 
@@ -29,8 +29,6 @@ type _ f =
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
-
-  | Abort : can f
 
 and 'a t = { thin : Thin.t0; con : 'a f }
 
@@ -93,14 +91,12 @@ let rec thin_f : type a. Thin.t0 -> a f -> a f =
     | Cdr vneu ->
       Cdr (thin f vneu)
 
-    | Abort ->
-      v
 
 and thin_clo h (Clo (g, (tm, rho, f))) = Clo (Thin.cmp g h, (tm, rho, f))
 and thin_bclo h (BClo (g, (tm, rho, f))) = BClo (Thin.cmp g h, (tm, rho, f))
 and thin_bnd f (B v) = B (thin (Thin.skip f) v)
 and thin_sys f sys = List.map (thin_tube f) sys
-and thin_tube f (vd0, vd1, clo) = (thin f vd0, thin f vd1, thin_clo f clo)
+and thin_tube f (vd0, vd1, clo) = (thin f vd0, thin f vd1, Option.map (thin_clo f) clo)
 
 let into vf = 
   {thin = Thin.id; con = vf}
@@ -182,9 +178,6 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
     | Tm.Dim1 ->
       into Dim1
 
-    | Tm.Abort ->
-      into Abort
-
 
 and eval_sys g (sys, rho, f) = 
   List.map (fun tb -> eval_tube g (tb, rho, f)) sys
@@ -194,10 +187,11 @@ and eval_tube g ((t0, t1, tm), rho, f) =
   let vd1 = eval g (t1, rho, f) in
   let bdy =
     begin 
-      match out vd0, out vd1 with 
-      | Dim0, Dim1 -> clo Thin.id (Tm.into Tm.Abort, [], Thin.id)
-      | Dim1, Dim0 -> clo Thin.id (Tm.into Tm.Abort, [], Thin.id)
-      | _ -> clo g (tm, rho, f)
+      match out vd0, out vd1, tm with 
+      | Dim0, Dim1, _ -> None
+      | Dim1, Dim0, _ -> None
+      | _, _, Some tm -> Some (clo g (tm, rho, f))
+      | _ -> failwith "eval_tube: expected Some"
     end
   in
   (vd0, vd1, bdy)
@@ -296,7 +290,9 @@ and reflect_ext dom sys vneu =
   | [] -> reflect (eval_clo dom) vneu
   | (vd0, vd1, clo) :: sys ->
     if dim_eq vd0 vd1 then 
-      eval_clo clo
+      match clo with 
+      | Some clo -> eval_clo clo
+      | None -> failwith "reflect_ext: did not expect None in tube"
     else
       reflect_ext dom sys vneu
 
