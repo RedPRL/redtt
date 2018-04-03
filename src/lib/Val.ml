@@ -25,6 +25,7 @@ type _ f =
   | Cons : clo * clo -> can f
 
   | Coe : can t * can t * can t bnd * can t -> can f
+  | HCom : can t * can t * can t * can t * (can t, bclo) system -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
@@ -82,6 +83,9 @@ let rec thin_f : type a. Thin.t0 -> a f -> a f =
     | Coe (vd0, vd1, bnd, v) ->
       Coe (thin f vd0, thin f vd1, thin_bnd f bnd, thin f v)
 
+    | HCom (vd0, vd1, vty, cap, sys) ->
+      HCom (thin f vd0, thin f vd1, thin f vty, thin f cap, thin_bsys f sys)
+
     | App (vneu, varg) ->
       App (thin f vneu, thin f varg)
 
@@ -96,7 +100,9 @@ and thin_clo h (Clo (g, (tm, rho, f))) = Clo (Thin.cmp g h, (tm, rho, f))
 and thin_bclo h (BClo (g, (tm, rho, f))) = BClo (Thin.cmp g h, (tm, rho, f))
 and thin_bnd f (B v) = B (thin (Thin.skip f) v)
 and thin_sys f sys = List.map (thin_tube f) sys
+and thin_bsys f sys = List.map (thin_btube f) sys
 and thin_tube f (vd0, vd1, clo) = (thin f vd0, thin f vd1, Option.map (thin_clo f) clo)
+and thin_btube f (vd0, vd1, clo) = (thin f vd0, thin f vd1, Option.map (thin_bclo f) clo)
 
 let into vf = 
   {thin = Thin.id; con = vf}
@@ -150,8 +156,13 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
       let vtm = eval g (tm, rho, f) in
       into @@ Coe (vd0, vd1, vty, vtm)
 
-    | Tm.HCom _ ->
-      failwith "TODO: eval hcom"
+    | Tm.HCom (d0, d1, ty, cap, sys) ->
+      let vd0 = eval g (d0, rho, f) in
+      let vd1 = eval g (d1, rho, f) in
+      let vty = eval g (ty, rho, f) in
+      let vcap = eval g (ty, rho, f) in
+      let vsys = eval_bsys g (sys, rho, f) in
+      into @@ HCom (vd0, vd1, vty, vcap, vsys)
 
     | Tm.App (tm0, tm1) ->
       let vfun = eval g (tm0, rho, f) in
@@ -182,6 +193,11 @@ let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
 and eval_sys g (sys, rho, f) = 
   List.map (fun tb -> eval_tube g (tb, rho, f)) sys
 
+and eval_bsys g (sys, rho, f) = 
+  List.map (fun tb -> eval_btube g (tb, rho, f)) sys
+
+(* TODO: consolidate what follows *)
+
 and eval_tube g ((t0, t1, tm), rho, f) =
   let vd0 = eval g (t0, rho, f) in
   let vd1 = eval g (t1, rho, f) in
@@ -196,9 +212,25 @@ and eval_tube g ((t0, t1, tm), rho, f) =
   in
   (vd0, vd1, bdy)
 
+and eval_btube g ((t0, t1, tm), rho, f) =
+  let vd0 = eval g (t0, rho, f) in
+  let vd1 = eval g (t1, rho, f) in
+  let bdy =
+    begin 
+      match out vd0, out vd1, tm with 
+      | Dim0, Dim1, _ -> None
+      | Dim1, Dim0, _ -> None
+      | _, _, Some tm -> Some (bclo g (tm, rho, f))
+      | _ -> failwith "eval_tube: expected Some"
+    end
+  in
+  (vd0, vd1, bdy)  
+
 and eval_abnd g (Tm.AB tm, rho, f) = 
   B (eval (Thin.keep g) (tm, rho, Thin.skip f))
 
+
+(* TODO: hcom *)
 and apply vfun varg = 
   match out vfun with 
   | Lam bclo -> inst_bclo bclo varg
@@ -226,7 +258,7 @@ and apply vfun varg =
     end
   | _ -> failwith "apply"
 
-
+(* TODO: hcom *)
 and car v = 
   match out v with 
   | Cons (clo, _) -> eval_clo clo
@@ -249,6 +281,7 @@ and car v =
     end
   | _ -> failwith "car"
 
+(* TODO: hcom *)
 and cdr v = 
   match out v with 
   | Cons (_, clo) -> eval_clo clo
