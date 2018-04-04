@@ -23,13 +23,14 @@ sig
   val split : ('a * 'b) t -> 'a t * 'b t
 end = 
 struct
-  type 'a t = DimVal.t -> 'a
-  let inst f a = f a
-  let make f = f
-  let map f g x = f (g x)
+  type 'a t = { fam : DimVal.t -> 'a }
+
+  let inst f a = f.fam a
+  let make f = {fam = f}
+  let map f g = make @@ fun x -> f (inst g x)
   let split f = 
-    (fun x -> fst @@ f x),
-    (fun x -> snd @@ f x)
+    (make @@ fun x -> fst @@ inst f x),
+    (make @@ fun x -> snd @@ inst f x)
 end
 
 type 'a dimbind = 'a DimBind.t
