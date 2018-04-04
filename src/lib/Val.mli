@@ -12,7 +12,6 @@ type 'a dimbind
 
 type 'a t
 type _ f = 
-  | Atom : string -> can f
   | Lvl : int -> neu f
 
   | Up : can t * neu t -> can f
@@ -20,7 +19,6 @@ type _ f =
   | Pi : clo * bclo -> can f
   | Sg : clo * bclo -> can f
   | Ext : clo * (can t, clo) system -> can f
-
   | Univ : Lvl.t -> can f
   | Interval : can f
 
@@ -31,6 +29,7 @@ type _ f =
   | Cons : clo * clo -> can f
 
   | Coe : can t * can t * can t dimbind * can t -> can f
+
   | HCom : can t * can t * can t * can t * (can t, can t dimbind) system -> can f
 
   | App : neu t * can t -> neu f
