@@ -3,9 +3,6 @@ type neu = [`Neu]
 
 type 'a bnd = B of 'a
 
-type ('i, 'a) tube = 'i * 'i * 'a option
-type ('i, 'a) system = ('i, 'a) tube list
-
 module DimVal = 
 struct
   type t = 
@@ -50,7 +47,7 @@ type _ f =
 
   | Pi : clo * bclo -> can f
   | Sg : clo * bclo -> can f
-  | Ext : clo * (can t, clo) system -> can f
+  | Ext : clo * clo system -> can f
   | Univ : Lvl.t -> can f
   | Interval : can f
 
@@ -62,13 +59,16 @@ type _ f =
 
   | Coe : can t * can t * can t dimfam * can t -> can f
 
-  | HCom : can t * can t * can t * can t * (can t, can t dimfam) system -> can f
+  | HCom : can t * can t * can t * can t * can t dimfam system -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
 
 and 'a t = { con : 'a f }
+
+and 'a tube = can t * can t * 'a option
+and 'a system = 'a tube list
 
 and env = can t list
 and clo = [`Eval of Tm.chk Tm.t * env | `Ret of can t] ref
