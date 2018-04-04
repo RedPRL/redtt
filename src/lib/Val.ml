@@ -62,7 +62,7 @@ type _ f =
 and 'a t = { con : 'a f }
 
 and env = can t list
-and clo = Clo of Tm.chk Tm.t * env
+and clo = [`Eval of Tm.chk Tm.t * env | `Ret of can t] ref
 and bclo = BClo of Tm.chk Tm.t Tm.bnd * env
 
 let into vf = 
@@ -92,7 +92,7 @@ let project_dimval (type a) (v : a t) =
   | _ -> failwith "project_dimval"
 
 let clo tm rho = 
-  Clo (tm, rho)
+  ref @@ `Eval (tm, rho)
 
 let bclo bnd rho =
   BClo (bnd, rho)
@@ -365,5 +365,10 @@ and inst_bclo : bclo -> can t -> can t =
     eval (v :: vrho) tm
 
 and eval_clo : clo -> can t = 
-  fun (Clo (tm, vrho)) -> 
-    eval vrho tm
+  fun clo ->
+    match !clo with 
+    | `Eval (tm, rho) ->
+      let v = eval rho tm in
+      clo := `Ret v;
+      v
+    | `Ret v -> v
