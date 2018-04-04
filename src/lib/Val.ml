@@ -14,7 +14,7 @@ struct
     | Lvl of int
 end
 
-module DimBind :
+module DimFam :
 sig
   type 'a t
   val inst : 'a t -> DimVal.t -> 'a
@@ -23,17 +23,25 @@ sig
   val split : ('a * 'b) t -> 'a t * 'b t
 end = 
 struct
-  type 'a t = { fam : DimVal.t -> 'a }
+  type 'a t = { fam : DimVal.t -> 'a; cache : (DimVal.t, 'a) Hashtbl.t }
 
-  let inst f a = f.fam a
-  let make f = {fam = f}
+  let inst f i = 
+    match Hashtbl.find_opt f.cache i with
+    | Some a -> a
+    | None ->
+      let a = f.fam i in
+      Hashtbl.add f.cache i a;
+      a
+
+  let make f = {fam = f; cache = Hashtbl.create 10}
+
   let map f g = make @@ fun x -> f (inst g x)
   let split f = 
     (make @@ fun x -> fst @@ inst f x),
     (make @@ fun x -> snd @@ inst f x)
 end
 
-type 'a dimbind = 'a DimBind.t
+type 'a dimfam = 'a DimFam.t
 
 type _ f = 
   | Lvl : int -> neu f
@@ -52,9 +60,9 @@ type _ f =
   | Lam : bclo -> can f
   | Cons : clo * clo -> can f
 
-  | Coe : can t * can t * can t dimbind * can t -> can f
+  | Coe : can t * can t * can t dimfam * can t -> can f
 
-  | HCom : can t * can t * can t * can t * (can t, can t dimbind) system -> can f
+  | HCom : can t * can t * can t * can t * (can t, can t dimfam) system -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
@@ -105,7 +113,7 @@ let map_tubes f =
 
 
 let map_btubes f = 
-  map_tubes (DimBind.map f)
+  map_tubes (DimFam.map f)
 
 
 let out_pi v = 
@@ -144,7 +152,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Coe (d0, d1, Tm.B ty, tm) ->
       let vd0 = eval rho d0 in
       let vd1 = eval rho d1 in
-      let vty = DimBind.make (fun x -> eval (embed_dimval x :: rho) ty) in
+      let vty = DimFam.make (fun x -> eval (embed_dimval x :: rho) ty) in
       let vtm = eval rho tm in
       into @@ Coe (vd0, vd1, vty, vtm)
 
@@ -211,7 +219,7 @@ and eval_btube rho (t0, t1, obnd) =
     | DimVal.Dim1, DimVal.Dim0, _ -> None
     | _, _, Some (Tm.B tm) ->
       let vbnd = 
-        DimBind.make @@ fun x ->
+        DimFam.make @@ fun x ->
         eval (embed_dimval x :: rho) tm
       in
       Some vbnd
@@ -223,19 +231,19 @@ and eval_btube rho (t0, t1, obnd) =
 
 and com (vd0, vd1, vbnd, vcap, vsys) =
   let vcap' = into @@ Coe (vd0, vd1, vbnd, vcap) in
-  let vty' = DimBind.inst vbnd @@ project_dimval vd1 in
+  let vty' = DimFam.inst vbnd @@ project_dimval vd1 in
   let tube vbnd = 
-    DimBind.make @@ fun x ->
-    into @@ Coe (embed_dimval x, vd1, vbnd, DimBind.inst vbnd x)
+    DimFam.make @@ fun x ->
+    into @@ Coe (embed_dimval x, vd1, vbnd, DimFam.inst vbnd x)
   in
   let vsys' = map_tubes tube vsys in
   into @@ HCom (vd0, vd1, vty', vcap', vsys')
 
 and out_bind_pi vbnd = 
-  DimBind.split @@ DimBind.map out_pi vbnd
+  DimFam.split @@ DimFam.map out_pi vbnd
 
 and out_bind_sg vbnd = 
-  DimBind.split @@ DimBind.map out_sg vbnd
+  DimFam.split @@ DimFam.map out_sg vbnd
 
 and apply vfun varg = 
   match out vfun with 
@@ -249,11 +257,11 @@ and apply vfun varg =
 
   | Coe (vd0, vd1, vbnd, vfun) ->
     let dom, cod = out_bind_pi vbnd in
-    let vdom = DimBind.map eval_clo dom in
+    let vdom = DimFam.map eval_clo dom in
     let vcod =
-      DimBind.make @@ fun x -> 
+      DimFam.make @@ fun x -> 
       let coe = into @@ Coe (vd1, embed_dimval x, vdom, varg) in
-      inst_bclo (DimBind.inst cod x) coe
+      inst_bclo (DimFam.inst cod x) coe
     in
     let coe = into @@ Coe (vd1, vd0, vdom, varg) in
     into @@ Coe (vd0, vd1, vcod, apply vfun coe)
@@ -279,7 +287,7 @@ and car v =
 
   | Coe (vd0, vd1, vbnd, v) ->
     let dom, cod = out_bind_sg vbnd in
-    let vdom = DimBind.map eval_clo dom in
+    let vdom = DimFam.map eval_clo dom in
     let vcar = car v in
     into @@ Coe (vd0, vd1, vdom, vcar)
 
@@ -306,12 +314,12 @@ and cdr v =
 
   | Coe (vd0, vd1, vbnd, v) -> 
     let dom, cod = out_bind_pi vbnd in
-    let vdom = DimBind.map eval_clo dom in
+    let vdom = DimFam.map eval_clo dom in
     let vcar = car v in
     let vcod =
-      DimBind.make @@ fun x -> 
+      DimFam.make @@ fun x -> 
       let coe = into @@ Coe (vd0, embed_dimval x, vdom, vcar) in
-      inst_bclo (DimBind.inst cod x) coe
+      inst_bclo (DimFam.inst cod x) coe
     in
     into @@ Coe (vd0, vd1, vcod, cdr v)
 
@@ -319,7 +327,7 @@ and cdr v =
     let dom, cod = out_sg vty in
     let vdom = eval_clo dom in
     let vcod = 
-      DimBind.make @@ fun x ->
+      DimFam.make @@ fun x ->
       let hcom = into @@ HCom (vd0, embed_dimval x, vdom, car vcap, map_btubes car vsys) in
       inst_bclo cod hcom in
     let vcap' = cdr vcap in
