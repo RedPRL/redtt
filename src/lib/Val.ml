@@ -59,25 +59,101 @@ type _ f =
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
 
-and 'a t = { con : 'a f; atom_env : atom_env }
+and 'a t = { con : 'a f; atom_env : atom_env list }
 
 and atom_env = can t StringMap.t
 and env = can t list
-and clo = Clo of Tm.chk Tm.t * env * atom_env
-and bclo = BClo of Tm.chk Tm.t Tm.bnd * env * atom_env
+and clo = Clo of Tm.chk Tm.t * env * atom_env list
+and bclo = BClo of Tm.chk Tm.t Tm.bnd * env * atom_env list
 
 let into vf = 
-  {con = vf; atom_env = StringMap.empty}
+  {con = vf; atom_env = []}
 
-(* TODO: propagate atom substitutions *)
+let merge_atom_envs arho0 arho1 =
+  StringMap.merge (fun _ x _ -> x) arho0 arho1
+
+let subst_atoms arho v =
+  {con = v.con; atom_env = arho @ v.atom_env}
+
+let clo_subst_atoms arho clo = 
+  let Clo (t, vrho, arho') = clo in
+  Clo (t, vrho, arho @ arho')
+
+let bclo_subst_atoms arho clo = 
+  let BClo (t, vrho, arho') = clo in
+  BClo (t, vrho, arho @ arho')
+
+let rec subst_atoms_f : type a. atom_env list -> a f -> a f =
+  fun arhos vf ->
+    match vf with
+    | Atom x ->
+      proj_atom (List.rev arhos) x
+
+    | Up (vty, vneu) ->
+      Up (subst_atoms arhos vty, subst_atoms arhos vneu)
+
+    | Pi (clo, bclo) ->
+      Pi (clo_subst_atoms arhos clo, bclo_subst_atoms arhos bclo)
+
+    | Sg (clo, bclo) ->
+      Sg (clo_subst_atoms arhos clo, bclo_subst_atoms arhos bclo)
+
+    | Ext (vty, vsys) ->
+      failwith ""
+
+    | Lam bclo ->
+      Lam (bclo_subst_atoms arhos bclo)
+
+    | Cons (clo0, clo1) ->
+      Cons (clo_subst_atoms arhos clo0, clo_subst_atoms arhos clo1)
+
+    | Coe (vd0, vd1, vbnd, v) ->
+      let vbnd' = 
+        DimBind.make @@ fun x ->
+          let arhos' =
+            match x with 
+            | DimVal.Atom x -> List.map (StringMap.remove x) arhos
+            | _ -> arhos
+          in
+          subst_atoms arhos' @@ DimBind.inst vbnd x
+      in
+      Coe (subst_atoms arhos vd0, subst_atoms arhos vd1, vbnd', subst_atoms arhos v)
+
+    | HCom _ ->
+      failwith ""
+
+    | App (vneu, varg) ->
+      App (subst_atoms arhos vneu, subst_atoms arhos varg)
+
+    | Car vneu ->
+      Car (subst_atoms arhos vneu)
+
+    | Cdr vneu ->
+      Cdr (subst_atoms arhos vneu)
+
+    | Univ _ -> vf
+    | Interval -> vf
+    | Dim0 -> vf
+    | Dim1 -> vf
+    | Lvl _ -> vf
+
+(* TODO: optimize *)
+and proj_atom (arhos : atom_env list) (x : string) : can f = 
+  match arhos with 
+  | [] -> Atom x
+  | arho :: arhos ->
+    match StringMap.find_opt x arho with 
+    | None -> proj_atom arhos x
+    | Some v -> subst_atoms_f (List.rev_append arhos v.atom_env) v.con
+
 let out node = 
-  node.con
+  subst_atoms_f node.atom_env node.con
 
 let clo tm rho = 
-  Clo (tm, rho, StringMap.empty)
+  Clo (tm, rho, [])
 
 let bclo bnd rho =
-  BClo (bnd, rho, StringMap.empty)
+  BClo (bnd, rho, [])
 
 let embed_dimval dv = 
   match dv with 
@@ -93,9 +169,9 @@ let project_dimval v =
   | Atom a -> DimVal.Atom a
   | Up (_, vneu) ->
     begin
-    match out vneu with
-    | Lvl i -> DimVal.Lvl i
-    | _ -> failwith "project_dimval/Up"
+      match out vneu with
+      | Lvl i -> DimVal.Lvl i
+      | _ -> failwith "project_dimval/Up"
     end
   | _ -> failwith "project_dimval"
 
@@ -112,6 +188,9 @@ let out_sg v =
   match out v with 
   | Sg (dom, cod) -> dom, cod
   | _ -> failwith "out_sg"
+
+
+
 
 let rec eval : type a. env -> a Tm.t -> can t =
   fun rho tm ->
@@ -149,17 +228,6 @@ and eval_sys g (sys, rho, f) = failwith ""
 
 and eval_bsys g (sys, rho, f) = failwith ""
 
-and subst_dims arho v =
-  failwith ""
-
-and clo_subst_dim x name clo = 
-  let Clo (t, vrho, arho) = clo in
-  Clo (t, vrho, StringMap.add name x arho)
-
-and bclo_subst_dim x name clo = 
-  let BClo (t, vrho, arho) = clo in
-  BClo (t, vrho, StringMap.add name x arho)
-
 and com (vd0, vd1, vbnd, vcap, vsys) =
   let vcap' = into @@ Coe (vd0, vd1, vbnd, vcap) in
   let vty' = DimBind.inst vbnd @@ project_dimval vd1 in
@@ -170,16 +238,16 @@ and out_bind_pi vbnd =
   let a = "fresh" in
   match out @@ DimBind.inst vbnd @@ DimVal.Atom a with
   | Pi (dom, cod) ->
-    DimBind.make (fun x -> clo_subst_dim (embed_dimval x) a dom),
-    DimBind.make (fun x -> bclo_subst_dim (embed_dimval x) a cod)
+    DimBind.make (fun x -> clo_subst_atoms [StringMap.singleton a (embed_dimval x)] dom),
+    DimBind.make (fun x -> bclo_subst_atoms [StringMap.singleton a (embed_dimval x)] cod)
   | _ -> failwith "out_bind_pi"
 
 and out_bind_sg vbnd = 
   let a = "fresh" in
   match out @@ DimBind.inst vbnd @@ DimVal.Atom a with
   | Sg (dom, cod) ->
-    DimBind.make (fun x -> clo_subst_dim (embed_dimval x) a dom),
-    DimBind.make (fun x -> bclo_subst_dim (embed_dimval x) a cod)
+    DimBind.make (fun x -> clo_subst_atoms [StringMap.singleton a (embed_dimval x)] dom),
+    DimBind.make (fun x -> bclo_subst_atoms [StringMap.singleton a (embed_dimval x)] cod)
   | _ -> failwith "out_bind_sg"
 
 and apply vfun varg = 
@@ -197,8 +265,8 @@ and apply vfun varg =
     let vdom = DimBind.map eval_clo dom in
     let vcod =
       DimBind.make @@ fun x -> 
-        let coe = into @@ Coe (vd1, embed_dimval x, vdom, varg) in
-        inst_bclo (DimBind.inst cod x) coe
+      let coe = into @@ Coe (vd1, embed_dimval x, vdom, varg) in
+      inst_bclo (DimBind.inst cod x) coe
     in
     let coe = into @@ Coe (vd1, vd0, vdom, varg) in
     into @@ Coe (vd0, vd1, vcod, apply vfun coe)
@@ -252,8 +320,8 @@ and cdr v =
     let vcar = car v in
     let vcod =
       DimBind.make @@ fun x -> 
-        let coe = into @@ Coe (vd0, embed_dimval x, vdom, vcar) in
-        inst_bclo (DimBind.inst cod x) coe
+      let coe = into @@ Coe (vd0, embed_dimval x, vdom, vcar) in
+      inst_bclo (DimBind.inst cod x) coe
     in
     into @@ Coe (vd0, vd1, vcod, cdr v)
 
@@ -295,8 +363,8 @@ and dim_eq_neu vnd0 vnd1 =
 
 and inst_bclo : bclo -> can t -> can t =
   fun (BClo (Tm.B tm, vrho, arho)) v ->
-    subst_dims arho @@ eval (v :: vrho) tm
+    subst_atoms arho @@ eval (v :: vrho) tm
 
 and eval_clo : clo -> can t = 
   fun (Clo (tm, vrho, arho)) -> 
-    subst_dims arho @@ eval vrho tm
+    subst_atoms arho @@ eval vrho tm
