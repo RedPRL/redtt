@@ -1,7 +1,7 @@
 type ('i, 'a) tube = 'i * 'i * 'a option
 type ('i, 'a) system = ('i, 'a) tube list
 
-type var = Thin.t0
+type var = Thin.t
 
 type 'a bnd = B of 'a
 

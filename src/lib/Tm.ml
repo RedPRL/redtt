@@ -1,7 +1,7 @@
 type ('i, 'a) tube = 'i * 'i * 'a option
 type ('i, 'a) system = ('i, 'a) tube list
 
-type var = Thin.t0
+type var = Thin.t
 
 type 'a bnd = B of 'a
 
@@ -32,40 +32,40 @@ type _ f =
   | Dim0 : chk f
   | Dim1 : chk f
 
-and 'a node = {info : info option; con : 'a f; thin : Thin.t0}
+and 'a node = {info : info option; con : 'a f; thin : Thin.t}
 and 'a t = 'a node
 
 let into tf = {info = None; con = tf; thin = Thin.id}
 let into_info info tf = {info = Some info; con = tf; thin = Thin.id}
 let info node = node.info
 
-let thin : type a. Thin.t0 -> a t -> a t = 
+let thin : type a. Thin.t -> a t -> a t = 
   fun th {info; con; thin} ->
     {info; con; thin = Thin.cmp thin th}
 
-let thin_bnd : type a. Thin.t0 -> a t bnd -> a t bnd = 
+let thin_bnd : type a. Thin.t -> a t bnd -> a t bnd = 
   fun th (B t) ->
     B (thin (Thin.skip th) t)
 
 
-let thin_tube : type a b. Thin.t0 -> (a t, b t) tube -> (a t, b t) tube = 
+let thin_tube : type a b. Thin.t -> (a t, b t) tube -> (a t, b t) tube = 
   fun th (td0, td1, tm) ->
     (thin th td0, thin th td1, Option.map (thin th) tm)
 
-let thin_btube : type a b. Thin.t0 -> (a t, b t bnd) tube -> (a t, b t bnd) tube = 
+let thin_btube : type a b. Thin.t -> (a t, b t bnd) tube -> (a t, b t bnd) tube = 
   fun th (td0, td1, tm) ->
     (thin th td0, thin th td1, Option.map (thin_bnd th) tm)
 
-let thin_bsys : type a. Thin.t0 -> (a t, a t bnd) system -> (a t, a t bnd) system = 
+let thin_bsys : type a. Thin.t -> (a t, a t bnd) system -> (a t, a t bnd) system = 
   fun th ->
     List.map (thin_btube th)
 
-let thin_sys : type a. Thin.t0 -> (a t, a t) system -> (a t, a t) system = 
+let thin_sys : type a. Thin.t -> (a t, a t) system -> (a t, a t) system = 
   fun th ->
     List.map (thin_tube th)
 
 
-let rec thin_f : type a. Thin.t0 -> a f -> a f = 
+let rec thin_f : type a. Thin.t -> a f -> a f = 
   fun th tf ->
     match tf with 
     | Var g ->

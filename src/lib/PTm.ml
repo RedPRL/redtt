@@ -14,7 +14,7 @@ sig
   type t
   val init : t
   val bind : string -> t -> t
-  val get : string -> t -> Thin.t0
+  val get : string -> t -> Thin.t
 end
 
 module ResEnv : ResEnv = 
