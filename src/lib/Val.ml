@@ -267,7 +267,7 @@ and eval_btube g ((t0, t1, tm), rho, f) : can t * can t * can t DimBind.t option
       | Dim0, Dim1, _ -> None
       | Dim1, Dim0, _ -> None
       | _, _, Some (Tm.VB tm) -> Some (DimBind.make (fun x -> eval g (tm, embed_dimval x :: rho, f)))
-      | _ -> failwith "eval_tube: expected Some"
+      | _ -> failwith "eval_btube: expected Some"
     end
   in
   (vd0, vd1, bdy)  
