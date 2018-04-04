@@ -366,8 +366,7 @@ and apply vfun varg =
     let dom, cod = out_pi vty in
     let vcod = inst_bclo cod varg in
     let vcap' = apply vcap varg in
-    let tube (vd0', vd1', ovbnd) = vd0', vd1', Option.map (DimBind.map (fun v -> apply v varg)) ovbnd in
-    let vsys' = List.map tube vsys in
+    let vsys' = map_btubes (fun v -> apply v varg) vsys in
     into @@ HCom (vd0, vd1, vcod, vcap', vsys')
 
   | _ -> failwith "apply"
@@ -389,8 +388,6 @@ and car v =
     into @@ Coe (vd0, vd1, vdom, vcar)
 
 
-(*
-
   | HCom (vd0, vd1, vty, vcap, vsys) ->
     let dom, cod = out_sg vty in
     let vdom = eval_clo dom in
@@ -398,7 +395,6 @@ and car v =
     let vsys' = map_btubes car vsys in
     into @@ HCom (vd0, vd1, vdom, vcap', vsys')
 
-*)
   | _ -> failwith "car"
 
 (* TODO: hcom *)
