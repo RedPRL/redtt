@@ -20,15 +20,17 @@ sig
   val inst : 'a t -> DimVal.t -> 'a
   val make : (DimVal.t -> 'a) -> 'a t
   val map : ('a -> 'b) -> 'a t -> 'b t
+  val split : ('a * 'b) t -> 'a t * 'b t
 end = 
 struct
   type 'a t = DimVal.t -> 'a
   let inst f a = f a
   let make f = f
   let map f g x = f (g x)
+  let split f = 
+    (fun x -> fst @@ f x),
+    (fun x -> snd @@ f x)
 end
-
-module StringMap = Map.Make (String)
 
 type 'a dimbind = 'a DimBind.t
 
@@ -96,8 +98,13 @@ let bclo bnd rho =
   BClo (bnd, rho)
 
 
-let map_btubes f vsys = 
-  List.map (fun (vd0, vd1, vbnd) -> (vd0, vd1, Option.map (DimBind.map f) vbnd)) vsys
+let map_tubes f = 
+  List.map @@ fun (vd0, vd1, vbnd) ->
+  (vd0, vd1, Option.map f vbnd)
+
+
+let map_btubes f = 
+  map_tubes (DimBind.map f)
 
 
 let out_pi v = 
@@ -216,16 +223,18 @@ and eval_btube rho (t0, t1, obnd) =
 and com (vd0, vd1, vbnd, vcap, vsys) =
   let vcap' = into @@ Coe (vd0, vd1, vbnd, vcap) in
   let vty' = DimBind.inst vbnd @@ project_dimval vd1 in
-  let vsys' = List.map (fun (vd0', vd1', ovbnd) -> (vd0', vd1', Option.map (fun vbnd -> DimBind.make (fun x -> into @@ Coe (embed_dimval x, vd1, vbnd, DimBind.inst vbnd x))) ovbnd)) vsys in
+  let tube vbnd = 
+    DimBind.make @@ fun x ->
+    into @@ Coe (embed_dimval x, vd1, vbnd, DimBind.inst vbnd x)
+  in
+  let vsys' = map_tubes tube vsys in
   into @@ HCom (vd0, vd1, vty', vcap', vsys')
 
 and out_bind_pi vbnd = 
-  DimBind.map (fun v -> let dom, _ = out_pi v in dom) vbnd,
-  DimBind.map (fun v -> let _, cod = out_pi v in cod) vbnd
+  DimBind.split @@ DimBind.map out_pi vbnd
 
 and out_bind_sg vbnd = 
-  DimBind.map (fun v -> let dom, _ = out_sg v in dom) vbnd,
-  DimBind.map (fun v -> let _, cod = out_sg v in cod) vbnd
+  DimBind.split @@ DimBind.map out_sg vbnd
 
 and apply vfun varg = 
   match out vfun with 
