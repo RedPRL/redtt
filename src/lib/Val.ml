@@ -59,29 +59,18 @@ type _ f =
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
 
-and 'a t = { con : 'a f; atom_env : atom_env list }
+and 'a t = { con : 'a f }
 
 and atom_env = can t StringMap.t
 and env = can t list
-and clo = Clo of Tm.chk Tm.t * env * atom_env list
-and bclo = BClo of Tm.chk Tm.t Tm.bnd * env * atom_env list
+and clo = Clo of Tm.chk Tm.t * env
+and bclo = BClo of Tm.chk Tm.t Tm.bnd * env
 
 let into vf = 
-  {con = vf; atom_env = []}
+  {con = vf}
 
 let merge_atom_envs arho0 arho1 =
   StringMap.merge (fun _ x _ -> x) arho0 arho1
-
-let subst_atoms arho v =
-  {con = v.con; atom_env = arho @ v.atom_env}
-
-let clo_subst_atoms arho clo = 
-  let Clo (t, vrho, arho') = clo in
-  Clo (t, vrho, arho @ arho')
-
-let bclo_subst_atoms arho clo = 
-  let BClo (t, vrho, arho') = clo in
-  BClo (t, vrho, arho @ arho')
 
 
 let embed_dimval dv = 
@@ -91,95 +80,11 @@ let embed_dimval dv =
   | DimVal.Atom a -> into @@ Atom a
   | DimVal.Lvl i -> into @@ Up (into Interval, into @@ Lvl i)
 
-
-let rec subst_atoms_f : type a. atom_env list -> a f -> a f =
-  fun arhos vf ->
-    match vf with
-    | Atom x ->
-      proj_atom (List.rev arhos) x
-
-    | Up (vty, vneu) ->
-      Up (subst_atoms arhos vty, subst_atoms arhos vneu)
-
-    | Pi (clo, bclo) ->
-      Pi (clo_subst_atoms arhos clo, bclo_subst_atoms arhos bclo)
-
-    | Sg (clo, bclo) ->
-      Sg (clo_subst_atoms arhos clo, bclo_subst_atoms arhos bclo)
-
-    | Ext (vty, vsys) ->
-      failwith ""
-
-    | Lam bclo ->
-      Lam (bclo_subst_atoms arhos bclo)
-
-    | Cons (clo0, clo1) ->
-      Cons (clo_subst_atoms arhos clo0, clo_subst_atoms arhos clo1)
-
-    | Coe (vd0, vd1, vbnd, v) ->
-      let vd0' = subst_atoms arhos vd0 in
-      let vd1' = subst_atoms arhos vd1 in
-      let vbnd' = dimbind_subst_atoms arhos vbnd in
-      let v' = subst_atoms arhos v in
-      Coe (vd0', vd1', vbnd', v')
-
-    | HCom (vd0, vd1, vty, vcap, vsys) ->
-      let vd0' = subst_atoms arhos vd0 in
-      let vd1' = subst_atoms arhos vd1 in
-      let vty' = subst_atoms arhos vty in
-      let vcap' = subst_atoms arhos vcap in
-      let vsys' = List.map (btube_subst_atoms arhos) vsys in
-      HCom (vd0', vd1', vty', vcap', vsys')
-
-    | App (vneu, varg) ->
-      App (subst_atoms arhos vneu, subst_atoms arhos varg)
-
-    | Car vneu ->
-      Car (subst_atoms arhos vneu)
-
-    | Cdr vneu ->
-      Cdr (subst_atoms arhos vneu)
-
-    | Univ _ -> vf
-    | Interval -> vf
-    | Dim0 -> vf
-    | Dim1 -> vf
-    | Lvl _ -> vf
+let out : type a. a t -> a f = 
+  fun node -> node.con
 
 
-(* TODO: optimize *)
-and proj_atom (arhos : atom_env list) (x : string) : can f = 
-  match arhos with 
-  | [] -> Atom x
-  | arho :: arhos ->
-    match StringMap.find_opt x arho with 
-    | None -> proj_atom arhos x
-    | Some v -> subst_atoms_f (List.rev_append arhos v.atom_env) v.con
-
-
-and btube_subst_atoms arhos (vd0, vd1, obnd) =
-  let vd0' = subst_atoms arhos vd0 in
-  let vd1' = subst_atoms arhos vd1 in
-  let obnd' =
-    match project_dimval vd0', project_dimval vd1', obnd with
-    | DimVal.Dim0, DimVal.Dim1, _ -> None
-    | DimVal.Dim1, DimVal.Dim0, _ -> None
-    | _, _, Some bnd ->
-      Some (dimbind_subst_atoms arhos bnd)
-    | _ -> failwith "btube_subst_atoms: expected Some"
-  in
-  (vd0', vd1', obnd')
-
-and dimbind_subst_atoms arhos bnd = 
-  DimBind.make @@ fun x ->
-  let arhos' =
-    match x with 
-    | DimVal.Atom x -> List.map (StringMap.remove x) arhos
-    | _ -> arhos
-  in
-  subst_atoms arhos' @@ DimBind.inst bnd x
-
-and project_dimval (type a) (v : a t) = 
+let project_dimval (type a) (v : a t) = 
   match out v with
   | Dim0 -> DimVal.Dim0
   | Dim1 -> DimVal.Dim1
@@ -192,14 +97,14 @@ and project_dimval (type a) (v : a t) =
     end
   | _ -> failwith "project_dimval"
 
-and out : type a. a t -> a f = fun node ->
-  subst_atoms_f node.atom_env node.con
+(* and out : type a. a t -> a f = fun node ->
+  subst_atoms_f node.atom_env node.con *)
 
 let clo tm rho = 
-  Clo (tm, rho, [])
+  Clo (tm, rho)
 
 let bclo bnd rho =
-  BClo (bnd, rho, [])
+  BClo (bnd, rho)
 
 
 let map_btubes f vsys = 
@@ -329,16 +234,16 @@ and out_bind_pi vbnd =
   let a = "fresh" in
   match out @@ DimBind.inst vbnd @@ DimVal.Atom a with
   | Pi (dom, cod) ->
-    DimBind.make (fun x -> clo_subst_atoms [StringMap.singleton a (embed_dimval x)] dom),
-    DimBind.make (fun x -> bclo_subst_atoms [StringMap.singleton a (embed_dimval x)] cod)
+    DimBind.map (fun v -> let dom, _ = out_pi v in dom) vbnd,
+    DimBind.map (fun v -> let _, cod = out_pi v in cod) vbnd
   | _ -> failwith "out_bind_pi"
 
 and out_bind_sg vbnd = 
   let a = "fresh" in
   match out @@ DimBind.inst vbnd @@ DimVal.Atom a with
   | Sg (dom, cod) ->
-    DimBind.make (fun x -> clo_subst_atoms [StringMap.singleton a (embed_dimval x)] dom),
-    DimBind.make (fun x -> bclo_subst_atoms [StringMap.singleton a (embed_dimval x)] cod)
+    DimBind.map (fun v -> let dom, _ = out_sg v in dom) vbnd,
+    DimBind.map (fun v -> let _, cod = out_sg v in cod) vbnd
   | _ -> failwith "out_bind_sg"
 
 and apply vfun varg = 
@@ -467,9 +372,9 @@ and dim_eq_neu vnd0 vnd1 =
   | _ -> false
 
 and inst_bclo : bclo -> can t -> can t =
-  fun (BClo (Tm.B tm, vrho, arho)) v ->
-    subst_atoms arho @@ eval (v :: vrho) tm
+  fun (BClo (Tm.B tm, vrho)) v ->
+    eval (v :: vrho) tm
 
 and eval_clo : clo -> can t = 
-  fun (Clo (tm, vrho, arho)) -> 
-    subst_atoms arho @@ eval vrho tm
+  fun (Clo (tm, vrho)) -> 
+    eval vrho tm
