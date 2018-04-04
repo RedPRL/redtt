@@ -20,7 +20,10 @@ sig
   val split : ('a * 'b) t -> 'a t * 'b t
 end = 
 struct
-  type 'a t = { fam : DimVal.t -> 'a; cache : (DimVal.t, 'a) Hashtbl.t }
+  type 'a t = 
+    { fam : DimVal.t -> 'a
+    ; cache : (DimVal.t, 'a) Hashtbl.t 
+    }
 
   let inst f i = 
     match Hashtbl.find_opt f.cache i with
@@ -67,7 +70,7 @@ type _ f =
 
 and 'a t = { con : 'a f }
 
-and 'a tube = can t * can t * 'a option
+and 'a tube = DimVal.t * DimVal.t * 'a option
 and 'a system = 'a tube list
 
 and env = can t list
@@ -199,10 +202,10 @@ and eval_bsys rho bsys =
   List.map (eval_btube rho) bsys
 
 and eval_tube rho (t0, t1, otm) =
-  let vd0 = eval rho t0 in
-  let vd1 = eval rho t1 in
+  let vd0 = project_dimval @@ eval rho t0 in
+  let vd1 = project_dimval @@ eval rho t1 in
   let ov =
-    match project_dimval vd0, project_dimval vd1, otm with
+    match vd0, vd1, otm with
     | DimVal.Dim0, DimVal.Dim1, _ -> None
     | DimVal.Dim1, DimVal.Dim0, _ -> None
     | _, _, Some tm -> Some (clo tm rho)
@@ -211,10 +214,10 @@ and eval_tube rho (t0, t1, otm) =
   (vd0, vd1, ov)
 
 and eval_btube rho (t0, t1, obnd) =
-  let vd0 = eval rho t0 in
-  let vd1 = eval rho t1 in
+  let vd0 = project_dimval @@ eval rho t0 in
+  let vd1 = project_dimval @@ eval rho t1 in
   let ovbnd =
-    match project_dimval vd0, project_dimval vd1, obnd with
+    match vd0, vd1, obnd with
     | DimVal.Dim0, DimVal.Dim1, _ -> None
     | DimVal.Dim1, DimVal.Dim0, _ -> None
     | _, _, Some (Tm.B tm) ->
@@ -354,19 +357,10 @@ and reflect_ext dom sys vneu =
       reflect_ext dom sys vneu
 
 and dim_eq vd0 vd1 =
-  match out vd0, out vd1 with
-  | Dim0, Dim0 -> true
-  | Dim1, Dim1 -> true
-  | Up (_, vnd0), Up (_, vnd1) ->
-    dim_eq_neu vnd0 vnd1
-  | _ -> false
-
-(* The only reason this makes sense is that the neutral form of dimensions
-   can only be variables. This does *not* work if we allow dimensions
-   to appear in sigma types, or on the rhs of pi types, etc. *)
-and dim_eq_neu vnd0 vnd1 = 
-  match out vnd0, out vnd1 with 
-  | Lvl i, Lvl j -> i = j
+  match vd0, vd1 with
+  | DimVal.Dim0, DimVal.Dim0 -> true
+  | DimVal.Dim1, DimVal.Dim1 -> true
+  | DimVal.Lvl i, DimVal.Lvl j -> i = j
   | _ -> false
 
 and inst_bclo : bclo -> can t -> can t =
