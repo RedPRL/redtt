@@ -39,6 +39,10 @@ type _ f =
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
 
+type env = can t list
+
+val eval : env -> 'a Tm.t -> can t
+
 val eval_clo : clo -> can t
 val inst_bclo : bclo -> can t -> can t
 
