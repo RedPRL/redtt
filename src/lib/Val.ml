@@ -6,6 +6,31 @@ type 'a bnd = B of 'a
 type ('i, 'a) tube = 'i * 'i * 'a option
 type ('i, 'a) system = ('i, 'a) tube list
 
+module DimVal = 
+struct
+  type t = 
+    | Dim0
+    | Dim1
+    | Lvl of int
+    | Idx of Thin.t0
+end
+
+module DimBind :
+sig
+  type 'a t
+  val inst : 'a t -> DimVal.t -> 'a
+  val make : (DimVal.t -> 'a) -> 'a t
+  val map : ('a -> 'b) -> 'a t -> 'b t
+end = 
+struct
+  type 'a t = DimVal.t -> 'a
+  let inst f a = f a
+  let make f = f
+  let map f g x = f (g x)
+end
+
+type 'a dimbind = 'a DimBind.t
+
 type _ f = 
   | Idx : Thin.t0 -> can f
   | Lvl : int -> neu f
@@ -25,7 +50,7 @@ type _ f =
   | Cons : clo * clo -> can f
 
   | Coe : can t * can t * can t bnd * can t -> can f
-  | HCom : can t * can t * can t * can t * (can t, bclo) system -> can f
+  | HCom : can t * can t * can t * can t * (can t, can t dimbind) system -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
@@ -102,7 +127,8 @@ and thin_bnd f (B v) = B (thin (Thin.skip f) v)
 and thin_sys f sys = List.map (thin_tube f) sys
 and thin_bsys f sys = List.map (thin_btube f) sys
 and thin_tube f (vd0, vd1, clo) = (thin f vd0, thin f vd1, Option.map (thin_clo f) clo)
-and thin_btube f (vd0, vd1, clo) = (thin f vd0, thin f vd1, Option.map (thin_bclo f) clo)
+and thin_btube f (vd0, vd1, clo) = (thin f vd0, thin f vd1, Option.map (thin_dim_bind f) clo)
+and thin_dim_bind _ _ = failwith ""
 
 let into vf = 
   {thin = Thin.id; con = vf}
@@ -117,6 +143,26 @@ let clo g (tm, rho, f) =
 let bclo g (bnd, rho, f) =
   BClo (g, (bnd, rho, f))
 
+let embed_dimval dv = 
+  match dv with 
+  | DimVal.Dim0 -> into Dim0
+  | DimVal.Dim1 -> into Dim1
+  | DimVal.Idx i -> into @@ Idx i
+  | DimVal.Lvl i -> into @@ Up (into Interval, into @@ Lvl i)
+
+let map_btubes f vsys = 
+  List.map (fun (vd0, vd1, vbnd) -> (vd0, vd1, Option.map (DimBind.map f) vbnd)) vsys
+
+
+let out_pi v = 
+  match out v with 
+  | Pi (dom, cod) -> dom, cod
+  | _ -> failwith "out_pi"
+
+let out_sg v = 
+  match out v with 
+  | Sg (dom, cod) -> dom, cod
+  | _ -> failwith "out_sg"
 
 let rec eval : type a. Thin.t0 -> (a Tm.t * env * Thin.t0) -> can t =
   fun g (tm, rho, f) ->
@@ -212,7 +258,7 @@ and eval_tube g ((t0, t1, tm), rho, f) =
   in
   (vd0, vd1, bdy)
 
-and eval_btube g ((t0, t1, tm), rho, f) =
+and eval_btube g ((t0, t1, tm), rho, f) : can t * can t * can t DimBind.t option =
   let vd0 = eval g (t0, rho, f) in
   let vd1 = eval g (t1, rho, f) in
   let bdy =
@@ -220,7 +266,7 @@ and eval_btube g ((t0, t1, tm), rho, f) =
       match out vd0, out vd1, tm with 
       | Dim0, Dim1, _ -> None
       | Dim1, Dim0, _ -> None
-      | _, _, Some tm -> Some (bclo g (tm, rho, f))
+      | _, _, Some (Tm.VB tm) -> Some (DimBind.make (fun x -> eval g (tm, embed_dimval x :: rho, f)))
       | _ -> failwith "eval_tube: expected Some"
     end
   in
@@ -230,86 +276,86 @@ and eval_abnd g (Tm.AB tm, rho, f) =
   B (eval (Thin.keep g) (tm, rho, Thin.skip f))
 
 
-(* TODO: hcom *)
 and apply vfun varg = 
   match out vfun with 
-  | Lam bclo -> inst_bclo bclo varg
+  | Lam bclo ->
+    inst_bclo bclo varg
+
   | Up (vty, vneu) ->
-    begin 
-      match out vty with 
-      | Pi (dom, cod) -> 
-        let vcod = inst_bclo cod varg in
-        reflect vcod @@ into @@ App (vneu, varg)
-      | _ -> failwith "apply/up"
-    end
+    let dom, cod = out_pi vty in
+    let vcod = inst_bclo cod varg in
+    reflect vcod @@ into @@ App (vneu, varg)
+
   | Coe (vd0, vd1, B vty, v) ->
-    begin
-      match out vty with 
-      | Pi (dom, cod) ->
-        let vdom = eval_clo dom in
-        let vd1' = thin (Thin.skip Thin.id) vd1 in
-        let vgen = into @@ Idx Thin.id in
-        let vdom' = thin (Thin.keep (Thin.skip Thin.id)) vdom in
-        let varg' = thin (Thin.skip Thin.id) varg in
-        let vcod = inst_bclo cod (into @@ Coe (vd1', vgen, B vdom', varg')) in
-        let vapp = apply v (into @@ Coe (vd1, vd0, B vdom, varg)) in
-        into @@ Coe (vd0, vd1, B vcod, vapp)
-      | _ -> failwith "apply/coe"
-    end
+    let dom, cod = out_pi vty in
+    let vdom = eval_clo dom in
+    let vd1' = thin (Thin.skip Thin.id) vd1 in
+    let vgen = into @@ Idx Thin.id in
+    let vdom' = thin (Thin.keep (Thin.skip Thin.id)) vdom in
+    let varg' = thin (Thin.skip Thin.id) varg in
+    let vcod = inst_bclo cod (into @@ Coe (vd1', vgen, B vdom', varg')) in
+    let vapp = apply v (into @@ Coe (vd1, vd0, B vdom, varg)) in
+    into @@ Coe (vd0, vd1, B vcod, vapp)
+
+  | HCom (vd0, vd1, vty, vcap, vsys) ->
+    let dom, cod = out_pi vty in
+    let vcod = inst_bclo cod varg in
+    let vcap' = apply vcap varg in
+    let vsys' = map_btubes (fun v -> apply v varg) vsys in
+    into @@ HCom (vd0, vd1, vcod, vcap', vsys')
+
   | _ -> failwith "apply"
 
-(* TODO: hcom *)
 and car v = 
   match out v with 
-  | Cons (clo, _) -> eval_clo clo
+  | Cons (clo, _) ->
+    eval_clo clo
+
   | Up (vty, vneu) -> 
-    begin
-      match out vty with 
-      | Sg (dom, cod) ->
-        let vdom = eval_clo dom in
-        reflect vdom @@ into @@ Car vneu
-      | _ -> failwith "car/up"
-    end
+    let dom, cod = out_sg vty in
+    let vdom = eval_clo dom in
+    reflect vdom @@ into @@ Car vneu
+
   | Coe (vd0, vd1, B vty, v) ->
-    begin
-      match out vty with 
-      | Sg (dom, cod) ->
-        let vdom = eval_clo dom in
-        let v' = car v in
-        into @@ Coe (vd0, vd1, B vdom, v')
-      | _ -> failwith "car/coe"
-    end
+    let dom, cod = out_sg vty in
+    let vdom = eval_clo dom in
+    let v' = car v in
+    into @@ Coe (vd0, vd1, B vdom, v')
+
+  | HCom (vd0, vd1, vty, vcap, vsys) ->
+    let dom, cod = out_sg vty in
+    let vdom = eval_clo dom in
+    let vcap' = car vcap in
+    let vsys' = map_btubes car vsys in
+    into @@ HCom (vd0, vd1, vdom, vcap', vsys')
+
   | _ -> failwith "car"
 
 (* TODO: hcom *)
 and cdr v = 
   match out v with 
-  | Cons (_, clo) -> eval_clo clo
+  | Cons (_, clo) ->
+    eval_clo clo
+
   | Up (vty, vneu) ->
-    begin
-      match out vty with 
-      | Sg (dom, cod) ->
-        let vcar = car v in
-        let vcod = inst_bclo cod vcar in
-        reflect vcod @@ into @@ Cdr vneu
-      | _ -> failwith "cdr/up"
-    end
+    let dom, cod = out_sg vty in
+    let vcar = car v in
+    let vcod = inst_bclo cod vcar in
+    reflect vcod @@ into @@ Cdr vneu
+
   | Coe (vd0, vd1, B vty, v) -> 
-    begin
-      match out vty with
-      | Sg (dom, cod) ->
-        let vcar = car v in
-        let vcdr = cdr v in
-        let vdom = eval_clo dom in
-        let vd0' = thin (Thin.skip Thin.id) vd0 in
-        let vgen = into @@ Idx Thin.id in
-        let vdom' = thin (Thin.keep (Thin.skip Thin.id)) vdom in
-        let vcar' = thin (Thin.skip Thin.id) vcar in
-        let vcoe = into @@ Coe (vd0', vgen, B vdom', vcar') in
-        let vcod = inst_bclo cod vcoe in
-        into @@ Coe (vd0, vd1, B vcod, vcdr)
-      | _ -> failwith "cdr/coe"
-    end
+    let dom, cod = out_sg vty in 
+    let vcar = car v in
+    let vcdr = cdr v in
+    let vdom = eval_clo dom in
+    let vd0' = thin (Thin.skip Thin.id) vd0 in
+    let vgen = into @@ Idx Thin.id in
+    let vdom' = thin (Thin.keep (Thin.skip Thin.id)) vdom in
+    let vcar' = thin (Thin.skip Thin.id) vcar in
+    let vcoe = into @@ Coe (vd0', vgen, B vdom', vcar') in
+    let vcod = inst_bclo cod vcoe in
+    into @@ Coe (vd0, vd1, B vcod, vcdr)
+
   | _ -> failwith "cdr"
 
 and reflect vty vneu =
