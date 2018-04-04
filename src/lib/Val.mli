@@ -12,7 +12,7 @@ type 'a dimbind
 
 type 'a t
 type _ f = 
-  | Idx : Thin.t0 -> can f
+  | Atom : string -> can f
   | Lvl : int -> neu f
 
   | Up : can t * neu t -> can f
@@ -30,7 +30,7 @@ type _ f =
   | Lam : bclo -> can f
   | Cons : clo * clo -> can f
 
-  | Coe : can t * can t * can t bnd * can t -> can f
+  | Coe : can t * can t * can t dimbind * can t -> can f
   | HCom : can t * can t * can t * can t * (can t, can t dimbind) system -> can f
 
   | App : neu t * can t -> neu f
@@ -39,8 +39,6 @@ type _ f =
 
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
-
-val thin : Thin.t0 -> 'a t -> 'a t
 
 val eval_clo : clo -> can t
 val inst_bclo : bclo -> can t -> can t
