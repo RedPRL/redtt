@@ -3,44 +3,6 @@ type neu = [`Neu]
 
 type 'a bnd = B of 'a
 
-module DimVal = 
-struct
-  type t = 
-    | Dim0
-    | Dim1
-    | Lvl of int
-end
-
-module DimFam :
-sig
-  type 'a t
-  val inst : 'a t -> DimVal.t -> 'a
-  val make : (DimVal.t -> 'a) -> 'a t
-  val map : ('a -> 'b) -> 'a t -> 'b t
-  val split : ('a * 'b) t -> 'a t * 'b t
-end = 
-struct
-  type 'a t = 
-    { fam : DimVal.t -> 'a
-    ; cache : (DimVal.t, 'a) Hashtbl.t 
-    }
-
-  let inst f i = 
-    match Hashtbl.find_opt f.cache i with
-    | Some a -> a
-    | None ->
-      let a = f.fam i in
-      Hashtbl.add f.cache i a;
-      a
-
-  let make f = {fam = f; cache = Hashtbl.create 10}
-
-  let map f g = make @@ fun x -> f (inst g x)
-  let split f = 
-    (make @@ fun x -> fst @@ inst f x),
-    (make @@ fun x -> snd @@ inst f x)
-end
-
 type 'a dimfam = 'a DimFam.t
 
 type _ f = 
