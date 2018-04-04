@@ -12,7 +12,6 @@ struct
     | Dim0
     | Dim1
     | Lvl of int
-    | Atom of string
 end
 
 module DimBind :
@@ -34,7 +33,6 @@ module StringMap = Map.Make (String)
 type 'a dimbind = 'a DimBind.t
 
 type _ f = 
-  | Atom : string -> can f
   | Lvl : int -> neu f
 
   | Up : can t * neu t -> can f
@@ -61,7 +59,6 @@ type _ f =
 
 and 'a t = { con : 'a f }
 
-and atom_env = can t StringMap.t
 and env = can t list
 and clo = Clo of Tm.chk Tm.t * env
 and bclo = BClo of Tm.chk Tm.t Tm.bnd * env
@@ -69,15 +66,11 @@ and bclo = BClo of Tm.chk Tm.t Tm.bnd * env
 let into vf = 
   {con = vf}
 
-let merge_atom_envs arho0 arho1 =
-  StringMap.merge (fun _ x _ -> x) arho0 arho1
-
 
 let embed_dimval dv = 
   match dv with 
   | DimVal.Dim0 -> into Dim0
   | DimVal.Dim1 -> into Dim1
-  | DimVal.Atom a -> into @@ Atom a
   | DimVal.Lvl i -> into @@ Up (into Interval, into @@ Lvl i)
 
 let out : type a. a t -> a f = 
@@ -88,7 +81,6 @@ let project_dimval (type a) (v : a t) =
   match out v with
   | Dim0 -> DimVal.Dim0
   | Dim1 -> DimVal.Dim1
-  | Atom a -> DimVal.Atom a
   | Up (_, vneu) ->
     begin
       match out vneu with
@@ -96,9 +88,6 @@ let project_dimval (type a) (v : a t) =
       | _ -> failwith "project_dimval/Up"
     end
   | _ -> failwith "project_dimval"
-
-(* and out : type a. a t -> a f = fun node ->
-  subst_atoms_f node.atom_env node.con *)
 
 let clo tm rho = 
   Clo (tm, rho)
@@ -231,20 +220,12 @@ and com (vd0, vd1, vbnd, vcap, vsys) =
   into @@ HCom (vd0, vd1, vty', vcap', vsys')
 
 and out_bind_pi vbnd = 
-  let a = "fresh" in
-  match out @@ DimBind.inst vbnd @@ DimVal.Atom a with
-  | Pi (dom, cod) ->
-    DimBind.map (fun v -> let dom, _ = out_pi v in dom) vbnd,
-    DimBind.map (fun v -> let _, cod = out_pi v in cod) vbnd
-  | _ -> failwith "out_bind_pi"
+  DimBind.map (fun v -> let dom, _ = out_pi v in dom) vbnd,
+  DimBind.map (fun v -> let _, cod = out_pi v in cod) vbnd
 
 and out_bind_sg vbnd = 
-  let a = "fresh" in
-  match out @@ DimBind.inst vbnd @@ DimVal.Atom a with
-  | Sg (dom, cod) ->
-    DimBind.map (fun v -> let dom, _ = out_sg v in dom) vbnd,
-    DimBind.map (fun v -> let _, cod = out_sg v in cod) vbnd
-  | _ -> failwith "out_bind_sg"
+  DimBind.map (fun v -> let dom, _ = out_sg v in dom) vbnd,
+  DimBind.map (fun v -> let _, cod = out_sg v in cod) vbnd
 
 and apply vfun varg = 
   match out vfun with 
@@ -358,13 +339,12 @@ and dim_eq vd0 vd1 =
   match out vd0, out vd1 with
   | Dim0, Dim0 -> true
   | Dim1, Dim1 -> true
-  | Atom x, Atom y -> x = y
   | Up (_, vnd0), Up (_, vnd1) ->
     dim_eq_neu vnd0 vnd1
   | _ -> false
 
 (* The only reason this makes sense is that the neutral form of dimensions
-   can only be variables or atoms. This does *not* work if we allow dimensions
+   can only be variables. This does *not* work if we allow dimensions
    to appear in sigma types, or on the rhs of pi types, etc. *)
 and dim_eq_neu vnd0 vnd1 = 
   match out vnd0, out vnd1 with 
