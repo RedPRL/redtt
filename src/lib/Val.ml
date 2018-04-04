@@ -103,10 +103,10 @@ let project_dimval (type a) (v : a t) =
     end
   | _ -> failwith "project_dimval"
 
-let clo tm rho = 
+let (<:) tm rho =
   ref @@ `Eval (tm, rho)
 
-let bclo bnd rho =
+let (<:+) bnd rho = 
   BClo (bnd, rho)
 
 
@@ -138,19 +138,19 @@ let rec eval : type a. env -> a Tm.t -> can t =
       v
 
     | Tm.Pi (dom, cod) ->
-      into @@ Pi (clo dom rho, bclo cod rho)
+      into @@ Pi (dom <: rho, cod <:+ rho)
 
     | Tm.Sg (dom, cod) ->
-      into @@ Sg (clo dom rho, bclo cod rho)
+      into @@ Sg (dom <: rho, cod <:+ rho)
 
     | Tm.Ext (ty, sys) ->
-      into @@ Ext (clo ty rho, eval_sys rho sys)
+      into @@ Ext (ty <: rho, eval_sys rho sys)
 
     | Tm.Lam bdy ->
-      into @@ Lam (bclo bdy rho)
+      into @@ Lam (bdy <:+ rho)
 
     | Tm.Cons (t0, t1) ->
-      into @@ Cons (clo t0 rho, clo t1 rho)
+      into @@ Cons (t0 <: rho, t1 <: rho)
 
     | Tm.Coe (d0, d1, Tm.B ty, tm) ->
       let vd0 = eval rho d0 in
@@ -208,7 +208,7 @@ and eval_tube rho (t0, t1, otm) =
     match vd0, vd1, otm with
     | DimVal.Dim0, DimVal.Dim1, _ -> None
     | DimVal.Dim1, DimVal.Dim0, _ -> None
-    | _, _, Some tm -> Some (clo tm rho)
+    | _, _, Some tm -> Some (tm <: rho)
     | _ -> failwith "eval_tube: expected Some"
   in
   (vd0, vd1, ov)
