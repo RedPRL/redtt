@@ -397,7 +397,6 @@ and car v =
 
   | _ -> failwith "car"
 
-(* TODO: hcom *)
 and cdr v = 
   match out v with 
   | Cons (_, clo) ->
@@ -419,6 +418,17 @@ and cdr v =
       inst_bclo (DimBind.inst cod x) coe
     in
     into @@ Coe (vd0, vd1, vcod, cdr v)
+
+  | HCom (vd0, vd1, vty, vcap, vsys) ->
+    let dom, cod = out_sg vty in
+    let vdom = eval_clo dom in
+    let vcod = 
+      DimBind.make @@ fun x ->
+      let hcom = into @@ HCom (vd0, embed_dimval x, vdom, car vcap, map_btubes car vsys) in
+      inst_bclo cod hcom in
+    let vcap' = cdr vcap in
+    let vsys' = map_btubes cdr vsys in
+    com (vd0, vd1, vcod, vcap', vsys')
 
   | _ -> failwith "cdr"
 
