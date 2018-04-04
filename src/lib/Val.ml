@@ -110,12 +110,12 @@ let rec subst_atoms_f : type a. atom_env list -> a f -> a f =
     | Coe (vd0, vd1, vbnd, v) ->
       let vbnd' = 
         DimBind.make @@ fun x ->
-          let arhos' =
-            match x with 
-            | DimVal.Atom x -> List.map (StringMap.remove x) arhos
-            | _ -> arhos
-          in
-          subst_atoms arhos' @@ DimBind.inst vbnd x
+        let arhos' =
+          match x with 
+          | DimVal.Atom x -> List.map (StringMap.remove x) arhos
+          | _ -> arhos
+        in
+        subst_atoms arhos' @@ DimBind.inst vbnd x
       in
       Coe (subst_atoms arhos vd0, subst_atoms arhos vd1, vbnd', subst_atoms arhos v)
 
