@@ -217,8 +217,6 @@ let out_sg v =
   | _ -> failwith "out_sg"
 
 
-
-
 let rec eval : type a. env -> a Tm.t -> can t =
   fun rho tm ->
     match Tm.out tm with 
@@ -229,12 +227,32 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Pi (dom, cod) ->
       into @@ Pi (clo dom rho, bclo cod rho)
 
+    | Tm.Sg (dom, cod) ->
+      into @@ Sg (clo dom rho, bclo cod rho)
+
+    | Tm.Ext (ty, sys) ->
+      into @@ Ext (clo ty rho, eval_sys rho sys)
+
+    | Tm.Lam bdy ->
+      into @@ Lam (bclo bdy rho)
+
+    | Tm.Cons (t0, t1) ->
+      into @@ Cons (clo t0 rho, clo t1 rho)
+
     | Tm.Coe (d0, d1, Tm.B ty, tm) ->
       let vd0 = eval rho d0 in
       let vd1 = eval rho d1 in
       let vty = DimBind.make (fun x -> eval (embed_dimval x :: rho) ty) in
       let vtm = eval rho tm in
       into @@ Coe (vd0, vd1, vty, vtm)
+
+    | Tm.HCom (d0, d1, ty, cap, sys) ->
+      let vd0 = eval rho d0 in
+      let vd1 = eval rho d1 in
+      let vty = eval rho ty in 
+      let vcap = eval rho cap in
+      let vsys = eval_bsys rho sys in
+      into @@ HCom (vd0, vd1, vty, vcap, vsys)
 
     | Tm.Univ lvl ->
       into @@ Univ lvl
@@ -248,12 +266,58 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Dim1 ->
       into Dim1
 
-    | _ -> failwith ""
+    | Tm.Car t ->
+      car @@ eval rho t
+
+    | Tm.Cdr t ->
+      cdr @@ eval rho t
+
+    | Tm.App (t1, t2) ->
+      apply (eval rho t1) (eval rho t2)
+
+    | Tm.Down t ->
+      eval rho t.tm
+
+    | Tm.Up t ->
+      eval rho t
 
 
-and eval_sys g (sys, rho, f) = failwith ""
+and eval_sys rho sys =
+  List.map (eval_tube rho) sys
 
-and eval_bsys g (sys, rho, f) = failwith ""
+and eval_bsys rho bsys =
+  List.map (eval_btube rho) bsys
+
+and eval_tube rho (t0, t1, otm) =
+  let vd0 = eval rho t0 in
+  let vd1 = eval rho t1 in
+  let ov =
+    match project_dimval vd0, project_dimval vd1, otm with
+    | DimVal.Dim0, DimVal.Dim1, _ -> None
+    | DimVal.Dim1, DimVal.Dim0, _ -> None
+    | _, _, Some tm -> Some (clo tm rho)
+    | _ -> failwith "eval_tube: expected Some"
+  in
+  (vd0, vd1, ov)
+
+and eval_btube rho (t0, t1, obnd) =
+  let vd0 = eval rho t0 in
+  let vd1 = eval rho t1 in
+  let ovbnd =
+    match project_dimval vd0, project_dimval vd1, obnd with
+    | DimVal.Dim0, DimVal.Dim1, _ -> None
+    | DimVal.Dim1, DimVal.Dim0, _ -> None
+    | _, _, Some (Tm.B tm) ->
+      let vbnd = 
+        DimBind.make @@ fun x ->
+        eval (embed_dimval x :: rho) tm
+      in
+      Some vbnd
+    | _ -> failwith "eval_tube: expected Some"
+  in
+  (vd0, vd1, ovbnd)
+
+
 
 and com (vd0, vd1, vbnd, vcap, vsys) =
   let vcap' = into @@ Coe (vd0, vd1, vbnd, vcap) in

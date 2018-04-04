@@ -17,7 +17,7 @@ type _ f =
   | App : inf t * chk t -> inf f
   | Down : {ty : chk t; tm : chk t} -> inf f
   | Coe : chk t * chk t * chk t bnd * chk t -> inf f
-| HCom : chk t * chk t * chk t * chk t * (chk t, chk t bnd) system -> inf f
+  | HCom : chk t * chk t * chk t * chk t * (chk t, chk t bnd) system -> inf f
 
   | Up : inf t -> chk f
 
