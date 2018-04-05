@@ -218,6 +218,11 @@ and out_bind_pi vbnd =
 and out_bind_sg vbnd = 
   DimFam.split @@ DimFam.map out_sg vbnd
 
+
+(* TODO: what about when the type-index of coe or hcom is an extension type?
+   I think the right way to figure out what to do in such cases is to first design
+   a version where extension types have explicit introduction and elimination forms.
+ *)
 and apply vfun varg = 
   match out vfun with 
   | Lam bclo ->
