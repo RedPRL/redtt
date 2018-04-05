@@ -18,7 +18,7 @@ type _ f =
 
   | Pi : clo * bclo -> can f
   | Sg : clo * bclo -> can f
-  | Ext : clo * clo system -> can f
+  | Ext : can t * clo system -> can f
   | Univ : Lvl.t -> can f
   | Interval : can f
 
