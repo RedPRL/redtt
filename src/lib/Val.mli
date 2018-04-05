@@ -7,8 +7,8 @@ type 'a bnd = B of 'a
 
 type clo
 type bclo
+
 type 'a system
-type 'a dimfam = 'a DimFam.t
 
 type 'a t
 type _ f = 
@@ -28,9 +28,9 @@ type _ f =
   | Lam : bclo -> can f
   | Cons : clo * clo -> can f
 
-  | Coe : can t * can t * can t dimfam * can t -> can f
+  | Coe : can t * can t * can t DimFam.t * can t -> can f
 
-  | HCom : can t * can t * can t * can t * can t dimfam system -> can f
+  | HCom : can t * can t * can t * can t * can t DimFam.t system -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
