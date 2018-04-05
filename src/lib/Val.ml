@@ -129,6 +129,14 @@ let rec eval : type a. env -> a Tm.t -> can t =
       let vsys = eval_bsys rho sys in
       into @@ HCom (vd0, vd1, vty, vcap, vsys)
 
+    | Tm.Com (d0, d1, Tm.B ty, cap, sys) ->
+      let vd0 = eval rho d0 in
+      let vd1 = eval rho d1 in
+      let vty = DimFam.make (fun x -> eval (embed_dimval x :: rho) ty) in
+      let vcap = eval rho cap in
+      let vsys = eval_bsys rho sys in
+      com (vd0, vd1, vty, vcap, vsys)
+
     | Tm.Univ lvl ->
       into @@ Univ lvl
 

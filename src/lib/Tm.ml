@@ -1,6 +1,3 @@
-type ('i, 'a) tube = 'i * 'i * 'a option
-type ('i, 'a) system = ('i, 'a) tube list
-
 type var = Thin.t
 
 type 'a bnd = B of 'a
@@ -17,14 +14,15 @@ type _ f =
   | App : inf t * chk t -> inf f
   | Down : {ty : chk t; tm : chk t} -> inf f
   | Coe : chk t * chk t * chk t bnd * chk t -> inf f
-  | HCom : chk t * chk t * chk t * chk t * (chk t, chk t bnd) system -> inf f
+  | HCom : chk t * chk t * chk t * chk t * chk t bnd system -> inf f
+  | Com : chk t * chk t * chk t bnd * chk t * chk t bnd system -> inf f  
 
   | Up : inf t -> chk f
 
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
-  | Ext : chk t * (chk t, chk t) system -> chk f
+  | Ext : chk t * chk t system -> chk f
   | Interval : chk f
 
   | Lam : chk t bnd -> chk f
@@ -34,6 +32,8 @@ type _ f =
 
 and 'a node = {info : info option; con : 'a f; thin : Thin.t}
 and 'a t = 'a node
+and 'a tube = chk t * chk t * 'a option
+and 'a system = 'a tube list
 
 let into tf = {info = None; con = tf; thin = Thin.id}
 let into_info info tf = {info = Some info; con = tf; thin = Thin.id}
@@ -48,19 +48,19 @@ let thin_bnd : type a. Thin.t -> a t bnd -> a t bnd =
     B (thin (Thin.skip th) t)
 
 
-let thin_tube : type a b. Thin.t -> (a t, b t) tube -> (a t, b t) tube = 
+let thin_tube : type a b. Thin.t -> b t tube -> b t tube = 
   fun th (td0, td1, tm) ->
     (thin th td0, thin th td1, Option.map (thin th) tm)
 
-let thin_btube : type a b. Thin.t -> (a t, b t bnd) tube -> (a t, b t bnd) tube = 
+let thin_btube : type a b. Thin.t -> b t bnd tube -> b t bnd tube = 
   fun th (td0, td1, tm) ->
     (thin th td0, thin th td1, Option.map (thin_bnd th) tm)
 
-let thin_bsys : type a. Thin.t -> (a t, a t bnd) system -> (a t, a t bnd) system = 
+let thin_bsys : type a. Thin.t -> a t bnd system -> a t bnd system = 
   fun th ->
     List.map (thin_btube th)
 
-let thin_sys : type a. Thin.t -> (a t, a t) system -> (a t, a t) system = 
+let thin_sys : type a. Thin.t -> a t system -> a t system = 
   fun th ->
     List.map (thin_tube th)
 
@@ -88,6 +88,9 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
 
     | HCom (td0, td1, ty, tm, sys) -> 
       HCom (thin th td0, thin th td1, thin th ty, thin th tm, thin_bsys th sys)
+
+    | Com (td0, td1, ty, tm, sys) ->
+      Com (thin th td0, thin th td1, thin_bnd th ty, thin th tm, thin_bsys th sys)
 
     | Up t ->
       Up (thin th t)

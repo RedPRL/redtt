@@ -8,7 +8,7 @@ type 'a bnd = B of 'a
 type clo
 type bclo
 type 'a system
-type 'a dimfam
+type 'a dimfam = 'a DimFam.t
 
 type 'a t
 type _ f = 
