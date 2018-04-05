@@ -395,7 +395,7 @@ and wrap_frm : frm -> clo -> clo =
     | `Eval (tm, rho, stk) ->
       ref @@ `Eval (tm, rho, frm :: stk)
     | `Ret v ->
-      ref @@ `Ret (eval_stk v [frm])
+      ref @@ `Ret (eval_frm frm v)
 
 and wrap_bfrm : bfrm -> bclo -> bclo =
   fun bfrm bclo ->
