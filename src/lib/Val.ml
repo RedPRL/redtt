@@ -38,18 +38,18 @@ and 'a tube = DimVal.t * DimVal.t * 'a option
 and 'a system = 'a tube list
 
 and env = can t list
-and clo = [`Eval of Tm.chk Tm.t * env * frm list | `Ret of can t] ref
-and bclo = BClo of Tm.chk Tm.t Tm.bnd * env * bfrm list
+and clo = [`Eval of Tm.chk Tm.t * env * stk | `Ret of can t] ref
+and bclo = BClo of Tm.chk Tm.t Tm.bnd * env * stk
 
 and frm =
   | FApply of can t
   | FExtCar of clo system
   | FCar
   | FCdr
-
-and bfrm =
   | FExtApp of clo system
   | FExtCdr of clo system
+
+and stk = frm list
 
 let into vf =
   {con = vf}
@@ -347,48 +347,39 @@ and dim_eq vd0 vd1 =
 
 and inst_bclo : bclo -> can t -> can t =
   fun (BClo (Tm.B tm, rho, stk)) varg ->
-    let v = eval (varg :: rho) tm in
-    eval_bstk v stk varg
+    let rho' = varg :: rho in
+    let v = eval rho' tm in
+    eval_stk stk rho' v
 
-and eval_bstk v bstk varg =
-  match bstk with
-  | [] -> v
-  | bfrm :: bstk ->
-    eval_bfrm bfrm (eval_bstk v bstk varg) varg
 
-and eval_stk v stk =
+and eval_stk stk rho v =
   match stk with
   | [] -> v
   | frm::stk ->
-    eval_frm frm @@ eval_stk v stk
+    eval_frm rho frm @@
+    eval_stk stk rho v
 
-and eval_frm frm v =
+and eval_frm rho frm v =
   match frm with
-  | FExtCar sys ->
-    into @@ Ext (v, map_tubes (wrap_frm FCar) sys)
-
-  | FApply varg ->
-    apply v varg
-
   | FCar ->
     car v
-
   | FCdr ->
     cdr v
-
-and eval_bfrm bfrm v varg =
-  match bfrm with
-  | FExtApp sys ->
-    into @@ Ext (v, map_tubes (wrap_frm (FApply varg)) sys)
-
+  | FApply varg ->
+    apply v varg
+  | FExtCar sys ->
+    into @@ Ext (v, map_tubes (wrap_frm FCar) sys)
   | FExtCdr sys ->
     into @@ Ext (v, map_tubes (wrap_frm FCdr) sys)
+  | FExtApp sys ->
+    let varg = List.hd rho in
+    into @@ Ext (v, map_tubes (wrap_frm (FApply varg)) sys)
 
 and eval_clo : clo -> can t =
   fun clo ->
     match !clo with
     | `Eval (tm, rho, stk) ->
-      let v = eval_stk (eval rho tm) stk in
+      let v = eval_stk stk rho (eval rho tm) in
       clo := `Ret v;
       v
     | `Ret v -> v
@@ -399,9 +390,9 @@ and wrap_frm : frm -> clo -> clo =
     | `Eval (tm, rho, stk) ->
       ref @@ `Eval (tm, rho, frm :: stk)
     | `Ret v ->
-      ref @@ `Ret (eval_frm frm v)
+      ref @@ `Ret (eval_frm [] frm v)
 
-and wrap_bfrm : bfrm -> bclo -> bclo =
-  fun bfrm bclo ->
+and wrap_bfrm : frm -> bclo -> bclo =
+  fun frm bclo ->
     let BClo (tm, rho, bstk) = bclo in
-    BClo (tm, rho, bfrm :: bstk)
+    BClo (tm, rho, frm :: bstk)
