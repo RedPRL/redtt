@@ -11,37 +11,22 @@ type t = Node of {info : info; con : t f}
 
 module type ResEnv =
 sig
-  type 'a el = Var of 'a | Atom of 'a
-
   type t
   val init : t
-  val bind : string el -> t -> t
-  val get : string -> t -> Thin.t0 el
+  val bind : string -> t -> t
+  val get : string -> t -> Thin.t
 end
 
 module ResEnv : ResEnv = 
 struct
-  type 'a el = Var of 'a | Atom of 'a
-  type t = string el list
+  type t = string list
 
   let init = []
-
   let bind x env = x :: env
-
-  let map f el = 
-    match el with 
-    | Var i -> Var (f i)
-    | Atom i -> Atom (f i)
-
-  let proj el = 
-    match el with 
-    | Var i -> i
-    | Atom i -> i
-
   let rec get x (env : t) =
     match env with 
     | [] -> failwith "variable not found"
-    | y :: ys -> if x = proj y then map (fun _ -> Thin.id) y else map Thin.skip @@ get x ys
+    | y :: ys -> if x = y then Thin.id else Thin.skip @@ get x ys
 end
 
 module Resolver (R : ResEnv) :
@@ -63,20 +48,15 @@ struct
     let Node pf = p in
     match pf.con with
     | Bind (x, p) ->
-      Tm.VB (chk (R.bind (R.Var x) env) p)
+      Tm.B (chk (R.bind x env) p)
     | _ ->
-      Tm.VB (chk (R.bind (R.Var "_") env) p)
+      Tm.B (chk (R.bind "_" env) p)
 
   and inf (env : R.t) p =
     let Node pf = p in
     Tm.into_info pf.info @@
     match pf.con with
-    | Atom x -> 
-      begin
-        match R.get x env with 
-        | R.Atom i -> Tm.Atom i
-        | R.Var i -> Tm.Var i
-      end
+    | Atom x -> Tm.Var (R.get x env)
     | _ -> failwith ""
 
 end
