@@ -1,6 +1,10 @@
 type can = [`Can]
 type neu = [`Neu]
 
+type 'a tube = DimVal.t * DimVal.t * 'a option
+type 'a system = 'a tube list
+
+
 type _ f =
   | Lvl : int -> neu f
 
@@ -27,13 +31,9 @@ type _ f =
   | Cdr : neu t -> neu f
 
 and 'a t = { con : 'a f }
-
-and 'a tube = DimVal.t * DimVal.t * 'a option
-and 'a system = 'a tube list
-
 and env = can t list
-and 'a clo = {foc : 'a; thin : Thin.t; env : env; stk : stk}
 
+and 'a clo = {foc : 'a; thin : Thin.t; env : env; stk : stk}
 and tclo = Tm.chk Tm.t clo
 and bclo = Tm.chk Tm.t Tm.bnd clo
 
