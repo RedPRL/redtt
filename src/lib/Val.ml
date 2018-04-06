@@ -78,8 +78,8 @@ let project_dimval (type a) (v : a t) =
     end
   | _ -> failwith "project_dimval"
 
-let (<:) tm (th, rho) : 'a =
-  {foc = tm; env = rho; thin = th; stk = []}
+let (<:) tm rho : 'a =
+  {foc = tm; env = rho; thin = Thin.id; stk = []}
 
 
 let map_tubes f =
@@ -87,46 +87,46 @@ let map_tubes f =
   (vd0, vd1, Option.map f vbnd)
 
 
-let rec eval : type a. Thin.t -> env -> a Tm.t -> can t =
-  fun th rho tm ->
+let rec eval : type a. env -> a Tm.t -> can t =
+  fun rho tm ->
     match Tm.out tm with
     | Tm.Var i ->
-      Thin.proj (Thin.cmp i th) rho
+      Thin.proj i rho
 
     | Tm.Pi (dom, cod) ->
-      into @@ Pi (dom <: (th, rho), cod <: (th, rho))
+      into @@ Pi (dom <: rho, cod <: rho)
 
     | Tm.Sg (dom, cod) ->
-      into @@ Sg (dom <: (th, rho), cod <: (th, rho))
+      into @@ Sg (dom <: rho, cod <: rho)
 
     | Tm.Ext (ty, sys) ->
-      into @@ Ext (eval th rho ty, eval_sys th rho sys)
+      into @@ Ext (eval rho ty, eval_sys rho sys)
 
     | Tm.Lam bdy ->
-      into @@ Lam (bdy <: (th, rho))
+      into @@ Lam (bdy <: rho)
 
     | Tm.Cons (t0, t1) ->
-      into @@ Cons (t0 <: (th, rho), t1 <: (th, rho))
+      into @@ Cons (t0 <: rho, t1 <: rho)
 
     | Tm.Coe info ->
-      let vd0 = eval th rho info.dim0 in
-      let vd1 = eval th rho info.dim1 in
-      let vtm = eval th rho info.tm in
-      into @@ Coe {dim0 = vd0; dim1 = vd1; ty = info.ty <: (th, rho); tm = vtm}
+      let vd0 = eval rho info.dim0 in
+      let vd1 = eval rho info.dim1 in
+      let vtm = eval rho info.tm in
+      into @@ Coe {dim0 = vd0; dim1 = vd1; ty = info.ty <: rho; tm = vtm}
 
     | Tm.HCom info ->
-      let vd0 = eval th rho info.dim0 in
-      let vd1 = eval th rho info.dim1 in
-      let vcap = eval th rho info.cap in
-      let vsys = eval_bsys th rho info.sys in
-      into @@ HCom {dim0 = vd0; dim1 = vd1; ty = info.ty <: (th, rho); cap = vcap; sys = vsys}
+      let vd0 = eval rho info.dim0 in
+      let vd1 = eval rho info.dim1 in
+      let vcap = eval rho info.cap in
+      let vsys = eval_bsys rho info.sys in
+      into @@ HCom {dim0 = vd0; dim1 = vd1; ty = info.ty <: rho; cap = vcap; sys = vsys}
 
     | Tm.Com info ->
-      let vd0 = eval th rho info.dim0 in
-      let vd1 = eval th rho info.dim1 in
-      let vcap = eval th rho info.cap in
-      let vsys = eval_bsys th rho info.sys in
-      com ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: (th, rho)) ~cap:vcap ~sys:vsys
+      let vd0 = eval rho info.dim0 in
+      let vd1 = eval rho info.dim1 in
+      let vcap = eval rho info.cap in
+      let vsys = eval_bsys rho info.sys in
+      com ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~cap:vcap ~sys:vsys
 
     | Tm.Univ lvl ->
       into @@ Univ lvl
@@ -141,19 +141,19 @@ let rec eval : type a. Thin.t -> env -> a Tm.t -> can t =
       into Dim1
 
     | Tm.Car t ->
-      car @@ eval th rho t
+      car @@ eval rho t
 
     | Tm.Cdr t ->
-      cdr @@ eval th rho t
+      cdr @@ eval rho t
 
     | Tm.App (t1, t2) ->
-      apply (eval th rho t1) (eval th rho t2)
+      apply (eval rho t1) (eval rho t2)
 
     | Tm.Down t ->
-      eval th rho t.tm
+      eval rho t.tm
 
     | Tm.Up t ->
-      eval th rho t
+      eval rho t
 
 and out_pi v =
   match out v with
@@ -172,32 +172,32 @@ and out_sg v =
     bclo_frame (KExtCdr vsys) cod
   | _ -> failwith "out_sg"
 
-and eval_sys th rho sys =
-  List.map (eval_tube th rho) sys
+and eval_sys rho sys =
+  List.map (eval_tube rho) sys
 
-and eval_bsys th rho bsys =
-  List.map (eval_btube th rho) bsys
+and eval_bsys rho bsys =
+  List.map (eval_btube rho) bsys
 
-and eval_tube th rho (t0, t1, otm) =
-  let vd0 = project_dimval @@ eval th rho t0 in
-  let vd1 = project_dimval @@ eval th rho t1 in
+and eval_tube rho (t0, t1, otm) =
+  let vd0 = project_dimval @@ eval rho t0 in
+  let vd1 = project_dimval @@ eval rho t1 in
   let ov =
     match vd0, vd1, otm with
     | DimVal.Dim0, DimVal.Dim1, _ -> None
     | DimVal.Dim1, DimVal.Dim0, _ -> None
-    | _, _, Some tm -> Some (tm <: (th, rho))
+    | _, _, Some tm -> Some (tm <: rho)
     | _ -> failwith "eval_tube: expected Some"
   in
   (vd0, vd1, ov)
 
-and eval_btube th rho (t0, t1, obnd) =
-  let vd0 = project_dimval @@ eval th rho t0 in
-  let vd1 = project_dimval @@ eval th rho t1 in
+and eval_btube rho (t0, t1, obnd) =
+  let vd0 = project_dimval @@ eval rho t0 in
+  let vd1 = project_dimval @@ eval rho t1 in
   let ovbnd =
     match vd0, vd1, obnd with
     | DimVal.Dim0, DimVal.Dim1, _ -> None
     | DimVal.Dim1, DimVal.Dim0, _ -> None
-    | _, _, Some bnd -> Some (bnd <: (th, rho))
+    | _, _, Some bnd -> Some (bnd <: rho)
     | _ -> failwith "eval_tube: expected Some"
   in
   (vd0, vd1, ovbnd)
@@ -375,12 +375,12 @@ and inst_bclo : bclo -> can t -> can t =
   fun node varg ->
     let Tm.B tm = node.foc in
     eval_stk node.stk (varg :: node.env) @@
-    eval node.thin (varg :: node.env) tm
+    eval (Thin.act node.thin @@ varg :: node.env) tm
 
 and eval_clo : tclo -> can t =
   fun node ->
     eval_stk node.stk node.env @@
-    eval node.thin node.env node.foc
+    eval (Thin.act node.thin @@ node.env) node.foc
 
 and clo_frame : frm -> tclo -> tclo =
   fun frm node ->

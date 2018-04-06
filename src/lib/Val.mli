@@ -38,7 +38,7 @@ val out : 'a t -> 'a f
 
 type env = can t list
 
-val eval : Thin.t -> env -> 'a Tm.t -> can t
+val eval : env -> 'a Tm.t -> can t
 
 val eval_clo : tclo -> can t
 val inst_bclo : bclo -> can t -> can t
