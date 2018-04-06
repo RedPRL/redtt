@@ -1,13 +1,6 @@
 type can = [`Can]
 type neu = [`Neu]
 
-type 'a bnd = B of 'a
-
-(* TODO: reformulate using closures with suspended stacks instead of DimFam;
-   I believe that this should scale up to even things as complicated as
-   coe in V-types, etc. *)
-
-
 type _ f =
   | Lvl : int -> neu f
 
