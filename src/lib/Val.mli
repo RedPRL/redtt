@@ -2,9 +2,6 @@
 type can
 type neu
 
-type 'a bnd = B of 'a
-
-
 type tclo
 type bclo
 
