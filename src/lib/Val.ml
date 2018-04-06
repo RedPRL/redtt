@@ -108,25 +108,25 @@ let rec eval : type a. Thin.t -> env -> a Tm.t -> can t =
     | Tm.Cons (t0, t1) ->
       into @@ Cons (t0 <: (th, rho), t1 <: (th, rho))
 
-    | Tm.Coe (d0, d1, bnd, tm) ->
-      let vd0 = eval th rho d0 in
-      let vd1 = eval th rho d1 in
-      let vtm = eval th rho tm in
-      into @@ Coe {dim0 = vd0; dim1 = vd1; ty = bnd <: (th, rho); tm = vtm}
+    | Tm.Coe info ->
+      let vd0 = eval th rho info.dim0 in
+      let vd1 = eval th rho info.dim1 in
+      let vtm = eval th rho info.tm in
+      into @@ Coe {dim0 = vd0; dim1 = vd1; ty = info.ty <: (th, rho); tm = vtm}
 
-    | Tm.HCom (d0, d1, ty, cap, sys) ->
-      let vd0 = eval th rho d0 in
-      let vd1 = eval th rho d1 in
-      let vcap = eval th rho cap in
-      let vsys = eval_bsys th rho sys in
-      into @@ HCom {dim0 = vd0; dim1 = vd1; ty = ty <: (th, rho); cap = vcap; sys = vsys}
+    | Tm.HCom info ->
+      let vd0 = eval th rho info.dim0 in
+      let vd1 = eval th rho info.dim1 in
+      let vcap = eval th rho info.cap in
+      let vsys = eval_bsys th rho info.sys in
+      into @@ HCom {dim0 = vd0; dim1 = vd1; ty = info.ty <: (th, rho); cap = vcap; sys = vsys}
 
-    | Tm.Com (d0, d1, bnd, cap, sys) ->
-      let vd0 = eval th rho d0 in
-      let vd1 = eval th rho d1 in
-      let vcap = eval th rho cap in
-      let vsys = eval_bsys th rho sys in
-      com ~dim0:vd0 ~dim1:vd1 ~ty:(bnd <: (th, rho)) ~cap:vcap ~sys:vsys
+    | Tm.Com info ->
+      let vd0 = eval th rho info.dim0 in
+      let vd1 = eval th rho info.dim1 in
+      let vcap = eval th rho info.cap in
+      let vsys = eval_bsys th rho info.sys in
+      com ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: (th, rho)) ~cap:vcap ~sys:vsys
 
     | Tm.Univ lvl ->
       into @@ Univ lvl

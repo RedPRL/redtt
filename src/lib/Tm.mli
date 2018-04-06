@@ -18,9 +18,9 @@ type _ f =
   | Cdr : inf t -> inf f
   | App : inf t * chk t -> inf f
   | Down : {ty : chk t; tm : chk t} -> inf f
-  | Coe : chk t * chk t * chk t bnd * chk t -> inf f
-  | HCom : chk t * chk t * chk t * chk t * chk t bnd system -> inf f
-  | Com : chk t * chk t * chk t bnd * chk t * chk t bnd system -> inf f
+  | Coe : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
+  | HCom : {dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
+  | Com : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
 
   | Up : inf t -> chk f
 

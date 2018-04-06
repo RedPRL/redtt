@@ -13,9 +13,9 @@ type _ f =
   | Cdr : inf t -> inf f
   | App : inf t * chk t -> inf f
   | Down : {ty : chk t; tm : chk t} -> inf f
-  | Coe : chk t * chk t * chk t bnd * chk t -> inf f
-  | HCom : chk t * chk t * chk t * chk t * chk t bnd system -> inf f
-  | Com : chk t * chk t * chk t bnd * chk t * chk t bnd system -> inf f  
+  | Coe : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
+  | HCom : {dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
+  | Com : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
 
   | Up : inf t -> chk f
 
@@ -83,14 +83,14 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
     | Down {ty; tm} ->
       Down {ty = thin th ty; tm = thin th tm}
 
-    | Coe (td0, td1, bnd, tm) ->
-      Coe (thin th td0, thin th td1, thin_bnd th bnd, thin th tm)
+    | Coe info ->
+      Coe {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; tm = thin th info.tm}
 
-    | HCom (td0, td1, ty, tm, sys) -> 
-      HCom (thin th td0, thin th td1, thin th ty, thin th tm, thin_bsys th sys)
+    | HCom info ->
+      HCom {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
 
-    | Com (td0, td1, ty, tm, sys) ->
-      Com (thin th td0, thin th td1, thin_bnd th ty, thin th tm, thin_bsys th sys)
+    | Com info ->
+      Com {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
 
     | Up t ->
       Up (thin th t)
