@@ -5,4 +5,5 @@ val keep : t -> t
 val skip : t -> t
 val cmp : t -> t -> t
 
+val act : t -> 'a list -> 'a list
 val proj : t -> 'a list -> 'a

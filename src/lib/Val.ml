@@ -38,8 +38,8 @@ and 'a tube = DimVal.t * DimVal.t * 'a option
 and 'a system = 'a tube list
 
 and env = can t list
-and clo = Clo of Tm.chk Tm.t * env * stk
-and bclo = BClo of Tm.chk Tm.t Tm.bnd * env * stk
+and clo = Clo of {tm : Tm.chk Tm.t; thin : Thin.t; env : env; stk : stk}
+and bclo = BClo of {bnd : Tm.chk Tm.t Tm.bnd; thin : Thin.t; env : env; stk : stk}
 
 and frm =
   | KApply of can t
@@ -84,10 +84,10 @@ let project_dimval (type a) (v : a t) =
   | _ -> failwith "project_dimval"
 
 let (<:) tm rho : clo =
-  Clo (tm, rho, [])
+  Clo {tm; env = rho; thin = Thin.id; stk = []}
 
 let (<:+) bnd rho =
-  BClo (bnd, rho, [])
+  BClo {bnd; env = rho; thin = Thin.id; stk = []}
 
 
 let map_tubes f =
@@ -213,9 +213,10 @@ and eval_btube rho (t0, t1, obnd) =
 
 
 and com (vd0, vd1, bclo, vcap, vsys) =
+  let BClo node = bclo in
   let vcap' = into @@ Coe (vd0, vd1, bclo, vcap) in
-  let BClo (Tm.B tm, rho, stk) = bclo in
-  let ty = Clo (tm, vd1 :: rho, stk) in
+  let Tm.B tm = node.bnd in
+  let ty = Clo {tm; env = vd1 :: node.env; thin = node.thin; stk = node.stk} in
   let tube bclo' = bclo_frame (KComTubeCoe {dim1 = vd1; ty = bclo; tube = bclo'}) bclo in
   let vsys' = map_tubes tube vsys in
   into @@ HCom (vd0, vd1, ty, vcap', vsys')
@@ -238,8 +239,9 @@ and apply vfun varg =
 
   | HCom (vd0, vd1, vty, vcap, vsys) ->
     let dom, cod = out_pi @@ eval_clo vty in
-    let BClo (Tm.B tm, rho, stk) = cod in
-    let cod' = Clo (tm, varg :: rho, stk) in
+    let BClo node = cod in
+    let Tm.B tm = node.bnd in
+    let cod' = Clo {tm; env = varg :: node.env; stk = node.stk; thin = node.thin} in
     let vcap' = apply vcap varg in
     let vsys' = map_tubes (bclo_frame (KApply varg)) vsys in
     into @@ HCom (vd0, vd1, cod', vcap', vsys')
@@ -289,10 +291,9 @@ and cdr v =
     into @@ (Coe (vd0, vd1, cod, vcdr))
 
   | HCom (vd0, vd1, ty, vcap, vsys) ->
-    let Clo (tty, rho, stk) = ty in
-    let bty = Tm.B (Tm.thin (Thin.skip Thin.id) tty) in
+    let Clo node = ty in
     let frm = KSgCodHCom {dim0 = vd0; dom = clo_frame KSgDom ty; cap = vcap; sys = vsys} in
-    let cod' = BClo (bty, rho, frm :: stk) in
+    let cod' = BClo {bnd = Tm.B node.tm; thin = Thin.skip node.thin; env = node.env; stk = frm :: node.stk} in
     let vcap' = cdr vcap in
     let vsys' = map_tubes (bclo_frame KCdr) vsys in
     com (vd0, vd1, cod', vcap', vsys')
@@ -324,10 +325,11 @@ and dim_eq vd0 vd1 =
   | _ -> false
 
 and inst_bclo : bclo -> can t -> can t =
-  fun (BClo (Tm.B tm, rho, stk)) varg ->
-    let rho' = varg :: rho in
-    let v = eval rho' tm in
-    eval_stk stk rho' v
+  fun (BClo bclo) varg ->
+    let env' = varg :: bclo.env in
+    let Tm.B tm = bclo.bnd in
+    let v = eval env' tm in
+    eval_stk bclo.stk env' v
 
 
 and eval_stk stk rho v =
@@ -379,16 +381,14 @@ and eval_frm rho frm v =
 
 
 and eval_clo : clo -> can t =
-  fun (Clo (tm, rho, stk)) ->
-    eval_stk stk rho (eval rho tm)
-
+  fun (Clo node) ->
+    eval_stk node.stk node.env @@
+    eval (Thin.act node.thin node.env) node.tm
 
 and clo_frame : frm -> clo -> clo =
-  fun frm clo ->
-    let Clo (tm, rho, stk) = clo in
-    Clo (tm, rho, frm :: stk)
+  fun frm (Clo node) ->
+    Clo {tm = node.tm; env = node.env; stk = frm :: node.stk; thin = node.thin}
 
 and bclo_frame : frm -> bclo -> bclo =
-  fun frm bclo ->
-    let BClo (tm, rho, bstk) = bclo in
-    BClo (tm, rho, frm :: bstk)
+  fun frm (BClo node) ->
+    BClo {bnd = node.bnd; env = node.env; stk = frm :: node.stk; thin = node.thin}
