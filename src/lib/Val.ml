@@ -321,13 +321,6 @@ and dim_eq vd0 vd1 =
   | DimVal.Lvl i, DimVal.Lvl j -> i = j
   | _ -> false
 
-and inst_bclo : bclo -> can t -> can t =
-  fun bclo varg ->
-    let env' = varg :: bclo.env in
-    let Tm.B tm = bclo.foc in
-    let v = eval env' tm in
-    eval_stk bclo.stk env' v
-
 
 and eval_stk stk rho v =
   match stk with
@@ -387,6 +380,11 @@ and eval_frm rho frm v =
     let hcom = into @@ HCom (dim0, dimx, dom, car cap, map_tubes (bclo_frame KCar) sys) in
     inst_bclo cod hcom
 
+and inst_bclo : bclo -> can t -> can t =
+  fun node varg ->
+    let Tm.B tm = node.foc in
+    eval_stk node.stk (varg :: node.env) @@
+    eval (Thin.act node.thin @@ varg :: node.env) tm
 
 and eval_clo : tclo -> can t =
   fun node ->
