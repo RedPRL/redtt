@@ -5,7 +5,7 @@ type neu
 type 'a bnd = B of 'a
 
 
-type clo
+type tclo
 type bclo
 
 type 'a system
@@ -16,9 +16,9 @@ type _ f =
 
   | Up : can t * neu t -> can f
 
-  | Pi : clo * bclo -> can f
-  | Sg : clo * bclo -> can f
-  | Ext : can t * clo system -> can f
+  | Pi : tclo * bclo -> can f
+  | Sg : tclo * bclo -> can f
+  | Ext : can t * tclo system -> can f
   | Univ : Lvl.t -> can f
   | Interval : can f
 
@@ -26,11 +26,11 @@ type _ f =
   | Dim1 : can f
 
   | Lam : bclo -> can f
-  | Cons : clo * clo -> can f
+  | Cons : tclo * tclo -> can f
 
   | Coe : can t * can t * bclo * can t -> can f
 
-  | HCom : can t * can t * clo * can t * bclo system -> can f
+  | HCom : can t * can t * tclo * can t * bclo system -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
@@ -43,7 +43,7 @@ type env = can t list
 
 val eval : env -> 'a Tm.t -> can t
 
-val eval_clo : clo -> can t
+val eval_clo : tclo -> can t
 val inst_bclo : bclo -> can t -> can t
 
 val apply : can t -> can t -> can t

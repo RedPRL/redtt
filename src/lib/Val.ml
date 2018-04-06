@@ -7,14 +7,15 @@ type 'a bnd = B of 'a
    I believe that this should scale up to even things as complicated as
    coe in V-types, etc. *)
 
+
 type _ f =
   | Lvl : int -> neu f
 
   | Up : can t * neu t -> can f
 
-  | Pi : clo * bclo -> can f
-  | Sg : clo * bclo -> can f
-  | Ext : can t * clo system -> can f
+  | Pi : tclo * bclo -> can f
+  | Sg : tclo * bclo -> can f
+  | Ext : can t * tclo system -> can f
   | Univ : Lvl.t -> can f
   | Interval : can f
 
@@ -22,11 +23,11 @@ type _ f =
   | Dim1 : can f
 
   | Lam : bclo -> can f
-  | Cons : clo * clo -> can f
+  | Cons : tclo * tclo -> can f
 
   | Coe : can t * can t * bclo * can t -> can f
 
-  | HCom : can t * can t * clo * can t * bclo system -> can f
+  | HCom : can t * can t * tclo * can t * bclo system -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
@@ -38,22 +39,24 @@ and 'a tube = DimVal.t * DimVal.t * 'a option
 and 'a system = 'a tube list
 
 and env = can t list
-and clo = Clo of {tm : Tm.chk Tm.t; thin : Thin.t; env : env; stk : stk}
-and bclo = BClo of {bnd : Tm.chk Tm.t Tm.bnd; thin : Thin.t; env : env; stk : stk}
+and 'a clo = {foc : 'a; thin : Thin.t; env : env; stk : stk}
+
+and tclo = Tm.chk Tm.t clo
+and bclo = Tm.chk Tm.t Tm.bnd clo
 
 and frm =
   | KApply of can t
-  | KExtCar of clo system
+  | KExtCar of tclo system
   | KCar
   | KCdr
-  | KExtApp of clo system
-  | KExtCdr of clo system
+  | KExtApp of tclo system
+  | KExtCdr of tclo system
   | KComTubeCoe of {dim1 : can t; ty : bclo; tube : bclo}
   | KPiDom
   | KPiCodCoe of {dim1 : can t; dom : bclo; arg : can t}
   | KSgDom
   | KSgCodCoe of {dim0 : can t; dom : bclo; arg : can t}
-  | KSgCodHCom of {dim0 : can t; dom : clo; cap : can t; sys : bclo system}
+  | KSgCodHCom of {dim0 : can t; dom : tclo; cap : can t; sys : bclo system}
 
 and stk = frm list
 
@@ -83,11 +86,8 @@ let project_dimval (type a) (v : a t) =
     end
   | _ -> failwith "project_dimval"
 
-let (<:) tm rho : clo =
-  Clo {tm; env = rho; thin = Thin.id; stk = []}
-
-let (<:+) bnd rho =
-  BClo {bnd; env = rho; thin = Thin.id; stk = []}
+let (<:) tm rho : 'a =
+  {foc = tm; env = rho; thin = Thin.id; stk = []}
 
 
 let map_tubes f =
@@ -103,16 +103,16 @@ let rec eval : type a. env -> a Tm.t -> can t =
       v
 
     | Tm.Pi (dom, cod) ->
-      into @@ Pi (dom <: rho, cod <:+ rho)
+      into @@ Pi (dom <: rho, cod <: rho)
 
     | Tm.Sg (dom, cod) ->
-      into @@ Sg (dom <: rho, cod <:+ rho)
+      into @@ Sg (dom <: rho, cod <: rho)
 
     | Tm.Ext (ty, sys) ->
       into @@ Ext (eval rho ty, eval_sys rho sys)
 
     | Tm.Lam bdy ->
-      into @@ Lam (bdy <:+ rho)
+      into @@ Lam (bdy <: rho)
 
     | Tm.Cons (t0, t1) ->
       into @@ Cons (t0 <: rho, t1 <: rho)
@@ -121,7 +121,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
       let vd0 = eval rho d0 in
       let vd1 = eval rho d1 in
       let vtm = eval rho tm in
-      into @@ Coe (vd0, vd1, bnd <:+ rho, vtm)
+      into @@ Coe (vd0, vd1, bnd <: rho, vtm)
 
     | Tm.HCom (d0, d1, ty, cap, sys) ->
       let vd0 = eval rho d0 in
@@ -135,7 +135,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
       let vd1 = eval rho d1 in
       let vcap = eval rho cap in
       let vsys = eval_bsys rho sys in
-      com (vd0, vd1, bnd <:+ rho, vcap, vsys)
+      com (vd0, vd1, bnd <: rho, vcap, vsys)
 
     | Tm.Univ lvl ->
       into @@ Univ lvl
@@ -206,17 +206,16 @@ and eval_btube rho (t0, t1, obnd) =
     match vd0, vd1, obnd with
     | DimVal.Dim0, DimVal.Dim1, _ -> None
     | DimVal.Dim1, DimVal.Dim0, _ -> None
-    | _, _, Some bnd -> Some (bnd <:+ rho)
+    | _, _, Some bnd -> Some (bnd <: rho)
     | _ -> failwith "eval_tube: expected Some"
   in
   (vd0, vd1, ovbnd)
 
 
 and com (vd0, vd1, bclo, vcap, vsys) =
-  let BClo node = bclo in
   let vcap' = into @@ Coe (vd0, vd1, bclo, vcap) in
-  let Tm.B tm = node.bnd in
-  let ty = Clo {tm; env = vd1 :: node.env; thin = node.thin; stk = node.stk} in
+  let Tm.B tm = bclo.foc in
+  let ty = {foc = tm; env = vd1 :: bclo.env; thin = bclo.thin; stk = bclo.stk} in
   let tube bclo' = bclo_frame (KComTubeCoe {dim1 = vd1; ty = bclo; tube = bclo'}) bclo in
   let vsys' = map_tubes tube vsys in
   into @@ HCom (vd0, vd1, ty, vcap', vsys')
@@ -239,9 +238,8 @@ and apply vfun varg =
 
   | HCom (vd0, vd1, vty, vcap, vsys) ->
     let dom, cod = out_pi @@ eval_clo vty in
-    let BClo node = cod in
-    let Tm.B tm = node.bnd in
-    let cod' = Clo {tm; env = varg :: node.env; stk = node.stk; thin = node.thin} in
+    let Tm.B tm = cod.foc in
+    let cod' = {cod with foc = tm; env = varg :: cod.env} in
     let vcap' = apply vcap varg in
     let vsys' = map_tubes (bclo_frame (KApply varg)) vsys in
     into @@ HCom (vd0, vd1, cod', vcap', vsys')
@@ -291,9 +289,8 @@ and cdr v =
     into @@ (Coe (vd0, vd1, cod, vcdr))
 
   | HCom (vd0, vd1, ty, vcap, vsys) ->
-    let Clo node = ty in
     let frm = KSgCodHCom {dim0 = vd0; dom = clo_frame KSgDom ty; cap = vcap; sys = vsys} in
-    let cod' = BClo {bnd = Tm.B node.tm; thin = Thin.skip node.thin; env = node.env; stk = frm :: node.stk} in
+    let cod' = {ty with foc = Tm.B ty.foc; thin = Thin.skip ty.thin; stk = frm :: ty.stk} in
     let vcap' = cdr vcap in
     let vsys' = map_tubes (bclo_frame KCdr) vsys in
     com (vd0, vd1, cod', vcap', vsys')
@@ -325,9 +322,9 @@ and dim_eq vd0 vd1 =
   | _ -> false
 
 and inst_bclo : bclo -> can t -> can t =
-  fun (BClo bclo) varg ->
+  fun bclo varg ->
     let env' = varg :: bclo.env in
-    let Tm.B tm = bclo.bnd in
+    let Tm.B tm = bclo.foc in
     let v = eval env' tm in
     eval_stk bclo.stk env' v
 
@@ -391,15 +388,15 @@ and eval_frm rho frm v =
     inst_bclo cod hcom
 
 
-and eval_clo : clo -> can t =
-  fun (Clo node) ->
+and eval_clo : tclo -> can t =
+  fun node ->
     eval_stk node.stk node.env @@
-    eval (Thin.act node.thin node.env) node.tm
+    eval (Thin.act node.thin node.env) node.foc
 
-and clo_frame : frm -> clo -> clo =
-  fun frm (Clo node) ->
-    Clo {tm = node.tm; env = node.env; stk = frm :: node.stk; thin = node.thin}
+and clo_frame : frm -> tclo -> tclo =
+  fun frm node ->
+    { node with stk = frm :: node.stk}
 
 and bclo_frame : frm -> bclo -> bclo =
-  fun frm (BClo node) ->
-    BClo {bnd = node.bnd; env = node.env; stk = frm :: node.stk; thin = node.thin}
+  fun frm node ->
+    { node with stk = frm :: node.stk }
