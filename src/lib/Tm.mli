@@ -35,6 +35,8 @@ type _ f =
   | Dim0 : chk f
   | Dim1 : chk f
 
+val thin : Thin.t -> 'a t -> 'a t
+
 val path : chk t bnd * chk t * chk t -> chk t
 
 val into : 'a f -> 'a t

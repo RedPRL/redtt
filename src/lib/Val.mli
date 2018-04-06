@@ -11,7 +11,7 @@ type bclo
 type 'a system
 
 type 'a t
-type _ f = 
+type _ f =
   | Lvl : int -> neu f
 
   | Up : can t * neu t -> can f
@@ -28,9 +28,9 @@ type _ f =
   | Lam : bclo -> can f
   | Cons : clo * clo -> can f
 
-  | Coe : can t * can t * can t DimFam.t * can t -> can f
+  | Coe : can t * can t * bclo * can t -> can f
 
-  | HCom : can t * can t * can t * can t * can t DimFam.t system -> can f
+  | HCom : can t * can t * clo * can t * bclo system -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f

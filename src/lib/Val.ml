@@ -24,9 +24,9 @@ type _ f =
   | Lam : bclo -> can f
   | Cons : clo * clo -> can f
 
-  | Coe : can t * can t * can t DimFam.t * can t -> can f
+  | Coe : can t * can t * bclo * can t -> can f
 
-  | HCom : can t * can t * can t * can t * can t DimFam.t system -> can f
+  | HCom : can t * can t * clo * can t * bclo system -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f
@@ -38,16 +38,22 @@ and 'a tube = DimVal.t * DimVal.t * 'a option
 and 'a system = 'a tube list
 
 and env = can t list
-and clo = [`Eval of Tm.chk Tm.t * env * stk | `Ret of can t] ref
+and clo = Clo of Tm.chk Tm.t * env * stk
 and bclo = BClo of Tm.chk Tm.t Tm.bnd * env * stk
 
 and frm =
-  | FApply of can t
-  | FExtCar of clo system
-  | FCar
-  | FCdr
-  | FExtApp of clo system
-  | FExtCdr of clo system
+  | KApply of can t
+  | KExtCar of clo system
+  | KCar
+  | KCdr
+  | KExtApp of clo system
+  | KExtCdr of clo system
+  | KComTubeCoe of {dim1 : can t; ty : bclo; tube : bclo}
+  | KPiDom
+  | KPiCodCoe of {dim1 : can t; dom : bclo; arg : can t}
+  | KSgDom
+  | KSgCodCoe of {dim0 : can t; dom : bclo; arg : can t}
+  | KSgCodHCom of {dim0 : can t; dom : clo; cap : can t; sys : bclo system}
 
 and stk = frm list
 
@@ -78,7 +84,7 @@ let project_dimval (type a) (v : a t) =
   | _ -> failwith "project_dimval"
 
 let (<:) tm rho : clo =
-  ref @@ `Eval (tm, rho, [])
+  Clo (tm, rho, [])
 
 let (<:+) bnd rho =
   BClo (bnd, rho, [])
@@ -87,11 +93,6 @@ let (<:+) bnd rho =
 let map_tubes f =
   List.map @@ fun (vd0, vd1, vbnd) ->
   (vd0, vd1, Option.map f vbnd)
-
-
-let map_btubes f =
-  map_tubes (DimFam.map f)
-
 
 
 let rec eval : type a. env -> a Tm.t -> can t =
@@ -116,28 +117,25 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Cons (t0, t1) ->
       into @@ Cons (t0 <: rho, t1 <: rho)
 
-    | Tm.Coe (d0, d1, Tm.B ty, tm) ->
+    | Tm.Coe (d0, d1, bnd, tm) ->
       let vd0 = eval rho d0 in
       let vd1 = eval rho d1 in
-      let vty = DimFam.make (fun x -> eval (embed_dimval x :: rho) ty) in
       let vtm = eval rho tm in
-      into @@ Coe (vd0, vd1, vty, vtm)
+      into @@ Coe (vd0, vd1, bnd <:+ rho, vtm)
 
     | Tm.HCom (d0, d1, ty, cap, sys) ->
       let vd0 = eval rho d0 in
       let vd1 = eval rho d1 in
-      let vty = eval rho ty in
       let vcap = eval rho cap in
       let vsys = eval_bsys rho sys in
-      into @@ HCom (vd0, vd1, vty, vcap, vsys)
+      into @@ HCom (vd0, vd1, ty <: rho, vcap, vsys)
 
-    | Tm.Com (d0, d1, Tm.B ty, cap, sys) ->
+    | Tm.Com (d0, d1, bnd, cap, sys) ->
       let vd0 = eval rho d0 in
       let vd1 = eval rho d1 in
-      let vty = DimFam.make (fun x -> eval (embed_dimval x :: rho) ty) in
       let vcap = eval rho cap in
       let vsys = eval_bsys rho sys in
-      com (vd0, vd1, vty, vcap, vsys)
+      com (vd0, vd1, bnd <:+ rho, vcap, vsys)
 
     | Tm.Univ lvl ->
       into @@ Univ lvl
@@ -171,7 +169,7 @@ and out_pi v =
   | Pi (dom, cod) -> dom, cod
   | Ext (vty, vsys) ->
     let dom, cod = out_pi vty in
-    dom, wrap_bfrm (FExtApp vsys) cod
+    dom, bclo_frame (KExtApp vsys) cod
   | _ -> failwith "out_pi"
 
 and out_sg v =
@@ -179,8 +177,8 @@ and out_sg v =
   | Sg (dom, cod) -> dom, cod
   | Ext (vty, vsys) ->
     let dom, cod = out_sg vty in
-    wrap_frm (FExtCar vsys) dom,
-    wrap_bfrm (FExtCdr vsys) cod
+    clo_frame (KExtCar vsys) dom,
+    bclo_frame (KExtCdr vsys) cod
   | _ -> failwith "out_sg"
 
 and eval_sys rho sys =
@@ -208,27 +206,19 @@ and eval_btube rho (t0, t1, obnd) =
     match vd0, vd1, obnd with
     | DimVal.Dim0, DimVal.Dim1, _ -> None
     | DimVal.Dim1, DimVal.Dim0, _ -> None
-    | _, _, Some (Tm.B tm) ->
-      let vbnd =
-        DimFam.make @@ fun x ->
-        eval (embed_dimval x :: rho) tm
-      in
-      Some vbnd
+    | _, _, Some bnd -> Some (bnd <:+ rho)
     | _ -> failwith "eval_tube: expected Some"
   in
   (vd0, vd1, ovbnd)
 
 
-
-and com (vd0, vd1, vbnd, vcap, vsys) =
-  let vcap' = into @@ Coe (vd0, vd1, vbnd, vcap) in
-  let vty' = DimFam.inst vbnd @@ project_dimval vd1 in
-  let tube vbnd =
-    DimFam.make @@ fun x ->
-    into @@ Coe (embed_dimval x, vd1, vbnd, DimFam.inst vbnd x)
-  in
+and com (vd0, vd1, bclo, vcap, vsys) =
+  let vcap' = into @@ Coe (vd0, vd1, bclo, vcap) in
+  let BClo (Tm.B tm, rho, stk) = bclo in
+  let ty = Clo (tm, vd1 :: rho, stk) in
+  let tube bclo' = bclo_frame (KComTubeCoe {dim1 = vd1; ty = bclo; tube = bclo'}) bclo in
   let vsys' = map_tubes tube vsys in
-  into @@ HCom (vd0, vd1, vty', vcap', vsys')
+  into @@ HCom (vd0, vd1, ty, vcap', vsys')
 
 and apply vfun varg =
   match out vfun with
@@ -241,22 +231,18 @@ and apply vfun varg =
     reflect vcod @@ into @@ App (vneu, varg)
 
   | Coe (vd0, vd1, vbnd, vfun) ->
-    let dom, cod = DimFam.split @@ DimFam.map out_pi vbnd in
-    let vdom = DimFam.map eval_clo dom in
-    let vcod =
-      DimFam.make @@ fun x ->
-      let coe = into @@ Coe (vd1, embed_dimval x, vdom, varg) in
-      inst_bclo (DimFam.inst cod x) coe
-    in
-    let coe = into @@ Coe (vd1, vd0, vdom, varg) in
-    into @@ Coe (vd0, vd1, vcod, apply vfun coe)
+    let dom = bclo_frame KPiDom vbnd in
+    let cod = bclo_frame (KPiCodCoe {dim1 = vd1; dom = dom; arg = varg}) vbnd in
+    let varg' = into @@ Coe (vd1, vd0, dom, varg) in
+    into @@ Coe (vd0, vd1, cod, apply vfun varg')
 
   | HCom (vd0, vd1, vty, vcap, vsys) ->
-    let dom, cod = out_pi vty in
-    let vcod = inst_bclo cod varg in
+    let dom, cod = out_pi @@ eval_clo vty in
+    let BClo (Tm.B tm, rho, stk) = cod in
+    let cod' = Clo (tm, varg :: rho, stk) in
     let vcap' = apply vcap varg in
-    let vsys' = map_btubes (fun v -> apply v varg) vsys in
-    into @@ HCom (vd0, vd1, vcod, vcap', vsys')
+    let vsys' = map_tubes (bclo_frame (KApply varg)) vsys in
+    into @@ HCom (vd0, vd1, cod', vcap', vsys')
 
   | _ -> failwith "apply"
 
@@ -270,19 +256,16 @@ and car v =
     let vdom = eval_clo dom in
     reflect vdom @@ into @@ Car vneu
 
-  | Coe (vd0, vd1, vbnd, v) ->
-    let dom, _ = DimFam.split @@ DimFam.map out_sg vbnd in
-    let vdom = DimFam.map eval_clo dom in
+  | Coe (vd0, vd1, bclo, v) ->
+    let dom = bclo_frame KSgDom bclo in
     let vcar = car v in
-    into @@ Coe (vd0, vd1, vdom, vcar)
-
+    into @@ Coe (vd0, vd1, dom, vcar)
 
   | HCom (vd0, vd1, vty, vcap, vsys) ->
-    let dom, _ = out_sg vty in
-    let vdom = eval_clo dom in
+    let dom, _ = out_sg @@ eval_clo vty in
     let vcap' = car vcap in
-    let vsys' = map_btubes car vsys in
-    into @@ HCom (vd0, vd1, vdom, vcap', vsys')
+    let vsys' = map_tubes (bclo_frame KCar) vsys in
+    into @@ HCom (vd0, vd1, dom, vcap', vsys')
 
   | _ -> failwith "car"
 
@@ -297,27 +280,22 @@ and cdr v =
     let vcod = inst_bclo cod vcar in
     reflect vcod @@ into @@ Cdr vneu
 
-  | Coe (vd0, vd1, vbnd, v) ->
-    let dom, cod = DimFam.split @@ DimFam.map out_sg vbnd in
-    let vdom = DimFam.map eval_clo dom in
+  | Coe (vd0, vd1, bclo, v) ->
     let vcar = car v in
-    let vcod =
-      DimFam.make @@ fun x ->
-      let coe = into @@ Coe (vd0, embed_dimval x, vdom, vcar) in
-      inst_bclo (DimFam.inst cod x) coe
-    in
-    into @@ Coe (vd0, vd1, vcod, cdr v)
+    let vcdr = cdr v in
+    let dom = bclo_frame KSgDom bclo in
+    let frm = KSgCodCoe {dim0 = vd0; dom = dom; arg = vcar} in
+    let cod = bclo_frame frm bclo in
+    into @@ (Coe (vd0, vd1, cod, vcdr))
 
-  | HCom (vd0, vd1, vty, vcap, vsys) ->
-    let dom, cod = out_sg vty in
-    let vdom = eval_clo dom in
-    let vcod =
-      DimFam.make @@ fun x ->
-      let hcom = into @@ HCom (vd0, embed_dimval x, vdom, car vcap, map_btubes car vsys) in
-      inst_bclo cod hcom in
+  | HCom (vd0, vd1, ty, vcap, vsys) ->
+    let Clo (tty, rho, stk) = ty in
+    let bty = Tm.B (Tm.thin (Thin.skip Thin.id) tty) in
+    let frm = KSgCodHCom {dim0 = vd0; dom = clo_frame KSgDom ty; cap = vcap; sys = vsys} in
+    let cod' = BClo (bty, rho, frm :: stk) in
     let vcap' = cdr vcap in
-    let vsys' = map_btubes cdr vsys in
-    com (vd0, vd1, vcod, vcap', vsys')
+    let vsys' = map_tubes (bclo_frame KCdr) vsys in
+    com (vd0, vd1, cod', vcap', vsys')
 
   | _ -> failwith "cdr"
 
@@ -361,38 +339,56 @@ and eval_stk stk rho v =
 
 and eval_frm rho frm v =
   match frm with
-  | FCar ->
+  | KCar ->
     car v
-  | FCdr ->
+  | KCdr ->
     cdr v
-  | FApply varg ->
+  | KApply varg ->
     apply v varg
-  | FExtCar sys ->
-    into @@ Ext (v, map_tubes (wrap_frm FCar) sys)
-  | FExtCdr sys ->
-    into @@ Ext (v, map_tubes (wrap_frm FCdr) sys)
-  | FExtApp sys ->
+  | KExtCar sys ->
+    into @@ Ext (v, map_tubes (clo_frame KCar) sys)
+  | KExtCdr sys ->
+    into @@ Ext (v, map_tubes (clo_frame KCdr) sys)
+  | KExtApp sys ->
     let varg = List.hd rho in
-    into @@ Ext (v, map_tubes (wrap_frm (FApply varg)) sys)
+    into @@ Ext (v, map_tubes (clo_frame (KApply varg)) sys)
+  | KComTubeCoe {dim1; ty; tube} ->
+    let varg = List.hd rho in
+    into @@ Coe (varg, dim1, ty, inst_bclo tube varg)
+  | KPiDom ->
+    let dom, _ = out_pi v in
+    eval_clo dom
+  | KPiCodCoe {dim1; dom; arg} ->
+    let dimx = List.hd rho in
+    let _, cod = out_pi v in
+    let coe = into @@ Coe (dim1, dimx, dom, arg) in
+    inst_bclo cod coe
+  | KSgDom ->
+    let dom, _ = out_sg v in
+    eval_clo dom
+  | KSgCodCoe {dim0; dom; arg} ->
+    let dimx = List.hd rho in
+    let _, cod = out_sg v in
+    let coe = into @@ Coe (dim0, dimx, dom, arg) in
+    inst_bclo cod coe
+  | KSgCodHCom {dim0; dom; cap; sys} ->
+    let dimx = List.hd rho in
+    let _, cod = out_sg v in
+    let hcom = into @@ HCom (dim0, dimx, dom, car cap, map_tubes (bclo_frame KCar) sys) in
+    inst_bclo cod hcom
+
 
 and eval_clo : clo -> can t =
-  fun clo ->
-    match !clo with
-    | `Eval (tm, rho, stk) ->
-      let v = eval_stk stk rho (eval rho tm) in
-      clo := `Ret v;
-      v
-    | `Ret v -> v
+  fun (Clo (tm, rho, stk)) ->
+    eval_stk stk rho (eval rho tm)
 
-and wrap_frm : frm -> clo -> clo =
+
+and clo_frame : frm -> clo -> clo =
   fun frm clo ->
-    match !clo with
-    | `Eval (tm, rho, stk) ->
-      ref @@ `Eval (tm, rho, frm :: stk)
-    | `Ret v ->
-      ref @@ `Ret (eval_frm [] frm v)
+    let Clo (tm, rho, stk) = clo in
+    Clo (tm, rho, frm :: stk)
 
-and wrap_bfrm : frm -> bclo -> bclo =
+and bclo_frame : frm -> bclo -> bclo =
   fun frm bclo ->
     let BClo (tm, rho, bstk) = bclo in
     BClo (tm, rho, frm :: bstk)
