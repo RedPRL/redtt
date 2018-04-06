@@ -41,11 +41,9 @@
 
 \newcommand\DeclBox[1]{\framebox{$\displaystyle{}#1$}}
 \newcommand\FmtThin[1]{{\color{ProcessBlue}#1}}
-\newcommand\XThin[3]{{#2}\rightarrowtriangle_{#1}{#3}}
 
 \newcommand\Thin[2]{{#1}\rightarrowtriangle{#2}}
 \newcommand\IsThin[3]{\FmtThin{#1}:\Thin{#2}{#3}}
-\newcommand\IsXThin[4]{\FmtThin{#1}:\XThin{#2}{#3}{#4}}
 
 \newcommand\ThinId{\mathsf{id}}
 \newcommand\ThinKeep[1]{\mbox{\leftthumbsdown}\!\!\rangle\!{#1}\!\langle\!\!\mbox{\rightthumbsdown}}
@@ -72,7 +70,6 @@
 
 \newcommand\Interval{\FmtKwd{dim}}
 \newcommand\Bool{\FmtKwd{bool}}
-\newcommand\Atom[1]{{\boldsymbol\alpha}_{#1}}
 \newcommand\Var[1]{\mathsf{v}_{#1}}
 
 \newcommand\SortChk{\FmtKwd{chk}}
@@ -85,9 +82,9 @@
 
 \newcommand\Tm[3]{{#1}\mid{#2}\vdash{#3}}
 \newcommand\FmtTm[1]{{\color{Violet}#1}}
-\newcommand\IsTm[4]{{#1}\mid{#2}\vdash\FmtTm{#3}:{#4}}
-\newcommand\IsChk[3]{\IsTm{#1}{#2}{#3}{\SortChk}}
-\newcommand\IsInf[3]{\IsTm{#1}{#2}{#3}{\SortInf}}
+\newcommand\IsTm[3]{{#1}\vdash\FmtTm{#2}:{#3}}
+\newcommand\IsChk[2]{\IsTm{#1}{#2}{\SortChk}}
+\newcommand\IsInf[2]{\IsTm{#1}{#2}{\SortInf}}
 
 \newcommand\TExp[2]{
   \FmtTm{
@@ -117,8 +114,6 @@
 \newcommand\Apply[3]{\FmtVal{#1}\mathrel{@}\FmtVal{#2}\Downarrow\FmtVal{#3}}
 \newcommand\InstClo[3]{\FmtVal{#1}\bullet\FmtVal{#2}\Downarrow\FmtVal{#3}}
 \newcommand\ThinVal[2]{\widehat{\FmtThin{#1}}\Parens*{\FmtVal{#2}}}
-\newcommand\ThinTmAtom[2]{\widehat{\FmtThin{#1}}_{\Atom{}}\Parens*{\FmtTm{#2}}}
-\newcommand\ThinTmVar[2]{\widehat{\FmtThin{#1}}_{\Var{}}\Parens*{\FmtTm{#2}}}
 \newcommand\Car[2]{\FmtVal{#1}\ \mathbf{car}\Downarrow\FmtVal{#2}}
 \newcommand\Cdr[2]{\FmtVal{#1}\ \mathbf{cdr}\Downarrow\FmtVal{#2}}
 
@@ -179,11 +174,9 @@ to do this algorithmically follows the structure of NbE very closely
 
 \section{Thinnings}
 
-$X$-Thinnings are a defunctionalized representation of substitutions
-which capture the idea of deleting some variables from within a
-context, or possibly replacing them with an element of the family
-$X:\SET^{\mathbb{N}}$. When $X$ is the empty family, these correspond
-to the \emph{order-preserving embeddings} of Chapman.
+Thinnings are a defunctionalized representation of weakenings which
+capture the idea of deleting some variables from within a context;
+these correspond to the \emph{order-preserving embeddings} of Chapman.
 %
 We choose a representation of thinnings which lends itself to
 efficient calculation, but is not canonical; therefore, any operation
@@ -191,200 +184,138 @@ on thinnings must be proved to be respect the algebraic laws of
 thinnings in order to be well-defined.
 \begin{mathparpagebreakable}
   \DeclBox{
-    \IsXThin{f}{X}{n}{m}
+    \IsThin{f}{n}{m}
   }
   \\
   \inferrule{
   }{
-    \IsXThin{\ThinId}{X}{n}{n}
+    \IsThin{\ThinId}{n}{n}
   }
   \and
   \inferrule{
-    \IsXThin{f}{X}{n}{m}
+    \IsThin{f}{n}{m}
   }{
-    \IsXThin{\ThinKeep{f}}{X}{n+1}{m+1}
+    \IsThin{\ThinKeep{f}}{n+1}{m+1}
   }
   \and
   \inferrule{
-    \IsXThin{f}{X}{n}{m}
+    \IsThin{f}{n}{m}
   }{
-    \IsXThin{\ThinSkip{f}}{X}{n+1}{m}
-  }
-  \and
-  \inferrule{
-    \IsXThin{f}{X}{n}{m}
-    \\
-    a:X_n
-  }{
-    \IsXThin{\ThinRep{f}{a}}{X}{n}{m+1}
+    \IsThin{\ThinSkip{f}}{n+1}{m}
   }
 \end{mathparpagebreakable}
 
-We will write $\THIN$ for the category of $\varnothing$-thinnings
-induced by the above. To simplify notation, we write $\Thin{n}{m}$ for
-$\XThin{\varnothing}{n}{m}$.
+We will write $\THIN$ for the category of thinnings
+induced by the above.
 
 \section{Terms}
 
-\newcommand\TSubstA[3]{
-  \TExp{subst_{\Atom{}}}{
-    \FmtThin{#1}%
-    \mathbin{{\color{gray}*}}%
-    \FmtThin{#2},
-    \FmtThin{#3}
-  }
-}
-
-\newcommand\TThinV[2]{
-  \TExp{thin_{\Var{}}}{
-    \FmtThin{#1},
-    #2
-  }
-}
-
-
-In our term language, we distinguish between \emph{atoms} and
-\emph{variables}, and their respective binders. Variable binders are
-given meaning through substitution, whereas atom binders are subject
-to open evaluation. Most binders are variable binders; the only atom
-binder in our language comes from $\FmtKwd{coe}$.
-
-
-\begin{remark}
-  This is a matter of some subtlety in the context of
-  \emph{normalization by evaluation} in which the evaluation and
-  quotation phases of computation are distinguished: while we do not
-  evaluate underneath a variable binder, during the quotation phase we
-  \emph{do} instantiate such a variable binder with a semantic
-  indeterminate or generic element: so, even though we end up
-  transforming the interior of the binder, this is still done through
-  substitution. In contrast, we do evaluate underneath atom binders.
-\end{remark}
-
-\begin{remark}
-  Note that the atom/variable distinction does not align with the
-  distinction of dimension variables from other variables. Dimensions
-  in our formal language are treated the same as other terms, and some
-  dimensions are bound as atoms (such as in $\FmtKwd{coe}$) and others
-  are bound as variables (as in path types and path
-  abstractions). Note that we also treat path abstraction and
-  functional abstraction uniformly using $\FmtKwd{lam}$.
-\end{remark}
-
-
 Terms are classified by sorts $\tau\in\Braces*{\SortChk,\SortInf}$; we
-will write the judgment $\IsTm{n}{l}{M}{\tau}$ to mean that
-$\FmtTm{M}$ is a term of sort $\tau$ with $n$ atoms and $l$
-variables. In the term language, both atoms and variables are managed
-using De Bruijn indices. An illustrative fragment of the syntax is
-presented below.
+will write the judgment $\IsTm{n}{M}{\tau}$ to mean that $\FmtTm{M}$
+is a term of sort $\tau$ with $n$ variables. In the term language,
+variables are managed using De Bruijn indices. An illustrative
+fragment of the syntax is presented below. (TODO)
 
 \begin{mathparpagebreakable}
   \DeclBox{
-    \IsTm{n}{l}{M}{\tau}
+    \IsTm{n}{M}{\tau}
   }
   \\
   \and
-  \inferrule[TmAtom]{
+  \inferrule[TmVar]{
     i<n
   }{
-    \IsInf{n}{l}{\Atom{i}}
-  }
-  \and
-  \inferrule[TmVar]{
-    i<l
-  }{
-    \IsInf{n}{l}{\Var{i}}
+    \IsInf{n}{\Var{i}}
   }
   \and
   \inferrule[TmPi]{
-    \IsChk{n}{l}{A}
+    \IsChk{n}{A}
     \\
-    \IsChk{n}{l+1}{B}
+    \IsChk{n+1}{B}
   }{
-    \IsChk{n}{l}{
+    \IsChk{n}{
       \TExp{\Pi}{A,B}
     }
   }
   \and
   \inferrule[TmSg]{
-    \IsChk{n}{l}{A}
+    \IsChk{n}{A}
     \\
-    \IsChk{n}{l+1}{B}
+    \IsChk{n+1}{B}
   }{
-    \IsChk{n}{l}{
+    \IsChk{n}{
       \TExp{\Sigma}{A,B}
     }
   }
   \and
   \inferrule[TmLam]{
-    \IsChk{n}{l+1}{M}
+    \IsChk{n+1}{M}
   }{
-    \IsChk{n}{l}{\TExp{\lambda}{M}}
+    \IsChk{n}{\TExp{\lambda}{M}}
   }
   \and
   \inferrule[TmCons]{
-    \IsChk{n}{l}{M}
+    \IsChk{n}{M}
     \\
-    \IsChk{n}{l}{N}
+    \IsChk{n}{N}
   }{
-    \IsChk{n}{l}{\TExp{cons}{M,N}}
+    \IsChk{n}{\TExp{cons}{M,N}}
   }
   \and
   \inferrule[TmCar]{
-    \IsInf{n}{l}{R}
+    \IsInf{n}{R}
   }{
-    \IsInf{n}{l}{\TExp{car}{R}}
+    \IsInf{n}{\TExp{car}{R}}
   }
   \and
   \inferrule[TmCdr]{
-    \IsInf{n}{l}{R}
+    \IsInf{n}{R}
   }{
-    \IsInf{n}{l}{\TExp{cdr}{R}}
+    \IsInf{n}{\TExp{cdr}{R}}
   }
   \and
   \inferrule[TmDim0]{
   }{
-    \IsChk{n}{l}{0}
+    \IsChk{n}{0}
   }
   \and
   \inferrule[TmDim1]{
   }{
-    \IsChk{n}{l}{1}
+    \IsChk{n}{1}
   }
   \and
   \inferrule[TmUp]{
-    \IsInf{n}{l}{R}
+    \IsInf{n}{R}
   }{
-    \IsChk{n}{l}{\TExp{\uparrow}{R}}
+    \IsChk{n}{\TExp{\uparrow}{R}}
   }
   \and
   \inferrule[TmApp]{
-    \IsInf{n}{l}{R}
+    \IsInf{n}{R}
     \\
-    \IsChk{n}{l}{M}
+    \IsChk{n}{M}
   }{
-    \IsInf{n}{l}{\TExp{@}{R,M}}
+    \IsInf{n}{\TExp{@}{R,M}}
   }
   \and
   \inferrule[TmDown]{
-    \IsChk{n}{l}{A}
+    \IsChk{n}{A}
     \\
-    \IsChk{n}{l}{M}
+    \IsChk{n}{M}
   }{
-    \IsInf{n}{l}{\TExp{\downarrow}{A,M}}
+    \IsInf{n}{\TExp{\downarrow}{A,M}}
   }
   \and
   \inferrule[TmCoe]{
-    \IsChk{n}{l}{I}
+    \IsChk{n}{I}
     \\
-    \IsChk{n}{l}{J}
+    \IsChk{n}{J}
     \\
-    \IsChk{n+1}{l}{A}
+    \IsChk{n+1}{A}
     \\
-    \IsChk{n}{l}{M}
+    \IsChk{n}{M}
   }{
-    \IsInf{n}{l}{
+    \IsInf{n}{
       \TExp{coe}{
         I,
         J,
@@ -396,18 +327,18 @@ presented below.
   \and
   \inferrule[TmSys]{
     \overline{
-      \IsChk{n}{l}{I_i}
+      \IsChk{n}{I_i}
     }
     \\
     \overline{
-      \IsChk{n}{l}{J_i}
+      \IsChk{n}{J_i}
     }
     \\
     \overline{
-      \IsChk{n}{l}{M_i}
+      \IsChk{n}{M_i}
     }
   }{
-    \IsTm{n}{l}{
+    \IsTm{n}{
       \Squares*{
         \overline{
           \Tube{I_i}{J_i}{M_i}
@@ -418,18 +349,18 @@ presented below.
   \and
   \inferrule[TmBSys]{
     \overline{
-      \IsChk{n}{l}{I_i}
+      \IsChk{n}{I_i}
     }
     \\
     \overline{
-      \IsChk{n}{l}{J_i}
+      \IsChk{n}{J_i}
     }
     \\
     \overline{
-      \IsChk{n}{l+1}{M_i}
+      \IsChk{n+1}{M_i}
     }
   }{
-    \IsTm{n}{l}{
+    \IsTm{n}{
       \Squares*{
         \overline{
           \BTube{I_i}{J_i}{M_i}
@@ -439,11 +370,11 @@ presented below.
   }
   \and
   \inferrule[TmExtend]{
-    \IsChk{n}{l}{A}
+    \IsChk{n}{A}
     \\
-    \IsTm{n}{l}{S}{\SortSys}
+    \IsTm{n}{S}{\SortSys}
   }{
-    \IsChk{n}{l}{
+    \IsChk{n}{
       \TExp{ext}{
         A,
         S
@@ -452,17 +383,17 @@ presented below.
   }
   \and
   \inferrule[TmHCom]{
-    \IsChk{n}{l}{I}
+    \IsChk{n}{I}
     \\
-    \IsChk{n}{l}{J}
+    \IsChk{n}{J}
     \\
-    \IsChk{n}{l}{A}
+    \IsChk{n}{A}
     \\
-    \IsChk{n}{l}{M}
+    \IsChk{n}{M}
     \\
-    \IsTm{n}{l}{S}{\SortBSys}
+    \IsTm{n}{S}{\SortBSys}
   }{
-    \IsInf{n}{l}{
+    \IsInf{n}{
       \TExp{hcom}{
         I,
         J,
@@ -472,199 +403,8 @@ presented below.
       }
     }
   }
-  \and
-  \inferrule[TmSubstAtom]{
-    \IsTm{m}{l}{M}{\tau}
-    \\
-    \IsXThin{f}{\Parens*{\Tm{\square}{k}{\SortInf}}}{n}{m}
-    \\
-    \IsThin{g}{l}{k}
-  }{
-    \IsTm{n}{l}{
-      \TSubstA{g}{f}{M}
-    }{\tau}
-  }
-  \and
-  \inferrule[TmThinVar]{
-    \IsTm{m}{k}{M}{\tau}
-    \\
-    \IsThin{f}{l}{k}
-  }{
-    \IsTm{n}{l}{
-      \TThinV{f}{M}
-    }{\tau}
-  }
 \end{mathparpagebreakable}
 
-Path types can be defined in terms of dependent function and extension types as follows:
-\[
-  \TExp{path}{
-    A,
-    M,
-    N
-  }
-  \triangleq
-  \TExp{\Pi}{
-    \Interval,
-    \TExp{ext}{
-      A,
-      \Squares*{
-        \Tube{
-          \TExp{\uparrow}{\Var{0}}
-        }{0}{
-          \ThinTmVar{\ThinSkip{\ThinId}}{M}
-        },
-        \Tube{
-          \TExp{\uparrow}{\Var{0}}
-        }{1}{
-          \ThinTmVar{\ThinSkip{\ThinId}}{N}
-        }
-      }
-    }
-  }
-\]
-
-
-\newcommand\PushSubstA[4]{\Squares*{\FmtThin{#1}*\FmtThin{#2}}*\FmtTm{#3}\leadsto\FmtTm{#4}}
-\newcommand\PushThinV[3]{\FmtThin{#1}*\FmtTm{#2}\leadsto\FmtTm{#3}}
-
-\subsection{Explicit Substitutions}
-
-In the term language, we have explicit substitutions of atoms
-$\TSubstA{g}{f}{M}$ and thinnings of variables $\TThinV{f}{M}$; these
-can be cheaply \emph{pushed} inward in the following way:
-
-\begin{mathparpagebreakable}
-  \DeclBox{
-    \inferrule[JdgSubstA]{
-      \IsTm{m}{l}{M}{\tau}
-      \\
-      \IsXThin{f}{\Parens*{\Tm{\square}{l'}{\SortInf}}}{n}{m}
-      \\
-      \IsThin{g}{l}{l'}
-      \\
-      \IsTm{n}{l}{N}{\tau}
-    }{
-      \DeclBox{
-        \PushSubstA{g^+}{f^+}{M^+}{N^-}
-      }
-    }
-  }
-  \\
-  \inferrule[SubstAId]{}{
-    \PushSubstA{g}{\ThinId}{M}{M}
-  }
-  \and
-  \inferrule[SubstASubstAtom]{
-    \PushSubstA{g'}{f'}{M}{M'}
-    \\
-    \PushSubstA{g}{f}{M'}{M''}
-  }{
-    \PushSubstA{g}{f}{
-      \TSubstA{g'}{f'}{M}
-    }{
-      M''
-    }
-  }
-  \and
-  \inferrule[SubstAThinV]{
-    \PushThinV{h}{M}{M'}
-    \\
-    \PushSubstA{g}{f}{M'}{M''}
-  }{
-    \PushSubstA{g}{f}{\TThinV{h}{M}}{M''}
-  }
-  \and
-  \inferrule[SubstAAtom]{
-    \PushSubstA{\ThinId}{\ThinId}{f_{\Atom{}}\Parens{i}}{M}
-  }{
-    \PushSubstA{g}{f}{\Atom{i}}{
-      \ThinTmVar{g}{M}
-    }
-  }
-  \and
-  \inferrule[SubstAVar]{}{
-    \PushSubstA{g}{f}{\Var{i}}{g_{\Var{\square}}\Parens{i}}
-  }
-  \and
-  \inferrule[SubstALam]{}{
-    \PushSubstA{g}{f}{
-      \TExp{\lambda}{M}
-    }{
-      \TExp{\lambda}{
-        \TSubstA{\ThinSkip{g}}{f}{M}
-      }
-    }
-  }
-  \\
-  \inferrule[SubstACoe]{}{
-    \PushSubstA{g}{f}{
-      \TExp{coe}{
-        I,
-        J,
-        A,
-        M
-      }
-    }{
-      \TExp{coe}{
-        \TSubstA{g}{f}{I},
-        \TSubstA{g}{f}{J},
-        \TSubstA{g}{\ThinSkip{f}}{A},
-        \TSubstA{g}{f}{M}
-      }
-    }
-  }
-\end{mathparpagebreakable}
-
-\begin{mathparpagebreakable}
-  \DeclBox{
-    \inferrule[JdgThinV]{
-      \IsTm{n}{k}{M}{\tau}
-      \\
-      \IsThin{f}{l}{k}
-      \\
-      \IsTm{n}{l}{N}{\tau}
-    }{
-      \DeclBox{
-        \PushThinV{f^+}{M^+}{N^-}
-      }
-    }
-  }
-  \\
-  \inferrule[ThinVId]{}{
-    \PushThinV{\ThinId}{M}{M}
-  }
-  \and
-  \inferrule[ThinVSubstA]{
-    \PushSubstA{g}{f}{M}{M'}
-    \\
-    \PushThinV{h}{M'}{M''}
-  }{
-    \PushThinV{h}{
-      \TSubstA{g}{f}{M}
-    }{M''}
-  }
-  \and
-  \inferrule[ThinVThinV]{
-    \PushThinV{f}{M}{M'}
-    \\
-    \PushThinV{g}{M'}{M''}
-  }{
-    \PushThinV{g}{
-      \TThinV{f}{M}
-    }{M''}
-  }
-  \and
-  \inferrule[ThinVLam]{}{
-    \PushThinV{f}{
-      \TExp{\lambda}{M}
-    }{
-      \TExp{\lambda}{
-        \TThinV{\ThinSkip{f}}{M}
-      }
-    }
-  }
-\end{mathparpagebreakable}
 
 \section{Semantic Domain}
 
@@ -680,162 +420,93 @@ environments, we must naturally employ a notion of \emph{closure}.
 \newcommand\SortClo{\FmtKwd{clo}}
 \newcommand\SortBClo{\FmtKwd{bclo}}
 \newcommand\SortEnv[1]{\FmtKwd{env}_{#1}}
-\newcommand\IsVal[3]{{#1}\Vdash\FmtVal{#2}:{#3}}
-\newcommand\Val[2]{{#1}\Vdash{#2}}
+\newcommand\IsVal[2]{\Vdash\FmtVal{#1}:{#2}}
 
 \newcommand\Clo[4]{
-  \Squares*{
-    \FmtThin{#1}%
-    \mathbin{\color{gray}*}%
-    \Angles*{
-      \FmtTm{#4}
-      \mathbin{\color{gray}\triangleleft}%
-      \FmtThin{#2}
-      \mathbin{\color{gray}*}%
-      \FmtVal{#3}
-    }
-  }
+  \text{(TODO)}
 }
 
 \newcommand\BClo[4]{
-  \Squares*{
-    \FmtThin{#1}%
-    \mathbin{\color{gray}*}%
-    \Angles*{
-      \FmtTm{#4}
-      \mathbin{\color{gray}\triangleleft^+}%
-      \FmtThin{#2}
-      \mathbin{\color{gray}*}%
-      \FmtVal{#3}
-    }
-  }
+  \text{(TODO)}
 }
 
 
 Values are classified by sorts
 $\tau\in\Braces*{\SortCan,\SortNeu,\SortEnv{l},\SortClo,\SortBClo}$; for
-such a sort $\tau$, we will write $\IsVal{n}{M}{\tau}$ to mean that
-$\FmtVal{M}$ is a value of sort $\tau$ with $n$ atoms. We no longer
+such a sort $\tau$, we will write $\IsVal{M}{\tau}$ to mean that
+$\FmtVal{M}$ is a value of sort $\tau$. We no longer
 track the number of variables, because these are replaced by
 indeterminates in the form of De Bruijn levels (which have an absolute
 reference).
 
 \begin{mathparpagebreakable}
   \DeclBox{
-    \IsVal{n}{M}{\tau}
+    \IsVal{M}{\tau}
   }
   \\
-  \inferrule[ValAtom]{
-    i<n
-  }{
-    \IsVal{n}{\Atom{i}}{\SortCan}
-  }
-  \and
   \inferrule[ValGen]{
   }{
-    \IsVal{n}{\Var{l}}{\SortNeu}
+    \IsVal{\Var{l}}{\SortNeu}
   }
   \and
   \inferrule[ValUp]{
-    \IsVal{n}{A}{\SortCan}
+    \IsVal{A}{\SortCan}
     \\
-    \IsVal{n}{R}{\SortNeu}
+    \IsVal{R}{\SortNeu}
   }{
-    \IsVal{n}{
+    \IsVal{
       \VExp{\uparrow}{A,R}
     }{\SortCan}
   }
   \and
-  \inferrule[ValClo]{
-    \IsThin{g}{o}{n}
-    \\
-    \IsThin{f}{n}{m}
-    \\
-    \IsVal{m}{\rho}{\SortEnv{l}}
-    \\
-    \IsTm{n}{l}{M}{\SortChk}
-  }{
-    \IsVal{o}{
-      \Clo{g}{f}{\rho}{M}
-    }{\SortClo}
-  }
-  \and
-  \inferrule[ValBClo]{
-    \IsThin{g}{o}{n}
-    \\
-    \IsThin{f}{n}{m}
-    \\
-    \IsVal{m}{\rho}{\SortEnv{l}}
-    \\
-    \IsTm{n}{l+1}{M}{\SortChk}
-  }{
-    \IsVal{o}{
-      \BClo{g}{f}{\rho}{M}
-    }{\SortBClo}
-  }
-  \and
   \inferrule[ValEnv]{
-    \forall{i<l}.\ \IsVal{n}{M_i}{\SortCan}
+    \forall{i<l}.\ \IsVal{M_i}{\SortCan}
   }{
-    \IsVal{n}{\Squares{M_i}_{i<l}}{\SortEnv{l}}
+    \IsVal{\Squares{M_i}_{i<l}}{\SortEnv{l}}
   }
   \\
   \inferrule[ValPi]{
-    \IsVal{n}{A}{\SortClo}
+    \IsVal{A}{\SortClo}
     \\
-    \IsVal{n}{A}{\SortBClo}
+    \IsVal{A}{\SortBClo}
   }{
-    \IsVal{n}{
+    \IsVal{
       \VExp{\Pi}{A,B}
     }{\SortCan}
   }
   \and
   \inferrule[ValLam]{
-    \IsVal{n}{M}{\SortClo}
+    \IsVal{M}{\SortClo}
   }{
-    \IsVal{n}{\VExp{\lambda}{M}}{\SortCan}
+    \IsVal{\VExp{\lambda}{M}}{\SortCan}
   }
   \and
   \inferrule[ValApp]{
-    \IsVal{n}{R}{\SortNeu}
+    \IsVal{R}{\SortNeu}
     \\
-    \IsVal{n}{M}{\SortCan}
+    \IsVal{M}{\SortCan}
   }{
-    \IsVal{n}{\VExp{@}{R,M}}{\SortNeu}
+    \IsVal{\VExp{@}{R,M}}{\SortNeu}
   }
   \and
   \inferrule[ValCons]{
-    \IsVal{n}{M}{\SortClo}
+    \IsVal{M}{\SortClo}
     \\
-    \IsVal{n}{N}{\SortClo}
+    \IsVal{N}{\SortClo}
   }{
-    \IsVal{n}{\VExp{cons}{M,N}}{\SortCan}
+    \IsVal{\VExp{cons}{M,N}}{\SortCan}
   }
   \and
   \inferrule[ValCar]{
-    \IsVal{n}{R}{\SortNeu}
+    \IsVal{R}{\SortNeu}
   }{
-    \IsVal{n}{\VExp{car}{R}}{\SortNeu}
+    \IsVal{\VExp{car}{R}}{\SortNeu}
   }
   \and
   \inferrule[ValCdr]{
-    \IsVal{n}{R}{\SortNeu}
+    \IsVal{R}{\SortNeu}
   }{
-    \IsVal{n}{\VExp{cdr}{R}}{\SortNeu}
-  }
-  \and
-  \inferrule[ValCoe]{
-    \IsVal{n}{I}{\SortCan}
-    \\
-    \IsVal{n}{J}{\SortCan}
-    \\
-    \IsVal{n+1}{A}{\SortCan}
-    \\
-    \IsVal{n}{M}{\SortCan}
-  }{
-    \IsVal{n}{
-      \VExp{coe}{I,J,A,M}
-    }{\SortCan}
+    \IsVal{\VExp{cdr}{R}}{\SortNeu}
   }
 \end{mathparpagebreakable}
 
@@ -883,8 +554,8 @@ thinning $\FmtThin{f}$; this allows us to avoid actually executing
 thinnings and substitutions until the last moment possible. In fact,
 the preceding sentence can be rephrased as construing evaluation as a
 relation $\EvalClo{M_\SortClo}{M_\SortCan}$ where
-$\IsVal{n}{M_\SortClo}{\SortClo}$ and
-$\IsVal{n}{M_\SortCan}{\SortCan}$.
+$\IsVal{M_\SortClo}{\SortClo}$ and
+$\IsVal{M_\SortCan}{\SortCan}$.
 
 We will write $\Eval{g}{f}{\rho}{M}{M}$ as a notation for
 $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
@@ -909,32 +580,6 @@ $\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
     }
   }
   \\
-  \inferrule[EvalSubstA]{
-    \PushSubstA{j}{h}{M}{M'}
-    \\
-    \Eval{g}{f}{\rho}{M'}{M'}
-  }{
-    \Eval{g}{f}{\rho}{
-      \TSubstA{j}{h}{M}
-    }{M'}
-  }
-  \and
-  \inferrule[EvalThinV]{
-    \PushThinV{h}{M}{M'}
-    \\
-    \Eval{g}{f}{\rho}{M'}{M'}
-  }{
-    \Eval{g}{f}{\rho}{
-      \TThinV{h}{M}
-    }{M'}
-  }
-  \and
-  \inferrule[EvalAtom]{}{
-    \Eval{g}{f}{\rho}{\Atom{i}}{
-      \ThinVal{g}{\Atom{i}}
-    }
-  }
-  \and
   \inferrule[EvalVar]{}{
     \Eval{g}{f}{\rho}{\Var{l}}{
       \ThinVal{
@@ -1061,11 +706,11 @@ with an \emph{abort}. (TODO)
 \begin{mathparpagebreakable}
   \DeclBox{
     \inferrule[JdgInst]{
-      \IsVal{n}{M}{\SortBClo}
+      \IsVal{M}{\SortBClo}
       \\
-      \IsVal{n}{N}{\SortCan}
+      \IsVal{N}{\SortCan}
       \\
-      \IsVal{n}{O}{\SortCan}
+      \IsVal{O}{\SortCan}
     }{
       \DeclBox{\InstClo{M^+}{N^+}{O^-}}
     }
@@ -1083,11 +728,11 @@ with an \emph{abort}. (TODO)
 \begin{mathparpagebreakable}
   \DeclBox{
     \inferrule[JdgReflect]{
-      \IsVal{n}{A}{\SortCan}
+      \IsVal{A}{\SortCan}
       \\
-      \IsVal{n}{R}{\SortNeu}
+      \IsVal{R}{\SortNeu}
       \\
-      \IsVal{n}{M}{\SortCan}
+      \IsVal{M}{\SortCan}
     }{
       \DeclBox{\Reflect{A^+}{R^+}{M^-}}
     }
@@ -1126,11 +771,11 @@ with an \emph{abort}. (TODO)
 \begin{mathparpagebreakable}
   \DeclBox{
     \inferrule[JdgApply]{
-      \IsVal{n}{M}{\SortCan}
+      \IsVal{M}{\SortCan}
       \\
-      \IsVal{n}{N}{\SortCan}
+      \IsVal{N}{\SortCan}
       \\
-      \IsVal{n}{O}{\SortCan}
+      \IsVal{O}{\SortCan}
     }{
       \DeclBox{\Apply{M^+}{N^+}{O^-}}
     }
@@ -1156,48 +801,6 @@ with an \emph{abort}. (TODO)
       }
     }{N}{M}
   }
-  \and
-  \inferrule[ApplyCoePi]{
-    \EvalClo{A_\SortClo}{A_\SortCan}
-    \\
-    \InstClo{B_\SortBClo}{
-      \VExp{coe}{
-        \ThinVal{\ThinSkip{\ThinId}}{J},
-        \Atom{0},
-        \ThinVal{
-          \ThinKeep{\ThinSkip{\ThinId}}
-        }{A_\SortCan},
-        \ThinVal{\ThinSkip{\ThinId}}{N}
-      }
-    }{
-      B_\SortCan{}
-    }
-    \\
-    \Apply{M}{
-      \VExp{coe}{
-        J,
-        I,
-        A_\SortCan,
-        N
-      }
-    }{O}
-  }{
-    \Apply{
-      \VExp{coe}{
-        I,
-        J,
-        \VExp{\Pi}{A_\SortClo,B_\SortBClo},
-        M
-      }
-    }{N}{
-      \VExp{coe}{
-        I,
-        J,
-        B_\SortCan,
-        O
-      }
-    }
-  }
 \end{mathparpagebreakable}
 
 Observe how in \textsc{ApplyCoePi}, we used in an essential way the
@@ -1219,9 +822,9 @@ closures.
 \begin{mathparpagebreakable}
   \DeclBox{
     \inferrule[JdgCar]{
-      \IsVal{n}{M}{\SortCan}
+      \IsVal{M}{\SortCan}
       \\
-      \IsVal{n}{N}{\SortCan}
+      \IsVal{N}{\SortCan}
     }{
       \DeclBox{
         \Car{M^+}{N^-}
@@ -1281,9 +884,9 @@ closures.
 \begin{mathparpagebreakable}
   \DeclBox{
     \inferrule[JdgCdr]{
-      \IsVal{n}{M}{\SortCan}
+      \IsVal{M}{\SortCan}
       \\
-      \IsVal{n}{N}{\SortCan}
+      \IsVal{N}{\SortCan}
     }{
       \DeclBox{
         \Cdr{M^+}{N^-}
@@ -1320,42 +923,6 @@ closures.
       }
     }{N}
   }
-  \and
-  \inferrule[CdrCoeSg]{
-    \Car{M}{M_0}
-    \\
-    \Cdr{M}{M_1}
-    \\
-    \EvalClo{A_\SortClo}{A_\SortCan}
-    \\\\
-    \InstClo{B_\SortBClo}{
-      \VExp{coe}{
-        \ThinVal{\ThinSkip{\ThinId}}{I},
-        \Atom{0},
-        \ThinVal{\ThinKeep{\ThinSkip{\ThinId}}}{A_\SortCan},
-        \ThinVal{\ThinSkip{\ThinId}}{M_0}
-      }
-    }{B_\SortCan}
-  }{
-    \Cdr{
-      \VExp{coe}{
-        I,
-        J,
-        \VExp{\Sigma}{
-          A_\SortClo,
-          B_\SortBClo%
-        },
-        M
-      }
-    }{
-      \VExp{coe}{
-        I,
-        J,
-        B_\SortCan,
-        M_1
-      }
-    }
-  }
 \end{mathparpagebreakable}
 
 
@@ -1385,17 +952,17 @@ closures.
   }
   \and
   \inferrule[CtxExtVar]{
-    \IsVal{n}{\Gamma}{\SortCtx{l}}
+    \IsVal{\Gamma}{\SortCtx{l}}
     \\
-    \IsVal{n}{A}{\SortCan}
+    \IsVal{A}{\SortCan}
   }{
-    \IsVal{n}{\Gamma.A}{\SortCtx{l+1}}
+    \IsVal{\Gamma.A}{\SortCtx{l+1}}
   }
   \and
   \inferrule[CtxExtAtom]{
-    \IsVal{n}{\Gamma}{\SortCtx{l}}
+    \IsVal{\Gamma}{\SortCtx{l}}
     \\
-    \IsVal{n}{A}{\SortCan}
+    \IsVal{A}{\SortCan}
   }{
     \IsVal{n+1}{\Gamma.\nabla{}A}{\SortCtx{l}}
   }
@@ -1407,16 +974,15 @@ To start with, I define a quotation from semantic values to syntactic
 terms; together with evaluation, this generates a theory of
 definitional equivalence.
 
-\newcommand\LookupVar[4]{\FmtVal{#1}\ni\Var{#2}:\Squares*{\FmtThin{#4}*\FmtVal{#3}}}
 
 \begin{mathparpagebreakable}
   \DeclBox{
     \inferrule[JdgQuoteCan]{
-      \IsVal{n}{\Gamma}{\SortCtx{l}}
+      \IsVal{\Gamma}{\SortCtx{l}}
       \\
-      \IsVal{n}{A}{\SortCan}
+      \IsVal{A}{\SortCan}
       \\
-      \IsVal{n}{M}{\SortCan}
+      \IsVal{M}{\SortCan}
       \\
       \IsTm{n}{l}{M}{\SortChk}
     }{
@@ -1426,13 +992,13 @@ definitional equivalence.
   \and
   \DeclBox{
     \inferrule[JdgQuoteNeu]{
-      \IsVal{n}{\Gamma}{\SortCtx{l}}
+      \IsVal{\Gamma}{\SortCtx{l}}
       \\
-      \IsVal{n}{R}{\SortNeu}
+      \IsVal{R}{\SortNeu}
       \\
       \IsTm{n}{l}{R}{\SortInf}
       \\
-      \IsVal{n}{A}{\SortCan}
+      \IsVal{A}{\SortCan}
     }{
       \DeclBox{\QuoteNeu{\Gamma^+}{R^+}{R^-}{A^-}}
     }
@@ -1492,63 +1058,6 @@ definitional equivalence.
     }
   }
   \and
-  \inferrule[QuoteCoeUp]{
-    \QuoteCan{\Gamma}{\Interval}{I}{I}
-    \\
-    \QuoteCan{\Gamma}{\Interval}{J}{J}
-    \\\\
-    \QuoteNeu{\Gamma.\nabla\Interval}{R}{R}{A'}
-    \\
-    \QuoteCan{\Gamma.\nabla\Interval}{\FmtKwd{U}}{A'}{A'}
-    \\\\
-    \PushSubstA{\ThinId}{
-      \ThinRep{\ThinId}{
-        \TExp{\downarrow}{
-          \Interval,
-          I
-        }
-      }
-    }{A'}{A_I}
-    \\
-    \Eval{\ThinId}{\ThinId}{\parallel\Gamma\parallel}{A_I}{A_I}
-    \\
-    \QuoteCan{\Gamma}{A_I}{M}{M}
-  }{
-    \QuoteCan{\Gamma}{C}{
-      \VExp{coe}{
-        I,
-        J,
-        \VExp{\uparrow}{A,R},
-        M
-      }
-    }{
-      \TExp{\uparrow}{
-        \TExp{coe}{
-          I,
-          J,
-          \TExp{\uparrow}{R},
-          M
-        }
-      }
-    }
-  }
-  \and
-  \inferrule[QuoteAtom]{}{
-    \QuoteCan{\Gamma}{A}{\Atom{i}}{\Atom{i}}
-  }
-  \and
-  \inferrule[QuoteVar]{
-    \FmtTm{i}\equiv{\FmtTm{\Len{\FmtVal{\Gamma}}-\Parens*{\FmtVal{l}+1}}}
-    \\
-    \LookupVar{\Gamma}{i}{A}{f}
-  }{
-    \QuoteNeu{\Gamma}{\Var{l}}{
-      \Var{i}
-    }{
-      \ThinVal{f}{A}
-    }
-  }
-  \and
   \inferrule[QuoteApPi]{
     \QuoteNeu{\Gamma}{R}{R}{
       \VExp{\Pi}{A_\SortClo,B_\SortBClo}
@@ -1605,39 +1114,6 @@ definitional equivalence.
     }
   }
 \end{mathparpagebreakable}
-
-\begin{mathparpagebreakable}
-  \DeclBox{
-    \inferrule[JdgLookupVar]{
-      \IsVal{n}{\Gamma}{\SortCtx{l}}
-      \\
-      i<l
-      \\
-      \IsThin{f}{n}{m}
-      \\
-      \IsVal{m}{A}{\SortCan}
-    }{
-      \DeclBox{\LookupVar{\Gamma^+}{i^+}{A^-}{f^-}}
-    }
-  }
-  \\
-  \inferrule[LookupVarAtom]{
-    \LookupVar{\Gamma}{n}{A}{f}
-  }{
-    \LookupVar{\Gamma.\nabla{}B}{n}{A}{\ThinSkip{f}}
-  }
-  \and
-  \inferrule[LookupVarHere]{}{
-    \LookupVar{\Gamma.A}{0}{A}{\ThinId}
-  }
-  \and
-  \inferrule[LookupVarThere]{
-    \LookupVar{\Gamma}{n}{A}{f}
-  }{
-    \LookupVar{\Gamma.B}{n+1}{A}{f}
-  }
-\end{mathparpagebreakable}
-
 
 \nocite{abel-coquand-pagano:2009, abel-vezzosi-winterhalter:2017, altenkirch-chapman:2009, abcfhl:2017, cchm:2017, altenkirch-mcbride:2006, altenkirch-mcbride-swierstra:2007, stone-harper:2006, angiuli-favonia-harper:2017}
 
