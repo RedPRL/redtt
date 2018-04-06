@@ -343,36 +343,47 @@ and eval_frm rho frm v =
   match frm with
   | KCar ->
     car v
+
   | KCdr ->
     cdr v
+
   | KApply varg ->
     apply v varg
+
   | KExtCar sys ->
     into @@ Ext (v, map_tubes (clo_frame KCar) sys)
+
   | KExtCdr sys ->
     into @@ Ext (v, map_tubes (clo_frame KCdr) sys)
+
   | KExtApp sys ->
     let varg = List.hd rho in
     into @@ Ext (v, map_tubes (clo_frame (KApply varg)) sys)
+
   | KComTubeCoe {dim1; ty; tube} ->
     let varg = List.hd rho in
     into @@ Coe (varg, dim1, ty, inst_bclo tube varg)
+
   | KPiDom ->
     let dom, _ = out_pi v in
     eval_clo dom
+
   | KPiCodCoe {dim1; dom; arg} ->
     let dimx = List.hd rho in
     let _, cod = out_pi v in
     let coe = into @@ Coe (dim1, dimx, dom, arg) in
     inst_bclo cod coe
+
   | KSgDom ->
     let dom, _ = out_sg v in
     eval_clo dom
+
   | KSgCodCoe {dim0; dom; arg} ->
     let dimx = List.hd rho in
     let _, cod = out_sg v in
     let coe = into @@ Coe (dim0, dimx, dom, arg) in
     inst_bclo cod coe
+
   | KSgCodHCom {dim0; dom; cap; sys} ->
     let dimx = List.hd rho in
     let _, cod = out_sg v in
