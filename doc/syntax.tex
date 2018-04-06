@@ -547,160 +547,6 @@ reindexing action is renaming.
 \section{Evaluation}
 
 
-At a high level, evaluation takes terms to values; at a finer-grained
-level, however, we will evaluate with respect to a thinning
-$\FmtThin{g}$ and an environment $\FmtVal{\rho}$ together with a
-thinning $\FmtThin{f}$; this allows us to avoid actually executing
-thinnings and substitutions until the last moment possible. In fact,
-the preceding sentence can be rephrased as construing evaluation as a
-relation $\EvalClo{M_\SortClo}{M_\SortCan}$ where
-$\IsVal{M_\SortClo}{\SortClo}$ and
-$\IsVal{M_\SortCan}{\SortCan}$.
-
-We will write $\Eval{g}{f}{\rho}{M}{M}$ as a notation for
-$\EvalClo{\Clo{g}{f}{\rho}{M}}{M}$, when it is well-formed:
-
-
-\begin{mathparpagebreakable}
-  \DeclBox{
-    \inferrule[JdgEval]{
-      \IsThin{g}{o}{n}
-      \\
-      \IsThin{f}{n}{m}
-      \\
-      \IsVal{m}{\rho}{\SortEnv{l}}
-      \\
-      \IsTm{n}{l}{M}{\tau}
-      \\
-      \IsVal{o}{M}{\SortCan}
-    }{
-      \DeclBox{
-        \Eval{g^+}{f^+}{\rho^+}{M^+}{M^-}
-      }
-    }
-  }
-  \\
-  \inferrule[EvalVar]{}{
-    \Eval{g}{f}{\rho}{\Var{l}}{
-      \ThinVal{
-        g\circ{}f
-      }{\rho_l}
-    }
-  }
-  \and
-  \inferrule[EvalPi]{}{
-    \Eval{g}{f}{\rho}{
-      \TExp{\Pi}{A,B}
-    }{
-      \VExp{\Pi}{
-        \Clo{g}{f}{\rho}{A},
-        \BClo{g}{f}{\rho}{B}
-      }
-    }
-  }
-  \and
-  \inferrule[EvalSg]{}{
-    \Eval{g}{f}{\rho}{
-      \TExp{\Sigma}{A,B}
-    }{
-      \VExp{\Sigma}{
-        \Clo{g}{f}{\rho}{A},
-        \BClo{g}{f}{\rho}{B}
-      }
-    }
-  }
-  \and
-  \inferrule[EvalLam]{}{
-    \Eval{g}{f}{\rho}{
-      \TExp{\lambda}{M}
-    }{
-      \VExp{\lambda}{
-        \BClo{g}{f}{\rho}{M}
-      }
-    }
-  }
-  \and
-  \and
-  \inferrule[EvalUp]{
-    \Eval{g}{f}{\rho}{R}{M}
-  }{
-    \Eval{g}{f}{\rho}{
-      \TExp{\uparrow}{R}
-    }{
-      M
-    }
-  }
-  \and
-  \inferrule[EvalDown]{
-    \Eval{g}{f}{\rho}{M}{M}
-  }{
-    \Eval{g}{f}{\rho}{
-      \TExp{\downarrow}{A,M}
-    }{M}
-  }
-  \and
-  \inferrule[EvalCoe]{
-    \Eval{g}{f}{\rho}{I}{I}
-    \\
-    \Eval{g}{f}{\rho}{J}{J}
-    \\
-    \Eval{\ThinKeep{g}}{\ThinSkip{f}}{\rho}{A}{A}
-    \\
-    \Eval{g}{f}{\rho}{M}{M}
-  }{
-    \Eval{g}{f}{\rho}{
-      \TExp{coe}{I,J,A,M}
-    }{
-      \VExp{coe}{
-        I,
-        J,
-        A,
-        M
-      }
-    }
-  }
-  \and
-  \inferrule[EvalApp]{
-    \Eval{g}{f}{\rho}{R}{M_{\mathsf{fun}}}
-    \\
-    \Eval{g}{f}{\rho}{M}{M_{\mathsf{arg}}}
-    \\
-    \Apply{M_{\mathsf{fun}}}{M_{\mathsf{arg}}}{N}
-  }{
-    \Eval{g}{f}{\rho}{
-      \TExp{@}{
-        R,
-        M
-      }
-    }{
-      N
-    }
-  }
-  \and
-  \inferrule[EvalCar]{
-    \Eval{g}{f}{\rho}{R}{M}
-    \\
-    \Car{M}{N}
-  }{
-    \Eval{g}{f}{\rho}{
-      \TExp{car}{R}
-    }{N}
-  }
-  \and
-  \inferrule[EvalCdr]{
-    \Eval{g}{f}{\rho}{R}{M}
-    \\
-    \Cdr{M}{N}
-  }{
-    \Eval{g}{f}{\rho}{
-      \TExp{cdr}{R}
-    }{N}
-  }
-\end{mathparpagebreakable}
-
-We will also require a judgment for evaluating systems; this will be
-interesting, because the cells associated to false equations must be replaced
-with an \emph{abort}. (TODO)
 
 
 \begin{mathparpagebreakable}
@@ -755,7 +601,7 @@ with an \emph{abort}. (TODO)
     }{
       R
     }{
-      M_k^\SortCan
+      M_k^\SortCan%
     }
   }
   \and
@@ -803,21 +649,6 @@ with an \emph{abort}. (TODO)
   }
 \end{mathparpagebreakable}
 
-Observe how in \textsc{ApplyCoePi}, we used in an essential way the
-fact that the dimension binder of $\FmtKwd{coe}$ abstracts an
-\emph{atom} rather than a \emph{variable}; in the semantic domain,
-this means that we may name this dimension using an atom of the $0$th
-De Bruijn index. This is essential: if we had bound a variable rather
-than an atom, it would be impossible from this point of view of the
-application judgment to know the De Bruijn level of the bound
-dimension.
-
-The cost of this solution to the problem of evaluating under binders
-is that we must be careful to apply thinnings in all the right
-places. It is easy to verify that the semantic term is well-formed
-using the strongly-scoped term formation rules given; moreover, the
-thinnings will generally be inexpensive, since they tend to pile up on
-closures.
 
 \begin{mathparpagebreakable}
   \DeclBox{
@@ -984,7 +815,7 @@ definitional equivalence.
       \\
       \IsVal{M}{\SortCan}
       \\
-      \IsTm{n}{l}{M}{\SortChk}
+      \IsTm{n}{M}{\SortChk}
     }{
       \DeclBox{\QuoteCan{\Gamma^+}{A^+}{M^+}{M^-}}
     }
@@ -996,7 +827,7 @@ definitional equivalence.
       \\
       \IsVal{R}{\SortNeu}
       \\
-      \IsTm{n}{l}{R}{\SortInf}
+      \IsTm{n}{R}{\SortInf}
       \\
       \IsVal{A}{\SortCan}
     }{
