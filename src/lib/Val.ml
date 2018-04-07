@@ -57,10 +57,11 @@ let into vf =
 
 
 let embed_dimval dv =
+  into @@
   match dv with
-  | DimVal.Dim0 -> into Dim0
-  | DimVal.Dim1 -> into Dim1
-  | DimVal.Lvl i -> into @@ Up (into Interval, into @@ Lvl i)
+  | DimVal.Dim0 -> Dim0
+  | DimVal.Dim1 -> Dim1
+  | DimVal.Lvl i -> Up (into Interval, into @@ Lvl i)
 
 let out : type a. a t -> a f =
   fun node -> node.con
@@ -79,12 +80,57 @@ let project_dimval (type a) (v : a t) =
   | _ -> failwith "project_dimval"
 
 let (<:) tm rho : 'a =
-  {foc = tm; env = rho; thin = Thin.id; stk = []}
+  { foc = tm
+  ; env = rho
+  ; thin = Thin.id
+  ; stk = []
+  }
 
 
 let map_tubes f =
   List.map @@ fun (vd0, vd1, vbnd) ->
   (vd0, vd1, Option.map f vbnd)
+
+let clo_frame : frm -> tclo -> tclo =
+  fun frm node ->
+    { node with stk = frm :: node.stk}
+
+let bclo_frame : frm -> bclo -> bclo =
+  fun frm node ->
+    { node with stk = frm :: node.stk }
+
+
+let coe ~dim0 ~dim1 ~ty ~tm =
+  into @@ Coe {dim0; dim1; ty; tm}
+
+let hcom ~dim0 ~dim1 ~ty ~cap ~sys = 
+  into @@ HCom {dim0; dim1; ty; cap; sys}
+
+let com ~dim0 ~dim1 ~ty ~cap ~sys =
+  let vcap' = coe ~dim0 ~dim1 ~ty ~tm:cap in
+  let Tm.B tm = ty.foc in
+  let ty1 = {ty with foc = tm; env = dim1 :: ty.env} in
+  let tube bclo' = bclo_frame (KComTubeCoe {dim1 = dim1; ty = ty; tube = bclo'}) ty in
+  let vsys' = map_tubes tube sys in
+  hcom ~dim0 ~dim1 ~ty:ty1 ~cap:vcap' ~sys:vsys'
+
+
+let rec out_pi v =
+  match out v with
+  | Pi (dom, cod) -> dom, cod
+  | Ext (vty, vsys) ->
+    let dom, cod = out_pi vty in
+    dom, bclo_frame (KExtApp vsys) cod
+  | _ -> failwith "out_pi"
+
+let rec out_sg v =
+  match out v with
+  | Sg (dom, cod) -> dom, cod
+  | Ext (vty, vsys) ->
+    let dom, cod = out_sg vty in
+    clo_frame (KExtCar vsys) dom,
+    bclo_frame (KExtCdr vsys) cod
+  | _ -> failwith "out_sg"
 
 
 let rec eval : type a. env -> a Tm.t -> can t =
@@ -112,14 +158,14 @@ let rec eval : type a. env -> a Tm.t -> can t =
       let vd0 = eval rho info.dim0 in
       let vd1 = eval rho info.dim1 in
       let vtm = eval rho info.tm in
-      into @@ Coe {dim0 = vd0; dim1 = vd1; ty = info.ty <: rho; tm = vtm}
+      coe ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~tm:vtm
 
     | Tm.HCom info ->
       let vd0 = eval rho info.dim0 in
       let vd1 = eval rho info.dim1 in
       let vcap = eval rho info.cap in
       let vsys = eval_bsys rho info.sys in
-      into @@ HCom {dim0 = vd0; dim1 = vd1; ty = info.ty <: rho; cap = vcap; sys = vsys}
+      hcom ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~cap:vcap ~sys:vsys
 
     | Tm.Com info ->
       let vd0 = eval rho info.dim0 in
@@ -155,23 +201,6 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Up t ->
       eval rho t
 
-and out_pi v =
-  match out v with
-  | Pi (dom, cod) -> dom, cod
-  | Ext (vty, vsys) ->
-    let dom, cod = out_pi vty in
-    dom, bclo_frame (KExtApp vsys) cod
-  | _ -> failwith "out_pi"
-
-and out_sg v =
-  match out v with
-  | Sg (dom, cod) -> dom, cod
-  | Ext (vty, vsys) ->
-    let dom, cod = out_sg vty in
-    clo_frame (KExtCar vsys) dom,
-    bclo_frame (KExtCdr vsys) cod
-  | _ -> failwith "out_sg"
-
 and eval_sys rho sys =
   List.map (eval_tube rho) sys
 
@@ -203,14 +232,6 @@ and eval_btube rho (t0, t1, obnd) =
   (vd0, vd1, ovbnd)
 
 
-and com ~dim0 ~dim1 ~ty ~cap ~sys =
-  let vcap' = into @@ Coe {dim0; dim1; ty; tm = cap} in
-  let Tm.B tm = ty.foc in
-  let ty1 = {ty with foc = tm; env = dim1 :: ty.env} in
-  let tube bclo' = bclo_frame (KComTubeCoe {dim1 = dim1; ty = ty; tube = bclo'}) ty in
-  let vsys' = map_tubes tube sys in
-  into @@ HCom {dim0; dim1; ty = ty1; cap = vcap'; sys = vsys'}
-
 and apply vfun varg =
   match out vfun with
   | Lam bclo ->
@@ -224,8 +245,8 @@ and apply vfun varg =
   | Coe info ->
     let dom = bclo_frame KPiDom info.ty in
     let cod = bclo_frame (KPiCodCoe {dim1 = info.dim1; dom = dom; arg = varg}) info.ty in
-    let varg' = into @@ Coe {dim0 = info.dim1; dim1 = info.dim0; ty = dom; tm = varg} in
-    into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = cod; tm = apply info.tm varg'}
+    let varg' = coe ~dim0:info.dim1 ~dim1:info.dim0 ~ty:dom ~tm:varg in
+    coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:(apply info.tm varg')
 
   | HCom info ->
     let dom, cod = out_pi @@ eval_clo info.ty in
@@ -233,7 +254,7 @@ and apply vfun varg =
     let cod' = {cod with foc = tm; env = varg :: cod.env} in
     let vcap' = apply info.cap varg in
     let vsys' = map_tubes (bclo_frame (KApply varg)) info.sys in
-    into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty = cod'; cap = vcap'; sys = vsys'}
+    hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod' ~cap:vcap' ~sys:vsys'
 
   | _ -> failwith "apply"
 
@@ -250,13 +271,13 @@ and car v =
   | Coe info ->
     let dom = bclo_frame KSgDom info.ty in
     let vcar = car v in
-    into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = dom; tm = vcar}
+    coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~tm:vcar
 
   | HCom info ->
     let dom, _ = out_sg @@ eval_clo info.ty in
     let vcap' = car info.cap in
     let vsys' = map_tubes (bclo_frame KCar) info.sys in
-    into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty = dom; cap = vcap'; sys = vsys'}
+    hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~cap:vcap' ~sys:vsys'
 
   | _ -> failwith "car"
 
@@ -277,7 +298,7 @@ and cdr v =
     let dom = bclo_frame KSgDom info.ty in
     let frm = KSgCodCoe {dim0 = info.dim0; dom = dom; arg = vcar} in
     let cod = bclo_frame frm info.ty in
-    into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = cod; tm = vcdr}
+    coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:vcdr
 
   | HCom info ->
     let frm = KSgCodHCom {dim0 = info.dim0; dom = clo_frame KSgDom info.ty; cap = info.cap; sys = info.sys} in
@@ -343,7 +364,8 @@ and eval_frm rho frm v =
 
   | KComTubeCoe {dim1; ty; tube} ->
     let varg = List.hd rho in
-    into @@ Coe {dim0 = varg; dim1; ty; tm = inst_bclo tube varg}
+    let tm = inst_bclo tube varg in
+    coe ~dim0:varg ~dim1 ~ty ~tm
 
   | KPiDom ->
     let dom, _ = out_pi v in
@@ -352,8 +374,8 @@ and eval_frm rho frm v =
   | KPiCodCoe {dim1; dom; arg} ->
     let dimx = List.hd rho in
     let _, cod = out_pi v in
-    let coe = into @@ Coe {dim0 = dim1; dim1 = dimx; ty = dom; tm = arg} in
-    inst_bclo cod coe
+    inst_bclo cod @@
+    coe ~dim0:dim1 ~dim1:dimx ~ty:dom ~tm:arg
 
   | KSgDom ->
     let dom, _ = out_sg v in
@@ -362,14 +384,14 @@ and eval_frm rho frm v =
   | KSgCodCoe {dim0; dom; arg} ->
     let dimx = List.hd rho in
     let _, cod = out_sg v in
-    let coe = into @@ Coe {dim0; dim1 = dimx; ty = dom; tm = arg} in
-    inst_bclo cod coe
+    inst_bclo cod @@
+    coe ~dim0 ~dim1:dimx ~ty:dom ~tm:arg
 
   | KSgCodHCom {dim0; dom; cap; sys} ->
     let dimx = List.hd rho in
     let _, cod = out_sg v in
-    let hcom = into @@ HCom {dim0; dim1 = dimx; ty = dom; cap = car cap; sys = map_tubes (bclo_frame KCar) sys} in
-    inst_bclo cod hcom
+    inst_bclo cod @@
+    hcom ~dim0 ~dim1:dimx ~ty:dom ~cap:(car cap) ~sys:(map_tubes (bclo_frame KCar) sys)
 
 and inst_bclo : bclo -> can t -> can t =
   fun node varg ->
@@ -382,10 +404,3 @@ and eval_clo : tclo -> can t =
     eval_stk node.stk node.env @@
     eval (Thin.act node.thin @@ node.env) node.foc
 
-and clo_frame : frm -> tclo -> tclo =
-  fun frm node ->
-    { node with stk = frm :: node.stk}
-
-and bclo_frame : frm -> bclo -> bclo =
-  fun frm node ->
-    { node with stk = frm :: node.stk }
