@@ -103,7 +103,7 @@ let bclo_frame : frm -> bclo -> bclo =
 let coe ~dim0 ~dim1 ~ty ~tm =
   into @@ Coe {dim0; dim1; ty; tm}
 
-let hcom ~dim0 ~dim1 ~ty ~cap ~sys = 
+let hcom ~dim0 ~dim1 ~ty ~cap ~sys =
   into @@ HCom {dim0; dim1; ty; cap; sys}
 
 let com ~dim0 ~dim1 ~ty ~cap ~sys =
@@ -353,14 +353,17 @@ and eval_frm rho frm v =
     apply v varg
 
   | KExtCar sys ->
-    into @@ Ext (v, map_tubes (clo_frame KCar) sys)
+    let sys' = map_tubes (clo_frame KCar) sys in
+    into @@ Ext (v, sys')
 
   | KExtCdr sys ->
-    into @@ Ext (v, map_tubes (clo_frame KCdr) sys)
+    let sys' = map_tubes (clo_frame KCdr) sys in
+    into @@ Ext (v, sys')
 
   | KExtApp sys ->
     let varg = List.hd rho in
-    into @@ Ext (v, map_tubes (clo_frame (KApply varg)) sys)
+    let sys' = map_tubes (clo_frame @@ KApply varg) sys in
+    into @@ Ext (v, sys')
 
   | KComTubeCoe {dim1; ty; tube} ->
     let varg = List.hd rho in
@@ -390,8 +393,10 @@ and eval_frm rho frm v =
   | KSgCodHCom {dim0; dom; cap; sys} ->
     let dimx = List.hd rho in
     let _, cod = out_sg v in
+    let cap' = car cap in
+    let sys' = map_tubes (bclo_frame KCar) sys in
     inst_bclo cod @@
-    hcom ~dim0 ~dim1:dimx ~ty:dom ~cap:(car cap) ~sys:(map_tubes (bclo_frame KCar) sys)
+    hcom ~dim0 ~dim1:dimx ~ty:dom ~cap:cap' ~sys:sys'
 
 and inst_bclo : bclo -> can t -> can t =
   fun node varg ->
