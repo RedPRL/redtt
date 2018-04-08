@@ -23,10 +23,14 @@ struct
 
   let init = []
   let bind x env = x :: env
-  let rec get x (env : t) =
+  let rec get x env =
     match env with 
-    | [] -> failwith "variable not found"
-    | y :: ys -> if x = y then Thin.id else Thin.skip @@ get x ys
+    | [] ->
+      failwith "variable not found"
+    | y :: ys ->
+      if x = y 
+      then Thin.id
+      else Thin.skip @@ get x ys
 end
 
 module Resolver (R : ResEnv) :
@@ -56,7 +60,9 @@ struct
     let Node pf = p in
     Tm.into_info pf.info @@
     match pf.con with
-    | Atom x -> Tm.Var (R.get x env)
-    | _ -> failwith ""
+    | Atom x ->
+      Tm.Var (R.get x env)
+    | _ ->
+      failwith "Reader could not understand parsetree"
 
 end
