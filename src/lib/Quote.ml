@@ -159,6 +159,94 @@ and approx_sys ~vr ~tag ~ctx ~ty ~sys0 ~sys1 =
   in go sys0 sys1 []
 
 
+(* Invariant: this should only be called on neutral and base types.
+   Invariant: ty = bty[dim1] *)
+and reduce_coe ~ctx ~tag ~ty ~dim0 ~dim1 ~bty ~tm =
+  let vd0 = Val.project_dimval dim0 in
+  let vd1 = Val.project_dimval dim1 in
+  match DimVal.compare vd0 vd1 with
+  | DimVal.Same ->
+    tm
+
+  | _ ->
+    match tag with
+    | Cube.Equality ->
+      let vty0 = Val.inst_bclo bty dim0 in
+      let univ = Val.into @@ Val.Univ Lvl.Omega in
+      begin
+        match approx_can ~vr:Iso ~ctx ~ty:univ ~can0:vty0 ~can1:ty with
+        | _ -> tm
+        | exception _ ->
+          reduce_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm
+      end
+
+    | Cube.Path ->
+      reduce_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm
+
+and reduce_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm =
+  let interval = Val.into @@ Val.Interval tag in
+  let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
+  match Val.out @@ Val.inst_bclo bty vgen with
+  | Val.Up (univ, tyneu) ->
+    Val.into @@ Val.Coe {tag; dim0; dim1; ty = bty; tm}
+
+  | Val.Univ _ ->
+    tm
+
+  | _ -> failwith "quote_coe: missing case (?)"
+
+
+
+(* Invariant: this should only be called on neutral and base types. *)
+and reduce_hcom ~ctx ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
+  match tag with 
+  | Cube.Equality ->
+    cap
+
+  | Cube.Path ->
+    let vd0 = Val.project_dimval dim0 in 
+    let vd1 = Val.project_dimval dim1 in
+    match DimVal.compare vd0 vd1 with
+    | DimVal.Same ->
+      cap
+    | _ ->
+      reduce_path_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys
+
+and reduce_path_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
+  let interval = Val.into @@ Val.Interval Cube.Path in
+  let rec go tubes =
+    match tubes with
+    | [] ->
+      Val.into @@ Val.HCom {tag = Cube.Path; dim0; dim1; ty; cap; sys}
+
+    | (dim0', dim1', obclo) :: tubes ->
+      match DimVal.compare dim0' dim1', obclo with
+      | DimVal.Same, Some bclo ->
+        Val.inst_bclo bclo (Val.embed_dimval dim1')
+
+      | _ ->
+       match approx_can ~vr:Iso ~ctx ~ty:interval ~can0:(Val.embed_dimval dim0') ~can1:(Val.embed_dimval dim1') with
+       | exception _ ->
+         go tubes
+       | _ ->
+         match obclo with
+         | Some bclo ->
+           Val.inst_bclo bclo (Val.embed_dimval dim1')
+         | None ->
+           failwith "reduce_path_hcom: expected Some"
+  in
+  go sys
+
+
+
+
+
+
+
+
+
+
+
 let rec quote_can ~ctx ~ty ~can =
   match Val.out ty, Val.out can with
   | Val.Univ lvl, Val.Pi (dom, cod) ->
@@ -255,6 +343,7 @@ and quote_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm =
     quote_can ~ctx ~ty ~can:tm
 
   | _ -> failwith "quote_coe: missing case (?)"
+
 
 
 (* Invariant: this should only be called on neutral and base types. *)
