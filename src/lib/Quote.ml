@@ -383,3 +383,6 @@ let quote_neu ~ctx ~neu =
 
 let approx ~ctx ~ty ~can0 ~can1 =
   ignore @@ approx_can_ ~vr:Covar ~ctx ~ty ~can0 ~can1
+
+let equiv ~ctx ~ty ~can0 ~can1 =
+  ignore @@ approx_can_ ~vr:Iso ~ctx ~ty ~can0 ~can1
