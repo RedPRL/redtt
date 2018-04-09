@@ -346,11 +346,11 @@ and reduce_hcom ~ctx ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
     | Cube.Equality, Val.Univ _ ->
       cap
     | _, _ ->
-      reduce_path_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys
+      reduce_rigid_hcom ~ctx ~tag ~dim0 ~dim1 ~ty ~cap ~sys
 
 
-and reduce_path_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
-  let interval = Val.into @@ Val.Interval Cube.Path in
+and reduce_rigid_hcom ~ctx ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
+  let interval = Val.into @@ Val.Interval tag in
   let rec go tubes =
     match tubes with
     | [] ->
