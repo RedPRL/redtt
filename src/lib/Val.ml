@@ -101,18 +101,11 @@ let bclo_frame : frm -> bclo -> bclo =
 
 
 let coe ~tag ~dim0 ~dim1 ~ty ~tm =
-  into @@ Coe {tag; dim0; dim1; ty; tm}
+  match DimVal.compare (project_dimval dim0) (project_dimval dim1) with
+  | DimVal.Same -> tm
+  | _ -> into @@ Coe {tag; dim0; dim1; ty; tm}
 
-let hcom ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
-  into @@ HCom {tag; dim0; dim1; ty; cap; sys}
 
-let com ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
-  let vcap' = coe ~tag ~dim0 ~dim1 ~ty ~tm:cap in
-  let Tm.B tm = ty.foc in
-  let ty1 = {ty with foc = tm; env = dim1 :: ty.env} in
-  let tube bclo' = bclo_frame (KComTubeCoe {tag; dim1 = dim1; ty = ty; tube = bclo'}) ty in
-  let vsys' = map_tubes tube sys in
-  hcom ~tag ~dim0 ~dim1 ~ty:ty1 ~cap:vcap' ~sys:vsys'
 
 
 let rec out_pi v =
@@ -200,6 +193,37 @@ let rec eval : type a. env -> a Tm.t -> can t =
 
     | Tm.Up t ->
       eval rho t
+
+and project_bsys ~dim1 ~sys = 
+  let rec go tubes =
+    match tubes with
+    | [] -> `Ret sys
+    | (vd0, vd1, obclo) :: sys ->
+      match DimVal.compare vd0 vd1, obclo with
+      | DimVal.Same, Some bclo ->
+        `Throw (inst_bclo bclo dim1)
+      | DimVal.Same, None ->
+        failwith "project_bsys: expected Some"
+      | _, _ -> go tubes
+  in
+  go sys
+
+and hcom ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
+  match DimVal.compare (project_dimval dim0) (project_dimval dim1) with
+  | DimVal.Same -> cap 
+  | _ -> 
+    match project_bsys ~dim1 ~sys with
+    | `Ret sys -> into @@ HCom {tag; dim0; dim1; ty; cap; sys}
+    | `Throw v -> v
+
+and com ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
+  let vcap' = coe ~tag ~dim0 ~dim1 ~ty ~tm:cap in
+  let Tm.B tm = ty.foc in
+  let ty1 = {ty with foc = tm; env = dim1 :: ty.env} in
+  let tube bclo' = bclo_frame (KComTubeCoe {tag; dim1 = dim1; ty = ty; tube = bclo'}) ty in
+  let vsys' = map_tubes tube sys in
+  hcom ~tag ~dim0 ~dim1 ~ty:ty1 ~cap:vcap' ~sys:vsys'
+
 
 and eval_sys rho sys =
   List.map (eval_tube rho) sys
