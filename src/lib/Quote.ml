@@ -86,7 +86,7 @@ and quote_coe ~ctx ~tag ~ty ~dim0 ~dim1 ~bty ~tm =
       let univ = Val.into @@ Val.Univ Lvl.Omega in
       let qty0 = quote_can ~ctx ~ty:univ ~can:vty0 in
       let qty = quote_can ~ctx ~ty:univ ~can:ty in
-      if qty0 = qty then 
+      if Tm.eq qty0 qty then 
         quote_can ~ctx ~ty ~can:tm
       else 
         quote_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm

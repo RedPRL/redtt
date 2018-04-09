@@ -125,6 +125,10 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
 
 let out node = thin_f node.thin node.con
 
+(* TODO incorrect!!! *)
+let eq t1 t2 =
+  t1 = t2
+
 module Pretty =
 struct
   module Env :
