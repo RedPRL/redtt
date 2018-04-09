@@ -42,10 +42,6 @@ type info = Lexing.position * Lexing.position
 val into_info : info -> 'a f -> 'a t
 val info : 'a t -> info option
 
-
-val eq : 'a t -> 'a t -> bool
-
-
 module Pretty :
 sig
   module Env :
