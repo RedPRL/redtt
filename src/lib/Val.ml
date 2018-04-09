@@ -210,26 +210,18 @@ and eval_bsys rho bsys =
 and eval_tube rho (t0, t1, otm) =
   let vd0 = project_dimval @@ eval rho t0 in
   let vd1 = project_dimval @@ eval rho t1 in
-  let ov =
-    match vd0, vd1, otm with
-    | DimVal.Dim0, DimVal.Dim1, _ -> None
-    | DimVal.Dim1, DimVal.Dim0, _ -> None
-    | _, _, Some tm -> Some (tm <: rho)
-    | _ -> failwith "eval_tube: expected Some"
-  in
-  (vd0, vd1, ov)
+  match DimVal.compare vd0 vd1, otm with
+  | DimVal.Apart, _ -> (vd0, vd1, None)
+  | _, Some tm -> (vd0, vd1, Some (tm <: rho))
+  | _ -> failwith "eval_tube: invalid arguments"
 
 and eval_btube rho (t0, t1, obnd) =
   let vd0 = project_dimval @@ eval rho t0 in
   let vd1 = project_dimval @@ eval rho t1 in
-  let ovbnd =
-    match vd0, vd1, obnd with
-    | DimVal.Dim0, DimVal.Dim1, _ -> None
-    | DimVal.Dim1, DimVal.Dim0, _ -> None
-    | _, _, Some bnd -> Some (bnd <: rho)
-    | _ -> failwith "eval_tube: expected Some"
-  in
-  (vd0, vd1, ovbnd)
+  match DimVal.compare vd0 vd1, obnd with
+  | DimVal.Apart, _ -> (vd0, vd1, None)
+  | _, Some bnd -> (vd0, vd1, Some (bnd <: rho))
+  | _ -> failwith "eval_btube: invalid arguments"
 
 
 and apply vfun varg =
@@ -319,20 +311,14 @@ and reflect_ext dom sys vneu =
   match sys with
   | [] -> reflect dom vneu
   | (vd0, vd1, clo) :: sys ->
-    if dim_eq vd0 vd1 then
-      match clo with
-      | Some clo -> eval_clo clo
-      | None -> failwith "reflect_ext: did not expect None in tube"
-    else
-      reflect_ext dom sys vneu
-
-and dim_eq vd0 vd1 =
-  match vd0, vd1 with
-  | DimVal.Dim0, DimVal.Dim0 -> true
-  | DimVal.Dim1, DimVal.Dim1 -> true
-  | DimVal.Lvl i, DimVal.Lvl j -> i = j
-  | _ -> false
-
+    match DimVal.compare vd0 vd1 with
+    | DimVal.Same -> 
+      begin
+        match clo with
+        | Some clo -> eval_clo clo
+        | None -> failwith "reflect_ext: did not expect None in tube"
+      end
+    | _ -> reflect_ext dom sys vneu
 
 and eval_stk stk rho v =
   match stk with
