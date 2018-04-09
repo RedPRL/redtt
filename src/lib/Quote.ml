@@ -74,7 +74,9 @@ and quote_coe ~ctx ~ty ~dim0 ~dim1 ~bty ~tm =
   let vd0 = Val.project_dimval dim0 in
   let vd1 = Val.project_dimval dim1 in
   match DimVal.compare vd0 vd1 with
-  | DimVal.Same -> quote_can ~ctx ~ty ~can:tm
+  | DimVal.Same ->
+    quote_can ~ctx ~ty ~can:tm
+
   | _ ->
     let interval = Val.into Val.Interval in
     let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
@@ -94,8 +96,24 @@ and quote_coe ~ctx ~ty ~dim0 ~dim1 ~bty ~tm =
 
     | _ -> failwith "quote_coe: missing case (?)"
 
-and quote_hcom ~dim0 ~dim1 ~ty ~cap ~sys =
-  failwith ""
+and quote_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
+  let vd0 = Val.project_dimval dim0 in 
+  let vd1 = Val.project_dimval dim1 in
+  match DimVal.compare vd0 vd1 with
+  | DimVal.Same ->
+    quote_can ~ctx ~ty ~can:cap
+
+  | _ ->
+    match Val.out ty with
+    | Val.Up (univ, tyneu) ->
+      (* We need to search for a tube with a true equation; if we find one, we should quote from just that tube.
+         If we don't find one, then we need to produce a syntactic hcom. *)
+      failwith "TODO: quote_hcom"
+
+    | _ ->
+      (* In this case, 'ty' is guaranteed to be a universe or base type. The behavior of hcom here will depend on
+         whether we are doing equality-hcom or path-hcom, a distinction which I have not yet implemented. *)
+      failwith "TODO: quote_hcom"
 
 and quote_neu ~ctx ~neu =
   match Val.out neu with 
