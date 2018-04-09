@@ -48,3 +48,6 @@ val car : can t -> can t
 val cdr : can t -> can t
 
 val reflect : can t -> neu t -> can t
+
+val out_pi : can t -> tclo * bclo
+val out_sg : can t -> tclo * bclo

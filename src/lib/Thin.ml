@@ -24,3 +24,8 @@ let rec act f xs =
 (* TODO: more efficient version possible *)
 let proj f xs = 
   List.hd @@ act f xs
+
+let rec from_ix i = 
+  match i with
+  | 0 -> id
+  | _ -> skip @@ from_ix @@ i - 1
