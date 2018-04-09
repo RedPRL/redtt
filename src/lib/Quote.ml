@@ -17,11 +17,27 @@ end
 type ctx = Ctx.t
 
 let rec quote_can ~ctx ~ty ~can =
-  match Val.out ty with
-  | Val.Univ lvl ->
-    quote_can_ty ~ctx ~lvl ~ty:can
+  match Val.out ty, Val.out can with
+  | Val.Univ lvl, Val.Pi (dom, cod) ->
+    let vdom = Val.eval_clo dom in
+    let qdom = quote_can ~ctx ~ty ~can:vdom in
+    let vgen = Val.reflect vdom @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
+    let vcod = Val.inst_bclo cod vgen in
+    let qcod = quote_can ~ctx:(Ctx.ext ctx vdom) ~ty ~can:vcod in
+    Tm.into @@ Tm.Pi (qdom, Tm.B qcod)
 
-  | Val.Pi (dom, cod) ->
+  | Val.Univ lvl, Val.Sg (dom, cod) ->
+    let vdom = Val.eval_clo dom in
+    let qdom = quote_can ~ctx ~ty ~can:vdom in
+    let vgen = Val.reflect vdom @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
+    let vcod = Val.inst_bclo cod vgen in
+    let qcod = quote_can ~ctx:(Ctx.ext ctx vdom) ~ty ~can:vcod in
+    Tm.into @@ Tm.Sg (qdom, Tm.B qcod)
+
+  | Val.Univ lvl, Val.Interval ->
+    Tm.into Tm.Interval
+
+  | Val.Pi (dom, cod), _ ->
     let vdom = Val.eval_clo dom in
     let vgen = Val.reflect vdom @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
     let vcod = Val.inst_bclo cod vgen in
@@ -29,7 +45,7 @@ let rec quote_can ~ctx ~ty ~can =
     let qbdy = quote_can ~ctx:(Ctx.ext ctx vdom) ~ty:vcod ~can:vapp in
     Tm.into @@ Tm.Lam (Tm.B qbdy)
 
-  | Val.Sg (dom, cod) ->
+  | Val.Sg (dom, cod), _ ->
     let vdom = Val.eval_clo dom in
     let vcar = Val.car can in
     let vcdr = Val.cdr can in
@@ -38,31 +54,48 @@ let rec quote_can ~ctx ~ty ~can =
     let qcdr = quote_can ~ctx ~ty:vcod ~can:vcdr in
     Tm.into @@ Tm.Cons (qcar, qcdr)
 
-  | Val.Ext (vdom, _) ->
+  | Val.Ext (vdom, _), _ ->
     (* TODO: is this correct? I think that it is, because of invariants that are maintained in evaluation. *)
     quote_can ~ctx ~ty:vdom ~can
 
-  | _ -> failwith "TODO: quote_can"
+  | _, Val.Up (ty, neu) ->
+    let qneu = quote_neu ~ctx ~neu in
+    Tm.into @@ Tm.Up qneu.tm
 
-and quote_can_ty ~ctx ~lvl ~ty = 
-  match Val.out ty with
-  | Val.Pi (dom, cod) ->
-    let vdom = Val.eval_clo dom in
-    let qdom = quote_can_ty ~ctx ~lvl ~ty:vdom in
-    let vgen = Val.reflect vdom @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
-    let vcod = Val.inst_bclo cod vgen in
-    let qcod = quote_can_ty ~ctx:(Ctx.ext ctx vdom) ~lvl ~ty:vcod in
-    Tm.into @@ Tm.Pi (qdom, Tm.B qcod)
+  | _, Val.Coe {dim0; dim1; ty = bty; tm} ->
+    quote_coe ~ctx ~ty ~dim0 ~dim1 ~bty ~tm
 
-  | Val.Sg (dom, cod) ->
-    let vdom = Val.eval_clo dom in
-    let qdom = quote_can_ty ~ctx ~lvl ~ty:vdom in
-    let vgen = Val.reflect vdom @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
-    let vcod = Val.inst_bclo cod vgen in
-    let qcod = quote_can_ty ~ctx:(Ctx.ext ctx vdom) ~lvl ~ty:vcod in
-    Tm.into @@ Tm.Sg (qdom, Tm.B qcod)
+  | _, Val.HCom {dim0; dim1; cap; sys; _} ->
+    quote_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys
 
-  | _ -> failwith "TODO: quote_can_ty"
+  | _ -> failwith "quot_can: unhandled case"
+
+and quote_coe ~ctx ~ty ~dim0 ~dim1 ~bty ~tm =
+  let vd0 = Val.project_dimval dim0 in
+  let vd1 = Val.project_dimval dim1 in
+  match DimVal.compare vd0 vd1 with
+  | DimVal.Same -> quote_can ~ctx ~ty ~can:tm
+  | _ ->
+    let interval = Val.into Val.Interval in
+    let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
+    match Val.out @@ Val.inst_bclo bty vgen with
+    | Val.Up (univ, tyneu) ->
+      let ty0 = Val.inst_bclo bty dim0 in
+      let qtm = quote_can ~ctx ~ty:ty0 ~can:tm in
+      let qdim0 = quote_can ~ctx ~ty:interval ~can:dim0 in
+      let qdim1 = quote_can ~ctx ~ty:interval ~can:dim1 in
+      let qty = quote_neu ~ctx:(Ctx.ext ctx interval) ~neu:tyneu in
+      let tybnd = Tm.B (Tm.into @@ Tm.Up qty.tm) in
+      let tcoe = Tm.into @@ Tm.Coe {dim0 = qdim0; dim1 = qdim1; ty = tybnd; tm = qtm} in
+      Tm.into @@ Tm.Up tcoe
+
+    | Val.Univ _ ->
+      quote_can ~ctx ~ty ~can:tm
+
+    | _ -> failwith "quote_coe: missing case (?)"
+
+and quote_hcom ~dim0 ~dim1 ~ty ~cap ~sys =
+  failwith ""
 
 and quote_neu ~ctx ~neu =
   match Val.out neu with 

@@ -40,6 +40,8 @@ type env = can t list
 
 val eval : env -> 'a Tm.t -> can t
 
+val project_dimval : can t -> DimVal.t
+
 val eval_clo : tclo -> can t
 val inst_bclo : bclo -> can t -> can t
 
