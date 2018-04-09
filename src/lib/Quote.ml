@@ -18,7 +18,7 @@ type ctx = Ctx.t
 
 type variance = Covar | Iso
 
-let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 = 
+let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
   match Val.out ty, Val.out can0, Val.out can1 with
   | Val.Univ lvl, Val.Pi (dom0, cod0), _ ->
     let dom1, cod1 = Val.out_pi can1 in
@@ -72,12 +72,12 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     begin
       match vr with
       | Iso ->
-        if lvl0 = lvl1 then 
+        if lvl0 = lvl1 then
           Tm.into @@ Tm.Univ lvl0
         else
           failwith "approx/iso: univ levels"
       | Covar ->
-        if lvl0 <= lvl1 then 
+        if lvl0 <= lvl1 then
           Tm.into @@ Tm.Univ lvl0
         else
           failwith "approx/covar: univ levels"
@@ -122,36 +122,76 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let qcdr = approx_can_ ~vr ~ctx ~ty:vcod ~can0:vcdr0 ~can1:vcdr1 in
     Tm.into @@ Tm.Cons (qcar, qcdr)
 
-(*
-  | _, Val.Coe coe0, Val.Coe coe1 ->
-    let coe0' = reduce_coe ~ctx ~tag:coe0.tag ~ty ~dim0:coe0.dim0 ~dim1:coe0.dim1 ~bty:coe0.ty ~tm:coe0.tm in
-    let coe1' = reduce_coe ~ctx ~tag:coe1.tag ~ty ~dim0:coe1.dim0 ~dim1:coe1.dim1 ~bty:coe1.ty ~tm:coe1.tm in
-    approx_coe_contracta ~vr ~ctx ~ty ~can0:coe0' ~can1:coe1'
-
   | _, Val.Coe coe0, _ ->
-    let coe0' = reduce_coe ~ctx ~tag:coe0.tag ~ty ~dim0:coe0.dim0 ~dim1:coe0.dim1 ~bty:coe0.ty ~tm:coe0.tm in
-    approx_coe_contracta ~vr ~ctx ~ty ~can0:coe0' ~can1
+    begin
+      match project_coe ~ctx ~tag:coe0.tag ~ty ~dim0:coe0.dim0 ~dim1:coe0.dim1 ~bty:coe0.ty ~tm:coe0.tm with
+      | Some v ->
+        approx_can_ ~vr ~ctx ~ty ~can0:v ~can1
+
+      | None ->
+        match Val.out can1 with
+        | Val.Coe coe1 ->
+          if coe0.tag != coe1.tag then failwith "tag mismatch" else
+            let interval = Val.into @@ Val.Interval coe0.tag in
+            let univ = Val.into @@ Val.Univ Lvl.Omega in
+            let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:coe0.dim0 ~can1:coe0.dim0 in
+            let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:coe0.dim1 ~can1:coe0.dim1 in
+            let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
+            let vty0 = Val.inst_bclo coe0.ty vgen in
+            let vty1 = Val.inst_bclo coe1.ty vgen in
+            let qty = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty:univ ~can0:vty0 ~can1:vty1 in
+            let qtm = approx_can_ ~vr ~ctx ~ty:(Val.inst_bclo coe0.ty coe0.dim0) ~can0:coe0.tm ~can1:coe1.tm in
+            let tcoe = Tm.into @@ Tm.Coe {tag = coe0.tag; dim0 = qdim0; dim1 = qdim1; ty = Tm.B qty; tm = qtm} in
+            Tm.into @@ Tm.Up tcoe
+
+        | _ ->
+          failwith "approx / coe"
+    end
 
   | _, _, Val.Coe coe1 ->
-    let coe1' = reduce_coe ~ctx ~tag:coe1.tag ~ty ~dim0:coe1.dim0 ~dim1:coe1.dim1 ~bty:coe1.ty ~tm:coe1.tm in
-    approx_coe_contracta ~vr ~ctx ~ty ~can0 ~can1:coe1'
-
-
-  | _, Val.HCom hcom0, Val.HCom hcom1 ->
-
-    let hcom0' = reduce_hcom ~ctx ~tag:hcom0.tag ~dim0:hcom0.dim0 ~dim1:hcom0.dim1 ~ty:hcom0.ty ~cap:hcom0.cap ~sys:hcom0.sys in
-    let hcom1' = reduce_hcom ~ctx ~tag:hcom1.tag ~dim0:hcom1.dim0 ~dim1:hcom1.dim1 ~ty:hcom1.ty ~cap:hcom1.cap ~sys:hcom1.sys in
-    approx_hcom_contracta ~vr ~ctx ~ty ~can0:hcom0' ~can1:hcom1'
+    begin
+      match project_coe ~ctx ~tag:coe1.tag ~ty ~dim0:coe1.dim0 ~dim1:coe1.dim1 ~bty:coe1.ty ~tm:coe1.tm with
+      | Some v ->
+        approx_can_ ~vr ~ctx ~ty ~can0 ~can1:v
+      | None ->
+        failwith "approx / coe"
+    end
 
   | _, Val.HCom hcom0, _ ->
-    let hcom0' = reduce_hcom ~ctx ~tag:hcom0.tag ~dim0:hcom0.dim0 ~dim1:hcom0.dim1 ~ty:hcom0.ty ~cap:hcom0.cap ~sys:hcom0.sys in
-    approx_hcom_contracta ~vr ~ctx ~ty ~can0:hcom0' ~can1
+    begin
+      match project_hcom ~tag:hcom0.tag ~ty ~cap:hcom0.cap with
+      | Some v ->
+        approx_can_ ~vr ~ctx ~ty ~can0:v ~can1
+
+      | None ->
+        match Val.out can1 with
+        | Val.HCom hcom1 ->
+          if hcom0.tag != hcom1.tag then failwith "tag mismatch" else
+            let interval = Val.into @@ Val.Interval hcom0.tag in
+            let univ = Val.into @@ Val.Univ Lvl.Omega in
+            let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:hcom0.dim0 ~can1:hcom1.dim0 in
+            let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:hcom0.dim1 ~can1:hcom1.dim1 in
+            let vty0 = Val.eval_clo hcom0.ty in
+            let vty1 = Val.eval_clo hcom1.ty in
+            let qty = approx_can_ ~vr ~ctx ~ty:univ ~can0:vty0 ~can1:vty1 in
+            let qcap = approx_can_ ~vr ~ctx ~ty:vty0 ~can0:hcom0.cap ~can1:hcom1.cap in
+            let qsys = approx_bsys ~vr ~tag:hcom0.tag ~ctx ~ty ~sys0:hcom0.sys ~sys1:hcom1.sys in
+            let thcom = Tm.into @@ Tm.HCom {tag = hcom0.tag; dim0 = qdim0; dim1 = qdim1; ty = qty; cap = qcap; sys = qsys} in
+            Tm.into @@ Tm.Up thcom
+
+        | _ ->
+          failwith "approx / hcom"
+    end
+
 
   | _, _, Val.HCom hcom1 ->
-    let hcom1' = reduce_hcom ~ctx ~tag:hcom1.tag ~dim0:hcom1.dim0 ~dim1:hcom1.dim1 ~ty:hcom1.ty ~cap:hcom1.cap ~sys:hcom1.sys in
-    approx_hcom_contracta ~vr ~ctx ~ty ~can0 ~can1:hcom1'
-
-    *)
+    begin
+      match project_hcom ~tag:hcom1.tag ~ty ~cap:hcom1.cap with
+      | Some v ->
+        approx_can_ ~vr ~ctx ~ty ~can0 ~can1:v
+      | None ->
+        failwith "approx / hcom"
+    end
 
   | _, Val.Up (_, neu0), Val.Up (_, neu1) ->
     let q = approx_neu_ ~vr ~ctx ~neu0 ~neu1 in
@@ -159,13 +199,13 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
 
   | _ -> failwith "approx_can_"
 
-and approx_neu_ ~vr ~ctx ~neu0 ~neu1 = 
+and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
   match Val.out neu0, Val.out neu1 with
   | Val.Lvl l0, Val.Lvl l1 ->
     if l0 != l1 then failwith "de bruijn level mismatch" else
       let ix = Ctx.len ctx - (l0 + 1) in
       let th = Thin.from_ix ix in
-      {tm = Tm.into @@ Tm.Var th; 
+      {tm = Tm.into @@ Tm.Var th;
        ty = Ctx.nth ctx ix}
 
   | Val.App (neu0, varg0), Val.App (neu1, varg1) ->
@@ -198,7 +238,7 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
 
 and approx_sys ~vr ~tag ~ctx ~ty ~sys0 ~sys1 =
   let interval = Val.into @@ Val.Interval tag in
-  let rec go sys0 sys1 acc =   
+  let rec go sys0 sys1 acc =
     match vr, sys0, sys1 with
     | _, [], [] ->
       List.rev acc
@@ -230,7 +270,7 @@ and approx_sys ~vr ~tag ~ctx ~ty ~sys0 ~sys1 =
 
 and approx_bsys ~vr ~tag ~ctx ~ty ~sys0 ~sys1 =
   let interval = Val.into @@ Val.Interval tag in
-  let rec go sys0 sys1 acc =   
+  let rec go sys0 sys1 acc =
     match vr, sys0, sys1 with
     | _, [], [] ->
       List.rev acc
@@ -260,44 +300,6 @@ and approx_bsys ~vr ~tag ~ctx ~ty ~sys0 ~sys1 =
     | _ -> failwith "approx_bsys"
 
   in go sys0 sys1 []
-
-and approx_coe_contracta ~vr ~ctx ~ty ~can0 ~can1 =
-  match Val.out can0, Val.out can1 with
-  | Val.Coe coe0, Val.Coe coe1 ->
-    if coe0.tag != coe1.tag then failwith "tag mismatch" else
-      let interval = Val.into @@ Val.Interval coe0.tag in
-      let univ = Val.into @@ Val.Univ Lvl.Omega in
-      let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:coe0.dim0 ~can1:coe0.dim0 in
-      let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:coe0.dim1 ~can1:coe0.dim1 in
-      let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
-      let vty0 = Val.inst_bclo coe0.ty vgen in
-      let vty1 = Val.inst_bclo coe1.ty vgen in
-      let qty = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty:univ ~can0:vty0 ~can1:vty1 in
-      let qtm = approx_can_ ~vr ~ctx ~ty:(Val.inst_bclo coe0.ty coe0.dim0) ~can0:coe0.tm ~can1:coe1.tm in
-      let tcoe = Tm.into @@ Tm.Coe {tag = coe0.tag; dim0 = qdim0; dim1 = qdim1; ty = Tm.B qty; tm = qtm} in
-      Tm.into @@ Tm.Up tcoe
-
-  | _, _ ->
-    approx_can_ ~vr ~ctx ~ty ~can0 ~can1
-
-and approx_hcom_contracta ~vr ~ctx ~ty ~can0 ~can1 =
-  match Val.out can0, Val.out can1 with
-  | Val.HCom hcom0, Val.HCom hcom1 ->
-    if hcom0.tag != hcom1.tag then failwith "tag mismatch" else
-      let interval = Val.into @@ Val.Interval hcom0.tag in
-      let univ = Val.into @@ Val.Univ Lvl.Omega in
-      let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:hcom0.dim0 ~can1:hcom1.dim0 in
-      let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:hcom0.dim1 ~can1:hcom1.dim1 in
-      let vty0 = Val.eval_clo hcom0.ty in
-      let vty1 = Val.eval_clo hcom1.ty in
-      let qty = approx_can_ ~vr ~ctx ~ty:univ ~can0:vty0 ~can1:vty1 in
-      let qcap = approx_can_ ~vr ~ctx ~ty:vty0 ~can0:hcom0.cap ~can1:hcom1.cap in
-      let qsys = approx_bsys ~vr ~tag:hcom0.tag ~ctx ~ty ~sys0:hcom0.sys ~sys1:hcom1.sys in
-      let thcom = Tm.into @@ Tm.HCom {tag = hcom0.tag; dim0 = qdim0; dim1 = qdim1; ty = qty; cap = qcap; sys = qsys} in
-      Tm.into @@ Tm.Up thcom
-
-  | _, _ ->
-    approx_can_ ~vr ~ctx ~ty ~can0 ~can1
 
 
 (* Invariant: this should only be called on neutral and base types.
@@ -338,10 +340,10 @@ and project_hcom ~tag ~ty ~cap =
   | _ -> None
 
 
-let quote_can ~ctx ~ty ~can = 
+let quote_can ~ctx ~ty ~can =
   approx_can_ ~vr:Iso ~ctx ~ty ~can0:can ~can1:can
 
-let quote_neu ~ctx ~neu = 
+let quote_neu ~ctx ~neu =
   approx_neu_ ~vr:Iso ~ctx ~neu0:neu ~neu1:neu
 
 let approx ~ctx ~ty ~can0 ~can1 =
