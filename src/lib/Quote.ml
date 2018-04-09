@@ -104,11 +104,39 @@ and quote_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
     quote_can ~ctx ~ty ~can:cap
 
   | _ ->
+    let interval = Val.into Val.Interval in
     match Val.out ty with
     | Val.Up (univ, tyneu) ->
-      (* We need to search for a tube with a true equation; if we find one, we should quote from just that tube.
-         If we don't find one, then we need to produce a syntactic hcom. *)
-      failwith "TODO: quote_hcom"
+      let rec go tubes acc =
+        match tubes with
+        | [] ->
+          let tsys = List.rev acc in
+          let qdim0 = quote_can ~ctx ~ty:interval ~can:dim0 in
+          let qdim1 = quote_can ~ctx ~ty:interval ~can:dim1 in
+          let qty = quote_neu ~ctx ~neu:tyneu in
+          let qcap = quote_can ~ctx ~ty ~can:cap in
+          let thcom = Tm.into @@ Tm.HCom {dim0 = qdim0; dim1 = qdim1; ty = Tm.into @@ Tm.Up qty.tm; cap = qcap; sys = tsys} in
+          Tm.into @@ Tm.Up thcom
+
+        | (dim0', dim1', obclo) :: tubes ->
+          match DimVal.compare dim0' dim1', obclo with
+          | DimVal.Same, Some bclo ->
+            let v = Val.inst_bclo bclo (Val.embed_dimval dim1') in
+            quote_can ~ctx ~ty:ty ~can:v
+
+          | _ ->
+            let qdim0' = quote_can ~ctx ~ty:interval ~can:(Val.embed_dimval dim0') in
+            let qdim1' = quote_can ~ctx ~ty:interval ~can:(Val.embed_dimval dim1') in
+            let go_bclo bclo =
+              let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
+              let v = Val.inst_bclo bclo vgen in
+              Tm.B (quote_can ~ctx:(Ctx.ext ctx interval) ~ty:ty ~can:v)
+            in
+            let qbnd = Option.map go_bclo obclo in
+            let qtube = (qdim0', qdim1', qbnd) in
+            go tubes (qtube :: acc)
+      in
+      go sys []
 
     | _ ->
       (* In this case, 'ty' is guaranteed to be a universe or base type. The behavior of hcom here will depend on

@@ -5,7 +5,8 @@ type neu
 type tclo
 type bclo
 
-type 'a system
+type 'a tube = DimVal.t * DimVal.t * 'a option
+type 'a system = 'a tube list
 
 type 'a t
 
@@ -41,6 +42,7 @@ type env = can t list
 val eval : env -> 'a Tm.t -> can t
 
 val project_dimval : can t -> DimVal.t
+val embed_dimval : DimVal.t -> can t
 
 val eval_clo : tclo -> can t
 val inst_bclo : bclo -> can t -> can t
