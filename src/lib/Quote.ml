@@ -136,16 +136,16 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     approx_coe_contracta ~vr ~ctx ~ty ~can0 ~can1:coe1'
 
   | _, Val.HCom hcom0, Val.HCom hcom1 ->
-    let hcom0' = reduce_hcom ~ctx ~tag:hcom0.tag ~dim0:hcom0.dim0 ~dim1:hcom0.dim1 ~ty:hcom0.ty ~cap:hcom0.cap ~sys:hcom0.sys in
-    let hcom1' = reduce_hcom ~ctx ~tag:hcom1.tag ~dim0:hcom1.dim0 ~dim1:hcom1.dim1 ~ty:hcom1.ty ~cap:hcom1.cap ~sys:hcom1.sys in
+    let hcom0' = reduce_hcom ~ctx ~dim0:hcom0.dim0 ~dim1:hcom0.dim1 ~ty:hcom0.ty ~cap:hcom0.cap ~sys:hcom0.sys in
+    let hcom1' = reduce_hcom ~ctx ~dim0:hcom1.dim0 ~dim1:hcom1.dim1 ~ty:hcom1.ty ~cap:hcom1.cap ~sys:hcom1.sys in
     approx_hcom_contracta ~vr ~ctx ~ty ~can0:hcom0' ~can1:hcom1'
 
   | _, Val.HCom hcom0, _ ->
-    let hcom0' = reduce_hcom ~ctx ~tag:hcom0.tag ~dim0:hcom0.dim0 ~dim1:hcom0.dim1 ~ty:hcom0.ty ~cap:hcom0.cap ~sys:hcom0.sys in
+    let hcom0' = reduce_hcom ~ctx ~dim0:hcom0.dim0 ~dim1:hcom0.dim1 ~ty:hcom0.ty ~cap:hcom0.cap ~sys:hcom0.sys in
     approx_hcom_contracta ~vr ~ctx ~ty ~can0:hcom0' ~can1
 
   | _, _, Val.HCom hcom1 ->
-    let hcom1' = reduce_hcom ~ctx ~tag:hcom1.tag ~dim0:hcom1.dim0 ~dim1:hcom1.dim1 ~ty:hcom1.ty ~cap:hcom1.cap ~sys:hcom1.sys in
+    let hcom1' = reduce_hcom ~ctx ~dim0:hcom1.dim0 ~dim1:hcom1.dim1 ~ty:hcom1.ty ~cap:hcom1.cap ~sys:hcom1.sys in
     approx_hcom_contracta ~vr ~ctx ~ty ~can0 ~can1:hcom1'
 
   | _, Val.Up (_, neu0), Val.Up (_, neu1) ->
@@ -334,21 +334,17 @@ and reduce_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm =
 
 
 (* Invariant: this should only be called on neutral and base types. *)
-and reduce_hcom ~ctx ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
-  match tag with 
-  | Cube.Equality ->
+and reduce_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
+  let vd0 = Val.project_dimval dim0 in 
+  let vd1 = Val.project_dimval dim1 in
+  match DimVal.compare vd0 vd1 with
+  | DimVal.Same ->
     cap
+  | _ ->
+    reduce_rigid_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys
 
-  | Cube.Path ->
-    let vd0 = Val.project_dimval dim0 in 
-    let vd1 = Val.project_dimval dim1 in
-    match DimVal.compare vd0 vd1 with
-    | DimVal.Same ->
-      cap
-    | _ ->
-      reduce_path_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys
 
-and reduce_path_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
+and reduce_rigid_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
   let interval = Val.into @@ Val.Interval Cube.Path in
   let rec go tubes =
     match tubes with
