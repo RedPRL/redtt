@@ -19,7 +19,7 @@ type _ f =
   | Sg : tclo * bclo -> can f
   | Ext : can t * tclo system -> can f
   | Univ : Lvl.t -> can f
-  | Interval : can f
+  | Interval : Cube.t -> can f
 
   | Dim0 : can f
   | Dim1 : can f
@@ -27,8 +27,8 @@ type _ f =
   | Lam : bclo -> can f
   | Cons : tclo * tclo -> can f
 
-  | Coe : { dim0 : can t; dim1 : can t; ty : bclo; tm : can t } -> can f
-  | HCom : { dim0 : can t; dim1 : can t; ty : tclo; cap : can t; sys : bclo system } -> can f
+  | Coe : {tag : Cube.t; dim0 : can t; dim1 : can t; ty : bclo; tm : can t} -> can f
+  | HCom : {tag : Cube.t; dim0 : can t; dim1 : can t; ty : tclo; cap : can t; sys : bclo system} -> can f
 
   | App : neu t * can t -> neu f
   | Car : neu t -> neu f

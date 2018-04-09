@@ -34,8 +34,8 @@ let rec quote_can ~ctx ~ty ~can =
     let qcod = quote_can ~ctx:(Ctx.ext ctx vdom) ~ty ~can:vcod in
     Tm.into @@ Tm.Sg (qdom, Tm.B qcod)
 
-  | Val.Univ lvl, Val.Interval ->
-    Tm.into Tm.Interval
+  | Val.Univ lvl, Val.Interval tag ->
+    Tm.into @@ Tm.Interval tag
 
   | Val.Pi (dom, cod), _ ->
     let vdom = Val.eval_clo dom in
@@ -62,15 +62,15 @@ let rec quote_can ~ctx ~ty ~can =
     let qneu = quote_neu ~ctx ~neu in
     Tm.into @@ Tm.Up qneu.tm
 
-  | _, Val.Coe {dim0; dim1; ty = bty; tm} ->
-    quote_coe ~ctx ~ty ~dim0 ~dim1 ~bty ~tm
+  | _, Val.Coe {tag; dim0; dim1; ty = bty; tm} ->
+    quote_coe ~ctx ~tag ~ty ~dim0 ~dim1 ~bty ~tm
 
-  | _, Val.HCom {dim0; dim1; cap; sys; _} ->
-    quote_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys
+  | _, Val.HCom {tag; dim0; dim1; cap; sys; _} ->
+    quote_hcom ~ctx ~tag ~dim0 ~dim1 ~ty ~cap ~sys
 
   | _ -> failwith "quot_can: unhandled case"
 
-and quote_coe ~ctx ~ty ~dim0 ~dim1 ~bty ~tm =
+and quote_coe ~ctx ~tag ~ty ~dim0 ~dim1 ~bty ~tm =
   let vd0 = Val.project_dimval dim0 in
   let vd1 = Val.project_dimval dim1 in
   match DimVal.compare vd0 vd1 with
@@ -78,7 +78,7 @@ and quote_coe ~ctx ~ty ~dim0 ~dim1 ~bty ~tm =
     quote_can ~ctx ~ty ~can:tm
 
   | _ ->
-    let interval = Val.into Val.Interval in
+    let interval = Val.into @@ Val.Interval tag in
     let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
     match Val.out @@ Val.inst_bclo bty vgen with
     | Val.Up (univ, tyneu) ->
@@ -88,7 +88,7 @@ and quote_coe ~ctx ~ty ~dim0 ~dim1 ~bty ~tm =
       let qdim1 = quote_can ~ctx ~ty:interval ~can:dim1 in
       let qty = quote_neu ~ctx:(Ctx.ext ctx interval) ~neu:tyneu in
       let tybnd = Tm.B (Tm.into @@ Tm.Up qty.tm) in
-      let tcoe = Tm.into @@ Tm.Coe {dim0 = qdim0; dim1 = qdim1; ty = tybnd; tm = qtm} in
+      let tcoe = Tm.into @@ Tm.Coe {tag; dim0 = qdim0; dim1 = qdim1; ty = tybnd; tm = qtm} in
       Tm.into @@ Tm.Up tcoe
 
     | Val.Univ _ ->
@@ -96,7 +96,7 @@ and quote_coe ~ctx ~ty ~dim0 ~dim1 ~bty ~tm =
 
     | _ -> failwith "quote_coe: missing case (?)"
 
-and quote_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
+and quote_hcom ~ctx ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
   let vd0 = Val.project_dimval dim0 in 
   let vd1 = Val.project_dimval dim1 in
   match DimVal.compare vd0 vd1 with
@@ -104,9 +104,9 @@ and quote_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
     quote_can ~ctx ~ty ~can:cap
 
   | _ ->
-    let interval = Val.into Val.Interval in
     match Val.out ty with
     | Val.Up (univ, tyneu) ->
+      let interval = Val.into @@ Val.Interval tag in
       let rec go tubes acc =
         match tubes with
         | [] ->
@@ -115,7 +115,7 @@ and quote_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
           let qdim1 = quote_can ~ctx ~ty:interval ~can:dim1 in
           let qty = quote_neu ~ctx ~neu:tyneu in
           let qcap = quote_can ~ctx ~ty ~can:cap in
-          let thcom = Tm.into @@ Tm.HCom {dim0 = qdim0; dim1 = qdim1; ty = Tm.into @@ Tm.Up qty.tm; cap = qcap; sys = tsys} in
+          let thcom = Tm.into @@ Tm.HCom {tag; dim0 = qdim0; dim1 = qdim1; ty = Tm.into @@ Tm.Up qty.tm; cap = qcap; sys = tsys} in
           Tm.into @@ Tm.Up thcom
 
         | (dim0', dim1', obclo) :: tubes ->
@@ -139,9 +139,12 @@ and quote_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
       go sys []
 
     | _ ->
-      (* In this case, 'ty' is guaranteed to be a universe or base type. The behavior of hcom here will depend on
-         whether we are doing equality-hcom or path-hcom, a distinction which I have not yet implemented. *)
-      failwith "TODO: quote_hcom"
+      (* In this case, 'ty' is guaranteed to be a universe or base type. *)
+      match tag with
+      | Cube.Equality ->
+        (* Since we are in the cubical structure for equality (not paths), we can project out the cap *)
+        quote_can ~ctx ~ty ~can:cap
+
 
 and quote_neu ~ctx ~neu =
   match Val.out neu with 
