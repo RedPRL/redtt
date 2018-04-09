@@ -27,7 +27,7 @@ type _ f =
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
-  | Ext : chk t * chk t system -> chk f
+  | Ext : Cube.t * chk t * chk t system -> chk f
   | Interval : Cube.t -> chk f
 
   | Lam : chk t bnd -> chk f

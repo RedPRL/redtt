@@ -17,7 +17,7 @@ type _ f =
 
   | Pi : tclo * bclo -> can f
   | Sg : tclo * bclo -> can f
-  | Ext : can t * tclo system -> can f
+  | Ext : Cube.t * can t * tclo system -> can f
   | Univ : Lvl.t -> can f
   | Interval : Cube.t -> can f
 
