@@ -70,6 +70,8 @@ let rec quote_can ~ctx ~ty ~can =
 
   | _ -> failwith "quot_can: unhandled case"
 
+(* Invariant: this should only be called on neutral and base types.
+   Invariant: ty = bty[dim1] *)
 and quote_coe ~ctx ~tag ~ty ~dim0 ~dim1 ~bty ~tm =
   let vd0 = Val.project_dimval dim0 in
   let vd1 = Val.project_dimval dim1 in
@@ -78,72 +80,88 @@ and quote_coe ~ctx ~tag ~ty ~dim0 ~dim1 ~bty ~tm =
     quote_can ~ctx ~ty ~can:tm
 
   | _ ->
-    let interval = Val.into @@ Val.Interval tag in
-    let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
-    match Val.out @@ Val.inst_bclo bty vgen with
-    | Val.Up (univ, tyneu) ->
-      let ty0 = Val.inst_bclo bty dim0 in
-      let qtm = quote_can ~ctx ~ty:ty0 ~can:tm in
-      let qdim0 = quote_can ~ctx ~ty:interval ~can:dim0 in
-      let qdim1 = quote_can ~ctx ~ty:interval ~can:dim1 in
-      let qty = quote_neu ~ctx:(Ctx.ext ctx interval) ~neu:tyneu in
-      let tybnd = Tm.B (Tm.into @@ Tm.Up qty.tm) in
-      let tcoe = Tm.into @@ Tm.Coe {tag; dim0 = qdim0; dim1 = qdim1; ty = tybnd; tm = qtm} in
-      Tm.into @@ Tm.Up tcoe
+    match tag with
+    | Cube.Equality ->
+      let vty0 = Val.inst_bclo bty dim0 in
+      let univ = Val.into @@ Val.Univ Lvl.Omega in
+      let qty0 = quote_can ~ctx ~ty:univ ~can:vty0 in
+      let qty = quote_can ~ctx ~ty:univ ~can:ty in
+      if qty0 = qty then 
+        quote_can ~ctx ~ty ~can:tm
+      else 
+        quote_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm
 
-    | Val.Univ _ ->
-      quote_can ~ctx ~ty ~can:tm
+    | Cube.Path ->
+      quote_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm
 
-    | _ -> failwith "quote_coe: missing case (?)"
+and quote_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm =
+  let interval = Val.into @@ Val.Interval tag in
+  let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
+  match Val.out @@ Val.inst_bclo bty vgen with
+  | Val.Up (univ, tyneu) ->
+    let ty0 = Val.inst_bclo bty dim0 in
+    let qtm = quote_can ~ctx ~ty:ty0 ~can:tm in
+    let qdim0 = quote_can ~ctx ~ty:interval ~can:dim0 in
+    let qdim1 = quote_can ~ctx ~ty:interval ~can:dim1 in
+    let qty = quote_neu ~ctx:(Ctx.ext ctx interval) ~neu:tyneu in
+    let tybnd = Tm.B (Tm.into @@ Tm.Up qty.tm) in
+    let tcoe = Tm.into @@ Tm.Coe {tag; dim0 = qdim0; dim1 = qdim1; ty = tybnd; tm = qtm} in
+    Tm.into @@ Tm.Up tcoe
 
+  | Val.Univ _ ->
+    quote_can ~ctx ~ty ~can:tm
+
+  | _ -> failwith "quote_coe: missing case (?)"
+
+
+(* Invariant: this should only be called on neutral and base types. *)
 and quote_hcom ~ctx ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
-  let vd0 = Val.project_dimval dim0 in 
-  let vd1 = Val.project_dimval dim1 in
-  match DimVal.compare vd0 vd1 with
-  | DimVal.Same ->
+  match tag with 
+  | Cube.Equality ->
     quote_can ~ctx ~ty ~can:cap
 
-  | _ ->
-    match Val.out ty with
-    | Val.Up (univ, tyneu) ->
-      let interval = Val.into @@ Val.Interval tag in
-      let rec go tubes acc =
-        match tubes with
-        | [] ->
-          let tsys = List.rev acc in
-          let qdim0 = quote_can ~ctx ~ty:interval ~can:dim0 in
-          let qdim1 = quote_can ~ctx ~ty:interval ~can:dim1 in
-          let qty = quote_neu ~ctx ~neu:tyneu in
-          let qcap = quote_can ~ctx ~ty ~can:cap in
-          let thcom = Tm.into @@ Tm.HCom {tag; dim0 = qdim0; dim1 = qdim1; ty = Tm.into @@ Tm.Up qty.tm; cap = qcap; sys = tsys} in
-          Tm.into @@ Tm.Up thcom
-
-        | (dim0', dim1', obclo) :: tubes ->
-          match DimVal.compare dim0' dim1', obclo with
-          | DimVal.Same, Some bclo ->
-            let v = Val.inst_bclo bclo (Val.embed_dimval dim1') in
-            quote_can ~ctx ~ty:ty ~can:v
-
-          | _ ->
-            let qdim0' = quote_can ~ctx ~ty:interval ~can:(Val.embed_dimval dim0') in
-            let qdim1' = quote_can ~ctx ~ty:interval ~can:(Val.embed_dimval dim1') in
-            let go_bclo bclo =
-              let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
-              let v = Val.inst_bclo bclo vgen in
-              Tm.B (quote_can ~ctx:(Ctx.ext ctx interval) ~ty:ty ~can:v)
-            in
-            let qbnd = Option.map go_bclo obclo in
-            let qtube = (qdim0', qdim1', qbnd) in
-            go tubes (qtube :: acc)
-      in
-      go sys []
-
+  | Cube.Path ->
+    let vd0 = Val.project_dimval dim0 in 
+    let vd1 = Val.project_dimval dim1 in
+    match DimVal.compare vd0 vd1 with
+    | DimVal.Same ->
+      quote_can ~ctx ~ty ~can:cap
     | _ ->
-      (* In this case, 'ty' is guaranteed to be a universe or base type. *)
-      match tag with
-      | Cube.Equality ->
-        (* Since we are in the cubical structure for equality (not paths), we can project out the cap *)
-        quote_can ~ctx ~ty ~can:cap
+      quote_path_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys
+
+and quote_path_hcom ~ctx ~dim0 ~dim1 ~ty ~cap ~sys =
+  let interval = Val.into @@ Val.Interval Cube.Path in
+  let rec go tubes acc =
+    match tubes with
+    | [] ->
+      let tsys = List.rev acc in
+      let qdim0 = quote_can ~ctx ~ty:interval ~can:dim0 in
+      let qdim1 = quote_can ~ctx ~ty:interval ~can:dim1 in
+      let univ = Val.into @@ Val.Univ Lvl.Omega in
+      let qty = quote_can ~ctx ~ty:univ ~can:ty in
+      let qcap = quote_can ~ctx ~ty ~can:cap in
+      let thcom = Tm.into @@ Tm.HCom {tag = Cube.Path; dim0 = qdim0; dim1 = qdim1; ty = qty; cap = qcap; sys = tsys} in
+      Tm.into @@ Tm.Up thcom
+
+    | (dim0', dim1', obclo) :: tubes ->
+      match DimVal.compare dim0' dim1', obclo with
+      | DimVal.Same, Some bclo ->
+        let v = Val.inst_bclo bclo (Val.embed_dimval dim1') in
+        quote_can ~ctx ~ty:ty ~can:v
+
+      | _ ->
+        let qdim0' = quote_can ~ctx ~ty:interval ~can:(Val.embed_dimval dim0') in
+        let qdim1' = quote_can ~ctx ~ty:interval ~can:(Val.embed_dimval dim1') in
+        let go_bclo bclo =
+          let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
+          let v = Val.inst_bclo bclo vgen in
+          Tm.B (quote_can ~ctx:(Ctx.ext ctx interval) ~ty:ty ~can:v)
+        in
+        let qbnd = Option.map go_bclo obclo in
+        let qtube = (qdim0', qdim1', qbnd) in
+        go tubes (qtube :: acc)
+  in
+  go sys []
 
 
 and quote_neu ~ctx ~neu =
