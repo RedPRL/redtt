@@ -331,6 +331,9 @@ and reflect vty vneu =
     reflect_ext dom sys vneu
   | _ -> into @@ Up (vty, vneu)
 
+and generic vty i = 
+  reflect vty @@ into @@ Lvl i
+
 and reflect_ext dom sys vneu =
   match sys with
   | [] -> reflect dom vneu
