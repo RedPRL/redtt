@@ -334,8 +334,7 @@ and project_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm =
 
 (* Invariant: this should only be called on neutral and base types. *)
 and project_hcom ~tag ~ty ~cap =
-  let vty = Val.eval_clo ty in
-  match tag, Val.out vty with
+  match tag, Val.out ty with
   | Cube.Equality, Val.Univ _ -> Some cap
   | _ -> None
 
