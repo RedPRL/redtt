@@ -124,11 +124,11 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
 
   | _, Val.Coe coe0, _ ->
     begin
-      match project_coe ~ctx ~tag:coe0.tag ~ty ~dim0:coe0.dim0 ~dim1:coe0.dim1 ~bty:coe0.ty ~tm:coe0.tm with
-      | Some v ->
-        approx_can_ ~vr ~ctx ~ty ~can0:v ~can1
+      match project_coe ~ctx ~tag:coe0.tag ~ty ~dim0:coe0.dim0 ~bty:coe0.ty with
+      | `Proj ->
+        approx_can_ ~vr ~ctx ~ty ~can0:coe0.tm ~can1
 
-      | None ->
+      | `Coe ->
         match Val.out can1 with
         | Val.Coe coe1 ->
           if coe0.tag != coe1.tag then failwith "tag mismatch" else
@@ -150,20 +150,20 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
 
   | _, _, Val.Coe coe1 ->
     begin
-      match project_coe ~ctx ~tag:coe1.tag ~ty ~dim0:coe1.dim0 ~dim1:coe1.dim1 ~bty:coe1.ty ~tm:coe1.tm with
-      | Some v ->
-        approx_can_ ~vr ~ctx ~ty ~can0 ~can1:v
-      | None ->
+      match project_coe ~ctx ~tag:coe1.tag ~ty ~dim0:coe1.dim0 ~bty:coe1.ty with
+      | `Proj ->
+        approx_can_ ~vr ~ctx ~ty ~can0 ~can1:coe1.tm
+      | `Coe ->
         failwith "approx / coe"
     end
 
   | _, Val.HCom hcom0, _ ->
     begin
-      match project_hcom ~tag:hcom0.tag ~ty ~cap:hcom0.cap with
-      | Some v ->
-        approx_can_ ~vr ~ctx ~ty ~can0:v ~can1
+      match project_hcom ~tag:hcom0.tag ~ty with
+      | `Cap ->
+        approx_can_ ~vr ~ctx ~ty ~can0:hcom0.cap ~can1
 
-      | None ->
+      | `HCom ->
         match Val.out can1 with
         | Val.HCom hcom1 ->
           if hcom0.tag != hcom1.tag then failwith "tag mismatch" else
@@ -186,10 +186,10 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
 
   | _, _, Val.HCom hcom1 ->
     begin
-      match project_hcom ~tag:hcom1.tag ~ty ~cap:hcom1.cap with
-      | Some v ->
-        approx_can_ ~vr ~ctx ~ty ~can0 ~can1:v
-      | None ->
+      match project_hcom ~tag:hcom1.tag ~ty with
+      | `Cap ->
+        approx_can_ ~vr ~ctx ~ty ~can0 ~can1:hcom1.cap
+      | `HCom ->
         failwith "approx / hcom"
     end
 
@@ -304,39 +304,34 @@ and approx_bsys ~vr ~tag ~ctx ~ty ~sys0 ~sys1 =
 
 (* Invariant: this should only be called on neutral and base types.
    Invariant: ty = bty[dim1] *)
-and project_coe ~ctx ~tag ~ty ~dim0 ~dim1 ~bty ~tm =
+and project_coe ~ctx ~tag ~ty ~dim0 ~bty =
   match tag with
   | Cube.Equality ->
     let vty0 = Val.inst_bclo bty dim0 in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     begin
       match approx_can_ ~vr:Iso ~ctx ~ty:univ ~can0:vty0 ~can1:ty with
-      | _ -> Some tm
-      | exception _ ->
-        None
+      | _ -> `Proj
+      | exception _ -> `Coe
     end
 
   | Cube.Path ->
-    project_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm
+    project_rigid_coe ~ctx ~ty ~tag ~dim0 ~bty
 
-and project_rigid_coe ~ctx ~ty ~tag ~dim0 ~dim1 ~bty ~tm =
+and project_rigid_coe ~ctx ~ty ~tag ~dim0 ~bty =
   let interval = Val.into @@ Val.Interval tag in
   let vgen = Val.reflect interval @@ Val.into @@ Val.Lvl (Ctx.len ctx) in
   match Val.out @@ Val.inst_bclo bty vgen with
-  | Val.Up (univ, tyneu) ->
-    None
-
-  | Val.Univ _ ->
-    Some tm
-
-  | _ -> failwith "quote_coe: missing case (?)"
+  | Val.Up (univ, tyneu) -> `Coe
+  | Val.Univ _ -> `Proj
+  | _ -> failwith "project_rigid_coe: missing case (?)"
 
 
 (* Invariant: this should only be called on neutral and base types. *)
-and project_hcom ~tag ~ty ~cap =
+and project_hcom ~tag ~ty =
   match tag, Val.out ty with
-  | Cube.Equality, Val.Univ _ -> Some cap
-  | _ -> None
+  | Cube.Equality, Val.Univ _ -> `Cap
+  | _ -> `HCom
 
 
 let quote_can ~ctx ~ty ~can =
