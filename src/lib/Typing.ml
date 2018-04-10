@@ -59,6 +59,9 @@ let rec check ~ctx ~ty ~tm =
     let ctx' = Ctx.ext ctx vdom in
     check ~ctx:ctx' ~ty ~tm:cod
 
+  | Val.Univ _, Tm.Ext (tag, dom, sys) ->
+    failwith "TODO!"
+
   | Val.Pi (dom, cod), Tm.Lam (Tm.B tm) ->
     let vdom = Val.eval_clo dom in
     let ctx' = Ctx.ext ctx vdom in
@@ -71,6 +74,9 @@ let rec check ~ctx ~ty ~tm =
     let vtm0 = check_eval ~ctx ~ty:vdom ~tm:tm0 in
     let vcod = Val.inst_bclo cod vtm0 in
     check ~ctx ~ty:vcod ~tm:tm1
+
+  | Val.Ext (tag, dom, sys), _ ->
+    failwith "TODO!"
 
   | Val.Interval _, Tm.Dim0 ->
     ()
@@ -122,7 +128,15 @@ and infer ~ctx ~tm =
     vty
 
   | Tm.Coe coe ->
-    failwith ""
+    let interval = Val.into @@ Val.Interval coe.tag in
+    let univ = Val.into @@ Val.Univ Lvl.Omega in
+    let vdim0 = check_eval ~ctx ~ty:interval ~tm:coe.dim0 in
+    let vdim1 = check_eval ~ctx ~ty:interval ~tm:coe.dim1 in
+    let Tm.B ty = coe.ty in
+    check ~ctx:(Ctx.ext ctx interval) ~ty:univ ~tm:ty;
+    let vty0 = Val.eval (vdim0 :: Ctx.env ctx) ty in
+    check ~ctx:ctx ~ty:vty0 ~tm:coe.tm;
+    Val.eval (vdim1 :: Ctx.env ctx) ty
 
   | Tm.HCom hcom ->
     failwith ""
