@@ -1,5 +1,3 @@
-type mode = Rel | Irrel
-
 module Ctx :
 sig
   type t
@@ -46,20 +44,20 @@ end
 
 type ctx = Ctx.t
 
-let rec check ~mode ~ctx ~ty ~tm =
+let rec check ~ctx ~ty ~tm =
   match Val.out ty, Tm.out tm with
   | Val.Univ lvl, Tm.Univ lvl' ->
     if Lvl.greater lvl lvl' then () else failwith "Universe level failure"
 
   | Val.Univ _, Tm.Pi (dom, Tm.B cod) ->
-    let vdom = check_eval ~mode ~ctx ~ty ~tm:dom in
+    let vdom = check_eval ~ctx ~ty ~tm:dom in
     let ctx' = Ctx.ext ctx vdom in
-    check ~mode ~ctx:ctx' ~ty ~tm:cod
+    check ~ctx:ctx' ~ty ~tm:cod
 
   | Val.Univ _, Tm.Sg (dom, Tm.B cod) ->
-    let vdom = check_eval ~mode ~ctx ~ty ~tm:dom in
+    let vdom = check_eval ~ctx ~ty ~tm:dom in
     let ctx' = Ctx.ext ctx vdom in
-    check ~mode ~ctx:ctx' ~ty ~tm:cod
+    check ~ctx:ctx' ~ty ~tm:cod
 
   | Val.Univ _, Tm.Ext (tag, dom, sys) ->
     failwith "TODO!"
@@ -69,13 +67,13 @@ let rec check ~mode ~ctx ~ty ~tm =
     let ctx' = Ctx.ext ctx vdom in
     let vgen = Val.generic vdom @@ Ctx.len ctx in
     let vcod = Val.inst_bclo cod vgen in
-    check ~mode ~ctx:ctx' ~ty:vcod ~tm
+    check ~ctx:ctx' ~ty:vcod ~tm
 
   | Val.Sg (dom, cod), Tm.Cons (tm0, tm1) ->
     let vdom = Val.eval_clo dom in
-    let vtm0 = check_eval ~mode ~ctx ~ty:vdom ~tm:tm0 in
+    let vtm0 = check_eval ~ctx ~ty:vdom ~tm:tm0 in
     let vcod = Val.inst_bclo cod vtm0 in
-    check ~mode ~ctx ~ty:vcod ~tm:tm1
+    check ~ctx ~ty:vcod ~tm:tm1
 
   | Val.Ext (tag, dom, sys), _ ->
     failwith "TODO!"
@@ -87,37 +85,37 @@ let rec check ~mode ~ctx ~ty ~tm =
     ()
 
   | _, Tm.Up tm ->
-    let ty' = infer ~mode ~ctx ~tm in
+    let ty' = infer ~ctx ~tm in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     Quote.approx ~ctx:(Ctx.qctx ctx) ~ty:univ ~can0:ty' ~can1:ty
 
 
   | _ -> failwith ""
 
-and check_eval ~mode ~ctx ~ty ~tm =
-  check ~mode ~ctx ~ty ~tm;
+and check_eval ~ctx ~ty ~tm =
+  check ~ctx ~ty ~tm;
   Val.eval (Ctx.env ctx) tm
 
 
-and infer ~mode ~ctx ~tm =
+and infer ~ctx ~tm =
   match Tm.out tm with
   | Tm.Var th ->
     Ctx.lookup th ctx
 
   | Tm.App (tfun, targ) ->
-    let ty = infer ~mode ~ctx ~tm:tfun in
+    let ty = infer ~ctx ~tm:tfun in
     let dom, cod = Val.out_pi ty in
     let vdom = Val.eval_clo dom in
-    let varg = check_eval ~mode ~ctx ~ty:vdom ~tm:targ in
+    let varg = check_eval ~ctx ~ty:vdom ~tm:targ in
     Val.inst_bclo cod varg
 
   | Tm.Car tm ->
-    let ty = infer ~mode ~ctx ~tm in
+    let ty = infer ~ctx ~tm in
     let dom, _ = Val.out_sg ty in
     Val.eval_clo dom
 
   | Tm.Cdr tm ->
-    let ty = infer ~mode ~ctx ~tm in
+    let ty = infer ~ctx ~tm in
     let _, cod = Val.out_sg ty in
     let vpair = Val.eval (Ctx.env ctx) tm in
     let vcar = Val.car vpair in
@@ -125,24 +123,19 @@ and infer ~mode ~ctx ~tm =
 
   | Tm.Down {ty; tm} ->
     let univ = Val.into @@ Val.Univ Lvl.Omega in
-    let vty = check_eval ~mode ~ctx ~ty:univ ~tm:ty in
-    check ~mode ~ctx ~ty:vty ~tm;
+    let vty = check_eval ~ctx ~ty:univ ~tm:ty in
+    check ~ctx ~ty:vty ~tm;
     vty
 
   | Tm.Coe coe ->
     let interval = Val.into @@ Val.Interval coe.tag in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
-    let vdim0 = check_eval ~mode ~ctx ~ty:interval ~tm:coe.dim0 in
-    let vdim1 = check_eval ~mode ~ctx ~ty:interval ~tm:coe.dim1 in
+    let vdim0 = check_eval ~ctx ~ty:interval ~tm:coe.dim0 in
+    let vdim1 = check_eval ~ctx ~ty:interval ~tm:coe.dim1 in
     let Tm.B ty = coe.ty in
-    let ty_mode = 
-      match coe.tag with
-      | Cube.Equality -> Irrel
-      | Cube.Path -> mode
-    in
-    check ~mode:ty_mode ~ctx:(Ctx.ext ctx interval) ~ty:univ ~tm:ty;
+    check ~ctx:(Ctx.ext ctx interval) ~ty:univ ~tm:ty;
     let vty0 = Val.eval (vdim0 :: Ctx.env ctx) ty in
-    check ~mode ~ctx:ctx ~ty:vty0 ~tm:coe.tm;
+    check ~ctx:ctx ~ty:vty0 ~tm:coe.tm;
     Val.eval (vdim1 :: Ctx.env ctx) ty
 
   | Tm.HCom hcom ->
