@@ -38,11 +38,11 @@ and bclo = Tm.chk Tm.t Tm.bnd clo
 
 and frm =
   | KApply of can t
-  | KExtCar of Cube.t * tclo system
+  | KRestrictCar of Cube.t * tclo system
   | KCar
   | KCdr
-  | KExtApp of Cube.t * tclo system
-  | KExtCdr of Cube.t * tclo system
+  | KRestrictApp of Cube.t * tclo system
+  | KRestrictCdr of Cube.t * tclo system
   | KComTubeCoe of {tag : Cube.t; dim1 : can t; ty : bclo; tube : bclo}
   | KPiDom
   | KPiCodCoe of {tag : Cube.t; dim1 : can t; dom : bclo; arg : can t}
@@ -113,7 +113,7 @@ let rec out_pi v =
   | Pi (dom, cod) -> dom, cod
   | Restrict (tag, vty, vsys) ->
     let dom, cod = out_pi vty in
-    dom, bclo_frame (KExtApp (tag, vsys)) cod
+    dom, bclo_frame (KRestrictApp (tag, vsys)) cod
   | _ -> failwith "out_pi"
 
 let rec out_sg v =
@@ -121,8 +121,8 @@ let rec out_sg v =
   | Sg (dom, cod) -> dom, cod
   | Restrict (tag, vty, vsys) ->
     let dom, cod = out_sg vty in
-    clo_frame (KExtCar (tag, vsys)) dom,
-    bclo_frame (KExtCdr (tag, vsys)) cod
+    clo_frame (KRestrictCar (tag, vsys)) dom,
+    bclo_frame (KRestrictCdr (tag, vsys)) cod
   | _ -> failwith "out_sg"
 
 
@@ -365,15 +365,15 @@ and eval_frm rho frm v =
   | KApply varg ->
     apply v varg
 
-  | KExtCar (tag, sys) ->
+  | KRestrictCar (tag, sys) ->
     let sys' = map_tubes (clo_frame KCar) sys in
     into @@ Restrict (tag, v, sys')
 
-  | KExtCdr (tag, sys) ->
+  | KRestrictCdr (tag, sys) ->
     let sys' = map_tubes (clo_frame KCdr) sys in
     into @@ Restrict (tag, v, sys')
 
-  | KExtApp (tag, sys) ->
+  | KRestrictApp (tag, sys) ->
     let varg = List.hd rho in
     let sys' = map_tubes (clo_frame @@ KApply varg) sys in
     into @@ Restrict (tag, v, sys')
