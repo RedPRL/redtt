@@ -47,10 +47,13 @@ sig
   val ext : t -> el -> t
 
   include DimRel.S with type t := t
+
+  val set_rel : DimRel.t -> t -> t
 end
 
 
 type env = Env.t
+type rel = DimRel.t
 
 val eval : env -> 'a Tm.t -> can t
 
@@ -60,12 +63,12 @@ val embed_dimval : DimVal.t -> can t
 val eval_clo : tclo -> can t
 val inst_bclo : bclo -> can t -> can t
 
-val apply : can t -> can t -> can t
-val car : can t -> can t
-val cdr : can t -> can t
+val apply : rel -> can t -> can t -> can t
+val car : rel -> can t -> can t
+val cdr : rel -> can t -> can t
 
-val reflect : can t -> neu t -> can t
-val generic : can t -> int -> can t
+val reflect : rel -> can t -> neu t -> can t
+val generic : rel -> can t -> int -> can t
 
 val out_pi : can t -> tclo * bclo
 val out_sg : can t -> tclo * bclo

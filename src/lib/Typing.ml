@@ -11,20 +11,21 @@ sig
 
   val env : t -> Val.env
   val qctx : t -> Quote.ctx
+  val rel : t -> DimRel.t
 end =
 struct
   type t =
     {tys : Val.can Val.t list;
      env : Val.env;
      qctx : Quote.ctx;
-     rel : DimRel.M.t;
+     rel : DimRel.t;
      len : int}
 
   let emp =
     {tys = [];
      env = Val.Env.emp;
      qctx = Quote.Ctx.emp;
-     rel = DimRel.M.emp;
+     rel = DimRel.emp;
      len = 0}
 
   let ext cx v =
@@ -35,25 +36,21 @@ struct
      len = cx.len + 1}
 
   let restrict_exn cx d0 d1 =
-    let rel = DimRel.M.restrict_exn cx.rel d0 d1 in
+    let rel = DimRel.restrict_exn cx.rel d0 d1 in
     {cx with rel = rel}
 
   let compare_dim cx =
-    DimRel.M.compare_dim cx.rel
+    DimRel.compare_dim cx.rel
 
-  exception Inconsistent = DimRel.M.Inconsistent
+  exception Inconsistent = DimRel.Inconsistent
 
   let lookup th cx =
     Thin.proj th cx.tys
 
-  let len cx =
-    cx.len
-
-  let env cx =
-    cx.env
-
-  let qctx cx =
-    cx.qctx
+  let len cx = cx.len
+  let env cx = Val.Env.set_rel cx.rel cx.env 
+  let qctx cx = Quote.Ctx.set_rel cx.rel cx.qctx
+  let rel cx = cx.rel
 end
 
 let rec update_env ix v rho = 
@@ -103,7 +100,7 @@ let rec check ~mode ~ctx ~ty ~tm =
   | Val.Pi (dom, cod), Tm.Lam (Tm.B tm) ->
     let vdom = Val.eval_clo dom in
     let ctx' = Ctx.ext ctx vdom in
-    let vgen = Val.generic vdom @@ Ctx.len ctx in
+    let vgen = Val.generic (Ctx.rel ctx) vdom @@ Ctx.len ctx in
     let vcod = Val.inst_bclo cod vgen in
     check ~mode:Real ~ctx:ctx' ~ty:vcod ~tm
 
@@ -165,7 +162,7 @@ and infer ~mode ~ctx ~tm =
     let ty = infer ~mode:Real ~ctx ~tm in
     let _, cod = Val.out_sg ty in
     let vpair = Val.eval (Ctx.env ctx) tm in
-    let vcar = Val.car vpair in
+    let vcar = Val.car (Ctx.rel ctx) vpair in
     Val.inst_bclo cod vcar
 
   | Tm.Down {ty; tm} ->

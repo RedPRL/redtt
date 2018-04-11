@@ -4,6 +4,8 @@ type neu = [`Neu]
 type 'a tube = DimVal.t * DimVal.t * 'a option
 type 'a system = 'a tube list
 
+type rel = DimRel.t
+
 
 type _ f =
   | Lvl : int -> neu f
@@ -30,7 +32,7 @@ type _ f =
   | Cdr : neu t -> neu f
 
 and 'a t = { con : 'a f }
-and env = { vals : can t list; rel : DimRel.M.t }
+and env = { vals : can t list; rel : DimRel.t }
 
 and 'a clo = { foc : 'a; thin : Thin.t; env : env; stk : stk }
 and tclo = Tm.chk Tm.t clo
@@ -64,6 +66,9 @@ sig
   val lookup : Thin.t -> t -> el
   val thin : Thin.t -> t -> t
 
+  val rel : t -> DimRel.t
+  val set_rel : DimRel.t -> t -> t
+
   include DimRel.S with type t := t
 end =
 struct
@@ -72,7 +77,7 @@ struct
 
   let emp =
     {vals = [];
-     rel = DimRel.M.emp}
+     rel = DimRel.emp}
 
   let ext env v =
     {vals = v :: env.vals;
@@ -84,14 +89,17 @@ struct
   let thin th env =
     {env with vals = Thin.act th env.vals}
 
-  exception Inconsistent = DimRel.M.Inconsistent
+  exception Inconsistent = DimRel.Inconsistent
 
   let restrict_exn env d0 d1 =
-    let rel = DimRel.M.restrict_exn env.rel d0 d1 in
+    let rel = DimRel.restrict_exn env.rel d0 d1 in
     {env with rel = rel}
 
   let compare_dim env =
-    DimRel.M.compare_dim env.rel
+    DimRel.compare_dim env.rel
+
+  let rel env = env.rel
+  let set_rel rl env = {env with rel = rl}
 end
 
 let into vf =
@@ -142,8 +150,8 @@ let bclo_frame : frm -> bclo -> bclo =
     { node with stk = frm :: node.stk }
 
 
-let coe ~tag ~dim0 ~dim1 ~ty ~tm =
-  match DimVal.compare (project_dimval dim0) (project_dimval dim1) with
+let coe ~rel ~tag ~dim0 ~dim1 ~ty ~tm =
+  match DimRel.compare_dim rel (project_dimval dim0) (project_dimval dim1) with
   | DimVal.Same -> tm
   | _ -> into @@ Coe {tag; dim0; dim1; ty; tm}
 
@@ -193,21 +201,21 @@ let rec eval : type a. env -> a Tm.t -> can t =
       let vd0 = eval rho info.dim0 in
       let vd1 = eval rho info.dim1 in
       let vtm = eval rho info.tm in
-      coe ~tag:info.tag ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~tm:vtm
+      coe ~rel:(Env.rel rho) ~tag:info.tag ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~tm:vtm
 
     | Tm.HCom info ->
       let vd0 = eval rho info.dim0 in
       let vd1 = eval rho info.dim1 in
       let vcap = eval rho info.cap in
       let vsys = eval_bsys rho info.sys in
-      hcom ~tag:info.tag ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~cap:vcap ~sys:vsys
+      hcom ~rel:(Env.rel rho) ~tag:info.tag ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~cap:vcap ~sys:vsys
 
     | Tm.Com info ->
       let vd0 = eval rho info.dim0 in
       let vd1 = eval rho info.dim1 in
       let vcap = eval rho info.cap in
       let vsys = eval_bsys rho info.sys in
-      com ~tag:info.tag ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~cap:vcap ~sys:vsys
+      com ~rel:(Env.rel rho) ~tag:info.tag ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~cap:vcap ~sys:vsys
 
     | Tm.Univ lvl ->
       into @@ Univ lvl
@@ -222,13 +230,13 @@ let rec eval : type a. env -> a Tm.t -> can t =
       into Dim1
 
     | Tm.Car t ->
-      car @@ eval rho t
+      car (Env.rel rho) @@ eval rho t
 
     | Tm.Cdr t ->
-      cdr @@ eval rho t
+      cdr (Env.rel rho) @@ eval rho t
 
     | Tm.App (t1, t2) ->
-      apply (eval rho t1) (eval rho t2)
+      apply (Env.rel rho) (eval rho t1) (eval rho t2)
 
     | Tm.Down t ->
       eval rho t.tm
@@ -236,12 +244,12 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Up t ->
       eval rho t
 
-and project_bsys ~dim1 ~sys =
+and project_bsys ~rel ~dim1 ~sys =
   let rec go tubes =
     match tubes with
     | [] -> `Ret sys
     | (vd0, vd1, obclo) :: sys ->
-      match DimVal.compare vd0 vd1, obclo with
+      match DimRel.compare_dim rel vd0 vd1, obclo with
       | DimVal.Same, Some bclo ->
         `Throw (inst_bclo bclo dim1)
       | DimVal.Same, None ->
@@ -250,21 +258,21 @@ and project_bsys ~dim1 ~sys =
   in
   go sys
 
-and hcom ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
-  match DimVal.compare (project_dimval dim0) (project_dimval dim1) with
+and hcom ~rel ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
+  match DimRel.compare_dim rel (project_dimval dim0) (project_dimval dim1) with
   | DimVal.Same -> cap
   | _ ->
-    match project_bsys ~dim1 ~sys with
+    match project_bsys ~rel ~dim1 ~sys with
     | `Ret sys -> into @@ HCom {tag; dim0; dim1; ty; cap; sys}
     | `Throw v -> v
 
-and com ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
-  let vcap' = coe ~tag ~dim0 ~dim1 ~ty ~tm:cap in
+and com ~rel ~tag ~dim0 ~dim1 ~ty ~cap ~sys =
+  let vcap' = coe ~rel ~tag ~dim0 ~dim1 ~ty ~tm:cap in
   let Tm.B tm = ty.foc in
   let ty1 = {ty with foc = tm; env = Env.ext ty.env dim1} in
   let tube bclo' = bclo_frame (KComTubeCoe {tag; dim1 = dim1; ty = ty; tube = bclo'}) ty in
   let vsys' = map_tubes tube sys in
-  hcom ~tag ~dim0 ~dim1 ~ty:ty1 ~cap:vcap' ~sys:vsys'
+  hcom ~rel ~tag ~dim0 ~dim1 ~ty:ty1 ~cap:vcap' ~sys:vsys'
 
 
 and eval_sys rho sys =
@@ -293,7 +301,7 @@ and eval_btube rho (t0, t1, obnd) =
   with
   | Env.Inconsistent -> (vd0, vd1, None)
 
-and apply vfun varg =
+and apply rel vfun varg =
   match out vfun with
   | Lam bclo ->
     inst_bclo bclo varg
@@ -301,25 +309,25 @@ and apply vfun varg =
   | Up (vty, vneu) ->
     let dom, cod = out_pi vty in
     let vcod = inst_bclo cod varg in
-    reflect vcod @@ into @@ App (vneu, varg)
+    reflect rel vcod @@ into @@ App (vneu, varg)
 
   | Coe info ->
     let dom = bclo_frame KPiDom info.ty in
     let cod = bclo_frame (KPiCodCoe {tag = info.tag; dim1 = info.dim1; dom = dom; arg = varg}) info.ty in
-    let varg' = coe ~tag:info.tag ~dim0:info.dim1 ~dim1:info.dim0 ~ty:dom ~tm:varg in
-    coe ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:(apply info.tm varg')
+    let varg' = coe ~rel ~tag:info.tag ~dim0:info.dim1 ~dim1:info.dim0 ~ty:dom ~tm:varg in
+    coe ~rel ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:(apply rel info.tm varg')
 
   | HCom info ->
     let dom, cod = out_pi @@ eval_clo info.ty in
     let Tm.B tm = cod.foc in
     let cod' = {cod with foc = tm; env = Env.ext cod.env varg} in
-    let vcap' = apply info.cap varg in
+    let vcap' = apply rel info.cap varg in
     let vsys' = map_tubes (bclo_frame (KApply varg)) info.sys in
-    hcom ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod' ~cap:vcap' ~sys:vsys'
+    hcom ~rel ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod' ~cap:vcap' ~sys:vsys'
 
   | _ -> failwith "apply"
 
-and car v =
+and car rel v =
   match out v with
   | Cons (clo, _) ->
     eval_clo clo
@@ -327,70 +335,70 @@ and car v =
   | Up (vty, vneu) ->
     let dom, _ = out_sg vty in
     let vdom = eval_clo dom in
-    reflect vdom @@ into @@ Car vneu
+    reflect rel vdom @@ into @@ Car vneu
 
   | Coe info ->
     let dom = bclo_frame KSgDom info.ty in
-    let vcar = car v in
-    coe ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~tm:vcar
+    let vcar = car rel v in
+    coe ~rel:rel ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~tm:vcar
 
   | HCom info ->
     let dom, _ = out_sg @@ eval_clo info.ty in
-    let vcap' = car info.cap in
+    let vcap' = car rel info.cap in
     let vsys' = map_tubes (bclo_frame KCar) info.sys in
-    hcom ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~cap:vcap' ~sys:vsys'
+    hcom ~rel ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~cap:vcap' ~sys:vsys'
 
   | _ -> failwith "car"
 
-and cdr v =
+and cdr rel v =
   match out v with
   | Cons (_, clo) ->
     eval_clo clo
 
   | Up (vty, vneu) ->
     let dom, cod = out_sg vty in
-    let vcar = car v in
+    let vcar = car rel v in
     let vcod = inst_bclo cod vcar in
-    reflect vcod @@ into @@ Cdr vneu
+    reflect rel vcod @@ into @@ Cdr vneu
 
   | Coe info ->
-    let vcar = car info.tm in
-    let vcdr = cdr info.tm in
+    let vcar = car rel info.tm in
+    let vcdr = cdr rel info.tm in
     let dom = bclo_frame KSgDom info.ty in
     let frm = KSgCodCoe {tag = info.tag; dim0 = info.dim0; dom = dom; arg = vcar} in
     let cod = bclo_frame frm info.ty in
-    coe ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:vcdr
+    coe ~rel ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:vcdr
 
   | HCom info ->
     let frm = KSgCodHCom {tag = info.tag; dim0 = info.dim0; dom = clo_frame KSgDom info.ty; cap = info.cap; sys = info.sys} in
     let cod' = {info.ty with foc = Tm.B info.ty.foc; thin = Thin.skip info.ty.thin; stk = frm :: info.ty.stk} in
-    let vcap' = cdr info.cap in
+    let vcap' = cdr rel info.cap in
     let vsys' = map_tubes (bclo_frame KCdr) info.sys in
-    com ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod' ~cap:vcap' ~sys:vsys'
+    com ~rel ~tag:info.tag ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod' ~cap:vcap' ~sys:vsys'
 
   | _ -> failwith "cdr"
 
-and reflect vty vneu =
+and reflect rel vty vneu =
   match out vty with
   | Restrict (tag, dom, sys) ->
-    reflect_ext dom sys vneu
+    reflect_ext rel dom sys vneu
   | _ -> into @@ Up (vty, vneu)
 
-and generic vty i =
-  reflect vty @@ into @@ Lvl i
+and generic rel vty i =
+  reflect rel vty @@ into @@ Lvl i
 
-and reflect_ext dom sys vneu =
+and reflect_ext rel dom sys vneu =
   match sys with
-  | [] -> reflect dom vneu
+  | [] -> reflect rel dom vneu
   | (vd0, vd1, clo) :: sys ->
-    match DimVal.compare vd0 vd1 with
+    match DimRel.compare_dim rel vd0 vd1 with
     | DimVal.Same ->
       begin
         match clo with
         | Some clo -> eval_clo clo
         | None -> failwith "reflect_ext: did not expect None in tube"
       end
-    | _ -> reflect_ext dom sys vneu
+    | _ -> reflect_ext rel dom sys vneu
 
 and eval_stk stk (rho : env) v =
   match stk with
@@ -402,13 +410,13 @@ and eval_stk stk (rho : env) v =
 and eval_frm rho frm v =
   match frm with
   | KCar ->
-    car v
+    car (Env.rel rho) v
 
   | KCdr ->
-    cdr v
+    cdr (Env.rel rho) v
 
   | KApply varg ->
-    apply v varg
+    apply (Env.rel rho) v varg
 
   | KRestrictCar (tag, sys) ->
     let sys' = map_tubes (clo_frame KCar) sys in
@@ -426,7 +434,7 @@ and eval_frm rho frm v =
   | KComTubeCoe {tag; dim1; ty; tube} ->
     let varg = List.hd rho.vals in
     let tm = inst_bclo tube varg in
-    coe ~tag ~dim0:varg ~dim1 ~ty ~tm
+    coe ~rel:(Env.rel rho) ~tag ~dim0:varg ~dim1 ~ty ~tm
 
   | KPiDom ->
     let dom, _ = out_pi v in
@@ -436,7 +444,7 @@ and eval_frm rho frm v =
     let dimx = List.hd rho.vals in
     let _, cod = out_pi v in
     inst_bclo cod @@
-    coe ~tag ~dim0:dim1 ~dim1:dimx ~ty:dom ~tm:arg
+    coe ~rel:(Env.rel rho) ~tag ~dim0:dim1 ~dim1:dimx ~ty:dom ~tm:arg
 
   | KSgDom ->
     let dom, _ = out_sg v in
@@ -446,15 +454,15 @@ and eval_frm rho frm v =
     let dimx = List.hd rho.vals in
     let _, cod = out_sg v in
     inst_bclo cod @@
-    coe ~tag ~dim0 ~dim1:dimx ~ty:dom ~tm:arg
+    coe ~rel:(Env.rel rho) ~tag ~dim0 ~dim1:dimx ~ty:dom ~tm:arg
 
   | KSgCodHCom {tag; dim0; dom; cap; sys} ->
     let dimx = List.hd rho.vals in
     let _, cod = out_sg v in
-    let cap' = car cap in
+    let cap' = car (Env.rel rho) cap in
     let sys' = map_tubes (bclo_frame KCar) sys in
     inst_bclo cod @@
-    hcom ~tag ~dim0 ~dim1:dimx ~ty:dom ~cap:cap' ~sys:sys'
+    hcom ~rel:(Env.rel rho) ~tag ~dim0 ~dim1:dimx ~ty:dom ~cap:cap' ~sys:sys'
 
 and inst_bclo : bclo -> can t -> can t =
   fun node varg ->

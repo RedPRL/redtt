@@ -5,16 +5,23 @@ sig
   type t
   val len : t -> int
   val nth : t -> int -> Val.can Val.t
-  val ext : t -> Val.can Val.t -> t
+
   val emp : t
+  val ext : t -> Val.can Val.t -> t
+
+  val rel : t -> DimRel.t
+  val set_rel : DimRel.t -> t -> t
 end =
 struct
-  type t = {tys : Val.can Val.t list; len : int}
+  type t = {tys : Val.can Val.t list; rel : DimRel.t; len : int}
   let len cx = cx.len
   let nth cx i = List.nth cx.tys i
 
-  let emp = {tys = []; len = 0}
-  let ext cx ty = {tys = ty::cx.tys; len = cx.len + 1}
+  let emp = {tys = []; len = 0; rel = DimRel.emp}
+  let ext cx ty = {tys = ty::cx.tys; len = cx.len + 1; rel = cx.rel}
+
+  let rel cx = cx.rel
+  let set_rel rl cx = {cx with rel = rl}
 end
 
 type ctx = Ctx.t
@@ -27,8 +34,8 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let dom1, cod1 = Val.out_pi can1 in
     let vdom0 = Val.eval_clo dom0 in
     let vdom1 = Val.eval_clo dom1 in
-    let vgen0 = Val.generic vdom0 @@ Ctx.len ctx in
-    let vgen1 = Val.generic vdom1 @@ Ctx.len ctx in
+    let vgen0 = Val.generic (Ctx.rel ctx) vdom0 @@ Ctx.len ctx in
+    let vgen1 = Val.generic (Ctx.rel ctx) vdom1 @@ Ctx.len ctx in
     let vcod0 = Val.inst_bclo cod0 vgen0 in
     let vcod1 = Val.inst_bclo cod1 vgen1 in
     let qdom = approx_can_ ~vr:Iso ~ctx ~ty ~can0:vdom1 ~can1:vdom0 in
@@ -39,8 +46,8 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let dom0, cod0 = Val.out_pi can0 in
     let vdom0 = Val.eval_clo dom0 in
     let vdom1 = Val.eval_clo dom1 in
-    let vgen0 = Val.generic vdom0 @@ Ctx.len ctx in
-    let vgen1 = Val.generic vdom1 @@ Ctx.len ctx in
+    let vgen0 = Val.generic (Ctx.rel ctx) vdom0 @@ Ctx.len ctx in
+    let vgen1 = Val.generic (Ctx.rel ctx) vdom1 @@ Ctx.len ctx in
     let vcod0 = Val.inst_bclo cod0 vgen0 in
     let vcod1 = Val.inst_bclo cod1 vgen1 in
     let qdom = approx_can_ ~vr:Iso ~ctx ~ty ~can0:vdom1 ~can1:vdom0 in
@@ -51,8 +58,8 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let dom1, cod1 = Val.out_sg can1 in
     let vdom0 = Val.eval_clo dom0 in
     let vdom1 = Val.eval_clo dom1 in
-    let vgen0 = Val.generic vdom0 @@ Ctx.len ctx in
-    let vgen1 = Val.generic vdom1 @@ Ctx.len ctx in
+    let vgen0 = Val.generic (Ctx.rel ctx) vdom0 @@ Ctx.len ctx in
+    let vgen1 = Val.generic (Ctx.rel ctx) vdom1 @@ Ctx.len ctx in
     let vcod0 = Val.inst_bclo cod0 vgen0 in
     let vcod1 = Val.inst_bclo cod1 vgen1 in
     let qdom = approx_can_ ~vr:Iso ~ctx ~ty ~can0:vdom1 ~can1:vdom0 in
@@ -63,8 +70,8 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let dom0, cod0 = Val.out_sg can0 in
     let vdom0 = Val.eval_clo dom0 in
     let vdom1 = Val.eval_clo dom1 in
-    let vgen0 = Val.generic vdom0 @@ Ctx.len ctx in
-    let vgen1 = Val.generic vdom1 @@ Ctx.len ctx in
+    let vgen0 = Val.generic (Ctx.rel ctx) vdom0 @@ Ctx.len ctx in
+    let vgen1 = Val.generic (Ctx.rel ctx) vdom1 @@ Ctx.len ctx in
     let vcod0 = Val.inst_bclo cod0 vgen0 in
     let vcod1 = Val.inst_bclo cod1 vgen1 in
     let qdom = approx_can_ ~vr:Iso ~ctx ~ty ~can0:vdom1 ~can1:vdom0 in
@@ -107,19 +114,20 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
 
   | Val.Pi (dom, cod), _, _ ->
     let vdom = Val.eval_clo dom in
-    let vgen = Val.generic vdom @@ Ctx.len ctx in
+    let vgen = Val.generic (Ctx.rel ctx) vdom @@ Ctx.len ctx in
     let vcod = Val.inst_bclo cod vgen in
-    let vapp0 = Val.apply can0 vgen in
-    let vapp1 = Val.apply can1 vgen in
+    let vapp0 = Val.apply (Ctx.rel ctx) can0 vgen in
+    let vapp1 = Val.apply (Ctx.rel ctx) can1 vgen in
     let qbdy = approx_can_ ~vr ~ctx:(Ctx.ext ctx vdom) ~ty:vcod ~can0:vapp0 ~can1:vapp1 in
     Tm.into @@ Tm.Lam (Tm.B qbdy)
 
   | Val.Sg (dom, cod), _, _->
     let vdom = Val.eval_clo dom in
-    let vcar0 = Val.car can0 in
-    let vcar1 = Val.car can1 in
-    let vcdr0 = Val.cdr can0 in
-    let vcdr1 = Val.cdr can1 in
+    let rel = Ctx.rel ctx in
+    let vcar0 = Val.car rel can0 in
+    let vcar1 = Val.car rel can1 in
+    let vcdr0 = Val.cdr rel can0 in
+    let vcdr1 = Val.cdr rel can1 in
     let vcod = Val.inst_bclo cod vcar0 in
     let qcar = approx_can_ ~vr ~ctx ~ty:vdom ~can0:vcar0 ~can1:vcar1 in
     let qcdr = approx_can_ ~vr ~ctx ~ty:vcod ~can0:vcdr0 ~can1:vcdr1 in
@@ -139,7 +147,7 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
             let univ = Val.into @@ Val.Univ Lvl.Omega in
             let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:coe0.dim0 ~can1:coe0.dim0 in
             let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:coe0.dim1 ~can1:coe0.dim1 in
-            let vgen = Val.generic interval @@ Ctx.len ctx in
+            let vgen = Val.generic (Ctx.rel ctx) interval @@ Ctx.len ctx in
             let vty0 = Val.inst_bclo coe0.ty vgen in
             let vty1 = Val.inst_bclo coe1.ty vgen in
             let qty = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty:univ ~can0:vty0 ~can1:vty1 in
@@ -231,7 +239,7 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
     let quo = approx_neu_ ~vr ~ctx ~neu0 ~neu1 in
     let dom, cod = Val.out_sg quo.ty in
     let vdom = Val.eval_clo dom in
-    let vcar = Val.reflect vdom @@ Val.into @@ Val.Car neu0 in
+    let vcar = Val.reflect (Ctx.rel ctx) vdom @@ Val.into @@ Val.Car neu0 in
     let vcod = Val.inst_bclo cod vcar in
     {tm = Tm.into @@ Tm.Cdr quo.tm;
      ty = vcod}
@@ -286,7 +294,7 @@ and approx_bsys ~vr ~tag ~ctx ~ty ~sys0 ~sys1 =
       let oqbnd =
         match obclo0, obclo1 with
         | Some bclo0, Some bclo1 ->
-          let vgen = Val.generic interval @@ Ctx.len ctx in
+          let vgen = Val.generic (Ctx.rel ctx) interval @@ Ctx.len ctx in
           let v0 = Val.inst_bclo bclo0 vgen in
           let v1 = Val.inst_bclo bclo1 vgen in
           let qbnd = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty ~can0:v0 ~can1:v1 in
@@ -323,7 +331,7 @@ and project_coe ~ctx ~tag ~ty ~dim0 ~bty =
 
 and project_rigid_coe ~ctx ~ty ~tag ~dim0 ~bty =
   let interval = Val.into @@ Val.Interval tag in
-  let vgen = Val.generic interval @@ Ctx.len ctx in
+  let vgen = Val.generic (Ctx.rel ctx) interval @@ Ctx.len ctx in
   match Val.out @@ Val.inst_bclo bty vgen with
   | Val.Up (univ, tyneu) -> `Coe
   | Val.Univ _ -> `Proj

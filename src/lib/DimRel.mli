@@ -8,4 +8,4 @@ sig
   val compare_dim : t -> DimVal.t -> DimVal.t -> DimVal.compare
 end
 
-module M : S
+include S

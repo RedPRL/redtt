@@ -8,15 +8,12 @@ sig
   val compare_dim : t -> DimVal.t -> DimVal.t -> DimVal.compare
 end
 
-module M : S = 
-struct
-  type t
+type t
 
-  let emp = failwith ""
+let emp = failwith ""
 
-  exception Inconsistent
+exception Inconsistent
 
-  let restrict_exn _ _ _ = failwith "todo"
+let restrict_exn _ _ _ = failwith "todo"
 
-  let compare_dim _ _ _ = failwith ""
-end
+let compare_dim _ _ _ = failwith ""

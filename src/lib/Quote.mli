@@ -3,11 +3,14 @@ type neu_quo = {tm : Tm.inf Tm.t; ty : Val.can Val.t}
 module Ctx :
 sig
   type t
+
   val len : t -> int
   val nth : t -> int -> Val.can Val.t
   
   val emp : t
   val ext : t -> Val.can Val.t -> t
+
+  val set_rel : DimRel.t -> t -> t
 end
 
 type ctx = Ctx.t
