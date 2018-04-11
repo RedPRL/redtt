@@ -94,7 +94,17 @@ let rec check ~mode ~ctx ~ty ~tm =
     check ~mode:Real ~ctx ~ty:vcod ~tm:tm1
 
   | Val.Restrict (tag, dom, sys), _ ->
-    failwith "TODO!"
+    check ~mode:Real ~ctx ~ty:dom ~tm;
+    let go (vd0, vd1, otclo) =
+      failwith "This is very hard and I have no ideas yet for how to do it."
+      (* Somehow we need to check equality under the assumption of this dimension
+         equation; this seems to call for a substitution, which seems weird. I'm
+         not even sure how to write such a substitution.
+         
+         Somehow I feel that we need to come up with a new idea in the semantic
+         domain for the tube. *)
+    in
+    List.fold_right (fun tube _ -> go tube) sys ()
 
   | Val.Interval _, Tm.Dim0 ->
     ()
