@@ -37,7 +37,20 @@ type _ f =
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
 
-type env = can t list
+
+module Env : 
+sig
+  type el = can t
+
+  type t
+  val emp : t
+  val ext : t -> el -> t
+
+  include DimRel.S with type t := t
+end
+
+
+type env = Env.t
 
 val eval : env -> 'a Tm.t -> can t
 

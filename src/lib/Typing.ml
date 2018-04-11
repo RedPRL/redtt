@@ -4,10 +4,7 @@ sig
   val emp : t
   val ext : t -> Val.can Val.t -> t
 
-  val restrict : t -> DimVal.t * DimVal.t -> t
-  val compare_dim : t -> DimVal.t -> DimVal.t -> DimVal.compare
-
-  exception Inconsistent
+  include DimRel.S with type t := t
 
   val lookup : Thin.t -> t -> Val.can Val.t
   val len : t -> int
@@ -20,27 +17,31 @@ struct
     {tys : Val.can Val.t list;
      env : Val.env;
      qctx : Quote.ctx;
+     rel : DimRel.M.t;
      len : int}
 
   let emp =
     {tys = [];
-     env = [];
+     env = Val.Env.emp;
      qctx = Quote.Ctx.emp;
+     rel = DimRel.M.emp;
      len = 0}
 
   let ext cx v =
     {tys = v :: cx.tys;
-     env = Val.generic v cx.len :: cx.env;
+     env = Val.Env.ext cx.env v;
      qctx = Quote.Ctx.ext cx.qctx v;
+     rel = cx.rel;
      len = cx.len + 1}
 
-  let restrict _ _ =
-    failwith "TODO"
+  let restrict_exn cx d0 d1 =
+    let rel = DimRel.M.restrict_exn cx.rel d0 d1 in
+    {cx with rel = rel}
 
-  let compare_dim _ _ _ =
-    failwith "TODO"
+  let compare_dim cx =
+    DimRel.M.compare_dim cx.rel
 
-  exception Inconsistent
+  exception Inconsistent = DimRel.M.Inconsistent
 
   let lookup th cx =
     Thin.proj th cx.tys
@@ -116,7 +117,7 @@ let rec check ~mode ~ctx ~ty ~tm =
     check ~mode:Real ~ctx ~ty:dom ~tm;
     let go (vd0, vd1, otclo) =
       try
-        let ctx' = Ctx.restrict ctx (vd0, vd1) in
+        let ctx' = Ctx.restrict_exn ctx vd0 vd1 in
         let can0 = Val.eval (Ctx.env ctx') tm in
         let can1 = Val.eval_clo @@ Option.get_exn otclo in
         Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty:dom ~can0 ~can1
@@ -180,9 +181,9 @@ and infer ~mode ~ctx ~tm =
     let vdim1 = check_eval ~mode:Real ~ctx ~ty:interval ~tm:coe.dim1 in
     let Tm.B ty = coe.ty in
     check ~mode:Real ~ctx:(Ctx.ext ctx interval) ~ty:univ ~tm:ty;
-    let vty0 = Val.eval (vdim0 :: Ctx.env ctx) ty in
+    let vty0 = Val.eval (Val.Env.ext (Ctx.env ctx) vdim0) ty in
     check ~mode:Real ~ctx:ctx ~ty:vty0 ~tm:coe.tm;
-    Val.eval (vdim1 :: Ctx.env ctx) ty
+    Val.eval (Val.Env.ext (Ctx.env ctx) vdim1) ty
 
   | Tm.HCom hcom ->
     failwith ""
