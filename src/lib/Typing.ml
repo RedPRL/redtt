@@ -3,6 +3,12 @@ sig
   type t
   val emp : t
   val ext : t -> Val.can Val.t -> t
+
+  val restrict : t -> DimVal.t * DimVal.t -> t
+  val compare_dim : t -> DimVal.t -> DimVal.t -> DimVal.compare
+
+  exception Inconsistent
+
   val lookup : Thin.t -> t -> Val.can Val.t
   val len : t -> int
 
@@ -28,6 +34,14 @@ struct
      qctx = Quote.Ctx.ext cx.qctx v;
      len = cx.len + 1}
 
+  let restrict _ _ =
+    failwith "TODO"
+
+  let compare_dim _ _ _ =
+    failwith "TODO"
+
+  exception Inconsistent
+
   let lookup th cx =
     Thin.proj th cx.tys
 
@@ -39,8 +53,13 @@ struct
 
   let qctx cx =
     cx.qctx
-
 end
+
+let rec update_env ix v rho = 
+  match ix, rho with
+  | 0, _ :: rho -> v :: rho
+  | _, v' :: rho -> v' :: update_env (ix - 1) v rho
+  | _ -> failwith "update_env"
 
 type mode = FaconDeParler | Real
 
@@ -96,13 +115,13 @@ let rec check ~mode ~ctx ~ty ~tm =
   | Val.Restrict (tag, dom, sys), _ ->
     check ~mode:Real ~ctx ~ty:dom ~tm;
     let go (vd0, vd1, otclo) =
-      failwith "This is very hard and I have no ideas yet for how to do it."
-      (* Somehow we need to check equality under the assumption of this dimension
-         equation; this seems to call for a substitution, which seems weird. I'm
-         not even sure how to write such a substitution.
-         
-         Somehow I feel that we need to come up with a new idea in the semantic
-         domain for the tube. *)
+      try
+        let ctx' = Ctx.restrict ctx (vd0, vd1) in
+        let can0 = Val.eval (Ctx.env ctx') tm in
+        let can1 = Val.eval_clo @@ Option.get_exn otclo in
+        Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty:dom ~can0 ~can1
+      with
+      | Ctx.Inconsistent -> ()
     in
     List.fold_right (fun tube _ -> go tube) sys ()
 
