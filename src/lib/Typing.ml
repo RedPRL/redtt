@@ -59,7 +59,7 @@ let rec check ~ctx ~ty ~tm =
     let ctx' = Ctx.ext ctx vdom in
     check ~ctx:ctx' ~ty ~tm:cod
 
-  | Val.Univ _, Tm.Ext (tag, dom, sys) ->
+  | Val.Univ _, Tm.Restrict (tag, dom, sys) ->
     failwith "TODO!"
 
   | Val.Pi (dom, cod), Tm.Lam (Tm.B tm) ->
@@ -75,7 +75,7 @@ let rec check ~ctx ~ty ~tm =
     let vcod = Val.inst_bclo cod vtm0 in
     check ~ctx ~ty:vcod ~tm:tm1
 
-  | Val.Ext (tag, dom, sys), _ ->
+  | Val.Restrict (tag, dom, sys), _ ->
     failwith "TODO!"
 
   | Val.Interval _, Tm.Dim0 ->
@@ -88,7 +88,6 @@ let rec check ~ctx ~ty ~tm =
     let ty' = infer ~ctx ~tm in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     Quote.approx ~ctx:(Ctx.qctx ctx) ~ty:univ ~can0:ty' ~can1:ty
-
 
   | _ -> failwith ""
 
