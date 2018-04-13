@@ -66,6 +66,8 @@ struct
     | Some s -> S.mem d1 s
 end
 
+type t = Rel.t
+
 let emp = Rel.emp
 
 let restrict_exn rel x y =

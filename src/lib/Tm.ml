@@ -22,7 +22,6 @@ type _ f =
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
-  | Restrict : Cube.t * chk t * chk t system -> chk f
   | Interval : Cube.t -> chk f
 
   | Lam : chk t bnd -> chk f
@@ -103,9 +102,6 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
 
     | Sg (dom, cod) ->
       Sg (thin th dom, thin_bnd th cod)
-
-    | Restrict (tag, ty, sys) ->
-      Restrict (tag, thin th ty, thin_sys th sys)
 
     | Interval _ ->
       tf

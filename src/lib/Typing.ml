@@ -53,7 +53,7 @@ struct
   let rel cx = cx.rel
 end
 
-let rec update_env ix v rho = 
+let rec update_env ix v rho =
   match ix, rho with
   | 0, _ :: rho -> v :: rho
   | _, v' :: rho -> v' :: update_env (ix - 1) v rho
@@ -86,9 +86,6 @@ let rec check ~mode ~ctx ~ty ~tm =
     let ctx' = Ctx.ext ctx vdom in
     check ~mode:Real ~ctx:ctx' ~ty ~tm:cod
 
-  | Val.Univ _, Tm.Restrict (tag, dom, sys) ->
-    failwith "TODO!"
-
   | Val.Univ _, Tm.Interval tag ->
     begin
       match mode with
@@ -109,19 +106,6 @@ let rec check ~mode ~ctx ~ty ~tm =
     let vtm0 = check_eval ~mode:Real ~ctx ~ty:vdom ~tm:tm0 in
     let vcod = Val.inst_bclo cod vtm0 in
     check ~mode:Real ~ctx ~ty:vcod ~tm:tm1
-
-  | Val.Restrict (tag, dom, sys), _ ->
-    check ~mode:Real ~ctx ~ty:dom ~tm;
-    let go (vd0, vd1, otclo) =
-      try
-        let ctx' = Ctx.restrict_exn ctx vd0 vd1 in
-        let can0 = Val.eval (Ctx.env ctx') tm in
-        let can1 = Val.eval_clo @@ Option.get_exn otclo in
-        Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty:dom ~can0 ~can1
-      with
-      | Ctx.Inconsistent -> ()
-    in
-    List.fold_right (fun tube _ -> go tube) sys ()
 
   | Val.Interval _, Tm.Dim0 ->
     ()

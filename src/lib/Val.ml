@@ -14,7 +14,6 @@ type _ f =
 
   | Pi : tclo * bclo -> can f
   | Sg : tclo * bclo -> can f
-  | Restrict : Cube.t * can t * tclo system -> can f
   | Univ : Lvl.t -> can f
   | Interval : Cube.t -> can f
 
@@ -40,11 +39,8 @@ and bclo = Tm.chk Tm.t Tm.bnd clo
 
 and frm =
   | KApply of can t
-  | KRestrictCar of Cube.t * tclo system
   | KCar
   | KCdr
-  | KRestrictApp of Cube.t * tclo system
-  | KRestrictCdr of Cube.t * tclo system
   | KComTubeCoe of {tag : Cube.t; dim1 : can t; ty : bclo; tube : bclo}
   | KPiDom
   | KPiCodCoe of {tag : Cube.t; dim1 : can t; dom : bclo; arg : can t}
@@ -158,21 +154,14 @@ let coe ~rel ~tag ~dim0 ~dim1 ~ty ~tm =
 
 
 
-let rec out_pi v =
+let out_pi v =
   match out v with
   | Pi (dom, cod) -> dom, cod
-  | Restrict (tag, vty, vsys) ->
-    let dom, cod = out_pi vty in
-    dom, bclo_frame (KRestrictApp (tag, vsys)) cod
   | _ -> failwith "out_pi"
 
-let rec out_sg v =
+let out_sg v =
   match out v with
   | Sg (dom, cod) -> dom, cod
-  | Restrict (tag, vty, vsys) ->
-    let dom, cod = out_sg vty in
-    clo_frame (KRestrictCar (tag, vsys)) dom,
-    bclo_frame (KRestrictCdr (tag, vsys)) cod
   | _ -> failwith "out_sg"
 
 
@@ -187,9 +176,6 @@ let rec eval : type a. env -> a Tm.t -> can t =
 
     | Tm.Sg (dom, cod) ->
       into @@ Sg (dom <: rho, cod <: rho)
-
-    | Tm.Restrict (tag, ty, sys) ->
-      into @@ Restrict (tag, eval rho ty, eval_sys rho sys)
 
     | Tm.Lam bdy ->
       into @@ Lam (bdy <: rho)
@@ -379,10 +365,7 @@ and cdr rel v =
   | _ -> failwith "cdr"
 
 and reflect rel vty vneu =
-  match out vty with
-  | Restrict (tag, dom, sys) ->
-    reflect_ext rel dom sys vneu
-  | _ -> into @@ Up (vty, vneu)
+  into @@ Up (vty, vneu)
 
 and generic rel vty i =
   reflect rel vty @@ into @@ Lvl i
@@ -417,19 +400,6 @@ and eval_frm rho frm v =
 
   | KApply varg ->
     apply (Env.rel rho) v varg
-
-  | KRestrictCar (tag, sys) ->
-    let sys' = map_tubes (clo_frame KCar) sys in
-    into @@ Restrict (tag, v, sys')
-
-  | KRestrictCdr (tag, sys) ->
-    let sys' = map_tubes (clo_frame KCdr) sys in
-    into @@ Restrict (tag, v, sys')
-
-  | KRestrictApp (tag, sys) ->
-    let varg = List.hd rho.vals in
-    let sys' = map_tubes (clo_frame @@ KApply varg) sys in
-    into @@ Restrict (tag, v, sys')
 
   | KComTubeCoe {tag; dim1; ty; tube} ->
     let varg = List.hd rho.vals in

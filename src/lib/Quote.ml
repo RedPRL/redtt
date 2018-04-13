@@ -93,25 +93,6 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
           failwith "approx/covar: univ levels"
     end
 
-  | Val.Univ lvl, Val.Restrict (tag0, ty0, sys0), Val.Restrict (tag1, ty1, sys1) ->
-    if tag0 != tag1 then failwith "tag mismatch" else
-      let qty = approx_can_ ~vr ~ctx ~ty ~can0:ty0 ~can1:ty1 in
-      begin
-        match approx_sys ~vr ~tag:tag0 ~ctx ~ty ~sys0 ~sys1 with
-        | qsys -> Tm.into @@ Tm.Restrict (tag0, qty, qsys)
-        | exception exn ->
-          match vr with
-          | Covar -> approx_can_ ~vr ~ctx ~ty ~can0:ty0 ~can1
-          | Iso -> raise exn
-      end
-
-  | Val.Univ lvl, Val.Restrict (tag0, ty0, sys0), _ ->
-    begin
-      match vr with
-      | Covar -> approx_can_ ~vr ~ctx ~ty ~can0:ty0 ~can1
-      | _ -> failwith "approx_can_/univ/ext"
-    end
-
   | Val.Pi (dom, cod), _, _ ->
     let vdom = Val.eval_clo dom in
     let vgen = Val.generic (Ctx.rel ctx) vdom @@ Ctx.len ctx in
