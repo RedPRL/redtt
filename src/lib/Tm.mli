@@ -18,16 +18,16 @@ type _ f =
   | Cdr : inf t -> inf f
   | App : inf t * chk t -> inf f
   | Down : {ty : chk t; tm : chk t} -> inf f
-  | Coe : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
-  | HCom : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
-  | Com : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
+  | Coe : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
+  | HCom : {dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
+  | Com : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
 
   | Up : inf t -> chk f
 
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
-  | Interval : Cube.t -> chk f
+  | Interval : chk f
 
   | Lam : chk t bnd -> chk f
   | Cons : chk t * chk t -> chk f

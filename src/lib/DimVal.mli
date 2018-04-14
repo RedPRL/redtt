@@ -1,7 +1,7 @@
 type t = 
   | Dim0
   | Dim1
-  | Lvl of Cube.t * int
+  | Lvl of int
 
 type compare =
   | Same

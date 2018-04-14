@@ -86,7 +86,7 @@ let rec check ~mode ~ctx ~ty ~tm =
     let ctx' = Ctx.ext ctx vdom in
     check ~mode:Real ~ctx:ctx' ~ty ~tm:cod
 
-  | Val.Univ _, Tm.Interval tag ->
+  | Val.Univ _, Tm.Interval ->
     begin
       match mode with
       | Real -> failwith "Interval is not ontologically real"
@@ -107,10 +107,10 @@ let rec check ~mode ~ctx ~ty ~tm =
     let vcod = Val.inst_bclo cod vtm0 in
     check ~mode:Real ~ctx ~ty:vcod ~tm:tm1
 
-  | Val.Interval _, Tm.Dim0 ->
+  | Val.Interval, Tm.Dim0 ->
     ()
 
-  | Val.Interval _, Tm.Dim1 ->
+  | Val.Interval, Tm.Dim1 ->
     ()
 
   | _, Tm.Up tm ->
@@ -156,7 +156,7 @@ and infer ~mode ~ctx ~tm =
     vty
 
   | Tm.Coe coe ->
-    let interval = Val.into @@ Val.Interval coe.tag in
+    let interval = Val.into Val.Interval in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let vdim0 = check_eval ~mode:Real ~ctx ~ty:interval ~tm:coe.dim0 in
     let vdim1 = check_eval ~mode:Real ~ctx ~ty:interval ~tm:coe.dim1 in

@@ -13,16 +13,16 @@ type _ f =
   | Cdr : inf t -> inf f
   | App : inf t * chk t -> inf f
   | Down : {ty : chk t; tm : chk t} -> inf f
-  | Coe : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
-  | HCom : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
-  | Com : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
+  | Coe : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
+  | HCom : {dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
+  | Com : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
 
   | Up : inf t -> chk f
 
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
-  | Interval : Cube.t -> chk f
+  | Interval : chk f
 
   | Lam : chk t bnd -> chk f
   | Cons : chk t * chk t -> chk f
@@ -83,13 +83,13 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
       Down {ty = thin th ty; tm = thin th tm}
 
     | Coe info ->
-      Coe {tag = info.tag; dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; tm = thin th info.tm}
+      Coe {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; tm = thin th info.tm}
 
     | HCom info ->
-      HCom {tag = info.tag; dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
+      HCom {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
 
     | Com info ->
-      Com {tag = info.tag; dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
+      Com {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
 
     | Up t ->
       Up (thin th t)
@@ -103,7 +103,7 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
     | Sg (dom, cod) ->
       Sg (thin th dom, thin_bnd th cod)
 
-    | Interval _ ->
+    | Interval ->
       tf
 
     | Lam bdy ->
