@@ -30,8 +30,7 @@ type variance = Covar | Iso
 
 let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
   match Val.out ty, Val.out can0, Val.out can1 with
-  | Val.Univ lvl, Val.Pi (dom0, cod0), _ ->
-    let dom1, cod1 = Val.out_pi can1 in
+  | Val.Univ lvl, Val.Pi (dom0, cod0), Val.Pi (dom1, cod1) ->
     let vdom0 = Val.eval_clo dom0 in
     let vdom1 = Val.eval_clo dom1 in
     let vgen0 = Val.generic (Ctx.rel ctx) vdom0 @@ Ctx.len ctx in
@@ -42,19 +41,7 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let qcod = approx_can_ ~vr ~ctx:(Ctx.ext ctx vdom0) ~ty ~can0:vcod0 ~can1:vcod1 in
     Tm.into @@ Tm.Pi (qdom, Tm.B qcod)
 
-  | Val.Univ lvl, _, Val.Pi (dom1, cod1) ->
-    let dom0, cod0 = Val.out_pi can0 in
-    let vdom0 = Val.eval_clo dom0 in
-    let vdom1 = Val.eval_clo dom1 in
-    let vgen0 = Val.generic (Ctx.rel ctx) vdom0 @@ Ctx.len ctx in
-    let vgen1 = Val.generic (Ctx.rel ctx) vdom1 @@ Ctx.len ctx in
-    let vcod0 = Val.inst_bclo cod0 vgen0 in
-    let vcod1 = Val.inst_bclo cod1 vgen1 in
-    let qdom = approx_can_ ~vr:Iso ~ctx ~ty ~can0:vdom1 ~can1:vdom0 in
-    let qcod = approx_can_ ~vr ~ctx:(Ctx.ext ctx vdom0) ~ty ~can0:vcod0 ~can1:vcod1 in
-    Tm.into @@ Tm.Pi (qdom, Tm.B qcod)
-
-  | Val.Univ lvl, Val.Sg (dom0, cod0), _ ->
+  | Val.Univ lvl, Val.Sg (dom0, cod0), Val.Sg (dom1, cod1) ->
     let dom1, cod1 = Val.out_sg can1 in
     let vdom0 = Val.eval_clo dom0 in
     let vdom1 = Val.eval_clo dom1 in
@@ -65,18 +52,6 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let qdom = approx_can_ ~vr:Iso ~ctx ~ty ~can0:vdom1 ~can1:vdom0 in
     let qcod = approx_can_ ~vr ~ctx:(Ctx.ext ctx vdom0) ~ty ~can0:vcod0 ~can1:vcod1 in
     Tm.into @@ Tm.Pi (qdom, Tm.B qcod)
-
-  | Val.Univ lvl, _, Val.Sg (dom1, cod1) ->
-    let dom0, cod0 = Val.out_sg can0 in
-    let vdom0 = Val.eval_clo dom0 in
-    let vdom1 = Val.eval_clo dom1 in
-    let vgen0 = Val.generic (Ctx.rel ctx) vdom0 @@ Ctx.len ctx in
-    let vgen1 = Val.generic (Ctx.rel ctx) vdom1 @@ Ctx.len ctx in
-    let vcod0 = Val.inst_bclo cod0 vgen0 in
-    let vcod1 = Val.inst_bclo cod1 vgen1 in
-    let qdom = approx_can_ ~vr:Iso ~ctx ~ty ~can0:vdom1 ~can1:vdom0 in
-    let qcod = approx_can_ ~vr ~ctx:(Ctx.ext ctx vdom0) ~ty ~can0:vcod0 ~can1:vcod1 in
-    Tm.into @@ Tm.Sg (qdom, Tm.B qcod)
 
   | Val.Univ lvl, Val.Univ lvl0, Val.Univ lvl1 ->
     begin
