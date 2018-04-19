@@ -14,6 +14,8 @@ type _ f =
 
   | Pi : tclo * bclo -> can f
   | Sg : tclo * bclo -> can f
+  | Rst : bclo * tclo system -> can f
+
   | Univ : Lvl.t -> can f
   | Interval : can f
 
@@ -49,6 +51,8 @@ and frm =
   | KSgCodHCom of {dim0 : can t; dom : tclo; cap : can t; sys : bclo system}
 
 and stk = frm list
+
+
 
 
 module Env :
@@ -293,9 +297,18 @@ and apply rel vfun varg =
     inst_bclo bclo varg
 
   | Up (vty, vneu) ->
-    let dom, cod = out_pi vty in
-    let vcod = inst_bclo cod varg in
-    reflect rel vcod @@ into @@ App (vneu, varg)
+    begin
+      match out vty with
+      | Pi (dom, cod) ->
+        let vcod = inst_bclo cod varg in
+        reflect rel vcod @@ into @@ App (vneu, varg)
+
+      | Rst (cod, sys) ->
+        (* let vcod = inst_bclo cod varg in *)
+        failwith "TODO: find out if 'varg' matches any of the tubes"
+
+      | _ -> failwith ""
+    end
 
   | Coe info ->
     let dom = bclo_frame KPiDom info.ty in

@@ -2,6 +2,9 @@ type t =
   | Dim0
   | Dim1
   | Lvl of int
+  | Gen (* used in "forall" *)
+
+type equ = t * t
 
 type compare =
   | Same
@@ -16,4 +19,5 @@ let compare d0 d1 =
     if i = j then Same else Indeterminate
   | Dim0, Dim1 -> Apart
   | Dim1, Dim0 -> Apart
+  | Gen, Gen -> Same
   | _ -> Indeterminate
