@@ -235,6 +235,20 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Cons (t0, t1) ->
       into @@ Cons (t0 <: rho, t1 <: rho)
 
+    | Tm.Coe info ->
+      let dim0 = project_dimval @@ eval rho info.dim0 in
+      let dim1 = project_dimval @@ eval rho info.dim1 in
+      begin
+        match Env.compare_dim rho dim0 dim1 with
+        | DimVal.Same ->
+          eval rho info.tm
+        | _ ->
+          let ty = info.ty <:+ rho in
+          let tm = eval rho info.tm in
+          into @@ Coe {dim0; dim1; ty; tm}
+      end
+
+
 (*
     | Tm.Coe info ->
       let vd0 = eval rho info.dim0 in
