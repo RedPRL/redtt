@@ -71,6 +71,9 @@ end
 
 type ctx = Ctx.t
 
+let check_sys_valid sys : unit =
+  failwith "TODO: check favonia's validity condition on lists of equations"
+
 let rec check ~mode ~ctx ~ty ~tm =
   match Val.out ty, Tm.out tm with
   | Val.Univ lvl, Tm.Univ lvl' ->
@@ -87,6 +90,7 @@ let rec check ~mode ~ctx ~ty ~tm =
     check ~mode:Real ~ctx:ctx' ~ty ~tm:cod
 
   | Val.Univ _, Tm.Ext (Tm.B (cod, sys)) ->
+    check_sys_valid sys;
     failwith "TODO"
 
   | Val.Univ _, Tm.Interval ->
@@ -123,7 +127,7 @@ let rec check ~mode ~ctx ~ty ~tm =
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     Quote.approx ~ctx:(Ctx.qctx ctx) ~ty:univ ~can0:ty' ~can1:ty
 
-  | _ -> failwith ""
+  | _ -> failwith "check"
 
 and check_eval ~mode ~ctx ~ty ~tm =
   check ~mode ~ctx ~ty ~tm;
@@ -190,14 +194,50 @@ and infer ~mode ~ctx ~tm =
     let vdim1 = check_eval ~mode:Real ~ctx ~ty:interval ~tm:coe.dim1 in
     let Tm.B ty = coe.ty in
     check ~mode:Real ~ctx:(Ctx.ext ctx interval) ~ty:univ ~tm:ty;
-    let vty0 = Val.eval (Val.Env.ext (Ctx.env ctx) vdim0) ty in
+    let env = Ctx.env ctx in
+    let vty0 = Val.eval (Val.Env.ext env vdim0) ty in
     check ~mode:Real ~ctx:ctx ~ty:vty0 ~tm:coe.tm;
-    Val.eval (Val.Env.ext (Ctx.env ctx) vdim1) ty
+    Val.eval (Val.Env.ext env vdim1) ty
 
   | Tm.HCom hcom ->
-    failwith ""
+    check_sys_valid hcom.sys;
+    let univ = Val.into @@ Val.Univ Lvl.Omega in
+    let vty = check_eval ~mode:Real ~ctx ~ty:univ ~tm:hcom.ty in
+    let vcap = check_eval ~mode:Real ~ctx ~ty:vty ~tm:hcom.cap in
+    (* TODO: check system types *)
+    check_bsys ~ctx ~ty:vty ~cap:vcap ~sys:hcom.sys;
+    (* TODO: check cap-tube conditions *)
+    (* TODO: check tube-tube conditions *)
+    vty
 
   | Tm.Com com ->
+    check_sys_valid com.sys;
     failwith ""
 
   | _ -> failwith "pattern exhaustiveness + GADTs is broken in OCaml :("
+
+(* TODO: check adjacency conditions *)
+and check_bsys ~ctx ~ty ~cap ~sys =
+  let interval = Val.into Val.Interval in
+  let rec go sys =
+    match sys with
+    | [] ->
+      ()
+
+    | (td0, td1, tb) :: sys ->
+      let vd0 = Val.project_dimval @@ check_eval ~mode:Real ~ctx ~ty:interval ~tm:td0 in
+      let vd1 = Val.project_dimval @@ check_eval ~mode:Real ~ctx ~ty:interval ~tm:td1 in
+      match Ctx.compare_dim ctx vd0 vd1, tb with
+      | DimVal.Apart, None ->
+        go sys
+
+      | (DimVal.Same | DimVal.Indeterminate), Some (Tm.B tm) ->
+        let ctx' = Ctx.ext ctx interval in
+        let v = check_eval ~mode:Real ~ctx:ctx' ~ty:ty ~tm in
+        Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty ~can0:cap ~can1:v;
+        go sys
+
+      | _ ->
+        failwith "check_bsys"
+  in
+  go sys
