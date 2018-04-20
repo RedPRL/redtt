@@ -48,6 +48,7 @@ struct
     | PiCodCoe of {bclo : 'a bclo; dim1 : DimVal.t; dom : 'a bclo; arg : 'a}
     | ExtCod of 'a bclo * DimVal.t
     | ExtSysTube of 'a bclo * int * DimVal.t
+    | ComCoeTube of {bclo : 'a bclo; ty : 'a bclo; dim1 : DimVal.t}
     | App of 'a bclo * 'a
     | Car of 'a bclo
     | Wk of 'a tclo
@@ -265,15 +266,25 @@ let rec eval : type a. env -> a Tm.t -> can t =
             into @@ HCom {dim0; dim1; ty; cap; sys}
       end
 
-(*
     | Tm.Com info ->
-      let vd0 = eval rho info.dim0 in
-      let vd1 = eval rho info.dim1 in
-      let vcap = eval rho info.cap in
-      let vsys = eval_bsys rho info.sys in
-      com ~rel:(Env.rel rho) ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~cap:vcap ~sys:vsys
-
-*)
+      let dim0 = project_dimval @@ eval rho info.dim0 in 
+      let dim1 = project_dimval @@ eval rho info.dim1 in
+      let bty = info.ty <:+ rho in
+      let cap =
+        let tm = eval rho info.cap in
+        into @@ Coe {dim0; dim1; ty = bty; tm}
+      in
+      begin
+        match Env.compare_dim rho dim0 dim1 with
+        | DimVal.Same ->
+          cap
+        | _ ->
+          let ty = inst_bclo bty @@ embed_dimval dim1 in
+          let sys = map_tubes (fun bclo -> Clo.ComCoeTube {bclo; ty = bty; dim1}) @@ eval_bsys rho info.sys in
+          match project_bsys sys dim1 with 
+          | Some v -> v
+          | None -> into @@ HCom {dim0; dim1; ty; cap; sys}
+      end
 
     | Tm.Univ lvl ->
       into @@ Univ lvl
@@ -301,8 +312,6 @@ let rec eval : type a. env -> a Tm.t -> can t =
 
     | Tm.Up t ->
       eval rho t
-
-    | _ -> failwith "TODO"
 
 
 and eval_bsys rho sys =
@@ -477,6 +486,11 @@ and inst_bclo bclo arg =
     let _, sclo = out_ext @@ inst_bclo bclo arg in
     let sys = inst_sclo sclo arg' in
     eval_clo @@ Tube.proj @@ List.nth sys i
+
+  | Clo.ComCoeTube {bclo; ty; dim1} ->
+    let v = inst_bclo bclo arg in
+    let dimx = project_dimval arg in
+    into @@ Coe {dim0 = dimx; dim1; ty; tm = v}
 
   | Clo.App (bclo, arg') ->
     let v = inst_bclo bclo arg in
