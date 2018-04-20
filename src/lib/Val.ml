@@ -363,7 +363,8 @@ and rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys =
 
 
 and rigid_coe ~dim0 ~dim1 ~ty ~tm =
-  (* TODO: case on ty *)
+  (* TODO: it might not be right to use DimGen here. I might need to have some notion of 
+     nominal dimension and generate a fresh one. I'm worried about interference, in case this gets called recursively.*)
   let tyx = inst_bclo ty @@ into DimGen in
   match out tyx with
   | Univ _ ->
