@@ -77,8 +77,14 @@ type _ f =
   | Lam : bclo -> can f
   | Cons : tclo * tclo -> can f
 
+    (* generic coercions in negative and neutral types: pi, sigma, extension *)
   | Coe : {dim0 : DimVal.t; dim1 : DimVal.t; ty : bclo; tm : can t} -> can f
+
+    (* generic composites in negative and neutral types: pi, sigma, extension *)
   | HCom : {dim0 : DimVal.t; dim1 : DimVal.t; ty : can t; cap : can t; sys : bclo system} -> can f
+
+    (* formal composites in positive types: like the universe, etc. *)
+  | FCom : {dim0 : DimVal.t; dim1 : DimVal.t; cap : can t; sys : bclo system} -> can f
 
   | FunApp : neu t * can t -> neu f
   | ExtApp : neu t * DimVal.t -> neu f
@@ -340,8 +346,18 @@ and rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys =
   | Bool ->
     cap
 
-  | _ ->
+  | (Pi _ | Sg _ | Ext _ | Up _) ->
     into @@ HCom {dim0; dim1; ty; cap; sys}
+
+  | Univ _ ->
+    into @@ FCom {dim0; dim1; cap; sys}
+
+  | FCom _ ->
+    failwith "hcom in fcom!"
+
+  | _ ->
+    failwith "rigid_hcom"
+
 
 and rigid_coe ~dim0 ~dim1 ~ty ~tm =
   (* TODO: case on ty *)
@@ -353,8 +369,11 @@ and rigid_coe ~dim0 ~dim1 ~ty ~tm =
   | Bool ->
     tm
 
-  | _ ->
+  | (Pi _ | Sg _ | Ext _ | Up _) ->
     into @@ Coe {dim0; dim1; ty; tm}
+
+  | _ ->
+    failwith "rigid_coe"
 
 and eval_bsys rho sys =
   List.map (eval_btube rho) sys
