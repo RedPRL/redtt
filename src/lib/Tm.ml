@@ -21,6 +21,7 @@ type _ f =
 
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
+  | Ext : (chk t * chk t system) bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
   | Interval : chk f
 
@@ -99,6 +100,10 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
 
     | Pi (dom, cod) ->
       Pi (thin th dom, thin_bnd th cod)
+
+    | Ext (B (cod, sys)) ->
+      let th' = Thin.skip th in
+      Ext (B (thin th' cod, thin_sys th' sys))
 
     | Sg (dom, cod) ->
       Sg (thin th dom, thin_bnd th cod)

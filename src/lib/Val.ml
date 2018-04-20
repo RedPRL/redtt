@@ -49,7 +49,7 @@ struct
     | Wk of 'a tclo
 
   type 'a sclo = 
-    | SysAwait of {env : 'a env_; sys : Tm.chk Tm.t system}
+    | SysAwait of {env : 'a env_; sys : Tm.chk Tm.t Tm.system Tm.bnd}
 end
 
 type _ f =
@@ -170,6 +170,9 @@ let (<:) tm env =
 let (<:+) btm env =
   Clo.Await {btm; env}
 
+let (<<:+) sys env = 
+  Clo.SysAwait {sys; env}
+
 let out_pi v =
   match out v with
   | Pi (dom, cod) -> dom, cod
@@ -209,6 +212,9 @@ let rec eval : type a. env -> a Tm.t -> can t =
 
     | Tm.Pi (dom, cod) ->
       into @@ Pi (dom <: rho, cod <:+ rho)
+
+    | Tm.Ext (Tm.B (cod, sys)) ->
+      into @@ Ext (Tm.B cod <:+ rho, Tm.B sys <<:+ rho)
 
     | Tm.Sg (dom, cod) ->
       into @@ Sg (dom <: rho, cod <:+ rho)
@@ -541,9 +547,24 @@ and inst_bclo bclo arg =
 
 and inst_sclo sclo arg = 
   match sclo with
-  | Clo.SysAwait {sys; env} ->
+  | Clo.SysAwait {sys = Tm.B sys; env} ->
     let arg' = embed_dimval arg in
-    map_tubes (fun tm -> tm <: Env.ext env arg') sys
+    let env' = Env.ext env arg' in
+    let go (tdim0, tdim1, otb) =
+      let vdim0 = project_dimval @@ eval env' tdim0 in
+      let vdim1 = project_dimval @@ eval env' tdim1 in
+      match Env.compare_dim env' vdim0 vdim1 with
+      | DimVal.Same -> 
+        let tm = Option.get_exn otb in
+        Tube.True (tm <: env')
+      | DimVal.Apart ->
+        Tube.False (vdim0, vdim1)
+      | DimVal.Indeterminate ->
+        let env'' = Env.restrict_exn env' vdim0 vdim1 in
+        let tm = Option.get_exn otb in
+        Tube.Indeterminate ((vdim0, vdim1), tm <: env'')
+    in
+    List.map go sys
 
 and eval_clo clo =
   match clo with
