@@ -311,9 +311,9 @@ and rigid_com ~dim0 ~dim1 ~ty ~cap ~sys =
   into @@ HCom {dim0; dim1; ty = ty'; cap = cap'; sys = sys'}
 
 and eval_bsys rho sys =
-  List.map (eval_tube rho) sys
+  List.map (eval_btube rho) sys
 
-and eval_tube rho (dim0, dim1, otb) =
+and eval_btube rho (dim0, dim1, otb) =
   let vdim0 = project_dimval @@ eval rho dim0 in
   let vdim1 = project_dimval @@ eval rho dim1 in
   match Env.compare_dim rho vdim0 vdim1, otb with
@@ -535,7 +535,8 @@ and inst_bclo bclo arg =
 and inst_sclo sclo arg = 
   match sclo with
   | Clo.SysAwait {sys; env} ->
-    failwith "TODO"
+    let arg' = embed_dimval arg in
+    map_tubes (fun tm -> tm <: Env.ext env arg') sys
 
 and eval_clo clo =
   match clo with
