@@ -303,12 +303,19 @@ and rigid_com ~dim0 ~dim1 ~ty ~cap ~sys =
   rigid_hcom ~dim0 ~dim1 ~ty:ty' ~cap:cap' ~sys:sys'
 
 and rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys = 
-  (* TODO: case on ty *)
-  into @@ HCom {dim0; dim1; ty; cap; sys}
+  match out ty with
+  (* TODO: for base types, do something *)
+  | _ ->
+    into @@ HCom {dim0; dim1; ty; cap; sys}
 
 and rigid_coe ~dim0 ~dim1 ~ty ~tm =
-(* TODO: case on ty *)
-  into @@ Coe {dim0; dim1; ty; tm}
+  (* TODO: case on ty *)
+  let tyx = inst_bclo ty @@ into DimGen in
+  match out tyx with
+  | Univ _ ->
+    tm
+  | _ ->
+    into @@ Coe {dim0; dim1; ty; tm}
 
 and eval_bsys rho sys =
   List.map (eval_btube rho) sys
@@ -438,7 +445,7 @@ and cdr v =
     let vcdr = cdr info.tm in
     let cod = Clo.SgCodCoe {bclo = info.ty; dim0 = info.dim0; arg = vcar} in
     rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:vcdr
-    
+
   | HCom info ->
     let ty = Clo.SgCodHCom {ty = info.ty; dim0 = info.dim0; cap = info.cap; sys = info.sys} in
     let cap = cdr info.cap in
