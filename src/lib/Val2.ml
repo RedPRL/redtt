@@ -14,7 +14,7 @@ struct
     | True of 'a
     | False of equ
     | Delete
-  
+
   let get_equ tb = 
     match tb with
     | Indeterminate (equ, _) -> Some equ
@@ -191,15 +191,15 @@ let out_ext v =
 
 let mapi_tubes f =
   List.mapi @@ fun i tube ->
-    match tube with
-    | Tube.Indeterminate (equ, a) ->
-      Tube.Indeterminate (equ, f i a)
-    | Tube.True a ->
-      Tube.True (f i a)
-    | Tube.False equ ->
-      Tube.False equ
-    | Tube.Delete ->
-      Tube.Delete
+  match tube with
+  | Tube.Indeterminate (equ, a) ->
+    Tube.Indeterminate (equ, f i a)
+  | Tube.True a ->
+    Tube.True (f i a)
+  | Tube.False equ ->
+    Tube.False equ
+  | Tube.Delete ->
+    Tube.Delete
 
 
 let map_tubes f =
@@ -339,14 +339,18 @@ and ext_apply vext vdim =
     let sys' = mapi_tubes (fun i _ -> Clo.ExtSysTube (info.ty, i, vdim)) sys in
     com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:sys'
 
-(* TODO: it is necessary to try and project from sys *)
   | HCom info ->
     let cap = ext_apply info.cap vdim in
     let cod, sclo = out_ext info.ty in
     let ty = inst_bclo cod @@ embed_dimval vdim in
     let rsys = inst_sclo sclo vdim in
-    let sys = map_tubes (fun tb -> Clo.Wk tb) rsys in
-    into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty; cap; sys = sys @ info.sys}
+    begin
+      match project_sys rsys with
+      | Some v -> v
+      | None -> 
+        let sys = map_tubes (fun tb -> Clo.Wk tb) rsys in
+        into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty; cap; sys = sys @ info.sys}
+    end
 
   | _ ->
     failwith "ext_apply"
@@ -364,18 +368,28 @@ and car v =
   | Coe info ->
     let vcar = car info.tm in
     into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = failwith "TODO"; tm = vcar}
-    (* let dom = bclo_frame KSgDom info.ty in
-    let vcar = car rel v in
-    coe ~rel:rel ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~tm:vcar *)
+  (* let dom = bclo_frame KSgDom info.ty in
+     let vcar = car rel v in
+     coe ~rel:rel ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~tm:vcar *)
 
   | HCom info ->
     failwith ""
-    (* let dom, _ = out_sg @@ eval_clo info.ty in
-    let vcap' = car rel info.cap in
-    let vsys' = map_tubes (bclo_frame KCar) info.sys in
-    hcom ~rel ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~cap:vcap' ~sys:vsys' *)
+  (* let dom, _ = out_sg @@ eval_clo info.ty in
+     let vcap' = car rel info.cap in
+     let vsys' = map_tubes (bclo_frame KCar) info.sys in
+     hcom ~rel ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~cap:vcap' ~sys:vsys' *)
 
   | _ -> failwith "car"
+
+and project_bsys sys r =
+  match sys with 
+  | [] ->
+    None
+  | Tube.True tb :: sys ->
+    Some (inst_bclo tb r)
+  | _ :: sys ->
+    project_bsys sys r
+
 
 and project_sys sys =
   match sys with 
