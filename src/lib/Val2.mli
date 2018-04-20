@@ -6,7 +6,17 @@ type tclo
 type bclo
 type sclo
 
-type 'a tube
+module Tube :
+sig
+  type equ = DimVal.equ
+  type 'a t = 
+    | Indeterminate of equ * 'a
+    | True of 'a
+    | False of equ
+    | Delete
+end
+
+type 'a tube = 'a Tube.t
 type 'a system = 'a tube list
 
 type 'a t

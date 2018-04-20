@@ -112,6 +112,7 @@ let embed_dimval dv =
   | DimVal.Dim0 -> Dim0
   | DimVal.Dim1 -> Dim1
   | DimVal.Lvl i -> Up (into Interval, into @@ Lvl i)
+  | _ -> failwith "blah"
 
 let out : type a. a t -> a f =
   fun node -> node.con
