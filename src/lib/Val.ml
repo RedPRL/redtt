@@ -229,7 +229,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
         | _ ->
           let ty = info.ty <:+ rho in
           let tm = eval rho info.tm in
-          into @@ Coe {dim0; dim1; ty; tm}
+          rigid_coe ~dim0 ~dim1 ~ty ~tm
       end
 
     | Tm.HCom info ->
@@ -246,7 +246,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
           | None ->
             let ty = eval rho info.ty in
             let cap = eval rho info.cap in
-            into @@ HCom {dim0; dim1; ty; cap; sys}
+            rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys
       end
 
     | Tm.Com info ->
@@ -255,7 +255,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
       let bty = info.ty <:+ rho in
       let cap =
         let tm = eval rho info.cap in
-        into @@ Coe {dim0; dim1; ty = bty; tm}
+        rigid_coe ~dim0 ~dim1 ~ty:bty ~tm
       in
       begin
         match Env.compare_dim rho dim0 dim1 with
@@ -266,7 +266,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
           let sys = map_tubes (fun bclo -> Clo.ComCoeTube {bclo; ty = bty; dim1}) @@ eval_bsys rho info.sys in
           match project_bsys sys dim1 with 
           | Some v -> v
-          | None -> into @@ HCom {dim0; dim1; ty; cap; sys}
+          | None -> rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys
       end
 
     | Tm.Univ lvl ->
@@ -297,10 +297,18 @@ let rec eval : type a. env -> a Tm.t -> can t =
       eval rho t
 
 and rigid_com ~dim0 ~dim1 ~ty ~cap ~sys =
-  let cap' = into @@ Coe {dim0; dim1; ty; tm = cap} in
+  let cap' = rigid_coe ~dim0 ~dim1 ~ty ~tm:cap in
   let ty' = inst_bclo ty @@ embed_dimval dim1 in
   let sys' = map_tubes (fun bclo -> Clo.ComCoeTube {bclo; ty; dim1}) sys in
-  into @@ HCom {dim0; dim1; ty = ty'; cap = cap'; sys = sys'}
+  rigid_hcom ~dim0 ~dim1 ~ty:ty' ~cap:cap' ~sys:sys'
+
+and rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys = 
+  (* TODO: case on ty *)
+  into @@ HCom {dim0; dim1; ty; cap; sys}
+
+and rigid_coe ~dim0 ~dim1 ~ty ~tm =
+(* TODO: case on ty *)
+  into @@ Coe {dim0; dim1; ty; tm}
 
 and eval_bsys rho sys =
   List.map (eval_btube rho) sys
@@ -331,15 +339,15 @@ and apply vfun varg =
   | Coe info ->
     let dom = Clo.PiDom info.ty in
     let cod = Clo.PiCodCoe {bclo = info.ty; dim1 = info.dim1; arg = varg} in
-    let varg' = into @@ Coe {dim0 = info.dim1; dim1 = info.dim0; ty = dom; tm = varg} in
-    into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = cod; tm = apply info.tm varg'}
+    let varg' = rigid_coe ~dim0:info.dim1 ~dim1:info.dim0 ~ty:dom ~tm:varg in
+    rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:(apply info.tm varg')
 
   | HCom info ->
     let dom, cod = out_pi info.ty in
     let vcod = inst_bclo cod varg in
     let vcap = apply info.cap varg in
     let vsys = map_tubes (fun bclo -> Clo.App (bclo, varg)) info.sys in
-    into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty = vcod; cap = vcap; sys = vsys}
+    rigid_hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty:vcod ~cap:vcap ~sys:vsys
 
   | _ -> failwith "apply"
 
@@ -368,7 +376,7 @@ and ext_apply vext vdim =
     begin
       match project_sys sys with
       | Some v ->
-        into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty; tm = v}
+        rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~tm:v
       | None ->
         let sys' = mapi_tubes (fun i _ -> Clo.ExtSysTube (info.ty, i, vdim)) sys in
         rigid_com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:sys'
@@ -384,7 +392,7 @@ and ext_apply vext vdim =
       | Some v -> v
       | None -> 
         let sys = map_tubes (fun tb -> Clo.Wk tb) rsys in
-        into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty; cap; sys = sys @ info.sys}
+        rigid_hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:(sys @ info.sys)
     end
 
   | _ ->
@@ -402,14 +410,14 @@ and car v =
 
   | Coe info ->
     let vcar = car info.tm in
-    into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = Clo.SgDom info.ty ; tm = vcar}
+    rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:(Clo.SgDom info.ty) ~tm:vcar
 
   | HCom info ->
     let dom, _ = out_sg info.ty in
     let ty = eval_clo dom in
     let cap = car info.cap in
     let sys = map_tubes (fun tb -> Clo.Car tb) info.sys in
-    into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty; cap; sys}
+    rigid_hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys
 
   | _ -> failwith "car"
 
@@ -429,7 +437,7 @@ and cdr v =
     let vcar = car info.tm in
     let vcdr = cdr info.tm in
     let cod = Clo.SgCodCoe {bclo = info.ty; dim0 = info.dim0; arg = vcar} in
-    into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = cod; tm = vcdr}
+    rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:vcdr
     
   | HCom info ->
     let ty = Clo.SgCodHCom {ty = info.ty; dim0 = info.dim0; cap = info.cap; sys = info.sys} in
@@ -476,14 +484,14 @@ and inst_bclo bclo arg =
     let dom = Clo.PiDom bclo in
     let dimx = project_dimval arg in
     let _, cod = out_pi @@ inst_bclo bclo arg in
-    let coe = into @@ Coe {dim0 = dim1; dim1 = dimx; ty = dom; tm = arg'} in
+    let coe = rigid_coe ~dim0:dim1 ~dim1:dimx ~ty:dom ~tm:arg' in
     inst_bclo cod coe
 
   | Clo.SgCodCoe {bclo; dim0; arg = arg'} ->
     let dom = Clo.SgDom bclo in
     let dimx = project_dimval arg in
     let _, cod = out_sg @@ inst_bclo bclo arg in
-    let coe = into @@ Coe {dim0 = dim0; dim1 = dimx; ty = dom; tm = arg'} in
+    let coe = rigid_coe ~dim0 ~dim1:dimx ~ty:dom ~tm:arg' in
     inst_bclo cod coe
 
   | Clo.SgCodHCom {ty; dim0; cap; sys} ->
@@ -492,8 +500,8 @@ and inst_bclo bclo arg =
     let ty' = eval_clo dom in
     let cap' = car cap in
     let sys' = map_tubes (fun bclo -> Clo.Car bclo) sys in
-    let coe = into @@ HCom {dim0; dim1 = dimx; ty = ty'; cap = cap'; sys = sys'} in
-    inst_bclo cod coe
+    let hcom = rigid_hcom ~dim0 ~dim1:dimx ~ty:ty' ~cap:cap' ~sys:sys' in
+    inst_bclo cod hcom
 
   | Clo.ExtCod (bclo, vdim) ->
     let cod, _ = out_ext @@ inst_bclo bclo arg in
@@ -507,7 +515,7 @@ and inst_bclo bclo arg =
   | Clo.ComCoeTube {bclo; ty; dim1} ->
     let v = inst_bclo bclo arg in
     let dimx = project_dimval arg in
-    into @@ Coe {dim0 = dimx; dim1; ty; tm = v}
+    rigid_coe ~dim0:dimx ~dim1 ~ty ~tm:v
 
   | Clo.App (bclo, arg') ->
     let v = inst_bclo bclo arg in
