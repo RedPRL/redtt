@@ -248,21 +248,24 @@ let rec eval : type a. env -> a Tm.t -> can t =
           into @@ Coe {dim0; dim1; ty; tm}
       end
 
+    | Tm.HCom info ->
+      let dim0 = project_dimval @@ eval rho info.dim0 in
+      let dim1 = project_dimval @@ eval rho info.dim1 in
+      begin
+        match Env.compare_dim rho dim0 dim1 with
+        | DimVal.Same ->
+          eval rho info.cap
+        | _ ->
+          let sys = eval_bsys rho info.sys in
+          match project_bsys sys dim1 with
+          | Some v -> v
+          | None ->
+            let ty = eval rho info.ty in
+            let cap = eval rho info.cap in
+            into @@ HCom {dim0; dim1; ty; cap; sys}
+      end
 
 (*
-    | Tm.Coe info ->
-      let vd0 = eval rho info.dim0 in
-      let vd1 = eval rho info.dim1 in
-      let vtm = eval rho info.tm in
-      coe ~rel:(Env.rel rho) ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~tm:vtm
-
-    | Tm.HCom info ->
-      let vd0 = eval rho info.dim0 in
-      let vd1 = eval rho info.dim1 in
-      let vcap = eval rho info.cap in
-      let vsys = eval_bsys rho info.sys in
-      hcom ~rel:(Env.rel rho) ~dim0:vd0 ~dim1:vd1 ~ty:(info.ty <: rho) ~cap:vcap ~sys:vsys
-
     | Tm.Com info ->
       let vd0 = eval rho info.dim0 in
       let vd1 = eval rho info.dim1 in
@@ -302,6 +305,22 @@ let rec eval : type a. env -> a Tm.t -> can t =
 
     | _ -> failwith "TODO"
 
+
+and eval_bsys rho sys =
+  List.map (eval_tube rho) sys
+
+and eval_tube rho (dim0, dim1, otb) =
+  let vdim0 = project_dimval @@ eval rho dim0 in
+  let vdim1 = project_dimval @@ eval rho dim1 in
+  match Env.compare_dim rho vdim0 vdim1, otb with
+  | DimVal.Same, Some tb ->
+    Tube.True (tb <:+ rho)
+  | DimVal.Apart, _ -> 
+    Tube.False (vdim0, vdim1)
+  | DimVal.Indeterminate, Some tb ->
+    let rho' = Env.restrict_exn rho vdim0 vdim1 in
+    Tube.Indeterminate ((vdim0, vdim1), tb <:+ rho')
+  | _ -> failwith "eval_tube"
 
 and apply vfun varg =
   match out vfun with
