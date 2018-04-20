@@ -233,8 +233,9 @@ and check_bsys ~ctx ~ty ~cap ~sys =
 
       | (DimVal.Same | DimVal.Indeterminate), Some (Tm.B tm) ->
         let ctx' = Ctx.ext ctx interval in
-        let v = check_eval ~mode:Real ~ctx:ctx' ~ty:ty ~tm in
-        Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty ~can0:cap ~can1:v;
+        let ctx'' = Ctx.restrict_exn ctx' vd0 vd1 in
+        let v = check_eval ~mode:Real ~ctx:ctx'' ~ty:ty ~tm in
+        Quote.equiv ~ctx:(Ctx.qctx ctx'') ~ty ~can0:cap ~can1:v;
         go sys
 
       | _ ->
