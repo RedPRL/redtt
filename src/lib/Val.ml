@@ -11,14 +11,14 @@ struct
 
   type 'a t = 
     | Indeterminate of equ * 'a
-    | True of 'a
+    | True of equ * 'a
     | False of equ
     | Delete
 
   let proj tb = 
     match tb with
     | Indeterminate (_, a) -> a
-    | True a -> a
+    | True (_, a) -> a
     | Delete -> failwith "Tube.proj: filtered equation"
     | False _ -> failwith "Tube.proj: false equation"
 end
@@ -208,8 +208,8 @@ let mapi_tubes f =
   match tube with
   | Tube.Indeterminate (equ, a) ->
     Tube.Indeterminate (equ, f i a)
-  | Tube.True a ->
-    Tube.True (f i a)
+  | Tube.True (equ, a) ->
+    Tube.True (equ, f i a)
   | Tube.False equ ->
     Tube.False equ
   | Tube.Delete ->
@@ -393,7 +393,7 @@ and eval_btube rho (dim0, dim1, otb) =
   | _ ->
     match Env.compare_dim rho vdim0 vdim1, otb with
     | DimVal.Same, Some tb ->
-      Tube.True (tb <:+ rho)
+      Tube.True ((vdim0, vdim1), tb <:+ rho)
     | DimVal.Apart, _ -> 
       Tube.False (vdim0, vdim1)
     | DimVal.Indeterminate, Some tb ->
@@ -543,7 +543,7 @@ and project_bsys sys r =
   match sys with 
   | [] ->
     None
-  | Tube.True tb :: sys ->
+  | Tube.True (_, tb) :: sys ->
     Some (inst_bclo tb @@ embed_dimval r)
   | _ :: sys ->
     project_bsys sys r
@@ -553,7 +553,7 @@ and project_sys sys =
   match sys with 
   | [] ->
     None
-  | Tube.True tb :: sys ->
+  | Tube.True (_, tb) :: sys ->
     Some (eval_clo tb)
   | _ :: sys ->
     project_sys sys
@@ -641,7 +641,7 @@ and inst_sclo sclo arg =
         match Env.compare_dim env' vdim0 vdim1 with
         | DimVal.Same -> 
           let tm = Option.get_exn otb in
-          Tube.True (tm <: env')
+          Tube.True ((vdim0, vdim1), tm <: env')
         | DimVal.Apart ->
           Tube.False (vdim0, vdim1)
         | DimVal.Indeterminate ->

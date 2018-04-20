@@ -11,7 +11,7 @@ sig
   type equ = DimVal.equ
   type 'a t = 
     | Indeterminate of equ * 'a
-    | True of 'a
+    | True of equ * 'a
     | False of equ
     | Delete
 end
@@ -89,6 +89,7 @@ val embed_dimval : DimVal.t -> can t
 
 val eval_clo : tclo -> can t
 val inst_bclo : bclo -> can t -> can t
+val inst_sclo : sclo -> DimVal.t -> tclo system
 
 val apply : can t -> can t -> can t
 val car : can t -> can t

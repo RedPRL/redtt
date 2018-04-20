@@ -60,7 +60,9 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let vcod1 = Val.inst_bclo cod0 vgen in
     let ctx' = Ctx.ext ctx interval in
     let qcod = approx_can_ ~vr ~ctx:ctx' ~ty ~can0:vcod0 ~can1:vcod1 in
-    let qsys = approx_sys ~vr ~ctx:ctx' ~ty:vcod0 ~sys0 ~sys1 in
+    let sys0x = Val.inst_sclo sys0 @@ Val.project_dimval vgen in
+    let sys1x = Val.inst_sclo sys1 @@ Val.project_dimval vgen in
+    let qsys = approx_sys ~vr ~ctx:ctx' ~ty:vcod0 ~sys0:sys0x ~sys1:sys1x in
     Tm.into @@ Tm.Ext (Tm.B (qcod, qsys))
 
   | Val.Univ _, Val.Interval, Val.Interval ->
@@ -210,70 +212,89 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
   | _ -> failwith "approx_neu_"
 
 
-and approx_sys ~vr ~ctx ~ty ~sys0 ~sys1 = failwith "TODO"
-(* let interval = Val.into Val.Interval in
-   let rec go sys0 sys1 acc =
-   match vr, sys0, sys1 with
-   | _, [], [] ->
-    List.rev acc
+and approx_sys ~vr ~ctx ~ty ~sys0 ~sys1 =
+  let interval = Val.into Val.Interval in
+  let rec go sys0 sys1 acc =
+    match sys0, sys1 with
+    | [], [] ->
+      List.rev acc
 
-   | _, tube0 :: sys0, tube1 :: sys1 ->
-    let (vd00, vd01, oclo0) = tube0 in
-    let (vd10, vd11, oclo1) = tube1 in
-    let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd00) ~can1:(Val.embed_dimval vd10) in
-    let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd01) ~can1:(Val.embed_dimval vd11) in
-    let oqv =
-      match oclo0, oclo1 with
-      | Some clo0, Some clo1 ->
-        let v0 = Val.eval_clo clo0 in
-        let v1 = Val.eval_clo clo1 in
-        let qv = approx_can_ ~vr ~ctx ~ty ~can0:v0 ~can1:v1 in
-        Some qv
+    | Val.Tube.Delete :: sys0, _ ->
+      go sys0 sys1 acc
 
-      | None, None ->
-        None
+    | _, Val.Tube.Delete :: sys1 ->
+      go sys0 sys1 acc
 
-      | _ ->
-        failwith "Expected Some"
-    in
-    go sys0 sys1 @@ (qd0, qd1, oqv) :: acc
+    | Val.Tube.True ((d00, d01), clo0) :: sys0, Val.Tube.True ((d10, d11), clo1) :: sys1 ->
+      let v0 = Val.eval_clo clo0 in
+      let v1 = Val.eval_clo clo1 in
+      let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d00) ~can1:(Val.embed_dimval d10) in
+      let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d01) ~can1:(Val.embed_dimval d11) in
+      let q = approx_can_ ~vr ~ctx ~ty ~can0:v0 ~can1:v1 in
+      let tb = qd0, qd1, Some q in
+      go sys0 sys1 @@ tb :: acc
 
-   | _ -> failwith "approx_sys"
+    | Val.Tube.Indeterminate ((d00, d01), clo0) :: sys0, Val.Tube.Indeterminate ((d10, d11), clo1) :: sys1 ->
+      let v0 = Val.eval_clo clo0 in
+      let v1 = Val.eval_clo clo1 in
+      let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d00) ~can1:(Val.embed_dimval d10) in
+      let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d01) ~can1:(Val.embed_dimval d11) in
+      let q = approx_can_ ~vr ~ctx ~ty ~can0:v0 ~can1:v1 in
+      let tb = qd0, qd1, Some q in
+      go sys0 sys1 @@ tb :: acc
 
-   in go sys0 sys1 [] *)
+    | Val.Tube.False (d00, d01) :: sys0, Val.Tube.False (d10, d11) :: sys ->
+      let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d00) ~can1:(Val.embed_dimval d10) in
+      let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d01) ~can1:(Val.embed_dimval d11) in
+      let tb = qd0, qd1, None in
+      go sys0 sys1 @@ tb :: acc
 
-and approx_bsys ~vr ~ctx ~ty ~sys0 ~sys1 = failwith "TODO"
-(* let interval = Val.into Val.Interval in
-   let rec go sys0 sys1 acc =
-   match vr, sys0, sys1 with
-   | _, [], [] ->
-    List.rev acc
+    | _ -> failwith "quote_sys"
+  in
+  go sys0 sys1 []
 
-   | _, tube0 :: sys0, tube1 :: sys1 ->
-    let (vd00, vd01, obclo0) = tube0 in
-    let (vd10, vd11, obclo1) = tube1 in
-    let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd00) ~can1:(Val.embed_dimval vd10) in
-    let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd01) ~can1:(Val.embed_dimval vd11) in
-    let oqbnd =
-      match obclo0, obclo1 with
-      | Some bclo0, Some bclo1 ->
-        let vgen = Val.generic interval @@ Ctx.len ctx in
-        let v0 = Val.inst_bclo bclo0 vgen in
-        let v1 = Val.inst_bclo bclo1 vgen in
-        let qbnd = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty ~can0:v0 ~can1:v1 in
-        Some (Tm.B qbnd)
+and approx_bsys ~vr ~ctx ~ty ~sys0 ~sys1 =
+  let interval = Val.into Val.Interval in
+  let rec go sys0 sys1 acc =
+    match sys0, sys1 with
+    | [], [] ->
+      List.rev acc
 
-      | None, None ->
-        None
+    | Val.Tube.Delete :: sys0, _ ->
+      go sys0 sys1 acc
 
-      | _ ->
-        failwith "Expected Some"
-    in
-    go sys0 sys1 @@ (qd0, qd1, oqbnd) :: acc
+    | _, Val.Tube.Delete :: sys1 ->
+      go sys0 sys1 acc
 
-   | _ -> failwith "approx_bsys"
+    | Val.Tube.True ((d00, d01), clo0) :: sys0, Val.Tube.True ((d10, d11), clo1) :: sys1 ->
+      let vgen = Val.generic interval @@ Ctx.len ctx in
+      let v0 = Val.inst_bclo clo0 vgen in
+      let v1 = Val.inst_bclo clo1 vgen in
+      let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d00) ~can1:(Val.embed_dimval d10) in
+      let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d01) ~can1:(Val.embed_dimval d11) in
+      let q = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty ~can0:v0 ~can1:v1 in
+      let tb = qd0, qd1, Some (Tm.B q) in
+      go sys0 sys1 @@ tb :: acc
 
-   in go sys0 sys1 [] *)
+    | Val.Tube.Indeterminate ((d00, d01), clo0) :: sys0, Val.Tube.Indeterminate ((d10, d11), clo1) :: sys1 ->
+      let vgen = Val.generic interval @@ Ctx.len ctx in
+      let v0 = Val.inst_bclo clo0 vgen in
+      let v1 = Val.inst_bclo clo1 vgen in
+      let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d00) ~can1:(Val.embed_dimval d10) in
+      let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d01) ~can1:(Val.embed_dimval d11) in
+      let q = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty ~can0:v0 ~can1:v1 in
+      let tb = qd0, qd1, Some (Tm.B q) in
+      go sys0 sys1 @@ tb :: acc
+
+    | Val.Tube.False (d00, d01) :: sys0, Val.Tube.False (d10, d11) :: sys ->
+      let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d00) ~can1:(Val.embed_dimval d10) in
+      let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval d01) ~can1:(Val.embed_dimval d11) in
+      let tb = qd0, qd1, None in
+      go sys0 sys1 @@ tb :: acc
+
+    | _ -> failwith "quote_sys"
+  in
+  go sys0 sys1 []
 
 let quote_can ~ctx ~ty ~can =
   approx_can_ ~vr:Iso ~ctx ~ty ~can0:can ~can1:can

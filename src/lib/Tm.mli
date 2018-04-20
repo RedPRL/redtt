@@ -12,6 +12,8 @@ type 'a t
 type 'a tube = chk t * chk t * 'a option
 type 'a system = 'a tube list
 
+(* TODO: add FCom *)
+
 type _ f =
   | Var : var -> inf f
   | Car : inf t -> inf f
