@@ -4,8 +4,19 @@ type neu
 
 type tclo
 type bclo
+type sclo
 
-type 'a tube = DimVal.t * DimVal.t * 'a option
+module Tube :
+sig
+  type equ = DimVal.equ
+  type 'a t = 
+    | Indeterminate of equ * 'a
+    | True of 'a
+    | False of equ
+    | Delete
+end
+
+type 'a tube = 'a Tube.t
 type 'a system = 'a tube list
 
 type 'a t
@@ -17,21 +28,24 @@ type _ f =
 
   | Pi : tclo * bclo -> can f
   | Sg : tclo * bclo -> can f
-  | Rst : bclo * tclo system -> can f
+  | Ext : bclo * sclo -> can f
 
   | Univ : Lvl.t -> can f
   | Interval : can f
 
   | Dim0 : can f
   | Dim1 : can f
+  | DimGen : can f
 
   | Lam : bclo -> can f
   | Cons : tclo * tclo -> can f
 
-  | Coe : {dim0 : can t; dim1 : can t; ty : bclo; tm : can t} -> can f
-  | HCom : {dim0 : can t; dim1 : can t; ty : tclo; cap : can t; sys : bclo system} -> can f
+  | Coe : {dim0 : DimVal.t; dim1 : DimVal.t; ty : bclo; tm : can t} -> can f
+  | HCom : {dim0 : DimVal.t; dim1 : DimVal.t; ty : can t; cap : can t; sys : bclo system} -> can f
 
-  | App : neu t * can t -> neu f
+  | FunApp : neu t * can t -> neu f
+  | ExtApp : neu t * DimVal.t -> neu f
+
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
 
@@ -54,7 +68,7 @@ end
 
 
 type env = Env.t
-type rel = DimRel.t
+
 
 val eval : env -> 'a Tm.t -> can t
 
@@ -64,12 +78,12 @@ val embed_dimval : DimVal.t -> can t
 val eval_clo : tclo -> can t
 val inst_bclo : bclo -> can t -> can t
 
-val apply : rel -> can t -> can t -> can t
-val car : rel -> can t -> can t
-val cdr : rel -> can t -> can t
-
-val reflect : rel -> can t -> neu t -> can t
-val generic : rel -> can t -> int -> can t
+val apply : can t -> can t -> can t
+val car : can t -> can t
+val cdr : can t -> can t
 
 val out_pi : can t -> tclo * bclo
 val out_sg : can t -> tclo * bclo
+
+val generic : can t -> int -> can t
+val reflect : can t -> neu t -> can t

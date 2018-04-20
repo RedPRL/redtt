@@ -33,8 +33,8 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
   | Val.Univ lvl, Val.Pi (dom0, cod0), Val.Pi (dom1, cod1) ->
     let vdom0 = Val.eval_clo dom0 in
     let vdom1 = Val.eval_clo dom1 in
-    let vgen0 = Val.generic (Ctx.rel ctx) vdom0 @@ Ctx.len ctx in
-    let vgen1 = Val.generic (Ctx.rel ctx) vdom1 @@ Ctx.len ctx in
+    let vgen0 = Val.generic vdom0 @@ Ctx.len ctx in
+    let vgen1 = Val.generic vdom1 @@ Ctx.len ctx in
     let vcod0 = Val.inst_bclo cod0 vgen0 in
     let vcod1 = Val.inst_bclo cod1 vgen1 in
     let qdom = approx_can_ ~vr:Iso ~ctx ~ty ~can0:vdom1 ~can1:vdom0 in
@@ -45,8 +45,8 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let dom1, cod1 = Val.out_sg can1 in
     let vdom0 = Val.eval_clo dom0 in
     let vdom1 = Val.eval_clo dom1 in
-    let vgen0 = Val.generic (Ctx.rel ctx) vdom0 @@ Ctx.len ctx in
-    let vgen1 = Val.generic (Ctx.rel ctx) vdom1 @@ Ctx.len ctx in
+    let vgen0 = Val.generic vdom0 @@ Ctx.len ctx in
+    let vgen1 = Val.generic vdom1 @@ Ctx.len ctx in
     let vcod0 = Val.inst_bclo cod0 vgen0 in
     let vcod1 = Val.inst_bclo cod1 vgen1 in
     let qdom = approx_can_ ~vr:Iso ~ctx ~ty ~can0:vdom1 ~can1:vdom0 in
@@ -70,20 +70,19 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
 
   | Val.Pi (dom, cod), _, _ ->
     let vdom = Val.eval_clo dom in
-    let vgen = Val.generic (Ctx.rel ctx) vdom @@ Ctx.len ctx in
+    let vgen = Val.generic vdom @@ Ctx.len ctx in
     let vcod = Val.inst_bclo cod vgen in
-    let vapp0 = Val.apply (Ctx.rel ctx) can0 vgen in
-    let vapp1 = Val.apply (Ctx.rel ctx) can1 vgen in
+    let vapp0 = Val.apply can0 vgen in
+    let vapp1 = Val.apply can1 vgen in
     let qbdy = approx_can_ ~vr ~ctx:(Ctx.ext ctx vdom) ~ty:vcod ~can0:vapp0 ~can1:vapp1 in
     Tm.into @@ Tm.Lam (Tm.B qbdy)
 
   | Val.Sg (dom, cod), _, _->
     let vdom = Val.eval_clo dom in
-    let rel = Ctx.rel ctx in
-    let vcar0 = Val.car rel can0 in
-    let vcar1 = Val.car rel can1 in
-    let vcdr0 = Val.cdr rel can0 in
-    let vcdr1 = Val.cdr rel can1 in
+    let vcar0 = Val.car can0 in
+    let vcar1 = Val.car can1 in
+    let vcdr0 = Val.cdr can0 in
+    let vcdr1 = Val.cdr can1 in
     let vcod = Val.inst_bclo cod vcar0 in
     let qcar = approx_can_ ~vr ~ctx ~ty:vdom ~can0:vcar0 ~can1:vcar1 in
     let qcdr = approx_can_ ~vr ~ctx ~ty:vcod ~can0:vcdr0 ~can1:vcdr1 in
@@ -100,13 +99,13 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
         | Val.Coe coe1 ->
           let interval = Val.into Val.Interval in
           let univ = Val.into @@ Val.Univ Lvl.Omega in
-          let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:coe0.dim0 ~can1:coe0.dim0 in
-          let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:coe0.dim1 ~can1:coe0.dim1 in
-          let vgen = Val.generic (Ctx.rel ctx) interval @@ Ctx.len ctx in
+          let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval coe0.dim0) ~can1:(Val.embed_dimval coe0.dim0) in
+          let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval coe0.dim1) ~can1:(Val.embed_dimval coe0.dim1) in
+          let vgen = Val.generic interval @@ Ctx.len ctx in
           let vty0 = Val.inst_bclo coe0.ty vgen in
           let vty1 = Val.inst_bclo coe1.ty vgen in
           let qty = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty:univ ~can0:vty0 ~can1:vty1 in
-          let qtm = approx_can_ ~vr ~ctx ~ty:(Val.inst_bclo coe0.ty coe0.dim0) ~can0:coe0.tm ~can1:coe1.tm in
+          let qtm = approx_can_ ~vr ~ctx ~ty:(Val.inst_bclo coe0.ty @@ Val.embed_dimval coe0.dim0) ~can0:coe0.tm ~can1:coe1.tm in
           let tcoe = Tm.into @@ Tm.Coe {dim0 = qdim0; dim1 = qdim1; ty = Tm.B qty; tm = qtm} in
           Tm.into @@ Tm.Up tcoe
 
@@ -134,10 +133,10 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
         | Val.HCom hcom1 ->
             let interval = Val.into Val.Interval in
             let univ = Val.into @@ Val.Univ Lvl.Omega in
-            let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:hcom0.dim0 ~can1:hcom1.dim0 in
-            let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:hcom0.dim1 ~can1:hcom1.dim1 in
-            let vty0 = Val.eval_clo hcom0.ty in
-            let vty1 = Val.eval_clo hcom1.ty in
+            let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval hcom0.dim0) ~can1:(Val.embed_dimval hcom1.dim0) in
+            let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval hcom0.dim1) ~can1:(Val.embed_dimval hcom1.dim1) in
+            let vty0 = hcom0.ty in
+            let vty1 = hcom1.ty in
             let qty = approx_can_ ~vr ~ctx ~ty:univ ~can0:vty0 ~can1:vty1 in
             let qcap = approx_can_ ~vr ~ctx ~ty:vty0 ~can0:hcom0.cap ~can1:hcom1.cap in
             let qsys = approx_bsys ~vr ~ctx ~ty ~sys0:hcom0.sys ~sys1:hcom1.sys in
@@ -173,7 +172,7 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
       {tm = Tm.into @@ Tm.Var th;
        ty = Ctx.nth ctx ix}
 
-  | Val.App (neu0, varg0), Val.App (neu1, varg1) ->
+  | Val.FunApp (neu0, varg0), Val.FunApp (neu1, varg1) ->
     let quo = approx_neu_ ~vr ~ctx ~neu0 ~neu1 in
     let dom, cod = Val.out_pi quo.ty in
     let vdom = Val.eval_clo dom in
@@ -193,7 +192,7 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
     let quo = approx_neu_ ~vr ~ctx ~neu0 ~neu1 in
     let dom, cod = Val.out_sg quo.ty in
     let vdom = Val.eval_clo dom in
-    let vcar = Val.reflect (Ctx.rel ctx) vdom @@ Val.into @@ Val.Car neu0 in
+    let vcar = Val.reflect vdom @@ Val.into @@ Val.Car neu0 in
     let vcod = Val.inst_bclo cod vcar in
     {tm = Tm.into @@ Tm.Cdr quo.tm;
      ty = vcod}
@@ -201,8 +200,8 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
   | _ -> failwith "approx_neu_"
 
 
-and approx_sys ~vr ~ctx ~ty ~sys0 ~sys1 =
-  let interval = Val.into Val.Interval in
+and approx_sys ~vr ~ctx ~ty ~sys0 ~sys1 = failwith "TODO"
+  (* let interval = Val.into Val.Interval in
   let rec go sys0 sys1 acc =
     match vr, sys0, sys1 with
     | _, [], [] ->
@@ -231,10 +230,10 @@ and approx_sys ~vr ~ctx ~ty ~sys0 ~sys1 =
 
     | _ -> failwith "approx_sys"
 
-  in go sys0 sys1 []
+  in go sys0 sys1 [] *)
 
-and approx_bsys ~vr ~ctx ~ty ~sys0 ~sys1 =
-  let interval = Val.into Val.Interval in
+and approx_bsys ~vr ~ctx ~ty ~sys0 ~sys1 = failwith "TODO"
+  (* let interval = Val.into Val.Interval in
   let rec go sys0 sys1 acc =
     match vr, sys0, sys1 with
     | _, [], [] ->
@@ -248,7 +247,7 @@ and approx_bsys ~vr ~ctx ~ty ~sys0 ~sys1 =
       let oqbnd =
         match obclo0, obclo1 with
         | Some bclo0, Some bclo1 ->
-          let vgen = Val.generic (Ctx.rel ctx) interval @@ Ctx.len ctx in
+          let vgen = Val.generic interval @@ Ctx.len ctx in
           let v0 = Val.inst_bclo bclo0 vgen in
           let v1 = Val.inst_bclo bclo1 vgen in
           let qbnd = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty ~can0:v0 ~can1:v1 in
@@ -264,14 +263,14 @@ and approx_bsys ~vr ~ctx ~ty ~sys0 ~sys1 =
 
     | _ -> failwith "approx_bsys"
 
-  in go sys0 sys1 []
+  in go sys0 sys1 [] *)
 
 
 (* Invariant: this should only be called on neutral and base types.
    Invariant: ty = bty[dim1] *)
 and project_coe ~ctx ~ty ~dim0 ~bty =
   let interval = Val.into Val.Interval in
-  let vgen = Val.generic (Ctx.rel ctx) interval @@ Ctx.len ctx in
+  let vgen = Val.generic interval @@ Ctx.len ctx in
   match Val.out @@ Val.inst_bclo bty vgen with
   | Val.Up (univ, tyneu) -> `Coe
   | Val.Univ _ -> `Proj

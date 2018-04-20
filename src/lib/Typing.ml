@@ -97,7 +97,7 @@ let rec check ~mode ~ctx ~ty ~tm =
   | Val.Pi (dom, cod), Tm.Lam (Tm.B tm) ->
     let vdom = Val.eval_clo dom in
     let ctx' = Ctx.ext ctx vdom in
-    let vgen = Val.generic (Ctx.rel ctx) vdom @@ Ctx.len ctx in
+    let vgen = Val.generic vdom @@ Ctx.len ctx in
     let vcod = Val.inst_bclo cod vgen in
     check ~mode:Real ~ctx:ctx' ~ty:vcod ~tm
 
@@ -146,7 +146,7 @@ and infer ~mode ~ctx ~tm =
     let ty = infer ~mode:Real ~ctx ~tm in
     let _, cod = Val.out_sg ty in
     let vpair = Val.eval (Ctx.env ctx) tm in
-    let vcar = Val.car (Ctx.rel ctx) vpair in
+    let vcar = Val.car vpair in
     Val.inst_bclo cod vcar
 
   | Tm.Down {ty; tm} ->
