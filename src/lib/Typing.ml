@@ -237,12 +237,28 @@ and check_bsys ~ctx ~ty ~cap ~sys =
         (* Check cap-tube compatibility *)
         Quote.equiv ~ctx:(Ctx.qctx ctx'') ~ty ~can0:cap ~can1:vtb;
 
-        (* TODO: check tube-tube compatibility with everything in 'acc'. *)
+        (* Check tube-tube adjacency conditions *)
+        go_adj ctx'' acc (vd0, vd1, tb);
 
-        let acc' = (vd0, vd1, vtb) :: acc in
+        let acc' = (vd0, vd1, tb) :: acc in
         go sys acc'
 
       | _ ->
         failwith "check_bsys"
+
+  (* Invariant: 'ctx' should already be restricted by vd0=vd1 *)
+  and go_adj ctx tubes (vd0, vd1, tb) = 
+    match tubes with
+    | [] ->
+      ()
+
+    | (vd0', vd1', tb') :: tubes ->
+      let ctx' = Ctx.restrict_exn ctx vd0' vd1' in
+      let env = Ctx.env ctx' in
+      let vtb = Val.eval env tb in
+      let vtb' = Val.eval env tb' in
+      Quote.equiv ~ctx:(Ctx.qctx ctx) ~ty ~can0:vtb ~can1:vtb';
+      go_adj ctx tubes (vd0, vd1, tb)
+
   in
   go sys []
