@@ -416,7 +416,7 @@ and project_bsys sys r =
   | [] ->
     None
   | Tube.True tb :: sys ->
-    Some (inst_bclo tb r)
+    Some (inst_bclo tb @@ embed_dimval r)
   | _ :: sys ->
     project_bsys sys r
 
