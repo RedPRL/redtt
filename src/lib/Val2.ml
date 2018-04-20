@@ -15,20 +15,12 @@ struct
     | False of equ
     | Delete
 
-  let get_equ tb = 
-    match tb with
-    | Indeterminate (equ, _) -> Some equ
-    | True a -> None
-    | False equ -> Some equ
-    | Delete -> None
-
   let proj tb = 
     match tb with
     | Indeterminate (_, a) -> a
     | True a -> a
     | Delete -> failwith "Tube.proj: filtered equation"
     | False _ -> failwith "Tube.proj: false equation"
-
 end
 
 type 'a tube = 'a Tube.t
