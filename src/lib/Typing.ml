@@ -204,9 +204,7 @@ and infer ~mode ~ctx ~tm =
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let vty = check_eval ~mode:Real ~ctx ~ty:univ ~tm:hcom.ty in
     let vcap = check_eval ~mode:Real ~ctx ~ty:vty ~tm:hcom.cap in
-    (* TODO: check system types *)
     check_bsys ~ctx ~ty:vty ~cap:vcap ~sys:hcom.sys;
-    (* TODO: check cap-tube conditions *)
     (* TODO: check tube-tube conditions *)
     vty
 
@@ -219,7 +217,7 @@ and infer ~mode ~ctx ~tm =
 (* TODO: check adjacency conditions *)
 and check_bsys ~ctx ~ty ~cap ~sys =
   let interval = Val.into Val.Interval in
-  let rec go sys =
+  let rec go sys acc =
     match sys with
     | [] ->
       ()
@@ -229,16 +227,22 @@ and check_bsys ~ctx ~ty ~cap ~sys =
       let vd1 = Val.project_dimval @@ check_eval ~mode:Real ~ctx ~ty:interval ~tm:td1 in
       match Ctx.compare_dim ctx vd0 vd1, tb with
       | DimVal.Apart, None ->
-        go sys
+        go sys acc
 
-      | (DimVal.Same | DimVal.Indeterminate), Some (Tm.B tm) ->
+      | (DimVal.Same | DimVal.Indeterminate), Some (Tm.B tb) ->
         let ctx' = Ctx.ext ctx interval in
         let ctx'' = Ctx.restrict_exn ctx' vd0 vd1 in
-        let v = check_eval ~mode:Real ~ctx:ctx'' ~ty:ty ~tm in
-        Quote.equiv ~ctx:(Ctx.qctx ctx'') ~ty ~can0:cap ~can1:v;
-        go sys
+        let vtb = check_eval ~mode:Real ~ctx:ctx'' ~ty:ty ~tm:tb in
+
+        (* Check cap-tube compatibility *)
+        Quote.equiv ~ctx:(Ctx.qctx ctx'') ~ty ~can0:cap ~can1:vtb;
+
+        (* TODO: check tube-tube compatibility with everything in 'acc'. *)
+
+        let acc' = (vd0, vd1, vtb) :: acc in
+        go sys acc'
 
       | _ ->
         failwith "check_bsys"
   in
-  go sys
+  go sys []
