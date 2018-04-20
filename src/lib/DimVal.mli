@@ -2,7 +2,8 @@ type t =
   | Dim0
   | Dim1
   | Lvl of int
-  | Gen (* used in "forall" *)
+  | Delete (* used in "forall" *)
+  | Fresh of Symbol.t
 
 type equ = t * t
 

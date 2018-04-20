@@ -66,7 +66,8 @@ type _ f =
 
   | Dim0 : can f
   | Dim1 : can f
-  | DimGen : can f
+  | DimDelete : can f
+  | DimFresh : Symbol.t -> can f
 
   | Bool : can f
   | Tt : can f
@@ -157,7 +158,8 @@ let embed_dimval dv =
   | DimVal.Dim0 -> Dim0
   | DimVal.Dim1 -> Dim1
   | DimVal.Lvl i -> Up (into Interval, into @@ Lvl i)
-  | DimVal.Gen -> DimGen
+  | DimVal.Delete -> DimDelete
+  | DimVal.Fresh x -> DimFresh x
 
 let out : type a. a t -> a f =
   fun node -> node.con
@@ -173,7 +175,8 @@ let project_dimval (type a) (v : a t) =
       | Interval, Lvl i -> DimVal.Lvl i 
       | _ -> failwith "project_dimval/Up"
     end
-  | DimGen -> DimVal.Gen
+  | DimDelete -> DimVal.Delete
+  | DimFresh x -> DimVal.Fresh x
   | _ -> failwith "project_dimval"
 
 let (<:) tm env = 
@@ -363,9 +366,8 @@ and rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys =
 
 
 and rigid_coe ~dim0 ~dim1 ~ty ~tm =
-  (* TODO: it might not be right to use DimGen here. I might need to have some notion of 
-     nominal dimension and generate a fresh one. I'm worried about interference, in case this gets called recursively.*)
-  let tyx = inst_bclo ty @@ into DimGen in
+  let x = Symbol.fresh () in
+  let tyx = inst_bclo ty @@ into @@ DimFresh x in
   match out tyx with
   | Univ _ ->
     tm
@@ -386,8 +388,8 @@ and eval_btube rho (dim0, dim1, otb) =
   let vdim0 = project_dimval @@ eval rho dim0 in
   let vdim1 = project_dimval @@ eval rho dim1 in
   match vdim0, vdim1 with
-  | DimVal.Gen, _ -> Tube.Delete
-  | _, DimVal.Gen -> Tube.Delete
+  | DimVal.Delete, _ -> Tube.Delete
+  | _, DimVal.Delete -> Tube.Delete
   | _ ->
     match Env.compare_dim rho vdim0 vdim1, otb with
     | DimVal.Same, Some tb ->
@@ -461,7 +463,7 @@ and ext_apply vext vdim =
   | Coe info ->
     let ty = Clo.ExtCod (info.ty, vdim) in
     let cap = ext_apply info.tm vdim in
-    let _, sclo = out_ext @@ inst_bclo info.ty @@ into DimGen in
+    let _, sclo = out_ext @@ inst_bclo info.ty @@ into DimDelete in
     let sys = inst_sclo sclo vdim in
     begin
       match project_sys sys with
@@ -631,9 +633,9 @@ and inst_sclo sclo arg =
       let vdim0 = project_dimval @@ eval env' tdim0 in
       let vdim1 = project_dimval @@ eval env' tdim1 in
       match vdim0, vdim1 with
-      | DimVal.Gen, _ ->
+      | DimVal.Delete, _ ->
         Tube.Delete
-      | _, DimVal.Gen ->
+      | _, DimVal.Delete ->
         Tube.Delete
       | _ ->
         match Env.compare_dim env' vdim0 vdim1 with

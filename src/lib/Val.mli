@@ -35,7 +35,8 @@ type _ f =
 
   | Dim0 : can f
   | Dim1 : can f
-  | DimGen : can f
+  | DimDelete : can f
+  | DimFresh : Symbol.t -> can f
 
   | Bool : can f
   | Tt : can f

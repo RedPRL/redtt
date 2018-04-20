@@ -2,7 +2,8 @@ type t =
   | Dim0
   | Dim1
   | Lvl of int
-  | Gen (* used in "forall" *)
+  | Delete (* used in "forall" *)
+  | Fresh of Symbol.t
 
 type equ = t * t
 
@@ -19,5 +20,6 @@ let compare d0 d1 =
     if i = j then Same else Indeterminate
   | Dim0, Dim1 -> Apart
   | Dim1, Dim0 -> Apart
-  | Gen, Gen -> Same
+  | Delete, Delete -> Same
+  | Fresh x, Fresh y -> if x = y then Same else Apart
   | _ -> Indeterminate
