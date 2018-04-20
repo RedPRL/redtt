@@ -200,22 +200,34 @@ and infer ~mode ~ctx ~tm =
     Val.eval (Val.Env.ext env vdim1) ty
 
   | Tm.HCom hcom ->
+    let interval = Val.into Val.Interval in
+    let vdim0 = check_eval ~mode:Real ~ctx ~ty:interval ~tm:hcom.dim0 in
+    check ~mode:Real ~ctx ~ty:interval ~tm:hcom.dim1;
     check_sys_valid hcom.sys;
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let vty = check_eval ~mode:Real ~ctx ~ty:univ ~tm:hcom.ty in
     let vcap = check_eval ~mode:Real ~ctx ~ty:vty ~tm:hcom.cap in
-    check_bsys ~ctx ~ty:vty ~cap:vcap ~sys:hcom.sys;
-    (* TODO: check tube-tube conditions *)
+    check_bsys ~ctx ~dim0:vdim0 ~tycap:vty ~ty:vty ~cap:vcap ~sys:hcom.sys;
     vty
 
   | Tm.Com com ->
+    let univ = Val.into @@ Val.Univ Lvl.Omega in
+    let interval = Val.into Val.Interval in
+    let vdim0 = check_eval ~mode:Real ~ctx ~ty:interval ~tm:com.dim0 in
+    let vdim1 = check_eval ~mode:Real ~ctx ~ty:interval ~tm:com.dim1 in
     check_sys_valid com.sys;
-    failwith ""
+
+    let Tm.B ty = com.ty in
+    let vty = check_eval ~mode:Real ~ctx:(Ctx.ext ctx interval) ~ty:univ ~tm:ty in
+    let env = Ctx.env ctx in
+    let vty0 = Val.eval (Val.Env.ext env vdim0) ty in
+    let vcap = check_eval ~mode:Real ~ctx ~ty:vty0 ~tm:com.cap in
+    check_bsys ~ctx ~dim0:vdim0 ~tycap:vty0 ~ty:vty ~cap:vcap ~sys:com.sys;
+    Val.eval (Val.Env.ext env vdim1) ty
 
   | _ -> failwith "pattern exhaustiveness + GADTs is broken in OCaml :("
 
-(* TODO: check adjacency conditions *)
-and check_bsys ~ctx ~ty ~cap ~sys =
+and check_bsys ~ctx ~dim0 ~tycap ~ty ~cap ~sys =
   let interval = Val.into Val.Interval in
   let rec go sys acc =
     match sys with
@@ -232,7 +244,10 @@ and check_bsys ~ctx ~ty ~cap ~sys =
       | (DimVal.Same | DimVal.Indeterminate), Some (Tm.B tb) ->
         let ctx' = Ctx.ext ctx interval in
         let ctx'' = Ctx.restrict_exn ctx' vd0 vd1 in
-        let vtb = check_eval ~mode:Real ~ctx:ctx'' ~ty:ty ~tm:tb in
+        check ~mode:Real ~ctx:ctx'' ~ty:ty ~tm:tb;
+
+        let env = Ctx.env ctx'' in
+        let vtb = Val.eval (Val.Env.ext env dim0) tb in
 
         (* Check cap-tube compatibility *)
         Quote.equiv ~ctx:(Ctx.qctx ctx'') ~ty ~can0:cap ~can1:vtb;
