@@ -307,7 +307,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
 
     | Tm.Ff ->
       into Ff
-    
+
     | Tm.If {mot; scrut; tcase; fcase} ->
       if_ ~mot:(mot <:+ rho) ~scrut:(eval rho scrut) ~tcase:(tcase <: rho) ~fcase:(fcase <: rho)
 
@@ -362,16 +362,20 @@ and eval_bsys rho sys =
 and eval_btube rho (dim0, dim1, otb) =
   let vdim0 = project_dimval @@ eval rho dim0 in
   let vdim1 = project_dimval @@ eval rho dim1 in
-  match Env.compare_dim rho vdim0 vdim1, otb with
-  | DimVal.Same, Some tb ->
-    Tube.True (tb <:+ rho)
-  | DimVal.Apart, _ -> 
-    Tube.False (vdim0, vdim1)
-  | DimVal.Indeterminate, Some tb ->
-    let rho' = Env.restrict_exn rho vdim0 vdim1 in
-    Tube.Indeterminate ((vdim0, vdim1), tb <:+ rho')
-  | _ -> failwith "eval_tube"
-  
+  match vdim0, vdim1 with
+  | DimVal.Gen, _ -> Tube.Delete
+  | _, DimVal.Gen -> Tube.Delete
+  | _ ->
+    match Env.compare_dim rho vdim0 vdim1, otb with
+    | DimVal.Same, Some tb ->
+      Tube.True (tb <:+ rho)
+    | DimVal.Apart, _ -> 
+      Tube.False (vdim0, vdim1)
+    | DimVal.Indeterminate, Some tb ->
+      let rho' = Env.restrict_exn rho vdim0 vdim1 in
+      Tube.Indeterminate ((vdim0, vdim1), tb <:+ rho')
+    | _ -> failwith "eval_btube"
+
 
 and if_ ~mot ~scrut ~tcase ~fcase =
   match out scrut with
@@ -603,16 +607,22 @@ and inst_sclo sclo arg =
     let go (tdim0, tdim1, otb) =
       let vdim0 = project_dimval @@ eval env' tdim0 in
       let vdim1 = project_dimval @@ eval env' tdim1 in
-      match Env.compare_dim env' vdim0 vdim1 with
-      | DimVal.Same -> 
-        let tm = Option.get_exn otb in
-        Tube.True (tm <: env')
-      | DimVal.Apart ->
-        Tube.False (vdim0, vdim1)
-      | DimVal.Indeterminate ->
-        let env'' = Env.restrict_exn env' vdim0 vdim1 in
-        let tm = Option.get_exn otb in
-        Tube.Indeterminate ((vdim0, vdim1), tm <: env'')
+      match vdim0, vdim1 with
+      | DimVal.Gen, _ ->
+        Tube.Delete
+      | _, DimVal.Gen ->
+        Tube.Delete
+      | _ ->
+        match Env.compare_dim env' vdim0 vdim1 with
+        | DimVal.Same -> 
+          let tm = Option.get_exn otb in
+          Tube.True (tm <: env')
+        | DimVal.Apart ->
+          Tube.False (vdim0, vdim1)
+        | DimVal.Indeterminate ->
+          let env'' = Env.restrict_exn env' vdim0 vdim1 in
+          let tm = Option.get_exn otb in
+          Tube.Indeterminate ((vdim0, vdim1), tm <: env'')
     in
     List.map go sys
 
