@@ -45,12 +45,15 @@ struct
     | Await of {env : 'a env_; btm : Tm.chk Tm.t Tm.bnd}
     | SgDom of 'a bclo
     | PiDom of 'a bclo
-    | PiCodCoe of {bclo : 'a bclo; dim1 : DimVal.t; dom : 'a bclo; arg : 'a}
+    | PiCodCoe of {bclo : 'a bclo; dim1 : DimVal.t; arg : 'a}
+    | SgCodCoe of {bclo : 'a bclo; dim0 : DimVal.t; arg : 'a}
+    | SgCodHCom of {ty : 'a; dim0 : DimVal.t; cap : 'a; sys : 'a bclo system}
     | ExtCod of 'a bclo * DimVal.t
     | ExtSysTube of 'a bclo * int * DimVal.t
     | ComCoeTube of {bclo : 'a bclo; ty : 'a bclo; dim1 : DimVal.t}
     | App of 'a bclo * 'a
     | Car of 'a bclo
+    | Cdr of 'a bclo
     | Wk of 'a tclo
 
   type 'a sclo = 
@@ -335,8 +338,8 @@ and apply vfun varg =
 
   | Coe info ->
     let dom = Clo.PiDom info.ty in
-    let cod = Clo.PiCodCoe {bclo = info.ty; dim1 = info.dim1; dom = dom; arg = varg} in
-    let varg' = into @@ Coe {dim0 = info.dim1; dim1 = info.dim1; ty = dom; tm = varg} in
+    let cod = Clo.PiCodCoe {bclo = info.ty; dim1 = info.dim1; arg = varg} in
+    let varg' = into @@ Coe {dim0 = info.dim1; dim1 = info.dim0; ty = dom; tm = varg} in
     into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = cod; tm = apply info.tm varg'}
 
   | HCom info ->
@@ -344,7 +347,7 @@ and apply vfun varg =
     let vcod = inst_bclo cod varg in
     let vcap = apply info.cap varg in
     let vsys = map_tubes (fun bclo -> Clo.App (bclo, varg)) info.sys in
-    into @@ HCom {dim0 = info.dim1; dim1 = info.dim1; ty = vcod; cap = vcap; sys = vsys}
+    into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty = vcod; cap = vcap; sys = vsys}
 
   | _ -> failwith "apply"
 
@@ -430,11 +433,17 @@ and cdr v =
     let vcod = inst_bclo cod vcar in
     into @@ Up (vcod, into @@ Cdr vneu)
 
-  | Coe _ ->
-    failwith "TODO: cdr/coe"
+  | Coe info ->
+    let vcar = car info.tm in
+    let vcdr = cdr info.tm in
+    let cod = Clo.SgCodCoe {bclo = info.ty; dim0 = info.dim0; arg = vcar} in
+    into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = cod; tm = vcdr}
     
-  | HCom _ ->
-    failwith "TODO: cdr/hcom"
+  | HCom info ->
+    let ty = Clo.SgCodHCom {ty = info.ty; dim0 = info.dim0; cap = info.cap; sys = info.sys} in
+    let cap = cdr info.cap in
+    let sys = map_tubes (fun bclo -> Clo.Cdr bclo) info.sys in
+    rigid_com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys
 
   | _ -> failwith "cdr"
 
@@ -471,10 +480,27 @@ and inst_bclo bclo arg =
     let dom, _ = out_pi @@ inst_bclo bclo arg in
     eval_clo dom
 
-  | Clo.PiCodCoe {bclo; dim1; dom; arg = arg'} ->
+  | Clo.PiCodCoe {bclo; dim1; arg = arg'} ->
+    let dom = Clo.PiDom bclo in
     let dimx = project_dimval arg in
     let _, cod = out_pi @@ inst_bclo bclo arg in
     let coe = into @@ Coe {dim0 = dim1; dim1 = dimx; ty = dom; tm = arg'} in
+    inst_bclo cod coe
+
+  | Clo.SgCodCoe {bclo; dim0; arg = arg'} ->
+    let dom = Clo.SgDom bclo in
+    let dimx = project_dimval arg in
+    let _, cod = out_sg @@ inst_bclo bclo arg in
+    let coe = into @@ Coe {dim0 = dim0; dim1 = dimx; ty = dom; tm = arg'} in
+    inst_bclo cod coe
+
+  | Clo.SgCodHCom {ty; dim0; cap; sys} ->
+    let dom, cod = out_sg ty in
+    let dimx = project_dimval arg in
+    let ty' = eval_clo dom in
+    let cap' = car cap in
+    let sys' = map_tubes (fun bclo -> Clo.Car bclo) sys in
+    let coe = into @@ HCom {dim0; dim1 = dimx; ty = ty'; cap = cap'; sys = sys'} in
     inst_bclo cod coe
 
   | Clo.ExtCod (bclo, vdim) ->
@@ -498,6 +524,10 @@ and inst_bclo bclo arg =
   | Clo.Car bclo ->
     let v = inst_bclo bclo arg in
     car v
+
+  | Clo.Cdr bclo ->
+    let v = inst_bclo bclo arg in
+    cdr v
 
   | Clo.Wk tclo -> 
     eval_clo tclo
