@@ -367,17 +367,14 @@ and car v =
 
   | Coe info ->
     let vcar = car info.tm in
-    into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = failwith "TODO"; tm = vcar}
-  (* let dom = bclo_frame KSgDom info.ty in
-     let vcar = car rel v in
-     coe ~rel:rel ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~tm:vcar *)
+    into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty = Clo.SgDom info.ty ; tm = vcar}
 
   | HCom info ->
-    failwith ""
-  (* let dom, _ = out_sg @@ eval_clo info.ty in
-     let vcap' = car rel info.cap in
-     let vsys' = map_tubes (bclo_frame KCar) info.sys in
-     hcom ~rel ~dim0:info.dim0 ~dim1:info.dim1 ~ty:dom ~cap:vcap' ~sys:vsys' *)
+    let dom, _ = out_sg info.ty in
+    let ty = eval_clo dom in
+    let cap = car info.cap in
+    let sys = map_tubes (fun tb -> Clo.Car tb) info.sys in
+    into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty; cap; sys}
 
   | _ -> failwith "car"
 
