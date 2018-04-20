@@ -339,6 +339,7 @@ and ext_apply vext vdim =
     let sys' = mapi_tubes (fun i _ -> Clo.ExtSysTube (info.ty, i, vdim)) sys in
     com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:sys'
 
+(* TODO: it is necessary to try and project from sys *)
   | HCom info ->
     let cap = ext_apply info.cap vdim in
     let cod, sclo = out_ext info.ty in
@@ -393,7 +394,7 @@ and inst_bclo bclo arg =
 
   | Clo.SgDom bclo ->
     let dom, _ = out_sg @@ inst_bclo bclo arg in
-    eval_clo domjj
+    eval_clo dom
 
   | Clo.PiDom bclo -> 
     let dom, _ = out_pi @@ inst_bclo bclo arg in
