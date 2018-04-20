@@ -88,74 +88,31 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let qcdr = approx_can_ ~vr ~ctx ~ty:vcod ~can0:vcdr0 ~can1:vcdr1 in
     Tm.into @@ Tm.Cons (qcar, qcdr)
 
-  | _, Val.Coe coe0, _ ->
-    begin
-      match project_coe ~ctx ~ty ~dim0:coe0.dim0 ~bty:coe0.ty with
-      | `Proj ->
-        approx_can_ ~vr ~ctx ~ty ~can0:coe0.tm ~can1
+  | _, Val.Coe coe0, Val.Coe coe1 ->
+    let interval = Val.into Val.Interval in
+    let univ = Val.into @@ Val.Univ Lvl.Omega in
+    let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval coe0.dim0) ~can1:(Val.embed_dimval coe0.dim0) in
+    let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval coe0.dim1) ~can1:(Val.embed_dimval coe0.dim1) in
+    let vgen = Val.generic interval @@ Ctx.len ctx in
+    let vty0 = Val.inst_bclo coe0.ty vgen in
+    let vty1 = Val.inst_bclo coe1.ty vgen in
+    let qty = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty:univ ~can0:vty0 ~can1:vty1 in
+    let qtm = approx_can_ ~vr ~ctx ~ty:(Val.inst_bclo coe0.ty @@ Val.embed_dimval coe0.dim0) ~can0:coe0.tm ~can1:coe1.tm in
+    let tcoe = Tm.into @@ Tm.Coe {dim0 = qdim0; dim1 = qdim1; ty = Tm.B qty; tm = qtm} in
+    Tm.into @@ Tm.Up tcoe
 
-      | `Coe ->
-        match Val.out can1 with
-        | Val.Coe coe1 ->
-          let interval = Val.into Val.Interval in
-          let univ = Val.into @@ Val.Univ Lvl.Omega in
-          let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval coe0.dim0) ~can1:(Val.embed_dimval coe0.dim0) in
-          let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval coe0.dim1) ~can1:(Val.embed_dimval coe0.dim1) in
-          let vgen = Val.generic interval @@ Ctx.len ctx in
-          let vty0 = Val.inst_bclo coe0.ty vgen in
-          let vty1 = Val.inst_bclo coe1.ty vgen in
-          let qty = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty:univ ~can0:vty0 ~can1:vty1 in
-          let qtm = approx_can_ ~vr ~ctx ~ty:(Val.inst_bclo coe0.ty @@ Val.embed_dimval coe0.dim0) ~can0:coe0.tm ~can1:coe1.tm in
-          let tcoe = Tm.into @@ Tm.Coe {dim0 = qdim0; dim1 = qdim1; ty = Tm.B qty; tm = qtm} in
-          Tm.into @@ Tm.Up tcoe
-
-        | _ ->
-          failwith "approx / coe"
-    end
-
-  | _, _, Val.Coe coe1 ->
-    begin
-      match project_coe ~ctx ~ty ~dim0:coe1.dim0 ~bty:coe1.ty with
-      | `Proj ->
-        approx_can_ ~vr ~ctx ~ty ~can0 ~can1:coe1.tm
-      | `Coe ->
-        failwith "approx / coe"
-    end
-
-  | _, Val.HCom hcom0, _ ->
-    begin
-      match project_hcom ~ty with
-      | `Cap ->
-        approx_can_ ~vr ~ctx ~ty ~can0:hcom0.cap ~can1
-
-      | `HCom ->
-        match Val.out can1 with
-        | Val.HCom hcom1 ->
-            let interval = Val.into Val.Interval in
-            let univ = Val.into @@ Val.Univ Lvl.Omega in
-            let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval hcom0.dim0) ~can1:(Val.embed_dimval hcom1.dim0) in
-            let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval hcom0.dim1) ~can1:(Val.embed_dimval hcom1.dim1) in
-            let vty0 = hcom0.ty in
-            let vty1 = hcom1.ty in
-            let qty = approx_can_ ~vr ~ctx ~ty:univ ~can0:vty0 ~can1:vty1 in
-            let qcap = approx_can_ ~vr ~ctx ~ty:vty0 ~can0:hcom0.cap ~can1:hcom1.cap in
-            let qsys = approx_bsys ~vr ~ctx ~ty ~sys0:hcom0.sys ~sys1:hcom1.sys in
-            let thcom = Tm.into @@ Tm.HCom {dim0 = qdim0; dim1 = qdim1; ty = qty; cap = qcap; sys = qsys} in
-            Tm.into @@ Tm.Up thcom
-
-        | _ ->
-          failwith "approx / hcom"
-    end
-
-
-  | _, _, Val.HCom hcom1 ->
-    begin
-      match project_hcom ~ty with
-      | `Cap ->
-        approx_can_ ~vr ~ctx ~ty ~can0 ~can1:hcom1.cap
-      | `HCom ->
-        failwith "approx / hcom"
-    end
+  | _, Val.HCom hcom0, Val.HCom hcom1 ->
+    let interval = Val.into Val.Interval in
+    let univ = Val.into @@ Val.Univ Lvl.Omega in
+    let qdim0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval hcom0.dim0) ~can1:(Val.embed_dimval hcom1.dim0) in
+    let qdim1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval hcom0.dim1) ~can1:(Val.embed_dimval hcom1.dim1) in
+    let vty0 = hcom0.ty in
+    let vty1 = hcom1.ty in
+    let qty = approx_can_ ~vr ~ctx ~ty:univ ~can0:vty0 ~can1:vty1 in
+    let qcap = approx_can_ ~vr ~ctx ~ty:vty0 ~can0:hcom0.cap ~can1:hcom1.cap in
+    let qsys = approx_bsys ~vr ~ctx ~ty ~sys0:hcom0.sys ~sys1:hcom1.sys in
+    let thcom = Tm.into @@ Tm.HCom {dim0 = qdim0; dim1 = qdim1; ty = qty; cap = qcap; sys = qsys} in
+    Tm.into @@ Tm.Up thcom
 
   | _, Val.Up (_, neu0), Val.Up (_, neu1) ->
     let q = approx_neu_ ~vr ~ctx ~neu0 ~neu1 in
@@ -201,88 +158,69 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
 
 
 and approx_sys ~vr ~ctx ~ty ~sys0 ~sys1 = failwith "TODO"
-  (* let interval = Val.into Val.Interval in
-  let rec go sys0 sys1 acc =
-    match vr, sys0, sys1 with
-    | _, [], [] ->
-      List.rev acc
+(* let interval = Val.into Val.Interval in
+   let rec go sys0 sys1 acc =
+   match vr, sys0, sys1 with
+   | _, [], [] ->
+    List.rev acc
 
-    | _, tube0 :: sys0, tube1 :: sys1 ->
-      let (vd00, vd01, oclo0) = tube0 in
-      let (vd10, vd11, oclo1) = tube1 in
-      let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd00) ~can1:(Val.embed_dimval vd10) in
-      let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd01) ~can1:(Val.embed_dimval vd11) in
-      let oqv =
-        match oclo0, oclo1 with
-        | Some clo0, Some clo1 ->
-          let v0 = Val.eval_clo clo0 in
-          let v1 = Val.eval_clo clo1 in
-          let qv = approx_can_ ~vr ~ctx ~ty ~can0:v0 ~can1:v1 in
-          Some qv
+   | _, tube0 :: sys0, tube1 :: sys1 ->
+    let (vd00, vd01, oclo0) = tube0 in
+    let (vd10, vd11, oclo1) = tube1 in
+    let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd00) ~can1:(Val.embed_dimval vd10) in
+    let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd01) ~can1:(Val.embed_dimval vd11) in
+    let oqv =
+      match oclo0, oclo1 with
+      | Some clo0, Some clo1 ->
+        let v0 = Val.eval_clo clo0 in
+        let v1 = Val.eval_clo clo1 in
+        let qv = approx_can_ ~vr ~ctx ~ty ~can0:v0 ~can1:v1 in
+        Some qv
 
-        | None, None ->
-          None
+      | None, None ->
+        None
 
-        | _ ->
-          failwith "Expected Some"
-      in
-      go sys0 sys1 @@ (qd0, qd1, oqv) :: acc
+      | _ ->
+        failwith "Expected Some"
+    in
+    go sys0 sys1 @@ (qd0, qd1, oqv) :: acc
 
-    | _ -> failwith "approx_sys"
+   | _ -> failwith "approx_sys"
 
-  in go sys0 sys1 [] *)
+   in go sys0 sys1 [] *)
 
 and approx_bsys ~vr ~ctx ~ty ~sys0 ~sys1 = failwith "TODO"
-  (* let interval = Val.into Val.Interval in
-  let rec go sys0 sys1 acc =
-    match vr, sys0, sys1 with
-    | _, [], [] ->
-      List.rev acc
+(* let interval = Val.into Val.Interval in
+   let rec go sys0 sys1 acc =
+   match vr, sys0, sys1 with
+   | _, [], [] ->
+    List.rev acc
 
-    | _, tube0 :: sys0, tube1 :: sys1 ->
-      let (vd00, vd01, obclo0) = tube0 in
-      let (vd10, vd11, obclo1) = tube1 in
-      let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd00) ~can1:(Val.embed_dimval vd10) in
-      let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd01) ~can1:(Val.embed_dimval vd11) in
-      let oqbnd =
-        match obclo0, obclo1 with
-        | Some bclo0, Some bclo1 ->
-          let vgen = Val.generic interval @@ Ctx.len ctx in
-          let v0 = Val.inst_bclo bclo0 vgen in
-          let v1 = Val.inst_bclo bclo1 vgen in
-          let qbnd = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty ~can0:v0 ~can1:v1 in
-          Some (Tm.B qbnd)
+   | _, tube0 :: sys0, tube1 :: sys1 ->
+    let (vd00, vd01, obclo0) = tube0 in
+    let (vd10, vd11, obclo1) = tube1 in
+    let qd0 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd00) ~can1:(Val.embed_dimval vd10) in
+    let qd1 = approx_can_ ~vr ~ctx ~ty:interval ~can0:(Val.embed_dimval vd01) ~can1:(Val.embed_dimval vd11) in
+    let oqbnd =
+      match obclo0, obclo1 with
+      | Some bclo0, Some bclo1 ->
+        let vgen = Val.generic interval @@ Ctx.len ctx in
+        let v0 = Val.inst_bclo bclo0 vgen in
+        let v1 = Val.inst_bclo bclo1 vgen in
+        let qbnd = approx_can_ ~vr ~ctx:(Ctx.ext ctx interval) ~ty ~can0:v0 ~can1:v1 in
+        Some (Tm.B qbnd)
 
-        | None, None ->
-          None
+      | None, None ->
+        None
 
-        | _ ->
-          failwith "Expected Some"
-      in
-      go sys0 sys1 @@ (qd0, qd1, oqbnd) :: acc
+      | _ ->
+        failwith "Expected Some"
+    in
+    go sys0 sys1 @@ (qd0, qd1, oqbnd) :: acc
 
-    | _ -> failwith "approx_bsys"
+   | _ -> failwith "approx_bsys"
 
-  in go sys0 sys1 [] *)
-
-
-(* Invariant: this should only be called on neutral and base types.
-   Invariant: ty = bty[dim1] *)
-and project_coe ~ctx ~ty ~dim0 ~bty =
-  let interval = Val.into Val.Interval in
-  let vgen = Val.generic interval @@ Ctx.len ctx in
-  match Val.out @@ Val.inst_bclo bty vgen with
-  | Val.Up (univ, tyneu) -> `Coe
-  | Val.Univ _ -> `Proj
-  | _ -> failwith "project_rigid_coe: missing case (?)"
-
-
-(* Invariant: this should only be called on neutral and base types. *)
-and project_hcom ~ty =
-  match Val.out ty with
-  (* if base type, like bool, return `Cap *)
-  | _ -> `HCom
-
+   in go sys0 sys1 [] *)
 
 let quote_can ~ctx ~ty ~can =
   approx_can_ ~vr:Iso ~ctx ~ty ~can0:can ~can1:can
