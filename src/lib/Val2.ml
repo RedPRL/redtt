@@ -206,18 +206,6 @@ let mapi_tubes f =
 let map_tubes f =
   mapi_tubes (fun i -> f)
 
-
-let com ~dim0 ~dim1 ~ty ~cap ~sys =
-  let _cap' = into @@ Coe {dim0; dim1; ty; tm = cap} in
-  failwith "TODO: com"
-(* let vcap' = coe ~rel ~dim0 ~dim1 ~ty ~tm:cap in
-   let Tm.B tm = ty.foc in
-   let ty1 = {ty with foc = tm; env = Env.ext ty.env dim1} in
-   let tube bclo' = bclo_frame (KComTubeCoe {dim1 = dim1; ty = ty; tube = bclo'}) ty in
-   let vsys' = map_tubes tube sys in
-   hcom ~rel ~dim0 ~dim1 ~ty:ty1 ~cap:vcap' ~sys:vsys' *)
-
-
 let rec eval : type a. env -> a Tm.t -> can t =
   fun rho tm ->
     match Tm.out tm with
@@ -290,7 +278,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
       into @@ Univ lvl
 
     | Tm.Interval ->
-      into @@ Interval
+      into Interval
 
     | Tm.Dim0 ->
       into Dim0
@@ -313,6 +301,11 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Up t ->
       eval rho t
 
+and rigid_com ~dim0 ~dim1 ~ty ~cap ~sys =
+  let cap' = into @@ Coe {dim0; dim1; ty; tm = cap} in
+  let ty' = inst_bclo ty @@ embed_dimval dim1 in
+  let sys' = map_tubes (fun bclo -> Clo.ComCoeTube {bclo; ty; dim1}) sys in
+  into @@ HCom {dim0; dim1; ty = ty'; cap = cap'; sys = sys'}
 
 and eval_bsys rho sys =
   List.map (eval_tube rho) sys
@@ -377,8 +370,14 @@ and ext_apply vext vdim =
     let cap = ext_apply info.tm vdim in
     let _, sclo = out_ext @@ inst_bclo info.ty @@ into DimGen in
     let sys = inst_sclo sclo vdim in
-    let sys' = mapi_tubes (fun i _ -> Clo.ExtSysTube (info.ty, i, vdim)) sys in
-    com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:sys'
+    begin
+      match project_sys sys with
+      | Some v ->
+        into @@ Coe {dim0 = info.dim0; dim1 = info.dim1; ty; tm = v}
+      | None ->
+        let sys' = mapi_tubes (fun i _ -> Clo.ExtSysTube (info.ty, i, vdim)) sys in
+        rigid_com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:sys'
+    end
 
   | HCom info ->
     let cap = ext_apply info.cap vdim in
