@@ -31,6 +31,11 @@ type _ f =
   | Sg : chk t * chk t bnd -> chk f
   | Interval : chk f
 
+  | Bool : chk f
+  | Tt : chk f
+  | Ff : chk f
+  | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
+
   | Lam : chk t bnd -> chk f
   | Cons : chk t * chk t -> chk f
   | Dim0 : chk f

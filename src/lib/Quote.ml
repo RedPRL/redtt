@@ -63,6 +63,12 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let qsys = approx_sys ~vr ~ctx:ctx' ~ty:vcod0 ~sys0 ~sys1 in
     Tm.into @@ Tm.Ext (Tm.B (qcod, qsys))
 
+  | Val.Univ _, Val.Interval, Val.Interval ->
+    Tm.into Tm.Interval
+
+  | Val.Univ _, Val.Bool, Val.Bool ->
+    Tm.into Tm.Bool
+
   | Val.Univ lvl, Val.Univ lvl0, Val.Univ lvl1 ->
     begin
       match vr with
@@ -97,6 +103,12 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let qcar = approx_can_ ~vr ~ctx ~ty:vdom ~can0:vcar0 ~can1:vcar1 in
     let qcdr = approx_can_ ~vr ~ctx ~ty:vcod ~can0:vcdr0 ~can1:vcdr1 in
     Tm.into @@ Tm.Cons (qcar, qcdr)
+
+  | Val.Bool, Val.Tt, Val.Tt ->
+    Tm.into Tm.Tt
+
+  | Val.Bool, Val.Ff, Val.Ff ->
+    Tm.into Tm.Ff
 
   | _, Val.Coe coe0, Val.Coe coe1 ->
     let interval = Val.into Val.Interval in
@@ -173,6 +185,27 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
     let vcod = Val.inst_bclo cod vcar in
     {tm = Tm.into @@ Tm.Cdr quo.tm;
      ty = vcod}
+
+  | Val.If if0, Val.If if1 ->
+    let bool = Val.into Val.Bool in
+    let univ = Val.into @@ Val.Univ Lvl.Omega in
+    let vgen = Val.generic bool @@ Ctx.len ctx in
+    let xmot0 = Val.inst_bclo if0.mot vgen in
+    let xmot1 = Val.inst_bclo if1.mot vgen in
+    let qmot = approx_can_ ~vr ~ctx:(Ctx.ext ctx bool) ~ty:univ ~can0:xmot0 ~can1:xmot1 in
+    let qscrut = approx_neu_ ~vr ~ctx ~neu0:if0.scrut ~neu1:if1.scrut in
+    let tt = Val.into Val.Tt in
+    let ff = Val.into Val.Ff in
+    let tmot = Val.inst_bclo if0.mot tt in
+    let fmot = Val.inst_bclo if1.mot ff in
+    let tcase0 = Val.eval_clo if0.tcase in
+    let tcase1 = Val.eval_clo if1.tcase in
+    let qtcase = approx_can_ ~vr ~ctx ~ty:tmot ~can0:tcase0 ~can1:tcase1 in
+    let fcase0 = Val.eval_clo if0.fcase in
+    let fcase1 = Val.eval_clo if1.fcase in
+    let qfcase = approx_can_ ~vr ~ctx ~ty:fmot ~can0:fcase0 ~can1:fcase1 in
+    {tm = Tm.into @@ Tm.If {mot = Tm.B qmot; scrut = qscrut.tm; tcase = qtcase; fcase = qfcase};
+     ty = Val.inst_bclo if0.mot @@ Val.reflect qscrut.ty if0.scrut}
 
   | _ -> failwith "approx_neu_"
 

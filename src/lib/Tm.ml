@@ -27,6 +27,11 @@ type _ f =
   | Sg : chk t * chk t bnd -> chk f
   | Interval : chk f
 
+  | Bool : chk f
+  | Tt : chk f
+  | Ff : chk f
+  | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
+
   | Lam : chk t bnd -> chk f
   | Cons : chk t * chk t -> chk f
   | Dim0 : chk f
@@ -127,6 +132,18 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
 
     | Dim1 ->
       tf
+
+    | Bool ->
+      tf
+
+    | Tt ->
+      tf
+    
+    | Ff ->
+      tf
+
+    | If {mot; scrut; tcase; fcase} ->
+      If {mot = thin_bnd th mot; scrut = thin th scrut; tcase = thin th tcase; fcase = thin th fcase}
 
 
 let out node = thin_f node.thin node.con

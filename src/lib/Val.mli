@@ -37,6 +37,11 @@ type _ f =
   | Dim1 : can f
   | DimGen : can f
 
+  | Bool : can f
+  | Tt : can f
+  | Ff : can f
+  | If : {mot : bclo; scrut : neu t; tcase : tclo; fcase : tclo} -> neu f
+
   | Lam : bclo -> can f
   | Cons : tclo * tclo -> can f
 

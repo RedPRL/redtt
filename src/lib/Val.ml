@@ -68,6 +68,12 @@ type _ f =
   | Dim1 : can f
   | DimGen : can f
 
+  | Bool : can f
+  | Tt : can f
+  | Ff : can f
+  | If : {mot : bclo; scrut : neu t; tcase : tclo; fcase : tclo} -> neu f
+
+
   | Lam : bclo -> can f
   | Cons : tclo * tclo -> can f
 
@@ -204,6 +210,12 @@ let mapi_tubes f =
 let map_tubes f =
   mapi_tubes (fun i -> f)
 
+let reflect ty neu = 
+  into @@ Up (ty, neu)
+
+let generic ty lvl = 
+  reflect ty @@ into @@ Lvl lvl
+
 let rec eval : type a. env -> a Tm.t -> can t =
   fun rho tm ->
     match Tm.out tm with
@@ -287,6 +299,18 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Dim1 ->
       into Dim1
 
+    | Tm.Bool -> 
+      into Bool
+
+    | Tm.Tt ->
+      into Tt
+
+    | Tm.Ff ->
+      into Ff
+    
+    | Tm.If {mot; scrut; tcase; fcase} ->
+      if_ ~mot:(mot <:+ rho) ~scrut:(eval rho scrut) ~tcase:(tcase <: rho) ~fcase:(fcase <: rho)
+
     | Tm.Car t ->
       car @@ eval rho t
 
@@ -313,7 +337,9 @@ and rigid_com ~dim0 ~dim1 ~ty ~cap ~sys =
 
 and rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys = 
   match out ty with
-  (* TODO: for base types, do something *)
+  | Bool ->
+    cap
+
   | _ ->
     into @@ HCom {dim0; dim1; ty; cap; sys}
 
@@ -323,6 +349,10 @@ and rigid_coe ~dim0 ~dim1 ~ty ~tm =
   match out tyx with
   | Univ _ ->
     tm
+
+  | Bool ->
+    tm
+
   | _ ->
     into @@ Coe {dim0; dim1; ty; tm}
 
@@ -341,6 +371,23 @@ and eval_btube rho (dim0, dim1, otb) =
     let rho' = Env.restrict_exn rho vdim0 vdim1 in
     Tube.Indeterminate ((vdim0, vdim1), tb <:+ rho')
   | _ -> failwith "eval_tube"
+  
+
+and if_ ~mot ~scrut ~tcase ~fcase =
+  match out scrut with
+  | Tt ->
+    eval_clo tcase
+
+  | Ff ->
+    eval_clo fcase
+
+  | Up (vty, vneu) ->
+    (* we may assume that vty is 'bool', don't worry about it *)
+    let vmot = inst_bclo mot @@ reflect vty vneu in
+    reflect vmot @@ into @@ If {mot; scrut = vneu; tcase; fcase}
+
+  | _ ->
+    failwith "if_"
 
 and apply vfun varg =
   match out vfun with
@@ -350,7 +397,7 @@ and apply vfun varg =
   | Up (vty, vneu) ->
     let dom, cod = out_pi vty in
     let vcod = inst_bclo cod varg in
-    into @@ Up (vcod, into @@ FunApp (vneu, varg))
+    reflect vcod @@ into @@ FunApp (vneu, varg)
 
   | Coe info ->
     let dom = Clo.PiDom info.ty in
@@ -381,7 +428,7 @@ and ext_apply vext vdim =
         v
       | None ->
         let vcod = inst_bclo cod @@ embed_dimval vdim in
-        into @@ Up (vcod, into @@ ExtApp (vneu, vdim))
+        reflect vcod @@ into @@ ExtApp (vneu, vdim)
     end
 
   | Coe info ->
@@ -422,7 +469,7 @@ and car v =
   | Up (vty, vneu) ->
     let dom, _ = out_sg vty in
     let vdom = eval_clo dom in
-    into @@ Up (vdom, into @@ Car vneu)
+    reflect vdom @@ into @@ Car vneu
 
   | Coe info ->
     let vcar = car info.tm in
@@ -445,9 +492,9 @@ and cdr v =
   | Up (vty, vneu) ->
     let dom, cod = out_sg vty in
     let vdom = eval_clo dom in
-    let vcar = into @@ Up (vdom, into @@ Car vneu) in
+    let vcar = reflect vdom @@ into @@ Car vneu in
     let vcod = inst_bclo cod vcar in
-    into @@ Up (vcod, into @@ Cdr vneu)
+    reflect vcod @@ into @@ Cdr vneu
 
   | Coe info ->
     let vcar = car info.tm in
@@ -578,8 +625,3 @@ and eval_clo clo =
     inst_bclo bclo arg
 
 
-let reflect ty neu = 
-  into @@ Up (ty, neu)
-
-let generic ty lvl = 
-  reflect ty @@ into @@ Lvl lvl

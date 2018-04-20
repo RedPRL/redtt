@@ -86,6 +86,9 @@ let rec check ~mode ~ctx ~ty ~tm =
     let ctx' = Ctx.ext ctx vdom in
     check ~mode:Real ~ctx:ctx' ~ty ~tm:cod
 
+  | Val.Univ _, Tm.Ext (Tm.B (cod, sys)) ->
+    failwith "TODO"
+
   | Val.Univ _, Tm.Interval ->
     begin
       match mode with
@@ -93,6 +96,8 @@ let rec check ~mode ~ctx ~ty ~tm =
       | FaconDeParler -> ()
     end
 
+  | Val.Univ _, Tm.Bool ->
+    ()
 
   | Val.Pi (dom, cod), Tm.Lam (Tm.B tm) ->
     let vdom = Val.eval_clo dom in
@@ -107,10 +112,10 @@ let rec check ~mode ~ctx ~ty ~tm =
     let vcod = Val.inst_bclo cod vtm0 in
     check ~mode:Real ~ctx ~ty:vcod ~tm:tm1
 
-  | Val.Interval, Tm.Dim0 ->
+  | Val.Interval, (Tm.Dim0 | Tm.Dim1) ->
     ()
 
-  | Val.Interval, Tm.Dim1 ->
+  | Val.Bool, (Tm.Ff | Tm.Tt) ->
     ()
 
   | _, Tm.Up tm ->
@@ -155,6 +160,22 @@ and infer ~mode ~ctx ~tm =
     let vpair = Val.eval (Ctx.env ctx) tm in
     let vcar = Val.car vpair in
     Val.inst_bclo cod vcar
+
+  | Tm.If {mot = Tm.B mot; scrut; tcase; fcase} ->
+    let bool = Val.into Val.Bool in
+    let univ = Val.into @@ Val.Univ Lvl.Omega in
+    let bool' = infer ~mode:Real ~ctx ~tm:scrut in
+    Quote.equiv ~ctx:(Ctx.qctx ctx) ~ty:univ ~can0:bool ~can1:bool';
+    check ~mode:Real ~ctx:(Ctx.ext ctx bool) ~ty:univ ~tm:mot;
+    let tt = Val.into Val.Tt in
+    let ff = Val.into Val.Ff in
+    let env = Ctx.env ctx in
+    let tmot = Val.eval (Val.Env.ext env tt) mot in
+    check ~mode:Real ~ctx ~ty:tmot ~tm:tcase;
+    let fmot = Val.eval (Val.Env.ext env ff) mot in
+    check ~mode:Real ~ctx ~ty:fmot ~tm:fcase;
+    let vscrut = Val.eval env scrut in
+    Val.eval (Val.Env.ext env vscrut) mot
 
   | Tm.Down {ty; tm} ->
     let univ = Val.into @@ Val.Univ Lvl.Omega in
