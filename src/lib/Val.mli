@@ -45,13 +45,13 @@ type _ f =
   | Lam : bclo -> can f
   | Cons : tclo * tclo -> can f
 
-    (* generic coercions in negative types: pi, sigma, extension *)
+  (* generic coercions in negative types: pi, sigma, extension *)
   | Coe : {dim0 : DimVal.t; dim1 : DimVal.t; ty : bclo; tm : can t} -> can f
 
-    (* generic composites in negative types: pi, sigma, extension *)
+  (* generic composites in negative types: pi, sigma, extension *)
   | HCom : {dim0 : DimVal.t; dim1 : DimVal.t; ty : can t; cap : can t; sys : bclo system} -> can f
 
-    (* formal composites in positive types: like the universe, etc. *)
+  (* formal composites in positive types: like the universe, etc. *)
   | FCom : {dim0 : DimVal.t; dim1 : DimVal.t; cap : can t; sys : bclo system} -> can f
 
   | FunApp : neu t * can t -> neu f

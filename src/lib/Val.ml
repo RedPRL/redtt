@@ -77,13 +77,13 @@ type _ f =
   | Lam : bclo -> can f
   | Cons : tclo * tclo -> can f
 
-    (* generic coercions in negative and neutral types: pi, sigma, extension *)
+  (* generic coercions in negative and neutral types: pi, sigma, extension *)
   | Coe : {dim0 : DimVal.t; dim1 : DimVal.t; ty : bclo; tm : can t} -> can f
 
-    (* generic composites in negative and neutral types: pi, sigma, extension *)
+  (* generic composites in negative and neutral types: pi, sigma, extension *)
   | HCom : {dim0 : DimVal.t; dim1 : DimVal.t; ty : can t; cap : can t; sys : bclo system} -> can f
 
-    (* formal composites in positive types: like the universe, etc. *)
+  (* formal composites in positive types: like the universe, etc. *)
   | FCom : {dim0 : DimVal.t; dim1 : DimVal.t; cap : can t; sys : bclo system} -> can f
 
   | FunApp : neu t * can t -> neu f
@@ -335,6 +335,9 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Up t ->
       eval rho t
 
+(* Invariant: a coercion is rigid when r != r'; a composition is rigid when r != r' and none of the tubes is under a true condition.
+   The inputs to rigid_com, rigid_hcom and rigid_coe must be rigid. These functions do only one thing, which is to dispatch to the 
+   correct implementation of (rigid) composition and coercion in a type-directed manner. *)
 and rigid_com ~dim0 ~dim1 ~ty ~cap ~sys =
   let cap' = rigid_coe ~dim0 ~dim1 ~ty ~tm:cap in
   let ty' = inst_bclo ty @@ embed_dimval dim1 in
