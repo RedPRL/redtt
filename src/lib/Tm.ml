@@ -11,19 +11,26 @@ type _ f =
   | Var : var -> inf f
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
-  | App : inf t * chk t -> inf f
+  | FunApp : inf t * chk t -> inf f
+  | ExtApp : inf t * chk t -> inf f
+
   | Down : {ty : chk t; tm : chk t} -> inf f
-  | Coe : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
-  | HCom : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
-  | Com : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
+  | Coe : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
+  | HCom : {dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
+  | Com : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
 
   | Up : inf t -> chk f
 
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
+  | Ext : (chk t * chk t system) bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
-  | Ext : Cube.t * chk t * chk t system -> chk f
-  | Interval : Cube.t -> chk f
+  | Interval : chk f
+
+  | Bool : chk f
+  | Tt : chk f
+  | Ff : chk f
+  | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
   | Cons : chk t * chk t -> chk f
@@ -77,20 +84,23 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
     | Cdr t -> 
       Cdr (thin th t)
 
-    | App (t1, t2) ->
-      App (thin th t1, thin th t2)
+    | FunApp (t1, t2) ->
+      FunApp (thin th t1, thin th t2)
+
+    | ExtApp (t1, t2) ->
+      ExtApp (thin th t1, thin th t2)
 
     | Down {ty; tm} ->
       Down {ty = thin th ty; tm = thin th tm}
 
     | Coe info ->
-      Coe {tag = info.tag; dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; tm = thin th info.tm}
+      Coe {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; tm = thin th info.tm}
 
     | HCom info ->
-      HCom {tag = info.tag; dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
+      HCom {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
 
     | Com info ->
-      Com {tag = info.tag; dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
+      Com {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
 
     | Up t ->
       Up (thin th t)
@@ -101,13 +111,14 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
     | Pi (dom, cod) ->
       Pi (thin th dom, thin_bnd th cod)
 
+    | Ext (B (cod, sys)) ->
+      let th' = Thin.skip th in
+      Ext (B (thin th' cod, thin_sys th' sys))
+
     | Sg (dom, cod) ->
       Sg (thin th dom, thin_bnd th cod)
 
-    | Ext (tag, ty, sys) ->
-      Ext (tag, thin th ty, thin_sys th sys)
-
-    | Interval _ ->
+    | Interval ->
       tf
 
     | Lam bdy ->
@@ -121,6 +132,18 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
 
     | Dim1 ->
       tf
+
+    | Bool ->
+      tf
+
+    | Tt ->
+      tf
+    
+    | Ff ->
+      tf
+
+    | If {mot; scrut; tcase; fcase} ->
+      If {mot = thin_bnd th mot; scrut = thin th scrut; tcase = thin th tcase; fcase = thin th fcase}
 
 
 let out node = thin_f node.thin node.con

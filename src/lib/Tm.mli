@@ -16,19 +16,25 @@ type _ f =
   | Var : var -> inf f
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
-  | App : inf t * chk t -> inf f
+  | FunApp : inf t * chk t -> inf f
+  | ExtApp : inf t * chk t -> inf f
   | Down : {ty : chk t; tm : chk t} -> inf f
-  | Coe : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
-  | HCom : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
-  | Com : {tag : Cube.t; dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
+  | Coe : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
+  | HCom : {dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
+  | Com : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
 
   | Up : inf t -> chk f
 
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
+  | Ext : (chk t * chk t system) bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
-  | Ext : Cube.t * chk t * chk t system -> chk f
-  | Interval : Cube.t -> chk f
+  | Interval : chk f
+
+  | Bool : chk f
+  | Tt : chk f
+  | Ff : chk f
+  | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
   | Cons : chk t * chk t -> chk f
