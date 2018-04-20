@@ -291,8 +291,7 @@ let rec eval : type a. env -> a Tm.t -> can t =
       car @@ eval rho t
 
     | Tm.Cdr t ->
-      failwith ""
-    (* cdr (Env.rel rho) @@ eval rho t *)
+      cdr @@ eval rho t
 
     | Tm.App (t1, t2) ->
       apply (eval rho t1) (eval rho t2)
@@ -410,6 +409,26 @@ and car v =
     into @@ HCom {dim0 = info.dim0; dim1 = info.dim1; ty; cap; sys}
 
   | _ -> failwith "car"
+
+and cdr v = 
+  match out v with
+  | Cons (_, clo) ->
+    eval_clo clo
+
+  | Up (vty, vneu) ->
+    let dom, cod = out_sg vty in
+    let vdom = eval_clo dom in
+    let vcar = into @@ Up (vdom, into @@ Car vneu) in
+    let vcod = inst_bclo cod vcar in
+    into @@ Up (vcod, into @@ Cdr vneu)
+
+  | Coe _ ->
+    failwith "TODO: cdr/coe"
+    
+  | HCom _ ->
+    failwith "TODO: cdr/hcom"
+
+  | _ -> failwith "cdr"
 
 and project_bsys sys r =
   match sys with 
