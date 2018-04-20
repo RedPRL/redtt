@@ -293,8 +293,11 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Cdr t ->
       cdr @@ eval rho t
 
-    | Tm.App (t1, t2) ->
+    | Tm.FunApp (t1, t2) ->
       apply (eval rho t1) (eval rho t2)
+
+    | Tm.ExtApp (t1, t2) ->
+      ext_apply (eval rho t1) @@ project_dimval @@ eval rho t2
 
     | Tm.Down t ->
       eval rho t.tm

@@ -84,6 +84,7 @@ val cdr : can t -> can t
 
 val out_pi : can t -> tclo * bclo
 val out_sg : can t -> tclo * bclo
+val out_ext : can t -> bclo * sclo
 
 val generic : can t -> int -> can t
 val reflect : can t -> neu t -> can t

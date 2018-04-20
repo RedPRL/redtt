@@ -130,11 +130,18 @@ and infer ~mode ~ctx ~tm =
   | Tm.Var th ->
     Ctx.lookup th ctx
 
-  | Tm.App (tfun, targ) ->
+  | Tm.FunApp (tfun, targ) ->
     let ty = infer ~mode:Real ~ctx ~tm:tfun in
     let dom, cod = Val.out_pi ty in
     let vdom = Val.eval_clo dom in
     let varg = check_eval ~mode:Real ~ctx ~ty:vdom ~tm:targ in
+    Val.inst_bclo cod varg
+
+  | Tm.ExtApp (text, targ) ->
+    let ty = infer ~mode:Real ~ctx ~tm:text in
+    let cod, _ = Val.out_ext ty in
+    let interval = Val.into Val.Interval in
+    let varg = check_eval ~mode:Real ~ctx ~ty:interval ~tm:targ in
     Val.inst_bclo cod varg
 
   | Tm.Car tm ->

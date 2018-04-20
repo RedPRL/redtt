@@ -11,7 +11,9 @@ type _ f =
   | Var : var -> inf f
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
-  | App : inf t * chk t -> inf f
+  | FunApp : inf t * chk t -> inf f
+  | ExtApp : inf t * chk t -> inf f
+
   | Down : {ty : chk t; tm : chk t} -> inf f
   | Coe : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
   | HCom : {dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
@@ -77,8 +79,11 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
     | Cdr t -> 
       Cdr (thin th t)
 
-    | App (t1, t2) ->
-      App (thin th t1, thin th t2)
+    | FunApp (t1, t2) ->
+      FunApp (thin th t1, thin th t2)
+
+    | ExtApp (t1, t2) ->
+      ExtApp (thin th t1, thin th t2)
 
     | Down {ty; tm} ->
       Down {ty = thin th ty; tm = thin th tm}

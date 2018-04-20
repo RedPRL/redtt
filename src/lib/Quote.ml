@@ -53,6 +53,16 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let qcod = approx_can_ ~vr ~ctx:(Ctx.ext ctx vdom0) ~ty ~can0:vcod0 ~can1:vcod1 in
     Tm.into @@ Tm.Pi (qdom, Tm.B qcod)
 
+  | Val.Univ lvl, Val.Ext (cod0, sys0), Val.Ext (cod1, sys1) ->
+    let interval = Val.into Val.Interval in
+    let vgen = Val.generic interval @@ Ctx.len ctx in
+    let vcod0 = Val.inst_bclo cod0 vgen in
+    let vcod1 = Val.inst_bclo cod0 vgen in
+    let ctx' = Ctx.ext ctx interval in
+    let qcod = approx_can_ ~vr ~ctx:ctx' ~ty ~can0:vcod0 ~can1:vcod1 in
+    let qsys = approx_sys ~vr ~ctx:ctx' ~ty:vcod0 ~sys0 ~sys1 in
+    Tm.into @@ Tm.Ext (Tm.B (qcod, qsys))
+
   | Val.Univ lvl, Val.Univ lvl0, Val.Univ lvl1 ->
     begin
       match vr with
@@ -135,8 +145,18 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
     let vdom = Val.eval_clo dom in
     let vcod = Val.inst_bclo cod varg0 in
     let qarg = approx_can_ ~vr:Iso ~ctx ~ty:vdom ~can0:varg0 ~can1:varg1 in
-    {tm = Tm.into @@ Tm.App (quo.tm, qarg);
+    {tm = Tm.into @@ Tm.FunApp (quo.tm, qarg);
      ty = vcod}
+
+  | Val.ExtApp (neu0, dim0), Val.ExtApp (neu1, dim1) ->
+    let quo = approx_neu_ ~vr ~ctx ~neu0 ~neu1 in
+    let cod, sys = Val.out_ext quo.ty in
+    let interval = Val.into Val.Interval in
+    let qarg = approx_can_ ~vr:Iso ~ctx ~ty:interval ~can0:(Val.embed_dimval dim0) ~can1:(Val.embed_dimval dim1) in
+    let vcod = Val.inst_bclo cod @@ Val.embed_dimval dim0 in
+    {tm = Tm.into @@ Tm.ExtApp (quo.tm, qarg);
+     ty = vcod}
+
 
   | Val.Car neu0, Val.Car neu1 ->
     let quo = approx_neu_ ~vr ~ctx ~neu0 ~neu1 in
