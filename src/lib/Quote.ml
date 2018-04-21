@@ -8,20 +8,14 @@ sig
 
   val emp : t
   val ext : t -> Val.can Val.t -> t
-
-  val rel : t -> DimRel.t
-  val set_rel : DimRel.t -> t -> t
 end =
 struct
-  type t = {tys : Val.can Val.t list; rel : DimRel.t; len : int}
+  type t = {tys : Val.can Val.t list; len : int}
   let len cx = cx.len
   let nth cx i = List.nth cx.tys i
 
-  let emp = {tys = []; len = 0; rel = DimRel.emp}
-  let ext cx ty = {tys = ty::cx.tys; len = cx.len + 1; rel = cx.rel}
-
-  let rel cx = cx.rel
-  let set_rel rl cx = {cx with rel = rl}
+  let emp = {tys = []; len = 0}
+  let ext cx ty = {tys = ty::cx.tys; len = cx.len + 1}
 end
 
 type ctx = Ctx.t

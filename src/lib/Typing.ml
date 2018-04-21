@@ -49,7 +49,7 @@ struct
 
   let len cx = cx.len
   let env cx = Val.Env.set_rel cx.rel cx.env 
-  let qctx cx = Quote.Ctx.set_rel cx.rel cx.qctx
+  let qctx cx = cx.qctx
   let rel cx = cx.rel
 end
 
@@ -242,9 +242,7 @@ and check_bsys ~ctx ~dim0 ~tycap ~ty ~cap ~sys =
 
         (* Check tube-tube adjacency conditions *)
         go_adj ctx'' acc (vd0, vd1, tb);
-
-        let acc' = (vd0, vd1, tb) :: acc in
-        go sys acc'
+        go sys @@ (vd0, vd1, tb) :: acc
 
       | _ ->
         failwith "check_bsys"

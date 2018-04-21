@@ -9,8 +9,6 @@ sig
   
   val emp : t
   val ext : t -> Val.can Val.t -> t
-
-  val set_rel : DimRel.t -> t -> t
 end
 
 type ctx = Ctx.t
