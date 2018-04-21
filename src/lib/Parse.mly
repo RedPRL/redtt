@@ -9,6 +9,7 @@
 %token RIGHT_SQUARE
 %token LEFT_PAREN
 %token RIGHT_PAREN
+%token COLON
 %token EOF
 
 %start <PTm.t option> prog
@@ -25,8 +26,12 @@ expr:
     { make_node $startpos $endpos @@ PTm.List xs }
   | a = ATOM
     { make_node $startpos $endpos @@ PTm.Atom a }
+  | COLON
+    { make_node $startpos $endpos @@ PTm.Atom ":" }
   | n = NUMERAL
     { make_node $startpos $endpos @@ PTm.Numeral n }
   | LEFT_SQUARE; x = ATOM; RIGHT_SQUARE; e = expr
     { make_node $startpos $endpos @@ PTm.Bind (x, e) }
+  | LEFT_SQUARE; x = ATOM; COLON; ty = expr; RIGHT_SQUARE; e = expr
+    { make_node $startpos $endpos @@ PTm.TyBind (x, ty, e)}
   ;

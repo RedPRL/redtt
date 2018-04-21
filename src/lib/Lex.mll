@@ -15,7 +15,7 @@ let next_line lexbuf =
 let num = ['0'-'9'] ['0'-'9']*
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
-let atom = "=" | "->" | "*" | ['a'-'z' 'A'-'Z' '_' ':' '+'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
+let atom = "=" | "->" | "*" | ['a'-'z' 'A'-'Z' '_' '+'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 
 rule read =
   parse
@@ -27,5 +27,6 @@ rule read =
   | ')'      { RIGHT_PAREN }
   | '['      { LEFT_SQUARE }
   | ']'      { RIGHT_SQUARE }
+  | ':'      { COLON }
   | _ { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof      { EOF }

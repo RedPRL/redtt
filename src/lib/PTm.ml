@@ -4,14 +4,17 @@ type 'a f =
   | Atom of string
   | Numeral of int
   | List of 'a list
+  | TyBind of name * 'a * 'a
   | Bind of name * 'a
 
 type info = Lexing.position * Lexing.position
 type t = Node of {info : info; con : t f}
 
 type 'a frame = 
-  | KList of info * t list * t list
+  | KList of info * 'a list * 'a list
   | KBind of info * string
+  | KTyBindTy of info * string * 'a
+  | KTyBindBdy of info * string * 'a
 
 module type ResEnv =
 sig
@@ -48,6 +51,8 @@ sig
   val (>>=) : 'a m -> ('a -> 'b m) -> 'b m
   val (>>) : 'a m -> 'b m -> 'b m
   val (<|>) : 'a m -> 'a m -> 'a m
+  val (<+>) : 'a m -> 'b m -> [`L of 'a | `R of 'b] m
+  val (<$>) : ('a -> 'b) -> 'a m -> 'b m
   val fix : ('a m -> 'a m) -> 'a m
   val fix2 : ('a m * 'b m -> 'a m) -> ('a m * 'b m -> 'b m) -> 'a m * 'b m
 
@@ -62,6 +67,7 @@ sig
   val peek_info : info m
   val open_list : 'a m -> 'a m
   val open_bind : 'a m -> 'a m
+  val open_tybind : 'a m -> 'a m
 
   val right : unit m
   val left : unit m
@@ -89,6 +95,10 @@ struct
       let a, state' = m state in
       k a state'
 
+  let (<$>) f m =
+    m >>= fun x ->
+    ret @@ f x
+
   let (>>) m n = 
     m >>= fun _ ->
     n
@@ -99,6 +109,12 @@ struct
     with _ -> 
       m2 state
 
+  let (<+>) m1 m2 : [`L of 'a | `R of 'b] m =
+    fun state ->
+      try 
+        ((fun x -> `L x) <$> m1) state
+      with _ -> 
+        ((fun x -> `R x) <$> m2) state
 
   let rec fix f state =
     f (fix f) state
@@ -174,6 +190,16 @@ struct
       | _ ->
         raise @@ Error {msg = "Expected binder"; info = node.info}
 
+  let down_tybind : string m = 
+    fun state ->
+      let Node node = state.head in
+      match node.con with
+      | TyBind (nm, ty, bdy) ->
+        nm, {head = ty; stack = (state.env, KTyBindTy (node.info, nm, bdy)) :: state.stack; env = state.env}
+
+      | _ ->
+        raise @@ Error {msg = "Expected typed binder"; info = node.info}
+
   let up : unit m = 
     fun state ->
       match state.stack with
@@ -189,12 +215,23 @@ struct
         let con = Bind (nm, state.head) in
         (), {head = Node {info; con}; stack = stk; env}
 
+      | (env, KTyBindTy (info, nm, bdy)) :: stk ->
+        let con = TyBind (nm, state.head, bdy) in
+        (), {head = Node {info; con}; stack = stk; env}
+
+      | (env, KTyBindBdy (info, nm, ty)) :: stk ->
+        let con = TyBind (nm, ty, state.head) in
+        (), {head = Node {info; con}; stack = stk; env}
+
 
   let left : unit m = 
     fun state ->
       match state.stack with
       | (env', KList (info, x::xs, ys)) :: stk ->
         (), {head = x; stack = (env', KList (info, xs, state.head :: ys)) :: stk; env = state.env}
+
+      | (env', KTyBindBdy (info, nm, ty)) :: stk ->
+        (), {head = ty; stack = (env', KTyBindTy (info, nm, state.head)) :: stk; env = env'}
 
       | _ ->
         let Node {info} = state.head in
@@ -206,6 +243,10 @@ struct
       | (env', KList (info, xs, y :: ys)) :: stk ->
         (), {head = y; stack = (env', KList (info, state.head :: xs, ys)) :: stk; env = state.env}
 
+      | (env', KTyBindTy (info, nm, bdy)) :: stk ->
+        let env'' = ResEnv.bind nm state.env in
+        (), {head = bdy; stack = (env', KTyBindBdy (info, nm, state.head)) :: stk; env = env''}
+
       | _ ->
         let Node {info} = state.head in
         raise @@ Error {msg = "Cannot go right"; info}
@@ -215,6 +256,9 @@ struct
 
   let open_bind (m : 'a m) : 'a m =
     down_bind >> m >>= fun x -> up >> ret x
+
+  let open_tybind (m : 'a m) : 'a m =
+    down_tybind >> m >>= fun x -> up >> ret x
 end
 
 module Reader :
@@ -235,31 +279,45 @@ struct
   let (>>=) = R.(>>=)
   let (>>) = R.(>>)
   let (<|>) = R.(<|>)
+  let (<+>) = R.(<+>)
+  let (<$>) = R.(<$>)
 
   let lambda chk =
     R.peek_info >>= fun info ->
     R.open_list @@ 
     R.kwd "lam" >>
     R.right >>
-    R.fix @@ fun m ->
+    R.fix @@ fun kont ->
     R.open_bind @@ 
-    m <|> chk >>= fun tm ->
+    (kont <|> chk) >>= fun tm ->
     R.ret @@ Tm.into_info info @@ Tm.Lam (Tm.B tm)
 
   let pi chk =
     R.peek_info >>= fun info ->
     R.open_list @@
     R.kwd "->" >>
-    R.right >>
+    R.fix @@ fun kont ->
+    R.open_tybind @@
     chk >>= fun dom ->
-    R.open_bind chk >>= fun cod ->
+    R.right >>
+    (kont <|> chk) >>= fun cod ->
     R.ret @@ Tm.into_info info @@ Tm.Pi (dom, Tm.B cod)
+
+  let sg chk =
+    R.peek_info >>= fun info ->
+    R.open_list @@
+    R.kwd "*" >>
+    R.fix @@ fun kont ->
+    R.open_tybind @@
+    chk >>= fun dom ->
+    R.right >>
+    (kont <|> chk) >>= fun cod ->
+    R.ret @@ Tm.into_info info @@ Tm.Sg (dom, Tm.B cod)
 
   let bool =
     R.peek_info >>= fun info ->
     R.kwd "bool" >>
     R.ret @@ Tm.into_info info @@ Tm.Bool
-
 
   let up inf =
     R.peek_info >>= fun info ->
@@ -283,6 +341,8 @@ struct
 
   let chk_f (chk, inf) =
     lambda chk <|>
+    pi chk <|>
+    sg chk <|>
     up inf
 
 
