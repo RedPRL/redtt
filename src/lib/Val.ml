@@ -378,6 +378,9 @@ and rigid_coe ~dim0 ~dim1 ~ty ~tm =
   | (Pi _ | Sg _ | Ext _ | Up _) ->
     into @@ Coe {dim0; dim1; ty; tm}
 
+  | FCom _ ->
+    failwith "coe in fcom!"
+
   | _ ->
     failwith "rigid_coe"
 
@@ -466,10 +469,12 @@ and ext_apply vext vdim =
     let _, sclo = out_ext @@ inst_bclo info.ty @@ into DimDelete in
     let sys = inst_sclo sclo vdim in
     begin
-      match project_sys sys with
-      | Some v ->
+      match project_sys sys, sys with
+      | Some v, _->
         rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~tm:v
-      | None ->
+      | _, [] ->
+        rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~tm:cap
+      | None, _ ->
         let sys' = mapi_tubes (fun i _ -> Clo.ExtSysTube (info.ty, i, vdim)) sys in
         rigid_com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:sys'
     end
