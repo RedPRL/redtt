@@ -114,7 +114,8 @@ struct
   let (<|>) m1 m2 state =
     try 
       m1 state
-    with _ -> 
+    with exn -> 
+      print_string @@ Printexc.to_string exn ^ "\n";
       m2 state
 
   let (<+>) m1 m2 : [`L of 'a | `R of 'b] m =
@@ -142,6 +143,16 @@ struct
     (fun _ ->
        raise @@ Error {msg; info})
 
+  let ptree_to_string (Node node) = 
+    match node.con with
+    | Atom _ -> "atom"
+    | List _ -> "list"
+    | Bind _ -> "bind"
+    | TyBind _ -> "tybind"
+    | Numeral _ -> "numeral"
+    | Tube _ -> "tube"
+
+
   let atom : string m =
     fun state ->
       let Node node = state.head in
@@ -149,7 +160,7 @@ struct
       | Atom nm -> 
         nm, state
       | _ -> 
-        raise @@ Error {msg = "Expected atom"; info = node.info}
+        raise @@ Error {msg = "Expected atom but found " ^ ptree_to_string state.head; info = node.info}
 
 
   let var : Thin.t m = 
@@ -175,7 +186,7 @@ struct
     fun nm ->
       atom >>= fun nm' ->
       if nm = nm' then ret () else
-        error "Keyword mismatch"
+        error @@ "Keyword mismatch: expected " ^ nm ^ " but found " ^ nm'
 
   let down_list : unit m =
     fun state ->
@@ -195,13 +206,14 @@ struct
         (), {head = dim0; stack = (state.env, KTube (node.info, `Dim0, dim1, bdy)) :: state.stack; env = state.env}
 
       | _ ->
-        raise @@ Error {msg = "Expectd tube"; info = node.info}
+        raise @@ Error {msg = "Expected tube"; info = node.info}
 
   let down_bind : string m =
     fun state ->
       let Node node = state.head in
       match node.con with
       | Bind (nm, x) ->
+        print_string @@ "downbound: " ^ nm ^ "\n";
         let env = ResEnv.bind nm state.env in
         nm, {head = x; stack = (state.env, KBind (node.info, nm)) :: state.stack; env}
 
@@ -330,82 +342,92 @@ struct
 
   let lambda chk =
     R.peek_info >>= fun info ->
-    R.open_list @@ 
-    R.kwd "lam" >>
-    R.right >>
-    R.fix @@ fun kont ->
-    R.open_bind @@ 
-    (kont <|> chk) >>= fun tm ->
-    R.ret @@ Tm.into_info info @@ Tm.Lam (Tm.B tm)
+    R.open_list begin
+      R.kwd "lam" >>
+      R.right >>
+      R.open_bind begin
+        chk >>= fun tm ->
+        R.ret @@ Tm.into_info info @@ Tm.Lam (Tm.B tm)
+      end
+    end
 
   let pi chk =
     R.peek_info >>= fun info ->
-    R.open_list @@
-    R.kwd "->" >>
-    R.fix @@ fun kont ->
-    R.open_tybind @@
-    chk >>= fun dom ->
-    R.right >>
-    (kont <|> chk) >>= fun cod ->
-    R.ret @@ Tm.into_info info @@ Tm.Pi (dom, Tm.B cod)
+    R.open_list begin
+      R.kwd "->" >>
+      chk >>= fun dom ->
+      R.right >>
+      R.open_bind begin
+        chk >>= fun cod ->
+        R.ret @@ Tm.into_info info @@ Tm.Pi (dom, Tm.B cod)
+      end
+    end
 
   let sg chk =
     R.peek_info >>= fun info ->
-    R.open_list @@
-    R.kwd "*" >>
-    R.fix @@ fun kont ->
-    R.open_tybind @@
-    chk >>= fun dom ->
-    R.right >>
-    (kont <|> chk) >>= fun cod ->
-    R.ret @@ Tm.into_info info @@ Tm.Sg (dom, Tm.B cod)
-
+    R.open_list begin
+      R.kwd "sg" >>
+      chk >>= fun dom ->
+      R.right >>
+      R.open_bind begin
+        chk >>= fun cod ->
+        R.ret @@ Tm.into_info info @@ Tm.Pi (dom, Tm.B cod)
+      end
+    end
 
   let tube chk = 
-    R.open_tube @@
-    chk >>= fun dim0 ->
-    R.right >>
-    chk >>= fun dim1 ->
-    R.right >>
-    chk >>= fun bdy ->
-    R.ret @@ (dim0, dim1, Some bdy)
+    R.open_tube begin
+      chk >>= fun dim0 ->
+      R.right >>
+      chk >>= fun dim1 ->
+      R.right >>
+      chk >>= fun bdy ->
+      R.ret @@ (dim0, dim1, Some bdy)
+    end
 
   let btube chk = 
-    R.open_tube @@
-    chk >>= fun dim0 ->
-    R.right >>
-    chk >>= fun dim1 ->
-    R.right >>
-    (R.open_bind chk) >>= fun bdy ->
-    R.ret @@ (dim0, dim1, Some (Tm.B bdy))
+    R.open_tube begin
+      chk >>= fun dim0 ->
+      R.right >>
+      chk >>= fun dim1 ->
+      R.right >>
+      (R.open_bind chk) >>= fun bdy ->
+      R.ret @@ (dim0, dim1, Some (Tm.B bdy))
+    end
 
   let ext chk =
     R.peek_info >>= fun info ->
-    R.open_list @@
-    R.kwd "#" >>
-    R.right >>
-    R.open_bind @@
-    R.open_list @@
-    chk >>= fun cod ->
-    R.many1 (tube chk) >>= fun sys ->
-    R.ret @@ Tm.into_info info @@ Tm.Ext (Tm.B (cod, sys))
+    R.open_list begin
+      R.kwd "#" >>
+      R.right >>
+      R.open_bind begin
+        R.open_list begin
+          chk >>= fun cod ->
+          R.many1 (tube chk) >>= fun sys ->
+          R.ret @@ Tm.into_info info @@ Tm.Ext (Tm.B (cod, sys))
+        end
+      end
+    end
 
   let empty_ext chk =
     R.peek_info >>= fun info ->
-    R.open_list @@
-    R.kwd "#" >>
-    R.right >>
-    R.open_bind @@
-    chk >>= fun cod ->
-    R.ret @@ Tm.into_info info @@ Tm.Ext (Tm.B (cod, []))
+    R.open_list begin
+      R.kwd "#" >>
+      R.right >>
+      R.open_bind begin
+        chk >>= fun cod ->
+        R.ret @@ Tm.into_info info @@ Tm.Ext (Tm.B (cod, []))
+      end
+    end
 
   let univ =
     R.peek_info >>= fun info ->
-    R.open_list @@
-    R.kwd "U" >>
-    R.right >>
-    R.num >>= fun i ->
-    R.ret @@ Tm.into_info info @@ Tm.Univ (Lvl.Const i)
+    R.open_list begin
+      R.kwd "U" >>
+      R.right >>
+      R.num >>= fun i ->
+      R.ret @@ Tm.into_info info @@ Tm.Univ (Lvl.Const i)
+    end
 
   let bool =
     R.peek_info >>= fun info ->
@@ -419,59 +441,64 @@ struct
 
   let down chk = 
     R.peek_info >>= fun info ->
-    R.open_list @@
-    R.kwd ":>" >>
-    R.right >>
-    chk >>= fun ty ->
-    R.right >>
-    chk >>= fun tm ->
-    R.ret @@ Tm.into_info info @@ Tm.Down {ty; tm}
+    R.open_list begin
+      R.kwd ":>" >>
+      R.right >>
+      chk >>= fun ty ->
+      R.right >>
+      chk >>= fun tm ->
+      let bool = Tm.into Tm.Bool in
+      R.ret @@ Tm.into_info info @@ Tm.Down {ty = bool; tm = bool}
+    end
 
   let coe chk = 
     R.peek_info >>= fun info ->
-    R.open_list @@
-    R.kwd "coe" >>
-    R.right >>
-    chk >>= fun dim0 ->
-    R.right >>
-    chk >>= fun dim1 ->
-    R.right >>
-    (R.open_bind chk) >>= fun ty ->
-    R.right >>
-    chk >>= fun tm ->
-    R.ret @@ Tm.into_info info @@ Tm.Coe {dim0; dim1; ty = Tm.B ty; tm}
+    R.open_list begin
+      R.kwd "coe" >>
+      R.right >>
+      chk >>= fun dim0 ->
+      R.right >>
+      chk >>= fun dim1 ->
+      R.right >>
+      (R.open_bind chk) >>= fun ty ->
+      R.right >>
+      chk >>= fun tm ->
+      R.ret @@ Tm.into_info info @@ Tm.Coe {dim0; dim1; ty = Tm.B ty; tm}
+    end
 
   let hcom chk =
     R.peek_info >>= fun info ->
-    R.open_list @@ 
-    R.kwd "hcom" >>
-    R.right >>
-    chk >>= fun dim0 ->
-    R.right >>
-    chk >>= fun dim1 ->
-    R.right >>
-    chk >>= fun ty ->
-    R.right >>
-    chk >>= fun cap ->
-    R.right >>
-    R.many1 (btube chk) >>= fun sys ->
-    R.ret @@ Tm.into_info info @@ Tm.HCom {dim0; dim1; ty; cap; sys}
+    R.open_list begin
+      R.kwd "hcom" >>
+      R.right >>
+      chk >>= fun dim0 ->
+      R.right >>
+      chk >>= fun dim1 ->
+      R.right >>
+      chk >>= fun ty ->
+      R.right >>
+      chk >>= fun cap ->
+      R.right >>
+      R.many1 (btube chk) >>= fun sys ->
+      R.ret @@ Tm.into_info info @@ Tm.HCom {dim0; dim1; ty; cap; sys}
+    end
 
   let com chk =
     R.peek_info >>= fun info ->
-    R.open_list @@ 
-    R.kwd "com" >>
-    R.right >>
-    chk >>= fun dim0 ->
-    R.right >>
-    chk >>= fun dim1 ->
-    R.right >>
-    (R.open_bind chk) >>= fun ty ->
-    R.right >>
-    chk >>= fun cap ->
-    R.right >>
-    R.many1 (btube chk) >>= fun sys ->
-    R.ret @@ Tm.into_info info @@ Tm.Com {dim0; dim1; ty = Tm.B ty; cap; sys}
+    R.open_list begin
+      R.kwd "com" >>
+      R.right >>
+      chk >>= fun dim0 ->
+      R.right >>
+      chk >>= fun dim1 ->
+      R.right >>
+      (R.open_bind chk) >>= fun ty ->
+      R.right >>
+      chk >>= fun cap ->
+      R.right >>
+      R.many1 (btube chk) >>= fun sys ->
+      R.ret @@ Tm.into_info info @@ Tm.Com {dim0; dim1; ty = Tm.B ty; cap; sys}
+    end
 
   let var =
     R.peek_info >>= fun info ->
@@ -480,18 +507,19 @@ struct
 
   let fun_app inf chk =
     R.peek_info >>= fun info ->
-    R.open_list @@
+    R.open_list begin
     inf >>= fun fn ->
     R.right >>
     chk >>= fun arg0 ->
     R.right >>
     R.many chk >>= fun rest ->
-      let app0 = Tm.into_info info @@ Tm.FunApp (fn, arg0) in
-      R.ret @@ List.fold_right (fun arg app -> Tm.into_info info @@ Tm.FunApp (app, arg)) rest app0
+    let app0 = Tm.into_info info @@ Tm.FunApp (fn, arg0) in
+    R.ret @@ List.fold_right (fun arg app -> Tm.into_info info @@ Tm.FunApp (app, arg)) rest app0
+    end
 
   let ext_app inf chk =
     R.peek_info >>= fun info ->
-    R.open_list @@
+    R.open_list begin
     R.kwd "@" >>
     R.right >>
     inf >>= fun fn ->
@@ -499,24 +527,26 @@ struct
     chk >>= fun arg0 ->
     R.right >>
     R.many chk >>= fun rest ->
-      let app0 = Tm.into_info info @@ Tm.FunApp (fn, arg0) in
-      R.ret @@ List.fold_right (fun arg app -> Tm.into_info info @@ Tm.FunApp (app, arg)) rest app0
+    let app0 = Tm.into_info info @@ Tm.FunApp (fn, arg0) in
+    R.ret @@ List.fold_right (fun arg app -> Tm.into_info info @@ Tm.FunApp (app, arg)) rest app0
+    end
 
 
   let chk_f (chk, inf) =
     lambda chk <|>
     pi chk <|>
     sg chk <|>
-    ext chk <|>
-    empty_ext chk <|>
+    (* ext chk <|> *)
+    (* empty_ext chk <|> *)
     bool <|>
-    univ <|>
+    univ 
+    <|>
     up inf
 
   let inf_f (chk, inf) =
-    coe chk <|>
-    hcom chk <|>
-    com chk <|>
+    (* coe chk <|> *)
+    (* hcom chk <|> *)
+    (* com chk <|> *)
     var <|>
     down chk
 
