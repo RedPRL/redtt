@@ -5,16 +5,20 @@ type 'a f =
   | Numeral of int
   | List of 'a list
   | TyBind of name * 'a * 'a
+  | Tube of 'a * 'a * 'a
   | Bind of name * 'a
 
 type info = Lexing.position * Lexing.position
 type t = Node of {info : info; con : t f}
 
+type tybind_hole = [`Ty | `Bdy]
+type tube_hole = [`Dim0 | `Dim1 | `Bdy]
+
 type 'a frame = 
   | KList of info * 'a list * 'a list
   | KBind of info * string
-  | KTyBindTy of info * string * 'a
-  | KTyBindBdy of info * string * 'a
+  | KTyBind of info * string * tybind_hole * 'a
+  | KTube of info * tube_hole * 'a * 'a
 
 module type ResEnv =
 sig
@@ -68,9 +72,13 @@ sig
   val open_list : 'a m -> 'a m
   val open_bind : 'a m -> 'a m
   val open_tybind : 'a m -> 'a m
+  val open_tube : 'a m -> 'a m
 
   val right : unit m
   val left : unit m
+
+  val many1 : 'a m -> 'a list m
+  val many : 'a m -> 'a list m
 end = 
 struct
   type node = t
@@ -179,6 +187,16 @@ struct
       | _ ->
         raise @@ Error {msg = "Expected list"; info = node.info}
 
+  let down_tube : unit m = 
+    fun state ->
+      let Node node = state.head in
+      match node.con with
+      | Tube (dim0, dim1, bdy) ->
+        (), {head = dim0; stack = (state.env, KTube (node.info, `Dim0, dim1, bdy)) :: state.stack; env = state.env}
+
+      | _ ->
+        raise @@ Error {msg = "Expectd tube"; info = node.info}
+
   let down_bind : string m =
     fun state ->
       let Node node = state.head in
@@ -195,7 +213,7 @@ struct
       let Node node = state.head in
       match node.con with
       | TyBind (nm, ty, bdy) ->
-        nm, {head = ty; stack = (state.env, KTyBindTy (node.info, nm, bdy)) :: state.stack; env = state.env}
+        nm, {head = ty; stack = (state.env, KTyBind (node.info, nm, `Ty, bdy)) :: state.stack; env = state.env}
 
       | _ ->
         raise @@ Error {msg = "Expected typed binder"; info = node.info}
@@ -215,12 +233,24 @@ struct
         let con = Bind (nm, state.head) in
         (), {head = Node {info; con}; stack = stk; env}
 
-      | (env, KTyBindTy (info, nm, bdy)) :: stk ->
+      | (env, KTyBind (info, nm, `Ty, bdy)) :: stk ->
         let con = TyBind (nm, state.head, bdy) in
         (), {head = Node {info; con}; stack = stk; env}
 
-      | (env, KTyBindBdy (info, nm, ty)) :: stk ->
+      | (env, KTyBind (info, nm, `Bdy, ty)) :: stk ->
         let con = TyBind (nm, ty, state.head) in
+        (), {head = Node {info; con}; stack = stk; env}
+
+      | (env, KTube (info, `Dim0, dim1, bdy)) :: stk ->
+        let con = Tube (state.head, dim1, bdy) in
+        (), {head = Node {info; con}; stack = stk; env}
+
+      | (env, KTube (info, `Dim1, dim0, bdy)) :: stk ->
+        let con = Tube (dim0, state.head, bdy) in
+        (), {head = Node {info; con}; stack = stk; env}
+
+      | (env, KTube (info, `Bdy, dim0, dim1)) :: stk ->
+        let con = Tube (dim0, dim1, state.head) in
         (), {head = Node {info; con}; stack = stk; env}
 
 
@@ -230,8 +260,8 @@ struct
       | (env', KList (info, x::xs, ys)) :: stk ->
         (), {head = x; stack = (env', KList (info, xs, state.head :: ys)) :: stk; env = state.env}
 
-      | (env', KTyBindBdy (info, nm, ty)) :: stk ->
-        (), {head = ty; stack = (env', KTyBindTy (info, nm, state.head)) :: stk; env = env'}
+      | (env', KTyBind (info, nm, `Bdy, ty)) :: stk ->
+        (), {head = ty; stack = (env', KTyBind (info, nm, `Bdy, state.head)) :: stk; env = env'}
 
       | _ ->
         let Node {info} = state.head in
@@ -243,9 +273,9 @@ struct
       | (env', KList (info, xs, y :: ys)) :: stk ->
         (), {head = y; stack = (env', KList (info, state.head :: xs, ys)) :: stk; env = state.env}
 
-      | (env', KTyBindTy (info, nm, bdy)) :: stk ->
+      | (env', KTyBind (info, nm, `Ty, bdy)) :: stk ->
         let env'' = ResEnv.bind nm state.env in
-        (), {head = bdy; stack = (env', KTyBindBdy (info, nm, state.head)) :: stk; env = env''}
+        (), {head = bdy; stack = (env', KTyBind (info, nm, `Bdy, state.head)) :: stk; env = env''}
 
       | _ ->
         let Node {info} = state.head in
@@ -259,6 +289,22 @@ struct
 
   let open_tybind (m : 'a m) : 'a m =
     down_tybind >> m >>= fun x -> up >> ret x
+
+  let open_tube (m : 'a m) : 'a m =
+    down_tube >> m >>= fun x -> up >> ret x
+
+
+  let many1 m = 
+    fix @@ fun k -> 
+    m >>= fun x ->
+    right >>
+    (k <|> ret []) >>= fun xs ->
+    ret @@ x :: xs
+
+  let many m =
+    many1 m <|> ret []
+
+
 end
 
 module Reader :
@@ -313,6 +359,27 @@ struct
     R.right >>
     (kont <|> chk) >>= fun cod ->
     R.ret @@ Tm.into_info info @@ Tm.Sg (dom, Tm.B cod)
+
+
+  let tube chk = 
+    R.open_tube @@
+    chk >>= fun dim0 ->
+    R.right >>
+    chk >>= fun dim1 ->
+    R.right >>
+    chk >>= fun bdy ->
+    R.ret @@ (dim0, dim1, Some bdy)
+
+  let ext chk =
+    R.peek_info >>= fun info ->
+    R.open_list @@
+    R.kwd "#" >>
+    R.right >>
+    R.open_bind @@
+    R.open_list @@
+    chk >>= fun cod ->
+    R.many (tube chk) >>= fun sys ->
+    R.ret @@ Tm.into_info info @@ Tm.Ext (Tm.B (cod, sys))
 
   let bool =
     R.peek_info >>= fun info ->
