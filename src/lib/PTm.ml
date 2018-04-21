@@ -387,8 +387,17 @@ struct
     R.open_bind @@
     R.open_list @@
     chk >>= fun cod ->
-    R.many (tube chk) >>= fun sys ->
+    R.many1 (tube chk) >>= fun sys ->
     R.ret @@ Tm.into_info info @@ Tm.Ext (Tm.B (cod, sys))
+
+  let empty_ext chk =
+    R.peek_info >>= fun info ->
+    R.open_list @@
+    R.kwd "#" >>
+    R.right >>
+    R.open_bind @@
+    chk >>= fun cod ->
+    R.ret @@ Tm.into_info info @@ Tm.Ext (Tm.B (cod, []))
 
   let univ =
     R.peek_info >>= fun info ->
@@ -411,7 +420,7 @@ struct
   let down chk = 
     R.peek_info >>= fun info ->
     R.open_list @@
-    R.kwd ":" >>
+    R.kwd ":>" >>
     R.right >>
     chk >>= fun ty ->
     R.right >>
@@ -469,20 +478,46 @@ struct
     R.var >>= fun th ->
     R.ret @@ Tm.into_info info @@ Tm.Var th
 
+  let fun_app inf chk =
+    R.peek_info >>= fun info ->
+    R.open_list @@
+    inf >>= fun fn ->
+    R.right >>
+    chk >>= fun arg0 ->
+    R.right >>
+    R.many chk >>= fun rest ->
+      let app0 = Tm.into_info info @@ Tm.FunApp (fn, arg0) in
+      R.ret @@ List.fold_right (fun arg app -> Tm.into_info info @@ Tm.FunApp (app, arg)) rest app0
+
+  let ext_app inf chk =
+    R.peek_info >>= fun info ->
+    R.open_list @@
+    R.kwd "@" >>
+    R.right >>
+    inf >>= fun fn ->
+    R.right >>
+    chk >>= fun arg0 ->
+    R.right >>
+    R.many chk >>= fun rest ->
+      let app0 = Tm.into_info info @@ Tm.FunApp (fn, arg0) in
+      R.ret @@ List.fold_right (fun arg app -> Tm.into_info info @@ Tm.FunApp (app, arg)) rest app0
+
+
   let chk_f (chk, inf) =
     lambda chk <|>
     pi chk <|>
     sg chk <|>
     ext chk <|>
+    empty_ext chk <|>
     bool <|>
     univ <|>
     up inf
 
   let inf_f (chk, inf) =
-    var <|> 
     coe chk <|>
     hcom chk <|>
     com chk <|>
+    var <|>
     down chk
 
   let chk, inf = 

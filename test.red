@@ -1,15 +1,15 @@
-(: unit
-  (let
-  (: (-> bool bool) (lam [x] (if bool x ff tt)))
-  [not]
-    (let
-      (: (= (-> bool bool) not not) (lam [_] (lam [x] (if bool x ff tt))))
-      [_]
-        ax)))
-
-
-(: (-> unit unit)
-   (lam [x] x))
-
-(: (let (: (U 0) unit) [A] (-> (U 0) [B] (-> (* A B) (* A B))))
-   (lam [B] (lam [x] x)))
+// below is notation for a type annotation
+(:>
+ (->
+  [ty : (U 0)]
+  [p : (# [_] ty)] // this is a "line type" (empty extension type)
+  // below is notation for extension types
+  (# [i] 
+   (ty 
+    [i=0 (@ p 1)] 
+    [i=1 (@ p 0)])))
+ 
+ (lam [ty] [p] 
+  (hcom 0 1 ty (@ p 0)
+   [x=0 [y] (@ p y)]
+   [x=1 [_] (@ p 0)])))
