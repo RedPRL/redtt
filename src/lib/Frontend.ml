@@ -16,8 +16,10 @@ let parse_with_error lexbuf =
 
 let rec parse_and_print lexbuf =
   match parse_with_error lexbuf with
-  | Some tm ->
-    Format.printf "> @[%a@]@." (Tm.Pretty.pp Tm.Pretty.Env.emp) (tm PTm.ResEnv.init);
+  | Some ptm ->
+    let tm = ptm PTm.ResEnv.init in
+    let _ = Typing.infer ~ctx:Typing.Ctx.emp ~tm in
+    Format.printf "> @[%a@]@." (Tm.Pretty.pp Tm.Pretty.Env.emp) tm;
     parse_and_print lexbuf
   | None -> ()
 

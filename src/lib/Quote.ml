@@ -143,8 +143,7 @@ and approx_neu_ ~vr ~ctx ~neu0 ~neu1 =
   | Val.Lvl l0, Val.Lvl l1 ->
     if l0 != l1 then failwith "de bruijn level mismatch" else
       let ix = Ctx.len ctx - (l0 + 1) in
-      let th = Thin.from_ix ix in
-      {tm = Tm.into @@ Tm.Var th;
+      {tm = Tm.into @@ Tm.Var ix;
        ty = Ctx.nth ctx ix}
 
   | Val.FunApp (neu0, varg0), Val.FunApp (neu1, varg1) ->

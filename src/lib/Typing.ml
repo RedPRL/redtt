@@ -6,7 +6,7 @@ sig
 
   include DimRel.S with type t := t
 
-  val lookup : Thin.t -> t -> Val.can Val.t
+  val lookup : int -> t -> Val.can Val.t
   val len : t -> int
 
   val env : t -> Val.env
@@ -44,8 +44,8 @@ struct
 
   exception Inconsistent = DimRel.Inconsistent
 
-  let lookup th cx =
-    Thin.proj th cx.tys
+  let lookup i cx =
+    List.nth cx.tys i
 
   let len cx = cx.len
   let env cx = Val.Env.set_rel cx.rel cx.env 

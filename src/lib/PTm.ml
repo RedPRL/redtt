@@ -25,7 +25,7 @@ sig
   type t
   val init : t
   val bind : string -> t -> t
-  val get : string -> t -> Thin.t
+  val get : string -> t -> int
 end
 
 module ResEnv : ResEnv = 
@@ -40,8 +40,8 @@ struct
       failwith "variable not found"
     | y :: ys ->
       if x = y 
-      then Thin.id
-      else Thin.skip @@ get x ys
+      then 0
+      else 1 + get x ys
 end
 
 module ReaderCombinators :
@@ -66,7 +66,7 @@ sig
   val atom : string m
   val kwd : string -> unit m
 
-  val var : Thin.t m
+  val var : int m
 
   val peek_info : info m
   val open_list : 'a m -> 'a m
@@ -163,12 +163,12 @@ struct
         raise @@ Error {msg = "Expected atom but found " ^ ptree_to_string state.head; info = node.info}
 
 
-  let var : Thin.t m = 
+  let var : int m = 
     atom >>= fun nm ->
     peek_env >>= fun env ->
     match ResEnv.get nm env with
-    | th -> 
-      ret th
+    | i -> 
+      ret i
     | exception _ -> 
       error "Could not resolve variable"
 

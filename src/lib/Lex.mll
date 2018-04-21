@@ -23,15 +23,20 @@ rule read =
   | newline  { next_line lexbuf; read lexbuf }
   | num      { NUMERAL (int_of_string (Lexing.lexeme lexbuf)) }
   | "bool"   { BOOL }
+  | ":>"     { COLON_ANGLE }
   | "->"     { RIGHT_ARROW }
+  | "@"      { AT }
   | "*"      { STAR }
   | "#"      { HASH }
   | "U"      { UNIV }
   | "lam"    { LAM }
-  | '('      { LEFT_PAREN }
-  | ')'      { RIGHT_PAREN }
-  | '['      { LEFT_SQUARE }
-  | ']'      { RIGHT_SQUARE }
+  | "cons"   { CONS }
+  | "car"    { CAR }
+  | "cdr"    { CDR }
+  | '('      { LPR }
+  | ')'      { RPR }
+  | '['      { LSQ }
+  | ']'      { RSQ }
   | ':'      { COLON }
   | '='      { EQUALS }
   | atom     { ATOM (Lexing.lexeme lexbuf) }

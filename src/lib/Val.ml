@@ -109,8 +109,7 @@ sig
   val emp : t
   val ext : t -> el -> t
 
-  val lookup : Thin.t -> t -> el
-  val thin : Thin.t -> t -> t
+  val lookup : int -> t -> el
 
   val rel : t -> DimRel.t
   val set_rel : DimRel.t -> t -> t
@@ -129,11 +128,8 @@ struct
     {vals = v :: env.vals;
      rel = env.rel}
 
-  let lookup th env =
-    Thin.proj th env.vals
-
-  let thin th env =
-    {env with vals = Thin.act th env.vals}
+  let lookup i env =
+    List.nth env.vals i
 
   exception Inconsistent = DimRel.Inconsistent
 

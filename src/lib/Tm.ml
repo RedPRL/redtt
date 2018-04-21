@@ -1,5 +1,3 @@
-type var = Thin.t
-
 type 'a bnd = B of 'a
 
 type chk = [`Chk]
@@ -8,7 +6,7 @@ type inf = [`Inf]
 type info = Lexing.position * Lexing.position
 
 type _ f =
-  | Var : var -> inf f
+  | Var : int -> inf f
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
   | FunApp : inf t * chk t -> inf f
@@ -37,15 +35,15 @@ type _ f =
   | Dim0 : chk f
   | Dim1 : chk f
 
-and 'a node = {info : info option; con : 'a f; thin : Thin.t}
+and 'a node = {info : info option; con : 'a f}
 and 'a t = 'a node
 and 'a tube = chk t * chk t * 'a option
 and 'a system = 'a tube list
 
-let into tf = {info = None; con = tf; thin = Thin.id}
-let into_info info tf = {info = Some info; con = tf; thin = Thin.id}
+let into tf = {info = None; con = tf}
+let into_info info tf = {info = Some info; con = tf}
 let info node = node.info
-
+(* 
 let thin : type a. Thin.t -> a t -> a t = 
   fun th {info; con; thin} ->
     {info; con; thin = Thin.cmp thin th}
@@ -143,10 +141,10 @@ let rec thin_f : type a. Thin.t -> a f -> a f =
       tf
 
     | If {mot; scrut; tcase; fcase} ->
-      If {mot = thin_bnd th mot; scrut = thin th scrut; tcase = thin th tcase; fcase = thin th fcase}
+      If {mot = thin_bnd th mot; scrut = thin th scrut; tcase = thin th tcase; fcase = thin th fcase} *)
 
 
-let out node = thin_f node.thin node.con
+let out node = node.con
 
 module Pretty =
 struct

@@ -1,6 +1,3 @@
-
-type var = Thin.t
-
 type 'a bnd = B of 'a
 
 (* sorts *)
@@ -15,7 +12,7 @@ type 'a system = 'a tube list
 (* TODO: add FCom *)
 
 type _ f =
-  | Var : var -> inf f
+  | Var : int -> inf f
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
   | FunApp : inf t * chk t -> inf f

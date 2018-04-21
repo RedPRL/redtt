@@ -1,3 +1,3 @@
-(:
- (-> [x : bool] [y : bool] x)
- bool)
+(:>
+ (-> [x : bool] [y : bool] bool)
+ (lam [x] [y] x))
