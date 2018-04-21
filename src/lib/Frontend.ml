@@ -14,14 +14,15 @@ let parse_with_error lexbuf =
     Format.fprintf Format.err_formatter "%a: syntax error\n" print_position lexbuf;
     exit (-1)
 
-module Resolver = PTm.Resolver (PTm.ResEnv)
+(* module Resolver = PTm.Resolver (PTm.ResEnv) *)
 
 let rec parse_and_print lexbuf =
   match parse_with_error lexbuf with
   | Some ptree ->
-    let tm = Resolver.inf PTm.ResEnv.init ptree in
-    Format.printf "> @[%a@]@." (Tm.Pretty.pp Tm.Pretty.Env.emp) tm;
-    parse_and_print lexbuf
+    (* let tm = Resolver.inf PTm.ResEnv.init ptree in *)
+    (* Format.printf "> @[%a@]@." (Tm.Pretty.pp Tm.Pretty.Env.emp) tm; *)
+    (* parse_and_print lexbuf *)
+    failwith "TODO"
   | None -> ()
 
 
