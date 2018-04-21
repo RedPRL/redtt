@@ -370,6 +370,15 @@ struct
     chk >>= fun bdy ->
     R.ret @@ (dim0, dim1, Some bdy)
 
+  let btube chk = 
+    R.open_tube @@
+    chk >>= fun dim0 ->
+    R.right >>
+    chk >>= fun dim1 ->
+    R.right >>
+    (R.open_bind chk) >>= fun bdy ->
+    R.ret @@ (dim0, dim1, Some (Tm.B bdy))
+
   let ext chk =
     R.peek_info >>= fun info ->
     R.open_list @@
@@ -380,6 +389,14 @@ struct
     chk >>= fun cod ->
     R.many (tube chk) >>= fun sys ->
     R.ret @@ Tm.into_info info @@ Tm.Ext (Tm.B (cod, sys))
+
+  let univ =
+    R.peek_info >>= fun info ->
+    R.open_list @@
+    R.kwd "U" >>
+    R.right >>
+    R.num >>= fun i ->
+    R.ret @@ Tm.into_info info @@ Tm.Univ (Lvl.Const i)
 
   let bool =
     R.peek_info >>= fun info ->
@@ -401,6 +418,52 @@ struct
     chk >>= fun tm ->
     R.ret @@ Tm.into_info info @@ Tm.Down {ty; tm}
 
+  let coe chk = 
+    R.peek_info >>= fun info ->
+    R.open_list @@
+    R.kwd "coe" >>
+    R.right >>
+    chk >>= fun dim0 ->
+    R.right >>
+    chk >>= fun dim1 ->
+    R.right >>
+    (R.open_bind chk) >>= fun ty ->
+    R.right >>
+    chk >>= fun tm ->
+    R.ret @@ Tm.into_info info @@ Tm.Coe {dim0; dim1; ty = Tm.B ty; tm}
+
+  let hcom chk =
+    R.peek_info >>= fun info ->
+    R.open_list @@ 
+    R.kwd "hcom" >>
+    R.right >>
+    chk >>= fun dim0 ->
+    R.right >>
+    chk >>= fun dim1 ->
+    R.right >>
+    chk >>= fun ty ->
+    R.right >>
+    chk >>= fun cap ->
+    R.right >>
+    R.many1 (btube chk) >>= fun sys ->
+    R.ret @@ Tm.into_info info @@ Tm.HCom {dim0; dim1; ty; cap; sys}
+
+  let com chk =
+    R.peek_info >>= fun info ->
+    R.open_list @@ 
+    R.kwd "com" >>
+    R.right >>
+    chk >>= fun dim0 ->
+    R.right >>
+    chk >>= fun dim1 ->
+    R.right >>
+    (R.open_bind chk) >>= fun ty ->
+    R.right >>
+    chk >>= fun cap ->
+    R.right >>
+    R.many1 (btube chk) >>= fun sys ->
+    R.ret @@ Tm.into_info info @@ Tm.Com {dim0; dim1; ty = Tm.B ty; cap; sys}
+
   let var =
     R.peek_info >>= fun info ->
     R.var >>= fun th ->
@@ -410,11 +473,16 @@ struct
     lambda chk <|>
     pi chk <|>
     sg chk <|>
+    ext chk <|>
+    bool <|>
+    univ <|>
     up inf
-
 
   let inf_f (chk, inf) =
     var <|> 
+    coe chk <|>
+    hcom chk <|>
+    com chk <|>
     down chk
 
   let chk, inf = 
