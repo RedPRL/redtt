@@ -11,6 +11,7 @@ type _ f =
   | Lam : {vars : string list} -> chk f
   | Tuple : {cells : chk t list} -> chk f
   | Hole : chk f
+  | Quote : {tm : ResEnv.t -> 'a Tm.t} -> 'a f
 
 and tele = 
   | TCons of {vars : string list; dom : chk t; cod : tele}
