@@ -20,4 +20,6 @@ val emp : t
 val ext : meta -> sequent -> t -> t
 val set : meta -> Tm.chk Tm.t -> t -> t
 
+val menv : t -> MEnv.t
+
 val lookup_exn : meta -> t -> sequent

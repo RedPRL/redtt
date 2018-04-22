@@ -27,7 +27,7 @@ end
 type 'a tube = 'a Tube.t
 type 'a system = 'a tube list
 
-type menv = Tm.chk Tm.t option MEnv.t
+type menv = MEnv.t
 
 module Clo = 
 struct

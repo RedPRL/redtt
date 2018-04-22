@@ -1,5 +1,5 @@
 type cx = LCx.t
-type mcx = {mcx : MCx.t; menv : Tm.chk Tm.t option MEnv.t}
+type mcx = {mcx : MCx.t; menv : MEnv.t}
 
 let check_sys_valid sys : unit =
   print_string "TODO: check favonia's validity condition on lists of equations\n"

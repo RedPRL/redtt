@@ -1,73 +1,50 @@
-type env = 
-  {mcx : MCx.t}
-
+type mcx = MCx.t
+type lcx = LCx.t
+type rnv = ResEnv.t
+type menv = MEnv.t
 type hole = Symbol.t
 
-type 'a tactic = env -> env * 'a 
-
-let (>>=) m k env = 
-  let env', a = m env in
-  k a env'
-
-let (>>) m n =
-  m >>= fun _ -> n
-
-let ret x env = 
-  env, x
-
-let get env = env, env
+module E = ElabMonad
+let (>>=) = E.(>>=)
+let (>>) = E.(>>)
 
 (* Some preliminary sketches of the elaborator tactics. *)
 
-let lambda ~name : hole -> hole tactic =
-  fun alpha env ->
-    let seq = MCx.lookup_exn alpha env.mcx in
-    let menv = failwith "TODO" in
-    match Val.out @@ Val.eval (menv, LCx.env seq.lcx) seq.ty with
-    | Val.Pi (dom, cod) ->
-      let beta = Symbol.fresh () in
-      let goal = 
-        let vdom = Val.eval_clo dom in
-        let lcx = LCx.ext seq.lcx vdom in
-        let vgen = Val.generic vdom @@ LCx.len seq.lcx in
-        let vcod = Val.inst_bclo cod vgen in
-        let univ = Val.into @@ Val.Univ Lvl.Omega in
-        let tcod = Quote.quote_can ~n:(LCx.len seq.lcx + 1) ~ty:univ ~can:vcod in
-        MCx.{lcx; rnv = ResEnv.bind name seq.rnv; ty = tcod; cell = Ask} in
-      let mcx' = MCx.ext beta goal env.mcx in
-      {mcx = mcx'}, beta
-
-    | _ -> failwith "Foo"
-
-let rec lambdas ~names:xs : hole -> hole tactic =
+let lambda x : hole -> hole E.m =
   fun alpha ->
-    match xs with
-    | [] -> 
-      ret alpha
-
-    | x::xs ->
-      lambda ~name:x alpha >>= 
-      lambdas ~names:xs
-
-let fill tm : hole -> unit tactic =
-  fun alpha env ->
-    let seq = MCx.lookup_exn alpha env.mcx in
-    let menv = failwith "" in
-    let vty = Val.eval (menv, LCx.env seq.lcx) seq.ty in
-    let tm = tm seq.rnv in
-    Typing.check ~mcx:{mcx = env.mcx; menv} ~cx:seq.lcx ~ty:vty ~tm:tm;
-    let env' = {mcx = MCx.set alpha tm env.mcx} in
-    env', ()
-
-let rec compile_chk : hole -> Tm.chk ElabTm.t -> unit tactic =
-  fun alpha etm ->
-    match ElabTm.out etm with
-    | ElabTm.Lam {vars; bdy} ->
-      lambdas ~names:vars alpha >>= fun beta ->
-      compile_chk beta bdy
-
-    | ElabTm.Quote tm -> 
-      fill tm alpha
+    E.lookup_goal alpha >>= fun (cx, rnv, ty) ->
+    match Tm.out ty with
+    | Tm.Pi (dom, Tm.B cod) -> 
+      E.eval (LCx.env cx) dom >>= fun vdom ->
+      let cx' = LCx.ext cx vdom in
+      let goal = MCx.{lcx = cx'; rnv = ResEnv.bind x rnv; ty = cod; cell = Ask} in
+      E.new_goal goal >>= fun beta ->
+      let tm = 
+        let inf = Tm.into @@ Tm.Meta (beta, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0)) in
+        let chk = Tm.into @@ Tm.Up inf in
+        Tm.into @@ Tm.Lam (Tm.B chk)
+      in
+      E.fill alpha tm >>
+      E.ret beta
 
     | _ -> 
-      failwith ""
+      failwith "lambda"
+
+let rec lambdas xs alpha : hole E.m =
+  match xs with
+  | [] -> 
+    E.ret alpha
+
+  | x::xs ->
+    lambda x alpha >>= 
+    lambdas xs
+
+
+let rec elab : type a. a ElabTm.t -> hole -> unit E.m =
+  fun etm alpha ->
+    match ElabTm.out etm with
+    | ElabTm.Lam {vars; bdy} ->
+      lambdas vars alpha >>=
+      elab bdy
+    | _ -> 
+      failwith "TODO"

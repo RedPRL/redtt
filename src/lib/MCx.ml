@@ -27,3 +27,16 @@ let set x tm cx =
 
 let lookup_exn x cx = 
   M.find x cx
+
+
+let menv cx = 
+  let module E : MEnv.S =
+  struct
+    let find x = 
+      let seq = M.find x cx in
+      match seq.cell with
+      | Ret tm -> Some tm
+      | _ -> None
+  end
+  in
+  MEnv.make (module E)

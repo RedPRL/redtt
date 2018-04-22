@@ -82,7 +82,7 @@ sig
 end
 
 
-type menv = Tm.chk Tm.t option MEnv.t
+type menv = MEnv.t
 type env = Env.t
 
 val eval : menv * env -> 'a Tm.t -> can t
