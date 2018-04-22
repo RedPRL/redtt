@@ -142,6 +142,9 @@ struct
   let compare_dim env =
     DimRel.compare_dim env.rel
 
+  let canonize env =
+    DimRel.canonize env.rel 
+
   let rel env = env.rel
   let set_rel rl env = {env with rel = rl}
 end
@@ -356,7 +359,10 @@ let rec eval : type a. env -> a Tm.t -> can t =
       apply (eval rho t1) (eval rho t2)
 
     | Tm.ExtApp (t1, t2) ->
-      ext_apply (eval rho t1) @@ project_dimval @@ eval rho t2
+      ext_apply (eval rho t1) @@ 
+      Env.canonize rho @@  (* This is a bit fishy ! *)
+      project_dimval @@ 
+      eval rho t2
 
     | Tm.Down t ->
       eval rho t.tm

@@ -42,6 +42,9 @@ struct
   let compare_dim cx =
     DimRel.compare_dim cx.rel
 
+  let canonize cx = 
+    DimRel.canonize cx.rel
+
   exception Inconsistent = DimRel.Inconsistent
 
   let lookup i cx =
@@ -123,7 +126,7 @@ let rec check ~ctx ~ty ~tm =
           let ctx'' = Ctx.restrict_exn ctx' dim0 dim1 in
           let can0 = Val.eval_clo clo in
           let can1 = Val.eval (Ctx.env ctx'') tm in
-          Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty:vcodx ~can0 ~can1
+          Quote.equiv ~ctx:(Ctx.qctx ctx'') ~ty:vcodx ~can0 ~can1
 
         | Val.Tube.False _ ->
           ()

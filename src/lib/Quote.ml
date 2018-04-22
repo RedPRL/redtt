@@ -89,6 +89,9 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
     let qbdy = approx_can_ ~vr ~ctx:(Ctx.ext ctx vdom) ~ty:vcod ~can0:vapp0 ~can1:vapp1 in
     Tm.into @@ Tm.Lam (Tm.B qbdy)
 
+  | Val.Ext (cod, sys), _, _ ->
+    failwith "TODO"
+
   | Val.Sg (dom, cod), _, _->
     let vdom = Val.eval_clo dom in
     let vcar0 = Val.car can0 in
@@ -299,4 +302,8 @@ let approx ~ctx ~ty ~can0 ~can1 =
   ignore @@ approx_can_ ~vr:Covar ~ctx ~ty ~can0 ~can1
 
 let equiv ~ctx ~ty ~can0 ~can1 =
-  ignore @@ approx_can_ ~vr:Iso ~ctx ~ty ~can0 ~can1
+  try 
+    ignore @@ approx_can_ ~vr:Iso ~ctx ~ty ~can0 ~can1
+  with
+  | _ -> 
+    failwith @@ Val.to_string can0 ^ " /= " ^ Val.to_string can1 ^ " : " ^ Val.to_string ty

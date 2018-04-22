@@ -6,6 +6,8 @@ sig
   exception Inconsistent
   val restrict_exn : t -> DimVal.t -> DimVal.t -> t
   val compare_dim : t -> DimVal.t -> DimVal.t -> DimVal.compare
+
+  val canonize : t -> DimVal.t -> DimVal.t
 end
 
 module Vertex :
@@ -27,6 +29,7 @@ sig
   val emp : t
   val ext : t -> DimVal.t -> DimVal.t -> t
   val check : t -> DimVal.t -> DimVal.t -> bool
+  val get : t -> DimVal.t -> DimVal.t
 end =
 struct
   module M = Map.Make (Vertex)
@@ -38,7 +41,7 @@ struct
 
   let get g v =
     match M.find_opt v g with
-    | Some v' -> v'
+    | Some v' -> min v v'
     | None -> v
 
   let can_link g d0 d1 =
@@ -52,8 +55,8 @@ struct
     let d0' = get g d0 in
     let d1' = get g d1 in
     let d = min d0' d1' in
-    if can_link g d0 d1 then
-      M.add d0' d @@ M.add d1' d g
+    if can_link g d0' d1' then
+      M.add d0' d @@ M.add d1' d @@ M.add d0 d @@ M.add d1 d g
     else
       raise Inconsistent
 
@@ -78,3 +81,6 @@ let compare_dim rel x y =
     else
       DimVal.Indeterminate
   | r -> r
+
+let canonize rel x =
+  Rel.get rel x

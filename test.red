@@ -1,3 +1,18 @@
 (:> 
- (# [i] [j] bool [i=0 tt] [j=1 tt])
- (lam [i] [j] tt))
+ (-> 
+  [f : (-> bool bool)]
+  [g : (-> bool bool)]
+  [p : 
+   (-> 
+    [b : bool] 
+    (# [i] 
+     bool 
+     [i=0 (f b)] 
+     [i=1 (g b)]))]
+  (# [i]
+   (-> bool bool)
+   [i=0 f]
+   [i=1 g]))
+ 
+ (lam [f] [g] [p] [i] [x]
+  (@ (p x) i)))
