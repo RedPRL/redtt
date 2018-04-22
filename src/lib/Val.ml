@@ -390,7 +390,7 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
       begin
         match MEnv.find sym menv with
         | None -> 
-          failwith "TODO"
+          failwith "TODO: how do we evaluate a meta whose value is not yet known?"
         | Some tm ->
           let env' = eval_subst rho sigma in
           eval (menv, env') tm
