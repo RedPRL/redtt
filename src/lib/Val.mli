@@ -76,6 +76,7 @@ sig
   type t
   val emp : t
   val ext : t -> el -> t
+  val proj : t -> t
 
   include DimRel.S with type t := t
 end
@@ -85,6 +86,7 @@ type env = Env.t
 
 
 val eval : env -> 'a Tm.t -> can t
+val eval_subst : env -> Tm.subst -> env
 
 val project_dimval : can t -> DimVal.t
 val embed_dimval : DimVal.t -> can t

@@ -12,3 +12,6 @@
 (define foo bool :>
  tt)
 
+(define bar (# [i] bool [i=0 tt] [i=1 foo]) :>
+ (lam [i] tt))
+

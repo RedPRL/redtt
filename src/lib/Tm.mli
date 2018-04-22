@@ -42,6 +42,12 @@ type _ f =
 
   | Let : inf t * chk t bnd -> chk f
 
+and subst = 
+  | Id
+  | Proj
+  | Sub of subst * inf t
+  | Cmp of subst * subst
+
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
 

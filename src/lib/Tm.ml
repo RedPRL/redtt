@@ -37,6 +37,12 @@ type _ f =
 
   | Let : inf t * chk t bnd -> chk f
 
+and subst = 
+  | Id
+  | Proj
+  | Sub of subst * inf t
+  | Cmp of subst * subst
+
 and 'a node = {info : info option; con : 'a f}
 and 'a t = 'a node
 and 'a tube = chk t * chk t * 'a option

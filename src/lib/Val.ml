@@ -114,6 +114,7 @@ sig
   val ext : t -> el -> t
 
   val lookup : int -> t -> el
+  val proj : t -> t
 
   include DimRel.S with type t := t
 end =
@@ -131,6 +132,9 @@ struct
 
   let lookup i env =
     List.nth env.vals i
+
+  let proj env = 
+    {env with vals = List.tl env.vals}
 
   exception Inconsistent = DimRel.Inconsistent
 
@@ -377,6 +381,22 @@ let rec eval : type a. env -> a Tm.t -> can t =
       let v = eval rho t0 in
       eval (Env.ext rho v) t1
 
+and eval_subst env sigma = 
+  match sigma with
+  | Tm.Id -> 
+    env
+
+  | Tm.Proj -> 
+    Env.proj env
+
+  | Tm.Sub (sigma, inf) -> 
+    let env' = eval_subst env sigma in
+    let el = eval env inf in
+    Env.ext env' el
+
+  | Tm.Cmp (tau, sigma) -> 
+    let env' = eval_subst env sigma in
+    eval_subst env' tau
 
 (* Invariant: a coercion is rigid when r != r'; a composition is rigid when r != r' and none of the tubes is under a true condition.
    The inputs to rigid_com, rigid_hcom and rigid_coe must be rigid. These functions do only one thing, which is to dispatch to the 
