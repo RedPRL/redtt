@@ -67,7 +67,7 @@
     | 1 -> make_node start stop Tm.Dim1
     | _ -> raise Error
 
-  module R = PTm.ResEnv
+  module R = ResEnv
 %}
 
 %token <int> NUMERAL
@@ -83,7 +83,7 @@
 %token BOOL UNIV LAM CONS CAR CDR TT FF
 %token EOF
 
-%start <(PTm.ResEnv.t -> Tm.inf Tm.t) option> prog
+%start <(ResEnv.t -> Tm.inf Tm.t) option> prog
 %%
 prog:
   | e = inf
