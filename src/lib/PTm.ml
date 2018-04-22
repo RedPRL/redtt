@@ -1,16 +1,3 @@
-type name = string
-
-type 'a f =
-  | Atom of string
-  | Numeral of int
-  | List of 'a list
-  | TyBind of name * 'a * 'a
-  | Tube of 'a * 'a * 'a
-  | Bind of name * 'a
-
-type info = Lexing.position * Lexing.position
-type t = Node of {info : info; con : t f}
-
 module type ResEnv =
 sig
   type t
