@@ -34,6 +34,10 @@ let lookup_goal alpha =
   let nty = Quote.quote_can ~n:(LCx.len seq.lcx) ~ty:univ ~can:vty in
   ret (seq.lcx, seq.rnv, nty)
 
+let lookup_res alpha = 
+  lookup alpha >>= fun seq ->
+  ret seq.rnv
+
 let new_goal seq cx =
   let alpha = Symbol.fresh () in
   let cx' = MCx.ext alpha seq cx in

@@ -15,6 +15,7 @@ val get_menv : menv m
 
 val lookup : hole -> MCx.sequent m
 val lookup_goal : hole -> (lcx * rnv * Tm.chk Tm.t) m
+val lookup_res : hole -> rnv m
 
 val new_goal : MCx.sequent -> hole m
 val fill : hole -> Tm.chk Tm.t -> unit m
