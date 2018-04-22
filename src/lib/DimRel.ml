@@ -32,38 +32,35 @@ struct
   module M = Map.Make (Vertex)
   module S = Set.Make (Vertex)
 
-  type t = S.t M.t
+  type t = DimVal.t M.t
 
   let emp = M.empty
 
   let get g v =
     match M.find_opt v g with
-    | Some s -> g, s
-    | None ->
-      let s = S.empty in
-      let g' = M.add v s g in
-      g', s
+    | Some v' -> v'
+    | None -> v
 
-  let can_link g d d' =
-    let s = try M.find d g with _ -> S.empty in
-    let s' = try M.find d' g with _ -> S.empty in
-    let d_is_0 = S.mem DimVal.Dim0 s in
-    let d_is_1 = S.mem DimVal.Dim1 s in
-    let d'_is_0 = S.mem DimVal.Dim0 s' in
-    let d'_is_1 = S.mem DimVal.Dim1 s' in
-    not ((d_is_0 && d'_is_1) || (d_is_1 && d'_is_0))
+  let can_link g d0 d1 =
+    let d0' = get g d0 in
+    let d1' = get g d1 in
+    match DimVal.compare d0' d1' with
+    | Apart -> false
+    | _ -> true
 
   let ext g d0 d1 =
+    let d0' = get g d0 in
+    let d1' = get g d1 in
+    let d = min d0' d1' in
     if can_link g d0 d1 then
-      M.update d1 (function Some s -> Some (S.add d0 s) | None -> Some (S.singleton d0)) @@
-      M.update d0 (function Some s -> Some (S.add d1 s) | None -> Some (S.singleton d1)) g
+      M.add d0' d @@ M.add d1' d g
     else
       raise Inconsistent
 
   let check g d0 d1 =
-    match M.find_opt d0 g with
-    | None -> false
-    | Some s -> S.mem d1 s
+    match DimVal.compare (get g d0) (get g d1) with
+    | Same -> true
+    | _ -> false
 end
 
 type t = Rel.t

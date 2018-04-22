@@ -130,7 +130,7 @@ let rec check ~ctx ~ty ~tm =
 
         | Val.Tube.Delete ->
           ()
-          
+
     in
     go @@ Val.inst_sclo sys @@ Val.project_dimval vgen
 
@@ -332,11 +332,16 @@ and check_sys ~ctx ~ty ~sys =
       ()
 
     | (vd0', vd1', tb') :: tubes ->
-      let ctx' = Ctx.restrict_exn ctx vd0' vd1' in
-      let env = Ctx.env ctx' in
-      let vtb = Val.eval env tb in
-      let vtb' = Val.eval env tb' in
-      Quote.equiv ~ctx:(Ctx.qctx ctx) ~ty ~can0:vtb ~can1:vtb';
+      begin
+        try 
+          let ctx' = Ctx.restrict_exn ctx vd0' vd1' in
+          let env = Ctx.env ctx' in
+          let vtb = Val.eval env tb in
+          let vtb' = Val.eval env tb' in
+          Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty ~can0:vtb ~can1:vtb';
+        with
+        | Ctx.Inconsistent -> ()
+      end;
       go_adj ctx tubes (vd0, vd1, tb)
 
   in
