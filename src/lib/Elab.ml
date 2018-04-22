@@ -5,6 +5,18 @@ type hole = Symbol.t
 
 type 'a tactic = env -> env * 'a 
 
+let (>>=) m k env = 
+  let env', a = m env in
+  k a env'
+
+let (>>) m n =
+  m >>= fun _ -> n
+
+let ret x env = 
+  env, x
+
+let get env = env, env
+
 (* Some preliminary sketches of the elaborator tactics. *)
 
 let lambda ~name : hole -> hole tactic =
@@ -26,3 +38,36 @@ let lambda ~name : hole -> hole tactic =
       {mcx = mcx'}, beta
 
     | _ -> failwith "Foo"
+
+let rec lambdas ~names:xs : hole -> hole tactic =
+  fun alpha ->
+    match xs with
+    | [] -> 
+      ret alpha
+
+    | x::xs ->
+      lambda ~name:x alpha >>= 
+      lambdas ~names:xs
+
+let fill tm : hole -> unit tactic =
+  fun alpha env ->
+    let seq = MCx.lookup_exn alpha env.mcx in
+    let menv = failwith "" in
+    let vty = Val.eval (menv, LCx.env seq.lcx) seq.ty in
+    let tm = tm seq.rnv in
+    Typing.check ~mcx:{mcx = env.mcx; menv} ~cx:seq.lcx ~ty:vty ~tm:tm;
+    let env' = {mcx = MCx.set alpha tm env.mcx} in
+    env', ()
+
+let rec compile_chk : hole -> Tm.chk ElabTm.t -> unit tactic =
+  fun alpha etm ->
+    match ElabTm.out etm with
+    | ElabTm.Lam {vars; bdy} ->
+      lambdas ~names:vars alpha >>= fun beta ->
+      compile_chk beta bdy
+
+    | ElabTm.Quote tm -> 
+      fill tm alpha
+
+    | _ -> 
+      failwith ""
