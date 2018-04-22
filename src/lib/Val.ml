@@ -162,11 +162,11 @@ let embed_dimval dv =
 let out : type a. a t -> a f =
   fun node -> node.con
 
-let to_string : type a. a t -> string = 
+let rec to_string : type a. a t -> string = 
   fun v ->
     match out v with
-    | Lvl _ -> "#lvl"
-    | Up _ -> "#up"
+    | Lvl i -> "(lvl " ^ string_of_int i ^ ")"
+    | Up (v0,v1) -> "(up " ^ to_string v0 ^ " " ^ to_string v1 ^ ")"
     | Pi _ -> "#pi"
     | Sg _ -> "#sg"
     | Ext _ -> "#ext"
@@ -185,8 +185,8 @@ let to_string : type a. a t -> string =
     | Coe _ -> "#coe"
     | HCom _ -> "#hcom"
     | FCom _ -> "#fcom"
-    | FunApp _ -> "#funapp"
-    | ExtApp _ -> "#extapp"
+    | FunApp (v0, v1) -> "(" ^ to_string v0 ^ " " ^ to_string v1 ^ ")"
+    | ExtApp (v0, v1) -> "(@ " ^ to_string v0 ^ " " ^ to_string (embed_dimval v1) ^ ")"
     | Car _ -> "#car"
     | Cdr _ -> "#cdr"
 
