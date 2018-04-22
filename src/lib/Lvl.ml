@@ -5,3 +5,8 @@ let greater l0 l1 =
   | Omega, Const _ -> true
   | Const i0, Const i1 -> i0 > i1
   | _ -> false
+
+let to_string l = 
+  match l with
+  | Omega -> "omega"
+  | Const i -> string_of_int i

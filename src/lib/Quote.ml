@@ -65,7 +65,7 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
   | Val.Univ _, Val.Bool, Val.Bool ->
     Tm.into Tm.Bool
 
-  | Val.Univ lvl, Val.Univ lvl0, Val.Univ lvl1 ->
+  | Val.Univ _, Val.Univ lvl0, Val.Univ lvl1 ->
     begin
       match vr with
       | Iso ->
@@ -74,10 +74,10 @@ let rec approx_can_ ~vr ~ctx ~ty ~can0 ~can1 =
         else
           failwith "approx/iso: univ levels"
       | Covar ->
-        if lvl0 <= lvl1 then
-          Tm.into @@ Tm.Univ lvl0
+        if Lvl.greater lvl0 lvl1 then
+          failwith @@ "approx/covar: " ^ Lvl.to_string lvl1 ^ " > " ^ Lvl.to_string lvl0
         else
-          failwith "approx/covar: univ levels"
+          Tm.into @@ Tm.Univ lvl0
     end
 
   | Val.Pi (dom, cod), _, _ ->
