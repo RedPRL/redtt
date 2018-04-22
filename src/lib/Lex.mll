@@ -33,6 +33,8 @@ rule read =
   | "cons"   { CONS }
   | "car"    { CAR }
   | "cdr"    { CDR }
+  | "tt"     { TT }
+  | "ff"     { FF }
   | '('      { LPR }
   | ')'      { RPR }
   | '['      { LSQ }

@@ -43,106 +43,6 @@ and 'a system = 'a tube list
 let into tf = {info = None; con = tf}
 let into_info info tf = {info = Some info; con = tf}
 let info node = node.info
-(* 
-let thin : type a. Thin.t -> a t -> a t = 
-  fun th {info; con; thin} ->
-    {info; con; thin = Thin.cmp thin th}
-
-let thin_bnd : type a. Thin.t -> a t bnd -> a t bnd = 
-  fun th (B t) ->
-    B (thin (Thin.skip th) t)
-
-
-let thin_tube : type a b. Thin.t -> b t tube -> b t tube = 
-  fun th (td0, td1, tm) ->
-    (thin th td0, thin th td1, Option.map (thin th) tm)
-
-let thin_btube : type a b. Thin.t -> b t bnd tube -> b t bnd tube = 
-  fun th (td0, td1, tm) ->
-    (thin th td0, thin th td1, Option.map (thin_bnd th) tm)
-
-let thin_bsys : type a. Thin.t -> a t bnd system -> a t bnd system = 
-  fun th ->
-    List.map (thin_btube th)
-
-let thin_sys : type a. Thin.t -> a t system -> a t system = 
-  fun th ->
-    List.map (thin_tube th)
-
-
-let rec thin_f : type a. Thin.t -> a f -> a f = 
-  fun th tf ->
-    match tf with 
-    | Var g ->
-      Var (Thin.cmp g th)
-
-    | Car t ->
-      Car (thin th t)
-
-    | Cdr t -> 
-      Cdr (thin th t)
-
-    | FunApp (t1, t2) ->
-      FunApp (thin th t1, thin th t2)
-
-    | ExtApp (t1, t2) ->
-      ExtApp (thin th t1, thin th t2)
-
-    | Down {ty; tm} ->
-      Down {ty = thin th ty; tm = thin th tm}
-
-    | Coe info ->
-      Coe {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; tm = thin th info.tm}
-
-    | HCom info ->
-      HCom {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
-
-    | Com info ->
-      Com {dim0 = thin th info.dim0; dim1 = thin th info.dim1; ty = thin_bnd th info.ty; cap = thin th info.cap; sys = thin_bsys th info.sys}
-
-    | Up t ->
-      Up (thin th t)
-
-    | Univ lvl ->
-      tf
-
-    | Pi (dom, cod) ->
-      Pi (thin th dom, thin_bnd th cod)
-
-    | Ext (B (cod, sys)) ->
-      let th' = Thin.skip th in
-      Ext (B (thin th' cod, thin_sys th' sys))
-
-    | Sg (dom, cod) ->
-      Sg (thin th dom, thin_bnd th cod)
-
-    | Interval ->
-      tf
-
-    | Lam bdy ->
-      Lam (thin_bnd th bdy)
-
-    | Cons (t1, t2) ->
-      Cons (thin th t1, thin th t2)
-
-    | Dim0 ->
-      tf
-
-    | Dim1 ->
-      tf
-
-    | Bool ->
-      tf
-
-    | Tt ->
-      tf
-    
-    | Ff ->
-      tf
-
-    | If {mot; scrut; tcase; fcase} ->
-      If {mot = thin_bnd th mot; scrut = thin th scrut; tcase = thin th tcase; fcase = thin th fcase} *)
-
 
 let out node = node.con
 
@@ -166,5 +66,11 @@ struct
   end
 
   let pp : type a. Env.t -> Format.formatter -> a t -> unit = 
-    fun _ _ -> failwith "pp"
+    fun env fmt tm ->
+      match out tm with
+      | Var i -> 
+        Format.fprintf fmt "%s" @@ 
+        Env.var i env
+      
+      | _ -> failwith ""
 end

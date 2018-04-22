@@ -61,6 +61,12 @@
       let fn' = make_multi_funapp start stop fn rest in
       make_node start stop @@ Tm.ExtApp (fn', arg)
 
+  let make_dim_const start stop i =
+    match i with
+    | 0 -> make_node start stop Tm.Dim0
+    | 1 -> make_node start stop Tm.Dim1
+    | _ -> raise Error
+
   module R = PTm.ResEnv
 %}
 
@@ -74,7 +80,7 @@
 %token EQUALS
 %token RIGHT_ARROW
 %token STAR HASH AT
-%token BOOL UNIV LAM CONS CAR CDR
+%token BOOL UNIV LAM CONS CAR CDR TT FF
 %token EOF
 
 %start <(PTm.ResEnv.t -> Tm.inf Tm.t) option> prog
@@ -123,13 +129,24 @@ multibind(X):
   ;
 
 constrained:
-  | ty = chk; list(tube(chk))
-    { fun env -> failwith "" }
+  | ty = chk; sys = list(tube(chk))
+    { fun env -> (ty env, List.map (fun x -> x env) sys) }
 
 chk:
   | BOOL
     { fun env ->
         make_node $startpos $endpos @@ Tm.Bool }
+  | TT
+    { fun env ->
+        make_node $startpos $endpos @@ Tm.Tt }
+
+  | FF
+    { fun env ->
+        make_node $startpos $endpos @@ Tm.Ff }
+
+  | i = NUMERAL
+    { fun _ -> 
+        make_dim_const $startpos $endpos i }
 
   | LPR; UNIV; i = NUMERAL; RPR
     { fun env ->
