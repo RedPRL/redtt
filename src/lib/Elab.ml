@@ -30,6 +30,19 @@ let lambda x : hole -> hole E.m =
     | _ -> 
       failwith "lambda"
 
+let pi x : hole -> (hole * hole) E.m = 
+  fun alpha ->
+    E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
+    let gdom = MCx.{lcx; rnv; ty; cell = Ask} in
+    E.new_goal gdom >>= fun alpha0 ->
+    let tdom = Tm.into @@ Tm.Meta (alpha0, Tm.Id) in
+    E.eval (LCx.env lcx) tdom >>= fun vdom ->
+    let lcx' = LCx.ext lcx vdom in
+    let rnv' = ResEnv.bind x rnv in
+    let gcod = MCx.{lcx = lcx'; rnv = rnv'; ty; cell = Ask} in
+    E.new_goal gcod >>= fun alpha1 ->
+    E.ret (alpha0, alpha1)
+
 let rec lambdas xs alpha : hole E.m =
   match xs with
   | [] -> 
