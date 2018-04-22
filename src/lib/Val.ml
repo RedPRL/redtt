@@ -1,5 +1,6 @@
 type can = [`Can]
 type neu = [`Neu]
+type nf = [`Nf]
 
 type rel = DimRel.t
 
@@ -87,11 +88,12 @@ type _ f =
   (* formal composites in positive types: like the universe, etc. *)
   | FCom : {dim0 : DimVal.t; dim1 : DimVal.t; cap : can t; sys : bclo system} -> can f
 
-  | FunApp : neu t * can t -> neu f
+  | FunApp : neu t * nf t -> neu f
   | ExtApp : neu t * DimVal.t -> neu f
 
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
+  | Down : can t * can t -> nf f
 
 and 'a t = { con : 'a f }
 and env = can t env_
@@ -192,6 +194,7 @@ let rec to_string : type a. a t -> string =
     | ExtApp (v0, v1) -> "(@ " ^ to_string v0 ^ " " ^ to_string (embed_dimval v1) ^ ")"
     | Car _ -> "#car"
     | Cdr _ -> "#cdr"
+    | Down _ -> "#nf"
 
 
 let project_dimval (type a) (v : a t) =
@@ -231,6 +234,9 @@ let out_ext v =
   match out v with
   | Ext (cod, sys) -> cod, sys
   | _ -> failwith "out_ext"
+let out_nf v =
+  match out v with
+  | Down (ty, el) -> ty, el
 
 let mapi_tubes f =
   List.mapi @@ fun i tube ->
@@ -460,8 +466,9 @@ and apply vfun varg =
 
   | Up (vty, vneu) ->
     let dom, cod = out_pi vty in
+    let vdom = eval_clo dom in
     let vcod = inst_bclo cod varg in
-    reflect vcod @@ into @@ FunApp (vneu, varg)
+    reflect vcod @@ into @@ FunApp (vneu, into @@ Down (vdom, varg))
 
   | Coe info ->
     let dom = Clo.PiDom info.ty in

@@ -10,28 +10,24 @@ sig
   val len : t -> int
 
   val env : t -> Val.env
-  val qctx : t -> Quote.ctx
   val rel : t -> DimRel.t
 end =
 struct
   type t =
     {tys : Val.can Val.t list;
      env : Val.env;
-     qctx : Quote.ctx;
      rel : DimRel.t;
      len : int}
 
   let emp =
     {tys = [];
      env = Val.Env.emp;
-     qctx = Quote.Ctx.emp;
      rel = DimRel.emp;
      len = 0}
 
   let ext cx v =
     {tys = v :: cx.tys;
      env = Val.Env.ext cx.env @@ Val.generic v @@ cx.len;
-     qctx = Quote.Ctx.ext cx.qctx v;
      rel = cx.rel;
      len = cx.len + 1}
 
@@ -52,7 +48,6 @@ struct
 
   let len cx = cx.len
   let env cx = Val.Env.set_rel cx.rel cx.env 
-  let qctx cx = cx.qctx
   let rel cx = cx.rel
 end
 
@@ -120,13 +115,13 @@ let rec check ~ctx ~ty ~tm =
         | Val.Tube.True (_, clo) ->
           let can0 = Val.eval_clo clo in
           let can1 = Val.eval (Ctx.env ctx') tm in
-          Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty:vcodx ~can0 ~can1
+          Quote.equiv ~n:(Ctx.len ctx') ~ty:vcodx ~can0 ~can1
 
         | Val.Tube.Indeterminate ((dim0, dim1), clo) ->
           let ctx'' = Ctx.restrict_exn ctx' dim0 dim1 in
           let can0 = Val.eval_clo clo in
           let can1 = Val.eval (Ctx.env ctx'') tm in
-          Quote.equiv ~ctx:(Ctx.qctx ctx'') ~ty:vcodx ~can0 ~can1
+          Quote.equiv ~n:(Ctx.len ctx'') ~ty:vcodx ~can0 ~can1
 
         | Val.Tube.False _ ->
           ()
@@ -152,7 +147,7 @@ let rec check ~ctx ~ty ~tm =
   | _, Tm.Up tm ->
     let ty' = infer ~ctx ~tm in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
-    Quote.approx ~ctx:(Ctx.qctx ctx) ~ty:univ ~can0:ty' ~can1:ty
+    Quote.approx ~n:(Ctx.len ctx) ~ty:univ ~can0:ty' ~can1:ty
 
   | _, _ -> failwith @@ "check: " ^ Val.to_string ty
 
@@ -196,7 +191,7 @@ and infer ~ctx ~tm =
     let bool = Val.into Val.Bool in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let bool' = infer ~ctx ~tm:scrut in
-    Quote.equiv ~ctx:(Ctx.qctx ctx) ~ty:univ ~can0:bool ~can1:bool';
+    Quote.equiv ~n:(Ctx.len ctx) ~ty:univ ~can0:bool ~can1:bool';
     check ~ctx:(Ctx.ext ctx bool) ~ty:univ ~tm:mot;
     let tt = Val.into Val.Tt in
     let ff = Val.into Val.Ff in
@@ -277,7 +272,7 @@ and check_bsys ~ctx ~dim0 ~tycap ~ty ~cap ~sys =
         let vtb = Val.eval (Val.Env.ext env dim0) tb in
 
         (* Check cap-tube compatibility *)
-        Quote.equiv ~ctx:(Ctx.qctx ctx'') ~ty ~can0:cap ~can1:vtb;
+        Quote.equiv ~n:(Ctx.len ctx'') ~ty ~can0:cap ~can1:vtb;
 
         (* Check tube-tube adjacency conditions *)
         go_adj ctx'' acc (vd0, vd1, tb);
@@ -297,7 +292,7 @@ and check_bsys ~ctx ~dim0 ~tycap ~ty ~cap ~sys =
       let env = Ctx.env ctx' in
       let vtb = Val.eval env tb in
       let vtb' = Val.eval env tb' in
-      Quote.equiv ~ctx:(Ctx.qctx ctx) ~ty ~can0:vtb ~can1:vtb';
+      Quote.equiv ~n:(Ctx.len ctx) ~ty ~can0:vtb ~can1:vtb';
       go_adj ctx tubes (vd0, vd1, tb)
 
   in
@@ -341,7 +336,7 @@ and check_sys ~ctx ~ty ~sys =
           let env = Ctx.env ctx' in
           let vtb = Val.eval env tb in
           let vtb' = Val.eval env tb' in
-          Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty ~can0:vtb ~can1:vtb';
+          Quote.equiv ~n:(Ctx.len ctx') ~ty ~can0:vtb ~can1:vtb';
         with
         | Ctx.Inconsistent -> ()
       end;

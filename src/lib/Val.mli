@@ -1,6 +1,7 @@
 (* sorts *)
 type can
 type neu
+type nf
 
 type tclo
 type bclo
@@ -55,11 +56,13 @@ type _ f =
   (* formal composites in positive types: like the universe, etc. *)
   | FCom : {dim0 : DimVal.t; dim1 : DimVal.t; cap : can t; sys : bclo system} -> can f
 
-  | FunApp : neu t * can t -> neu f
+  | FunApp : neu t * nf t -> neu f
   | ExtApp : neu t * DimVal.t -> neu f
 
   | Car : neu t -> neu f
   | Cdr : neu t -> neu f
+
+  | Down : can t * can t -> nf f
 
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
@@ -99,6 +102,7 @@ val cdr : can t -> can t
 val out_pi : can t -> tclo * bclo
 val out_sg : can t -> tclo * bclo
 val out_ext : can t -> bclo * sclo
+val out_nf : nf t -> can t * can t
 
 val generic : can t -> int -> can t
 val reflect : can t -> neu t -> can t
