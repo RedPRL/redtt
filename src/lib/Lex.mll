@@ -19,28 +19,28 @@ let atom = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 
 rule read =
   parse
-  | white    { read lexbuf }
-  | newline  { next_line lexbuf; read lexbuf }
-  | num      { NUMERAL (int_of_string (Lexing.lexeme lexbuf)) }
-  | "bool"   { BOOL }
-  | ":>"     { COLON_ANGLE }
-  | "->"     { RIGHT_ARROW }
-  | "@"      { AT }
-  | "*"      { STAR }
-  | "#"      { HASH }
-  | "U"      { UNIV }
-  | "lam"    { LAM }
-  | "cons"   { CONS }
-  | "car"    { CAR }
-  | "cdr"    { CDR }
-  | "tt"     { TT }
-  | "ff"     { FF }
-  | '('      { LPR }
-  | ')'      { RPR }
-  | '['      { LSQ }
-  | ']'      { RSQ }
-  | ':'      { COLON }
-  | '='      { EQUALS }
-  | atom     { ATOM (Lexing.lexeme lexbuf) }
+  | white { read lexbuf }
+  | newline { next_line lexbuf; read lexbuf }
+  | num { NUMERAL (int_of_string (Lexing.lexeme lexbuf)) }
+  | "bool" { BOOL }
+  | ":>" { COLON_ANGLE }
+  | "->" { RIGHT_ARROW }
+  | "@" { AT }
+  | "*" { STAR }
+  | "#" { HASH }
+  | "U" { UNIV }
+  | "lam" { LAM }
+  | "cons" { CONS }
+  | "car" { CAR }
+  | "cdr" { CDR }
+  | "tt" { TT }
+  | "ff" { FF }
+  | '(' { LPR }
+  | ')' { RPR }
+  | '[' { LSQ }
+  | ']' { RSQ }
+  | ':' { COLON }
+  | '=' { EQUALS }
+  | atom { ATOM (Lexing.lexeme lexbuf) }
   | _ { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
-  | eof      { EOF }
+  | eof { EOF }
