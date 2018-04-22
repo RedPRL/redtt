@@ -22,8 +22,6 @@ prog:
     { Some e }
   | EOF
     { None }
-  ;
-
 
 tele:
   | dom = chk; rest = tele
@@ -37,13 +35,11 @@ tele:
   | cod = chk
     { fun env ->
         TEnd (cod env) }
-  ;
 
 tube(X):
   | LSQ; r0 = chk; EQUALS; r1 = chk; e = X; RSQ
     { fun env ->
         r0 env, r1 env, Some (e env) }
-  ;
 
 bind(X):
   | LSQ; x = ATOM; RSQ; e = X
@@ -58,7 +54,6 @@ multibind(X):
   | LSQ; x = ATOM; RSQ; mb = multibind(X)
     { fun env ->
         MBCons (mb @@ R.bind x env) }
-  ;
 
 
 elist(X):
@@ -117,8 +112,6 @@ chk:
     { fun env ->
         make_node $startpos $endpos @@
         Tm.Up (e env) }
-
-  ;
 
 inf:
   | a = ATOM
