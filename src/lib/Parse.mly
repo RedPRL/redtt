@@ -7,10 +7,7 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
-%token LSQ
-%token RSQ
-%token LPR
-%token RPR
+%token LSQ RSQ LPR RPR
 %token COLON COLON_ANGLE
 %token EQUALS
 %token RIGHT_ARROW
@@ -63,9 +60,16 @@ multibind(X):
         MBCons (mb @@ R.bind x env) }
   ;
 
+
+elist(X):
+  | xs = list(X)
+    { fun env ->
+        List.map (fun x -> x env) xs}
+
 constrained:
-  | ty = chk; sys = list(tube(chk))
-    { fun env -> (ty env, List.map (fun x -> x env) sys) }
+  | ty = chk; sys = elist(tube(chk))
+    { fun env ->
+      ty env, sys env }
 
 chk:
   | BOOL
@@ -80,12 +84,13 @@ chk:
         make_node $startpos $endpos @@ Tm.Ff }
 
   | i = NUMERAL
-    { fun _ -> 
+    { fun _ ->
         make_dim_const $startpos $endpos i }
 
   | LPR; UNIV; i = NUMERAL; RPR
     { fun env ->
-        make_node $startpos $endpos @@ Tm.Univ (Lvl.Const i) }
+        make_node $startpos $endpos @@
+        Tm.Univ (Lvl.Const i) }
 
   | LPR; RIGHT_ARROW; tele = tele; RPR
     { fun env ->
@@ -103,39 +108,45 @@ chk:
     { fun env ->
         lam_from_multibind $startpos $endpos @@ mb env }
 
-  | LPR; CONS; e0 = chk; e1 = chk; RPR 
+  | LPR; CONS; e0 = chk; e1 = chk; RPR
     { fun env ->
-        make_node $startpos $endpos @@ Tm.Cons (e0 env, e1 env) }
+        make_node $startpos $endpos @@
+        Tm.Cons (e0 env, e1 env) }
 
   | e = inf
     { fun env ->
-        make_node $startpos $endpos @@ Tm.Up (e env) }
+        make_node $startpos $endpos @@
+        Tm.Up (e env) }
 
   ;
 
 inf:
   | a = ATOM
     { fun env ->
-        make_node $startpos $endpos @@ Tm.Var (R.get a env) }
+        make_node $startpos $endpos @@
+        Tm.Var (R.get a env) }
 
   | LPR; CAR; e = inf
     { fun env ->
-        make_node $startpos $endpos @@ Tm.Car (e env)}
+        make_node $startpos $endpos @@
+        Tm.Car (e env)}
 
   | LPR; CDR; e = inf
     { fun env ->
-        make_node $startpos $endpos @@ Tm.Cdr (e env)}
+        make_node $startpos $endpos @@
+        Tm.Cdr (e env)}
 
-  | LPR; e = inf; arg0 = chk; rest = list(chk); RPR
+  | LPR; e = inf; arg0 = chk; rest = elist(chk); RPR
     { fun env ->
         make_multi_funapp $startpos $endpos (e env) @@
-        List.rev @@ arg0 env :: List.map (fun x -> x env) rest }
+        List.rev @@ arg0 env :: rest env }
 
-  | LPR; AT; e = inf; arg0 = chk; rest = list(chk); RPR
+  | LPR; AT; e = inf; arg0 = chk; rest = elist(chk); RPR
     { fun env ->
         make_multi_extapp $startpos $endpos (e env) @@
-        List.rev @@ arg0 env :: List.map (fun x -> x env) rest }
+        List.rev @@ arg0 env :: rest env }
 
   | LPR; COLON_ANGLE; ty = chk; tm = chk; RPR
     { fun env ->
-        make_node $startpos $endpos @@ Tm.Down {ty = ty env; tm = tm env} }
+        make_node $startpos $endpos @@
+        Tm.Down {ty = ty env; tm = tm env} }
