@@ -41,6 +41,11 @@ let pi x : hole -> (hole * hole) E.m =
     let rnv' = ResEnv.bind x rnv in
     let gcod = MCx.{lcx = lcx'; rnv = rnv'; ty; cell = Ask} in
     E.new_goal gcod >>= fun alpha1 ->
+    let tm = 
+      let tcod = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0))) in
+      Tm.into @@ Tm.Pi (Tm.into @@ Tm.Up tdom, Tm.B tcod)
+    in
+    E.fill alpha tm >>
     E.ret (alpha0, alpha1)
 
 let rec lambdas xs alpha : hole E.m =
