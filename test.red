@@ -1,18 +1,10 @@
 (:> 
  (-> 
-  [f : (-> bool bool)]
-  [g : (-> bool bool)]
-  [p : 
-   (-> 
-    [b : bool] 
-    (# [i] 
-     bool 
-     [i=0 (f b)] 
-     [i=1 (g b)]))]
-  (# [i]
-   (-> bool bool)
-   [i=0 f]
-   [i=1 g]))
+  [A : (U 0)]
+  [f : (-> A A)]
+  [g : (-> A A)]
+  [p : (-> [b : A] (# [i] A [i=0 (f b)] [i=1 (g b)]))]
+  (# [i] (-> A A) [i=0 f] [i=1 g]))
  
- (lam [f] [g] [p] [i] [x]
+ (lam [A] [f] [g] [p] [i] [x]
   (@ (p x) i)))
