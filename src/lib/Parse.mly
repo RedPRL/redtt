@@ -17,10 +17,10 @@
 %start <ResEnv.t -> Decl.t list> prog
 %%
 prog:
-  | LPR; DEFINE; name = ATOM; args = tele_with_env; COLON_ANGLE; body = chk; rpr = RPR; p = prog
+  | LPR; DEFINE; name = ATOM; args = tele_with_env; COLON_ANGLE; body = chk; _rpr = RPR; p = prog
     { fun env -> 
       let tele, env_bdy = args env in
-      let info = $startpos, $endpos(rpr) in
+      let info = $startpos, $endpos(_rpr) in
       let decl = Decl.Define {name; info; args = tele; body = body env_bdy} in
       let env' = R.bind name env in
       decl :: p env' }
