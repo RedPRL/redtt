@@ -66,6 +66,27 @@ let sg x : hole -> (hole * hole) E.m =
     E.fill alpha tm >>
     E.ret (alpha0, alpha1)
 
+let cons : hole -> (hole * hole) E.m = 
+  fun alpha ->
+    E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
+    match Tm.out ty with
+    | Tm.Sg (dom, Tm.B cod) ->
+      let gcar = MCx.{lcx; rnv; ty = dom; cell = Ask} in
+      E.new_goal gcar >>= fun alpha0 ->
+      let tcar = Tm.into @@ Tm.Meta (alpha0, Tm.Id) in
+      let cod' = Tm.into @@ Tm.Let (tcar, Tm.B cod) in
+      let gcdr = MCx.{lcx; rnv; ty = cod'; cell = Ask} in
+      E.new_goal gcdr >>= fun alpha1 ->
+      let tm = 
+        let tcdr = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Id)) in
+        Tm.into @@ Tm.Cons (Tm.into @@ Tm.Up tcar, tcdr)
+      in
+      E.fill alpha tm >>
+      E.ret (alpha0, alpha1)
+
+    | _ ->
+      failwith "cons"
+
 let quote rtm alpha : unit E.m = 
   E.lookup_res alpha >>= fun rnv ->
   let tm = rtm rnv in
@@ -134,6 +155,22 @@ let rec elab : type a. a ElabTm.t -> hole -> unit E.m =
 
     | ElabTm.Quote rtm ->
       quote rtm alpha
+
+    | ElabTm.Tuple {cells} -> 
+      let rec go cells alpha = 
+        match cells with
+        | [cell] -> 
+          elab cell alpha
+
+        | cell::cells -> 
+          cons alpha >>= fun (alpha0, alpha1) ->
+          elab cell alpha0 >>
+          go cells alpha1
+
+        | [] -> 
+          failwith "TODO: empty tuple"
+      in
+      go cells alpha
 
     | _ -> 
       failwith "TODO"
