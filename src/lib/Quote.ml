@@ -68,7 +68,14 @@ let rec approx_can_ ~vr ~n ~ty ~can0 ~can1 =
     Tm.into @@ Tm.Lam (Tm.B qbdy)
 
   | Val.Ext (cod, sys), _, _ ->
-    failwith "TODO"
+    let interval = Val.into Val.Interval in
+    let vgen = Val.generic interval n in
+    let vdim = Val.project_dimval vgen in
+    let vcod = Val.inst_bclo cod vgen in
+    let vapp0 = Val.ext_apply can0 vdim in
+    let vapp1 = Val.ext_apply can1 vdim in
+    let qbdy = approx_can_ ~vr ~n:(n+1) ~ty:vcod ~can0:vapp0 ~can1:vapp1 in
+    Tm.into @@ Tm.Lam (Tm.B qbdy)
 
   | Val.Sg (dom, cod), _, _->
     let vdom = Val.eval_clo dom in

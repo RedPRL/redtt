@@ -94,6 +94,7 @@ val inst_bclo : bclo -> can t -> can t
 val inst_sclo : sclo -> DimVal.t -> tclo system
 
 val apply : can t -> can t -> can t
+val ext_apply : can t -> DimVal.t -> can t
 val car : can t -> can t
 val cdr : can t -> can t
 
