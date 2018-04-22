@@ -16,17 +16,17 @@ let to_inf decl =
     Tm.into @@ Tm.Down {ty; tm}
 
 
-let rec check_document ctx decls = 
+let rec check_document cx decls = 
   match decls with
   | [] ->
     ()
 
   | decl :: decls ->
-    let ctx' = check_decl ctx decl in
-    check_document ctx' decls
+    let cx' = check_decl cx decl in
+    check_document cx' decls
 
-and check_decl ctx decl = 
+and check_decl cx decl = 
   let tm = to_inf decl in
-  let ty = Typing.infer ~ctx ~tm in
-  let el = Val.eval (LCx.env ctx) tm in
-  LCx.def ctx ~ty ~tm:el
+  let ty = Typing.infer ~cx ~tm in
+  let el = Val.eval (LCx.env cx) tm in
+  LCx.def cx ~ty ~tm:el
