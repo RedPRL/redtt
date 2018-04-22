@@ -30,7 +30,7 @@ struct
 
   let ext cx v =
     {tys = v :: cx.tys;
-     env = Val.Env.ext cx.env v;
+     env = Val.Env.ext cx.env @@ Val.generic v @@ cx.len;
      qctx = Quote.Ctx.ext cx.qctx v;
      rel = cx.rel;
      len = cx.len + 1}
@@ -62,7 +62,7 @@ let rec update_env ix v rho =
 type ctx = Ctx.t
 
 let check_sys_valid sys : unit =
-  failwith "TODO: check favonia's validity condition on lists of equations"
+  print_string "TODO: check favonia's validity condition on lists of equations\n"
 
 let check_sys_valid_or_empty sys = 
   match sys with
@@ -86,7 +86,10 @@ let rec check ~ctx ~ty ~tm =
 
   | Val.Univ _, Tm.Ext (Tm.B (cod, sys)) ->
     check_sys_valid_or_empty sys;
-    failwith "TODO"
+    let interval = Val.into Val.Interval in
+    let ctx' = Ctx.ext ctx interval in
+    let vcod = check_eval ~ctx:ctx' ~ty ~tm:cod in
+    check_sys ~ctx:ctx' ~ty:vcod ~sys
 
   | Val.Univ _, Tm.Bool ->
     ()
@@ -97,6 +100,39 @@ let rec check ~ctx ~ty ~tm =
     let vgen = Val.generic vdom @@ Ctx.len ctx in
     let vcod = Val.inst_bclo cod vgen in
     check ~ctx:ctx' ~ty:vcod ~tm
+
+  | Val.Ext (cod, sys), Tm.Lam (Tm.B tm) ->
+    let interval = Val.into Val.Interval in
+    let ctx' = Ctx.ext ctx interval in
+    let vgen = Val.generic interval @@ Ctx.len ctx in
+    let vcodx = Val.inst_bclo cod vgen in
+    check ~ctx:ctx' ~ty:vcodx ~tm;
+    let rec go sys =
+      match sys with
+      | [] -> 
+        ()
+
+      | tube :: sys ->
+        match tube with
+        | Val.Tube.True (_, clo) ->
+          let can0 = Val.eval_clo clo in
+          let can1 = Val.eval (Ctx.env ctx') tm in
+          Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty:vcodx ~can0 ~can1
+
+        | Val.Tube.Indeterminate ((dim0, dim1), clo) ->
+          let ctx'' = Ctx.restrict_exn ctx' dim0 dim1 in
+          let can0 = Val.eval_clo clo in
+          let can1 = Val.eval (Ctx.env ctx'') tm in
+          Quote.equiv ~ctx:(Ctx.qctx ctx') ~ty:vcodx ~can0 ~can1
+
+        | Val.Tube.False _ ->
+          ()
+
+        | Val.Tube.Delete ->
+          ()
+          
+    in
+    go @@ Val.inst_sclo sys @@ Val.project_dimval vgen
 
   | Val.Sg (dom, cod), Tm.Cons (tm0, tm1) ->
     let vdom = Val.eval_clo dom in
@@ -115,7 +151,7 @@ let rec check ~ctx ~ty ~tm =
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     Quote.approx ~ctx:(Ctx.qctx ctx) ~ty:univ ~can0:ty' ~can1:ty
 
-  | _ -> failwith "check"
+  | _, _ -> failwith @@ "check: " ^ Val.to_string ty
 
 and check_eval ~ctx ~ty ~tm =
   check ~ctx ~ty ~tm;
@@ -242,6 +278,48 @@ and check_bsys ~ctx ~dim0 ~tycap ~ty ~cap ~sys =
 
         (* Check tube-tube adjacency conditions *)
         go_adj ctx'' acc (vd0, vd1, tb);
+        go sys @@ (vd0, vd1, tb) :: acc
+
+      | _ ->
+        failwith "check_bsys"
+
+  (* Invariant: 'ctx' should already be restricted by vd0=vd1 *)
+  and go_adj ctx tubes (vd0, vd1, tb) = 
+    match tubes with
+    | [] ->
+      ()
+
+    | (vd0', vd1', tb') :: tubes ->
+      let ctx' = Ctx.restrict_exn ctx vd0' vd1' in
+      let env = Ctx.env ctx' in
+      let vtb = Val.eval env tb in
+      let vtb' = Val.eval env tb' in
+      Quote.equiv ~ctx:(Ctx.qctx ctx) ~ty ~can0:vtb ~can1:vtb';
+      go_adj ctx tubes (vd0, vd1, tb)
+
+  in
+  go sys []
+
+and check_sys ~ctx ~ty ~sys =
+  let interval = Val.into Val.Interval in
+  let rec go sys acc =
+    match sys with
+    | [] ->
+      ()
+
+    | (td0, td1, tb) :: sys ->
+      let vd0 = Val.project_dimval @@ check_eval ~ctx ~ty:interval ~tm:td0 in
+      let vd1 = Val.project_dimval @@ check_eval ~ctx ~ty:interval ~tm:td1 in
+      match Ctx.compare_dim ctx vd0 vd1, tb with
+      | DimVal.Apart, None ->
+        go sys acc
+
+      | (DimVal.Same | DimVal.Indeterminate), Some tb ->
+        let ctx' = Ctx.restrict_exn ctx vd0 vd1 in
+        check ~ctx:ctx' ~ty ~tm:tb;
+
+        (* Check tube-tube adjacency conditions *)
+        go_adj ctx' acc (vd0, vd1, tb);
         go sys @@ (vd0, vd1, tb) :: acc
 
       | _ ->

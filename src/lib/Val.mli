@@ -64,6 +64,7 @@ type _ f =
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
 
+val to_string : 'a t -> string
 
 module Env : 
 sig

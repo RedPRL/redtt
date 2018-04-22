@@ -101,6 +101,8 @@ and sclo = can t Clo.sclo
 
 
 
+
+
 module Env :
 sig
   type el = can t
@@ -160,6 +162,34 @@ let embed_dimval dv =
 let out : type a. a t -> a f =
   fun node -> node.con
 
+let to_string : type a. a t -> string = 
+  fun v ->
+    match out v with
+    | Lvl _ -> "#lvl"
+    | Up _ -> "#up"
+    | Pi _ -> "#pi"
+    | Sg _ -> "#sg"
+    | Ext _ -> "#ext"
+    | Univ _ -> "#univ"
+    | Interval -> "#interval"
+    | Dim0 -> "#dim0"
+    | Dim1 -> "#dim1"
+    | DimDelete -> "#dim/delete"
+    | DimFresh _ -> "#dim/fresh"
+    | Bool -> "#bool"
+    | Tt -> "#tt"
+    | Ff -> "#ff"
+    | If _ -> "#if"
+    | Lam _ -> "#lam"
+    | Cons _ -> "#cons"
+    | Coe _ -> "#coe"
+    | HCom _ -> "#hcom"
+    | FCom _ -> "#fcom"
+    | FunApp _ -> "#funapp"
+    | ExtApp _ -> "#extapp"
+    | Car _ -> "#car"
+    | Cdr _ -> "#cdr"
+
 
 let project_dimval (type a) (v : a t) =
   match out v with
@@ -173,7 +203,7 @@ let project_dimval (type a) (v : a t) =
     end
   | DimDelete -> DimVal.Delete
   | DimFresh x -> DimVal.Fresh x
-  | _ -> failwith "project_dimval"
+  | _ -> failwith @@ "project_dimval: " ^ to_string v
 
 let (<:) tm env = 
   Clo.Eval {tm; env}
