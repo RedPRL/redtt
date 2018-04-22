@@ -82,11 +82,11 @@ sig
 end
 
 
+type menv = Tm.chk Tm.t option MEnv.t
 type env = Env.t
 
-
-val eval : env -> 'a Tm.t -> can t
-val eval_subst : env -> Tm.subst -> env
+val eval : menv * env -> 'a Tm.t -> can t
+val eval_subst : menv * env -> Tm.subst -> env
 
 val project_dimval : can t -> DimVal.t
 val embed_dimval : DimVal.t -> can t

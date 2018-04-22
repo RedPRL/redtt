@@ -27,6 +27,7 @@ let rec check_document cx decls =
 
 and check_decl cx decl = 
   let tm = to_inf decl in
-  let ty = Typing.infer ~cx ~tm in
-  let el = Val.eval (LCx.env cx) tm in
+  let menv = MEnv.empty in
+  let ty = Typing.infer ~mcx:{mcx = MCx.emp; menv} ~cx ~tm in
+  let el = Val.eval (menv, LCx.env cx) tm in
   LCx.def cx ~ty ~tm:el

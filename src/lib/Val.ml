@@ -27,15 +27,17 @@ end
 type 'a tube = 'a Tube.t
 type 'a system = 'a tube list
 
+type menv = Tm.chk Tm.t option MEnv.t
+
 module Clo = 
 struct
   type 'a tclo = 
-    | Eval of {env : 'a env_; tm : Tm.chk Tm.t}
+    | Eval of {menv : menv; env : 'a env_; tm : Tm.chk Tm.t}
     | Inst of 'a bclo * 'a
 
   and 'a bclo =
     (* wait for an argument, and then extend the environment and eval *)
-    | Await of {env : 'a env_; btm : Tm.chk Tm.t Tm.bnd}
+    | Await of {menv : menv; env : 'a env_; btm : Tm.chk Tm.t Tm.bnd}
     | SgDom of 'a bclo
     | PiDom of 'a bclo
     | PiCodCoe of {bclo : 'a bclo; dim1 : DimVal.t; arg : 'a}
@@ -50,7 +52,7 @@ struct
     | Wk of 'a tclo
 
   type 'a sclo = 
-    | SysAwait of {env : 'a env_; sys : Tm.chk Tm.t Tm.system Tm.bnd}
+    | SysAwait of {menv : menv; env : 'a env_; sys : Tm.chk Tm.t Tm.system Tm.bnd}
 end
 
 type _ f =
@@ -100,10 +102,6 @@ and env = can t env_
 and tclo = can t Clo.tclo
 and bclo = can t Clo.bclo
 and sclo = can t Clo.sclo
-
-
-
-
 
 module Env :
 sig
@@ -212,14 +210,14 @@ let project_dimval (type a) (v : a t) =
   | DimFresh x -> DimVal.Fresh x
   | _ -> failwith @@ "project_dimval: " ^ to_string v
 
-let (<:) tm env = 
-  Clo.Eval {tm; env}
+let (<:) tm (menv, env) = 
+  Clo.Eval {tm; env; menv}
 
-let (<:+) btm env =
-  Clo.Await {btm; env}
+let (<:+) btm (menv, env) =
+  Clo.Await {btm; env; menv}
 
-let (<<:+) sys env = 
-  Clo.SysAwait {sys; env}
+let (<<:+) sys (menv, env) = 
+  Clo.SysAwait {sys; menv; env}
 
 let out_pi v =
   match out v with
@@ -261,11 +259,12 @@ let reflect ty neu =
 let generic ty lvl = 
   reflect ty @@ into @@ Lvl lvl
 
-let rec eval : type a. env -> a Tm.t -> can t =
+let rec eval : type a. menv * env -> a Tm.t -> can t =
   fun rho tm ->
     match Tm.out tm with
     | Tm.Var i ->
-      Env.lookup i rho
+      let _, env = rho in
+      Env.lookup i env
 
     | Tm.Pi (dom, cod) ->
       into @@ Pi (dom <: rho, cod <:+ rho)
@@ -285,8 +284,9 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Coe info ->
       let dim0 = project_dimval @@ eval rho info.dim0 in
       let dim1 = project_dimval @@ eval rho info.dim1 in
+      let _, env = rho in
       begin
-        match Env.compare_dim rho dim0 dim1 with
+        match Env.compare_dim env dim0 dim1 with
         | DimVal.Same ->
           eval rho info.tm
         | _ ->
@@ -298,8 +298,9 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.HCom info ->
       let dim0 = project_dimval @@ eval rho info.dim0 in
       let dim1 = project_dimval @@ eval rho info.dim1 in
+      let _, env = rho in
       begin
-        match Env.compare_dim rho dim0 dim1 with
+        match Env.compare_dim env dim0 dim1 with
         | DimVal.Same ->
           eval rho info.cap
         | _ ->
@@ -321,7 +322,8 @@ let rec eval : type a. env -> a Tm.t -> can t =
         rigid_coe ~dim0 ~dim1 ~ty:bty ~tm
       in
       begin
-        match Env.compare_dim rho dim0 dim1 with
+        let _, env = rho in
+        match Env.compare_dim env dim0 dim1 with
         | DimVal.Same ->
           cap
         | _ ->
@@ -366,8 +368,9 @@ let rec eval : type a. env -> a Tm.t -> can t =
       apply (eval rho t1) (eval rho t2)
 
     | Tm.ExtApp (t1, t2) ->
+      let _, env = rho in
       ext_apply (eval rho t1) @@ 
-      Env.canonize rho @@  (* This is a bit fishy ! *)
+      Env.canonize env @@  (* This is a bit fishy ! *)
       project_dimval @@ 
       eval rho t2
 
@@ -378,13 +381,24 @@ let rec eval : type a. env -> a Tm.t -> can t =
       eval rho t
 
     | Tm.Let (t0, Tm.B t1) ->
+      let menv, env = rho in
       let v = eval rho t0 in
-      eval (Env.ext rho v) t1
+      eval (menv, Env.ext env v) t1
 
     | Tm.Meta (sym, sigma) ->
-      failwith "TODO: eval meta"
+      let menv, env = rho in
+      begin
+        match MEnv.find sym menv with
+        | None -> 
+          failwith "TODO"
+        | Some tm ->
+          let env' = eval_subst rho sigma in
+          eval (menv, env') tm
+          (* Don't know if this is correct, but we'll see *)
+      end
 
-and eval_subst env sigma = 
+and eval_subst rho sigma = 
+  let menv, env = rho in
   match sigma with
   | Tm.Id -> 
     env
@@ -393,13 +407,14 @@ and eval_subst env sigma =
     Env.proj env
 
   | Tm.Sub (sigma, inf) -> 
-    let env' = eval_subst env sigma in
-    let el = eval env inf in
+    let env' = eval_subst rho sigma in
+    let el = eval rho inf in
     Env.ext env' el
 
   | Tm.Cmp (tau, sigma) -> 
-    let env' = eval_subst env sigma in
-    eval_subst env' tau
+    let menv, _ = rho in
+    let env' = eval_subst rho sigma in
+    eval_subst (menv, env') tau
 
 (* Invariant: a coercion is rigid when r != r'; a composition is rigid when r != r' and none of the tubes is under a true condition.
    The inputs to rigid_com, rigid_hcom and rigid_coe must be rigid. These functions do only one thing, which is to dispatch to the 
@@ -457,14 +472,15 @@ and eval_btube rho (dim0, dim1, otb) =
   | DimVal.Delete, _ -> Tube.Delete
   | _, DimVal.Delete -> Tube.Delete
   | _ ->
-    match Env.compare_dim rho vdim0 vdim1, otb with
+    let menv, env = rho in
+    match Env.compare_dim env vdim0 vdim1, otb with
     | DimVal.Same, Some tb ->
       Tube.True ((vdim0, vdim1), tb <:+ rho)
     | DimVal.Apart, _ -> 
       Tube.False (vdim0, vdim1)
     | DimVal.Indeterminate, Some tb ->
-      let rho' = Env.restrict_exn rho vdim0 vdim1 in
-      Tube.Indeterminate ((vdim0, vdim1), tb <:+ rho')
+      let env' = Env.restrict_exn env vdim0 vdim1 in
+      Tube.Indeterminate ((vdim0, vdim1), tb <:+ (menv, env'))
     | _ -> failwith "eval_btube"
 
 
@@ -629,9 +645,9 @@ and project_sys sys =
 
 and inst_bclo bclo arg =
   match bclo with 
-  | Clo.Await {btm; env} ->
+  | Clo.Await {btm; env; menv} ->
     let Tm.B tm = btm in
-    eval (Env.ext env arg) tm
+    eval (menv, Env.ext env arg) tm
 
   | Clo.SgDom bclo ->
     let dom, _ = out_sg @@ inst_bclo bclo arg in
@@ -695,12 +711,12 @@ and inst_bclo bclo arg =
 
 and inst_sclo sclo arg = 
   match sclo with
-  | Clo.SysAwait {sys = Tm.B sys; env} ->
+  | Clo.SysAwait {sys = Tm.B sys; menv; env} ->
     let arg' = embed_dimval arg in
     let env' = Env.ext env arg' in
     let go (tdim0, tdim1, otb) =
-      let vdim0 = project_dimval @@ eval env' tdim0 in
-      let vdim1 = project_dimval @@ eval env' tdim1 in
+      let vdim0 = project_dimval @@ eval (menv, env') tdim0 in
+      let vdim1 = project_dimval @@ eval (menv, env') tdim1 in
       match vdim0, vdim1 with
       | DimVal.Delete, _ ->
         Tube.Delete
@@ -710,20 +726,20 @@ and inst_sclo sclo arg =
         match Env.compare_dim env' vdim0 vdim1 with
         | DimVal.Same -> 
           let tm = Option.get_exn otb in
-          Tube.True ((vdim0, vdim1), tm <: env')
+          Tube.True ((vdim0, vdim1), tm <: (menv, env'))
         | DimVal.Apart ->
           Tube.False (vdim0, vdim1)
         | DimVal.Indeterminate ->
           let env'' = Env.restrict_exn env' vdim0 vdim1 in
           let tm = Option.get_exn otb in
-          Tube.Indeterminate ((vdim0, vdim1), tm <: env'')
+          Tube.Indeterminate ((vdim0, vdim1), tm <: (menv, env''))
     in
     List.map go sys
 
 and eval_clo clo =
   match clo with
-  | Clo.Eval {tm; env} ->
-    eval env tm
+  | Clo.Eval {tm; env; menv} ->
+    eval (menv, env) tm
 
   | Clo.Inst (bclo, arg) ->
     inst_bclo bclo arg
