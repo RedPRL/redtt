@@ -112,7 +112,7 @@ sig
   val ext : t -> el -> t
 
   val lookup : int -> t -> el
-  val proj : t -> t
+  val proj : t -> t * el
 
   include DimRel.S with type t := t
 end =
@@ -132,7 +132,7 @@ struct
     List.nth env.vals i
 
   let proj env = 
-    {env with vals = List.tl env.vals}
+    {env with vals = List.tl env.vals}, List.hd env.vals
 
   exception Inconsistent = DimRel.Inconsistent
 
@@ -404,7 +404,8 @@ and eval_subst rho sigma =
     env
 
   | Tm.Proj -> 
-    Env.proj env
+    let env', _ = Env.proj env in
+    env'
 
   | Tm.Sub (sigma, inf) -> 
     let env' = eval_subst rho sigma in

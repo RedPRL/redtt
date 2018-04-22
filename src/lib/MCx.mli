@@ -7,7 +7,7 @@ type cell =
   | Ret of Tm.chk Tm.t
   | Ask
 
-type sequent = {lcx : LCx.t; ty : Val.can Val.t; cell : cell}
+type sequent = {lcx : LCx.t; ty : Tm.chk Tm.t; cell : cell}
 
 val emp : t
 val ext : meta -> sequent -> t -> t

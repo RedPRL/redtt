@@ -76,7 +76,7 @@ sig
   type t
   val emp : t
   val ext : t -> el -> t
-  val proj : t -> t
+  val proj : t -> t * el
 
   include DimRel.S with type t := t
 end

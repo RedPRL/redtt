@@ -18,10 +18,29 @@ let def cx ~ty ~tm =
    env = Val.Env.ext cx.env tm;
    len = cx.len + 1}
 
-let proj cx = 
+let proj_exn cx = 
   {tys = List.tl cx.tys;
-   env = Val.Env.proj cx.env;
+   env = fst @@ Val.Env.proj cx.env;
    len = cx.len - 1}
+
+
+type view = 
+  | Snoc of {cx : t; ty : Val.can Val.t; def : Val.can Val.t}
+  | Nil
+
+let view cx = 
+  match cx.tys with
+  | [] ->
+    Nil
+
+  | ty :: tys ->
+    let cx' = proj_exn cx in
+    Snoc {cx = cx'; ty = ty; def = snd @@ Val.Env.proj cx.env }
+
+
+let proj cx = 
+  try Some (proj_exn cx) with
+  | _ -> None
 
 let restrict_exn cx d0 d1 =
   let env = Val.Env.restrict_exn cx.env d0 d1 in

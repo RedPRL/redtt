@@ -196,9 +196,28 @@ and infer ~mcx ~cx ~tm =
     Val.eval (mcx.menv, Val.Env.ext env vdim1) ty
 
   | Tm.Meta (sym, sigma) -> 
-    failwith "TODO: typecheck meta"
+    let seq = MCx.lookup_exn sym mcx.mcx in
+    let cx' = infer_subst ~mcx ~cx:seq.lcx ~subst:sigma in
+    cx_equiv ~mcx ~cx0:cx ~cx1:cx';
+    let env' = Val.eval_subst (mcx.menv, LCx.env cx) sigma in
+    Val.eval (mcx.menv, env') seq.ty
 
   | _ -> failwith "pattern exhaustiveness + GADTs is broken in OCaml :("
+
+and cx_equiv ~mcx ~cx0 ~cx1 =
+  let univ = Val.into @@ Val.Univ Lvl.Omega in
+  match LCx.view cx0, LCx.view cx1 with
+  | LCx.Nil, LCx.Nil ->
+    ()
+
+  | LCx.Snoc snoc0, LCx.Snoc snoc1 -> 
+    cx_equiv ~mcx ~cx0:snoc0.cx ~cx1:snoc1.cx;
+    let n = LCx.len snoc0.cx in
+    Quote.approx ~n ~ty:univ ~can0:snoc0.ty ~can1:snoc1.ty;
+    Quote.approx ~n ~ty:snoc0.ty ~can0:snoc0.def ~can1:snoc1.def
+  
+  | _ ->
+    failwith "cx_equiv"
 
 and infer_subst ~mcx ~cx ~subst =
   match subst with
@@ -206,7 +225,7 @@ and infer_subst ~mcx ~cx ~subst =
     cx
 
   | Tm.Proj ->
-    LCx.proj cx
+    LCx.proj_exn cx
 
   | Tm.Cmp (tau, sigma) ->
     let cx' = infer_subst ~mcx ~cx ~subst:sigma in
