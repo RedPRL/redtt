@@ -15,13 +15,13 @@
 %token BOOL UNIV LAM CONS CAR CDR TT FF
 %token EOF
 
-%start <(ResEnv.t -> Tm.inf Tm.t) option> prog
+%start <ResEnv.t -> Tm.inf Tm.t list> prog
 %%
 prog:
-  | e = inf
-    { Some e }
+  | e = inf; p = prog
+    { fun env -> e env :: p env }
   | EOF
-    { None }
+    { fun env -> [] }
 
 tele:
   | dom = chk; rest = tele

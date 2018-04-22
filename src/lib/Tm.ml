@@ -72,5 +72,6 @@ struct
         Format.fprintf fmt "%s" @@ 
         Env.var i env
       
-      | _ -> failwith "TODO: pp"
+      | _ ->
+        Format.fprintf fmt "<term>"
 end
