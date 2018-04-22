@@ -78,8 +78,6 @@ sig
   val ext : t -> el -> t
 
   include DimRel.S with type t := t
-
-  val set_rel : DimRel.t -> t -> t
 end
 
 

@@ -10,36 +10,32 @@ sig
   val len : t -> int
 
   val env : t -> Val.env
-  val rel : t -> DimRel.t
 end =
 struct
   type t =
     {tys : Val.can Val.t list;
      env : Val.env;
-     rel : DimRel.t;
      len : int}
 
   let emp =
     {tys = [];
      env = Val.Env.emp;
-     rel = DimRel.emp;
      len = 0}
 
   let ext cx v =
     {tys = v :: cx.tys;
      env = Val.Env.ext cx.env @@ Val.generic v @@ cx.len;
-     rel = cx.rel;
      len = cx.len + 1}
 
   let restrict_exn cx d0 d1 =
-    let rel = DimRel.restrict_exn cx.rel d0 d1 in
-    {cx with rel = rel}
+    let env = Val.Env.restrict_exn cx.env d0 d1 in
+    {cx with env = env}
 
   let compare_dim cx =
-    DimRel.compare_dim cx.rel
+    Val.Env.compare_dim cx.env
 
   let canonize cx = 
-    DimRel.canonize cx.rel
+    Val.Env.canonize cx.env
 
   exception Inconsistent = DimRel.Inconsistent
 
@@ -47,8 +43,7 @@ struct
     List.nth cx.tys i
 
   let len cx = cx.len
-  let env cx = Val.Env.set_rel cx.rel cx.env 
-  let rel cx = cx.rel
+  let env cx = cx.env 
 end
 
 let rec update_env ix v rho =

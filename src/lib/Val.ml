@@ -115,9 +115,6 @@ sig
 
   val lookup : int -> t -> el
 
-  val rel : t -> DimRel.t
-  val set_rel : DimRel.t -> t -> t
-
   include DimRel.S with type t := t
 end =
 struct
