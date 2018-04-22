@@ -6,3 +6,5 @@ let fresh () =
   let i = !counter in
   counter := i + 1;
   i
+
+let compare = compare

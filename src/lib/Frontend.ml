@@ -16,7 +16,7 @@ let parse_with_error lexbuf =
 
 let parse_and_print lexbuf =
   let doc = parse_with_error lexbuf ResEnv.init in
-  Decl.check_document Typing.Ctx.emp doc
+  Decl.check_document LCx.emp doc
 
 let load_file filename =
   let ch = open_in filename in

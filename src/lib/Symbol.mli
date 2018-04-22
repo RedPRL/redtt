@@ -1,3 +1,3 @@
-type t
+include Map.OrderedType
 
 val fresh : unit -> t

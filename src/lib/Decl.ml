@@ -28,5 +28,5 @@ let rec check_document ctx decls =
 and check_decl ctx decl = 
   let tm = to_inf decl in
   let ty = Typing.infer ~ctx ~tm in
-  let el = Val.eval (Typing.Ctx.env ctx) tm in
-  Typing.Ctx.def ctx ~ty ~tm:el
+  let el = Val.eval (LCx.env ctx) tm in
+  LCx.def ctx ~ty ~tm:el
