@@ -40,11 +40,13 @@ type _ f =
   | Dim0 : chk f
   | Dim1 : chk f
 
+  | Let : inf t * chk t bnd -> chk f
+
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
 
 type info = Lexing.position * Lexing.position
-val into_info : info -> 'a f -> 'a t
+val into_info : info option -> 'a f -> 'a t
 val info : 'a t -> info option
 
 module Pretty :

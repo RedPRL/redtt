@@ -373,6 +373,11 @@ let rec eval : type a. env -> a Tm.t -> can t =
     | Tm.Up t ->
       eval rho t
 
+    | Tm.Let (t0, Tm.B t1) ->
+      let v = eval rho t0 in
+      eval (Env.ext rho v) t1
+
+
 (* Invariant: a coercion is rigid when r != r'; a composition is rigid when r != r' and none of the tubes is under a true condition.
    The inputs to rigid_com, rigid_hcom and rigid_coe must be rigid. These functions do only one thing, which is to dispatch to the 
    correct implementation of (rigid) composition and coercion in a type-directed manner. *)

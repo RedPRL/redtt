@@ -15,15 +15,8 @@ let parse_with_error lexbuf =
     exit (-1)
 
 let parse_and_print lexbuf =
-  let rec go tms = 
-    match tms with
-    | [] -> ()
-    | tm::tms ->
-      let _ = Typing.infer ~ctx:Typing.Ctx.emp ~tm in
-      Format.printf "> @[%a@]@." (Tm.Pretty.pp Tm.Pretty.Env.emp) tm;
-      go tms
-  in 
-  go @@ parse_with_error lexbuf ResEnv.init
+  let doc = parse_with_error lexbuf ResEnv.init in
+  Decl.check_document Typing.Ctx.emp doc
 
 let load_file filename =
   let ch = open_in filename in

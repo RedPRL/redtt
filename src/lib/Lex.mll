@@ -22,6 +22,7 @@ rule read =
   | white { read lexbuf }
   | newline { next_line lexbuf; read lexbuf }
   | num { NUMERAL (int_of_string (Lexing.lexeme lexbuf)) }
+  | "define" { DEFINE }
   | "bool" { BOOL }
   | ":>" { COLON_ANGLE }
   | "->" { RIGHT_ARROW }

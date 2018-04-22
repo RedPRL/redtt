@@ -5,7 +5,7 @@ let bind x env = x :: env
 let rec get x env =
   match env with 
   | [] ->
-    failwith "variable not found"
+    failwith @@ "variable not found: " ^ x
   | y :: ys ->
     if x = y 
     then 0

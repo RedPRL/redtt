@@ -3,6 +3,7 @@ sig
   type t
   val emp : t
   val ext : t -> Val.can Val.t -> t
+  val def : t -> ty:Val.can Val.t -> tm:Val.can Val.t -> t
 
   include DimRel.S with type t := t
 
@@ -25,6 +26,11 @@ struct
   let ext cx v =
     {tys = v :: cx.tys;
      env = Val.Env.ext cx.env @@ Val.generic v @@ cx.len;
+     len = cx.len + 1}
+
+  let def cx ~ty ~tm = 
+    {tys = ty :: cx.tys;
+     env = Val.Env.ext cx.env tm;
      len = cx.len + 1}
 
   let restrict_exn cx d0 d1 =
@@ -144,7 +150,14 @@ let rec check ~ctx ~ty ~tm =
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     Quote.approx ~n:(Ctx.len ctx) ~ty:univ ~can0:ty' ~can1:ty
 
+  | _, Tm.Let (tm0, Tm.B tm1) ->
+    let ty0 = infer ~ctx ~tm:tm0 in
+    let v = Val.eval (Ctx.env ctx) tm0 in
+    let ctx' = Ctx.def ctx ~ty:ty0 ~tm:v in
+    check ~ctx:ctx' ~ty ~tm:tm1
+
   | _, _ -> failwith @@ "check: " ^ Val.to_string ty
+
 
 and check_eval ~ctx ~ty ~tm =
   check ~ctx ~ty ~tm;

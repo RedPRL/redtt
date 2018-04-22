@@ -35,13 +35,15 @@ type _ f =
   | Dim0 : chk f
   | Dim1 : chk f
 
+  | Let : inf t * chk t bnd -> chk f
+
 and 'a node = {info : info option; con : 'a f}
 and 'a t = 'a node
 and 'a tube = chk t * chk t * 'a option
 and 'a system = 'a tube list
 
 let into tf = {info = None; con = tf}
-let into_info info tf = {info = Some info; con = tf}
+let into_info info tf = {info = info; con = tf}
 let info node = node.info
 
 let out node = node.con
