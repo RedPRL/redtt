@@ -39,6 +39,10 @@ let rec lambdas xs alpha : hole E.m =
     lambda x alpha >>= 
     lambdas xs
 
+let quote rtm alpha : unit E.m = 
+  E.lookup_goal alpha >>= fun (cx, rnv, ty) ->
+    let tm = rtm rnv in
+    E.fill alpha tm
 
 let rec elab : type a. a ElabTm.t -> hole -> unit E.m =
   fun etm alpha ->
@@ -46,5 +50,9 @@ let rec elab : type a. a ElabTm.t -> hole -> unit E.m =
     | ElabTm.Lam {vars; bdy} ->
       lambdas vars alpha >>=
       elab bdy
+
+    | ElabTm.Quote rtm ->
+      quote rtm alpha
+
     | _ -> 
       failwith "TODO"
