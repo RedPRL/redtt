@@ -5,8 +5,11 @@ type document = t list
 
 let rec tele_to_multibind tele bdy = 
   match tele with
-  | TmUtil.TEnd _ -> TmUtil.MBEnd bdy
-  | TmUtil.TCons (_, tele) -> TmUtil.MBCons (tele_to_multibind tele bdy)
+  | TmUtil.TEnd _ -> 
+    TmUtil.MBEnd bdy
+
+  | TmUtil.TCons (_, tele) -> 
+    TmUtil.MBCons (tele_to_multibind tele bdy)
 
 let to_inf decl = 
   match decl with
