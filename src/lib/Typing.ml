@@ -164,25 +164,6 @@ let rec check ~ctx ~ty ~tm =
 
   | _, _ -> failwith @@ "check: " ^ Val.to_string ty
 
-and infer_subst ~ctx ~subst =
-  match subst with
-  | Tm.Id ->
-    ctx
-
-  | Tm.Proj ->
-    Ctx.proj ctx
-
-  | Tm.Cmp (tau, sigma) ->
-    let ctx' = infer_subst ~ctx ~subst:sigma in
-    infer_subst ~ctx:ctx' ~subst:tau
-
-  | Tm.Sub (sigma, t) ->
-    let ty = infer ~ctx ~tm:t in
-    let ctx' = infer_subst ~ctx ~subst:sigma in
-    let el = Val.eval (Ctx.env ctx) t in
-    Ctx.def ctx' ~ty ~tm:el
-
-
 and check_eval ~ctx ~ty ~tm =
   check ~ctx ~ty ~tm;
   Val.eval (Ctx.env ctx) tm
@@ -279,7 +260,29 @@ and infer ~ctx ~tm =
     check_bsys ~ctx ~dim0:vdim0 ~tycap:vty0 ~ty:vty ~cap:vcap ~sys:com.sys;
     Val.eval (Val.Env.ext env vdim1) ty
 
+  | Tm.Meta (sym, sigma) -> 
+    failwith "TODO: typecheck meta"
+
   | _ -> failwith "pattern exhaustiveness + GADTs is broken in OCaml :("
+
+and infer_subst ~ctx ~subst =
+  match subst with
+  | Tm.Id ->
+    ctx
+
+  | Tm.Proj ->
+    Ctx.proj ctx
+
+  | Tm.Cmp (tau, sigma) ->
+    let ctx' = infer_subst ~ctx ~subst:sigma in
+    infer_subst ~ctx:ctx' ~subst:tau
+
+  | Tm.Sub (sigma, t) ->
+    let ty = infer ~ctx ~tm:t in
+    let ctx' = infer_subst ~ctx ~subst:sigma in
+    let el = Val.eval (Ctx.env ctx) t in
+    Ctx.def ctx' ~ty ~tm:el
+
 
 and check_bsys ~ctx ~dim0 ~tycap ~ty ~cap ~sys =
   let interval = Val.into Val.Interval in

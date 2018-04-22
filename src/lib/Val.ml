@@ -381,6 +381,9 @@ let rec eval : type a. env -> a Tm.t -> can t =
       let v = eval rho t0 in
       eval (Env.ext rho v) t1
 
+    | Tm.Meta (sym, sigma) ->
+      failwith "TODO: eval meta"
+
 and eval_subst env sigma = 
   match sigma with
   | Tm.Id -> 

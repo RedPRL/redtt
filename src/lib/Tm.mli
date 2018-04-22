@@ -41,6 +41,8 @@ type _ f =
   | Dim1 : chk f
 
   | Let : inf t * chk t bnd -> chk f
+  | Meta : Symbol.t * subst -> inf f
+
 
 and subst = 
   | Id
