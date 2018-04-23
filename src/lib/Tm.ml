@@ -114,7 +114,7 @@ struct
           | [] ->
             Format.fprintf fmt "@[<1>(# [%s]@ %a)@]" x (pp env') cod
           | _ ->
-            Format.fprintf fmt "@[<1>(# [%s]@ %a@ %a)@]" x (pp env') cod (pp_sys env') sys
+            Format.fprintf fmt "@[<1>(# [%s]@ %a@ @[%a@])@]" x (pp env') cod (pp_sys env') sys
         end
 
       | Lam (B (nm, tm)) ->
@@ -162,11 +162,11 @@ struct
         Format.fprintf fmt "@[<1>(coe %a %a@ [%s] %a@ %a)@]" (pp env) dim0 (pp env) dim1 x (pp env') ty (pp env) tm
 
       | HCom {dim0; dim1; ty; cap; sys} ->
-        Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" (pp env) dim0 (pp env) dim1 (pp env) ty (pp env) cap (pp_bsys env) sys
+        Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) dim0 (pp env) dim1 (pp env) ty (pp env) cap (pp_bsys env) sys
 
       | Com {dim0; dim1; ty = B (nm, ty); cap; sys} ->
         let x, env' = Env.bind nm env in
-        Format.fprintf fmt "@[<1>(com %a %a@ [%s] %a@ %a@ %a)@]" (pp env) dim0 (pp env) dim1 x (pp env) ty (pp env) cap (pp_bsys env) sys
+        Format.fprintf fmt "@[<1>(com %a %a@ [%s] %a@ %a@ @[%a@])@]" (pp env) dim0 (pp env) dim1 x (pp env) ty (pp env) cap (pp_bsys env) sys
 
       | If {mot = B (nm, mot); scrut; tcase; fcase} ->
         let x, env' = Env.bind nm env in
