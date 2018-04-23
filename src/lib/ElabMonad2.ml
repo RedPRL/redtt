@@ -58,15 +58,18 @@ let oblige : subgoal -> meta m =
     let x = Tree.cursor cfg.zip in
     let seq = MCx.lookup_exn x cfg.mcx in
 
+    let univ = Val.into @@ Val.Univ Lvl.Omega in
+    let tmcx = Typing.{mcx = cfg.mcx; menv = MCx.menv cfg.mcx} in
+
     let rnv, lcx = 
       let alg (nm, ty) (rnv, lcx) =
-        let vty = Val.eval (MCx.menv cfg.mcx, LCx.env lcx) ty in
+        Typing.check ~mcx:tmcx ~cx:lcx ~ty:univ ~tm:ty;
+        let vty = Val.eval (tmcx.menv, LCx.env lcx) ty in
         ResEnv.bind_opt nm rnv, LCx.ext lcx ~nm vty
       in List.fold_right alg hyps (seq.rnv, seq.lcx)
     in
 
-    let univ = Val.into @@ Val.Univ Lvl.Omega in
-    Typing.check ~mcx:{mcx = cfg.mcx; menv = MCx.menv cfg.mcx} ~cx:lcx ~ty:univ ~tm:ty;
+    Typing.check ~mcx:tmcx ~cx:lcx ~ty:univ ~tm:ty;
 
     let seq' = MCx.{rnv; lcx; ty; cell = MCx.Ask} in
     let y = Symbol.fresh () in

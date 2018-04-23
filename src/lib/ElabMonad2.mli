@@ -16,10 +16,10 @@ val subgoal : hyps:hyp list -> ty:ty -> subgoal
 (** Get the current goal *)
 val goal : ty m
 
-(** Emit a new subgoal. This does not change focus. *)
+(** Emit a new subgoal; this will cause the subgoal to be checked for well-formedness. This does not change focus. *)
 val oblige : subgoal -> meta m
 
-(** Fill the current hole. This does not change focus *)
+(** Fill the current hole; this will cause the supplied term to be typechecked. This does not change focus *)
 val fill : tm -> unit m
 
 (** Resolve the variables in the term according to the current hole's resolver environment. *)
