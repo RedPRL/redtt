@@ -186,8 +186,7 @@ and infer ~mcx ~cx ~tm =
     check_sys_valid hcom.sys;
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let vty = check_eval ~mcx ~cx ~ty:univ ~tm:hcom.ty in
-    let vcap = check_eval ~mcx ~cx ~ty:vty ~tm:hcom.cap in
-    check_bsys ~mcx ~cx ~dim0:vdim0 ~tycap:vty ~ty:vty ~cap:vcap ~sys:hcom.sys;
+    check_bsys ~mcx ~cx ~dim0:vdim0 ~tycap:vty ~ty:vty ~cap:hcom.cap ~sys:hcom.sys;
     vty
 
   | Tm.Com com ->
@@ -201,8 +200,7 @@ and infer ~mcx ~cx ~tm =
     let vty = check_eval ~mcx ~cx:(LCx.ext cx interval) ~ty:univ ~tm:ty in
     let env = LCx.env cx in
     let vty0 = Val.eval (mcx.menv, Val.Env.ext env vdim0) ty in
-    let vcap = check_eval ~mcx ~cx ~ty:vty0 ~tm:com.cap in
-    check_bsys ~mcx ~cx ~dim0:vdim0 ~tycap:vty0 ~ty:vty ~cap:vcap ~sys:com.sys;
+    check_bsys ~mcx ~cx ~dim0:vdim0 ~tycap:vty0 ~ty:vty ~cap:com.cap ~sys:com.sys;
     Val.eval (mcx.menv, Val.Env.ext env vdim1) ty
 
   | Tm.Meta (sym, sigma) -> 
@@ -262,24 +260,24 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
         go sys acc
 
       | (DimVal.Same | DimVal.Indeterminate), Some (Tm.B (_, tb)) ->
-        let cx'' = 
-          let cx' = LCx.ext cx interval in
-          LCx.restrict_exn cx' vd0 vd1
-        in
+        begin
+          let cxx = LCx.restrict_exn (LCx.ext cx interval) vd0 vd1 in
+          check ~mcx ~cx:cxx ~ty:ty ~tm:tb
+        end;
 
-        check ~mcx ~cx:cx'' ~ty:ty ~tm:tb;
+        let cx0 = LCx.restrict_exn (LCx.def cx ~ty:interval ~tm:dim0) vd0 vd1 in
+        let vtb = Val.eval (mcx.menv, LCx.env cx0) tb in
 
-        let vtb = 
-          let cx' = LCx.def cx ~ty:interval ~tm:dim0 in
-          let env = LCx.env cx' in
-          Val.eval (mcx.menv, env) tb 
+        let vcap = 
+          let env = LCx.env @@ LCx.restrict_exn cx vd0 vd1 in
+          Val.eval (mcx.menv, env) cap
         in
 
         (* Check cap-tube compatibility *)
-        equiv "bsys/cap-tube" ~cx:cx'' ~ty ~can0:cap ~can1:vtb;
+        equiv "bsys/cap-tube" ~cx:cx0 ~ty ~can0:vcap ~can1:vtb;
 
         (* Check tube-tube adjacency conditions *)
-        go_adj cx'' acc (vd0, vd1, tb);
+        go_adj (LCx.restrict_exn cx vd0 vd1) acc (vd0, vd1, tb);
         go sys @@ (vd0, vd1, tb) :: acc
 
       | _ ->
