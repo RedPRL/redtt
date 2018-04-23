@@ -8,6 +8,22 @@ module E = ElabMonad
 module Notation = Monad.Notation (E)
 open Notation
 
+module Tm =
+struct
+  include Tm
+
+  let var i = Tm.into @@ Tm.Var i
+  let inst0 t = Tm.Sub (Tm.Id, t)
+
+  let meta hole sub = Tm.into @@ Tm.Meta (hole, sub)
+  let up t = Tm.into @@ Tm.Up t
+  let lam nm t = Tm.into @@ Tm.Lam (Tm.B (nm, t))
+  let pi nm dom cod = Tm.into @@ Tm.Pi (dom, Tm.B (nm, cod))
+  let sg nm dom cod = Tm.into @@ Tm.Sg (dom, Tm.B (nm, cod))
+  let let_ nm t0 t1 = Tm.into @@ Tm.Let (t0, Tm.B (nm, t1))
+  let cons t0 t1 = Tm.into @@ Tm.Cons (t0, t1)
+end
+
 (* Some preliminary sketches of the elaborator tactics. *)
 
 let lambda x : hole -> hole E.m =
@@ -19,9 +35,8 @@ let lambda x : hole -> hole E.m =
       let cx' = LCx.ext cx vdom in
       E.new_goal ~lcx:cx' ~rnv:(ResEnv.bind x rnv) ~ty:cod >>= fun beta ->
       let tm = 
-        let inf = Tm.into @@ Tm.Meta (beta, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0)) in
-        let chk = Tm.into @@ Tm.Up inf in
-        Tm.into @@ Tm.Lam (Tm.B (nm, chk))
+        let inf = Tm.meta beta @@ Tm.inst0 @@ Tm.var 0 in
+        Tm.lam nm @@ Tm.up inf
       in
       E.fill alpha tm >>
       E.ret beta
@@ -33,14 +48,14 @@ let pi x : hole -> (hole * hole) E.m =
   fun alpha ->
     E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
     E.new_goal ~lcx ~rnv ~ty >>= fun alpha0 ->
-    let tdom = Tm.into @@ Tm.Meta (alpha0, Tm.Id) in
+    let tdom = Tm.up @@ Tm.meta alpha0 Tm.Id in
     E.eval (LCx.env lcx) tdom >>= fun vdom ->
     let lcx' = LCx.ext lcx vdom in
     let rnv' = ResEnv.bind x rnv in
     E.new_goal ~lcx:lcx' ~rnv:rnv' ~ty >>= fun alpha1 ->
     let tm = 
-      let tcod = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0))) in
-      Tm.into @@ Tm.Pi (Tm.into @@ Tm.Up tdom, Tm.B (Some x, tcod))
+      let tcod = Tm.up @@ Tm.meta alpha1 @@ Tm.inst0 @@ Tm.var 0 in
+      Tm.pi (Some x) tdom tcod
     in
     E.fill alpha tm >>
     E.ret (alpha0, alpha1)
@@ -49,14 +64,14 @@ let sg x : hole -> (hole * hole) E.m =
   fun alpha ->
     E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
     E.new_goal ~lcx ~rnv ~ty >>= fun alpha0 ->
-    let tdom = Tm.into @@ Tm.Meta (alpha0, Tm.Id) in
+    let tdom = Tm.up @@ Tm.meta alpha0 Tm.Id in
     E.eval (LCx.env lcx) tdom >>= fun vdom ->
     let lcx' = LCx.ext lcx vdom in
     let rnv' = ResEnv.bind x rnv in
     E.new_goal ~lcx:lcx' ~rnv:rnv' ~ty >>= fun alpha1 ->
     let tm = 
-      let tcod = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0))) in
-      Tm.into @@ Tm.Sg (Tm.into @@ Tm.Up tdom, Tm.B (Some x, tcod))
+      let tcod = Tm.up @@ Tm.meta alpha1 @@ Tm.inst0 @@ Tm.var 0 in
+      Tm.sg (Some x) tdom tcod
     in
     E.fill alpha tm >>
     E.ret (alpha0, alpha1)
@@ -67,12 +82,12 @@ let cons : hole -> (hole * hole) E.m =
     match Tm.out ty with
     | Tm.Sg (dom, Tm.B (nm, cod)) ->
       E.new_goal ~lcx ~rnv ~ty:dom >>= fun alpha0 ->
-      let tcar = Tm.into @@ Tm.Meta (alpha0, Tm.Id) in
-      let cod' = Tm.into @@ Tm.Let (tcar, Tm.B (nm, cod)) in
+      let tcar = Tm.meta alpha0 Tm.Id in
+      let cod' = Tm.let_ nm tcar cod in
       E.new_goal ~lcx ~rnv ~ty:cod' >>= fun alpha1 ->
       let tm = 
-        let tcdr = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Id)) in
-        Tm.into @@ Tm.Cons (Tm.into @@ Tm.Up tcar, tcdr)
+        let tcdr = Tm.up @@ Tm.meta alpha1 Tm.Id in
+        Tm.cons (Tm.up tcar) tcdr
       in
       E.fill alpha tm >>
       E.ret (alpha0, alpha1)
