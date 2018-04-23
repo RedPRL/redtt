@@ -57,19 +57,23 @@ let rec check ~mcx ~cx ~ty ~tm =
         | Val.Tube.True (_, clo) ->
           let can0 = Val.eval_clo clo in
           let can1 = Val.eval (mcx.menv, LCx.env cx') tm in
-          equiv ~cx:cx' ~ty:vcodx ~can0 ~can1
+          equiv "ext/lam/tube/true" ~cx:cx' ~ty:vcodx ~can0 ~can1;
+          go sys
 
         | Val.Tube.Indeterminate ((dim0, dim1), clo) ->
           let cx'' = LCx.restrict_exn cx' dim0 dim1 in
           let can0 = Val.eval_clo clo in
           let can1 = Val.eval (mcx.menv, LCx.env cx'') tm in
-          equiv ~cx:cx'' ~ty:vcodx ~can0 ~can1
+          equiv "ext/lam/tube/indet" ~cx:cx'' ~ty:vcodx ~can0 ~can1;
+          go sys
 
         | Val.Tube.False _ ->
-          ()
+          Format.fprintf Format.err_formatter "Found false tube@.";
+          go sys
 
         | Val.Tube.Delete ->
-          ()
+          Format.fprintf Format.err_formatter "Found delete tube@.";
+          go sys
 
     in
     go @@ Val.inst_sclo sys @@ Val.project_dimval vgen
@@ -145,7 +149,7 @@ and infer ~mcx ~cx ~tm =
     let bool = Val.into Val.Bool in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let bool' = infer ~mcx ~cx ~tm:scrut in
-    equiv ~cx:cx ~ty:univ ~can0:bool ~can1:bool';
+    equiv "if" ~cx:cx ~ty:univ ~can0:bool ~can1:bool';
     check ~mcx ~cx:(LCx.ext cx bool) ~ty:univ ~tm:mot;
     let tt = Val.into Val.Tt in
     let ff = Val.into Val.Ff in
@@ -218,8 +222,8 @@ and cx_equiv ~mcx ~cx0 ~cx1 =
 
   | LCx.Snoc snoc0, LCx.Snoc snoc1 -> 
     cx_equiv ~mcx ~cx0:snoc0.cx ~cx1:snoc1.cx;
-    approx ~cx:snoc0.cx ~ty:univ ~can0:snoc0.ty ~can1:snoc1.ty;
-    approx ~cx:snoc0.cx ~ty:snoc0.ty ~can0:snoc0.def ~can1:snoc1.def
+    equiv "cx_equiv" ~cx:snoc0.cx ~ty:univ ~can0:snoc0.ty ~can1:snoc1.ty;
+    equiv "cx_equiv" ~cx:snoc0.cx ~ty:snoc0.ty ~can0:snoc0.def ~can1:snoc1.def
 
   | _ ->
     failwith "cx_equiv"
@@ -272,7 +276,7 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
         in
 
         (* Check cap-tube compatibility *)
-        equiv ~cx:cx'' ~ty ~can0:cap ~can1:vtb;
+        equiv "bsys/cap-tube" ~cx:cx'' ~ty ~can0:cap ~can1:vtb;
 
         (* Check tube-tube adjacency conditions *)
         go_adj cx'' acc (vd0, vd1, tb);
@@ -294,7 +298,7 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
           let env = LCx.env cx' in
           let vtb = Val.eval (mcx.menv, env) tb in
           let vtb' = Val.eval (mcx.menv, env) tb' in
-          equiv ~cx:cx' ~ty ~can0:vtb ~can1:vtb';
+          equiv "bsys/adj" ~cx:cx' ~ty ~can0:vtb ~can1:vtb';
         with
         | LCx.Inconsistent -> ()
       end;
@@ -341,7 +345,7 @@ and check_sys ~mcx ~cx ~ty ~sys =
           let env = LCx.env cx' in
           let vtb = Val.eval (mcx.menv, env) tb in
           let vtb' = Val.eval (mcx.menv, env) tb' in
-          equiv ~cx:cx' ~ty ~can0:vtb ~can1:vtb';
+          equiv "sys/adj" ~cx:cx' ~ty ~can0:vtb ~can1:vtb';
         with
         | LCx.Inconsistent -> ()
       end;
@@ -350,7 +354,7 @@ and check_sys ~mcx ~cx ~ty ~sys =
   in
   go sys []
 
-and equiv ~cx ~ty ~can0 ~can1 =
+and equiv trace ~cx ~ty ~can0 ~can1 =
   let ppenv = LCx.ppenv cx in
   let n = LCx.len cx in
   try
@@ -359,7 +363,7 @@ and equiv ~cx ~ty ~can0 ~can1 =
   | exn ->
     let tm0 = Quote.quote_can ~n ~ty ~can:can0 in
     let tm1 = Quote.quote_can ~n ~ty ~can:can1 in
-    Format.fprintf Format.err_formatter "%a /= %a\n" (Tm.Pretty.pp ppenv) tm0 (Tm.Pretty.pp ppenv) tm1;
+    Format.fprintf Format.err_formatter "%s: checking %a == %a@." trace (Tm.Pretty.pp ppenv) tm0 (Tm.Pretty.pp ppenv) tm1;
     raise exn
 
 and approx ~cx ~ty ~can0 ~can1 =
