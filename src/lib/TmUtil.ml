@@ -2,43 +2,43 @@ let make_node start stop con =
   Tm.into_info (Some (start, stop)) con
 
 type tele =
-  | TCons of Tm.chk Tm.t * tele
+  | TCons of string option * Tm.chk Tm.t * tele
   | TEnd of Tm.chk Tm.t
 
 type 'a multibind = 
-  | MBCons of 'a multibind
+  | MBCons of string option * 'a multibind
   | MBEnd of 'a
 
 let rec pi_from_tele info tele =
   match tele with
   | TEnd ty -> ty
-  | TCons (ty, tele) ->
+  | TCons (nm, ty, tele) ->
     Tm.into_info info @@
-    Tm.Pi (ty, Tm.B (pi_from_tele info tele))
+    Tm.Pi (ty, Tm.B (nm, pi_from_tele info tele))
 
 let rec sg_from_tele info tele =
   match tele with
   | TEnd ty -> ty
-  | TCons (ty, tele) ->
+  | TCons (nm, ty, tele) ->
     Tm.into_info info @@
-    Tm.Pi (ty, Tm.B (sg_from_tele info tele))
+    Tm.Pi (ty, Tm.B (nm, sg_from_tele info tele))
 
 let rec lam_from_multibind info mb =
   match mb with
   | MBEnd bdy -> bdy
-  | MBCons mb ->
+  | MBCons (nm, mb) ->
     Tm.into_info info @@
-    Tm.Lam (Tm.B (lam_from_multibind info mb))
+    Tm.Lam (Tm.B (nm, lam_from_multibind info mb))
 
 let rec ext_from_multibind start stop mb = 
   match mb with
-  | MBCons (MBEnd (ty, sys)) ->
+  | MBCons (nm, MBEnd (ty, sys)) ->
     Tm.into_info (Some (start, stop)) @@
-    Tm.Ext (Tm.B (ty, sys))
+    Tm.Ext (Tm.B (nm, (ty, sys)))
 
-  | MBCons mb ->
+  | MBCons (nm, mb) ->
     Tm.into_info (Some (start, stop)) @@
-    Tm.Ext (Tm.B (ext_from_multibind start stop mb, []))
+    Tm.Ext (Tm.B (nm, (ext_from_multibind start stop mb, [])))
 
   | MBEnd _ ->
     failwith "ext_from_multibind"

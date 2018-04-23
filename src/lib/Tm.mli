@@ -1,4 +1,4 @@
-type 'a bnd = B of 'a
+type 'a bnd = B of string option * 'a
 
 (* sorts *)
 type chk
@@ -64,7 +64,7 @@ sig
     type t
     val emp : t
     val var : int -> t -> string
-    val bind : string -> t -> t
+    val bind : string option -> t -> string * t
     val bind_fresh : t -> string * t
   end
 

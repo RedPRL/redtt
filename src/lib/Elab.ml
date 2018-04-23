@@ -14,7 +14,7 @@ let lambda x : hole -> hole E.m =
   fun alpha ->
     E.lookup_goal alpha >>= fun (cx, rnv, ty) ->
     match Tm.out ty with
-    | Tm.Pi (dom, Tm.B cod) -> 
+    | Tm.Pi (dom, Tm.B (nm, cod)) -> 
       E.eval (LCx.env cx) dom >>= fun vdom ->
       let cx' = LCx.ext cx vdom in
       let goal = MCx.{lcx = cx'; rnv = ResEnv.bind x rnv; ty = cod; cell = Ask} in
@@ -22,7 +22,7 @@ let lambda x : hole -> hole E.m =
       let tm = 
         let inf = Tm.into @@ Tm.Meta (beta, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0)) in
         let chk = Tm.into @@ Tm.Up inf in
-        Tm.into @@ Tm.Lam (Tm.B chk)
+        Tm.into @@ Tm.Lam (Tm.B (nm, chk))
       in
       E.fill alpha tm >>
       E.ret beta
@@ -43,7 +43,7 @@ let pi x : hole -> (hole * hole) E.m =
     E.new_goal gcod >>= fun alpha1 ->
     let tm = 
       let tcod = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0))) in
-      Tm.into @@ Tm.Pi (Tm.into @@ Tm.Up tdom, Tm.B tcod)
+      Tm.into @@ Tm.Pi (Tm.into @@ Tm.Up tdom, Tm.B (Some x, tcod))
     in
     E.fill alpha tm >>
     E.ret (alpha0, alpha1)
@@ -61,7 +61,7 @@ let sg x : hole -> (hole * hole) E.m =
     E.new_goal gcod >>= fun alpha1 ->
     let tm = 
       let tcod = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0))) in
-      Tm.into @@ Tm.Sg (Tm.into @@ Tm.Up tdom, Tm.B tcod)
+      Tm.into @@ Tm.Sg (Tm.into @@ Tm.Up tdom, Tm.B (Some x, tcod))
     in
     E.fill alpha tm >>
     E.ret (alpha0, alpha1)
@@ -70,11 +70,11 @@ let cons : hole -> (hole * hole) E.m =
   fun alpha ->
     E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
     match Tm.out ty with
-    | Tm.Sg (dom, Tm.B cod) ->
+    | Tm.Sg (dom, Tm.B (nm, cod)) ->
       let gcar = MCx.{lcx; rnv; ty = dom; cell = Ask} in
       E.new_goal gcar >>= fun alpha0 ->
       let tcar = Tm.into @@ Tm.Meta (alpha0, Tm.Id) in
-      let cod' = Tm.into @@ Tm.Let (tcar, Tm.B cod) in
+      let cod' = Tm.into @@ Tm.Let (tcar, Tm.B (nm, cod)) in
       let gcdr = MCx.{lcx; rnv; ty = cod'; cell = Ask} in
       E.new_goal gcdr >>= fun alpha1 ->
       let tm = 

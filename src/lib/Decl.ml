@@ -13,8 +13,8 @@ let rec tele_to_multibind tele bdy =
   | TmUtil.TEnd _ -> 
     TmUtil.MBEnd bdy
 
-  | TmUtil.TCons (_, tele) -> 
-    TmUtil.MBCons (tele_to_multibind tele bdy)
+  | TmUtil.TCons (nm, _, tele) -> 
+    TmUtil.MBCons (nm, tele_to_multibind tele bdy)
 
 let to_inf decl = 
   match decl with
@@ -42,6 +42,6 @@ and check_decl (cx, ppenv) decl =
     let menv = MEnv.empty in
     let ty = Typing.infer ~mcx:{mcx = MCx.emp; menv} ~cx ~tm:inf in
     let el = Val.eval (menv, LCx.env cx) tm in
-    let ppenv' = Tm.Pretty.Env.bind (decl_name decl) ppenv in
+    let _, ppenv' = Tm.Pretty.Env.bind (Some (decl_name decl)) ppenv in
     Format.fprintf Format.std_formatter "> %a\n\n" (Tm.Pretty.pp ppenv) inf;
-    LCx.def cx ~ty ~tm:el, ppenv';
+    LCx.def cx ~ty ~tm:el, ppenv'

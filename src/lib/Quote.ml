@@ -11,7 +11,7 @@ let rec approx_can_ ~vr ~n ~ty ~can0 ~can1 =
     let vcod1 = Val.inst_bclo cod1 vgen1 in
     let qdom = approx_can_ ~vr:Iso ~n ~ty ~can0:vdom1 ~can1:vdom0 in
     let qcod = approx_can_ ~vr ~n:(n + 1) ~ty ~can0:vcod0 ~can1:vcod1 in
-    Tm.into @@ Tm.Pi (qdom, Tm.B qcod)
+    Tm.into @@ Tm.Pi (qdom, Tm.B (None, qcod))
 
   | Val.Univ lvl, Val.Sg (dom0, cod0), Val.Sg (dom1, cod1) ->
     let dom1, cod1 = Val.out_sg can1 in
@@ -23,7 +23,7 @@ let rec approx_can_ ~vr ~n ~ty ~can0 ~can1 =
     let vcod1 = Val.inst_bclo cod1 vgen1 in
     let qdom = approx_can_ ~vr:Iso ~n ~ty ~can0:vdom1 ~can1:vdom0 in
     let qcod = approx_can_ ~vr ~n:(n + 1) ~ty ~can0:vcod0 ~can1:vcod1 in
-    Tm.into @@ Tm.Pi (qdom, Tm.B qcod)
+    Tm.into @@ Tm.Pi (qdom, Tm.B (None, qcod))
 
   | Val.Univ lvl, Val.Ext (cod0, sys0), Val.Ext (cod1, sys1) ->
     let interval = Val.into Val.Interval in
@@ -35,7 +35,7 @@ let rec approx_can_ ~vr ~n ~ty ~can0 ~can1 =
     let sys0x = Val.inst_sclo sys0 @@ Val.project_dimval vgen in
     let sys1x = Val.inst_sclo sys1 @@ Val.project_dimval vgen in
     let qsys = approx_sys ~vr ~n:n' ~ty:vcod0 ~sys0:sys0x ~sys1:sys1x in
-    Tm.into @@ Tm.Ext (Tm.B (qcod, qsys))
+    Tm.into @@ Tm.Ext (Tm.B (None, (qcod, qsys)))
 
   | Val.Univ _, Val.Interval, Val.Interval ->
     Tm.into Tm.Interval
@@ -65,7 +65,7 @@ let rec approx_can_ ~vr ~n ~ty ~can0 ~can1 =
     let vapp0 = Val.apply can0 vgen in
     let vapp1 = Val.apply can1 vgen in
     let qbdy = approx_can_ ~vr ~n:(n+1) ~ty:vcod ~can0:vapp0 ~can1:vapp1 in
-    Tm.into @@ Tm.Lam (Tm.B qbdy)
+    Tm.into @@ Tm.Lam (Tm.B (None, qbdy))
 
   | Val.Ext (cod, sys), _, _ ->
     let interval = Val.into Val.Interval in
@@ -75,7 +75,7 @@ let rec approx_can_ ~vr ~n ~ty ~can0 ~can1 =
     let vapp0 = Val.ext_apply can0 vdim in
     let vapp1 = Val.ext_apply can1 vdim in
     let qbdy = approx_can_ ~vr ~n:(n+1) ~ty:vcod ~can0:vapp0 ~can1:vapp1 in
-    Tm.into @@ Tm.Lam (Tm.B qbdy)
+    Tm.into @@ Tm.Lam (Tm.B (None, qbdy))
 
   | Val.Sg (dom, cod), _, _->
     let vdom = Val.eval_clo dom in
@@ -104,7 +104,7 @@ let rec approx_can_ ~vr ~n ~ty ~can0 ~can1 =
     let vty1 = Val.inst_bclo coe1.ty vgen in
     let qty = approx_can_ ~vr ~n:(n + 1) ~ty:univ ~can0:vty0 ~can1:vty1 in
     let qtm = approx_can_ ~vr ~n ~ty:(Val.inst_bclo coe0.ty @@ Val.embed_dimval coe0.dim0) ~can0:coe0.tm ~can1:coe1.tm in
-    let tcoe = Tm.into @@ Tm.Coe {dim0 = qdim0; dim1 = qdim1; ty = Tm.B qty; tm = qtm} in
+    let tcoe = Tm.into @@ Tm.Coe {dim0 = qdim0; dim1 = qdim1; ty = Tm.B (None, qty); tm = qtm} in
     Tm.into @@ Tm.Up tcoe
 
   | _, Val.HCom hcom0, Val.HCom hcom1 ->
@@ -172,7 +172,7 @@ and approx_neu_ ~vr ~n ~neu0 ~neu1 =
     let fcase0 = Val.eval_clo if0.fcase in
     let fcase1 = Val.eval_clo if1.fcase in
     let qfcase = approx_can_ ~vr ~n ~ty:fmot ~can0:fcase0 ~can1:fcase1 in
-    Tm.into @@ Tm.If {mot = Tm.B qmot; scrut = qscrut; tcase = qtcase; fcase = qfcase}
+    Tm.into @@ Tm.If {mot = Tm.B (None, qmot); scrut = qscrut; tcase = qtcase; fcase = qfcase}
 
   | _ -> failwith "approx_neu_"
 
@@ -238,7 +238,7 @@ and approx_bsys ~vr ~n ~ty ~sys0 ~sys1 =
       let qd0 = approx_can_ ~vr ~n ~ty:interval ~can0:(Val.embed_dimval d00) ~can1:(Val.embed_dimval d10) in
       let qd1 = approx_can_ ~vr ~n ~ty:interval ~can0:(Val.embed_dimval d01) ~can1:(Val.embed_dimval d11) in
       let q = approx_can_ ~vr ~n:(n+1) ~ty ~can0:v0 ~can1:v1 in
-      let tb = qd0, qd1, Some (Tm.B q) in
+      let tb = qd0, qd1, Some (Tm.B (None, q)) in
       go sys0 sys1 @@ tb :: acc
 
     | Val.Tube.Indeterminate ((d00, d01), clo0) :: sys0, Val.Tube.Indeterminate ((d10, d11), clo1) :: sys1 ->
@@ -248,7 +248,7 @@ and approx_bsys ~vr ~n ~ty ~sys0 ~sys1 =
       let qd0 = approx_can_ ~vr ~n ~ty:interval ~can0:(Val.embed_dimval d00) ~can1:(Val.embed_dimval d10) in
       let qd1 = approx_can_ ~vr ~n ~ty:interval ~can0:(Val.embed_dimval d01) ~can1:(Val.embed_dimval d11) in
       let q = approx_can_ ~vr ~n:(n + 1) ~ty ~can0:v0 ~can1:v1 in
-      let tb = qd0, qd1, Some (Tm.B q) in
+      let tb = qd0, qd1, Some (Tm.B (None, q)) in
       go sys0 sys1 @@ tb :: acc
 
     | Val.Tube.False (d00, d01) :: sys0, Val.Tube.False (d10, d11) :: sys ->

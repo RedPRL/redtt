@@ -1,4 +1,4 @@
-type 'a bnd = B of 'a
+type 'a bnd = B of string option * 'a
 
 type chk = [`Chk]
 type inf = [`Inf]
@@ -62,7 +62,7 @@ struct
     type t
     val emp : t
     val var : int -> t -> string
-    val bind : string -> t -> t
+    val bind : string option -> t -> string * t
     val bind_fresh : t -> string * t
   end =
   struct
@@ -75,7 +75,12 @@ struct
       x, (i + 1, x :: xs)
 
     let bind nm (i, xs) =
-      (i, nm :: xs)
+      match nm with
+      | None ->
+        let x = "x" ^ string_of_int i in
+        x, (i + 1, x :: xs)
+      | Some x ->
+        x, (i, x:: xs)
   end
 
   let rec pp : type a. Env.t -> Format.formatter -> a t -> unit = 
@@ -88,16 +93,16 @@ struct
       | Down {ty; tm} ->
         Format.fprintf fmt "@[<1>(:>@ %a@ %a)@]" (pp env) ty (pp env) tm
 
-      | Pi (dom, B cod) ->
-        let x, env' = Env.bind_fresh env in
+      | Pi (dom, B (nm, cod)) ->
+        let x, env' = Env.bind nm env in
         Format.fprintf fmt "@[<1>(-> [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
 
-      | Sg (dom, B cod) ->
-        let x, env' = Env.bind_fresh env in
+      | Sg (dom, B (nm, cod)) ->
+        let x, env' = Env.bind nm env in
         Format.fprintf fmt "@[<1>(* [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
 
-      | Ext (B (cod, sys)) ->
-        let x, env' = Env.bind_fresh env in
+      | Ext (B (nm, (cod, sys))) ->
+        let x, env' = Env.bind nm env in
         begin
           match sys with
           | [] ->
@@ -106,8 +111,8 @@ struct
             Format.fprintf fmt "@[<1>(# [%s]@ %a@ %a)@]" x (pp env') cod (pp_sys env') sys
         end
 
-      | Lam (B tm) ->
-        let x, env' = Env.bind_fresh env in
+      | Lam (B (nm, tm)) ->
+        let x, env' = Env.bind nm env in
         Format.fprintf fmt "@[<1>(lam [%s]@ %a)@]" x (pp env') tm
 
       | FunApp (tm0, tm1) ->
@@ -146,26 +151,26 @@ struct
       | Univ lvl ->
         Format.fprintf fmt "(U %a)" Lvl.pp lvl
 
-      | Coe {dim0; dim1; ty = B ty; tm} ->
-        let x, env' = Env.bind_fresh env in
+      | Coe {dim0; dim1; ty = B (nm, ty); tm} ->
+        let x, env' = Env.bind nm env in
         Format.fprintf fmt "@[<1>(coe %a %a@ [%s] %a@ %a)@]" (pp env) dim0 (pp env) dim1 x (pp env') ty (pp env) tm
 
       | HCom {dim0; dim1; ty; cap; sys} ->
         Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" (pp env) dim0 (pp env) dim1 (pp env) ty (pp env) cap (pp_bsys env) sys
 
-      | Com {dim0; dim1; ty = B ty; cap; sys} ->
-        let x, env' = Env.bind_fresh env in
+      | Com {dim0; dim1; ty = B (nm, ty); cap; sys} ->
+        let x, env' = Env.bind nm env in
         Format.fprintf fmt "@[<1>(com %a %a@ [%s] %a@ %a@ %a)@]" (pp env) dim0 (pp env) dim1 x (pp env) ty (pp env) cap (pp_bsys env) sys
 
-      | If {mot = B mot; scrut; tcase; fcase} ->
-        let x, env' = Env.bind_fresh env in
+      | If {mot = B (nm, mot); scrut; tcase; fcase} ->
+        let x, env' = Env.bind nm env in
         Format.fprintf fmt "@[<1>(if@ [%s] %a@ %a %a %a)@]" x (pp env') mot (pp env) scrut (pp env) tcase (pp env) fcase
 
       | Cons (tm0, tm1) -> 
         Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
 
-      | Let (tm0, B tm1) ->
-        let x, env' = Env.bind_fresh env in
+      | Let (tm0, B (nm, tm1)) ->
+        let x, env' = Env.bind nm env in
         Format.fprintf fmt "@[<1>(let@ @[<1>[%s %a]@] %a)@]" x (pp env) tm0 (pp env') tm1
 
       | Meta _ ->
@@ -176,7 +181,7 @@ struct
     match sys with
     | [] ->
       ()
-    
+
     | [tube] ->
       pp_tube env fmt tube
 
@@ -187,7 +192,7 @@ struct
     match sys with
     | [] ->
       ()
-    
+
     | [tube] ->
       pp_btube env fmt tube
 
@@ -209,7 +214,7 @@ struct
     | None -> 
       Format.fprintf fmt "@[<1>[%a=%a@ -]@]" (pp env) dim0 (pp env) dim1
 
-    | Some (B tm) -> 
-      let x, env' = Env.bind_fresh env in
+    | Some (B (nm, tm)) -> 
+      let x, env' = Env.bind nm env in
       Format.fprintf fmt "@[<1>[%a=%a@ [%s] %a]@]" (pp env) dim0 (pp env) dim1 x (pp env') tm
 end

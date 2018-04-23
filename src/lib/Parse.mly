@@ -32,13 +32,13 @@ tele_with_env:
     { fun env ->
       let env' = R.bind "_" env in
       let tele, env'' = rest env' in
-      TCons (dom env, tele), env'' }
+      TCons (Some "_", dom env, tele), env'' }
 
   | LSQ; x = ATOM; COLON; dom = chk; RSQ; rest = tele_with_env
     { fun env ->
       let env' = R.bind x env in
       let tele, env'' = rest env' in
-      TCons (dom env, tele), env'' }
+      TCons (Some x, dom env, tele), env'' }
 
   | cod = chk
     { fun env ->
@@ -57,7 +57,7 @@ tube(X):
 bind(X):
   | LSQ; x = ATOM; RSQ; e = X
     { fun env ->
-      Tm.B (e @@ R.bind x env) }
+      Tm.B (Some x, e @@ R.bind x env) }
 
 multibind(X):
   | e = X
@@ -66,7 +66,7 @@ multibind(X):
 
   | LSQ; x = ATOM; RSQ; mb = multibind(X)
     { fun env ->
-      MBCons (mb @@ R.bind x env) }
+      MBCons (Some x, mb @@ R.bind x env) }
 
 
 elist(X):

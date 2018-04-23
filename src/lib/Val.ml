@@ -269,8 +269,8 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
     | Tm.Pi (dom, cod) ->
       into @@ Pi (dom <: rho, cod <:+ rho)
 
-    | Tm.Ext (Tm.B (cod, sys)) ->
-      into @@ Ext (Tm.B cod <:+ rho, Tm.B sys <<:+ rho)
+    | Tm.Ext (Tm.B (nm, (cod, sys))) ->
+      into @@ Ext (Tm.B (nm, cod) <:+ rho, Tm.B (nm, sys) <<:+ rho)
 
     | Tm.Sg (dom, cod) ->
       into @@ Sg (dom <: rho, cod <:+ rho)
@@ -380,7 +380,7 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
     | Tm.Up t ->
       eval rho t
 
-    | Tm.Let (t0, Tm.B t1) ->
+    | Tm.Let (t0, Tm.B (_, t1)) ->
       let menv, env = rho in
       let v = eval rho t0 in
       eval (menv, Env.ext env v) t1
@@ -647,7 +647,7 @@ and project_sys sys =
 and inst_bclo bclo arg =
   match bclo with 
   | Clo.Await {btm; env; menv} ->
-    let Tm.B tm = btm in
+    let Tm.B (_, tm) = btm in
     eval (menv, Env.ext env arg) tm
 
   | Clo.SgDom bclo ->
@@ -712,7 +712,7 @@ and inst_bclo bclo arg =
 
 and inst_sclo sclo arg = 
   match sclo with
-  | Clo.SysAwait {sys = Tm.B sys; menv; env} ->
+  | Clo.SysAwait {sys = Tm.B (_, sys); menv; env} ->
     let arg' = embed_dimval arg in
     let env' = Env.ext env arg' in
     let go (tdim0, tdim1, otb) =
