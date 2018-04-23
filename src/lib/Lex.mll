@@ -34,6 +34,9 @@ rule read =
   | "cons" { CONS }
   | "car" { CAR }
   | "cdr" { CDR }
+  | "hcom" { HCOM }
+  | "com" { COM }
+  | "coe" { COE }
   | "tt" { TT }
   | "ff" { FF }
   | "if" { IF }

@@ -258,12 +258,18 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
         go sys acc
 
       | (DimVal.Same | DimVal.Indeterminate), Some (Tm.B (_, tb)) ->
-        let cx' = LCx.ext cx interval in
-        let cx'' = LCx.restrict_exn cx' vd0 vd1 in
+        let cx'' = 
+          let cx' = LCx.ext cx interval in
+          LCx.restrict_exn cx' vd0 vd1
+        in
+
         check ~mcx ~cx:cx'' ~ty:ty ~tm:tb;
 
-        let env = LCx.env cx'' in
-        let vtb = Val.eval (mcx.menv, Val.Env.ext env dim0) tb in
+        let vtb = 
+          let cx' = LCx.def cx ~ty:interval ~tm:dim0 in
+          let env = LCx.env cx' in
+          Val.eval (mcx.menv, env) tb 
+        in
 
         (* Check cap-tube compatibility *)
         equiv ~cx:cx'' ~ty ~can0:cap ~can1:vtb;
@@ -282,11 +288,16 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
       ()
 
     | (vd0', vd1', tb') :: tubes ->
-      let cx' = LCx.restrict_exn cx vd0' vd1' in
-      let env = LCx.env cx' in
-      let vtb = Val.eval (mcx.menv, env) tb in
-      let vtb' = Val.eval (mcx.menv, env) tb' in
-      equiv ~cx:cx ~ty ~can0:vtb ~can1:vtb';
+      begin
+        try 
+          let cx' = LCx.restrict_exn cx vd0' vd1' in
+          let env = LCx.env cx' in
+          let vtb = Val.eval (mcx.menv, env) tb in
+          let vtb' = Val.eval (mcx.menv, env) tb' in
+          equiv ~cx:cx' ~ty ~can0:vtb ~can1:vtb';
+        with
+        | LCx.Inconsistent -> ()
+      end;
       go_adj cx tubes (vd0, vd1, tb)
 
   in
@@ -315,7 +326,7 @@ and check_sys ~mcx ~cx ~ty ~sys =
         go sys @@ (vd0, vd1, tb) :: acc
 
       | _ ->
-        failwith "check_bsys"
+        failwith "check_sys"
 
   (* Invariant: 'cx' should already be restricted by vd0=vd1 *)
   and go_adj cx tubes (vd0, vd1, tb) = 

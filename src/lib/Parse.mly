@@ -11,7 +11,7 @@
 %token EQUALS
 %token RIGHT_ARROW
 %token STAR HASH AT
-%token BOOL UNIV LAM CONS CAR CDR TT FF IF
+%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE
 %token EOF
 
 %start <ResEnv.t -> Decl.t list> prog
@@ -155,7 +155,13 @@ inf:
 
   | LPR; IF; mot = bind(chk); scrut = inf; tcase = chk; fcase = chk; RPR 
     { fun env ->
-      make_node $startpos $endpos @@ Tm.If {mot = mot env; scrut = scrut env; tcase = tcase env; fcase = fcase env} }
+      make_node $startpos $endpos @@ 
+      Tm.If {mot = mot env; scrut = scrut env; tcase = tcase env; fcase = fcase env} }
+
+  | LPR; HCOM; dim0 = chk; dim1 = chk; ty = chk; cap = chk; sys = elist(tube(bind(chk))); RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.HCom {dim0 = dim0 env; dim1 = dim1 env; ty = ty env; cap = cap env; sys = sys env} }
 
   | LPR; COLON_ANGLE; ty = chk; tm = chk; RPR
     { fun env ->
