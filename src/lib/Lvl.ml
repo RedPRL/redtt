@@ -10,3 +10,10 @@ let to_string l =
   match l with
   | Omega -> "omega"
   | Const i -> string_of_int i
+
+let pp fmt l = 
+  match l with
+  | Omega ->
+    Format.fprintf fmt "omega"
+  | Const i ->
+    Format.fprintf fmt "%i" i

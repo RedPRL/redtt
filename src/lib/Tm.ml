@@ -62,25 +62,104 @@ struct
     type t
     val emp : t
     val var : int -> t -> string
-    val bind : t -> string * t
+    val bind : string -> t -> t
+    val bind_fresh : t -> string * t
   end =
   struct
     type t = int * string list
 
     let emp = 0, []
     let var i (_, xs) = List.nth xs i
-    let bind (i, xs) =
+    let bind_fresh (i, xs) =
       let x = "x" ^ string_of_int i in
       x, (i + 1, x :: xs)
+
+    let bind nm (i, xs) =
+      (i, nm :: xs)
   end
 
-  let pp : type a. Env.t -> Format.formatter -> a t -> unit = 
+  let rec pp : type a. Env.t -> Format.formatter -> a t -> unit = 
     fun env fmt tm ->
       match out tm with
       | Var i -> 
         Format.fprintf fmt "%s" @@ 
         Env.var i env
-      
+
+      | Down {ty; tm} ->
+        Format.fprintf fmt "@[<1>(:>@ %a@ %a)@]" (pp env) ty (pp env) tm
+
+      | Pi (dom, B cod) ->
+        let x, env' = Env.bind_fresh env in
+        Format.fprintf fmt "@[<1>(-> [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
+
+      | Sg (dom, B cod) ->
+        let x, env' = Env.bind_fresh env in
+        Format.fprintf fmt "@[<1>(* [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
+
+      | Ext (B (cod, sys)) ->
+        let x, env' = Env.bind_fresh env in
+        begin
+          match sys with
+          | [] ->
+            Format.fprintf fmt "@[<1>(# [%s]@ %a)@]" x (pp env') cod
+          | _ ->
+            Format.fprintf fmt "@[<1>(# [%s]@ %a@ %a)@]" x (pp env') cod (pp_sys env') sys
+        end
+
+      | Lam (B tm) ->
+        let x, env' = Env.bind_fresh env in
+        Format.fprintf fmt "@[<1>(lam [%s]@ %a)@]" x (pp env') tm
+
+      | FunApp (tm0, tm1) ->
+        Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp env) tm0 (pp env) tm1
+
+      | ExtApp (tm0, tm1) ->
+        Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" (pp env) tm0 (pp env) tm1
+
+      | Up tm ->
+        pp env fmt tm
+
+      | Bool ->
+        Format.fprintf fmt "bool"
+
+      | Interval ->
+        Format.fprintf fmt "dim"
+
+      | Tt ->
+        Format.fprintf fmt "tt"
+
+      | Ff ->
+        Format.fprintf fmt "ff"
+
+      | Dim0 ->
+        Format.fprintf fmt "0"
+
+      | Dim1 ->
+        Format.fprintf fmt "1"
+
+      | Univ lvl ->
+        Format.fprintf fmt "(U %a)" Lvl.pp lvl
+
       | _ ->
         Format.fprintf fmt "<term>"
+
+  and pp_sys env fmt sys = 
+    match sys with
+    | [] ->
+      ()
+    
+    | [tube] ->
+      pp_tube env fmt tube
+
+    | tube :: sys ->
+      Format.fprintf fmt "%a@ %a" (pp_tube env) tube (pp_sys env) sys
+
+  and pp_tube env fmt tube = 
+    let dim0, dim1, otm = tube in
+    match otm with
+    | None -> 
+      Format.fprintf fmt "@[<1>[%a=%a@ -]@]" (pp env) dim0 (pp env) dim1
+
+    | Some tm -> 
+      Format.fprintf fmt "@[<1>[%a=%a@ %a]@]" (pp env) dim0 (pp env) dim1 (pp env) tm
 end

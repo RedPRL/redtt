@@ -64,7 +64,8 @@ sig
     type t
     val emp : t
     val var : int -> t -> string
-    val bind : t -> string * t
+    val bind : string -> t -> t
+    val bind_fresh : t -> string * t
   end
 
   val pp : Env.t -> Format.formatter -> 'a t -> unit
