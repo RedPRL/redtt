@@ -43,5 +43,5 @@ and check_decl (cx, ppenv) decl =
     let ty = Typing.infer ~mcx:{mcx = MCx.emp; menv} ~cx ~tm:inf in
     let el = Val.eval (menv, LCx.env cx) tm in
     let _, ppenv' = Tm.Pretty.Env.bind (Some (decl_name decl)) ppenv in
-    Format.fprintf Format.std_formatter "> %a\n\n" (Tm.Pretty.pp ppenv) inf;
+    Format.fprintf Format.std_formatter "> %a@.@." (Tm.Pretty.pp ppenv) inf;
     LCx.def cx ~ty ~tm:el, ppenv'
