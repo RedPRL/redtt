@@ -269,13 +269,13 @@ and pp_btube fmt tube =
   match tube with
   | Tube.True ((dim0, dim1), bclo) ->
     Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" pp_dim dim0 pp_dim dim1 pp_bclo bclo
-  
+
   | Tube.False (dim0, dim1) ->
     Format.fprintf fmt "@[<1>[%a/=%a]@]" pp_dim dim0 pp_dim dim1
 
   | Tube.Indeterminate ((dim0, dim1), bclo) ->
     Format.fprintf fmt "@[<1>[?%a=%a@ %a]@]" pp_dim dim0 pp_dim dim1 pp_bclo bclo
-  
+
   | Tube.Delete ->
     Format.fprintf fmt "[-]"
 
@@ -451,7 +451,11 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
       into Ff
 
     | Tm.If {mot; scrut; tcase; fcase} ->
-      if_ ~mot:(mot <:+ rho) ~scrut:(eval rho scrut) ~tcase:(tcase <: rho) ~fcase:(fcase <: rho)
+      if_ 
+        ~mot:(mot <:+ rho) 
+        ~scrut:(eval rho scrut) 
+        ~tcase:(tcase <: rho) 
+        ~fcase:(fcase <: rho)
 
     | Tm.Car t ->
       car @@ eval rho t
@@ -565,19 +569,27 @@ and eval_btube rho (dim0, dim1, otb) =
   let vdim0 = project_dimval @@ eval rho dim0 in
   let vdim1 = project_dimval @@ eval rho dim1 in
   match vdim0, vdim1 with
-  | DimVal.Delete, _ -> Tube.Delete
-  | _, DimVal.Delete -> Tube.Delete
+  | DimVal.Delete, _ -> 
+    Tube.Delete
+
+  | _, DimVal.Delete -> 
+    Tube.Delete
+
   | _ ->
     let menv, env = rho in
     match Env.compare_dim env vdim0 vdim1, otb with
     | DimVal.Same, Some tb ->
       Tube.True ((vdim0, vdim1), tb <:+ rho)
+
     | DimVal.Apart, _ -> 
       Tube.False (vdim0, vdim1)
+
     | DimVal.Indeterminate, Some tb ->
       let env' = Env.restrict_exn env vdim0 vdim1 in
       Tube.Indeterminate ((vdim0, vdim1), tb <:+ (menv, env'))
-    | _ -> failwith "eval_btube"
+
+    | _ ->
+      failwith "eval_btube"
 
 
 and if_ ~mot ~scrut ~tcase ~fcase =
