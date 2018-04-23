@@ -4,11 +4,7 @@ type rnv = ResEnv.t
 type menv = MEnv.t
 type hole = Symbol.t
 
-type 'a m
-
-val (>>=) : 'a m -> ('a -> 'b m) -> 'b m
-val (>>) : 'a m -> 'b m -> 'b m
-val ret : 'a -> 'a m
+include Monad.S
 
 (* TODO: 
    Expose a *local* interface, where the focused hole is part of the state.

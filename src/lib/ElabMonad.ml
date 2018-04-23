@@ -4,18 +4,18 @@ type rnv = ResEnv.t
 type menv = MEnv.t
 type hole = Symbol.t
 
-
+module M = 
+struct
 type 'a m = mcx -> mcx * 'a 
 
-let (>>=) m k cx = 
+let bind m k cx = 
   let cx', a = m cx in
   k a cx'
 
-let (>>) m n =
-  m >>= fun _ -> n
-
 let ret x cx = 
   cx, x
+
+end
 
 let get_env cx = 
   cx, cx
@@ -25,6 +25,11 @@ let get_menv cx =
 
 let lookup alpha cx =
   cx, MCx.lookup_exn alpha cx
+
+
+include M
+module Notation = Monad.Notation(M)
+open Notation
 
 let lookup_goal alpha = 
   get_menv >>= fun menv ->

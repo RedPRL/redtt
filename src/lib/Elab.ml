@@ -5,8 +5,8 @@ type menv = MEnv.t
 type hole = Symbol.t
 
 module E = ElabMonad
-let (>>=) = E.(>>=)
-let (>>) = E.(>>)
+module Notation = Monad.Notation (E)
+open Notation
 
 (* Some preliminary sketches of the elaborator tactics. *)
 
