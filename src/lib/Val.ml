@@ -166,35 +166,101 @@ let embed_dimval dv =
 let out : type a. a t -> a f =
   fun node -> node.con
 
-let rec to_string : type a. a t -> string = 
-  fun v ->
+let rec pp : type a. Format.formatter -> a t -> unit =
+  fun fmt v ->
     match out v with
-    | Lvl i -> "(lvl " ^ string_of_int i ^ ")"
-    | Up (v0,v1) -> "(up " ^ to_string v0 ^ " " ^ to_string v1 ^ ")"
-    | Pi _ -> "#pi"
-    | Sg _ -> "#sg"
-    | Ext _ -> "#ext"
-    | Univ _ -> "#univ"
-    | Interval -> "#interval"
-    | Dim0 -> "#dim0"
-    | Dim1 -> "#dim1"
-    | DimDelete -> "#dim/delete"
-    | DimFresh _ -> "#dim/fresh"
-    | Bool -> "#bool"
-    | Tt -> "#tt"
-    | Ff -> "#ff"
-    | If _ -> "#if"
-    | Lam _ -> "#lam"
-    | Cons _ -> "#cons"
-    | Coe _ -> "#coe"
-    | HCom _ -> "#hcom"
-    | FCom _ -> "#fcom"
-    | FunApp (v0, v1) -> "(" ^ to_string v0 ^ " " ^ to_string v1 ^ ")"
-    | ExtApp (v0, v1) -> "(@ " ^ to_string v0 ^ " " ^ to_string (embed_dimval v1) ^ ")"
-    | Car _ -> "#car"
-    | Cdr _ -> "#cdr"
-    | Down _ -> "#nf"
+    | Lvl i ->
+      Format.fprintf fmt "v%i" i
 
+    | Up (v0, v1) ->
+      Format.fprintf fmt "@[<1>(↑@ %a@ %a)@]" pp v0 pp v1
+
+    | Pi (dom, cod) ->
+      Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_tclo dom pp_bclo cod
+
+    | Sg (dom, cod) ->
+      Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_tclo dom pp_bclo cod
+
+    | Ext (cod, sys) ->
+      Format.fprintf fmt "@[<1>(#@ %a@ %a)@]" pp_bclo cod pp_sclo sys
+
+    | Univ lvl ->
+      Format.fprintf fmt "@[<1>(U %a)]" Lvl.pp lvl
+
+    | Interval ->
+      Format.fprintf fmt "dim"
+
+    | Dim0 ->
+      Format.fprintf fmt "0"
+
+    | Dim1 ->
+      Format.fprintf fmt "1"
+
+    | DimFresh sym ->
+      Format.fprintf fmt "<#dim/fresh>"
+
+    | DimDelete ->
+      Format.fprintf fmt "<#dim/delete>"
+
+    | Bool ->
+      Format.fprintf fmt "bool"
+
+    | Tt ->
+      Format.fprintf fmt "tt"
+
+    | Ff ->
+      Format.fprintf fmt "ff"
+
+    | If info ->
+      Format.fprintf fmt "@[<1>(if@ %a %a %a %a)@]" pp_bclo info.mot pp info.scrut pp_tclo info.tcase pp_tclo info.fcase
+
+    | Lam bdy ->
+      Format.fprintf fmt "@[<1>(lam %a)]" pp_bclo bdy
+
+    | Cons (v0, v1) ->
+      Format.fprintf fmt "@[<1>(cons@ %a@ %a)]" pp_tclo v0 pp_tclo v1
+
+    | Coe info ->
+      Format.fprintf fmt "@[<1>(coe %a %a@ %a %a)]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp_bclo info.ty pp info.tm
+
+    | HCom info ->
+      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp info.ty pp info.cap pp_bsys info.sys
+
+    | FCom info ->
+      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a)]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp info.cap pp_bsys info.sys
+
+    | FunApp (v0, v1) -> 
+      Format.fprintf fmt "@[<1>(%a %a)]" pp v0 pp v1
+
+    | ExtApp (v0, v1) -> 
+      Format.fprintf fmt "@[<1>(%s %a %a)]" "@" pp v0 pp (embed_dimval v1)
+
+    | Car v -> 
+      Format.fprintf fmt "@[<1>(car %a)]" pp v
+
+    | Cdr v ->
+      Format.fprintf fmt "@[<1>(cdr %a)]" pp v
+
+    | Down (v0, v1) ->
+      Format.fprintf fmt "@[<1>(↓ %a %a)]" pp v0 pp v1
+
+
+and pp_tclo fmt _ =
+  Format.fprintf fmt "<#clo>"
+
+and pp_bclo fmt _ =
+  Format.fprintf fmt "<#bclo>"
+
+and pp_sclo fmt _ =
+  Format.fprintf fmt "<#sclo>"
+
+and pp_bsys fmt _ =
+  Format.fprintf fmt "<#bsys>"
+
+let to_string v =
+  ignore @@ Format.flush_str_formatter ();
+  pp Format.str_formatter v;
+  Format.flush_str_formatter ()
 
 let project_dimval (type a) (v : a t) =
   match out v with
@@ -208,7 +274,10 @@ let project_dimval (type a) (v : a t) =
     end
   | DimDelete -> DimVal.Delete
   | DimFresh x -> DimVal.Fresh x
-  | _ -> failwith @@ "project_dimval: " ^ to_string v
+  | _ -> 
+    Format.fprintf Format.err_formatter "Tried to project %a as a dimension@." pp v;
+    failwith "project_dimval"
+
 
 let (<:) tm (menv, env) = 
   Clo.Eval {tm; env; menv}
