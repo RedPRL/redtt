@@ -128,7 +128,7 @@ let rec approx_can_ ~vr ~n ~ty ~can0 ~can1 =
     Tm.into Tm.Dim0
 
   | Val.Interval, Val.Dim1, Val.Dim1 ->
-    Tm.into Tm.Dim0
+    Tm.into Tm.Dim1
     
 
   | _ -> 
