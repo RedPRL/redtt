@@ -4,7 +4,7 @@ type rnv = ResEnv.t
 type menv = MEnv.t
 type hole = Symbol.t
 
-module E = ElabMonad2
+module E = ElabMonad
 module Notation = Monad.Notation (E)
 open E.Notation
 open Notation
