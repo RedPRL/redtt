@@ -74,13 +74,7 @@ let restrict_exn rel x y =
   Rel.ext rel x y
 
 let compare_dim rel x y =
-  match DimVal.compare x y with
-  | DimVal.Indeterminate ->
-    if Rel.check rel x y then 
-      DimVal.Same
-    else
-      DimVal.Indeterminate
-  | r -> r
+  DimVal.compare (Rel.get rel x) (Rel.get rel y)
 
 let canonize rel x =
   Rel.get rel x
