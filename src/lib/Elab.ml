@@ -82,7 +82,8 @@ let rec elab : type a. a ElabTm.t -> unit E.m =
           E.move `Right >>
           elab dom >>
           E.move `Left >>
-          go_vars xs dom
+          go_vars xs dom >>
+          E.move `Up
 
       in
       go tele
