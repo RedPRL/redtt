@@ -14,36 +14,36 @@ let rec check ~mcx ~cx ~ty ~tm =
   | Val.Univ lvl, Tm.Univ lvl' ->
     if Lvl.greater lvl lvl' then () else failwith "Universe level failure"
 
-  | Val.Univ _, Tm.Pi (dom, Tm.B (_, cod)) ->
+  | Val.Univ _, Tm.Pi (dom, Tm.B (nm, cod)) ->
     let vdom = check_eval ~mcx ~cx ~ty ~tm:dom in
-    let cx' = LCx.ext cx vdom in
+    let cx' = LCx.ext cx ~nm vdom in
     check ~mcx ~cx:cx' ~ty ~tm:cod
 
-  | Val.Univ _, Tm.Sg (dom, Tm.B (_, cod)) ->
+  | Val.Univ _, Tm.Sg (dom, Tm.B (nm, cod)) ->
     let vdom = check_eval ~mcx ~cx ~ty ~tm:dom in
-    let cx' = LCx.ext cx vdom in
+    let cx' = LCx.ext cx ~nm vdom in
     check ~mcx ~cx:cx' ~ty ~tm:cod
 
-  | Val.Univ _, Tm.Ext (Tm.B (_ ,(cod, sys))) ->
+  | Val.Univ _, Tm.Ext (Tm.B (nm, (cod, sys))) ->
     check_sys_valid_or_empty sys;
     let interval = Val.into Val.Interval in
-    let cx' = LCx.ext cx interval in
+    let cx' = LCx.ext cx ~nm interval in
     let vcod = check_eval ~mcx ~cx:cx' ~ty ~tm:cod in
     check_sys ~mcx ~cx:cx' ~ty:vcod ~sys
 
   | Val.Univ _, Tm.Bool ->
     ()
 
-  | Val.Pi (dom, cod), Tm.Lam (Tm.B (_, tm)) ->
+  | Val.Pi (dom, cod), Tm.Lam (Tm.B (nm, tm)) ->
     let vdom = Val.eval_clo dom in
-    let cx' = LCx.ext cx vdom in
+    let cx' = LCx.ext cx ~nm vdom in
     let vgen = Val.generic vdom @@ LCx.len cx in
     let vcod = Val.inst_bclo cod vgen in
     check ~mcx ~cx:cx' ~ty:vcod ~tm
 
-  | Val.Ext (cod, sys), Tm.Lam (Tm.B (_, tm)) ->
+  | Val.Ext (cod, sys), Tm.Lam (Tm.B (nm, tm)) ->
     let interval = Val.into Val.Interval in
-    let cx' = LCx.ext cx interval in
+    let cx' = LCx.ext cx ~nm interval in
     let vgen = Val.generic interval @@ LCx.len cx in
     let vcodx = Val.inst_bclo cod vgen in
     check ~mcx ~cx:cx' ~ty:vcodx ~tm;
@@ -98,7 +98,7 @@ let rec check ~mcx ~cx ~ty ~tm =
   | _, Tm.Let (tm0, Tm.B (_, tm1)) ->
     let ty0 = infer ~mcx ~cx ~tm:tm0 in
     let v = Val.eval (mcx.menv, LCx.env cx) tm0 in
-    let cx' = LCx.def cx ~ty:ty0 ~tm:v in
+    let cx' = LCx.def cx ty0 v in
     check ~mcx ~cx:cx' ~ty ~tm:tm1
 
   | _, _ -> 
@@ -145,12 +145,12 @@ and infer ~mcx ~cx ~tm =
     let vcar = Val.car vpair in
     Val.inst_bclo cod vcar
 
-  | Tm.If {mot = Tm.B (_, mot); scrut; tcase; fcase} ->
+  | Tm.If {mot = Tm.B (nm, mot); scrut; tcase; fcase} ->
     let bool = Val.into Val.Bool in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let bool' = infer ~mcx ~cx ~tm:scrut in
     equiv "if" ~cx:cx ~ty:univ ~can0:bool ~can1:bool';
-    check ~mcx ~cx:(LCx.ext cx bool) ~ty:univ ~tm:mot;
+    check ~mcx ~cx:(LCx.ext cx ~nm bool) ~ty:univ ~tm:mot;
     let tt = Val.into Val.Tt in
     let ff = Val.into Val.Ff in
     let env = LCx.env cx in
@@ -172,8 +172,8 @@ and infer ~mcx ~cx ~tm =
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let vdim0 = check_eval ~mcx ~cx ~ty:interval ~tm:coe.dim0 in
     let vdim1 = check_eval ~mcx ~cx ~ty:interval ~tm:coe.dim1 in
-    let Tm.B (_, ty) = coe.ty in
-    check ~mcx ~cx:(LCx.ext cx interval) ~ty:univ ~tm:ty;
+    let Tm.B (nm, ty) = coe.ty in
+    check ~mcx ~cx:(LCx.ext cx ~nm interval) ~ty:univ ~tm:ty;
     let env = LCx.env cx in
     let vty0 = Val.eval (mcx.menv, Val.Env.ext env vdim0) ty in
     check ~mcx ~cx:cx ~ty:vty0 ~tm:coe.tm;
@@ -196,8 +196,8 @@ and infer ~mcx ~cx ~tm =
     let vdim1 = check_eval ~mcx ~cx ~ty:interval ~tm:com.dim1 in
     check_sys_valid com.sys;
 
-    let Tm.B (_, ty) = com.ty in
-    let vty = check_eval ~mcx ~cx:(LCx.ext cx interval) ~ty:univ ~tm:ty in
+    let Tm.B (nm, ty) = com.ty in
+    let vty = check_eval ~mcx ~cx:(LCx.ext cx ~nm interval) ~ty:univ ~tm:ty in
     let env = LCx.env cx in
     let vty0 = Val.eval (mcx.menv, Val.Env.ext env vdim0) ty in
     check_bsys ~mcx ~cx ~dim0:vdim0 ~tycap:vty0 ~ty:vty ~cap:com.cap ~sys:com.sys;
@@ -242,7 +242,7 @@ and infer_subst ~mcx ~cx ~subst =
     let ty = infer ~mcx ~cx ~tm:t in
     let cx' = infer_subst ~mcx ~cx ~subst:sigma in
     let el = Val.eval (mcx.menv, LCx.env cx) t in
-    LCx.def cx' ~ty ~tm:el
+    LCx.def cx' ty el
 
 
 and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
@@ -259,13 +259,13 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
       | DimVal.Apart, None ->
         go sys acc
 
-      | (DimVal.Same | DimVal.Indeterminate), Some (Tm.B (_, tb)) ->
+      | (DimVal.Same | DimVal.Indeterminate), Some (Tm.B (nm, tb)) ->
         begin
-          let cxx = LCx.restrict_exn (LCx.ext cx interval) vd0 vd1 in
+          let cxx = LCx.restrict_exn (LCx.ext cx ~nm interval) vd0 vd1 in
           check ~mcx ~cx:cxx ~ty:ty ~tm:tb
         end;
 
-        let cx0 = LCx.restrict_exn (LCx.def cx ~ty:interval ~tm:dim0) vd0 vd1 in
+        let cx0 = LCx.restrict_exn (LCx.def cx interval dim0) vd0 vd1 in
         let vtb = Val.eval (mcx.menv, LCx.env cx0) tb in
 
         let vcap = 

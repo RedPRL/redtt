@@ -10,15 +10,15 @@ let emp =
    ppenv = Tm.Pretty.Env.emp;
    len = 0}
 
-let ext cx v =
-  let _, ppenv = Tm.Pretty.Env.bind_fresh cx.ppenv in
+let ext cx ?nm:(nm = None) v =
+  let _, ppenv = Tm.Pretty.Env.bind nm cx.ppenv in
   {tys = v :: cx.tys;
    env = Val.Env.ext cx.env @@ Val.generic v @@ cx.len;
    len = cx.len + 1;
    ppenv}
 
-let def cx ~ty ~tm = 
-  let _, ppenv = Tm.Pretty.Env.bind_fresh cx.ppenv in
+let def cx ?nm:(nm = None) ty tm = 
+  let _, ppenv = Tm.Pretty.Env.bind nm cx.ppenv in
   {tys = ty :: cx.tys;
    env = Val.Env.ext cx.env tm;
    len = cx.len + 1;

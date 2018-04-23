@@ -3,8 +3,8 @@
 type t
 
 val emp : t
-val ext : t -> Val.can Val.t -> t
-val def : t -> ty:Val.can Val.t -> tm:Val.can Val.t -> t
+val ext : t -> ?nm:string option -> Val.can Val.t -> t
+val def : t -> ?nm:string option -> Val.can Val.t -> Val.can Val.t -> t
 
 val proj: t -> t option
 val proj_exn : t -> t

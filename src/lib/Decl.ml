@@ -33,7 +33,7 @@ let rec check_document cx decls =
     let cx' = check_decl cx decl in
     check_document cx' decls
 
-and check_decl (cx, ppenv) decl = 
+and check_decl cx decl = 
   match decl with
   | Define {info; args; body; name} ->
     let ty = TmUtil.pi_from_tele (Some info) args in
@@ -42,6 +42,7 @@ and check_decl (cx, ppenv) decl =
     let menv = MEnv.empty in
     let ty = Typing.infer ~mcx:{mcx = MCx.emp; menv} ~cx ~tm:inf in
     let el = Val.eval (menv, LCx.env cx) tm in
-    let _, ppenv' = Tm.Pretty.Env.bind (Some (decl_name decl)) ppenv in
+    let nm = Some (decl_name decl) in
+    let ppenv = LCx.ppenv cx in
     Format.fprintf Format.std_formatter "> %a@.@." (Tm.Pretty.pp ppenv) inf;
-    LCx.def cx ~ty ~tm:el, ppenv'
+    LCx.def cx ~nm ty el

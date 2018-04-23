@@ -3,4 +3,4 @@ type t =
 
 type document = t list
 
-val check_document : LCx.t * Tm.Pretty.Env.t -> document -> unit
+val check_document : LCx.t -> document -> unit
