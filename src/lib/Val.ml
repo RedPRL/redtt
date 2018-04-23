@@ -221,19 +221,19 @@ let rec pp : type a. Format.formatter -> a t -> unit =
       Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" pp_tclo v0 pp_tclo v1
 
     | Coe info ->
-      Format.fprintf fmt "@[<1>(coe %a %a@ %a %a)@]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp_bclo info.ty pp info.tm
+      Format.fprintf fmt "@[<1>(coe %a %a@ %a %a)@]" pp_dim info.dim0 pp_dim info.dim1 pp_bclo info.ty pp info.tm
 
     | HCom info ->
-      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp info.ty pp info.cap pp_bsys info.sys
+      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" pp_dim info.dim0 pp_dim info.dim1 pp info.ty pp info.cap pp_bsys info.sys
 
     | FCom info ->
-      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a)@]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp info.cap pp_bsys info.sys
+      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a)@]" pp_dim info.dim0 pp_dim info.dim1 pp info.cap pp_bsys info.sys
 
     | FunApp (v0, v1) -> 
       Format.fprintf fmt "@[<1>(%a %a)@]" pp v0 pp v1
 
     | ExtApp (v0, v1) -> 
-      Format.fprintf fmt "@[<1>(%s %a %a)@]" "@" pp v0 pp (embed_dimval v1)
+      Format.fprintf fmt "@[<1>(%s %a %a)@]" "@" pp v0 pp_dim v1
 
     | Car v -> 
       Format.fprintf fmt "@[<1>(car %a)@]" pp v
@@ -254,8 +254,33 @@ and pp_bclo fmt _ =
 and pp_sclo fmt _ =
   Format.fprintf fmt "<#sclo>"
 
-and pp_bsys fmt _ =
-  Format.fprintf fmt "<#bsys>"
+and pp_bsys fmt sys =
+  match sys with
+  | [] -> 
+    ()
+
+  | [tube] ->
+    pp_btube fmt tube
+
+  | tube::tubes ->
+    Format.fprintf fmt "%a@ %a" pp_btube tube pp_bsys tubes
+
+and pp_btube fmt tube =
+  match tube with
+  | Tube.True ((dim0, dim1), bclo) ->
+    Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" pp_dim dim0 pp_dim dim1 pp_bclo bclo
+  
+  | Tube.False (dim0, dim1) ->
+    Format.fprintf fmt "@[<1>[%a/=%a]@]" pp_dim dim0 pp_dim dim1
+
+  | Tube.Indeterminate ((dim0, dim1), bclo) ->
+    Format.fprintf fmt "@[<1>[?%a=%a@ %a]@]" pp_dim dim0 pp_dim dim1 pp_bclo bclo
+  
+  | Tube.Delete ->
+    Format.fprintf fmt "[-]"
+
+and pp_dim fmt dim = 
+  pp fmt @@ embed_dimval dim
 
 let to_string v =
   ignore @@ Format.flush_str_formatter ();
