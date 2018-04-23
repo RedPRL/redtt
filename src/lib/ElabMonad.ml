@@ -38,10 +38,11 @@ let lookup_res alpha =
   lookup alpha >>= fun seq ->
   ret seq.rnv
 
-let new_goal seq cx =
-  let alpha = Symbol.fresh () in
-  let cx' = MCx.ext alpha seq cx in
-  cx', alpha
+let new_goal ~lcx ~rnv ~ty  : hole m =
+  fun cx ->
+    let alpha = Symbol.fresh () in
+    let cx' = MCx.ext alpha MCx.{lcx; rnv; ty; cell = Ask} cx in
+    cx', alpha
 
 let fill alpha tm : unit m =
   fun cx ->

@@ -17,8 +17,7 @@ let lambda x : hole -> hole E.m =
     | Tm.Pi (dom, Tm.B (nm, cod)) -> 
       E.eval (LCx.env cx) dom >>= fun vdom ->
       let cx' = LCx.ext cx vdom in
-      let goal = MCx.{lcx = cx'; rnv = ResEnv.bind x rnv; ty = cod; cell = Ask} in
-      E.new_goal goal >>= fun beta ->
+      E.new_goal ~lcx:cx' ~rnv:(ResEnv.bind x rnv) ~ty:cod >>= fun beta ->
       let tm = 
         let inf = Tm.into @@ Tm.Meta (beta, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0)) in
         let chk = Tm.into @@ Tm.Up inf in
@@ -33,14 +32,12 @@ let lambda x : hole -> hole E.m =
 let pi x : hole -> (hole * hole) E.m = 
   fun alpha ->
     E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
-    let gdom = MCx.{lcx; rnv; ty; cell = Ask} in
-    E.new_goal gdom >>= fun alpha0 ->
+    E.new_goal ~lcx ~rnv ~ty >>= fun alpha0 ->
     let tdom = Tm.into @@ Tm.Meta (alpha0, Tm.Id) in
     E.eval (LCx.env lcx) tdom >>= fun vdom ->
     let lcx' = LCx.ext lcx vdom in
     let rnv' = ResEnv.bind x rnv in
-    let gcod = MCx.{lcx = lcx'; rnv = rnv'; ty; cell = Ask} in
-    E.new_goal gcod >>= fun alpha1 ->
+    E.new_goal ~lcx:lcx' ~rnv:rnv' ~ty >>= fun alpha1 ->
     let tm = 
       let tcod = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0))) in
       Tm.into @@ Tm.Pi (Tm.into @@ Tm.Up tdom, Tm.B (Some x, tcod))
@@ -51,14 +48,12 @@ let pi x : hole -> (hole * hole) E.m =
 let sg x : hole -> (hole * hole) E.m = 
   fun alpha ->
     E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
-    let gdom = MCx.{lcx; rnv; ty; cell = Ask} in
-    E.new_goal gdom >>= fun alpha0 ->
+    E.new_goal ~lcx ~rnv ~ty >>= fun alpha0 ->
     let tdom = Tm.into @@ Tm.Meta (alpha0, Tm.Id) in
     E.eval (LCx.env lcx) tdom >>= fun vdom ->
     let lcx' = LCx.ext lcx vdom in
     let rnv' = ResEnv.bind x rnv in
-    let gcod = MCx.{lcx = lcx'; rnv = rnv'; ty; cell = Ask} in
-    E.new_goal gcod >>= fun alpha1 ->
+    E.new_goal ~lcx:lcx' ~rnv:rnv' ~ty >>= fun alpha1 ->
     let tm = 
       let tcod = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Sub (Tm.Id, Tm.into @@ Tm.Var 0))) in
       Tm.into @@ Tm.Sg (Tm.into @@ Tm.Up tdom, Tm.B (Some x, tcod))
@@ -71,12 +66,10 @@ let cons : hole -> (hole * hole) E.m =
     E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
     match Tm.out ty with
     | Tm.Sg (dom, Tm.B (nm, cod)) ->
-      let gcar = MCx.{lcx; rnv; ty = dom; cell = Ask} in
-      E.new_goal gcar >>= fun alpha0 ->
+      E.new_goal ~lcx ~rnv ~ty:dom >>= fun alpha0 ->
       let tcar = Tm.into @@ Tm.Meta (alpha0, Tm.Id) in
       let cod' = Tm.into @@ Tm.Let (tcar, Tm.B (nm, cod)) in
-      let gcdr = MCx.{lcx; rnv; ty = cod'; cell = Ask} in
-      E.new_goal gcdr >>= fun alpha1 ->
+      E.new_goal ~lcx ~rnv ~ty:cod' >>= fun alpha1 ->
       let tm = 
         let tcdr = Tm.into @@ Tm.Up (Tm.into @@ Tm.Meta (alpha1, Tm.Id)) in
         Tm.into @@ Tm.Cons (Tm.into @@ Tm.Up tcar, tcdr)

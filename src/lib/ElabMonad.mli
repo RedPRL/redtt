@@ -10,14 +10,15 @@ val (>>=) : 'a m -> ('a -> 'b m) -> 'b m
 val (>>) : 'a m -> 'b m -> 'b m
 val ret : 'a -> 'a m
 
-val get_env : mcx m
-val get_menv : menv m
+(* TODO: 
+   Expose a *local* interface, where the focused hole is part of the state.
+   This will simplify the use of this monad considerably. *)
 
-val lookup : hole -> MCx.sequent m
 val lookup_goal : hole -> (lcx * rnv * Tm.chk Tm.t) m
 val lookup_res : hole -> rnv m
 
-val new_goal : MCx.sequent -> hole m
+val new_goal : lcx:lcx -> rnv:rnv -> ty:Tm.chk Tm.t -> hole m
+
 val fill : hole -> Tm.chk Tm.t -> unit m
 
 val eval : Val.env -> 'a Tm.t -> Val.can Val.t m
