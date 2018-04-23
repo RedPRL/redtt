@@ -66,6 +66,8 @@ sig
     val var : int -> t -> string
     val bind : string option -> t -> string * t
     val bind_fresh : t -> string * t
+
+    val proj : t -> t
   end
 
   val pp : Env.t -> Format.formatter -> 'a t -> unit

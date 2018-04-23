@@ -124,7 +124,15 @@ let rec approx_can_ ~vr ~n ~ty ~can0 ~can1 =
     let q = approx_neu_ ~vr ~n ~neu0 ~neu1 in
     Tm.into @@ Tm.Up q
 
-  | _ -> failwith "approx_can_"
+  | Val.Interval, Val.Dim0, Val.Dim0 ->
+    Tm.into Tm.Dim0
+
+  | Val.Interval, Val.Dim1, Val.Dim1 ->
+    Tm.into Tm.Dim0
+    
+
+  | _ -> 
+    failwith @@ "approx_can_: " ^ Val.to_string can0 ^ " <= "  ^ Val.to_string can1
 
 and approx_neu_ ~vr ~n ~neu0 ~neu1 =
   match Val.out neu0, Val.out neu1 with

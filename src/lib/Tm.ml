@@ -64,6 +64,7 @@ struct
     val var : int -> t -> string
     val bind : string option -> t -> string * t
     val bind_fresh : t -> string * t
+    val proj : t -> t
   end =
   struct
     type t = int * string list
@@ -73,6 +74,11 @@ struct
     let bind_fresh (i, xs) =
       let x = "x" ^ string_of_int i in
       x, (i + 1, x :: xs)
+
+    let proj (i, xs) =
+      match xs with
+      | [] -> failwith "ppenv/proj"
+      | _::xs -> (i, xs)
 
     let bind nm (i, xs) =
       match nm with

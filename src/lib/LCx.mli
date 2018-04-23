@@ -21,3 +21,4 @@ val lookup : int -> t -> Val.can Val.t
 val len : t -> int
 
 val env : t -> Val.env
+val ppenv : t -> Tm.Pretty.Env.t

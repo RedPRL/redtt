@@ -36,6 +36,7 @@ rule read =
   | "cdr" { CDR }
   | "tt" { TT }
   | "ff" { FF }
+  | "if" { IF }
   | '(' { LPR }
   | ')' { RPR }
   | '[' { LSQ }

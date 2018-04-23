@@ -1,27 +1,35 @@
 type t =
   {tys : Val.can Val.t list;
    env : Val.env;
+   ppenv : Tm.Pretty.Env.t;
    len : int}
 
 let emp =
   {tys = [];
    env = Val.Env.emp;
+   ppenv = Tm.Pretty.Env.emp;
    len = 0}
 
 let ext cx v =
+  let _, ppenv = Tm.Pretty.Env.bind_fresh cx.ppenv in
   {tys = v :: cx.tys;
    env = Val.Env.ext cx.env @@ Val.generic v @@ cx.len;
-   len = cx.len + 1}
+   len = cx.len + 1;
+   ppenv}
 
 let def cx ~ty ~tm = 
+  let _, ppenv = Tm.Pretty.Env.bind_fresh cx.ppenv in
   {tys = ty :: cx.tys;
    env = Val.Env.ext cx.env tm;
-   len = cx.len + 1}
+   len = cx.len + 1;
+   ppenv}
 
 let proj_exn cx = 
+  let ppenv = Tm.Pretty.Env.proj cx.ppenv in
   {tys = List.tl cx.tys;
    env = fst @@ Val.Env.proj cx.env;
-   len = cx.len - 1}
+   len = cx.len - 1;
+   ppenv}
 
 
 type view = 
@@ -59,3 +67,4 @@ let lookup i cx =
 
 let len cx = cx.len
 let env cx = cx.env 
+let ppenv cx = cx.ppenv

@@ -11,7 +11,7 @@
 %token EQUALS
 %token RIGHT_ARROW
 %token STAR HASH AT
-%token BOOL UNIV LAM CONS CAR CDR TT FF
+%token BOOL UNIV LAM CONS CAR CDR TT FF IF
 %token EOF
 
 %start <ResEnv.t -> Decl.t list> prog
@@ -152,6 +152,10 @@ inf:
     { fun env ->
       make_multi_extapp $startpos $endpos (e env) @@
       List.rev @@ arg0 env :: rest env }
+
+  | LPR; IF; mot = bind(chk); scrut = inf; tcase = chk; fcase = chk; RPR 
+    { fun env ->
+      make_node $startpos $endpos @@ Tm.If {mot = mot env; scrut = scrut env; tcase = tcase env; fcase = fcase env} }
 
   | LPR; COLON_ANGLE; ty = chk; tm = chk; RPR
     { fun env ->

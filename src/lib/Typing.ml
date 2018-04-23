@@ -57,13 +57,13 @@ let rec check ~mcx ~cx ~ty ~tm =
         | Val.Tube.True (_, clo) ->
           let can0 = Val.eval_clo clo in
           let can1 = Val.eval (mcx.menv, LCx.env cx') tm in
-          Quote.equiv ~n:(LCx.len cx') ~ty:vcodx ~can0 ~can1
+          equiv ~cx:cx' ~ty:vcodx ~can0 ~can1
 
         | Val.Tube.Indeterminate ((dim0, dim1), clo) ->
           let cx'' = LCx.restrict_exn cx' dim0 dim1 in
           let can0 = Val.eval_clo clo in
           let can1 = Val.eval (mcx.menv, LCx.env cx'') tm in
-          Quote.equiv ~n:(LCx.len cx'') ~ty:vcodx ~can0 ~can1
+          equiv ~cx:cx'' ~ty:vcodx ~can0 ~can1
 
         | Val.Tube.False _ ->
           ()
@@ -89,7 +89,7 @@ let rec check ~mcx ~cx ~ty ~tm =
   | _, Tm.Up tm ->
     let ty' = infer ~mcx ~cx ~tm in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
-    Quote.approx ~n:(LCx.len cx) ~ty:univ ~can0:ty' ~can1:ty
+    approx ~cx:cx ~ty:univ ~can0:ty' ~can1:ty
 
   | _, Tm.Let (tm0, Tm.B (_, tm1)) ->
     let ty0 = infer ~mcx ~cx ~tm:tm0 in
@@ -97,7 +97,13 @@ let rec check ~mcx ~cx ~ty ~tm =
     let cx' = LCx.def cx ~ty:ty0 ~tm:v in
     check ~mcx ~cx:cx' ~ty ~tm:tm1
 
-  | _, _ -> failwith @@ "check: " ^ Val.to_string ty
+  | _, _ -> 
+    let ppenv = LCx.ppenv cx in
+    let n = LCx.len cx in
+    let univ = Val.into @@ Val.Univ Lvl.Omega in
+    let tty = Quote.quote_can ~n ~ty:univ ~can:ty in
+    Format.fprintf Format.err_formatter "%a !: %a" (Tm.Pretty.pp ppenv) tm (Tm.Pretty.pp ppenv) tty;
+    failwith "check"
 
 and check_eval ~mcx ~cx ~ty ~tm =
   check ~mcx ~cx ~ty ~tm;
@@ -139,7 +145,7 @@ and infer ~mcx ~cx ~tm =
     let bool = Val.into Val.Bool in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let bool' = infer ~mcx ~cx ~tm:scrut in
-    Quote.equiv ~n:(LCx.len cx) ~ty:univ ~can0:bool ~can1:bool';
+    equiv ~cx:cx ~ty:univ ~can0:bool ~can1:bool';
     check ~mcx ~cx:(LCx.ext cx bool) ~ty:univ ~tm:mot;
     let tt = Val.into Val.Tt in
     let ff = Val.into Val.Ff in
@@ -212,10 +218,9 @@ and cx_equiv ~mcx ~cx0 ~cx1 =
 
   | LCx.Snoc snoc0, LCx.Snoc snoc1 -> 
     cx_equiv ~mcx ~cx0:snoc0.cx ~cx1:snoc1.cx;
-    let n = LCx.len snoc0.cx in
-    Quote.approx ~n ~ty:univ ~can0:snoc0.ty ~can1:snoc1.ty;
-    Quote.approx ~n ~ty:snoc0.ty ~can0:snoc0.def ~can1:snoc1.def
-  
+    approx ~cx:snoc0.cx ~ty:univ ~can0:snoc0.ty ~can1:snoc1.ty;
+    approx ~cx:snoc0.cx ~ty:snoc0.ty ~can0:snoc0.def ~can1:snoc1.def
+
   | _ ->
     failwith "cx_equiv"
 
@@ -261,7 +266,7 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
         let vtb = Val.eval (mcx.menv, Val.Env.ext env dim0) tb in
 
         (* Check cap-tube compatibility *)
-        Quote.equiv ~n:(LCx.len cx'') ~ty ~can0:cap ~can1:vtb;
+        equiv ~cx:cx'' ~ty ~can0:cap ~can1:vtb;
 
         (* Check tube-tube adjacency conditions *)
         go_adj cx'' acc (vd0, vd1, tb);
@@ -281,7 +286,7 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
       let env = LCx.env cx' in
       let vtb = Val.eval (mcx.menv, env) tb in
       let vtb' = Val.eval (mcx.menv, env) tb' in
-      Quote.equiv ~n:(LCx.len cx) ~ty ~can0:vtb ~can1:vtb';
+      equiv ~cx:cx ~ty ~can0:vtb ~can1:vtb';
       go_adj cx tubes (vd0, vd1, tb)
 
   in
@@ -325,7 +330,7 @@ and check_sys ~mcx ~cx ~ty ~sys =
           let env = LCx.env cx' in
           let vtb = Val.eval (mcx.menv, env) tb in
           let vtb' = Val.eval (mcx.menv, env) tb' in
-          Quote.equiv ~n:(LCx.len cx') ~ty ~can0:vtb ~can1:vtb';
+          equiv ~cx:cx' ~ty ~can0:vtb ~can1:vtb';
         with
         | LCx.Inconsistent -> ()
       end;
@@ -333,3 +338,27 @@ and check_sys ~mcx ~cx ~ty ~sys =
 
   in
   go sys []
+
+and equiv ~cx ~ty ~can0 ~can1 =
+  let ppenv = LCx.ppenv cx in
+  let n = LCx.len cx in
+  try
+    Quote.equiv ~n ~ty ~can0 ~can1
+  with
+  | exn ->
+    let tm0 = Quote.quote_can ~n ~ty ~can:can0 in
+    let tm1 = Quote.quote_can ~n ~ty ~can:can1 in
+    Format.fprintf Format.err_formatter "%a /= %a\n" (Tm.Pretty.pp ppenv) tm0 (Tm.Pretty.pp ppenv) tm1;
+    raise exn
+
+and approx ~cx ~ty ~can0 ~can1 =
+  let ppenv = LCx.ppenv cx in
+  let n = LCx.len cx in
+  try
+    Quote.approx ~n ~ty ~can0 ~can1
+  with
+  | exn ->
+    let tm0 = Quote.quote_can ~n ~ty ~can:can0 in
+    let tm1 = Quote.quote_can ~n ~ty ~can:can1 in
+    Format.fprintf Format.err_formatter "%a /<= %a\n" (Tm.Pretty.pp ppenv) tm0 (Tm.Pretty.pp ppenv) tm1;
+    raise exn
