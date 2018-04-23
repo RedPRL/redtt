@@ -1,31 +1,31 @@
 type t =
   {tys : Val.can Val.t list;
    env : Val.env;
-   ppenv : Tm.Pretty.Env.t;
+   ppenv : Pretty.Env.t;
    len : int}
 
 let emp =
   {tys = [];
    env = Val.Env.emp;
-   ppenv = Tm.Pretty.Env.emp;
+   ppenv = Pretty.Env.emp;
    len = 0}
 
 let ext cx ?nm:(nm = None) v =
-  let _, ppenv = Tm.Pretty.Env.bind nm cx.ppenv in
+  let _, ppenv = Pretty.Env.bind nm cx.ppenv in
   {tys = v :: cx.tys;
    env = Val.Env.ext cx.env @@ Val.generic v @@ cx.len;
    len = cx.len + 1;
    ppenv}
 
 let def cx ?nm:(nm = None) ty tm = 
-  let _, ppenv = Tm.Pretty.Env.bind nm cx.ppenv in
+  let _, ppenv = Pretty.Env.bind nm cx.ppenv in
   {tys = ty :: cx.tys;
    env = Val.Env.ext cx.env tm;
    len = cx.len + 1;
    ppenv}
 
 let proj_exn cx = 
-  let ppenv = Tm.Pretty.Env.proj cx.ppenv in
+  let ppenv = Pretty.Env.proj cx.ppenv in
   {tys = List.tl cx.tys;
    env = fst @@ Val.Env.proj cx.env;
    len = cx.len - 1;

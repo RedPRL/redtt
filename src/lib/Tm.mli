@@ -57,18 +57,4 @@ type info = Lexing.position * Lexing.position
 val into_info : info option -> 'a f -> 'a t
 val info : 'a t -> info option
 
-module Pretty :
-sig
-  module Env :
-  sig
-    type t
-    val emp : t
-    val var : int -> t -> string
-    val bind : string option -> t -> string * t
-    val bind_fresh : t -> string * t
-
-    val proj : t -> t
-  end
-
-  val pp : Env.t -> Format.formatter -> 'a t -> unit
-end
+val pp : 'a t Pretty.t

@@ -15,7 +15,7 @@ type _ f =
   | Down : {ty : chk t; tm : chk t} -> inf f
   | Coe : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
   | HCom : {dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
-  | Com : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f  
+  | Com : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f
 
   | Up : inf t -> chk f
 
@@ -38,7 +38,7 @@ type _ f =
   | Let : inf t * chk t bnd -> chk f
   | Meta : Symbol.t * subst -> inf f
 
-and subst = 
+and subst =
   | Id
   | Proj
   | Sub of subst * inf t
@@ -55,172 +55,137 @@ let info node = node.info
 
 let out node = node.con
 
-module Pretty =
-struct
-  module Env :
-  sig
-    type t
-    val emp : t
-    val var : int -> t -> string
-    val bind : string option -> t -> string * t
-    val bind_fresh : t -> string * t
-    val proj : t -> t
-  end =
-  struct
-    type t = int * string list
+let rec pp : type a. a t Pretty.t =
+  fun env fmt tm ->
+    match out tm with
+    | Var i ->
+      Format.fprintf fmt "%s" @@
+      Pretty.Env.var i env
 
-    let emp = 0, []
-    let var i (_, xs) = List.nth xs i
-    let bind_fresh (i, xs) =
-      let x = "x" ^ string_of_int i in
-      x, (i + 1, x :: xs)
+    | Down {ty; tm} ->
+      Format.fprintf fmt "@[<1>(:>@ %a@ %a)@]" (pp env) ty (pp env) tm
 
-    let proj (i, xs) =
-      match xs with
-      | [] -> failwith "ppenv/proj"
-      | _::xs -> (i, xs)
+    | Pi (dom, B (nm, cod)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<1>(-> [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
 
-    let bind nm (i, xs) =
-      match nm with
-      | None ->
-        let x = "x" ^ string_of_int i in
-        x, (i + 1, x :: xs)
-      | Some x ->
-        x, (i, x:: xs)
-  end
+    | Sg (dom, B (nm, cod)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<1>(* [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
 
-  let rec pp : type a. Env.t -> Format.formatter -> a t -> unit = 
-    fun env fmt tm ->
-      match out tm with
-      | Var i -> 
-        Format.fprintf fmt "%s" @@ 
-        Env.var i env
+    | Ext (B (nm, (cod, sys))) ->
+      let x, env' = Pretty.Env.bind nm env in
+      begin
+        match sys with
+        | [] ->
+          Format.fprintf fmt "@[<1>(# [%s]@ %a)@]" x (pp env') cod
+        | _ ->
+          Format.fprintf fmt "@[<1>(# [%s]@ %a@ @[%a@])@]" x (pp env') cod (pp_sys env') sys
+      end
 
-      | Down {ty; tm} ->
-        Format.fprintf fmt "@[<1>(:>@ %a@ %a)@]" (pp env) ty (pp env) tm
+    | Lam (B (nm, tm)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<1>(lam [%s]@ %a)@]" x (pp env') tm
 
-      | Pi (dom, B (nm, cod)) ->
-        let x, env' = Env.bind nm env in
-        Format.fprintf fmt "@[<1>(-> [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
+    | FunApp (tm0, tm1) ->
+      Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp env) tm0 (pp env) tm1
 
-      | Sg (dom, B (nm, cod)) ->
-        let x, env' = Env.bind nm env in
-        Format.fprintf fmt "@[<1>(* [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
+    | ExtApp (tm0, tm1) ->
+      Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" (pp env) tm0 (pp env) tm1
 
-      | Ext (B (nm, (cod, sys))) ->
-        let x, env' = Env.bind nm env in
-        begin
-          match sys with
-          | [] ->
-            Format.fprintf fmt "@[<1>(# [%s]@ %a)@]" x (pp env') cod
-          | _ ->
-            Format.fprintf fmt "@[<1>(# [%s]@ %a@ @[%a@])@]" x (pp env') cod (pp_sys env') sys
-        end
+    | Car tm ->
+      Format.fprintf fmt "@[<1>(car@ %a)@]" (pp env) tm
 
-      | Lam (B (nm, tm)) ->
-        let x, env' = Env.bind nm env in
-        Format.fprintf fmt "@[<1>(lam [%s]@ %a)@]" x (pp env') tm
+    | Cdr tm ->
+      Format.fprintf fmt "@[<1>(cdr@ %a)@]" (pp env) tm
 
-      | FunApp (tm0, tm1) ->
-        Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp env) tm0 (pp env) tm1
+    | Up tm ->
+      pp env fmt tm
 
-      | ExtApp (tm0, tm1) ->
-        Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" (pp env) tm0 (pp env) tm1
+    | Bool ->
+      Format.fprintf fmt "bool"
 
-      | Car tm ->
-        Format.fprintf fmt "@[<1>(car@ %a)@]" (pp env) tm
+    | Interval ->
+      Format.fprintf fmt "dim"
 
-      | Cdr tm ->
-        Format.fprintf fmt "@[<1>(cdr@ %a)@]" (pp env) tm
+    | Tt ->
+      Format.fprintf fmt "tt"
 
-      | Up tm ->
-        pp env fmt tm
+    | Ff ->
+      Format.fprintf fmt "ff"
 
-      | Bool ->
-        Format.fprintf fmt "bool"
+    | Dim0 ->
+      Format.fprintf fmt "0"
 
-      | Interval ->
-        Format.fprintf fmt "dim"
+    | Dim1 ->
+      Format.fprintf fmt "1"
 
-      | Tt ->
-        Format.fprintf fmt "tt"
+    | Univ lvl ->
+      Format.fprintf fmt "(U %a)" Lvl.pp lvl
 
-      | Ff ->
-        Format.fprintf fmt "ff"
+    | Coe {dim0; dim1; ty = B (nm, ty); tm} ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<1>(coe %a %a@ [%s] %a@ %a)@]" (pp env) dim0 (pp env) dim1 x (pp env') ty (pp env) tm
 
-      | Dim0 ->
-        Format.fprintf fmt "0"
+    | HCom {dim0; dim1; ty; cap; sys} ->
+      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) dim0 (pp env) dim1 (pp env) ty (pp env) cap (pp_bsys env) sys
 
-      | Dim1 ->
-        Format.fprintf fmt "1"
+    | Com {dim0; dim1; ty = B (nm, ty); cap; sys} ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<1>(com %a %a@ [%s] %a@ %a@ @[%a@])@]" (pp env) dim0 (pp env) dim1 x (pp env) ty (pp env) cap (pp_bsys env) sys
 
-      | Univ lvl ->
-        Format.fprintf fmt "(U %a)" Lvl.pp lvl
+    | If {mot = B (nm, mot); scrut; tcase; fcase} ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<1>(if@ [%s] %a@ %a %a %a)@]" x (pp env') mot (pp env) scrut (pp env) tcase (pp env) fcase
 
-      | Coe {dim0; dim1; ty = B (nm, ty); tm} ->
-        let x, env' = Env.bind nm env in
-        Format.fprintf fmt "@[<1>(coe %a %a@ [%s] %a@ %a)@]" (pp env) dim0 (pp env) dim1 x (pp env') ty (pp env) tm
+    | Cons (tm0, tm1) ->
+      Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
 
-      | HCom {dim0; dim1; ty; cap; sys} ->
-        Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) dim0 (pp env) dim1 (pp env) ty (pp env) cap (pp_bsys env) sys
+    | Let (tm0, B (nm, tm1)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<1>(let@ @[<1>[%s %a]@] %a)@]" x (pp env) tm0 (pp env') tm1
 
-      | Com {dim0; dim1; ty = B (nm, ty); cap; sys} ->
-        let x, env' = Env.bind nm env in
-        Format.fprintf fmt "@[<1>(com %a %a@ [%s] %a@ %a@ @[%a@])@]" (pp env) dim0 (pp env) dim1 x (pp env) ty (pp env) cap (pp_bsys env) sys
-
-      | If {mot = B (nm, mot); scrut; tcase; fcase} ->
-        let x, env' = Env.bind nm env in
-        Format.fprintf fmt "@[<1>(if@ [%s] %a@ %a %a %a)@]" x (pp env') mot (pp env) scrut (pp env) tcase (pp env) fcase
-
-      | Cons (tm0, tm1) -> 
-        Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
-
-      | Let (tm0, B (nm, tm1)) ->
-        let x, env' = Env.bind nm env in
-        Format.fprintf fmt "@[<1>(let@ @[<1>[%s %a]@] %a)@]" x (pp env) tm0 (pp env') tm1
-
-      | Meta _ ->
-        Format.fprintf fmt "<meta>"
+    | Meta _ ->
+      Format.fprintf fmt "<meta>"
 
 
-  and pp_sys env fmt sys = 
-    match sys with
-    | [] ->
-      ()
+and pp_sys env fmt sys =
+  match sys with
+  | [] ->
+    ()
 
-    | [tube] ->
-      pp_tube env fmt tube
+  | [tube] ->
+    pp_tube env fmt tube
 
-    | tube :: sys ->
-      Format.fprintf fmt "%a@ %a" (pp_tube env) tube (pp_sys env) sys
+  | tube :: sys ->
+    Format.fprintf fmt "%a@ %a" (pp_tube env) tube (pp_sys env) sys
 
-  and pp_bsys env fmt sys = 
-    match sys with
-    | [] ->
-      ()
+and pp_bsys env fmt sys =
+  match sys with
+  | [] ->
+    ()
 
-    | [tube] ->
-      pp_btube env fmt tube
+  | [tube] ->
+    pp_btube env fmt tube
 
-    | tube :: sys ->
-      Format.fprintf fmt "%a@ %a" (pp_btube env) tube (pp_bsys env) sys
+  | tube :: sys ->
+    Format.fprintf fmt "%a@ %a" (pp_btube env) tube (pp_bsys env) sys
 
-  and pp_tube env fmt tube = 
-    let dim0, dim1, otm = tube in
-    match otm with
-    | None -> 
-      Format.fprintf fmt "@[<1>[%a=%a@ -]@]" (pp env) dim0 (pp env) dim1
+and pp_tube env fmt tube =
+  let dim0, dim1, otm = tube in
+  match otm with
+  | None ->
+    Format.fprintf fmt "@[<1>[%a=%a@ -]@]" (pp env) dim0 (pp env) dim1
 
-    | Some tm -> 
-      Format.fprintf fmt "@[<1>[%a=%a@ %a]@]" (pp env) dim0 (pp env) dim1 (pp env) tm
+  | Some tm ->
+    Format.fprintf fmt "@[<1>[%a=%a@ %a]@]" (pp env) dim0 (pp env) dim1 (pp env) tm
 
-  and pp_btube env fmt tube = 
-    let dim0, dim1, obnd = tube in
-    match obnd with
-    | None -> 
-      Format.fprintf fmt "@[<1>[%a=%a@ -]@]" (pp env) dim0 (pp env) dim1
+and pp_btube env fmt tube =
+  let dim0, dim1, obnd = tube in
+  match obnd with
+  | None ->
+    Format.fprintf fmt "@[<1>[%a=%a@ -]@]" (pp env) dim0 (pp env) dim1
 
-    | Some (B (nm, tm)) -> 
-      let x, env' = Env.bind nm env in
-      Format.fprintf fmt "@[<1>[%a=%a@ [%s] %a]@]" (pp env) dim0 (pp env) dim1 x (pp env') tm
-end
+  | Some (B (nm, tm)) ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>[%a=%a@ [%s] %a]@]" (pp env) dim0 (pp env) dim1 x (pp env') tm

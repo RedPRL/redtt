@@ -44,5 +44,5 @@ and check_decl cx decl =
     let el = Val.eval (menv, LCx.env cx) tm in
     let nm = Some (decl_name decl) in
     let ppenv = LCx.ppenv cx in
-    Format.fprintf Format.std_formatter "> %a@.@." (Tm.Pretty.pp ppenv) inf;
+    Format.fprintf Format.std_formatter "> %a@.@." (Tm.pp ppenv) inf;
     LCx.def cx ~nm ty el

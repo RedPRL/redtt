@@ -106,7 +106,7 @@ let rec check ~mcx ~cx ~ty ~tm =
     let n = LCx.len cx in
     let univ = Val.into @@ Val.Univ Lvl.Omega in
     let tty = Quote.quote_can ~n ~ty:univ ~can:ty in
-    Format.fprintf Format.err_formatter "%a !: %a" (Tm.Pretty.pp ppenv) tm (Tm.Pretty.pp ppenv) tty;
+    Format.fprintf Format.err_formatter "%a !: %a" (Tm.pp ppenv) tm (Tm.pp ppenv) tty;
     failwith "check"
 
 and check_eval ~mcx ~cx ~ty ~tm =
@@ -361,7 +361,7 @@ and equiv trace ~cx ~ty ~can0 ~can1 =
   | exn ->
     let tm0 = Quote.quote_can ~n ~ty ~can:can0 in
     let tm1 = Quote.quote_can ~n ~ty ~can:can1 in
-    Format.fprintf Format.err_formatter "%s: checking %a == %a@." trace (Tm.Pretty.pp ppenv) tm0 (Tm.Pretty.pp ppenv) tm1;
+    Format.fprintf Format.err_formatter "%s: checking %a == %a@." trace (Tm.pp ppenv) tm0 (Tm.pp ppenv) tm1;
     raise exn
 
 and approx ~cx ~ty ~can0 ~can1 =
@@ -373,5 +373,5 @@ and approx ~cx ~ty ~can0 ~can1 =
   | exn ->
     let tm0 = Quote.quote_can ~n ~ty ~can:can0 in
     let tm1 = Quote.quote_can ~n ~ty ~can:can1 in
-    Format.fprintf Format.err_formatter "%a /<= %a\n" (Tm.Pretty.pp ppenv) tm0 (Tm.Pretty.pp ppenv) tm1;
+    Format.fprintf Format.err_formatter "%a /<= %a\n" (Tm.pp ppenv) tm0 (Tm.pp ppenv) tm1;
     raise exn

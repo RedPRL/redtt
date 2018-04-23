@@ -166,7 +166,7 @@ let embed_dimval dv =
 let out : type a. a t -> a f =
   fun node -> node.con
 
-let rec pp : type a. Format.formatter -> a t -> unit =
+let rec pp : type a. a t Pretty.t0 =
   fun fmt v ->
     match out v with
     | Lvl i ->
