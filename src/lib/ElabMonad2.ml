@@ -38,6 +38,13 @@ include M
 module MonadNotation = Monad.Notation(M)
 open MonadNotation
 
+let eval tm : Val.can Val.t m = 
+  get >>= fun cfg ->
+  let x = Tree.cursor cfg.zip in
+  let seq = MCx.lookup_exn x cfg.mcx in
+  let menv = MCx.menv cfg.mcx in
+  ret @@ Val.eval (menv, LCx.env seq.lcx) seq.ty
+
 
 let goal : ty m = 
   get >>= fun cfg ->
@@ -81,28 +88,28 @@ let oblige : subgoal -> meta m =
 let fill : tm -> unit m = 
   fun tm ->
     get >>= fun cfg ->
-      let x = Tree.cursor cfg.zip in
-      let seq = MCx.lookup_exn x cfg.mcx in
-      match seq.cell with
-      | Ask -> 
-        let vty = Val.eval (MCx.menv cfg.mcx, LCx.env seq.lcx) seq.ty in
-        Typing.check ~mcx:{mcx = cfg.mcx; menv = MCx.menv cfg.mcx} ~cx:seq.lcx ~ty:vty ~tm;
-        set @@ {cfg with mcx = MCx.set x tm cfg.mcx}
+    let x = Tree.cursor cfg.zip in
+    let seq = MCx.lookup_exn x cfg.mcx in
+    match seq.cell with
+    | Ask -> 
+      let vty = Val.eval (MCx.menv cfg.mcx, LCx.env seq.lcx) seq.ty in
+      Typing.check ~mcx:{mcx = cfg.mcx; menv = MCx.menv cfg.mcx} ~cx:seq.lcx ~ty:vty ~tm;
+      set @@ {cfg with mcx = MCx.set x tm cfg.mcx}
 
-      | Ret _ ->
-        failwith "Cannot fill resolved hole"
+    | Ret _ ->
+      failwith "Cannot fill resolved hole"
 
 let resolve : rtm -> tm m = 
   fun rtm -> 
     get >>= fun cfg ->
-      let x = Tree.cursor cfg.zip in
-      let seq = MCx.lookup_exn x cfg.mcx in
-      ret @@ rtm seq.rnv
+    let x = Tree.cursor cfg.zip in
+    let seq = MCx.lookup_exn x cfg.mcx in
+    ret @@ rtm seq.rnv
 
 let move : Tree.move -> unit m =
   fun mv ->
     get >>= fun cfg ->
-      set @@ {cfg with zip = Tree.move mv cfg.zip}
+    set @@ {cfg with zip = Tree.move mv cfg.zip}
 
 module Notation = 
 struct

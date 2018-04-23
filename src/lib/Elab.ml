@@ -4,8 +4,9 @@ type rnv = ResEnv.t
 type menv = MEnv.t
 type hole = Symbol.t
 
-module E = ElabMonad
+module E = ElabMonad2
 module Notation = Monad.Notation (E)
+open E.Notation
 open Notation
 
 module Tm =
@@ -22,163 +23,69 @@ struct
   let sg nm dom cod = Tm.into @@ Tm.Sg (dom, Tm.B (nm, cod))
   let let_ nm t0 t1 = Tm.into @@ Tm.Let (t0, Tm.B (nm, t1))
   let cons t0 t1 = Tm.into @@ Tm.Cons (t0, t1)
+  let univ lvl = Tm.into @@ Tm.Univ lvl
 end
 
-(* Some preliminary sketches of the elaborator tactics. *)
-
-let lambda x : hole -> hole E.m =
-  fun alpha ->
-    E.lookup_goal alpha >>= fun (cx, rnv, ty) ->
+module Tac = 
+struct
+  let lambda nm : unit E.m = 
+    E.goal >>= fun ty ->
     match Tm.out ty with
-    | Tm.Pi (dom, Tm.B (nm, cod)) -> 
-      E.eval (LCx.env cx) dom >>= fun vdom ->
-      let cx' = LCx.ext cx vdom in
-      E.new_goal ~lcx:cx' ~rnv:(ResEnv.bind x rnv) ~ty:cod >>= fun beta ->
+    | Tm.Pi (dom, Tm.B (_, cod)) -> 
+      E.oblige ([nm, dom] >- cod) >>= fun alpha ->
       let tm = 
-        let inf = Tm.meta beta @@ Tm.inst0 @@ Tm.var 0 in
+        let inf = Tm.meta alpha @@ Tm.inst0 @@ Tm.var 0 in
         Tm.lam nm @@ Tm.up inf
       in
-      E.fill alpha tm >>
-      E.ret beta
-
-    | _ -> 
-      failwith "lambda"
-
-let pi x : hole -> (hole * hole) E.m = 
-  fun alpha ->
-    E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
-    E.new_goal ~lcx ~rnv ~ty >>= fun alpha0 ->
-    let tdom = Tm.up @@ Tm.meta alpha0 Tm.Id in
-    E.eval (LCx.env lcx) tdom >>= fun vdom ->
-    let lcx' = LCx.ext lcx vdom in
-    let rnv' = ResEnv.bind x rnv in
-    E.new_goal ~lcx:lcx' ~rnv:rnv' ~ty >>= fun alpha1 ->
-    let tm = 
-      let tcod = Tm.up @@ Tm.meta alpha1 @@ Tm.inst0 @@ Tm.var 0 in
-      Tm.pi (Some x) tdom tcod
-    in
-    E.fill alpha tm >>
-    E.ret (alpha0, alpha1)
-
-let sg x : hole -> (hole * hole) E.m = 
-  fun alpha ->
-    E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
-    E.new_goal ~lcx ~rnv ~ty >>= fun alpha0 ->
-    let tdom = Tm.up @@ Tm.meta alpha0 Tm.Id in
-    E.eval (LCx.env lcx) tdom >>= fun vdom ->
-    let lcx' = LCx.ext lcx vdom in
-    let rnv' = ResEnv.bind x rnv in
-    E.new_goal ~lcx:lcx' ~rnv:rnv' ~ty >>= fun alpha1 ->
-    let tm = 
-      let tcod = Tm.up @@ Tm.meta alpha1 @@ Tm.inst0 @@ Tm.var 0 in
-      Tm.sg (Some x) tdom tcod
-    in
-    E.fill alpha tm >>
-    E.ret (alpha0, alpha1)
-
-let cons : hole -> (hole * hole) E.m = 
-  fun alpha ->
-    E.lookup_goal alpha >>= fun (lcx, rnv, ty) ->
-    match Tm.out ty with
-    | Tm.Sg (dom, Tm.B (nm, cod)) ->
-      E.new_goal ~lcx ~rnv ~ty:dom >>= fun alpha0 ->
-      let tcar = Tm.meta alpha0 Tm.Id in
-      let cod' = Tm.let_ nm tcar cod in
-      E.new_goal ~lcx ~rnv ~ty:cod' >>= fun alpha1 ->
-      let tm = 
-        let tcdr = Tm.up @@ Tm.meta alpha1 Tm.Id in
-        Tm.cons (Tm.up tcar) tcdr
-      in
-      E.fill alpha tm >>
-      E.ret (alpha0, alpha1)
+      E.fill tm
 
     | _ ->
-      failwith "cons"
+      failwith "lambda: expected pi"
 
-let quote rtm alpha : unit E.m = 
-  E.lookup_res alpha >>= fun rnv ->
-  let tm = rtm rnv in
-  E.fill alpha tm
+  let pi nm : unit E.m = 
+    E.goal >>= fun ty ->
+    match Tm.out ty with
+    | Tm.Univ lvl ->
+      E.oblige ([] >- Tm.univ lvl) >>= fun alpha ->
+      let dom = Tm.up @@ Tm.meta alpha Tm.Id in
+      E.oblige ([nm, dom] >- Tm.univ lvl) >>= fun beta ->
+      let cod = Tm.up @@ Tm.meta beta @@ Tm.inst0 @@ Tm.var 0 in
+      let tm = Tm.pi nm dom cod in
+      E.fill tm
 
-let rec elab : type a. a ElabTm.t -> hole -> unit E.m =
-  fun etm alpha ->
+    | _ ->
+      failwith "pi: expected universe"
+
+end
+
+let rec elab : type a. a ElabTm.t -> unit E.m =
+  fun etm ->
     match ElabTm.out etm with
     | ElabTm.Pi tele -> 
-      let rec go tele alpha =
+      let rec go tele =
         match tele with
         | ElabTm.TEnd {cod} -> 
-          elab cod alpha
+          elab cod
 
         | ElabTm.TCons {vars; dom; cod} -> 
-          go_vars vars dom alpha >>=
+          go_vars vars dom >>
           go cod 
 
-      and go_vars vars dom alpha = 
+      and go_vars vars dom = 
         match vars with
         | [] -> 
-          E.ret alpha
+          E.ret ()
 
         | x::xs ->
-          pi x alpha >>= fun (alpha0, alpha1) ->
-          elab dom alpha0 >>
-          go_vars xs dom alpha1
+          Tac.pi (Some x) >>
+          E.move `Down >>
+          E.move `Right >>
+          elab dom >>
+          E.move `Left >>
+          go_vars xs dom
 
       in
-      go tele alpha
-
-    | ElabTm.Sg tele -> 
-      let rec go tele alpha =
-        match tele with
-        | ElabTm.TEnd {cod} -> 
-          elab cod alpha
-
-        | ElabTm.TCons {vars; dom; cod} -> 
-          go_vars vars dom alpha >>=
-          go cod 
-
-      and go_vars vars dom alpha = 
-        match vars with
-        | [] -> 
-          E.ret alpha
-
-        | x::xs ->
-          sg x alpha >>= fun (alpha0, alpha1) ->
-          elab dom alpha0 >>
-          go_vars xs dom alpha1
-
-      in
-      go tele alpha
-
-    | ElabTm.Lam {vars; bdy} ->
-      let rec go xs alpha = 
-        match xs with
-        | [] -> 
-          elab bdy alpha
-
-        | x::xs ->
-          lambda x alpha >>= 
-          go xs
-      in
-      go vars alpha
-
-    | ElabTm.Quote rtm ->
-      quote rtm alpha
-
-    | ElabTm.Tuple {cells} -> 
-      let rec go cells alpha = 
-        match cells with
-        | [cell] -> 
-          elab cell alpha
-
-        | cell::cells -> 
-          cons alpha >>= fun (alpha0, alpha1) ->
-          elab cell alpha0 >>
-          go cells alpha1
-
-        | [] -> 
-          failwith "TODO: empty tuple"
-      in
-      go cells alpha
+      go tele
 
     | _ -> 
       failwith "TODO"
