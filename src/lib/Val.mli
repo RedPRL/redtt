@@ -67,6 +67,7 @@ type _ f =
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
 
+val pp : Format.formatter -> 'a t -> unit
 val to_string : 'a t -> string
 
 module Env : 
