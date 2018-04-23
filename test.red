@@ -9,7 +9,6 @@
   [p : (-> [x : A] (Path (B x) (f x) (g x)))]
   (Path (-> [x : A] (B x)) f g)
   :>
-
   (lam [i] [x] (@ (p x) i)))
 
 
@@ -20,15 +19,14 @@
 (define notnot [x : bool] bool :>
  (not (not x)))
 
-(define notnotidpt [x : bool] (Path bool (notnot x) x) :>
+(define notnot/id/pt [x : bool] (Path bool (notnot x) x) :>
  (if
   [x] (Path bool (notnot x) x)
   x
   (lam [i] tt)
   (lam [i] ff)))
 
-(define notnotid (Path (-> bool bool) notnot (lam [x] x)) :>
+(define notnot/id (Path (-> bool bool) notnot (lam [x] x)) :>
  (lam [i] [x]
-  (@ (notnotidpt x) i)))
-
+  (@ (notnot/id/pt x) i)))
 
