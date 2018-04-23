@@ -6,14 +6,14 @@ type hole = Symbol.t
 
 module M = 
 struct
-type 'a m = mcx -> mcx * 'a 
+  type 'a m = mcx -> mcx * 'a 
 
-let bind m k cx = 
-  let cx', a = m cx in
-  k a cx'
+  let bind m k cx = 
+    let cx', a = m cx in
+    k a cx'
 
-let ret x cx = 
-  cx, x
+  let ret x cx = 
+    cx, x
 
 end
 
