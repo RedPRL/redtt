@@ -185,7 +185,7 @@ let rec pp : type a. Format.formatter -> a t -> unit =
       Format.fprintf fmt "@[<1>(#@ %a@ %a)@]" pp_bclo cod pp_sclo sys
 
     | Univ lvl ->
-      Format.fprintf fmt "@[<1>(U %a)]" Lvl.pp lvl
+      Format.fprintf fmt "@[<1>(U %a)@]" Lvl.pp lvl
 
     | Interval ->
       Format.fprintf fmt "dim"
@@ -215,28 +215,28 @@ let rec pp : type a. Format.formatter -> a t -> unit =
       Format.fprintf fmt "@[<1>(if@ %a %a %a %a)@]" pp_bclo info.mot pp info.scrut pp_tclo info.tcase pp_tclo info.fcase
 
     | Lam bdy ->
-      Format.fprintf fmt "@[<1>(lam %a)]" pp_bclo bdy
+      Format.fprintf fmt "@[<1>(lam %a)@]" pp_bclo bdy
 
     | Cons (v0, v1) ->
-      Format.fprintf fmt "@[<1>(cons@ %a@ %a)]" pp_tclo v0 pp_tclo v1
+      Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" pp_tclo v0 pp_tclo v1
 
     | Coe info ->
-      Format.fprintf fmt "@[<1>(coe %a %a@ %a %a)]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp_bclo info.ty pp info.tm
+      Format.fprintf fmt "@[<1>(coe %a %a@ %a %a)@]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp_bclo info.ty pp info.tm
 
     | HCom info ->
-      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp info.ty pp info.cap pp_bsys info.sys
+      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp info.ty pp info.cap pp_bsys info.sys
 
     | FCom info ->
-      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a)]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp info.cap pp_bsys info.sys
+      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a)@]" pp (embed_dimval info.dim0) pp (embed_dimval info.dim1) pp info.cap pp_bsys info.sys
 
     | FunApp (v0, v1) -> 
-      Format.fprintf fmt "@[<1>(%a %a)]" pp v0 pp v1
+      Format.fprintf fmt "@[<1>(%a %a)@]" pp v0 pp v1
 
     | ExtApp (v0, v1) -> 
-      Format.fprintf fmt "@[<1>(%s %a %a)]" "@" pp v0 pp (embed_dimval v1)
+      Format.fprintf fmt "@[<1>(%s %a %a)@]" "@" pp v0 pp (embed_dimval v1)
 
     | Car v -> 
-      Format.fprintf fmt "@[<1>(car %a)]" pp v
+      Format.fprintf fmt "@[<1>(car %a)@]" pp v
 
     | Cdr v ->
       Format.fprintf fmt "@[<1>(cdr %a)]" pp v
@@ -291,17 +291,18 @@ let (<<:+) sys (menv, env) =
 let out_pi v =
   match out v with
   | Pi (dom, cod) -> dom, cod
-  | _ -> failwith "out_pi"
+  | _ -> failwith @@ "out_pi: " ^ to_string v
 
 let out_sg v =
   match out v with
   | Sg (dom, cod) -> dom, cod
-  | _ -> failwith "out_sg"
+  | _ -> failwith @@ "out_sg: " ^ to_string v
 
 let out_ext v =
   match out v with
   | Ext (cod, sys) -> cod, sys
-  | _ -> failwith "out_ext"
+  | _ -> failwith @@ "out_ext: " ^ to_string v
+
 let out_nf v =
   match out v with
   | Down (ty, el) -> ty, el
