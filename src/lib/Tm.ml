@@ -116,6 +116,12 @@ struct
       | ExtApp (tm0, tm1) ->
         Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" (pp env) tm0 (pp env) tm1
 
+      | Car tm ->
+        Format.fprintf fmt "@[<1>(car@ %a)@]" (pp env) tm
+
+      | Cdr tm ->
+        Format.fprintf fmt "@[<1>(cdr@ %a)@]" (pp env) tm
+
       | Up tm ->
         pp env fmt tm
 
@@ -140,8 +146,31 @@ struct
       | Univ lvl ->
         Format.fprintf fmt "(U %a)" Lvl.pp lvl
 
-      | _ ->
-        Format.fprintf fmt "<term>"
+      | Coe {dim0; dim1; ty = B ty; tm} ->
+        let x, env' = Env.bind_fresh env in
+        Format.fprintf fmt "@[<1>(coe %a %a@ [%s] %a@ %a)@]" (pp env) dim0 (pp env) dim1 x (pp env') ty (pp env) tm
+
+      | HCom {dim0; dim1; ty; cap; sys} ->
+        Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" (pp env) dim0 (pp env) dim1 (pp env) ty (pp env) cap (pp_bsys env) sys
+
+      | Com {dim0; dim1; ty = B ty; cap; sys} ->
+        let x, env' = Env.bind_fresh env in
+        Format.fprintf fmt "@[<1>(com %a %a@ [%s] %a@ %a@ %a)@]" (pp env) dim0 (pp env) dim1 x (pp env) ty (pp env) cap (pp_bsys env) sys
+
+      | If {mot = B mot; scrut; tcase; fcase} ->
+        let x, env' = Env.bind_fresh env in
+        Format.fprintf fmt "@[<1>(if@ [%s] %a@ %a %a %a)@]" x (pp env') mot (pp env) scrut (pp env) tcase (pp env) fcase
+
+      | Cons (tm0, tm1) -> 
+        Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
+
+      | Let (tm0, B tm1) ->
+        let x, env' = Env.bind_fresh env in
+        Format.fprintf fmt "@[<1>(let@ @[<1>[%s %a]@] %a)@]" x (pp env) tm0 (pp env') tm1
+
+      | Meta _ ->
+        Format.fprintf fmt "<meta>"
+
 
   and pp_sys env fmt sys = 
     match sys with
@@ -154,6 +183,17 @@ struct
     | tube :: sys ->
       Format.fprintf fmt "%a@ %a" (pp_tube env) tube (pp_sys env) sys
 
+  and pp_bsys env fmt sys = 
+    match sys with
+    | [] ->
+      ()
+    
+    | [tube] ->
+      pp_btube env fmt tube
+
+    | tube :: sys ->
+      Format.fprintf fmt "%a@ %a" (pp_btube env) tube (pp_bsys env) sys
+
   and pp_tube env fmt tube = 
     let dim0, dim1, otm = tube in
     match otm with
@@ -162,4 +202,14 @@ struct
 
     | Some tm -> 
       Format.fprintf fmt "@[<1>[%a=%a@ %a]@]" (pp env) dim0 (pp env) dim1 (pp env) tm
+
+  and pp_btube env fmt tube = 
+    let dim0, dim1, obnd = tube in
+    match obnd with
+    | None -> 
+      Format.fprintf fmt "@[<1>[%a=%a@ -]@]" (pp env) dim0 (pp env) dim1
+
+    | Some (B tm) -> 
+      let x, env' = Env.bind_fresh env in
+      Format.fprintf fmt "@[<1>[%a=%a@ [%s] %a]@]" (pp env) dim0 (pp env) dim1 x (pp env') tm
 end
