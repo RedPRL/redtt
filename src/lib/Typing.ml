@@ -1,5 +1,5 @@
 type cx = LCx.t
-type mcx = {mcx : MCx.t; menv : MEnv.t}
+type mcx = MCx.t
 
 let check_sys_valid sys : unit =
   print_string "TODO: check favonia's validity condition on lists of equations\n"
@@ -56,14 +56,14 @@ let rec check ~mcx ~cx ~ty ~tm =
         match tube with
         | Val.Tube.True (_, clo) ->
           let can0 = Val.eval_clo clo in
-          let can1 = Val.eval (mcx.menv, LCx.env cx') tm in
+          let can1 = Val.eval (MCx.menv mcx, LCx.env cx') tm in
           equiv "ext/lam/tube/true" ~cx:cx' ~ty:vcodx ~can0 ~can1;
           go sys
 
         | Val.Tube.Indeterminate ((dim0, dim1), clo) ->
           let cx'' = LCx.restrict_exn cx' dim0 dim1 in
           let can0 = Val.eval_clo clo in
-          let can1 = Val.eval (mcx.menv, LCx.env cx'') tm in
+          let can1 = Val.eval (MCx.menv mcx, LCx.env cx'') tm in
           equiv "ext/lam/tube/indet" ~cx:cx'' ~ty:vcodx ~can0 ~can1;
           go sys
 
@@ -97,7 +97,7 @@ let rec check ~mcx ~cx ~ty ~tm =
 
   | _, Tm.Let (tm0, Tm.B (_, tm1)) ->
     let ty0 = infer ~mcx ~cx ~tm:tm0 in
-    let v = Val.eval (mcx.menv, LCx.env cx) tm0 in
+    let v = Val.eval (MCx.menv mcx, LCx.env cx) tm0 in
     let cx' = LCx.def cx ty0 v in
     check ~mcx ~cx:cx' ~ty ~tm:tm1
 
@@ -111,7 +111,7 @@ let rec check ~mcx ~cx ~ty ~tm =
 
 and check_eval ~mcx ~cx ~ty ~tm =
   check ~mcx ~cx ~ty ~tm;
-  Val.eval (mcx.menv, LCx.env cx) tm
+  Val.eval (MCx.menv mcx, LCx.env cx) tm
 
 
 and infer ~mcx ~cx ~tm =
@@ -141,7 +141,7 @@ and infer ~mcx ~cx ~tm =
   | Tm.Cdr tm ->
     let ty = infer ~mcx ~cx ~tm in
     let _, cod = Val.out_sg ty in
-    let vpair = Val.eval (mcx.menv, LCx.env cx) tm in
+    let vpair = Val.eval (MCx.menv mcx, LCx.env cx) tm in
     let vcar = Val.car vpair in
     Val.inst_bclo cod vcar
 
@@ -154,12 +154,12 @@ and infer ~mcx ~cx ~tm =
     let tt = Val.into Val.Tt in
     let ff = Val.into Val.Ff in
     let env = LCx.env cx in
-    let tmot = Val.eval (mcx.menv, Val.Env.ext env tt) mot in
+    let tmot = Val.eval (MCx.menv mcx, Val.Env.ext env tt) mot in
     check ~mcx ~cx ~ty:tmot ~tm:tcase;
-    let fmot = Val.eval (mcx.menv, Val.Env.ext env ff) mot in
+    let fmot = Val.eval (MCx.menv mcx, Val.Env.ext env ff) mot in
     check ~mcx ~cx ~ty:fmot ~tm:fcase;
-    let vscrut = Val.eval (mcx.menv, env) scrut in
-    Val.eval (mcx.menv, Val.Env.ext env vscrut) mot
+    let vscrut = Val.eval (MCx.menv mcx, env) scrut in
+    Val.eval (MCx.menv mcx, Val.Env.ext env vscrut) mot
 
   | Tm.Down {ty; tm} ->
     let univ = Val.into @@ Val.Univ Lvl.Omega in
@@ -175,9 +175,9 @@ and infer ~mcx ~cx ~tm =
     let Tm.B (nm, ty) = coe.ty in
     check ~mcx ~cx:(LCx.ext cx ~nm interval) ~ty:univ ~tm:ty;
     let env = LCx.env cx in
-    let vty0 = Val.eval (mcx.menv, Val.Env.ext env vdim0) ty in
+    let vty0 = Val.eval (MCx.menv mcx, Val.Env.ext env vdim0) ty in
     check ~mcx ~cx:cx ~ty:vty0 ~tm:coe.tm;
-    Val.eval (mcx.menv, Val.Env.ext env vdim1) ty
+    Val.eval (MCx.menv mcx, Val.Env.ext env vdim1) ty
 
   | Tm.HCom hcom ->
     let interval = Val.into Val.Interval in
@@ -199,16 +199,16 @@ and infer ~mcx ~cx ~tm =
     let Tm.B (nm, ty) = com.ty in
     let vty = check_eval ~mcx ~cx:(LCx.ext cx ~nm interval) ~ty:univ ~tm:ty in
     let env = LCx.env cx in
-    let vty0 = Val.eval (mcx.menv, Val.Env.ext env vdim0) ty in
+    let vty0 = Val.eval (MCx.menv mcx, Val.Env.ext env vdim0) ty in
     check_bsys ~mcx ~cx ~dim0:vdim0 ~tycap:vty0 ~ty:vty ~cap:com.cap ~sys:com.sys;
-    Val.eval (mcx.menv, Val.Env.ext env vdim1) ty
+    Val.eval (MCx.menv mcx, Val.Env.ext env vdim1) ty
 
   | Tm.Meta (sym, sigma) -> 
-    let seq = MCx.lookup_exn sym mcx.mcx in
+    let seq = MCx.lookup_exn sym mcx in
     let cx' = infer_subst ~mcx ~cx:seq.lcx ~subst:sigma in
     cx_equiv ~mcx ~cx0:cx ~cx1:cx';
-    let env' = Val.eval_subst (mcx.menv, LCx.env cx) sigma in
-    Val.eval (mcx.menv, env') seq.ty
+    let env' = Val.eval_subst (MCx.menv mcx, LCx.env cx) sigma in
+    Val.eval (MCx.menv mcx, env') seq.ty
 
   | _ -> failwith "pattern exhaustiveness + GADTs is broken in OCaml :("
 
@@ -241,7 +241,7 @@ and infer_subst ~mcx ~cx ~subst =
   | Tm.Sub (sigma, t) ->
     let ty = infer ~mcx ~cx ~tm:t in
     let cx' = infer_subst ~mcx ~cx ~subst:sigma in
-    let el = Val.eval (mcx.menv, LCx.env cx) t in
+    let el = Val.eval (MCx.menv mcx, LCx.env cx) t in
     LCx.def cx' ty el
 
 
@@ -266,11 +266,11 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
         end;
 
         let cx0 = LCx.restrict_exn (LCx.def cx interval dim0) vd0 vd1 in
-        let vtb = Val.eval (mcx.menv, LCx.env cx0) tb in
+        let vtb = Val.eval (MCx.menv mcx, LCx.env cx0) tb in
 
         let vcap = 
           let env = LCx.env @@ LCx.restrict_exn cx vd0 vd1 in
-          Val.eval (mcx.menv, env) cap
+          Val.eval (MCx.menv mcx, env) cap
         in
 
         (* Check cap-tube compatibility *)
@@ -294,8 +294,8 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
         try 
           let cx' = LCx.restrict_exn cx vd0' vd1' in
           let env = LCx.env cx' in
-          let vtb = Val.eval (mcx.menv, env) tb in
-          let vtb' = Val.eval (mcx.menv, env) tb' in
+          let vtb = Val.eval (MCx.menv mcx, env) tb in
+          let vtb' = Val.eval (MCx.menv mcx, env) tb' in
           equiv "bsys/adj" ~cx:cx' ~ty ~can0:vtb ~can1:vtb';
         with
         | LCx.Inconsistent -> ()
@@ -341,8 +341,8 @@ and check_sys ~mcx ~cx ~ty ~sys =
         try 
           let cx' = LCx.restrict_exn cx vd0' vd1' in
           let env = LCx.env cx' in
-          let vtb = Val.eval (mcx.menv, env) tb in
-          let vtb' = Val.eval (mcx.menv, env) tb' in
+          let vtb = Val.eval (MCx.menv mcx, env) tb in
+          let vtb' = Val.eval (MCx.menv mcx, env) tb' in
           equiv "sys/adj" ~cx:cx' ~ty ~can0:vtb ~can1:vtb';
         with
         | LCx.Inconsistent -> ()

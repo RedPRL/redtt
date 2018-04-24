@@ -38,23 +38,31 @@ include M
 module MonadNotation = Monad.Notation(M)
 open MonadNotation
 
+let sequent : MCx.sequent m = 
+  get >>= fun cfg ->
+  let x = Tree.cursor cfg.zip in
+  ret @@ MCx.lookup_exn x cfg.mcx
+
+
 let eval tm : Val.can Val.t m = 
   get >>= fun cfg ->
   let x = Tree.cursor cfg.zip in
   let seq = MCx.lookup_exn x cfg.mcx in
-  let menv = MCx.menv cfg.mcx in
+  let menv = MCx.menv cfg.mcx in 
   ret @@ Val.eval (menv, LCx.env seq.lcx) seq.ty
 
 
-let goal : ty m = 
+let quote_ty v : tm m =
   get >>= fun cfg ->
   let x = Tree.cursor cfg.zip in
   let seq = MCx.lookup_exn x cfg.mcx in
-  let menv = MCx.menv cfg.mcx in
-  let vty = Val.eval (menv, LCx.env seq.lcx) seq.ty in
   let univ = Val.into @@ Val.Univ Lvl.Omega in
-  let nty = Quote.quote_can ~n:(LCx.len seq.lcx) ~ty:univ ~can:vty in
-  ret nty
+  ret @@ Quote.quote_can ~n:(LCx.len seq.lcx) ~ty:univ ~can:v
+
+
+let goal : ty m = 
+  sequent >>= fun seq ->
+  eval seq.ty >>= quote_ty
 
 let subgoal ~hyps ~ty = 
   hyps, ty
@@ -62,21 +70,19 @@ let subgoal ~hyps ~ty =
 let oblige : subgoal -> meta m = 
   fun (hyps, ty) ->
     get >>= fun cfg ->
-    let x = Tree.cursor cfg.zip in
-    let seq = MCx.lookup_exn x cfg.mcx in
+    sequent >>= fun seq ->
 
     let univ = Val.into @@ Val.Univ Lvl.Omega in
-    let tmcx = Typing.{mcx = cfg.mcx; menv = MCx.menv cfg.mcx} in
 
     let rnv, lcx = 
       let alg (nm, ty) (rnv, lcx) =
-        Typing.check ~mcx:tmcx ~cx:lcx ~ty:univ ~tm:ty;
-        let vty = Val.eval (tmcx.menv, LCx.env lcx) ty in
+        Typing.check ~mcx:cfg.mcx ~cx:lcx ~ty:univ ~tm:ty;
+        let vty = Val.eval (MCx.menv cfg.mcx, LCx.env lcx) ty in
         ResEnv.bind_opt nm rnv, LCx.ext lcx ~nm vty
       in List.fold_right alg hyps (seq.rnv, seq.lcx)
     in
 
-    Typing.check ~mcx:tmcx ~cx:lcx ~ty:univ ~tm:ty;
+    Typing.check ~mcx:cfg.mcx ~cx:lcx ~ty:univ ~tm:ty;
 
     let seq' = MCx.{rnv; lcx; ty; cell = MCx.Ask} in
     let y = Symbol.fresh () in
@@ -93,7 +99,7 @@ let fill : tm -> unit m =
     match seq.cell with
     | Ask -> 
       let vty = Val.eval (MCx.menv cfg.mcx, LCx.env seq.lcx) seq.ty in
-      Typing.check ~mcx:{mcx = cfg.mcx; menv = MCx.menv cfg.mcx} ~cx:seq.lcx ~ty:vty ~tm;
+      Typing.check ~mcx:cfg.mcx ~cx:seq.lcx ~ty:vty ~tm;
       set @@ {cfg with mcx = MCx.set x tm cfg.mcx}
 
     | Ret _ ->
@@ -101,9 +107,7 @@ let fill : tm -> unit m =
 
 let resolve : rtm -> tm m = 
   fun rtm -> 
-    get >>= fun cfg ->
-    let x = Tree.cursor cfg.zip in
-    let seq = MCx.lookup_exn x cfg.mcx in
+    sequent >>= fun seq ->
     ret @@ rtm seq.rnv
 
 let move : Tree.move -> unit m =
