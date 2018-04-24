@@ -29,7 +29,7 @@ module Make (R : SOURCE) : LEXER = struct
       (":>", COLON_ANGLE);
       ("@", AT);
       ("*", STAR);
-      ("=", EQUALS);
+      ("#", HASH);
       ("bool", BOOL);
       ("car", CAR);
       ("cdr", CDR);
@@ -55,9 +55,9 @@ let number =
 let whitespace =
   [' ' '\t']+
 let atom_initial =
-  [^ '0'-'9' '(' ')' '[' ']' '{' '}' '.' '#' '\\' '"' ' ' '\t' '\n' '\r']
+  [^ '0'-'9' '(' ')' '[' ']' '{' '}' '.' '\\' '=' '"' ' ' '\t' '\n' '\r']
 let atom_subsequent =
-  [^ '(' ')' '[' ']' '{' '}' '.' '#' '\\' '"' ' ' '\t' '\n' '\r']
+  [^ '(' ')' '[' ']' '{' '}' '.' '#' '\\' '=' '"' ' ' '\t' '\n' '\r']
 
 refill {refill_handler}
 
@@ -74,22 +74,22 @@ rule token = parse
 }
   | number
 { Lwt.return (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
-  | '#'
-{ Lwt.return Grammar.HASH }
   | '('
-{ Lwt.return Grammar.LPR }
+{ Lwt.return LPR }
   | ')'
-{ Lwt.return Grammar.RPR }
+{ Lwt.return RPR }
   | '['
 { Lwt.return LSQ }
   | ']'
 { Lwt.return RSQ }
+  | '='
+{ Lwt.return EQUALS }
   | line_ending
 { new_line lexbuf; token lexbuf }
   | whitespace
 { token lexbuf }
   | eof
-{ Lwt.return Grammar.EOF }
+{ Lwt.return EOF }
   | _
 { Lwt_io.printlf "Unexpected char: %s" (lexeme lexbuf) >>= fun _ -> token lexbuf }
 
