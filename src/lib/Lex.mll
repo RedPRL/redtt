@@ -24,12 +24,6 @@ module Make (R : SOURCE) : LEXER = struct
 
   let keywords =
     make_table 0 [
-      ("->", RIGHT_ARROW);
-      (":", COLON);
-      (":>", COLON_ANGLE);
-      ("@", AT);
-      ("*", STAR);
-      ("#", HASH);
       ("bool", BOOL);
       ("car", CAR);
       ("cdr", CDR);
@@ -55,23 +49,13 @@ let number =
 let whitespace =
   [' ' '\t']+
 let atom_initial =
-  [^ '0'-'9' '(' ')' '[' ']' '{' '}' '.' '\\' '=' '"' ' ' '\t' '\n' '\r']
+  [^ '0'-'9' '-' '(' ')' '[' ']' '{' '}' '.' '#' '\\' '@' '*' ':' '=' '"' ' ' '\t' '\n' '\r']
 let atom_subsequent =
-  [^ '(' ')' '[' ']' '{' '}' '.' '#' '\\' '=' '"' ' ' '\t' '\n' '\r']
+  [^             '(' ')' '[' ']' '{' '}' '.' '#' '\\' '@' '*' ':' '=' '"' ' ' '\t' '\n' '\r']
 
 refill {refill_handler}
 
 rule token = parse
-  | atom_initial atom_subsequent*
-    {
-      let input = lexeme lexbuf in
-      begin try
-        let kwd = Hashtbl.find keywords input in
-        Lwt.return kwd
-      with Not_found ->
-        Lwt.return (Grammar.ATOM input)
-      end
-    }
   | number
     { Lwt.return (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
   | '('
@@ -81,15 +65,37 @@ rule token = parse
   | '['
     { Lwt.return LSQ }
   | ']'
-    { Lwt.return RSQ }
+{ Lwt.return RSQ }
+  | '#'
+{ Lwt.return HASH }
+  | '@'
+{ Lwt.return AT }
+  | '*'
+{ Lwt.return STAR }
+  | ':'
+{ Lwt.return COLON }
+  | ":>"
+{ Lwt.return COLON_ANGLE }
   | '='
-    { Lwt.return EQUALS }
+{ Lwt.return EQUALS }
+  | "->"
+{ Lwt.return RIGHT_ARROW }
   | line_ending
     { new_line lexbuf; token lexbuf }
   | whitespace
     { token lexbuf }
   | eof
-    { Lwt.return EOF }
+{ Lwt.return EOF }
+  | atom_initial atom_subsequent*
+{
+  let input = lexeme lexbuf in
+  begin try
+    let kwd = Hashtbl.find keywords input in
+    Lwt.return kwd
+  with Not_found ->
+    Lwt.return (Grammar.ATOM input)
+  end
+}
   | _
     { Lwt_io.printlf "Unexpected char: %s" (lexeme lexbuf) >>= fun _ -> token lexbuf }
 
