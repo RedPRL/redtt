@@ -1,6 +1,9 @@
 module V = Val
 module T = Tm
 
+type el = V.can V.t
+type tm = T.chk T.t
+
 let rec equiv n ~ty el0 el1 =
   match V.out ty, V.out el0, V.out el1 with
   | _, V.Pi (dom0, cod0), V.Pi (dom1, cod1) ->

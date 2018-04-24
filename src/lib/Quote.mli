@@ -1,6 +1,9 @@
-val quote : int -> ty:Val.can Val.t -> Val.can Val.t -> Tm.chk Tm.t
-val equiv : int -> ty:Val.can Val.t -> Val.can Val.t -> Val.can Val.t -> Tm.chk Tm.t
+type el = Val.can Val.t
+type tm = Tm.chk Tm.t
 
-val equiv_ty : int -> Val.can Val.t -> Val.can Val.t -> Tm.chk Tm.t
-val quote_ty : int -> Val.can Val.t -> Tm.chk Tm.t
-val approx_ty : int -> Val.can Val.t -> Val.can Val.t -> unit
+val quote : int -> ty:el -> el -> tm
+val equiv : int -> ty:el -> el -> el -> tm
+
+val equiv_ty : int -> el -> el -> tm
+val quote_ty : int -> el -> tm
+val approx_ty : int -> el -> el -> unit
