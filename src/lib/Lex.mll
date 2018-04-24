@@ -29,7 +29,6 @@ module Make (R : SOURCE) : LEXER = struct
       (":>", COLON_ANGLE);
       ("@", AT);
       ("*", STAR);
-      ("#", HASH);
       ("=", EQUALS);
       ("bool", BOOL);
       ("car", CAR);
@@ -75,6 +74,8 @@ rule token = parse
 }
   | number
 { Lwt.return (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
+  | '#'
+{ Lwt.return Grammar.HASH }
   | '('
 { Lwt.return Grammar.LPR }
   | ')'
