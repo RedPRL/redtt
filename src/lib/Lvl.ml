@@ -6,12 +6,12 @@ let greater l0 l1 =
   | Const i0, Const i1 -> i0 > i1
   | _ -> false
 
-let to_string l = 
+let to_string l =
   match l with
   | Omega -> "omega"
   | Const i -> string_of_int i
 
-let pp fmt l = 
+let pp fmt l =
   match l with
   | Omega ->
     Format.fprintf fmt "omega"

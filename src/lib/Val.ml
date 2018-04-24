@@ -497,7 +497,7 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
       end
 
 and eval_subst rho sigma =
-  let _menv, env = rho in
+  let _, env = rho in
   match sigma with
   | Tm.Id ->
     env
@@ -851,5 +851,3 @@ and eval_clo clo =
 
   | Clo.Inst (bclo, arg) ->
     inst_bclo bclo arg
-
-

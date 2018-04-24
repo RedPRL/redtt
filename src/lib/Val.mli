@@ -10,7 +10,7 @@ type sclo
 module Tube :
 sig
   type equ = DimVal.equ
-  type 'a t = 
+  type 'a t =
     | Indeterminate of equ * 'a
     | True of equ * 'a
     | False of equ
@@ -70,7 +70,7 @@ val out : 'a t -> 'a f
 val pp : 'a t Pretty.t0
 val to_string : 'a t -> string
 
-module Env : 
+module Env :
 sig
   type el = can t
 

@@ -254,7 +254,7 @@ and equiv_bsys n ~ty sys0 sys1 =
       let tb = qd0, qd1, Some (T.B (None, q)) in
       go sys0 sys1 @@ tb :: acc
 
-    | V.Tube.False (d00, d01) :: sys0, V.Tube.False (d10, d11) :: _sys ->
+    | V.Tube.False (d00, d01) :: sys0, V.Tube.False (d10, d11) :: sys1 ->
       let qd0 = equiv_dim n d00 d10 in
       let qd1 = equiv_dim n d01 d11 in
       let tb = qd0, qd1, None in

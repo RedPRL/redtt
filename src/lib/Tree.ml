@@ -1,14 +1,14 @@
 type 'a tree =
-  | Node of {label : 'a; children : 'a forest} 
+  | Node of {label : 'a; children : 'a forest}
 
 and 'a forest = 'a tree list
 
-type 'a frame = 
-  {label : 'a; 
-   lefts : 'a forest; 
+type 'a frame =
+  {label : 'a;
+   lefts : 'a forest;
    rights : 'a forest}
 
-type 'a dtree = 
+type 'a dtree =
   {below : 'a forest;
    above : 'a frame list}
 
@@ -18,10 +18,10 @@ let init label =
   let ctx = {below = []; above = []} in
   {label; ctx}
 
-let cursor {label; _} = 
+let cursor {label; _} =
   label
 
-let insert lbl {label; ctx} = 
+let insert lbl {label; ctx} =
   let node = Node {label = lbl; children = []} in
   let below = node :: ctx.below in
   let ctx' = {ctx with below} in
@@ -32,11 +32,11 @@ type move = [`Id of move0 | `Star of move0]
 exception InvalidMove of move0
 
 let down {label; ctx} =
-  match ctx.below with 
-  | [] -> 
+  match ctx.below with
+  | [] ->
     raise @@ InvalidMove `Down
 
-  | Node node :: xs -> 
+  | Node node :: xs ->
     let below = node.children in
     let frame = {label; lefts = []; rights = xs} in
     let above = frame :: ctx.above in
@@ -54,7 +54,7 @@ let up {label; ctx} =
     let ctx' = {below; above} in
     {label = frame.label; ctx = ctx'}
 
-let left {label; ctx} = 
+let left {label; ctx} =
   match ctx.above with
   | [] ->
     raise @@ InvalidMove `Left
@@ -99,7 +99,7 @@ let move m =
   | `Id m0 ->
     move0 m0
   | `Star m0 ->
-    let rec go zip = 
+    let rec go zip =
       try go @@ move0 m0 zip with
       | _ -> zip
     in go

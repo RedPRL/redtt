@@ -17,14 +17,14 @@ let ext cx ?nm:(nm = None) v =
    len = cx.len + 1;
    ppenv}
 
-let def cx ?nm:(nm = None) ty tm = 
+let def cx ?nm:(nm = None) ty tm =
   let _, ppenv = Pretty.Env.bind nm cx.ppenv in
   {tys = ty :: cx.tys;
    env = Val.Env.ext cx.env tm;
    len = cx.len + 1;
    ppenv}
 
-let proj_exn cx = 
+let proj_exn cx =
   let ppenv = Pretty.Env.proj cx.ppenv in
   {tys = List.tl cx.tys;
    env = fst @@ Val.Env.proj cx.env;
@@ -32,11 +32,11 @@ let proj_exn cx =
    ppenv}
 
 
-type view = 
+type view =
   | Snoc of {cx : t; ty : Val.can Val.t; def : Val.can Val.t}
   | Nil
 
-let view cx = 
+let view cx =
   match cx.tys with
   | [] ->
     Nil
@@ -46,7 +46,7 @@ let view cx =
     Snoc {cx = cx'; ty = ty; def = snd @@ Val.Env.proj cx.env }
 
 
-let proj cx = 
+let proj cx =
   try Some (proj_exn cx) with
   | _ -> None
 
@@ -57,7 +57,7 @@ let restrict_exn cx d0 d1 =
 let compare_dim cx =
   Val.Env.compare_dim cx.env
 
-let canonize cx = 
+let canonize cx =
   Val.Env.canonize cx.env
 
 exception Inconsistent = DimRel.Inconsistent
@@ -66,5 +66,5 @@ let lookup i cx =
   List.nth cx.tys i
 
 let len cx = cx.len
-let env cx = cx.env 
+let env cx = cx.env
 let ppenv cx = cx.ppenv

@@ -1,7 +1,7 @@
 include Monad.S
 
-type tm = Tm.chk Tm.t 
-type ty = Tm.chk Tm.t 
+type tm = Tm.chk Tm.t
+type ty = Tm.chk Tm.t
 type rtm = ResEnv.t -> tm
 
 type meta = Symbol.t
@@ -23,7 +23,7 @@ val oblige : subgoal -> meta m
 val fill : tm -> unit m
 
 (** Resolve the variables in the term according to the current hole's resolver environment. *)
-val resolve : rtm -> tm m 
+val resolve : rtm -> tm m
 
 (** Move through the proof tree *)
 val move : Tree.move -> unit m

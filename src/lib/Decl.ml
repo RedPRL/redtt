@@ -3,20 +3,20 @@ type t =
 
 type document = t list
 
-let decl_name dcl = 
+let decl_name dcl =
   match dcl with
   | Define {name; _} ->
     name
 
-let rec tele_to_multibind tele bdy = 
+let rec tele_to_multibind tele bdy =
   match tele with
-  | TmUtil.TEnd _ -> 
+  | TmUtil.TEnd _ ->
     TmUtil.MBEnd bdy
 
-  | TmUtil.TCons (nm, _, tele) -> 
+  | TmUtil.TCons (nm, _, tele) ->
     TmUtil.MBCons (nm, tele_to_multibind tele bdy)
 
-let to_inf decl = 
+let to_inf decl =
   match decl with
   | Define {info; args; body; _} ->
     let ty = TmUtil.pi_from_tele (Some info) args in
@@ -24,7 +24,7 @@ let to_inf decl =
     Tm.into @@ Tm.Down {ty; tm}
 
 
-let rec check_document cx decls = 
+let rec check_document cx decls =
   match decls with
   | [] ->
     ()
@@ -33,7 +33,7 @@ let rec check_document cx decls =
     let cx' = check_decl cx decl in
     check_document cx' decls
 
-and check_decl cx decl = 
+and check_decl cx decl =
   match decl with
   | Define {info; args; body} ->
     let ty = TmUtil.pi_from_tele (Some info) args in

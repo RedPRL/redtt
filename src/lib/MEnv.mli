@@ -1,4 +1,4 @@
-module type S = 
+module type S =
 sig
   val find : Symbol.t -> Tm.chk Tm.t option
 end

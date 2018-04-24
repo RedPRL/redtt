@@ -18,7 +18,7 @@
 %%
 prog:
   | LPR; DEFINE; name = ATOM; args = tele_with_env; COLON_ANGLE; body = chk; _rpr = RPR; p = prog
-    { fun env -> 
+    { fun env ->
       let tele, env_bdy = args env in
       let info = $startpos, $endpos(_rpr) in
       let decl = Decl.Define {name; info; args = tele; body = body env_bdy} in
@@ -153,9 +153,9 @@ inf:
       make_multi_extapp $startpos $endpos (e env) @@
       List.rev @@ arg0 env :: rest env }
 
-  | LPR; IF; mot = bind(chk); scrut = inf; tcase = chk; fcase = chk; RPR 
+  | LPR; IF; mot = bind(chk); scrut = inf; tcase = chk; fcase = chk; RPR
     { fun env ->
-      make_node $startpos $endpos @@ 
+      make_node $startpos $endpos @@
       Tm.If {mot = mot env; scrut = scrut env; tcase = tcase env; fcase = fcase env} }
 
   | LPR; HCOM; dim0 = chk; dim1 = chk; ty = chk; cap = chk; sys = elist(tube(bind(chk))); RPR
