@@ -4,6 +4,8 @@ type 'a bnd = B of string option * 'a
 type chk
 type inf
 
+(** The type of terms, indexed by a sort [chk] or [inf]. See [_ f] for the 
+    external view, which can be accessed using [out]. *)
 type 'a t
 
 type 'a tube = chk t * chk t * 'a option
@@ -11,6 +13,9 @@ type 'a system = 'a tube list
 
 (* TODO: add FCom *)
 
+(** The external view of syntactic terms, parameterized by a sort [chk] or [inf]. 
+    We use an indexed family because it simplifies implementation by forcing terms to 
+    be shaped in a certain way. *)
 type _ f =
   | Var : int -> inf f
   | Car : inf t -> inf f
@@ -41,14 +46,16 @@ type _ f =
   | Dim1 : chk f
 
   | Let : inf t * chk t bnd -> chk f
+
   | Meta : Symbol.t * subst -> inf f
 
-
+(** Explicit substitutions in the style of Abadi. *)
 and subst = 
   | Id
   | Proj
   | Sub of subst * inf t
   | Cmp of subst * subst
+
 
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
