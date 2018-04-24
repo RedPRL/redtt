@@ -41,7 +41,7 @@ let view cx =
   | [] ->
     Nil
 
-  | ty :: tys ->
+  | ty :: _tys ->
     let cx' = proj_exn cx in
     Snoc {cx = cx'; ty = ty; def = snd @@ Val.Env.proj cx.env }
 
