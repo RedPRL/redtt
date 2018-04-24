@@ -35,7 +35,7 @@ let rec check_document cx decls =
 
 and check_decl cx decl =
   match decl with
-  | Define {info; args; body; name} ->
+  | Define {info; args; body} ->
     let ty = TmUtil.pi_from_tele (Some info) args in
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
     let inf = Tm.into @@ Tm.Down {ty; tm} in

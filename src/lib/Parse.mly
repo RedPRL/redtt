@@ -25,7 +25,7 @@ prog:
       let env' = R.bind name env in
       decl :: p env' }
   | EOF
-    { fun env -> [] }
+    { fun _env -> [] }
 
 tele_with_env:
   | dom = chk; rest = tele_with_env
@@ -81,23 +81,23 @@ constrained:
 
 chk:
   | BOOL
-    { fun env ->
+    { fun _env ->
       make_node $startpos $endpos @@ Tm.Bool }
 
   | TT
-    { fun env ->
+    { fun _env ->
       make_node $startpos $endpos @@ Tm.Tt }
 
   | FF
-    { fun env ->
+    { fun _env ->
       make_node $startpos $endpos @@ Tm.Ff }
 
   | i = NUMERAL
-    { fun _ ->
+    { fun _env ->
       make_dim_const $startpos $endpos i }
 
   | LPR; UNIV; i = NUMERAL; RPR
-    { fun env ->
+    { fun _env ->
       make_node $startpos $endpos @@
       Tm.Univ (Lvl.Const i) }
 

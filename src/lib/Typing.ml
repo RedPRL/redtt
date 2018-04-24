@@ -1,7 +1,7 @@
 type cx = LCx.t
 type mcx = MCx.t
 
-let check_sys_valid sys : unit =
+let check_sys_valid _sys : unit =
   print_string "TODO: check favonia's validity condition on lists of equations\n"
 
 let check_sys_valid_or_empty sys =
@@ -244,6 +244,7 @@ and infer_subst ~mcx ~cx ~subst =
 
 
 and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
+  ignore tycap;
   let interval = Val.into Val.Interval in
   let rec go sys acc =
     match sys with

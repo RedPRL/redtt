@@ -196,7 +196,7 @@ let rec pp : type a. a t Pretty.t0 =
     | Dim1 ->
       Format.fprintf fmt "1"
 
-    | DimFresh sym ->
+    | DimFresh _sym ->
       Format.fprintf fmt "<#dim/fresh>"
 
     | DimDelete ->
@@ -346,7 +346,7 @@ let mapi_tubes f =
 
 
 let map_tubes f =
-  mapi_tubes (fun i -> f)
+  mapi_tubes (fun _i -> f)
 
 let reflect ty neu =
   into @@ Up (ty, neu)
@@ -485,7 +485,7 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
       eval (menv, Env.ext env v) t1
 
     | Tm.Meta (sym, sigma) ->
-      let menv, env = rho in
+      let menv, _env = rho in
       begin
         match MEnv.find sym menv with
         | None ->
@@ -497,7 +497,7 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
       end
 
 and eval_subst rho sigma =
-  let menv, env = rho in
+  let _, env = rho in
   match sigma with
   | Tm.Id ->
     env
@@ -626,7 +626,7 @@ and apply vfun varg =
     rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:(apply info.tm varg')
 
   | HCom info ->
-    let dom, cod = out_pi info.ty in
+    let _dom, cod = out_pi info.ty in
     let vcod = inst_bclo cod varg in
     let vcap = apply info.cap varg in
     let vsys = map_tubes (fun bclo -> Clo.App (bclo, varg)) info.sys in
@@ -736,7 +736,7 @@ and project_bsys sys r =
   match sys with
   | [] ->
     None
-  | Tube.True (_, tb) :: sys ->
+  | Tube.True (_, tb) :: _sys ->
     Some (inst_bclo tb @@ embed_dimval r)
   | _ :: sys ->
     project_bsys sys r
@@ -746,7 +746,7 @@ and project_sys sys =
   match sys with
   | [] ->
     None
-  | Tube.True (_, tb) :: sys ->
+  | Tube.True (_, tb) :: _sys ->
     Some (eval_clo tb)
   | _ :: sys ->
     project_sys sys

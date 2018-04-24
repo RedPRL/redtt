@@ -8,4 +8,5 @@
 
 (library
  ((name Cubical)
-  (public_name cubical)))
+  (public_name cubical)
+  (flags (:standard -short-paths -strict-formats -w +a-3-4-6-9-22-30-32-39-40-41-42-44-48-60))))

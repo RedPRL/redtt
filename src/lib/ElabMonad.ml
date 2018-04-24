@@ -44,7 +44,7 @@ let sequent : MCx.sequent m =
   ret @@ MCx.lookup_exn x cfg.mcx
 
 
-let eval tm : Val.can Val.t m =
+let eval _tm : Val.can Val.t m =
   get >>= fun cfg ->
   let x = Tree.cursor cfg.zip in
   let seq = MCx.lookup_exn x cfg.mcx in
