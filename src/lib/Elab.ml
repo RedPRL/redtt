@@ -33,14 +33,24 @@ struct
     match Tm.out ty with
     | Tm.Pi (dom, Tm.B (_, cod)) -> 
       E.oblige ([nm, dom] >- cod) >>= fun alpha ->
-      let tm = 
-        let inf = Tm.meta alpha @@ Tm.inst0 @@ Tm.var 0 in
-        Tm.lam nm @@ Tm.up inf
-      in
-      E.fill tm
+      E.fill @@ Tm.lam nm @@ Tm.up @@ Tm.meta alpha @@ Tm.inst0 @@ Tm.var 0
 
     | _ ->
       failwith "lambda: expected pi"
+
+  let cons : unit E.m = 
+    E.goal >>= fun ty ->
+    match Tm.out ty with
+    | Tm.Sg (dom, Tm.B (nm, cod)) ->
+      E.oblige ([] >- dom) >>= fun alpha ->
+      let tm0 = Tm.meta alpha Tm.Id in
+      let cod' = Tm.let_ nm tm0 cod in
+      E.oblige ([] >- cod') >>= fun beta ->
+      let tm1 = Tm.meta beta Tm.Id in
+      E.fill @@ Tm.cons (Tm.up tm0) (Tm.up tm1)
+
+    | _ ->
+      failwith "cons: expected sg"
 
   let pi nm : unit E.m = 
     E.goal >>= fun ty ->
@@ -50,11 +60,28 @@ struct
       let dom = Tm.up @@ Tm.meta alpha Tm.Id in
       E.oblige ([nm, dom] >- Tm.univ lvl) >>= fun beta ->
       let cod = Tm.up @@ Tm.meta beta @@ Tm.inst0 @@ Tm.var 0 in
-      let tm = Tm.pi nm dom cod in
-      E.fill tm
+      E.fill @@ Tm.pi nm dom cod
 
     | _ ->
       failwith "pi: expected universe"
+
+  let sg nm : unit E.m = 
+    E.goal >>= fun ty ->
+    match Tm.out ty with
+    | Tm.Univ lvl ->
+      E.oblige ([] >- Tm.univ lvl) >>= fun alpha ->
+      let dom = Tm.up @@ Tm.meta alpha Tm.Id in
+      E.oblige ([nm, dom] >- Tm.univ lvl) >>= fun beta ->
+      let cod = Tm.up @@ Tm.meta beta @@ Tm.inst0 @@ Tm.var 0 in
+      E.fill @@ Tm.sg nm dom cod
+
+    | _ ->
+      failwith "sg: expected universe"
+
+  let under tac = 
+    E.move `Down >>
+    tac >> 
+    E.move `Up
 
 end
 
@@ -78,12 +105,12 @@ let rec elab : type a. a ElabTm.t -> unit E.m =
 
         | x::xs ->
           Tac.pi (Some x) >>
-          E.move `Down >>
-          E.move `Right >>
-          elab dom >>
-          E.move `Left >>
-          go_vars xs dom >>
-          E.move `Up
+          Tac.under begin
+            E.move `Right >>
+            elab dom >>
+            E.move `Left >>
+            go_vars xs dom
+          end
 
       in
       go tele
