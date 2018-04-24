@@ -5,7 +5,7 @@ sig
   val ret : 'a -> 'a m
 end
 
-module type Notation = 
+module type Notation =
 sig
   type 'a m
 

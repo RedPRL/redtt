@@ -5,7 +5,7 @@ type tele =
   | TCons of string option * Tm.chk Tm.t * tele
   | TEnd of Tm.chk Tm.t
 
-type 'a multibind = 
+type 'a multibind =
   | MBCons of string option * 'a multibind
   | MBEnd of 'a
 
@@ -30,7 +30,7 @@ let rec lam_from_multibind info mb =
     Tm.into_info info @@
     Tm.Lam (Tm.B (nm, lam_from_multibind info mb))
 
-let rec ext_from_multibind start stop mb = 
+let rec ext_from_multibind start stop mb =
   match mb with
   | MBCons (nm, MBEnd (ty, sys)) ->
     Tm.into_info (Some (start, stop)) @@
@@ -46,7 +46,7 @@ let rec ext_from_multibind start stop mb =
 
 let rec make_multi_funapp start stop fn rest =
   match rest with
-  | [] -> 
+  | [] ->
     fn
   | arg :: rest ->
     let fn' = make_multi_funapp start stop fn rest in
@@ -54,7 +54,7 @@ let rec make_multi_funapp start stop fn rest =
 
 let rec make_multi_extapp start stop fn rest =
   match rest with
-  | [] -> 
+  | [] ->
     fn
   | arg :: rest ->
     let fn' = make_multi_funapp start stop fn rest in

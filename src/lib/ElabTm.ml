@@ -13,7 +13,7 @@ type _ f =
   | Hole : chk f
   | Quote : (ResEnv.t -> chk Tm.t) -> chk f
 
-and tele = 
+and tele =
   | TCons of {vars : string list; dom : chk t; cod : tele}
   | TEnd of {cod : chk t}
 

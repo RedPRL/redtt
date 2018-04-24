@@ -6,11 +6,11 @@ type meta = Symbol.t
 
 (* In case someone asks, why are the terms and types stored as terms rather than values:
 
-   These terms are used in many different contexts (under explicit substitutions), 
+   These terms are used in many different contexts (under explicit substitutions),
    and it doesn't make sense to substitute in *value*. But we do know how to
    take a term and evaluate it under an explicit substitution. *)
 
-type cell = 
+type cell =
   | Ret of Tm.chk Tm.t
   | Ask
 

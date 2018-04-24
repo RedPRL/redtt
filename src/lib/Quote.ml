@@ -48,7 +48,7 @@ let rec equiv n ~ty el0 el1 =
     T.into T.Bool
 
   | _, V.Univ l0, V.Univ l1 ->
-    if l0 = l1 then 
+    if l0 = l1 then
       T.univ l0
     else
       failwith "equiv: univ level mismatch"
@@ -100,8 +100,8 @@ let rec equiv n ~ty el0 el1 =
     let vapp1 = V.apply el1 vgen in
     let qbdy = equiv (n + 1) ~ty:vcod vapp0 vapp1 in
     T.lam None qbdy
-    
-    
+
+
   | V.Ext (cod, sys), _, _ ->
     let interval = V.into V.Interval in
     let vgen = V.generic interval n in
@@ -126,7 +126,7 @@ let rec equiv n ~ty el0 el1 =
   | _ ->
     failwith "equiv"
 
-and equiv_neu n neu0 neu1 = 
+and equiv_neu n neu0 neu1 =
   match V.out neu0, V.out neu1 with
   | V.Lvl l0, V.Lvl l1 ->
     if l0 != l1 then failwith "de bruijn level mismatch" else
@@ -173,11 +173,11 @@ and equiv_neu n neu0 neu1 =
   | _ -> failwith "equiv_neu"
 
 
-and equiv_ty n ty0 ty1 = 
+and equiv_ty n ty0 ty1 =
   let univ = V.into @@ V.Univ Lvl.Omega in
   equiv n ~ty:univ ty0 ty1
 
-and equiv_dim n dim0 dim1 = 
+and equiv_dim n dim0 dim1 =
   let interval = V.into V.Interval in
   equiv n ~ty:interval (V.embed_dimval dim0) (V.embed_dimval dim1)
 
@@ -265,7 +265,7 @@ and equiv_bsys n ~ty sys0 sys1 =
   in
   go sys0 sys1 []
 
-let rec approx_ty n ty0 ty1 = 
+let rec approx_ty n ty0 ty1 =
   match V.out ty0, V.out ty1 with
   | V.Univ l0, V.Univ l1 ->
     if Lvl.greater l0 l1 then
