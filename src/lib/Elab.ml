@@ -79,9 +79,10 @@ struct
       failwith "sg: expected universe"
 
   let under tac = 
-    E.move `Down >>
+    E.move0 `Down >>
+    E.move (`Star `Right) >>
     tac >> 
-    E.move `Up
+    E.move0 `Up 
 
 end
 
@@ -106,9 +107,8 @@ let rec elab : type a. a ElabTm.t -> unit E.m =
         | x::xs ->
           Tac.pi (Some x) >>
           Tac.under begin
-            E.move `Right >>
             elab dom >>
-            E.move `Left >>
+            E.move0 `Left >>
             go_vars xs dom
           end
 

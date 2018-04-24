@@ -27,6 +27,7 @@ val resolve : rtm -> tm m
 
 (** Move through the proof tree *)
 val move : Tree.move -> unit m
+val move0 : Tree.move0 -> unit m
 
 (* Evaluate a typechecked term in the current local context. *)
 val eval : tm -> Val.can Val.t m

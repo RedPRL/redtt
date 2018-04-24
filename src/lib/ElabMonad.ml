@@ -115,6 +115,9 @@ let move : Tree.move -> unit m =
     get >>= fun cfg ->
     set @@ {cfg with zip = Tree.move mv cfg.zip}
 
+let move0 m = 
+  move (`Id m)
+
 module Notation = 
 struct
   let (>-) hyps ty = subgoal ~hyps ~ty
