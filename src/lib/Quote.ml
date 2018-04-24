@@ -1,29 +1,27 @@
-type variance = Covar | Iso
-
 module V = Val
 module T = Tm
 
 let rec equiv n ~ty el0 el1 =
   match V.out ty, V.out el0, V.out el1 with
   | _, V.Pi (dom0, cod0), V.Pi (dom1, cod1) ->
-    let vdom0 = Val.eval_clo dom0 in
-    let vdom1 = Val.eval_clo dom1 in
+    let vdom0 = V.eval_clo dom0 in
+    let vdom1 = V.eval_clo dom1 in
     let qdom = equiv n ~ty vdom0 vdom1 in
-    let vgen0 = Val.generic vdom0 n in
-    let vgen1 = Val.generic vdom1 n in
-    let vcod0 = Val.inst_bclo cod0 vgen0 in
-    let vcod1 = Val.inst_bclo cod1 vgen1 in
+    let vgen0 = V.generic vdom0 n in
+    let vgen1 = V.generic vdom1 n in
+    let vcod0 = V.inst_bclo cod0 vgen0 in
+    let vcod1 = V.inst_bclo cod1 vgen1 in
     let qcod = equiv (n+1) ~ty vcod0 vcod1 in
     T.pi None qdom qcod
 
   | _, V.Sg (dom0, cod0), V.Sg (dom1, cod1) ->
-    let vdom0 = Val.eval_clo dom0 in
-    let vdom1 = Val.eval_clo dom1 in
+    let vdom0 = V.eval_clo dom0 in
+    let vdom1 = V.eval_clo dom1 in
     let qdom = equiv n ~ty vdom0 vdom1 in
-    let vgen0 = Val.generic vdom0 n in
-    let vgen1 = Val.generic vdom1 n in
-    let vcod0 = Val.inst_bclo cod0 vgen0 in
-    let vcod1 = Val.inst_bclo cod1 vgen1 in
+    let vgen0 = V.generic vdom0 n in
+    let vgen1 = V.generic vdom1 n in
+    let vcod0 = V.inst_bclo cod0 vgen0 in
+    let vcod1 = V.inst_bclo cod1 vgen1 in
     let qcod = equiv (n+1) ~ty vcod0 vcod1 in
     T.sg None qdom qcod
 
@@ -59,9 +57,9 @@ let rec equiv n ~ty el0 el1 =
     T.into T.Ff
 
   | _, V.Coe coe0, V.Coe coe1 ->
-    let interval = V.into Val.Interval in
-    let qdim0 = equiv_dim n ~dim0:coe0.dim0 ~dim1:coe0.dim0 in
-    let qdim1 = equiv_dim n ~dim0:coe0.dim1 ~dim1:coe0.dim1 in
+    let interval = V.into V.Interval in
+    let qdim0 = equiv_dim n coe0.dim0 coe0.dim0 in
+    let qdim1 = equiv_dim n coe0.dim1 coe0.dim1 in
     let vgen = V.generic interval n in
     let vty0x = V.inst_bclo coe0.ty vgen in
     let vty1x = V.inst_bclo coe1.ty vgen in
@@ -72,25 +70,24 @@ let rec equiv n ~ty el0 el1 =
     T.up tcoe
 
   | _, V.HCom hcom0, V.HCom hcom1 ->
-    let qdim0 = equiv_dim n ~dim0:hcom0.dim0 ~dim1:hcom1.dim0 in
-    let qdim1 = equiv_dim n ~dim0:hcom0.dim1 ~dim1:hcom1.dim1 in
+    let qdim0 = equiv_dim n hcom0.dim0 hcom1.dim0 in
+    let qdim1 = equiv_dim n hcom0.dim1 hcom1.dim1 in
     let vty0 = hcom0.ty in
     let vty1 = hcom1.ty in
     let qty = equiv_ty n vty0 vty1 in
     let qcap = equiv n ~ty:vty0 hcom0.cap hcom1.cap in
     let qsys = equiv_bsys n ~ty hcom0.sys hcom1.sys in
-    let thcom = Tm.into @@ Tm.HCom {dim0 = qdim0; dim1 = qdim1; ty = qty; cap = qcap; sys = qsys} in
-    Tm.into @@ Tm.Up thcom
+    let thcom = T.into @@ T.HCom {dim0 = qdim0; dim1 = qdim1; ty = qty; cap = qcap; sys = qsys} in
+    T.up thcom
 
-  | _, Val.Up (_, neu0), Val.Up (_, neu1) ->
-    let q = equiv_neu n ~neu0 ~neu1 in
-    Tm.into @@ Tm.Up q
+  | _, V.Up (_, neu0), V.Up (_, neu1) ->
+    T.up @@ equiv_neu n neu0 neu1
 
-  | _, Val.Dim0, Val.Dim0 ->
-    Tm.into Tm.Dim0
+  | _, V.Dim0, V.Dim0 ->
+    T.into T.Dim0
 
-  | _ , Val.Dim1, Val.Dim1 ->
-    Tm.into Tm.Dim1
+  | _ , V.Dim1, V.Dim1 ->
+    T.into T.Dim1
 
   | V.Pi (dom, cod), _, _ ->
     let vdom = V.eval_clo dom in
@@ -99,10 +96,10 @@ let rec equiv n ~ty el0 el1 =
     let vapp0 = V.apply el0 vgen in
     let vapp1 = V.apply el1 vgen in
     let qbdy = equiv (n + 1) ~ty:vcod vapp0 vapp1 in
-    Tm.lam None qbdy
+    T.lam None qbdy
     
     
-  | Val.Ext (cod, sys), _, _ ->
+  | V.Ext (cod, sys), _, _ ->
     let interval = V.into V.Interval in
     let vgen = V.generic interval n in
     let vdim = V.project_dimval vgen in
@@ -110,9 +107,9 @@ let rec equiv n ~ty el0 el1 =
     let vapp0 = V.ext_apply el0 vdim in
     let vapp1 = V.ext_apply el1 vdim in
     let qbdy = equiv (n+1) ~ty:vcod vapp0 vapp1 in
-    Tm.lam None qbdy
+    T.lam None qbdy
 
-  | Val.Sg (dom, cod), _, _->
+  | V.Sg (dom, cod), _, _->
     let vdom = V.eval_clo dom in
     let vcar0 = V.car el0 in
     let vcar1 = V.car el1 in
@@ -121,12 +118,12 @@ let rec equiv n ~ty el0 el1 =
     let vcod = V.inst_bclo cod vcar0 in
     let qcar = equiv n ~ty:vdom vcar0 vcar1 in
     let qcdr = equiv n ~ty:vcod vcdr0 vcdr1 in
-    Tm.cons qcar qcdr
+    T.cons qcar qcdr
 
   | _ ->
     failwith "equiv"
 
-and equiv_neu n ~neu0 ~neu1 = 
+and equiv_neu n neu0 neu1 = 
   match V.out neu0, V.out neu1 with
   | V.Lvl l0, V.Lvl l1 ->
     if l0 != l1 then failwith "de bruijn level mismatch" else
@@ -134,22 +131,22 @@ and equiv_neu n ~neu0 ~neu1 =
       T.var ix
 
   | V.FunApp (neu0, nfarg0), V.FunApp (neu1, nfarg1) ->
-    let quo = equiv_neu n ~neu0 ~neu1 in
+    let quo = equiv_neu n neu0 neu1 in
     let vdom, varg0 = V.out_nf nfarg0 in
     let _, varg1 = V.out_nf nfarg1 in
     let qarg = equiv n ~ty:vdom varg0 varg1 in
     T.into @@ T.FunApp (quo, qarg)
 
   | V.ExtApp (neu0, dim0), V.ExtApp (neu1, dim1) ->
-    let quo = equiv_neu n ~neu0 ~neu1 in
-    let qarg = equiv_dim n ~dim0 ~dim1 in
+    let quo = equiv_neu n neu0 neu1 in
+    let qarg = equiv_dim n dim0 dim1 in
     T.into @@ T.ExtApp (quo, qarg)
 
   | V.Car neu0, V.Car neu1 ->
-    T.car @@ equiv_neu n ~neu0 ~neu1
+    T.car @@ equiv_neu n neu0 neu1
 
-  | V.Cdr neu0, Val.Cdr neu1 ->
-    T.cdr @@ equiv_neu n ~neu0 ~neu1
+  | V.Cdr neu0, V.Cdr neu1 ->
+    T.cdr @@ equiv_neu n neu0 neu1
 
   | V.If if0, V.If if1 ->
     let bool = V.into V.Bool in
@@ -177,9 +174,9 @@ and equiv_ty n ty0 ty1 =
   let univ = V.into @@ V.Univ Lvl.Omega in
   equiv n ~ty:univ ty0 ty1
 
-and equiv_dim n ~dim0 ~dim1 = 
+and equiv_dim n dim0 dim1 = 
   let interval = V.into V.Interval in
-  equiv n ~ty:interval (Val.embed_dimval dim0) (Val.embed_dimval dim1)
+  equiv n ~ty:interval (V.embed_dimval dim0) (V.embed_dimval dim1)
 
 and equiv_sys n ~ty sys0 sys1 =
   let rec go sys0 sys1 acc =
@@ -187,33 +184,33 @@ and equiv_sys n ~ty sys0 sys1 =
     | [], [] ->
       List.rev acc
 
-    | Val.Tube.Delete :: sys0, _ ->
+    | V.Tube.Delete :: sys0, _ ->
       go sys0 sys1 acc
 
-    | _, Val.Tube.Delete :: sys1 ->
+    | _, V.Tube.Delete :: sys1 ->
       go sys0 sys1 acc
 
-    | Val.Tube.True ((d00, d01), clo0) :: sys0, Val.Tube.True ((d10, d11), clo1) :: sys1 ->
-      let v0 = Val.eval_clo clo0 in
-      let v1 = Val.eval_clo clo1 in
-      let qd0 = equiv_dim n ~dim0:d00 ~dim1:d10 in
-      let qd1 = equiv_dim n ~dim0:d01 ~dim1:d11 in
+    | V.Tube.True ((d00, d01), clo0) :: sys0, V.Tube.True ((d10, d11), clo1) :: sys1 ->
+      let v0 = V.eval_clo clo0 in
+      let v1 = V.eval_clo clo1 in
+      let qd0 = equiv_dim n d00 d10 in
+      let qd1 = equiv_dim n d01 d11 in
       let q = equiv n ~ty v0 v1 in
       let tb = qd0, qd1, Some q in
       go sys0 sys1 @@ tb :: acc
 
-    | Val.Tube.Indeterminate ((d00, d01), clo0) :: sys0, Val.Tube.Indeterminate ((d10, d11), clo1) :: sys1 ->
-      let v0 = Val.eval_clo clo0 in
-      let v1 = Val.eval_clo clo1 in
-      let qd0 = equiv_dim n ~dim0:d00 ~dim1:d10 in
-      let qd1 = equiv_dim n ~dim0:d01 ~dim1:d11 in
+    | V.Tube.Indeterminate ((d00, d01), clo0) :: sys0, V.Tube.Indeterminate ((d10, d11), clo1) :: sys1 ->
+      let v0 = V.eval_clo clo0 in
+      let v1 = V.eval_clo clo1 in
+      let qd0 = equiv_dim n d00 d10 in
+      let qd1 = equiv_dim n d01 d11 in
       let q = equiv n ~ty v0 v1 in
       let tb = qd0, qd1, Some q in
       go sys0 sys1 @@ tb :: acc
 
-    | Val.Tube.False (d00, d01) :: sys0, Val.Tube.False (d10, d11) :: sys ->
-      let qd0 = equiv_dim n ~dim0:d00 ~dim1:d10 in
-      let qd1 = equiv_dim n ~dim0:d01 ~dim1:d11 in
+    | V.Tube.False (d00, d01) :: sys0, V.Tube.False (d10, d11) :: sys ->
+      let qd0 = equiv_dim n d00 d10 in
+      let qd1 = equiv_dim n d01 d11 in
       let tb = qd0, qd1, None in
       go sys0 sys1 @@ tb :: acc
 
@@ -232,32 +229,32 @@ and equiv_bsys n ~ty sys0 sys1 =
     | V.Tube.Delete :: sys0, _ ->
       go sys0 sys1 acc
 
-    | _, Val.Tube.Delete :: sys1 ->
+    | _, V.Tube.Delete :: sys1 ->
       go sys0 sys1 acc
 
     | V.Tube.True ((d00, d01), clo0) :: sys0, V.Tube.True ((d10, d11), clo1) :: sys1 ->
-      let vgen = Val.generic interval n in
+      let vgen = V.generic interval n in
       let v0 = V.inst_bclo clo0 vgen in
       let v1 = V.inst_bclo clo1 vgen in
-      let qd0 = equiv_dim n ~dim0:d00 ~dim1:d10 in
-      let qd1 = equiv_dim n ~dim0:d01 ~dim1:d11 in
+      let qd0 = equiv_dim n d00 d10 in
+      let qd1 = equiv_dim n d01 d11 in
       let q = equiv (n+1) ~ty v0 v1 in
-      let tb = qd0, qd1, Some (Tm.B (None, q)) in
+      let tb = qd0, qd1, Some (T.B (None, q)) in
       go sys0 sys1 @@ tb :: acc
 
     | V.Tube.Indeterminate ((d00, d01), clo0) :: sys0, V.Tube.Indeterminate ((d10, d11), clo1) :: sys1 ->
       let vgen = V.generic interval n in
       let v0 = V.inst_bclo clo0 vgen in
       let v1 = V.inst_bclo clo1 vgen in
-      let qd0 = equiv_dim n ~dim0:d00 ~dim1:d10 in
-      let qd1 = equiv_dim n ~dim0:d01 ~dim1:d11 in
+      let qd0 = equiv_dim n d00 d10 in
+      let qd1 = equiv_dim n d01 d11 in
       let q = equiv (n+1) ~ty v0 v1 in
-      let tb = qd0, qd1, Some (Tm.B (None, q)) in
+      let tb = qd0, qd1, Some (T.B (None, q)) in
       go sys0 sys1 @@ tb :: acc
 
-    | Val.Tube.False (d00, d01) :: sys0, Val.Tube.False (d10, d11) :: sys ->
-      let qd0 = equiv_dim n ~dim0:d00 ~dim1:d10 in
-      let qd1 = equiv_dim n ~dim0:d01 ~dim1:d11 in
+    | V.Tube.False (d00, d01) :: sys0, V.Tube.False (d10, d11) :: sys ->
+      let qd0 = equiv_dim n d00 d10 in
+      let qd1 = equiv_dim n d01 d11 in
       let tb = qd0, qd1, None in
       go sys0 sys1 @@ tb :: acc
 
