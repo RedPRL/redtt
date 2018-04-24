@@ -57,7 +57,7 @@ let quote_ty v : tm m =
   let x = Tree.cursor cfg.zip in
   let seq = MCx.lookup_exn x cfg.mcx in
   let univ = Val.into @@ Val.Univ Lvl.Omega in
-  ret @@ Quote.quote_can ~n:(LCx.len seq.lcx) ~ty:univ ~can:v
+  ret @@ Quote.quote (LCx.len seq.lcx) ~ty:univ v
 
 
 let goal : ty m = 

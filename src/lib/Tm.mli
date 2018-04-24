@@ -57,4 +57,16 @@ type info = Lexing.position * Lexing.position
 val into_info : info option -> 'a f -> 'a t
 val info : 'a t -> info option
 
+val var : int -> inf t
+val inst0 : inf t -> subst
+val up : inf t -> chk t
+val lam : string option -> chk t -> chk t
+val pi : string option -> chk t -> chk t -> chk t
+val sg : string option -> chk t -> chk t -> chk t
+val let_ : string option -> inf t -> chk t -> chk t
+val cons : chk t -> chk t -> chk t
+val univ : Lvl.t -> chk t
+val car : inf t -> inf t
+val cdr : inf t -> inf t
+
 val pp : 'a t Pretty.t

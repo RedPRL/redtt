@@ -55,6 +55,20 @@ let info node = node.info
 
 let out node = node.con
 
+let var i = into @@ Var i
+let inst0 t = Sub (Id, t)
+
+let meta hole sub = into @@ Meta (hole, sub)
+let up t = into @@ Up t
+let lam nm t = into @@ Lam (B (nm, t))
+let pi nm dom cod = into @@ Pi (dom, B (nm, cod))
+let sg nm dom cod = into @@ Sg (dom, B (nm, cod))
+let let_ nm t0 t1 = into @@ Let (t0, B (nm, t1))
+let cons t0 t1 = into @@ Cons (t0, t1)
+let univ lvl = into @@ Univ lvl
+let car t = into @@ Car t
+let cdr t = into @@ Cdr t
+
 let rec pp : type a. a t Pretty.t =
   fun env fmt tm ->
     match out tm with
