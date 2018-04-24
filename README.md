@@ -1,8 +1,52 @@
-This is my attempt to develop normalization-by-evaluation for cartesian cubical
+This is an attempt to develop normalization-by-evaluation for cartesian cubical
 type theory, using the interval and "extension types" to generalize path types.
 
-The purpose of this is to develop a formal version of two-level type theory
-which has good global properties, including (among other things) a rich and
-decidable definitional eqivalence relation. NbE isn't the end goal, but rather
-the tool we use in order to characterize algorithmic definitional equivalence.
-We will use this as the proof theory for the successor to RedPRL.
+## Contributing Guidelines
+
+Help is welcome and desired! Please see the [open
+tickets](https://github.com/jonsterling/cubical-experiment/issues). Currently,
+we are trying to limit the dependencies of this code; when something is
+available as a package, but can easily be coded locally, we prefer the latter.
+
+We also want to avoid using things like syntax extensions/ppxs, though we may
+end up using one of these for the lexer at one point.
+
+
+## Installing
+
+### Prerequisites
+
+| prerequisite |      | version                                                                | how to install                  |
+| ------------ | ---- | :--------------------------------------------------------------------- | ------------------------------- |
+| Opam         | `>=` | [`1.2.2`](https://github.com/ocaml/opam/releases/tag/1.2.2)            | manually or via package manager |
+| OCaml        | `>=` | [`4.06.1+flambda`](https://github.com/ocaml/ocaml/releases/tag/4.06.1) | `opam switch 4.06.1+flambda`    |
+| utop         | `>=` | [`2.0.2`](https://github.com/diml/utop/releases/tag/2.0.2)             | `opam install utop` (optional)  |
+
+### Installing Dependencies
+
+```
+$ git clone https://github.com/jonsterling/cubical-experiment
+$ cd tt
+$ opam update
+$ opam pin add -y .
+```
+
+### Building
+
+```
+$ make
+```
+
+### Toplevel
+
+Requires `utop` (see prerequisites).
+
+```
+$ make top
+```
+
+### Tests
+
+```
+$ make test
+```
