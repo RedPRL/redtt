@@ -33,7 +33,6 @@ sig
 end =
 struct
   module M = Map.Make (Vertex)
-  module S = Set.Make (Vertex)
 
   type t = DimVal.t M.t
 
