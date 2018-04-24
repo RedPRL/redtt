@@ -73,6 +73,8 @@ rule token = parse
     Lwt.return (Grammar.ATOM input)
   end
 }
+  | number
+{ Lwt.return (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
   | '('
 { Lwt.return Grammar.LPR }
   | ')'
