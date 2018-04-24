@@ -15,5 +15,8 @@ clean:
 test:
 	@${DUNE} build @runtest
 
+doc:
+	@${DUNE} build @doc
+
 top:
 	@${DUNE} utop src/lib

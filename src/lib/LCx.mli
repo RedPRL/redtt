@@ -1,4 +1,4 @@
-(* local context *)
+(** Local context *)
 
 type t
 

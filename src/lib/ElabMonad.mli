@@ -34,6 +34,6 @@ val eval : tm -> Val.can Val.t m
 
 module Notation :
 sig
-  (** Notation for 'subgoal' *)
+  (** Notation for [subgoal]. *)
   val (>-) : hyp list -> ty -> subgoal
 end
