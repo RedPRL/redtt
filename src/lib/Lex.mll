@@ -63,35 +63,35 @@ refill {refill_handler}
 
 rule token = parse
   | atom_initial atom_subsequent*
-{
-  let input = lexeme lexbuf in
-  begin try
-    let kwd = Hashtbl.find keywords input in
-    Lwt.return kwd
-  with Not_found ->
-    Lwt.return (Grammar.ATOM input)
-  end
-}
+    {
+      let input = lexeme lexbuf in
+      begin try
+        let kwd = Hashtbl.find keywords input in
+        Lwt.return kwd
+      with Not_found ->
+        Lwt.return (Grammar.ATOM input)
+      end
+    }
   | number
-{ Lwt.return (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
+    { Lwt.return (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
   | '('
-{ Lwt.return LPR }
+    { Lwt.return LPR }
   | ')'
-{ Lwt.return RPR }
+    { Lwt.return RPR }
   | '['
-{ Lwt.return LSQ }
+    { Lwt.return LSQ }
   | ']'
-{ Lwt.return RSQ }
+    { Lwt.return RSQ }
   | '='
-{ Lwt.return EQUALS }
+    { Lwt.return EQUALS }
   | line_ending
-{ new_line lexbuf; token lexbuf }
+    { new_line lexbuf; token lexbuf }
   | whitespace
-{ token lexbuf }
+    { token lexbuf }
   | eof
-{ Lwt.return EOF }
+    { Lwt.return EOF }
   | _
-{ Lwt_io.printlf "Unexpected char: %s" (lexeme lexbuf) >>= fun _ -> token lexbuf }
+    { Lwt_io.printlf "Unexpected char: %s" (lexeme lexbuf) >>= fun _ -> token lexbuf }
 
 {
 end (* LEXER *)
