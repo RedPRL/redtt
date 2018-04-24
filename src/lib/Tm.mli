@@ -75,5 +75,6 @@ val cons : chk t -> chk t -> chk t
 val univ : Lvl.t -> chk t
 val car : inf t -> inf t
 val cdr : inf t -> inf t
+val meta : Symbol.t -> subst -> inf t
 
 val pp : 'a t Pretty.t

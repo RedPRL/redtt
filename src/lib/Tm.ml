@@ -68,6 +68,7 @@ let cons t0 t1 = into @@ Cons (t0, t1)
 let univ lvl = into @@ Univ lvl
 let car t = into @@ Car t
 let cdr t = into @@ Cdr t
+let meta sym subst = into @@ Meta (sym, subst)
 
 let rec pp : type a. a t Pretty.t =
   fun env fmt tm ->

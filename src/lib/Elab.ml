@@ -9,23 +9,6 @@ module Notation = Monad.Notation (E)
 open E.Notation
 open Notation
 
-module Tm =
-struct
-  include Tm
-
-  let var i = Tm.into @@ Tm.Var i
-  let inst0 t = Tm.Sub (Tm.Id, t)
-
-  let meta hole sub = Tm.into @@ Tm.Meta (hole, sub)
-  let up t = Tm.into @@ Tm.Up t
-  let lam nm t = Tm.into @@ Tm.Lam (Tm.B (nm, t))
-  let pi nm dom cod = Tm.into @@ Tm.Pi (dom, Tm.B (nm, cod))
-  let sg nm dom cod = Tm.into @@ Tm.Sg (dom, Tm.B (nm, cod))
-  let let_ nm t0 t1 = Tm.into @@ Tm.Let (t0, Tm.B (nm, t1))
-  let cons t0 t1 = Tm.into @@ Tm.Cons (t0, t1)
-  let univ lvl = Tm.into @@ Tm.Univ lvl
-end
-
 module Tac = 
 struct
   let lambda nm : unit E.m = 
