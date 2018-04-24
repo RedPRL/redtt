@@ -1,5 +1,5 @@
 (define Path [A : (U 0)] [M : A] [N : A] (U 0) :>
- (# [i] A [i=0 M] [i=1 N]))
+ (# [i] A [i = 0 M] [i = 1 N]))
 
 (define funext
  [A : (U 0)]
@@ -39,8 +39,8 @@
  :>
  (lam [i]
   (hcom 0 1 A (@ p 0)
-   [i=0 [j] (@ p j)]
-   [i=1 [_] (@ p 0)])))
+   [i = 0 [j] (@ p j)]
+   [i = 1 [_] (@ p 0)])))
 
 
 (define trans
@@ -52,5 +52,5 @@
  :>
  (lam [i]
   (hcom 0 1 A (@ p i)
-   [i=0 [_] (@ p 0)]
-   [i=1 [j] (@ q j)])))
+   [i = 0 [_] (@ p 0)]
+   [i = 1 [j] (@ q j)])))
