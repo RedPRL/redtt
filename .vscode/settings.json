@@ -1,0 +1,13 @@
+{
+  "editor.detectIndentation": false,
+  "editor.insertSpaces": true,
+  "editor.tabSize": 2,
+  "editor.trimAutoWhitespace": true,
+  "files.exclude": {
+    "_build": true,
+    "_opam": true,
+    "**/.merlin": true,
+    "**/*.install": true
+  },
+  "search.exclude": {}
+}

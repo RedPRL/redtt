@@ -4,7 +4,7 @@ type mcx = MCx.t
 let check_sys_valid sys : unit =
   print_string "TODO: check favonia's validity condition on lists of equations\n"
 
-let check_sys_valid_or_empty sys = 
+let check_sys_valid_or_empty sys =
   match sys with
   | [] -> ()
   | _ -> check_sys_valid sys
@@ -49,7 +49,7 @@ let rec check ~mcx ~cx ~ty ~tm =
     check ~mcx ~cx:cx' ~ty:vcodx ~tm;
     let rec go sys =
       match sys with
-      | [] -> 
+      | [] ->
         ()
 
       | tube :: sys ->
@@ -100,7 +100,7 @@ let rec check ~mcx ~cx ~ty ~tm =
     let cx' = LCx.def cx ty0 v in
     check ~mcx ~cx:cx' ~ty ~tm:tm1
 
-  | _, _ -> 
+  | _, _ ->
     let ppenv = LCx.ppenv cx in
     let n = LCx.len cx in
     let tty = Quote.quote_ty n ty in
@@ -201,7 +201,7 @@ and infer ~mcx ~cx ~tm =
     check_bsys ~mcx ~cx ~dim0:vdim0 ~tycap:vty0 ~ty:vty ~cap:com.cap ~sys:com.sys;
     Val.eval (MCx.menv mcx, Val.Env.ext env vdim1) ty
 
-  | Tm.Meta (sym, sigma) -> 
+  | Tm.Meta (sym, sigma) ->
     let seq = MCx.lookup_exn sym mcx in
     let cx' = infer_subst ~mcx ~cx:seq.lcx ~subst:sigma in
     cx_equiv ~mcx ~cx0:cx ~cx1:cx';
@@ -216,7 +216,7 @@ and cx_equiv ~mcx ~cx0 ~cx1 =
   | LCx.Nil, LCx.Nil ->
     ()
 
-  | LCx.Snoc snoc0, LCx.Snoc snoc1 -> 
+  | LCx.Snoc snoc0, LCx.Snoc snoc1 ->
     cx_equiv ~mcx ~cx0:snoc0.cx ~cx1:snoc1.cx;
     equiv "cx_equiv" ~cx:snoc0.cx ~ty:univ snoc0.ty snoc1.ty;
     equiv "cx_equiv" ~cx:snoc0.cx ~ty:snoc0.ty snoc0.def snoc1.def
@@ -266,7 +266,7 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
         let cx0 = LCx.restrict_exn (LCx.def cx interval dim0) vd0 vd1 in
         let vtb = Val.eval (MCx.menv mcx, LCx.env cx0) tb in
 
-        let vcap = 
+        let vcap =
           let env = LCx.env @@ LCx.restrict_exn cx vd0 vd1 in
           Val.eval (MCx.menv mcx, env) cap
         in
@@ -282,14 +282,14 @@ and check_bsys ~mcx ~cx ~dim0 ~tycap ~ty ~cap ~sys =
         failwith "check_bsys"
 
   (* Invariant: 'cx' should already be restricted by vd0=vd1 *)
-  and go_adj cx tubes (vd0, vd1, tb) = 
+  and go_adj cx tubes (vd0, vd1, tb) =
     match tubes with
     | [] ->
       ()
 
     | (vd0', vd1', tb') :: tubes ->
       begin
-        try 
+        try
           let cx' = LCx.restrict_exn cx vd0' vd1' in
           let env = LCx.env cx' in
           let vtb = Val.eval (MCx.menv mcx, env) tb in
@@ -329,14 +329,14 @@ and check_sys ~mcx ~cx ~ty ~sys =
         failwith "check_sys"
 
   (* Invariant: 'cx' should already be restricted by vd0=vd1 *)
-  and go_adj cx tubes (vd0, vd1, tb) = 
+  and go_adj cx tubes (vd0, vd1, tb) =
     match tubes with
     | [] ->
       ()
 
     | (vd0', vd1', tb') :: tubes ->
       begin
-        try 
+        try
           let cx' = LCx.restrict_exn cx vd0' vd1' in
           let env = LCx.env cx' in
           let vtb = Val.eval (MCx.menv mcx, env) tb in

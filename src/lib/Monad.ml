@@ -5,7 +5,7 @@ sig
   val ret : 'a -> 'a m
 end
 
-module type Notation = 
+module type Notation =
 sig
   type 'a m
 
@@ -17,7 +17,7 @@ end
 module Notation (M : S) =
 struct
   let (>>=) = M.bind
-  let (>>) m n = 
+  let (>>) m n =
     m >>= fun _ -> n
 
   let (<$>) f m =

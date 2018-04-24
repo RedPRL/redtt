@@ -1,10 +1,10 @@
-module type S = 
+module type S =
 sig
   val find : Symbol.t -> Tm.chk Tm.t option
 end
 
-type t = 
-| Proxy of (module S)
+type t =
+  | Proxy of (module S)
 
 let make m =
   Proxy m
@@ -14,7 +14,7 @@ struct
   let find _ = failwith "Empty"
 end
 
-let empty = 
+let empty =
   Proxy (module Empty : S)
 
 let find x (Proxy (module M : S)) =

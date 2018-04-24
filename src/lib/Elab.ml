@@ -9,19 +9,19 @@ module Notation = Monad.Notation (E)
 open E.Notation
 open Notation
 
-module Tac = 
+module Tac =
 struct
-  let lambda nm : unit E.m = 
+  let lambda nm : unit E.m =
     E.goal >>= fun ty ->
     match Tm.out ty with
-    | Tm.Pi (dom, Tm.B (_, cod)) -> 
+    | Tm.Pi (dom, Tm.B (_, cod)) ->
       E.oblige ([nm, dom] >- cod) >>= fun alpha ->
       E.fill @@ Tm.lam nm @@ Tm.up @@ Tm.meta alpha @@ Tm.inst0 @@ Tm.var 0
 
     | _ ->
       failwith "lambda: expected pi"
 
-  let cons : unit E.m = 
+  let cons : unit E.m =
     E.goal >>= fun ty ->
     match Tm.out ty with
     | Tm.Sg (dom, Tm.B (nm, cod)) ->
@@ -35,7 +35,7 @@ struct
     | _ ->
       failwith "cons: expected sg"
 
-  let pi nm : unit E.m = 
+  let pi nm : unit E.m =
     E.goal >>= fun ty ->
     match Tm.out ty with
     | Tm.Univ lvl ->
@@ -48,7 +48,7 @@ struct
     | _ ->
       failwith "pi: expected universe"
 
-  let sg nm : unit E.m = 
+  let sg nm : unit E.m =
     E.goal >>= fun ty ->
     match Tm.out ty with
     | Tm.Univ lvl ->
@@ -61,30 +61,30 @@ struct
     | _ ->
       failwith "sg: expected universe"
 
-  let under tac = 
+  let under tac =
     E.move0 `Down >>
     E.move (`Star `Right) >>
-    tac >> 
-    E.move0 `Up 
+    tac >>
+    E.move0 `Up
 
 end
 
 let rec elab : type a. a ElabTm.t -> unit E.m =
   fun etm ->
     match ElabTm.out etm with
-    | ElabTm.Pi tele -> 
+    | ElabTm.Pi tele ->
       let rec go tele =
         match tele with
-        | ElabTm.TEnd {cod} -> 
+        | ElabTm.TEnd {cod} ->
           elab cod
 
-        | ElabTm.TCons {vars; dom; cod} -> 
+        | ElabTm.TCons {vars; dom; cod} ->
           go_vars vars dom >>
-          go cod 
+          go cod
 
-      and go_vars vars dom = 
+      and go_vars vars dom =
         match vars with
-        | [] -> 
+        | [] ->
           E.ret ()
 
         | x::xs ->
@@ -98,5 +98,5 @@ let rec elab : type a. a ElabTm.t -> unit E.m =
       in
       go tele
 
-    | _ -> 
+    | _ ->
       failwith "TODO"

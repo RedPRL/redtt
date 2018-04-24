@@ -9,7 +9,7 @@ val def : t -> ?nm:string option -> Val.can Val.t -> Val.can Val.t -> t
 val proj: t -> t option
 val proj_exn : t -> t
 
-type view = 
+type view =
   | Snoc of {cx : t; ty : Val.can Val.t; def : Val.can Val.t}
   | Nil
 
