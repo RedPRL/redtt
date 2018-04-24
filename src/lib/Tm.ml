@@ -146,7 +146,7 @@ let rec pp : type a. a t Pretty.t =
       Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) dim0 (pp env) dim1 (pp env) ty (pp env) cap (pp_bsys env) sys
 
     | Com {dim0; dim1; ty = B (nm, ty); cap; sys} ->
-      let x, env' = Pretty.Env.bind nm env in
+      let x, _env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<1>(com %a %a@ [%s] %a@ %a@ @[%a@])@]" (pp env) dim0 (pp env) dim1 x (pp env) ty (pp env) cap (pp_bsys env) sys
 
     | If {mot = B (nm, mot); scrut; tcase; fcase} ->
