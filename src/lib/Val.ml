@@ -2,8 +2,6 @@ type can = [`Can]
 type neu = [`Neu]
 type nf = [`Nf]
 
-type rel = DimRel.t
-
 type 'a env_ = { vals : 'a list; rel : DimRel.t }
 
 module Tube =
