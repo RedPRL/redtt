@@ -65,37 +65,45 @@ rule token = parse
   | '['
     { Lwt.return LSQ }
   | ']'
-{ Lwt.return RSQ }
+    { Lwt.return RSQ }
   | '#'
-{ Lwt.return HASH }
+    { Lwt.return HASH }
   | '@'
-{ Lwt.return AT }
+    { Lwt.return AT }
   | '*'
-{ Lwt.return STAR }
+    { Lwt.return AST }
+  | "×"
+    { Lwt.return TIMES }
   | ':'
-{ Lwt.return COLON }
+    { Lwt.return COLON }
   | ":>"
-{ Lwt.return COLON_ANGLE }
+    { Lwt.return COLON_ANGLE }
+  | "▷"
+    { Lwt.return COLON_ANGLE }
   | '='
-{ Lwt.return EQUALS }
+    { Lwt.return EQUALS }
   | "->"
-{ Lwt.return RIGHT_ARROW }
+    { Lwt.return RIGHT_ARROW }
+  | "→"
+    { Lwt.return RIGHT_ARROW }
+  | "λ"
+    { Lwt.return LAM }
   | line_ending
     { new_line lexbuf; token lexbuf }
   | whitespace
     { token lexbuf }
   | eof
-{ Lwt.return EOF }
+    { Lwt.return EOF }
   | atom_initial atom_subsequent*
-{
-  let input = lexeme lexbuf in
-  begin try
-    let kwd = Hashtbl.find keywords input in
-    Lwt.return kwd
-  with Not_found ->
-    Lwt.return (Grammar.ATOM input)
-  end
-}
+    {
+      let input = lexeme lexbuf in
+      begin try
+        let kwd = Hashtbl.find keywords input in
+        Lwt.return kwd
+      with Not_found ->
+        Lwt.return (Grammar.ATOM input)
+      end
+    }
   | _
     { Lwt_io.printlf "Unexpected char: %s" (lexeme lexbuf) >>= fun _ -> token lexbuf }
 

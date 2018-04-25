@@ -10,7 +10,7 @@
 %token COLON COLON_ANGLE
 %token EQUALS
 %token RIGHT_ARROW
-%token STAR HASH AT
+%token AST TIMES HASH AT
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE
 %token EOF
 
@@ -105,7 +105,11 @@ chk:
     { fun env ->
       pi_from_tele (Some ($startpos, $endpos)) @@ tele env }
 
-  | LPR; STAR; tele = tele; RPR
+  | LPR; AST; tele = tele; RPR
+    { fun env ->
+      sg_from_tele (Some ($startpos, $endpos)) @@ tele env }
+
+  | LPR; TIMES; tele = tele; RPR
     { fun env ->
       sg_from_tele (Some ($startpos, $endpos)) @@ tele env }
 

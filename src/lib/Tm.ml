@@ -78,15 +78,15 @@ let rec pp : type a. a t Pretty.t =
       Pretty.Env.var i env
 
     | Down {ty; tm} ->
-      Format.fprintf fmt "@[<1>(:>@ %a@ %a)@]" (pp env) ty (pp env) tm
+      Format.fprintf fmt "@[<1>(▷@ %a@ %a)@]" (pp env) ty (pp env) tm
 
     | Pi (dom, B (nm, cod)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(-> [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
+      Format.fprintf fmt "@[<1>(→ [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
 
     | Sg (dom, B (nm, cod)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(* [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
+      Format.fprintf fmt "@[<1>(× [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
 
     | Ext (B (nm, (cod, sys))) ->
       let x, env' = Pretty.Env.bind nm env in
@@ -100,7 +100,7 @@ let rec pp : type a. a t Pretty.t =
 
     | Lam (B (nm, tm)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(lam [%s]@ %a)@]" x (pp env') tm
+      Format.fprintf fmt "@[<1>(λ [%s]@ %a)@]" x (pp env') tm
 
     | FunApp (tm0, tm1) ->
       Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp env) tm0 (pp env) tm1
