@@ -51,10 +51,10 @@ type _ f =
   | Coe : {dim0 : DimVal.t; dim1 : DimVal.t; ty : bclo; tm : can t} -> can f
 
   (* generic composites in negative types: pi, sigma, extension *)
-  | HCom : {dim0 : DimVal.t; dim1 : DimVal.t; ty : can t; cap : can t; sys : bclo system} -> can f
+  | HCom : {proj : can t option; dim0 : DimVal.t; dim1 : DimVal.t; ty : can t; cap : can t; sys : bclo system} -> can f
 
   (* formal composites in positive types: like the universe, etc. *)
-  | FCom : {dim0 : DimVal.t; dim1 : DimVal.t; cap : can t; sys : bclo system} -> can f
+  | FCom : {proj :  can t option; dim0 : DimVal.t; dim1 : DimVal.t; cap : can t; sys : bclo system} -> can f
 
   | FunApp : neu t * nf t -> neu f
   | ExtApp : neu t * DimVal.t -> neu f

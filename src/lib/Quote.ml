@@ -72,6 +72,12 @@ let rec equiv n ~ty el0 el1 =
     let tcoe = T.into @@ T.Coe {dim0 = qdim0; dim1 = qdim1; ty = T.B (None, qty); tm = qtm} in
     T.up tcoe
 
+  | _, V.HCom {proj = Some v; _}, _ ->
+    equiv n ~ty v el1
+
+  | _, _, V.HCom {proj = Some v; _} ->
+    equiv n ~ty el0 v
+
   | _, V.HCom hcom0, V.HCom hcom1 ->
     let qdim0 = equiv_dim n hcom0.dim0 hcom1.dim0 in
     let qdim1 = equiv_dim n hcom0.dim1 hcom1.dim1 in
@@ -82,6 +88,15 @@ let rec equiv n ~ty el0 el1 =
     let qsys = equiv_bsys n ~ty hcom0.sys hcom1.sys in
     let thcom = T.into @@ T.HCom {dim0 = qdim0; dim1 = qdim1; ty = qty; cap = qcap; sys = qsys} in
     T.up thcom
+
+  | _, V.FCom {proj = Some v; _}, _ ->
+    equiv n ~ty v el1
+
+  | _, _, V.FCom {proj = Some v; _} ->
+    equiv n ~ty el0 v
+
+  | _, V.FCom _, V.FCom _ ->
+    failwith "I haven't yet implemented quoting of fcom"
 
   | _, V.Up (_, neu0), V.Up (_, neu1) ->
     T.up @@ equiv_neu n neu0 neu1

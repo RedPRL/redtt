@@ -83,10 +83,10 @@ type _ f =
   | Coe : {dim0 : DimVal.t; dim1 : DimVal.t; ty : bclo; tm : can t} -> can f
 
   (* generic composites in negative and neutral types: pi, sigma, extension *)
-  | HCom : {dim0 : DimVal.t; dim1 : DimVal.t; ty : can t; cap : can t; sys : bclo system} -> can f
+  | HCom : {proj : can t option; dim0 : DimVal.t; dim1 : DimVal.t; ty : can t; cap : can t; sys : bclo system} -> can f
 
   (* formal composites in positive types: like the universe, etc. *)
-  | FCom : {dim0 : DimVal.t; dim1 : DimVal.t; cap : can t; sys : bclo system} -> can f
+  | FCom : {proj : can t option; dim0 : DimVal.t; dim1 : DimVal.t; cap : can t; sys : bclo system} -> can f
 
   | FunApp : neu t * nf t -> neu f
   | ExtApp : neu t * DimVal.t -> neu f
@@ -225,7 +225,12 @@ let rec pp : type a. a t Pretty.t0 =
       Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" pp_dim info.dim0 pp_dim info.dim1 pp info.ty pp info.cap pp_bsys info.sys
 
     | FCom info ->
-      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a)@]" pp_dim info.dim0 pp_dim info.dim1 pp info.cap pp_bsys info.sys
+      begin
+        match info.proj with
+        | Some v -> pp fmt v
+        | None ->
+          Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ %a)@]" pp_dim info.dim0 pp_dim info.dim1 pp info.cap pp_bsys info.sys
+      end
 
     | FunApp (v0, v1) ->
       Format.fprintf fmt "@[<1>(%a %a)@]" pp v0 pp v1
@@ -375,8 +380,8 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
       into @@ Cons (t0 <: rho, t1 <: rho)
 
     | Tm.Coe info ->
-      let dim0 = project_dimval @@ eval rho info.dim0 in
-      let dim1 = project_dimval @@ eval rho info.dim1 in
+      let dim0 = eval_dim rho info.dim0 in
+      let dim1 = eval_dim rho info.dim1 in
       let _, env = rho in
       begin
         match Env.compare_dim env dim0 dim1 with
@@ -389,43 +394,24 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
       end
 
     | Tm.HCom info ->
-      let dim0 = project_dimval @@ eval rho info.dim0 in
-      let dim1 = project_dimval @@ eval rho info.dim1 in
-      let _, env = rho in
-      begin
-        match Env.compare_dim env dim0 dim1 with
-        | DimVal.Same ->
-          eval rho info.cap
-        | _ ->
-          let sys = eval_bsys rho info.sys in
-          match project_bsys sys dim1 with
-          | Some v -> v
-          | None ->
-            let ty = eval rho info.ty in
-            let cap = eval rho info.cap in
-            rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys
-      end
+      let dim0 = eval_dim rho info.dim0 in
+      let dim1 = eval_dim rho info.dim1 in
+      let sys = eval_bsys rho info.sys in
+      let ty = eval rho info.ty in
+      let cap = eval rho info.cap in
+      make_hcom ~dim0 ~dim1 ~ty ~cap ~sys
 
     | Tm.Com info ->
-      let dim0 = project_dimval @@ eval rho info.dim0 in
-      let dim1 = project_dimval @@ eval rho info.dim1 in
+      let dim0 = eval_dim rho info.dim0 in
+      let dim1 = eval_dim rho info.dim1 in
       let bty = info.ty <:+ rho in
       let cap =
         let tm = eval rho info.cap in
         rigid_coe ~dim0 ~dim1 ~ty:bty ~tm
       in
-      begin
-        let _, env = rho in
-        match Env.compare_dim env dim0 dim1 with
-        | DimVal.Same ->
-          cap
-        | _ ->
-          let ty = inst_bclo bty @@ embed_dimval dim1 in
-          let sys = map_tubes (fun bclo -> Clo.ComCoeTube {bclo; ty = bty; dim1}) @@ eval_bsys rho info.sys in
-          match project_bsys sys dim1 with
-          | Some v -> v
-          | None -> rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys
-      end
+      let ty = inst_bclo bty @@ embed_dimval dim1 in
+      let sys = map_tubes (fun bclo -> Clo.ComCoeTube {bclo; ty = bty; dim1}) @@ eval_bsys rho info.sys in
+      make_hcom ~dim0 ~dim1 ~ty ~cap ~sys
 
     | Tm.Univ lvl ->
       into @@ Univ lvl
@@ -465,11 +451,8 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
       apply (eval rho t1) (eval rho t2)
 
     | Tm.ExtApp (t1, t2) ->
-      let _, env = rho in
       ext_apply (eval rho t1) @@
-      Env.canonize env @@  (* This is a bit fishy ! *)
-      project_dimval @@
-      eval rho t2
+      eval_dim rho t2
 
     | Tm.Down t ->
       eval rho t.tm
@@ -494,6 +477,12 @@ let rec eval : type a. menv * env -> a Tm.t -> can t =
           (* Don't know if this is correct, but we'll see *)
       end
 
+and eval_dim rho dim =
+  let _, env = rho in
+  Env.canonize env @@
+  project_dimval @@
+  eval rho dim
+
 and eval_subst rho sigma =
   let _, env = rho in
   match sigma with
@@ -514,31 +503,37 @@ and eval_subst rho sigma =
     let env' = eval_subst rho sigma in
     eval_subst (menv, env') tau
 
-(* Invariant: a coercion is rigid when r != r'; a composition is rigid when r != r' and none of the tubes is under a true condition.
-   The inputs to rigid_com, rigid_hcom and rigid_coe must be rigid. These functions do only one thing, which is to dispatch to the
-   correct implementation of (rigid) composition and coercion in a type-directed manner. *)
-and rigid_com ~dim0 ~dim1 ~ty ~cap ~sys =
+and make_com ~dim0 ~dim1 ~ty ~cap ~sys =
   let cap' = rigid_coe ~dim0 ~dim1 ~ty ~tm:cap in
   let ty' = inst_bclo ty @@ embed_dimval dim1 in
   let sys' = map_tubes (fun bclo -> Clo.ComCoeTube {bclo; ty; dim1}) sys in
-  rigid_hcom ~dim0 ~dim1 ~ty:ty' ~cap:cap' ~sys:sys'
+  make_hcom ~dim0 ~dim1 ~ty:ty' ~cap:cap' ~sys:sys'
 
-and rigid_hcom ~dim0 ~dim1 ~ty ~cap ~sys =
+
+and proj_hcom ~dim0 ~dim1 ~cap ~sys =
+  match DimVal.compare dim0 dim1 with
+  | Same ->
+    Some cap
+  | _ ->
+    project_bsys sys dim1
+
+and make_hcom ~dim0 ~dim1 ~ty ~cap ~sys =
+  let proj = proj_hcom ~dim0 ~dim1 ~cap ~sys in
   match out ty with
   | Bool ->
     cap
 
   | (Pi _ | Sg _ | Ext _ | Up _) ->
-    into @@ HCom {dim0; dim1; ty; cap; sys}
+    into @@ HCom {proj; dim0; dim1; ty; cap; sys}
 
   | Univ _ ->
-    into @@ FCom {dim0; dim1; cap; sys}
+    into @@ FCom {proj; dim0; dim1; cap; sys}
 
   | FCom _ ->
     failwith "hcom in fcom!"
 
   | _ ->
-    failwith "rigid_hcom"
+    failwith "make_hcom"
 
 
 and rigid_coe ~dim0 ~dim1 ~ty ~tm =
@@ -564,8 +559,8 @@ and eval_bsys rho sys =
   List.map (eval_btube rho) sys
 
 and eval_btube rho (dim0, dim1, otb) =
-  let vdim0 = project_dimval @@ eval rho dim0 in
-  let vdim1 = project_dimval @@ eval rho dim1 in
+  let vdim0 = eval_dim rho dim0 in
+  let vdim1 = eval_dim rho dim1 in
   match vdim0, vdim1 with
   | DimVal.Delete, _ ->
     Tube.Delete
@@ -623,12 +618,15 @@ and apply vfun varg =
     let varg' = rigid_coe ~dim0:info.dim1 ~dim1:info.dim0 ~ty:dom ~tm:varg in
     rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:(apply info.tm varg')
 
+  | HCom {proj = Some vfun'; _} ->
+    apply vfun' varg
+
   | HCom info ->
     let _dom, cod = out_pi info.ty in
     let vcod = inst_bclo cod varg in
     let vcap = apply info.cap varg in
     let vsys = map_tubes (fun bclo -> Clo.App (bclo, varg)) info.sys in
-    rigid_hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty:vcod ~cap:vcap ~sys:vsys
+    make_hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty:vcod ~cap:vcap ~sys:vsys
 
   | _ -> failwith "apply"
 
@@ -662,21 +660,19 @@ and ext_apply vext vdim =
         rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~tm:cap
       | None, _ ->
         let sys' = mapi_tubes (fun i _ -> Clo.ExtSysTube (info.ty, i, vdim)) sys in
-        rigid_com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:sys'
+        make_com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:sys'
     end
+
+  | HCom {proj = Some vext'; _} ->
+    ext_apply vext' vdim
 
   | HCom info ->
     let cap = ext_apply info.cap vdim in
     let cod, sclo = out_ext info.ty in
     let ty = inst_bclo cod @@ embed_dimval vdim in
     let rsys = inst_sclo sclo vdim in
-    begin
-      match project_sys rsys with
-      | Some v -> v
-      | None ->
-        let sys = map_tubes (fun tb -> Clo.Wk tb) rsys in
-        rigid_hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:(sys @ info.sys)
-    end
+    let sys = map_tubes (fun tb -> Clo.Wk tb) rsys in
+    make_hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys:(sys @ info.sys)
 
   | _ ->
     failwith "ext_apply"
@@ -695,12 +691,15 @@ and car v =
     let vcar = car info.tm in
     rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:(Clo.SgDom info.ty) ~tm:vcar
 
+  | HCom {proj = Some v'; _} ->
+    car v'
+
   | HCom info ->
     let dom, _ = out_sg info.ty in
     let ty = eval_clo dom in
     let cap = car info.cap in
     let sys = map_tubes (fun tb -> Clo.Car tb) info.sys in
-    rigid_hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys
+    make_hcom ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys
 
   | _ -> failwith "car"
 
@@ -722,11 +721,14 @@ and cdr v =
     let cod = Clo.SgCodCoe {bclo = info.ty; dim0 = info.dim0; arg = vcar} in
     rigid_coe ~dim0:info.dim0 ~dim1:info.dim1 ~ty:cod ~tm:vcdr
 
+  | HCom {proj = Some v'; _} ->
+    cdr v'
+
   | HCom info ->
     let ty = Clo.SgCodHCom {ty = info.ty; dim0 = info.dim0; cap = info.cap; sys = info.sys} in
     let cap = cdr info.cap in
     let sys = map_tubes (fun bclo -> Clo.Cdr bclo) info.sys in
-    rigid_com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys
+    make_com ~dim0:info.dim0 ~dim1:info.dim1 ~ty ~cap ~sys
 
   | _ -> failwith "cdr"
 
@@ -783,7 +785,7 @@ and inst_bclo bclo arg =
     let ty' = eval_clo dom in
     let cap' = car cap in
     let sys' = map_tubes (fun bclo -> Clo.Car bclo) sys in
-    let hcom = rigid_hcom ~dim0 ~dim1:dimx ~ty:ty' ~cap:cap' ~sys:sys' in
+    let hcom = make_hcom ~dim0 ~dim1:dimx ~ty:ty' ~cap:cap' ~sys:sys' in
     inst_bclo cod hcom
 
   | Clo.ExtCod (bclo, vdim) ->
@@ -821,8 +823,8 @@ and inst_sclo sclo arg =
     let arg' = embed_dimval arg in
     let env' = Env.ext env arg' in
     let go (tdim0, tdim1, otb) =
-      let vdim0 = project_dimval @@ eval (menv, env') tdim0 in
-      let vdim1 = project_dimval @@ eval (menv, env') tdim1 in
+      let vdim0 = eval_dim (menv, env') tdim0 in
+      let vdim1 = eval_dim (menv, env') tdim1 in
       match vdim0, vdim1 with
       | DimVal.Delete, _ ->
         Tube.Delete
