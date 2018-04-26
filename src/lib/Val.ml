@@ -225,12 +225,7 @@ let rec pp : type a. a t Pretty.t0 =
       Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" pp_dim info.dim0 pp_dim info.dim1 pp info.ty pp info.cap pp_bsys info.sys
 
     | FCom info ->
-      begin
-        match info.proj with
-        | Some v -> pp fmt v
-        | None ->
-          Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ %a)@]" pp_dim info.dim0 pp_dim info.dim1 pp info.cap pp_bsys info.sys
-      end
+      Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ %a)@]" pp_dim info.dim0 pp_dim info.dim1 pp info.cap pp_bsys info.sys
 
     | FunApp (v0, v1) ->
       Format.fprintf fmt "@[<1>(%a %a)@]" pp v0 pp v1
