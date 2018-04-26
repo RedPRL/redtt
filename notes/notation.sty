@@ -1,0 +1,129 @@
+\newcommand\MathKwd[1]{\mathsf{#1}}
+\usepackage[svgnames]{xcolor}
+\usepackage{mathtools}
+
+\DeclarePairedDelimiter{\Parens}{\lparen}{\rparen}
+\DeclarePairedDelimiter{\Squares}{[}{]}
+
+
+\newcommand\Sys[1]{#1}
+
+\makeatletter
+\def\rightharpoonupfill@{\arrowfill@\relbar\relbar\rightharpoonup}
+\newcommand{\overrightharpoonup}{%
+\mathpalette{\overarrow@\rightharpoonupfill@}}
+\makeatother
+
+\renewcommand\Vec[1]{
+  \overrightharpoonup{#1}
+}
+
+\renewcommand\Box[3]{
+  \Parens{
+    \MathKwd{box}^{{#1}\rightsquigarrow{#2}}%
+    #3\;
+    \Sys{#3}
+  }
+}
+
+\newcommand\XCap[3]{
+  \Parens{
+    \MathKwd{cap}^{{#1}\leftsquigarrow{#2}}%
+    #3\;
+    \Sys{#3}
+  }
+}
+
+\newcommand\Bind[2]{
+  \Squares{#1}\,#2
+}
+
+\newcommand\Tube[3]{
+  \Squares{{{#1}={#2}}\mathrel{\hookrightarrow}{#3}}
+}
+
+\newcommand\BTube[4]{
+  \Tube{#1}{#2}{\Bind{#3}{#4}}
+}
+
+\newcommand\Coe[5]{
+  \Parens{
+    \MathKwd{coe}^{{#1}\rightsquigarrow{#2}}_{\Bind{#3}{#4}}\;
+    #5
+  }
+}
+
+\newcommand\FCom[4]{
+  \Parens{
+    \MathKwd{fcom}^{{#1}\rightsquigarrow{#2}}\;
+    #3\;
+    \Sys{#4}
+  }
+}
+
+\newcommand\GCom[6]{
+  \Parens{
+    \MathKwd{gcom}^{{#1}\rightsquigarrow{#2}}_{\Bind{#3}{#4}}\;
+    #5\;
+    \Sys{#6}
+  }
+}
+
+\newcommand\HCom[5]{
+  \Parens{
+    \MathKwd{hcom}^{{#1}\rightsquigarrow{#2}}_{#3}\;
+    #4\;
+    \Sys{#5}
+  }
+}
+
+\newcommand\Meta[2]{
+  \Parens{#1\; #2}
+}
+
+
+
+\newcommand\Step[2]{
+  {#1}\mapsto{#2}
+}
+
+\newcommand\BreakStep[2]{
+  \begin{array}{c}
+    #1\\
+    \mapsto\\
+    #2
+  \end{array}
+}
+
+
+\newcommand{\Alert}[1]{%
+  \colorbox{DarkSlateGray!30}{$\displaystyle#1$}
+}
+
+\newcommand{\Hole}[1]{%
+  \colorbox{Red!30}{$\displaystyle?#1$}
+}
+
+\newcommand\Eq[2]{#1=#2}
+\newcommand\NotEq[2]{#1\not=#2}
+
+\newcommand\DimDelete{\maltese}
+
+\newcommand\Define[2]{{#1}\triangleq{#2}}
+
+%%% Experimental
+\newcommand\HComCap[5]{
+  \Parens{
+    \MathKwd{hcom/cap}^{{#1}\rightsquigarrow{#2}}_{#3}\;
+    #4\;
+    \Sys{#5}
+  }
+}
+
+\newcommand\HComTube[6]{
+  \Parens{
+    {\MathKwd{hcom/tube/}{#1}}^{{#2}\rightsquigarrow{#3}}_{#4}\;
+    #5\;
+    \Sys{#6}
+  }
+}

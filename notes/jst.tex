@@ -1,0 +1,130 @@
+\documentclass{article}
+
+\usepackage{fullpage}
+\usepackage{jst}
+\usepackage{mathpartir}
+\usepackage{notation}
+
+\begin{document}
+
+Note that as a matter of convention, I write $\Meta{s}{\DimDelete}$ to mean
+``delete this tube if the resulting instantiation mentions $\DimDelete$'' (it's
+how I implement $\forall$).
+
+\[
+  \inferrule[CoeFcom/0]{
+    \Alert{
+      \Eq{
+        \Meta{s}{r'}
+      }{
+        \Meta{s'}{r'}
+      }
+    }
+    \\
+    \NotEq{
+      \Meta{s}{x}
+    }{
+      \Meta{s'}{x}
+    }
+    \\
+    \NotEq{
+      \Meta{s_i}{x}
+    }{
+      \Meta{s'_i}{x}
+    }
+  }{
+    \BreakStep{
+      \Coe{r}{r'}{x}{
+        \FCom{
+          \Meta{s}{x}
+        }{
+          \Meta{s'}{x}
+        }{
+          \Meta{A}{x}
+        }{
+          \Vec{
+            \BTube{
+              \Meta{s_i}{x}
+            }{
+              \Meta{s'_i}{x}
+            }{z}{
+              \Meta{B_i}{x\;z}
+            }
+          }
+        }
+      }{M}
+    }{
+      \GCom{r}{r'}{x}{
+        \Meta{A}{x}
+      }{M}{
+        \Vec{
+          \BTube{
+            \Meta{s_i}{\DimDelete}
+          }{
+            \Meta{s'_i}{\DimDelete}
+          }{x}{
+            \Coe{
+              \Meta{s'}{x}
+            }{
+              \Meta{s}{x}
+            }{z}{
+              \Meta{B_i}{x\;z}
+            }{
+              \Coe{r}{x}{x}{
+                \Meta{B_i}{x\;\Meta{s}{x}}
+              }{M}
+            }
+          }
+        }\;
+        \BTube{
+          \Meta{s}{\DimDelete}
+        }{
+          \Meta{s'}{\DimDelete}
+        }{x}{
+          \Coe{r}{x}{x}{
+            \Meta{A}{x}
+          }{M}
+        }
+      }
+    }
+  }
+\]
+
+It is not at all clear how to implement the evaluation semantics for such a
+rule, at least in a na\"ive way. That is, in the presentation above we maintain
+the fiction that we can ``see'' into the binder-closures well enough to take
+out the $\Meta{A}{x}$ (or even the $\Meta{s}{x}$!), etc.\ and use it elsewhere.
+We do not have this luxury, however, in the semantic domain; generally, the
+closures need to be thought of as black boxes.
+
+One idea that doesn't work is to add a new kind of stack frame to the binder
+closure, that says \emph{During instantiation, if this becomes an $\MathKwd{fcom}$,
+project the cap!} But this doesn't work, since depending on with what
+dimension the closure is instantiated, the $\MathKwd{fcom}$ may disappear, and
+(for instance) be replaced by one of its tubes. Then, we have lost track of the
+cap forever.
+
+However, I think there is a way out. During evaluation, when we encounter a
+non-rigid composition, we simply project out the appropriate part (either the
+cap or one of the tubes), and lose the rest of the information. We can keep
+ahold of that information instead, by adding new value constructors to our
+semantic domain, like:
+%
+\begin{mathpar}
+  \HComCap{r}{r'}{A}{M}{\ldots}
+  \and
+  \HComTube{i}{r}{r'}{A}{M}{
+    \ldots
+    \Tube{s_i}{s'_i}{\ldots}
+    \ldots
+  }
+\end{mathpar}
+
+Now, meta-operations like function application, etc.\ must respond to these new
+kinds of values; they would simply project out the cap or the appropriate tube,
+and continue. But what this gives us the ability to do is see the cap of an
+$\MathKwd{fcom}$ even when the composition has been replaced by one of its
+tubes, etc.; this would allow us to implement a continuation which grabs the
+appropriate part of the composition for use in the resulting $\MathKwd{gcom}$.
+
+\end{document}
