@@ -7,10 +7,6 @@
 
 \begin{document}
 
-Everything below is under the global assumption $\Alert{\NotEq{r}{r'}}$; in the
-\emph{typed} evaluation semantics, we prefer to project directly in case a $\MathKwd{coe}$
-is not rigid.
-%
 Note that as a matter of convention, I write $\Meta{s}{\DimDelete}$ to mean
 ``delete this tube if the resulting instantiation mentions $\DimDelete$'' (it's
 how I implement $\forall$).
@@ -95,33 +91,6 @@ how I implement $\forall$).
     }
   }
 \]
-
-It is not at all clear how to implement the evaluation semantics for such a
-rule, at least in a na\"ive way. That is, in the presentation above we maintain
-the fiction that we can ``see'' into the binder-closures well enough to take
-out the $\Meta{A}{x}$ (or even the $\Meta{s}{x}$!), etc.\ and use it elsewhere.
-We do not have this luxury, however, in the semantic domain; generally, the
-closures need to be thought of as black boxes.
-
-One idea that doesn't work is to add a new kind of stack frame to the binder
-closure, that says \emph{During instantiation, if this becomes an $\MathKwd{fcom}$,
-project the cap!} But this doesn't work, since depending on with what
-dimension the closure is instantiated, the $\MathKwd{fcom}$ may disappear, and
-(for instance) be replaced by one of its tubes. Then, we have lost track of the
-cap forever.
-
-However, I think there is a way out. During evaluation, when we encounter a
-non-rigid composition, we currently project out the appropriate part (either the
-cap or one of the tubes), and lose the rest of the information. We could instead \emph{not} do this, but actually just annotate the composition with the value that would have been projected out.
-
-Then, meta-operations like semantic function application would see and use this
-projection; likewise, quotation and definitional equivalence would do the same.
-However, by keeping this information, we would be able to extend the language
-of closures with a stack frame that can project the cap from an
-$\MathKwd{fcom}$, even if at instantiation-time it would have already evaluated
-to the tube. In particular, this allows us to implement a continuation which
-grabs the appropriate part of the composition for use in the resulting
-$\MathKwd{gcom}$.
 
 \paragraph{Projecting the tube}
 
