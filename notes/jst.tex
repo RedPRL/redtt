@@ -11,6 +11,8 @@ Note that as a matter of convention, I write $\Meta{s}{\DimDelete}$ to mean
 ``delete this tube if the resulting instantiation mentions $\DimDelete$'' (it's
 how I implement $\forall$).
 
+\paragraph{Projecting the cap}
+
 \[
   \inferrule[CoeFcom/0]{
     \Alert{
@@ -116,5 +118,88 @@ $\MathKwd{fcom}$, even if at instantiation-time it would have already evaluated
 to the tube. In particular, this allows us to implement a continuation which
 grabs the appropriate part of the composition for use in the resulting
 $\MathKwd{gcom}$.
+
+\paragraph{Projecting the tube}
+
+If we are able to project from the system of the outer $\MathKwd{box}$, then
+the situation is much easier. This projection is generally of a
+$\MathKwd{gcom}$, but if $s_k,s'_k$ do not mention $x$, we can project from the
+system of the $\MathKwd{gcom}$ too. This yields a nested $\MathKwd{coe}$, but
+the outer $\MathKwd{coe}$ is not rigid, so we can project the inner one.
+
+\[
+  \inferrule[CoeFcom/1/0]{
+    \Alert{
+      \NotEq{
+        \Meta{s}{r'}
+      }{
+        \Meta{s'}{r'}
+      }
+    }
+    \\
+    \Alert{
+      k\mathrm{\ min\ s.t.}\
+      \Eq{
+        \Meta{s_k}{r'}
+      }{
+        \Meta{s'_k}{r'}
+      }
+    }
+    \\
+    \Alert{
+      \NotEq{
+        \Meta{s_k}{\DimDelete}
+      }{
+        \DimDelete
+      }
+    }
+    \\
+    \Alert{
+      \NotEq{
+        \Meta{s'_k}{\DimDelete}
+      }{
+        \DimDelete
+      }
+    }
+    \\\\
+    \NotEq{
+      \Meta{s}{x}
+    }{
+      \Meta{s'}{x}
+    }
+    \\
+    \NotEq{
+      \Meta{s_i}{x}
+    }{
+      \Meta{s'_i}{x}
+    }
+  }{
+    \Step{
+      \Coe{r}{r'}{x}{
+        \FCom{
+          \Meta{s}{x}
+        }{
+          \Meta{s'}{x}
+        }{
+          \Meta{A}{x}
+        }{
+          \Vec{
+            \BTube{
+              \Meta{s_i}{x}
+            }{
+              \Meta{s'_i}{x}
+            }{z}{
+              \Meta{B_i}{x\;z}
+            }
+          }
+        }
+      }{M}
+    }{
+      \Coe{r}{r'}{x}{
+        \Meta{B_i}{x\;\Meta{s'}{x}}
+      }{M}
+    }
+  }
+\]
 
 \end{document}
