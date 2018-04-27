@@ -1,5 +1,5 @@
 \documentclass{article}
-
+\usepackage[landscape]{geometry}
 \usepackage{fullpage}
 \usepackage{jst}
 \usepackage{mathpartir}
@@ -7,6 +7,10 @@
 
 \begin{document}
 
+Everything below is under the global assumption $\Alert{\NotEq{r}{r'}}$; in the
+\emph{typed} evaluation semantics, we prefer to project directly in case a $\MathKwd{coe}$
+is not rigid.
+%
 Note that as a matter of convention, I write $\Meta{s}{\DimDelete}$ to mean
 ``delete this tube if the resulting instantiation mentions $\DimDelete$'' (it's
 how I implement $\forall$).
@@ -121,14 +125,81 @@ $\MathKwd{gcom}$.
 
 \paragraph{Projecting the tube}
 
-If we are able to project from the system of the outer $\MathKwd{box}$, then
-the situation is much easier. This projection is generally of a
-$\MathKwd{gcom}$, but if $s_k,s'_k$ do not mention $x$, we can project from the
-system of the $\MathKwd{gcom}$ too. This yields a nested $\MathKwd{coe}$, but
-the outer $\MathKwd{coe}$ is not rigid, so we can project the inner one.
-
-\[
-  \inferrule[CoeFcom/1/0]{
+\begin{mathpar}
+%   \inferrule[CoeFcom/1/0]{
+%     \Alert{
+%       \NotEq{
+%         \Meta{s}{r'}
+%       }{
+%         \Meta{s'}{r'}
+%       }
+%     }
+%     \\
+%     \Alert{
+%       k\mathrm{\ min\ s.t.}\
+%       \Eq{
+%         \Meta{s_k}{r'}
+%       }{
+%         \Meta{s'_k}{r'}
+%       }
+%     }
+%     \\
+%     \Alert{
+%       \NotEq{
+%         \Meta{s_k}{\DimDelete}
+%       }{
+%         \DimDelete
+%       }
+%     }
+%     \\
+%     \Alert{
+%       \NotEq{
+%         \Meta{s'_k}{\DimDelete}
+%       }{
+%         \DimDelete
+%       }
+%     }
+%     \\\\
+%     \NotEq{
+%       \Meta{s}{x}
+%     }{
+%       \Meta{s'}{x}
+%     }
+%     \\
+%     \NotEq{
+%       \Meta{s_i}{x}
+%     }{
+%       \Meta{s'_i}{x}
+%     }
+%   }{
+%     \Step{
+%       \Coe{r}{r'}{x}{
+%         \FCom{
+%           \Meta{s}{x}
+%         }{
+%           \Meta{s'}{x}
+%         }{
+%           \Meta{A}{x}
+%         }{
+%           \Vec{
+%             \BTube{
+%               \Meta{s_i}{x}
+%             }{
+%               \Meta{s'_i}{x}
+%             }{z}{
+%               \Meta{B_i}{x\;z}
+%             }
+%           }
+%         }
+%       }{M}
+%     }{
+%       \Coe{r}{r'}{x}{
+%         \Meta{B_i}{x\;\Meta{s'}{x}}
+%       }{M}
+%     }
+%   }
+%   \and
+  \inferrule[CoeFcom/1]{
     \Alert{
       \NotEq{
         \Meta{s}{r'}
@@ -146,22 +217,6 @@ the outer $\MathKwd{coe}$ is not rigid, so we can project the inner one.
       }
     }
     \\
-    \Alert{
-      \NotEq{
-        \Meta{s_k}{\DimDelete}
-      }{
-        \DimDelete
-      }
-    }
-    \\
-    \Alert{
-      \NotEq{
-        \Meta{s'_k}{\DimDelete}
-      }{
-        \DimDelete
-      }
-    }
-    \\\\
     \NotEq{
       \Meta{s}{x}
     }{
@@ -173,8 +228,87 @@ the outer $\MathKwd{coe}$ is not rigid, so we can project the inner one.
     }{
       \Meta{s'_i}{x}
     }
+    \\\\
+    \Define{O}{
+      \HCom{
+        \Meta{s'}{r}
+      }{
+        \Meta{s}{r}
+      }{
+        \Meta{A}{r}
+      }{
+        \XCap{
+          \Meta{s}{r}
+        }{
+          \Meta{s'}{r}
+        }{M}{
+          \Vec{
+            \BTube{
+              \Meta{s_i}{r}
+            }{
+              \Meta{s'_i}{r}
+            }{z}{
+              \Meta{B_i}{r\;z}
+            }
+          }
+        }
+      }{
+        \Vec{
+          \BTube{
+            \Meta{s_i}{r}
+          }{
+            \Meta{s'_i}{r}
+          }{z}{
+            \Coe{z}{
+              \Meta{s}{r}
+            }{z}{
+              \Meta{B_i}{r\;z}
+            }{
+              \Coe{
+                \Meta{s'}{r}
+              }{z}{z}{
+                \Meta{B_i}{r\;z}
+              }{M}
+            }
+          }
+        }
+      }
+    }
+    \\
+    \Define{P}{
+      \GCom{r}{r'}{x}{
+        \Meta{A}{x}
+      }{O}{
+        \Vec{
+          \BTube{
+            \Meta{s_i}{\DimDelete}
+          }{
+            \Meta{s'_i}{\DimDelete}
+          }{x}{
+            \Coe{
+              \Meta{s'}{r'}
+            }{
+              \Meta{s}{r'}
+            }{z}{
+              \Meta{B_i}{r'\;z}
+            }{
+              \Coe{r}{x}{x}{
+                \Meta{B_i}{x\;\Meta{s'}{x}}
+              }{M}
+            }
+          }
+        },
+        \BTube{
+          \Meta{s}{\DimDelete}
+        }{
+          \Meta{s'}{\DimDelete}
+        }{x}{
+          \Coe{r}{x}{x}{\Meta{A}{x}}{M}
+        }
+      }
+    }
   }{
-    \Step{
+    \BreakStep{
       \Coe{r}{r'}{x}{
         \FCom{
           \Meta{s}{x}
@@ -195,11 +329,47 @@ the outer $\MathKwd{coe}$ is not rigid, so we can project the inner one.
         }
       }{M}
     }{
-      \Coe{r}{r'}{x}{
-        \Meta{B_i}{x\;\Meta{s'}{x}}
-      }{M}
+      \GCom{
+        \Meta{s}{r'}
+      }{
+        \Meta{s'}{r'}
+      }{z}{
+        \Meta{B_k}{r'\;z}
+      }{
+        P
+      }{
+        \Vec{
+          \BTube{
+            \Meta{s_i}{\DimDelete}
+          }{
+            \Meta{s'_i}{\DimDelete}
+          }{z}{
+            \Coe{
+              \Meta{s'}{r'}
+            }{z}{z}{
+              \Meta{B_i}{r'\;z}
+            }{
+              \Coe{r}{r'}{x}{
+                \Meta{B_i}{x\;\Meta{s'}{x}}
+              }{M}
+            }
+          }
+        }
+        \;
+        \BTube{r}{r'}{z}{
+          \Coe{
+            \Meta{s'}{r'}
+          }{z}{z}{
+            \Meta{B_k}{r'\;z}
+          }{
+            \Coe{r}{r'}{x}{
+              \Meta{B_k}{x}{\Meta{s'}{x}}
+            }{M}
+          }
+        }
+      }
     }
   }
-\]
+\end{mathpar}
 
 \end{document}

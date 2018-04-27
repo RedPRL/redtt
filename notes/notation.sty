@@ -26,11 +26,11 @@
   }
 }
 
-\newcommand\XCap[3]{
+\newcommand\XCap[4]{
   \Parens{
     \MathKwd{cap}^{{#1}\leftsquigarrow{#2}}%
     #3\;
-    \Sys{#3}
+    \Sys{#4}
   }
 }
 
@@ -110,20 +110,3 @@
 \newcommand\DimDelete{\maltese}
 
 \newcommand\Define[2]{{#1}\triangleq{#2}}
-
-%%% Experimental
-\newcommand\HComCap[5]{
-  \Parens{
-    \MathKwd{hcom/cap}^{{#1}\rightsquigarrow{#2}}_{#3}\;
-    #4\;
-    \Sys{#5}
-  }
-}
-
-\newcommand\HComTube[6]{
-  \Parens{
-    {\MathKwd{hcom/tube/}{#1}}^{{#2}\rightsquigarrow{#3}}_{#4}\;
-    #5\;
-    \Sys{#6}
-  }
-}
