@@ -38,6 +38,10 @@ struct
   and clo = tm * env
   and env = can val_ list
 
+
+  let swap d0 d1 v =
+    failwith "TODO"
+
   let car : can val_ -> can val_ cmd = failwith ""
   let cdr : can val_ -> can val_ cmd  = failwith ""
 
@@ -60,7 +64,8 @@ struct
           | Pi {dom; cod} ->
             dom >>= fun vdom ->
             coe dim1 dim0 (x, vdom) varg >>= fun coe_arg0 ->
-            coe dim1 (D.Named x) (x, vdom) varg >>= fun coe_argx -> (* Potential problem, we might need to freshen 'x' *)
+            M.fresh >>= fun y ->
+            coe dim1 (D.Named y) (y, swap x y vdom) varg >>= fun coe_argx ->
             inst_clo cod coe_argx >>= fun codcoe ->
             apply el coe_arg0 >>= fun el' ->
             coe dim0 dim1 (x, codcoe) el'
