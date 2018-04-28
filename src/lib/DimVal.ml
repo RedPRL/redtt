@@ -3,7 +3,7 @@ type t =
   | Dim1
   | Lvl of int
   | Delete (* used in "forall" *)
-  | Fresh of Symbol.t
+  | Named of Symbol.t
 
 type equ = t * t
 
@@ -21,5 +21,5 @@ let compare d0 d1 =
   | Dim0, Dim1 -> Apart
   | Dim1, Dim0 -> Apart
   | Delete, Delete -> Same
-  | Fresh x, Fresh y -> if x = y then Same else Apart
+  | Named x, Named y -> if x = y then Same else Apart
   | _ -> Indeterminate

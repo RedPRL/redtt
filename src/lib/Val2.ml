@@ -24,7 +24,7 @@ struct
   open Notation
 
   type _ val_ =
-    | Pi : {dom : can val_ cmd; cod : clo cmd} -> can val_
+    | Pi : {dom : can val_ cmd; cod : clo} -> can val_
     | V : {dim : dim; ty0 : can val_ cmd; ty1 : can val_ cmd; equiv : can val_ cmd} -> can val_
     | VIn : dim * can val_ * can val_ -> can val_
 
@@ -41,23 +41,55 @@ struct
   let car : can val_ -> can val_ cmd = failwith ""
   let cdr : can val_ -> can val_ cmd  = failwith ""
 
-  let apply : can val_ -> can val_ -> can val_ cmd = failwith ""
+  let rec eval : type a. env -> a Tm.t -> can val_ cmd =
+    fun _ _ ->
+      failwith "TODO"
 
-  let rec coe r r' (x, ty) el =
+  and inst_clo (tm, env) arg =
+    eval (arg :: env) tm
+
+  and apply : can val_ -> can val_ -> can val_ cmd =
+    fun vfun varg ->
+      match vfun with
+      | Lam clo ->
+        inst_clo clo varg
+
+      | Coe {dim0; dim1; ty = (x, ty); el} ->
+        begin
+          match ty with
+          | Pi {dom; cod} ->
+            dom >>= fun vdom ->
+            coe dim1 dim0 (x, vdom) varg >>= fun coe_arg0 ->
+            coe dim1 (D.Named x) (x, vdom) varg >>= fun coe_argx -> (* Potential problem, we might need to freshen 'x' *)
+            inst_clo cod coe_argx >>= fun codcoe ->
+            apply el coe_arg0 >>= fun el' ->
+            coe dim0 dim1 (x, codcoe) el'
+
+          | _ ->
+            failwith "expected pi"
+        end
+
+      | _ ->
+        failwith "TODO"
+
+  and coe r r' (x, (ty : can val_)) el =
     M.ask r r' @@ function
     | Same ->
       M.ret el
 
     | _ ->
       match ty with
+      | Pi _ ->
+        M.ret @@ Coe {dim0 = r; dim1 = r'; ty = (x, ty); el}
+
       | V vinfo ->
         begin
-          M.ask vinfo.dim (D.Fresh x) @@ function
+          M.ask vinfo.dim (D.Named x) @@ function
           | D.Same ->
             begin
               M.ask r D.Dim1 @@ function
               | D.Same ->
-                M.restrict r' (D.Fresh x) vinfo.equiv >>= fun equiv_r' ->
+                M.restrict r' (D.Named x) vinfo.equiv >>= fun equiv_r' ->
                 vinfo.ty1 >>= fun tyb ->
                 coe D.Dim1 r' (x, tyb) el >>= fun coe1r'bn ->
                 cdr equiv_r' >>= fun cdr_equiv_r' ->

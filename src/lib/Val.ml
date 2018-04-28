@@ -68,7 +68,7 @@ type _ f =
   | Dim0 : can f
   | Dim1 : can f
   | DimDelete : can f
-  | DimFresh : Symbol.t -> can f
+  | DimNamed : Symbol.t -> can f
 
   | Bool : can f
   | Tt : can f
@@ -159,7 +159,7 @@ let embed_dimval dv =
   | DimVal.Dim1 -> Dim1
   | DimVal.Lvl i -> Up (into Interval, into @@ Lvl i)
   | DimVal.Delete -> DimDelete
-  | DimVal.Fresh x -> DimFresh x
+  | DimVal.Named x -> DimNamed x
 
 let out : type a. a t -> a f =
   fun node -> node.con
@@ -194,7 +194,7 @@ let rec pp : type a. a t Pretty.t0 =
     | Dim1 ->
       Format.fprintf fmt "1"
 
-    | DimFresh _sym ->
+    | DimNamed _sym ->
       Format.fprintf fmt "<#dim/fresh>"
 
     | DimDelete ->
@@ -296,7 +296,7 @@ let project_dimval (type a) (v : a t) =
       | _ -> failwith "project_dimval/Up"
     end
   | DimDelete -> DimVal.Delete
-  | DimFresh x -> DimVal.Fresh x
+  | DimNamed x -> DimVal.Named x
   | _ ->
     Format.fprintf Format.err_formatter "Tried to project %a as a dimension@." pp v;
     failwith "project_dimval"
@@ -533,7 +533,7 @@ and make_hcom ~dim0 ~dim1 ~ty ~cap ~sys =
 
 and rigid_coe ~dim0 ~dim1 ~ty ~tm =
   let x = Symbol.fresh () in
-  let tyx = inst_bclo ty @@ into @@ DimFresh x in
+  let tyx = inst_bclo ty @@ into @@ DimNamed x in
   match out tyx with
   | Univ _ ->
     tm
