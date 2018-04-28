@@ -23,36 +23,36 @@ struct
   module Notation = Monad.Notation (M)
   open Notation
 
-  type _ val_ =
-    | Pi : {dom : can val_ cmd; cod : clo} -> can val_
-    | V : {dim : dim; ty0 : can val_ cmd; ty1 : can val_ cmd; equiv : can val_ cmd} -> can val_
-    | VIn : dim * can val_ * can val_ -> can val_
+  type _ t =
+    | Pi : {dom : can t cmd; cod : clo} -> can t
+    | V : {dim : dim; ty0 : can t cmd; ty1 : can t cmd; equiv : can t cmd} -> can t
+    | VIn : dim * can t * can t -> can t
 
-    | Coe : {dim0 : dim; dim1 : dim; ty : Symbol.t * can val_; el : can val_} -> can val_
+    | Coe : {dim0 : dim; dim1 : dim; ty : Symbol.t * can t; el : can t} -> can t
 
-    | Lam : clo -> can val_
-    | Pair : can val_ * can val_ -> can val_
-    | FunApp : neu val_ * can val_ -> can val_
-    | ExtApp : neu val_ * dim -> can val_
+    | Lam : clo -> can t
+    | Pair : can t * can t -> can t
+    | FunApp : neu t * can t -> can t
+    | ExtApp : neu t * dim -> can t
 
   and clo = tm * env
-  and env = can val_ list
+  and env = can t list
 
 
   let swap d0 d1 v =
     failwith "TODO"
 
-  let car : can val_ -> can val_ cmd = failwith ""
-  let cdr : can val_ -> can val_ cmd  = failwith ""
+  let car : can t -> can t cmd = failwith ""
+  let cdr : can t -> can t cmd  = failwith ""
 
-  let rec eval : type a. env -> a Tm.t -> can val_ cmd =
+  let rec eval : type a. env -> a Tm.t -> can t cmd =
     fun _ _ ->
       failwith "TODO"
 
   and inst_clo (tm, env) arg =
     eval (arg :: env) tm
 
-  and apply : can val_ -> can val_ -> can val_ cmd =
+  and apply : can t -> can t -> can t cmd =
     fun vfun varg ->
       match vfun with
       | Lam clo ->
@@ -77,7 +77,7 @@ struct
       | _ ->
         failwith "TODO"
 
-  and coe r r' (x, (ty : can val_)) el =
+  and coe r r' (x, (ty : can t)) el =
     M.ask r r' @@ function
     | Same ->
       M.ret el
