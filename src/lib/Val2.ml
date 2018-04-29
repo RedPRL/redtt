@@ -13,7 +13,7 @@ sig
 
   type state
   val save : state m
-  val restore : state -> 'a m -> 'a m
+  val reset : state -> 'a m -> 'a m
 
   module Dim :
   sig
@@ -22,6 +22,71 @@ sig
     val fresh : Symbol.t m
   end
 end
+
+(* This is a strange monad that lets me pass around some local state + a modification to this state.
+   It should let us simulate the weird state control effects that we need for closures and thunks. *)
+module type BidirectionalReader =
+sig
+  include Monad.S
+
+  type state
+  type delta
+
+  val run : state -> 'a m -> 'a
+
+  val thunk : (unit -> 'a) -> 'a m
+
+  val read : state m
+  val reset : state -> 'a m -> 'a m
+  val modifyAfter : delta -> 'a m -> 'a m
+end
+
+module BidirectionalReader (X : sig type t end) : BidirectionalReader with type state = X.t with type delta = X.t -> X.t =
+struct
+  type state = X.t
+  type delta = state -> state
+
+  type 'a m = delta * state -> 'a
+
+  let thunk f _ = f ()
+
+  let run s m =
+    m ((fun x -> x), s)
+
+  let ret a _ = a
+  let bind m k (d, s) = k (m (d, s)) (d, s)
+  let read (d, s) = d s
+
+  let modifyAfter d m (d0, s0) =
+    let d' s = d (d0 s) in
+    m (d', s0)
+
+  let reset s m (d, _) =
+    m (d, s)
+end
+
+module Sem : Sem =
+struct
+  type rel = DimRel.t
+  module R = BidirectionalReader (struct type t = rel end)
+  module N = Monad.Notation (R)
+  open N
+
+  include R
+
+  let save = read
+
+  module Dim =
+  struct
+    let fresh = thunk Symbol.fresh
+    let restrict d0 d1 = modifyAfter (fun rel -> DimRel.restrict_exn rel d0 d1)
+    let ask d0 d1 k =
+      read >>= fun rel ->
+      k @@ DimRel.compare_dim rel d0 d1
+  end
+
+end
+
 
 type atom = Symbol.t
 
@@ -97,6 +162,14 @@ struct
     P.lookup x pi, act pi vx
 
 
+  let out_pi ty =
+    match ty with
+    | Pi {dom; cod} ->
+      dom, cod
+
+    | _ ->
+      failwith "out_pi"
+
   let car : can t -> can t cmd = failwith ""
   let cdr : can t -> can t cmd  = failwith ""
 
@@ -116,7 +189,7 @@ struct
       | _ -> failwith ""
 
   and inst_clo (tm, env, pi, st) arg =
-    M.restore st @@ eval (arg :: env, pi) tm
+    M.reset st @@ eval (arg :: env, pi) tm
 
   and apply : can t -> can t -> can t cmd =
     fun fn arg ->
@@ -181,76 +254,5 @@ struct
 
     | _ ->
       failwith "TODO: rigid_coe"
-
-  and out_pi ty =
-    match ty with
-    | Pi {dom; cod} ->
-      dom, cod
-
-    | _ ->
-      failwith "out_pi"
-
-
-    (*
-  and apply : can t -> can t -> can t cmd =
-    fun vfun varg ->
-      match vfun with
-      | Lam clo ->
-        inst_clo clo varg
-
-      | Coe {dim0; dim1; ty = (x, ty); el} ->
-        begin
-          match ty with
-          | Pi {dom; cod} ->
-            dom >>= fun vdom ->
-            coe dim1 dim0 (x, vdom) varg >>= fun coe_arg0 ->
-            M.fresh >>= fun y ->
-            coe dim1 (D.Named y) (y, swap x y vdom) varg >>= fun coe_argx ->
-            inst_clo cod coe_argx >>= fun codcoe ->
-            apply el coe_arg0 >>= fun el' ->
-            coe dim0 dim1 (x, codcoe) el'
-
-          | _ ->
-            failwith "expected pi"
-        end
-
-      | _ ->
-        failwith "TODO" *)
-
-  (* and coe r r' (x, (ty : can t)) el =
-     M.ask r r' @@ function
-     | Same ->
-      M.ret el
-
-     | _ ->
-      match ty with
-      | Pi _ ->
-        M.ret @@ Coe {dim0 = r; dim1 = r'; ty = (x, ty); el}
-
-      | V vinfo ->
-        begin
-          M.ask vinfo.dim (D.Named x) @@ function
-          | D.Same ->
-            begin
-              M.ask r D.Dim1 @@ function
-              | D.Same ->
-                M.restrict r' (D.Named x) vinfo.equiv >>= fun equiv_r' ->
-                vinfo.ty1 >>= fun tyb ->
-                coe D.Dim1 r' (x, tyb) el >>= fun coe1r'bn ->
-                cdr equiv_r' >>= fun cdr_equiv_r' ->
-                apply cdr_equiv_r' coe1r'bn >>= fun app_cdr_equiv ->
-                car app_cdr_equiv >>= fun otm ->
-                car otm >>= fun otm0 ->
-                M.ret @@ VIn (r', otm0, failwith "")
-
-              | _ ->
-                failwith "TODO"
-            end
-          | _ ->
-            failwith ""
-        end
-
-      | _ ->
-        failwith "TODO" *)
 
 end
