@@ -26,7 +26,7 @@ struct
 
   type delta =
     | Id
-    | Eq of D.t * D.t
+    | Equate of D.t * D.t
     | Cmp of delta * delta
 
   (* the idea is that for any part of the term in which we may need to issue a dimension substitution,
@@ -38,7 +38,7 @@ struct
     | Sg : {dom : can t; cod : clo} -> can t
 
     | V : {r : dim; ty0 : delta -> can t; ty1 : delta -> can t; equiv : delta -> can t} -> can t
-    | VIn : dim * can t * can t -> can t
+    | VIn : {r : dim; el0 : can t; el1 : can t} -> can t
 
     | Coe : {r : dim; r' : dim; abs : Symbol.t * can t; el : can t} -> can t
 
@@ -46,6 +46,16 @@ struct
     | Pair : can t * can t -> can t
     | FunApp : neu t * can t -> can t
     | ExtApp : neu t * dim -> can t
+
+    | Up : {ty : can t; neu : neu t} -> can t
+
+    | Lvl : int -> neu t
+
+    | Interval : can t
+    | Dim0 : can t
+    | Dim1 : can t
+    | DimDelete : can t
+    | DimNamed : Symbol.t -> can t
 
   and 'a cfg = { tm : 'a Tm.t; phi : rel; rho : env; pi : perm}
   and clo = B of Tm.chk cfg
@@ -90,6 +100,21 @@ struct
   and act_abs pi (x, vx) =
     P.lookup x pi, act pi vx
 
+  let project_dim (type a) (v : a t) =
+    match v with
+    | Dim0 -> DimVal.Dim0
+    | Dim1 -> DimVal.Dim1
+    | Up {ty; neu} ->
+      begin
+        match ty, neu with
+        | Interval, Lvl i -> DimVal.Lvl i
+        | _ -> failwith "project_dim/Up"
+      end
+    | DimDelete -> DimVal.Delete
+    | DimNamed x -> DimVal.Named x
+    | _ ->
+      failwith "project_dim"
+
   let rec eval : type a. a cfg -> can t =
     fun cfg ->
       match Tm.out cfg.tm with
@@ -112,7 +137,29 @@ struct
         let v1 = eval {cfg with tm = t1} in
         apply v0 v1
 
+      | Tm.Coe info ->
+        let r = eval_dim {cfg with tm = info.dim0} in
+        let r' = eval_dim {cfg with tm = info.dim1} in
+        let abs =
+          lazy begin
+            let x = Symbol.fresh () in
+            let Tm.B (_, ty) = info.ty in
+            x, eval {cfg with tm = ty; rho = DimNamed x :: cfg.rho}
+          end
+        in
+        let el =
+          lazy begin
+            eval {cfg with tm = info.tm}
+          end
+        in
+        make_coe r r' abs el
+
       | _ -> failwith ""
+
+  and eval_dim cfg =
+    DimRel.canonize cfg.phi @@
+    project_dim @@
+    eval cfg
 
   and apply vfun varg =
     match vfun with
@@ -133,6 +180,20 @@ struct
       failwith "apply"
 
 
+  and vin r el0 el1 =
+    match r with
+    | D.Dim0 -> Lazy.force el0
+    | D.Dim1 -> Lazy.force el1
+    | _ -> VIn {r; el0 = Lazy.force el0; el1 = Lazy.force el1}
+
+
+  and make_coe r r' abs el =
+    match D.compare r r' with
+    | D.Same ->
+      Lazy.force el
+    | _ ->
+      rigid_coe r r' (Lazy.force abs) (Lazy.force el)
+
   and rigid_coe r r' abs el =
     match abs with
     | _, (Pi _ | Sg _) ->
@@ -142,13 +203,13 @@ struct
       begin
         match D.compare (D.Named x) info.r, D.compare r D.Dim0 with
         | D.Same, D.Same ->
-          let vty1 = info.ty1 Id in
-          let equiv_fun0x = car @@ info.equiv @@ Eq (D.Dim0, D.Named x) in
-          let vapp = apply equiv_fun0x el in
-          let vcoe = rigid_coe r r' (x, vty1) vapp in
-          VIn (r', el, vcoe)
+          vin r' (lazy el) @@ lazy begin
+            let equiv_fun0x = car @@ info.equiv @@ Equate (D.Dim0, D.Named x) in
+            rigid_coe r r' (x, info.ty1 Id) @@
+            apply equiv_fun0x el
+          end
 
-        | _ -> failwith ""
+        | _ -> failwith "TODO: it gets harder from here ;-)"
       end
 
     | _ -> failwith "TODO"
