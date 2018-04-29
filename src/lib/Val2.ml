@@ -23,7 +23,15 @@ struct
 
   type perm = P.t
   type rel = DimRel.t
-  type delta = rel -> rel
+
+  type delta =
+    | Id
+    | Eq of D.t * D.t
+    | Cmp of delta * delta
+
+  (* the idea is that for any part of the term in which we may need to issue a dimension substitution,
+     we should make it a family [delta -> can t]. This can be easily memoized later so that we don't
+     repeatedly evaluate the expression. *)
 
   type _ t =
     | Pi : {dom : can t; cod : clo} -> can t
@@ -134,8 +142,8 @@ struct
       begin
         match D.compare (D.Named x) info.r, D.compare r D.Dim0 with
         | D.Same, D.Same ->
-          let vty1 = info.ty1 (fun rel -> rel) in
-          let equiv_fun0x = car @@ info.equiv @@ fun rel -> DimRel.restrict_exn rel D.Dim0 (D.Named x) in
+          let vty1 = info.ty1 Id in
+          let equiv_fun0x = car @@ info.equiv @@ Eq (D.Dim0, D.Named x) in
           let vapp = apply equiv_fun0x el in
           let vcoe = rigid_coe r r' (x, vty1) vapp in
           VIn (r', el, vcoe)
