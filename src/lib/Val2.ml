@@ -80,6 +80,9 @@ struct
   let restrict dl  =
     F.map (fun dl' -> Cmp (dl, dl'))
 
+  let restrict_sys dl =
+    List.map (restrict dl)
+
   let restrict_clo dl {tm; phi; rho; atoms} =
     {tm; phi = eval_delta dl phi; rho; atoms}
 
@@ -169,13 +172,7 @@ struct
     match D.compare r r' with
     | Same -> F.inst dl el
     | _ ->
-      match F.inst dl tyx with
-      | Bool -> F.inst dl el
-      | (Pi _ | Sg _) ->
-        let abs = x, restrict dl tyx in
-        let el = restrict dl el in
-        Coe {r; r'; abs; el}
-      | _ -> failwith ""
+      F.inst dl @@ rigid_coe r r' (x, tyx) el
 
   and make_hcom r r' ty cap sys =
     F.make @@ fun dl ->
@@ -188,7 +185,7 @@ struct
       let rec go sys =
         match sys with
         | [] ->
-          rigid_hcom r r' ty cap sys
+          F.inst dl @@ rigid_hcom r r' ty cap sys
         | tube :: sys ->
           go_tube (F.inst dl tube) sys
       and go_tube tb sys =
@@ -200,8 +197,34 @@ struct
       in
       go sys
 
+  and rigid_coe r r' (x, tyx) el =
+    F.make @@ fun dl ->
+    match F.inst dl tyx with
+    | Bool ->
+      F.inst dl el
+
+    | (Pi _ | Sg _) ->
+      let abs = x, restrict dl tyx in
+      let el = restrict dl el in
+      Coe {r; r'; abs; el}
+
+    | _ ->
+      failwith "TODO: rigid_coe"
+
   and rigid_hcom r r' ty cap sys =
-    failwith ""
+    F.make @@ fun dl ->
+    match F.inst dl ty with
+    | Bool ->
+      F.inst dl cap
+
+    | (Pi _ | Sg _) ->
+      let ty = restrict dl ty in
+      let cap = restrict dl cap in
+      let sys = restrict_sys dl sys in
+      HCom {r; r'; ty; cap; sys}
+
+    | _ ->
+      failwith ""
 
 
 end
