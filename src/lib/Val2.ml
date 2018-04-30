@@ -34,14 +34,6 @@ sig
   val map : (delta -> delta) -> 'a t -> 'a t
 end
 
-module Fam : Fam =
-struct
-  type 'a t = delta -> 'a
-  let make f = f
-  let inst dl f = f dl
-  let map g f dl = f (g dl)
-end
-
 module V (P : Perm) (F : Fam) =
 struct
   type perm = P.t
@@ -56,20 +48,18 @@ struct
       eval_delta delta1 @@
       eval_delta delta0 phi
 
-  module Tube =
-  struct
-    type 'a t =
-      | True of eqn * 'a
-      | Indet of eqn * 'a
-      | False of eqn
-      | Delete
-  end
+  type 'a tube =
+    | True of eqn * 'a
+    | Indet of eqn * 'a
+    | False of eqn
+    | Delete
 
   type _ f =
     | Pi : {dom: can t; cod : clo} -> can f
     | Sg : {dom: can t; cod : clo} -> can f
     | Lam : clo -> can f
     | Coe : {r : dim; r' : dim; abs : can t abs; el : can t} -> can f
+    | HCom : {r : dim; r' : dim; ty : can t; cap : can t; sys : can t abs sys} -> can f
 
     | Bool : can f
 
@@ -78,15 +68,20 @@ struct
   and 'a t = 'a f F.t
 
   and 'a abs = atom * 'a
-  and 'a cfg = {tm : 'a; phi : rel; rho : env; atoms : Symbol.t list}
+  and 'a cfg = {tm : 'a; phi : rel; rho : env; atoms : atom list}
+  and 'a sys = 'a tube F.t list
   and clo = Tm.chk Tm.t Tm.bnd cfg
   and env = can t list
 
-  let restrict r r'  =
-    F.map (fun dl -> Cmp (Equate (r, r'), dl))
+  let fam_of_dim r =
+    F.make @@ fun dl ->
+    DimRel.canonize (eval_delta dl DimRel.emp) r
 
-  let restrict_clo r r' {tm; phi; rho; atoms} =
-    {tm; phi = DimRel.restrict_exn phi r r'; rho; atoms}
+  let restrict dl  =
+    F.map (fun dl' -> Cmp (dl, dl'))
+
+  let restrict_clo dl {tm; phi; rho; atoms} =
+    {tm; phi = eval_delta dl phi; rho; atoms}
 
 
   let rec eval : type a. a Tm.t cfg -> can t =
@@ -94,28 +89,36 @@ struct
       match Tm.out cfg.tm with
       | Tm.Pi (dom, cod) ->
         F.make @@ fun dl ->
-        let phi = eval_delta dl cfg.phi in
-        let dom = eval {cfg with tm = dom; phi} in
-        let cod = {cfg with tm = cod; phi} in
+        let dom = restrict dl @@ eval {cfg with tm = dom} in
+        let cod = restrict_clo dl @@ {cfg with tm = cod} in
         Pi {dom; cod}
 
       | Tm.Sg (dom, cod) ->
         F.make @@ fun dl ->
-        let phi = eval_delta dl cfg.phi in
-        let dom = eval {cfg with tm = dom; phi} in
-        let cod = {cfg with tm = cod; phi} in
+        let dom = restrict dl @@ eval {cfg with tm = dom} in
+        let cod = restrict_clo dl @@ {cfg with tm = cod} in
         Sg {dom; cod}
 
       | Tm.Coe info ->
         let r = eval_dim {cfg with tm = info.dim0} in
         let r' = eval_dim {cfg with tm = info.dim1} in
-        let Tm.B (_, ty) = info.ty in
+        let el = eval {cfg with tm = info.tm} in
+
         let x = Symbol.fresh () in
-        let vty = eval {cfg with tm = ty; atoms = x :: cfg.atoms} in
-        make_coe r r' (x, vty) @@
-        eval {cfg with tm = info.tm}
+        let Tm.B (_, tty) = info.ty in
+        let abs = x, eval {cfg with tm = tty; atoms = x :: cfg.atoms} in
+        make_coe r r' abs el
+
+      | Tm.HCom info ->
+        let r = eval_dim {cfg with tm = info.dim0} in
+        let r' = eval_dim {cfg with tm = info.dim1} in
+        let ty = eval {cfg with tm = info.ty} in
+        let cap = eval {cfg with tm = info.cap} in
+        let sys = eval_bsys {cfg with tm = info.sys} in
+        make_hcom r r' ty cap sys
 
       | _ -> failwith ""
+
 
   and eval_dim : type a. a Tm.t cfg -> dim t =
     fun cfg ->
@@ -131,26 +134,74 @@ struct
       | _ ->
         failwith "eval_dim"
 
+  and eval_bsys cfg : can t abs sys =
+    List.map
+      (fun tb -> eval_btube {cfg with tm = tb})
+      cfg.tm
 
-  and make_coe r r' (x, ty) el =
+  and eval_btube cfg =
+    let tr, tr', otm = cfg.tm in
+    let r = eval_dim {cfg with tm = tr} in
+    let r' = eval_dim {cfg with tm = tr'} in
+    F.make @@ fun dl ->
+    let Dim r = F.inst dl r in
+    let Dim r' = F.inst dl r' in
+    match D.compare r r', otm with
+    | D.Same, Some (Tm.B (_, tm)) ->
+      let x = Symbol.fresh () in
+      let abs = x, restrict dl @@ eval {cfg with tm} in
+      True ((r, r'), abs)
+
+    | D.Indeterminate, Some (Tm.B (_, tm)) ->
+      let x = Symbol.fresh () in
+      let abs = x, restrict dl @@ eval {cfg with tm} in
+      Indet ((r, r'), abs)
+
+    | D.Apart, _ ->
+      False (r, r')
+
+    | _ -> failwith "eval_tube"
+
+  and make_coe r r' (x, tyx) el =
+    F.make @@ fun dl ->
+    let Dim r = F.inst dl r in
+    let Dim r' = F.inst dl r' in
+    match D.compare r r' with
+    | Same -> F.inst dl el
+    | _ ->
+      match F.inst dl tyx with
+      | Bool -> F.inst dl el
+      | (Pi _ | Sg _) ->
+        let abs = x, restrict dl tyx in
+        let el = restrict dl el in
+        Coe {r; r'; abs; el}
+      | _ -> failwith ""
+
+  and make_hcom r r' ty cap sys =
     F.make @@ fun dl ->
     let Dim r = F.inst dl r in
     let Dim r' = F.inst dl r' in
     match D.compare r r' with
     | D.Same ->
-      F.inst dl el
+      F.inst dl cap
     | _ ->
-      F.inst dl @@ rigid_coe r r' (x, ty) el
+      let rec go sys =
+        match sys with
+        | [] ->
+          rigid_hcom r r' ty cap sys
+        | tube :: sys ->
+          go_tube (F.inst dl tube) sys
+      and go_tube tb sys =
+        match tb with
+        | True (_, (y, vy)) ->
+          F.inst dl @@ restrict (Equate (D.Named y, r')) vy
+        | _ ->
+          go sys
+      in
+      go sys
 
-  and rigid_coe r r' (x, ty) el =
-    F.make @@ fun dl ->
-    match F.inst dl ty with
-    | Bool ->
-      F.inst dl el
-    | (Pi _ | Sg _) ->
-      Coe {r; r'; abs = (x, ty); el}
-    | _ ->
-      failwith "rigid_coe"
+  and rigid_hcom r r' ty cap sys =
+    failwith ""
 
 
 end
