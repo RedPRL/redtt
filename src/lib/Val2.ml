@@ -86,6 +86,15 @@ struct
   let restrict_clo dl {tm; phi; rho; atoms} =
     {tm; phi = eval_delta dl phi; rho; atoms}
 
+  let out_pi v =
+    match v with
+    | Pi {dom; cod} -> dom, cod
+    | _ -> failwith "out_pi"
+
+
+  let act : type a. P.t -> a t -> a t =
+    fun _pi ->
+      failwith "TODO: act"
 
   let rec eval : type a. a Tm.t cfg -> can t =
     fun cfg ->
@@ -120,6 +129,16 @@ struct
         let sys = eval_bsys {cfg with tm = info.sys} in
         make_hcom r r' ty cap sys
 
+      | Tm.FunApp (t0, t1) ->
+        let vfun = eval {cfg with tm = t0} in
+        let varg = eval {cfg with tm = t1} in
+        apply vfun varg
+
+      | Tm.Var i ->
+        F.make @@ fun dl ->
+        (* TODO: do I need to do something with cfg.phi here? *)
+        F.inst dl @@ List.nth cfg.rho i
+
       | _ -> failwith ""
 
 
@@ -146,9 +165,11 @@ struct
     let tr, tr', otm = cfg.tm in
     let r = eval_dim {cfg with tm = tr} in
     let r' = eval_dim {cfg with tm = tr'} in
+
     F.make @@ fun dl ->
     let Dim r = F.inst dl r in
     let Dim r' = F.inst dl r' in
+
     match D.compare r r', otm with
     | D.Same, Some (Tm.B (_, tm)) ->
       let x = Symbol.fresh () in
@@ -164,6 +185,33 @@ struct
       False (r, r')
 
     | _ -> failwith "eval_tube"
+
+  and apply vfun varg =
+    F.make @@ fun dl ->
+    let varg' = restrict dl varg in
+    (* TODO: Should I have restricted the above ??? *)
+    match F.inst dl vfun with
+    | Lam clo ->
+      F.inst Id @@
+      eval {clo with rho = varg' :: clo.rho}
+
+    | Coe info ->
+      let x, tyx = info.abs in
+      let dom, cod = out_pi @@ F.inst dl tyx in
+      let abs_cod =
+        let y = Symbol.fresh () in
+        let abs = y, act (P.swap x y) dom in
+        let coe = rigid_coe info.r' (D.Named x) abs varg' in
+        x, eval {cod with rho = coe :: cod.rho}
+      in
+      let el = apply info.el @@ rigid_coe info.r' info.r (x, dom) varg' in
+      F.inst Id @@ rigid_coe info.r info.r' abs_cod el
+
+    | HCom info ->
+      F.inst Id @@ rigid_hcom info.r info.r' (failwith "") (failwith "") (failwith "")
+
+    | _ ->
+      failwith ""
 
   and make_coe r r' (x, tyx) el =
     F.make @@ fun dl ->
@@ -224,7 +272,7 @@ struct
       HCom {r; r'; ty; cap; sys}
 
     | _ ->
-      failwith ""
+      failwith "TODO: rigid_hcom"
 
 
 end
