@@ -55,425 +55,51 @@ struct
   (* TODO: now we use a nominal represnetation of dimension binders, so we need swapping. this is currently
      implemented naively, but it should be replaced by suspended permutations. *)
 
-  type _ t =
-    | Pi : {dom : can t; cod : clo} -> can t
-    | Sg : {dom : can t; cod : clo} -> can t
-    | Ext : rst abs -> can t
 
-    | V : {r : dim; ty0 : delta -> can t; ty1 : delta -> can t; equiv : can t fam} -> can t
-    | VIn : {r : dim; el0 : can t; el1 : can t} -> can t
+  type _ f =
+    | Pi : {dom: can t; cod : clo} -> can f
+    | Sg : {dom: can t; cod : clo} -> can f
+    | Lam : clo -> can f
+    | Coe : {r : dim; r' : dim; abs : can t abs; el : can t} -> can f
 
-    | Coe : {r : dim; r' : dim; abs : can t abs; el : can t} -> can t
-    | HCom : {r : dim; r' : dim; ty : can t fam; cap : can t fam; sys : can t fam abs sys} -> can t
-    | FCom : {r : dim; r' : dim; cap : can t fam; sys : can t fam abs sys} -> can t
-
-    | Lam : clo -> can t
-    | Pair : can t * can t -> can t
-    | FunApp : neu t * can t -> can t
-    | ExtApp : neu t * dim -> can t
-
-    | Univ : Lvl.t -> can t
-    | Bool : can t
-
-    | Up : {ty : can t; neu : neu t} -> can t
-
-    | Lvl : int -> neu t
-
-    | Interval : can t
-
+  and 'a t = Node of {con : delta -> 'a f}
+  and 'a abs = atom * 'a
   and 'a cfg = {tm : 'a; phi : rel; rho : env; pi : perm}
-  and 'a abs = Symbol.t * 'a
-  and 'a fam = delta -> 'a
-  and 'a tube = 'a Tube.t
-  and 'a sys = 'a tube list
-  and rst = R of {ty : can t fam; sys : can t fam sys}
-  and clo = B of Tm.chk Tm.t cfg
-  and env = env_el list
-  and env_el = Val of can t | Dim of D.t
+  and clo = Tm.chk Tm.t Tm.bnd cfg
+  and env = can t list
 
-  let out_pi v =
-    match v with
-    | Pi {dom; cod} -> dom, cod
-    | _ -> failwith "out_pi"
 
-  let out_sg v =
-    match v with
-    | Sg {dom; cod} -> dom, cod
-    | _ -> failwith "out_sg"
+  let rec out (Node node) dl =
+    node.con dl
 
-  let rec act : type a. P.t -> a t -> a t =
-    fun pi v ->
-      match v with
-      | Pi {dom; cod} ->
-        Pi {dom = act pi dom; cod = act_clo pi cod}
+  let into fam =
+    Node {con = fam}
 
-      | Sg {dom; cod} ->
-        Sg {dom = act pi dom; cod = act_clo pi cod}
+  let restrict r r' (Node node) =
+    Node {con = fun dl -> node.con @@ Cmp (Equate (r, r'), dl)}
 
-      | Ext (x, R {ty; sys}) ->
-        let rst = R {ty = act_fam pi ty; sys = act_sys pi sys} in
-        Ext (P.lookup x pi, rst)
-
-      | V info ->
-        let r = P.read info.r pi in
-        let ty0 = act_fam pi info.ty0 in
-        let ty1 = act_fam pi info.ty1 in
-        let equiv = act_fam pi info.equiv in
-        V {r; ty0; ty1; equiv}
-
-      | VIn info ->
-        let r = P.read info.r pi in
-        let el0 = act pi info.el0 in
-        let el1 = act pi info.el1 in
-        VIn {r; el0; el1}
-
-      | Coe info ->
-        let r = P.read info.r pi in
-        let r' = P.read info.r' pi in
-        let abs = act_abs pi info.abs in
-        let el = act pi info.el in
-        Coe {r; r'; abs; el}
-
-      | HCom info ->
-        let r = P.read info.r pi in
-        let r' = P.read info.r' pi in
-        let ty = act_fam pi info.ty in
-        let cap = act_fam pi info.cap in
-        let sys = act_bsys pi info.sys in
-        HCom {r; r'; ty; cap; sys}
-
-      | FCom info ->
-        let r = P.read info.r pi in
-        let r' = P.read info.r' pi in
-        let cap = act_fam pi info.cap in
-        let sys = act_bsys pi info.sys in
-        FCom {r; r'; cap; sys}
-
-      | Lam clo ->
-        Lam (act_clo pi clo)
-
-      | Pair (v0, v1) ->
-        Pair (act pi v0, act pi v1)
-
-      | FunApp (v0, v1) ->
-        FunApp (act pi v0, act pi v1)
-
-      | ExtApp (v, r) ->
-        ExtApp (act pi v, P.read r pi)
-
-      | Up {ty; neu} ->
-        Up {ty = act pi ty; neu = act pi neu}
-
-      | Bool ->
-        v
-
-      | Interval ->
-        v
-
-      | Univ _ ->
-        v
-
-      | Lvl _ ->
-        v
-
-  and act_fam pi fam =
-    fun rel -> act pi (fam rel)
-
-  and act_clo pi (B cfg) =
-    B {cfg with pi = P.cmp pi cfg.pi}
-
-  and act_abs pi (x, vx) =
-    P.lookup x pi, act pi vx
-
-  and act_sys pi sys =
-    List.map (act_tube pi) sys
-
-  and act_bsys pi sys =
-    List.map (act_btube pi) sys
-
-  and act_tube pi tube =
-    match tube with
-    | Tube.True ((r, r'), fam) ->
-      Tube.True ((P.read r pi, P.read r' pi), act_fam pi fam)
-
-    | Tube.Indet ((r, r'), fam) ->
-      Tube.Indet ((P.read r pi, P.read r' pi), act_fam pi fam)
-
-    | Tube.False (r, r') ->
-      Tube.False (P.read r pi, P.read r' pi)
-
-    | Tube.Delete ->
-      Tube.Delete
-
-  and act_btube pi tube =
-    match tube with
-    | Tube.True ((r, r'), (x, fam)) ->
-      Tube.True ((P.read r pi, P.read r' pi), (P.lookup x pi, act_fam pi fam))
-
-    | Tube.Indet ((r, r'), (x, fam)) ->
-      Tube.Indet ((P.read r pi, P.read r' pi), (P.lookup x pi, act_fam pi fam))
-
-    | Tube.False (r, r') ->
-      Tube.False (P.read r pi, P.read r' pi)
-
-    | Tube.Delete ->
-      Tube.Delete
-
+  let restrict_clo r r' {tm; phi; rho; pi} =
+    {tm; phi = DimRel.restrict_exn phi r r'; rho; pi}
 
 
   let rec eval : type a. a Tm.t cfg -> can t =
     fun cfg ->
       match Tm.out cfg.tm with
-      | Tm.Pi (dom, Tm.B (_, cod)) ->
-        let dom = eval {cfg with tm = dom} in
-        let cod = B {cfg with tm = cod} in
+      | Tm.Pi (dom, cod) ->
+        into @@ fun dl ->
+        let phi = eval_delta dl cfg.phi in
+        let dom = eval {cfg with tm = dom; phi} in
+        let cod = {cfg with tm = cod; phi} in
         Pi {dom; cod}
 
-      | Tm.Sg (dom, Tm.B (_, cod)) ->
-        let dom = eval {cfg with tm = dom} in
-        let cod = B {cfg with tm = cod} in
+      | Tm.Sg (dom, cod) ->
+        into @@ fun dl ->
+        let phi = eval_delta dl cfg.phi in
+        let dom = eval {cfg with tm = dom; phi} in
+        let cod = {cfg with tm = cod; phi} in
         Sg {dom; cod}
 
-      | Tm.Lam (Tm.B (_, bdy)) ->
-        let bdy = B {cfg with tm = bdy} in
-        Lam bdy
-
-      | Tm.FunApp (t0, t1) ->
-        let v0 = eval {cfg with tm = t0} in
-        let v1 = eval {cfg with tm = t1} in
-        apply v0 v1
-
-      | Tm.ExtApp (t0, t1) ->
-        let v = eval {cfg with tm = t0} in
-        let r = eval_dim {cfg with tm = t1} in
-        ext_apply v r
-
-      | Tm.Coe info ->
-        let r = eval_dim {cfg with tm = info.dim0} in
-        let r' = eval_dim {cfg with tm = info.dim1} in
-        let abs =
-          lazy begin
-            let x = Symbol.fresh () in
-            let Tm.B (_, ty) = info.ty in
-            x, eval {cfg with tm = ty; rho = Dim (D.Named x) :: cfg.rho}
-          end
-        in
-        let el =
-          lazy begin
-            eval {cfg with tm = info.tm}
-          end
-        in
-        make_coe r r' abs el
-
-      | Tm.HCom info ->
-        let r = eval_dim {cfg with tm = info.dim0} in
-        let r' = eval_dim {cfg with tm = info.dim1} in
-        let ty = eval_fam {cfg with tm = info.ty} in
-        let cap = eval_fam {cfg with tm = info.cap} in
-        let sys = eval_bsys {cfg with tm = info.sys} in
-        make_hcom r r' ty cap sys
-
-      | Tm.Interval ->
-        Interval
-
       | _ -> failwith ""
-
-  and eval_fam cfg =
-    fun delta ->
-      eval {cfg with phi = eval_delta delta cfg.phi}
-
-  and eval_bsys cfg =
-    List.map
-      (fun tube -> eval_btube {cfg with tm = tube})
-      cfg.tm
-
-  and eval_btube cfg =
-    let tr, tr', otm = cfg.tm in
-    let r = eval_dim {cfg with tm = tr} in
-    let r' = eval_dim {cfg with tm = tr'} in
-    match D.compare r r', otm with
-    | D.Same, Some (Tm.B (_, tm)) ->
-      let x = Symbol.fresh () in
-      let fam = eval_fam {cfg with tm = tm; rho = Dim (D.Named x) :: cfg.rho} in
-      let abs = x, fam in
-      Tube.True ((r, r'), abs)
-
-    | D.Indeterminate, Some (Tm.B (_, tm)) ->
-      let x = Symbol.fresh () in
-      let fam = eval_fam {cfg with tm = tm; rho = Dim (D.Named x) :: cfg.rho} in
-      let abs = x, fam in
-      Tube.Indet ((r, r'), abs)
-
-    | D.Apart, _ ->
-      Tube.False (r, r')
-
-    | _ ->
-      failwith "eval_tube"
-
-  and eval_dim cfg =
-    match Tm.out cfg.tm with
-    | Tm.Var i ->
-      begin
-        match List.nth cfg.rho i with
-        | Dim d -> DimRel.canonize cfg.phi d
-        | _ -> failwith "Expected dimension in environment"
-      end
-    | Tm.Dim0 ->
-      D.Dim0
-    | Tm.Dim1 ->
-      D.Dim1
-    | _ -> failwith "eval_dim"
-
-
-  and apply vfun varg =
-    match vfun with
-    | Lam clo ->
-      inst_clo clo varg
-
-    | Coe info ->
-      let x, ty = info.abs in
-      let dom, cod = out_pi ty in
-      let coe_arg s =
-        let y = Symbol.fresh () in
-        rigid_coe info.r' s (y, act (P.swap x y) dom) varg
-      in
-      rigid_coe info.r info.r' (x, inst_clo cod @@ coe_arg @@ D.Named x) @@
-      apply info.el @@ coe_arg info.r
-
-    | HCom info ->
-      let _, cod = out_pi @@ info.ty Id in
-      let ty = inst_clo cod varg in
-      let cap = apply (info.cap Id) varg in
-      let go (x, fam) =
-        let y = Symbol.fresh () in
-        let fam' delta = apply (act (P.swap x y) @@ fam delta) varg
-        in (y, fam')
-      in
-      let sys = map_bsys go info.sys in
-      rigid_hcom info.r info.r' ty cap sys
-
-    | _ ->
-      failwith "apply"
-
-  and map_bsys f sys =
-    List.map (map_btube f) sys
-
-  and map_btube f tube =
-    match tube with
-    | Tube.True (eqn, abs) ->
-      Tube.True (eqn, f abs)
-    | Tube.Indet (eqn, abs) ->
-      Tube.Indet (eqn, f abs)
-    | Tube.False _ ->
-      tube
-    | Tube.Delete ->
-      tube
-
-  and ext_apply _vext _r =
-    failwith "TODO"
-
-
-  and vin r el0 el1 =
-    match r with
-    | D.Dim0 ->
-      Lazy.force el0
-    | D.Dim1 ->
-      Lazy.force el1
-    | _ ->
-      VIn {r; el0 = Lazy.force el0; el1 = Lazy.force el1}
-
-
-
-  and make_hcom r r' ty cap sys =
-    match D.compare r r' with
-    | D.Same ->
-      cap Id
-    | _ ->
-      match project_sys sys with
-      | None -> rigid_hcom r r' ty cap sys
-      | Some (x, fam) -> fam @@ Equate (D.Named x, r')
-
-  and project_sys sys =
-    match sys with
-    | [] ->
-      None
-
-    | Tube.True (_, abs) :: _ ->
-      Some abs
-
-    | _ :: sys ->
-      project_sys sys
-
-
-  and make_coe r r' abs el =
-    match D.compare r r' with
-    | D.Same ->
-      Lazy.force el
-    | _ ->
-      rigid_coe r r' (Lazy.force abs) (Lazy.force el)
-
-  (* Invariant: r != r' *)
-  and rigid_coe r r' abs el =
-    match abs with
-    | _, (Pi _ | Sg _ | Ext _) ->
-      Coe {r; r'; abs; el}
-
-    | _, (Bool | Univ _) ->
-      el
-
-    | x, V info ->
-      begin
-        match D.compare (D.Named x) info.r, D.compare r D.Dim0 with
-        | D.Same, D.Same ->
-          vin r' (lazy el) @@ lazy begin
-            let equiv_fun0x = car @@ info.equiv @@ Equate (D.Dim0, D.Named x) in
-            rigid_coe r r' (x, info.ty1 Id) @@
-            apply equiv_fun0x el
-          end
-
-        | _ -> failwith "TODO: it gets harder from here ;-)"
-      end
-
-    | _, FCom _ ->
-      failwith "Taste it, coe in fcom!!!"
-
-    | _ -> failwith "TODO"
-
-  (* Invariant: r != r', sys is rigid *)
-  and rigid_hcom r r' ty cap sys =
-    match ty Id with
-    | (Pi _ | Sg _ | Ext _ | Up _) ->
-      HCom {r; r'; ty; cap; sys}
-
-    | Bool ->
-      cap Id
-
-    | Univ _ ->
-      FCom {r; r'; cap; sys}
-
-    | FCom _ ->
-      failwith "Taste it, hcom in fcom!!!"
-
-    | _ ->
-      failwith "rigid_hcom"
-
-  and car v =
-    match v with
-    | Pair (v0, _) ->
-      v0
-
-    | Coe info ->
-      let (x, ty) = info.abs in
-      let dom, _ = out_sg ty in
-      let abs = (x, dom) in
-      let el = car info.el in
-      rigid_coe info.r info.r' abs el
-
-    | _ ->
-      failwith "TODO: car"
-
-  and inst_clo (B cfg) v =
-    eval {cfg with rho = Val v :: cfg.rho}
 
 
 end
