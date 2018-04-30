@@ -58,8 +58,9 @@ struct
     | Pi : {dom: can t; cod : clo} -> can f
     | Sg : {dom: can t; cod : clo} -> can f
     | Lam : clo -> can f
-    | Coe : {r : dim; r' : dim; abs : can t abs; el : can t} -> can f
-    | HCom : {r : dim; r' : dim; ty : can t; cap : can t; sys : can t abs sys} -> can f
+
+    | Coe : {r : dim t; r' : dim t; abs : can t abs; el : can t} -> can f
+    | HCom : {r : dim t; r' : dim t; ty : can t; cap : can t; sys : can t abs sys} -> can f
 
     | Bool : can f
 
@@ -75,7 +76,7 @@ struct
 
   let fam_of_dim r =
     F.make @@ fun dl ->
-    DimRel.canonize (eval_delta dl DimRel.emp) r
+    Dim (DimRel.canonize (eval_delta dl DimRel.emp) r)
 
   let restrict dl  =
     F.map (fun dl' -> Cmp (dl, dl'))
@@ -189,7 +190,6 @@ struct
   and apply vfun varg =
     F.make @@ fun dl ->
     let varg' = restrict dl varg in
-    (* TODO: Should I have restricted the above ??? *)
     match F.inst dl vfun with
     | Lam clo ->
       F.inst Id @@
@@ -201,78 +201,73 @@ struct
       let abs_cod =
         let y = Symbol.fresh () in
         let abs = y, act (P.swap x y) dom in
-        let coe = rigid_coe info.r' (D.Named x) abs varg' in
+        let coe = make_coe info.r' (fam_of_dim @@ D.Named x) abs varg' in
         x, eval {cod with rho = coe :: cod.rho}
       in
-      let el = apply info.el @@ rigid_coe info.r' info.r (x, dom) varg' in
-      F.inst Id @@ rigid_coe info.r info.r' abs_cod el
+      let el = apply info.el @@ make_coe info.r' info.r (x, dom) varg' in
+      F.inst Id @@ make_coe info.r info.r' abs_cod el
 
     | HCom info ->
-      F.inst Id @@ rigid_hcom info.r info.r' (failwith "") (failwith "") (failwith "")
+      F.inst Id @@ make_hcom info.r info.r' (failwith "") (failwith "") (failwith "")
 
     | _ ->
       failwith ""
 
   and make_coe r r' (x, tyx) el =
     F.make @@ fun dl ->
-    let Dim r = F.inst dl r in
-    let Dim r' = F.inst dl r' in
-    match D.compare r r' with
+    match D.compare (test_dim dl r) (test_dim dl r') with
     | Same -> F.inst dl el
     | _ ->
-      F.inst dl @@ rigid_coe r r' (x, tyx) el
+      match F.inst dl tyx with
+      | Bool ->
+        F.inst dl el
+
+      | (Pi _ | Sg _) ->
+        let abs = x, restrict dl tyx in
+        let el = restrict dl el in
+        Coe {r; r'; abs; el}
+
+      | _ ->
+        failwith "TODO: make_coe"
+
+  and test_dim dl r =
+    let Dim r = F.inst dl r in
+    r
 
   and make_hcom r r' ty cap sys =
     F.make @@ fun dl ->
-    let Dim r = F.inst dl r in
-    let Dim r' = F.inst dl r' in
-    match D.compare r r' with
+    match D.compare (test_dim dl r) (test_dim dl r') with
     | D.Same ->
       F.inst dl cap
     | _ ->
-      let rec go sys =
-        match sys with
-        | [] ->
-          F.inst dl @@ rigid_hcom r r' ty cap sys
-        | tube :: sys ->
-          go_tube (F.inst dl tube) sys
-      and go_tube tb sys =
-        match tb with
-        | True (_, (y, vy)) ->
-          F.inst dl @@ restrict (Equate (D.Named y, r')) vy
+      match project_bsys dl r' sys with
+      | Some v -> v
+      | None ->
+        match F.inst dl ty with
+        | Bool ->
+          F.inst dl cap
+
+        | (Pi _ | Sg _) ->
+          let ty = restrict dl ty in
+          let cap = restrict dl cap in
+          let sys = restrict_sys dl sys in
+          HCom {r; r'; ty; cap; sys}
+
         | _ ->
-          go sys
-      in
-      go sys
+          failwith "TODO: make_hcom"
 
-  and rigid_coe r r' (x, tyx) el =
-    F.make @@ fun dl ->
-    match F.inst dl tyx with
-    | Bool ->
-      F.inst dl el
+  and project_bsys dl r' sys =
+    match sys with
+    | [] ->
+      None
 
-    | (Pi _ | Sg _) ->
-      let abs = x, restrict dl tyx in
-      let el = restrict dl el in
-      Coe {r; r'; abs; el}
+    | tube :: sys ->
+      match F.inst dl tube with
+      | True (_, (y, vy)) ->
+        let vr' = F.inst dl @@ restrict (Equate (D.Named y, test_dim dl r')) vy
+        in Some vr'
 
-    | _ ->
-      failwith "TODO: rigid_coe"
-
-  and rigid_hcom r r' ty cap sys =
-    F.make @@ fun dl ->
-    match F.inst dl ty with
-    | Bool ->
-      F.inst dl cap
-
-    | (Pi _ | Sg _) ->
-      let ty = restrict dl ty in
-      let cap = restrict dl cap in
-      let sys = restrict_sys dl sys in
-      HCom {r; r'; ty; cap; sys}
-
-    | _ ->
-      failwith "TODO: rigid_hcom"
-
+      | _ ->
+        project_bsys dl r' sys
 
 end
