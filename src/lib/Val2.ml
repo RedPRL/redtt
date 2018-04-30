@@ -230,9 +230,12 @@ struct
 
   and vin r el0 el1 =
     match r with
-    | D.Dim0 -> Lazy.force el0
-    | D.Dim1 -> Lazy.force el1
-    | _ -> VIn {r; el0 = Lazy.force el0; el1 = Lazy.force el1}
+    | D.Dim0 ->
+      Lazy.force el0
+    | D.Dim1 ->
+      Lazy.force el1
+    | _ ->
+      VIn {r; el0 = Lazy.force el0; el1 = Lazy.force el1}
 
 
 
@@ -279,31 +282,6 @@ struct
     | _ -> failwith "TODO"
 
   and car _ = failwith ""
-
-  (* match abs with
-     | _, Pi _ ->
-     M.ret @@ Coe {r; r'; abs; el}
-
-     | x, V info ->
-     begin
-      M.Dim.ask (D.Named x) info.r @@ function
-      | D.Same ->
-        begin
-          M.Dim.ask r D.Dim0 @@ function
-          | D.Same ->
-            info.ty1 >>= fun vty1 ->
-            M.Dim.restrict D.Dim0 (D.Named x) info.equiv >>= fun vequiv0 ->
-            car vequiv0 >>= fun vcar ->
-            apply vcar el >>= fun vapp ->
-            rigid_coe r r' (x, vty1) vapp >>= fun vcoe ->
-            M.ret @@ VIn (r', el, vcoe)
-
-          | _ ->
-            failwith ""
-        end
-      | _ ->
-        failwith "TODO"
-     end *)
 
 
 
