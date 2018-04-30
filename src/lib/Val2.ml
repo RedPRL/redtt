@@ -68,7 +68,7 @@ struct
 
     | Interval : can t
 
-  and 'a cfg = { tm : 'a Tm.t; phi : rel; rho : env; pi : perm}
+  and 'a cfg = {tm : 'a Tm.t; phi : rel; rho : env; pi : perm}
   and 'a abs = Symbol.t * 'a
   and 'a fam = delta -> 'a
   and 'a tube = 'a Tube.t
@@ -88,12 +88,24 @@ struct
     | Pi {dom; cod} ->
       Pi {dom = act pi dom; cod = act_clo pi cod}
 
+    | Sg {dom; cod} ->
+      Sg {dom = act pi dom; cod = act_clo pi cod}
+
+    | Ext (x, foo) ->
+      Ext (P.lookup x pi, failwith "TODO")
+
     | V info ->
       let r = P.read info.r pi in
       let ty0 = act_fam pi info.ty0 in
       let ty1 = act_fam pi info.ty1 in
       let equiv = act_fam pi info.equiv in
       V {r; ty0; ty1; equiv}
+
+    | VIn info ->
+      let r = P.read info.r pi in
+      let el0 = act pi info.el0 in
+      let el1 = act pi info.el1 in
+      VIn {r; el0; el1}
 
     | Coe info ->
       let r = P.read info.r pi in
@@ -102,11 +114,29 @@ struct
       let el = act pi info.el in
       Coe {r; r'; abs; el}
 
+    | HCom _ ->
+      failwith "TODO"
+
+    | FCom _ ->
+      failwith "TODO"
+
     | Lam clo ->
       Lam (act_clo pi clo)
 
-    | _ ->
-      failwith ""
+    | Pair (v0, v1) ->
+      Pair (act pi v0, act pi v1)
+
+    | FunApp (v0, v1) ->
+      FunApp (act pi v0, act pi v1)
+
+    | ExtApp (v, r) ->
+      ExtApp (act pi v, P.read r pi)
+
+    | Up {ty; neu} ->
+      Up {ty = act pi ty; neu = act pi neu}
+
+    | (Bool | Interval | Univ _ | Lvl _) ->
+      v
 
   and act_fam pi fam =
     fun rel -> act pi (fam rel)
