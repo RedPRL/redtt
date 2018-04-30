@@ -283,8 +283,6 @@ struct
 
   and car _ = failwith ""
 
-
-
   and inst_clo (B cfg) v =
     eval {cfg with rho = Val v :: cfg.rho}
 
