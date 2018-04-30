@@ -42,6 +42,9 @@ struct
      we should make it a family [delta -> can t]. This can be easily memoized later so that we don't
      repeatedly evaluate the expression. *)
 
+  (* TODO: now we use a nominal represnetation of dimension binders, so we need swapping. this is currently
+     implemented naively, but it should be replaced by suspended permutations. *)
+
   type _ t =
     | Pi : {dom : can t; cod : clo} -> can t
     | Sg : {dom : can t; cod : clo} -> can t
