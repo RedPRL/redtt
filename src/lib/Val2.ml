@@ -21,13 +21,22 @@ end
 module V (P : Perm) =
 struct
 
+  type eqn = D.t * D.t
   type perm = P.t
   type rel = DimRel.t
 
   type delta =
     | Id
-    | Equate of D.t * D.t
+    | Equate of eqn
     | Cmp of delta * delta
+
+  module Tube =
+  struct
+    type 'a t =
+      | True of eqn * 'a
+      | False of eqn
+      | Delete
+  end
 
   (* the idea is that for any part of the term in which we may need to issue a dimension substitution,
      we should make it a family [delta -> can t]. This can be easily memoized later so that we don't
@@ -36,30 +45,38 @@ struct
   type _ t =
     | Pi : {dom : can t; cod : clo} -> can t
     | Sg : {dom : can t; cod : clo} -> can t
+    | Ext : rst abs -> can t
 
-    | V : {r : dim; ty0 : delta -> can t; ty1 : delta -> can t; equiv : delta -> can t} -> can t
+    | V : {r : dim; ty0 : delta -> can t; ty1 : delta -> can t; equiv : can t fam} -> can t
     | VIn : {r : dim; el0 : can t; el1 : can t} -> can t
 
-    | Coe : {r : dim; r' : dim; abs : Symbol.t * can t; el : can t} -> can t
+    | Coe : {r : dim; r' : dim; abs : can t abs; el : can t} -> can t
+    | HCom : {r : dim; r' : dim; ty : can t fam; cap : can t fam; sys : can t abs sys} -> can t
+    | FCom : {r : dim; r' : dim; cap : can t fam; sys : can t abs sys} -> can t
 
     | Lam : clo -> can t
     | Pair : can t * can t -> can t
     | FunApp : neu t * can t -> can t
     | ExtApp : neu t * dim -> can t
 
+    | Univ : Lvl.t -> can t
+    | Bool : can t
+
     | Up : {ty : can t; neu : neu t} -> can t
 
     | Lvl : int -> neu t
 
     | Interval : can t
-    | Dim0 : can t
-    | Dim1 : can t
-    | DimDelete : can t
-    | DimNamed : Symbol.t -> can t
 
   and 'a cfg = { tm : 'a Tm.t; phi : rel; rho : env; pi : perm}
+  and 'a abs = Symbol.t * 'a
+  and 'a fam = delta -> 'a
+  and 'a tube = 'a Tube.t
+  and 'a sys = 'a fam tube list
+  and rst = R of {ty : can t fam; sys : can t sys}
   and clo = B of Tm.chk cfg
-  and env = can t list
+  and env = env_el list
+  and env_el = Val of can t | Dim of D.t
 
   let out_pi v =
     match v with
@@ -100,21 +117,6 @@ struct
   and act_abs pi (x, vx) =
     P.lookup x pi, act pi vx
 
-  let project_dim (type a) (v : a t) =
-    match v with
-    | Dim0 -> DimVal.Dim0
-    | Dim1 -> DimVal.Dim1
-    | Up {ty; neu} ->
-      begin
-        match ty, neu with
-        | Interval, Lvl i -> DimVal.Lvl i
-        | _ -> failwith "project_dim/Up"
-      end
-    | DimDelete -> DimVal.Delete
-    | DimNamed x -> DimVal.Named x
-    | _ ->
-      failwith "project_dim"
-
   let rec eval : type a. a cfg -> can t =
     fun cfg ->
       match Tm.out cfg.tm with
@@ -144,7 +146,7 @@ struct
           lazy begin
             let x = Symbol.fresh () in
             let Tm.B (_, ty) = info.ty in
-            x, eval {cfg with tm = ty; rho = DimNamed x :: cfg.rho}
+            x, eval {cfg with tm = ty; rho = Dim (D.Named x) :: cfg.rho}
           end
         in
         let el =
@@ -154,12 +156,25 @@ struct
         in
         make_coe r r' abs el
 
+      | Tm.Interval ->
+        Interval
+
       | _ -> failwith ""
 
   and eval_dim cfg =
-    DimRel.canonize cfg.phi @@
-    project_dim @@
-    eval cfg
+    match Tm.out cfg.tm with
+    | Tm.Var i ->
+      begin
+        match List.nth cfg.rho i with
+        | Dim d -> DimRel.canonize cfg.phi d
+        | _ -> failwith "Expected dimension in environment"
+      end
+    | Tm.Dim0 ->
+      D.Dim0
+    | Tm.Dim1 ->
+      D.Dim1
+    | _ -> failwith "eval_dim"
+
 
   and apply vfun varg =
     match vfun with
@@ -187,6 +202,19 @@ struct
     | _ -> VIn {r; el0 = Lazy.force el0; el1 = Lazy.force el1}
 
 
+
+  and make_hcom r r' ty cap sys =
+    match D.compare r r' with
+    | D.Same ->
+      Lazy.force cap
+    | _ ->
+      match project_bsys r' sys with
+      | None -> failwith ""
+      | Some v -> v
+
+  and project_bsys sys =
+    failwith ""
+
   and make_coe r r' abs el =
     match D.compare r r' with
     | D.Same ->
@@ -198,6 +226,9 @@ struct
     match abs with
     | _, (Pi _ | Sg _) ->
       Coe {r; r'; abs; el}
+
+    | _, (Bool | Univ _) ->
+      el
 
     | x, V info ->
       begin
@@ -214,7 +245,7 @@ struct
 
     | _ -> failwith "TODO"
 
-  and car v = failwith ""
+  and car _ = failwith ""
 
   (* match abs with
      | _, Pi _ ->
@@ -244,7 +275,7 @@ struct
 
 
   and inst_clo (B cfg) v =
-    eval {cfg with rho = v :: cfg.rho}
+    eval {cfg with rho = Val v :: cfg.rho}
 
 
 end
