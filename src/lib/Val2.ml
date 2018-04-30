@@ -87,6 +87,10 @@ struct
     | Pi {dom; cod} -> dom, cod
     | _ -> failwith "out_pi"
 
+  let out_sg v =
+    match v with
+    | Sg {dom; cod} -> dom, cod
+    | _ -> failwith "out_sg"
   let rec act pi v =
     match v with
     | Pi {dom; cod} ->
@@ -309,7 +313,20 @@ struct
 
     | _ -> failwith "TODO"
 
-  and car _ = failwith ""
+  and car v =
+    match v with
+    | Pair (v0, _) ->
+      v0
+
+    | Coe info ->
+      let (x, ty) = info.abs in
+      let dom, _ = out_sg ty in
+      let abs = (x, dom) in
+      let el = car info.el in
+      rigid_coe info.r info.r' abs el
+
+    | _ ->
+      failwith "TODO: car"
 
   and inst_clo (B cfg) v =
     eval {cfg with rho = Val v :: cfg.rho}
