@@ -65,8 +65,8 @@ struct
     | VIn : {r : dim; el0 : can t; el1 : can t} -> can t
 
     | Coe : {r : dim; r' : dim; abs : can t abs; el : can t} -> can t
-    | HCom : {r : dim; r' : dim; ty : can t fam; cap : can t fam; sys : can t abs sys} -> can t
-    | FCom : {r : dim; r' : dim; cap : can t fam; sys : can t abs sys} -> can t
+    | HCom : {r : dim; r' : dim; ty : can t fam; cap : can t fam; sys : can t fam abs sys} -> can t
+    | FCom : {r : dim; r' : dim; cap : can t fam; sys : can t fam abs sys} -> can t
 
     | Lam : clo -> can t
     | Pair : can t * can t -> can t
@@ -86,8 +86,8 @@ struct
   and 'a abs = Symbol.t * 'a
   and 'a fam = delta -> 'a
   and 'a tube = 'a Tube.t
-  and 'a sys = 'a fam tube list
-  and rst = R of {ty : can t fam; sys : can t sys}
+  and 'a sys = 'a tube list
+  and rst = R of {ty : can t fam; sys : can t fam sys}
   and clo = B of Tm.chk Tm.t cfg
   and env = env_el list
   and env_el = Val of can t | Dim of D.t
@@ -326,24 +326,21 @@ struct
     | D.Same ->
       cap Id
     | _ ->
-      match project_bsys r' sys with
+      match project_sys sys with
       | None -> rigid_hcom r r' ty cap sys
-      | Some v -> v
+      | Some (x, fam) -> fam @@ Equate (D.Named x, r')
 
-  and rigid_hcom _r _r' _ty _cap _sys =
-    failwith "TODO"
-
-  and project_bsys r' sys =
+  and project_sys sys =
     match sys with
     | [] ->
       None
 
-    | Tube.True (_, (x, fam)) :: _ ->
-      let v = fam @@ Equate (D.Named x, r') in
-      Some v
+    | Tube.True (_, abs) :: _ ->
+      Some abs
 
     | _ :: sys ->
-      project_bsys r' sys
+      project_sys sys
+
 
   and make_coe r r' abs el =
     match D.compare r r' with
@@ -352,9 +349,10 @@ struct
     | _ ->
       rigid_coe r r' (Lazy.force abs) (Lazy.force el)
 
+  (* Invariant: r != r' *)
   and rigid_coe r r' abs el =
     match abs with
-    | _, (Pi _ | Sg _) ->
+    | _, (Pi _ | Sg _ | Ext _) ->
       Coe {r; r'; abs; el}
 
     | _, (Bool | Univ _) ->
@@ -373,7 +371,28 @@ struct
         | _ -> failwith "TODO: it gets harder from here ;-)"
       end
 
+    | _, FCom _ ->
+      failwith "Taste it, coe in fcom!!!"
+
     | _ -> failwith "TODO"
+
+  (* Invariant: r != r', sys is rigid *)
+  and rigid_hcom r r' ty cap sys =
+    match ty Id with
+    | (Pi _ | Sg _ | Ext _ | Up _) ->
+      HCom {r; r'; ty; cap; sys}
+
+    | Bool ->
+      cap Id
+
+    | Univ _ ->
+      FCom {r; r'; cap; sys}
+
+    | FCom _ ->
+      failwith "Taste it, hcom in fcom!!!"
+
+    | _ ->
+      failwith "rigid_hcom"
 
   and car v =
     match v with
