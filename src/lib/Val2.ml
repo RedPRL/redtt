@@ -2,7 +2,6 @@ module D = DimVal
 
 type tm = Tm.chk Tm.t
 type dim = D.t
-type query = Eq of dim * dim
 
 type can = [`Can]
 type neu = [`Neu]
@@ -101,6 +100,7 @@ struct
     match v with
     | Sg {dom; cod} -> dom, cod
     | _ -> failwith "out_sg"
+
   let rec act : type a. P.t -> a t -> a t =
     fun pi v ->
       match v with
@@ -135,10 +135,19 @@ struct
         Coe {r; r'; abs; el}
 
       | HCom info ->
-        failwith "TODO"
+        let r = P.read info.r pi in
+        let r' = P.read info.r' pi in
+        let ty = act_fam pi info.ty in
+        let cap = act_fam pi info.cap in
+        let sys = act_bsys pi info.sys in
+        HCom {r; r'; ty; cap; sys}
 
-      | FCom _ ->
-        failwith "TODO"
+      | FCom info ->
+        let r = P.read info.r pi in
+        let r' = P.read info.r' pi in
+        let cap = act_fam pi info.cap in
+        let sys = act_bsys pi info.sys in
+        FCom {r; r'; cap; sys}
 
       | Lam clo ->
         Lam (act_clo pi clo)
@@ -179,6 +188,9 @@ struct
   and act_sys pi sys =
     List.map (act_tube pi) sys
 
+  and act_bsys pi sys =
+    List.map (act_btube pi) sys
+
   and act_tube pi tube =
     match tube with
     | Tube.True ((r, r'), fam) ->
@@ -192,6 +204,21 @@ struct
 
     | Tube.Delete ->
       Tube.Delete
+
+  and act_btube pi tube =
+    match tube with
+    | Tube.True ((r, r'), (x, fam)) ->
+      Tube.True ((P.read r pi, P.read r' pi), (P.lookup x pi, act_fam pi fam))
+
+    | Tube.Indet ((r, r'), (x, fam)) ->
+      Tube.Indet ((P.read r pi, P.read r' pi), (P.lookup x pi, act_fam pi fam))
+
+    | Tube.False (r, r') ->
+      Tube.False (P.read r pi, P.read r' pi)
+
+    | Tube.Delete ->
+      Tube.Delete
+
 
 
   let rec eval : type a. a Tm.t cfg -> can t =
@@ -313,8 +340,34 @@ struct
       rigid_coe info.r info.r' (x, inst_clo cod @@ coe_arg @@ D.Named x) @@
       apply info.el @@ coe_arg info.r
 
+    | HCom info ->
+      let _, cod = out_pi @@ info.ty Id in
+      let ty = inst_clo cod varg in
+      let cap = apply (info.cap Id) varg in
+      let go (x, fam) =
+        let y = Symbol.fresh () in
+        let fam' delta = apply (act (P.swap x y) @@ fam delta) varg
+        in (y, fam')
+      in
+      let sys = map_bsys go info.sys in
+      rigid_hcom info.r info.r' ty cap sys
+
     | _ ->
       failwith "apply"
+
+  and map_bsys f sys =
+    List.map (map_btube f) sys
+
+  and map_btube f tube =
+    match tube with
+    | Tube.True (eqn, abs) ->
+      Tube.True (eqn, f abs)
+    | Tube.Indet (eqn, abs) ->
+      Tube.Indet (eqn, f abs)
+    | Tube.False _ ->
+      tube
+    | Tube.Delete ->
+      tube
 
   and ext_apply _vext _r =
     failwith "TODO"
