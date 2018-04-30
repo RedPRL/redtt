@@ -34,6 +34,7 @@ struct
   struct
     type 'a t =
       | True of eqn * 'a
+      | Indet of eqn * 'a
       | False of eqn
       | Delete
   end
@@ -94,8 +95,9 @@ struct
     | Sg {dom; cod} ->
       Sg {dom = act pi dom; cod = act_clo pi cod}
 
-    | Ext (x, foo) ->
-      Ext (P.lookup x pi, failwith "TODO")
+    | Ext (x, R {ty; sys}) ->
+      let rst = R {ty = act_fam pi ty; sys = act_sys pi sys} in
+      Ext (P.lookup x pi, rst)
 
     | V info ->
       let r = P.read info.r pi in
@@ -150,6 +152,24 @@ struct
   and act_abs pi (x, vx) =
     P.lookup x pi, act pi vx
 
+  and act_sys pi sys =
+    List.map (act_tube pi) sys
+
+  and act_tube pi tube =
+    match tube with
+    | Tube.True ((r, r'), fam) ->
+      Tube.True ((P.read r pi, P.read r' pi), act_fam pi fam)
+
+    | Tube.Indet ((r, r'), v) ->
+      Tube.Indet ((P.read r pi, P.read r' pi), act_fam pi fam)
+
+    | Tube.False (r, r') ->
+      Tube.False (P.read r pi, P.read r' pi)
+
+    | Tube.Delete ->
+      Tube.Delete
+
+
   let rec eval : type a. a cfg -> can t =
     fun cfg ->
       match Tm.out cfg.tm with
@@ -171,6 +191,11 @@ struct
         let v0 = eval {cfg with tm = t0} in
         let v1 = eval {cfg with tm = t1} in
         apply v0 v1
+
+      | Tm.ExtApp (t0, t1) ->
+        let v = eval {cfg with tm = t0} in
+        let r = eval_dim {cfg with tm = t1} in
+        ext_apply v r
 
       | Tm.Coe info ->
         let r = eval_dim {cfg with tm = info.dim0} in
@@ -227,6 +252,9 @@ struct
     | _ ->
       failwith "apply"
 
+  and ext_apply _vext _r =
+    failwith "TODO"
+
 
   and vin r el0 el1 =
     match r with
@@ -239,7 +267,7 @@ struct
 
 
 
-  and make_hcom r r' ty cap sys =
+  and make_hcom r r' _ty cap sys =
     match D.compare r r' with
     | D.Same ->
       Lazy.force cap
@@ -248,7 +276,7 @@ struct
       | None -> failwith ""
       | Some v -> v
 
-  and project_bsys sys =
+  and project_bsys _sys =
     failwith ""
 
   and make_coe r r' abs el =
