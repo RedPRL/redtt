@@ -30,6 +30,16 @@ struct
     | Equate of eqn
     | Cmp of delta * delta
 
+  let rec eval_delta delta phi =
+    match delta with
+    | Id ->
+      phi
+    | Equate (r, r') ->
+      DimRel.restrict_exn phi r r'
+    | Cmp (delta1, delta0) ->
+      eval_delta delta1 @@
+      eval_delta delta0 phi
+
   module Tube =
   struct
     type 'a t =
@@ -72,13 +82,13 @@ struct
 
     | Interval : can t
 
-  and 'a cfg = {tm : 'a Tm.t; phi : rel; rho : env; pi : perm}
+  and 'a cfg = {tm : 'a; phi : rel; rho : env; pi : perm}
   and 'a abs = Symbol.t * 'a
   and 'a fam = delta -> 'a
   and 'a tube = 'a Tube.t
   and 'a sys = 'a fam tube list
   and rst = R of {ty : can t fam; sys : can t sys}
-  and clo = B of Tm.chk cfg
+  and clo = B of Tm.chk Tm.t cfg
   and env = env_el list
   and env_el = Val of can t | Dim of D.t
 
@@ -123,7 +133,7 @@ struct
       let el = act pi info.el in
       Coe {r; r'; abs; el}
 
-    | HCom _ ->
+    | HCom info ->
       failwith "TODO"
 
     | FCom _ ->
@@ -164,7 +174,7 @@ struct
     | Tube.True ((r, r'), fam) ->
       Tube.True ((P.read r pi, P.read r' pi), act_fam pi fam)
 
-    | Tube.Indet ((r, r'), v) ->
+    | Tube.Indet ((r, r'), fam) ->
       Tube.Indet ((P.read r pi, P.read r' pi), act_fam pi fam)
 
     | Tube.False (r, r') ->
@@ -174,7 +184,7 @@ struct
       Tube.Delete
 
 
-  let rec eval : type a. a cfg -> can t =
+  let rec eval : type a. a Tm.t cfg -> can t =
     fun cfg ->
       match Tm.out cfg.tm with
       | Tm.Pi (dom, Tm.B (_, cod)) ->
@@ -218,10 +228,50 @@ struct
         in
         make_coe r r' abs el
 
+      | Tm.HCom info ->
+        let r = eval_dim {cfg with tm = info.dim0} in
+        let r' = eval_dim {cfg with tm = info.dim1} in
+        let ty = eval_fam {cfg with tm = info.ty} in
+        let cap = eval_fam {cfg with tm = info.cap} in
+        let sys = eval_bsys {cfg with tm = info.sys} in
+        make_hcom r r' ty cap sys
+
       | Tm.Interval ->
         Interval
 
       | _ -> failwith ""
+
+  and eval_fam cfg =
+    fun delta ->
+      eval {cfg with phi = eval_delta delta cfg.phi}
+
+  and eval_bsys cfg =
+    List.map
+      (fun tube -> eval_btube {cfg with tm = tube})
+      cfg.tm
+
+  and eval_btube cfg =
+    let tr, tr', otm = cfg.tm in
+    let r = eval_dim {cfg with tm = tr} in
+    let r' = eval_dim {cfg with tm = tr'} in
+    match D.compare r r', otm with
+    | D.Same, Some (Tm.B (_, tm)) ->
+      let x = Symbol.fresh () in
+      let fam = eval_fam {cfg with tm = tm; rho = Dim (D.Named x) :: cfg.rho} in
+      let abs = x, fam in
+      Tube.True ((r, r'), abs)
+
+    | D.Indeterminate, Some (Tm.B (_, tm)) ->
+      let x = Symbol.fresh () in
+      let fam = eval_fam {cfg with tm = tm; rho = Dim (D.Named x) :: cfg.rho} in
+      let abs = x, fam in
+      Tube.Indet ((r, r'), abs)
+
+    | D.Apart, _ ->
+      Tube.False (r, r')
+
+    | _ ->
+      failwith "eval_tube"
 
   and eval_dim cfg =
     match Tm.out cfg.tm with
@@ -271,17 +321,29 @@ struct
 
 
 
-  and make_hcom r r' _ty cap sys =
+  and make_hcom r r' ty cap sys =
     match D.compare r r' with
     | D.Same ->
-      Lazy.force cap
+      cap Id
     | _ ->
       match project_bsys r' sys with
-      | None -> failwith ""
+      | None -> rigid_hcom r r' ty cap sys
       | Some v -> v
 
-  and project_bsys _sys =
-    failwith ""
+  and rigid_hcom _r _r' _ty _cap _sys =
+    failwith "TODO"
+
+  and project_bsys r' sys =
+    match sys with
+    | [] ->
+      None
+
+    | Tube.True (_, (x, fam)) :: _ ->
+      let v = fam @@ Equate (D.Named x, r') in
+      Some v
+
+    | _ :: sys ->
+      project_bsys r' sys
 
   and make_coe r r' abs el =
     match D.compare r r' with
