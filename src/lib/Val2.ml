@@ -17,17 +17,34 @@ sig
   val read : dim -> t -> dim
 end
 
-module V (P : Perm) =
+
+type eqn = D.t * D.t
+type rel = DimRel.t
+
+type delta =
+  | Id
+  | Equate of eqn
+  | Cmp of delta * delta
+
+module type Fam =
+sig
+  type 'a t
+  val make : (delta -> 'a) -> 'a t
+  val inst : delta -> 'a t -> 'a
+  val map : (delta -> delta) -> 'a t -> 'a t
+end
+
+module Fam : Fam =
 struct
+  type 'a t = delta -> 'a
+  let make f = f
+  let inst dl f = f dl
+  let map g f dl = f (g dl)
+end
 
-  type eqn = D.t * D.t
+module V (P : Perm) (F : Fam) =
+struct
   type perm = P.t
-  type rel = DimRel.t
-
-  type delta =
-    | Id
-    | Equate of eqn
-    | Cmp of delta * delta
 
   let rec eval_delta delta phi =
     match delta with
@@ -48,58 +65,92 @@ struct
       | Delete
   end
 
-  (* the idea is that for any part of the term in which we may need to issue a dimension substitution,
-     we should make it a family [delta -> can t]. This can be easily memoized later so that we don't
-     repeatedly evaluate the expression. *)
-
-  (* TODO: now we use a nominal represnetation of dimension binders, so we need swapping. this is currently
-     implemented naively, but it should be replaced by suspended permutations. *)
-
-
   type _ f =
     | Pi : {dom: can t; cod : clo} -> can f
     | Sg : {dom: can t; cod : clo} -> can f
     | Lam : clo -> can f
     | Coe : {r : dim; r' : dim; abs : can t abs; el : can t} -> can f
 
-  and 'a t = Node of {con : delta -> 'a f}
+    | Bool : can f
+
+    | Dim : D.t -> dim f
+
+  and 'a t = 'a f F.t
+
   and 'a abs = atom * 'a
-  and 'a cfg = {tm : 'a; phi : rel; rho : env; pi : perm}
+  and 'a cfg = {tm : 'a; phi : rel; rho : env; atoms : Symbol.t list}
   and clo = Tm.chk Tm.t Tm.bnd cfg
   and env = can t list
 
+  let restrict r r'  =
+    F.map (fun dl -> Cmp (Equate (r, r'), dl))
 
-  let rec out (Node node) dl =
-    node.con dl
-
-  let into fam =
-    Node {con = fam}
-
-  let restrict r r' (Node node) =
-    Node {con = fun dl -> node.con @@ Cmp (Equate (r, r'), dl)}
-
-  let restrict_clo r r' {tm; phi; rho; pi} =
-    {tm; phi = DimRel.restrict_exn phi r r'; rho; pi}
+  let restrict_clo r r' {tm; phi; rho; atoms} =
+    {tm; phi = DimRel.restrict_exn phi r r'; rho; atoms}
 
 
   let rec eval : type a. a Tm.t cfg -> can t =
     fun cfg ->
       match Tm.out cfg.tm with
       | Tm.Pi (dom, cod) ->
-        into @@ fun dl ->
+        F.make @@ fun dl ->
         let phi = eval_delta dl cfg.phi in
         let dom = eval {cfg with tm = dom; phi} in
         let cod = {cfg with tm = cod; phi} in
         Pi {dom; cod}
 
       | Tm.Sg (dom, cod) ->
-        into @@ fun dl ->
+        F.make @@ fun dl ->
         let phi = eval_delta dl cfg.phi in
         let dom = eval {cfg with tm = dom; phi} in
         let cod = {cfg with tm = cod; phi} in
         Sg {dom; cod}
 
+      | Tm.Coe info ->
+        let r = eval_dim {cfg with tm = info.dim0} in
+        let r' = eval_dim {cfg with tm = info.dim1} in
+        let Tm.B (_, ty) = info.ty in
+        let x = Symbol.fresh () in
+        let vty = eval {cfg with tm = ty; atoms = x :: cfg.atoms} in
+        make_coe r r' (x, vty) @@
+        eval {cfg with tm = info.tm}
+
       | _ -> failwith ""
+
+  and eval_dim : type a. a Tm.t cfg -> dim t =
+    fun cfg ->
+      F.make @@ fun dl ->
+      match Tm.out cfg.tm with
+      | Tm.Dim0 -> Dim Dim0
+      | Tm.Dim1 -> Dim Dim1
+      | Tm.Var ix ->
+        let x = List.nth cfg.atoms ix in
+        let phi = eval_delta dl cfg.phi in
+        let dim = DimRel.canonize phi @@ D.Named x in
+        Dim dim
+      | _ ->
+        failwith "eval_dim"
+
+
+  and make_coe r r' (x, ty) el =
+    F.make @@ fun dl ->
+    let Dim r = F.inst dl r in
+    let Dim r' = F.inst dl r' in
+    match D.compare r r' with
+    | D.Same ->
+      F.inst dl el
+    | _ ->
+      F.inst dl @@ rigid_coe r r' (x, ty) el
+
+  and rigid_coe r r' (x, ty) el =
+    F.make @@ fun dl ->
+    match F.inst dl ty with
+    | Bool ->
+      F.inst dl el
+    | (Pi _ | Sg _) ->
+      Coe {r; r'; abs = (x, ty); el}
+    | _ ->
+      failwith "rigid_coe"
 
 
 end
