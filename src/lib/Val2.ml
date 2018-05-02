@@ -184,12 +184,12 @@ struct
     match D.compare r r', otm with
     | D.Same, Some (Tm.B (_, tm)) ->
       let x = Symbol.fresh () in
-      let abs = x, restrict dl @@ eval {cfg with tm} in
+      let abs = x, restrict dl @@ eval {cfg with tm; rho = Atom x :: cfg.rho} in
       True ((r, r'), abs)
 
     | D.Indeterminate, Some (Tm.B (_, tm)) ->
       let x = Symbol.fresh () in
-      let abs = x, restrict dl @@ eval {cfg with tm} in
+      let abs = x, restrict dl @@ eval {cfg with tm; rho = Atom x :: cfg.rho} in
       Indet ((r, r'), abs)
 
     | D.Apart, _ ->
