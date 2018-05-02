@@ -192,8 +192,9 @@ struct
     let varg' = restrict dl varg in
     match F.inst dl vfun with
     | Lam clo ->
+      let Tm.B (_, bdy) = clo.tm in
       F.inst Id @@
-      eval {clo with rho = varg' :: clo.rho}
+      eval {clo with tm = bdy; rho = varg' :: clo.rho}
 
     | Coe info ->
       let x, tyx = info.abs in
@@ -202,7 +203,8 @@ struct
         let y = Symbol.fresh () in
         let abs = y, act (P.swap x y) dom in
         let coe = make_coe info.r' (fam_of_dim @@ D.Named x) abs varg' in
-        x, eval {cod with rho = coe :: cod.rho}
+        let Tm.B (_, cod_bdy) = cod.tm in
+        x, eval {cod with tm = cod_bdy; rho = coe :: cod.rho}
       in
       let el = apply info.el @@ make_coe info.r' info.r (x, dom) varg' in
       F.inst Id @@ make_coe info.r info.r' abs_cod el
