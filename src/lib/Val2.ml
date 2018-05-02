@@ -31,7 +31,8 @@ sig
   type 'a t
   val make : (delta -> 'a) -> 'a t
   val inst : delta -> 'a t -> 'a
-  val map : (delta -> delta) -> 'a t -> 'a t
+
+  val restrict : delta -> 'a t -> 'a t
 end
 
 module V (P : Perm) (F : Fam) =
@@ -79,8 +80,7 @@ struct
     F.make @@ fun dl ->
     Dim (DimRel.canonize (eval_delta dl DimRel.emp) r)
 
-  let restrict dl  =
-    F.map (fun dl' -> Cmp (dl, dl'))
+  let restrict = F.restrict
 
   let restrict_sys dl =
     List.map (restrict dl)
