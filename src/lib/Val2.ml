@@ -69,10 +69,11 @@ struct
   and 'a t = 'a f F.t
 
   and 'a abs = atom * 'a
-  and 'a cfg = {tm : 'a; phi : rel; rho : env; atoms : atom list}
+  and 'a cfg = {tm : 'a; phi : rel; rho : env}
   and 'a sys = 'a tube F.t list
   and clo = Tm.chk Tm.t Tm.bnd cfg
-  and env = can t list
+  and env_el = Val of can t | Atom of atom
+  and env = env_el list
 
   let fam_of_dim r =
     F.make @@ fun dl ->
@@ -84,8 +85,8 @@ struct
   let restrict_sys dl =
     List.map (restrict dl)
 
-  let restrict_clo dl {tm; phi; rho; atoms} =
-    {tm; phi = eval_delta dl phi; rho; atoms}
+  let restrict_clo dl {tm; phi; rho} =
+    {tm; phi = eval_delta dl phi; rho}
 
   let out_pi v =
     match v with
@@ -119,7 +120,7 @@ struct
 
         let x = Symbol.fresh () in
         let Tm.B (_, tty) = info.ty in
-        let abs = x, eval {cfg with tm = tty; atoms = x :: cfg.atoms} in
+        let abs = x, eval {cfg with tm = tty; rho = Atom x :: cfg.rho} in
         make_coe r r' abs el
 
       | Tm.HCom info ->
@@ -137,8 +138,12 @@ struct
 
       | Tm.Var i ->
         F.make @@ fun dl ->
-        (* TODO: do I need to do something with cfg.phi here? *)
-        F.inst dl @@ List.nth cfg.rho i
+        begin
+          (* TODO: do I need to do something with cfg.phi here? *)
+          match List.nth cfg.rho i with
+          | Val v -> F.inst dl v
+          | _ -> failwith "Expected value in environment"
+        end
 
       | _ -> failwith ""
 
@@ -150,10 +155,15 @@ struct
       | Tm.Dim0 -> Dim Dim0
       | Tm.Dim1 -> Dim Dim1
       | Tm.Var ix ->
-        let x = List.nth cfg.atoms ix in
-        let phi = eval_delta dl cfg.phi in
-        let dim = DimRel.canonize phi @@ D.Named x in
-        Dim dim
+        begin
+          match List.nth cfg.rho ix with
+          | Atom x ->
+            let phi = eval_delta dl cfg.phi in
+            let dim = DimRel.canonize phi @@ D.Named x in
+            Dim dim
+          | _ ->
+            failwith "Expected atom in environment"
+        end
       | _ ->
         failwith "eval_dim"
 
@@ -194,7 +204,7 @@ struct
     | Lam clo ->
       let Tm.B (_, bdy) = clo.tm in
       F.inst Id @@
-      eval {clo with tm = bdy; rho = varg' :: clo.rho}
+      eval {clo with tm = bdy; rho = Val varg' :: clo.rho}
 
     | Coe info ->
       let x, tyx = info.abs in
@@ -204,7 +214,7 @@ struct
         let abs = y, act (P.swap x y) dom in
         let coe = make_coe info.r' (fam_of_dim @@ D.Named x) abs varg' in
         let Tm.B (_, cod_bdy) = cod.tm in
-        x, eval {cod with tm = cod_bdy; rho = coe :: cod.rho}
+        x, eval {cod with tm = cod_bdy; rho = Val coe :: cod.rho}
       in
       let el = apply info.el @@ make_coe info.r' info.r (x, dom) varg' in
       F.inst Id @@ make_coe info.r info.r' abs_cod el
