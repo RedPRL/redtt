@@ -1,11 +1,7 @@
 open Cmdliner
+open Cubical
 
-let cmd_help: unit Lwt.t Term.t * Term.info =
-  let doc = "show help" in
-  Term.
-    ( ret @@ pure @@ `Help ( `Pager, None )
-    , info "help" ~doc
-    )
+type command = unit Lwt.t Term.t * Term.info
 
 let cmd_default =
   Term.
@@ -13,7 +9,27 @@ let cmd_default =
     , info "cubical" ~version:"0.1.0"
     )
 
-let cmds = [
+let cmd_help =
+  let doc = "show help" in
+  Term.
+    ( ret @@ pure @@ `Help ( `Pager, None )
+    , info "help" ~doc
+    )
+
+let cmd_load_file =
+  let doc = "load file" in
+  let file_name = Arg.
+    ( required
+    & pos ~rev:true 0 (some string) None
+    & info [] ~doc ~docv:"FILE"
+    ) in
+  Term.
+    ( pure Frontend.load_file $ file_name
+    , info "load-file" ~doc
+    )
+
+let cmds : command list = [
+  cmd_load_file;
   cmd_help;
 ]
 

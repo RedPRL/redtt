@@ -12,11 +12,14 @@ build:
 clean:
 	@${DUNE} clean
 
-test:
-	@${DUNE} build @runtest
-
 doc:
 	@${DUNE} build @doc
+
+examples:
+	@${DUNE} exec -- cubical load-file test.red
+
+test:
+	@${DUNE} build @runtest
 
 top:
 	@${DUNE} utop src/lib
