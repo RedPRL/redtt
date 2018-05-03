@@ -1,6 +1,3 @@
-\pdfmapfile{+minionmath.map}
-
-
 \usepackage{fontspec}
 
 \usepackage{xltxtra}
@@ -31,5 +28,13 @@
 \titleformat*{\paragraph}{\itshape\bfseries\sffamily}
 
 \usepackage{unicode-math}
-\setmathfont{Minion Math}
-\setmathfontface\mathsf{Cronos Pro}
+
+\IfFontExistsTF{Minion Math}{
+  \pdfmapfile{+minionmath.map}
+  \setmathfont{Minion Math}
+}{
+}
+
+\IfFontExistsTF{Cronos Pro}{
+  \setmathfontface\mathsf{Cronos Pro}
+}{}

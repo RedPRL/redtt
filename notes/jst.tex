@@ -1,348 +1,108 @@
 \documentclass{article}
+\usepackage{stmaryrd}
 \usepackage[landscape]{geometry}
-\usepackage{fullpage}
+% \usepackage{fullpage}
 \usepackage{jst}
 \usepackage{mathpartir}
 \usepackage{notation}
 
+\newcommand\Eval[2]{
+  \FmtFam{
+    {\left\llbracket\FmtTm{#1}\right\rrbracket}_{\FmtVal{#2}}
+  }
+}
+
+\title{cubical evaluation semantics}
+\author{Carlo Angiuli \and Jon Sterling}
+
 \begin{document}
+\maketitle
 
-Note that as a matter of convention, I write $\Meta{s}{\DimDelete}$ to mean
-``delete this tube if the resulting instantiation mentions $\DimDelete$'' (it's
-how I implement $\forall$).
 
-\paragraph{Projecting the cap}
+Colors: \FmtTm{terms}, \FmtFam{value families}, \FmtVal{values}, \FmtRst{restrictions}.
 
-\[
-  \inferrule[CoeFcom/cap]{
-    \Alert{
-      \Eq{
-        \Meta{s}{r'}
-      }{
-        \Meta{s'}{r'}
-      }
-    }
-    \\
-    \NotEq{
-      \Meta{s}{x}
-    }{
-      \Meta{s'}{x}
-    }
-    \\
-    \NotEq{
-      \Meta{s_i}{x}
-    }{
-      \Meta{s'_i}{x}
-    }
-  }{
-    \BreakStep{
-      \Coe{r}{r'}{x}{
-        \FCom{
-          \Meta{s}{x}
-        }{
-          \Meta{s'}{x}
-        }{
-          \Meta{A}{x}
-        }{
-          \Vec{
-            \BTube{
-              \Meta{s_i}{x}
-            }{
-              \Meta{s'_i}{x}
-            }{z}{
-              \Meta{B_i}{x\;z}
-            }
-          }
-        }
-      }{M}
-    }{
-      \GCom{r}{r'}{x}{
-        \Meta{A}{x}
-      }{M}{
-        \Vec{
-          \BTube{
-            \Meta{s_i}{\DimDelete}
-          }{
-            \Meta{s'_i}{\DimDelete}
-          }{x}{
-            \Coe{
-              \Meta{s'}{x}
-            }{
-              \Meta{s}{x}
-            }{z}{
-              \Meta{B_i}{x\;z}
-            }{
-              \Coe{r}{x}{x}{
-                \Meta{B_i}{x\;\Meta{s}{x}}
-              }{M}
-            }
-          }
-        }\;
-        \BTube{
-          \Meta{s}{\DimDelete}
-        }{
-          \Meta{s'}{\DimDelete}
-        }{x}{
-          \Coe{r}{x}{x}{
-            \Meta{A}{x}
-          }{M}
-        }
-      }
+\begin{align*}
+  \Eval{
+    \TLam{M}
+  }{\rho}
+  &=
+  \Fam{\phi}{
+    \VLam{
+      \VClo{M}{\rho}{\phi}
     }
   }
-\]
-
-\paragraph{Projecting the tube}
-
-\begin{mathpar}
-%   \inferrule[CoeFcom/1/0]{
-%     \Alert{
-%       \NotEq{
-%         \Meta{s}{r'}
-%       }{
-%         \Meta{s'}{r'}
-%       }
-%     }
-%     \\
-%     \Alert{
-%       k\mathrm{\ min\ s.t.}\
-%       \Eq{
-%         \Meta{s_k}{r'}
-%       }{
-%         \Meta{s'_k}{r'}
-%       }
-%     }
-%     \\
-%     \Alert{
-%       \NotEq{
-%         \Meta{s_k}{\DimDelete}
-%       }{
-%         \DimDelete
-%       }
-%     }
-%     \\
-%     \Alert{
-%       \NotEq{
-%         \Meta{s'_k}{\DimDelete}
-%       }{
-%         \DimDelete
-%       }
-%     }
-%     \\\\
-%     \NotEq{
-%       \Meta{s}{x}
-%     }{
-%       \Meta{s'}{x}
-%     }
-%     \\
-%     \NotEq{
-%       \Meta{s_i}{x}
-%     }{
-%       \Meta{s'_i}{x}
-%     }
-%   }{
-%     \Step{
-%       \Coe{r}{r'}{x}{
-%         \FCom{
-%           \Meta{s}{x}
-%         }{
-%           \Meta{s'}{x}
-%         }{
-%           \Meta{A}{x}
-%         }{
-%           \Vec{
-%             \BTube{
-%               \Meta{s_i}{x}
-%             }{
-%               \Meta{s'_i}{x}
-%             }{z}{
-%               \Meta{B_i}{x\;z}
-%             }
-%           }
-%         }
-%       }{M}
-%     }{
-%       \Coe{r}{r'}{x}{
-%         \Meta{B_i}{x\;\Meta{s'}{x}}
-%       }{M}
-%     }
-%   }
-%   \and
-  \inferrule[CoeFcom/tube]{
-    \Alert{
-      \NotEq{
-        \Meta{s}{r'}
-      }{
-        \Meta{s'}{r'}
-      }
-    }
-    \\
-    \Alert{
-      k\mathrm{\ min\ s.t.}\
-      \Eq{
-        \Meta{s_k}{r'}
-      }{
-        \Meta{s'_k}{r'}
-      }
-    }
-    \\
-    \NotEq{
-      \Meta{s}{x}
+  \\
+  \Eval{
+    \TPi{A}{B}
+  }{\rho}
+  &=
+  \Fam{\phi}{
+    \VPi{
+      \Rst{\phi}{\Eval{A}{\rho}}
     }{
-      \Meta{s'}{x}
-    }
-    \\
-    \NotEq{
-      \Meta{s_i}{x}
-    }{
-      \Meta{s'_i}{x}
-    }
-    \\\\
-    \Define{O}{
-      \HCom{
-        \Meta{s'}{r}
-      }{
-        \Meta{s}{r}
-      }{
-        \Meta{A}{r}
-      }{
-        \XCap{
-          \Meta{s}{r}
-        }{
-          \Meta{s'}{r}
-        }{M}{
-          \Vec{
-            \BTube{
-              \Meta{s_i}{r}
-            }{
-              \Meta{s'_i}{r}
-            }{z}{
-              \Meta{B_i}{r\;z}
-            }
-          }
-        }
-      }{
-        \Vec{
-          \BTube{
-            \Meta{s_i}{r}
-          }{
-            \Meta{s'_i}{r}
-          }{z}{
-            \Coe{z}{
-              \Meta{s}{r}
-            }{z}{
-              \Meta{B_i}{r\;z}
-            }{
-              \Coe{
-                \Meta{s'}{r}
-              }{z}{z}{
-                \Meta{B_i}{r\;z}
-              }{M}
-            }
-          }
-        }
-      }
-    }
-    \\
-    \Define{P}{
-      \GCom{r}{r'}{x}{
-        \Meta{A}{x}
-      }{O}{
-        \Vec{
-          \BTube{
-            \Meta{s_i}{\DimDelete}
-          }{
-            \Meta{s'_i}{\DimDelete}
-          }{x}{
-            \Coe{
-              \Meta{s'}{r'}
-            }{
-              \Meta{s}{r'}
-            }{z}{
-              \Meta{B_i}{r'\;z}
-            }{
-              \Coe{r}{x}{x}{
-                \Meta{B_i}{x\;\Meta{s'}{x}}
-              }{M}
-            }
-          }
-        },
-        \BTube{
-          \Meta{s}{\DimDelete}
-        }{
-          \Meta{s'}{\DimDelete}
-        }{x}{
-          \Coe{r}{x}{x}{\Meta{A}{x}}{M}
-        }
-      }
-    }
-  }{
-    \BreakStep{
-      \Coe{r}{r'}{x}{
-        \FCom{
-          \Meta{s}{x}
-        }{
-          \Meta{s'}{x}
-        }{
-          \Meta{A}{x}
-        }{
-          \Vec{
-            \BTube{
-              \Meta{s_i}{x}
-            }{
-              \Meta{s'_i}{x}
-            }{z}{
-              \Meta{B_i}{x\;z}
-            }
-          }
-        }
-      }{M}
-    }{
-      \GCom{
-        \Meta{s}{r'}
-      }{
-        \Meta{s'}{r'}
-      }{z}{
-        \Meta{B_k}{r'\;z}
-      }{
-        P
-      }{
-        \Vec{
-          \BTube{
-            \Meta{s_i}{\DimDelete}
-          }{
-            \Meta{s'_i}{\DimDelete}
-          }{z}{
-            \Coe{
-              \Meta{s'}{r'}
-            }{z}{z}{
-              \Meta{B_i}{r'\;z}
-            }{
-              \Coe{r}{r'}{x}{
-                \Meta{B_i}{x\;\Meta{s'}{x}}
-              }{M}
-            }
-          }
-        }
-        \;
-        \BTube{r}{r'}{z}{
-          \Coe{
-            \Meta{s'}{r'}
-          }{z}{z}{
-            \Meta{B_k}{r'\;z}
-          }{
-            \Coe{r}{r'}{x}{
-              \Meta{B_k}{x}{\Meta{s'}{x}}
-            }{M}
-          }
-        }
-      }
+      \VClo{B}{\rho}{\phi}
     }
   }
-\end{mathpar}
+  \\
+  \Eval{
+    \TApp{M}{N}
+  }{\rho}
+  &=
+  \SemApp{
+    \Eval{M}{\rho}
+  }{
+    \Eval{N}{\rho}
+  }
+  \\
+  \Eval{
+    \TVar{i}
+  }{\rho}
+  &=
+  \Fam{\_}{
+    \rho_i
+  }
+\end{align*}
 
-Within this case, there are several sub-cases depending on what the dimensions
-involved are; but it is not yet clear to me whether it will be an advantage to
-expand them here.
+\begin{align*}
+  \SemApp{F}{G}
+  &=
+  \Fam{\phi}{
+    \begin{cases}
+      \Cond{
+        \FamTest{F}{\phi}
+        \equiv
+        \VLam{
+          \VClo{M}{\rho}{\psi}
+        }
+      }{
+        \Rst{\phi\circ\psi}{\Eval{M}{\rho, \FamTest{G}{\phi}}}
+      }
+      \\
+      \Cond{
+        \FamTest{F}{\phi}
+        \equiv
+        \Hole{neutral}
+      }{
+        \Hole{neutral}
+      }
+      \\
+      \Cond{
+        \FamTest{F}{\phi}
+        \equiv
+        \Hole{coe}
+      }{
+        \Hole{coe}
+      }
+      \\
+      \Cond{
+        \FamTest{F}{\phi}
+        \equiv
+        \Hole{hcom}
+      }{
+        \Hole{hcom}
+      }
+    \end{cases}
+  }
+\end{align*}
 
 \end{document}

@@ -18,90 +18,92 @@
   \overrightharpoonup{#1}
 }
 
-\renewcommand\Box[3]{
-  \Parens{
-    \MathKwd{box}^{{#1}\rightsquigarrow{#2}}%
-    #3\;
-    \Sys{#3}
+
+\newcommand\Mute[1]{
+  {\color{SlateGray}#1}
+}
+
+\newcommand\TBind[1]{
+  \Mute{\lbrace}#1\Mute{\rbrace}
+}
+
+\newcommand\VLam[1]{
+  \FmtVal{\lambda\FmtClo{#1}}
+}
+
+\newcommand\Rst[2]{
+  \FmtRst{#1}^*{#2}
+}
+
+
+\newcommand\VPi[2]{
+  \FmtVal{\Pi\Parens*{\FmtFam{#1}, \FmtClo{#2}}}
+}
+
+\newcommand\FmtClo[1]{
+  {\normalcolor #1}%
+}
+
+\newcommand\FmtTm[1]{
+  {\color{MidnightBlue}#1}%
+}
+
+\newcommand\FmtVal[1]{
+  {\color{Red}#1}%
+}
+
+\newcommand\FmtFam[1]{
+  {\color{Purple}#1}%
+}
+
+\newcommand\FmtRst[1]{
+  {\color{Green}#1}%
+}
+
+\newcommand\VClo[3]{
+  \langle \FmtTm{#1},\FmtVal{#2},\FmtRst{#3} \rangle
+}
+
+\newcommand\Fam[2]{
+  \FmtFam{\lbrack\FmtRst{#1}\rbrack\ \FmtVal{#2}}
+}
+
+\newcommand\TLam[1]{
+  \FmtTm{
+    \Parens{
+      \lambda\TBind{#1}
+    }
   }
 }
 
-\newcommand\XCap[4]{
-  \Parens{
-    \MathKwd{cap}^{{#1}\leftsquigarrow{#2}}%
-    #3\;
-    \Sys{#4}
+\newcommand\TPi[2]{
+  \FmtTm{
+    \Parens{
+      {\Pi}\; {#1}\ \TBind{#2}
+    }
   }
 }
 
-\newcommand\Bind[2]{
-  \Squares{#1}\,#2
+\newcommand\TApp[2]{
+  \FmtTm{\Parens{#1\ #2}}
 }
 
-\newcommand\Tube[3]{
-  \Squares{{{#1}={#2}}\mathrel{\hookrightarrow}{#3}}
-}
-
-\newcommand\BTube[4]{
-  \Tube{#1}{#2}{\Bind{#3}{#4}}
-}
-
-\newcommand\Coe[5]{
-  \Parens{
-    \MathKwd{coe}^{{#1}\rightsquigarrow{#2}}_{\Bind{#3}{#4}}\;
-    #5
+\newcommand\SemApp[2]{
+  \FmtFam{
+    \FmtFam{#1} \mathbin{@} \FmtFam{#2}
   }
 }
 
-\newcommand\FCom[4]{
-  \Parens{
-    \MathKwd{fcom}^{{#1}\rightsquigarrow{#2}}\;
-    #3\;
-    \Sys{#4}
-  }
+\newcommand\TVar[1]{
+  \FmtTm{x_{#1}}
 }
-
-\newcommand\GCom[6]{
-  \Parens{
-    \MathKwd{gcom}^{{#1}\rightsquigarrow{#2}}_{\Bind{#3}{#4}}\;
-    #5\;
-    \Sys{#6}
-  }
-}
-
-\newcommand\HCom[5]{
-  \Parens{
-    \MathKwd{hcom}^{{#1}\rightsquigarrow{#2}}_{#3}\;
-    #4\;
-    \Sys{#5}
-  }
-}
-
-\newcommand\Meta[2]{
-  \Parens{#1\, #2}
-}
-
-
-
-\newcommand\Step[2]{
-  {#1}\mapsto{#2}
-}
-
-\newcommand\BreakStep[2]{
-  \begin{array}{c}
-    #1\\
-    \mapsto\\
-    #2
-  \end{array}
-}
-
 
 \newcommand{\Alert}[1]{%
   \colorbox{DarkSlateGray!20}{$\displaystyle#1$}
 }
 
 \newcommand{\Hole}[1]{%
-  \colorbox{Red!30}{$\displaystyle?#1$}
+  \colorbox{Red!30}{\textit{#1}}
 }
 
 \newcommand\Eq[2]{#1=#2}
@@ -110,3 +112,11 @@
 \newcommand\DimDelete{\maltese}
 
 \newcommand\Define[2]{{#1}\triangleq{#2}}
+
+\newcommand\Cond[2]{
+  {\normalcolor{#1}} &\Mute{\Mapsto}\quad {#2}
+}
+
+\newcommand\FamTest[2]{
+  \FmtVal{\FmtFam{#1}\Squares{\FmtRst{#2}}}
+}
