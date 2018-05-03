@@ -18,6 +18,20 @@
 \begin{document}
 \maketitle
 
+I've been thinking a bit more carefully about the evaluation semantics and the
+semantic domain. What I think we want to do is take a term and an environment
+and return a family of values (indexed in restrictions); but crucially, I think
+it is important that the environment be a vector of \emph{values} and not of
+value-families. By studying carefully the case for instantiating closures
+(where the rubber meets the road for variables), I think it becomes clear that
+this is the right way.
+
+To interpret a variable, we just project from the environment and ignore the
+restriction. I think the way that we had been thinking of doing it would result
+in the restriction from inside the closure infecting the argument.
+
+\bigskip
+
 
 Colors: \FmtTm{terms}, \FmtFam{value families}, \FmtVal{values}, \FmtRst{restrictions}.
 
@@ -75,7 +89,11 @@ Colors: \FmtTm{terms}, \FmtFam{value families}, \FmtVal{values}, \FmtRst{restric
           \VClo{M}{\rho}{\psi}
         }
       }{
-        \Rst{\phi\circ\psi}{\Eval{M}{\rho, \FamTest{G}{\phi}}}
+        \FamTest{
+          \Rst{\phi}{\Eval{M}{\rho, \FamTest{G}{\phi}}}
+        }{
+          \psi
+        }
       }
       \\
       \Cond{
