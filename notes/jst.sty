@@ -27,11 +27,12 @@
 \titleformat*{\subsubsection}{\itshape\bfseries\sffamily}
 \titleformat*{\paragraph}{\itshape\bfseries\sffamily}
 
-\usepackage{unicode-math}
+\usepackage[bold-style=upright]{unicode-math}
 
 \IfFontExistsTF{Minion Math}{
   \pdfmapfile{+minionmath.map}
   \setmathfont{Minion Math}
+  \setmathfontface\mathbf{Minion Math Bold}
 }{
 }
 

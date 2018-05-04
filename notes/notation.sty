@@ -8,14 +8,8 @@
 
 \newcommand\Sys[1]{#1}
 
-\makeatletter
-\def\rightharpoonupfill@{\arrowfill@\relbar\relbar\rightharpoonup}
-\newcommand{\overrightharpoonup}{%
-\mathpalette{\overarrow@\rightharpoonupfill@}}
-\makeatother
-
 \renewcommand\Vec[1]{
-  \overrightharpoonup{#1}
+  \overline{#1}
 }
 
 
@@ -71,7 +65,7 @@
 \newcommand\VBool{\FmtVal{\mathbf{bool}}}
 
 \newcommand\VPi[2]{%
-  \FmtVal{\Pi\Parens*{\FmtFam{#1}, \FmtClo{#2}}}
+  \FmtVal{\symbf{\Pi}\Parens*{\FmtFam{#1}, \FmtClo{#2}}}
 }
 
 \newcommand\FmtClo[1]{%
@@ -142,6 +136,19 @@
     \Squares{#5}
   }
 }
+
+\newcommand\VCoe[4]{
+  \FmtVal{
+    \mathbf{coe}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtAbs{#3}}\,\FmtFam{#4}
+  }
+}
+
+\newcommand\SemCoe[4]{
+  \FmtVal{
+    \underline{\mathbf{coe}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtAbs{#3}}\,\FmtFam{#4}
+  }
+}
+
 
 \newcommand\SemHCom[5]{
   \FmtVal{

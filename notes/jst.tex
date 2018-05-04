@@ -92,7 +92,7 @@ family by a restriction.
         }
       }{
         \FamTest{
-          \Eval{M}{\rho, \FamTest{G}{\phi}}
+          \Eval{M}{\Squares*{\rho, \FamTest{G}{\phi}}}
         }{
           \psi
         }
@@ -105,7 +105,7 @@ family by a restriction.
         \FamTest{C}{\RstId}\equiv \VPi{A}{\VClo{B}{\rho}{\psi}}
       }{
         \VUp{
-          \Rst{\psi}{\Eval{B}{\rho,\FamTest{G}{\phi}}}
+          \Rst{\psi}{\Eval{B}{\Squares*{\rho,\FamTest{G}{\phi}}}}
         }{
           \Parens*{
             \Fam{\chi}{
@@ -122,9 +122,47 @@ family by a restriction.
       \Cond{
         \FamTest{F}{\phi}
         \equiv
-        \Hole{coe}
+        \VCoe{r}{r'}{
+          \VAbs{\alpha}{C}
+        }{M},
+        \FamTest{C}{\RstId}\equiv \VPi{A}{\VClo{B}{\rho}{\psi}}
       }{
-        \Hole{coe}
+        \Fresh{\beta}{
+          \Fresh{\gamma}{
+            \SemCoe{r}{r'}{
+              \VAbs{\beta}{
+                \Eval{B}{
+                  \Squares*{
+                    \rho,
+                    \SemCoe{r'}{\beta}{
+                      \VAbs{\gamma}{
+                        \Act{\Swap{\gamma}{\alpha}}{A}
+                      }
+                    }{
+                      \FamTest{G}{\phi}
+                    }
+                  }
+                }
+              }
+            }{
+              \SemApp{M}{
+                \Fam{\chi}{
+                  \SemCoe{
+                    \Rst{\chi}{r'}
+                  }{
+                    \Rst{\chi}{r}
+                  }{
+                    \VAbs{\gamma}{
+                      \Act{\Swap{\gamma}{\alpha}}{A}
+                    }
+                  }{
+                    \Rst{\chi\circ\phi}{G}
+                  }
+                }
+              }
+            }
+          }
+        }
       }
       \\
       \Cond{
@@ -142,7 +180,7 @@ family by a restriction.
       }{
         \Fresh{\beta}{
           \SemHCom{r}{r'}{
-            \Rst{\psi}{\Eval{B}{\rho,\FamTest{G}{\phi}}}
+            \Rst{\psi}{\Eval{B}{\Squares*{\rho,\FamTest{G}{\phi}}}}
           }{
             \SemApp{M}{\Rst{\phi}{G}}
           }{
