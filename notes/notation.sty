@@ -19,53 +19,95 @@
 }
 
 
-\newcommand\Mute[1]{
-  {\color{SlateGray}#1}
+\newcommand\FmtAbs[1]{%
+  {\color{DarkCyan}#1}%
 }
 
-\newcommand\TBind[1]{
+\newcommand\VFace[2]{
+  \FmtFam{#1}\hookrightarrow\FmtAbs{#2}
+}
+
+\newcommand\Fresh[2]{
+  {\normalcolor\nu\FmtVal{#1}.\ {#2}}
+}
+
+\newcommand\Act[2]{
+  {#1}\cdot{#2}
+}
+
+\newcommand\Swap[2]{
+  \Parens{\FmtVal{#1}\;\FmtVal{#2}}
+}
+
+\newcommand\VAbs[2]{
+  \langle\FmtVal{#1}\rangle\FmtFam{#2}
+}
+
+\newcommand\Mute[1]{%
+  {\color{SlateGray}#1}%
+}
+
+\newcommand\TBind[1]{%
   \Mute{\lbrace}#1\Mute{\rbrace}
 }
 
-\newcommand\VLam[1]{
+\newcommand\VLam[1]{%
   \FmtVal{\lambda\FmtClo{#1}}
 }
 
-\newcommand\Rst[2]{
+\newcommand\VUp[2]{%
+  \FmtVal{
+    {\uparrow^{\FmtFam{#1}}}\FmtFam{#2}
+  }
+}
+
+\newcommand\Rst[2]{%
   \FmtRst{#1}^*\FmtFam{#2}
 }
 
 
-\newcommand\VPi[2]{
+\newcommand\RstId{\FmtRst{\cdot}}
+
+\newcommand\VBool{\FmtVal{\mathbf{bool}}}
+
+\newcommand\VPi[2]{%
   \FmtVal{\Pi\Parens*{\FmtFam{#1}, \FmtClo{#2}}}
 }
 
-\newcommand\FmtClo[1]{
-  {\normalcolor #1}%
+\newcommand\FmtClo[1]{%
+  {\color{DarkSlateGray} #1}%
 }
 
-\newcommand\FmtTm[1]{
+\newcommand\FmtTm[1]{%
   {\color{MidnightBlue}#1}%
 }
 
-\newcommand\FmtVal[1]{
+\newcommand\FmtVal[1]{%
   {\color{Red}#1}%
 }
 
-\newcommand\FmtFam[1]{
+\newcommand\FmtFam[1]{%
   {\color{Purple}#1}%
 }
 
-\newcommand\FmtRst[1]{
+\newcommand\FmtRst[1]{%
   {\color{Green}#1}%
 }
 
-\newcommand\VClo[3]{
+\newcommand\VClo[3]{%
   \langle \FmtTm{#1},\FmtVal{#2},\FmtRst{#3} \rangle
 }
 
-\newcommand\Fam[2]{
+\newcommand\Fam[2]{%
   \FmtFam{\lbrack\FmtRst{#1}\rbrack\ \FmtVal{#2}}
+}
+
+\newcommand\TUp[1]{%
+  \FmtTm{
+    \Parens{
+      {\uparrow}\;\FmtTm{#1}
+    }
+  }
 }
 
 \newcommand\TLam[1]{
@@ -88,9 +130,35 @@
   \FmtTm{\Parens{#1\ #2}}
 }
 
+\newcommand\VApp[2]{
+  \FmtVal{
+    \mathbf{app}\Parens{\FmtFam{#1}, \FmtFam{#2}}
+  }
+}
+
+\newcommand\VHCom[5]{
+  \FmtVal{
+    \mathbf{hcom}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
+    \Squares{#5}
+  }
+}
+
+\newcommand\SemHCom[5]{
+  \FmtVal{
+    \underline{\mathbf{hcom}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
+    \Squares{#5}
+  }
+}
+
+\newcommand\RstEquate[2]{
+  \FmtRst{
+    \FmtVal{#1}=\FmtVal{#2}
+  }
+}
+
 \newcommand\SemApp[2]{
   \FmtFam{
-    \FmtFam{#1} \mathbin{@} \FmtFam{#2}
+    \underline{\mathbf{app}}\Parens{\FmtFam{#1},\FmtFam{#2}}
   }
 }
 
@@ -103,7 +171,7 @@
 }
 
 \newcommand{\Hole}[1]{%
-  \colorbox{Red!30}{\textit{#1}}
+  \colorbox{Red!30}{\textit{?#1}}
 }
 
 \newcommand\Eq[2]{#1=#2}
@@ -117,6 +185,16 @@
   {\normalcolor{#1}} &\Mute{\Mapsto}\quad {#2}
 }
 
+\newcommand\Otherwise[1]{
+  \Cond{\text{otherwise}}{#1}
+}
+
 \newcommand\FamTest[2]{
   \FmtVal{\FmtFam{#1}\Squares{\FmtRst{#2}}}
+}
+
+\newcommand\Array[1]{
+  \!\!\!\begin{array}[t]{l}
+    #1
+  \end{array}
 }

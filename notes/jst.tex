@@ -1,7 +1,7 @@
 \documentclass{article}
 \usepackage{stmaryrd}
 \usepackage[landscape]{geometry}
-% \usepackage{fullpage}
+\usepackage{fullpage}
 \usepackage{jst}
 \usepackage{mathpartir}
 \usepackage{notation}
@@ -79,9 +79,9 @@ family by a restriction.
   }
 \end{align*}
 
-\begin{align*}
+\[
   \SemApp{F}{G}
-  &=
+  =
   \Fam{\phi}{
     \begin{cases}
       \Cond{
@@ -92,7 +92,7 @@ family by a restriction.
         }
       }{
         \FamTest{
-          \Rst{\phi}{\Eval{M}{\rho, \FamTest{G}{\phi}}}
+          \Eval{M}{\rho, \FamTest{G}{\phi}}
         }{
           \psi
         }
@@ -101,9 +101,16 @@ family by a restriction.
       \Cond{
         \FamTest{F}{\phi}
         \equiv
-        \Hole{neutral}
+        \VUp{C}{R},
+        \FamTest{C}{\RstId}\equiv \VPi{A}{\VClo{B}{\rho}{\psi}}
       }{
-        \Hole{neutral}
+        \VUp{
+          \Rst{\psi}{\Eval{B}{\rho,\FamTest{G}{\phi}}}
+        }{
+          \VApp{R}{
+            \Rst{\phi}{G}
+          }
+        }
       }
       \\
       \Cond{
@@ -117,12 +124,84 @@ family by a restriction.
       \Cond{
         \FamTest{F}{\phi}
         \equiv
-        \Hole{hcom}
+        \VHCom{r}{r'}{C}{M}{
+          \Vec{
+            \VFace{\xi_i}{
+              \VAbs{\alpha_i}{N_i}
+            }
+          }
+        },
+        \FamTest{C}{\RstId}\equiv
+        \VPi{A}{\VClo{B}{\rho}{\psi}}
       }{
-        \Hole{hcom}
+        \Fresh{\beta}{
+          \SemHCom{r}{r'}{
+            \Rst{\psi}{\Eval{B}{\rho,\FamTest{G}{\phi}}}
+          }{
+            \SemApp{M}{\Rst{\phi}{G}}
+          }{
+            \Vec{
+              \VFace{\xi_i}{
+                \VAbs{\beta}{
+                  \SemApp{
+                    \Act{
+                      \Swap{\alpha_i}{\beta}
+                    }{N_i}
+                  }{
+                    \Rst{\phi}{G}
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     \end{cases}
   }
-\end{align*}
+\]
+
+\[
+  \SemHCom{r}{r'}{C}{M}{
+    \Vec{
+      \VFace{\xi_i}{\VAbs{\alpha_i}{N_i}}
+    }
+  }
+  =
+  \FmtVal{
+    \begin{cases}
+      \Cond{
+        \FamTest{r}{\RstId}=\FamTest{r'}{\RstId}
+      }{
+        \FamTest{M}{\RstId}
+      }
+      \\
+      \Cond{
+        \exists_{\textit{min}}k.\models\FamTest{\xi_i}{\RstId}
+      }{
+        \FamTest{N_i}{
+          \RstEquate{\alpha_i}{\FamTest{r'}{\RstId}}
+        }
+      }
+      \\
+      \Cond{
+        \FamTest{C}{\RstId}
+        \equiv
+        \VPi{A}{B}
+      }{
+        \VHCom{r}{r'}{C}{M}{
+          \Vec{
+            \VFace{\xi_i}{\VAbs{\alpha_i}{N_i}}
+          }
+        }
+      }
+      \\
+      \Cond{
+        \FamTest{C}{\RstId}\equiv\VBool
+      }{
+        \FamTest{M}{\RstId}
+      }
+    \end{cases}
+  }
+\]
 
 \end{document}
