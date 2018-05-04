@@ -6,11 +6,15 @@
 \usepackage{mathpartir}
 \usepackage{notation}
 
-\newcommand\Eval[2]{
+\newcommand\Eval[3]{
   \FmtFam{
-    {\left\llbracket\FmtTm{#1}\right\rrbracket}_{\FmtVal{#2}}
+    {\left\llbracket\FmtTm{#1}\right\rrbracket}_{\FmtVal{#2}}^{\FmtVal{#3}}
   }
 }
+
+\newcommand\ForceEq[3]{\FmtRst{#1}\vDash\FmtFam{#2}=\FmtFam{#2}}
+\newcommand\ForceTrue[2]{\FmtRst{#1}\vDash\FmtFam{#2}}
+\newcommand\ForceTest[3]{\FmtRst{#1}\vDash\FmtFam{#2}\Downarrow\FmtVal{#3}}
 
 \title{cubical evaluation semantics}
 \author{Carlo Angiuli \and Jon Sterling}
@@ -40,191 +44,257 @@ family by a restriction.
 \begin{align*}
   \Eval{
     \TLam{M}
-  }{\rho}
+  }{\rho}{\pi}
   &=
   \Fam{\phi}{
     \VLam{
-      \VClo{M}{\rho}{\phi}
+      \VClo{M}{\rho}{\pi}{\phi}
     }
   }
   \\
   \Eval{
     \TPi{A}{B}
-  }{\rho}
+  }{\rho}{\pi}
   &=
   \Fam{\phi}{
     \VPi{
-      \Rst{\phi}{\Eval{A}{\rho}}
+      \Rst{\phi}{\Eval{A}{\rho}{\pi}}
     }{
-      \VClo{B}{\rho}{\phi}
+      \VClo{B}{\rho}{\pi}{\phi}
     }
   }
   \\
   \Eval{
     \TApp{M}{N}
-  }{\rho}
+  }{\rho}{\pi}
   &=
   \SemApp{
-    \Eval{M}{\rho}
+    \Eval{M}{\rho}{\pi}
   }{
-    \Eval{N}{\rho}
+    \Eval{N}{\rho}{\pi}
   }
   \\
   \Eval{
     \TVar{i}
-  }{\rho}
+  }{\rho}{\pi}
   &=
   \Fam{\_}{
     \rho_i
   }
 \end{align*}
 
-\[
-  \SemApp{F}{G}
-  =
-  \Fam{\phi}{
-    \begin{cases}
-      \Cond{
-        \FamTest{F}{\phi}
-        \equiv
-        \VLam{
-          \VClo{M}{\rho}{\psi}
-        }
-      }{
-        \FamTest{
-          \Eval{M}{\Squares*{\rho, \FamTest{G}{\phi}}}
-        }{
-          \psi
-        }
+We write $\ForceTest{\phi}{F}{V}$ as a shorthand for
+$\FamTest{F}{\phi}\equiv\FmtVal{V}$.
+
+\begin{mathparpagebreakable}
+  \inferrule{
+    \ForceTest{\phi}{F}{
+      \VLam{
+        \VClo{M}{\rho}{\pi}{\psi}
       }
-      \\
-      \Cond{
-        \FamTest{F}{\phi}
-        \equiv
-        \VUp{C}{R},
-        \FamTest{C}{\RstId}\equiv \VPi{A}{\VClo{B}{\rho}{\psi}}
+    }
+  }{
+    \ForceTest{\phi}{
+      \SemApp{F}{N}
+    }{
+      \FamTest{
+        \Eval{M}{\Squares*{\rho, \FamTest{N}{\phi}}}{\pi}
       }{
-        \VUp{
-          \Rst{\psi}{\Eval{B}{\Squares*{\rho,\FamTest{G}{\phi}}}}
-        }{
-          \Parens*{
-            \Fam{\chi}{
-              \VApp{
-                \Rst{\chi}{R}
-              }{
-                \Rst{\chi\circ\phi}{G}
-              }
+        \psi
+      }
+    }
+  }
+  \and
+  \inferrule{
+    \ForceTest{\phi}{F}{\VUp{C}{R}}
+    \\
+    \ForceTest{\RstId}{C}{\VPi{A}{\VClo{B}{\rho}{\pi}{\psi}}}
+  }{
+    \ForceTest{\phi}{
+      \SemApp{F}{N}
+    }{
+      \VUp{
+        \Rst{\psi}{\Eval{B}{\Squares*{\rho,\FamTest{N}{\phi}}}{\pi}}
+      }{
+        \Parens*{
+          \Fam{\chi}{
+            \VApp{
+              \Rst{\chi}{R}
+            }{
+              \Rst{\chi\circ\phi}{N}
             }
           }
         }
       }
-      \\
-      \Cond{
-        \FamTest{F}{\phi}
-        \equiv
-        \VCoe{r}{r'}{
-          \VAbs{\alpha}{C}
-        }{M},
-        \FamTest{C}{\RstId}\equiv \VPi{A}{\VClo{B}{\rho}{\psi}}
-      }{
-        \Fresh{\beta}{
-          \Fresh{\gamma}{
-            \SemCoe{r}{r'}{
-              \VAbs{\beta}{
-                \Eval{B}{
-                  \Squares*{
-                    \rho,
-                    \SemCoe{r'}{\beta}{
-                      \VAbs{\gamma}{
-                        \Act{\Swap{\gamma}{\alpha}}{A}
-                      }
-                    }{
-                      \FamTest{G}{\phi}
-                    }
-                  }
-                }
-              }
-            }{
-              \SemApp{M}{
-                \Fam{\chi}{
-                  \SemCoe{
-                    \Rst{\chi}{r'}
-                  }{
-                    \Rst{\chi}{r}
-                  }{
+    }
+  }
+  \and
+  \inferrule{
+    \ForceTest{\phi}{F}{
+      \VCoe{r}{r'}{
+        \VAbs{\alpha}{C}
+      }{M}
+    }
+    \\
+    \ForceTest{\RstId}{C}{
+      \VPi{A}{\VClo{B}{\rho}{\pi}{\psi}}
+    }
+  }{
+    \ForceTest{\phi}{
+      \SemApp{F}{N}
+    }{
+      \Fresh{\beta}{
+        \Fresh{\gamma}{
+          \SemCoe{r}{r'}{
+            \VAbs{\beta}{
+              \Eval{B}{
+                \Squares*{
+                  \rho,
+                  \SemCoe{r'}{\beta}{
                     \VAbs{\gamma}{
                       \Act{\Swap{\gamma}{\alpha}}{A}
                     }
                   }{
-                    \Rst{\chi\circ\phi}{G}
+                    \FamTest{N}{\phi}
                   }
+                }
+              }{
+                \Squares*{\pi, \Swap{\beta}{\alpha}}
+              }
+            }
+          }{
+            \SemApp{M}{
+              \Fam{\chi}{
+                \SemCoe{
+                  \Rst{\chi}{r'}
+                }{
+                  \Rst{\chi}{r}
+                }{
+                  \VAbs{\gamma}{
+                    \Act{\Swap{\gamma}{\alpha}}{A}
+                  }
+                }{
+                  \Rst{\chi\circ\phi}{N}
                 }
               }
             }
           }
         }
       }
-      \\
-      \Cond{
-        \FamTest{F}{\phi}
-        \equiv
-        \VHCom{r}{r'}{C}{M}{
-          \Vec{
-            \VFace{\xi_i}{
-              \VAbs{\alpha_i}{N_i}
-            }
-          }
-        },
-        \FamTest{C}{\RstId}\equiv
-        \VPi{A}{\VClo{B}{\rho}{\psi}}
-      }{
-        \Fresh{\beta}{
-          \SemHCom{r}{r'}{
-            \Rst{\psi}{\Eval{B}{\Squares*{\rho,\FamTest{G}{\phi}}}}
-          }{
-            \SemApp{M}{\Rst{\phi}{G}}
-          }{
-            \Vec{
-              \VFace{\xi_i}{
-                \VAbs{\beta}{
-                  \SemApp{
-                    \Act{
-                      \Swap{\alpha_i}{\beta}
-                    }{N_i}
-                  }{
-                    \Rst{\phi}{G}
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    \end{cases}
-  }
-\]
-
-\[
-  \SemHCom{r}{r'}{C}{M}{
-    \Vec{
-      \VFace{\xi_i}{\VAbs{\alpha_i}{N_i}}
     }
   }
+  \and
+  \inferrule{
+    \ForceTest{\phi}{F}{
+      \VHCom{r}{r'}{C}{M}{
+        \Vec{
+          \VFace{\xi_i}{
+            \VAbs{\alpha_i}{N_i}
+          }
+        }
+      }
+    }
+    \\
+    \ForceTest{\RstId}{C}{
+      \VPi{A}{\VClo{B}{\rho}{\pi}{\psi}}
+    }
+  }{
+    \ForceTest{\phi}{
+      \SemApp{F}{O}
+    }{
+      \Fresh{\beta}{
+        \SemHCom{r}{r'}{
+          \Rst{\psi}{
+            \Eval{B}{\Squares*{\rho,\FamTest{O}{\phi}}}{\pi}
+          }
+        }{
+          \SemApp{M}{\Rst{\phi}{O}}
+        }{
+          \Vec{
+            \VFace{\xi_i}{
+              \VAbs{\beta}{
+                \SemApp{
+                  \Act{
+                    \Swap{\alpha_i}{\beta}
+                  }{N_i}
+                }{
+                  \Rst{\phi}{O}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+\end{mathparpagebreakable}
+
+\begin{mathparpagebreakable}
+  \inferrule{
+    \ForceEq{\RstId}{r}{r'}
+  }{
+    \SemHCom{r}{r'}{C}{M}{
+      \Vec{
+        \VFace{\xi_i}{\VAbs{\alpha_i}{N_i}}
+      }
+    }
+    \equiv
+    \FamTest{M}{\RstId}
+  }
+  \and
+  \inferrule{
+    \exists_{\textit{min}}k,
+    \ForceTrue{\RstId}{\xi_k}
+  }{
+    \SemHCom{r}{r'}{C}{M}{
+      \Vec{
+        \VFace{\xi_i}{\VAbs{\alpha_i}{N_i}}
+      }
+    }
+    \equiv
+    \FamTest{N_k}{
+      \RstEquate{\alpha_k}{\FamTest{r'}{\RstId}}
+    }
+  }
+  \and
+  \inferrule{
+    \ForceTest{\RstId}{C}{\VPi{A}{B}}
+  }{
+    \SemHCom{r}{r'}{C}{M}{
+      \Vec{
+        \VFace{\xi_i}{\VAbs{\alpha_i}{N_i}}
+      }
+    }
+    \equiv
+    \VHCom{r}{r'}{C}{M}{
+      \Vec{
+        \VFace{\xi_i}{\VAbs{\alpha_i}{N_i}}
+      }
+    }
+  }
+  \and
+  \inferrule{
+    \ForceTest{\RstId}{C}{\VBool}
+  }{
+    \SemHCom{r}{r'}{C}{M}{
+      \Vec{
+        \VFace{\xi_i}{\VAbs{\alpha_i}{N_i}}
+      }
+    }
+    \equiv
+    \FamTest{M}{\RstId}
+  }
+\end{mathparpagebreakable}
+
+\[
+  \SemCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
   =
   \FmtVal{
     \begin{cases}
       \Cond{
-        \FamTest{r}{\RstId}=\FamTest{r'}{\RstId}
+        \models\FamTest{r}{\RstId}=\FamTest{r'}{\RstId}
       }{
         \FamTest{M}{\RstId}
-      }
-      \\
-      \Cond{
-        \exists_{\textit{min}}k.\models\FamTest{\xi_k}{\RstId}
-      }{
-        \FamTest{N_k}{
-          \RstEquate{\alpha_k}{\FamTest{r'}{\RstId}}
-        }
       }
       \\
       \Cond{
@@ -232,20 +302,17 @@ family by a restriction.
         \equiv
         \VPi{A}{B}
       }{
-        \VHCom{r}{r'}{C}{M}{
-          \Vec{
-            \VFace{\xi_i}{\VAbs{\alpha_i}{N_i}}
-          }
-        }
+        \VCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
       }
       \\
       \Cond{
-        \FamTest{C}{\RstId}\equiv\VBool
+        \FamTest{C}{\RstId}
+        \equiv
+        \VBool
       }{
         \FamTest{M}{\RstId}
       }
     \end{cases}
   }
 \]
-
 \end{document}
