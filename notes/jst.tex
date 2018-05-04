@@ -107,8 +107,14 @@ family by a restriction.
         \VUp{
           \Rst{\psi}{\Eval{B}{\rho,\FamTest{G}{\phi}}}
         }{
-          \VApp{R}{
-            \Rst{\phi}{G}
+          \Parens*{
+            \Fam{\chi}{
+              \VApp{
+                \Rst{\chi}{R}
+              }{
+                \Rst{\chi\circ\phi}{G}
+              }
+            }
           }
         }
       }
