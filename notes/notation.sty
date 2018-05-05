@@ -136,17 +136,44 @@
   }
 }
 
+\newcommand\HComLike[6]{
+  {#1}^{\FmtFam{#2}\leadsto\FmtFam{#3}}_{#4}\,\FmtFam{#5}\,%
+  \FmtSys{\Squares*{#6}}
+}
+
 \newcommand\VHCom[5]{
   \FmtVal{
-    \mathbf{hcom}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
-    \FmtSys{\Squares*{#5}}
+    \HComLike{\mathbf{hcom}}{#1}{#2}{\FmtFam{#3}}{#4}{#5}
   }
 }
 
 \newcommand\VFCom[4]{
   \FmtVal{
-    \mathbf{fcom}^{\FmtFam{#1}\leadsto\FmtFam{#2}}\,\FmtFam{#3}\,%
-    \FmtSys{\Squares*{#4}}
+    \HComLike{\mathbf{fcom}}{#1}{#2}{}{\FmtFam{#3}}{#4}
+  }
+}
+
+\newcommand\SemHCom[5]{
+  \FmtVal{
+    \HComLike{\underline{\mathbf{hcom}}}{#1}{#2}{\FmtFam{#3}}{#4}{#5}
+  }
+}
+
+\newcommand\SemHComFam[5]{
+  \FmtFam{
+    \HComLike{\underline{\mathbf{hcom}}}{#1}{#2}{\FmtFam{#3}}{#4}{#5}
+  }
+}
+
+\newcommand\SemGComFam[5]{
+  \FmtFam{
+    \HComLike{\underline{\mathbf{hcom}}}{#1}{#2}{\FmtAbs{#3}}{#4}{#5}
+  }
+}
+
+\newcommand\SemBox[4]{
+  \FmtVal{
+    \HComLike{\underline{\mathbf{box}}}{#1}{#2}{}{\FmtAbs{#3}}{#4}
   }
 }
 
@@ -169,33 +196,6 @@
 }
 
 
-\newcommand\SemHCom[5]{
-  \FmtVal{
-    \underline{\mathbf{hcom}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
-    \FmtSys{\Squares*{#5}}
-  }
-}
-
-\newcommand\SemHComFam[5]{
-  \FmtFam{
-    \underline{\mathbf{hcom}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
-    \FmtSys{\Squares*{#5}}
-  }
-}
-
-\newcommand\SemGComFam[5]{
-  \FmtFam{
-    \underline{\mathbf{gcom}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtAbs{#3}}\,\FmtFam{#4}\,%
-    \FmtSys{\Squares*{#5}}
-  }
-}
-
-\newcommand\SemBox[4]{
-  \FmtVal{
-    \underline{\mathbf{box}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}\,\FmtFam{#3}\,%
-    \FmtSys{\Squares*{#4}}
-  }
-}
 
 \newcommand\RstEquate[2]{
   \FmtRst{
