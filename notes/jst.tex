@@ -393,25 +393,86 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
         }
       }
     }
-    \\
-    \FmtRst{\phi}\triangleq{\Parens*{\RstEquate{r'}{\alpha}}}
     \\\\
-    \Hole{foo}
+    \FmtRst{\phi_{r}}\triangleq{\Parens*{\RstEquate{\FamTest{r}{\RstId}}{\alpha}}}
+    \\
+    \FmtRst{\phi_{r'}}\triangleq{\Parens*{\RstEquate{\FamTest{r'}{\RstId}}{\alpha}}}
+    \\\\
+    \FmtFam{O}\triangleq
+    \Hole{}
+    \\\\
+    \FmtFam{P}\triangleq
+    \SemGComFam{r}{r'}{
+      \VAbs{\alpha}{A}
+    }{
+      \Rst{
+        \Parens*{\RstEquate{\beta}{\FamTest{s}{\phi_r}}}
+      }{O}
+    }{
+      \Vec{
+        \VFace{\xi_i}{
+          \Fresh{\gamma}{
+            \VAbs{\gamma}{
+              \SemCoeFam{
+                \Act{\Swap{\gamma}{\alpha}}{s'}
+              }{
+                \Act{\Swap{\gamma}{\alpha}}{s}
+              }{
+                \VAbs{\beta}{
+                  \Act{\Swap{\gamma}{\alpha}}{B_i}
+                }
+              }{
+                \SemCoeFam{r}{\gamma}{
+                  \VAbs{\alpha}{
+                    \Rst{
+                      \Parens*{\RstEquate{\FamTest{s'}{\RstId}}{\beta}}
+                    }{
+                      B_i
+                    }
+                  }
+                }{M}
+              }
+            }
+          }
+        }
+        \vert_{
+          \FmtVal{\alpha}\# \FamTest{\xi_i}{\RstId}
+        }
+      },
+      \VFace{
+        s = s'
+      }{
+        \Fresh{\gamma}{
+          \VAbs{\gamma}{
+            \SemCoeFam{r}{\gamma}{
+              \VAbs{\alpha}{A}
+            }{M}
+          }
+        }
+      }
+      \vert_{
+        \FmtVal{\alpha}\# \Squares*{\FamTest{s}{\RstId},\FamTest{s'}{\RstId}}
+      }
+    }
+    \\\\
+    \FmtFace{\Vec{T}}\triangleq\Hole{}
+    \\\\
+    \FmtFace{\Vec{U}}\triangleq\Hole{}
   }{
     \SemCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
     \equiv
     \SemBox{
-      \Rst{\phi}{s}
+      \Rst{\phi_{r'}}{s}
     }{
-      \Rst{\phi}{s'}
+      \Rst{\phi_{r'}}{s'}
     }{
       \Parens*{
         \SemHComFam{
-          \Rst{\phi}{s}
+          \Rst{\phi_{r'}}{s}
         }{
-          \Rst{\phi}{s'}
+          \Rst{\phi_{r'}}{s'}
         }{
-          \Rst{\phi}{A}
+          \Rst{\phi_{r'}}{A}
         }{
           P
         }{

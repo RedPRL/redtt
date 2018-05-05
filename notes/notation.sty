@@ -6,7 +6,13 @@
 \DeclarePairedDelimiter{\Squares}{[}{]}
 
 
-\newcommand\Sys[1]{#1}
+\newcommand\FmtSys[1]{%
+  {\color{FireBrick}#1}
+}
+
+\newcommand\FmtFace[1]{%
+  {\color{FireBrick}#1}
+}
 
 \renewcommand\Vec[1]{
   \overline{#1}
@@ -18,11 +24,11 @@
 }
 
 \newcommand\VFace[2]{
-  \FmtFam{#1}\hookrightarrow\FmtAbs{#2}
+  \FmtFace{\FmtFam{#1}\hookrightarrow\FmtAbs{#2}}
 }
 
 \newcommand\Fresh[2]{
-  {\normalcolor\nu\FmtVal{#1}.\ {#2}}
+  \nu\FmtVal{#1}.\ {#2}
 }
 
 \newcommand\Act[2]{
@@ -133,14 +139,14 @@
 \newcommand\VHCom[5]{
   \FmtVal{
     \mathbf{hcom}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
-    \Squares{#5}
+    \FmtSys{\Squares*{#5}}
   }
 }
 
 \newcommand\VFCom[4]{
   \FmtVal{
     \mathbf{fcom}^{\FmtFam{#1}\leadsto\FmtFam{#2}}\,\FmtFam{#3}\,%
-    \Squares{#4}
+    \FmtSys{\Squares*{#4}}
   }
 }
 
@@ -166,21 +172,28 @@
 \newcommand\SemHCom[5]{
   \FmtVal{
     \underline{\mathbf{hcom}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
-    \Squares{#5}
+    \FmtSys{\Squares*{#5}}
   }
 }
 
 \newcommand\SemHComFam[5]{
   \FmtFam{
     \underline{\mathbf{hcom}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
-    \Squares{#5}
+    \FmtSys{\Squares*{#5}}
+  }
+}
+
+\newcommand\SemGComFam[5]{
+  \FmtFam{
+    \underline{\mathbf{gcom}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtAbs{#3}}\,\FmtFam{#4}\,%
+    \FmtSys{\Squares*{#5}}
   }
 }
 
 \newcommand\SemBox[4]{
   \FmtVal{
     \underline{\mathbf{box}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}\,\FmtFam{#3}\,%
-    \Squares{#4}
+    \FmtSys{\Squares*{#4}}
   }
 }
 
