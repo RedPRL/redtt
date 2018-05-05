@@ -400,6 +400,22 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
     \\
     \FmtRst{\phi_{r'}}\triangleq{\Parens*{\RstEquate{\FamTest{r'}{\RstId}}{\alpha}}}
     \\\\
+    \FmtFam{N_i}
+    \triangleq
+    \FmtFam{
+      \SemCoeFam{s'}{\beta}{
+        \VAbs{\beta}{B_i}
+      }{
+        \SemCoeFam{r}{\alpha}{
+          \VAbs{\alpha}{
+            \Rst{
+              \Parens*{\RstEquate{s'}{\beta}}
+            }{B_i}
+          }
+        }{M}
+      }
+    }
+    \\\\
     \FmtFam{O_t}\triangleq
     \SemHComFam{
       \Rst{\phi_r}{s'}
@@ -467,24 +483,16 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
         \VBFace{\xi_i}{
           \Fresh{\gamma}{
             \VAbs{\gamma}{
-              \SemCoeFam{
-                \Act{\Swap{\gamma}{\alpha}}{s'}
-              }{
-                \Act{\Swap{\gamma}{\alpha}}{s}
-              }{
-                \VAbs{\beta}{
-                  \Act{\Swap{\gamma}{\alpha}}{B_i}
+              \Rst{
+                \Parens*{
+                  \RstEquate{
+                    \Act{\Swap{\gamma}{\alpha}}{s}
+                  }{\beta}
                 }
               }{
-                \SemCoeFam{r}{\gamma}{
-                  \VAbs{\alpha}{
-                    \Rst{
-                      \Parens*{\RstEquate{\FamTest{s'}{\RstId}}{\beta}}
-                    }{
-                      B_i
-                    }
-                  }
-                }{M}
+                \Parens*{
+                  \Act{\Swap{\gamma}{\alpha}}{N_i}
+                }
               }
             }
           }
@@ -525,22 +533,12 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
         }{
           \Fresh{\eta}{
             \VAbs{\eta}{
-              \SemCoeFam{
-                \Rst{\phi_{r'}}{s'}
-              }{\eta}{
-                \VAbs{\beta}{
-                  \Rst{
-                    \RstForall{\beta}{\phi_{r'}}
-                  }{B_i}
-                }
+              \Rst{
+                \phi_{r'}
               }{
-                \SemCoeFam{r}{r'}{
-                  \VAbs{\alpha}{
-                    \Rst{
-                      \Parens*{\RstEquate{\FamTest{s'}{\RstId}}{\beta}}
-                    }{B_i}
-                  }
-                }{M}
+                \Parens*{
+                  \Act{\Swap{\eta}{\beta}}{N_i}
+                }
               }
             }
           }
@@ -578,34 +576,11 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
                 \Rst{\phi_{r'}}{s}
               }{
                 \VAbs{\beta}{
-                  \Rst{
-                    \RstForall{\beta}{\phi_{r'}}
-                  }{B_i}
+                  \Rst{\RstForall{\beta}{\phi_{r'}}}{B_i}
                 }
               }{
-                \SemCoeFam{
-                  \Rst{\phi_{r'}}{s'}
-                }{\delta}{
-                  \VAbs{\beta}{
-                    \Rst{
-                      \RstForall{\beta}{\phi_{r'}}
-                    }{B_i}
-                  }
-                }{
-                  \SemCoeFam{r}{r'}{
-                    \Fresh{\eta}{
-                      \VAbs{\eta}{
-                        \Rst{
-                          \Parens{
-                            \Parens{\RstEquate{\FamTest{s'}{\phi_{r'}}}{\delta}}
-                            \circ\phi_{r'}
-                          }
-                        }{
-                          \Act{\Swap{\eta}{\beta}}{B_i}
-                        }
-                      }
-                    }
-                  }{M}
+                \Rst{\phi_{r'}}{
+                  \Parens*{\Act{\Swap{\delta}{\beta}}{N_i}}
                 }
               }
             }
