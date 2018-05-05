@@ -12,8 +12,10 @@
   }
 }
 
-\newcommand\ForceEq[3]{\FmtRst{#1}\vDash\FmtFam{#2}=\FmtFam{#2}}
+\newcommand\ForceEq[3]{\FmtRst{#1}\vDash\FmtFam{#2}=\FmtFam{#3}}
+\newcommand\ForceNotEq[3]{\FmtRst{#1}\vDash\FmtFam{#2}\not=\FmtFam{#3}}
 \newcommand\ForceTrue[2]{\FmtRst{#1}\vDash\FmtFam{#2}}
+\newcommand\ForceNotTrue[2]{\FmtRst{#1}\not\vDash\FmtFam{#2}}
 \newcommand\ForceTest[3]{\FmtRst{#1}\vDash\FmtFam{#2}\Downarrow\FmtVal{#3}}
 
 \title{cubical evaluation semantics}
@@ -164,18 +166,12 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
             }
           }{
             \SemApp{M}{
-              \Fam{\chi}{
-                \SemCoe{
-                  \Rst{\chi}{r'}
-                }{
-                  \Rst{\chi}{r}
-                }{
-                  \VAbs{\gamma}{
-                    \Act{\Swap{\gamma}{\alpha}}{A}
-                  }
-                }{
-                  \Rst{\chi\circ\phi}{N}
+              \SemCoeFam{r'}{r}{
+                \VAbs{\gamma}{
+                  \Act{\Swap{\gamma}{\alpha}}{A}
                 }
+              }{
+                \Rst{\phi}{N}
               }
             }
           }
@@ -227,6 +223,30 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
       }
     }
   }
+  \\
+  \inferrule{}{
+    \ForceTest{\phi}{
+      \SemCoeFam{r}{r'}{
+        \VAbs{\alpha}{A}
+      }{M}
+    }{
+      \SemCoe{
+        \Rst{\phi}{r}
+      }{
+        \Rst{\phi}{r'}
+      }{
+        \Fresh{\beta}{
+          \VAbs{\beta}{
+            \Rst{\phi}{
+              \Act{\Swap{\beta}{\alpha}}{A}
+            }
+          }
+        }
+      }{
+        \Rst{\phi}{M}
+      }
+    }
+  }
 \end{mathparpagebreakable}
 
 \begin{mathparpagebreakable}
@@ -243,6 +263,8 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
   }
   \and
   \inferrule{
+    \ForceNotEq{\RstId}{r}{r'}
+    \\
     \exists_{\textit{min}}k,
     \ForceTrue{\RstId}{\xi_k}
   }{
@@ -258,6 +280,10 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
   }
   \and
   \inferrule{
+    \ForceNotEq{\RstId}{r}{r'}
+    \\
+    \Vec{\ForceNotTrue{\RstId}{\xi_i}}
+    \\
     \ForceTest{\RstId}{C}{\VPi{A}{B}}
   }{
     \SemHCom{r}{r'}{C}{M}{
@@ -274,6 +300,10 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
   }
   \and
   \inferrule{
+    \ForceNotEq{\RstId}{r}{r'}
+    \\
+    \Vec{\ForceNotTrue{\RstId}{\xi_i}}
+    \\
     \ForceTest{\RstId}{C}{\VBool}
   }{
     \SemHCom{r}{r'}{C}{M}{
@@ -284,35 +314,114 @@ $\FamTest{F}{\phi}\equiv\FmtVal{V}$.
     \equiv
     \FamTest{M}{\RstId}
   }
+  \\
+  \inferrule{}{
+    \ForceTest{\phi}{
+      \SemHComFam{r}{r'}{A}{M}{
+        \Vec{
+          \VFace{\xi_i}{
+            \VAbs{\alpha_i}{N_i}
+          }
+        }
+      }
+    }{
+      \Fresh{\beta}{
+        \SemHCom{
+          \Rst{\phi}{r}
+        }{
+          \Rst{\phi}{r'}
+        }{
+          \Rst{\phi}{A}
+        }{
+          \Rst{\phi}{M}
+        }{
+          \Vec{
+            \VFace{
+              \Rst{\phi}{\xi_i}
+            }{
+              \VAbs{
+                \beta
+              }{
+                \Rst{\phi}{\Act{\Swap{\beta}{\alpha_i}}{N_i}}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 \end{mathparpagebreakable}
 
-\[
-  \SemCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
-  =
-  \FmtVal{
-    \begin{cases}
-      \Cond{
-        \models\FamTest{r}{\RstId}=\FamTest{r'}{\RstId}
-      }{
-        \FamTest{M}{\RstId}
-      }
-      \\
-      \Cond{
-        \FamTest{C}{\RstId}
-        \equiv
-        \VPi{A}{B}
-      }{
-        \VCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
-      }
-      \\
-      \Cond{
-        \FamTest{C}{\RstId}
-        \equiv
-        \VBool
-      }{
-        \FamTest{M}{\RstId}
-      }
-    \end{cases}
+\begin{mathparpagebreakable}
+  \inferrule{
+    \ForceEq{\RstId}{r}{r'}
+  }{
+    \SemCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
+    \equiv
+    \FamTest{M}{\RstId}
   }
-\]
+  \and
+  \inferrule{
+    \ForceNotEq{\RstId}{r}{r'}
+    \\
+    \ForceTest{\RstId}{C}{\VPi{A}{B}}
+  }{
+    \SemCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
+    \equiv
+    \VCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
+  }
+  \and
+  \inferrule{
+    \ForceNotEq{\RstId}{r}{r'}
+    \\
+    \ForceTest{\RstId}{C}{\VBool}
+  }{
+    \SemCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
+    \equiv
+    \FamTest{M}{\RstId}
+  }
+  \and
+  \inferrule{
+    \ForceNotEq{\RstId}{r}{r'}
+    \\
+    \ForceTest{\RstId}{C}{
+      \VFCom{s}{s'}{A}{
+        \Vec{
+          \VFace{\xi_i}{
+            \VAbs{\beta}{B_i}
+          }
+        }
+      }
+    }
+    \\
+    \FmtRst{\phi}\triangleq{\Parens*{\RstEquate{r'}{\alpha}}}
+    \\\\
+    \Hole{foo}
+  }{
+    \SemCoe{r}{r'}{\VAbs{\alpha}{C}}{M}
+    \equiv
+    \SemBox{
+      \Rst{\phi}{s}
+    }{
+      \Rst{\phi}{s'}
+    }{
+      \Parens*{
+        \SemHComFam{
+          \Rst{\phi}{s}
+        }{
+          \Rst{\phi}{s'}
+        }{
+          \Rst{\phi}{A}
+        }{
+          P
+        }{
+          \Vec{T}
+        }
+      }
+    }{
+      \Vec{U}
+    }
+  }
+\end{mathparpagebreakable}
+
 \end{document}

@@ -56,7 +56,7 @@
 }
 
 \newcommand\Rst[2]{%
-  \FmtRst{#1}^*\FmtFam{#2}
+  \FmtRst{#1}^*\!\FmtFam{#2}
 }
 
 
@@ -137,6 +137,13 @@
   }
 }
 
+\newcommand\VFCom[4]{
+  \FmtVal{
+    \mathbf{fcom}^{\FmtFam{#1}\leadsto\FmtFam{#2}}\,\FmtFam{#3}\,%
+    \Squares{#4}
+  }
+}
+
 \newcommand\VCoe[4]{
   \FmtVal{
     \mathbf{coe}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtAbs{#3}}\,\FmtFam{#4}
@@ -149,11 +156,31 @@
   }
 }
 
+\newcommand\SemCoeFam[4]{
+  \FmtFam{
+    \underline{\mathbf{coe}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtAbs{#3}}\,\FmtFam{#4}
+  }
+}
+
 
 \newcommand\SemHCom[5]{
   \FmtVal{
     \underline{\mathbf{hcom}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
     \Squares{#5}
+  }
+}
+
+\newcommand\SemHComFam[5]{
+  \FmtFam{
+    \underline{\mathbf{hcom}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}_{\FmtFam{#3}}\,\FmtFam{#4}\,%
+    \Squares{#5}
+  }
+}
+
+\newcommand\SemBox[4]{
+  \FmtVal{
+    \underline{\mathbf{box}}^{\FmtFam{#1}\leadsto\FmtFam{#2}}\,\FmtFam{#3}\,%
+    \Squares{#4}
   }
 }
 
