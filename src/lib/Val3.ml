@@ -1,59 +1,133 @@
-module R = Restriction
-module P = Permutation
-module D = DimVal
-
 type atom = Symbol.t
 
-module Dim :
+module D :
 sig
   type t
+  val dim0 : t
+  val dim1 : t
+  val named : atom -> t
 
-  val make : D.t -> t
-  val compare : t -> t -> D.compare
+  type compare =
+    | Same
+    | Apart
+    | Indeterminate
 
-  val perm : P.t -> t -> t
-  val restrict : R.t -> t -> t
+  val compare : t -> t -> compare
 
-  val equate_with : t -> t -> R.t
+
+  type action
+  val subst : t -> atom -> action
+  val equate : t -> t -> action
+  val swap : atom -> atom -> action
+  val cmp : action -> action -> action
+  val idn : action
+
+  val act : action -> t -> t
 end =
 struct
-  type t = {r : D.t; phi : R.t}
+  type t =
+    | Dim0
+    | Dim1
+    | Atom of {atom : atom; history : atom list}
 
-  let make r =
-    {r; phi = R.emp}
+  let dim0 = Dim0
+  let dim1 = Dim1
+  let named x = Atom {atom = x; history = []}
 
-  let compare c d =
-    let phi = R.union c.phi d.phi in
-    R.compare c.r d.r phi
+  type action =
+    | Subst of t * atom
+    | Swap of atom * atom
+    | Diag of atom * (atom * atom)
+    | Cmp of action * action
+    | Id
 
-  let perm pi c =
-    {phi = R.perm pi c.phi;
-     r = P.read c.r pi}
+  let subst r x = Subst (r, x)
 
-  let restrict phi c =
-    {c with phi = R.union phi c.phi}
+  let equate r r' =
+    match r, r' with
+    | Dim0, Dim0 ->
+      Id
+    | Dim1, Dim1 ->
+      Id
+    | Dim0, Atom atm ->
+      subst Dim0 atm.atom
+    | Dim1, Atom atm ->
+      subst Dim1 atm.atom
+    | Atom atm, Dim0 ->
+      subst Dim0 atm.atom
+    | Atom atm, Dim1 ->
+      subst Dim1 atm.atom
+    | Atom atm0, Atom atm1 ->
+      let z = Symbol.fresh () in
+      Diag (z, (atm0.atom, atm1.atom))
+    | _ ->
+      failwith "Inconsistent equation"
 
-  let equate_with c d =
-    R.union (R.equate c.r d.r) @@
-    R.union c.phi d.phi
+  let cmp sigma1 sigma0 =
+    Cmp (sigma1, sigma0)
+
+  let idn = Id
+
+  let swap x y =
+    Swap (x, y)
+
+  type compare =
+    | Same
+    | Apart
+    | Indeterminate
+
+  let compare r r' =
+    match r, r' with
+    | Dim0, Dim0 -> Same
+    | Dim1, Dim1 -> Same
+    | Dim0, Dim1 -> Apart
+    | Dim1, Dim0 -> Apart
+    | Atom atm0, Atom atm1 ->
+      if atm0.atom = atm1.atom then
+        Same
+      else
+        Indeterminate
+    | _ -> Indeterminate
+
+  let atom_swap (x, y) z =
+    if x = z then y else if y = z then x else z
+
+  let rec act sigma r =
+    match r, sigma with
+    | (Dim0 | Dim1), _ -> r
+    | _, Id -> r
+    | _, Cmp (sigma1, sigma0) ->
+      act sigma1 @@ act sigma0 r
+    | Atom atm, Subst (r', x) ->
+      if atm.atom = x then r' else r
+    | Atom atm, Diag (z, (x, y)) ->
+      if atm.atom = x then
+        Atom {atom = z; history = x :: atm.history}
+      else if atm.atom = y then
+        Atom {atom = z; history = y :: atm.history}
+      else
+        r
+    | Atom atm, Swap (x, y) ->
+      Atom
+        {atom = atom_swap (x, y) atm.atom;
+         history = List.map (atom_swap (x, y)) atm.history}
 end
 
 module Star :
 sig
   type t
-  type 'a m = [`Ok of 'a | `Same of Dim.t * Dim.t]
+  type 'a m = [`Ok of 'a | `Same of D.t * D.t]
 
-  val make : Dim.t -> Dim.t -> t m
-  val unleash : t -> Dim.t * Dim.t
-  val perm : P.t -> t -> t
-  val restrict : R.t -> t -> t m
+  val make : D.t -> D.t -> t m
+  val unleash : t -> D.t * D.t
+  val act : D.action -> t -> t m
 end =
 struct
-  type t = Dim.t * Dim.t
+  type t = D.t * D.t
   type 'a m = [`Ok of 'a | `Same of t]
 
   let make c d =
-    match Dim.compare c d with
+    match D.compare c d with
     | D.Same ->
       `Same (c, d)
     | _ ->
@@ -61,59 +135,39 @@ struct
 
   let unleash p = p
 
-  let perm pi (c, d) =
-    Dim.perm pi c, Dim.perm pi d
-
-  let restrict phi (c, d) =
-    make (Dim.restrict phi c) (Dim.restrict phi d)
+  let act phi (r, r') =
+    make (D.act phi r) (D.act phi r')
 end
+
 
 module Gen :
 sig
   type t
   type 'a m = [`Ok of 'a | `Const of [`Dim0 | `Dim1]]
-  val make : Dim.t -> t m
-  val unleash : t -> Dim.t
-  val perm : P.t -> t -> t
-  val restrict : R.t -> t -> t m
+  val make : D.t -> t m
+  val unleash : t -> D.t
+  val act : D.action -> t -> t m
 end =
 struct
-  type t = Dim.t
+  type t = D.t
   type 'a m = [`Ok of 'a | `Const of [`Dim0 | `Dim1]]
 
   let make c =
-    match Dim.compare c (Dim.make D.Dim0) with
+    match D.compare c D.dim0 with
     | D.Same -> `Const `Dim0
     | _ ->
-      match Dim.compare c (Dim.make D.Dim1) with
+      match D.compare c D.dim0 with
       | D.Same -> `Const `Dim1
       | _ -> `Ok c
 
   let unleash c = c
 
-  let perm pi c =
-    Dim.perm pi c
-
-  let restrict phi c =
-    make @@ Dim.restrict phi c
+  let act phi r =
+    make @@ D.act phi r
 end
 
 type can = [`Can]
 type neu = [`Neu]
-
-type frame =
-  | Restrict of R.t
-  | Perm of P.t
-
-let enqueue f fs =
-  match f, fs with
-  | Restrict phi, Restrict phi' :: fs ->
-    Restrict (R.union phi phi') :: fs
-  | Perm pi, Perm pi' :: fs ->
-    Perm (P.cmp pi pi') :: fs
-  | _ ->
-    f::fs
-
 
 type _ con =
   | Loop : Gen.t -> can con
@@ -127,7 +181,7 @@ type _ con =
 and 'a with_env = {tm : 'a; rho : env}
 and (_, 'a) face =
   | False : Star.t -> ('x, 'a) face
-  | True : Dim.t * Dim.t * 'a -> ([`Any], 'a) face
+  | True : D.t * D.t * 'a -> ([`Any], 'a) face
   | Indet : Star.t * 'a -> ('x, 'a) face
 
 and cfg = Tm.chk Tm.t with_env node
@@ -141,41 +195,34 @@ and box_sys = ([`Rigid], can value) face list
 and cap_sys = ([`Rigid], can value) face list
 
 and abs = {atom : atom; node : can value}
-and 'a node = {inner : 'a; queue : frame list}
+and 'a node = {inner : 'a; action : D.action}
 and 'a value = 'a con node ref
-
-
 type 'a step = [`Ret of 'a con | `Step of 'a value]
 
 let ret v = `Ret v
 let step v = `Step v
 
+module type Sort =
+sig
+  type t
+  type 'a m
+  val act : D.action -> t -> t m
+end
+
 module Val =
 struct
   let into : type a. a con -> a value =
     fun inner ->
-      ref @@ {inner; queue = []}
+      ref @@ {inner; action = D.idn}
 
   let from_step step =
     match step with
     | `Ret con -> into con
     | `Step t -> t
 
-  let perm : type a. P.t -> a value -> a value =
-    fun pi node ->
-      ref @@ {!node with queue = enqueue (Perm pi) !node.queue}
-
-  let restrict : type a. R.t -> a value -> a value =
+  let act : type a. D.action -> a value -> a value =
     fun phi node ->
-      ref @@ {!node with queue = enqueue (Restrict phi) !node.queue}
-end
-
-module type Sort =
-sig
-  type t
-  type 'a m
-  val restrict : R.t -> t -> t m
-  val perm : P.t -> t -> t
+      ref @@ {!node with action = D.cmp phi !node.action}
 end
 
 module CanVal : Sort with type t = can value with type 'a m = 'a =
@@ -184,7 +231,6 @@ struct
   type 'a m = 'a
   type t = can value
 end
-
 
 module Abs :
 sig
@@ -198,71 +244,50 @@ struct
 
   let unleash abs =
     let x = Symbol.fresh () in
-    x, Val.perm (P.swap x abs.atom) abs.node
-
-  let perm pi abs =
-    {atom = P.lookup abs.atom pi;
-     node = Val.perm pi abs.node}
+    x, Val.act (D.swap x abs.atom) abs.node
 
   let bind atom node =
     {atom; node}
 
-  let restrict phi abs =
+  let act phi abs =
     let x, node = unleash abs in
-    bind x @@ Val.restrict phi node
+    bind x @@ Val.act phi node
 end
-
 
 module Face (X : Sort with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
-
-  val restrict : R.t -> 'x t -> [`Any] t
-  val perm : P.t -> 'x t -> 'x t
+  val act : D.action -> 'x t -> [`Any] t
 end =
 struct
   type 'x t = ('x, X.t) face
 
-  let restrict : type x. R.t -> x t -> _ t =
+  let act : type x. D.action -> x t -> _ t =
     fun phi face ->
       match face with
       | True (c, d, t) ->
-        True (Dim.restrict phi c, Dim.restrict phi d, X.restrict phi t)
+        True (D.act phi c, D.act phi d, X.act phi t)
       | False p ->
         False p
       | Indet (p, t) ->
-        let t' = X.restrict phi t in
-        match Star.restrict phi p with
+        let t' = X.act phi t in
+        match Star.act phi p with
         | `Ok p' ->
           Indet (p', t')
         | `Same (c, d) ->
           True (c, d, t')
-
-  let perm : type x. P.t -> x t -> x t =
-    fun pi face ->
-      match face with
-      | True (c, d, t) ->
-        True (Dim.perm pi c, Dim.perm pi d, X.perm pi t)
-      | False p ->
-        False (Star.perm pi p)
-      | Indet (p, t) ->
-        Indet (Star.perm pi p, X.perm pi t)
 end
 
 module ValFace = Face (CanVal)
 module AbsFace = Face (Abs)
-
 
 module Clo : Sort with type t = clo with type 'a m = 'a =
 struct
   type t = clo
   type 'a m = 'a
 
-  let perm pi clo =
-    {clo with queue = enqueue (Perm pi) clo.queue}
-
-  let restrict phi clo =
-    {clo with queue = enqueue (Restrict phi) clo.queue}
+  let act phi clo =
+    {clo with action = D.cmp phi clo.action}
 end
 
 module CompSys :
@@ -277,65 +302,35 @@ struct
 
   exception Proj of abs
 
-  let rec restrict_aux phi sys =
+  let rec act_aux phi sys =
     match sys with
     | [] -> []
     | face :: sys ->
-      match AbsFace.restrict phi face with
+      match AbsFace.act phi face with
       | True (_, _, abs) ->
         raise @@ Proj abs
       | False p ->
-        False p :: restrict_aux phi sys
+        False p :: act_aux phi sys
       | Indet (p, t) ->
-        Indet (p, t) :: restrict_aux phi sys
+        Indet (p, t) :: act_aux phi sys
 
-  let restrict phi sys =
-    try `Ok (restrict_aux phi sys)
+  let act phi sys =
+    try `Ok (act_aux phi sys)
     with
     | Proj abs ->
       `Proj abs
-
-  let perm pi =
-    List.map (AbsFace.perm pi)
 end
 
 
 module Con =
 struct
-  let perm : type a. P.t -> a con -> a con =
-    fun pi con ->
-      match con with
-      | Loop x ->
-        Loop (Gen.perm pi x)
-      | Base ->
-        con
-      | Coe info ->
-        let dir = Star.perm pi info.dir in
-        let abs = Abs.perm pi info.abs in
-        let el = Val.perm pi info.el in
-        Coe {dir; abs; el}
-      | HCom info ->
-        let dir = Star.perm pi info.dir in
-        let ty = Val.perm pi info.ty in
-        let cap = Val.perm pi info.ty in
-        let sys = List.map (AbsFace.perm pi) info.sys in
-        HCom {dir; ty; cap; sys}
-      | Pi info ->
-        let dom = Val.perm pi info.dom in
-        let cod = Clo.perm pi info.cod in
-        Pi {dom; cod}
-      | Bool ->
-        con
-      | Lam clo ->
-        Lam (Clo.perm pi clo)
-
-  let rec restrict : type a. R.t -> a con -> a step =
+  let rec act : type a. D.action -> a con -> a step =
     fun phi con ->
       match con with
       | Loop x ->
         ret @@
         begin
-          match Gen.restrict phi x with
+          match Gen.act phi x with
           | `Ok y -> Loop y
           | `Const _ -> Base
         end
@@ -343,6 +338,20 @@ struct
       | Base ->
         ret con
 
+      | _ -> failwith ""
+
+  and unleash : type a. a value -> a con =
+    fun node ->
+      match act !node.action !node.inner with
+      | `Ret con ->
+        node := {inner = con; action = D.idn};
+        con
+      | `Step t ->
+        let con = unleash t in
+        node := {inner = con; action = D.idn};
+        con
+
+  (*
       | Coe info ->
         make_coe
           (Star.restrict phi info.dir)
@@ -420,10 +429,11 @@ struct
 
   and eval_queue : type a. frame list -> a con -> a con =
     fun fs con ->
-      eval_stack (List.rev fs) con
+      eval_stack (List.rev fs) con *)
 
 end
 
+(*
 let rec eval_queue_dim fs c =
   eval_stack_dim (List.rev fs) c
 
@@ -496,3 +506,5 @@ and inst_clo clo varg =
   let Tm.B (_, tm) = clo.inner.tm in
   eval {clo with inner = {tm; rho = Val varg :: clo.inner.rho}}
 
+
+*)
