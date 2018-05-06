@@ -338,7 +338,26 @@ struct
       | Base ->
         ret con
 
-      | _ -> failwith ""
+      | Coe info ->
+        make_coe
+          (Star.act phi info.dir)
+          (lazy begin Abs.act phi info.abs end)
+          (lazy begin Val.act phi info.el end)
+
+      | HCom info ->
+        failwith ""
+
+      | Bool ->
+        ret con
+
+      | Lam clo ->
+        ret @@ Lam (Clo.act phi clo)
+
+      | Pi info ->
+        let dom = Val.act phi info.dom in
+        let cod = Clo.act phi info.cod in
+        ret @@ Pi {dom; cod}
+
 
   and unleash : type a. a value -> a con =
     fun node ->
@@ -350,27 +369,6 @@ struct
         let con = unleash t in
         node := {inner = con; action = D.idn};
         con
-
-  (*
-      | Coe info ->
-        make_coe
-          (Star.restrict phi info.dir)
-          (lazy begin Abs.restrict phi info.abs end)
-          (lazy begin Val.restrict phi info.el end)
-
-      | HCom info ->
-        failwith ""
-
-      | Bool ->
-        ret con
-
-      | Lam clo ->
-        ret @@ Lam (Clo.restrict phi clo)
-
-      | Pi info ->
-        let dom = Val.restrict phi info.dom in
-        let cod = Clo.restrict phi info.cod in
-        ret @@ Pi {dom; cod}
 
   and make_coe mdir abs el : can step =
     match mdir with
@@ -389,7 +387,7 @@ struct
         | `Proj abs ->
           let _, r' = Star.unleash dir in
           let x, el = Abs.unleash abs in
-          step @@ Val.restrict (Dim.equate_with r' (Dim.make @@ D.Named x)) el
+          step @@ Val.act (D.subst r' x) el
       end
     | `Same ->
       step @@ Lazy.force cap
@@ -406,61 +404,19 @@ struct
   and rigid_hcom dir ty cap sys : can step =
     failwith ""
 
-  and unleash : type a. a value -> a con =
-    fun node ->
-      let inner = eval_queue !node.queue !node.inner in
-      node := {inner; queue = []};
-      inner
-
-  and eval_stack : type a. frame list -> a con -> a con =
-    fun fs con ->
-      match fs with
-      | [] -> con
-      | f :: fs ->
-        eval_stack fs @@
-        match f with
-        | Restrict phi ->
-          begin
-            match restrict phi con with
-            | `Ret con -> con
-            | `Step node -> unleash node
-          end
-        | Perm pi -> perm pi con
-
-  and eval_queue : type a. frame list -> a con -> a con =
-    fun fs con ->
-      eval_stack (List.rev fs) con *)
-
 end
 
-(*
-let rec eval_queue_dim fs c =
-  eval_stack_dim (List.rev fs) c
-
-and eval_stack_dim fs c =
-  match fs with
-  | [] -> c
-  | f :: fs ->
-    eval_stack_dim fs @@
-    match f with
-    | Restrict phi ->
-      Dim.restrict phi c
-    | Perm pi ->
-      Dim.perm pi c
-
-
-let eval_dim (cfg : cfg) : Dim.t =
+let eval_dim (cfg : cfg) : D.t =
   match Tm.out cfg.inner.tm with
   | Tm.Dim0 ->
-    Dim.make D.Dim0
+    D.dim0
   | Tm.Dim1 ->
-    Dim.make D.Dim1
+    D.dim1
   | Tm.Var i ->
     begin
       match List.nth cfg.inner.rho i with
       | Atom x ->
-        eval_queue_dim cfg.queue @@
-        Dim.make (D.Named x)
+        D.act cfg.action @@ D.named x
       | _ ->
         failwith "eval_dim: expected atom in environment"
     end
@@ -505,6 +461,3 @@ and apply vfun varg =
 and inst_clo clo varg =
   let Tm.B (_, tm) = clo.inner.tm in
   eval {clo with inner = {tm; rho = Val varg :: clo.inner.rho}}
-
-
-*)
