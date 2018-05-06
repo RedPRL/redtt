@@ -99,32 +99,51 @@ type frame =
   | Restrict of R.t
   | Perm of P.t
 
+let enqueue f fs =
+  match f, fs with
+  | Restrict phi, Restrict phi' :: fs ->
+    Restrict (R.union phi phi') :: fs
+  | Perm pi, Perm pi' :: fs ->
+    Perm (P.cmp pi pi') :: fs
+  | _ ->
+    f::fs
+
+
 type _ con =
   | Loop : Gen.t -> can con
   | Base : can con
   | Coe : {dir : Star.t; abs : abs; el : can t} -> can con
   | Pi : {dom : can t; cod : clo} -> can con
+  | Lam : clo -> can con
   | Bool : can con
 
-and 'a cfg = {tm : 'a; rho : env; phi : R.t; pi : P.t}
-and clo = Tm.chk Tm.bnd cfg
-and env = can t list
+and 'a with_env = {tm : 'a; rho : env}
+and cfg = Tm.chk Tm.t with_env node
+and clo = Tm.chk Tm.t Tm.bnd with_env node
+and env_el = Val of can t | Atom of atom
+and env = env_el list
 
 and abs = {atom : atom; node : can t}
-and 'a node = {con : 'a con; queue : frame list}
-and 'a t = 'a node ref
+and 'a node = {inner : 'a; queue : frame list}
+and 'a t = 'a con node ref
 
+
+type 'a step = [`Ret of 'a con | `Step of 'a t]
+
+let ret v = `Ret v
+let step v = `Step v
 
 module Val =
 struct
-  let enqueue f fs =
-    match f, fs with
-    | Restrict phi, Restrict phi' :: fs ->
-      Restrict (R.union phi phi') :: fs
-    | Perm pi, Perm pi' :: fs ->
-      Perm (P.cmp pi pi') :: fs
-    | _ ->
-      f::fs
+
+  let into : type a. a con -> a t =
+    fun inner ->
+      ref @@ {inner; queue = []}
+
+  let from_step step =
+    match step with
+    | `Ret con -> into con
+    | `Step t -> t
 
   let perm : type a. P.t -> a t -> a t =
     fun pi node ->
@@ -157,14 +176,12 @@ end
 module Clo =
 struct
   let perm pi clo =
-    {clo with pi = P.cmp pi clo.pi}
+    {clo with queue = enqueue (Perm pi) clo.queue}
+
+  let restrict phi clo =
+    {clo with queue = enqueue (Restrict phi) clo.queue}
 end
 
-
-type 'a step = [`Ret of 'a con | `Step of 'a t]
-
-let ret v = `Ret v
-let step v = `Step v
 
 module Con =
 struct
@@ -186,6 +203,8 @@ struct
         Pi {dom; cod}
       | Bool ->
         con
+      | Lam clo ->
+        Lam (Clo.perm pi clo)
 
   let rec restrict : type a. R.t -> a con -> a step =
     fun phi con ->
@@ -198,13 +217,25 @@ struct
           | `Const _ -> Base
         end
 
+      | Base ->
+        ret con
+
       | Coe info ->
         make_coe
           (Star.restrict phi info.dir)
           (lazy begin Abs.restrict phi info.abs end)
           (lazy begin Val.restrict phi info.el end)
 
-      | _ -> failwith ""
+      | Bool ->
+        ret con
+
+      | Lam clo ->
+        ret @@ Lam (Clo.restrict phi clo)
+
+      | Pi info ->
+        let dom = Val.restrict phi info.dom in
+        let cod = Clo.restrict phi info.cod in
+        ret @@ Pi {dom; cod}
 
   and make_coe mdir abs el : can step =
     match mdir with
@@ -224,9 +255,9 @@ struct
 
   and unleash : type a. a t -> a con =
     fun node ->
-      let con = eval_queue !node.queue !node.con in
-      node := {con; queue = []};
-      con
+      let inner = eval_queue !node.queue !node.inner in
+      node := {inner; queue = []};
+      inner
 
   and eval_stack : type a. frame list -> a con -> a con =
     fun fs con ->
@@ -246,4 +277,77 @@ struct
   and eval_queue : type a. frame list -> a con -> a con =
     fun fs con ->
       eval_stack (List.rev fs) con
+
 end
+
+let rec eval_queue_dim fs c =
+  eval_stack_dim (List.rev fs) c
+and eval_stack_dim fs c =
+  match fs with
+  | [] -> c
+  | f :: fs ->
+    eval_stack_dim fs @@
+    match f with
+    | Restrict phi ->
+      Dim.restrict phi c
+    | Perm pi ->
+      Dim.perm pi c
+
+
+let eval_dim (cfg : cfg) : Dim.t =
+  match Tm.out cfg.inner.tm with
+  | Tm.Dim0 ->
+    Dim.make D.Dim0
+  | Tm.Dim1 ->
+    Dim.make D.Dim1
+  | Tm.Var i ->
+    begin
+      match List.nth cfg.inner.rho i with
+      | Atom x ->
+        eval_queue_dim cfg.queue @@
+        Dim.make (D.Named x)
+      | _ ->
+        failwith "eval_dim: expected atom in environment"
+    end
+  | _ ->
+    failwith "eval_dim"
+
+let set_tm tm cfg =
+  {cfg with inner = {cfg.inner with tm}}
+
+let rec eval (cfg : cfg) : can t =
+  match Tm.out cfg.inner.tm with
+  | Tm.Lam bnd ->
+    Val.into @@ Lam (set_tm bnd cfg)
+
+  | Tm.Coe info ->
+    Val.from_step @@
+    let r = eval_dim @@ set_tm info.dim0 cfg in
+    let r' = eval_dim @@ set_tm info.dim1 cfg in
+    let dir = Star.make r r' in
+    let abs = lazy (eval_abs info.ty cfg) in
+    let el = lazy (eval @@ set_tm info.tm cfg) in
+    Con.make_coe dir abs el
+
+  | _ ->
+    failwith ""
+
+and eval_abs bnd cfg =
+  let Tm.B (_, tm) = bnd in
+  let x = Symbol.fresh () in
+  let rho = Atom x :: cfg.inner.rho in
+  Abs.bind x @@ eval {cfg with inner = {tm; rho}}
+
+and apply vfun varg =
+  match Con.unleash vfun with
+  | Lam clo ->
+    inst_clo clo varg
+
+  | _ ->
+    failwith ""
+
+
+and inst_clo clo varg =
+  let Tm.B (_, tm) = clo.inner.tm in
+  eval {clo with inner = {tm; rho = Val varg :: clo.inner.rho}}
+
