@@ -64,3 +64,5 @@ let compare r r' t =
   let cr' = UF.find (P.read r' t.perm) t.classes in
   D.compare cr cr'
 
+let unleash r t =
+  canonize r t

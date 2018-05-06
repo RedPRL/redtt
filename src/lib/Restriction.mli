@@ -9,3 +9,5 @@ val union : t -> t -> t
 val perm : Permutation.t -> t -> t
 
 val compare : dim -> dim -> t -> DimVal.compare
+
+val unleash : dim -> t -> dim
