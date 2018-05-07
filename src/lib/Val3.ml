@@ -181,7 +181,7 @@ type neu = [`Neu]
 
 (* Even now, one potential issue with this algorithm is that I think substitution action
    still isn't a priori functorial for HCom. That is, suppose we first apply a substitution that makes
-   [r /= r'] but [|= xi_i]; this causes a face to be projected; then we do another substitution
+   [r /= r'] but [|= xi_k]; this causes a face to be projected; then we do another substitution
    that made [r = r'].  This is not the same as composing the substitutions and then running them,
    because that would cause the cap to be projected.
 
@@ -204,12 +204,12 @@ type _ con =
   | Lam : clo -> can con
   | Bool : can con
 
-and 'a with_env = {tm : 'a; rho : env}
 and (_, 'a) face =
   | False : Star.t -> ('x, 'a) face
   | True : D.t * D.t * 'a -> ([`Any], 'a) face
   | Indet : Star.t * 'a -> ('x, 'a) face
 
+and 'a with_env = {tm : 'a; rho : env}
 and cfg = Tm.chk Tm.t with_env node
 and clo = Tm.chk Tm.t Tm.bnd with_env node
 and env_el = Val of can value | Atom of atom
@@ -494,6 +494,11 @@ let rec eval (cfg : cfg) : can value =
     let cap = lazy (eval @@ set_tm info.cap cfg) in
     let sys = lazy (eval_abs_sys @@ set_tm info.sys cfg) in
     Con.make_hcom dir ty cap sys
+
+  | Tm.FunApp (t0, t1) ->
+    let v0 = eval @@ set_tm t0 cfg in
+    let v1 = eval @@ set_tm t1 cfg in
+    apply v0 v1
 
   | _ ->
     failwith ""
