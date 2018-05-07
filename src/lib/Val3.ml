@@ -189,10 +189,14 @@ and clo = Tm.chk Tm.t Tm.bnd with_env node
 and env_el = Val of can value | Atom of atom
 and env = env_el list
 
-and comp_sys = ([`Rigid], abs) face list
-and ext_sys = ([`Any], can value) face list
-and box_sys = ([`Rigid], can value) face list
-and cap_sys = ([`Rigid], can value) face list
+and rigid_abs_face = ([`Rigid], abs) face
+and val_face = ([`Any], can value) face
+and rigid_val_face = ([`Rigid], can value) face
+
+and comp_sys = rigid_abs_face list
+and ext_sys = val_face list
+and box_sys = rigid_val_face list
+and cap_sys = rigid_abs_face list
 
 and abs = {atom : atom; node : can value}
 and 'a node = {inner : 'a; action : D.action}
