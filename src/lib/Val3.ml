@@ -389,7 +389,7 @@ struct
           let x, el = Abs.unleash abs in
           step @@ Val.act (D.subst r' x) el
       end
-    | `Same ->
+    | `Same _ ->
       step @@ Lazy.force cap
 
   and rigid_coe dir abs el : can step =
@@ -399,10 +399,17 @@ struct
       ret @@ Coe {dir; abs; el}
     | Bool ->
       step el
-    | _ -> failwith ""
+    | _ ->
+      failwith "TODO"
 
   and rigid_hcom dir ty cap sys : can step =
-    failwith ""
+    match unleash ty with
+    | Pi _ ->
+      ret @@ HCom {dir; ty; cap; sys}
+    | Bool ->
+      step cap
+    | _ ->
+      failwith "TODO"
 
 end
 
@@ -426,6 +433,8 @@ let eval_dim (cfg : cfg) : D.t =
 let set_tm tm cfg =
   {cfg with inner = {cfg.inner with tm}}
 
+exception Proj of abs
+
 let rec eval (cfg : cfg) : can value =
   match Tm.out cfg.inner.tm with
   | Tm.Lam bnd ->
@@ -436,15 +445,65 @@ let rec eval (cfg : cfg) : can value =
     let r = eval_dim @@ set_tm info.dim0 cfg in
     let r' = eval_dim @@ set_tm info.dim1 cfg in
     let dir = Star.make r r' in
-    let abs = lazy (eval_abs info.ty cfg) in
+    let abs = lazy (eval_abs @@ set_tm info.ty cfg) in
     let el = lazy (eval @@ set_tm info.tm cfg) in
     Con.make_coe dir abs el
+
+  | Tm.HCom info ->
+    Val.from_step @@
+    let r = eval_dim @@ set_tm info.dim0 cfg in
+    let r' = eval_dim @@ set_tm info.dim1 cfg in
+    let dir = Star.make r r' in
+    let ty = lazy (eval @@ set_tm info.ty cfg) in
+    let cap = lazy (eval @@ set_tm info.cap cfg) in
+    let sys = lazy (eval_abs_sys @@ set_tm info.sys cfg) in
+    Con.make_hcom dir ty cap sys
 
   | _ ->
     failwith ""
 
-and eval_abs bnd cfg =
-  let Tm.B (_, tm) = bnd in
+and eval_abs_face cfg =
+  let tr, tr', obnd = cfg.inner.tm in
+  let r = eval_dim @@ set_tm tr cfg in
+  let r' = eval_dim @@ set_tm tr' cfg in
+  match Star.make r r' with
+  | `Ok xi ->
+    begin
+      match D.compare r r' with
+      | D.Apart ->
+        False xi
+      | _ ->
+        let bnd = Option.get_exn obnd in
+        let abs = lazy begin eval_abs @@ set_tm bnd cfg end in
+        Indet (xi, abs)
+    end
+  | `Same _ ->
+    let bnd = Option.get_exn obnd in
+    let abs = lazy begin eval_abs @@ set_tm bnd cfg end in
+    True (r, r', abs)
+
+and force_rigid_face face =
+  match face with
+  | True (_, _, abs) ->
+    raise @@ Proj (Lazy.force abs)
+  | False xi ->
+    False xi
+  | Indet (xi, abs) ->
+    Indet (xi, Lazy.force abs)
+
+and eval_abs_sys cfg =
+  try
+    let sys =
+      List.map
+        (fun x -> force_rigid_face @@ eval_abs_face @@ set_tm x cfg)
+        cfg.inner.tm
+    in `Ok sys
+  with
+  | Proj abs ->
+    `Proj abs
+
+and eval_abs cfg =
+  let Tm.B (_, tm) = cfg.inner.tm in
   let x = Symbol.fresh () in
   let rho = Atom x :: cfg.inner.rho in
   Abs.bind x @@ eval {cfg with inner = {tm; rho}}
