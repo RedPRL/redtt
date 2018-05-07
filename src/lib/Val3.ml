@@ -493,8 +493,13 @@ and eval_abs_face cfg =
         False xi
       | _ ->
         let bnd = Option.get_exn obnd in
-        (* Here, I should really be evaluating under a restriction, but I seem to have lost the ability to do that ;-) *)
-        let abs = lazy begin eval_abs {cfg with inner = {cfg.inner with tm = bnd}} end in
+        let abs =
+          lazy begin
+            eval_abs
+              {inner = {cfg.inner with tm = bnd};
+               action = D.cmp (D.equate r r') cfg.action}
+          end
+        in
         Indet (xi, abs)
     end
   | `Same _ ->
