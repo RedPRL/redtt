@@ -250,8 +250,10 @@ struct
     let x = Symbol.fresh () in
     x, Val.act (D.swap x abs.atom) abs.node
 
+  (* FYI: It may not be necessary to freshen here, depending on how substitution is implemented. *)
   let bind atom node =
-    {atom; node}
+    let x = Symbol.fresh () in
+    {atom = x; node = Val.act (D.swap x atom) node}
 
   let act phi abs =
     let x, node = unleash abs in
@@ -516,10 +518,39 @@ and eval_abs cfg =
   let rho = Atom x :: cfg.inner.rho in
   Abs.bind x @@ eval {cfg with inner = {tm; rho}}
 
+and out_pi v =
+  match Con.unleash v with
+  | Pi {dom; cod} -> dom, cod
+  | _ -> failwith "out_pi"
+
 and apply vfun varg =
   match Con.unleash vfun with
   | Lam clo ->
     inst_clo clo varg
+
+  | Coe info ->
+    Val.from_step @@
+    let r, r' = Star.unleash info.dir in
+    let x, tyx = Abs.unleash info.abs in
+    let domx, codx = out_pi tyx in
+    let abs =
+      Abs.bind x @@
+      inst_clo codx @@
+      Val.from_step @@
+      Con.make_coe
+        (Star.make r' (D.named x))
+        (lazy begin Abs.bind x domx end)
+        (lazy varg)
+    in
+    let el =
+      apply info.el @@
+      Val.from_step @@
+      Con.make_coe
+        (Star.make r' r)
+        (lazy begin Abs.bind x domx end)
+        (lazy varg)
+    in
+    Con.rigid_coe info.dir abs el
 
   | _ ->
     failwith ""
