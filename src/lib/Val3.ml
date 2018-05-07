@@ -345,7 +345,11 @@ struct
           (lazy begin Val.act phi info.el end)
 
       | HCom info ->
-        failwith ""
+        make_hcom
+          (Star.act phi info.dir)
+          (lazy begin Val.act phi info.ty end)
+          (lazy begin Val.act phi info.cap end)
+          (lazy begin CompSys.act phi info.sys end)
 
       | Bool ->
         ret con
