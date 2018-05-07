@@ -178,6 +178,23 @@ end
 type can = [`Can]
 type neu = [`Neu]
 
+
+(* Even now, one potential issue with this algorithm is that I think substitution action
+   still isn't a priori functorial for HCom. That is, suppose we first apply a substitution that makes
+   [r /= r'] but [|= xi_i]; this causes a face to be projected; then we do another substitution
+   that made [r = r'].  This is not the same as composing the substitutions and then running them,
+   because that would cause the cap to be projected.
+
+   However, these will be the same in the definitional equality if the term started off as well-typed.
+   So that seems like it is OK; the disadvantage is that there is no sense in which we can regard
+   ourselves as having defined a priori a presheaf of values---however, it will, for each type, induce a
+   presheaf of values.
+
+   As a side-remark, I was thinking that for the untyped case, it seems like one could implement a version
+   where substitution really did commute using a control effect: once we receive a substitution that causes the
+   cap to become available, we actually JUMP back to where we started and re-run everything against the cap
+   instead of the projected tube. Might be worth figuring out some day.
+*)
 type _ con =
   | Loop : Gen.t -> can con
   | Base : can con
