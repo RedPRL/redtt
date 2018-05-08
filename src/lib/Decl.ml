@@ -23,7 +23,7 @@ let to_inf decl =
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
     Tm.into @@ Tm.Down {ty; tm}
 
-
+(*
 let rec check_document cx decls =
   match decls with
   | [] ->
@@ -44,4 +44,4 @@ and check_decl cx decl =
     let nm = Some (decl_name decl) in
     let ppenv = LCx.ppenv cx in
     Format.fprintf Format.std_formatter "> %a@.@." (Tm.pp ppenv) inf;
-    LCx.def cx ~nm ty el
+    LCx.def cx ~nm ty el *)

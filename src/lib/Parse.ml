@@ -52,9 +52,9 @@ module Element = struct
   let handle lexbuf (I.Element (_state, _value, _start_pos, _end_pos)) : Message.t =
     let kind = Kind.ERROR in
     (* let details = begin match I.incoming_symbol state with
-      | I.N nonterminal -> Nonterminal.details nonterminal ~value
-      | I.T terminal -> Terminal.details terminal ~value
-    end in *)
+       | I.N nonterminal -> Nonterminal.details nonterminal ~value
+       | I.T terminal -> Terminal.details terminal ~value
+       end in *)
     let details _fmt () = () in
     Message.make lexbuf ~kind ~details
 end
@@ -66,8 +66,9 @@ let loop lexbuf tokens =
         go (I.resume checkpoint) ()
 
       | I.Accepted result ->
-        let doc = result ResEnv.init in
-        Lwt.return @@ Decl.check_document LCx.emp doc
+        let _doc = result ResEnv.init in
+        Lwt.return ()
+      (* Lwt.return @@ Decl.check_document LCx.emp doc *)
 
       | I.HandlingError env ->
         begin match I.top env with
