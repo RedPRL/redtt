@@ -162,10 +162,10 @@ inf:
       make_node $startpos $endpos @@
       Tm.If {mot = mot env; scrut = scrut env; tcase = tcase env; fcase = fcase env} }
 
-  | LPR; HCOM; dim0 = chk; dim1 = chk; ty = chk; cap = chk; sys = elist(tube(bind(chk))); RPR
+  | LPR; HCOM; r0 = chk; r1 = chk; ty = chk; cap = chk; sys = elist(tube(bind(chk))); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      Tm.HCom {dim0 = dim0 env; dim1 = dim1 env; ty = ty env; cap = cap env; sys = sys env} }
+      Tm.HCom {r = r0 env; r' = r1 env; ty = ty env; cap = cap env; sys = sys env} }
 
   | LPR; COLON_ANGLE; ty = chk; tm = chk; RPR
     { fun env ->

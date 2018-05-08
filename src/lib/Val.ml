@@ -24,11 +24,11 @@ type neu = [`Neu]
    instead of the projected tube. Might be worth figuring out some day.
 *)
 type _ con =
-  | Loop : Gen.t -> can con
-  | Base : can con
+  | Pi : {dom : can value; cod : clo} -> can con
+  | Sg : {dom : can value; cod : clo} -> can con
+  | Ext : (can value * ext_sys) Abstraction.abs -> can con
   | Coe : {dir : Star.t; abs : abs; el : can value} -> can con
   | HCom : {dir : Star.t; ty : can value; cap : can value; sys : comp_sys} -> can con
-  | Pi : {dom : can value; cod : clo} -> can con
   | Lam : clo -> can con
   | Bool : can con
 
@@ -133,16 +133,18 @@ struct
   let rec act : type a. D.action -> a con -> a step =
     fun phi con ->
       match con with
-      | Loop x ->
-        ret @@
-        begin
-          match Gen.act phi x with
-          | `Ok y -> Loop y
-          | `Const _ -> Base
-        end
+      | Pi info ->
+        let dom = Val.act phi info.dom in
+        let cod = Clo.act phi info.cod in
+        ret @@ Pi {dom; cod}
 
-      | Base ->
-        ret con
+      | Sg info ->
+        let dom = Val.act phi info.dom in
+        let cod = Clo.act phi info.cod in
+        ret @@ Sg {dom; cod}
+
+      | Ext _abs ->
+        failwith "TODO"
 
       | Coe info ->
         make_coe
@@ -163,10 +165,6 @@ struct
       | Lam clo ->
         ret @@ Lam (Clo.act phi clo)
 
-      | Pi info ->
-        let dom = Val.act phi info.dom in
-        let cod = Clo.act phi info.cod in
-        ret @@ Pi {dom; cod}
 
 
   and unleash : type a. a value -> a con =
@@ -247,13 +245,26 @@ exception Proj of abs
 
 let rec eval (cfg : cfg) : can value =
   match Tm.out cfg.inner.tm with
+  | Tm.Pi (dom, cod) ->
+    let dom = eval @@ set_tm dom cfg in
+    let cod = set_tm cod cfg in
+    Val.into @@ Pi {dom; cod}
+
+  | Tm.Sg (dom, cod) ->
+    let dom = eval @@ set_tm dom cfg in
+    let cod = set_tm cod cfg in
+    Val.into @@ Sg {dom; cod}
+
+  | Tm.Ext (Tm.B (_, (_cod, _sys))) ->
+    failwith "TODO"
+
   | Tm.Lam bnd ->
     Val.into @@ Lam (set_tm bnd cfg)
 
   | Tm.Coe info ->
     Val.from_step @@
-    let r = eval_dim @@ set_tm info.dim0 cfg in
-    let r' = eval_dim @@ set_tm info.dim1 cfg in
+    let r = eval_dim @@ set_tm info.r cfg in
+    let r' = eval_dim @@ set_tm info.r' cfg in
     let dir = Star.make r r' in
     let abs = lazy (eval_abs @@ set_tm info.ty cfg) in
     let el = lazy (eval @@ set_tm info.tm cfg) in
@@ -261,8 +272,8 @@ let rec eval (cfg : cfg) : can value =
 
   | Tm.HCom info ->
     Val.from_step @@
-    let r = eval_dim @@ set_tm info.dim0 cfg in
-    let r' = eval_dim @@ set_tm info.dim1 cfg in
+    let r = eval_dim @@ set_tm info.r cfg in
+    let r' = eval_dim @@ set_tm info.r' cfg in
     let dir = Star.make r r' in
     let ty = lazy (eval @@ set_tm info.ty cfg) in
     let cap = lazy (eval @@ set_tm info.cap cfg) in

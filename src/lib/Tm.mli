@@ -23,9 +23,10 @@ type _ f =
   | FunApp : inf t * chk t -> inf f
   | ExtApp : inf t * chk t -> inf f
   | Down : {ty : chk t; tm : chk t} -> inf f
-  | Coe : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; tm : chk t} -> inf f
-  | HCom : {dim0 : chk t; dim1 : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
-  | Com : {dim0 : chk t; dim1 : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f
+  | Coe : {r : chk t; r' : chk t; ty : chk t bnd; tm : chk t} -> inf f
+  | HCom : {r : chk t; r' : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
+  | FCom : {r : chk t; r' : chk t; cap : chk t; sys : chk t bnd system} -> inf f
+  | Com : {r : chk t; r' : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f
 
   | Up : inf t -> chk f
 
@@ -41,6 +42,8 @@ type _ f =
   | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
+  | ExtLam : chk t bnd -> chk f
+
   | Cons : chk t * chk t -> chk f
   | Dim0 : chk f
   | Dim1 : chk f
