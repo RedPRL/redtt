@@ -379,6 +379,9 @@ and rigid_coe dir abs el : can step =
   | FCom _info ->
     failwith "Coe in fcom, taste it!!"
 
+  | V _info ->
+    failwith "Coe in V, taste it!!!"
+
   | _ ->
     failwith "TODO: rigid_coe"
 
@@ -386,10 +389,19 @@ and rigid_hcom dir ty cap sys : can step =
   match unleash_can ty with
   | Pi _ ->
     ret @@ HCom {dir; ty; cap; sys}
+
   | Bool ->
     step cap
+
   | Univ _ ->
     ret @@ FCom {dir; cap; sys}
+
+  | FCom _info ->
+    failwith "hcom in fcom, taste it!!"
+
+  | V _info ->
+    failwith "hcom in V, taste it!!!"
+
   | _ ->
     failwith "TODO"
 
