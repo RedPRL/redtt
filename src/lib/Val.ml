@@ -127,6 +127,22 @@ struct
       `Proj abs
 end
 
+module ExtSys :
+sig
+  include Sort
+    with type t = ext_sys
+    with type 'a m = 'a
+end =
+struct
+  type t = ext_sys
+  type 'a m = 'a
+
+  let act phi =
+    List.map (ValFace.act phi)
+end
+
+module ExtAbs = Abstraction.M (Sort.Prod (CanVal) (ExtSys))
+
 
 module Con =
 struct
@@ -143,8 +159,9 @@ struct
         let cod = Clo.act phi info.cod in
         ret @@ Sg {dom; cod}
 
-      | Ext _abs ->
-        failwith "TODO"
+      | Ext abs ->
+        let abs' = ExtAbs.act phi abs in
+        ret @@ Ext abs'
 
       | Coe info ->
         make_coe
