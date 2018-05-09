@@ -6,23 +6,6 @@ module Gen = DimGeneric
 type can = [`Can]
 type neu = [`Neu]
 
-
-(* Even now, one potential issue with this algorithm is that I think substitution action
-   still isn't a priori functorial for HCom. That is, suppose we first apply a substitution that makes
-   [r /= r'] but [|= xi_k]; this causes a face to be projected; then we do another substitution
-   that made [r = r'].  This is not the same as composing the substitutions and then running them,
-   because that would cause the cap to be projected.
-
-   However, these will be the same in the definitional equality if the term started off as well-typed.
-   So that seems like it is OK; the disadvantage is that there is no sense in which we can regard
-   ourselves as having defined a priori a presheaf of values---however, it will, for each type, induce a
-   presheaf of values.
-
-   As a side-remark, I was thinking that for the untyped case, it seems like one could implement a version
-   where substitution really did commute using a control effect: once we receive a substitution that causes the
-   cap to become available, we actually JUMP back to where we started and re-run everything against the cap
-   instead of the projected tube. Might be worth figuring out some day.
-*)
 type _ con =
   | Pi : {dom : can value; cod : clo} -> can con
   | Sg : {dom : can value; cod : clo} -> can con
@@ -485,10 +468,17 @@ and eval_ext_abs cfg =
   let rho = Atom x :: cfg.inner.rho in
   ExtAbs.bind x (eval {cfg with inner = {tm; rho}}, eval_ext_sys {cfg with inner = {tm = sys; rho}})
 
-and out_pi v =
+and unleash_pi v =
   match unleash_can v with
   | Pi {dom; cod} -> dom, cod
-  | _ -> failwith "out_pi"
+  | _ -> failwith "unleash_pi"
+
+and unleash_ext v r =
+  match unleash_can v with
+  | Ext abs ->
+    ExtAbs.inst abs r
+  | _ ->
+    failwith "out_ext"
 
 and apply vfun varg =
   match unleash_can vfun with
@@ -501,7 +491,7 @@ and apply vfun varg =
       | `Step el ->
         apply el varg
       | `Neu neu ->
-        let _, cod = out_pi info.ty in
+        let _, cod = unleash_pi info.ty in
         let cod' = inst_clo cod varg in
         let app = Val.into @@ FunApp (Val.into neu, varg) in
         Val.into @@ Up {ty = cod'; neu = app}
@@ -511,7 +501,7 @@ and apply vfun varg =
     Val.from_step_can @@
     let r, r' = Star.unleash info.dir in
     let x, tyx = Abs.unleash info.abs in
-    let domx, codx = out_pi tyx in
+    let domx, codx = unleash_pi tyx in
     let abs =
       Abs.bind x @@
       inst_clo codx @@
@@ -545,20 +535,14 @@ and ext_apply vext r =
       | `Step el ->
         ext_apply el r
       | `Neu neu ->
+        let tyr, sysr = unleash_ext info.ty r in
         begin
-          match unleash_can info.ty with
-          | Ext abs ->
-            let tyr, sysr = ExtAbs.inst abs r in
-            begin
-              match List.map force_ext_face sysr with
-              | _ ->
-                let app = Val.into @@ ExtApp (Val.into neu, sysr, r) in
-                Val.into @@ Up {ty = tyr; neu = app}
-              | exception (ProjVal v) ->
-                v
-            end
+          match List.map force_ext_face sysr with
           | _ ->
-            failwith "ext_apply: expected extension type"
+            let app = Val.into @@ ExtApp (Val.into neu, sysr, r) in
+            Val.into @@ Up {ty = tyr; neu = app}
+          | exception (ProjVal v) ->
+            v
         end
     end
 
