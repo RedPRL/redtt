@@ -101,3 +101,13 @@ let rec act sigma r =
     Atom
       {atom = atom_swap (x, y) atm.atom;
        history = List.map (atom_swap (x, y)) atm.history}
+
+
+exception ExpectedAtom
+
+let atom r =
+  match r with
+  | Atom atm ->
+    atm.atom
+  | _ ->
+    raise ExpectedAtom

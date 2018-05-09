@@ -21,4 +21,7 @@ val swap : atom -> atom -> action
 val cmp : action -> action -> action
 val idn : action
 
+val atom : t -> atom
+exception ExpectedAtom
+
 val act : action -> t -> t

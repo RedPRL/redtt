@@ -32,6 +32,7 @@ type _ con =
   | ExtApp : neu value * ext_sys * D.t -> neu con
   | Car : neu value -> neu con
   | Cdr : neu value -> neu con
+  | VProj : {x : Gen.t; ty1 : can value; neu : neu value; func : can value} -> neu con
 
 and ('x, 'a) face = ('x, 'a) Face.face
 
@@ -225,6 +226,13 @@ let rec act : type a. D.action -> a con -> a step =
         (Val.act phi info.el0)
         (Val.act phi info.el1)
 
+    | VProj info ->
+      step @@
+      let mx = Gen.act phi info.x in
+      let el = Val.act phi @@ Val.into @@ Up {ty = info.ty1; neu = info.neu} in
+      let func = Val.act phi info.func in
+      vproj mx el func
+
     | Univ _ ->
       ret con
 
@@ -399,8 +407,8 @@ and rigid_coe dir abs el : can step =
     begin
       let r, r' = Star.unleash dir in
       let xty1 = Abs.bind x info.ty1 in
-      match D.unleash r with
-      | `Dim0 ->
+      match Gen.make r with
+      | `Const `Dim0 ->
         let el1 =
           Val.from_step @@
           rigid_coe dir xty1 @@
@@ -408,7 +416,7 @@ and rigid_coe dir abs el : can step =
         in
         make_vin (Gen.make r') el el1
 
-      | `Dim1 ->
+      | `Const `Dim1 ->
         let coe1r'el = Val.from_step @@ rigid_coe dir xty1 el in
         let el0 = car @@ apply (cdr @@ Val.act (D.subst r' x) info.equiv) coe1r'el in
         let el1 =
@@ -429,9 +437,36 @@ and rigid_coe dir abs el : can step =
         in
         make_vin (Gen.make r') (car el0) el1
 
-      | `Generic ->
-        (* TODO: case on whether info.x == x *)
-        failwith ""
+      | `Ok _ ->
+        begin
+          match D.compare (Gen.unleash info.x) (D.named x) with
+          | D.Same ->
+            failwith "This is the hard one"
+
+          | _ ->
+            let xty0 = Abs.bind x info.ty0 in
+            let el0 = Val.from_step @@ rigid_coe dir xty0 el in
+            let el1 =
+              let cap = rigid_vproj info.x el @@ car @@ Val.act (Dim.subst r x) info.equiv in
+              let sys =
+                let face0 =
+                  AbsFace.gen_const info.x `Dim0 @@
+                  Abs.bind x @@ apply (car info.equiv) @@
+                  Val.from_step @@ make_coe (Star.make r (D.named x)) xty0 el
+                in
+                let face1 =
+                  AbsFace.gen_const info.x `Dim1 @@
+                  Abs.bind x @@
+                  Val.from_step @@ make_coe (Star.make r (D.named x)) xty1 el
+                in
+                [face0; face1]
+              in
+              Val.from_step @@ rigid_com dir xty1 cap sys
+            in
+            ret @@ VIn {x = info.x; el0; el1}
+        end
+
+
     end
 
   | _ ->
@@ -659,7 +694,14 @@ and unleash_ext v r =
   | Ext abs ->
     ExtAbs.inst abs r
   | _ ->
-    failwith "out_ext"
+    failwith "unleash_ext"
+
+and unleash_v v =
+  match unleash_can v with
+  | V {x; ty0; ty1; equiv} ->
+    x, ty0, ty1, equiv
+  | _ ->
+    failwith "unleash_v"
 
 and apply vfun varg =
   match unleash_can vfun with
@@ -787,6 +829,25 @@ and ext_apply vext s =
     failwith "ext_apply"
 
 
+and vproj mgen el func : can value =
+  match mgen with
+  | `Ok x ->
+    rigid_vproj x el func
+  | `Const `Dim0 ->
+    apply func el
+  | `Const `Dim1 ->
+    el
+
+and rigid_vproj x el func : can value =
+  match unleash_can el with
+  | VIn info ->
+    (* Invariant: info.x == x, not well-typed otherwise *)
+    info.el1
+  | Up up ->
+    let _, _, ty1, _ = unleash_v up.ty in
+    let neu = Val.into @@ VProj {x; ty1; neu = up.neu; func} in
+    Val.into @@ Up {ty = ty1; neu}
+  | _ -> failwith "vproj"
 
 and car v =
   match unleash_can v with
@@ -886,7 +947,6 @@ and cdr v =
     rigid_com info.dir abs cap sys
 
   | _ -> failwith "TODO: cdr"
-
 
 and inst_clo clo varg =
   let Tm.B (_, tm) = clo.inner.tm in

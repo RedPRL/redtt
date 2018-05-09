@@ -11,5 +11,9 @@ module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
   val make : Dim.t -> Dim.t -> X.t -> ([`Any], X.t) face
+
+  (* convenience function for generating rigid faces x = ε *)
+  val gen_const : DimGeneric.t -> [`Dim0 | `Dim1] -> X.t -> ('x, X.t) face
+
   val act : Dim.action -> ('x, X.t) face -> [`Any] t
 end

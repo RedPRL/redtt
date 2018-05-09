@@ -34,6 +34,7 @@ module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
   val act : Dim.action -> 'x t -> [`Any] t
+  val gen_const : DimGeneric.t -> [`Dim0 | `Dim1] -> X.t -> ('x, X.t) face
   val make : Dim.t -> Dim.t -> X.t -> ([`Any], X.t) face
 end =
 struct
@@ -53,6 +54,22 @@ struct
         end
       | `Same _ ->
         True (r, r', a)
+
+  let gen_const : type x. DimGeneric.t -> [`Dim0 | `Dim1] -> X.t -> (x, X.t) face =
+    fun x eps a ->
+      let r =
+        match eps with
+        | `Dim0 -> Dim.dim0
+        | `Dim1 -> Dim.dim1
+      in
+      match make (DimGeneric.unleash x) r a with
+      | True (_, _, _) ->
+        failwith "Impossible"
+      | False p ->
+        False p
+      | Indet (p, a) ->
+        Indet (p, a)
+
 
   let act : type x. Dim.action -> x t -> _ t =
     fun phi face ->
