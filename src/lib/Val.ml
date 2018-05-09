@@ -224,12 +224,12 @@ let rec act : type a. D.action -> a con -> a step =
     | ExtApp (neu, sys, r) ->
       let sys' = ExtSys.act phi sys in
       begin
-        match ignore @@ List.map force_ext_face sys' with
-        | () ->
+        match force_ext_sys sys' with
+        | `Rigid ->
           let neu' = Val.act phi neu in
           let r' = Dim.act phi r in
           ret @@ ExtApp (neu', sys', r')
-        | exception (ProjVal v) ->
+        | `Proj v ->
           step_can v
       end
 
@@ -260,6 +260,14 @@ and force_ext_face (face : val_face) =
     Face.False xi
   | Face.Indet (xi, v) ->
     Face.Indet (xi, v)
+
+and force_ext_sys sys =
+  try
+    ignore @@ List.map force_ext_face sys;
+    `Rigid
+  with
+  | ProjVal v ->
+    `Proj v
 
 and unleash_can : type a. can value -> can con =
   fun node ->
@@ -521,6 +529,9 @@ and apply vfun varg =
     in
     rigid_coe info.dir abs el
 
+  | HCom _info ->
+    failwith ""
+
   | _ ->
     failwith ""
 
@@ -537,11 +548,11 @@ and ext_apply vext r =
       | `Neu neu ->
         let tyr, sysr = unleash_ext info.ty r in
         begin
-          match List.map force_ext_face sysr with
-          | _ ->
+          match force_ext_sys sysr with
+          | `Rigid ->
             let app = Val.into @@ ExtApp (Val.into neu, sysr, r) in
             Val.into @@ Up {ty = tyr; neu = app}
-          | exception (ProjVal v) ->
+          | `Proj v ->
             v
         end
     end
