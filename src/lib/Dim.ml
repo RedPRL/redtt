@@ -47,6 +47,12 @@ let equate r r' =
   | _ ->
     failwith "Inconsistent equation"
 
+let unleash r =
+  match r with
+  | Dim0 -> `Dim0
+  | Dim1 -> `Dim1
+  | _ -> `Generic
+
 let cmp sigma1 sigma0 =
   Cmp (sigma1, sigma0)
 

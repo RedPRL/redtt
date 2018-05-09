@@ -11,6 +11,8 @@ type compare =
 
 val compare : t -> t -> compare
 
+val unleash : t -> [`Dim0 | `Dim1 | `Generic ]
+
 
 type action
 val subst : t -> atom -> action

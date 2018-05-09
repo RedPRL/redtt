@@ -17,6 +17,7 @@ type _ con =
 
   | Univ : Lvl.t -> can con
   | V : {x : Gen.t; ty0 : can value; ty1 : can value; equiv : can value} -> can con
+  | VIn : {x : Gen.t; el0 : can value; el1 : can value} -> can con
 
   | Lam : clo -> can con
   | ExtLam : abs -> can con
@@ -218,6 +219,12 @@ let rec act : type a. D.action -> a con -> a step =
         (lazy begin Val.act phi info.ty1 end)
         (lazy begin Val.act phi info.equiv end)
 
+    | VIn info ->
+      make_vin
+        (Gen.act phi info.x)
+        (lazy begin Val.act phi info.el0 end)
+        (lazy begin Val.act phi info.el1 end)
+
     | Univ _ ->
       ret con
 
@@ -330,6 +337,15 @@ and make_v mgen ty0 ty1 equiv : can step =
   | `Const `Dim1 ->
     step @@ Lazy.force ty1
 
+and make_vin mgen el0 el1 : can step =
+  match mgen with
+  | `Ok x ->
+    ret @@ VIn {x; el0 = Lazy.force el0; el1 = Lazy.force el1}
+  | `Const `Dim0 ->
+    step @@ Lazy.force el0
+  | `Const `Dim1 ->
+    step @@ Lazy.force el0
+
 and make_coe mdir abs el : can step =
   match mdir with
   | `Ok dir ->
@@ -368,8 +384,8 @@ and make_fcom mdir cap msys : can step =
     step @@ Lazy.force cap
 
 and rigid_coe dir abs el : can step =
-  let _, ty = Abs.unleash abs in
-  match unleash_can ty with
+  let x, tyx = Abs.unleash abs in
+  match unleash_can tyx with
   | (Pi _ | Sg _ ) ->
     ret @@ Coe {dir; abs; el}
 
@@ -379,8 +395,28 @@ and rigid_coe dir abs el : can step =
   | FCom _info ->
     failwith "Coe in fcom, taste it!!"
 
-  | V _info ->
-    failwith "Coe in V, taste it!!!"
+  | V info ->
+    begin
+      let r, r' = Star.unleash dir in
+      match D.unleash r with
+      | `Dim0 ->
+        let el0 = lazy el in
+        let el1 =
+          lazy begin
+            Val.from_step @@
+            let xty1 = Abs.bind x info.ty1 in
+            rigid_coe dir xty1 @@
+            apply (car @@ Val.act (D.subst D.dim0 x) info.equiv) el
+          end
+        in
+        make_vin (Gen.make r') el0 el1
+
+      | `Dim1 ->
+        failwith "TODO"
+
+      | `Generic ->
+        failwith ""
+    end
 
   | _ ->
     failwith "TODO: rigid_coe"
@@ -422,7 +458,7 @@ and rigid_com dir abs cap (sys : comp_sys) : can step =
   in
   rigid_hcom dir ty capcoe syscoe
 
-let rec eval (cfg : cfg) : can value =
+and eval (cfg : cfg) : can value =
   match Tm.out cfg.inner.tm with
   | Tm.Var i ->
     begin
