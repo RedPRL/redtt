@@ -196,34 +196,34 @@ let rec act : type a. D.action -> a con -> a step =
     | Coe info ->
       make_coe
         (Star.act phi info.dir)
-        (lazy begin Abs.act phi info.abs end)
-        (lazy begin Val.act phi info.el end)
+        (Abs.act phi info.abs)
+        (Val.act phi info.el)
 
     | HCom info ->
       make_hcom
         (Star.act phi info.dir)
-        (lazy begin Val.act phi info.ty end)
-        (lazy begin Val.act phi info.cap end)
-        (lazy begin CompSys.act phi info.sys end)
+        (Val.act phi info.ty)
+        (Val.act phi info.cap)
+        (CompSys.act phi info.sys)
 
     | FCom info ->
       make_fcom
         (Star.act phi info.dir)
-        (lazy begin Val.act phi info.cap end)
-        (lazy begin CompSys.act phi info.sys end)
+        (Val.act phi info.cap)
+        (CompSys.act phi info.sys)
 
     | V info ->
       make_v
         (Gen.act phi info.x)
-        (lazy begin Val.act phi info.ty0 end)
-        (lazy begin Val.act phi info.ty1 end)
-        (lazy begin Val.act phi info.equiv end)
+        (Val.act phi info.ty0)
+        (Val.act phi info.ty1)
+        (Val.act phi info.equiv)
 
     | VIn info ->
       make_vin
         (Gen.act phi info.x)
-        (lazy begin Val.act phi info.el0 end)
-        (lazy begin Val.act phi info.el1 end)
+        (Val.act phi info.el0)
+        (Val.act phi info.el1)
 
     | Univ _ ->
       ret con
@@ -278,11 +278,11 @@ let rec act : type a. D.action -> a con -> a step =
 and force_abs_face face =
   match face with
   | Face.True (_, _, abs) ->
-    raise @@ ProjAbs (Lazy.force abs)
+    raise @@ ProjAbs abs
   | Face.False xi ->
     Face.False xi
   | Face.Indet (xi, abs) ->
-    Face.Indet (xi, Lazy.force abs)
+    Face.Indet (xi, abs)
 
 and force_ext_face (face : val_face) =
   match face with
@@ -331,57 +331,57 @@ and unleash_neu : neu value -> [`Neu of neu con | `Step of can value] =
 and make_v mgen ty0 ty1 equiv : can step =
   match mgen with
   | `Ok x ->
-    ret @@ V {x; ty0 = Lazy.force ty0; ty1 = Lazy.force ty1; equiv = Lazy.force equiv}
+    ret @@ V {x; ty0; ty1; equiv}
   | `Const `Dim0 ->
-    step @@ Lazy.force ty0
+    step ty0
   | `Const `Dim1 ->
-    step @@ Lazy.force ty1
+    step ty1
 
 and make_vin mgen el0 el1 : can step =
   match mgen with
   | `Ok x ->
-    ret @@ VIn {x; el0 = Lazy.force el0; el1 = Lazy.force el1}
+    ret @@ VIn {x; el0; el1}
   | `Const `Dim0 ->
-    step @@ Lazy.force el0
+    step el0
   | `Const `Dim1 ->
-    step @@ Lazy.force el0
+    step el0
 
 and make_coe mdir abs el : can step =
   match mdir with
   | `Ok dir ->
-    rigid_coe dir (Lazy.force abs) (Lazy.force el)
+    rigid_coe dir abs el
   | `Same _ ->
-    step @@ Lazy.force el
+    step el
 
 and make_hcom mdir ty cap msys : can step =
   match mdir with
   | `Ok dir ->
     begin
-      match Lazy.force msys with
+      match msys with
       | `Ok sys ->
-        rigid_hcom dir (Lazy.force ty) (Lazy.force cap) sys
+        rigid_hcom dir ty cap sys
       | `Proj abs ->
         let _, r' = Star.unleash dir in
         let x, el = Abs.unleash abs in
         step @@ Val.act (D.subst r' x) el
     end
   | `Same _ ->
-    step @@ Lazy.force cap
+    step cap
 
 and make_fcom mdir cap msys : can step =
   match mdir with
   | `Ok dir ->
     begin
-      match Lazy.force msys with
+      match msys with
       | `Ok sys ->
-        ret @@ FCom {dir; cap = Lazy.force cap; sys}
+        ret @@ FCom {dir; cap; sys}
       | `Proj abs ->
         let _, r' = Star.unleash dir in
         let x, el = Abs.unleash abs in
         step @@ Val.act (D.subst r' x) el
     end
   | `Same _ ->
-    step @@ Lazy.force cap
+    step cap
 
 and rigid_coe dir abs el : can step =
   let x, tyx = Abs.unleash abs in
@@ -398,21 +398,36 @@ and rigid_coe dir abs el : can step =
   | V info ->
     begin
       let r, r' = Star.unleash dir in
+      let xty1 = Abs.bind x info.ty1 in
       match D.unleash r with
       | `Dim0 ->
-        let el0 = lazy el in
         let el1 =
-          lazy begin
-            Val.from_step @@
-            let xty1 = Abs.bind x info.ty1 in
-            rigid_coe dir xty1 @@
-            apply (car @@ Val.act (D.subst D.dim0 x) info.equiv) el
-          end
+          Val.from_step @@
+          rigid_coe dir xty1 @@
+          apply (car @@ Val.act (D.subst D.dim0 x) info.equiv) el
         in
-        make_vin (Gen.make r') el0 el1
+        make_vin (Gen.make r') el el1
 
       | `Dim1 ->
-        failwith "TODO"
+        let coe1r'el = Val.from_step @@ rigid_coe dir xty1 el in
+        let el0 = car @@ apply (cdr @@ Val.act (D.subst r' x) info.equiv) coe1r'el in
+        let el1 =
+          Val.from_step @@
+          let ty1r' = Val.act (D.subst r' x) info.ty1 in
+          let cap = coe1r'el in
+          let sys =
+            force_abs_sys @@
+            let face0 =
+              AbsFace.make r' D.dim0 @@
+              let y = Symbol.fresh () in
+              Abs.bind y @@ ext_apply (cdr el0) @@ D.named y
+            in
+            let face1 = AbsFace.make r' D.dim1 @@ Abs.const coe1r'el in
+            [face0; face1]
+          in
+          make_hcom (Star.make D.dim1 D.dim0) ty1r' cap sys
+        in
+        make_vin (Gen.make r') (car el0) el1
 
       | `Generic ->
         failwith ""
@@ -452,7 +467,7 @@ and rigid_com dir abs cap (sys : comp_sys) : can step =
       let yi, vi = Abs.unleash absi in
       let y2r' = Star.make (D.named yi) (D.act phi r') in
       Abs.bind yi @@ Val.from_step @@
-      make_coe y2r' (lazy abs) (lazy vi)
+      make_coe y2r' abs vi
     in
     List.map face sys
   in
@@ -498,8 +513,8 @@ and eval (cfg : cfg) : can value =
     let r = eval_dim @@ set_tm info.r cfg in
     let r' = eval_dim @@ set_tm info.r' cfg in
     let dir = Star.make r r' in
-    let abs = lazy (eval_abs @@ set_tm info.ty cfg) in
-    let el = lazy (eval @@ set_tm info.tm cfg) in
+    let abs = eval_abs @@ set_tm info.ty cfg in
+    let el = eval @@ set_tm info.tm cfg in
     make_coe dir abs el
 
   | Tm.HCom info ->
@@ -507,9 +522,9 @@ and eval (cfg : cfg) : can value =
     let r = eval_dim @@ set_tm info.r cfg in
     let r' = eval_dim @@ set_tm info.r' cfg in
     let dir = Star.make r r' in
-    let ty = lazy (eval @@ set_tm info.ty cfg) in
-    let cap = lazy (eval @@ set_tm info.cap cfg) in
-    let sys = lazy (eval_abs_sys @@ set_tm info.sys cfg) in
+    let ty = eval @@ set_tm info.ty cfg in
+    let cap = eval @@ set_tm info.cap cfg in
+    let sys = eval_abs_sys @@ set_tm info.sys cfg in
     make_hcom dir ty cap sys
 
   | Tm.FCom info ->
@@ -517,8 +532,8 @@ and eval (cfg : cfg) : can value =
     let r = eval_dim @@ set_tm info.r cfg in
     let r' = eval_dim @@ set_tm info.r' cfg in
     let dir = Star.make r r' in
-    let cap = lazy (eval @@ set_tm info.cap cfg) in
-    let sys = lazy (eval_abs_sys @@ set_tm info.sys cfg) in
+    let cap = eval @@ set_tm info.cap cfg in
+    let sys = eval_abs_sys @@ set_tm info.sys cfg in
     make_fcom dir cap sys
 
   | Tm.FunApp (t0, t1) ->
@@ -565,17 +580,15 @@ and eval_abs_face cfg =
       | _ ->
         let bnd = Option.get_exn obnd in
         let abs =
-          lazy begin
-            eval_abs
-              {inner = {cfg.inner with tm = bnd};
-               action = D.cmp (D.equate r r') cfg.action}
-          end
+          eval_abs
+            {inner = {cfg.inner with tm = bnd};
+             action = D.cmp (D.equate r r') cfg.action}
         in
         Face.Indet (xi, abs)
     end
   | `Same _ ->
     let bnd = Option.get_exn obnd in
-    let abs = lazy begin eval_abs @@ set_tm bnd cfg end in
+    let abs = eval_abs @@ set_tm bnd cfg in
     Face.True (r, r', abs)
 
 and eval_abs_sys cfg =
@@ -675,16 +688,16 @@ and apply vfun varg =
       Val.from_step @@
       make_coe
         (Star.make r' (D.named x))
-        (lazy begin Abs.bind x domx end)
-        (lazy varg)
+        (Abs.bind x domx)
+        varg
     in
     let el =
       apply info.el @@
       Val.from_step @@
       make_coe
         (Star.make r' r)
-        (lazy begin Abs.bind x domx end)
-        (lazy varg)
+        (Abs.bind x domx)
+        varg
     in
     rigid_coe info.dir abs el
 
@@ -828,8 +841,8 @@ and cdr v =
         Val.from_step @@
         make_coe
           (Star.make r (D.named x))
-          (lazy begin Abs.bind x domx end)
-          (lazy begin car info.el end)
+          (Abs.bind x domx)
+          (car info.el)
       in
       Abs.bind x @@ inst_clo codx coerx
     in
@@ -843,21 +856,19 @@ and cdr v =
       let dom, cod = unleash_sg info.ty in
       let z = Symbol.fresh () in
       let sys =
-        lazy begin
-          let face =
-            Face.map @@ fun _ _ absi ->
-            let yi, vi = Abs.unleash absi in
-            Abs.bind yi @@ car vi
-          in
-          `Ok (List.map face info.sys)
-        end
+        let face =
+          Face.map @@ fun _ _ absi ->
+          let yi, vi = Abs.unleash absi in
+          Abs.bind yi @@ car vi
+        in
+        `Ok (List.map face info.sys)
       in
       let hcom =
         Val.from_step @@
         make_hcom
           (Star.make r (D.named z))
-          (lazy dom)
-          (lazy begin car info.cap end)
+          dom
+          (car info.cap)
           sys
       in
       Abs.bind z @@ inst_clo cod hcom

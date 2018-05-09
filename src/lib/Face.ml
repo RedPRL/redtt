@@ -34,9 +34,25 @@ module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
   val act : Dim.action -> 'x t -> [`Any] t
+  val make : Dim.t -> Dim.t -> X.t -> ([`Any], X.t) face
 end =
 struct
   type 'x t = ('x, X.t) face
+
+
+  let make : Dim.t -> Dim.t -> X.t -> ([`Any], X.t) face =
+    fun r r' a ->
+      match DimStar.make r r' with
+      | `Ok p ->
+        begin
+          match Dim.compare r r' with
+          | Dim.Apart ->
+            False p
+          | _ ->
+            Indet (p, X.act (Dim.equate r r') a)
+        end
+      | `Same _ ->
+        True (r, r', a)
 
   let act : type x. Dim.action -> x t -> _ t =
     fun phi face ->
