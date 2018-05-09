@@ -32,7 +32,9 @@ type _ con =
   | ExtApp : neu value * ext_sys * D.t -> neu con
   | Car : neu value -> neu con
   | Cdr : neu value -> neu con
-  | VProj : {x : Gen.t; ty1 : can value; neu : neu value; func : can value} -> neu con
+
+  (* Invariant: neu \in vty, vty is a V type *)
+  | VProj : {x : Gen.t; vty : can value; neu : neu value; func : can value} -> neu con
 
 and ('x, 'a) face = ('x, 'a) Face.face
 
@@ -229,7 +231,7 @@ let rec act : type a. D.action -> a con -> a step =
     | VProj info ->
       step @@
       let mx = Gen.act phi info.x in
-      let el = Val.act phi @@ Val.into @@ Up {ty = info.ty1; neu = info.neu} in
+      let el = Val.act phi @@ Val.into @@ Up {ty = info.vty; neu = info.neu} in
       let func = Val.act phi info.func in
       vproj mx el func
 
@@ -845,7 +847,7 @@ and rigid_vproj x el func : can value =
     info.el1
   | Up up ->
     let _, _, ty1, _ = unleash_v up.ty in
-    let neu = Val.into @@ VProj {x; ty1; neu = up.neu; func} in
+    let neu = Val.into @@ VProj {x; vty = up.ty; neu = up.neu; func} in
     Val.into @@ Up {ty = ty1; neu}
   | _ -> failwith "vproj"
 
