@@ -340,30 +340,22 @@ and rigid_hcom dir ty cap sys : can step =
   | _ ->
     failwith "TODO"
 
-and rigid_com dir abs cap sys : can step =
-  let r, r' = Star.unleash dir in
-  let ty = lazy begin Abs.inst abs r' end in
-  let capcoe = lazy begin Val.from_step @@ rigid_coe dir abs cap end in
-  let syscoe =
-    lazy begin
-      let face =
-        Face.map @@ fun ri r'i absi ->
-        lazy begin
-          let phi = D.equate ri r'i in
-          let yi, vi = Abs.unleash absi in
-          let y2r' = Star.make (D.named yi) (D.act phi r') in
-          Abs.bind yi @@ Val.from_step @@
-          make_coe y2r' (lazy abs) (lazy vi)
-        end
-      in
-      force_abs_sys @@ List.map face sys
-    end
+and rigid_com dir abs cap (sys : comp_sys) : can step =
+  let _, r' = Star.unleash dir in
+  let ty = Abs.inst abs r' in
+  let capcoe = Val.from_step @@ rigid_coe dir abs cap in
+  let syscoe : comp_sys =
+    let face =
+      Face.map @@ fun ri r'i absi ->
+      let phi = D.equate ri r'i in
+      let yi, vi = Abs.unleash absi in
+      let y2r' = Star.make (D.named yi) (D.act phi r') in
+      Abs.bind yi @@ Val.from_step @@
+      make_coe y2r' (lazy abs) (lazy vi)
+    in
+    List.map face sys
   in
-  make_hcom
-    (Star.make r r')
-    ty
-    capcoe
-    syscoe
+  rigid_hcom dir ty capcoe syscoe
 
 let rec eval (cfg : cfg) : can value =
   match Tm.out cfg.inner.tm with
@@ -687,7 +679,41 @@ and cdr v =
     rigid_coe info.dir abs el
 
   | HCom info ->
-    failwith "TODO: cdr/hcom"
+    Val.from_step @@
+    let abs =
+      let r, _ = Star.unleash info.dir in
+      let dom, cod = unleash_sg info.ty in
+      let z = Symbol.fresh () in
+      let sys =
+        lazy begin
+          let face =
+            Face.map @@ fun ri r'i absi ->
+            let yi, vi = Abs.unleash absi in
+            Abs.bind yi @@ car vi
+          in
+          `Ok (List.map face info.sys)
+        end
+      in
+      let hcom =
+        Val.from_step @@
+        make_hcom
+          (Star.make r (D.named z))
+          (lazy dom)
+          (lazy begin car info.cap end)
+          sys
+      in
+      Abs.bind z @@ inst_clo cod hcom
+    in
+    let cap = cdr info.cap in
+    let sys =
+      let face =
+        Face.map @@ fun ri r'i absi ->
+        let yi, vi = Abs.unleash absi in
+        Abs.bind yi @@ cdr vi
+      in
+      List.map face info.sys
+    in
+    rigid_com info.dir abs cap sys
 
   | _ -> failwith "TODO: cdr"
 
