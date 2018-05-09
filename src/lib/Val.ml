@@ -48,12 +48,10 @@ and 'a value = 'a con node ref
 
 type _ step =
   | Ret : 'a con -> 'a step
-  | StepCan : can value -> 'a step
-  | StepNeu : neu value -> neu step
+  | Step : can value -> 'a step
 
 let ret v = Ret v
-let step_neu v = StepNeu v
-let step_can v = StepCan v
+let step v = Step v
 
 module type Sort = Sort.S
 
@@ -63,11 +61,10 @@ struct
     fun inner ->
       ref @@ {inner; action = D.idn}
 
-  let from_step_can (step : can step) : can value =
+  let from_step (step : can step) : can value =
     match step with
     | Ret con -> into con
-    | StepCan t -> t
-
+    | Step t -> t
 
   let act : type a. D.action -> a value -> a value =
     fun phi node ->
@@ -230,7 +227,7 @@ let rec act : type a. D.action -> a con -> a step =
           let r' = Dim.act phi r in
           ret @@ ExtApp (neu', sys', r')
         | `Proj v ->
-          step_can v
+          step v
       end
 
 
@@ -275,7 +272,7 @@ and unleash_can : type a. can value -> can con =
     | Ret con ->
       node := {inner = con; action = D.idn};
       con
-    | StepCan t ->
+    | Step t ->
       let con = unleash_can t in
       node := {inner = con; action = D.idn};
       con
@@ -286,9 +283,7 @@ and unleash_neu : type a. neu value -> [`Neu of neu con | `Step of can value] =
     | Ret con ->
       node := {inner = con; action = D.idn};
       `Neu con
-    | StepNeu t ->
-      unleash_neu t
-    | StepCan t ->
+    | Step t ->
       `Step t
 
 and make_coe mdir abs el : can step =
@@ -296,7 +291,7 @@ and make_coe mdir abs el : can step =
   | `Ok dir ->
     rigid_coe dir (Lazy.force abs) (Lazy.force el)
   | `Same _ ->
-    step_can @@ Lazy.force el
+    step @@ Lazy.force el
 
 and make_hcom mdir ty cap msys : can step =
   match mdir with
@@ -308,10 +303,10 @@ and make_hcom mdir ty cap msys : can step =
       | `Proj abs ->
         let _, r' = Star.unleash dir in
         let x, el = Abs.unleash abs in
-        step_can @@ Val.act (D.subst r' x) el
+        step @@ Val.act (D.subst r' x) el
     end
   | `Same _ ->
-    step_can @@ Lazy.force cap
+    step @@ Lazy.force cap
 
 and rigid_coe dir abs el : can step =
   let _, ty = Abs.unleash abs in
@@ -319,7 +314,7 @@ and rigid_coe dir abs el : can step =
   | Pi _ ->
     ret @@ Coe {dir; abs; el}
   | Bool ->
-    step_can el
+    step el
   | _ ->
     failwith "TODO"
 
@@ -328,7 +323,7 @@ and rigid_hcom dir ty cap sys : can step =
   | Pi _ ->
     ret @@ HCom {dir; ty; cap; sys}
   | Bool ->
-    step_can cap
+    step cap
   | _ ->
     failwith "TODO"
 
@@ -363,7 +358,7 @@ let rec eval (cfg : cfg) : can value =
     Val.into @@ ExtLam abs
 
   | Tm.Coe info ->
-    Val.from_step_can @@
+    Val.from_step @@
     let r = eval_dim @@ set_tm info.r cfg in
     let r' = eval_dim @@ set_tm info.r' cfg in
     let dir = Star.make r r' in
@@ -372,7 +367,7 @@ let rec eval (cfg : cfg) : can value =
     make_coe dir abs el
 
   | Tm.HCom info ->
-    Val.from_step_can @@
+    Val.from_step @@
     let r = eval_dim @@ set_tm info.r cfg in
     let r' = eval_dim @@ set_tm info.r' cfg in
     let dir = Star.make r r' in
@@ -506,14 +501,14 @@ and apply vfun varg =
     end
 
   | Coe info ->
-    Val.from_step_can @@
+    Val.from_step @@
     let r, r' = Star.unleash info.dir in
     let x, tyx = Abs.unleash info.abs in
     let domx, codx = unleash_pi tyx in
     let abs =
       Abs.bind x @@
       inst_clo codx @@
-      Val.from_step_can @@
+      Val.from_step @@
       make_coe
         (Star.make r' (D.named x))
         (lazy begin Abs.bind x domx end)
@@ -521,7 +516,7 @@ and apply vfun varg =
     in
     let el =
       apply info.el @@
-      Val.from_step_can @@
+      Val.from_step @@
       make_coe
         (Star.make r' r)
         (lazy begin Abs.bind x domx end)
@@ -529,8 +524,18 @@ and apply vfun varg =
     in
     rigid_coe info.dir abs el
 
-  | HCom _info ->
-    failwith ""
+  | HCom info ->
+    let _, cod = unleash_pi info.ty in
+    let ty = inst_clo cod varg in
+    let cap = apply info.cap varg in
+    let app_face =
+      Face.map @@ fun r r' abs ->
+      let x, v = Abs.unleash abs in
+      Abs.bind x @@ apply v (Val.act (D.equate r r') v)
+    in
+    let sys = List.map app_face info.sys in
+    Val.from_step @@
+    rigid_hcom info.dir ty cap sys
 
   | _ ->
     failwith ""

@@ -3,6 +3,17 @@ type (_, 'a) face =
   | True : Dim.t * Dim.t * 'a -> ([`Any], 'a) face
   | Indet : DimStar.t * 'a -> ('x, 'a) face
 
+let map : type x. (Dim.t -> Dim.t -> 'a -> 'b) -> (x, 'a) face -> (x, 'b) face =
+  fun f face ->
+    match face with
+    | False p ->
+      False p
+    | True (r, r', v) ->
+      True (r, r', f r r' v)
+    | Indet (p, v) ->
+      let r, r' = DimStar.unleash p in
+      Indet (p, f r r' v)
+
 module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
