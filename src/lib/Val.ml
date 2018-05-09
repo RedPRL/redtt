@@ -26,11 +26,20 @@ type neu = [`Neu]
 type _ con =
   | Pi : {dom : can value; cod : clo} -> can con
   | Sg : {dom : can value; cod : clo} -> can con
-  | Ext : (can value * ext_sys) Abstraction.abs -> can con
+  | Ext : ext_abs -> can con
   | Coe : {dir : Star.t; abs : abs; el : can value} -> can con
   | HCom : {dir : Star.t; ty : can value; cap : can value; sys : comp_sys} -> can con
   | Lam : clo -> can con
+  | ExtLam : abs -> can con
+  | Cons : can value * can value -> can con
   | Bool : can con
+  | Tt : can con
+  | Ff : can con
+
+  | Up : {ty : can value; neu : neu value} -> can con
+  | Lvl : {ty : can value; lvl : int} -> neu con
+  | FunApp : neu value * can value -> neu con
+  | ExtApp : neu value * ext_sys * D.t -> neu con
 
 and ('x, 'a) face = ('x, 'a) Face.face
 
@@ -41,6 +50,7 @@ and env_el = Val of can value | Atom of atom
 and env = env_el list
 
 and abs = can value Abstraction.abs
+and ext_abs = (can value * ext_sys) Abstraction.abs
 and rigid_abs_face = ([`Rigid], abs) face
 and val_face = ([`Any], can value) face
 and rigid_val_face = ([`Rigid], can value) face
@@ -52,10 +62,15 @@ and cap_sys = rigid_abs_face list
 
 and 'a node = {inner : 'a; action : D.action}
 and 'a value = 'a con node ref
-type 'a step = [`Ret of 'a con | `Step of 'a value]
 
-let ret v = `Ret v
-let step v = `Step v
+type _ step =
+  | Ret : 'a con -> 'a step
+  | StepCan : can value -> 'a step
+  | StepNeu : neu value -> neu step
+
+let ret v = Ret v
+let step_neu v = StepNeu v
+let step_can v = StepCan v
 
 module type Sort = Sort.S
 
@@ -65,10 +80,11 @@ struct
     fun inner ->
       ref @@ {inner; action = D.idn}
 
-  let from_step step =
+  let from_step_can (step : can step) : can value =
     match step with
-    | `Ret con -> into con
-    | `Step t -> t
+    | Ret con -> into con
+    | StepCan t -> t
+
 
   let act : type a. D.action -> a value -> a value =
     fun phi node ->
@@ -143,100 +159,12 @@ end
 
 module ExtAbs = Abstraction.M (Sort.Prod (CanVal) (ExtSys))
 
+let set_tm tm cfg =
+  {cfg with inner = {cfg.inner with tm}}
 
-module Con =
-struct
-  let rec act : type a. D.action -> a con -> a step =
-    fun phi con ->
-      match con with
-      | Pi info ->
-        let dom = Val.act phi info.dom in
-        let cod = Clo.act phi info.cod in
-        ret @@ Pi {dom; cod}
+exception ProjAbs of abs
+exception ProjVal of can value
 
-      | Sg info ->
-        let dom = Val.act phi info.dom in
-        let cod = Clo.act phi info.cod in
-        ret @@ Sg {dom; cod}
-
-      | Ext abs ->
-        let abs' = ExtAbs.act phi abs in
-        ret @@ Ext abs'
-
-      | Coe info ->
-        make_coe
-          (Star.act phi info.dir)
-          (lazy begin Abs.act phi info.abs end)
-          (lazy begin Val.act phi info.el end)
-
-      | HCom info ->
-        make_hcom
-          (Star.act phi info.dir)
-          (lazy begin Val.act phi info.ty end)
-          (lazy begin Val.act phi info.cap end)
-          (lazy begin CompSys.act phi info.sys end)
-
-      | Bool ->
-        ret con
-
-      | Lam clo ->
-        ret @@ Lam (Clo.act phi clo)
-
-
-
-  and unleash : type a. a value -> a con =
-    fun node ->
-      match act !node.action !node.inner with
-      | `Ret con ->
-        node := {inner = con; action = D.idn};
-        con
-      | `Step t ->
-        let con = unleash t in
-        node := {inner = con; action = D.idn};
-        con
-
-  and make_coe mdir abs el : can step =
-    match mdir with
-    | `Ok dir ->
-      rigid_coe dir (Lazy.force abs) (Lazy.force el)
-    | `Same _ ->
-      step @@ Lazy.force el
-
-  and make_hcom mdir ty cap msys : can step =
-    match mdir with
-    | `Ok dir ->
-      begin
-        match Lazy.force msys with
-        | `Ok sys ->
-          rigid_hcom dir (Lazy.force ty) (Lazy.force cap) sys
-        | `Proj abs ->
-          let _, r' = Star.unleash dir in
-          let x, el = Abs.unleash abs in
-          step @@ Val.act (D.subst r' x) el
-      end
-    | `Same _ ->
-      step @@ Lazy.force cap
-
-  and rigid_coe dir abs el : can step =
-    let _, ty = Abs.unleash abs in
-    match unleash ty with
-    | Pi _ ->
-      ret @@ Coe {dir; abs; el}
-    | Bool ->
-      step el
-    | _ ->
-      failwith "TODO"
-
-  and rigid_hcom dir ty cap sys : can step =
-    match unleash ty with
-    | Pi _ ->
-      ret @@ HCom {dir; ty; cap; sys}
-    | Bool ->
-      step cap
-    | _ ->
-      failwith "TODO"
-
-end
 
 let eval_dim (cfg : cfg) : D.t =
   match Tm.out cfg.inner.tm with
@@ -248,20 +176,180 @@ let eval_dim (cfg : cfg) : D.t =
     begin
       match List.nth cfg.inner.rho i with
       | Atom x ->
-        D.act cfg.action @@ D.named x
+        D.named x
+      (* D.act cfg.action @@ D.named x *)
+      (* TODO: should I do this here? I think not, but I'm not sure. *)
       | _ ->
         failwith "eval_dim: expected atom in environment"
     end
   | _ ->
     failwith "eval_dim"
 
-let set_tm tm cfg =
-  {cfg with inner = {cfg.inner with tm}}
 
-exception Proj of abs
+
+let rec act : type a. D.action -> a con -> a step =
+  fun phi (con : a con) ->
+    match con with
+    | Pi info ->
+      let dom = Val.act phi info.dom in
+      let cod = Clo.act phi info.cod in
+      ret @@ Pi {dom; cod}
+
+    | Sg info ->
+      let dom = Val.act phi info.dom in
+      let cod = Clo.act phi info.cod in
+      ret @@ Sg {dom; cod}
+
+    | Ext abs ->
+      let abs' = ExtAbs.act phi abs in
+      ret @@ Ext abs'
+
+    | Coe info ->
+      make_coe
+        (Star.act phi info.dir)
+        (lazy begin Abs.act phi info.abs end)
+        (lazy begin Val.act phi info.el end)
+
+    | HCom info ->
+      make_hcom
+        (Star.act phi info.dir)
+        (lazy begin Val.act phi info.ty end)
+        (lazy begin Val.act phi info.cap end)
+        (lazy begin CompSys.act phi info.sys end)
+
+    | Bool ->
+      ret con
+
+    | Tt ->
+      ret con
+
+    | Ff ->
+      ret con
+
+    | Lam clo ->
+      ret @@ Lam (Clo.act phi clo)
+
+    | ExtLam abs ->
+      ret @@ ExtLam (Abs.act phi abs)
+
+    | Cons (v0, v1) ->
+      ret @@ Cons (Val.act phi v0, Val.act phi v1)
+
+    | FunApp (neu, arg) ->
+      ret @@ FunApp (Val.act phi neu, Val.act phi arg)
+
+    | ExtApp (neu, sys, r) ->
+      let sys' = ExtSys.act phi sys in
+      begin
+        match ignore @@ List.map force_ext_face sys' with
+        | () ->
+          let neu' = Val.act phi neu in
+          let r' = Dim.act phi r in
+          ret @@ ExtApp (neu', sys', r')
+        | exception (ProjVal v) ->
+          step_can v
+      end
+
+
+    | Lvl info ->
+      let ty = Val.act phi info.ty in
+      ret @@ Lvl {info with ty}
+
+    | Up info ->
+      let ty = Val.act phi info.ty in
+      let neu = Val.act phi info.neu in
+      ret @@ Up {ty; neu}
+
+and force_abs_face face =
+  match face with
+  | Face.True (_, _, abs) ->
+    raise @@ ProjAbs (Lazy.force abs)
+  | Face.False xi ->
+    Face.False xi
+  | Face.Indet (xi, abs) ->
+    Face.Indet (xi, Lazy.force abs)
+
+and force_ext_face (face : val_face) =
+  match face with
+  | Face.True (_, _, v) ->
+    raise @@ ProjVal v
+  | Face.False xi ->
+    Face.False xi
+  | Face.Indet (xi, v) ->
+    Face.Indet (xi, v)
+
+and unleash_can : type a. can value -> can con =
+  fun node ->
+    match act !node.action !node.inner with
+    | Ret con ->
+      node := {inner = con; action = D.idn};
+      con
+    | StepCan t ->
+      let con = unleash_can t in
+      node := {inner = con; action = D.idn};
+      con
+
+and unleash_neu : type a. neu value -> [`Neu of neu con | `Step of can value] =
+  fun node ->
+    match act !node.action !node.inner with
+    | Ret con ->
+      node := {inner = con; action = D.idn};
+      `Neu con
+    | StepNeu t ->
+      unleash_neu t
+    | StepCan t ->
+      `Step t
+
+and make_coe mdir abs el : can step =
+  match mdir with
+  | `Ok dir ->
+    rigid_coe dir (Lazy.force abs) (Lazy.force el)
+  | `Same _ ->
+    step_can @@ Lazy.force el
+
+and make_hcom mdir ty cap msys : can step =
+  match mdir with
+  | `Ok dir ->
+    begin
+      match Lazy.force msys with
+      | `Ok sys ->
+        rigid_hcom dir (Lazy.force ty) (Lazy.force cap) sys
+      | `Proj abs ->
+        let _, r' = Star.unleash dir in
+        let x, el = Abs.unleash abs in
+        step_can @@ Val.act (D.subst r' x) el
+    end
+  | `Same _ ->
+    step_can @@ Lazy.force cap
+
+and rigid_coe dir abs el : can step =
+  let _, ty = Abs.unleash abs in
+  match unleash_can ty with
+  | Pi _ ->
+    ret @@ Coe {dir; abs; el}
+  | Bool ->
+    step_can el
+  | _ ->
+    failwith "TODO"
+
+and rigid_hcom dir ty cap sys : can step =
+  match unleash_can ty with
+  | Pi _ ->
+    ret @@ HCom {dir; ty; cap; sys}
+  | Bool ->
+    step_can cap
+  | _ ->
+    failwith "TODO"
 
 let rec eval (cfg : cfg) : can value =
   match Tm.out cfg.inner.tm with
+  | Tm.Var i ->
+    begin
+      match List.nth cfg.inner.rho i with
+      | Val v -> v
+      | _ -> failwith "Expected value in environment"
+    end
+
   | Tm.Pi (dom, cod) ->
     let dom = eval @@ set_tm dom cfg in
     let cod = set_tm cod cfg in
@@ -279,29 +367,42 @@ let rec eval (cfg : cfg) : can value =
   | Tm.Lam bnd ->
     Val.into @@ Lam (set_tm bnd cfg)
 
+  | Tm.ExtLam bnd ->
+    let abs = eval_abs @@ set_tm bnd cfg in
+    Val.into @@ ExtLam abs
+
   | Tm.Coe info ->
-    Val.from_step @@
+    Val.from_step_can @@
     let r = eval_dim @@ set_tm info.r cfg in
     let r' = eval_dim @@ set_tm info.r' cfg in
     let dir = Star.make r r' in
     let abs = lazy (eval_abs @@ set_tm info.ty cfg) in
     let el = lazy (eval @@ set_tm info.tm cfg) in
-    Con.make_coe dir abs el
+    make_coe dir abs el
 
   | Tm.HCom info ->
-    Val.from_step @@
+    Val.from_step_can @@
     let r = eval_dim @@ set_tm info.r cfg in
     let r' = eval_dim @@ set_tm info.r' cfg in
     let dir = Star.make r r' in
     let ty = lazy (eval @@ set_tm info.ty cfg) in
     let cap = lazy (eval @@ set_tm info.cap cfg) in
     let sys = lazy (eval_abs_sys @@ set_tm info.sys cfg) in
-    Con.make_hcom dir ty cap sys
+    make_hcom dir ty cap sys
 
   | Tm.FunApp (t0, t1) ->
     let v0 = eval @@ set_tm t0 cfg in
     let v1 = eval @@ set_tm t1 cfg in
     apply v0 v1
+
+  | Tm.Bool ->
+    Val.into Bool
+
+  | Tm.Tt ->
+    Val.into Tt
+
+  | Tm.Ff ->
+    Val.into Ff
 
   | _ ->
     failwith ""
@@ -332,24 +433,15 @@ and eval_abs_face cfg =
     let abs = lazy begin eval_abs @@ set_tm bnd cfg end in
     Face.True (r, r', abs)
 
-and force_rigid_face face =
-  match face with
-  | Face.True (_, _, abs) ->
-    raise @@ Proj (Lazy.force abs)
-  | Face.False xi ->
-    Face.False xi
-  | Face.Indet (xi, abs) ->
-    Face.Indet (xi, Lazy.force abs)
-
 and eval_abs_sys cfg =
   try
     let sys =
       List.map
-        (fun x -> force_rigid_face @@ eval_abs_face @@ set_tm x cfg)
+        (fun x -> force_abs_face @@ eval_abs_face @@ set_tm x cfg)
         cfg.inner.tm
     in `Ok sys
   with
-  | Proj abs ->
+  | ProjAbs abs ->
     `Proj abs
 
 and eval_ext_face cfg : val_face =
@@ -394,41 +486,83 @@ and eval_ext_abs cfg =
   ExtAbs.bind x (eval {cfg with inner = {tm; rho}}, eval_ext_sys {cfg with inner = {tm = sys; rho}})
 
 and out_pi v =
-  match Con.unleash v with
+  match unleash_can v with
   | Pi {dom; cod} -> dom, cod
   | _ -> failwith "out_pi"
 
 and apply vfun varg =
-  match Con.unleash vfun with
+  match unleash_can vfun with
   | Lam clo ->
     inst_clo clo varg
 
+  | Up info ->
+    begin
+      match unleash_neu info.neu with
+      | `Step el ->
+        apply el varg
+      | `Neu neu ->
+        let _, cod = out_pi info.ty in
+        let cod' = inst_clo cod varg in
+        let app = Val.into @@ FunApp (Val.into neu, varg) in
+        Val.into @@ Up {ty = cod'; neu = app}
+    end
+
   | Coe info ->
-    Val.from_step @@
+    Val.from_step_can @@
     let r, r' = Star.unleash info.dir in
     let x, tyx = Abs.unleash info.abs in
     let domx, codx = out_pi tyx in
     let abs =
       Abs.bind x @@
       inst_clo codx @@
-      Val.from_step @@
-      Con.make_coe
+      Val.from_step_can @@
+      make_coe
         (Star.make r' (D.named x))
         (lazy begin Abs.bind x domx end)
         (lazy varg)
     in
     let el =
       apply info.el @@
-      Val.from_step @@
-      Con.make_coe
+      Val.from_step_can @@
+      make_coe
         (Star.make r' r)
         (lazy begin Abs.bind x domx end)
         (lazy varg)
     in
-    Con.rigid_coe info.dir abs el
+    rigid_coe info.dir abs el
 
   | _ ->
     failwith ""
+
+and ext_apply vext r =
+  match unleash_can vext with
+  | ExtLam abs ->
+    Abs.inst abs r
+
+  | Up info ->
+    begin
+      match unleash_neu info.neu with
+      | `Step el ->
+        ext_apply el r
+      | `Neu neu ->
+        begin
+          match unleash_can info.ty with
+          | Ext abs ->
+            let tyr, sysr = ExtAbs.inst abs r in
+            begin
+              match List.map force_ext_face sysr with
+              | _ ->
+                let app = Val.into @@ ExtApp (Val.into neu, sysr, r) in
+                Val.into @@ Up {ty = tyr; neu = app}
+              | exception (ProjVal v) ->
+                v
+            end
+          | _ ->
+            failwith "ext_apply: expected extension type"
+        end
+    end
+
+  | _ -> failwith ""
 
 
 and inst_clo clo varg =

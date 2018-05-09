@@ -8,6 +8,7 @@ sig
   include Sort.S with type 'a m = 'a with type t = X.t abs
   val bind : atom -> X.t -> t
   val unleash : t -> atom * X.t
+  val inst : t -> Dim.t -> X.t
 end =
 struct
   type 'a m = 'a
@@ -16,6 +17,9 @@ struct
   let unleash abs =
     let x = Symbol.fresh () in
     x, X.act (D.swap x abs.atom) abs.node
+
+  let inst abs r =
+    X.act (D.subst r abs.atom) abs.node
 
   (* FYI: It may not be necessary to freshen here, depending on how substitution is implemented. *)
   let bind atom node =
