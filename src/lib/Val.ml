@@ -272,8 +272,8 @@ let rec eval (cfg : cfg) : can value =
     let cod = set_tm cod cfg in
     Val.into @@ Sg {dom; cod}
 
-  | Tm.Ext (Tm.B (_, (_cod, _sys))) ->
-    let abs = failwith "TODO" in
+  | Tm.Ext bnd ->
+    let abs = eval_ext_abs @@ set_tm bnd cfg in
     Val.into @@ Ext abs
 
   | Tm.Lam bnd ->
@@ -352,7 +352,7 @@ and eval_abs_sys cfg =
   | Proj abs ->
     `Proj abs
 
-and eval_ext_face cfg =
+and eval_ext_face cfg : val_face =
   let tr, tr', otm = cfg.inner.tm in
   let r = eval_dim @@ set_tm tr cfg in
   let r' = eval_dim @@ set_tm tr' cfg in
@@ -365,27 +365,33 @@ and eval_ext_face cfg =
       | _ ->
         let tm = Option.get_exn otm in
         let el =
-          lazy begin
-            eval
-              {inner = {cfg.inner with tm};
-               action = D.cmp (D.equate r r') cfg.action}
-          end
+          eval
+            {inner = {cfg.inner with tm};
+             action = D.cmp (D.equate r r') cfg.action}
         in
         Face.Indet (xi, el)
     end
   | `Same _ ->
     let tm = Option.get_exn otm in
-    let el = lazy begin eval @@ set_tm tm cfg end in
+    let el = eval @@ set_tm tm cfg in
     Face.True (r, r', el)
 
-and eval_ext_sys (sys : Tm.chk Tm.t Tm.system with_env node) =
-  List.map (fun x -> eval_ext_face @@ set_tm x sys) sys.inner.tm
+and eval_ext_sys (sys : Tm.chk Tm.t Tm.system with_env node) : ext_sys =
+  List.map
+    (fun x -> eval_ext_face @@ set_tm x sys)
+    sys.inner.tm
 
 and eval_abs cfg =
   let Tm.B (_, tm) = cfg.inner.tm in
   let x = Symbol.fresh () in
   let rho = Atom x :: cfg.inner.rho in
   Abs.bind x @@ eval {cfg with inner = {tm; rho}}
+
+and eval_ext_abs cfg =
+  let Tm.B (_, (tm, sys)) = cfg.inner.tm in
+  let x = Symbol.fresh () in
+  let rho = Atom x :: cfg.inner.rho in
+  ExtAbs.bind x (eval {cfg with inner = {tm; rho}}, eval_ext_sys {cfg with inner = {tm = sys; rho}})
 
 and out_pi v =
   match Con.unleash v with
