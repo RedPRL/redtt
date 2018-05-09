@@ -637,7 +637,22 @@ and cdr v =
     v1
 
   | Coe info ->
-    failwith "TODO: cdr/coe"
+    Val.from_step @@
+    let abs =
+      let x, tyx = Abs.unleash info.abs in
+      let domx, codx = unleash_sg tyx in
+      let r, _ = Star.unleash info.dir in
+      let coerx =
+        Val.from_step @@
+        make_coe
+          (Star.make r (D.named x))
+          (lazy begin Abs.bind x domx end)
+          (lazy begin car info.el end)
+      in
+      Abs.bind x @@ inst_clo codx coerx
+    in
+    let el = cdr info.el in
+    rigid_coe info.dir abs el
 
   | HCom info ->
     failwith "TODO: cdr/hcom"
