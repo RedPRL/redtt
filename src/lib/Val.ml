@@ -224,7 +224,7 @@ let rec act : type a. D.action -> a con -> a step =
       let sys' = ExtSys.act phi sys in
       begin
         match force_ext_sys sys' with
-        | `Rigid ->
+        | `Rigid _ ->
           let neu' = Val.act phi neu in
           let r' = Dim.act phi r in
           ret @@ ExtApp (neu', sys', r')
@@ -266,8 +266,7 @@ and force_ext_face (face : val_face) =
 
 and force_ext_sys sys =
   try
-    ignore @@ List.map force_ext_face sys;
-    `Rigid
+    `Rigid (List.map force_ext_face sys)
   with
   | ProjVal v ->
     `Proj v
@@ -591,26 +590,45 @@ and apply vfun varg =
   | _ ->
     failwith "apply"
 
-and ext_apply vext r =
+and ext_apply vext s =
   match unleash_can vext with
   | ExtLam abs ->
-    Abs.inst abs r
+    Abs.inst abs s
 
   | Up info ->
     begin
       match unleash_neu info.neu with
       | `Step el ->
-        ext_apply el r
+        ext_apply el s
       | `Neu neu ->
-        let tyr, sysr = unleash_ext info.ty r in
+        let tyr, sysr = unleash_ext info.ty s in
         begin
           match force_ext_sys sysr with
-          | `Rigid ->
-            let app = Val.into @@ ExtApp (Val.into neu, sysr, r) in
+          | `Rigid _ ->
+            let app = Val.into @@ ExtApp (Val.into neu, sysr, s) in
             Val.into @@ Up {ty = tyr; neu = app}
           | `Proj v ->
             v
         end
+    end
+
+  | Coe _info ->
+    failwith "TODO: ext_apply/coe"
+
+  | HCom info ->
+    let ty_s, sys_s = unleash_ext info.ty s in
+    begin
+      match force_ext_sys sys_s with
+      | `Proj v ->
+        v
+      | `Rigid boundary_sys ->
+        Val.from_step @@
+        let cap = ext_apply info.cap s in
+        let correction_sys =
+          let face = Face.map @@ fun _ _ v -> Abs.const v in
+          List.map face boundary_sys
+        in
+        rigid_hcom info.dir ty_s cap @@ correction_sys @ info.sys
     end
 
   | _ ->
@@ -687,7 +705,7 @@ and cdr v =
       let sys =
         lazy begin
           let face =
-            Face.map @@ fun ri r'i absi ->
+            Face.map @@ fun _ _ absi ->
             let yi, vi = Abs.unleash absi in
             Abs.bind yi @@ car vi
           in
