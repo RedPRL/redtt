@@ -5,6 +5,7 @@ module Gen = DimGeneric
 
 type can = [`Can]
 type neu = [`Neu]
+type nf = [`Nf]
 
 type _ con =
   | Pi : {dom : can value; cod : clo} -> can con
@@ -28,13 +29,15 @@ type _ con =
 
   | Up : {ty : can value; neu : neu value} -> can con
   | Lvl : int -> neu con
-  | FunApp : neu value * can value -> neu con
+  | FunApp : neu value * nf value -> neu con
   | ExtApp : neu value * ext_sys * D.t -> neu con
   | Car : neu value -> neu con
   | Cdr : neu value -> neu con
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : Gen.t; vty : can value; neu : neu value; func : can value} -> neu con
+
+  | Down : {ty : can value; el : can value} -> nf con
 
 and ('x, 'a) face = ('x, 'a) Face.face
 
@@ -284,6 +287,11 @@ let rec act : type a. D.action -> a con -> a step =
       let ty = Val.act phi info.ty in
       let neu = Val.act phi info.neu in
       ret @@ Up {ty; neu}
+
+    | Down info ->
+      let ty = Val.act phi info.ty in
+      let el = Val.act phi info.el in
+      ret @@ Down {ty; el}
 
 and force_abs_face face =
   match face with
@@ -716,9 +724,9 @@ and apply vfun varg =
       | `Step el ->
         apply el varg
       | `Neu neu ->
-        let _, cod = unleash_pi info.ty in
+        let dom, cod = unleash_pi info.ty in
         let cod' = inst_clo cod varg in
-        let app = Val.into @@ FunApp (Val.into neu, varg) in
+        let app = Val.into @@ FunApp (Val.into neu, Val.into @@ Down {ty = dom; el = varg}) in
         Val.into @@ Up {ty = cod'; neu = app}
     end
 
