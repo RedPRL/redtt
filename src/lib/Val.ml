@@ -352,14 +352,17 @@ and make_fcom mdir cap msys : can step =
 and rigid_coe dir abs el : can step =
   let _, ty = Abs.unleash abs in
   match unleash_can ty with
-  | Pi _ ->
+  | (Pi _ | Sg _ ) ->
     ret @@ Coe {dir; abs; el}
-  | Bool ->
+
+  | (Bool | Univ _) ->
     step el
-  | Univ _ ->
-    step el
+
+  | FCom info ->
+    failwith "Coe in fcom, taste it!!"
+
   | _ ->
-    failwith "TODO"
+    failwith "TODO: rigid_coe"
 
 and rigid_hcom dir ty cap sys : can step =
   match unleash_can ty with
