@@ -19,7 +19,8 @@ struct
       | False p ->
         False p
       | Indet (p, t) ->
-        let t' = X.act phi t in
+        let r, r' = DimStar.unleash p in
+        let t' = X.act (Dim.cmp (Dim.equate r r') phi) t in
         match DimStar.act phi p with
         | `Ok p' ->
           Indet (p', t')
