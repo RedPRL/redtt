@@ -16,6 +16,7 @@ type _ con =
   | FCom : {dir : Star.t; cap : can value; sys : comp_sys} -> can con
 
   | Univ : Lvl.t -> can con
+  | V : {x : Gen.t; ty0 : can value; ty1 : can value; equiv : can value} -> can con
 
   | Lam : clo -> can con
   | ExtLam : abs -> can con
@@ -210,6 +211,13 @@ let rec act : type a. D.action -> a con -> a step =
         (lazy begin Val.act phi info.cap end)
         (lazy begin CompSys.act phi info.sys end)
 
+    | V info ->
+      make_v
+        (Gen.act phi info.x)
+        (lazy begin Val.act phi info.ty0 end)
+        (lazy begin Val.act phi info.ty1 end)
+        (lazy begin Val.act phi info.equiv end)
+
     | Univ _ ->
       ret con
 
@@ -312,6 +320,16 @@ and unleash_neu : neu value -> [`Neu of neu con | `Step of can value] =
     | Step t ->
       `Step t
 
+
+and make_v mgen ty0 ty1 equiv : can step =
+  match mgen with
+  | `Ok x ->
+    ret @@ V {x; ty0 = Lazy.force ty0; ty1 = Lazy.force ty1; equiv = Lazy.force equiv}
+  | `Const `Dim0 ->
+    step @@ Lazy.force ty0
+  | `Const `Dim1 ->
+    step @@ Lazy.force ty1
+
 and make_coe mdir abs el : can step =
   match mdir with
   | `Ok dir ->
@@ -358,7 +376,7 @@ and rigid_coe dir abs el : can step =
   | (Bool | Univ _) ->
     step el
 
-  | FCom info ->
+  | FCom _info ->
     failwith "Coe in fcom, taste it!!"
 
   | _ ->
