@@ -256,7 +256,8 @@ let rec eval (cfg : cfg) : can value =
     Val.into @@ Sg {dom; cod}
 
   | Tm.Ext (Tm.B (_, (_cod, _sys))) ->
-    failwith "TODO"
+    let abs = failwith "TODO" in
+    Val.into @@ Ext abs
 
   | Tm.Lam bnd ->
     Val.into @@ Lam (set_tm bnd cfg)
@@ -333,6 +334,35 @@ and eval_abs_sys cfg =
   with
   | Proj abs ->
     `Proj abs
+
+and eval_ext_face cfg =
+  let tr, tr', otm = cfg.inner.tm in
+  let r = eval_dim @@ set_tm tr cfg in
+  let r' = eval_dim @@ set_tm tr' cfg in
+  match Star.make r r' with
+  | `Ok xi ->
+    begin
+      match D.compare r r' with
+      | D.Apart ->
+        Face.False xi
+      | _ ->
+        let tm = Option.get_exn otm in
+        let el =
+          lazy begin
+            eval
+              {inner = {cfg.inner with tm};
+               action = D.cmp (D.equate r r') cfg.action}
+          end
+        in
+        Face.Indet (xi, el)
+    end
+  | `Same _ ->
+    let tm = Option.get_exn otm in
+    let el = lazy begin eval @@ set_tm tm cfg end in
+    Face.True (r, r', el)
+
+and eval_ext_sys (sys : Tm.chk Tm.t Tm.system with_env node) =
+  List.map (fun x -> eval_ext_face @@ set_tm x sys) sys.inner.tm
 
 and eval_abs cfg =
   let Tm.B (_, tm) = cfg.inner.tm in
