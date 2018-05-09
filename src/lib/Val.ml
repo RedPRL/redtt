@@ -272,6 +272,13 @@ and force_ext_sys sys =
   | ProjVal v ->
     `Proj v
 
+and force_abs_sys sys =
+  try
+    `Ok (List.map force_abs_face sys)
+  with
+  | ProjAbs abs ->
+    `Proj abs
+
 and unleash_can : type a. can value -> can con =
   fun node ->
     match act !node.action !node.inner with
@@ -332,6 +339,31 @@ and rigid_hcom dir ty cap sys : can step =
     step cap
   | _ ->
     failwith "TODO"
+
+and rigid_com dir abs cap sys : can step =
+  let r, r' = Star.unleash dir in
+  let ty = lazy begin Abs.inst abs r' end in
+  let capcoe = lazy begin Val.from_step @@ rigid_coe dir abs cap end in
+  let syscoe =
+    lazy begin
+      let face =
+        Face.map @@ fun ri r'i absi ->
+        lazy begin
+          let phi = D.equate ri r'i in
+          let yi, vi = Abs.unleash absi in
+          let y2r' = Star.make (D.named yi) (D.act phi r') in
+          Abs.bind yi @@ Val.from_step @@
+          make_coe y2r' (lazy abs) (lazy vi)
+        end
+      in
+      force_abs_sys @@ List.map face sys
+    end
+  in
+  make_hcom
+    (Star.make r r')
+    ty
+    capcoe
+    syscoe
 
 let rec eval (cfg : cfg) : can value =
   match Tm.out cfg.inner.tm with
