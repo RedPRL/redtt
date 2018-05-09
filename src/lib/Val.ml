@@ -430,6 +430,7 @@ and rigid_coe dir abs el : can step =
         make_vin (Gen.make r') (car el0) el1
 
       | `Generic ->
+        (* TODO: case on whether info.x == x *)
         failwith ""
     end
 
