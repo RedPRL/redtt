@@ -20,9 +20,11 @@ type _ con =
   | Ff : can con
 
   | Up : {ty : can value; neu : neu value} -> can con
-  | Lvl : {ty : can value; lvl : int} -> neu con
+  | Lvl : int -> neu con
   | FunApp : neu value * can value -> neu con
   | ExtApp : neu value * ext_sys * D.t -> neu con
+  | Car : neu value -> neu con
+  | Cdr : neu value -> neu con
 
 and ('x, 'a) face = ('x, 'a) Face.face
 
@@ -230,10 +232,14 @@ let rec act : type a. D.action -> a con -> a step =
           step v
       end
 
+    | Car neu ->
+      ret @@ Car (Val.act phi neu)
 
-    | Lvl info ->
-      let ty = Val.act phi info.ty in
-      ret @@ Lvl {info with ty}
+    | Cdr neu ->
+      ret @@ Cdr (Val.act phi neu)
+
+    | Lvl l ->
+      ret con
 
     | Up info ->
       let ty = Val.act phi info.ty in
@@ -357,6 +363,11 @@ let rec eval (cfg : cfg) : can value =
     let abs = eval_abs @@ set_tm bnd cfg in
     Val.into @@ ExtLam abs
 
+  | Tm.Cons (t0, t1) ->
+    let v0 = eval @@ set_tm t0 cfg in
+    let v1 = eval @@ set_tm t1 cfg in
+    Val.into @@ Cons (v0, v1)
+
   | Tm.Coe info ->
     Val.from_step @@
     let r = eval_dim @@ set_tm info.r cfg in
@@ -380,6 +391,17 @@ let rec eval (cfg : cfg) : can value =
     let v0 = eval @@ set_tm t0 cfg in
     let v1 = eval @@ set_tm t1 cfg in
     apply v0 v1
+
+  | Tm.ExtApp (t, tr) ->
+    let v = eval @@ set_tm t cfg in
+    let r = eval_dim @@ set_tm tr cfg in
+    ext_apply v r
+
+  | Tm.Car t ->
+    car @@ eval @@ set_tm t cfg
+
+  | Tm.Cdr t ->
+    cdr @@ eval @@ set_tm t cfg
 
   | Tm.Bool ->
     Val.into Bool
@@ -476,6 +498,11 @@ and unleash_pi v =
   | Pi {dom; cod} -> dom, cod
   | _ -> failwith "unleash_pi"
 
+and unleash_sg v =
+  match unleash_can v with
+  | Sg {dom; cod} -> dom, cod
+  | _ -> failwith "unleash_sg"
+
 and unleash_ext v r =
   match unleash_can v with
   | Ext abs ->
@@ -538,7 +565,7 @@ and apply vfun varg =
     rigid_hcom info.dir ty cap sys
 
   | _ ->
-    failwith ""
+    failwith "apply"
 
 and ext_apply vext r =
   match unleash_can vext with
@@ -562,7 +589,60 @@ and ext_apply vext r =
         end
     end
 
-  | _ -> failwith ""
+  | _ ->
+    failwith "ext_apply"
+
+and car v =
+  match unleash_can v with
+  | Cons (v0, _) ->
+    v0
+
+  | Up info ->
+    begin
+      match unleash_neu info.neu with
+      | `Step el ->
+        car el
+      | `Neu neu ->
+        let dom, _ = unleash_sg info.ty in
+        let neu = Val.into neu in
+        Val.into @@ Up {ty = dom; neu = Val.into @@ Car neu}
+    end
+
+  | Coe info ->
+    Val.from_step @@
+    let x, tyx = Abs.unleash info.abs in
+    let domx, _ = unleash_sg tyx in
+    let abs = Abs.bind x domx in
+    let el = car info.el in
+    rigid_coe info.dir abs el
+
+  | HCom info ->
+    Val.from_step @@
+    let dom, _ = unleash_sg info.ty in
+    let cap = car info.cap in
+    let face =
+      Face.map @@ fun _ _ abs ->
+      let y, v = Abs.unleash abs in
+      Abs.bind y @@ car v
+    in
+    let sys = List.map face info.sys in
+    rigid_hcom info.dir dom cap sys
+
+  | _ ->
+    failwith "car"
+
+and cdr v =
+  match unleash_can v with
+  | Cons (_, v1) ->
+    v1
+
+  | Coe info ->
+    failwith "TODO: cdr/coe"
+
+  | HCom info ->
+    failwith "TODO: cdr/hcom"
+
+  | _ -> failwith "TODO: cdr"
 
 
 and inst_clo clo varg =
