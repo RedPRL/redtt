@@ -10,8 +10,11 @@ type _ con =
   | Pi : {dom : can value; cod : clo} -> can con
   | Sg : {dom : can value; cod : clo} -> can con
   | Ext : ext_abs -> can con
+
   | Coe : {dir : Star.t; abs : abs; el : can value} -> can con
   | HCom : {dir : Star.t; ty : can value; cap : can value; sys : comp_sys} -> can con
+  | FCom : {dir : Star.t; cap : can value; sys : comp_sys} -> can con
+
   | Lam : clo -> can con
   | ExtLam : abs -> can con
   | Cons : can value * can value -> can con
@@ -199,6 +202,12 @@ let rec act : type a. D.action -> a con -> a step =
         (lazy begin Val.act phi info.cap end)
         (lazy begin CompSys.act phi info.sys end)
 
+    | FCom info ->
+      make_fcom
+        (Star.act phi info.dir)
+        (lazy begin Val.act phi info.cap end)
+        (lazy begin CompSys.act phi info.sys end)
+
     | Bool ->
       ret con
 
@@ -320,6 +329,21 @@ and make_hcom mdir ty cap msys : can step =
   | `Same _ ->
     step @@ Lazy.force cap
 
+and make_fcom mdir cap msys : can step =
+  match mdir with
+  | `Ok dir ->
+    begin
+      match Lazy.force msys with
+      | `Ok sys ->
+        ret @@ FCom {dir; cap = Lazy.force cap; sys}
+      | `Proj abs ->
+        let _, r' = Star.unleash dir in
+        let x, el = Abs.unleash abs in
+        step @@ Val.act (D.subst r' x) el
+    end
+  | `Same _ ->
+    step @@ Lazy.force cap
+
 and rigid_coe dir abs el : can step =
   let _, ty = Abs.unleash abs in
   match unleash_can ty with
@@ -409,6 +433,15 @@ let rec eval (cfg : cfg) : can value =
     let cap = lazy (eval @@ set_tm info.cap cfg) in
     let sys = lazy (eval_abs_sys @@ set_tm info.sys cfg) in
     make_hcom dir ty cap sys
+
+  | Tm.FCom info ->
+    Val.from_step @@
+    let r = eval_dim @@ set_tm info.r cfg in
+    let r' = eval_dim @@ set_tm info.r' cfg in
+    let dir = Star.make r r' in
+    let cap = lazy (eval @@ set_tm info.cap cfg) in
+    let sys = lazy (eval_abs_sys @@ set_tm info.sys cfg) in
+    make_fcom dir cap sys
 
   | Tm.FunApp (t0, t1) ->
     let v0 = eval @@ set_tm t0 cfg in
