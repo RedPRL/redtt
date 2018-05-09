@@ -386,6 +386,33 @@ and make_hcom mdir ty cap msys : can step =
   | `Same _ ->
     step cap
 
+and make_com mdir abs cap msys : can step =
+  match mdir with
+  | `Ok dir ->
+    let _, r' = Star.unleash dir in
+    begin
+      match msys with
+      | `Ok sys ->
+        let ty = Abs.inst abs r' in
+        let capcoe = Val.from_step @@ rigid_coe dir abs cap in
+        let syscoe : comp_sys =
+          let face =
+            Face.map @@ fun ri r'i absi ->
+            let phi = D.equate ri r'i in
+            let yi, vi = Abs.unleash absi in
+            let y2r' = Star.make (D.named yi) (D.act phi r') in
+            Abs.bind yi @@ Val.from_step @@
+            make_coe y2r' abs vi
+          in
+          List.map face sys
+        in
+        rigid_hcom dir ty capcoe syscoe
+      | `Proj abs ->
+        step @@ Abs.inst abs r'
+    end
+  | `Same _ ->
+    step cap
+
 and make_fcom mdir cap msys : can step =
   match mdir with
   | `Ok dir ->
@@ -519,99 +546,131 @@ and rigid_com dir abs cap (sys : comp_sys) : can step =
   in
   rigid_hcom dir ty capcoe syscoe
 
-and eval (cfg : cfg) : can value =
-  match Tm.out cfg.inner.tm with
-  | Tm.Var i ->
-    begin
-      match List.nth cfg.inner.rho i with
-      | Val v -> v
-      | _ -> failwith "Expected value in environment"
-    end
+and eval : type x. x Tm.t with_env node -> can value =
+  fun cfg ->
+    match Tm.out cfg.inner.tm with
+    | Tm.Var i ->
+      begin
+        match List.nth cfg.inner.rho i with
+        | Val v -> v
+        | _ -> failwith "Expected value in environment"
+      end
 
-  | Tm.Pi (dom, cod) ->
-    let dom = eval @@ set_tm dom cfg in
-    let cod = set_tm cod cfg in
-    Val.into @@ Pi {dom; cod}
+    | Tm.Pi (dom, cod) ->
+      let dom = eval @@ set_tm dom cfg in
+      let cod = set_tm cod cfg in
+      Val.into @@ Pi {dom; cod}
 
-  | Tm.Sg (dom, cod) ->
-    let dom = eval @@ set_tm dom cfg in
-    let cod = set_tm cod cfg in
-    Val.into @@ Sg {dom; cod}
+    | Tm.Sg (dom, cod) ->
+      let dom = eval @@ set_tm dom cfg in
+      let cod = set_tm cod cfg in
+      Val.into @@ Sg {dom; cod}
 
-  | Tm.Ext bnd ->
-    let abs = eval_ext_abs @@ set_tm bnd cfg in
-    Val.into @@ Ext abs
+    | Tm.Ext bnd ->
+      let abs = eval_ext_abs @@ set_tm bnd cfg in
+      Val.into @@ Ext abs
 
-  | Tm.Lam bnd ->
-    Val.into @@ Lam (set_tm bnd cfg)
+    | Tm.Lam bnd ->
+      Val.into @@ Lam (set_tm bnd cfg)
 
-  | Tm.ExtLam bnd ->
-    let abs = eval_abs @@ set_tm bnd cfg in
-    Val.into @@ ExtLam abs
+    | Tm.ExtLam bnd ->
+      let abs = eval_abs @@ set_tm bnd cfg in
+      Val.into @@ ExtLam abs
 
-  | Tm.Cons (t0, t1) ->
-    let v0 = eval @@ set_tm t0 cfg in
-    let v1 = eval @@ set_tm t1 cfg in
-    Val.into @@ Cons (v0, v1)
+    | Tm.Cons (t0, t1) ->
+      let v0 = eval @@ set_tm t0 cfg in
+      let v1 = eval @@ set_tm t1 cfg in
+      Val.into @@ Cons (v0, v1)
 
-  | Tm.Coe info ->
-    Val.from_step @@
-    let r = eval_dim @@ set_tm info.r cfg in
-    let r' = eval_dim @@ set_tm info.r' cfg in
-    let dir = Star.make r r' in
-    let abs = eval_abs @@ set_tm info.ty cfg in
-    let el = eval @@ set_tm info.tm cfg in
-    make_coe dir abs el
+    | Tm.Coe info ->
+      Val.from_step @@
+      let r = eval_dim @@ set_tm info.r cfg in
+      let r' = eval_dim @@ set_tm info.r' cfg in
+      let dir = Star.make r r' in
+      let abs = eval_abs @@ set_tm info.ty cfg in
+      let el = eval @@ set_tm info.tm cfg in
+      make_coe dir abs el
 
-  | Tm.HCom info ->
-    Val.from_step @@
-    let r = eval_dim @@ set_tm info.r cfg in
-    let r' = eval_dim @@ set_tm info.r' cfg in
-    let dir = Star.make r r' in
-    let ty = eval @@ set_tm info.ty cfg in
-    let cap = eval @@ set_tm info.cap cfg in
-    let sys = eval_abs_sys @@ set_tm info.sys cfg in
-    make_hcom dir ty cap sys
+    | Tm.HCom info ->
+      Val.from_step @@
+      let r = eval_dim @@ set_tm info.r cfg in
+      let r' = eval_dim @@ set_tm info.r' cfg in
+      let dir = Star.make r r' in
+      let ty = eval @@ set_tm info.ty cfg in
+      let cap = eval @@ set_tm info.cap cfg in
+      let sys = eval_abs_sys @@ set_tm info.sys cfg in
+      make_hcom dir ty cap sys
 
-  | Tm.FCom info ->
-    Val.from_step @@
-    let r = eval_dim @@ set_tm info.r cfg in
-    let r' = eval_dim @@ set_tm info.r' cfg in
-    let dir = Star.make r r' in
-    let cap = eval @@ set_tm info.cap cfg in
-    let sys = eval_abs_sys @@ set_tm info.sys cfg in
-    make_fcom dir cap sys
+    | Tm.Com info ->
+      Val.from_step @@
+      let r = eval_dim @@ set_tm info.r cfg in
+      let r' = eval_dim @@ set_tm info.r' cfg in
+      let dir = Star.make r r' in
+      let abs = eval_abs @@ set_tm info.ty cfg in
+      let cap = eval @@ set_tm info.cap cfg in
+      let sys = eval_abs_sys @@ set_tm info.sys cfg in
+      make_com dir abs cap sys
 
-  | Tm.FunApp (t0, t1) ->
-    let v0 = eval @@ set_tm t0 cfg in
-    let v1 = eval @@ set_tm t1 cfg in
-    apply v0 v1
+    | Tm.FCom info ->
+      Val.from_step @@
+      let r = eval_dim @@ set_tm info.r cfg in
+      let r' = eval_dim @@ set_tm info.r' cfg in
+      let dir = Star.make r r' in
+      let cap = eval @@ set_tm info.cap cfg in
+      let sys = eval_abs_sys @@ set_tm info.sys cfg in
+      make_fcom dir cap sys
 
-  | Tm.ExtApp (t, tr) ->
-    let v = eval @@ set_tm t cfg in
-    let r = eval_dim @@ set_tm tr cfg in
-    ext_apply v r
+    | Tm.FunApp (t0, t1) ->
+      let v0 = eval @@ set_tm t0 cfg in
+      let v1 = eval @@ set_tm t1 cfg in
+      apply v0 v1
 
-  | Tm.Car t ->
-    car @@ eval @@ set_tm t cfg
+    | Tm.ExtApp (t, tr) ->
+      let v = eval @@ set_tm t cfg in
+      let r = eval_dim @@ set_tm tr cfg in
+      ext_apply v r
 
-  | Tm.Cdr t ->
-    cdr @@ eval @@ set_tm t cfg
+    | Tm.Car t ->
+      car @@ eval @@ set_tm t cfg
 
-  | Tm.Univ lvl ->
-    Val.into @@ Univ lvl
+    | Tm.Cdr t ->
+      cdr @@ eval @@ set_tm t cfg
 
-  | Tm.Bool ->
-    Val.into Bool
+    | Tm.Univ lvl ->
+      Val.into @@ Univ lvl
 
-  | Tm.Tt ->
-    Val.into Tt
+    | Tm.Bool ->
+      Val.into Bool
 
-  | Tm.Ff ->
-    Val.into Ff
+    | Tm.Tt ->
+      Val.into Tt
 
-  | _ ->
-    failwith ""
+    | Tm.Ff ->
+      Val.into Ff
+
+    | Tm.Interval ->
+      failwith "The interval is only a facon de parler"
+
+    | Tm.Dim0 ->
+      failwith "0 is a dimension"
+
+    | Tm.Dim1 ->
+      failwith "1 is a dimension"
+
+    | Tm.Down info ->
+      eval @@ set_tm info.tm cfg
+
+    | Tm.Up t ->
+      eval @@ set_tm t cfg
+
+    | Tm.If _ ->
+      failwith "TODO: eval if"
+
+    | Tm.Let _ ->
+      failwith "TODO: eval let"
+
+    | Tm.Meta _ ->
+      failwith "TODO: eval meta"
 
 and eval_abs_face cfg =
   let tr, tr', obnd = cfg.inner.tm in
