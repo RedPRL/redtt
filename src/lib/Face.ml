@@ -14,6 +14,22 @@ let map : type x. (Dim.t -> Dim.t -> 'a -> 'b) -> (x, 'a) face -> (x, 'b) face =
       let r, r' = DimStar.unleash p in
       Indet (p, f r r' v)
 
+let get_cond : type x. (x, 'a) face -> Dim.t * Dim.t =
+  fun face ->
+    match face with
+    | False p ->
+      DimStar.unleash p
+    | True (r, r', _) ->
+      r, r'
+    | Indet (p, _) ->
+      DimStar.unleash p
+
+let forall : type x. Dim.atom -> (x, 'a) face -> [`Delete | `Keep] =
+  fun x face ->
+    let s = Dim.named x in
+    let r, r' = get_cond face in
+    if r = s or r' = s then `Delete else `Keep
+
 module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face

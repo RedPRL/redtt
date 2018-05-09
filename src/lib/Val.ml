@@ -238,7 +238,7 @@ let rec act : type a. D.action -> a con -> a step =
     | Cdr neu ->
       ret @@ Cdr (Val.act phi neu)
 
-    | Lvl l ->
+    | Lvl _ ->
       ret con
 
     | Up info ->
@@ -278,7 +278,7 @@ and force_abs_sys sys =
   | ProjAbs abs ->
     `Proj abs
 
-and unleash_can : type a. can value -> can con =
+and unleash_can : can value -> can con =
   fun node ->
     match act !node.action !node.inner with
     | Ret con ->
@@ -289,7 +289,7 @@ and unleash_can : type a. can value -> can con =
       node := {inner = con; action = D.idn};
       con
 
-and unleash_neu : type a. neu value -> [`Neu of neu con | `Step of can value] =
+and unleash_neu : neu value -> [`Neu of neu con | `Step of can value] =
   fun node ->
     match act !node.action !node.inner with
     | Ret con ->
@@ -612,8 +612,32 @@ and ext_apply vext s =
         end
     end
 
-  | Coe _info ->
-    failwith "TODO: ext_apply/coe"
+  | Coe info ->
+    let y, ext_y = Abs.unleash info.abs in
+    let ty_s, sys_s = unleash_ext ext_y s in
+    let forall_y_sys_s =
+      let filter_face face =
+        match Face.forall y face with
+        | `Keep -> true
+        | `Delete -> false
+      in
+      List.filter filter_face sys_s
+    in
+    begin
+      match force_ext_sys forall_y_sys_s with
+      | `Proj v ->
+        v
+
+      | `Rigid rsys ->
+        let correction =
+          let face = Face.map @@ fun _ _ v -> Abs.bind y v in
+          List.map face rsys
+        in
+        let abs = Abs.bind y ty_s in
+        let cap = ext_apply info.el s in
+        Val.from_step @@
+        rigid_com info.dir abs cap correction
+    end
 
   | HCom info ->
     let ty_s, sys_s = unleash_ext info.ty s in
@@ -633,6 +657,8 @@ and ext_apply vext s =
 
   | _ ->
     failwith "ext_apply"
+
+
 
 and car v =
   match unleash_can v with
@@ -725,7 +751,7 @@ and cdr v =
     let cap = cdr info.cap in
     let sys =
       let face =
-        Face.map @@ fun ri r'i absi ->
+        Face.map @@ fun _ _ absi ->
         let yi, vi = Abs.unleash absi in
         Abs.bind yi @@ cdr vi
       in
