@@ -15,6 +15,8 @@ type _ con =
   | HCom : {dir : Star.t; ty : can value; cap : can value; sys : comp_sys} -> can con
   | FCom : {dir : Star.t; cap : can value; sys : comp_sys} -> can con
 
+  | Univ : Lvl.t -> can con
+
   | Lam : clo -> can con
   | ExtLam : abs -> can con
   | Cons : can value * can value -> can con
@@ -208,6 +210,9 @@ let rec act : type a. D.action -> a con -> a step =
         (lazy begin Val.act phi info.cap end)
         (lazy begin CompSys.act phi info.sys end)
 
+    | Univ _ ->
+      ret con
+
     | Bool ->
       ret con
 
@@ -351,6 +356,8 @@ and rigid_coe dir abs el : can step =
     ret @@ Coe {dir; abs; el}
   | Bool ->
     step el
+  | Univ _ ->
+    step el
   | _ ->
     failwith "TODO"
 
@@ -360,6 +367,8 @@ and rigid_hcom dir ty cap sys : can step =
     ret @@ HCom {dir; ty; cap; sys}
   | Bool ->
     step cap
+  | Univ _ ->
+    ret @@ FCom {dir; cap; sys}
   | _ ->
     failwith "TODO"
 
@@ -458,6 +467,9 @@ let rec eval (cfg : cfg) : can value =
 
   | Tm.Cdr t ->
     cdr @@ eval @@ set_tm t cfg
+
+  | Tm.Univ lvl ->
+    Val.into @@ Univ lvl
 
   | Tm.Bool ->
     Val.into Bool
