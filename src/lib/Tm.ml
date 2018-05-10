@@ -47,19 +47,145 @@ and subst =
   | Sub of subst * inf t
   | Cmp of subst * subst
 
-and 'a node = {info : info option; con : 'a f}
+and 'a node = {info : info option; con : 'a f; subst : subst}
 and 'a t = 'a node
 and 'a tube = chk t * chk t * 'a option
 and 'a system = 'a tube list
 
-let into tf = {info = None; con = tf}
-let into_info info tf = {info = info; con = tf}
+
+let into tf = {info = None; con = tf; subst = Id}
+let into_info info tf = {info = info; con = tf; subst = Id}
 let info node = node.info
 
-let out node = node.con
-
 let var i = into @@ Var i
+let lift sub = Sub (sub, var 0)
 let inst0 t = Sub (Id, t)
+
+let subst : type x. subst -> x t -> x t =
+  fun sub node ->
+    {node with subst = Cmp (sub, node.subst)}
+
+let subst_bnd : subst -> 'a t bnd -> 'a t bnd =
+  fun sub bnd ->
+    let B (nm, t) = bnd in
+    B (nm, subst (lift sub) t)
+
+let rec substf : type x. subst -> x f -> x f =
+  fun sub con ->
+    match sub with
+    | Id -> con
+    | _ ->
+      match con with
+      | Var ix ->
+        proj sub ix
+      | Bool -> con
+      | Tt -> con
+      | Ff -> con
+      | Dim0 -> con
+      | Dim1 -> con
+      | Univ _ -> con
+      | Car t ->
+        Car (subst sub t)
+      | Cdr t ->
+        Cdr (subst sub t)
+      | FunApp (t0, t1) ->
+        FunApp (subst sub t0, subst sub t1)
+      | ExtApp (t0, t1) ->
+        ExtApp (subst sub t0, subst sub t1)
+      | Down {ty; tm} ->
+        Down {ty = subst sub ty; tm = subst sub tm}
+      | Coe info ->
+        let r = subst sub info.r in
+        let r' = subst sub info.r' in
+        let ty = subst_bnd sub info.ty in
+        let tm = subst sub info.tm in
+        Coe {r; r'; ty; tm}
+      | HCom info ->
+        let r = subst sub info.r in
+        let r' = subst sub info.r' in
+        let ty = subst sub info.ty in
+        let cap = subst sub info.cap in
+        let sys = subst_comp_sys sub info.sys in
+        HCom {r; r'; ty; cap; sys}
+      | FCom info ->
+        let r = subst sub info.r in
+        let r' = subst sub info.r' in
+        let cap = subst sub info.cap in
+        let sys = subst_comp_sys sub info.sys in
+        FCom {r; r'; cap; sys}
+      | Com info ->
+        let r = subst sub info.r in
+        let r' = subst sub info.r' in
+        let ty = subst_bnd sub info.ty in
+        let cap = subst sub info.cap in
+        let sys = subst_comp_sys sub info.sys in
+        Com {r; r'; ty; cap; sys}
+      | Up t ->
+        Up (subst sub t)
+      | Pi (dom, cod) ->
+        Pi (subst sub dom, subst_bnd sub cod)
+      | Sg (dom, cod) ->
+        Sg (subst sub dom, subst_bnd sub cod)
+      | Ext (B (nm, (cod, sys))) ->
+        Ext (B (nm, (subst (lift sub) cod, subst_ext_sys (lift sub) sys)))
+      | If info ->
+        let mot = subst_bnd sub info.mot in
+        let scrut = subst sub info.scrut in
+        let tcase = subst sub info.tcase in
+        let fcase = subst sub info.fcase in
+        If {mot; scrut; tcase; fcase}
+      | VProj info ->
+        let r = subst sub info.r in
+        let tm = subst sub info.tm in
+        let ty0 = subst sub info.ty0 in
+        let ty1 = subst sub info.ty1 in
+        let equiv = subst sub info.equiv in
+        VProj {r; tm; ty0; ty1; equiv}
+      | Lam bnd ->
+        Lam (subst_bnd sub bnd)
+      | ExtLam bnd ->
+        ExtLam (subst_bnd sub bnd)
+      | Cons (t0, t1) ->
+        Cons (subst sub t0, subst sub t1)
+      | Let (t, bnd) ->
+        Let (subst sub t, subst_bnd sub bnd)
+      | Meta (sym, sub') ->
+        Meta (sym, Cmp (sub, sub'))
+
+and subst_ext_sys sub sys =
+  List.map (subst_ext_face sub) sys
+
+and subst_ext_face sub (r, r', otm) =
+  let r = subst sub r in
+  let r' = subst sub r' in
+  let otm = Option.map (subst sub) otm in
+  r, r', otm
+
+and subst_comp_face sub (r, r', obnd) =
+  let r = subst sub r in
+  let r' = subst sub r' in
+  let obnd = Option.map (subst_bnd sub) obnd in
+  r, r', obnd
+
+and subst_comp_sys sub sys =
+  List.map (subst_comp_face sub) sys
+
+and proj sub ix : inf f =
+  match sub with
+  | Id ->
+    Var ix
+  | Proj ->
+    Var (ix + 1)
+  | Sub (sub, t) ->
+    if ix = 0 then out t else proj sub (ix - 1)
+  | Cmp (sub1, sub0) ->
+    substf sub1 @@ proj sub0 ix
+
+and out : type x. x t -> x f =
+  fun node ->
+    substf node.subst node.con
+
+
 
 let meta hole sub = into @@ Meta (hole, sub)
 let up t = into @@ Up t
@@ -216,3 +342,14 @@ and pp_btube env fmt tube =
   | Some (B (nm, tm)) ->
     let x, env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>[%a=%a@ [%s] %a]@]" (pp env) r (pp env) r' x (pp env') tm
+
+module Macros =
+struct
+  let arr ty0 ty1 =
+    pi None ty0 @@
+    subst Proj ty1
+
+  let times ty0 ty1 =
+    sg None ty0 @@
+    subst Proj ty1
+end

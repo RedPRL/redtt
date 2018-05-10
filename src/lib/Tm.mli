@@ -59,9 +59,10 @@ and subst =
   | Sub of subst * inf t
   | Cmp of subst * subst
 
-
 val into : 'a f -> 'a t
 val out : 'a t -> 'a f
+
+val subst : subst -> 'a t -> 'a t
 
 type info = Lexing.position * Lexing.position
 val into_info : info option -> 'a f -> 'a t
@@ -80,5 +81,12 @@ val univ : Lvl.t -> chk t
 val car : inf t -> inf t
 val cdr : inf t -> inf t
 val meta : Symbol.t -> subst -> inf t
+
+(* macros *)
+module Macros :
+sig
+  val arr : chk t -> chk t -> chk t
+  val times : chk t -> chk t -> chk t
+end
 
 val pp : 'a t Pretty.t
