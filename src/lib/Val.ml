@@ -28,11 +28,12 @@ type _ con =
   | Ff : can con
 
   | Up : {ty : can value; neu : neu value} -> can con
+
   | Lvl : int -> neu con
-  | FunApp : neu value * nf value -> neu con
-  | ExtApp : neu value * ext_sys * D.t -> neu con
-  | Car : neu value -> neu con
-  | Cdr : neu value -> neu con
+  | FunApp : neu con * nf value -> neu con
+  | ExtApp : neu con * ext_sys * D.t -> neu con
+  | Car : neu con -> neu con
+  | Cdr : neu con -> neu con
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : Gen.t; vty : can value; neu : neu value; func : can value} -> neu con
@@ -260,51 +261,51 @@ let rec act : type a. D.action -> a con -> a step =
       ret @@ Cons (Val.act phi v0, Val.act phi v1)
 
     | FunApp (neu, arg) ->
-      let neu' = Val.act phi neu in
-      let varg' = Val.act phi arg in
+      let neu = act phi neu in
+      let varg = Val.act phi arg in
       begin
-        match unleash_neu neu' with
-        | `Neu neu ->
-          ret @@ FunApp (Val.into neu, varg')
-        | `Step v ->
-          step @@ apply v @@ Val.into @@ unleash_nf varg'
+        match neu with
+        | Ret neu ->
+          ret @@ FunApp (neu, varg)
+        | Step v ->
+          step @@ apply v @@ nf_to_can varg
       end
 
     | ExtApp (neu, sys, r) ->
-      let sys' = ExtSys.act phi sys in
-      let neu' = Val.act phi neu in
-      let r' = Dim.act phi r in
+      let sys = ExtSys.act phi sys in
+      let neu = act phi neu in
+      let r = Dim.act phi r in
       begin
-        match unleash_neu neu' with
-        | `Neu neu ->
+        match neu with
+        | Ret neu ->
           begin
-            match force_ext_sys sys' with
+            match force_ext_sys sys with
             | `Rigid _ ->
-              ret @@ ExtApp (Val.into neu, sys', r')
+              ret @@ ExtApp (neu, sys, r)
             | `Proj v ->
               step v
           end
-        | `Step v ->
-          step @@ ext_apply v r'
+        | Step v ->
+          step @@ ext_apply v r
       end
 
     | Car neu ->
-      let neu' = Val.act phi neu in
+      let neu = act phi neu in
       begin
-        match unleash_neu neu' with
-        | `Neu neu ->
-          ret @@ Car (Val.into neu)
-        | `Step v ->
+        match neu with
+        | Ret neu ->
+          ret @@ Car neu
+        | Step v ->
           step @@ car v
       end
 
     | Cdr neu ->
-      let neu' = Val.act phi neu in
+      let neu = act phi neu in
       begin
-        match unleash_neu neu' with
-        | `Neu neu ->
-          ret @@ Cdr (Val.into neu)
-        | `Step v ->
+        match neu with
+        | Ret neu ->
+          ret @@ Cdr neu
+        | Step v ->
           step @@ cdr v
       end
 
@@ -364,14 +365,15 @@ and unleash_can : can value -> can con =
       node := {inner = con; action = D.idn};
       con
 
-and unleash_nf : nf value -> can con =
+and nf_to_can : nf value -> can value =
   fun node ->
     match act !node.action !node.inner with
     | Ret (Down info) ->
       node := {inner = Down info; action = D.idn};
-      unleash_can info.el
+      info.el
     | Step t ->
-      unleash_can t
+      t
+
 
 and unleash_neu : neu value -> [`Neu of neu con | `Step of can value] =
   fun node ->
@@ -541,8 +543,6 @@ and rigid_coe dir abs el : can step =
             in
             ret @@ VIn {x = info.x; el0; el1}
         end
-
-
     end
 
   | _ ->
@@ -824,7 +824,7 @@ and apply vfun varg =
       | `Neu neu ->
         let dom, cod = unleash_pi info.ty in
         let cod' = inst_clo cod varg in
-        let app = Val.into @@ FunApp (Val.into neu, Val.into @@ Down {ty = dom; el = varg}) in
+        let app = Val.into @@ FunApp (neu, Val.into @@ Down {ty = dom; el = varg}) in
         Val.into @@ Up {ty = cod'; neu = app}
     end
 
@@ -883,7 +883,7 @@ and ext_apply vext s =
         begin
           match force_ext_sys sysr with
           | `Rigid _ ->
-            let app = Val.into @@ ExtApp (Val.into neu, sysr, s) in
+            let app = Val.into @@ ExtApp (neu, sysr, s) in
             Val.into @@ Up {ty = tyr; neu = app}
           | `Proj v ->
             v
@@ -969,7 +969,6 @@ and car v =
         car el
       | `Neu neu ->
         let dom, _ = unleash_sg info.ty in
-        let neu = Val.into neu in
         Val.into @@ Up {ty = dom; neu = Val.into @@ Car neu}
     end
 
