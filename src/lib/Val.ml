@@ -261,10 +261,9 @@ let rec act : type a. D.action -> a con -> a step =
       ret @@ Cons (Val.act phi v0, Val.act phi v1)
 
     | FunApp (neu, arg) ->
-      let neu = act phi neu in
       let varg = Val.act phi arg in
       begin
-        match neu with
+        match act phi neu with
         | Ret neu ->
           ret @@ FunApp (neu, varg)
         | Step v ->
@@ -273,10 +272,9 @@ let rec act : type a. D.action -> a con -> a step =
 
     | ExtApp (neu, sys, r) ->
       let sys = ExtSys.act phi sys in
-      let neu = act phi neu in
       let r = Dim.act phi r in
       begin
-        match neu with
+        match act phi neu with
         | Ret neu ->
           begin
             match force_ext_sys sys with
@@ -290,9 +288,8 @@ let rec act : type a. D.action -> a con -> a step =
       end
 
     | Car neu ->
-      let neu = act phi neu in
       begin
-        match neu with
+        match act phi neu with
         | Ret neu ->
           ret @@ Car neu
         | Step v ->
@@ -300,9 +297,8 @@ let rec act : type a. D.action -> a con -> a step =
       end
 
     | Cdr neu ->
-      let neu = act phi neu in
       begin
-        match neu with
+        match act phi neu with
         | Ret neu ->
           ret @@ Cdr neu
         | Step v ->
