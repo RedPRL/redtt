@@ -48,7 +48,6 @@ and neu =
 and nf = {ty : value; el : value}
 
 
-
 and ('x, 'a) face = ('x, 'a) Face.face
 
 and clo =
@@ -1047,3 +1046,21 @@ and inst_clo clo varg =
 
 let const_clo v =
   Const v
+
+
+
+module Macro =
+struct
+  let equiv ~ty0 ~ty1 : value =
+    let rho = [ty0; ty1] in
+    let funty =
+      Tm.pi None
+        (Tm.up @@ Tm.var 0) (* ty0 *)
+        (Tm.up @@ Tm.var 2) (* ty1 *)
+    in
+    eval rho @@
+    Tm.sg None funty @@
+    Tm.pi None (Tm.up @@ Tm.var 2) @@ (* ty1 *)
+    failwith " this is really fucking hard !!!"
+
+end
