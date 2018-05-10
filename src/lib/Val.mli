@@ -53,6 +53,7 @@ type _ con =
   | ExtApp : neu con * ext_sys * dim -> neu con
   | Car : neu con -> neu con
   | Cdr : neu con -> neu con
+  | If : {mot : clo; neu : neu con; tcase : can value; fcase : can value} -> neu con
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : gen; vty : can value; neu : neu con; func : can value} -> neu con

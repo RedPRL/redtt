@@ -38,6 +38,8 @@ type _ con =
   | ExtApp : neu con * ext_sys * D.t -> neu con
   | Car : neu con -> neu con
   | Cdr : neu con -> neu con
+  | If : {mot : clo; neu : neu con; tcase : can value; fcase : can value} -> neu con
+
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : Gen.t; vty : can value; neu : neu con; func : can value} -> neu con
@@ -313,6 +315,18 @@ and act_neu phi con =
         ret @@ Cdr neu
       | Step v ->
         step @@ cdr v
+    end
+
+  | If info ->
+    let mot = Clo.act phi info.mot in
+    let tcase = Val.act phi info.tcase in
+    let fcase = Val.act phi info.fcase in
+    begin
+      match act_neu phi info.neu with
+      | Ret neu ->
+        ret @@ If {mot; neu; tcase; fcase}
+      | Step v ->
+        step @@ if_ mot v tcase fcase
     end
 
   | Lvl _ ->
@@ -680,8 +694,9 @@ and eval : type x. x Tm.t with_env node -> can value =
     | Tm.If _ ->
       failwith "TODO: eval if"
 
-    | Tm.Let _ ->
-      failwith "TODO: eval let"
+    | Tm.Let (t0, Tm.B (_, t1)) ->
+      let v0 = eval @@ set_tm t0 cfg in
+      eval {cfg with inner = {tm = t1; rho = Val v0 :: cfg.inner.rho}}
 
     | Tm.Meta _ ->
       failwith "TODO: eval meta"
@@ -912,7 +927,21 @@ and rigid_vproj x el func : can value =
     let _, _, ty1, _ = unleash_v up.ty in
     let neu = VProj {x; vty = up.ty; neu = up.neu; func} in
     Val.into @@ Up {ty = ty1; neu}
-  | _ -> failwith "vproj"
+  | _ ->
+    failwith "vproj"
+
+and if_ mot scrut tcase fcase =
+  match unleash_can scrut with
+  | Tt ->
+    tcase
+  | Ff ->
+    fcase
+  | Up up ->
+    let neu = If {mot; neu = up.neu; tcase; fcase} in
+    let mot' = inst_clo mot scrut in
+    Val.into @@ Up {ty = mot'; neu}
+  | _ ->
+    failwith "if_"
 
 and car v =
   match unleash_can v with
