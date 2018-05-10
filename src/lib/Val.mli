@@ -41,11 +41,8 @@ and neu =
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
 
   (* Invariant: neu \in vty, vty is a V type
-
-     This should be changed to carry all the components of the V type
-
   *)
-  | VProj : {x : gen; vty : value; neu : neu; func : value} -> neu
+  | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
 and nf = {ty : value; el : value}
 

@@ -172,16 +172,17 @@ and equate_neu env neu0 neu1 =
     Tm.into @@ Tm.If {mot = Tm.B (None, mot); scrut; tcase; fcase}
 
   | VProj vproj0, VProj vproj1 ->
-    let r0 = DimGeneric.unleash vproj0.x in
-    let r1 = DimGeneric.unleash vproj1.x in
-    let tr = equate_dim env r0 r1 in
-    let tm = equate_neu env vproj0.neu vproj1.neu in
-    let funty =
-      let _, ty0, ty1, _ = unleash_v vproj0.vty in
-      into @@ Pi {dom = ty0; cod = const_clo ty1}
-    in
-    let func = equate env funty vproj0.func vproj1.func in
-    Tm.into @@ Tm.VProj {r = tr; tm; func}
+    (* let r0 = DimGeneric.unleash vproj0.x in *)
+    (* let r1 = DimGeneric.unleash vproj1.x in *)
+    (* let tr = equate_dim env r0 r1 in
+       let tm = equate_neu env vproj0.neu vproj1.neu in
+       let funty =
+       let _, ty0, ty1, _ = unleash_v vproj0.vty in
+       into @@ Pi {dom = ty0; cod = const_clo ty1}
+       in
+       let func = equate env funty vproj0.func vproj1.func in
+       Tm.into @@ Tm.VProj {r = tr; tm; func} *)
+    failwith "TODO"
 
   | _ -> failwith "equate_neu"
 

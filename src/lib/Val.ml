@@ -43,7 +43,7 @@ and neu =
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
 
   (* Invariant: neu \in vty, vty is a V type *)
-  | VProj : {x : Gen.t; vty : value; neu : neu; func : value} -> neu
+  | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
 and nf = {ty : value; el : value}
 
@@ -267,11 +267,12 @@ let rec act_can phi con =
 and act_neu phi con =
   match con with
   | VProj info ->
-    step @@
-    let mx = Gen.act phi info.x in
-    let el = Val.act phi @@ into @@ Up {ty = info.vty; neu = info.neu} in
-    let func = Val.act phi info.func in
-    vproj mx ~el ~func
+    failwith "TODO: vproj"
+  (* step @@
+     let mx = Gen.act phi info.x in
+     let el = Val.act phi @@ into @@ Up {ty = info.vty; neu = info.neu} in
+     let func = Val.act phi info.func in
+     vproj mx ~el ~func *)
 
   | FunApp (neu, arg) ->
     let varg = act_nf phi arg in
@@ -509,7 +510,13 @@ and rigid_coe dir abs el =
             let xty0 = Abs.bind x info.ty0 in
             let el0 = rigid_coe dir xty0 el in
             let el1 =
-              let cap = rigid_vproj info.x ~el ~func:(car @@ Val.act (Dim.subst r x) info.equiv) in
+              let cap =
+                let phi = Dim.subst r x in
+                let ty0r = Val.act phi info.ty0 in
+                let ty1r = Val.act phi info.ty1 in
+                let equivr = Val.act phi info.equiv in
+                rigid_vproj info.x ~el ~ty0:ty0r ~ty1:ty1r ~equiv:equivr
+              in
               let r2x = Star.make r (D.named x) in
               let sys =
                 let face0 =
@@ -661,9 +668,11 @@ and eval : type x. env -> x Tm.t -> value =
 
     | Tm.VProj info ->
       let r = eval_dim rho info.r in
+      let ty0 = eval rho info.ty0 in
+      let ty1 = eval rho info.ty1 in
       let el = eval rho info.tm in
-      let func = eval rho info.func in
-      vproj (Gen.make r) el func
+      let equiv = eval rho info.equiv in
+      vproj (Gen.make r) ~ty0 ~ty1 ~equiv ~el
 
     | Tm.Univ lvl ->
       into @@ Univ lvl
@@ -901,26 +910,25 @@ and ext_apply vext s =
     failwith "ext_apply"
 
 
-and vproj mgen ~el ~func : value =
+and vproj mgen ~ty0 ~ty1 ~equiv ~el : value =
   match mgen with
   | `Ok x ->
-    rigid_vproj x ~el ~func
+    rigid_vproj x ~ty0 ~ty1 ~equiv ~el
   | `Const `Dim0 ->
+    let func = car equiv in
     apply func el
   | `Const `Dim1 ->
     el
 
-and rigid_vproj x ~el ~func : value =
+and rigid_vproj x ~ty0 ~ty1 ~equiv ~el : value =
   match unleash el with
   | VIn info ->
-    (* Invariant: info.x == x, not well-typed otherwise *)
     info.el1
   | Up up ->
-    let _, _, ty1, _ = unleash_v up.ty in
-    let neu = VProj {x; vty = up.ty; neu = up.neu; func} in
+    let neu = VProj {x; ty0; ty1; equiv; neu = up.neu} in
     into @@ Up {ty = ty1; neu}
   | _ ->
-    failwith "vproj"
+    failwith "rigid_vproj"
 
 and if_ mot scrut tcase fcase =
   match unleash scrut with
