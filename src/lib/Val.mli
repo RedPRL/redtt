@@ -5,7 +5,6 @@ type gen = DimGeneric.t
 type dim = Dim.t
 
 type value
-type cfg
 type clo
 
 type ('x, 'a) face = ('x, 'a) Face.face
@@ -65,6 +64,6 @@ and env = env_el list
 
 val unleash : value -> con
 
-val eval : cfg -> value
+val eval : env -> 'a Tm.t -> value
 val apply : value -> value -> value
 val ext_apply : value -> dim -> value

@@ -48,7 +48,6 @@ and nf =
 and ('x, 'a) face = ('x, 'a) Face.face
 
 and 'a with_env = {tm : 'a; rho : env}
-and cfg = Tm.chk Tm.t with_env node
 and clo = Tm.chk Tm.t Tm.bnd with_env node
 and env_el = Val of value | Atom of atom
 and env = env_el list
@@ -155,26 +154,21 @@ end
 
 module ExtAbs = Abstraction.M (Sort.Prod (Val) (ExtSys))
 
-let set_tm tm cfg =
-  {cfg with inner = {cfg.inner with tm}}
-
 exception ProjAbs of abs
 exception ProjVal of value
 
 
-let eval_dim (cfg : cfg) : D.t =
-  match Tm.out cfg.inner.tm with
+let eval_dim rho tm : D.t =
+  match Tm.out tm with
   | Tm.Dim0 ->
     D.dim0
   | Tm.Dim1 ->
     D.dim1
   | Tm.Var i ->
     begin
-      match List.nth cfg.inner.rho i with
+      match List.nth rho i with
       | Atom x ->
         D.named x
-      (* D.act cfg.action @@ D.named x *)
-      (* TODO: should I do this here? I think not, but I'm not sure. *)
       | _ ->
         failwith "eval_dim: expected atom in environment"
     end
@@ -565,91 +559,95 @@ and rigid_com dir abs cap (sys : comp_sys) : value =
   in
   rigid_hcom dir ty capcoe syscoe
 
-and eval : type x. x Tm.t with_env node -> value =
-  fun cfg ->
-    match Tm.out cfg.inner.tm with
+
+and clo bnd rho =
+  {inner = {tm = bnd; rho}; action = D.idn}
+
+and eval : type x. env -> x Tm.t -> value =
+  fun rho tm ->
+    match Tm.out tm with
     | Tm.Var i ->
       begin
-        match List.nth cfg.inner.rho i with
+        match List.nth rho i with
         | Val v -> v
         | _ -> failwith "Expected value in environment"
       end
 
     | Tm.Pi (dom, cod) ->
-      let dom = eval @@ set_tm dom cfg in
-      let cod = set_tm cod cfg in
+      let dom = eval rho dom in
+      let cod = clo cod rho in
       Val.into @@ Pi {dom; cod}
 
     | Tm.Sg (dom, cod) ->
-      let dom = eval @@ set_tm dom cfg in
-      let cod = set_tm cod cfg in
+      let dom = eval rho dom in
+      let cod = clo cod rho in
       Val.into @@ Sg {dom; cod}
 
     | Tm.Ext bnd ->
-      let abs = eval_ext_abs @@ set_tm bnd cfg in
+      let abs = eval_ext_abs rho bnd in
       Val.into @@ Ext abs
 
     | Tm.Lam bnd ->
-      Val.into @@ Lam (set_tm bnd cfg)
+      Val.into @@ Lam (clo bnd rho)
 
     | Tm.ExtLam bnd ->
-      let abs = eval_abs @@ set_tm bnd cfg in
+      let abs = eval_abs rho bnd in
       Val.into @@ ExtLam abs
 
     | Tm.Cons (t0, t1) ->
-      let v0 = eval @@ set_tm t0 cfg in
-      let v1 = eval @@ set_tm t1 cfg in
+      let v0 = eval rho t0 in
+      let v1 = eval rho t1 in
       Val.into @@ Cons (v0, v1)
 
     | Tm.Coe info ->
-      let r = eval_dim @@ set_tm info.r cfg in
-      let r' = eval_dim @@ set_tm info.r' cfg in
+      let r = eval_dim rho info.r in
+      let r' = eval_dim rho info.r' in
       let dir = Star.make r r' in
-      let abs = eval_abs @@ set_tm info.ty cfg in
-      let el = eval @@ set_tm info.tm cfg in
+      let abs = eval_abs rho info.ty  in
+      let el = eval rho info.tm in
       make_coe dir abs el
 
     | Tm.HCom info ->
-      let r = eval_dim @@ set_tm info.r cfg in
-      let r' = eval_dim @@ set_tm info.r' cfg in
+      let r = eval_dim rho info.r in
+      let r' = eval_dim rho info.r' in
       let dir = Star.make r r' in
-      let ty = eval @@ set_tm info.ty cfg in
-      let cap = eval @@ set_tm info.cap cfg in
-      let sys = eval_abs_sys @@ set_tm info.sys cfg in
+      let ty = eval rho info.ty in
+      let cap = eval rho info.cap in
+      let sys = eval_abs_sys rho info.sys in
       make_hcom dir ty cap sys
 
     | Tm.Com info ->
-      let r = eval_dim @@ set_tm info.r cfg in
-      let r' = eval_dim @@ set_tm info.r' cfg in
+      let r = eval_dim rho info.r in
+      let r' = eval_dim rho info.r' in
       let dir = Star.make r r' in
-      let abs = eval_abs @@ set_tm info.ty cfg in
-      let cap = eval @@ set_tm info.cap cfg in
-      let sys = eval_abs_sys @@ set_tm info.sys cfg in
+      let abs = eval_abs rho info.ty in
+      let cap = eval rho info.cap in
+      let sys = eval_abs_sys rho info.sys in
       make_com dir abs cap sys
 
     | Tm.FCom info ->
-      let r = eval_dim @@ set_tm info.r cfg in
-      let r' = eval_dim @@ set_tm info.r' cfg in
+      let r = eval_dim rho info.r  in
+      let r' = eval_dim rho info.r' in
       let dir = Star.make r r' in
-      let cap = eval @@ set_tm info.cap cfg in
-      let sys = eval_abs_sys @@ set_tm info.sys cfg in
+      let cap = eval rho info.cap in
+      let sys = eval_abs_sys rho info.sys in
       make_fcom dir cap sys
 
     | Tm.FunApp (t0, t1) ->
-      let v0 = eval @@ set_tm t0 cfg in
-      let v1 = eval @@ set_tm t1 cfg in
+      let v0 = eval rho t0 in
+      let v1 = eval rho t1 in
       apply v0 v1
 
     | Tm.ExtApp (t, tr) ->
-      let v = eval @@ set_tm t cfg in
-      let r = eval_dim @@ set_tm tr cfg in
+      let v = eval rho t in
+      let r = eval_dim rho tr in
       ext_apply v r
 
     | Tm.Car t ->
-      car @@ eval @@ set_tm t cfg
+      car @@ eval rho t
 
     | Tm.Cdr t ->
-      cdr @@ eval @@ set_tm t cfg
+      cdr @@ eval rho t
 
     | Tm.Univ lvl ->
       Val.into @@ Univ lvl
@@ -673,29 +671,28 @@ and eval : type x. x Tm.t with_env node -> value =
       failwith "1 is a dimension"
 
     | Tm.Down info ->
-      eval @@ set_tm info.tm cfg
+      eval rho info.tm
 
     | Tm.Up t ->
-      eval @@ set_tm t cfg
+      eval rho t
 
     | Tm.If info ->
-      let mot = set_tm info.mot cfg in
-      let scrut = eval @@ set_tm info.scrut cfg in
-      let tcase = eval @@ set_tm info.tcase cfg in
-      let fcase = eval @@ set_tm info.fcase cfg in
+      let mot = clo info.mot rho in
+      let scrut = eval rho info.scrut in
+      let tcase = eval rho info.tcase in
+      let fcase = eval rho info.fcase in
       if_ mot scrut tcase fcase
 
     | Tm.Let (t0, Tm.B (_, t1)) ->
-      let v0 = eval @@ set_tm t0 cfg in
-      eval {cfg with inner = {tm = t1; rho = Val v0 :: cfg.inner.rho}}
+      let v0 = eval rho t0 in
+      eval (Val v0 :: rho) t1
 
-    | Tm.Meta _ ->
-      failwith "TODO: eval meta"
+    | _ -> failwith ""
 
-and eval_abs_face cfg =
-  let tr, tr', obnd = cfg.inner.tm in
-  let r = eval_dim @@ set_tm tr cfg in
-  let r' = eval_dim @@ set_tm tr' cfg in
+
+and eval_abs_face rho (tr, tr', obnd) =
+  let r = eval_dim rho tr in
+  let r' = eval_dim rho tr' in
   match Star.make r r' with
   | `Ok xi ->
     begin
@@ -704,33 +701,28 @@ and eval_abs_face cfg =
         Face.False xi
       | _ ->
         let bnd = Option.get_exn obnd in
-        let abs =
-          eval_abs
-            {inner = {cfg.inner with tm = bnd};
-             action = D.cmp (D.equate r r') cfg.action}
-        in
+        let abs = Abs.act (D.equate r r') @@ eval_abs rho bnd in
         Face.Indet (xi, abs)
     end
   | `Same _ ->
     let bnd = Option.get_exn obnd in
-    let abs = eval_abs @@ set_tm bnd cfg in
+    let abs = eval_abs rho bnd in
     Face.True (r, r', abs)
 
-and eval_abs_sys cfg =
+and eval_abs_sys rho sys  =
   try
     let sys =
       List.map
-        (fun x -> force_abs_face @@ eval_abs_face @@ set_tm x cfg)
-        cfg.inner.tm
+        (fun x -> force_abs_face @@ eval_abs_face rho x)
+        sys
     in `Ok sys
   with
   | ProjAbs abs ->
     `Proj abs
 
-and eval_ext_face cfg : val_face =
-  let tr, tr', otm = cfg.inner.tm in
-  let r = eval_dim @@ set_tm tr cfg in
-  let r' = eval_dim @@ set_tm tr' cfg in
+and eval_ext_face rho (tr, tr', otm) : val_face =
+  let r = eval_dim rho tr in
+  let r' = eval_dim rho tr' in
   match Star.make r r' with
   | `Ok xi ->
     begin
@@ -739,34 +731,28 @@ and eval_ext_face cfg : val_face =
         Face.False xi
       | _ ->
         let tm = Option.get_exn otm in
-        let el =
-          eval
-            {inner = {cfg.inner with tm};
-             action = D.cmp (D.equate r r') cfg.action}
-        in
+        let el = Val.act (D.equate r r') @@ eval rho tm in
         Face.Indet (xi, el)
     end
   | `Same _ ->
     let tm = Option.get_exn otm in
-    let el = eval @@ set_tm tm cfg in
+    let el = eval rho tm in
     Face.True (r, r', el)
 
-and eval_ext_sys (sys : Tm.chk Tm.t Tm.system with_env node) : ext_sys =
-  List.map
-    (fun x -> eval_ext_face @@ set_tm x sys)
-    sys.inner.tm
+and eval_ext_sys rho sys : ext_sys =
+  List.map (eval_ext_face rho) sys
 
-and eval_abs cfg =
-  let Tm.B (_, tm) = cfg.inner.tm in
+and eval_abs rho bnd =
+  let Tm.B (_, tm) = bnd in
   let x = Symbol.fresh () in
-  let rho = Atom x :: cfg.inner.rho in
-  Abs.bind x @@ eval {cfg with inner = {tm; rho}}
+  let rho = Atom x :: rho in
+  Abs.bind x @@ eval rho tm
 
-and eval_ext_abs cfg =
-  let Tm.B (_, (tm, sys)) = cfg.inner.tm in
+and eval_ext_abs rho bnd =
+  let Tm.B (_, (tm, sys)) = bnd in
   let x = Symbol.fresh () in
-  let rho = Atom x :: cfg.inner.rho in
-  ExtAbs.bind x (eval {cfg with inner = {tm; rho}}, eval_ext_sys {cfg with inner = {tm = sys; rho}})
+  let rho = Atom x :: rho in
+  ExtAbs.bind x (eval rho tm, eval_ext_sys rho sys)
 
 and unleash_pi v =
   match unleash v with
@@ -1022,4 +1008,5 @@ and cdr v =
 
 and inst_clo clo varg =
   let Tm.B (_, tm) = clo.inner.tm in
-  eval {clo with inner = {tm; rho = Val varg :: clo.inner.rho}}
+  Val.act clo.action @@
+  eval (Val varg :: clo.inner.rho) tm
