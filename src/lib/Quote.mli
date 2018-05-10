@@ -12,8 +12,10 @@ sig
   val ix_of_atom : Symbol.t -> t -> int
 end
 
-val quote_nf : Env.t -> Val.nf -> Tm.chk Tm.t
-val quote_neu : Env.t -> Val.neu -> Tm.inf Tm.t
+type env = Env.t
 
-val equiv : Env.t -> ty:Val.value -> Val.value -> Val.value -> unit
-val subtype : Env.t -> Val.value -> Val.value -> unit
+val quote_nf : env -> Val.nf -> Tm.chk Tm.t
+val quote_neu : env -> Val.neu -> Tm.inf Tm.t
+
+val equiv : env -> ty:Val.value -> Val.value -> Val.value -> unit
+val subtype : env -> Val.value -> Val.value -> unit

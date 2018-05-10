@@ -1,4 +1,6 @@
 open Val
+
+
 module Env :
 sig
   type t
@@ -37,6 +39,8 @@ struct
     let lvl = M.find x env.atoms in
     ix_of_lvl lvl env
 end
+
+type env = Env.t
 
 let generic env ty =
   into @@ Up {ty = ty; neu = Lvl (Env.len env)}
