@@ -352,4 +352,38 @@ struct
   let times ty0 ty1 =
     sg None ty0 @@
     subst Proj ty1
+
+  let path ty tm0 tm1 =
+    let ty' = subst Proj ty in
+    let face0 = up (var 0), into Dim0, Some (subst Proj tm0) in
+    let face1 = up (var 0), into Dim1, Some (subst Proj tm1) in
+    let sys = [face0; face1] in
+    into @@ Ext (B (None, (ty', sys)))
+
+  let fiber ~ty0 ~ty1 ~f ~x =
+    sg None ty0 @@
+    path
+      (subst Proj ty1)
+      (up @@ into @@ FunApp (subst Proj f, up @@ var 0))
+      (subst Proj x)
+
+  let proj2 = Cmp (Proj, Proj)
+
+  let is_contr ty =
+    sg None ty @@
+    pi None (subst Proj ty) @@
+    path
+      (subst proj2 ty)
+      (up @@ var 0)
+      (up @@ var 1)
+
+  let equiv ty0 ty1 =
+    sg None (arr ty0 ty1) @@
+    pi None (subst Proj ty1) @@
+    is_contr @@
+    fiber
+      ~ty0:(subst proj2 ty0)
+      ~ty1:(subst proj2 ty1)
+      ~f:(var 1)
+      ~x:(up @@ var 0)
 end

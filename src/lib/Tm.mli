@@ -87,6 +87,13 @@ module Macros :
 sig
   val arr : chk t -> chk t -> chk t
   val times : chk t -> chk t -> chk t
+
+  (* non-dependent path *)
+  val path : chk t -> chk t -> chk t -> chk t
+
+  val is_contr : chk t -> chk t
+  val fiber : ty0:chk t -> ty1:chk t -> f:inf t -> x:chk t -> chk t
+  val equiv : chk t -> chk t -> chk t
 end
 
 val pp : 'a t Pretty.t
