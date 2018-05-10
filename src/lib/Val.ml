@@ -267,12 +267,19 @@ let rec act_can phi con =
 and act_neu phi con =
   match con with
   | VProj info ->
-    failwith "TODO: vproj"
-  (* step @@
-     let mx = Gen.act phi info.x in
-     let el = Val.act phi @@ into @@ Up {ty = info.vty; neu = info.neu} in
-     let func = Val.act phi info.func in
-     vproj mx ~el ~func *)
+    let mx = Gen.act phi info.x in
+    let ty0 = Val.act phi info.ty0 in
+    let ty1 = Val.act phi info.ty1 in
+    let equiv = Val.act phi info.equiv in
+    begin
+      match act_neu phi info.neu with
+      | Ret neu ->
+        let vty = make_v mx ty0 ty1 equiv in
+        let el = into @@ Up {ty = vty; neu = neu} in
+        step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
+      | Step el ->
+        step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
+    end
 
   | FunApp (neu, arg) ->
     let varg = act_nf phi arg in
