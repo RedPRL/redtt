@@ -267,7 +267,7 @@ let rec act : type a. D.action -> a con -> a step =
         | `Neu neu ->
           ret @@ FunApp (Val.into neu, varg')
         | `Step v ->
-          step @@ apply v varg'
+          step @@ apply v @@ Val.into @@ unleash_nf varg'
       end
 
     | ExtApp (neu, sys, r) ->
@@ -363,6 +363,15 @@ and unleash_can : can value -> can con =
       let con = unleash_can t in
       node := {inner = con; action = D.idn};
       con
+
+and unleash_nf : nf value -> can con =
+  fun node ->
+    match act !node.action !node.inner with
+    | Ret (Down info) ->
+      node := {inner = Down info; action = D.idn};
+      unleash_can info.el
+    | Step t ->
+      unleash_can t
 
 and unleash_neu : neu value -> [`Neu of neu con | `Step of can value] =
   fun node ->
