@@ -43,8 +43,7 @@ and neu =
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : gen; vty : value; neu : neu; func : value} -> neu
 
-and nf =
-  | Down of {ty : value; el : value}
+and nf = {ty : value; el : value}
 
 and abs = value Abstraction.abs
 
@@ -61,9 +60,13 @@ and ext_abs = (value * ext_sys) Abstraction.abs
 and env_el = Val of value | Atom of atom
 and env = env_el list
 
-
+val into : con -> value
 val unleash : value -> con
 
 val eval : env -> 'a Tm.t -> value
 val apply : value -> value -> value
 val ext_apply : value -> dim -> value
+val car : value -> value
+val cdr : value -> value
+
+val inst_clo : clo -> value -> value

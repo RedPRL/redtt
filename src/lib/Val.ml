@@ -45,8 +45,7 @@ and neu =
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : Gen.t; vty : value; neu : neu; func : value} -> neu
 
-and nf =
-  | Down of {ty : value; el : value}
+and nf = {ty : value; el : value}
 
 
 
@@ -79,24 +78,21 @@ let step v = Step v
 
 module type Sort = Sort.S
 
-module Val :
-sig
-  include Sort with type t = value with type 'a m = 'a
-  val into : con -> value
-end =
+module Val : Sort with type t = value with type 'a m = 'a =
 struct
   type 'a m = 'a
   type t = value
-
-  let into : con -> value =
-    fun con ->
-      ref @@ Node {con; action = D.idn}
 
   let act : D.action -> value -> value =
     fun phi thunk ->
       let Node node = !thunk in
       ref @@ Node {node with action = D.cmp phi node.action}
 end
+
+let into : con -> value =
+  fun con ->
+    ref @@ Node {con; action = D.idn}
+
 
 module Abs = Abstraction.M (Val)
 
@@ -186,16 +182,16 @@ let rec act_can phi con =
   | Pi info ->
     let dom = Val.act phi info.dom in
     let cod = Clo.act phi info.cod in
-    Val.into @@ Pi {dom; cod}
+    into @@ Pi {dom; cod}
 
   | Sg info ->
     let dom = Val.act phi info.dom in
     let cod = Clo.act phi info.cod in
-    Val.into @@ Sg {dom; cod}
+    into @@ Sg {dom; cod}
 
   | Ext abs ->
     let abs' = ExtAbs.act phi abs in
-    Val.into @@ Ext abs'
+    into @@ Ext abs'
 
   | Coe info ->
     make_coe
@@ -230,32 +226,32 @@ let rec act_can phi con =
       (Val.act phi info.el1)
 
   | Univ _ ->
-    Val.into con
+    into con
 
   | Bool ->
-    Val.into con
+    into con
 
   | Tt ->
-    Val.into con
+    into con
 
   | Ff ->
-    Val.into con
+    into con
 
   | Lam clo ->
-    Val.into @@ Lam (Clo.act phi clo)
+    into @@ Lam (Clo.act phi clo)
 
   | ExtLam abs ->
-    Val.into @@ ExtLam (Abs.act phi abs)
+    into @@ ExtLam (Abs.act phi abs)
 
   | Cons (v0, v1) ->
-    Val.into @@ Cons (Val.act phi v0, Val.act phi v1)
+    into @@ Cons (Val.act phi v0, Val.act phi v1)
 
   | Up info ->
     let ty = Val.act phi info.ty in
     begin
       match act_neu phi info.neu with
       | Ret neu ->
-        Val.into @@ Up {ty; neu}
+        into @@ Up {ty; neu}
       | Step v ->
         v
     end
@@ -265,7 +261,7 @@ and act_neu phi con =
   | VProj info ->
     step @@
     let mx = Gen.act phi info.x in
-    let el = Val.act phi @@ Val.into @@ Up {ty = info.vty; neu = info.neu} in
+    let el = Val.act phi @@ into @@ Up {ty = info.vty; neu = info.neu} in
     let func = Val.act phi info.func in
     vproj mx el func
 
@@ -276,7 +272,7 @@ and act_neu phi con =
       | Ret neu ->
         ret @@ FunApp (neu, varg)
       | Step v ->
-        let Down {el; _} = varg in
+        let {el; _} = varg in
         step @@ apply v el
     end
 
@@ -332,10 +328,10 @@ and act_neu phi con =
 
 and act_nf phi (nf : nf) =
   match nf with
-  | Down info ->
+  | info ->
     let ty = Val.act phi info.ty in
     let el = Val.act phi info.el in
-    Down {ty; el}
+    {ty; el}
 
 and force_abs_face face =
   match face with
@@ -384,7 +380,7 @@ and unleash : value -> con =
 and make_v mgen ty0 ty1 equiv : value =
   match mgen with
   | `Ok x ->
-    Val.into @@ V {x; ty0; ty1; equiv}
+    into @@ V {x; ty0; ty1; equiv}
   | `Const `Dim0 ->
     ty0
   | `Const `Dim1 ->
@@ -393,7 +389,7 @@ and make_v mgen ty0 ty1 equiv : value =
 and make_vin mgen el0 el1 : value =
   match mgen with
   | `Ok x ->
-    Val.into @@ VIn {x; el0; el1}
+    into @@ VIn {x; el0; el1}
   | `Const `Dim0 ->
     el0
   | `Const `Dim1 ->
@@ -441,7 +437,7 @@ and make_fcom mdir cap msys : value =
     begin
       match msys with
       | `Ok sys ->
-        Val.into @@ FCom {dir; cap; sys}
+        into @@ FCom {dir; cap; sys}
       | `Proj abs ->
         let _, r' = Star.unleash dir in
         let x, el = Abs.unleash abs in
@@ -454,7 +450,7 @@ and rigid_coe dir abs el =
   let x, tyx = Abs.unleash abs in
   match unleash tyx with
   | (Pi _ | Sg _ ) ->
-    Val.into @@ Coe {dir; abs; el}
+    into @@ Coe {dir; abs; el}
 
   | (Bool | Univ _) ->
     el
@@ -522,7 +518,7 @@ and rigid_coe dir abs el =
               in
               rigid_com dir xty1 cap sys
             in
-            Val.into @@ VIn {x = info.x; el0; el1}
+            into @@ VIn {x = info.x; el0; el1}
         end
     end
 
@@ -532,13 +528,13 @@ and rigid_coe dir abs el =
 and rigid_hcom dir ty cap sys : value =
   match unleash ty with
   | Pi _ ->
-    Val.into @@ HCom {dir; ty; cap; sys}
+    into @@ HCom {dir; ty; cap; sys}
 
   | Bool ->
     cap
 
   | Univ _ ->
-    Val.into @@ FCom {dir; cap; sys}
+    into @@ FCom {dir; cap; sys}
 
   | FCom _info ->
     failwith "hcom in fcom, taste it!!"
@@ -582,28 +578,28 @@ and eval : type x. env -> x Tm.t -> value =
     | Tm.Pi (dom, cod) ->
       let dom = eval rho dom in
       let cod = clo cod rho in
-      Val.into @@ Pi {dom; cod}
+      into @@ Pi {dom; cod}
 
     | Tm.Sg (dom, cod) ->
       let dom = eval rho dom in
       let cod = clo cod rho in
-      Val.into @@ Sg {dom; cod}
+      into @@ Sg {dom; cod}
 
     | Tm.Ext bnd ->
       let abs = eval_ext_abs rho bnd in
-      Val.into @@ Ext abs
+      into @@ Ext abs
 
     | Tm.Lam bnd ->
-      Val.into @@ Lam (clo bnd rho)
+      into @@ Lam (clo bnd rho)
 
     | Tm.ExtLam bnd ->
       let abs = eval_abs rho bnd in
-      Val.into @@ ExtLam abs
+      into @@ ExtLam abs
 
     | Tm.Cons (t0, t1) ->
       let v0 = eval rho t0 in
       let v1 = eval rho t1 in
-      Val.into @@ Cons (v0, v1)
+      into @@ Cons (v0, v1)
 
     | Tm.Coe info ->
       let r = eval_dim rho info.r in
@@ -656,16 +652,16 @@ and eval : type x. env -> x Tm.t -> value =
       cdr @@ eval rho t
 
     | Tm.Univ lvl ->
-      Val.into @@ Univ lvl
+      into @@ Univ lvl
 
     | Tm.Bool ->
-      Val.into Bool
+      into Bool
 
     | Tm.Tt ->
-      Val.into Tt
+      into Tt
 
     | Tm.Ff ->
-      Val.into Ff
+      into Ff
 
     | Tm.Interval ->
       failwith "The interval is only a facon de parler"
@@ -792,8 +788,8 @@ and apply vfun varg =
   | Up info ->
     let dom, cod = unleash_pi info.ty in
     let cod' = inst_clo cod varg in
-    let app = FunApp (info.neu, Down {ty = dom; el = varg}) in
-    Val.into @@ Up {ty = cod'; neu = app}
+    let app = FunApp (info.neu, {ty = dom; el = varg}) in
+    into @@ Up {ty = cod'; neu = app}
 
   | Coe info ->
     let r, r' = Star.unleash info.dir in
@@ -842,7 +838,7 @@ and ext_apply vext s =
       match force_ext_sys sysr with
       | `Rigid _ ->
         let app = ExtApp (info.neu, sysr, s) in
-        Val.into @@ Up {ty = tyr; neu = app}
+        into @@ Up {ty = tyr; neu = app}
       | `Proj v ->
         v
     end
@@ -909,7 +905,7 @@ and rigid_vproj x el func : value =
   | Up up ->
     let _, _, ty1, _ = unleash_v up.ty in
     let neu = VProj {x; vty = up.ty; neu = up.neu; func} in
-    Val.into @@ Up {ty = ty1; neu}
+    into @@ Up {ty = ty1; neu}
   | _ ->
     failwith "vproj"
 
@@ -922,7 +918,7 @@ and if_ mot scrut tcase fcase =
   | Up up ->
     let neu = If {mot; neu = up.neu; tcase; fcase} in
     let mot' = inst_clo mot scrut in
-    Val.into @@ Up {ty = mot'; neu}
+    into @@ Up {ty = mot'; neu}
   | _ ->
     failwith "if_"
 
@@ -933,7 +929,7 @@ and car v =
 
   | Up info ->
     let dom, _ = unleash_sg info.ty in
-    Val.into @@ Up {ty = dom; neu = Car info.neu}
+    into @@ Up {ty = dom; neu = Car info.neu}
 
   | Coe info ->
     let x, tyx = Abs.unleash info.abs in
