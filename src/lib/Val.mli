@@ -70,3 +70,13 @@ val car : value -> value
 val cdr : value -> value
 
 val inst_clo : clo -> value -> value
+val const_clo : value -> clo
+
+val unleash_v : value -> gen * value * value * value
+
+
+module ExtAbs : Abstraction.S
+  with type el = value * ext_sys
+
+module Abs : Abstraction.S
+  with type el = value

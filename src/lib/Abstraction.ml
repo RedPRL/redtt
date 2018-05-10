@@ -3,15 +3,21 @@ type 'a abs = {atom : atom option; node : 'a}
 
 module D = Dim
 
-module M (X : Sort.S with type 'a m = 'a) :
+module type S =
 sig
-  include Sort.S with type 'a m = 'a with type t = X.t abs
-  val bind : atom -> X.t -> t
-  val const : X.t -> t
-  val unleash : t -> atom * X.t
-  val inst : t -> Dim.t -> X.t
-end =
+  type el
+
+  include Sort.S with type 'a m = 'a with type t = el abs
+
+  val bind : atom -> el -> t
+  val const : el -> t
+  val unleash : t -> atom * el
+  val inst : t -> Dim.t -> el
+end
+
+module M (X : Sort.S with type 'a m = 'a) : S with type el = X.t =
 struct
+  type el = X.t
   type 'a m = 'a
   type t = X.t abs
 

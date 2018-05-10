@@ -24,6 +24,8 @@ val idn : action
 val status : action -> [`Done | `Enqueued]
 
 val atom : t -> atom
+val quote : t -> [`Dim0 | `Dim1 | `Generic of atom]
+
 exception ExpectedAtom
 
 val act : action -> t -> t

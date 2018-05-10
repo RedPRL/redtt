@@ -30,6 +30,7 @@ type _ f =
   | Tt : chk f
   | Ff : chk f
   | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
+  | VProj : {r : chk t; tm : inf t; func : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
   | ExtLam : chk t bnd -> chk f
@@ -64,6 +65,7 @@ let inst0 t = Sub (Id, t)
 let meta hole sub = into @@ Meta (hole, sub)
 let up t = into @@ Up t
 let lam nm t = into @@ Lam (B (nm, t))
+let ext_lam nm t = into @@ ExtLam (B (nm, t))
 let pi nm dom cod = into @@ Pi (dom, B (nm, cod))
 let sg nm dom cod = into @@ Sg (dom, B (nm, cod))
 let let_ nm t0 t1 = into @@ Let (t0, B (nm, t1))
@@ -120,6 +122,9 @@ let rec pp : type a. a t Pretty.t =
 
     | Cdr tm ->
       Format.fprintf fmt "@[<1>(cdr@ %a)@]" (pp env) tm
+
+    | VProj {r; tm; func} ->
+      Format.fprintf fmt "@[<1>(vproj %a@ %a@ %a)@]" (pp env) r (pp env) tm (pp env) func
 
     | Up tm ->
       pp env fmt tm

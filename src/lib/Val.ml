@@ -51,7 +51,10 @@ and nf = {ty : value; el : value}
 
 and ('x, 'a) face = ('x, 'a) Face.face
 
-and clo = Clo of {bnd : Tm.chk Tm.t Tm.bnd; rho : env; action : D.action}
+and clo =
+  | Clo of {bnd : Tm.chk Tm.t Tm.bnd; rho : env; action : D.action}
+  | Const of value
+
 and env_el = Val of value | Atom of atom
 and env = env_el list
 
@@ -104,8 +107,12 @@ struct
   type t = clo
   type 'a m = 'a
 
-  let act phi (Clo clo) =
-    Clo {clo with action = D.cmp phi clo.action}
+  let act phi clo =
+    match clo with
+    | Clo info ->
+      Clo {info with action = D.cmp phi info.action}
+    | Const v ->
+      Const (Val.act phi v)
 end
 
 module CompSys :
@@ -153,7 +160,8 @@ struct
     List.map (ValFace.act phi)
 end
 
-module ExtAbs = Abstraction.M (Sort.Prod (Val) (ExtSys))
+module ExtAbs : Abstraction.S with type el = value * ext_sys =
+  Abstraction.M (Sort.Prod (Val) (ExtSys))
 
 exception ProjAbs of abs
 exception ProjVal of value
@@ -263,7 +271,7 @@ and act_neu phi con =
     let mx = Gen.act phi info.x in
     let el = Val.act phi @@ into @@ Up {ty = info.vty; neu = info.neu} in
     let func = Val.act phi info.func in
-    vproj mx el func
+    vproj mx ~el ~func
 
   | FunApp (neu, arg) ->
     let varg = act_nf phi arg in
@@ -501,7 +509,7 @@ and rigid_coe dir abs el =
             let xty0 = Abs.bind x info.ty0 in
             let el0 = rigid_coe dir xty0 el in
             let el1 =
-              let cap = rigid_vproj info.x el @@ car @@ Val.act (Dim.subst r x) info.equiv in
+              let cap = rigid_vproj info.x ~el ~func:(car @@ Val.act (Dim.subst r x) info.equiv) in
               let r2x = Star.make r (D.named x) in
               let sys =
                 let face0 =
@@ -651,6 +659,12 @@ and eval : type x. env -> x Tm.t -> value =
     | Tm.Cdr t ->
       cdr @@ eval rho t
 
+    | Tm.VProj info ->
+      let r = eval_dim rho info.r in
+      let el = eval rho info.tm in
+      let func = eval rho info.func in
+      vproj (Gen.make r) el func
+
     | Tm.Univ lvl ->
       into @@ Univ lvl
 
@@ -689,7 +703,9 @@ and eval : type x. env -> x Tm.t -> value =
       let v0 = eval rho t0 in
       eval (Val v0 :: rho) t1
 
-    | _ -> failwith ""
+    | Tm.Meta _ ->
+      failwith "TODO: eval meta"
+
 
 
 and eval_abs_face rho (tr, tr', obnd) =
@@ -888,16 +904,16 @@ and ext_apply vext s =
     failwith "ext_apply"
 
 
-and vproj mgen el func : value =
+and vproj mgen ~el ~func : value =
   match mgen with
   | `Ok x ->
-    rigid_vproj x el func
+    rigid_vproj x ~el ~func
   | `Const `Dim0 ->
     apply func el
   | `Const `Dim1 ->
     el
 
-and rigid_vproj x el func : value =
+and rigid_vproj x ~el ~func : value =
   match unleash el with
   | VIn info ->
     (* Invariant: info.x == x, not well-typed otherwise *)
@@ -1008,7 +1024,14 @@ and cdr v =
 
   | _ -> failwith "TODO: cdr"
 
-and inst_clo (Clo clo) varg =
-  let Tm.B (_, tm) = clo.bnd in
-  Val.act clo.action @@
-  eval (Val varg :: clo.rho) tm
+and inst_clo clo varg =
+  match clo with
+  | Clo info ->
+    let Tm.B (_, tm) = info.bnd in
+    Val.act info.action @@
+    eval (Val varg :: info.rho) tm
+  | Const v ->
+    v
+
+let const_clo v =
+  Const v

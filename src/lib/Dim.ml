@@ -116,3 +116,15 @@ let atom r =
     atm.atom
   | _ ->
     raise ExpectedAtom
+
+let quote r =
+  match r with
+  | Atom atm ->
+    let rec go x ys =
+      match ys with
+      | [] -> `Generic x
+      | y::ys -> go y ys
+    in
+    go atm.atom atm.history
+  | Dim0 -> `Dim0
+  | Dim1 -> `Dim1

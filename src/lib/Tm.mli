@@ -40,6 +40,7 @@ type _ f =
   | Tt : chk f
   | Ff : chk f
   | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
+  | VProj : {r : chk t; tm : inf t; func : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
   | ExtLam : chk t bnd -> chk f
@@ -71,6 +72,7 @@ val var : int -> inf t
 val inst0 : inf t -> subst
 val up : inf t -> chk t
 val lam : string option -> chk t -> chk t
+val ext_lam : string option -> chk t -> chk t
 val pi : string option -> chk t -> chk t -> chk t
 val sg : string option -> chk t -> chk t -> chk t
 val let_ : string option -> inf t -> chk t -> chk t
