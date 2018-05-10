@@ -7,6 +7,11 @@ type dim = D.t
 type star = Star.t
 type gen = Gen.t
 
+(* Notes: I have defined the semantic domain and evaluator in a fairly naive way, in order to avoid
+   some confusing questions. It may not be that efficient! But it should be easier at this point to
+   transform it into something efficient, since the code is currently simple-minded enough to
+   think about. *)
+
 type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con
