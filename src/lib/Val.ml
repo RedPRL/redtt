@@ -370,14 +370,14 @@ and force_abs_sys sys =
   | ProjAbs abs ->
     `Proj abs
 
-and unleash_can : value -> con =
+and unleash : value -> con =
   fun node ->
     match Dim.status !node.action with
     | `Done ->
       !node.inner
     | `Enqueued ->
       let node' = act_can !node.action !node.inner in
-      let con = unleash_can node' in
+      let con = unleash node' in
       node := {inner = con; action = D.idn};
       con
 
@@ -428,19 +428,7 @@ and make_com mdir abs cap msys : value =
     begin
       match msys with
       | `Ok sys ->
-        let ty = Abs.inst abs r' in
-        let capcoe = rigid_coe dir abs cap in
-        let syscoe : comp_sys =
-          let face =
-            Face.map @@ fun ri r'i absi ->
-            let phi = D.equate ri r'i in
-            let yi, vi = Abs.unleash absi in
-            let y2r' = Star.make (D.named yi) (D.act phi r') in
-            Abs.bind yi @@ make_coe y2r' abs vi
-          in
-          List.map face sys
-        in
-        rigid_hcom dir ty capcoe syscoe
+        rigid_com dir abs cap sys
       | `Proj abs ->
         Abs.inst abs r'
     end
@@ -464,7 +452,7 @@ and make_fcom mdir cap msys : value =
 
 and rigid_coe dir abs el =
   let x, tyx = Abs.unleash abs in
-  match unleash_can tyx with
+  match unleash tyx with
   | (Pi _ | Sg _ ) ->
     Val.into @@ Coe {dir; abs; el}
 
@@ -542,7 +530,7 @@ and rigid_coe dir abs el =
     failwith "TODO: rigid_coe"
 
 and rigid_hcom dir ty cap sys : value =
-  match unleash_can ty with
+  match unleash ty with
   | Pi _ ->
     Val.into @@ HCom {dir; ty; cap; sys}
 
@@ -781,31 +769,31 @@ and eval_ext_abs cfg =
   ExtAbs.bind x (eval {cfg with inner = {tm; rho}}, eval_ext_sys {cfg with inner = {tm = sys; rho}})
 
 and unleash_pi v =
-  match unleash_can v with
+  match unleash v with
   | Pi {dom; cod} -> dom, cod
   | _ -> failwith "unleash_pi"
 
 and unleash_sg v =
-  match unleash_can v with
+  match unleash v with
   | Sg {dom; cod} -> dom, cod
   | _ -> failwith "unleash_sg"
 
 and unleash_ext v r =
-  match unleash_can v with
+  match unleash v with
   | Ext abs ->
     ExtAbs.inst abs r
   | _ ->
     failwith "unleash_ext"
 
 and unleash_v v =
-  match unleash_can v with
+  match unleash v with
   | V {x; ty0; ty1; equiv} ->
     x, ty0, ty1, equiv
   | _ ->
     failwith "unleash_v"
 
 and apply vfun varg =
-  match unleash_can vfun with
+  match unleash vfun with
   | Lam clo ->
     inst_clo clo varg
 
@@ -852,7 +840,7 @@ and apply vfun varg =
     failwith "apply"
 
 and ext_apply vext s =
-  match unleash_can vext with
+  match unleash vext with
   | ExtLam abs ->
     Abs.inst abs s
 
@@ -922,7 +910,7 @@ and vproj mgen el func : value =
     el
 
 and rigid_vproj x el func : value =
-  match unleash_can el with
+  match unleash el with
   | VIn info ->
     (* Invariant: info.x == x, not well-typed otherwise *)
     info.el1
@@ -934,7 +922,7 @@ and rigid_vproj x el func : value =
     failwith "vproj"
 
 and if_ mot scrut tcase fcase =
-  match unleash_can scrut with
+  match unleash scrut with
   | Tt ->
     tcase
   | Ff ->
@@ -947,7 +935,7 @@ and if_ mot scrut tcase fcase =
     failwith "if_"
 
 and car v =
-  match unleash_can v with
+  match unleash v with
   | Cons (v0, _) ->
     v0
 
@@ -977,7 +965,7 @@ and car v =
     failwith "car"
 
 and cdr v =
-  match unleash_can v with
+  match unleash v with
   | Cons (_, v1) ->
     v1
 
