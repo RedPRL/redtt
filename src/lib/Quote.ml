@@ -264,12 +264,43 @@ and equate_dim env r r' =
 
 
 let equiv env ~ty el0 el1 =
-  match equate env ty el0 el1 with
-  | _ -> true
-  | exception _ -> false
+  ignore @@ equate env ty el0 el1
 
 let quote_nf env nf =
   equate env nf.ty nf.el nf.el
 
 let quote_neu env neu =
   equate_neu env neu neu
+
+let rec subtype env ty0 ty1 =
+  match unleash ty0, unleash ty1 with
+  | Pi pi0, Pi pi1 ->
+    subtype env pi1.dom pi0.dom;
+    let var = generic env pi0.dom in
+    let vcod0 = inst_clo pi0.cod var in
+    let vcod1 = inst_clo pi1.cod var in
+    subtype env vcod0 vcod1
+
+  | Sg sg0, Sg sg1 ->
+    subtype env sg0.dom sg1.dom;
+    let var = generic env sg0.dom in
+    let vcod0 = inst_clo sg0.cod var in
+    let vcod1 = inst_clo sg1.cod var in
+    subtype env vcod0 vcod1
+
+  | Ext abs0, Ext abs1 ->
+    let x, (ty0x, sys0x) = ExtAbs.unleash abs0 in
+    let ty1x, sys1x = ExtAbs.inst abs1 @@ Dim.named x in
+    let envx = Env.abs env x in
+    subtype envx ty0x ty1x;
+    ignore @@ equate_val_sys envx ty0x sys0x sys1x
+
+  | Univ lvl0, Univ lvl1 ->
+    if lvl0 = lvl1 or Lvl.greater lvl1 lvl0 then
+      ()
+    else
+      failwith "Universe level too big"
+
+  | _ ->
+    let univ = into @@ Univ Lvl.Omega in
+    equiv env univ ty0 ty1

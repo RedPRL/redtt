@@ -15,4 +15,5 @@ end
 val quote_nf : Env.t -> Val.nf -> Tm.chk Tm.t
 val quote_neu : Env.t -> Val.neu -> Tm.inf Tm.t
 
-val equiv : Env.t -> ty:Val.value -> Val.value -> Val.value -> bool
+val equiv : Env.t -> ty:Val.value -> Val.value -> Val.value -> unit
+val subtype : Env.t -> Val.value -> Val.value -> unit
