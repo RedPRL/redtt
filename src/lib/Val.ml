@@ -260,25 +260,53 @@ let rec act : type a. D.action -> a con -> a step =
       ret @@ Cons (Val.act phi v0, Val.act phi v1)
 
     | FunApp (neu, arg) ->
-      ret @@ FunApp (Val.act phi neu, Val.act phi arg)
+      let neu' = Val.act phi neu in
+      let varg' = Val.act phi arg in
+      begin
+        match unleash_neu neu' with
+        | `Neu neu ->
+          ret @@ FunApp (Val.into neu, varg')
+        | `Step v ->
+          step @@ apply v varg'
+      end
 
     | ExtApp (neu, sys, r) ->
       let sys' = ExtSys.act phi sys in
+      let neu' = Val.act phi neu in
+      let r' = Dim.act phi r in
       begin
-        match force_ext_sys sys' with
-        | `Rigid _ ->
-          let neu' = Val.act phi neu in
-          let r' = Dim.act phi r in
-          ret @@ ExtApp (neu', sys', r')
-        | `Proj v ->
-          step v
+        match unleash_neu neu' with
+        | `Neu neu ->
+          begin
+            match force_ext_sys sys' with
+            | `Rigid _ ->
+              ret @@ ExtApp (Val.into neu, sys', r')
+            | `Proj v ->
+              step v
+          end
+        | `Step v ->
+          step @@ ext_apply v r'
       end
 
     | Car neu ->
-      ret @@ Car (Val.act phi neu)
+      let neu' = Val.act phi neu in
+      begin
+        match unleash_neu neu' with
+        | `Neu neu ->
+          ret @@ Car (Val.into neu)
+        | `Step v ->
+          step @@ car v
+      end
 
     | Cdr neu ->
-      ret @@ Cdr (Val.act phi neu)
+      let neu' = Val.act phi neu in
+      begin
+        match unleash_neu neu' with
+        | `Neu neu ->
+          ret @@ Cdr (Val.into neu)
+        | `Step v ->
+          step @@ cdr v
+      end
 
     | Lvl _ ->
       ret con
@@ -444,6 +472,7 @@ and rigid_coe dir abs el : can step =
     begin
       let r, r' = Star.unleash dir in
       let xty1 = Abs.bind x info.ty1 in
+
       match Gen.make r with
       | `Const `Dim0 ->
         let el1 =
@@ -485,16 +514,17 @@ and rigid_coe dir abs el : can step =
             let el0 = Val.from_step @@ rigid_coe dir xty0 el in
             let el1 =
               let cap = rigid_vproj info.x el @@ car @@ Val.act (Dim.subst r x) info.equiv in
+              let r2x = Star.make r (D.named x) in
               let sys =
                 let face0 =
                   AbsFace.gen_const info.x `Dim0 @@
                   Abs.bind x @@ apply (car info.equiv) @@
-                  Val.from_step @@ make_coe (Star.make r (D.named x)) xty0 el
+                  Val.from_step @@ make_coe r2x xty0 el
                 in
                 let face1 =
                   AbsFace.gen_const info.x `Dim1 @@
                   Abs.bind x @@
-                  Val.from_step @@ make_coe (Star.make r (D.named x)) xty1 el
+                  Val.from_step @@ make_coe r2x xty1 el
                 in
                 [face0; face1]
               in
