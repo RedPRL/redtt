@@ -1,7 +1,11 @@
-type atom = Symbol.t
 module D = Dim
 module Star = DimStar
 module Gen = DimGeneric
+
+type atom = Symbol.t
+type dim = D.t
+type star = Star.t
+type gen = Gen.t
 
 type can = [`Can]
 type neu = [`Neu]
