@@ -7,58 +7,57 @@ type dim = D.t
 type star = Star.t
 type gen = Gen.t
 
-type can = [`Can]
-type neu = [`Neu]
-type nf = [`Nf]
+type con =
+  | Pi : {dom : value; cod : clo} -> con
+  | Sg : {dom : value; cod : clo} -> con
+  | Ext : ext_abs -> con
 
-type _ con =
-  | Pi : {dom : can value; cod : clo} -> can con
-  | Sg : {dom : can value; cod : clo} -> can con
-  | Ext : ext_abs -> can con
+  | Coe : {dir : star; abs : abs; el : value} -> con
+  | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
+  | FCom : {dir : star; cap : value; sys : comp_sys} -> con
 
-  | Coe : {dir : Star.t; abs : abs; el : can value} -> can con
-  | HCom : {dir : Star.t; ty : can value; cap : can value; sys : comp_sys} -> can con
-  | FCom : {dir : Star.t; cap : can value; sys : comp_sys} -> can con
+  | Univ : Lvl.t -> con
+  | V : {x : gen; ty0 : value; ty1 : value; equiv : value} -> con
+  | VIn : {x : gen; el0 : value; el1 : value} -> con
 
-  | Univ : Lvl.t -> can con
-  | V : {x : Gen.t; ty0 : can value; ty1 : can value; equiv : can value} -> can con
-  | VIn : {x : Gen.t; el0 : can value; el1 : can value} -> can con
+  | Lam : clo -> con
+  | ExtLam : abs -> con
+  | Cons : value * value -> con
+  | Bool : con
+  | Tt : con
+  | Ff : con
 
-  | Lam : clo -> can con
-  | ExtLam : abs -> can con
-  | Cons : can value * can value -> can con
-  | Bool : can con
-  | Tt : can con
-  | Ff : can con
+  | Up : {ty : value; neu : neu} -> con
 
-  | Up : {ty : can value; neu : neu con} -> can con
-
-  | Lvl : int -> neu con
-  | FunApp : neu con * nf con -> neu con
-  | ExtApp : neu con * ext_sys * D.t -> neu con
-  | Car : neu con -> neu con
-  | Cdr : neu con -> neu con
-  | If : {mot : clo; neu : neu con; tcase : can value; fcase : can value} -> neu con
-
+and neu =
+  | Lvl : int -> neu
+  | FunApp : neu * nf -> neu
+  | ExtApp : neu * ext_sys * D.t -> neu
+  | Car : neu -> neu
+  | Cdr : neu -> neu
+  | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
 
   (* Invariant: neu \in vty, vty is a V type *)
-  | VProj : {x : Gen.t; vty : can value; neu : neu con; func : can value} -> neu con
+  | VProj : {x : Gen.t; vty : value; neu : neu; func : value} -> neu
 
-  | Down : {ty : can value; el : can value} -> nf con
+and nf =
+  | Down of {ty : value; el : value}
+
+
 
 and ('x, 'a) face = ('x, 'a) Face.face
 
 and 'a with_env = {tm : 'a; rho : env}
 and cfg = Tm.chk Tm.t with_env node
 and clo = Tm.chk Tm.t Tm.bnd with_env node
-and env_el = Val of can value | Atom of atom
+and env_el = Val of value | Atom of atom
 and env = env_el list
 
-and abs = can value Abstraction.abs
-and ext_abs = (can value * ext_sys) Abstraction.abs
+and abs = value Abstraction.abs
+and ext_abs = (value * ext_sys) Abstraction.abs
 and rigid_abs_face = ([`Rigid], abs) face
-and val_face = ([`Any], can value) face
-and rigid_val_face = ([`Rigid], can value) face
+and val_face = ([`Any], value) face
+and rigid_val_face = ([`Rigid], value) face
 
 and comp_sys = rigid_abs_face list
 and ext_sys = val_face list
@@ -66,38 +65,38 @@ and box_sys = rigid_val_face list
 and cap_sys = rigid_abs_face list
 
 and 'a node = {inner : 'a; action : D.action}
-and 'a value = 'a con node ref
+and value = con node ref
 
 type step =
-  | Ret : neu con -> step
-  | Step : can value -> step
+  | Ret : neu -> step
+  | Step : value -> step
 
 let ret v = Ret v
 let step v = Step v
 
 module type Sort = Sort.S
 
-module Val =
+module Val :
+sig
+  include Sort with type t = value with type 'a m = 'a
+  val into : con -> value
+end =
 struct
-  let into : type a. a con -> a value =
+  type 'a m = 'a
+  type t = value
+
+  let into : con -> value =
     fun inner ->
       ref @@ {inner; action = D.idn}
 
-  let act : type a. D.action -> a value -> a value =
+  let act : D.action -> value -> value =
     fun phi node ->
       ref @@ {!node with action = D.cmp phi !node.action}
 end
 
-module CanVal : Sort with type t = can value with type 'a m = 'a =
-struct
-  include Val
-  type 'a m = 'a
-  type t = can value
-end
+module Abs = Abstraction.M (Val)
 
-module Abs = Abstraction.M (CanVal)
-
-module ValFace = Face.M (CanVal)
+module ValFace = Face.M (Val)
 module AbsFace = Face.M (Abs)
 
 module Clo : Sort with type t = clo with type 'a m = 'a =
@@ -154,13 +153,13 @@ struct
     List.map (ValFace.act phi)
 end
 
-module ExtAbs = Abstraction.M (Sort.Prod (CanVal) (ExtSys))
+module ExtAbs = Abstraction.M (Sort.Prod (Val) (ExtSys))
 
 let set_tm tm cfg =
   {cfg with inner = {cfg.inner with tm}}
 
 exception ProjAbs of abs
-exception ProjVal of can value
+exception ProjVal of value
 
 
 let eval_dim (cfg : cfg) : D.t =
@@ -332,8 +331,8 @@ and act_neu phi con =
   | Lvl _ ->
     ret con
 
-and act_nf phi con =
-  match con with
+and act_nf phi (nf : nf) =
+  match nf with
   | Down info ->
     let ty = Val.act phi info.ty in
     let el = Val.act phi info.el in
@@ -371,7 +370,7 @@ and force_abs_sys sys =
   | ProjAbs abs ->
     `Proj abs
 
-and unleash_can : can value -> can con =
+and unleash_can : value -> con =
   fun node ->
     match Dim.status !node.action with
     | `Done ->
@@ -382,7 +381,7 @@ and unleash_can : can value -> can con =
       node := {inner = con; action = D.idn};
       con
 
-and make_v mgen ty0 ty1 equiv : can value =
+and make_v mgen ty0 ty1 equiv : value =
   match mgen with
   | `Ok x ->
     Val.into @@ V {x; ty0; ty1; equiv}
@@ -391,7 +390,7 @@ and make_v mgen ty0 ty1 equiv : can value =
   | `Const `Dim1 ->
     ty1
 
-and make_vin mgen el0 el1 : can value =
+and make_vin mgen el0 el1 : value =
   match mgen with
   | `Ok x ->
     Val.into @@ VIn {x; el0; el1}
@@ -400,14 +399,14 @@ and make_vin mgen el0 el1 : can value =
   | `Const `Dim1 ->
     el0
 
-and make_coe mdir abs el : can value =
+and make_coe mdir abs el : value =
   match mdir with
   | `Ok dir ->
     rigid_coe dir abs el
   | `Same _ ->
     el
 
-and make_hcom mdir ty cap msys : can value =
+and make_hcom mdir ty cap msys : value =
   match mdir with
   | `Ok dir ->
     begin
@@ -422,7 +421,7 @@ and make_hcom mdir ty cap msys : can value =
   | `Same _ ->
     cap
 
-and make_com mdir abs cap msys : can value =
+and make_com mdir abs cap msys : value =
   match mdir with
   | `Ok dir ->
     let _, r' = Star.unleash dir in
@@ -448,7 +447,7 @@ and make_com mdir abs cap msys : can value =
   | `Same _ ->
     cap
 
-and make_fcom mdir cap msys : can value =
+and make_fcom mdir cap msys : value =
   match mdir with
   | `Ok dir ->
     begin
@@ -542,7 +541,7 @@ and rigid_coe dir abs el =
   | _ ->
     failwith "TODO: rigid_coe"
 
-and rigid_hcom dir ty cap sys : can value =
+and rigid_hcom dir ty cap sys : value =
   match unleash_can ty with
   | Pi _ ->
     Val.into @@ HCom {dir; ty; cap; sys}
@@ -562,7 +561,7 @@ and rigid_hcom dir ty cap sys : can value =
   | _ ->
     failwith "TODO"
 
-and rigid_com dir abs cap (sys : comp_sys) : can value =
+and rigid_com dir abs cap (sys : comp_sys) : value =
   let _, r' = Star.unleash dir in
   let ty = Abs.inst abs r' in
   let capcoe = rigid_coe dir abs cap in
@@ -578,7 +577,7 @@ and rigid_com dir abs cap (sys : comp_sys) : can value =
   in
   rigid_hcom dir ty capcoe syscoe
 
-and eval : type x. x Tm.t with_env node -> can value =
+and eval : type x. x Tm.t with_env node -> value =
   fun cfg ->
     match Tm.out cfg.inner.tm with
     | Tm.Var i ->
@@ -909,7 +908,7 @@ and ext_apply vext s =
     failwith "ext_apply"
 
 
-and vproj mgen el func : can value =
+and vproj mgen el func : value =
   match mgen with
   | `Ok x ->
     rigid_vproj x el func
@@ -918,7 +917,7 @@ and vproj mgen el func : can value =
   | `Const `Dim1 ->
     el
 
-and rigid_vproj x el func : can value =
+and rigid_vproj x el func : value =
   match unleash_can el with
   | VIn info ->
     (* Invariant: info.x == x, not well-typed otherwise *)
