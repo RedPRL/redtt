@@ -47,8 +47,7 @@ and nf =
 
 and ('x, 'a) face = ('x, 'a) Face.face
 
-and 'a with_env = {tm : 'a; rho : env}
-and clo = Tm.chk Tm.t Tm.bnd with_env node
+and clo = Clo of {bnd : Tm.chk Tm.t Tm.bnd; rho : env; action : D.action}
 and env_el = Val of value | Atom of atom
 and env = env_el list
 
@@ -63,8 +62,8 @@ and ext_sys = val_face list
 and box_sys = rigid_val_face list
 and cap_sys = rigid_abs_face list
 
-and 'a node = {inner : 'a; action : D.action}
-and value = con node ref
+and node = Node of {con : con; action : D.action}
+and value = node ref
 
 type step =
   | Ret : neu -> step
@@ -85,12 +84,13 @@ struct
   type t = value
 
   let into : con -> value =
-    fun inner ->
-      ref @@ {inner; action = D.idn}
+    fun con ->
+      ref @@ Node {con; action = D.idn}
 
   let act : D.action -> value -> value =
-    fun phi node ->
-      ref @@ {!node with action = D.cmp phi !node.action}
+    fun phi thunk ->
+      let Node node = !thunk in
+      ref @@ Node {node with action = D.cmp phi node.action}
 end
 
 module Abs = Abstraction.M (Val)
@@ -103,8 +103,8 @@ struct
   type t = clo
   type 'a m = 'a
 
-  let act phi clo =
-    {clo with action = D.cmp phi clo.action}
+  let act phi (Clo clo) =
+    Clo {clo with action = D.cmp phi clo.action}
 end
 
 module CompSys :
@@ -366,13 +366,14 @@ and force_abs_sys sys =
 
 and unleash : value -> con =
   fun node ->
-    match Dim.status !node.action with
+    let Node info = !node in
+    match Dim.status info.action with
     | `Done ->
-      !node.inner
+      info.con
     | `Enqueued ->
-      let node' = act_can !node.action !node.inner in
+      let node' = act_can info.action info.con in
       let con = unleash node' in
-      node := {inner = con; action = D.idn};
+      node := Node {con = con; action = D.idn};
       con
 
 and make_v mgen ty0 ty1 equiv : value =
@@ -561,7 +562,7 @@ and rigid_com dir abs cap (sys : comp_sys) : value =
 
 
 and clo bnd rho =
-  {inner = {tm = bnd; rho}; action = D.idn}
+  Clo {bnd; rho; action = D.idn}
 
 and eval : type x. env -> x Tm.t -> value =
   fun rho tm ->
@@ -1006,7 +1007,7 @@ and cdr v =
 
   | _ -> failwith "TODO: cdr"
 
-and inst_clo clo varg =
-  let Tm.B (_, tm) = clo.inner.tm in
+and inst_clo (Clo clo) varg =
+  let Tm.B (_, tm) = clo.bnd in
   Val.act clo.action @@
-  eval (Val varg :: clo.inner.rho) tm
+  eval (Val varg :: clo.rho) tm
