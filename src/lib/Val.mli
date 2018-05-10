@@ -62,6 +62,9 @@ and ext_abs = (value * ext_sys) Abstraction.abs
 and env_el = Val of value | Atom of atom
 and env = env_el list
 
+
+val unleash : value -> con
+
 val eval : cfg -> value
 val apply : value -> value -> value
 val ext_apply : value -> dim -> value
