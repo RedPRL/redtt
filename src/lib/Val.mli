@@ -40,7 +40,11 @@ and neu =
   | Cdr : neu -> neu
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
 
-  (* Invariant: neu \in vty, vty is a V type *)
+  (* Invariant: neu \in vty, vty is a V type
+
+     This should be changed to carry all the components of the V type
+
+  *)
   | VProj : {x : gen; vty : value; neu : neu; func : value} -> neu
 
 and nf = {ty : value; el : value}
@@ -64,6 +68,8 @@ val into : con -> value
 val unleash : value -> con
 
 val eval : env -> 'a Tm.t -> value
+val eval_dim : env -> Tm.chk Tm.t -> dim
+
 val apply : value -> value -> value
 val ext_apply : value -> dim -> value
 val car : value -> value
@@ -72,7 +78,11 @@ val cdr : value -> value
 val inst_clo : clo -> value -> value
 val const_clo : value -> clo
 
+
+val unleash_pi : value -> value * clo
+val unleash_sg : value -> value * clo
 val unleash_v : value -> gen * value * value * value
+val unleash_ext : value -> dim -> value * ext_sys
 
 
 module ExtAbs : Abstraction.S

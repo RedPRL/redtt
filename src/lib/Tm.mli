@@ -34,7 +34,6 @@ type _ f =
   | Pi : chk t * chk t bnd -> chk f
   | Ext : (chk t * chk t system) bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
-  | Interval : chk f
 
   | Bool : chk f
   | Tt : chk f

@@ -24,7 +24,6 @@ type _ f =
   | Pi : chk t * chk t bnd -> chk f
   | Ext : (chk t * chk t system) bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
-  | Interval : chk f
 
   | Bool : chk f
   | Tt : chk f
@@ -131,9 +130,6 @@ let rec pp : type a. a t Pretty.t =
 
     | Bool ->
       Format.fprintf fmt "bool"
-
-    | Interval ->
-      Format.fprintf fmt "dim"
 
     | Tt ->
       Format.fprintf fmt "tt"

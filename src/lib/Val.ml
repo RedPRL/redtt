@@ -677,9 +677,6 @@ and eval : type x. env -> x Tm.t -> value =
     | Tm.Ff ->
       into Ff
 
-    | Tm.Interval ->
-      failwith "The interval is only a facon de parler"
-
     | Tm.Dim0 ->
       failwith "0 is a dimension"
 
