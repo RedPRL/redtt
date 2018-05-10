@@ -49,7 +49,7 @@ type _ con =
   | Up : {ty : can value; neu : neu con} -> can con
 
   | Lvl : int -> neu con
-  | FunApp : neu con * nf value -> neu con
+  | FunApp : neu con * nf con -> neu con
   | ExtApp : neu con * ext_sys * dim -> neu con
   | Car : neu con -> neu con
   | Cdr : neu con -> neu con

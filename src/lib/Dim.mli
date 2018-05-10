@@ -21,6 +21,8 @@ val swap : atom -> atom -> action
 val cmp : action -> action -> action
 val idn : action
 
+val status : action -> [`Done | `Enqueued]
+
 val atom : t -> atom
 exception ExpectedAtom
 

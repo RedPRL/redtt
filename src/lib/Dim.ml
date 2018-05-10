@@ -103,6 +103,11 @@ let rec act sigma r =
        history = List.map (atom_swap (x, y)) atm.history}
 
 
+let status phi =
+  match phi with
+  | Id -> `Done
+  | _ -> `Enqueued
+
 exception ExpectedAtom
 
 let atom r =

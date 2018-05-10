@@ -34,7 +34,7 @@ type _ con =
   | Up : {ty : can value; neu : neu con} -> can con
 
   | Lvl : int -> neu con
-  | FunApp : neu con * nf value -> neu con
+  | FunApp : neu con * nf con -> neu con
   | ExtApp : neu con * ext_sys * D.t -> neu con
   | Car : neu con -> neu con
   | Cdr : neu con -> neu con
@@ -66,9 +66,9 @@ and cap_sys = rigid_abs_face list
 and 'a node = {inner : 'a; action : D.action}
 and 'a value = 'a con node ref
 
-type _ step =
-  | Ret : 'a con -> 'a step
-  | Step : can value -> 'a step
+type step =
+  | Ret : neu con -> step
+  | Step : can value -> step
 
 let ret v = Ret v
 let step v = Step v
@@ -80,11 +80,6 @@ struct
   let into : type a. a con -> a value =
     fun inner ->
       ref @@ {inner; action = D.idn}
-
-  let from_step (step : can step) : can value =
-    match step with
-    | Ret con -> into con
-    | Step t -> t
 
   let act : type a. D.action -> a value -> a value =
     fun phi node ->
@@ -186,144 +181,149 @@ let eval_dim (cfg : cfg) : D.t =
     failwith "eval_dim"
 
 
+let rec act_can phi con =
+  match con with
+  | Pi info ->
+    let dom = Val.act phi info.dom in
+    let cod = Clo.act phi info.cod in
+    Val.into @@ Pi {dom; cod}
 
-let rec act : type a. D.action -> a con -> a step =
-  fun phi (con : a con) ->
-    match con with
-    | Pi info ->
-      let dom = Val.act phi info.dom in
-      let cod = Clo.act phi info.cod in
-      ret @@ Pi {dom; cod}
+  | Sg info ->
+    let dom = Val.act phi info.dom in
+    let cod = Clo.act phi info.cod in
+    Val.into @@ Sg {dom; cod}
 
-    | Sg info ->
-      let dom = Val.act phi info.dom in
-      let cod = Clo.act phi info.cod in
-      ret @@ Sg {dom; cod}
+  | Ext abs ->
+    let abs' = ExtAbs.act phi abs in
+    Val.into @@ Ext abs'
 
-    | Ext abs ->
-      let abs' = ExtAbs.act phi abs in
-      ret @@ Ext abs'
+  | Coe info ->
+    make_coe
+      (Star.act phi info.dir)
+      (Abs.act phi info.abs)
+      (Val.act phi info.el)
 
-    | Coe info ->
-      make_coe
-        (Star.act phi info.dir)
-        (Abs.act phi info.abs)
-        (Val.act phi info.el)
+  | HCom info ->
+    make_hcom
+      (Star.act phi info.dir)
+      (Val.act phi info.ty)
+      (Val.act phi info.cap)
+      (CompSys.act phi info.sys)
 
-    | HCom info ->
-      make_hcom
-        (Star.act phi info.dir)
-        (Val.act phi info.ty)
-        (Val.act phi info.cap)
-        (CompSys.act phi info.sys)
+  | FCom info ->
+    make_fcom
+      (Star.act phi info.dir)
+      (Val.act phi info.cap)
+      (CompSys.act phi info.sys)
 
-    | FCom info ->
-      make_fcom
-        (Star.act phi info.dir)
-        (Val.act phi info.cap)
-        (CompSys.act phi info.sys)
+  | V info ->
+    make_v
+      (Gen.act phi info.x)
+      (Val.act phi info.ty0)
+      (Val.act phi info.ty1)
+      (Val.act phi info.equiv)
 
-    | V info ->
-      make_v
-        (Gen.act phi info.x)
-        (Val.act phi info.ty0)
-        (Val.act phi info.ty1)
-        (Val.act phi info.equiv)
+  | VIn info ->
+    make_vin
+      (Gen.act phi info.x)
+      (Val.act phi info.el0)
+      (Val.act phi info.el1)
 
-    | VIn info ->
-      make_vin
-        (Gen.act phi info.x)
-        (Val.act phi info.el0)
-        (Val.act phi info.el1)
+  | Univ _ ->
+    Val.into con
 
-    | VProj info ->
-      step @@
-      let mx = Gen.act phi info.x in
-      let el = Val.act phi @@ Val.into @@ Up {ty = info.vty; neu = info.neu} in
-      let func = Val.act phi info.func in
-      vproj mx el func
+  | Bool ->
+    Val.into con
 
-    | Univ _ ->
-      ret con
+  | Tt ->
+    Val.into con
 
-    | Bool ->
-      ret con
+  | Ff ->
+    Val.into con
 
-    | Tt ->
-      ret con
+  | Lam clo ->
+    Val.into @@ Lam (Clo.act phi clo)
 
-    | Ff ->
-      ret con
+  | ExtLam abs ->
+    Val.into @@ ExtLam (Abs.act phi abs)
 
-    | Lam clo ->
-      ret @@ Lam (Clo.act phi clo)
+  | Cons (v0, v1) ->
+    Val.into @@ Cons (Val.act phi v0, Val.act phi v1)
 
-    | ExtLam abs ->
-      ret @@ ExtLam (Abs.act phi abs)
+  | Up info ->
+    let ty = Val.act phi info.ty in
+    begin
+      match act_neu phi info.neu with
+      | Ret neu ->
+        Val.into @@ Up {ty; neu}
+      | Step v ->
+        v
+    end
 
-    | Cons (v0, v1) ->
-      ret @@ Cons (Val.act phi v0, Val.act phi v1)
+and act_neu phi con =
+  match con with
+  | VProj info ->
+    step @@
+    let mx = Gen.act phi info.x in
+    let el = Val.act phi @@ Val.into @@ Up {ty = info.vty; neu = info.neu} in
+    let func = Val.act phi info.func in
+    vproj mx el func
 
-    | FunApp (neu, arg) ->
-      let varg = Val.act phi arg in
-      begin
-        match act phi neu with
-        | Ret neu ->
-          ret @@ FunApp (neu, varg)
-        | Step v ->
-          step @@ apply v @@ nf_to_can varg
-      end
+  | FunApp (neu, arg) ->
+    let varg = act_nf phi arg in
+    begin
+      match act_neu phi neu with
+      | Ret neu ->
+        ret @@ FunApp (neu, varg)
+      | Step v ->
+        let Down {el; _} = varg in
+        step @@ apply v el
+    end
 
-    | ExtApp (neu, sys, r) ->
-      let sys = ExtSys.act phi sys in
-      let r = Dim.act phi r in
-      begin
-        match act phi neu with
-        | Ret neu ->
-          begin
-            match force_ext_sys sys with
-            | `Rigid _ ->
-              ret @@ ExtApp (neu, sys, r)
-            | `Proj v ->
-              step v
-          end
-        | Step v ->
-          step @@ ext_apply v r
-      end
+  | ExtApp (neu, sys, r) ->
+    let sys = ExtSys.act phi sys in
+    let r = Dim.act phi r in
+    begin
+      match act_neu phi neu with
+      | Ret neu ->
+        begin
+          match force_ext_sys sys with
+          | `Rigid _ ->
+            ret @@ ExtApp (neu, sys, r)
+          | `Proj v ->
+            step v
+        end
+      | Step v ->
+        step @@ ext_apply v r
+    end
 
-    | Car neu ->
-      begin
-        match act phi neu with
-        | Ret neu ->
-          ret @@ Car neu
-        | Step v ->
-          step @@ car v
-      end
+  | Car neu ->
+    begin
+      match act_neu phi neu with
+      | Ret neu ->
+        ret @@ Car neu
+      | Step v ->
+        step @@ car v
+    end
 
-    | Cdr neu ->
-      begin
-        match act phi neu with
-        | Ret neu ->
-          ret @@ Cdr neu
-        | Step v ->
-          step @@ cdr v
-      end
+  | Cdr neu ->
+    begin
+      match act_neu phi neu with
+      | Ret neu ->
+        ret @@ Cdr neu
+      | Step v ->
+        step @@ cdr v
+    end
 
-    | Lvl _ ->
-      ret con
+  | Lvl _ ->
+    ret con
 
-    | Up info ->
-      let ty = Val.act phi info.ty in
-      begin
-        match act phi info.neu with
-        | Ret neu -> ret @@ Up {ty; neu}
-        | Step v -> step v
-      end
-
-    | Down info ->
-      let ty = Val.act phi info.ty in
-      let el = Val.act phi info.el in
-      ret @@ Down {ty; el}
+and act_nf phi con =
+  match con with
+  | Down info ->
+    let ty = Val.act phi info.ty in
+    let el = Val.act phi info.el in
+    Down {ty; el}
 
 and force_abs_face face =
   match face with
@@ -359,51 +359,41 @@ and force_abs_sys sys =
 
 and unleash_can : can value -> can con =
   fun node ->
-    match act !node.action !node.inner with
-    | Ret con ->
+    match Dim.status !node.action with
+    | `Done ->
+      !node.inner
+    | `Enqueued ->
+      let node' = act_can !node.action !node.inner in
+      let con = unleash_can node' in
       node := {inner = con; action = D.idn};
       con
-    | Step t ->
-      let con = unleash_can t in
-      node := {inner = con; action = D.idn};
-      con
 
-and nf_to_can : nf value -> can value =
-  fun node ->
-    match act !node.action !node.inner with
-    | Ret (Down info) ->
-      node := {inner = Down info; action = D.idn};
-      info.el
-    | Step t ->
-      t
-
-
-and make_v mgen ty0 ty1 equiv : can step =
+and make_v mgen ty0 ty1 equiv : can value =
   match mgen with
   | `Ok x ->
-    ret @@ V {x; ty0; ty1; equiv}
+    Val.into @@ V {x; ty0; ty1; equiv}
   | `Const `Dim0 ->
-    step ty0
+    ty0
   | `Const `Dim1 ->
-    step ty1
+    ty1
 
-and make_vin mgen el0 el1 : can step =
+and make_vin mgen el0 el1 : can value =
   match mgen with
   | `Ok x ->
-    ret @@ VIn {x; el0; el1}
+    Val.into @@ VIn {x; el0; el1}
   | `Const `Dim0 ->
-    step el0
+    el0
   | `Const `Dim1 ->
-    step el0
+    el0
 
-and make_coe mdir abs el : can step =
+and make_coe mdir abs el : can value =
   match mdir with
   | `Ok dir ->
     rigid_coe dir abs el
   | `Same _ ->
-    step el
+    el
 
-and make_hcom mdir ty cap msys : can step =
+and make_hcom mdir ty cap msys : can value =
   match mdir with
   | `Ok dir ->
     begin
@@ -413,12 +403,12 @@ and make_hcom mdir ty cap msys : can step =
       | `Proj abs ->
         let _, r' = Star.unleash dir in
         let x, el = Abs.unleash abs in
-        step @@ Val.act (D.subst r' x) el
+        Val.act (D.subst r' x) el
     end
   | `Same _ ->
-    step cap
+    cap
 
-and make_com mdir abs cap msys : can step =
+and make_com mdir abs cap msys : can value =
   match mdir with
   | `Ok dir ->
     let _, r' = Star.unleash dir in
@@ -426,48 +416,47 @@ and make_com mdir abs cap msys : can step =
       match msys with
       | `Ok sys ->
         let ty = Abs.inst abs r' in
-        let capcoe = Val.from_step @@ rigid_coe dir abs cap in
+        let capcoe = rigid_coe dir abs cap in
         let syscoe : comp_sys =
           let face =
             Face.map @@ fun ri r'i absi ->
             let phi = D.equate ri r'i in
             let yi, vi = Abs.unleash absi in
             let y2r' = Star.make (D.named yi) (D.act phi r') in
-            Abs.bind yi @@ Val.from_step @@
-            make_coe y2r' abs vi
+            Abs.bind yi @@ make_coe y2r' abs vi
           in
           List.map face sys
         in
         rigid_hcom dir ty capcoe syscoe
       | `Proj abs ->
-        step @@ Abs.inst abs r'
+        Abs.inst abs r'
     end
   | `Same _ ->
-    step cap
+    cap
 
-and make_fcom mdir cap msys : can step =
+and make_fcom mdir cap msys : can value =
   match mdir with
   | `Ok dir ->
     begin
       match msys with
       | `Ok sys ->
-        ret @@ FCom {dir; cap; sys}
+        Val.into @@ FCom {dir; cap; sys}
       | `Proj abs ->
         let _, r' = Star.unleash dir in
         let x, el = Abs.unleash abs in
-        step @@ Val.act (D.subst r' x) el
+        Val.act (D.subst r' x) el
     end
   | `Same _ ->
-    step cap
+    cap
 
-and rigid_coe dir abs el : can step =
+and rigid_coe dir abs el =
   let x, tyx = Abs.unleash abs in
   match unleash_can tyx with
   | (Pi _ | Sg _ ) ->
-    ret @@ Coe {dir; abs; el}
+    Val.into @@ Coe {dir; abs; el}
 
   | (Bool | Univ _) ->
-    step el
+    el
 
   | FCom _info ->
     failwith "Coe in fcom, taste it!!"
@@ -480,17 +469,15 @@ and rigid_coe dir abs el : can step =
       match Gen.make r with
       | `Const `Dim0 ->
         let el1 =
-          Val.from_step @@
           rigid_coe dir xty1 @@
           apply (car @@ Val.act (D.subst D.dim0 x) info.equiv) el
         in
         make_vin (Gen.make r') el el1
 
       | `Const `Dim1 ->
-        let coe1r'el = Val.from_step @@ rigid_coe dir xty1 el in
+        let coe1r'el = rigid_coe dir xty1 el in
         let el0 = car @@ apply (cdr @@ Val.act (D.subst r' x) info.equiv) coe1r'el in
         let el1 =
-          Val.from_step @@
           let ty1r' = Val.act (D.subst r' x) info.ty1 in
           let cap = coe1r'el in
           let sys =
@@ -515,7 +502,7 @@ and rigid_coe dir abs el : can step =
 
           | _ ->
             let xty0 = Abs.bind x info.ty0 in
-            let el0 = Val.from_step @@ rigid_coe dir xty0 el in
+            let el0 = rigid_coe dir xty0 el in
             let el1 =
               let cap = rigid_vproj info.x el @@ car @@ Val.act (Dim.subst r x) info.equiv in
               let r2x = Star.make r (D.named x) in
@@ -523,34 +510,34 @@ and rigid_coe dir abs el : can step =
                 let face0 =
                   AbsFace.gen_const info.x `Dim0 @@
                   Abs.bind x @@ apply (car info.equiv) @@
-                  Val.from_step @@ make_coe r2x xty0 el
+                  make_coe r2x xty0 el
                 in
                 let face1 =
                   AbsFace.gen_const info.x `Dim1 @@
                   Abs.bind x @@
-                  Val.from_step @@ make_coe r2x xty1 el
+                  make_coe r2x xty1 el
                 in
                 [face0; face1]
               in
-              Val.from_step @@ rigid_com dir xty1 cap sys
+              rigid_com dir xty1 cap sys
             in
-            ret @@ VIn {x = info.x; el0; el1}
+            Val.into @@ VIn {x = info.x; el0; el1}
         end
     end
 
   | _ ->
     failwith "TODO: rigid_coe"
 
-and rigid_hcom dir ty cap sys : can step =
+and rigid_hcom dir ty cap sys : can value =
   match unleash_can ty with
   | Pi _ ->
-    ret @@ HCom {dir; ty; cap; sys}
+    Val.into @@ HCom {dir; ty; cap; sys}
 
   | Bool ->
-    step cap
+    cap
 
   | Univ _ ->
-    ret @@ FCom {dir; cap; sys}
+    Val.into @@ FCom {dir; cap; sys}
 
   | FCom _info ->
     failwith "hcom in fcom, taste it!!"
@@ -561,18 +548,17 @@ and rigid_hcom dir ty cap sys : can step =
   | _ ->
     failwith "TODO"
 
-and rigid_com dir abs cap (sys : comp_sys) : can step =
+and rigid_com dir abs cap (sys : comp_sys) : can value =
   let _, r' = Star.unleash dir in
   let ty = Abs.inst abs r' in
-  let capcoe = Val.from_step @@ rigid_coe dir abs cap in
+  let capcoe = rigid_coe dir abs cap in
   let syscoe : comp_sys =
     let face =
       Face.map @@ fun ri r'i absi ->
       let phi = D.equate ri r'i in
       let yi, vi = Abs.unleash absi in
       let y2r' = Star.make (D.named yi) (D.act phi r') in
-      Abs.bind yi @@ Val.from_step @@
-      make_coe y2r' abs vi
+      Abs.bind yi @@ make_coe y2r' abs vi
     in
     List.map face sys
   in
@@ -615,7 +601,6 @@ and eval : type x. x Tm.t with_env node -> can value =
       Val.into @@ Cons (v0, v1)
 
     | Tm.Coe info ->
-      Val.from_step @@
       let r = eval_dim @@ set_tm info.r cfg in
       let r' = eval_dim @@ set_tm info.r' cfg in
       let dir = Star.make r r' in
@@ -624,7 +609,6 @@ and eval : type x. x Tm.t with_env node -> can value =
       make_coe dir abs el
 
     | Tm.HCom info ->
-      Val.from_step @@
       let r = eval_dim @@ set_tm info.r cfg in
       let r' = eval_dim @@ set_tm info.r' cfg in
       let dir = Star.make r r' in
@@ -634,7 +618,6 @@ and eval : type x. x Tm.t with_env node -> can value =
       make_hcom dir ty cap sys
 
     | Tm.Com info ->
-      Val.from_step @@
       let r = eval_dim @@ set_tm info.r cfg in
       let r' = eval_dim @@ set_tm info.r' cfg in
       let dir = Star.make r r' in
@@ -644,7 +627,6 @@ and eval : type x. x Tm.t with_env node -> can value =
       make_com dir abs cap sys
 
     | Tm.FCom info ->
-      Val.from_step @@
       let r = eval_dim @@ set_tm info.r cfg in
       let r' = eval_dim @@ set_tm info.r' cfg in
       let dir = Star.make r r' in
@@ -812,18 +794,16 @@ and apply vfun varg =
   | Up info ->
     let dom, cod = unleash_pi info.ty in
     let cod' = inst_clo cod varg in
-    let app = FunApp (info.neu, Val.into @@ Down {ty = dom; el = varg}) in
+    let app = FunApp (info.neu, Down {ty = dom; el = varg}) in
     Val.into @@ Up {ty = cod'; neu = app}
 
   | Coe info ->
-    Val.from_step @@
     let r, r' = Star.unleash info.dir in
     let x, tyx = Abs.unleash info.abs in
     let domx, codx = unleash_pi tyx in
     let abs =
       Abs.bind x @@
       inst_clo codx @@
-      Val.from_step @@
       make_coe
         (Star.make r' (D.named x))
         (Abs.bind x domx)
@@ -831,7 +811,6 @@ and apply vfun varg =
     in
     let el =
       apply info.el @@
-      Val.from_step @@
       make_coe
         (Star.make r' r)
         (Abs.bind x domx)
@@ -849,7 +828,6 @@ and apply vfun varg =
       Abs.bind x @@ apply v (Val.act (D.equate r r') v)
     in
     let sys = List.map app_face info.sys in
-    Val.from_step @@
     rigid_hcom info.dir ty cap sys
 
   | _ ->
@@ -894,7 +872,6 @@ and ext_apply vext s =
         in
         let abs = Abs.bind y ty_s in
         let cap = ext_apply info.el s in
-        Val.from_step @@
         rigid_com info.dir abs cap correction
     end
 
@@ -905,7 +882,6 @@ and ext_apply vext s =
       | `Proj v ->
         v
       | `Rigid boundary_sys ->
-        Val.from_step @@
         let cap = ext_apply info.cap s in
         let correction_sys =
           let face = Face.map @@ fun _ _ v -> Abs.const v in
@@ -948,7 +924,6 @@ and car v =
     Val.into @@ Up {ty = dom; neu = Car info.neu}
 
   | Coe info ->
-    Val.from_step @@
     let x, tyx = Abs.unleash info.abs in
     let domx, _ = unleash_sg tyx in
     let abs = Abs.bind x domx in
@@ -956,7 +931,6 @@ and car v =
     rigid_coe info.dir abs el
 
   | HCom info ->
-    Val.from_step @@
     let dom, _ = unleash_sg info.ty in
     let cap = car info.cap in
     let face =
@@ -976,13 +950,11 @@ and cdr v =
     v1
 
   | Coe info ->
-    Val.from_step @@
     let abs =
       let x, tyx = Abs.unleash info.abs in
       let domx, codx = unleash_sg tyx in
       let r, _ = Star.unleash info.dir in
       let coerx =
-        Val.from_step @@
         make_coe
           (Star.make r (D.named x))
           (Abs.bind x domx)
@@ -994,7 +966,6 @@ and cdr v =
     rigid_coe info.dir abs el
 
   | HCom info ->
-    Val.from_step @@
     let abs =
       let r, _ = Star.unleash info.dir in
       let dom, cod = unleash_sg info.ty in
@@ -1008,7 +979,6 @@ and cdr v =
         `Ok (List.map face info.sys)
       in
       let hcom =
-        Val.from_step @@
         make_hcom
           (Star.make r (D.named z))
           dom
