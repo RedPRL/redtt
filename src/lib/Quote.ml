@@ -70,6 +70,8 @@ let rec equate env ty el0 el1 =
     let app1 = ext_apply el1 r in
     Tm.ext_lam None @@ equate (Env.abs env x) tyx app0 app1
 
+  (* TODO: V type, in order to get eta law *)
+
   | _ ->
     match unleash el0, unleash el1 with
     | Univ lvl0, Univ lvl1 ->

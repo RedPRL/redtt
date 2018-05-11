@@ -1,6 +1,7 @@
 type atom = Symbol.t
 type star = DimStar.t
 type gen = DimGeneric.t
+type rel = Restriction.t
 
 type dim = Dim.t
 
@@ -9,6 +10,11 @@ type clo
 
 type ('x, 'a) face = ('x, 'a) Face.face
 
+(* TODO: now it may be possible to semantic domain to use the fancy restriction data structure,
+   instead of inventing a new dimension and doing a diagonal. Needs further investigation.
+
+   It was already necessary to *evaluate* with respect to a restriction, based on the needs of the
+   typechecker; but the further question is how things should work in the internal semantic operations. *)
 
 type con =
   | Pi : {dom : value; cod : clo} -> con
@@ -64,8 +70,8 @@ and env = env_el list
 val make : con -> value
 val unleash : value -> con
 
-val eval : env -> 'a Tm.t -> value
-val eval_dim : env -> Tm.chk Tm.t -> dim
+val eval : rel -> env -> 'a Tm.t -> value
+val eval_dim : rel -> env -> 'a Tm.t -> dim
 
 val apply : value -> value -> value
 val ext_apply : value -> dim -> value
@@ -75,11 +81,14 @@ val cdr : value -> value
 val inst_clo : clo -> value -> value
 val const_clo : value -> clo
 
-
 val unleash_pi : value -> value * clo
 val unleash_sg : value -> value * clo
 val unleash_v : value -> gen * value * value * value
 val unleash_ext : value -> dim -> value * ext_sys
+
+module Val : Sort.S
+  with type t = value
+  with type 'a m = 'a
 
 
 module ExtAbs : Abstraction.S

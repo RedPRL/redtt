@@ -42,8 +42,9 @@ let equate r r' =
   | Atom atm, Dim1 ->
     subst Dim1 atm.atom
   | Atom atm0, Atom atm1 ->
-    let z = Symbol.fresh () in
-    Diag (z, (atm0.atom, atm1.atom))
+    if atm0.atom = atm1.atom then Id else
+      let z = Symbol.fresh () in
+      Diag (z, (atm0.atom, atm1.atom))
   | _ ->
     failwith "Inconsistent equation"
 

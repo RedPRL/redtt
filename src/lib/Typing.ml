@@ -1,38 +1,61 @@
 module V = Val
 module Q = Quote
 module T = Tm
+module R = Restriction
 
 module Cx :
 sig
   type t
   val ext_ty : t -> V.value -> t * V.value
+  val ext_dim : t -> t * V.atom
+  val restrict : t -> Dim.t -> Dim.t -> t
 
   val eval : t -> 'a T.t -> V.value
   val eval_dim : t -> T.chk T.t -> V.dim
 
+
   val lookup : int -> t -> [`Ty of V.value | `Dim]
+  val compare_dim : t -> Dim.t -> Dim.t -> Dim.compare
+  val check_eq : t -> ty:V.value -> V.value -> V.value -> unit
 end =
 struct
   type hyp = [`Ty of V.value | `Dim]
 
-  type t = {tys : hyp list; env : V.env; qenv : Q.env}
+  type t = {tys : hyp list; env : V.env; qenv : Q.env; rel : R.t}
 
-  let ext_ty {env; qenv; tys} vty =
+  let ext_ty {env; qenv; tys; rel} vty =
     let n = Q.Env.len qenv in
     let var = V.make @@ V.Up {ty = vty; neu = V.Lvl n} in
     {env = V.Val var :: env;
      tys = `Ty vty :: tys;
-     qenv = Q.Env.succ qenv},
+     qenv = Q.Env.succ qenv;
+     rel},
     var
 
-  let eval {env; _} tm =
-    V.eval env tm
+  let ext_dim {env; qenv; tys; rel} =
+    let x = Symbol.fresh () in
+    {env = V.Atom x :: env;
+     tys = `Dim :: tys;
+     qenv = Q.Env.abs qenv x;
+     rel}, x
 
-  let eval_dim {env; _} tm =
-    V.eval_dim env tm
+  let eval {env; rel; _} tm =
+    V.eval rel env tm
+
+  let eval_dim {env; rel; _} tm =
+    V.eval_dim rel env tm
 
   let lookup i {tys; _} =
     List.nth tys i
+
+  let restrict cx r r' =
+    {cx with rel = R.union (R.equate r r') cx.rel}
+
+  let compare_dim cx r r' =
+    R.compare r r' cx.rel
+
+  let check_eq cx ~ty el0 el1 =
+    Q.equiv cx.qenv ~ty el0 el1
 end
 
 type cx = Cx.t
@@ -73,15 +96,76 @@ let rec check cx ty tm =
     let vcod = V.inst_clo cod v in
     check cx vcod t1
 
+  | V.Univ lvl0, T.Univ lvl1 ->
+    if Lvl.greater lvl0 lvl1 then () else
+      failwith "Predicativity violation"
+
+  | V.Univ _, T.Pi (dom, B (_, cod)) ->
+    let vdom = check_eval cx ty dom in
+    let cxx', _ = Cx.ext_ty cx vdom in
+    check cxx' ty cod
+
+  | V.Univ _, T.Sg (dom, B (_, cod)) ->
+    let vdom = check_eval cx ty dom in
+    let cxx, _ = Cx.ext_ty cx vdom in
+    check cxx ty cod
+
+  | V.Univ _, T.Ext (B (_, (cod, sys))) ->
+    let cxx, _ = Cx.ext_dim cx in
+    let vcod = check_eval cxx ty cod in
+    check_ext_sys cxx vcod sys
+
+  | V.Univ _, T.V info ->
+    check_dim cx info.r;
+    let ty0 = check_eval cx ty info.ty0 in
+    let ty1 = check_eval cx ty info.ty1 in
+    check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
+
   | _ -> failwith ""
 
-and check_eval cx ty tm =
-  check cx ty tm;
-  Cx.eval cx tm
+and check_ext_sys cx ty sys =
+  let rec go sys acc =
+    match sys with
+    | [] ->
+      ()
+    | (tr0, tr1, otm) :: sys ->
+      let r0 = check_eval_dim cx tr0 in
+      let r1 = check_eval_dim cx tr1 in
+      begin
+        match Cx.compare_dim cx r0 r1, otm with
+        | Dim.Apart, None ->
+          go sys acc
 
-and check_eval_dim cx tr =
-  check_dim cx tr;
-  Cx.eval_dim cx tr
+        | (Dim.Same | Dim.Indeterminate), Some tm ->
+          let cx' = Cx.restrict cx r0 r1 in
+          check cx' ty tm;
+
+          (* Check tube-tube adjacency conditions *)
+          go_adj cx' acc (r0, r1, tm);
+          go sys @@ (r0, r1, tm) :: acc
+
+        | _ ->
+          failwith "check_ext_sys"
+      end
+
+  (* Invariant: cx should already be restricted by r0=r1 *)
+  and go_adj cx faces face =
+    match faces with
+    | [] -> ()
+    | (r'0, r'1, tm') :: faces ->
+      let _, _, tm = face in
+      begin
+        try
+          let cx' = Cx.restrict cx r'0 r'1 in
+          let v = Cx.eval cx' tm in
+          let v' = Cx.eval cx' tm' in
+          Cx.check_eq cx' ~ty v v'
+        with
+        | R.Inconsistent -> ()
+      end;
+      go_adj cx faces face
+  in
+  go sys []
 
 and infer cx tm =
   match Tm.unleash tm with
@@ -113,8 +197,34 @@ and infer cx tm =
     ty
 
   | T.VProj info ->
-    failwith "TODO: this doesn't yet have enough information: we need to change it to carry every part of the V type"
+    let v_ty =
+      check_eval_ty cx @@
+      T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
+    in
+    check cx v_ty info.tm;
+    Cx.eval cx info.ty1
 
   | _ ->
     failwith "infer"
 
+
+
+and check_eval cx ty tm =
+  check cx ty tm;
+  Cx.eval cx tm
+
+and check_ty cx ty =
+  let univ = V.make @@ V.Univ Lvl.Omega in
+  check cx univ ty
+
+and check_eval_dim cx tr =
+  check_dim cx tr;
+  Cx.eval_dim cx tr
+
+and check_eval_ty cx ty =
+  check_ty cx ty;
+  Cx.eval cx ty
+
+and check_is_equivalence cx ~ty0 ~ty1 ~equiv =
+  let type_of_equiv = V.Macro.equiv ty0 ty1 in
+  check cx type_of_equiv equiv

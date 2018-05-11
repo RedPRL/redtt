@@ -25,11 +25,13 @@ type _ f =
   | Ext : (chk t * chk t system) bnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
 
+  | V : {r : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> chk f
+
   | Bool : chk f
   | Tt : chk f
   | Ff : chk f
   | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
-  | VProj : {r : chk t; tm : inf t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> inf f
+  | VProj : {r : chk t; tm : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
   | ExtLam : chk t bnd -> chk f
@@ -78,28 +80,36 @@ let rec substf : type x. subst -> x f -> x f =
       match con with
       | Var ix ->
         proj sub ix
+
       | Bool -> con
       | Tt -> con
       | Ff -> con
       | Dim0 -> con
       | Dim1 -> con
       | Univ _ -> con
+
       | Car t ->
         Car (subst sub t)
+
       | Cdr t ->
         Cdr (subst sub t)
+
       | FunApp (t0, t1) ->
         FunApp (subst sub t0, subst sub t1)
+
       | ExtApp (t0, t1) ->
         ExtApp (subst sub t0, subst sub t1)
+
       | Down {ty; tm} ->
         Down {ty = subst sub ty; tm = subst sub tm}
+
       | Coe info ->
         let r = subst sub info.r in
         let r' = subst sub info.r' in
         let ty = subst_bnd sub info.ty in
         let tm = subst sub info.tm in
         Coe {r; r'; ty; tm}
+
       | HCom info ->
         let r = subst sub info.r in
         let r' = subst sub info.r' in
@@ -107,12 +117,14 @@ let rec substf : type x. subst -> x f -> x f =
         let cap = subst sub info.cap in
         let sys = subst_comp_sys sub info.sys in
         HCom {r; r'; ty; cap; sys}
+
       | FCom info ->
         let r = subst sub info.r in
         let r' = subst sub info.r' in
         let cap = subst sub info.cap in
         let sys = subst_comp_sys sub info.sys in
         FCom {r; r'; cap; sys}
+
       | Com info ->
         let r = subst sub info.r in
         let r' = subst sub info.r' in
@@ -120,20 +132,33 @@ let rec substf : type x. subst -> x f -> x f =
         let cap = subst sub info.cap in
         let sys = subst_comp_sys sub info.sys in
         Com {r; r'; ty; cap; sys}
+
       | Up t ->
         Up (subst sub t)
+
       | Pi (dom, cod) ->
         Pi (subst sub dom, subst_bnd sub cod)
+
       | Sg (dom, cod) ->
         Sg (subst sub dom, subst_bnd sub cod)
+
       | Ext (B (nm, (cod, sys))) ->
         Ext (B (nm, (subst (lift sub) cod, subst_ext_sys (lift sub) sys)))
+
+      | V info ->
+        let r = subst sub info.r in
+        let ty0 = subst sub info.ty0 in
+        let ty1 = subst sub info.ty1 in
+        let equiv = subst sub info.equiv in
+        V {r; ty0; ty1; equiv}
+
       | If info ->
         let mot = subst_bnd sub info.mot in
         let scrut = subst sub info.scrut in
         let tcase = subst sub info.tcase in
         let fcase = subst sub info.fcase in
         If {mot; scrut; tcase; fcase}
+
       | VProj info ->
         let r = subst sub info.r in
         let tm = subst sub info.tm in
@@ -141,14 +166,19 @@ let rec substf : type x. subst -> x f -> x f =
         let ty1 = subst sub info.ty1 in
         let equiv = subst sub info.equiv in
         VProj {r; tm; ty0; ty1; equiv}
+
       | Lam bnd ->
         Lam (subst_bnd sub bnd)
+
       | ExtLam bnd ->
         ExtLam (subst_bnd sub bnd)
+
       | Cons (t0, t1) ->
         Cons (subst sub t0, subst sub t1)
+
       | Let (t, bnd) ->
         Let (subst sub t, subst_bnd sub bnd)
+
       | Meta (sym, sub') ->
         Meta (sym, Cmp (sub, sub'))
 
@@ -230,6 +260,9 @@ let rec pp : type a. a t Pretty.t =
         | _ ->
           Format.fprintf fmt "@[<1>(# [%s]@ %a@ @[%a@])@]" x (pp env') cod (pp_sys env') sys
       end
+
+    | V info ->
+      Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
 
     | Lam (B (nm, tm)) ->
       let x, env' = Pretty.Env.bind nm env in
