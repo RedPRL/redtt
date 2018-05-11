@@ -9,7 +9,7 @@ type gen = Gen.t
 
 (* Notes: I have defined the semantic domain and evaluator in a fairly naive way, in order to avoid
    some confusing questions. It may not be that efficient! But it should be easier at this point to
-   transform it into something efficient, since the code is currently simple-minded enough to
+   transform it make something efficient, since the code is currently simple-minded enough to
    think about. *)
 
 type con =
@@ -91,7 +91,7 @@ struct
       ref @@ Node {node with action = D.cmp phi node.action}
 end
 
-let into : con -> value =
+let make : con -> value =
   fun con ->
     ref @@ Node {con; action = D.idn}
 
@@ -167,7 +167,7 @@ exception ProjVal of value
 
 
 let eval_dim rho tm : D.t =
-  match Tm.out tm with
+  match Tm.unleash tm with
   | Tm.Dim0 ->
     D.dim0
   | Tm.Dim1 ->
@@ -189,16 +189,16 @@ let rec act_can phi con =
   | Pi info ->
     let dom = Val.act phi info.dom in
     let cod = Clo.act phi info.cod in
-    into @@ Pi {dom; cod}
+    make @@ Pi {dom; cod}
 
   | Sg info ->
     let dom = Val.act phi info.dom in
     let cod = Clo.act phi info.cod in
-    into @@ Sg {dom; cod}
+    make @@ Sg {dom; cod}
 
   | Ext abs ->
     let abs' = ExtAbs.act phi abs in
-    into @@ Ext abs'
+    make @@ Ext abs'
 
   | Coe info ->
     make_coe
@@ -233,32 +233,32 @@ let rec act_can phi con =
       (Val.act phi info.el1)
 
   | Univ _ ->
-    into con
+    make con
 
   | Bool ->
-    into con
+    make con
 
   | Tt ->
-    into con
+    make con
 
   | Ff ->
-    into con
+    make con
 
   | Lam clo ->
-    into @@ Lam (Clo.act phi clo)
+    make @@ Lam (Clo.act phi clo)
 
   | ExtLam abs ->
-    into @@ ExtLam (Abs.act phi abs)
+    make @@ ExtLam (Abs.act phi abs)
 
   | Cons (v0, v1) ->
-    into @@ Cons (Val.act phi v0, Val.act phi v1)
+    make @@ Cons (Val.act phi v0, Val.act phi v1)
 
   | Up info ->
     let ty = Val.act phi info.ty in
     begin
       match act_neu phi info.neu with
       | Ret neu ->
-        into @@ Up {ty; neu}
+        make @@ Up {ty; neu}
       | Step v ->
         v
     end
@@ -274,7 +274,7 @@ and act_neu phi con =
       match act_neu phi info.neu with
       | Ret neu ->
         let vty = make_v mx ty0 ty1 equiv in
-        let el = into @@ Up {ty = vty; neu = neu} in
+        let el = make @@ Up {ty = vty; neu = neu} in
         step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
       | Step el ->
         step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
@@ -395,7 +395,7 @@ and unleash : value -> con =
 and make_v mgen ty0 ty1 equiv : value =
   match mgen with
   | `Ok x ->
-    into @@ V {x; ty0; ty1; equiv}
+    make @@ V {x; ty0; ty1; equiv}
   | `Const `Dim0 ->
     ty0
   | `Const `Dim1 ->
@@ -404,7 +404,7 @@ and make_v mgen ty0 ty1 equiv : value =
 and make_vin mgen el0 el1 : value =
   match mgen with
   | `Ok x ->
-    into @@ VIn {x; el0; el1}
+    make @@ VIn {x; el0; el1}
   | `Const `Dim0 ->
     el0
   | `Const `Dim1 ->
@@ -452,7 +452,7 @@ and make_fcom mdir cap msys : value =
     begin
       match msys with
       | `Ok sys ->
-        into @@ FCom {dir; cap; sys}
+        make @@ FCom {dir; cap; sys}
       | `Proj abs ->
         let _, r' = Star.unleash dir in
         let x, el = Abs.unleash abs in
@@ -465,7 +465,7 @@ and rigid_coe dir abs el =
   let x, tyx = Abs.unleash abs in
   match unleash tyx with
   | (Pi _ | Sg _ ) ->
-    into @@ Coe {dir; abs; el}
+    make @@ Coe {dir; abs; el}
 
   | (Bool | Univ _) ->
     el
@@ -539,7 +539,7 @@ and rigid_coe dir abs el =
               in
               rigid_com dir xty1 cap sys
             in
-            into @@ VIn {x = info.x; el0; el1}
+            make @@ VIn {x = info.x; el0; el1}
         end
     end
 
@@ -549,13 +549,13 @@ and rigid_coe dir abs el =
 and rigid_hcom dir ty cap sys : value =
   match unleash ty with
   | Pi _ ->
-    into @@ HCom {dir; ty; cap; sys}
+    make @@ HCom {dir; ty; cap; sys}
 
   | Bool ->
     cap
 
   | Univ _ ->
-    into @@ FCom {dir; cap; sys}
+    make @@ FCom {dir; cap; sys}
 
   | FCom _info ->
     failwith "hcom in fcom, taste it!!"
@@ -588,7 +588,7 @@ and clo bnd rho =
 
 and eval : type x. env -> x Tm.t -> value =
   fun rho tm ->
-    match Tm.out tm with
+    match Tm.unleash tm with
     | Tm.Var i ->
       begin
         match List.nth rho i with
@@ -599,28 +599,28 @@ and eval : type x. env -> x Tm.t -> value =
     | Tm.Pi (dom, cod) ->
       let dom = eval rho dom in
       let cod = clo cod rho in
-      into @@ Pi {dom; cod}
+      make @@ Pi {dom; cod}
 
     | Tm.Sg (dom, cod) ->
       let dom = eval rho dom in
       let cod = clo cod rho in
-      into @@ Sg {dom; cod}
+      make @@ Sg {dom; cod}
 
     | Tm.Ext bnd ->
       let abs = eval_ext_abs rho bnd in
-      into @@ Ext abs
+      make @@ Ext abs
 
     | Tm.Lam bnd ->
-      into @@ Lam (clo bnd rho)
+      make @@ Lam (clo bnd rho)
 
     | Tm.ExtLam bnd ->
       let abs = eval_abs rho bnd in
-      into @@ ExtLam abs
+      make @@ ExtLam abs
 
     | Tm.Cons (t0, t1) ->
       let v0 = eval rho t0 in
       let v1 = eval rho t1 in
-      into @@ Cons (v0, v1)
+      make @@ Cons (v0, v1)
 
     | Tm.Coe info ->
       let r = eval_dim rho info.r in
@@ -681,16 +681,16 @@ and eval : type x. env -> x Tm.t -> value =
       vproj (Gen.make r) ~ty0 ~ty1 ~equiv ~el
 
     | Tm.Univ lvl ->
-      into @@ Univ lvl
+      make @@ Univ lvl
 
     | Tm.Bool ->
-      into Bool
+      make Bool
 
     | Tm.Tt ->
-      into Tt
+      make Tt
 
     | Tm.Ff ->
-      into Ff
+      make Ff
 
     | Tm.Dim0 ->
       failwith "0 is a dimension"
@@ -817,7 +817,7 @@ and apply vfun varg =
     let dom, cod = unleash_pi info.ty in
     let cod' = inst_clo cod varg in
     let app = FunApp (info.neu, {ty = dom; el = varg}) in
-    into @@ Up {ty = cod'; neu = app}
+    make @@ Up {ty = cod'; neu = app}
 
   | Coe info ->
     let r, r' = Star.unleash info.dir in
@@ -866,7 +866,7 @@ and ext_apply vext s =
       match force_ext_sys sysr with
       | `Rigid _ ->
         let app = ExtApp (info.neu, sysr, s) in
-        into @@ Up {ty = tyr; neu = app}
+        make @@ Up {ty = tyr; neu = app}
       | `Proj v ->
         v
     end
@@ -932,7 +932,7 @@ and rigid_vproj x ~ty0 ~ty1 ~equiv ~el : value =
     info.el1
   | Up up ->
     let neu = VProj {x; ty0; ty1; equiv; neu = up.neu} in
-    into @@ Up {ty = ty1; neu}
+    make @@ Up {ty = ty1; neu}
   | _ ->
     failwith "rigid_vproj"
 
@@ -945,7 +945,7 @@ and if_ mot scrut tcase fcase =
   | Up up ->
     let neu = If {mot; neu = up.neu; tcase; fcase} in
     let mot' = inst_clo mot scrut in
-    into @@ Up {ty = mot'; neu}
+    make @@ Up {ty = mot'; neu}
   | _ ->
     failwith "if_"
 
@@ -956,7 +956,7 @@ and car v =
 
   | Up info ->
     let dom, _ = unleash_sg info.ty in
-    into @@ Up {ty = dom; neu = Car info.neu}
+    make @@ Up {ty = dom; neu = Car info.neu}
 
   | Coe info ->
     let x, tyx = Abs.unleash info.abs in

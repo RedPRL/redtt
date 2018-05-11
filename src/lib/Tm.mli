@@ -5,7 +5,7 @@ type chk
 type inf
 
 (** The type of terms, indexed by a sort [chk] or [inf]. See [_ f] for the
-    external view, which can be accessed using [out]. *)
+    external view, which can be accessed using [unleash]. *)
 type 'a t
 
 type 'a tube = chk t * chk t * 'a option
@@ -59,9 +59,11 @@ and subst =
   | Sub of subst * inf t
   | Cmp of subst * subst
 
-val into : 'a f -> 'a t
-val out : 'a t -> 'a f
+val make : 'a f -> 'a t
+val unleash : 'a t -> 'a f
 
+(** Explicit substitutions are used under the hood, so this is a constant time operation;
+    the cost of substituion is spread unleash across calls to [unleash]. *)
 val subst : subst -> 'a t -> 'a t
 
 type info = Lexing.position * Lexing.position

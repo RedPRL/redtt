@@ -21,7 +21,7 @@ let to_inf decl =
   | Define {info; args; body; _} ->
     let ty = TmUtil.pi_from_tele (Some info) args in
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
-    Tm.into @@ Tm.Down {ty; tm}
+    Tm.make @@ Tm.Down {ty; tm}
 
 (*
 let rec check_document cx decls =

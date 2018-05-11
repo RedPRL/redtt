@@ -48,22 +48,22 @@ and subst =
   | Cmp of subst * subst
 
 and 'a node = {info : info option; con : 'a f; subst : subst}
-and 'a t = 'a node
+and 'a t = 'a node ref
 and 'a tube = chk t * chk t * 'a option
 and 'a system = 'a tube list
 
 
-let into tf = {info = None; con = tf; subst = Id}
-let into_info info tf = {info = info; con = tf; subst = Id}
-let info node = node.info
+let make tf = ref {info = None; con = tf; subst = Id}
+let into_info info tf = ref {info = info; con = tf; subst = Id}
+let info node = !node.info
 
-let var i = into @@ Var i
+let var i = make @@ Var i
 let lift sub = Sub (sub, var 0)
 let inst0 t = Sub (Id, t)
 
 let subst : type x. subst -> x t -> x t =
   fun sub node ->
-    {node with subst = Cmp (sub, node.subst)}
+    ref {!node with subst = Cmp (sub, !node.subst)}
 
 let subst_bnd : subst -> 'a t bnd -> 'a t bnd =
   fun sub bnd ->
@@ -178,32 +178,34 @@ and proj sub ix : inf f =
   | Proj ->
     Var (ix + 1)
   | Sub (sub, t) ->
-    if ix = 0 then out t else proj sub (ix - 1)
+    if ix = 0 then unleash t else proj sub (ix - 1)
   | Cmp (sub1, sub0) ->
     substf sub1 @@ proj sub0 ix
 
-and out : type x. x t -> x f =
+and unleash : type x. x t -> x f =
   fun node ->
-    substf node.subst node.con
+    let con = substf !node.subst !node.con in
+    node := {!node with con; subst = Id};
+    con
 
 
 
-let meta hole sub = into @@ Meta (hole, sub)
-let up t = into @@ Up t
-let lam nm t = into @@ Lam (B (nm, t))
-let ext_lam nm t = into @@ ExtLam (B (nm, t))
-let pi nm dom cod = into @@ Pi (dom, B (nm, cod))
-let sg nm dom cod = into @@ Sg (dom, B (nm, cod))
-let let_ nm t0 t1 = into @@ Let (t0, B (nm, t1))
-let cons t0 t1 = into @@ Cons (t0, t1)
-let univ lvl = into @@ Univ lvl
-let car t = into @@ Car t
-let cdr t = into @@ Cdr t
-let meta sym subst = into @@ Meta (sym, subst)
+let meta hole sub = make @@ Meta (hole, sub)
+let up t = make @@ Up t
+let lam nm t = make @@ Lam (B (nm, t))
+let ext_lam nm t = make @@ ExtLam (B (nm, t))
+let pi nm dom cod = make @@ Pi (dom, B (nm, cod))
+let sg nm dom cod = make @@ Sg (dom, B (nm, cod))
+let let_ nm t0 t1 = make @@ Let (t0, B (nm, t1))
+let cons t0 t1 = make @@ Cons (t0, t1)
+let univ lvl = make @@ Univ lvl
+let car t = make @@ Car t
+let cdr t = make @@ Cdr t
+let meta sym subst = make @@ Meta (sym, subst)
 
 let rec pp : type a. a t Pretty.t =
   fun env fmt tm ->
-    match out tm with
+    match unleash tm with
     | Var i ->
       Format.fprintf fmt "%s" @@
       Pretty.Env.var i env
@@ -356,16 +358,16 @@ struct
 
   let path ty tm0 tm1 =
     let ty' = subst Proj ty in
-    let face0 = up (var 0), into Dim0, Some (subst Proj tm0) in
-    let face1 = up (var 0), into Dim1, Some (subst Proj tm1) in
+    let face0 = up (var 0), make Dim0, Some (subst Proj tm0) in
+    let face1 = up (var 0), make Dim1, Some (subst Proj tm1) in
     let sys = [face0; face1] in
-    into @@ Ext (B (None, (ty', sys)))
+    make @@ Ext (B (None, (ty', sys)))
 
   let fiber ~ty0 ~ty1 ~f ~x =
     sg None ty0 @@
     path
       (subst Proj ty1)
-      (up @@ into @@ FunApp (subst Proj f, up @@ var 0))
+      (up @@ make @@ FunApp (subst Proj f, up @@ var 0))
       (subst Proj x)
 
   let proj2 = Cmp (Proj, Proj)

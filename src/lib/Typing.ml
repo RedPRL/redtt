@@ -19,7 +19,7 @@ struct
 
   let ext_ty {env; qenv; tys} vty =
     let n = Q.Env.len qenv in
-    let var = V.into @@ V.Up {ty = vty; neu = V.Lvl n} in
+    let var = V.make @@ V.Up {ty = vty; neu = V.Lvl n} in
     {env = V.Val var :: env;
      tys = `Ty vty :: tys;
      qenv = Q.Env.succ qenv},
@@ -38,7 +38,7 @@ end
 type cx = Cx.t
 
 let infer_dim cx tr =
-  match T.out tr with
+  match T.unleash tr with
   | T.Var ix ->
     begin
       match Cx.lookup ix cx with
@@ -49,7 +49,7 @@ let infer_dim cx tr =
     failwith "infer_dim: expected dimension"
 
 let check_dim cx tr =
-  match T.out tr with
+  match T.unleash tr with
   | T.Dim0 ->
     ()
   | T.Dim1 ->
@@ -62,7 +62,7 @@ let check_dim cx tr =
 
 
 let rec check cx ty tm =
-  match V.unleash ty, T.out tm with
+  match V.unleash ty, T.unleash tm with
   | V.Pi {dom; cod}, T.Lam (T.B (_, tm)) ->
     let cxx, x = Cx.ext_ty cx dom in
     let vcod = V.inst_clo cod x in
@@ -84,7 +84,7 @@ and check_eval_dim cx tr =
   Cx.eval_dim cx tr
 
 and infer cx tm =
-  match Tm.out tm with
+  match Tm.unleash tm with
   | T.Var ix ->
     begin
       match Cx.lookup ix cx with

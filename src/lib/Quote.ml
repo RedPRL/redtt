@@ -43,7 +43,7 @@ end
 type env = Env.t
 
 let generic env ty =
-  into @@ Up {ty = ty; neu = Lvl (Env.len env)}
+  make @@ Up {ty = ty; neu = Lvl (Env.len env)}
 
 let rec equate env ty el0 el1 =
   match unleash ty with
@@ -79,7 +79,7 @@ let rec equate env ty el0 el1 =
         failwith "Expected equal universe levels"
 
     | Bool, Bool ->
-      Tm.into Tm.Bool
+      Tm.make Tm.Bool
 
     | Pi pi0, Pi pi1 ->
       let dom = equate env ty pi0.dom pi1.dom in
@@ -103,7 +103,7 @@ let rec equate env ty el0 el1 =
       let envx = Env.abs env x in
       let tyx = equate envx ty ty0x ty1x in
       let sysx = equate_val_sys envx ty0x sys0x sys1x in
-      Tm.into @@ Tm.Ext (Tm.B (None, (tyx, sysx)))
+      Tm.make @@ Tm.Ext (Tm.B (None, (tyx, sysx)))
 
     | Up up0, Up up1 ->
       Tm.up @@ equate_neu env up0.neu up1.neu
@@ -112,25 +112,25 @@ let rec equate env ty el0 el1 =
       let tr, tr' = equate_star env fcom0.dir fcom1.dir in
       let cap = equate env ty fcom0.cap fcom1.cap in
       let sys = equate_comp_sys env ty fcom0.sys fcom1.sys in
-      Tm.up @@ Tm.into @@ Tm.FCom {r = tr; r' = tr'; cap; sys}
+      Tm.up @@ Tm.make @@ Tm.FCom {r = tr; r' = tr'; cap; sys}
 
     | HCom hcom0, HCom hcom1 ->
       let tr, tr' = equate_star env hcom0.dir hcom1.dir in
       let ty = equate_ty env hcom0.ty hcom1.ty in
       let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
       let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
-      Tm.up @@ Tm.into @@ Tm.HCom {r = tr; r' = tr'; ty; cap; sys}
+      Tm.up @@ Tm.make @@ Tm.HCom {r = tr; r' = tr'; ty; cap; sys}
 
     | Coe coe0, Coe coe1 ->
       let tr, tr' = equate_star env coe0.dir coe1.dir in
-      let univ = into @@ Univ Lvl.Omega in
+      let univ = make @@ Univ Lvl.Omega in
       let bnd = equate_val_abs env univ coe0.abs coe1.abs in
       let tyr =
         let r, _ = DimStar.unleash coe0.dir in
         Abs.inst coe0.abs @@ r
       in
       let tm = equate env tyr coe0.el coe1.el in
-      Tm.up @@ Tm.into @@ Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}
+      Tm.up @@ Tm.make @@ Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}
 
     | _ ->
       failwith "equate"
@@ -152,24 +152,24 @@ and equate_neu env neu0 neu1 =
   | FunApp (neu0, nf0), FunApp (neu1, nf1) ->
     let t0 = equate_neu env neu0 neu1 in
     let t1 = equate env nf0.ty nf0.el nf1.el in
-    Tm.into @@ Tm.FunApp (t0, t1)
+    Tm.make @@ Tm.FunApp (t0, t1)
 
   | ExtApp (neu0, _, r0), ExtApp (neu1, _, r1) ->
     let t = equate_neu env neu0 neu1 in
     let tr = equate_dim env r0 r1 in
-    Tm.into @@ Tm.ExtApp (t, tr)
+    Tm.make @@ Tm.ExtApp (t, tr)
 
   | If if0, If if1 ->
-    let var = generic env @@ into Bool in
+    let var = generic env @@ make Bool in
     let vmot0 = inst_clo if0.mot var in
     let vmot1 = inst_clo if1.mot var in
     let mot = equate_ty (Env.succ env) vmot0 vmot1 in
     let scrut = equate_neu env if0.neu if1.neu in
-    let vmot_tt = inst_clo if0.mot @@ into Tt in
-    let vmot_ff = inst_clo if0.mot @@ into Ff in
+    let vmot_tt = inst_clo if0.mot @@ make Tt in
+    let vmot_ff = inst_clo if0.mot @@ make Ff in
     let tcase = equate env vmot_tt if0.tcase if1.tcase in
     let fcase = equate env vmot_ff if0.fcase if1.fcase in
-    Tm.into @@ Tm.If {mot = Tm.B (None, mot); scrut; tcase; fcase}
+    Tm.make @@ Tm.If {mot = Tm.B (None, mot); scrut; tcase; fcase}
 
   | VProj vproj0, VProj vproj1 ->
     (* let r0 = DimGeneric.unleash vproj0.x in *)
@@ -178,16 +178,16 @@ and equate_neu env neu0 neu1 =
        let tm = equate_neu env vproj0.neu vproj1.neu in
        let funty =
        let _, ty0, ty1, _ = unleash_v vproj0.vty in
-       into @@ Pi {dom = ty0; cod = const_clo ty1}
+       make @@ Pi {dom = ty0; cod = const_clo ty1}
        in
        let func = equate env funty vproj0.func vproj1.func in
-       Tm.into @@ Tm.VProj {r = tr; tm; func} *)
+       Tm.make @@ Tm.VProj {r = tr; tm; func} *)
     failwith "TODO"
 
   | _ -> failwith "equate_neu"
 
 and equate_ty env ty0 ty1 : Tm.chk Tm.t =
-  let univ = into @@ Univ Lvl.Omega in
+  let univ = make @@ Univ Lvl.Omega in
   equate env univ ty0 ty1
 
 
@@ -255,9 +255,9 @@ and equate_star env p0 p1 =
 and equate_dim env r r' =
   match Dim.quote r, Dim.quote r' with
   | `Dim0, `Dim0 ->
-    Tm.into Tm.Dim0
+    Tm.make Tm.Dim0
   | `Dim1, `Dim1 ->
-    Tm.into Tm.Dim1
+    Tm.make Tm.Dim1
   | `Generic x, `Generic y ->
     let ix0 = Env.ix_of_atom x env in
     let ix1 = Env.ix_of_atom y env in
@@ -307,5 +307,5 @@ let rec subtype env ty0 ty1 =
       failwith "Universe level too big"
 
   | _ ->
-    let univ = into @@ Univ Lvl.Omega in
+    let univ = make @@ Univ Lvl.Omega in
     equiv env univ ty0 ty1

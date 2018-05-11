@@ -61,7 +61,7 @@ and ext_abs = (value * ext_sys) Abstraction.abs
 and env_el = Val of value | Atom of atom
 and env = env_el list
 
-val into : con -> value
+val make : con -> value
 val unleash : value -> con
 
 val eval : env -> 'a Tm.t -> value
