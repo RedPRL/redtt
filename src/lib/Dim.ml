@@ -1,9 +1,20 @@
 type atom = Symbol.t
 
-type t =
+type repr =
   | Dim0
   | Dim1
-  | Atom of {atom : atom; history : atom list}
+  | Atom of atom
+
+module Repr =
+struct
+  type t = repr
+  let compare = Pervasives.compare
+end
+
+module S = Set.Make (Repr)
+
+type t = repr * S.t
+
 
 (* The [Atom] constructor is the only weird case. It is implemented this way in order to
    support diagonal equations, which we treat as different from the substitution of one
@@ -14,118 +25,86 @@ type t =
    When comparing generic dimensions, only the [atom] field is considered; but using the history,
    we can reconstruct the 'real' name of the dimension, which is crucial for quotation. *)
 
-let dim0 = Dim0
-let dim1 = Dim1
-let named x = Atom {atom = x; history = []}
-
-type action =
-  | Subst of t * atom
-  | Swap of atom * atom
-  | Diag of atom * (atom * atom)
-  | Cmp of action * action
-  | Id
-
-let subst r x = Subst (r, x)
-
-let equate r r' =
-  match r, r' with
-  | Dim0, Dim0 ->
-    Id
-  | Dim1, Dim1 ->
-    Id
-  | Dim0, Atom atm ->
-    subst Dim0 atm.atom
-  | Dim1, Atom atm ->
-    subst Dim1 atm.atom
-  | Atom atm, Dim0 ->
-    subst Dim0 atm.atom
-  | Atom atm, Dim1 ->
-    subst Dim1 atm.atom
-  | Atom atm0, Atom atm1 ->
-    if atm0.atom = atm1.atom then Id else
-      let z = Symbol.fresh () in
-      Diag (z, (atm0.atom, atm1.atom))
-  | _ ->
-    failwith "Inconsistent equation"
-
-let unleash r =
-  match r with
-  | Dim0 -> `Dim0
-  | Dim1 -> `Dim1
-  | _ -> `Generic
-
-let cmp sigma1 sigma0 =
-  Cmp (sigma1, sigma0)
-
-let idn = Id
-
-let swap x y =
-  Swap (x, y)
+let dim0 = Dim0, S.singleton Dim0
+let dim1 = Dim1, S.singleton Dim1
+let named a = Atom a, S.singleton @@ Atom a
 
 type compare =
   | Same
   | Apart
   | Indeterminate
 
-let compare r r' =
-  match r, r' with
-  | Dim0, Dim0 -> Same
-  | Dim1, Dim1 -> Same
-  | Dim0, Dim1 -> Apart
-  | Dim1, Dim0 -> Apart
-  | Atom atm0, Atom atm1 ->
-    if atm0.atom = atm1.atom then
-      Same
-    else
-      Indeterminate
-  | _ -> Indeterminate
+let compare (_, r) (_, r') =
+  if S.mem Dim0 r && S.mem Dim1 r' then Same
+  else if S.mem Dim1 r && S.mem Dim1 r' then Same
+  else if S.mem Dim0 r && S.mem Dim1 r' then Apart
+  else if S.mem Dim1 r && S.mem Dim0 r' then Apart
+  else if S.is_empty @@ S.inter r r' then Indeterminate
+  else Same
 
-let atom_swap (x, y) z =
-  if x = z then y else if y = z then x else z
-
-let rec act sigma r =
-  match r, sigma with
-  | (Dim0 | Dim1), _ -> r
-  | _, Id -> r
-  | _, Cmp (sigma1, sigma0) ->
-    act sigma1 @@ act sigma0 r
-  | Atom atm, Subst (r', x) ->
-    if atm.atom = x then r' else r
-  | Atom atm, Diag (z, (x, y)) ->
-    if atm.atom = x then
-      Atom {atom = z; history = x :: atm.history}
-    else if atm.atom = y then
-      Atom {atom = z; history = y :: atm.history}
-    else
-      r
-  | Atom atm, Swap (x, y) ->
-    Atom
-      {atom = atom_swap (x, y) atm.atom;
-       history = List.map (atom_swap (x, y)) atm.history}
+let entangle (r, rs) (r', rs') =
+  let rs'' = S.union rs rs' in
+  (r, rs''), (r', rs'')
 
 
-let status phi =
+
+
+type action =
+  | Subst of t * atom
+  | Swap of atom * atom
+  | UnionIfIntersects of S.t
+  | Cmp of action * action
+  | Id
+
+let subst r x = Subst (r, x)
+
+let equate t t' =
+  let _, rs = t in
+  let _, rs' = t' in
+  UnionIfIntersects (S.union rs rs')
+
+let swap x y = Swap (x, y)
+
+let cmp phi psi = Cmp (phi, psi)
+
+let idn = Id
+
+
+let swap_repr x y rep =
+  match rep with
+  | Dim0 -> Dim0
+  | Dim1 -> Dim1
+  | Atom z ->
+    Atom (if x = z then y else if y = z then x else z)
+
+
+let rec act phi t =
   match phi with
-  | Id -> `Done
-  | _ -> `Enqueued
+  | Id -> t
 
-exception ExpectedAtom
+  | Swap (x, y) ->
+    let r, rs = t in
+    swap_repr x y r, S.map (swap_repr x y) rs
 
-let atom r =
-  match r with
-  | Atom atm ->
-    atm.atom
-  | _ ->
-    raise ExpectedAtom
+  | Cmp (phi1, phi0) ->
+    act phi1 @@ act phi0 t
 
-let quote r =
-  match r with
-  | Atom atm ->
-    let rec go x ys =
-      match ys with
-      | [] -> `Generic x
-      | y::ys -> go y ys
-    in
-    go atm.atom atm.history
-  | Dim0 -> `Dim0
-  | Dim1 -> `Dim1
+  | UnionIfIntersects rs' ->
+    let r, rs = t in
+    if S.is_empty @@ S.inter rs rs' then t else
+      r, S.union rs rs'
+
+  | Subst (t', x) ->
+    begin
+      match t with
+      | Atom y, _ ->
+        if x = y then t' else t
+      | _ -> t
+    end
+
+let unleash (r, _) = r
+
+let action_is_id phi =
+  match phi with
+  | Id -> true
+  | _ -> false

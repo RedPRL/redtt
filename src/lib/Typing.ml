@@ -246,9 +246,9 @@ and infer cx tm =
     check cx v_ty info.tm;
     Cx.eval cx info.ty1
 
-  | T.Coe info ->
-    let cxx, x = Cx.ext_dim cx in
-    check_ty cxx info.ty;
+  | T.Coe _info ->
+    let _cxx, _x = Cx.ext_dim cx in
+    (* check_ty cxx info.ty; *)
     failwith "TODO"
 
   | T.Com _info ->

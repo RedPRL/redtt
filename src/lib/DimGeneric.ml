@@ -15,6 +15,3 @@ let unleash c = c
 
 let act phi r =
   make @@ D.act phi r
-
-let subst_with t r =
-  Dim.subst r @@ Dim.atom t

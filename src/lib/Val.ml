@@ -391,10 +391,10 @@ and force_abs_sys sys =
 and unleash : value -> con =
   fun node ->
     let Node info = !node in
-    match Dim.status info.action with
-    | `Done ->
+    match Dim.action_is_id info.action with
+    | true ->
       info.con
-    | `Enqueued ->
+    | false ->
       let node' = act_can info.action info.con in
       let con = unleash node' in
       node := Node {con = con; action = D.idn};
@@ -584,7 +584,7 @@ and rigid_com dir abs cap (sys : comp_sys) : value =
       let phi = D.equate ri r'i in
       let yi, vi = Abs.unleash absi in
       let y2r' = Star.make (D.named yi) (D.act phi r') in
-      Abs.bind yi @@ make_coe y2r' abs vi
+      Abs.bind yi @@ make_coe y2r' (Abs.act phi abs) @@ Val.act phi vi
     in
     List.map face sys
   in

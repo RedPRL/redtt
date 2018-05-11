@@ -173,7 +173,7 @@ and equate_neu env neu0 neu1 =
     let fcase = equate env vmot_ff if0.fcase if1.fcase in
     Tm.make @@ Tm.If {mot = Tm.B (None, mot); scrut; tcase; fcase}
 
-  | VProj vproj0, VProj vproj1 ->
+  | VProj _vproj0, VProj _vproj1 ->
     (* let r0 = DimGeneric.unleash vproj0.x in *)
     (* let r1 = DimGeneric.unleash vproj1.x in *)
     (* let tr = equate_dim env r0 r1 in
@@ -255,20 +255,19 @@ and equate_star env p0 p1 =
   tr, tr'
 
 and equate_dim env r r' =
-  match Dim.quote r, Dim.quote r' with
-  | `Dim0, `Dim0 ->
-    Tm.make Tm.Dim0
-  | `Dim1, `Dim1 ->
-    Tm.make Tm.Dim1
-  | `Generic x, `Generic y ->
-    let ix0 = Env.ix_of_atom x env in
-    let ix1 = Env.ix_of_atom y env in
-    if ix0 = ix1 then
-      Tm.up @@ Tm.var ix0
-    else
-      failwith "Dimensions did not match"
-  | _ -> failwith "Dimensions did not match"
+  match Dim.compare r r' with
+  | Same ->
+    quote_dim env r
+  | _ ->
+    failwith "Dimensions did not match"
 
+and quote_dim env r =
+  match Dim.unleash r with
+  | Dim.Dim0 -> Tm.make Tm.Dim0
+  | Dim.Dim1 -> Tm.make Tm.Dim1
+  | Dim.Atom x ->
+    let ix = Env.ix_of_atom x env in
+    Tm.up @@ Tm.var ix
 
 let equiv env ~ty el0 el1 =
   ignore @@ equate env ty el0 el1
