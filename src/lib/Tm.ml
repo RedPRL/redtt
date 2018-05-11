@@ -343,7 +343,7 @@ and pp_btube env fmt tube =
     let x, env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>[%a=%a@ [%s] %a]@]" (pp env) r (pp env) r' x (pp env') tm
 
-module Macros =
+module Macro =
 struct
   let arr ty0 ty1 =
     pi None ty0 @@

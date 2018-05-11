@@ -87,3 +87,7 @@ module ExtAbs : Abstraction.S
 
 module Abs : Abstraction.S
   with type el = value
+
+module Macro : sig
+  val equiv : value -> value -> value
+end

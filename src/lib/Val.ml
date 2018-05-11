@@ -1051,16 +1051,11 @@ let const_clo v =
 
 module Macro =
 struct
-  let equiv ~ty0 ~ty1 : value =
-    let rho = [ty0; ty1] in
-    let funty =
-      Tm.pi None
-        (Tm.up @@ Tm.var 0) (* ty0 *)
-        (Tm.up @@ Tm.var 2) (* ty1 *)
-    in
+  let equiv ty0 ty1 : value =
+    let rho = [Val ty0; Val ty1] in
     eval rho @@
-    Tm.sg None funty @@
-    Tm.pi None (Tm.up @@ Tm.var 2) @@ (* ty1 *)
-    failwith " this is really fucking hard !!!"
+    Tm.Macro.equiv
+      (Tm.up @@ Tm.var 0)
+      (Tm.up @@ Tm.var 1)
 
 end

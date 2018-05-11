@@ -82,8 +82,7 @@ val car : inf t -> inf t
 val cdr : inf t -> inf t
 val meta : Symbol.t -> subst -> inf t
 
-(* macros *)
-module Macros :
+module Macro :
 sig
   val arr : chk t -> chk t -> chk t
   val times : chk t -> chk t -> chk t
