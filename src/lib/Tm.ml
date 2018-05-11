@@ -170,6 +170,7 @@ and subst_comp_face sub (r, r', obnd) =
 and subst_comp_sys sub sys =
   List.map (subst_comp_face sub) sys
 
+(* TODO: double check that this is correct *)
 and proj sub ix : inf f =
   match sub with
   | Id ->
