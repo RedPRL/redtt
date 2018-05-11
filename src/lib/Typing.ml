@@ -17,6 +17,7 @@ sig
   val lookup : int -> t -> [`Ty of V.value | `Dim]
   val compare_dim : t -> Dim.t -> Dim.t -> Dim.compare
   val check_eq : t -> ty:V.value -> V.value -> V.value -> unit
+  val check_subtype : t -> V.value -> V.value -> unit
 end =
 struct
   type hyp = [`Ty of V.value | `Dim]
@@ -56,6 +57,9 @@ struct
 
   let check_eq cx ~ty el0 el1 =
     Q.equiv cx.qenv ~ty el0 el1
+
+  let check_subtype cx ty0 ty1 =
+    Q.subtype cx.qenv ty0 ty1
 end
 
 type cx = Cx.t
@@ -124,10 +128,14 @@ let rec check cx ty tm =
     let vcod = V.inst_clo cod v in
     check cx vcod t1
 
-  | V.Ext ext_abs, T.ExtLam (B (_, t)) ->
+  | V.Ext ext_abs, T.ExtLam (B (_, tm)) ->
     let cxx, x = Cx.ext_dim cx in
     let codx, sysx = V.ExtAbs.inst ext_abs (Dim.named x) in
     check_boundary cxx codx sysx tm
+
+  | _, T.Up tm ->
+    let ty' = infer cx tm in
+    Cx.check_subtype cx ty' ty
 
   | _ -> failwith ""
 
@@ -238,9 +246,28 @@ and infer cx tm =
     check cx v_ty info.tm;
     Cx.eval cx info.ty1
 
+  | T.Coe info ->
+    let cxx, x = Cx.ext_dim cx in
+    check_ty cxx info.ty;
+    failwith "TODO"
+
+  | T.Com _info ->
+    failwith "TODO"
+
+  | T.HCom _info ->
+    failwith "TODO"
+
+  | T.FCom _info ->
+    failwith "TODO"
+
+
+  | T.Down info ->
+    let ty = check_eval_ty cx info.ty in
+    check cx ty info.tm;
+    ty
+
   | _ ->
     failwith "infer"
-
 
 
 and check_eval cx ty tm =
