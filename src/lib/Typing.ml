@@ -86,16 +86,6 @@ let check_dim cx tr =
 
 let rec check cx ty tm =
   match V.unleash ty, T.unleash tm with
-  | V.Pi {dom; cod}, T.Lam (T.B (_, tm)) ->
-    let cxx, x = Cx.ext_ty cx dom in
-    let vcod = V.inst_clo cod x in
-    check cxx vcod tm
-
-  | V.Sg {dom; cod}, T.Cons (t0, t1) ->
-    let v = check_eval cx dom t0 in
-    let vcod = V.inst_clo cod v in
-    check cx vcod t1
-
   | V.Univ lvl0, T.Univ lvl1 ->
     if Lvl.greater lvl0 lvl1 then () else
       failwith "Predicativity violation"
@@ -121,7 +111,51 @@ let rec check cx ty tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
+  | V.Univ _, T.Bool ->
+    ()
+
+  | V.Pi {dom; cod}, T.Lam (T.B (_, tm)) ->
+    let cxx, x = Cx.ext_ty cx dom in
+    let vcod = V.inst_clo cod x in
+    check cxx vcod tm
+
+  | V.Sg {dom; cod}, T.Cons (t0, t1) ->
+    let v = check_eval cx dom t0 in
+    let vcod = V.inst_clo cod v in
+    check cx vcod t1
+
+  | V.Ext ext_abs, T.ExtLam (B (_, t)) ->
+    let cxx, x = Cx.ext_dim cx in
+    let codx, sysx = V.ExtAbs.inst ext_abs (Dim.named x) in
+    check_boundary cxx codx sysx tm
+
   | _ -> failwith ""
+
+and check_boundary cx ty sys tm =
+  let rec go sys =
+    match sys with
+    | [] -> ()
+    | face :: sys ->
+      check_boundary_face cx ty face tm;
+      go sys
+  in
+  check cx ty tm;
+  go sys
+
+and check_boundary_face cx ty face tm =
+  match face with
+  | Face.True (_, _, el) ->
+    Cx.check_eq cx ~ty el @@
+    Cx.eval cx tm
+
+  | Face.False _ ->
+    ()
+
+  | Face.Indet (p, el) ->
+    let r, r' = DimStar.unleash p in
+    let cx' = Cx.restrict cx r r' in
+    Cx.check_eq cx' ~ty el @@
+    Cx.eval cx' tm
 
 and check_ext_sys cx ty sys =
   let rec go sys acc =
