@@ -114,7 +114,7 @@ let rec equate env ty el0 el1 =
       let tr, tr' = equate_star env fcom0.dir fcom1.dir in
       let cap = equate env ty fcom0.cap fcom1.cap in
       let sys = equate_comp_sys env ty fcom0.sys fcom1.sys in
-      Tm.up @@ Tm.make @@ Tm.FCom {r = tr; r' = tr'; cap; sys}
+      Tm.make @@ Tm.FCom {r = tr; r' = tr'; cap; sys}
 
     | HCom hcom0, HCom hcom1 ->
       let tr, tr' = equate_star env hcom0.dir hcom1.dir in

@@ -212,6 +212,61 @@ and check_ext_sys cx ty sys =
   in
   go sys []
 
+and check_comp_sys cx r (cxx, x, tyx) cap sys =
+  let rec go sys acc =
+    match sys with
+    | [] ->
+      ()
+    | (tr0, tr1, obnd) :: sys ->
+      let r0 = check_eval_dim cx tr0 in
+      let r1 = check_eval_dim cx tr1 in
+      begin
+        match Cx.compare_dim cx r0 r1, obnd with
+        | Dim.Apart, None ->
+          go sys acc
+
+        | (Dim.Same | Dim.Indeterminate), Some bnd ->
+          (* check that bnd is a section of tyx under r0=r1 *)
+          let cxxr0r1 = Cx.restrict cxx r0 r1 in
+          let phir0r1 = Dim.equate r0 r1 in
+          let T.B (_, tm) = bnd in
+          check cxxr0r1 (V.Val.act phir0r1 tyx) tm;
+
+          (* check that tm<r/x> = cap under r0=r1 *)
+          let cxr0r1 = Cx.restrict cx r0 r1 in
+          let phirx = Dim.subst r x in
+          Cx.check_eq cxr0r1 ~ty:(V.Val.act phirx tyx) (V.Val.act phir0r1 cap) (V.Val.act phirx cap);
+
+          (* Check tube-tube adjacency conditions *)
+          go_adj cxxr0r1 acc (r0, r1, bnd);
+          go sys @@ (r0, r1, bnd) :: acc
+
+        | _ ->
+          failwith "check_ext_sys"
+      end
+
+  and go_adj cxx faces face =
+    match faces with
+    | [] -> ()
+    | (r'0, r'1, bnd') :: faces ->
+      let T.B (_, tm') = bnd' in
+      (* Invariant: cx should already be restricted by r0=r1 *)
+      let r0, r1, bnd = face in
+      let T.B (_, tm) = bnd in
+      begin
+        try
+          let cxx' = Cx.restrict cxx r'0 r'1 in
+          let v = Cx.eval cxx' tm in
+          let v' = Cx.eval cxx' tm' in
+          let phi = Dim.cmp (Dim.equate r'0 r'1) (Dim.equate r0 r1) in
+          Cx.check_eq cxx' ~ty:(V.Val.act phi tyx) v v'
+        with
+        | R.Inconsistent -> ()
+      end;
+      go_adj cx faces face
+
+  in go sys []
+
 and infer cx tm =
   match Tm.unleash tm with
   | T.Var ix ->
@@ -259,15 +314,25 @@ and infer cx tm =
     check cx vtyr info.tm;
     V.Val.act (Dim.subst r' x) vtyx
 
-  | T.Com _info ->
-    failwith "TODO"
+  | T.Com info ->
+    let r = check_eval_dim cx info.r in
+    let r' = check_eval_dim cx info.r' in
+    let cxx, x = Cx.ext_dim cx in
+    let T.B (_, ty) = info.ty in
+    let vtyx = check_eval_ty cxx ty in
+    let vtyr = V.Val.act (Dim.subst r x) vtyx in
+    let cap = check_eval cx vtyr info.cap in
+    check_comp_sys cx r (cxx, x, vtyx) cap info.sys;
+    V.Val.act (Dim.subst r' x) vtyx
 
-  | T.HCom _info ->
-    failwith "TODO"
-
-  | T.FCom _info ->
-    failwith "TODO"
-
+  | T.HCom info ->
+    let r = check_eval_dim cx info.r in
+    check_dim cx info.r';
+    let cxx, x = Cx.ext_dim cx in
+    let vty = check_eval_ty cx info.ty in
+    let cap = check_eval cx vty info.cap in
+    check_comp_sys cx r (cxx, x, vty) cap info.sys;
+    vty
 
   | T.Down info ->
     let ty = check_eval_ty cx info.ty in

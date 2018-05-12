@@ -15,8 +15,9 @@ type _ f =
   | Down : {ty : chk t; tm : chk t} -> inf f
   | Coe : {r : chk t; r' : chk t; ty : chk t bnd; tm : chk t} -> inf f
   | HCom : {r : chk t; r' : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
-  | FCom : {r : chk t; r' : chk t; cap : chk t; sys : chk t bnd system} -> inf f
   | Com : {r : chk t; r' : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f
+
+  | FCom : {r : chk t; r' : chk t; cap : chk t; sys : chk t bnd system} -> chk f
 
   | Up : inf t -> chk f
 
