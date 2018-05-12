@@ -249,10 +249,15 @@ and infer cx tm =
     check cx v_ty info.tm;
     Cx.eval cx info.ty1
 
-  | T.Coe _info ->
-    let _cxx, _x = Cx.ext_dim cx in
-    (* check_ty cxx info.ty; *)
-    failwith "TODO"
+  | T.Coe info ->
+    let r = check_eval_dim cx info.r in
+    let r' = check_eval_dim cx info.r' in
+    let cxx, x = Cx.ext_dim cx in
+    let T.B (_, ty) = info.ty in
+    let vtyx = check_eval_ty cxx ty in
+    let vtyr = V.Val.act (Dim.subst r x) vtyx in
+    check cx vtyr info.tm;
+    V.Val.act (Dim.subst r' x) vtyx
 
   | T.Com _info ->
     failwith "TODO"
