@@ -3,17 +3,20 @@ module Q = Quote
 module T = Tm
 module R = Restriction
 
+type value = V.value
+
 module Cx :
 sig
   type t
-  val ext_ty : t -> V.value -> t * V.value
-  val ext_el : t -> ty:V.value -> el:V.value -> t
-  val ext_dim : t -> t * V.atom
+  val ext_ty : t -> nm:string option -> value -> t * value
+  val ext_el : t -> nm:string option -> ty:value -> el:value -> t
+  val ext_dim : t -> nm:string option -> t * V.atom
   val restrict : t -> Dim.t -> Dim.t -> t
 
   val eval : t -> 'a T.t -> V.value
   val eval_dim : t -> T.chk T.t -> V.dim
 
+  val ppenv : t -> Pretty.env
 
   val lookup : int -> t -> [`Ty of V.value | `Dim]
   val compare_dim : t -> Dim.t -> Dim.t -> Dim.compare
@@ -23,29 +26,35 @@ end =
 struct
   type hyp = [`Ty of V.value | `Dim]
 
-  type t = {tys : hyp list; env : V.env; qenv : Q.env; rel : R.t}
+  type t = {tys : hyp list; env : V.env; qenv : Q.env; rel : R.t; ppenv : Pretty.env}
 
-  let ext_ty {env; qenv; tys; rel} vty =
+  let ext_ty {env; qenv; tys; rel; ppenv} ~nm vty =
     let n = Q.Env.len qenv in
     let var = V.make @@ V.Up {ty = vty; neu = V.Lvl n} in
     {env = V.Val var :: env;
      tys = `Ty vty :: tys;
      qenv = Q.Env.succ qenv;
+     ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel},
     var
 
-  let ext_el {env; qenv; tys; rel} ~ty ~el =
+  let ext_el {env; qenv; tys; rel; ppenv} ~nm ~ty ~el =
     {env = V.Val el :: env;
      tys = `Ty ty :: tys;
      qenv = Q.Env.succ qenv; (* Is this right? *)
+     ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}
 
-  let ext_dim {env; qenv; tys; rel} =
+  let ext_dim {env; qenv; tys; rel; ppenv} ~nm =
     let x = Symbol.fresh () in
     {env = V.Atom x :: env;
      tys = `Dim :: tys;
      qenv = Q.Env.abs qenv x;
+     ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}, x
+
+  let ppenv cx =
+    cx.ppenv
 
   let eval {env; rel; _} tm =
     V.eval rel env tm
@@ -101,18 +110,18 @@ let rec check cx ty tm =
     if Lvl.greater lvl0 lvl1 then () else
       failwith "Predicativity violation"
 
-  | V.Univ _, T.Pi (dom, B (_, cod)) ->
+  | V.Univ _, T.Pi (dom, B (nm, cod)) ->
     let vdom = check_eval cx ty dom in
-    let cxx', _ = Cx.ext_ty cx vdom in
+    let cxx', _ = Cx.ext_ty cx ~nm vdom in
     check cxx' ty cod
 
-  | V.Univ _, T.Sg (dom, B (_, cod)) ->
+  | V.Univ _, T.Sg (dom, B (nm, cod)) ->
     let vdom = check_eval cx ty dom in
-    let cxx, _ = Cx.ext_ty cx vdom in
+    let cxx, _ = Cx.ext_ty cx ~nm vdom in
     check cxx ty cod
 
-  | V.Univ _, T.Ext (B (_, (cod, sys))) ->
-    let cxx, _ = Cx.ext_dim cx in
+  | V.Univ _, T.Ext (B (nm, (cod, sys))) ->
+    let cxx, _ = Cx.ext_dim cx ~nm in
     let vcod = check_eval cxx ty cod in
     check_ext_sys cxx vcod sys
 
@@ -125,8 +134,8 @@ let rec check cx ty tm =
   | V.Univ _, T.Bool ->
     ()
 
-  | V.Pi {dom; cod}, T.Lam (T.B (_, tm)) ->
-    let cxx, x = Cx.ext_ty cx dom in
+  | V.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
+    let cxx, x = Cx.ext_ty cx ~nm dom in
     let vcod = V.inst_clo cod x in
     check cxx vcod tm
 
@@ -135,8 +144,8 @@ let rec check cx ty tm =
     let vcod = V.inst_clo cod v in
     check cx vcod t1
 
-  | V.Ext ext_abs, T.ExtLam (B (_, tm)) ->
-    let cxx, x = Cx.ext_dim cx in
+  | V.Ext ext_abs, T.ExtLam (B (nm, tm)) ->
+    let cxx, x = Cx.ext_dim cx ~nm in
     let codx, sysx = V.ExtAbs.inst ext_abs (Dim.named x) in
     check_boundary cxx codx sysx tm
 
@@ -152,7 +161,7 @@ let rec check cx ty tm =
 and check_fcom cx ty tr tr' tcap tsys =
   let r = check_eval_dim cx tr in
   check_dim cx tr';
-  let cxx, x = Cx.ext_dim cx in
+  let cxx, x = Cx.ext_dim cx ~nm:None in
   let cap = check_eval cx ty tcap in
   check_comp_sys cx r (cxx, x, ty) cap tsys
 
@@ -324,8 +333,8 @@ and infer cx tm =
   | T.Coe info ->
     let r = check_eval_dim cx info.r in
     let r' = check_eval_dim cx info.r' in
-    let cxx, x = Cx.ext_dim cx in
-    let T.B (_, ty) = info.ty in
+    let T.B (nm, ty) = info.ty in
+    let cxx, x = Cx.ext_dim cx ~nm in
     let vtyx = check_eval_ty cxx ty in
     let vtyr = V.Val.act (Dim.subst r x) vtyx in
     check cx vtyr info.tm;
@@ -334,8 +343,8 @@ and infer cx tm =
   | T.Com info ->
     let r = check_eval_dim cx info.r in
     let r' = check_eval_dim cx info.r' in
-    let cxx, x = Cx.ext_dim cx in
-    let T.B (_, ty) = info.ty in
+    let T.B (nm, ty) = info.ty in
+    let cxx, x = Cx.ext_dim cx ~nm in
     let vtyx = check_eval_ty cxx ty in
     let vtyr = V.Val.act (Dim.subst r x) vtyx in
     let cap = check_eval cx vtyr info.cap in
@@ -345,30 +354,30 @@ and infer cx tm =
   | T.HCom info ->
     let r = check_eval_dim cx info.r in
     check_dim cx info.r';
-    let cxx, x = Cx.ext_dim cx in
+    let cxx, x = Cx.ext_dim cx ~nm:None in
     let vty = check_eval_ty cx info.ty in
     let cap = check_eval cx vty info.cap in
     check_comp_sys cx r (cxx, x, vty) cap info.sys;
     vty
 
   | T.If info ->
-    let T.B (_, mot) = info.mot in
+    let T.B (nm, mot) = info.mot in
     let bool = V.make V.Bool in
-    let cxx, _= Cx.ext_ty cx bool in
+    let cxx, _= Cx.ext_ty cx ~nm bool in
     check_ty cxx mot;
 
     let scrut_ty = infer cx info.scrut in
     Cx.check_eq cx ~ty:(V.make @@ V.Univ Lvl.Omega) scrut_ty bool;
     let scrut = Cx.eval cx info.scrut in
 
-    let cx_tt = Cx.ext_el cx ~ty:bool ~el:(V.make V.Tt) in
-    let cx_ff = Cx.ext_el cx ~ty:bool ~el:(V.make V.Ff) in
+    let cx_tt = Cx.ext_el cx ~nm ~ty:bool ~el:(V.make V.Tt) in
+    let cx_ff = Cx.ext_el cx ~nm ~ty:bool ~el:(V.make V.Ff) in
     let mot_tt = Cx.eval cx_tt mot in
     let mot_ff = Cx.eval cx_ff mot in
     check cx mot_tt info.tcase;
     check cx mot_ff info.fcase;
 
-    let cx_scrut = Cx.ext_el cx ~ty:bool ~el:scrut in
+    let cx_scrut = Cx.ext_el cx ~nm ~ty:bool ~el:scrut in
     Cx.eval cx_scrut mot
 
 

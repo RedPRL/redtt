@@ -23,7 +23,7 @@ let to_inf decl =
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
     Tm.make @@ Tm.Down {ty; tm}
 
-(*
+
 let rec check_document cx decls =
   match decls with
   | [] ->
@@ -38,10 +38,10 @@ and check_decl cx decl =
   | Define {info; args; body} ->
     let ty = TmUtil.pi_from_tele (Some info) args in
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
-    let inf = Tm.into @@ Tm.Down {ty; tm} in
-    let ty = Typing.infer ~mcx:MCx.emp ~cx ~tm:inf in
-    let el = Val.eval (MEnv.empty, LCx.env cx) tm in
+    let inf = Tm.make @@ Tm.Down {ty; tm} in
+    let ty = Typing.infer cx inf in
+    let el = Typing.Cx.eval cx tm in
     let nm = Some (decl_name decl) in
-    let ppenv = LCx.ppenv cx in
+    let ppenv = Typing.Cx.ppenv cx in
     Format.fprintf Format.std_formatter "> %a@.@." (Tm.pp ppenv) inf;
-    LCx.def cx ~nm ty el *)
+    Typing.Cx.ext_el cx ~nm ~ty ~el
