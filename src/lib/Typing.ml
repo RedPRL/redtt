@@ -162,7 +162,8 @@ and check_boundary_face cx ty face tm =
   | Face.Indet (p, el) ->
     let r, r' = DimStar.unleash p in
     let cx' = Cx.restrict cx r r' in
-    Cx.check_eq cx' ~ty el @@
+    let phi = Dim.equate r r' in
+    Cx.check_eq cx' ~ty:(V.Val.act phi ty) el @@
     Cx.eval cx' tm
 
 and check_ext_sys cx ty sys =
@@ -179,8 +180,9 @@ and check_ext_sys cx ty sys =
           go sys acc
 
         | (Dim.Same | Dim.Indeterminate), Some tm ->
+          let phi = Dim.equate r0 r0 in
           let cx' = Cx.restrict cx r0 r1 in
-          check cx' ty tm;
+          check cx' (V.Val.act phi ty) tm;
 
           (* Check tube-tube adjacency conditions *)
           go_adj cx' acc (r0, r1, tm);
@@ -190,18 +192,19 @@ and check_ext_sys cx ty sys =
           failwith "check_ext_sys"
       end
 
-  (* Invariant: cx should already be restricted by r0=r1 *)
   and go_adj cx faces face =
     match faces with
     | [] -> ()
     | (r'0, r'1, tm') :: faces ->
-      let _, _, tm = face in
+      (* Invariant: cx should already be restricted by r0=r1 *)
+      let r0, r1, tm = face in
       begin
         try
           let cx' = Cx.restrict cx r'0 r'1 in
           let v = Cx.eval cx' tm in
           let v' = Cx.eval cx' tm' in
-          Cx.check_eq cx' ~ty v v'
+          let phi = Dim.cmp (Dim.equate r'0 r'1) (Dim.equate r0 r1) in
+          Cx.check_eq cx' ~ty:(V.Val.act phi ty) v v'
         with
         | R.Inconsistent -> ()
       end;
