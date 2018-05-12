@@ -2,45 +2,48 @@ type atom = Symbol.t
 type dim = Dim.repr
 module D = Dim
 
-type delta =
-  | Id
-  | Equate of dim * dim
-  | Cmp of delta * delta
+type eqn = dim * dim
 
 module UF = DisjointSet.Make (PersistentTable.M)
 
 type t =
   {classes : dim UF.t;
-   chronicle : delta;
+   chronicle : eqn list;
    size : int}
 
-let rec eval_delta dl uf =
+let rec eval_chronicle dl uf =
   match dl with
-  | Id -> uf
-  | Equate (r, r') ->
-    UF.union r r' uf
-  | Cmp (dl1, dl0) ->
-    eval_delta dl1 @@ eval_delta dl0 uf
+  | [] -> uf
+  | (r, r') :: dl ->
+    UF.union r r' @@ eval_chronicle dl uf
+
+let pp_repr fmt r =
+  match r with
+  | D.Dim0 ->
+    Format.fprintf fmt "0"
+  | D.Dim1 ->
+    Format.fprintf fmt "1"
+  | D.Atom x ->
+    Format.fprintf fmt "%s" @@ Symbol.to_string x
+
+let pp_eqn fmt (r, r') =
+  Format.fprintf fmt "%a=%a" pp_repr r pp_repr r'
+
+let pp_chronicle fmt chr =
+  let comma fmt () = Format.fprintf fmt ", " in
+  Format.pp_print_list ~pp_sep:comma pp_eqn fmt chr
+
 
 let emp =
   {classes = UF.init 100;
-   chronicle = Id;
+   chronicle = [];
    size = 0}
 
 let equate_ r r' t =
-  let dl = Equate (r, r') in
-  {chronicle = Cmp (dl, t.chronicle);
-   classes = eval_delta dl t.classes;
+  let dl = [r, r'] in
+  {chronicle = dl @ t.chronicle;
+   classes = eval_chronicle dl t.classes;
    size = t.size + 1}
-
-let equate r r' =
-  equate_ r r' emp
-
-
-let union_ t0 t1 =
-  {chronicle = Cmp (t0.chronicle, t1.chronicle);
-   classes = eval_delta t0.chronicle t1.classes;
-   size = t0.size + t1.size}
 
 exception Inconsistent
 
@@ -55,7 +58,7 @@ let canonize r t =
   if rr = find D.Dim0 t then
     D.Dim0
   else if rr = find D.Dim1 t then
-    D.Dim0
+    D.Dim1
   else
     rr
 
@@ -64,22 +67,26 @@ let compare r r' t =
   let cr' = canonize r' t in
   D.compare_repr cr cr'
 
-let ensure_consistent t =
-  match compare D.Dim0 D.Dim1 t with
-  | D.Same ->
-    raise Inconsistent
-  | _ ->
-    ()
 
-let union t0 t1 =
-  let res =
-    if t0.size > t1.size then
-      union_ t1 t0
-    else
-      union_ t0 t1
-  in
-  ensure_consistent res;
+let equate r0 r1 t =
+  let res = equate_ r0 r1 t in
+  begin
+    match compare D.Dim0 D.Dim1 res with
+    | D.Same ->
+      raise Inconsistent
+    | _ -> ()
+  end;
   res
+
+
+let test =
+  try
+    let x = D.Atom (Symbol.named (Some "i")) in
+    let rst = equate x D.Dim0 @@ equate x D.Dim1 emp in
+    Format.printf "Test failure: {@[<1>%a@]}@.\n" pp_chronicle rst.chronicle;
+    failwith "Test failed"
+  with
+  | Inconsistent -> ()
 
 
 let unleash r t =

@@ -4,8 +4,7 @@ type dim = Dim.repr
 type t
 
 val emp : t
-val equate : dim -> dim -> t
-val union : t -> t -> t
+val equate : dim -> dim -> t -> t
 
 val compare : dim -> dim -> t -> Dim.compare
 

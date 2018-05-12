@@ -57,7 +57,7 @@ struct
      rel}
 
   let ext_dim {env; qenv; tys; rel; ppenv} ~nm =
-    let x = Symbol.fresh () in
+    let x = Symbol.named nm in
     {env = V.Atom x :: env;
      tys = `Dim :: tys;
      qenv = Q.Env.abs qenv x;
@@ -77,7 +77,7 @@ struct
     List.nth tys i
 
   let restrict cx r r' =
-    {cx with rel = R.union (R.equate r r') cx.rel}
+    {cx with rel = R.equate r r' cx.rel}
 
   let compare_dim cx r r' =
     R.compare r r' cx.rel

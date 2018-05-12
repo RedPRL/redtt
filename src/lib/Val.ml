@@ -748,7 +748,7 @@ and eval_abs_face rel rho (tr, tr', obnd) =
         Face.False xi
       | _ ->
         let bnd = Option.get_exn obnd in
-        let rel' = R.union (R.equate r r') rel in
+        let rel' = R.equate r r' rel in
         let abs = eval_abs rel' rho bnd in
         Face.Indet (xi, abs)
     end
@@ -781,7 +781,7 @@ and eval_ext_face rel rho (tr, tr', otm) : val_face =
         Face.False xi
       | _ ->
         let tm = Option.get_exn otm in
-        let rel' = R.union (R.equate r r') rel in
+        let rel' = R.equate r r' rel in
         let el = eval rel' rho tm in
         Face.Indet (xi, el)
     end
