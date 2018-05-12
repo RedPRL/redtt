@@ -257,9 +257,9 @@ let rec pp : type a. a t Pretty.t =
       begin
         match sys with
         | [] ->
-          Format.fprintf fmt "@[<1>(# [%s]@ %a)@]" x (pp env') cod
+          Format.fprintf fmt "@[<1>(# <%s>@ %a)@]" x (pp env') cod
         | _ ->
-          Format.fprintf fmt "@[<1>(# [%s]@ %a@ @[%a@])@]" x (pp env') cod (pp_sys env') sys
+          Format.fprintf fmt "@[<1>(# <%s>@ %a@ @[%a@])@]" x (pp env') cod (pp_sys env') sys
       end
 
     | V info ->
@@ -271,7 +271,7 @@ let rec pp : type a. a t Pretty.t =
 
     | ExtLam (B (nm, tm)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(abs [%s]@ %a)@]" x (pp env') tm
+      Format.fprintf fmt "@[<1>(λ <%s>@ %a)@]" x (pp env') tm
 
     | FunApp (tm0, tm1) ->
       Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp env) tm0 (pp env) tm1

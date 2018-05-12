@@ -45,11 +45,14 @@ let union_ t0 t1 =
 exception Inconsistent
 
 let canonize r t =
-  UF.find r t.classes
+  try
+    UF.find r t.classes
+  with
+  | _ -> r
 
 let compare r r' t =
-  let cr = UF.find r t.classes in
-  let cr' = UF.find r' t.classes in
+  let cr = canonize r t in
+  let cr' = canonize r' t in
   D.compare cr cr'
 
 let ensure_consistent t =

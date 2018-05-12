@@ -12,7 +12,7 @@ struct
   type ('k, 'a) t = ('k, 'a) node ref
   and ('k, 'a) node =
     | Tbl of ('k, 'a) Hashtbl.t
-    | Diff of 'k * 'a * ('k, 'a) t
+    | Diff of 'k * 'a option * ('k, 'a) t
     | Invalid
 
   exception Fatal
@@ -24,12 +24,17 @@ struct
     match !t with
     | Tbl _ ->
       ()
-    | Diff (k, v, t') ->
+    | Diff (k, ov, t') ->
       reroot t';
       begin
         match !t' with
         | Tbl a as t'' ->
-          Hashtbl.replace a k v;
+          begin
+            match ov with
+            | Some v ->
+              Hashtbl.replace a k v
+            | None -> Hashtbl.remove a k
+          end;
           t := t'';
           t' := Invalid
         | _ ->
@@ -58,7 +63,7 @@ struct
     reroot t;
     match !t with
     | Tbl a as n ->
-      let old = Hashtbl.find a k in
+      let old = Hashtbl.find_opt a k in
       Hashtbl.replace a k v;
       let res = ref n in
       t := Diff (k, old, res);

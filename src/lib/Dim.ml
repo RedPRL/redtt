@@ -25,7 +25,7 @@ type compare =
   | Indeterminate
 
 let compare (_, r) (_, r') =
-  if S.mem Dim0 r && S.mem Dim1 r' then Same
+  if S.mem Dim0 r && S.mem Dim0 r' then Same
   else if S.mem Dim1 r && S.mem Dim1 r' then Same
   else if S.mem Dim0 r && S.mem Dim1 r' then Apart
   else if S.mem Dim1 r && S.mem Dim0 r' then Apart
