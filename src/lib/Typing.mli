@@ -4,6 +4,8 @@ module Cx :
 sig
   type t
 
+  val emp : t
+
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_el : t -> nm:string option -> ty:value -> el:value -> t
   val restrict : t -> Dim.t -> Dim.t -> t

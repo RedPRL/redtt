@@ -6,7 +6,8 @@ type tele =
   | TEnd of Tm.chk Tm.t
 
 type 'a multibind =
-  | MBCons of string option * 'a multibind
+  | MBConsVar of string option * 'a multibind
+  | MBConsDim of string option * 'a multibind
   | MBEnd of 'a
 
 let rec pi_from_tele info tele =
@@ -26,21 +27,24 @@ let rec sg_from_tele info tele =
 let rec lam_from_multibind info mb =
   match mb with
   | MBEnd bdy -> bdy
-  | MBCons (nm, mb) ->
+  | MBConsVar (nm, mb) ->
     Tm.into_info info @@
     Tm.Lam (Tm.B (nm, lam_from_multibind info mb))
+  | MBConsDim (nm, mb) ->
+    Tm.into_info info @@
+    Tm.ExtLam (Tm.B (nm, lam_from_multibind info mb))
 
 let rec ext_from_multibind start stop mb =
   match mb with
-  | MBCons (nm, MBEnd (ty, sys)) ->
+  | MBConsDim (nm, MBEnd (ty, sys)) ->
     Tm.into_info (Some (start, stop)) @@
     Tm.Ext (Tm.B (nm, (ty, sys)))
 
-  | MBCons (nm, mb) ->
+  | MBConsDim (nm, mb) ->
     Tm.into_info (Some (start, stop)) @@
     Tm.Ext (Tm.B (nm, (ext_from_multibind start stop mb, [])))
 
-  | MBEnd _ ->
+  | _ ->
     failwith "ext_from_multibind"
 
 

@@ -8,6 +8,8 @@ type value = V.value
 module Cx :
 sig
   type t
+  val emp : t
+
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_el : t -> nm:string option -> ty:value -> el:value -> t
   val ext_dim : t -> nm:string option -> t * V.atom
@@ -27,6 +29,13 @@ struct
   type hyp = [`Ty of V.value | `Dim]
 
   type t = {tys : hyp list; env : V.env; qenv : Q.env; rel : R.t; ppenv : Pretty.env}
+
+  let emp =
+    {env = [];
+     qenv = Q.Env.emp;
+     tys = [];
+     ppenv = Pretty.Env.emp;
+     rel = R.emp}
 
   let ext_ty {env; qenv; tys; rel; ppenv} ~nm vty =
     let n = Q.Env.len qenv in

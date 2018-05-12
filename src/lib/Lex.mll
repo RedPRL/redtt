@@ -86,6 +86,10 @@ rule token = parse
     { Lwt.return RIGHT_ARROW }
   | "→"
     { Lwt.return RIGHT_ARROW }
+  | "<"
+    { Lwt.return LGL }
+  | ">"
+    { Lwt.return RGL }
   | "λ"
     { Lwt.return LAM }
   | line_ending

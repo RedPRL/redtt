@@ -14,7 +14,7 @@ let rec tele_to_multibind tele bdy =
     TmUtil.MBEnd bdy
 
   | TmUtil.TCons (nm, _, tele) ->
-    TmUtil.MBCons (nm, tele_to_multibind tele bdy)
+    TmUtil.MBConsVar (nm, tele_to_multibind tele bdy)
 
 let to_inf decl =
   match decl with

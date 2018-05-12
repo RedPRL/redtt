@@ -6,7 +6,7 @@
 %token <int> NUMERAL
 %token <string> ATOM
 %token DEFINE
-%token LSQ RSQ LPR RPR
+%token LSQ RSQ LPR RPR LGL RGL
 %token COLON COLON_ANGLE
 %token EQUALS
 %token RIGHT_ARROW
@@ -66,7 +66,11 @@ multibind(X):
 
   | LSQ; x = ATOM; RSQ; mb = multibind(X)
     { fun env ->
-      MBCons (Some x, mb @@ R.bind x env) }
+      MBConsVar (Some x, mb @@ R.bind x env) }
+
+  | LGL; x = ATOM; RGL; mb = multibind(X)
+    { fun env ->
+      MBConsDim (Some x, mb @@ R.bind x env) }
 
 
 elist(X):

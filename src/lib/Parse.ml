@@ -66,9 +66,8 @@ let loop lexbuf tokens =
         go (I.resume checkpoint) ()
 
       | I.Accepted result ->
-        let _doc = result ResEnv.init in
-        Lwt.return ()
-      (* Lwt.return @@ Decl.check_document LCx.emp doc *)
+        let doc = result ResEnv.init in
+        Lwt.return @@ Decl.check_document Typing.Cx.emp doc
 
       | I.HandlingError env ->
         begin match I.top env with

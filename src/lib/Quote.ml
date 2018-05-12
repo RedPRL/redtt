@@ -7,6 +7,7 @@ sig
 
   val len : t -> int
 
+  val emp : t
   val make : int -> t
   val succ : t -> t
   val abs : t -> Symbol.t -> t
@@ -23,6 +24,8 @@ struct
 
   let make n =
     {n; atoms = M.empty}
+
+  let emp = make 0
 
   let succ env =
     {env with n = env.n + 1}

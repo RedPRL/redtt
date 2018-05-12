@@ -4,6 +4,7 @@ sig
 
   val len : t -> int
 
+  val emp : t
   val make : int -> t
   val succ : t -> t
   val abs : t -> Symbol.t -> t
