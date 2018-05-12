@@ -161,11 +161,16 @@ let rec check cx ty tm =
   | V.Univ _, T.FCom info ->
     check_fcom cx ty info.r info.r' info.cap info.sys
 
+  | V.Bool, (T.Tt | T.Ff) ->
+    ()
+
   | _, T.Up tm ->
     let ty' = infer cx tm in
     Cx.check_subtype cx ty' ty
 
-  | _ -> failwith ""
+  | _ ->
+    Format.eprintf "Failed to check term %a@." (Tm.pp (Cx.ppenv cx)) tm;
+    failwith "Type error"
 
 and check_fcom cx ty tr tr' tcap tsys =
   let r = check_eval_dim cx tr in

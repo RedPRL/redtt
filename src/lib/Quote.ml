@@ -39,8 +39,10 @@ struct
     env.n - (l + 1)
 
   let ix_of_atom x env =
-    let lvl = M.find x env.atoms in
-    ix_of_lvl lvl env
+    try
+      let lvl = M.find x env.atoms in
+      ix_of_lvl lvl env
+    with _ -> failwith "FUCK!!:"
 end
 
 type env = Env.t

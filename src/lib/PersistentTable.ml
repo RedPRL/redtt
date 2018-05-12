@@ -13,7 +13,6 @@ struct
   and ('k, 'a) node =
     | Tbl of ('k, 'a) Hashtbl.t
     | Diff of 'k * 'a option * ('k, 'a) t
-    | Invalid
 
   exception Fatal
 
@@ -36,12 +35,9 @@ struct
             | None -> Hashtbl.remove a k
           end;
           t := t'';
-          t' := Invalid
         | _ ->
           raise Fatal
       end
-    | Invalid ->
-      raise Fatal
 
   let rec get k t =
     match !t with
@@ -56,8 +52,6 @@ struct
         | _ ->
           raise Fatal
       end
-    | Invalid ->
-      raise Fatal
 
   let set k v t =
     reroot t;
