@@ -38,7 +38,7 @@ type con =
   | Up : {ty : value; neu : neu} -> con
 
 and neu =
-  | Lvl : int -> neu
+  | Lvl : string option * int -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * ext_sys * D.t -> neu
   | Car : neu -> neu
@@ -73,6 +73,8 @@ and cap_sys = rigid_abs_face list
 
 and node = Node of {con : con; action : D.action}
 and value = node ref
+
+
 
 type step =
   | Ret : neu -> step
@@ -184,13 +186,16 @@ let rec eval_dim : type x. rel -> env -> x Tm.t -> D.repr =
       begin
         match List.nth rho i with
         | Atom x ->
-          R.unleash (D.Atom x) rel
+          R.canonize (D.Atom x) rel
         | _ ->
-          failwith "eval_dim_repr: expected atom in environment"
+          failwith "eval_dim: expected atom in environment"
       end
     | _ ->
-      failwith "eval_dim_repr"
+      failwith "eval_dim"
 
+let eval_dim_class : type x. rel -> env -> x Tm.t -> D.t =
+  fun rel rho tm ->
+    R.unleash (eval_dim rel rho tm) rel
 
 let rec act_can phi con =
   match con with
@@ -619,7 +624,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make @@ Ext abs
 
     | Tm.V info ->
-      let r = Dim.singleton @@ eval_dim rel rho info.r in
+      let r = eval_dim_class rel rho info.r in
       let ty0 = eval rel rho info.ty0 in
       let ty1 = eval rel rho info.ty1 in
       let equiv = eval rel rho info.equiv in
@@ -638,16 +643,16 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make @@ Cons (v0, v1)
 
     | Tm.Coe info ->
-      let r = Dim.singleton @@ eval_dim rel rho info.r in
-      let r' = Dim.singleton @@ eval_dim rel rho info.r' in
+      let r = eval_dim_class rel rho info.r in
+      let r' = eval_dim_class rel rho info.r' in
       let dir = Star.make r r' in
       let abs = eval_abs rel rho info.ty  in
       let el = eval rel rho info.tm in
       make_coe dir abs el
 
     | Tm.HCom info ->
-      let r = Dim.singleton @@ eval_dim rel rho info.r in
-      let r' = Dim.singleton @@ eval_dim rel rho info.r' in
+      let r = eval_dim_class rel rho info.r in
+      let r' = eval_dim_class rel rho info.r' in
       let dir = Star.make r r' in
       let ty = eval rel rho info.ty in
       let cap = eval rel rho info.cap in
@@ -655,8 +660,8 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make_hcom dir ty cap sys
 
     | Tm.Com info ->
-      let r = Dim.singleton @@ eval_dim rel rho info.r in
-      let r' = Dim.singleton @@ eval_dim rel rho info.r' in
+      let r = eval_dim_class rel rho info.r in
+      let r' = eval_dim_class rel rho info.r' in
       let dir = Star.make r r' in
       let abs = eval_abs rel rho info.ty in
       let cap = eval rel rho info.cap in
@@ -664,8 +669,8 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make_com dir abs cap sys
 
     | Tm.FCom info ->
-      let r = Dim.singleton @@ eval_dim rel rho info.r  in
-      let r' = Dim.singleton @@ eval_dim rel rho info.r' in
+      let r = eval_dim_class rel rho info.r  in
+      let r' = eval_dim_class rel rho info.r' in
       let dir = Star.make r r' in
       let cap = eval rel rho info.cap in
       let sys = eval_abs_sys rel rho info.sys in
@@ -678,7 +683,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
 
     | Tm.ExtApp (t, tr) ->
       let v = eval rel rho t in
-      let r = Dim.singleton @@ eval_dim rel rho tr in
+      let r = eval_dim_class rel rho tr in
       ext_apply v r
 
     | Tm.Car t ->
@@ -688,7 +693,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       cdr @@ eval rel rho t
 
     | Tm.VProj info ->
-      let r = Dim.singleton @@ eval_dim rel rho info.r in
+      let r = eval_dim_class rel rho info.r in
       let ty0 = eval rel rho info.ty0 in
       let ty1 = eval rel rho info.ty1 in
       let el = eval rel rho info.tm in
@@ -738,8 +743,8 @@ and eval : type x. rel -> env -> x Tm.t -> value =
 and eval_abs_face rel rho (tr, tr', obnd) =
   let r = eval_dim rel rho tr in
   let r' = eval_dim rel rho tr' in
-  let sr = Dim.singleton r in
-  let sr' = Dim.singleton r' in
+  let sr = R.unleash r rel in
+  let sr' = R.unleash r' rel in
   match Star.make sr sr' with
   | `Ok xi ->
     begin
@@ -771,8 +776,8 @@ and eval_abs_sys rel rho sys  =
 and eval_ext_face rel rho (tr, tr', otm) : val_face =
   let r = eval_dim rel rho tr in
   let r' = eval_dim rel rho tr' in
-  let sr = Dim.singleton r in
-  let sr' = Dim.singleton r' in
+  let sr = R.unleash r rel in
+  let sr' = R.unleash r' rel in
   match Star.make sr sr' with
   | `Ok xi ->
     begin
@@ -1080,3 +1085,38 @@ struct
       (Tm.up @@ Tm.var 1)
 
 end
+
+let rec pp_value fmt value =
+  match unleash value with
+  | Up up ->
+    Format.fprintf fmt "%a" pp_neu up.neu
+  | Lam clo ->
+    Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
+  | _ ->
+    Format.fprintf fmt "<value>"
+
+and pp_clo fmt _ =
+  Format.fprintf fmt "<clo>"
+
+and pp_neu fmt neu =
+  match neu with
+  | Lvl (None, i) ->
+    Format.fprintf fmt "#%i" i
+
+  | Lvl (Some x, _) ->
+    Format.fprintf fmt "%s" x
+
+  | FunApp (neu, arg) ->
+    Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
+
+  | ExtApp (neu, _, arg) ->
+    Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu Dim.pp arg
+
+  | Car neu ->
+    Format.fprintf fmt "@[<1>(car %a)@]" pp_neu neu
+
+  | Cdr neu ->
+    Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
+
+  | _ ->
+    Format.fprintf fmt "<neu>"

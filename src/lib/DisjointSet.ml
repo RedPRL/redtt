@@ -5,16 +5,19 @@ sig
   val init : size:int -> 'a t
   val union : 'a -> 'a -> 'a t -> 'a t
   val find : 'a -> 'a t -> 'a
+  val find_class : 'a -> 'a t -> 'a list
 end
 
 module Make (T : PersistentTable.S) : S =
 struct
   type 'a t =
     {rank : ('a, int) T.t;
+     children : ('a, 'a list) T.t;
      mutable parent : ('a, 'a) T.t}
 
   let init ~size =
     {rank = T.init ~size;
+     children = T.init ~size;
      parent = T.init ~size}
 
 
@@ -44,6 +47,17 @@ struct
     | _ ->
       0
 
+  let get_children cx h =
+    try
+      T.get cx h.children
+    with
+    | _ ->
+      []
+
+  let find_class x h =
+    let y = find x h in
+    y :: get_children y h
+
   let union (x : 'a) (y : 'a) (h : 'a t) =
     let cx = find x h in
     let cy = find y h in
@@ -52,12 +66,23 @@ struct
         let rx = get_rank cx h in
         let ry = get_rank cy h in
         if rx > ry then
-          {h with parent = T.set cy cx h.parent}
+          {h with
+           parent = T.set cy cx h.parent;
+           children =
+             let xs = get_children cx h in
+             T.set cx (cy :: xs) h.children}
         else if rx < ry then
-          {h with parent = T.set cx cy h.parent}
+          {h with
+           parent = T.set cx cy h.parent;
+           children =
+             let ys = get_children cy h in
+             T.set cy (cx :: ys) h.children}
         else
           {rank = T.set cx (rx + 1) h.rank;
-           parent = T.set cy cx h.parent}
+           parent = T.set cy cx h.parent;
+           children =
+             let xs = get_children cx h in
+             T.set cx (cy :: xs) h.children}
       end
     else
       h

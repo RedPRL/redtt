@@ -16,7 +16,7 @@ module S = Set.Make (Repr)
 type t = repr * S.t
 
 let singleton r = r, S.singleton r
-
+let from_reprs r rs = r, S.of_list rs
 
 let dim0 = singleton Dim0
 let dim1 = singleton Dim1
@@ -112,3 +112,19 @@ let action_is_id phi =
   match phi with
   | Id -> true
   | _ -> false
+
+let pp_repr fmt r =
+  match r with
+  | Dim0 ->
+    Format.fprintf fmt "0"
+  | Dim1 ->
+    Format.fprintf fmt "1"
+  | Atom x ->
+    Format.fprintf fmt "%s" @@ Symbol.to_string x
+
+let pp_repr_set fmt rs =
+  let comma fmt () = Format.fprintf fmt ", " in
+  Format.pp_print_list ~pp_sep:comma pp_repr fmt @@ S.elements rs
+
+let pp fmt (r, rs) =
+  Format.fprintf fmt "@[<1>{%a|%a}@]" pp_repr r pp_repr_set rs

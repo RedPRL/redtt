@@ -19,6 +19,11 @@ struct
   let init ~size =
     ref @@ Tbl (Hashtbl.create size)
 
+  let set_opt tbl k ov =
+    match ov with
+    | None -> Hashtbl.remove tbl k
+    | Some v -> Hashtbl.replace tbl k v
+
   let rec reroot t =
     match !t with
     | Tbl _ ->
@@ -27,14 +32,11 @@ struct
       reroot t';
       begin
         match !t' with
-        | Tbl a as t'' ->
-          begin
-            match ov with
-            | Some v ->
-              Hashtbl.replace a k v
-            | None -> Hashtbl.remove a k
-          end;
-          t := t'';
+        | Tbl a as n ->
+          let ov' = Hashtbl.find_opt a k in
+          set_opt a k ov;
+          t := n;
+          t' := Diff (k, ov', t)
         | _ ->
           raise Fatal
       end

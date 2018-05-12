@@ -8,6 +8,11 @@ val equate : dim -> dim -> t -> t
 
 val compare : dim -> dim -> t -> Dim.compare
 
-val unleash : dim -> t -> dim
+val canonize : dim -> t -> dim
+val unleash : dim -> t -> Dim.t
 
 exception Inconsistent
+
+
+
+val pp : Format.formatter -> t -> unit

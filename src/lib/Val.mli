@@ -39,7 +39,7 @@ type con =
   | Up : {ty : value; neu : neu} -> con
 
 and neu =
-  | Lvl : int -> neu
+  | Lvl : string option * int -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * ext_sys * dim -> neu
   | Car : neu -> neu
@@ -85,6 +85,11 @@ val unleash_pi : value -> value * clo
 val unleash_sg : value -> value * clo
 val unleash_v : value -> gen * value * value * value
 val unleash_ext : value -> dim -> value * ext_sys
+
+
+val pp_value : Format.formatter -> value -> unit
+val pp_neu : Format.formatter -> neu -> unit
+
 
 module Val : Sort.S
   with type t = value

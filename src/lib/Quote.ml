@@ -48,7 +48,7 @@ end
 type env = Env.t
 
 let generic env ty =
-  make @@ Up {ty = ty; neu = Lvl (Env.len env)}
+  make @@ Up {ty = ty; neu = Lvl (None, Env.len env)}
 
 let rec equate env ty el0 el1 =
   match unleash ty with
@@ -144,7 +144,7 @@ let rec equate env ty el0 el1 =
 
 and equate_neu env neu0 neu1 =
   match neu0, neu1 with
-  | Lvl l0, Lvl l1 ->
+  | Lvl (_, l0), Lvl (_, l1) ->
     if l0 = l1 then
       Tm.var @@ Env.ix_of_lvl l0 env
     else
@@ -191,7 +191,9 @@ and equate_neu env neu0 neu1 =
        Tm.make @@ Tm.VProj {r = tr; tm; func} *)
     failwith "TODO"
 
-  | _ -> failwith "equate_neu"
+  | _ ->
+    Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1;
+    failwith "equate_neu"
 
 and equate_ty env ty0 ty1 : Tm.chk Tm.t =
   let univ = make @@ Univ Lvl.Omega in

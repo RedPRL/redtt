@@ -24,6 +24,9 @@ sig
   val compare_dim : t -> Dim.repr -> Dim.repr -> Dim.compare
   val check_eq : t -> ty:V.value -> V.value -> V.value -> unit
   val check_subtype : t -> V.value -> V.value -> unit
+
+  val unleash_dim : t -> Dim.repr -> Dim.t
+  val equate_dim : t -> Dim.repr -> Dim.repr -> Dim.action
 end =
 struct
   type hyp = [`Ty of V.value | `Dim]
@@ -41,7 +44,7 @@ struct
 
   let ext_ty {env; qenv; tys; rel; ppenv} ~nm vty =
     let n = Q.Env.len qenv in
-    let var = V.make @@ V.Up {ty = vty; neu = V.Lvl n} in
+    let var = V.make @@ V.Up {ty = vty; neu = V.Lvl (nm, n)} in
     {env = V.Val var :: env;
      tys = `Ty vty :: tys;
      qenv = Q.Env.succ qenv;
@@ -79,14 +82,32 @@ struct
   let restrict cx r r' =
     {cx with rel = R.equate r r' cx.rel}
 
+  let equate_dim cx r r' =
+    let cr = R.unleash r cx.rel in
+    let cr' = R.unleash r' cx.rel in
+    Dim.equate cr cr'
+
   let compare_dim cx r r' =
     R.compare r r' cx.rel
 
+  let unleash_dim cx r =
+    R.unleash r cx.rel
+
   let check_eq cx ~ty el0 el1 =
-    Q.equiv cx.qenv ~ty el0 el1
+    try
+      Q.equiv cx.qenv ~ty el0 el1
+    with
+    | exn ->
+      Format.printf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1;
+      raise exn
 
   let check_subtype cx ty0 ty1 =
-    Q.subtype cx.qenv ty0 ty1
+    try
+      Q.subtype cx.qenv ty0 ty1
+    with
+    | exn ->
+      Format.printf "subtype: %a /<= %a@." V.pp_value ty0 V.pp_value ty1;
+      raise exn
 end
 
 type cx = Cx.t
@@ -205,7 +226,10 @@ and check_boundary_face cx ty face tm =
     let r, r' = DimStar.unleash p in
     let cx' = Cx.restrict cx (Dim.unleash r) (Dim.unleash r') in
     let phi = Dim.equate r r' in
+    (* let welp = Cx.eval cx' tm in *)
+    (* Format.printf "Fuck: %a ; %a; %a; %a@." Dim.pp r Dim.pp r' Val.pp_value welp (Tm.pp (Cx.ppenv cx)) tm; *)
     Cx.check_eq cx' ~ty:(V.Val.act phi ty) el @@
+    (* V.Val.act phi @@ Cx.eval cx' tm *)
     Cx.eval cx' tm
 
 and check_ext_sys cx ty sys =
@@ -224,7 +248,7 @@ and check_ext_sys cx ty sys =
         | (Dim.Same | Dim.Indeterminate), Some tm ->
           begin
             try
-              let phi = Dim.equate (Dim.singleton r0) (Dim.singleton r0) in
+              let phi = Cx.equate_dim cx r0 r1 in
               let cx' = Cx.restrict cx r0 r1 in
               check cx' (V.Val.act phi ty) tm;
 
@@ -249,7 +273,7 @@ and check_ext_sys cx ty sys =
           let cx' = Cx.restrict cx r'0 r'1 in
           let v = Cx.eval cx' tm in
           let v' = Cx.eval cx' tm' in
-          let phi = Dim.cmp (Dim.equate (Dim.singleton r'0) (Dim.singleton r'1)) (Dim.equate (Dim.singleton r0) (Dim.singleton r1)) in
+          let phi = Dim.cmp (Cx.equate_dim cx r'0 r'1) (Cx.equate_dim cx r0 r1) in
           Cx.check_eq cx' ~ty:(V.Val.act phi ty) v v'
         with
         | R.Inconsistent -> ()
@@ -344,7 +368,7 @@ and infer cx tm =
   | T.ExtApp (tm, tr) ->
     let r = check_eval_dim cx tr in
     let ext_ty = infer cx tm in
-    let ty, _ = V.unleash_ext ext_ty @@ Dim.singleton r in
+    let ty, _ = V.unleash_ext ext_ty @@ Cx.unleash_dim cx r in
     ty
 
   | T.VProj info ->
@@ -361,9 +385,9 @@ and infer cx tm =
     let T.B (nm, ty) = info.ty in
     let cxx, x = Cx.ext_dim cx ~nm in
     let vtyx = check_eval_ty cxx ty in
-    let vtyr = V.Val.act (Dim.subst (Dim.singleton r) x) vtyx in
+    let vtyr = V.Val.act (Dim.subst (Cx.unleash_dim cx r) x) vtyx in
     check cx vtyr info.tm;
-    V.Val.act (Dim.subst (Dim.singleton r') x) vtyx
+    V.Val.act (Dim.subst (Cx.unleash_dim cx r') x) vtyx
 
   | T.Com info ->
     let r = check_eval_dim cx info.r in

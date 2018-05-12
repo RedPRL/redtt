@@ -17,21 +17,15 @@ let rec eval_chronicle dl uf =
   | (r, r') :: dl ->
     UF.union r r' @@ eval_chronicle dl uf
 
-let pp_repr fmt r =
-  match r with
-  | D.Dim0 ->
-    Format.fprintf fmt "0"
-  | D.Dim1 ->
-    Format.fprintf fmt "1"
-  | D.Atom x ->
-    Format.fprintf fmt "%s" @@ Symbol.to_string x
-
 let pp_eqn fmt (r, r') =
-  Format.fprintf fmt "%a=%a" pp_repr r pp_repr r'
+  Format.fprintf fmt "%a=%a" Dim.pp_repr r Dim.pp_repr r'
 
 let pp_chronicle fmt chr =
   let comma fmt () = Format.fprintf fmt ", " in
   Format.pp_print_list ~pp_sep:comma pp_eqn fmt chr
+
+let pp fmt rst =
+  pp_chronicle fmt rst.chronicle
 
 
 let emp =
@@ -42,7 +36,7 @@ let emp =
 let equate_ r r' t =
   let dl = [r, r'] in
   {chronicle = dl @ t.chronicle;
-   classes = eval_chronicle dl t.classes;
+   classes = UF.union r r' t.classes;
    size = t.size + 1}
 
 exception Inconsistent
@@ -55,12 +49,17 @@ let find r t =
 
 let canonize r t =
   let rr = find r t in
-  if rr = find D.Dim0 t then
-    D.Dim0
-  else if rr = find D.Dim1 t then
-    D.Dim1
-  else
-    rr
+  let res =
+    if rr = find D.Dim0 t then
+      D.Dim0
+    else if rr = find D.Dim1 t then
+      D.Dim1
+    else
+      rr
+  in
+  (* Format.printf "%a |= 0 ==> %a@." pp t D.pp_repr (find D.Dim0 t);
+     Format.printf "Canonizing %a in %a as %a@." D.pp_repr r pp t D.pp_repr res; *)
+  res
 
 let compare r r' t =
   let cr = canonize r t in
@@ -88,6 +87,14 @@ let test =
   with
   | Inconsistent -> ()
 
+let test2 =
+  let x = D.Atom (Symbol.named (Some "i")) in
+  let rst = equate x D.Dim0 emp in
+  assert (canonize x rst = D.Dim0)
+
 
 let unleash r t =
-  canonize r t
+  let r' = canonize r t in
+  let rs = UF.find_class r' t.classes in
+  Dim.from_reprs r' rs
+

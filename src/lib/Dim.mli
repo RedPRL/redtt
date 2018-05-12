@@ -12,6 +12,7 @@ val dim1 : t
 val named : atom -> t
 
 val singleton : repr -> t
+val from_reprs : repr -> repr list -> t
 
 val entangle : t -> t -> t * t
 
@@ -35,3 +36,7 @@ val action_is_id : action -> bool
 val act : action -> t -> t
 
 val unleash : t -> repr
+
+
+val pp_repr : Format.formatter -> repr -> unit
+val pp : Format.formatter -> t -> unit
