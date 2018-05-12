@@ -133,11 +133,21 @@ let rec check cx ty tm =
     let codx, sysx = V.ExtAbs.inst ext_abs (Dim.named x) in
     check_boundary cxx codx sysx tm
 
+  | V.Univ _, T.FCom info ->
+    check_fcom cx ty info.r info.r' info.cap info.sys
+
   | _, T.Up tm ->
     let ty' = infer cx tm in
     Cx.check_subtype cx ty' ty
 
   | _ -> failwith ""
+
+and check_fcom cx ty tr tr' tcap tsys =
+  let r = check_eval_dim cx tr in
+  check_dim cx tr';
+  let cxx, x = Cx.ext_dim cx in
+  let cap = check_eval cx ty tcap in
+  check_comp_sys cx r (cxx, x, ty) cap tsys
 
 and check_boundary cx ty sys tm =
   let rec go sys =
