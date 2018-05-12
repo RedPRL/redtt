@@ -148,7 +148,7 @@ and equate_neu env neu0 neu1 =
     if l0 = l1 then
       Tm.var @@ Env.ix_of_lvl l0 env
     else
-      failwith "equate_neu: expected equal de bruijn levels"
+      failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
 
   | Car neu0, Car neu1 ->
     Tm.car @@ equate_neu env neu0 neu1
