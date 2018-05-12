@@ -71,7 +71,7 @@ val make : con -> value
 val unleash : value -> con
 
 val eval : rel -> env -> 'a Tm.t -> value
-val eval_dim : rel -> env -> 'a Tm.t -> dim
+val eval_dim : rel -> env -> 'a Tm.t -> Dim.repr
 
 val apply : value -> value -> value
 val ext_apply : value -> dim -> value

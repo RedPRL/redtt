@@ -1,5 +1,5 @@
 type atom = Symbol.t
-type dim = Dim.t
+type dim = Dim.repr
 module D = Dim
 
 type delta =
@@ -44,19 +44,28 @@ let union_ t0 t1 =
 
 exception Inconsistent
 
-let canonize r t =
+let find r t =
   try
     UF.find r t.classes
   with
   | _ -> r
 
+let canonize r t =
+  let rr = find r t in
+  if rr = find D.Dim0 t then
+    D.Dim0
+  else if rr = find D.Dim1 t then
+    D.Dim0
+  else
+    rr
+
 let compare r r' t =
   let cr = canonize r t in
   let cr' = canonize r' t in
-  D.compare cr cr'
+  D.compare_repr cr cr'
 
 let ensure_consistent t =
-  match compare D.dim0 D.dim1 t with
+  match compare D.Dim0 D.Dim1 t with
   | D.Same ->
     raise Inconsistent
   | _ ->

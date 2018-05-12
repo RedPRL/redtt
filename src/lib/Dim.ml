@@ -15,14 +15,28 @@ module S = Set.Make (Repr)
 
 type t = repr * S.t
 
-let dim0 = Dim0, S.singleton Dim0
-let dim1 = Dim1, S.singleton Dim1
-let named a = Atom a, S.singleton @@ Atom a
+let singleton r = r, S.singleton r
+
+
+let dim0 = singleton Dim0
+let dim1 = singleton Dim1
+let named a = singleton @@ Atom a
 
 type compare =
   | Same
   | Apart
   | Indeterminate
+
+let compare_repr r r' =
+  match r, r' with
+  | Dim0, Dim0 -> Same
+  | Dim1, Dim1 -> Same
+  | Dim1, Dim0 -> Apart
+  | Dim0, Dim1 -> Apart
+  | Atom x, Atom y ->
+    if x = y then Same else Indeterminate
+  | _ -> Indeterminate
+
 
 let compare (_, r) (_, r') =
   if S.mem Dim0 r && S.mem Dim0 r' then Same

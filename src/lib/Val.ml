@@ -169,27 +169,27 @@ exception ProjAbs of abs
 exception ProjVal of value
 
 
-let rec eval_dim : type x. rel -> env -> x Tm.t -> D.t =
+let rec eval_dim : type x. rel -> env -> x Tm.t -> D.repr =
   fun rel rho tm ->
     match Tm.unleash tm with
     | Tm.Dim0 ->
-      D.dim0
+      D.Dim0
     | Tm.Dim1 ->
-      D.dim1
-    | Tm.Up t ->
-      eval_dim rel rho t
+      D.Dim1
+    | Tm.Up tm ->
+      eval_dim rel rho tm
     | Tm.Down {tm; _} ->
       eval_dim rel rho tm
     | Tm.Var i ->
       begin
         match List.nth rho i with
         | Atom x ->
-          R.unleash (D.named x) rel
+          R.unleash (D.Atom x) rel
         | _ ->
-          failwith "eval_dim: expected atom in environment"
+          failwith "eval_dim_repr: expected atom in environment"
       end
     | _ ->
-      failwith "eval_dim"
+      failwith "eval_dim_repr"
 
 
 let rec act_can phi con =
@@ -619,7 +619,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make @@ Ext abs
 
     | Tm.V info ->
-      let r = eval_dim rel rho info.r in
+      let r = Dim.singleton @@ eval_dim rel rho info.r in
       let ty0 = eval rel rho info.ty0 in
       let ty1 = eval rel rho info.ty1 in
       let equiv = eval rel rho info.equiv in
@@ -638,16 +638,16 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make @@ Cons (v0, v1)
 
     | Tm.Coe info ->
-      let r = eval_dim rel rho info.r in
-      let r' = eval_dim rel rho info.r' in
+      let r = Dim.singleton @@ eval_dim rel rho info.r in
+      let r' = Dim.singleton @@ eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let abs = eval_abs rel rho info.ty  in
       let el = eval rel rho info.tm in
       make_coe dir abs el
 
     | Tm.HCom info ->
-      let r = eval_dim rel rho info.r in
-      let r' = eval_dim rel rho info.r' in
+      let r = Dim.singleton @@ eval_dim rel rho info.r in
+      let r' = Dim.singleton @@ eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let ty = eval rel rho info.ty in
       let cap = eval rel rho info.cap in
@@ -655,8 +655,8 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make_hcom dir ty cap sys
 
     | Tm.Com info ->
-      let r = eval_dim rel rho info.r in
-      let r' = eval_dim rel rho info.r' in
+      let r = Dim.singleton @@ eval_dim rel rho info.r in
+      let r' = Dim.singleton @@ eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let abs = eval_abs rel rho info.ty in
       let cap = eval rel rho info.cap in
@@ -664,8 +664,8 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make_com dir abs cap sys
 
     | Tm.FCom info ->
-      let r = eval_dim rel rho info.r  in
-      let r' = eval_dim rel rho info.r' in
+      let r = Dim.singleton @@ eval_dim rel rho info.r  in
+      let r' = Dim.singleton @@ eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let cap = eval rel rho info.cap in
       let sys = eval_abs_sys rel rho info.sys in
@@ -678,7 +678,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
 
     | Tm.ExtApp (t, tr) ->
       let v = eval rel rho t in
-      let r = eval_dim rel rho tr in
+      let r = Dim.singleton @@ eval_dim rel rho tr in
       ext_apply v r
 
     | Tm.Car t ->
@@ -688,7 +688,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       cdr @@ eval rel rho t
 
     | Tm.VProj info ->
-      let r = eval_dim rel rho info.r in
+      let r = Dim.singleton @@ eval_dim rel rho info.r in
       let ty0 = eval rel rho info.ty0 in
       let ty1 = eval rel rho info.ty1 in
       let el = eval rel rho info.tm in
@@ -738,10 +738,12 @@ and eval : type x. rel -> env -> x Tm.t -> value =
 and eval_abs_face rel rho (tr, tr', obnd) =
   let r = eval_dim rel rho tr in
   let r' = eval_dim rel rho tr' in
-  match Star.make r r' with
+  let sr = Dim.singleton r in
+  let sr' = Dim.singleton r' in
+  match Star.make sr sr' with
   | `Ok xi ->
     begin
-      match D.compare r r' with
+      match D.compare sr sr' with
       | D.Apart ->
         Face.False xi
       | _ ->
@@ -753,7 +755,7 @@ and eval_abs_face rel rho (tr, tr', obnd) =
   | `Same _ ->
     let bnd = Option.get_exn obnd in
     let abs = eval_abs rel rho bnd in
-    Face.True (r, r', abs)
+    Face.True (sr, sr', abs)
 
 and eval_abs_sys rel rho sys  =
   try
@@ -769,10 +771,12 @@ and eval_abs_sys rel rho sys  =
 and eval_ext_face rel rho (tr, tr', otm) : val_face =
   let r = eval_dim rel rho tr in
   let r' = eval_dim rel rho tr' in
-  match Star.make r r' with
+  let sr = Dim.singleton r in
+  let sr' = Dim.singleton r' in
+  match Star.make sr sr' with
   | `Ok xi ->
     begin
-      match D.compare r r' with
+      match D.compare sr sr' with
       | D.Apart ->
         Face.False xi
       | _ ->
@@ -784,7 +788,7 @@ and eval_ext_face rel rho (tr, tr', otm) : val_face =
   | `Same _ ->
     let tm = Option.get_exn otm in
     let el = eval rel rho tm in
-    Face.True (r, r', el)
+    Face.True (sr, sr', el)
 
 and eval_ext_sys rel rho sys : ext_sys =
   List.map (eval_ext_face rel rho) sys

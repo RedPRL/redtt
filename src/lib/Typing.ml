@@ -13,21 +13,23 @@ sig
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_el : t -> nm:string option -> ty:value -> el:value -> t
   val ext_dim : t -> nm:string option -> t * V.atom
-  val restrict : t -> Dim.t -> Dim.t -> t
+  val restrict : t -> Dim.repr -> Dim.repr -> t
 
   val eval : t -> 'a T.t -> V.value
-  val eval_dim : t -> T.chk T.t -> V.dim
+  val eval_dim : t -> T.chk T.t -> Dim.repr
 
   val ppenv : t -> Pretty.env
 
   val lookup : int -> t -> [`Ty of V.value | `Dim]
-  val compare_dim : t -> Dim.t -> Dim.t -> Dim.compare
+  val compare_dim : t -> Dim.repr -> Dim.repr -> Dim.compare
   val check_eq : t -> ty:V.value -> V.value -> V.value -> unit
   val check_subtype : t -> V.value -> V.value -> unit
 end =
 struct
   type hyp = [`Ty of V.value | `Dim]
 
+  (* The way that we model dimensions is now incompatible with the union-find version of things.
+     We need to find a new way. *)
   type t = {tys : hyp list; env : V.env; qenv : Q.env; rel : R.t; ppenv : Pretty.env}
 
   let emp =
@@ -201,7 +203,7 @@ and check_boundary_face cx ty face tm =
 
   | Face.Indet (p, el) ->
     let r, r' = DimStar.unleash p in
-    let cx' = Cx.restrict cx r r' in
+    let cx' = Cx.restrict cx (Dim.unleash r) (Dim.unleash r') in
     let phi = Dim.equate r r' in
     Cx.check_eq cx' ~ty:(V.Val.act phi ty) el @@
     Cx.eval cx' tm
@@ -220,12 +222,16 @@ and check_ext_sys cx ty sys =
           go sys acc
 
         | (Dim.Same | Dim.Indeterminate), Some tm ->
-          let phi = Dim.equate r0 r0 in
-          let cx' = Cx.restrict cx r0 r1 in
-          check cx' (V.Val.act phi ty) tm;
+          begin
+            try
+              let phi = Dim.equate (Dim.singleton r0) (Dim.singleton r0) in
+              let cx' = Cx.restrict cx r0 r1 in
+              check cx' (V.Val.act phi ty) tm;
 
-          (* Check tube-tube adjacency conditions *)
-          go_adj cx' acc (r0, r1, tm);
+              (* Check tube-tube adjacency conditions *)
+              go_adj cx' acc (r0, r1, tm);
+            with R.Inconsistent -> ()
+          end;
           go sys @@ (r0, r1, tm) :: acc
 
         | _ ->
@@ -243,7 +249,7 @@ and check_ext_sys cx ty sys =
           let cx' = Cx.restrict cx r'0 r'1 in
           let v = Cx.eval cx' tm in
           let v' = Cx.eval cx' tm' in
-          let phi = Dim.cmp (Dim.equate r'0 r'1) (Dim.equate r0 r1) in
+          let phi = Dim.cmp (Dim.equate (Dim.singleton r'0) (Dim.singleton r'1)) (Dim.equate (Dim.singleton r0) (Dim.singleton r1)) in
           Cx.check_eq cx' ~ty:(V.Val.act phi ty) v v'
         with
         | R.Inconsistent -> ()
@@ -266,19 +272,24 @@ and check_comp_sys cx r (cxx, x, tyx) cap sys =
           go sys acc
 
         | (Dim.Same | Dim.Indeterminate), Some bnd ->
-          (* check that bnd is a section of tyx under r0=r1 *)
-          let cxxr0r1 = Cx.restrict cxx r0 r1 in
-          let phir0r1 = Dim.equate r0 r1 in
-          let T.B (_, tm) = bnd in
-          check cxxr0r1 (V.Val.act phir0r1 tyx) tm;
+          begin
+            try
+              (* check that bnd is a section of tyx under r0=r1 *)
+              let cxxr0r1 = Cx.restrict cxx r0 r1 in
+              let phir0r1 = Dim.equate (Dim.singleton r0) (Dim.singleton r1) in
+              let T.B (_, tm) = bnd in
+              check cxxr0r1 (V.Val.act phir0r1 tyx) tm;
 
-          (* check that tm<r/x> = cap under r0=r1 *)
-          let cxr0r1 = Cx.restrict cx r0 r1 in
-          let phirx = Dim.subst r x in
-          Cx.check_eq cxr0r1 ~ty:(V.Val.act phirx tyx) (V.Val.act phir0r1 cap) (V.Val.act phirx cap);
+              (* check that tm<r/x> = cap under r0=r1 *)
+              let cxr0r1 = Cx.restrict cx r0 r1 in
+              let phirx = Dim.subst (Dim.singleton r) x in
+              Cx.check_eq cxr0r1 ~ty:(V.Val.act phirx tyx) (V.Val.act phir0r1 cap) (V.Val.act phirx cap);
+              (* Check tube-tube adjacency conditions *)
+              go_adj cxxr0r1 acc (r0, r1, bnd);
+            with
+              R.Inconsistent -> ()
+          end;
 
-          (* Check tube-tube adjacency conditions *)
-          go_adj cxxr0r1 acc (r0, r1, bnd);
           go sys @@ (r0, r1, bnd) :: acc
 
         | _ ->
@@ -298,7 +309,7 @@ and check_comp_sys cx r (cxx, x, tyx) cap sys =
           let cxx' = Cx.restrict cxx r'0 r'1 in
           let v = Cx.eval cxx' tm in
           let v' = Cx.eval cxx' tm' in
-          let phi = Dim.cmp (Dim.equate r'0 r'1) (Dim.equate r0 r1) in
+          let phi = Dim.cmp (Dim.equate (Dim.singleton r'0) (Dim.singleton r'1)) (Dim.equate (Dim.singleton r0) (Dim.singleton r1)) in
           Cx.check_eq cxx' ~ty:(V.Val.act phi tyx) v v'
         with
         | R.Inconsistent -> ()
@@ -333,7 +344,7 @@ and infer cx tm =
   | T.ExtApp (tm, tr) ->
     let r = check_eval_dim cx tr in
     let ext_ty = infer cx tm in
-    let ty, _ = V.unleash_ext ext_ty r in
+    let ty, _ = V.unleash_ext ext_ty @@ Dim.singleton r in
     ty
 
   | T.VProj info ->
@@ -350,9 +361,9 @@ and infer cx tm =
     let T.B (nm, ty) = info.ty in
     let cxx, x = Cx.ext_dim cx ~nm in
     let vtyx = check_eval_ty cxx ty in
-    let vtyr = V.Val.act (Dim.subst r x) vtyx in
+    let vtyr = V.Val.act (Dim.subst (Dim.singleton r) x) vtyx in
     check cx vtyr info.tm;
-    V.Val.act (Dim.subst r' x) vtyx
+    V.Val.act (Dim.subst (Dim.singleton r') x) vtyx
 
   | T.Com info ->
     let r = check_eval_dim cx info.r in
@@ -360,10 +371,10 @@ and infer cx tm =
     let T.B (nm, ty) = info.ty in
     let cxx, x = Cx.ext_dim cx ~nm in
     let vtyx = check_eval_ty cxx ty in
-    let vtyr = V.Val.act (Dim.subst r x) vtyx in
+    let vtyr = V.Val.act (Dim.subst (Dim.singleton r) x) vtyx in
     let cap = check_eval cx vtyr info.cap in
     check_comp_sys cx r (cxx, x, vtyx) cap info.sys;
-    V.Val.act (Dim.subst r' x) vtyx
+    V.Val.act (Dim.subst (Dim.singleton r') x) vtyx
 
   | T.HCom info ->
     let r = check_eval_dim cx info.r in
@@ -412,7 +423,7 @@ and check_ty cx ty =
   let univ = V.make @@ V.Univ Lvl.Omega in
   check cx univ ty
 
-and check_eval_dim cx tr =
+and check_eval_dim cx tr : Dim.repr =
   check_dim cx tr;
   Cx.eval_dim cx tr
 

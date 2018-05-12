@@ -11,6 +11,8 @@ val dim0 : t
 val dim1 : t
 val named : atom -> t
 
+val singleton : repr -> t
+
 val entangle : t -> t -> t * t
 
 type compare =
@@ -19,6 +21,7 @@ type compare =
   | Indeterminate
 
 val compare : t -> t -> compare
+val compare_repr : repr -> repr -> compare
 
 type action
 val subst : t -> atom -> action

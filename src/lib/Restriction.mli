@@ -1,5 +1,5 @@
 type atom = Symbol.t
-type dim = Dim.t
+type dim = Dim.repr
 
 type t
 
