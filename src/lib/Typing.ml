@@ -354,12 +354,12 @@ and infer cx tm =
   | T.If info ->
     let T.B (_, mot) = info.mot in
     let bool = V.make V.Bool in
-    let cxx = Cx.ext_ty cx bool in
+    let cxx, _= Cx.ext_ty cx bool in
     check_ty cxx mot;
 
     let scrut_ty = infer cx info.scrut in
     Cx.check_eq cx ~ty:(V.make @@ V.Univ Lvl.Omega) scrut_ty bool;
-    let scrut = Cx.eval cx bool info.scrut in
+    let scrut = Cx.eval cx info.scrut in
 
     let cx_tt = Cx.ext_el cx ~ty:bool ~el:(V.make V.Tt) in
     let cx_ff = Cx.ext_el cx ~ty:bool ~el:(V.make V.Ff) in
