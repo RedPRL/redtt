@@ -7,6 +7,7 @@ module Cx :
 sig
   type t
   val ext_ty : t -> V.value -> t * V.value
+  val ext_el : t -> ty:V.value -> el:V.value -> t
   val ext_dim : t -> t * V.atom
   val restrict : t -> Dim.t -> Dim.t -> t
 
@@ -32,6 +33,12 @@ struct
      qenv = Q.Env.succ qenv;
      rel},
     var
+
+  let ext_el {env; qenv; tys; rel} ~ty ~el =
+    {env = V.Val el :: env;
+     tys = `Ty ty :: tys;
+     qenv = Q.Env.succ qenv; (* Is this right? *)
+     rel}
 
   let ext_dim {env; qenv; tys; rel} =
     let x = Symbol.fresh () in
@@ -343,6 +350,27 @@ and infer cx tm =
     let cap = check_eval cx vty info.cap in
     check_comp_sys cx r (cxx, x, vty) cap info.sys;
     vty
+
+  | T.If info ->
+    let T.B (_, mot) = info.mot in
+    let bool = V.make V.Bool in
+    let cxx = Cx.ext_ty cx bool in
+    check_ty cxx mot;
+
+    let scrut_ty = infer cx info.scrut in
+    Cx.check_eq cx ~ty:(V.make @@ V.Univ Lvl.Omega) scrut_ty bool;
+    let scrut = Cx.eval cx bool info.scrut in
+
+    let cx_tt = Cx.ext_el cx ~ty:bool ~el:(V.make V.Tt) in
+    let cx_ff = Cx.ext_el cx ~ty:bool ~el:(V.make V.Ff) in
+    let mot_tt = Cx.eval cx_tt mot in
+    let mot_ff = Cx.eval cx_ff mot in
+    check cx mot_tt info.tcase;
+    check cx mot_ff info.fcase;
+
+    let cx_scrut = Cx.ext_el cx ~ty:bool ~el:scrut in
+    Cx.eval cx_scrut mot
+
 
   | T.Down info ->
     let ty = check_eval_ty cx info.ty in
