@@ -1098,12 +1098,51 @@ let rec pp_value fmt value =
     Format.fprintf fmt "tt"
   | Ff ->
     Format.fprintf fmt "ff"
-  | _ ->
-    Format.fprintf fmt "<value>"
+  | Bool ->
+    Format.fprintf fmt "bool"
+  | Pi {dom; cod} ->
+    Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
+  | Sg {dom; cod} ->
+    Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
+  | Ext abs ->
+    Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
+  | Univ lvl ->
+    Format.fprintf fmt "@[<1>(U@ %a)@]" Lvl.pp lvl
+  | Cons (v0, v1) ->
+    Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
+  | V _ ->
+    Format.fprintf fmt "<v-type>"
+  | VIn _ ->
+    Format.fprintf fmt "<vin>"
+  | Coe _ ->
+    Format.fprintf fmt "<coe>"
+  | HCom _ ->
+    Format.fprintf fmt "<hcom>"
+  | FCom _ ->
+    Format.fprintf fmt "<fcom>"
 
 and pp_abs fmt abs =
   let x, v = Abs.unleash abs in
-  Format.fprintf fmt "<%s> %a" (Symbol.to_string x) pp_value v
+  Format.fprintf fmt "@[<1><%s>@ %a@]" (Symbol.to_string x) pp_value v
+
+and pp_ext_abs fmt abs =
+  let x, (tyx, sysx) = ExtAbs.unleash abs in
+  Format.fprintf fmt "@[<1><%s>@ %a@ %a@]" (Symbol.to_string x) pp_value tyx pp_val_sys sysx
+
+and pp_val_sys fmt sys =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep pp_val_face fmt sys
+
+and pp_val_face fmt face =
+  match face with
+  | Face.True (r0, r1, v) ->
+    Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
+  | Face.False p ->
+    let r0, r1 = Star.unleash p in
+    Format.fprintf fmt "@[<1>[%a/=%a]@]" Dim.pp r0 Dim.pp r1
+  | Face.Indet (p, v) ->
+    let r0, r1 = Star.unleash p in
+    Format.fprintf fmt "@[<1>[?%a=%a %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
 
 and pp_clo fmt _ =
   Format.fprintf fmt "<clo>"
