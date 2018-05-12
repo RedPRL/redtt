@@ -88,6 +88,12 @@ let rec equate env ty el0 el1 =
     | Bool, Bool ->
       Tm.make Tm.Bool
 
+    | Tt, Tt ->
+      Tm.make Tm.Tt
+
+    | Ff, Ff ->
+      Tm.make Tm.Ff
+
     | Pi pi0, Pi pi1 ->
       let dom = equate env ty pi0.dom pi1.dom in
       let var = generic env pi0.dom in
@@ -140,6 +146,7 @@ let rec equate env ty el0 el1 =
       Tm.up @@ Tm.make @@ Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}
 
     | _ ->
+      Format.printf "Quote.equate: %a /= %a@." pp_value el0 pp_value el1;
       failwith "equate"
 
 and equate_neu env neu0 neu1 =

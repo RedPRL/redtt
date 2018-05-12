@@ -1092,8 +1092,18 @@ let rec pp_value fmt value =
     Format.fprintf fmt "%a" pp_neu up.neu
   | Lam clo ->
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
+  | ExtLam abs ->
+    Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
+  | Tt ->
+    Format.fprintf fmt "tt"
+  | Ff ->
+    Format.fprintf fmt "ff"
   | _ ->
     Format.fprintf fmt "<value>"
+
+and pp_abs fmt abs =
+  let x, v = Abs.unleash abs in
+  Format.fprintf fmt "<%s> %a" (Symbol.to_string x) pp_value v
 
 and pp_clo fmt _ =
   Format.fprintf fmt "<clo>"

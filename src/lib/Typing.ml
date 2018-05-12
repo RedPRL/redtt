@@ -226,10 +226,7 @@ and check_boundary_face cx ty face tm =
     let r, r' = DimStar.unleash p in
     let cx' = Cx.restrict cx (Dim.unleash r) (Dim.unleash r') in
     let phi = Dim.equate r r' in
-    (* let welp = Cx.eval cx' tm in *)
-    (* Format.printf "Fuck: %a ; %a; %a; %a@." Dim.pp r Dim.pp r' Val.pp_value welp (Tm.pp (Cx.ppenv cx)) tm; *)
     Cx.check_eq cx' ~ty:(V.Val.act phi ty) el @@
-    (* V.Val.act phi @@ Cx.eval cx' tm *)
     Cx.eval cx' tm
 
 and check_ext_sys cx ty sys =
