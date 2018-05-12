@@ -15,16 +15,6 @@ module S = Set.Make (Repr)
 
 type t = repr * S.t
 
-
-(* The [Atom] constructor is the only weird case. It is implemented this way in order to
-   support diagonal equations, which we treat as different from the substitution of one
-   dimension for an atom. In the case of a diagonal x=y, we generate a fresh atom 'z',
-   and then replace both and y with z; except, using the [history] field, we remember that
-   each one used to be x or y.
-
-   When comparing generic dimensions, only the [atom] field is considered; but using the history,
-   we can reconstruct the 'real' name of the dimension, which is crucial for quotation. *)
-
 let dim0 = Dim0, S.singleton Dim0
 let dim1 = Dim1, S.singleton Dim1
 let named a = Atom a, S.singleton @@ Atom a
