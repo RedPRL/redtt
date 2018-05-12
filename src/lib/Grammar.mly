@@ -59,6 +59,11 @@ bind(X):
     { fun env ->
       Tm.B (Some x, e @@ R.bind x env) }
 
+dimbind(X):
+  | LGL; x = ATOM; RGL; e = X
+    { fun env ->
+      Tm.B (Some x, e @@ R.bind x env) }
+
 multibind(X):
   | e = X
     { fun env ->
@@ -166,7 +171,7 @@ inf:
       make_node $startpos $endpos @@
       Tm.If {mot = mot env; scrut = scrut env; tcase = tcase env; fcase = fcase env} }
 
-  | LPR; HCOM; r0 = chk; r1 = chk; ty = chk; cap = chk; sys = elist(tube(bind(chk))); RPR
+  | LPR; HCOM; r0 = chk; r1 = chk; ty = chk; cap = chk; sys = elist(tube(dimbind(chk))); RPR
     { fun env ->
       make_node $startpos $endpos @@
       Tm.HCom {r = r0 env; r' = r1 env; ty = ty env; cap = cap env; sys = sys env} }
