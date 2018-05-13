@@ -176,7 +176,7 @@ let rec check cx ty tm =
     let vcod = V.inst_clo cod v in
     check cx vcod t1
 
-  | V.Ext ext_abs, T.ExtLam (B (nm, tm)) ->
+  | V.Ext ext_abs, T.ExtLam (T.B (nm, tm)) ->
     let cxx, x = Cx.ext_dim cx ~nm in
     let codx, sysx = V.ExtAbs.inst ext_abs (Dim.named x) in
     check_boundary cxx codx sysx tm
@@ -190,6 +190,12 @@ let rec check cx ty tm =
   | _, T.Up tm ->
     let ty' = infer cx tm in
     Cx.check_subtype cx ty' ty
+
+  | _, T.Let (t0, T.B (nm, t1)) ->
+    let ty' = infer cx t0 in
+    let el = Cx.eval cx t0 in
+    let cx' = Cx.ext_el cx ~nm ~ty:ty' ~el in
+    check cx' ty t1
 
   | _ ->
     Format.eprintf "Failed to check term %a@." (Tm.pp (Cx.ppenv cx)) tm;
