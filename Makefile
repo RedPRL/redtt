@@ -15,6 +15,9 @@ clean:
 doc:
 	@${DUNE} build @doc
 
+help:
+	@${DUNE} exec -- cubical help
+
 examples:
 	@${DUNE} exec -- cubical load-file test.red
 
