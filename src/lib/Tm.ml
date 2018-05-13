@@ -378,7 +378,7 @@ and pp_btube env fmt tube =
 
   | Some (B (nm, tm)) ->
     let x, env' = Pretty.Env.bind nm env in
-    Format.fprintf fmt "@[<1>[%a=%a@ [%s] %a]@]" (pp env) r (pp env) r' x (pp env') tm
+    Format.fprintf fmt "@[<1>[%a=%a@ <%s> %a]@]" (pp env) r (pp env) r' x (pp env') tm
 
 module Macro =
 struct
