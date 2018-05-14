@@ -57,7 +57,8 @@ let rec check mcx cx ty (sys : boundary) dev =
     let ty' = Typing.infer cx soln in
     let el = Cx.eval cx soln in
     let cxx = Cx.ext_el cx ~nm:None ~ty:ty' ~el in
-    check_meta mcx cxx ty (failwith "") bdy
+    let sys' = map_boundary (Tm.subst @@ Tm.Sub (Tm.Id, soln)) sys in
+    check_meta mcx cxx ty sys' bdy
 
   | _, Hole ->
     ()
