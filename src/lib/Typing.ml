@@ -156,8 +156,8 @@ let rec check cx ty tm =
     let cxx, _ = Cx.ext_ty cx ~nm vdom in
     check cxx ty cod
 
-  | V.Univ _, T.Ext (B (nm, (cod, sys))) ->
-    let cxx, _ = Cx.ext_dim cx ~nm in
+  | V.Univ _, T.Ext (NB (nms, (cod, sys))) ->
+    let cxx, _ = Cx.ext_dims cx ~nms in
     let vcod = check_eval cxx ty cod in
     check_ext_sys cxx vcod sys
 
@@ -180,9 +180,9 @@ let rec check cx ty tm =
     let vcod = V.inst_clo cod v in
     check cx vcod t1
 
-  | V.Ext ext_abs, T.ExtLam (T.B (nm, tm)) ->
-    let cxx, x = Cx.ext_dim cx ~nm in
-    let codx, sysx = V.ExtAbs.inst1 ext_abs (Dim.named x) in
+  | V.Ext ext_abs, T.ExtLam (T.NB (nms, tm)) ->
+    let cxx, xs = Cx.ext_dims cx ~nms in
+    let codx, sysx = V.ExtAbs.inst ext_abs @@ List.map Dim.named xs in
     check_boundary cxx codx sysx tm
 
   | V.Univ _, T.FCom info ->

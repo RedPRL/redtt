@@ -1,4 +1,5 @@
 type 'a bnd = B of string option * 'a
+type 'a nbnd = NB of string option list * 'a
 
 type chk = [`Chk]
 type inf = [`Inf]
@@ -23,7 +24,7 @@ type _ f =
 
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
-  | Ext : (chk t * chk t system) bnd -> chk f
+  | Ext : (chk t * chk t system) nbnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
 
   | V : {r : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> chk f
@@ -35,7 +36,7 @@ type _ f =
   | VProj : {r : chk t; tm : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
-  | ExtLam : chk t bnd -> chk f
+  | ExtLam : chk t nbnd -> chk f
 
   | Cons : chk t * chk t -> chk f
   | Dim0 : chk f
@@ -61,6 +62,11 @@ let info node = !node.info
 
 let var i = make @@ Var i
 let lift sub = Sub (sub, var 0)
+let rec liftn n sub =
+  match n with
+  | 0 -> sub
+  | _ -> liftn (n - 1) @@ lift sub
+
 let inst0 t = Sub (Id, t)
 
 let subst : type x. subst -> x t -> x t =
@@ -71,6 +77,11 @@ let subst_bnd : subst -> 'a t bnd -> 'a t bnd =
   fun sub bnd ->
     let B (nm, t) = bnd in
     B (nm, subst (lift sub) t)
+
+let subst_nbnd : subst -> 'a t nbnd -> 'a t nbnd =
+  fun sub bnd ->
+    let NB (nms, t) = bnd in
+    NB (nms, subst (liftn (List.length nms) sub) t)
 
 let rec substf : type x. subst -> x f -> x f =
   fun sub con ->
@@ -142,8 +153,9 @@ let rec substf : type x. subst -> x f -> x f =
       | Sg (dom, cod) ->
         Sg (subst sub dom, subst_bnd sub cod)
 
-      | Ext (B (nm, (cod, sys))) ->
-        Ext (B (nm, (subst (lift sub) cod, subst_ext_sys (lift sub) sys)))
+      | Ext (NB (nms, (cod, sys))) ->
+        let sub' = liftn (List.length nms) sub in
+        Ext (NB (nms, (subst sub' cod, subst_ext_sys sub' sys)))
 
       | V info ->
         let r = subst sub info.r in
@@ -171,7 +183,7 @@ let rec substf : type x. subst -> x f -> x f =
         Lam (subst_bnd sub bnd)
 
       | ExtLam bnd ->
-        ExtLam (subst_bnd sub bnd)
+        ExtLam (subst_nbnd sub bnd)
 
       | Cons (t0, t1) ->
         Cons (subst sub t0, subst sub t1)
@@ -219,7 +231,7 @@ and unleash : type x. x t -> x f =
 
 let up t = make @@ Up t
 let lam nm t = make @@ Lam (B (nm, t))
-let ext_lam nm t = make @@ ExtLam (B (nm, t))
+let ext_lam nms t = make @@ ExtLam (NB (nms, t))
 let pi nm dom cod = make @@ Pi (dom, B (nm, cod))
 let sg nm dom cod = make @@ Sg (dom, B (nm, cod))
 let let_ nm t0 t1 = make @@ Let (t0, B (nm, t1))
@@ -246,15 +258,16 @@ let rec pp : type a. a t Pretty.t =
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<1>(× [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
 
-    | Ext (B (nm, (cod, sys))) ->
-      let x, env' = Pretty.Env.bind nm env in
-      begin
-        match sys with
-        | [] ->
-          Format.fprintf fmt "@[<1>(# <%s>@ %a)@]" x (pp env') cod
-        | _ ->
-          Format.fprintf fmt "@[<1>(# <%s>@ %a@ @[%a@])@]" x (pp env') cod (pp_sys env') sys
-      end
+    | Ext (NB (nm, (cod, sys))) ->
+      Format.fprintf fmt "<ext>"
+    (* let x, env' = Pretty.Env.bind nm env in
+       begin
+       match sys with
+       | [] ->
+        Format.fprintf fmt "@[<1>(# <%s>@ %a)@]" x (pp env') cod
+       | _ ->
+        Format.fprintf fmt "@[<1>(# <%s>@ %a@ @[%a@])@]" x (pp env') cod (pp_sys env') sys
+       end *)
 
     | V info ->
       Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
@@ -263,9 +276,10 @@ let rec pp : type a. a t Pretty.t =
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<1>(λ [%s]@ %a)@]" x (pp env') tm
 
-    | ExtLam (B (nm, tm)) ->
-      let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(λ <%s>@ %a)@]" x (pp env') tm
+    | ExtLam (NB (nms, tm)) ->
+      Format.fprintf fmt "<extlam>"
+    (* let x, env' = Pretty.Env.bind nm env in
+       Format.fprintf fmt "@[<1>(λ <%s>@ %a)@]" x (pp env') tm *)
 
     | FunApp (tm0, tm1) ->
       Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp env) tm0 (pp env) tm1
@@ -389,7 +403,7 @@ struct
     let face0 = up (var 0), make Dim0, Some (subst Proj tm0) in
     let face1 = up (var 0), make Dim1, Some (subst Proj tm1) in
     let sys = [face0; face1] in
-    make @@ Ext (B (None, (ty', sys)))
+    make @@ Ext (NB ([None], (ty', sys)))
 
   let fiber ~ty0 ~ty1 ~f ~x =
     sg None ty0 @@

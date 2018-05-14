@@ -20,7 +20,7 @@ type mcx = cell MCx.t
 let map_boundary f sys =
   List.map (fun (r, r', otm) -> f r, f r', Option.map f otm) sys
 
-
+(*
 let rec check mcx cx ty (sys : boundary) dev =
   match Tm.unleash ty, dev with
   | Tm.Pi (dom, Tm.B (_, cod)), Lam {nm; bdy} ->
@@ -76,4 +76,4 @@ and check_meta mcx cx ty sys alpha =
   let vty' = Cx.eval cx cell.ty in
   Cx.check_subtype cx vty' vty;
   check mcx cx ty sys cell.hole
-
+ *)

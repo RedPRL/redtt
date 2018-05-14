@@ -32,20 +32,20 @@ let rec lam_from_multibind info mb =
     Tm.Lam (Tm.B (nm, lam_from_multibind info mb))
   | MBConsDim (nm, mb) ->
     Tm.into_info info @@
-    Tm.ExtLam (Tm.B (nm, lam_from_multibind info mb))
+    Tm.ExtLam (Tm.NB ([nm], lam_from_multibind info mb))
 
 let rec ext_from_multibind start stop mb =
-  match mb with
-  | MBConsDim (nm, MBEnd (ty, sys)) ->
-    Tm.into_info (Some (start, stop)) @@
-    Tm.Ext (Tm.B (nm, (ty, sys)))
+  (* match mb with
+     | MBConsDim (nm, MBEnd (ty, sys)) ->
+     Tm.into_info (Some (start, stop)) @@
+     Tm.Ext (Tm.NB (nm, (ty, sys)))
 
-  | MBConsDim (nm, mb) ->
-    Tm.into_info (Some (start, stop)) @@
-    Tm.Ext (Tm.B (nm, (ext_from_multibind start stop mb, [])))
+     | MBConsDim (nm, mb) ->
+     Tm.into_info (Some (start, stop)) @@
+     Tm.Ext (Tm.B (nm, (ext_from_multibind start stop mb, [])))
 
-  | _ ->
-    failwith "ext_from_multibind"
+     | _ -> *)
+  failwith "ext_from_multibind"
 
 
 let rec make_multi_funapp start stop fn rest =

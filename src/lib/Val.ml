@@ -620,8 +620,9 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make @@ Sg {dom; cod}
 
     | Tm.Ext bnd ->
-      let abs = eval_ext_abs rel rho bnd in
-      make @@ Ext abs
+      failwith "TODO: Ext"
+    (* let abs = eval_ext_abs rel rho bnd in
+       make @@ Ext abs *)
 
     | Tm.V info ->
       let r = eval_dim_class rel rho info.r in
@@ -634,8 +635,9 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make @@ Lam (clo bnd rel rho)
 
     | Tm.ExtLam bnd ->
-      let abs = eval_abs rel rho bnd in
-      make @@ ExtLam abs
+      failwith "TODO: ExtLam"
+    (* let abs = eval_abs rel rho bnd in
+       make @@ ExtLam abs *)
 
     | Tm.Cons (t0, t1) ->
       let v0 = eval rel rho t0 in
