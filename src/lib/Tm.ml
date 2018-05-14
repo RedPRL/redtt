@@ -42,7 +42,6 @@ type _ f =
   | Dim1 : chk f
 
   | Let : inf t * chk t bnd -> chk f
-  | Meta : Symbol.t * subst -> inf f
 
 and subst =
   | Id
@@ -180,9 +179,6 @@ let rec substf : type x. subst -> x f -> x f =
       | Let (t, bnd) ->
         Let (subst sub t, subst_bnd sub bnd)
 
-      | Meta (sym, sub') ->
-        Meta (sym, Cmp (sub, sub'))
-
 and subst_ext_sys sub sys =
   List.map (subst_ext_face sub) sys
 
@@ -221,7 +217,6 @@ and unleash : type x. x t -> x f =
 
 
 
-let meta hole sub = make @@ Meta (hole, sub)
 let up t = make @@ Up t
 let lam nm t = make @@ Lam (B (nm, t))
 let ext_lam nm t = make @@ ExtLam (B (nm, t))
@@ -232,7 +227,6 @@ let cons t0 t1 = make @@ Cons (t0, t1)
 let univ lvl = make @@ Univ lvl
 let car t = make @@ Car t
 let cdr t = make @@ Cdr t
-let meta sym subst = make @@ Meta (sym, subst)
 
 let rec pp : type a. a t Pretty.t =
   fun env fmt tm ->
@@ -334,9 +328,6 @@ let rec pp : type a. a t Pretty.t =
     | Let (tm0, B (nm, tm1)) ->
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<1>(let@ @[<1>[%s %a]@] %a)@]" x (pp env) tm0 (pp env') tm1
-
-    | Meta _ ->
-      Format.fprintf fmt "<meta>"
 
 
 and pp_sys env fmt sys =

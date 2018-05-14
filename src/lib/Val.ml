@@ -43,13 +43,13 @@ and neu =
   | ExtApp : neu * ext_sys * D.t -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
+
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
 and nf = {ty : value; el : value}
-
 
 and ('x, 'a) face = ('x, 'a) Face.face
 
@@ -734,10 +734,6 @@ and eval : type x. rel -> env -> x Tm.t -> value =
     | Tm.Let (t0, Tm.B (_, t1)) ->
       let v0 = eval rel rho t0 in
       eval rel (Val v0 :: rho) t1
-
-    | Tm.Meta _ ->
-      failwith "TODO: eval meta"
-
 
 
 and eval_abs_face rel rho (tr, tr', obnd) =

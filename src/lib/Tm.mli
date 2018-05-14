@@ -53,10 +53,8 @@ type _ f =
 
   | Let : inf t * chk t bnd -> chk f
 
-  | Meta : Symbol.t * subst -> inf f
-
 (** Explicit substitutions in the style of Abadi. *)
-and subst =
+type subst =
   | Id
   | Proj
   | Sub of subst * inf t
@@ -85,7 +83,6 @@ val cons : chk t -> chk t -> chk t
 val univ : Lvl.t -> chk t
 val car : inf t -> inf t
 val cdr : inf t -> inf t
-val meta : Symbol.t -> subst -> inf t
 
 module Macro :
 sig
