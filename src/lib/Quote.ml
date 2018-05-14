@@ -69,7 +69,7 @@ let rec equate env ty el0 el1 =
     Tm.cons q0 q1
 
   | Ext abs ->
-    let x, (tyx, _) = ExtAbs.unleash abs in
+    let x, (tyx, _) = ExtAbs.unleash1 abs in
     let r = Dim.named x in
     let app0 = ext_apply el0 r in
     let app1 = ext_apply el1 r in
@@ -111,8 +111,8 @@ let rec equate env ty el0 el1 =
       Tm.sg None dom cod
 
     | Ext abs0, Ext abs1 ->
-      let x, (ty0x, sys0x) = ExtAbs.unleash abs0 in
-      let ty1x, sys1x = ExtAbs.inst abs1 @@ Dim.named x in
+      let x, (ty0x, sys0x) = ExtAbs.unleash1 abs0 in
+      let ty1x, sys1x = ExtAbs.inst1 abs1 @@ Dim.named x in
       let envx = Env.abs env x in
       let tyx = equate envx ty ty0x ty1x in
       let sysx = equate_val_sys envx ty0x sys0x sys1x in
@@ -140,7 +140,7 @@ let rec equate env ty el0 el1 =
       let bnd = equate_val_abs env univ coe0.abs coe1.abs in
       let tyr =
         let r, _ = DimStar.unleash coe0.dir in
-        Abs.inst coe0.abs @@ r
+        Abs.inst1 coe0.abs r
       in
       let tm = equate env tyr coe0.el coe1.el in
       Tm.up @@ Tm.make @@ Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}
@@ -255,8 +255,8 @@ and equate_comp_face env ty face0 face1 =
   | _ -> failwith "equate_comp_face"
 
 and equate_val_abs env ty abs0 abs1 =
-  let x, v0x = Abs.unleash abs0 in
-  let v1x = Abs.inst abs1 @@ Dim.named x in
+  let x, v0x = Abs.unleash1 abs0 in
+  let v1x = Abs.inst1 abs1 @@ Dim.named x in
   let envx = Env.abs env x in
   let tm = equate envx ty v0x v1x in
   Tm.B (None, tm)
@@ -309,8 +309,8 @@ let rec subtype env ty0 ty1 =
     subtype env vcod0 vcod1
 
   | Ext abs0, Ext abs1 ->
-    let x, (ty0x, sys0x) = ExtAbs.unleash abs0 in
-    let ty1x, sys1x = ExtAbs.inst abs1 @@ Dim.named x in
+    let x, (ty0x, sys0x) = ExtAbs.unleash1 abs0 in
+    let ty1x, sys1x = ExtAbs.inst1 abs1 @@ Dim.named x in
     let envx = Env.abs env x in
     subtype envx ty0x ty1x;
     ignore @@ equate_val_sys envx ty0x sys0x sys1x

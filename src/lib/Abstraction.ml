@@ -1,5 +1,5 @@
 type atom = Symbol.t
-type 'a abs = {atom : atom option; node : 'a}
+type 'a abs = {atoms : atom list; node : 'a}
 
 module D = Dim
 
@@ -9,10 +9,13 @@ sig
 
   include Sort.S with type 'a m = 'a with type t = el abs
 
-  val bind : atom -> el -> t
-  val const : el -> t
-  val unleash : t -> atom * el
-  val inst : t -> Dim.t -> el
+  val bind : atom list -> el -> t
+  val unleash : t -> atom list * el
+  val inst : t -> Dim.t list -> el
+
+  val bind1 : atom -> el -> t
+  val unleash1 : t -> atom * el
+  val inst1 : t -> Dim.t -> el
 end
 
 module M (X : Sort.S with type 'a m = 'a) : S with type el = X.t =
@@ -21,28 +24,47 @@ struct
   type 'a m = 'a
   type t = X.t abs
 
-  let unleash abs =
-    match abs.atom with
-    | None -> Symbol.fresh (), abs.node
-    | Some a ->
-      let x = Symbol.fresh () in
-      x, X.act (D.swap x a) abs.node
+  let rec freshen_atoms xs acc phi =
+    match xs with
+    | [] -> List.rev acc, phi
+    | x :: xs ->
+      let y = Symbol.fresh () in
+      freshen_atoms xs (y :: acc) @@
+      D.cmp (D.swap y x) phi
 
-  let inst abs r =
-    match abs.atom with
-    | None -> abs.node
-    | Some a ->
-      X.act (D.subst r a) abs.node
+  let unleash abs =
+    let xs, phi = freshen_atoms abs.atoms [] D.idn in
+    xs, X.act phi abs.node
+
+  let rec inst_atoms xs rs phi =
+    match xs, rs with
+    | [], [] -> phi
+    | x :: xs, r :: rs ->
+      inst_atoms xs rs @@
+      D.cmp phi @@ D.subst r x
+    | _ -> failwith "inst_atoms"
+
+  let inst abs rs =
+    let phi = inst_atoms abs.atoms rs D.idn in
+    X.act phi abs.node
 
   (* FYI: It may not be necessary to freshen here, depending on how substitution is implemented. *)
-  let bind atom node =
-    let x = Symbol.fresh () in
-    {atom = Some x; node = X.act (D.swap x atom) node}
+  let bind atoms node =
+    {atoms; node}
 
-  let const node =
-    {atom = None; node = node}
+  let bind1 x el =
+    bind [x] el
+
+  let unleash1 abs =
+    let xs, el = unleash abs in
+    match xs with
+    | [x] -> x, el
+    | _ -> failwith "unleash1: incorrect binding depth"
+
+  let inst1 el r =
+    inst el [r]
 
   let act phi abs =
-    let x, node = unleash abs in
-    bind x @@ X.act phi node
+    let xs, node = unleash abs in
+    bind xs @@ X.act phi node
 end

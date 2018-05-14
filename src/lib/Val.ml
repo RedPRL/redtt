@@ -439,7 +439,7 @@ and make_hcom mdir ty cap msys : value =
         rigid_hcom dir ty cap sys
       | `Proj abs ->
         let _, r' = Star.unleash dir in
-        let x, el = Abs.unleash abs in
+        let x, el = Abs.unleash1 abs in
         Val.act (D.subst r' x) el
     end
   | `Same _ ->
@@ -454,7 +454,7 @@ and make_com mdir abs cap msys : value =
       | `Ok sys ->
         rigid_com dir abs cap sys
       | `Proj abs ->
-        Abs.inst abs r'
+        Abs.inst1 abs r'
     end
   | `Same _ ->
     cap
@@ -468,14 +468,14 @@ and make_fcom mdir cap msys : value =
         make @@ FCom {dir; cap; sys}
       | `Proj abs ->
         let _, r' = Star.unleash dir in
-        let x, el = Abs.unleash abs in
+        let x, el = Abs.unleash1 abs in
         Val.act (D.subst r' x) el
     end
   | `Same _ ->
     cap
 
 and rigid_coe dir abs el =
-  let x, tyx = Abs.unleash abs in
+  let x, tyx = Abs.unleash1 abs in
   match unleash tyx with
   | (Pi _ | Sg _ ) ->
     make @@ Coe {dir; abs; el}
@@ -489,7 +489,7 @@ and rigid_coe dir abs el =
   | V info ->
     begin
       let r, r' = Star.unleash dir in
-      let xty1 = Abs.bind x info.ty1 in
+      let xty1 = Abs.bind1 x info.ty1 in
 
       match Gen.make r with
       | `Const `Dim0 ->
@@ -510,9 +510,9 @@ and rigid_coe dir abs el =
             let face0 =
               AbsFace.make r' D.dim0 @@
               let y = Symbol.fresh () in
-              Abs.bind y @@ ext_apply (cdr el0) @@ D.named y
+              Abs.bind1 y @@ ext_apply (cdr el0) @@ D.named y
             in
-            let face1 = AbsFace.make r' D.dim1 @@ Abs.const coe1r'el in
+            let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Symbol.fresh ()] coe1r'el in
             [face0; face1]
           in
           make_hcom (Star.make D.dim1 D.dim0) ty1r' cap sys
@@ -526,7 +526,7 @@ and rigid_coe dir abs el =
             failwith "This is the hard one"
 
           | _ ->
-            let xty0 = Abs.bind x info.ty0 in
+            let xty0 = Abs.bind1 x info.ty0 in
             let el0 = rigid_coe dir xty0 el in
             let el1 =
               let cap =
@@ -540,12 +540,12 @@ and rigid_coe dir abs el =
               let sys =
                 let face0 =
                   AbsFace.gen_const info.x `Dim0 @@
-                  Abs.bind x @@ apply (car info.equiv) @@
+                  Abs.bind1 x @@ apply (car info.equiv) @@
                   make_coe r2x xty0 el
                 in
                 let face1 =
                   AbsFace.gen_const info.x `Dim1 @@
-                  Abs.bind x @@
+                  Abs.bind1 x @@
                   make_coe r2x xty1 el
                 in
                 [face0; face1]
@@ -581,15 +581,15 @@ and rigid_hcom dir ty cap sys : value =
 
 and rigid_com dir abs cap (sys : comp_sys) : value =
   let _, r' = Star.unleash dir in
-  let ty = Abs.inst abs r' in
+  let ty = Abs.inst1 abs r' in
   let capcoe = rigid_coe dir abs cap in
   let syscoe : comp_sys =
     let face =
       Face.map @@ fun ri r'i absi ->
       let phi = D.equate ri r'i in
-      let yi, vi = Abs.unleash absi in
+      let yi, vi = Abs.unleash1 absi in
       let y2r' = Star.make (D.named yi) (D.act phi r') in
-      Abs.bind yi @@ make_coe y2r' (Abs.act phi abs) @@ Val.act phi vi
+      Abs.bind1 yi @@ make_coe y2r' (Abs.act phi abs) @@ Val.act phi vi
     in
     List.map face sys
   in
@@ -798,13 +798,13 @@ and eval_abs rel rho bnd =
   let Tm.B (_, tm) = bnd in
   let x = Symbol.fresh () in
   let rho = Atom x :: rho in
-  Abs.bind x @@ eval rel rho tm
+  Abs.bind1 x @@ eval rel rho tm
 
 and eval_ext_abs rel rho bnd =
   let Tm.B (_, (tm, sys)) = bnd in
   let x = Symbol.fresh () in
   let rho = Atom x :: rho in
-  ExtAbs.bind x (eval rel rho tm, eval_ext_sys rel rho sys)
+  ExtAbs.bind1 x (eval rel rho tm, eval_ext_sys rel rho sys)
 
 and unleash_pi v =
   match unleash v with
@@ -819,7 +819,7 @@ and unleash_sg v =
 and unleash_ext v r =
   match unleash v with
   | Ext abs ->
-    ExtAbs.inst abs r
+    ExtAbs.inst1 abs r
   | _ ->
     failwith "unleash_ext"
 
@@ -843,21 +843,21 @@ and apply vfun varg =
 
   | Coe info ->
     let r, r' = Star.unleash info.dir in
-    let x, tyx = Abs.unleash info.abs in
+    let x, tyx = Abs.unleash1 info.abs in
     let domx, codx = unleash_pi tyx in
     let abs =
-      Abs.bind x @@
+      Abs.bind1 x @@
       inst_clo codx @@
       make_coe
         (Star.make r' (D.named x))
-        (Abs.bind x domx)
+        (Abs.bind1 x domx)
         varg
     in
     let el =
       apply info.el @@
       make_coe
         (Star.make r' r)
-        (Abs.bind x domx)
+        (Abs.bind1 x domx)
         varg
     in
     rigid_coe info.dir abs el
@@ -868,8 +868,8 @@ and apply vfun varg =
     let cap = apply info.cap varg in
     let app_face =
       Face.map @@ fun r r' abs ->
-      let x, v = Abs.unleash abs in
-      Abs.bind x @@ apply v (Val.act (D.equate r r') v)
+      let x, v = Abs.unleash1 abs in
+      Abs.bind1 x @@ apply v (Val.act (D.equate r r') v)
     in
     let sys = List.map app_face info.sys in
     rigid_hcom info.dir ty cap sys
@@ -880,7 +880,7 @@ and apply vfun varg =
 and ext_apply vext s =
   match unleash vext with
   | ExtLam abs ->
-    Abs.inst abs s
+    Abs.inst1 abs s
 
   | Up info ->
     let tyr, sysr = unleash_ext info.ty s in
@@ -894,7 +894,7 @@ and ext_apply vext s =
     end
 
   | Coe info ->
-    let y, ext_y = Abs.unleash info.abs in
+    let y, ext_y = Abs.unleash1 info.abs in
     let ty_s, sys_s = unleash_ext ext_y s in
     let forall_y_sys_s =
       let filter_face face =
@@ -911,10 +911,10 @@ and ext_apply vext s =
 
       | `Rigid rsys ->
         let correction =
-          let face = Face.map @@ fun _ _ v -> Abs.bind y v in
+          let face = Face.map @@ fun _ _ v -> Abs.bind1 y v in
           List.map face rsys
         in
-        let abs = Abs.bind y ty_s in
+        let abs = Abs.bind1 y ty_s in
         let cap = ext_apply info.el s in
         rigid_com info.dir abs cap correction
     end
@@ -928,7 +928,7 @@ and ext_apply vext s =
       | `Rigid boundary_sys ->
         let cap = ext_apply info.cap s in
         let correction_sys =
-          let face = Face.map @@ fun _ _ v -> Abs.const v in
+          let face = Face.map @@ fun _ _ v -> Abs.bind [Symbol.fresh ()] v in
           List.map face boundary_sys
         in
         rigid_hcom info.dir ty_s cap @@ correction_sys @ info.sys
@@ -981,9 +981,9 @@ and car v =
     make @@ Up {ty = dom; neu = Car info.neu}
 
   | Coe info ->
-    let x, tyx = Abs.unleash info.abs in
+    let x, tyx = Abs.unleash1 info.abs in
     let domx, _ = unleash_sg tyx in
-    let abs = Abs.bind x domx in
+    let abs = Abs.bind1 x domx in
     let el = car info.el in
     rigid_coe info.dir abs el
 
@@ -992,8 +992,8 @@ and car v =
     let cap = car info.cap in
     let face =
       Face.map @@ fun _ _ abs ->
-      let y, v = Abs.unleash abs in
-      Abs.bind y @@ car v
+      let y, v = Abs.unleash1 abs in
+      Abs.bind1 y @@ car v
     in
     let sys = List.map face info.sys in
     rigid_hcom info.dir dom cap sys
@@ -1008,16 +1008,16 @@ and cdr v =
 
   | Coe info ->
     let abs =
-      let x, tyx = Abs.unleash info.abs in
+      let x, tyx = Abs.unleash1 info.abs in
       let domx, codx = unleash_sg tyx in
       let r, _ = Star.unleash info.dir in
       let coerx =
         make_coe
           (Star.make r (D.named x))
-          (Abs.bind x domx)
+          (Abs.bind1 x domx)
           (car info.el)
       in
-      Abs.bind x @@ inst_clo codx coerx
+      Abs.bind1 x @@ inst_clo codx coerx
     in
     let el = cdr info.el in
     rigid_coe info.dir abs el
@@ -1042,7 +1042,7 @@ and cdr v =
           (car info.cap)
           sys
       in
-      Abs.bind z @@ inst_clo cod hcom
+      Abs.bind1 z @@ inst_clo cod hcom
     in
     let cap = cdr info.cap in
     let sys =
@@ -1118,11 +1118,11 @@ let rec pp_value fmt value =
     Format.fprintf fmt "<fcom>"
 
 and pp_abs fmt abs =
-  let x, v = Abs.unleash abs in
+  let x, v = Abs.unleash1 abs in
   Format.fprintf fmt "@[<1><%s>@ %a@]" (Symbol.to_string x) pp_value v
 
 and pp_ext_abs fmt abs =
-  let x, (tyx, sysx) = ExtAbs.unleash abs in
+  let x, (tyx, sysx) = ExtAbs.unleash1 abs in
   Format.fprintf fmt "@[<1><%s>@ %a@ %a@]" (Symbol.to_string x) pp_value tyx pp_val_sys sysx
 
 and pp_val_sys fmt sys =

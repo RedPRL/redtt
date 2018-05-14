@@ -178,7 +178,7 @@ let rec check cx ty tm =
 
   | V.Ext ext_abs, T.ExtLam (T.B (nm, tm)) ->
     let cxx, x = Cx.ext_dim cx ~nm in
-    let codx, sysx = V.ExtAbs.inst ext_abs (Dim.named x) in
+    let codx, sysx = V.ExtAbs.inst1 ext_abs (Dim.named x) in
     check_boundary cxx codx sysx tm
 
   | V.Univ _, T.FCom info ->
