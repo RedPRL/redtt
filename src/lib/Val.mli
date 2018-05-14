@@ -41,7 +41,7 @@ type con =
 and neu =
   | Lvl : string option * int -> neu
   | FunApp : neu * nf -> neu
-  | ExtApp : neu * ext_sys * dim -> neu
+  | ExtApp : neu * ext_sys * dim list -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
@@ -74,7 +74,7 @@ val eval : rel -> env -> 'a Tm.t -> value
 val eval_dim : rel -> env -> 'a Tm.t -> Dim.repr
 
 val apply : value -> value -> value
-val ext_apply : value -> dim -> value
+val ext_apply : value -> dim list -> value
 val car : value -> value
 val cdr : value -> value
 
@@ -84,7 +84,7 @@ val const_clo : value -> clo
 val unleash_pi : value -> value * clo
 val unleash_sg : value -> value * clo
 val unleash_v : value -> gen * value * value * value
-val unleash_ext : value -> dim -> value * ext_sys
+val unleash_ext : value -> dim list -> value * ext_sys
 
 
 val pp_value : Format.formatter -> value -> unit

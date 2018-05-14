@@ -40,7 +40,7 @@ type con =
 and neu =
   | Lvl : string option * int -> neu
   | FunApp : neu * nf -> neu
-  | ExtApp : neu * ext_sys * D.t -> neu
+  | ExtApp : neu * ext_sys * dim list -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
 
@@ -304,21 +304,21 @@ and act_neu phi con =
         step @@ apply v el
     end
 
-  | ExtApp (neu, sys, r) ->
+  | ExtApp (neu, sys, rs) ->
     let sys = ExtSys.act phi sys in
-    let r = Dim.act phi r in
+    let rs = List.map (Dim.act phi) rs in
     begin
       match act_neu phi neu with
       | Ret neu ->
         begin
           match force_ext_sys sys with
           | `Rigid _ ->
-            ret @@ ExtApp (neu, sys, r)
+            ret @@ ExtApp (neu, sys, rs)
           | `Proj v ->
             step v
         end
       | Step v ->
-        step @@ ext_apply v r
+        step @@ ext_apply v rs
     end
 
   | Car neu ->
@@ -510,7 +510,7 @@ and rigid_coe dir abs el =
             let face0 =
               AbsFace.make r' D.dim0 @@
               let y = Symbol.fresh () in
-              Abs.bind1 y @@ ext_apply (cdr el0) @@ D.named y
+              Abs.bind1 y @@ ext_apply (cdr el0) [D.named y]
             in
             let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Symbol.fresh ()] coe1r'el in
             [face0; face1]
@@ -681,10 +681,10 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       let v1 = eval rel rho t1 in
       apply v0 v1
 
-    | Tm.ExtApp (t, tr) ->
+    | Tm.ExtApp (t, ts) ->
       let v = eval rel rho t in
-      let r = eval_dim_class rel rho tr in
-      ext_apply v r
+      let rs = List.map (eval_dim_class rel rho) ts in
+      ext_apply v rs
 
     | Tm.Car t ->
       car @@ eval rel rho t
@@ -816,10 +816,10 @@ and unleash_sg v =
   | Sg {dom; cod} -> dom, cod
   | _ -> failwith "unleash_sg"
 
-and unleash_ext v r =
+and unleash_ext v rs =
   match unleash v with
   | Ext abs ->
-    ExtAbs.inst1 abs r
+    ExtAbs.inst abs rs
   | _ ->
     failwith "unleash_ext"
 
@@ -877,17 +877,17 @@ and apply vfun varg =
   | _ ->
     failwith "apply"
 
-and ext_apply vext s =
+and ext_apply vext ss =
   match unleash vext with
   | ExtLam abs ->
-    Abs.inst1 abs s
+    Abs.inst abs ss
 
   | Up info ->
-    let tyr, sysr = unleash_ext info.ty s in
+    let tyr, sysr = unleash_ext info.ty ss in
     begin
       match force_ext_sys sysr with
       | `Rigid _ ->
-        let app = ExtApp (info.neu, sysr, s) in
+        let app = ExtApp (info.neu, sysr, ss) in
         make @@ Up {ty = tyr; neu = app}
       | `Proj v ->
         v
@@ -895,7 +895,7 @@ and ext_apply vext s =
 
   | Coe info ->
     let y, ext_y = Abs.unleash1 info.abs in
-    let ty_s, sys_s = unleash_ext ext_y s in
+    let ty_s, sys_s = unleash_ext ext_y ss in
     let forall_y_sys_s =
       let filter_face face =
         match Face.forall y face with
@@ -915,18 +915,18 @@ and ext_apply vext s =
           List.map face rsys
         in
         let abs = Abs.bind1 y ty_s in
-        let cap = ext_apply info.el s in
+        let cap = ext_apply info.el ss in
         rigid_com info.dir abs cap correction
     end
 
   | HCom info ->
-    let ty_s, sys_s = unleash_ext info.ty s in
+    let ty_s, sys_s = unleash_ext info.ty ss in
     begin
       match force_ext_sys sys_s with
       | `Proj v ->
         v
       | `Rigid boundary_sys ->
-        let cap = ext_apply info.cap s in
+        let cap = ext_apply info.cap ss in
         let correction_sys =
           let face = Face.map @@ fun _ _ v -> Abs.bind [Symbol.fresh ()] v in
           List.map face boundary_sys
@@ -1154,8 +1154,8 @@ and pp_neu fmt neu =
   | FunApp (neu, arg) ->
     Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
 
-  | ExtApp (neu, _, arg) ->
-    Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu Dim.pp arg
+  | ExtApp (neu, _, args) ->
+    Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
 
   | Car neu ->
     Format.fprintf fmt "@[<1>(car %a)@]" pp_neu neu
@@ -1165,3 +1165,7 @@ and pp_neu fmt neu =
 
   | _ ->
     Format.fprintf fmt "<neu>"
+
+and pp_dims fmt rs =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep Dim.pp fmt rs

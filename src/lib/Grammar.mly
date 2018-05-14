@@ -161,10 +161,10 @@ inf:
       make_multi_funapp $startpos $endpos (e env) @@
       List.rev @@ arg0 env :: rest env }
 
-  | LPR; AT; e = inf; arg0 = chk; rest = elist(chk); RPR
+  | LPR; AT; e = inf; args = elist(chk); RPR
     { fun env ->
-      make_multi_extapp $startpos $endpos (e env) @@
-      List.rev @@ arg0 env :: rest env }
+      make_node $startpos $endpos @@
+      Tm.ExtApp (e env, args env) }
 
   | LPR; IF; mot = bind(chk); scrut = inf; tcase = chk; fcase = chk; RPR
     { fun env ->

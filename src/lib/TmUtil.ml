@@ -56,14 +56,6 @@ let rec make_multi_funapp start stop fn rest =
     let fn' = make_multi_funapp start stop fn rest in
     make_node start stop @@ Tm.FunApp (fn', arg)
 
-let rec make_multi_extapp start stop fn rest =
-  match rest with
-  | [] ->
-    fn
-  | arg :: rest ->
-    let fn' = make_multi_funapp start stop fn rest in
-    make_node start stop @@ Tm.ExtApp (fn', arg)
-
 let make_dim_const start stop i =
   match i with
   | 0 -> make_node start stop Tm.Dim0

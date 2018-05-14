@@ -10,7 +10,7 @@ sig
   val emp : t
   val make : int -> t
   val succ : t -> t
-  val abs : t -> Symbol.t -> t
+  val abs : t -> Symbol.t list -> t
 
   val ix_of_lvl : int -> t -> int
   val ix_of_atom : Symbol.t -> t -> int
@@ -30,10 +30,16 @@ struct
   let succ env =
     {env with n = env.n + 1}
 
-  let abs env x =
+  let abs1 env x =
     {n = env.n + 1;
      atoms = M.add x env.n env.atoms}
   (* TODO: should that be env.n + 1? *)
+
+  (* I might be doing this backwards ;-) *)
+  let rec abs env xs =
+    match xs with
+    | [] -> env
+    | x::xs -> abs (abs1 env x) xs
 
   let ix_of_lvl l env =
     env.n - (l + 1)
@@ -69,11 +75,11 @@ let rec equate env ty el0 el1 =
     Tm.cons q0 q1
 
   | Ext abs ->
-    let x, (tyx, _) = ExtAbs.unleash1 abs in
-    let r = Dim.named x in
-    let app0 = ext_apply el0 r in
-    let app1 = ext_apply el1 r in
-    Tm.ext_lam None @@ equate (Env.abs env x) tyx app0 app1
+    let xs, (tyx, _) = ExtAbs.unleash abs in
+    let rs = List.map Dim.named xs in
+    let app0 = ext_apply el0 rs in
+    let app1 = ext_apply el1 rs in
+    Tm.ext_lam None @@ equate (Env.abs env xs) tyx app0 app1
 
   (* TODO: V type, in order to get eta law *)
 
@@ -111,9 +117,9 @@ let rec equate env ty el0 el1 =
       Tm.sg None dom cod
 
     | Ext abs0, Ext abs1 ->
-      let x, (ty0x, sys0x) = ExtAbs.unleash1 abs0 in
-      let ty1x, sys1x = ExtAbs.inst1 abs1 @@ Dim.named x in
-      let envx = Env.abs env x in
+      let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
+      let ty1x, sys1x = ExtAbs.inst abs1 @@ List.map Dim.named xs in
+      let envx = Env.abs env xs in
       let tyx = equate envx ty ty0x ty1x in
       let sysx = equate_val_sys envx ty0x sys0x sys1x in
       Tm.make @@ Tm.Ext (Tm.B (None, (tyx, sysx)))
@@ -168,10 +174,10 @@ and equate_neu env neu0 neu1 =
     let t1 = equate env nf0.ty nf0.el nf1.el in
     Tm.make @@ Tm.FunApp (t0, t1)
 
-  | ExtApp (neu0, _, r0), ExtApp (neu1, _, r1) ->
+  | ExtApp (neu0, _, rs0), ExtApp (neu1, _, rs1) ->
     let t = equate_neu env neu0 neu1 in
-    let tr = equate_dim env r0 r1 in
-    Tm.make @@ Tm.ExtApp (t, tr)
+    let ts = equate_dims env rs0 rs1 in
+    Tm.make @@ Tm.ExtApp (t, ts)
 
   | If if0, If if1 ->
     let var = generic env @@ make Bool in
@@ -255,9 +261,9 @@ and equate_comp_face env ty face0 face1 =
   | _ -> failwith "equate_comp_face"
 
 and equate_val_abs env ty abs0 abs1 =
-  let x, v0x = Abs.unleash1 abs0 in
-  let v1x = Abs.inst1 abs1 @@ Dim.named x in
-  let envx = Env.abs env x in
+  let xs, v0x = Abs.unleash abs0 in
+  let v1x = Abs.inst abs1 @@ List.map Dim.named xs in
+  let envx = Env.abs env xs in
   let tm = equate envx ty v0x v1x in
   Tm.B (None, tm)
 
@@ -274,6 +280,16 @@ and equate_dim env r r' =
     quote_dim env r
   | _ ->
     failwith "Dimensions did not match"
+
+and equate_dims env rs rs' =
+  match rs, rs' with
+  | [], [] ->
+    []
+  | r :: rs, r' :: rs' ->
+    let r'' = equate_dim env r r' in
+    r'' :: equate_dims env rs rs'
+  | _ ->
+    failwith "equate_dims: length mismatch"
 
 and quote_dim env r =
   match Dim.unleash r with
@@ -309,9 +325,9 @@ let rec subtype env ty0 ty1 =
     subtype env vcod0 vcod1
 
   | Ext abs0, Ext abs1 ->
-    let x, (ty0x, sys0x) = ExtAbs.unleash1 abs0 in
-    let ty1x, sys1x = ExtAbs.inst1 abs1 @@ Dim.named x in
-    let envx = Env.abs env x in
+    let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
+    let ty1x, sys1x = ExtAbs.inst abs1 @@ List.map Dim.named xs in
+    let envx = Env.abs env xs in
     subtype envx ty0x ty1x;
     ignore @@ equate_val_sys envx ty0x sys0x sys1x
 

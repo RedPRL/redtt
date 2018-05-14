@@ -13,6 +13,7 @@ sig
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_el : t -> nm:string option -> ty:value -> el:value -> t
   val ext_dim : t -> nm:string option -> t * V.atom
+  val ext_dims : t -> nms:string option list -> t * V.atom list
   val restrict : t -> Dim.repr -> Dim.repr -> t
 
   val eval : t -> 'a T.t -> V.value
@@ -63,9 +64,12 @@ struct
     let x = Symbol.named nm in
     {env = V.Atom x :: env;
      tys = `Dim :: tys;
-     qenv = Q.Env.abs qenv x;
+     qenv = Q.Env.abs qenv [x];
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}, x
+
+  let ext_dims _ ~nms:_ =
+    failwith "TODO"
 
   let ppenv cx =
     cx.ppenv
@@ -369,9 +373,9 @@ and infer cx tm =
     V.inst_clo cod v1
 
   | T.ExtApp (tm, tr) ->
-    let r = check_eval_dim cx tr in
+    let rs = List.map (check_eval_dim cx) tr in
     let ext_ty = infer cx tm in
-    let ty, _ = V.unleash_ext ext_ty @@ Cx.unleash_dim cx r in
+    let ty, _ = V.unleash_ext ext_ty @@ List.map (Cx.unleash_dim cx) rs in
     ty
 
   | T.VProj info ->

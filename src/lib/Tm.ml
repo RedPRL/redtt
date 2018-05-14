@@ -10,7 +10,7 @@ type _ f =
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
   | FunApp : inf t * chk t -> inf f
-  | ExtApp : inf t * chk t -> inf f
+  | ExtApp : inf t * chk t list -> inf f
 
   | Down : {ty : chk t; tm : chk t} -> inf f
   | Coe : {r : chk t; r' : chk t; ty : chk t bnd; tm : chk t} -> inf f
@@ -97,8 +97,8 @@ let rec substf : type x. subst -> x f -> x f =
       | FunApp (t0, t1) ->
         FunApp (subst sub t0, subst sub t1)
 
-      | ExtApp (t0, t1) ->
-        ExtApp (subst sub t0, subst sub t1)
+      | ExtApp (t0, ts) ->
+        ExtApp (subst sub t0, List.map (subst sub) ts)
 
       | Down {ty; tm} ->
         Down {ty = subst sub ty; tm = subst sub tm}
@@ -270,8 +270,8 @@ let rec pp : type a. a t Pretty.t =
     | FunApp (tm0, tm1) ->
       Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp env) tm0 (pp env) tm1
 
-    | ExtApp (tm0, tm1) ->
-      Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" (pp env) tm0 (pp env) tm1
+    | ExtApp (tm, tms) ->
+      Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" (pp env) tm (pp_terms env) tms
 
     | Car tm ->
       Format.fprintf fmt "@[<1>(car@ %a)@]" (pp env) tm
@@ -329,6 +329,9 @@ let rec pp : type a. a t Pretty.t =
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<1>(let@ @[<1>[%s %a]@] %a)@]" x (pp env) tm0 (pp env') tm1
 
+and pp_terms env fmt ts =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep (pp env) fmt ts
 
 and pp_sys env fmt sys =
   match sys with
