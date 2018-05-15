@@ -2,7 +2,10 @@ type t = string option list
 
 let init = []
 let bind x env = Some x :: env
+
+(* TODO: is this backwards? *)
 let bindn xs env = List.map (fun x -> Some x) xs @ env
+
 let bind_opt x env = x :: env
 
 let rec get x env =
