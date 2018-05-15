@@ -68,8 +68,14 @@ struct
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}, x
 
-  let ext_dims _ ~nms:_ =
-    failwith "TODO: ext_dims"
+  let rec ext_dims cx ~nms =
+    match nms with
+    | [] -> cx, []
+    | nm::nms ->
+      (* TODO: is this backwards? *)
+      let cx, xs = ext_dims cx ~nms in
+      let cx, x = ext_dim cx ~nm in
+      cx, x :: xs
 
   let ppenv cx =
     cx.ppenv
