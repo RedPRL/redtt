@@ -803,10 +803,10 @@ and eval_abs rel rho bnd =
   Abs.bind1 x @@ eval rel rho tm
 
 and eval_ext_abs rel rho bnd =
-  let Tm.B (_, (tm, sys)) = bnd in
-  let x = Symbol.fresh () in
-  let rho = Atom x :: rho in
-  ExtAbs.bind1 x (eval rel rho tm, eval_ext_sys rel rho sys)
+  let Tm.NB (nms, (tm, sys)) = bnd in
+  let xs = List.map (fun _ -> Symbol.fresh ()) nms in
+  let rho = List.map (fun x -> Atom x) xs @ rho in
+  ExtAbs.bind xs (eval rel rho tm, eval_ext_sys rel rho sys)
 
 and unleash_pi v =
   match unleash v with
