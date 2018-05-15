@@ -258,16 +258,15 @@ let rec pp : type a. a t Pretty.t =
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<1>(× [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
 
-    | Ext (NB (nm, (cod, sys))) ->
-      Format.fprintf fmt "<ext>"
-    (* let x, env' = Pretty.Env.bind nm env in
-       begin
-       match sys with
-       | [] ->
-        Format.fprintf fmt "@[<1>(# <%s>@ %a)@]" x (pp env') cod
-       | _ ->
-        Format.fprintf fmt "@[<1>(# <%s>@ %a@ @[%a@])@]" x (pp env') cod (pp_sys env') sys
-       end *)
+    | Ext (NB (nms, (cod, sys))) ->
+      let xs, env' = Pretty.Env.bindn nms env in
+      begin
+        match sys with
+        | [] ->
+          Format.fprintf fmt "@[<1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
+        | _ ->
+          Format.fprintf fmt "@[<1>(# <%a>@ %a@ @[%a@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
+      end
 
     | V info ->
       Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
@@ -277,9 +276,8 @@ let rec pp : type a. a t Pretty.t =
       Format.fprintf fmt "@[<1>(λ [%s]@ %a)@]" x (pp env') tm
 
     | ExtLam (NB (nms, tm)) ->
-      Format.fprintf fmt "<extlam>"
-    (* let x, env' = Pretty.Env.bind nm env in
-       Format.fprintf fmt "@[<1>(λ <%s>@ %a)@]" x (pp env') tm *)
+      let xs, env' = Pretty.Env.bindn nms env in
+      Format.fprintf fmt "@[<1>(λ <%a>@ %a)@]" pp_strings xs (pp env') tm
 
     | FunApp (tm0, tm1) ->
       Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp env) tm0 (pp env) tm1
@@ -346,6 +344,11 @@ let rec pp : type a. a t Pretty.t =
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep (pp env) fmt ts
+
+and pp_strings fmt (xs : string list) : unit =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  let pp_string fmt str = Format.fprintf fmt "%s" str in
+  Format.pp_print_list ~pp_sep pp_string fmt xs
 
 and pp_sys env fmt sys =
   match sys with
