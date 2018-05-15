@@ -73,9 +73,9 @@ multibind(X):
     { fun env ->
       MBConsVar (Some x, mb @@ R.bind x env) }
 
-  | LGL; x = ATOM; RGL; mb = multibind(X)
+  | LGL; xs = list(ATOM); RGL; mb = multibind(X)
     { fun env ->
-      MBConsDim (Some x, mb @@ R.bind x env) }
+      MBConsDims (List.map (fun x -> Some x) xs, mb @@ R.bindn xs env) }
 
 
 elist(X):

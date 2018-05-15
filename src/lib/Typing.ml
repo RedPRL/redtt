@@ -69,7 +69,7 @@ struct
      rel}, x
 
   let ext_dims _ ~nms:_ =
-    failwith "TODO"
+    failwith "TODO: ext_dims"
 
   let ppenv cx =
     cx.ppenv
