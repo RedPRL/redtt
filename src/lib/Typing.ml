@@ -236,10 +236,13 @@ let rec check cx ty tm =
     let cxx, _ = Cx.ext_ty cx ~nm vdom in
     check cxx ty cod
 
-  | V.Univ _, T.Ext (NB (nms, (cod, sys))) ->
+  | V.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
     let cxx, xs = Cx.ext_dims cx ~nms in
     let vcod = check_eval cxx ty cod in
-    check_extension_cofibration cx xs @@ cofibration_of_sys cxx sys;
+    if not @@ Kind.stronger Kind.Kan univ.kind then
+      check_extension_cofibration cx xs @@ cofibration_of_sys cxx sys
+    else
+      ();
     check_ext_sys cxx vcod sys
 
   | V.Univ _, T.V info ->

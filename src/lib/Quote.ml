@@ -335,7 +335,7 @@ let rec subtype env ty0 ty1 =
     ignore @@ equate_val_sys envx ty0x sys0x sys1x
 
   | Univ info0, Univ info1 ->
-    if info0.kind <= info1.kind && (info0.lvl = info1.lvl or Lvl.greater info1.lvl info0.lvl) then
+    if (info0.kind = info1.kind or Kind.stronger info0.kind info1.kind) && (info0.lvl = info1.lvl or Lvl.greater info1.lvl info0.lvl) then
       ()
     else
       failwith "Universe subtyping error"
