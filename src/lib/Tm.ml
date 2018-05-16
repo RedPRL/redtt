@@ -272,7 +272,7 @@ let rec pp : type a. a t Pretty.t =
         | [] ->
           Format.fprintf fmt "@[<1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
         | _ ->
-          Format.fprintf fmt "@[<1>(# <%a>@ %a@ @[%a@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
+          Format.fprintf fmt "@[<1>(# @[<1><%a>@ %a@ @[%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
       end
 
 
