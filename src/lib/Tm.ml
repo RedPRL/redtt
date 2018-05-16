@@ -52,8 +52,8 @@ and subst =
 
 and 'a node = {info : info option; con : 'a f; subst : subst}
 and 'a t = 'a node ref
-and 'a tube = chk t * chk t * 'a option
-and 'a system = 'a tube list
+and 'a face = chk t * chk t * 'a option
+and 'a system = 'a face list
 
 
 let make tf = ref {info = None; con = tf; subst = Id}
@@ -355,25 +355,25 @@ and pp_sys env fmt sys =
   | [] ->
     ()
 
-  | [tube] ->
-    pp_tube env fmt tube
+  | [face] ->
+    pp_face env fmt face
 
-  | tube :: sys ->
-    Format.fprintf fmt "%a@ %a" (pp_tube env) tube (pp_sys env) sys
+  | face :: sys ->
+    Format.fprintf fmt "%a@ %a" (pp_face env) face (pp_sys env) sys
 
 and pp_bsys env fmt sys =
   match sys with
   | [] ->
     ()
 
-  | [tube] ->
-    pp_btube env fmt tube
+  | [face] ->
+    pp_bface env fmt face
 
-  | tube :: sys ->
-    Format.fprintf fmt "%a@ %a" (pp_btube env) tube (pp_bsys env) sys
+  | face :: sys ->
+    Format.fprintf fmt "%a@ %a" (pp_bface env) face (pp_bsys env) sys
 
-and pp_tube env fmt tube =
-  let r, r', otm = tube in
+and pp_face env fmt face =
+  let r, r', otm = face in
   match otm with
   | None ->
     Format.fprintf fmt "@[<1>[%a=%a@ -]@]" (pp env) r (pp env) r'
@@ -381,8 +381,8 @@ and pp_tube env fmt tube =
   | Some tm ->
     Format.fprintf fmt "@[<1>[%a=%a@ %a]@]" (pp env) r (pp env) r' (pp env) tm
 
-and pp_btube env fmt tube =
-  let r, r', obnd = tube in
+and pp_bface env fmt face =
+  let r, r', obnd = face in
   match obnd with
   | None ->
     Format.fprintf fmt "@[<1>[%a=%a@ -]@]" (pp env) r (pp env) r'

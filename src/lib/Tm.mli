@@ -9,8 +9,8 @@ type inf
     external view, which can be accessed using [unleash]. *)
 type 'a t
 
-type 'a tube = chk t * chk t * 'a option
-type 'a system = 'a tube list
+type 'a face = chk t * chk t * 'a option
+type 'a system = 'a face list
 
 (* TODO: add FCom *)
 

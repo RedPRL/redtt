@@ -339,7 +339,7 @@ and check_ext_sys cx ty sys =
               let cx' = Cx.restrict cx r0 r1 in
               check cx' (V.Val.act phi ty) tm;
 
-              (* Check tube-tube adjacency conditions *)
+              (* Check face-face adjacency conditions *)
               go_adj cx' acc (r0, r1, tm);
             with R.Inconsistent -> ()
           end;
@@ -395,7 +395,7 @@ and check_comp_sys cx r (cxx, x, tyx) cap sys =
               let cxr0r1 = Cx.restrict cx r0 r1 in
               let phirx = Dim.subst (Dim.singleton r) x in
               Cx.check_eq cxr0r1 ~ty:(V.Val.act phirx tyx) (V.Val.act phir0r1 cap) (V.Val.act phirx cap);
-              (* Check tube-tube adjacency conditions *)
+              (* Check face-face adjacency conditions *)
               go_adj cxxr0r1 acc (r0, r1, bnd);
             with
               R.Inconsistent -> ()
