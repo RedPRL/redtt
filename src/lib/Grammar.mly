@@ -49,7 +49,7 @@ tele:
     { fun env ->
       fst @@ tl env}
 
-tube(X):
+face(X):
   | LSQ; r0 = chk; EQUALS; r1 = chk; e = X; RSQ
     { fun env ->
       r0 env, r1 env, Some (e env) }
@@ -73,9 +73,9 @@ multibind(X):
     { fun env ->
       MBConsVar (Some x, mb @@ R.bind x env) }
 
-  | LGL; x = ATOM; RGL; mb = multibind(X)
+  | LGL; xs = list(ATOM); RGL; mb = multibind(X)
     { fun env ->
-      MBConsDim (Some x, mb @@ R.bind x env) }
+      MBConsDims (List.map (fun x -> Some x) xs, mb @@ R.bindn xs env) }
 
 
 elist(X):
@@ -84,7 +84,7 @@ elist(X):
       List.map (fun x -> x env) xs}
 
 constrained:
-  | ty = chk; sys = elist(tube(chk))
+  | ty = chk; sys = elist(face(chk))
     { fun env ->
       ty env, sys env }
 
@@ -171,7 +171,7 @@ inf:
       make_node $startpos $endpos @@
       Tm.If {mot = mot env; scrut = scrut env; tcase = tcase env; fcase = fcase env} }
 
-  | LPR; HCOM; r0 = chk; r1 = chk; ty = chk; cap = chk; sys = elist(tube(dimbind(chk))); RPR
+  | LPR; HCOM; r0 = chk; r1 = chk; ty = chk; cap = chk; sys = elist(face(dimbind(chk))); RPR
     { fun env ->
       make_node $startpos $endpos @@
       Tm.HCom {r = r0 env; r' = r1 env; ty = ty env; cap = cap env; sys = sys env} }

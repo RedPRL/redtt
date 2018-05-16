@@ -620,7 +620,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make @@ Sg {dom; cod}
 
     | Tm.Ext bnd ->
-      let abs = eval_ext_abs rel rho bnd in
+      let abs = eval_ext_bnd rel rho bnd in
       make @@ Ext abs
 
     | Tm.V info ->
@@ -634,7 +634,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       make @@ Lam (clo bnd rel rho)
 
     | Tm.ExtLam bnd ->
-      let abs = eval_abs rel rho bnd in
+      let abs = eval_nbnd rel rho bnd in
       make @@ ExtLam abs
 
     | Tm.Cons (t0, t1) ->
@@ -646,7 +646,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       let r = eval_dim_class rel rho info.r in
       let r' = eval_dim_class rel rho info.r' in
       let dir = Star.make r r' in
-      let abs = eval_abs rel rho info.ty  in
+      let abs = eval_bnd rel rho info.ty  in
       let el = eval rel rho info.tm in
       make_coe dir abs el
 
@@ -656,16 +656,16 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       let dir = Star.make r r' in
       let ty = eval rel rho info.ty in
       let cap = eval rel rho info.cap in
-      let sys = eval_abs_sys rel rho info.sys in
+      let sys = eval_bnd_sys rel rho info.sys in
       make_hcom dir ty cap sys
 
     | Tm.Com info ->
       let r = eval_dim_class rel rho info.r in
       let r' = eval_dim_class rel rho info.r' in
       let dir = Star.make r r' in
-      let abs = eval_abs rel rho info.ty in
+      let abs = eval_bnd rel rho info.ty in
       let cap = eval rel rho info.cap in
-      let sys = eval_abs_sys rel rho info.sys in
+      let sys = eval_bnd_sys rel rho info.sys in
       make_com dir abs cap sys
 
     | Tm.FCom info ->
@@ -673,7 +673,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       let r' = eval_dim_class rel rho info.r' in
       let dir = Star.make r r' in
       let cap = eval rel rho info.cap in
-      let sys = eval_abs_sys rel rho info.sys in
+      let sys = eval_bnd_sys rel rho info.sys in
       make_fcom dir cap sys
 
     | Tm.FunApp (t0, t1) ->
@@ -736,7 +736,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       eval rel (Val v0 :: rho) t1
 
 
-and eval_abs_face rel rho (tr, tr', obnd) =
+and eval_bnd_face rel rho (tr, tr', obnd) =
   let r = eval_dim rel rho tr in
   let r' = eval_dim rel rho tr' in
   let sr = R.unleash r rel in
@@ -750,19 +750,19 @@ and eval_abs_face rel rho (tr, tr', obnd) =
       | _ ->
         let bnd = Option.get_exn obnd in
         let rel' = R.equate r r' rel in
-        let abs = eval_abs rel' rho bnd in
+        let abs = eval_bnd rel' rho bnd in
         Face.Indet (xi, abs)
     end
   | `Same _ ->
     let bnd = Option.get_exn obnd in
-    let abs = eval_abs rel rho bnd in
+    let abs = eval_bnd rel rho bnd in
     Face.True (sr, sr', abs)
 
-and eval_abs_sys rel rho sys  =
+and eval_bnd_sys rel rho sys  =
   try
     let sys =
       List.map
-        (fun x -> force_abs_face @@ eval_abs_face rel rho x)
+        (fun x -> force_abs_face @@ eval_bnd_face rel rho x)
         sys
     in `Ok sys
   with
@@ -794,17 +794,23 @@ and eval_ext_face rel rho (tr, tr', otm) : val_face =
 and eval_ext_sys rel rho sys : ext_sys =
   List.map (eval_ext_face rel rho) sys
 
-and eval_abs rel rho bnd =
+and eval_bnd rel rho bnd =
   let Tm.B (_, tm) = bnd in
   let x = Symbol.fresh () in
   let rho = Atom x :: rho in
   Abs.bind1 x @@ eval rel rho tm
 
-and eval_ext_abs rel rho bnd =
-  let Tm.B (_, (tm, sys)) = bnd in
-  let x = Symbol.fresh () in
-  let rho = Atom x :: rho in
-  ExtAbs.bind1 x (eval rel rho tm, eval_ext_sys rel rho sys)
+and eval_nbnd rel rho bnd =
+  let Tm.NB (nms, tm) = bnd in
+  let xs = List.map (fun _ -> Symbol.fresh ()) nms in
+  let rho = List.map (fun x -> Atom x) xs @ rho in
+  Abs.bind xs @@ eval rel rho tm
+
+and eval_ext_bnd rel rho bnd =
+  let Tm.NB (nms, (tm, sys)) = bnd in
+  let xs = List.map (fun _ -> Symbol.fresh ()) nms in
+  let rho = List.map (fun x -> Atom x) xs @ rho in
+  ExtAbs.bind xs (eval rel rho tm, eval_ext_sys rel rho sys)
 
 and unleash_pi v =
   match unleash v with

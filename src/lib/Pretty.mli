@@ -4,6 +4,7 @@ sig
   val emp : t
   val var : int -> t -> string
   val bind : string option -> t -> string * t
+  val bindn : string option list -> t -> string list * t
   val bind_fresh : t -> string * t
 
   val proj : t -> t

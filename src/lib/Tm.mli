@@ -1,4 +1,5 @@
 type 'a bnd = B of string option * 'a
+type 'a nbnd = NB of string option list * 'a
 
 (* sorts *)
 type chk
@@ -8,8 +9,8 @@ type inf
     external view, which can be accessed using [unleash]. *)
 type 'a t
 
-type 'a tube = chk t * chk t * 'a option
-type 'a system = 'a tube list
+type 'a face = chk t * chk t * 'a option
+type 'a system = 'a face list
 
 (* TODO: add FCom *)
 
@@ -33,7 +34,7 @@ type _ f =
 
   | Univ : Lvl.t -> chk f
   | Pi : chk t * chk t bnd -> chk f
-  | Ext : (chk t * chk t system) bnd -> chk f
+  | Ext : (chk t * chk t system) nbnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
 
   | V : {r : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> chk f
@@ -45,7 +46,7 @@ type _ f =
   | VProj : {r : chk t; tm : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
-  | ExtLam : chk t bnd -> chk f
+  | ExtLam : chk t nbnd -> chk f
 
   | Cons : chk t * chk t -> chk f
   | Dim0 : chk f
@@ -75,7 +76,7 @@ val var : int -> inf t
 val inst0 : inf t -> subst
 val up : inf t -> chk t
 val lam : string option -> chk t -> chk t
-val ext_lam : string option -> chk t -> chk t
+val ext_lam : string option list -> chk t -> chk t
 val pi : string option -> chk t -> chk t -> chk t
 val sg : string option -> chk t -> chk t -> chk t
 val let_ : string option -> inf t -> chk t -> chk t

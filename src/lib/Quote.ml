@@ -79,7 +79,7 @@ let rec equate env ty el0 el1 =
     let rs = List.map Dim.named xs in
     let app0 = ext_apply el0 rs in
     let app1 = ext_apply el1 rs in
-    Tm.ext_lam None @@ equate (Env.abs env xs) tyx app0 app1
+    Tm.ext_lam (List.map (fun _ -> None) xs) @@ equate (Env.abs env xs) tyx app0 app1
 
   (* TODO: V type, in order to get eta law *)
 
@@ -122,7 +122,7 @@ let rec equate env ty el0 el1 =
       let envx = Env.abs env xs in
       let tyx = equate envx ty ty0x ty1x in
       let sysx = equate_val_sys envx ty0x sys0x sys1x in
-      Tm.make @@ Tm.Ext (Tm.B (None, (tyx, sysx)))
+      Tm.make @@ Tm.Ext (Tm.NB (List.map (fun _ -> None) xs, (tyx, sysx)))
 
     | Up up0, Up up1 ->
       Tm.up @@ equate_neu env up0.neu up1.neu

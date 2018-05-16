@@ -20,6 +20,14 @@ struct
       x, (i + 1, x :: xs)
     | Some x ->
       x, (i, x:: xs)
+
+  let rec bindn nms t =
+    match nms with
+    | [] -> [], t
+    | nm :: nms ->
+      let xs, t = bindn nms t in
+      let x, t = bind nm t in
+      x :: xs, t
 end
 
 type env = Env.t

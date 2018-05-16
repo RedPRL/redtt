@@ -68,8 +68,14 @@ struct
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}, x
 
-  let ext_dims _ ~nms:_ =
-    failwith "TODO"
+  let rec ext_dims cx ~nms =
+    match nms with
+    | [] -> cx, []
+    | nm::nms ->
+      (* TODO: is this backwards? *)
+      let cx, xs = ext_dims cx ~nms in
+      let cx, x = ext_dim cx ~nm in
+      cx, x :: xs
 
   let ppenv cx =
     cx.ppenv
@@ -116,6 +122,8 @@ end
 
 type cx = Cx.t
 
+type cofibration = (R.dim * R.dim) list
+
 let infer_dim cx tr =
   match T.unleash tr with
   | T.Var ix ->
@@ -138,7 +146,68 @@ let check_dim cx tr =
   | _ ->
     failwith "check_dim: expected dimension"
 
+let check_dim_in_class cx ocls r : unit =
+  match ocls with
+  | None -> ()
+  | Some cls ->
+    let clr = Cx.unleash_dim cx r in
+    begin
+      match Dim.compare cls clr with
+      | Dim.Same ->
+        ()
+      | _ ->
+        Format.printf "check_dim_in_class: %a in %a@." Dim.pp clr Dim.pp cls;
+        failwith "check_dim_in_class"
+    end
 
+let check_valid_cofibration cx ?dim_cls:(dim_cls = None) cofib =
+  let zeros = Hashtbl.create 20 in
+  let ones = Hashtbl.create 20 in
+  let rec go eqns =
+    match eqns with
+    | [] -> false
+    | (r, r') :: eqns ->
+      check_dim_in_class cx dim_cls r;
+      check_dim_in_class cx dim_cls r';
+      begin
+        match Cx.compare_dim cx r r' with
+        | Dim.Same -> true
+        | Dim.Apart -> go eqns
+        | Dim.Indeterminate ->
+          match r, r' with
+          | Dim.Dim0, Dim.Dim1 -> go eqns
+          | Dim.Dim1, Dim.Dim0 -> go eqns
+          | Dim.Dim0, Dim.Dim0 -> true
+          | Dim.Dim1, Dim.Dim1 -> true
+          | Dim.Atom x, Dim.Dim0 ->
+            if Hashtbl.mem ones x then true else
+              begin
+                Hashtbl.add zeros x ();
+                go eqns
+              end
+          | Dim.Atom x, Dim.Dim1 ->
+            if Hashtbl.mem zeros x then true else
+              begin
+                Hashtbl.add ones x ();
+                go eqns
+              end
+          | Dim.Atom x, Dim.Atom y ->
+            x = y or go eqns
+          | _, _ ->
+            go @@ (r', r) :: eqns
+      end
+  in
+  if go cofib then () else failwith "check_valid_cofibration"
+
+let check_extension_cofibration cx xs cofib =
+  match cofib, xs with
+  | [], _ -> ()
+  | _, x :: xs ->
+    let dim_of_atom x = Dim.Atom x in
+    let cls = Dim.from_reprs (dim_of_atom x) @@ Dim.Dim0 :: Dim.Dim1 :: dim_of_atom x :: List.map dim_of_atom xs in
+    check_valid_cofibration cx ~dim_cls:(Some cls) cofib
+  | _ ->
+    failwith "check_extension_cofibration"
 
 let rec check cx ty tm =
   match V.unleash ty, T.unleash tm with
@@ -156,9 +225,10 @@ let rec check cx ty tm =
     let cxx, _ = Cx.ext_ty cx ~nm vdom in
     check cxx ty cod
 
-  | V.Univ _, T.Ext (B (nm, (cod, sys))) ->
-    let cxx, _ = Cx.ext_dim cx ~nm in
+  | V.Univ _, T.Ext (NB (nms, (cod, sys))) ->
+    let cxx, xs = Cx.ext_dims cx ~nms in
     let vcod = check_eval cxx ty cod in
+    check_extension_cofibration cx xs @@ cofibration_of_sys cxx sys;
     check_ext_sys cxx vcod sys
 
   | V.Univ _, T.V info ->
@@ -180,9 +250,9 @@ let rec check cx ty tm =
     let vcod = V.inst_clo cod v in
     check cx vcod t1
 
-  | V.Ext ext_abs, T.ExtLam (T.B (nm, tm)) ->
-    let cxx, x = Cx.ext_dim cx ~nm in
-    let codx, sysx = V.ExtAbs.inst1 ext_abs (Dim.named x) in
+  | V.Ext ext_abs, T.ExtLam (T.NB (nms, tm)) ->
+    let cxx, xs = Cx.ext_dims cx ~nms in
+    let codx, sysx = V.ExtAbs.inst ext_abs @@ List.map Dim.named xs in
     check_boundary cxx codx sysx tm
 
   | V.Univ _, T.FCom info ->
@@ -205,11 +275,21 @@ let rec check cx ty tm =
     Format.eprintf "Failed to check term %a@." (Tm.pp (Cx.ppenv cx)) tm;
     failwith "Type error"
 
+and cofibration_of_sys : 'a. cx -> 'a Tm.system -> cofibration =
+  fun cx sys ->
+    let face (tr, tr', _) =
+      let r = Cx.eval_dim cx tr in
+      let r' = Cx.eval_dim cx tr' in
+      (r, r')
+    in
+    List.map face sys
+
 and check_fcom cx ty tr tr' tcap tsys =
   let r = check_eval_dim cx tr in
   check_dim cx tr';
   let cxx, x = Cx.ext_dim cx ~nm:None in
   let cap = check_eval cx ty tcap in
+  check_valid_cofibration cx @@ cofibration_of_sys cx tsys;
   check_comp_sys cx r (cxx, x, ty) cap tsys
 
 and check_boundary cx ty sys tm =
@@ -259,7 +339,7 @@ and check_ext_sys cx ty sys =
               let cx' = Cx.restrict cx r0 r1 in
               check cx' (V.Val.act phi ty) tm;
 
-              (* Check tube-tube adjacency conditions *)
+              (* Check face-face adjacency conditions *)
               go_adj cx' acc (r0, r1, tm);
             with R.Inconsistent -> ()
           end;
@@ -315,7 +395,7 @@ and check_comp_sys cx r (cxx, x, tyx) cap sys =
               let cxr0r1 = Cx.restrict cx r0 r1 in
               let phirx = Dim.subst (Dim.singleton r) x in
               Cx.check_eq cxr0r1 ~ty:(V.Val.act phirx tyx) (V.Val.act phir0r1 cap) (V.Val.act phirx cap);
-              (* Check tube-tube adjacency conditions *)
+              (* Check face-face adjacency conditions *)
               go_adj cxxr0r1 acc (r0, r1, bnd);
             with
               R.Inconsistent -> ()
@@ -413,6 +493,7 @@ and infer cx tm =
     let cxx, x = Cx.ext_dim cx ~nm:None in
     let vty = check_eval_ty cx info.ty in
     let cap = check_eval cx vty info.cap in
+    check_valid_cofibration cx @@ cofibration_of_sys cx info.sys;
     check_comp_sys cx r (cxx, x, vty) cap info.sys;
     vty
 
