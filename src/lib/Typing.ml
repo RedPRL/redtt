@@ -146,7 +146,7 @@ let check_dim cx tr =
   | _ ->
     failwith "check_dim: expected dimension"
 
-let check_local_dim cx ocls r : unit =
+let check_dim_in_class cx ocls r : unit =
   match ocls with
   | None -> ()
   | Some cls ->
@@ -155,12 +155,9 @@ let check_local_dim cx ocls r : unit =
       match Dim.compare cls clr with
       | Dim.Same ->
         ()
-      | Dim.Apart ->
-        (* In this case, the dimensions must have been constant *)
-        ()
-      | Dim.Indeterminate ->
-        Format.printf "check_local_dim: %a in %a@." Dim.pp clr Dim.pp cls;
-        failwith "check_local_dim"
+      | _ ->
+        Format.printf "check_dim_in_class: %a in %a@." Dim.pp clr Dim.pp cls;
+        failwith "check_dim_in_class"
     end
 
 let check_valid_cofibration cx ?dim_cls:(dim_cls = None) cofib =
@@ -170,8 +167,8 @@ let check_valid_cofibration cx ?dim_cls:(dim_cls = None) cofib =
     match eqns with
     | [] -> false
     | (r, r') :: eqns ->
-      check_local_dim cx dim_cls r;
-      check_local_dim cx dim_cls r';
+      check_dim_in_class cx dim_cls r;
+      check_dim_in_class cx dim_cls r';
       begin
         match Cx.compare_dim cx r r' with
         | Dim.Same -> true
