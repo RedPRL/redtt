@@ -66,13 +66,14 @@
  ▷
  tt)
 
-(define some-test
+(define _
  (bool [1=1 tt])
  ▷
  restriction-test)
 
-(define another-test
+(define _
  [M : (singleton bool tt)]
  bool
  ▷
  M)
+
