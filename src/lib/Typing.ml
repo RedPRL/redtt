@@ -11,7 +11,7 @@ sig
   val emp : t
 
   val ext_ty : t -> nm:string option -> value -> t * value
-  val ext_el : t -> nm:string option -> ty:value -> el:value -> t
+  val def : t -> nm:string option -> ty:value -> el:value -> t
   val ext_dim : t -> nm:string option -> t * V.atom
   val ext_dims : t -> nms:string option list -> t * V.atom list
   val restrict : t -> Dim.repr -> Dim.repr -> t
@@ -53,7 +53,7 @@ struct
      rel},
     var
 
-  let ext_el {env; qenv; tys; rel; ppenv} ~nm ~ty ~el =
+  let def {env; qenv; tys; rel; ppenv} ~nm ~ty ~el =
     {env = V.Val el :: env;
      tys = `Ty ty :: tys;
      qenv = Q.Env.succ qenv; (* Is this right? *)
@@ -268,7 +268,7 @@ let rec check cx ty tm =
   | _, T.Let (t0, T.B (nm, t1)) ->
     let ty' = infer cx t0 in
     let el = Cx.eval cx t0 in
-    let cx' = Cx.ext_el cx ~nm ~ty:ty' ~el in
+    let cx' = Cx.def cx ~nm ~ty:ty' ~el in
     check cx' ty t1
 
   | _ ->
@@ -507,14 +507,14 @@ and infer cx tm =
     Cx.check_eq cx ~ty:(V.make @@ V.Univ Lvl.Omega) scrut_ty bool;
     let scrut = Cx.eval cx info.scrut in
 
-    let cx_tt = Cx.ext_el cx ~nm ~ty:bool ~el:(V.make V.Tt) in
-    let cx_ff = Cx.ext_el cx ~nm ~ty:bool ~el:(V.make V.Ff) in
+    let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(V.make V.Tt) in
+    let cx_ff = Cx.def cx ~nm ~ty:bool ~el:(V.make V.Ff) in
     let mot_tt = Cx.eval cx_tt mot in
     let mot_ff = Cx.eval cx_ff mot in
     check cx mot_tt info.tcase;
     check cx mot_ff info.fcase;
 
-    let cx_scrut = Cx.ext_el cx ~nm ~ty:bool ~el:scrut in
+    let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:scrut in
     Cx.eval cx_scrut mot
 
 

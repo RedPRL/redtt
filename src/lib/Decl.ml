@@ -44,4 +44,4 @@ and check_decl cx decl =
     let nm = Some (decl_name decl) in
     let ppenv = Typing.Cx.ppenv cx in
     Format.fprintf Format.std_formatter "> %a@.@." (Tm.pp ppenv) inf;
-    Typing.Cx.ext_el cx ~nm ~ty ~el
+    Typing.Cx.def cx ~nm ~ty ~el

@@ -7,7 +7,7 @@ sig
   val emp : t
 
   val ext_ty : t -> nm:string option -> value -> t * value
-  val ext_el : t -> nm:string option -> ty:value -> el:value -> t
+  val def : t -> nm:string option -> ty:value -> el:value -> t
   val ext_dim : t -> nm:string option -> t * Val.atom
 
   val eval : t -> 'a Tm.t -> value
