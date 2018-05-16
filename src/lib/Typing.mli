@@ -17,6 +17,8 @@ sig
   val lookup : int -> t -> [`Ty of value | `Dim]
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
+
+  val quote : t -> ty:value -> value -> Tm.chk Tm.t
 end
 
 type cx = Cx.t

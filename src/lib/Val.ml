@@ -498,7 +498,7 @@ and make_fcom mdir cap msys : value =
 and rigid_coe dir abs el =
   let x, tyx = Abs.unleash1 abs in
   match unleash tyx with
-  | (Pi _ | Sg _ ) ->
+  | (Pi _ | Sg _ | Ext _ | Up _) ->
     make @@ Coe {dir; abs; el}
 
   | (Bool | Univ _) ->
@@ -582,7 +582,7 @@ and rigid_coe dir abs el =
 
 and rigid_hcom dir ty cap sys : value =
   match unleash ty with
-  | Pi _ ->
+  | (Pi _ | Sg _ | Ext _ | Up _) ->
     make @@ HCom {dir; ty; cap; sys}
 
   | Bool ->
@@ -598,7 +598,7 @@ and rigid_hcom dir ty cap sys : value =
     failwith "hcom in V, taste it!!!"
 
   | _ ->
-    failwith "TODO"
+    failwith "TODO: rigid_hcom"
 
 and rigid_com dir abs cap (sys : comp_sys) : value =
   let _, r' = Star.unleash dir in

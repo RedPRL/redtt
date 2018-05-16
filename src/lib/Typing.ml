@@ -27,6 +27,8 @@ sig
   val check_eq_ty : t -> V.value -> V.value -> unit
   val check_subtype : t -> V.value -> V.value -> unit
 
+  val quote : t -> ty:value -> value -> Tm.chk Tm.t
+
   val unleash_dim : t -> Dim.repr -> Dim.t
   val equate_dim : t -> Dim.repr -> Dim.repr -> Dim.action
 end =
@@ -103,6 +105,10 @@ struct
 
   let unleash_dim cx r =
     R.unleash r cx.rel
+
+
+  let quote cx ~ty el =
+    Q.quote_nf cx.qenv @@ V.{ty; el}
 
   let check_eq cx ~ty el0 el1 =
     try
