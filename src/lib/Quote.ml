@@ -124,6 +124,11 @@ let rec equate env ty el0 el1 =
       let sysx = equate_val_sys envx ty0x sys0x sys1x in
       Tm.make @@ Tm.Ext (Tm.NB (List.map (fun _ -> None) xs, (tyx, sysx)))
 
+    | Rst info0, Rst info1 ->
+      let ty = equate env ty info0.ty info1.ty in
+      let sys = equate_val_sys env info0.ty info0.sys info1.sys in
+      Tm.make @@ Tm.Rst {ty; sys}
+
     | Up up0, Up up1 ->
       Tm.up @@ equate_neu env up0.neu up1.neu
 
@@ -352,40 +357,41 @@ let rec subtype env ty0 ty1 =
       | _ -> ty1, []
     in
     subtype env ty0 ty1;
-
-    let gen = generic env ty0 in
-    let check_face ty face =
-      match face with
-      | Face.True (_, _, v) ->
-        begin try equiv env ~ty gen v; true with _ -> false end
-      | Face.False _ ->
-        true
-      | Face.Indet (p, v) ->
-        let r, r' = DimStar.unleash p in
-        let gen_rr' = Val.act (Dim.equate r r') gen in
-        let ty_rr' = Val.act (Dim.equate r r') ty in
-        begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end
-    in
-
-    let exception Break in
-    let n0 = List.length sys0 in
-    let n1 = List.length sys0 in
-    begin
-      try
-        for i = 0 to n0 - 1 do
-          let cond_i = check_face ty0 @@ List.nth sys0 i in
-          if cond_i then
-            for j = 0 to n1 - 1 do
-              let cond_j = check_face ty1 @@ List.nth sys1 j in
-              if cond_j then () else raise Break
-            done
-          else
-            ()
-        done
-      with
-      | Break ->
-        failwith "restriction subtyping"
-    end
-
+    approx_restriction env ty0 ty1 sys0 sys1
   | _ ->
     equiv_ty env ty0 ty1
+
+and approx_restriction env ty0 ty1 sys0 sys1 =
+  let gen = generic env ty0 in
+  let check_face ty face =
+    match face with
+    | Face.True (_, _, v) ->
+      begin try equiv env ~ty gen v; true with _ -> false end
+    | Face.False _ ->
+      true
+    | Face.Indet (p, v) ->
+      let r, r' = DimStar.unleash p in
+      let gen_rr' = Val.act (Dim.equate r r') gen in
+      let ty_rr' = Val.act (Dim.equate r r') ty in
+      begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end
+  in
+
+  let exception Break in
+  let n0 = List.length sys0 in
+  let n1 = List.length sys0 in
+  begin
+    try
+      for i = 0 to n0 - 1 do
+        let cond_i = check_face ty0 @@ List.nth sys0 i in
+        if cond_i then
+          for j = 0 to n1 - 1 do
+            let cond_j = check_face ty1 @@ List.nth sys1 j in
+            if cond_j then () else raise Break
+          done
+        else
+          ()
+      done
+    with
+    | Break ->
+      failwith "restriction subtyping"
+  end
