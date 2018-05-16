@@ -4,9 +4,12 @@ type theory, using the interval and "extension types" to generalize path types.
 ## Contributing Guidelines
 
 Help is welcome and desired! Please see the [open
-tickets](https://github.com/jonsterling/cubical-experiment/issues). Currently,
-we are trying to limit the dependencies of this code; when something is
-available as a package, but can easily be coded locally, we prefer the latter.
+tickets](https://github.com/jonsterling/cubical-experiment/issues) and
+especially our
+[Roadmap](https://github.com/jonsterling/cubical-experiment/projects/2).
+Currently, we are trying to limit the dependencies of this code; when something
+is available as a package, but can easily be coded locally, we prefer the
+latter.
 
 We also want to avoid using things like syntax extensions/ppxs, though we may
 end up using one of these for the lexer at one point.
@@ -24,7 +27,12 @@ end up using one of these for the lexer at one point.
 
 ### Other recommended packages
 
-`merlin`, `ocp-indent`
+We recommend installing `merlin` and `ocp-indent`; the easiest way to edit
+OCaml code out of the box is to install [Visual Studio
+Code](https://code.visualstudio.com/?wt.mc_id=adw-brand&gclid=EAIaIQobChMImd3JoKeL2wIVUlmGCh1lHAQ1EAAYASAAEgLUxPD_BwE)
+along with the [OCaml and Reason
+IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
+package by Darin Morrison.
 
 ### Installing Dependencies
 
