@@ -70,3 +70,9 @@
  (bool [1=1 tt])
  ▷
  restriction-test)
+
+(define another-test
+ [M : (singleton bool tt)]
+ bool
+ ▷
+ M)

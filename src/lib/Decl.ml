@@ -39,9 +39,16 @@ and check_decl cx decl =
     let ty = TmUtil.pi_from_tele (Some info) args in
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
     let inf = Tm.make @@ Tm.Down {ty; tm} in
-    let ty = Typing.infer cx inf in
+    let vty = Typing.infer cx inf in
     let el = Typing.Cx.eval cx tm in
+    let tm' = Typing.Cx.quote cx ~ty:vty el in
     let nm = Some (decl_name decl) in
     let ppenv = Typing.Cx.ppenv cx in
-    Format.fprintf Format.std_formatter "> %a@.@." (Tm.pp ppenv) inf;
-    Typing.Cx.def cx ~nm ~ty ~el
+    Format.fprintf
+      Format.std_formatter
+      "@[<v 0>%s@, : @[%a@]@, = @[%a@]@,~> @[%a@]@]@,@."
+      (decl_name decl)
+      (Tm.pp ppenv) ty
+      (Tm.pp ppenv) tm
+      (Tm.pp ppenv) tm';
+    Typing.Cx.def cx ~nm ~ty:vty ~el
