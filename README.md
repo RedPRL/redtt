@@ -22,13 +22,18 @@ end up using one of these for the lexer at one point.
 | OCaml        | `>=` | [`4.06.1`](https://github.com/ocaml/ocaml/releases/tag/4.06.1) | `opam switch 4.06.1`    |
 | utop         | `>=` | [`2.0.2`](https://github.com/diml/utop/releases/tag/2.0.2)             | `opam install utop` (optional)  |
 
+### Other recommended packages
+
+`merlin`, `ocp-indent`
+
 ### Installing Dependencies
 
 ```
 $ git clone https://github.com/jonsterling/cubical-experiment
 $ cd tt
 $ opam update
-$ opam pin add -y .
+$ opam pin add -y . # the first time you build
+$ opam upgrade      # after packages change
 ```
 
 ### Building
