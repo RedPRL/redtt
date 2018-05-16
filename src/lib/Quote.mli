@@ -19,4 +19,5 @@ val quote_nf : env -> Val.nf -> Tm.chk Tm.t
 val quote_neu : env -> Val.neu -> Tm.inf Tm.t
 
 val equiv : env -> ty:Val.value -> Val.value -> Val.value -> unit
+val equiv_ty : env -> Val.value -> Val.value -> unit
 val subtype : env -> Val.value -> Val.value -> unit

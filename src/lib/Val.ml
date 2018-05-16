@@ -24,7 +24,7 @@ type con =
   | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
   | FCom : {dir : star; cap : value; sys : comp_sys} -> con
 
-  | Univ : Lvl.t -> con
+  | Univ : {kind : Kind.t; lvl : Lvl.t} -> con
   | V : {x : gen; ty0 : value; ty1 : value; equiv : value} -> con
   | VIn : {x : gen; el0 : value; el1 : value} -> con
 
@@ -700,8 +700,8 @@ and eval : type x. rel -> env -> x Tm.t -> value =
       let equiv = eval rel rho info.equiv in
       vproj (Gen.make r) ~ty0 ~ty1 ~equiv ~el
 
-    | Tm.Univ lvl ->
-      make @@ Univ lvl
+    | Tm.Univ {kind; lvl} ->
+      make @@ Univ {kind; lvl}
 
     | Tm.Bool ->
       make Bool
@@ -1108,8 +1108,8 @@ let rec pp_value fmt value =
     Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
   | Ext abs ->
     Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
-  | Univ lvl ->
-    Format.fprintf fmt "@[<1>(U@ %a)@]" Lvl.pp lvl
+  | Univ {kind; lvl} ->
+    Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
   | Cons (v0, v1) ->
     Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
   | V _ ->

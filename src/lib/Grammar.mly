@@ -108,7 +108,7 @@ chk:
   | LPR; UNIV; i = NUMERAL; RPR
     { fun _env ->
       make_node $startpos $endpos @@
-      Tm.Univ (Lvl.Const i) }
+      Tm.Univ {kind = Kind.Kan; lvl = Lvl.Const i} }
 
   | LPR; RIGHT_ARROW; tele = tele; RPR
     { fun env ->

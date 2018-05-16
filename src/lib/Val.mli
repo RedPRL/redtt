@@ -25,7 +25,7 @@ type con =
   | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
   | FCom : {dir : star; cap : value; sys : comp_sys} -> con
 
-  | Univ : Lvl.t -> con
+  | Univ : {kind : Kind.t; lvl : Lvl.t} -> con
   | V : {x : gen; ty0 : value; ty1 : value; equiv : value} -> con
   | VIn : {x : gen; el0 : value; el1 : value} -> con
 

@@ -85,9 +85,9 @@ let rec equate env ty el0 el1 =
 
   | _ ->
     match unleash el0, unleash el1 with
-    | Univ lvl0, Univ lvl1 ->
-      if lvl0 = lvl1 then
-        Tm.univ lvl0
+    | Univ info0, Univ info1 ->
+      if info0.kind = info1.kind && info0.lvl = info1.lvl then
+        Tm.univ ~kind:info0.kind ~lvl:info0.lvl
       else
         failwith "Expected equal universe levels"
 
@@ -142,7 +142,7 @@ let rec equate env ty el0 el1 =
 
     | Coe coe0, Coe coe1 ->
       let tr, tr' = equate_star env coe0.dir coe1.dir in
-      let univ = make @@ Univ Lvl.Omega in
+      let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
       let bnd = equate_val_abs env univ coe0.abs coe1.abs in
       let tyr =
         let r, _ = DimStar.unleash coe0.dir in
@@ -209,7 +209,7 @@ and equate_neu env neu0 neu1 =
     failwith "equate_neu"
 
 and equate_ty env ty0 ty1 : Tm.chk Tm.t =
-  let univ = make @@ Univ Lvl.Omega in
+  let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
   equate env univ ty0 ty1
 
 
@@ -302,6 +302,9 @@ and quote_dim env r =
 let equiv env ~ty el0 el1 =
   ignore @@ equate env ty el0 el1
 
+let equiv_ty env ty0 ty1 =
+  ignore @@ equate_ty env ty0 ty1
+
 let quote_nf env nf =
   equate env nf.ty nf.el nf.el
 
@@ -331,12 +334,11 @@ let rec subtype env ty0 ty1 =
     subtype envx ty0x ty1x;
     ignore @@ equate_val_sys envx ty0x sys0x sys1x
 
-  | Univ lvl0, Univ lvl1 ->
-    if lvl0 = lvl1 or Lvl.greater lvl1 lvl0 then
+  | Univ info0, Univ info1 ->
+    if info0.kind <= info1.kind && (info0.lvl = info1.lvl or Lvl.greater info1.lvl info0.lvl) then
       ()
     else
-      failwith "Universe level too big"
+      failwith "Universe subtyping error"
 
   | _ ->
-    let univ = make @@ Univ Lvl.Omega in
-    equiv env univ ty0 ty1
+    equiv_ty env ty0 ty1

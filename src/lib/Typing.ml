@@ -24,6 +24,7 @@ sig
   val lookup : int -> t -> [`Ty of V.value | `Dim]
   val compare_dim : t -> Dim.repr -> Dim.repr -> Dim.compare
   val check_eq : t -> ty:V.value -> V.value -> V.value -> unit
+  val check_eq_ty : t -> V.value -> V.value -> unit
   val check_subtype : t -> V.value -> V.value -> unit
 
   val unleash_dim : t -> Dim.repr -> Dim.t
@@ -109,6 +110,14 @@ struct
     with
     | exn ->
       Format.printf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1;
+      raise exn
+
+  let check_eq_ty cx el0 el1 =
+    try
+      Q.equiv_ty cx.qenv el0 el1
+    with
+    | exn ->
+      Format.printf "check_eq_ty: %a /= %a@." V.pp_value el0 V.pp_value el1;
       raise exn
 
   let check_subtype cx ty0 ty1 =
@@ -211,8 +220,10 @@ let check_extension_cofibration cx xs cofib =
 
 let rec check cx ty tm =
   match V.unleash ty, T.unleash tm with
-  | V.Univ lvl0, T.Univ lvl1 ->
-    if Lvl.greater lvl0 lvl1 then () else
+  | V.Univ info0, T.Univ info1 ->
+    (* TODO: what about kinds? I think it's fine, since we learned from Andy Pitts how to make
+       the pretype universe Kan. But I may need to add those "ecom" fuckers, LOL. *)
+    if Lvl.greater info0.lvl info1.lvl then () else
       failwith "Predicativity violation"
 
   | V.Univ _, T.Pi (dom, B (nm, cod)) ->
@@ -504,7 +515,7 @@ and infer cx tm =
     check_ty cxx mot;
 
     let scrut_ty = infer cx info.scrut in
-    Cx.check_eq cx ~ty:(V.make @@ V.Univ Lvl.Omega) scrut_ty bool;
+    Cx.check_eq_ty cx scrut_ty bool;
     let scrut = Cx.eval cx info.scrut in
 
     let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(V.make V.Tt) in
@@ -532,7 +543,7 @@ and check_eval cx ty tm =
   Cx.eval cx tm
 
 and check_ty cx ty =
-  let univ = V.make @@ V.Univ Lvl.Omega in
+  let univ = V.make @@ V.Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
   check cx univ ty
 
 and check_eval_dim cx tr : Dim.repr =

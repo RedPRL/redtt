@@ -22,7 +22,7 @@ type _ f =
 
   | Up : inf t -> chk f
 
-  | Univ : Lvl.t -> chk f
+  | Univ : {kind : Kind.t; lvl : Lvl.t} -> chk f
   | Pi : chk t * chk t bnd -> chk f
   | Ext : (chk t * chk t system) nbnd -> chk f
   | Sg : chk t * chk t bnd -> chk f
@@ -236,7 +236,7 @@ let pi nm dom cod = make @@ Pi (dom, B (nm, cod))
 let sg nm dom cod = make @@ Sg (dom, B (nm, cod))
 let let_ nm t0 t1 = make @@ Let (t0, B (nm, t1))
 let cons t0 t1 = make @@ Cons (t0, t1)
-let univ lvl = make @@ Univ lvl
+let univ ~kind ~lvl = make @@ Univ {kind; lvl}
 let car t = make @@ Car t
 let cdr t = make @@ Cdr t
 
@@ -313,8 +313,8 @@ let rec pp : type a. a t Pretty.t =
     | Dim1 ->
       Format.fprintf fmt "1"
 
-    | Univ lvl ->
-      Format.fprintf fmt "(U %a)" Lvl.pp lvl
+    | Univ {kind; lvl} ->
+      Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
 
     | Coe {r; r'; ty = B (nm, ty); tm} ->
       let x, env' = Pretty.Env.bind nm env in
