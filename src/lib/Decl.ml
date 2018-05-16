@@ -46,9 +46,14 @@ and check_decl cx decl =
     let ppenv = Typing.Cx.ppenv cx in
     Format.fprintf
       Format.std_formatter
-      "@[<v 0>%s@, : @[%a@]@, = @[%a@]@,~> @[%a@]@]@,@."
+      "@[<v 0>%a@, : @[%a@]@, %a @[%a@]@, %a @[%a@]@]@,@."
+      (Uuseg_string.pp_utf_8)
       (decl_name decl)
       (Tm.pp ppenv) ty
+      (Uuseg_string.pp_utf_8)
+      "▷"
       (Tm.pp ppenv) tm
+      (Uuseg_string.pp_utf_8)
+      "↡"
       (Tm.pp ppenv) tm';
     Typing.Cx.def cx ~nm ~ty:vty ~el

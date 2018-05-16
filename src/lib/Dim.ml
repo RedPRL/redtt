@@ -120,7 +120,8 @@ let pp_repr fmt r =
   | Dim1 ->
     Format.fprintf fmt "1"
   | Atom x ->
-    Format.fprintf fmt "%s" @@ Symbol.to_string x
+    Uuseg_string.pp_utf_8 fmt @@
+    Symbol.to_string x
 
 let pp_repr_set fmt rs =
   let comma fmt () = Format.fprintf fmt ", " in

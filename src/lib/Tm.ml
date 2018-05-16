@@ -250,19 +250,20 @@ let rec pp : type a. a t Pretty.t =
   fun env fmt tm ->
     match unleash tm with
     | Var i ->
-      Format.fprintf fmt "%s" @@
-      Pretty.Env.var i env
+      Format.fprintf fmt "%a"
+        Uuseg_string.pp_utf_8
+        (Pretty.Env.var i env)
 
     | Down {ty; tm} ->
       Format.fprintf fmt "@[<1>(▷@ %a@ %a)@]" (pp env) ty (pp env) tm
 
     | Pi (dom, B (nm, cod)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(→ [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
+      Format.fprintf fmt "@[<1>(→ [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
 
     | Sg (dom, B (nm, cod)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(× [%s : %a]@ %a)@]" x (pp env) dom (pp env') cod
+      Format.fprintf fmt "@[<1>(× [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
 
     | Ext (NB (nms, (cod, sys))) ->
       let xs, env' = Pretty.Env.bindn nms env in
@@ -289,7 +290,7 @@ let rec pp : type a. a t Pretty.t =
 
     | Lam (B (nm, tm)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(λ [%s]@ %a)@]" x (pp env') tm
+      Format.fprintf fmt "@[<1>(λ [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') tm
 
     | ExtLam (NB (nms, tm)) ->
       let xs, env' = Pretty.Env.bindn nms env in
@@ -334,7 +335,7 @@ let rec pp : type a. a t Pretty.t =
 
     | Coe {r; r'; ty = B (nm, ty); tm} ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(coe %a %a@ [%s] %a@ %a)@]" (pp env) r (pp env) r' x (pp env') ty (pp env) tm
+      Format.fprintf fmt "@[<1>(coe %a %a@ [%a] %a@ %a)@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) tm
 
     | HCom {r; r'; ty; cap; sys} ->
       Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
@@ -344,18 +345,18 @@ let rec pp : type a. a t Pretty.t =
 
     | Com {r; r'; ty = B (nm, ty); cap; sys} ->
       let x, _env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(com %a %a@ [%s] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' x (pp env) ty (pp env) cap (pp_bsys env) sys
+      Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env) ty (pp env) cap (pp_bsys env) sys
 
     | If {mot = B (nm, mot); scrut; tcase; fcase} ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(if@ [%s] %a@ %a %a %a)@]" x (pp env') mot (pp env) scrut (pp env) tcase (pp env) fcase
+      Format.fprintf fmt "@[<1>(if@ [%a] %a@ %a %a %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot (pp env) scrut (pp env) tcase (pp env) fcase
 
     | Cons (tm0, tm1) ->
       Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
 
     | Let (tm0, B (nm, tm1)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(let@ @[<1>[%s %a]@] %a)@]" x (pp env) tm0 (pp env') tm1
+      Format.fprintf fmt "@[<1>(let@ @[<1>[%a %a]@] %a)@]" Uuseg_string.pp_utf_8 x (pp env) tm0 (pp env') tm1
 
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -363,8 +364,7 @@ and pp_terms env fmt ts =
 
 and pp_strings fmt (xs : string list) : unit =
   let pp_sep fmt () = Format.fprintf fmt " " in
-  let pp_string fmt str = Format.fprintf fmt "%s" str in
-  Format.pp_print_list ~pp_sep pp_string fmt xs
+  Format.pp_print_list ~pp_sep Uuseg_string.pp_utf_8 fmt xs
 
 and pp_sys env fmt sys =
   match sys with
@@ -405,7 +405,7 @@ and pp_bface env fmt face =
 
   | Some (B (nm, tm)) ->
     let x, env' = Pretty.Env.bind nm env in
-    Format.fprintf fmt "@[<1>[%a=%a@ <%s> %a]@]" (pp env) r (pp env) r' x (pp env') tm
+    Format.fprintf fmt "@[<1>[%a=%a@ <%a> %a]@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') tm
 
 module Macro =
 struct

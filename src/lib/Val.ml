@@ -1153,11 +1153,11 @@ let rec pp_value fmt value =
 
 and pp_abs fmt abs =
   let x, v = Abs.unleash1 abs in
-  Format.fprintf fmt "@[<1><%s>@ %a@]" (Symbol.to_string x) pp_value v
+  Format.fprintf fmt "@[<1><%a>@ %a@]" Uuseg_string.pp_utf_8 (Symbol.to_string x) pp_value v
 
 and pp_ext_abs fmt abs =
   let x, (tyx, sysx) = ExtAbs.unleash1 abs in
-  Format.fprintf fmt "@[<1><%s>@ %a@ %a@]" (Symbol.to_string x) pp_value tyx pp_val_sys sysx
+  Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" Uuseg_string.pp_utf_8 (Symbol.to_string x) pp_value tyx pp_val_sys sysx
 
 and pp_val_sys fmt sys =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -1183,7 +1183,7 @@ and pp_neu fmt neu =
     Format.fprintf fmt "#%i" i
 
   | Lvl (Some x, _) ->
-    Format.fprintf fmt "%s" x
+    Uuseg_string.pp_utf_8 fmt x
 
   | FunApp (neu, arg) ->
     Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
