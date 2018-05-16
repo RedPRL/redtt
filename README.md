@@ -22,7 +22,7 @@ end up using one of these for the lexer at one point.
 | prerequisite |      | version                                                                | how to install                  |
 | ------------ | ---- | :--------------------------------------------------------------------- | ------------------------------- |
 | Opam         | `>=` | [`1.2.2`](https://github.com/ocaml/opam/releases/tag/1.2.2)            | manually or via package manager |
-| OCaml        | `>=` | [`4.06.1`](https://github.com/ocaml/ocaml/releases/tag/4.06.1) | `opam switch 4.06.1`    |
+| OCaml        | `>=` | [`4.06.1`](https://github.com/ocaml/ocaml/releases/tag/4.06.1)         | `opam switch 4.06.1`            |
 | utop         | `>=` | [`2.0.2`](https://github.com/diml/utop/releases/tag/2.0.2)             | `opam install utop` (optional)  |
 
 ### Other recommended packages
