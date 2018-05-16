@@ -255,15 +255,15 @@ let rec pp : type a. a t Pretty.t =
         (Pretty.Env.var i env)
 
     | Down {ty; tm} ->
-      Format.fprintf fmt "@[<1>(▷@ %a@ %a)@]" (pp env) ty (pp env) tm
+      Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
 
     | Pi (dom, B (nm, cod)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(→ [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
+      Format.fprintf fmt "@[<1>(%a [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 "→" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
 
     | Sg (dom, B (nm, cod)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(× [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
+      Format.fprintf fmt "@[<1>(%a [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 "×" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
 
     | Ext (NB (nms, (cod, sys))) ->
       let xs, env' = Pretty.Env.bindn nms env in
