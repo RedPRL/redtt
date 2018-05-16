@@ -31,11 +31,13 @@ module Make (R : SOURCE) : LEXER = struct
       ("com", COM);
       ("cons", CONS);
       ("define", DEFINE);
-      ("ff", FF);
       ("hcom", HCOM);
       ("if", IF);
       ("lam", LAM);
       ("tt", TT);
+      ("ff", FF);
+      ("pre", PRE);
+      ("kan", KAN);
       ("U", UNIV);
     ]
 }

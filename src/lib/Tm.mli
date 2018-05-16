@@ -32,9 +32,10 @@ type _ f =
 
   | Up : inf t -> chk f
 
-  | Univ : Lvl.t -> chk f
+  | Univ : {kind : Kind.t; lvl : Lvl.t} -> chk f
   | Pi : chk t * chk t bnd -> chk f
   | Ext : (chk t * chk t system) nbnd -> chk f
+  | Rst : {ty : chk t; sys : chk t system} -> chk f
   | Sg : chk t * chk t bnd -> chk f
 
   | V : {r : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> chk f
@@ -81,7 +82,7 @@ val pi : string option -> chk t -> chk t -> chk t
 val sg : string option -> chk t -> chk t -> chk t
 val let_ : string option -> inf t -> chk t -> chk t
 val cons : chk t -> chk t -> chk t
-val univ : Lvl.t -> chk t
+val univ : kind:Kind.t -> lvl:Lvl.t -> chk t
 val car : inf t -> inf t
 val cdr : inf t -> inf t
 

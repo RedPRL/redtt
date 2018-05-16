@@ -85,9 +85,9 @@ let rec equate env ty el0 el1 =
 
   | _ ->
     match unleash el0, unleash el1 with
-    | Univ lvl0, Univ lvl1 ->
-      if lvl0 = lvl1 then
-        Tm.univ lvl0
+    | Univ info0, Univ info1 ->
+      if info0.kind = info1.kind && info0.lvl = info1.lvl then
+        Tm.univ ~kind:info0.kind ~lvl:info0.lvl
       else
         failwith "Expected equal universe levels"
 
@@ -124,6 +124,11 @@ let rec equate env ty el0 el1 =
       let sysx = equate_val_sys envx ty0x sys0x sys1x in
       Tm.make @@ Tm.Ext (Tm.NB (List.map (fun _ -> None) xs, (tyx, sysx)))
 
+    | Rst info0, Rst info1 ->
+      let ty = equate env ty info0.ty info1.ty in
+      let sys = equate_val_sys env info0.ty info0.sys info1.sys in
+      Tm.make @@ Tm.Rst {ty; sys}
+
     | Up up0, Up up1 ->
       Tm.up @@ equate_neu env up0.neu up1.neu
 
@@ -142,7 +147,7 @@ let rec equate env ty el0 el1 =
 
     | Coe coe0, Coe coe1 ->
       let tr, tr' = equate_star env coe0.dir coe1.dir in
-      let univ = make @@ Univ Lvl.Omega in
+      let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
       let bnd = equate_val_abs env univ coe0.abs coe1.abs in
       let tyr =
         let r, _ = DimStar.unleash coe0.dir in
@@ -152,7 +157,6 @@ let rec equate env ty el0 el1 =
       Tm.up @@ Tm.make @@ Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}
 
     | _ ->
-      Format.printf "Quote.equate: %a /= %a@." pp_value el0 pp_value el1;
       failwith "equate"
 
 and equate_neu env neu0 neu1 =
@@ -209,7 +213,7 @@ and equate_neu env neu0 neu1 =
     failwith "equate_neu"
 
 and equate_ty env ty0 ty1 : Tm.chk Tm.t =
-  let univ = make @@ Univ Lvl.Omega in
+  let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
   equate env univ ty0 ty1
 
 
@@ -302,6 +306,9 @@ and quote_dim env r =
 let equiv env ~ty el0 el1 =
   ignore @@ equate env ty el0 el1
 
+let equiv_ty env ty0 ty1 =
+  ignore @@ equate_ty env ty0 ty1
+
 let quote_nf env nf =
   equate env nf.ty nf.el nf.el
 
@@ -331,12 +338,60 @@ let rec subtype env ty0 ty1 =
     subtype envx ty0x ty1x;
     ignore @@ equate_val_sys envx ty0x sys0x sys1x
 
-  | Univ lvl0, Univ lvl1 ->
-    if lvl0 = lvl1 or Lvl.greater lvl1 lvl0 then
+  | Univ info0, Univ info1 ->
+    if (info0.kind = info1.kind or Kind.stronger info0.kind info1.kind) && (info0.lvl = info1.lvl or Lvl.greater info1.lvl info0.lvl) then
       ()
     else
-      failwith "Universe level too big"
+      failwith "Universe subtyping error"
 
+
+  (* The following code is kind of complicated. What it does is the following:
+     1. First, turn both sides into a restriction type somehow.
+     2. Then, using a generic element, check that the restriction of the lhs implies the restriction of the rhs.
+  *)
+  | Rst rst0, con1 ->
+    let ty0, sys0 = rst0.ty, rst0.sys in
+    let ty1, sys1 =
+      match con1 with
+      | Rst rst1 -> rst1.ty, rst1.sys
+      | _ -> ty1, []
+    in
+    subtype env ty0 ty1;
+    approx_restriction env ty0 ty1 sys0 sys1
   | _ ->
-    let univ = make @@ Univ Lvl.Omega in
-    equiv env univ ty0 ty1
+    equiv_ty env ty0 ty1
+
+and approx_restriction env ty0 ty1 sys0 sys1 =
+  let gen = generic env ty0 in
+  let check_face ty face =
+    match face with
+    | Face.True (_, _, v) ->
+      begin try equiv env ~ty gen v; true with _ -> false end
+    | Face.False _ ->
+      true
+    | Face.Indet (p, v) ->
+      let r, r' = DimStar.unleash p in
+      let gen_rr' = Val.act (Dim.equate r r') gen in
+      let ty_rr' = Val.act (Dim.equate r r') ty in
+      begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end
+  in
+
+  let exception Break in
+  let n0 = List.length sys0 in
+  let n1 = List.length sys0 in
+  begin
+    try
+      for i = 0 to n0 - 1 do
+        let cond_i = check_face ty0 @@ List.nth sys0 i in
+        if cond_i then
+          for j = 0 to n1 - 1 do
+            let cond_j = check_face ty1 @@ List.nth sys1 j in
+            if cond_j then () else raise Break
+          done
+        else
+          ()
+      done
+    with
+    | Break ->
+      failwith "restriction subtyping"
+  end

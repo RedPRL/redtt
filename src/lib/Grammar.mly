@@ -12,6 +12,7 @@
 %token RIGHT_ARROW
 %token AST TIMES HASH AT
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE
+%token PRE KAN
 %token EOF
 
 %start <ResEnv.t -> Decl.t list> prog
@@ -88,6 +89,13 @@ constrained:
     { fun env ->
       ty env, sys env }
 
+kind:
+  | KAN
+    { Kind.Kan }
+  | PRE
+    { Kind.Pre }
+  | { Kind.Kan }
+
 chk:
   | BOOL
     { fun _env ->
@@ -105,10 +113,10 @@ chk:
     { fun _env ->
       make_dim_const $startpos $endpos i }
 
-  | LPR; UNIV; i = NUMERAL; RPR
+  | LPR; UNIV; k = kind; i = NUMERAL; RPR
     { fun _env ->
       make_node $startpos $endpos @@
-      Tm.Univ (Lvl.Const i) }
+      Tm.Univ {kind = k; lvl = Lvl.Const i} }
 
   | LPR; RIGHT_ARROW; tele = tele; RPR
     { fun env ->
@@ -125,6 +133,12 @@ chk:
   | LPR; HASH; mb = multibind(constrained); RPR
     { fun env ->
       ext_from_multibind $startpos $endpos @@ mb env }
+
+  | LPR; rst = constrained; RPR
+    { fun env ->
+      let ty, sys = rst env in
+      make_node $startpos $endpos @@
+      Tm.Rst {ty; sys}}
 
   | LPR; LAM; mb = multibind(chk); RPR
     { fun env ->
