@@ -152,7 +152,6 @@ let rec equate env ty el0 el1 =
       Tm.up @@ Tm.make @@ Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}
 
     | _ ->
-      Format.printf "Quote.equate: %a /= %a@." pp_value el0 pp_value el1;
       failwith "equate"
 
 and equate_neu env neu0 neu1 =
@@ -373,10 +372,10 @@ let rec subtype env ty0 ty1 =
     let n1 = List.length sys0 in
     begin
       try
-        for i = 0 to n0 do
+        for i = 0 to n0 - 1 do
           let cond_i = check_face ty0 @@ List.nth sys0 i in
           if cond_i then
-            for j = 0 to n1 do
+            for j = 0 to n1 - 1 do
               let cond_j = check_face ty1 @@ List.nth sys1 j in
               if cond_j then () else raise Break
             done

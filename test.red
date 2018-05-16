@@ -65,3 +65,8 @@
  (singleton bool tt)
  ▷
  tt)
+
+(define some-test
+ (bool [1=1 tt])
+ ▷
+ restriction-test)
