@@ -25,6 +25,7 @@ type _ f =
   | Univ : {kind : Kind.t; lvl : Lvl.t} -> chk f
   | Pi : chk t * chk t bnd -> chk f
   | Ext : (chk t * chk t system) nbnd -> chk f
+  | Rst : {ty : chk t; sys : chk t system} -> chk f
   | Sg : chk t * chk t bnd -> chk f
 
   | V : {r : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> chk f
@@ -157,6 +158,11 @@ let rec substf : type x. subst -> x f -> x f =
         let sub' = liftn (List.length nms) sub in
         Ext (NB (nms, (subst sub' cod, subst_ext_sys sub' sys)))
 
+      | Rst info ->
+        let ty = subst sub info.ty in
+        let sys = subst_ext_sys sub info.sys in
+        Rst {ty; sys}
+
       | V info ->
         let r = subst sub info.r in
         let ty0 = subst sub info.ty0 in
@@ -266,6 +272,16 @@ let rec pp : type a. a t Pretty.t =
           Format.fprintf fmt "@[<1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
         | _ ->
           Format.fprintf fmt "@[<1>(# <%a>@ %a@ @[%a@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
+      end
+
+
+    | Rst {ty; sys}  ->
+      begin
+        match sys with
+        | [] ->
+          Format.fprintf fmt "%a" (pp env) ty
+        | _ ->
+          Format.fprintf fmt "@[<1>(%a@ @[%a@])@]" (pp env) ty (pp_sys env) sys
       end
 
     | V info ->

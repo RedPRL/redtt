@@ -243,7 +243,12 @@ let rec check cx ty tm =
       check_extension_cofibration cx xs @@ cofibration_of_sys cxx sys
     else
       ();
-    check_ext_sys cxx vcod sys
+    check_ext_sys univ.kind cxx vcod sys
+
+  | V.Univ univ, T.Rst info ->
+    if univ.kind = Kind.Pre then () else failwith "Restriction type is not Kan";
+    let ty = check_eval cx ty info.ty in
+    check_ext_sys univ.kind cx ty info.sys
 
   | V.Univ _, T.V info ->
     check_dim cx info.r;
@@ -268,6 +273,10 @@ let rec check cx ty tm =
     let cxx, xs = Cx.ext_dims cx ~nms in
     let codx, sysx = V.ExtAbs.inst ext_abs @@ List.map Dim.named xs in
     check_boundary cxx codx sysx tm
+
+  | V.Rst {ty; sys}, _ ->
+    check cx ty tm;
+    check_boundary cx ty sys tm
 
   | V.Univ _, T.FCom info ->
     check_fcom cx ty info.r info.r' info.cap info.sys
@@ -333,7 +342,7 @@ and check_boundary_face cx ty face tm =
     Cx.check_eq cx' ~ty:(V.Val.act phi ty) el @@
     Cx.eval cx' tm
 
-and check_ext_sys cx ty sys =
+and check_ext_sys kind cx ty sys =
   let rec go sys acc =
     match sys with
     | [] ->
@@ -353,9 +362,12 @@ and check_ext_sys cx ty sys =
               let cx' = Cx.restrict cx r0 r1 in
               check cx' (V.Val.act phi ty) tm;
 
-              (* Check face-face adjacency conditions *)
-              go_adj cx' acc (r0, r1, tm);
-            with R.Inconsistent -> ()
+              if kind = Kind.Kan then
+                (* Check face-face adjacency conditions *)
+                go_adj cx' acc (r0, r1, tm)
+              else ()
+            with
+            | R.Inconsistent -> ()
           end;
           go sys @@ (r0, r1, tm) :: acc
 

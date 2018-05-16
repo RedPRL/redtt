@@ -19,6 +19,7 @@ type ('x, 'a) face = ('x, 'a) Face.face
 type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con
+  | Rst : {ty : value; sys : ext_sys} -> con
   | Ext : ext_abs -> con
 
   | Coe : {dir : star; abs : abs; el : value} -> con

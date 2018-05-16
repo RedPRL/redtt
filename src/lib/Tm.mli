@@ -35,6 +35,7 @@ type _ f =
   | Univ : {kind : Kind.t; lvl : Lvl.t} -> chk f
   | Pi : chk t * chk t bnd -> chk f
   | Ext : (chk t * chk t system) nbnd -> chk f
+  | Rst : {ty : chk t; sys : chk t system} -> chk f
   | Sg : chk t * chk t bnd -> chk f
 
   | V : {r : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> chk f

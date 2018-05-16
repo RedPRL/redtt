@@ -52,3 +52,16 @@
   (hcom 0 1 A (@ p i)
    [i=0 <_> (@ p 0)]
    [i=1 <j> (@ q j)])))
+
+
+(define singleton
+ [A : (U 0)]
+ [M : A]
+ (U pre 0)
+ ▷
+ (A [0=0 M]))
+
+(define restriction-test
+ (singleton bool tt)
+ ▷
+ tt)

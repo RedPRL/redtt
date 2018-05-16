@@ -340,5 +340,53 @@ let rec subtype env ty0 ty1 =
     else
       failwith "Universe subtyping error"
 
+
+  (* The following code is kind of complicated. What it does is the following:
+     1. First, turn both sides into a restriction type somehow.
+     2. Then, using a generic element, check that the restriction of the lhs implies the restriction of the rhs.
+  *)
+  | Rst rst0, con1 ->
+    let ty0, sys0 = rst0.ty, rst0.sys in
+    let ty1, sys1 =
+      match con1 with
+      | Rst rst1 -> rst1.ty, rst1.sys
+      | _ -> ty1, []
+    in
+    subtype env ty0 ty1;
+
+    let gen = generic env ty0 in
+    let check_face ty face =
+      match face with
+      | Face.True (_, _, v) ->
+        begin try equiv env ~ty gen v; true with _ -> false end
+      | Face.False _ ->
+        true
+      | Face.Indet (p, v) ->
+        let r, r' = DimStar.unleash p in
+        let gen_rr' = Val.act (Dim.equate r r') gen in
+        let ty_rr' = Val.act (Dim.equate r r') ty in
+        begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end
+    in
+
+    let exception Break in
+    let n0 = List.length sys0 in
+    let n1 = List.length sys0 in
+    begin
+      try
+        for i = 0 to n0 do
+          let cond_i = check_face ty0 @@ List.nth sys0 i in
+          if cond_i then
+            for j = 0 to n1 do
+              let cond_j = check_face ty1 @@ List.nth sys1 j in
+              if cond_j then () else raise Break
+            done
+          else
+            ()
+        done
+      with
+      | Break ->
+        failwith "restriction subtyping"
+    end
+
   | _ ->
     equiv_ty env ty0 ty1

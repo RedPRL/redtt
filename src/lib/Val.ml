@@ -18,6 +18,7 @@ type rel = R.t
 type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con
+  | Rst : {ty : value; sys : ext_sys} -> con
   | Ext : ext_abs -> con
 
   | Coe : {dir : star; abs : abs; el : value} -> con
@@ -95,10 +96,6 @@ struct
       let Node node = !thunk in
       ref @@ Node {node with action = D.cmp phi node.action}
 end
-
-let make : con -> value =
-  fun con ->
-    ref @@ Node {con; action = D.idn}
 
 
 module Abs = Abstraction.M (Val)
@@ -197,7 +194,26 @@ let eval_dim_class : type x. rel -> env -> x Tm.t -> D.t =
   fun rel rho tm ->
     R.unleash (eval_dim rel rho tm) rel
 
-let rec act_can phi con =
+
+let rec make : con -> value =
+  fun con ->
+    match con with
+    | Up up ->
+      begin
+        match unleash up.ty with
+        | Rst info ->
+          begin
+            match force_ext_sys info.sys with
+            | `Proj el -> el
+            | `Rigid _ -> ref @@ Node {con; action = D.idn}
+          end
+        | _ ->
+          ref @@ Node {con; action = D.idn}
+      end
+    | _ ->
+      ref @@ Node {con; action = D.idn}
+
+and act_can phi con =
   match con with
   | Pi info ->
     let dom = Val.act phi info.dom in
@@ -212,6 +228,11 @@ let rec act_can phi con =
   | Ext abs ->
     let abs' = ExtAbs.act phi abs in
     make @@ Ext abs'
+
+  | Rst info ->
+    let ty = Val.act phi info.ty in
+    let sys = ExtSys.act phi info.sys in
+    make @@ Rst {ty; sys}
 
   | Coe info ->
     make_coe
@@ -622,6 +643,11 @@ and eval : type x. rel -> env -> x Tm.t -> value =
     | Tm.Ext bnd ->
       let abs = eval_ext_bnd rel rho bnd in
       make @@ Ext abs
+
+    | Tm.Rst info ->
+      let ty = eval rel rho info.ty in
+      let sys = eval_ext_sys rel rho info.sys in
+      make @@ Rst {ty; sys}
 
     | Tm.V info ->
       let r = eval_dim_class rel rho info.r in
@@ -1108,6 +1134,8 @@ let rec pp_value fmt value =
     Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
   | Ext abs ->
     Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
+  | Rst {ty; sys} ->
+    Format.fprintf fmt "@[<1>(#@ %a %a)@]" pp_value ty pp_val_sys sys
   | Univ {kind; lvl} ->
     Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
   | Cons (v0, v1) ->
