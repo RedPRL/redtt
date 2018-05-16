@@ -20,7 +20,7 @@ type mcx = cell MCx.t
 let map_boundary f sys =
   List.map (fun (r, r', otm) -> f r, f r', Option.map f otm) sys
 
-(*
+
 let rec check mcx cx ty (sys : boundary) dev =
   match Tm.unleash ty, dev with
   | Tm.Pi (dom, Tm.B (_, cod)), Lam {nm; bdy} ->
@@ -41,10 +41,19 @@ let rec check mcx cx ty (sys : boundary) dev =
     in
     check_meta mcx cxx cod sys' bdy
 
-  | Tm.Ext (Tm.B (_, (cod, sys'))), Lam {nm; bdy} ->
+  | Tm.Ext (Tm.NB ([], (cod, sys'))), _ ->
+    let sys'' = sys' @ sys in
+    check mcx cx cod sys'' dev
+
+  | Tm.Ext (Tm.NB (_ :: nms, (cod, sys'))), Lam {nm; bdy} ->
     let cxx, _ = Cx.ext_dim cx ~nm in
-    let sys'' = map_boundary (Tm.subst Tm.Proj) sys @ sys' in
-    check_meta mcx cxx cod sys'' bdy
+    let sys'' = map_boundary (Tm.subst Proj) sys in
+    let ext = Tm.make @@ Tm.Ext (Tm.NB (nms, (cod, sys'))) in
+    check_meta mcx cxx ext sys'' bdy
+
+  | Tm.Rst rst, _ ->
+    let sys' = rst.sys @ sys in
+    check mcx cx rst.ty sys' dev
 
   | _, Guess {guess; bdy} ->
     let cell = MCx.find guess mcx in
@@ -56,7 +65,7 @@ let rec check mcx cx ty (sys : boundary) dev =
   | _, Let {soln; bdy} ->
     let ty' = Typing.infer cx soln in
     let el = Cx.eval cx soln in
-    let cxx = Cx.ext_el cx ~nm:None ~ty:ty' ~el in
+    let cxx = Cx.def cx ~nm:None ~ty:ty' ~el in
     let sys' = map_boundary (Tm.subst @@ Tm.Sub (Tm.Id, soln)) sys in
     check_meta mcx cxx ty sys' bdy
 
@@ -65,8 +74,9 @@ let rec check mcx cx ty (sys : boundary) dev =
 
   | _, Ret t ->
     let vty = Cx.eval cx ty in
-    Typing.check cx vty t
-  (* TODO: check boundary *)
+    Typing.check cx vty t;
+    let sys = Typing.Cx.eval_ext_sys cx sys in
+    Typing.check_boundary cx vty sys t
 
   | _ -> failwith ""
 
@@ -76,4 +86,3 @@ and check_meta mcx cx ty sys alpha =
   let vty' = Cx.eval cx cell.ty in
   Cx.check_subtype cx vty' vty;
   check mcx cx ty sys cell.hole
- *)

@@ -7,10 +7,13 @@ sig
   val emp : t
 
   val ext_ty : t -> nm:string option -> value -> t * value
-  val def : t -> nm:string option -> ty:value -> el:value -> t
   val ext_dim : t -> nm:string option -> t * Val.atom
+  val ext_dims : t -> nms:string option list -> t * Val.atom list
+
+  val def : t -> nm:string option -> ty:value -> el:value -> t
 
   val eval : t -> 'a Tm.t -> value
+  val eval_ext_sys : t -> Tm.chk Tm.t Tm.system -> Val.ext_sys
 
   val ppenv : t -> Pretty.env
 
@@ -25,3 +28,5 @@ type cx = Cx.t
 
 val check : cx -> Val.value -> Tm.chk Tm.t -> unit
 val infer : cx -> Tm.inf Tm.t -> value
+
+val check_boundary : cx -> Val.value -> Val.ext_sys -> Tm.chk Tm.t -> unit

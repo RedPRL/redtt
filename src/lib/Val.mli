@@ -73,6 +73,7 @@ val unleash : value -> con
 
 val eval : rel -> env -> 'a Tm.t -> value
 val eval_dim : rel -> env -> 'a Tm.t -> Dim.repr
+val eval_ext_sys : rel -> env -> Tm.chk Tm.t Tm.system -> ext_sys
 
 val apply : value -> value -> value
 val ext_apply : value -> dim list -> value
