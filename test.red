@@ -1,6 +1,9 @@
 (define Path [A : (U 0)] [M : A] [N : A] (U 0) ▷
  (# <i> A [i=0 M] [i=1 N]))
 
+(define PathP [A : (# <i> (U 0))] [M : (@ A 0)] [N : (@ A 1)] (U 0) ▷
+ (# <i> (@ A i) [i=0 M] [i=1 N]))
+
 (define funext
  [A : (U 0)]
  [B : (→ A (U 0))]
@@ -77,3 +80,17 @@
  ▷
  M)
 
+(define connection/and
+ [A : (U 0)]
+ [a : A]
+ [b : A]
+ [p : (Path A a b)]
+ (PathP (λ <i> (Path A a (@ p i))) (λ <_> a) p)
+ ▷
+ (λ <i> <j>
+  (hcom 0 1 A a
+   [i=0 <k> (hcom 1 0 A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])]
+   [i=1 <k> (hcom 1 j A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])]
+   [j=0 <k> (hcom 1 0 A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])]
+   [j=1 <k> (hcom 1 i A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])]
+   [i=j <k> (hcom 1 i A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])])))
