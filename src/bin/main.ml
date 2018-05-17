@@ -1,12 +1,12 @@
 open Cmdliner
-open Cubical
+open RedTT
 
 type command = unit Lwt.t Term.t * Term.info
 
 let cmd_default =
   Term.
     ( ret @@ pure @@ `Help ( `Pager, None )
-    , info "cubical" ~version:"0.1.0"
+    , info "redtt" ~version:"0.1.0"
     )
 
 let cmd_help =
@@ -19,10 +19,10 @@ let cmd_help =
 let cmd_load_file =
   let doc = "load file" in
   let file_name = Arg.
-    ( required
-    & pos ~rev:true 0 (some string) None
-    & info [] ~doc ~docv:"FILE"
-    ) in
+                    ( required
+                      & pos ~rev:true 0 (some string) None
+                      & info [] ~doc ~docv:"FILE"
+                    ) in
   Term.
     ( pure Frontend.load_file $ file_name
     , info "load-file" ~doc

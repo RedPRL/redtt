@@ -16,10 +16,10 @@ doc:
 	@${DUNE} build @doc
 
 help:
-	@${DUNE} exec -- cubical help
+	@${DUNE} exec -- redtt help
 
 examples:
-	@${DUNE} exec -- cubical load-file test.red
+	@${DUNE} exec -- redtt load-file test.red
 
 test:
 	@${DUNE} build @runtest

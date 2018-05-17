@@ -2,8 +2,8 @@
 
 (executables
  ((names (main))
-  (libraries (cmdliner lwt.unix cubical))))
+  (libraries (cmdliner lwt.unix redtt))))
 
 (install
  ((section bin)
-  (files ((main.exe as cubical)))))
+  (files ((main.exe as redtt)))))
