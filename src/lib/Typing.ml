@@ -433,10 +433,10 @@ and check_comp_sys cx r (cxx, x, tyx) cap sys =
 
               (* check that tm<r/x> = cap under r0=r1 *)
               let cxr0r1 = Cx.restrict cx r0 r1 in
-              let phirx = Dim.subst (Dim.singleton r) x in
+              let phirx = Dim.cmp phir0r1 @@ Dim.subst (Dim.singleton r) x in
               Cx.check_eq cxr0r1 ~ty:(V.Val.act phirx tyx) (V.Val.act phir0r1 cap) (V.Val.act phirx cap);
               (* Check face-face adjacency conditions *)
-              go_adj cxxr0r1 acc (r0, r1, bnd);
+              go_adj cxxr0r1 acc (r0, r1, bnd)
             with
               R.Inconsistent -> ()
           end;
