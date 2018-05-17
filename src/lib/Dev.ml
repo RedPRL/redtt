@@ -43,8 +43,14 @@ struct
 
   type state = {seq : seq; dev : dev; stk: stack}
   type 'a m = state -> 'a * state
-  let ret _ = failwith ""
-  let bind _ _ = failwith ""
+  let ret a =
+    fun st ->
+      a, st
+
+  let bind m k =
+    fun st ->
+      let a, st' = m st in
+      k a st'
 
 
   let goal : seq m =
