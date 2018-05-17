@@ -128,7 +128,7 @@ struct
       Q.equiv cx.qenv ~ty el0 el1
     with
     | exn ->
-      Format.printf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1;
+      Format.eprintf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1;
       raise exn
 
   let check_eq_ty cx el0 el1 =
@@ -136,7 +136,7 @@ struct
       Q.equiv_ty cx.qenv el0 el1
     with
     | exn ->
-      Format.printf "check_eq_ty: %a /= %a@." V.pp_value el0 V.pp_value el1;
+      Format.eprintf "check_eq_ty: %a /= %a@." V.pp_value el0 V.pp_value el1;
       raise exn
 
   let check_subtype cx ty0 ty1 =
@@ -144,7 +144,7 @@ struct
       Q.subtype cx.qenv ty0 ty1
     with
     | exn ->
-      Format.printf "subtype: %a /<= %a@." V.pp_value ty0 V.pp_value ty1;
+      Format.eprintf "subtype: %a /<= %a@." V.pp_value ty0 V.pp_value ty1;
       raise exn
 end
 
