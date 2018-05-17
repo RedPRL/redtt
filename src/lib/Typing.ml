@@ -440,6 +440,7 @@ and check_comp_sys cx r (cxx, x, tyx) cap sys =
               let cxr0r1 = Cx.restrict cx r0 r1 in
               let phirx = Dim.cmp phir0r1 @@ Dim.subst (Dim.singleton r) x in
               Cx.check_eq cxr0r1 ~ty:(V.Val.act phirx tyx) (V.Val.act phir0r1 cap) (V.Val.act phirx cap);
+
               (* Check face-face adjacency conditions *)
               go_adj cxxr0r1 acc (r0, r1, bnd)
             with
@@ -470,7 +471,7 @@ and check_comp_sys cx r (cxx, x, tyx) cap sys =
         with
         | R.Inconsistent -> ()
       end;
-      go_adj cx faces face
+      go_adj cxx faces face
 
   in go sys []
 
