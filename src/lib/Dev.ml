@@ -20,15 +20,19 @@ module M :
 sig
   include Monad.S
 
+  type seq = {cx : Typing.cx; ty : V.value}
+
   val up : unit m
   val down : unit m
   val right : unit m
   val left : unit m
-
   val solve : unit m
+
+  val goal : seq m
 end =
 struct
   type seq = {cx : Typing.cx; ty : V.value}
+
   type frame =
     | KGuessL of {ty : ty; seq : seq; body : dev}
     | KGuessR of {ty : ty; seq : seq; guess : dev}
@@ -42,6 +46,10 @@ struct
   let ret _ = failwith ""
   let bind _ _ = failwith ""
 
+
+  let goal : seq m =
+    fun {dev; stk; seq} ->
+      seq, {dev; stk; seq}
 
   let up : unit m =
     fun {dev; stk; _} ->
