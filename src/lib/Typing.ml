@@ -18,7 +18,7 @@ sig
 
   val eval : t -> 'a T.t -> V.value
   val eval_dim : t -> T.chk T.t -> Dim.repr
-  val eval_ext_sys : t -> Tm.chk Tm.t Tm.system -> Val.ext_sys
+  val eval_tm_sys : t -> Tm.chk Tm.t Tm.system -> Val.val_sys
 
   val ppenv : t -> Pretty.env
 
@@ -90,8 +90,8 @@ struct
   let eval_dim {env; rel; _} tm =
     V.eval_dim rel env tm
 
-  let eval_ext_sys {env; rel; _} sys =
-    V.eval_ext_sys rel env sys
+  let eval_tm_sys {env; rel; _} sys =
+    V.eval_tm_sys rel env sys
 
   let lookup i {tys; _} =
     List.nth tys i

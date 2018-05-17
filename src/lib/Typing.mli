@@ -13,7 +13,7 @@ sig
   val def : t -> nm:string option -> ty:value -> el:value -> t
 
   val eval : t -> 'a Tm.t -> value
-  val eval_ext_sys : t -> Tm.chk Tm.t Tm.system -> Val.ext_sys
+  val eval_tm_sys : t -> Tm.chk Tm.t Tm.system -> Val.val_sys
 
   val ppenv : t -> Pretty.env
 
@@ -29,4 +29,4 @@ type cx = Cx.t
 val check : cx -> Val.value -> Tm.chk Tm.t -> unit
 val infer : cx -> Tm.inf Tm.t -> value
 
-val check_boundary : cx -> Val.value -> Val.ext_sys -> Tm.chk Tm.t -> unit
+val check_boundary : cx -> Val.value -> Val.val_sys -> Tm.chk Tm.t -> unit

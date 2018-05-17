@@ -18,7 +18,7 @@ type rel = R.t
 type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con
-  | Rst : {ty : value; sys : ext_sys} -> con
+  | Rst : {ty : value; sys : val_sys} -> con
   | Ext : ext_abs -> con
 
   | Coe : {dir : star; abs : abs; el : value} -> con
@@ -41,7 +41,7 @@ type con =
 and neu =
   | Lvl : string option * int -> neu
   | FunApp : neu * nf -> neu
-  | ExtApp : neu * ext_sys * dim list -> neu
+  | ExtApp : neu * val_sys * dim list -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
 
@@ -62,13 +62,13 @@ and env_el = Val of value | Atom of atom
 and env = env_el list
 
 and abs = value Abstraction.abs
-and ext_abs = (value * ext_sys) Abstraction.abs
+and ext_abs = (value * val_sys) Abstraction.abs
 and rigid_abs_face = ([`Rigid], abs) face
 and val_face = ([`Any], value) face
 and rigid_val_face = ([`Rigid], value) face
 
 and comp_sys = rigid_abs_face list
-and ext_sys = val_face list
+and val_sys = val_face list
 and box_sys = rigid_val_face list
 and cap_sys = rigid_abs_face list
 
@@ -147,22 +147,22 @@ struct
       `Proj abs
 end
 
-module ExtSys :
+module ValSys :
 sig
   include Sort
-    with type t = ext_sys
+    with type t = val_sys
     with type 'a m = 'a
 end =
 struct
-  type t = ext_sys
+  type t = val_sys
   type 'a m = 'a
 
   let act phi =
     List.map (ValFace.act phi)
 end
 
-module ExtAbs : Abstraction.S with type el = value * ext_sys =
-  Abstraction.M (Sort.Prod (Val) (ExtSys))
+module ExtAbs : Abstraction.S with type el = value * val_sys =
+  Abstraction.M (Sort.Prod (Val) (ValSys))
 
 exception ProjAbs of abs
 exception ProjVal of value
@@ -203,7 +203,7 @@ let rec make : con -> value =
         match unleash up.ty with
         | Rst info ->
           begin
-            match force_ext_sys info.sys with
+            match force_val_sys info.sys with
             | `Proj el -> el
             | `Rigid _ -> ref @@ Node {con; action = D.idn}
           end
@@ -231,7 +231,7 @@ and act_can phi con =
 
   | Rst info ->
     let ty = Val.act phi info.ty in
-    let sys = ExtSys.act phi info.sys in
+    let sys = ValSys.act phi info.sys in
     make @@ Rst {ty; sys}
 
   | Coe info ->
@@ -326,13 +326,13 @@ and act_neu phi con =
     end
 
   | ExtApp (neu, sys, rs) ->
-    let sys = ExtSys.act phi sys in
+    let sys = ValSys.act phi sys in
     let rs = List.map (Dim.act phi) rs in
     begin
       match act_neu phi neu with
       | Ret neu ->
         begin
-          match force_ext_sys sys with
+          match force_val_sys sys with
           | `Rigid _ ->
             ret @@ ExtApp (neu, sys, rs)
           | `Proj v ->
@@ -391,7 +391,7 @@ and force_abs_face face =
   | Face.Indet (xi, abs) ->
     Face.Indet (xi, abs)
 
-and force_ext_face (face : val_face) =
+and force_val_face (face : val_face) =
   match face with
   | Face.True (_, _, v) ->
     raise @@ ProjVal v
@@ -400,9 +400,9 @@ and force_ext_face (face : val_face) =
   | Face.Indet (xi, v) ->
     Face.Indet (xi, v)
 
-and force_ext_sys sys =
+and force_val_sys sys =
   try
-    `Rigid (List.map force_ext_face sys)
+    `Rigid (List.map force_val_face sys)
   with
   | ProjVal v ->
     `Proj v
@@ -646,7 +646,7 @@ and eval : type x. rel -> env -> x Tm.t -> value =
 
     | Tm.Rst info ->
       let ty = eval rel rho info.ty in
-      let sys = eval_ext_sys rel rho info.sys in
+      let sys = eval_tm_sys rel rho info.sys in
       make @@ Rst {ty; sys}
 
     | Tm.V info ->
@@ -795,7 +795,7 @@ and eval_bnd_sys rel rho sys  =
   | ProjAbs abs ->
     `Proj abs
 
-and eval_ext_face rel rho (tr, tr', otm) : val_face =
+and eval_tm_face rel rho (tr, tr', otm) : val_face =
   let r = eval_dim rel rho tr in
   let r' = eval_dim rel rho tr' in
   let sr = R.unleash r rel in
@@ -817,8 +817,8 @@ and eval_ext_face rel rho (tr, tr', otm) : val_face =
     let el = eval rel rho tm in
     Face.True (sr, sr', el)
 
-and eval_ext_sys rel rho sys : ext_sys =
-  List.map (eval_ext_face rel rho) sys
+and eval_tm_sys rel rho sys : val_sys =
+  List.map (eval_tm_face rel rho) sys
 
 and eval_bnd rel rho bnd =
   let Tm.B (_, tm) = bnd in
@@ -836,7 +836,7 @@ and eval_ext_bnd rel rho bnd =
   let Tm.NB (nms, (tm, sys)) = bnd in
   let xs = List.map (fun _ -> Symbol.fresh ()) nms in
   let rho = List.map (fun x -> Atom x) xs @ rho in
-  ExtAbs.bind xs (eval rel rho tm, eval_ext_sys rel rho sys)
+  ExtAbs.bind xs (eval rel rho tm, eval_tm_sys rel rho sys)
 
 and unleash_pi v =
   match unleash v with
@@ -917,7 +917,7 @@ and ext_apply vext ss =
   | Up info ->
     let tyr, sysr = unleash_ext info.ty ss in
     begin
-      match force_ext_sys sysr with
+      match force_val_sys sysr with
       | `Rigid _ ->
         let app = ExtApp (info.neu, sysr, ss) in
         make @@ Up {ty = tyr; neu = app}
@@ -937,7 +937,7 @@ and ext_apply vext ss =
       List.filter filter_face sys_s
     in
     begin
-      match force_ext_sys forall_y_sys_s with
+      match force_val_sys forall_y_sys_s with
       | `Proj v ->
         v
 
@@ -954,7 +954,7 @@ and ext_apply vext ss =
   | HCom info ->
     let ty_s, sys_s = unleash_ext info.ty ss in
     begin
-      match force_ext_sys sys_s with
+      match force_val_sys sys_s with
       | `Proj v ->
         v
       | `Rigid boundary_sys ->

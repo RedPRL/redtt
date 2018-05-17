@@ -1,11 +1,11 @@
 type meta = Symbol.t
 type term = Tm.chk Tm.t
 
-type dev =
-  | Lam of {nm : string option; bdy : meta}
+type 'a dev =
+  | Lam of {nm : string option; bdy : 'a}
   | Hole
-  | Guess of {guess : meta; bdy: meta}
-  | Let of {soln : Tm.inf Tm.t; bdy : meta}
+  | Guess of {guess : meta; bdy: 'a}
+  | Let of {soln : Tm.inf Tm.t; bdy : 'a}
   | Ret of term
 
 module Cx = Typing.Cx
@@ -13,7 +13,7 @@ module Cx = Typing.Cx
 module MCx = Map.Make (Symbol)
 
 type boundary = Tm.chk Tm.t Tm.system
-type cell = {ty : Tm.chk Tm.t; sys : boundary; hole : dev}
+type cell = {ty : Tm.chk Tm.t; sys : boundary; hole : meta dev}
 
 type mcx = cell MCx.t
 
@@ -75,7 +75,7 @@ let rec check mcx cx ty (sys : boundary) dev =
   | _, Ret t ->
     let vty = Cx.eval cx ty in
     Typing.check cx vty t;
-    let sys = Typing.Cx.eval_ext_sys cx sys in
+    let sys = Typing.Cx.eval_tm_sys cx sys in
     Typing.check_boundary cx vty sys t
 
   | _ -> failwith ""
