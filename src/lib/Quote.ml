@@ -79,7 +79,11 @@ let rec equate env ty el0 el1 =
     let rs = List.map Dim.named xs in
     let app0 = ext_apply el0 rs in
     let app1 = ext_apply el1 rs in
-    Tm.ext_lam (List.map (fun _ -> None) xs) @@ equate (Env.abs env xs) tyx app0 app1
+    Tm.ext_lam (List.map (fun _ -> None) xs) @@
+    equate (Env.abs env xs) tyx app0 app1
+
+  | Rst {ty; _} ->
+    equate env ty el0 el1
 
   (* TODO: V type, in order to get eta law *)
 
@@ -157,6 +161,7 @@ let rec equate env ty el0 el1 =
       Tm.up @@ Tm.make @@ Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}
 
     | _ ->
+      Format.eprintf "Failed to equate@; @[<1>%a = %a ∈ %a@] @." pp_value el0 pp_value el1 pp_value ty;
       failwith "equate"
 
 and equate_neu env neu0 neu1 =
