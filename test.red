@@ -109,3 +109,13 @@
    [j=0 <k> (hcom 0 i A (@ p k) [k=0 <w> (@ p w)] [k=1 <_> b])]
    [j=1 <k> (hcom 0 1 A (@ p k) [k=0 <w> (@ p w)] [k=1 <_> b])]
    [i=j <k> (hcom 0 i A (@ p k) [k=0 <w> (@ p w)] [k=1 <_> b])])))
+
+(define connection/or/diagonal
+ [A : (U 0)]
+ [a : A]
+ [b : A]
+ [p : (Path A a b)]
+ (singleton (Path A a b) p)
+ ▷
+ (λ <i>
+  (@ (@ (connection/or A a b p) i) i)))
