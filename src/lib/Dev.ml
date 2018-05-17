@@ -6,7 +6,7 @@ type cell =
   | Guess of {nm : string option; ty : ty; guess : dev}
   | Let of {nm : string option; ty : ty; def : tm}
   | Lam of {nm : string option; ty : ty}
-  | Specify of boundary
+  | Specify of boundary (* not sure if this is right *)
   | Restrict of {r : Tm.chk Tm.t; r' : Tm.chk Tm.t}
 
 and dev =
