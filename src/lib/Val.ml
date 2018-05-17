@@ -853,6 +853,7 @@ and unleash_ext v rs =
   | Ext abs ->
     ExtAbs.inst abs rs
   | _ ->
+    Format.printf "unleash_ext: %a@." pp_value v;
     failwith "unleash_ext"
 
 and unleash_v v =
@@ -1098,23 +1099,8 @@ and inst_clo clo varg =
   | Const v ->
     v
 
-let const_clo v =
-  Const v
 
-
-
-module Macro =
-struct
-  let equiv ty0 ty1 : value =
-    let rho = [Val ty0; Val ty1] in
-    eval R.emp rho @@
-    Tm.Macro.equiv
-      (Tm.up @@ Tm.var 0)
-      (Tm.up @@ Tm.var 1)
-
-end
-
-let rec pp_value fmt value =
+and pp_value fmt value =
   match unleash value with
   | Up up ->
     Format.fprintf fmt "%a" pp_neu up.neu
@@ -1203,3 +1189,22 @@ and pp_neu fmt neu =
 and pp_dims fmt rs =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep Dim.pp fmt rs
+
+let const_clo v =
+  Const v
+
+
+
+
+
+module Macro =
+struct
+  let equiv ty0 ty1 : value =
+    let rho = [Val ty0; Val ty1] in
+    eval R.emp rho @@
+    Tm.Macro.equiv
+      (Tm.up @@ Tm.var 0)
+      (Tm.up @@ Tm.var 1)
+
+end
+
