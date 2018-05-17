@@ -43,6 +43,7 @@ struct
 
   type state = {seq : seq; dev : dev; stk: stack}
   type 'a m = state -> 'a * state
+
   let ret a =
     fun st ->
       a, st
