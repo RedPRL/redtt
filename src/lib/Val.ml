@@ -1121,7 +1121,7 @@ and pp_value fmt value =
   | Ext abs ->
     Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
   | Rst {ty; sys} ->
-    Format.fprintf fmt "@[<1>(#@ %a %a)@]" pp_value ty pp_val_sys sys
+    Format.fprintf fmt "@[<1>(restrict@ %a@ %a)@]" pp_value ty pp_val_sys sys
   | Univ {kind; lvl} ->
     Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
   | Cons (v0, v1) ->
