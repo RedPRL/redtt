@@ -85,8 +85,13 @@ struct
   let ppenv cx =
     cx.ppenv
 
-  let eval {env; rel; _} tm =
-    V.eval rel env tm
+  let eval {env; rel; ppenv; _} tm =
+    try
+      V.eval rel env tm
+    with
+    | exn ->
+      Format.eprintf "Failed to evaluate: %a@." (Tm.pp ppenv) tm;
+      raise exn
 
   let eval_dim {env; rel; _} tm =
     V.eval_dim rel env tm
