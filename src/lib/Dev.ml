@@ -4,7 +4,7 @@ type tm = Tm.chk Tm.t
 module V = Val
 
 type dev =
-  | Ask of {ty : ty; body : dev}
+  | Hole
   | Guess of {ty : ty; guess : dev; body : dev}
   | Lam of {ty : ty; body : dev}
   | Ret of tm
@@ -29,6 +29,7 @@ sig
   val solve : unit m
 
   val goal : seq m
+  val lambda : unit m
 end =
 struct
   type seq = {cx : Typing.cx; ty : V.value}
@@ -37,7 +38,6 @@ struct
     | KGuessL of {ty : ty; seq : seq; body : dev}
     | KGuessR of {ty : ty; seq : seq; guess : dev}
     | KLam of {ty : ty; seq : seq}
-    | KAsk of {ty : ty; seq : seq}
 
   type stack = frame list
 
@@ -65,20 +65,12 @@ struct
       | KLam frm :: stk ->
         let lam = Lam {ty = frm.ty; body = dev} in
         (), {seq = frm.seq; dev = lam; stk}
-      | KAsk frm :: stk ->
-        let ask = Ask {ty = frm.ty; body = dev} in
-        (), {seq = frm.seq; dev = ask; stk}
 
   let down : unit m =
     fun {seq; dev; stk} ->
       match dev with
-      | Ret _ ->
+      | (Ret _ | Hole) ->
         failwith "down"
-      | Ask info ->
-        let hole_vty = Typing.Cx.eval seq.cx info.ty in
-        let cxx, _ = Typing.Cx.ext_ty ~nm:None seq.cx hole_vty in
-        let stk' = KAsk {seq; ty = info.ty} :: stk in
-        (), {seq = {seq with cx = cxx}; dev = info.body; stk = stk'}
       | Guess info ->
         let hole_vty = Typing.Cx.eval seq.cx info.ty in
         let cxx, _ = Typing.Cx.ext_ty ~nm:None seq.cx hole_vty in
@@ -120,6 +112,19 @@ struct
       (), {seq; dev = inst0 tm body; stk}
     | _ ->
       failwith "solve"
+
+  (* TODO: also match extension types *)
+  let lambda {seq; dev; stk} =
+    match dev, V.unleash seq.ty with
+    | Hole, V.Pi {dom; cod} ->
+      let cxx, x = Typing.Cx.ext_ty ~nm:None seq.cx dom in
+      let vcod = Val.inst_clo cod x in
+      let seq' = {cx = cxx; ty = vcod} in
+      let tdom = Typing.Cx.quote_ty seq.cx dom in
+      let lam = Lam {ty = tdom; body = Hole} in
+      (), {seq = seq'; dev = lam; stk}
+    | _ ->
+      failwith "lam"
 
 end
 

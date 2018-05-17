@@ -22,6 +22,7 @@ sig
   val check_subtype : t -> value -> value -> unit
 
   val quote : t -> ty:value -> value -> Tm.chk Tm.t
+  val quote_ty : t -> value -> Tm.chk Tm.t
 end
 
 type cx = Cx.t

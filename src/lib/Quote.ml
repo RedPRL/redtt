@@ -309,6 +309,9 @@ let equiv env ~ty el0 el1 =
 let equiv_ty env ty0 ty1 =
   ignore @@ equate_ty env ty0 ty1
 
+let quote_ty env ty =
+  equate_ty env ty ty
+
 let quote_nf env nf =
   equate env nf.ty nf.el nf.el
 
