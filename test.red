@@ -127,11 +127,15 @@
  [b : A]
  [p : (Path A a b)]
  (# <i j> A [j=0 a] [i=0 a] [j=1 (@ p i)] [i=1 (@ p j)])
-  ▷
+ ▷
  (λ <i j>
-  (hcom 0 1 A a
-   [i=0 <k> (hcom 1 0 A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])]
-   [i=1 <k> (hcom 1 j A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])]
-   [j=0 <k> (hcom 1 0 A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])]
-   [j=1 <k> (hcom 1 i A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])]
-   [i=j <k> (hcom 1 i A (@ p k) [k=0 <_> a] [k=1 <l> (@ p l)])])))
+  (let
+   [face (▷ (# <_ _> A) (λ <k l> (hcom 1 l A (@ p k) [k=0 <_> a] [k=1 <m> (@ p m)])))]
+   (hcom 0 1 A a
+    [i=0 <k> (@ face k 0)]
+    [i=1 <k> (@ face k j)]
+    [j=0 <k> (@ face k 0)]
+    [j=1 <k> (@ face k i)]
+    [i=j <k> (@ face k i)]))))
+
+

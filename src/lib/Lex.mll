@@ -33,6 +33,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("define", DEFINE);
       ("hcom", HCOM);
       ("if", IF);
+      ("let", LET);
       ("lam", LAM);
       ("tt", TT);
       ("ff", FF);

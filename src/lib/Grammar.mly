@@ -11,7 +11,7 @@
 %token EQUALS
 %token RIGHT_ARROW
 %token AST TIMES HASH AT
-%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE
+%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET
 %token PRE KAN
 %token EOF
 
@@ -148,6 +148,11 @@ chk:
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Cons (e0 env, e1 env) }
+
+  | LPR; LET; LSQ; x = ATOM; e0 = inf; RSQ; e1 = chk; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Let (e0 env, Tm.B (Some x, e1 @@ R.bind x env))}
 
   | e = inf
     { fun env ->
