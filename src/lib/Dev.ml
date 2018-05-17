@@ -14,6 +14,33 @@ and dev =
   | B of cell * dev
   | Ret of tm
 
+type (_, _) frame =
+  | KBCell : unit * dev -> (cell, dev) frame
+  | KBDev : cell * unit -> (dev, dev) frame
+  | KGuess : {nm : string option; ty : ty; guess : unit} -> (dev, cell) frame
+
+type (_, _) stack =
+  | Top : ('a, 'a) stack
+  | Push : ('a, 'b) frame * ('b, 'c) stack -> ('a, 'c) stack
+
+let plug : type a b. a -> (a, b) frame -> b =
+  fun a frm ->
+    match frm with
+    | KBCell ((), dev) ->
+      B (a, dev)
+    | KBDev (cell, ()) ->
+      B (cell, a)
+    | KGuess {nm; ty; _} ->
+      Guess {nm; ty; guess = a}
+
+let rec cut : type a b. a -> (a, b) stack -> b =
+  fun a stk ->
+    match stk with
+    | Top -> a
+    | Push (frm, stk) ->
+      cut (plug a frm) stk
+
+
 let rec pp_cell env fmt =
   function
   | Guess {nm; ty; guess} ->
