@@ -10,9 +10,12 @@ sig
   val ext_dim : t -> nm:string option -> t * Val.atom
   val ext_dims : t -> nms:string option list -> t * Val.atom list
 
+  val restrict : t -> Dim.repr -> Dim.repr -> t
+
   val def : t -> nm:string option -> ty:value -> el:value -> t
 
   val eval : t -> 'a Tm.t -> value
+  val eval_dim : t -> Tm.chk Tm.t -> Dim.repr
   val eval_tm_sys : t -> Tm.chk Tm.t Tm.system -> Val.val_sys
 
   val ppenv : t -> Pretty.env
