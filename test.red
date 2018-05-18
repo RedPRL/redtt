@@ -1,3 +1,5 @@
+; In redtt, path types are not primitive; instead, we have extension types, which
+; let you specify an n-cube with a valid boundary.
 (define Path [A : (U 0)] [M : A] [N : A] (U 0) ▷
  (# <i> A [i=0 M] [i=1 N]))
 
@@ -53,7 +55,9 @@
    [i=0 <_> (@ p 0)]
    [i=1 <j> (@ q j)])))
 
-
+; (singleton A M) is not Kan, but the judgments of redtt only presuppose that the types are
+; pretypes. In other words, we are free to use things like 'singleton', but it is not an element
+; of the Kan universe.
 (define singleton
  [A : (U 0)]
  [M : A]
@@ -87,6 +91,9 @@
  ▷
  (λ <i j>
   (let
+   ; this is an example of something that is much nicer here than in redprl and yacctt.
+   ; we can define using line types all the faces of the composition at once.
+   ; definitional equivalence kicks in to make this work.
    [face (▷ (# <_ _> A) (λ <k l> (hcom 0 l A (@ p k) [k=0 <w> (@ p w)] [k=1 <_> b])))]
    (hcom 1 0 A b
     [i=0 <k> (@ face k j)]
@@ -95,6 +102,7 @@
     [j=1 <k> (@ face k 1)]
     [i=j <k> (@ face k i)]))))
 
+; an example of using the singleton type to establish an exact equality
 (define connection/or/diagonal
  [A : (U 0)]
  [a : A]
@@ -121,5 +129,4 @@
     [j=0 <k> (@ face k 0)]
     [j=1 <k> (@ face k i)]
     [i=j <k> (@ face k i)]))))
-
 
