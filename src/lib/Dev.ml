@@ -218,6 +218,7 @@ sig
   val pop_cell : (cell, dev) move
 
   val push_dev : (dev, dev) move
+  val pop_dev : (dev, dev) move
 end =
 struct
   type 's cmd = {foc : 's; stk : ('s, dev) stack}
