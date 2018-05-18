@@ -6,7 +6,7 @@ type cell =
   | Guess of {nm : string option; ty : ty; guess : dev}
   | Let of {nm : string option; ty : ty; def : tm}
   | Lam of {nm : string option; ty : ty}
-  | Specify of boundary (* not sure if this is right *)
+  | Constrain of boundary (* not sure if this is right *)
   | Restrict of {r : Tm.chk Tm.t; r' : Tm.chk Tm.t}
 
 and dev =
@@ -76,11 +76,17 @@ let rec pp_cell env fmt =
       (Tm.pp env) ty;
     envx
 
-  | Specify _ ->
-    failwith ""
+  | Constrain sys ->
+    Format.fprintf fmt "constrain %a"
+      (Tm.pp_sys env) sys;
+    env
 
-  | Restrict _ ->
-    failwith ""
+  | Restrict {r; r'} ->
+    Format.fprintf fmt "[%a = %a]"
+      (Tm.pp env) r
+      (Tm.pp env) r';
+    env
+
 
 and pp_dev env fmt =
   function
@@ -153,7 +159,7 @@ struct
           let vty = Typing.Cx.eval tcx ty in
           fst @@ Typing.Cx.ext_ty tcx ~nm vty
 
-        | Specify _ ->
+        | Constrain _ ->
           tcx
 
         | Restrict {r; r'} ->

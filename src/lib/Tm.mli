@@ -100,3 +100,4 @@ sig
 end
 
 val pp : 'a t Pretty.t
+val pp_sys : chk t system Pretty.t
