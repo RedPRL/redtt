@@ -132,6 +132,10 @@ sig
       lambda binders. Let binders turn into definitions (which can be seen in type checking).
       Restrictions get turned into restrictions. *)
   val core : t -> Typing.cx
+
+
+  exception EmptyContext
+  val pop : t -> t
 end =
 struct
   type t =
@@ -161,6 +165,13 @@ struct
 
   let emp = Emp
   let ext t c = Ext (t, c)
+
+  exception EmptyContext
+
+  let pop =
+    function
+    | Emp -> raise EmptyContext
+    | Ext (cx, _) -> cx
 
   let rec core dcx =
     match dcx with
@@ -200,9 +211,13 @@ sig
 
   type ('i, 'o) move = ('i, 'o, unit) m
 
-  val into_guess : (cell, dev) move
-  val into_cell : (dev, cell) move
-  val into_dev : (dev, dev) move
+  val push_guess : (cell, dev) move
+  val pop_guess : (dev, cell) move
+
+  val push_cell : (dev, cell) move
+  val pop_cell : (cell, dev) move
+
+  val push_dev : (dev, dev) move
 end =
 struct
   type 's cmd = {foc : 's; stk : ('s, dev) stack}
@@ -215,7 +230,8 @@ struct
 
   type ('i, 'o) move = ('i, 'o, unit) m
 
-  let into_guess =
+
+  let push_guess : _ m =
     get >>= fun state ->
     match state.cmd.foc with
     | Guess {nm; ty; guess} ->
@@ -223,9 +239,23 @@ struct
       let cmd = {foc = guess; stk = stk} in
       set {state with cmd}
     | _ ->
+      Format.eprintf "Tried to descend into %a"
+        (pp_cell (Cx.ppenv state.cx))
+        state.cmd.foc;
       raise InvalidMove
 
-  let into_cell : (dev, cell, unit) m =
+
+  let pop_guess : (dev, cell) move =
+    get >>= fun (state : dev state) ->
+    match state.cmd.stk with
+    | Push (KGuess {ty; nm; _}, (stk : (cell, dev) stack)) ->
+      let foc = Guess {ty; nm; guess = state.cmd.foc} in
+      let cmd = {foc; stk} in
+      set {state with cmd}
+    | _ ->
+      raise InvalidMove
+
+  let push_cell : _ m =
     get >>= fun state ->
     match state.cmd.foc with
     | B (cell, dev) ->
@@ -239,7 +269,15 @@ struct
         state.cmd.foc;
       raise InvalidMove
 
-  let into_dev : (dev, dev, unit) m =
+  let pop_cell : (cell, dev) move =
+    get >>= fun (state : cell state) ->
+    match state.cmd.stk with
+    | Push (KBCell ((), dev), (stk : (dev, dev) stack)) ->
+      let foc = B (state.cmd.foc, dev) in
+      let cmd = {foc; stk} in
+      set {state with cmd}
+
+  let push_dev : _ m =
     get >>= fun state ->
     match state.cmd.foc with
     | B (cell, dev) ->
@@ -252,5 +290,16 @@ struct
       Format.eprintf "Tried to descend into %a"
         (pp_dev (Cx.ppenv state.cx))
         state.cmd.foc;
+      raise InvalidMove
+
+  let pop_dev : (dev, dev) move =
+    get >>= fun (state : dev state) ->
+    match state.cmd.stk with
+    | Push (KBDev (cell, ()), (stk : (dev, dev) stack)) ->
+      let foc = B (cell, state.cmd.foc) in
+      let cmd : dev cmd = {foc; stk} in
+      let cx = Cx.pop state.cx in
+      set {state with cmd; cx}
+    | _ ->
       raise InvalidMove
 end
