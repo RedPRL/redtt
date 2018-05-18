@@ -2,6 +2,9 @@ type ty = Tm.chk Tm.t
 type tm = Tm.chk Tm.t
 type boundary = Tm.chk Tm.t Tm.system
 
+(** A [cell] is an entry in the development context, what Conor McBride called a {e component} in his thesis.
+    These cells are also the left parts of the "binders" in the development calculus.
+*)
 type cell =
   | Guess of {nm : string option; ty : ty; guess : dev}
   | Let of {nm : string option; ty : ty; def : tm}
@@ -13,6 +16,8 @@ and dev =
   | Hole
   | B of cell * dev
   | Ret of tm
+
+(** We now proceed to unleash the proof state zipper. *)
 
 type (_, _) frame =
   | KBCell : unit * dev -> (cell, dev) frame
@@ -40,11 +45,27 @@ let rec cut : type a b. a -> (a, b) stack -> b =
     | Push (frm, stk) ->
       cut (plug a frm) stk
 
-
-let rec pp_cell env fmt =
+let rec ppenv_cell env =
   function
-  | Guess {nm; ty; guess} ->
-    let x, envx = Pretty.Env.bind nm env in
+  | Guess {nm; _} ->
+    let _, envx = Pretty.Env.bind nm env in
+    envx
+  | Let {nm; _} ->
+    let _, envx = Pretty.Env.bind nm env in
+    envx
+  | Lam {nm; _} ->
+    let _, envx = Pretty.Env.bind nm env in
+    envx
+  | Constrain _ ->
+    env
+  | Restrict _ ->
+    env
+
+let rec pp_cell env fmt cell =
+  let env' = ppenv_cell env cell in
+  match cell with
+  | Guess {ty; guess; _} ->
+    let x = Pretty.Env.var 0 env' in
     begin
       match guess with
       | Hole ->
@@ -57,36 +78,30 @@ let rec pp_cell env fmt =
           (Tm.pp env) ty
           Uuseg_string.pp_utf_8 "▷"
           (pp_dev env) guess
-    end;
-    envx
+    end
 
-  | Let {nm; ty; def} ->
-    let x, envx = Pretty.Env.bind nm env in
+  | Let {ty; def; _} ->
+    let x = Pretty.Env.var 0 env' in
     Format.fprintf fmt "!%a : %a %a %a"
       Uuseg_string.pp_utf_8 x
       (Tm.pp env) ty
       Uuseg_string.pp_utf_8 "▷"
-      (Tm.pp env) def;
-    envx
+      (Tm.pp env) def
 
-  | Lam {nm; ty} ->
-    let x, envx = Pretty.Env.bind nm env in
+  | Lam {ty; _} ->
+    let x = Pretty.Env.var 0 env' in
     Format.fprintf fmt "λ%a : %a"
       Uuseg_string.pp_utf_8 x
-      (Tm.pp env) ty;
-    envx
+      (Tm.pp env) ty
 
   | Constrain sys ->
     Format.fprintf fmt "constrain %a"
-      (Tm.pp_sys env) sys;
-    env
+      (Tm.pp_sys env) sys
 
   | Restrict {r; r'} ->
     Format.fprintf fmt "[%a = %a]"
       (Tm.pp env) r
-      (Tm.pp env) r';
-    env
-
+      (Tm.pp env) r'
 
 and pp_dev env fmt =
   function
@@ -96,8 +111,9 @@ and pp_dev env fmt =
     Format.fprintf fmt "`%a"
       (Tm.pp env) tm
   | B (cell, dev) ->
-    let env' = pp_cell env fmt cell in
-    Format.fprintf fmt ". %a"
+    let env' = ppenv_cell env cell in
+    Format.fprintf fmt "%a. %a"
+      (pp_cell env) cell
       (pp_dev env') dev
 
 (** Development contexts. Following Conor McBride, we define tactics to be admissible rules
@@ -109,6 +125,7 @@ sig
   val ext : t -> cell -> t
 
   val pp_cx : t Pretty.t0
+  val ppenv : t -> Pretty.env
 
   (** Compile a development context to a core-language context, for type checking.
       Guess binders turn into variable bindings (the guessed term is invisible), just like
@@ -121,15 +138,23 @@ struct
     | Emp
     | Ext of t * cell
 
+  let rec ppenv =
+    function
+    | Emp -> Pretty.Env.emp
+    | Ext (cx, c) ->
+      ppenv_cell (ppenv cx) c
+
   let rec pp_cx_ env fmt =
     function
     | Emp -> env
     | Ext (Emp, c) ->
-      pp_cell env fmt c
+      pp_cell env fmt c;
+      ppenv_cell env c
     | Ext (t, c) ->
       let env' = pp_cx_ env fmt t in
       Format.fprintf fmt "@,";
-      pp_cell env' fmt c
+      pp_cell env' fmt c;
+      ppenv_cell env' c
 
   let pp_cx fmt cx =
     ignore @@ pp_cx_ Pretty.Env.emp fmt cx
@@ -167,4 +192,51 @@ struct
           let vr' = Typing.Cx.eval_dim tcx r' in
           Typing.Cx.restrict tcx vr vr'
       end
+end
+
+module IxM :
+sig
+  include IxMonad.S
+
+  val down_cell : (dev, cell, unit) m
+end =
+struct
+
+  type 's cmd = {foc : 's; stk : ('s, dev) stack}
+  type 's state = {cx : Cx.t; ty : ty; cmd : 's cmd}
+
+  module State = IxStateMonad.M (struct type 'i t = 'i state end)
+  include State include IxMonad.Notation (State)
+
+  exception InvalidMove
+
+  let down_cell : (dev, cell, unit) m =
+    get >>= fun state ->
+    match state.cmd.foc with
+    | B (cell, dev) ->
+      let stk = Push (KBCell ((), dev), state.cmd.stk) in
+      let cmd = {foc = cell; stk = stk} in
+      (* TODO: update context *)
+      set {state with cmd}
+
+    | _ ->
+      Format.eprintf "Tried to descend into %a"
+        (pp_dev (Cx.ppenv state.cx))
+        state.cmd.foc;
+      raise InvalidMove
+
+  let down_dev : (dev, dev, unit) m =
+    get >>= fun state ->
+    match state.cmd.foc with
+    | B (cell, dev) ->
+      let stk = Push (KBDev (cell, ()), state.cmd.stk) in
+      let cmd = {foc = dev; stk = stk} in
+      (* TODO: update context *)
+      set {state with cmd}
+
+    | _ ->
+      Format.eprintf "Tried to descend into %a"
+        (pp_dev (Cx.ppenv state.cx))
+        state.cmd.foc;
+      raise InvalidMove
 end
