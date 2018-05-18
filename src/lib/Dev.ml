@@ -221,6 +221,8 @@ sig
 
   val push_dev : (dev, dev) move
   val pop_dev : (dev, dev) move
+
+  val lambda : (dev, dev) move
 end =
 struct
   type 's cmd = {foc : 's; stk : ('s, dev) stack}
@@ -287,6 +289,7 @@ struct
       let stk = Push (KBDev (cell, ()), state.cmd.stk) in
       let cmd = {foc = dev; stk = stk} in
       let cx = Cx.ext state.cx cell in
+      (* TODO: need to update the type *)
       set {state with cmd; cx}
 
     | _ ->
@@ -302,7 +305,17 @@ struct
       let foc = B (cell, state.cmd.foc) in
       let cmd : dev cmd = {foc; stk} in
       let cx = Cx.pop state.cx in
+      (* TODO: need to update the type *)
       set {state with cmd; cx}
     | _ ->
       raise InvalidMove
+
+
+  let lambda : (dev, dev) move =
+    get >>= fun state ->
+    match Tm.unleash state.ty with
+    | Tm.Pi (_dom, _cod) ->
+      failwith ""
+    | _ ->
+      failwith "lambda: expected pi type"
 end
