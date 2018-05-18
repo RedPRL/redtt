@@ -216,7 +216,6 @@ struct
     | B (cell, dev) ->
       let stk = Push (KBCell ((), dev), state.cmd.stk) in
       let cmd = {foc = cell; stk = stk} in
-      (* TODO: update context *)
       set {state with cmd}
 
     | _ ->
@@ -231,8 +230,8 @@ struct
     | B (cell, dev) ->
       let stk = Push (KBDev (cell, ()), state.cmd.stk) in
       let cmd = {foc = dev; stk = stk} in
-      (* TODO: update context *)
-      set {state with cmd}
+      let cx = Cx.ext state.cx cell in
+      set {state with cmd; cx}
 
     | _ ->
       Format.eprintf "Tried to descend into %a"
