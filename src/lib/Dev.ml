@@ -198,10 +198,13 @@ module IxM :
 sig
   include IxMonad.S
 
-  val down_cell : (dev, cell, unit) m
+  type ('i, 'o) move = ('i, 'o, unit) m
+
+  val into_guess : (cell, dev) move
+  val into_cell : (dev, cell) move
+  val into_dev : (dev, dev) move
 end =
 struct
-
   type 's cmd = {foc : 's; stk : ('s, dev) stack}
   type 's state = {cx : Cx.t; ty : ty; cmd : 's cmd}
 
@@ -210,7 +213,19 @@ struct
 
   exception InvalidMove
 
-  let down_cell : (dev, cell, unit) m =
+  type ('i, 'o) move = ('i, 'o, unit) m
+
+  let into_guess =
+    get >>= fun state ->
+    match state.cmd.foc with
+    | Guess {nm; ty; guess} ->
+      let stk = Push (KGuess {nm; ty; guess = ()}, state.cmd.stk) in
+      let cmd = {foc = guess; stk = stk} in
+      set {state with cmd}
+    | _ ->
+      raise InvalidMove
+
+  let into_cell : (dev, cell, unit) m =
     get >>= fun state ->
     match state.cmd.foc with
     | B (cell, dev) ->
@@ -224,7 +239,7 @@ struct
         state.cmd.foc;
       raise InvalidMove
 
-  let down_dev : (dev, dev, unit) m =
+  let into_dev : (dev, dev, unit) m =
     get >>= fun state ->
     match state.cmd.foc with
     | B (cell, dev) ->
