@@ -1,3 +1,5 @@
+open RedBasis
+
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option list * 'a
 

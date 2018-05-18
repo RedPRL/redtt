@@ -1,3 +1,5 @@
+open RedBasis
+
 type ty = Tm.chk Tm.t
 type tm = Tm.chk Tm.t
 type boundary = Tm.chk Tm.t Tm.system
