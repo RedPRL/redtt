@@ -52,15 +52,17 @@ let number =
 let whitespace =
   [' ' '\t']+
 let atom_initial =
-  [^ '0'-'9' '-' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' '=' '"' ' ' '\t' '\n' '\r']
+  [^ '0'-'9' '-' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' ' ' '\t' '\n' '\r']
 let atom_subsequent =
-  [^             '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' '=' '"' ' ' '\t' '\n' '\r']
+  [^             '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' ' ' '\t' '\n' '\r']
 
 refill {refill_handler}
 
 rule token = parse
   | number
     { Lwt.return (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
+  | ';'
+    {comment lexbuf}
   | '('
     { Lwt.return LPR }
   | ')'
@@ -113,6 +115,12 @@ rule token = parse
     }
   | _
     { Lwt_io.printlf "Unexpected char: %s" (lexeme lexbuf) >>= fun _ -> token lexbuf }
+
+and comment = parse
+  | line_ending
+    { new_line lexbuf; token lexbuf }
+  | _
+    { comment lexbuf }
 
 {
 end (* LEXER *)
