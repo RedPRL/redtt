@@ -2,7 +2,6 @@
 
 open RedBasis
 module T = PersistentTable.M
-type value = Val.value
 
 type entry =
   {ty : Tm.chk Tm.t;
@@ -15,15 +14,15 @@ let emp = T.init 100
 let add_hole sg nm ~ty =
   match T.find nm sg with
   | None ->
-    let entry = {ty; el = None} in
+    let entry = {ty; tm = None} in
     T.set nm entry sg
   | _ ->
     failwith "GlobalCx: name already used"
 
-let define sg nm ~ty ~el =
+let define (sg : t) (nm : string) ~ty ~tm =
   match T.find nm sg with
   | None ->
-    let entry = {ty; el = Some el} in
+    let entry = {ty; tm = Some tm} in
     T.set nm entry sg
   | _ ->
     failwith "GlobalCx: name already used"
