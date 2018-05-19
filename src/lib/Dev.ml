@@ -213,14 +213,16 @@ sig
 
   type ('i, 'o) move = ('i, 'o, unit) m
 
+  (** The names of these moves are not yet perfected. *)
+
   val push_guess : (cell, dev) move
   val pop_guess : (dev, cell) move
 
   val push_cell : (dev, cell) move
   val pop_cell : (cell, dev) move
 
-  val push_dev : (dev, dev) move
-  val pop_dev : (dev, dev) move
+  val down : (dev, dev) move
+  val up : (dev, dev) move
 
   val lambda : (dev, dev) move
 end =
@@ -282,7 +284,7 @@ struct
       let cmd = {foc; stk} in
       set {state with cmd}
 
-  let push_dev : _ m =
+  let down : _ m =
     get >>= fun state ->
     match state.cmd.foc with
     | B (cell, dev) ->
@@ -298,12 +300,12 @@ struct
         state.cmd.foc;
       raise InvalidMove
 
-  let pop_dev : (dev, dev) move =
+  let up : (dev, dev) move =
     get >>= fun (state : dev state) ->
     match state.cmd.stk with
     | Push (KBDev (cell, ()), (stk : (dev, dev) stack)) ->
       let foc = B (cell, state.cmd.foc) in
-      let cmd : dev cmd = {foc; stk} in
+      let cmd = {foc; stk} in
       let cx = Cx.pop state.cx in
       (* TODO: need to update the type *)
       set {state with cmd; cx}
