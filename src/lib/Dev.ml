@@ -16,14 +16,14 @@ type cell =
 
 and dev =
   | Hole of ty
-  | B of cell * dev
+  | Node of cell * dev
   | Ret of tm
 
 (** We now proceed to unleash the proof state zipper. *)
 
 type (_, _) frame =
-  | KBCell : unit * dev -> (cell, dev) frame
-  | KBDev : cell * unit -> (dev, dev) frame
+  | KNodeCell : unit * dev -> (cell, dev) frame
+  | KNodeDev : cell * unit -> (dev, dev) frame
   | KGuess : {nm : string option; ty : ty; guess : unit} -> (dev, cell) frame
 
 type (_, _) stack =
@@ -33,10 +33,10 @@ type (_, _) stack =
 let plug : type a b. a -> (a, b) frame -> b =
   fun a frm ->
     match frm with
-    | KBCell ((), dev) ->
-      B (a, dev)
-    | KBDev (cell, ()) ->
-      B (cell, a)
+    | KNodeCell ((), dev) ->
+      Node (a, dev)
+    | KNodeDev (cell, ()) ->
+      Node (cell, a)
     | KGuess {nm; ty; _} ->
       Guess {nm; ty; guess = a}
 
@@ -112,7 +112,7 @@ and pp_dev env fmt =
   | Ret tm ->
     Format.fprintf fmt "`%a"
       (Tm.pp env) tm
-  | B (cell, dev) ->
+  | Node (cell, dev) ->
     let env' = ppenv_cell env cell in
     Format.fprintf fmt "%a. %a"
       (pp_cell env) cell
@@ -272,8 +272,8 @@ struct
   let push_cell : _ m =
     get >>= fun state ->
     match state.cmd.foc with
-    | B (cell, dev) ->
-      let stk = Push (KBCell ((), dev), state.cmd.stk) in
+    | Node (cell, dev) ->
+      let stk = Push (KNodeCell ((), dev), state.cmd.stk) in
       let cmd = {foc = cell; stk = stk} in
       set {state with cmd}
 
@@ -286,16 +286,16 @@ struct
   let pop_cell : (cell, dev) move =
     get >>= fun (state : cell state) ->
     match state.cmd.stk with
-    | Push (KBCell ((), dev), (stk : (dev, dev) stack)) ->
-      let foc = B (state.cmd.foc, dev) in
+    | Push (KNodeCell ((), dev), (stk : (dev, dev) stack)) ->
+      let foc = Node (state.cmd.foc, dev) in
       let cmd = {foc; stk} in
       set {state with cmd}
 
   let down : _ m =
     get >>= fun state ->
     match state.cmd.foc with
-    | B (cell, dev) ->
-      let stk = Push (KBDev (cell, ()), state.cmd.stk) in
+    | Node (cell, dev) ->
+      let stk = Push (KNodeDev (cell, ()), state.cmd.stk) in
       let cmd = {foc = dev; stk = stk} in
       let cx = Cx.ext state.cx cell in
       set {cmd; cx}
@@ -309,8 +309,8 @@ struct
   let up : (dev, dev) move =
     get >>= fun (state : dev state) ->
     match state.cmd.stk with
-    | Push (KBDev (cell, ()), (stk : (dev, dev) stack)) ->
-      let foc = B (cell, state.cmd.foc) in
+    | Push (KNodeDev (cell, ()), (stk : (dev, dev) stack)) ->
+      let foc = Node (cell, state.cmd.foc) in
       let cmd = {foc; stk} in
       let cx = Cx.pop state.cx in
       set {cmd; cx}
@@ -344,7 +344,7 @@ struct
     match Tm.unleash ty with
     | Tm.Pi (dom, Tm.B (_, cod)) ->
       let lam = Lam {nm; ty = dom} in
-      set_foc @@ B (lam, Hole cod)
+      set_foc @@ Node (lam, Hole cod)
     | _ ->
       failwith "lambda: expected pi type"
 end
