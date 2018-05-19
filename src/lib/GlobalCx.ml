@@ -5,8 +5,8 @@ module T = PersistentTable.M
 type value = Val.value
 
 type entry =
-  {ty : value;
-   el : value option}
+  {ty : Tm.chk Tm.t;
+   tm : Tm.chk Tm.t option}
 
 type t = (string, entry) T.t
 
@@ -30,5 +30,12 @@ let define sg nm ~ty ~el =
 
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
-  let lookup _ = failwith ""
+  let lookup nm =
+    let {ty; tm} = T.get nm Sig.globals in
+    match tm with
+    | None ->
+      Val.Opaque {ty}
+    | Some tm ->
+      Val.Transparent {tm}
+
 end
