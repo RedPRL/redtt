@@ -224,7 +224,13 @@ sig
   val down : (dev, dev) move
   val up : (dev, dev) move
 
+  (** When the cursor is at a [Hole ty], check the supplied [tm] against [ty];
+      if it matches, then replace the hole with [Ret tm]. *)
   val fill : tm -> (dev, dev) move
+
+
+  (** When the cursor is at a hole of dependent function type, replace it with
+      a [Lam] cell and a hole underneath it. *)
   val lambda : string option -> (dev, dev) move
 end =
 struct
