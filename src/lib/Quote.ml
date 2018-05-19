@@ -228,6 +228,12 @@ struct
          Tm.make @@ Tm.VProj {r = tr; tm; func} *)
       failwith "TODO"
 
+    | Global nm0, Global nm1 ->
+      if nm0 = nm1 then
+        Tm.make @@ Tm.Global nm0
+      else
+        failwith "global variable name mismatch"
+
     | _ ->
       Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1;
       failwith "equate_neu"
