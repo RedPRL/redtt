@@ -95,7 +95,7 @@ sig
   val inst_clo : clo -> value -> value
   val const_clo : value -> clo
 
-  val unleash_pi : value -> value * clo
+  val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : value -> value * clo
   val unleash_v : value -> gen * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
@@ -897,10 +897,19 @@ struct
     let rho = List.map (fun x -> Atom x) xs @ rho in
     ExtAbs.bind xs (eval rel rho tm, eval_tm_sys rel rho sys)
 
-  and unleash_pi v =
+  and unleash_pi ?debug:(debug = []) v =
     match unleash v with
     | Pi {dom; cod} -> dom, cod
-    | _ -> failwith "unleash_pi"
+    | _ ->
+      Format.eprintf "%a: tried to unleash %a as pi type@."
+        pp_trace debug
+        pp_value v;
+      failwith "unleash_pi"
+
+  and pp_trace fmt trace =
+    Format.fprintf fmt "@[[%a]@]"
+      (Format.pp_print_list Format.pp_print_string)
+      trace
 
   and unleash_sg v =
     match unleash v with
@@ -928,7 +937,7 @@ struct
       inst_clo clo varg
 
     | Up info ->
-      let dom, cod = unleash_pi info.ty in
+      let dom, cod = unleash_pi ~debug:["apply"; "up"] info.ty in
       let cod' = inst_clo cod varg in
       let app = FunApp (info.neu, {ty = dom; el = varg}) in
       make @@ Up {ty = cod'; neu = app}
@@ -936,7 +945,7 @@ struct
     | Coe info ->
       let r, r' = Star.unleash info.dir in
       let x, tyx = Abs.unleash1 info.abs in
-      let domx, codx = unleash_pi tyx in
+      let domx, codx = unleash_pi ~debug:["apply"; "coe"] tyx in
       let abs =
         Abs.bind1 x @@
         inst_clo codx @@
@@ -955,7 +964,7 @@ struct
       rigid_coe info.dir abs el
 
     | HCom info ->
-      let _, cod = unleash_pi info.ty in
+      let _, cod = unleash_pi ~debug:["apply"; "hcom"] info.ty in
       let ty = inst_clo cod varg in
       let cap = apply info.cap varg in
       let app_face =

@@ -367,7 +367,7 @@ struct
       Eval.inst_clo cod @@ Eval.car v
 
     | T.FunApp (tm0, tm1) ->
-      let dom, cod = Eval.unleash_pi @@ infer cx tm0 in
+      let dom, cod = Eval.unleash_pi ~debug:["infer"] @@ infer cx tm0 in
       let v1 = check_eval cx dom tm1 in
       Eval.inst_clo cod v1
 

@@ -68,7 +68,7 @@ struct
   let def {env; qenv; tys; rel; ppenv} ~nm ~ty ~el =
     {env = Val.Val el :: env;
      tys = `Ty ty :: tys;
-     qenv = Quote.Env.succ qenv; (* Is this right? *)
+     qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}
 
