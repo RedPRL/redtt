@@ -11,7 +11,7 @@ type cell =
   | Guess of {nm : string option; ty : ty; guess : dev}
   | Let of {nm : string option; ty : ty; def : tm}
   | Lam of {nm : string option; ty : ty}
-  | Constrain of boundary (* not sure if this is right *)
+  | Constrain of boundary
   | Restrict of {r : Tm.chk Tm.t; r' : Tm.chk Tm.t}
 
 and dev =
@@ -224,6 +224,7 @@ sig
   val down : (dev, dev) move
   val up : (dev, dev) move
 
+  val fill : tm -> (dev, dev) move
   val lambda : string option -> (dev, dev) move
 end =
 struct
@@ -315,7 +316,7 @@ struct
     get >>= fun state ->
     match state.cmd.foc with
     | Hole ty ->
-      ret ty
+      ret (state.cx, ty)
     | _ ->
       raise InvalidMove
 
@@ -325,8 +326,15 @@ struct
     set {state with cmd}
 
 
+  let fill tm : (dev, dev) move =
+    get_hole >>= fun (cx, ty) ->
+    let tcx = Cx.core cx in
+    let vty = Typing.Cx.eval tcx ty in
+    Typing.check tcx vty tm;
+    set_foc @@ Ret tm
+
   let lambda nm : (dev, dev) move =
-    get_hole >>= fun ty ->
+    get_hole >>= fun (_, ty) ->
     match Tm.unleash ty with
     | Tm.Pi (dom, Tm.B (_, cod)) ->
       let lam = Lam {nm; ty = dom} in
