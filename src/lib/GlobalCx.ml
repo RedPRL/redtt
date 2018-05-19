@@ -19,7 +19,7 @@ let add_hole sg nm ~ty =
   | _ ->
     failwith "GlobalCx: name already used"
 
-let define (sg : t) (nm : string) ~ty ~tm =
+let define sg nm ~ty ~tm =
   match T.find nm sg with
   | None ->
     let entry = {ty; tm = Some tm} in

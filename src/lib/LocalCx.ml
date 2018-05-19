@@ -125,7 +125,7 @@ struct
 
 
   let quote cx ~ty el =
-    Q.quote_nf cx.qenv @@ V.{ty; el}
+    Q.quote_nf cx.qenv @@ {ty; el}
 
   let quote_ty cx ty =
     Q.quote_ty cx.qenv ty
