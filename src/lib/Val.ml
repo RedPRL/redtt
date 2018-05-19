@@ -42,6 +42,7 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
+  | Global : string -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * val_sys * dim list -> neu
   | Car : neu -> neu
@@ -429,6 +430,9 @@ struct
     | Lvl _ ->
       ret con
 
+    | Global _ ->
+      ret con
+
   and act_nf phi (nf : nf) =
     match nf with
     | info ->
@@ -684,8 +688,15 @@ struct
           | _ -> failwith "Expected value in environment"
         end
 
-      | Tm.Global _ ->
-        failwith "TODO: eval global"
+      | Tm.Global name ->
+        begin
+          match Sig.lookup name with
+          | Opaque {ty} ->
+            let vty = eval rel [] ty in
+            make @@ Up {ty = vty; neu = Global name}
+          | Transparent {tm} ->
+            eval rel [] tm
+        end
 
       | Tm.Pi (dom, cod) ->
         let dom = eval rel rho dom in

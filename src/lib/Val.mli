@@ -41,6 +41,7 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
+  | Global : string -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * val_sys * dim list -> neu
   | Car : neu -> neu
