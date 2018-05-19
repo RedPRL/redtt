@@ -15,7 +15,7 @@ type cell =
   | Restrict of {r : Tm.chk Tm.t; r' : Tm.chk Tm.t}
 
 and dev =
-  | Hole
+  | Hole of ty
   | B of cell * dev
   | Ret of tm
 
@@ -70,7 +70,7 @@ let rec pp_cell env fmt cell =
     let x = Pretty.Env.var 0 env' in
     begin
       match guess with
-      | Hole ->
+      | Hole _ ->
         Format.fprintf fmt "?%a : %a"
           Uuseg_string.pp_utf_8 x
           (Tm.pp env) ty
@@ -107,7 +107,7 @@ let rec pp_cell env fmt cell =
 
 and pp_dev env fmt =
   function
-  | Hole ->
+  | Hole _ ->
     Format.fprintf fmt "?"
   | Ret tm ->
     Format.fprintf fmt "`%a"
@@ -224,11 +224,11 @@ sig
   val down : (dev, dev) move
   val up : (dev, dev) move
 
-  val lambda : (dev, dev) move
+  val lambda : string option -> (dev, dev) move
 end =
 struct
   type 's cmd = {foc : 's; stk : ('s, dev) stack}
-  type 's state = {cx : Cx.t; ty : ty; cmd : 's cmd}
+  type 's state = {cx : Cx.t; cmd : 's cmd}
 
   module State = IxStateMonad.M (struct type 'i t = 'i state end)
   include State include IxMonad.Notation (State)
@@ -291,8 +291,7 @@ struct
       let stk = Push (KBDev (cell, ()), state.cmd.stk) in
       let cmd = {foc = dev; stk = stk} in
       let cx = Cx.ext state.cx cell in
-      (* TODO: need to update the type *)
-      set {state with cmd; cx}
+      set {cmd; cx}
 
     | _ ->
       Format.eprintf "Tried to descend into %a"
@@ -307,17 +306,31 @@ struct
       let foc = B (cell, state.cmd.foc) in
       let cmd = {foc; stk} in
       let cx = Cx.pop state.cx in
-      (* TODO: need to update the type *)
-      set {state with cmd; cx}
+      set {cmd; cx}
     | _ ->
       raise InvalidMove
 
 
-  let lambda : (dev, dev) move =
+  let get_hole =
     get >>= fun state ->
-    match Tm.unleash state.ty with
-    | Tm.Pi (_dom, _cod) ->
-      failwith ""
+    match state.cmd.foc with
+    | Hole ty ->
+      ret ty
+    | _ ->
+      raise InvalidMove
+
+  let set_foc foc =
+    get >>= fun state ->
+    let cmd = {state.cmd with foc} in
+    set {state with cmd}
+
+
+  let lambda nm : (dev, dev) move =
+    get_hole >>= fun ty ->
+    match Tm.unleash ty with
+    | Tm.Pi (dom, Tm.B (_, cod)) ->
+      let lam = Lam {nm; ty = dom} in
+      set_foc @@ B (lam, Hole cod)
     | _ ->
       failwith "lambda: expected pi type"
 end
