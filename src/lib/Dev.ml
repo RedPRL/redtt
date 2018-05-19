@@ -252,7 +252,11 @@ sig
 
   (** When the cursor is at a [Hole ty], check the supplied [tm] against [ty];
       if it matches, then replace the hole with [Ret tm]. *)
-  val fill : tm -> (dev, dev) move
+  val fill_hole : tm -> (dev, dev) move
+
+
+  (** When the cursor is at a {e pure} [Guess] cell, replace it with a [Let] cell. *)
+  val solve : (cell, cell) move
 
 
   (** When the cursor is at a hole of dependent function type, replace it with
@@ -261,6 +265,8 @@ sig
 end =
 struct
   type 's cmd = {foc : 's; stk : ('s, dev) stack}
+
+  (* TODO: we need a signature. *)
   type 's state = {cx : Cx.t; cmd : 's cmd}
 
   module State = IxStateMonad.M (struct type 'i t = 'i state end)
@@ -363,12 +369,24 @@ struct
     set {state with cmd}
 
 
-  let fill tm : (dev, dev) move =
+  let fill_hole tm : (dev, dev) move =
     get_hole >>= fun (cx, ty) ->
     let tcx = Cx.core cx in
     let vty = Typing.Cx.eval tcx ty in
     Typing.check tcx vty tm;
     set_foc @@ Ret tm
+
+  let solve : (cell, cell) move =
+    get >>= fun state ->
+    match state.cmd.foc with
+    | Guess {nm; ty; guess} ->
+      let proof = extract guess in
+      let tcx = Cx.core state.cx in
+      let vty = Typing.Cx.eval tcx ty in
+      Typing.check tcx vty proof;
+      set_foc @@ Let {nm; ty; def = proof}
+    | _ ->
+      failwith "solve: expected guess cell"
 
   let lambda nm : (dev, dev) move =
     get_hole >>= fun (_, ty) ->
@@ -391,7 +409,7 @@ struct
   let rec eval : eterm -> (dev, dev) IxM.move =
     function
     | Tt ->
-      IxM.fill @@ Tm.make Tm.Tt
+      IxM.fill_hole @@ Tm.make Tm.Tt
 
     | Lambda (x, etm) ->
       IxM.lambda (Some x) >>
