@@ -121,13 +121,9 @@ sig
   end
 end
 
-type sig_entry =
-  | Opaque of {ty : Tm.chk Tm.t}
-  | Transparent of {tm : Tm.chk Tm.t}
-
 module type Sig =
 sig
-  val lookup : string -> sig_entry
+  val lookup : string -> Tm.chk Tm.t
 end
 
 module M (Sig : Sig) : S =
@@ -689,14 +685,9 @@ struct
         end
 
       | Tm.Global name ->
-        begin
-          match Sig.lookup name with
-          | Opaque {ty} ->
-            let vty = eval rel [] ty in
-            make @@ Up {ty = vty; neu = Global name}
-          | Transparent {tm} ->
-            eval rel [] tm
-        end
+        let tty = Sig.lookup name in
+        let vty = eval rel [] tty in
+        make @@ Up {ty = vty; neu = Global name}
 
       | Tm.Pi (dom, cod) ->
         let dom = eval rel rho dom in

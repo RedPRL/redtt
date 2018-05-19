@@ -3,37 +3,30 @@
 open RedBasis
 module T = PersistentTable.M
 
-type entry =
-  {ty : Tm.chk Tm.t;
-   tm : Tm.chk Tm.t option}
-
-type t = (string, entry) T.t
+type ty = Tm.chk Tm.t
+type t = (string, ty) T.t
 
 let emp = T.init 100
 
 let add_hole sg nm ~ty =
   match T.find nm sg with
   | None ->
-    let entry = {ty; tm = None} in
-    T.set nm entry sg
+    T.set nm ty sg
   | _ ->
     failwith "GlobalCx: name already used"
 
 let define sg nm ~ty ~tm =
   match T.find nm sg with
   | None ->
-    let entry = {ty; tm = Some tm} in
-    T.set nm entry sg
+    let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm in
+    let sys = [face] in
+    let rty = Tm.make @@ Tm.Rst {ty; sys} in
+    T.set nm rty sg
   | _ ->
     failwith "GlobalCx: name already used"
 
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
   let lookup nm =
-    let {ty; tm} = T.get nm Sig.globals in
-    match tm with
-    | None ->
-      Val.Opaque {ty}
-    | Some tm ->
-      Val.Transparent {tm}
+    T.get nm Sig.globals
 end

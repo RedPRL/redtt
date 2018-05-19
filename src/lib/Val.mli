@@ -113,13 +113,10 @@ sig
   end
 end
 
-type sig_entry =
-  | Opaque of {ty : Tm.chk Tm.t}
-  | Transparent of {tm : Tm.chk Tm.t}
-
 module type Sig =
 sig
-  val lookup : string -> sig_entry
+  (** Return the type of a global variable *)
+  val lookup : string -> Tm.chk Tm.t
 end
 
 module M (Sig : Sig) : S
