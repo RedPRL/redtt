@@ -6,4 +6,5 @@
 
 (install
  ((section bin)
+  (package redtt)
   (files ((main.exe as redtt)))))

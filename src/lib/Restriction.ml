@@ -1,3 +1,5 @@
+open RedBasis
+
 type atom = Symbol.t
 type dim = Dim.repr
 module D = Dim

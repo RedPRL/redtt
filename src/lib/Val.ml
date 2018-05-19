@@ -1,3 +1,5 @@
+open RedBasis
+
 module D = Dim
 module Star = DimStar
 module Gen = DimGeneric
