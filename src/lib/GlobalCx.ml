@@ -37,5 +37,4 @@ struct
       Val.Opaque {ty}
     | Some tm ->
       Val.Transparent {tm}
-
 end
