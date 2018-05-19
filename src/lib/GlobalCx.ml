@@ -27,3 +27,8 @@ let define sg nm ~ty ~el =
     T.set nm entry sg
   | _ ->
     failwith "GlobalCx: name already used"
+
+module M (Sig : sig val globals : t end) : Val.Sig =
+struct
+  let lookup _ = failwith ""
+end

@@ -68,42 +68,57 @@ and ext_abs = (value * val_sys) Abstraction.abs
 and env_el = Val of value | Atom of atom
 and env = env_el list
 
-val make : con -> value
-val unleash : value -> con
 
-val eval : rel -> env -> 'a Tm.t -> value
-val eval_dim : rel -> env -> 'a Tm.t -> Dim.repr
-val eval_tm_sys : rel -> env -> Tm.chk Tm.t Tm.system -> val_sys
+module type S =
+sig
+  val make : con -> value
+  val unleash : value -> con
 
-val apply : value -> value -> value
-val ext_apply : value -> dim list -> value
-val car : value -> value
-val cdr : value -> value
+  val eval : rel -> env -> 'a Tm.t -> value
+  val eval_dim : rel -> env -> 'a Tm.t -> Dim.repr
+  val eval_tm_sys : rel -> env -> Tm.chk Tm.t Tm.system -> val_sys
 
-val inst_clo : clo -> value -> value
-val const_clo : value -> clo
+  val apply : value -> value -> value
+  val ext_apply : value -> dim list -> value
+  val car : value -> value
+  val cdr : value -> value
 
-val unleash_pi : value -> value * clo
-val unleash_sg : value -> value * clo
-val unleash_v : value -> gen * value * value * value
-val unleash_ext : value -> dim list -> value * val_sys
+  val inst_clo : clo -> value -> value
+  val const_clo : value -> clo
 
-
-val pp_value : Format.formatter -> value -> unit
-val pp_neu : Format.formatter -> neu -> unit
-
-
-module Val : Sort.S
-  with type t = value
-  with type 'a m = 'a
+  val unleash_pi : value -> value * clo
+  val unleash_sg : value -> value * clo
+  val unleash_v : value -> gen * value * value * value
+  val unleash_ext : value -> dim list -> value * val_sys
 
 
-module ExtAbs : Abstraction.S
-  with type el = value * val_sys
+  val pp_value : Format.formatter -> value -> unit
+  val pp_neu : Format.formatter -> neu -> unit
 
-module Abs : Abstraction.S
-  with type el = value
 
-module Macro : sig
-  val equiv : value -> value -> value
+  module Val : Sort.S
+    with type t = value
+    with type 'a m = 'a
+
+
+  module ExtAbs : Abstraction.S
+    with type el = value * val_sys
+
+  module Abs : Abstraction.S
+    with type el = value
+
+  module Macro : sig
+    val equiv : value -> value -> value
+  end
 end
+
+type sig_entry =
+  | Opaque of {ty : Tm.chk Tm.t}
+  | Transparent of {tm : Tm.chk Tm.t}
+
+module type Sig =
+sig
+  val lookup : string -> sig_entry
+end
+
+module M (Sig : Sig) : S

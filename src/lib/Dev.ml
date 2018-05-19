@@ -157,7 +157,7 @@ sig
       Guess binders turn into variable bindings (the guessed term is invisible), just like
       lambda binders. Let binders turn into definitions (which can be seen in type checking).
       Restrictions get turned into restrictions. *)
-  val core : t -> Typing.cx
+  val core : GlobalCx.t -> t -> Typing.cx
 
 
   exception EmptyContext
@@ -199,13 +199,16 @@ struct
     | Emp -> raise EmptyContext
     | Ext (cx, _) -> cx
 
-  let rec core dcx =
+  let rec core sg dcx =
+    let module Sig = GlobalCx.M (struct let globals = sg end) in
+    let module V = Val.M (Sig) in
+    let module LocalCx = LocalCx.M (V) in
     match dcx with
     | Emp ->
       LocalCx.emp
 
     | Ext (dcx, c) ->
-      let tcx = core dcx in
+      let tcx = core sg dcx in
       begin
         match c with
         | Guess {ty; nm; _} ->
@@ -373,8 +376,8 @@ struct
     get >>= fun state ->
     let module Sig = struct let globals = state.gcx end in
     let module T = Typing.M (Sig) in
-    let tcx = Cx.core state.cx in
-    let vty = LocalCx.eval tcx ty in
+    let tcx = Cx.core state.gcx state.cx in
+    let vty = T.Cx.eval tcx ty in
     T.check tcx vty tm;
     ret ()
 

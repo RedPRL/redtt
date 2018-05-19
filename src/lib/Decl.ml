@@ -5,6 +5,9 @@ type document = t list
 
 module Typing = Typing.M (struct let globals = GlobalCx.emp end)
 
+module V = Val.M (GlobalCx.M (struct let globals = GlobalCx.emp end))
+module LocalCx = LocalCx.M (V)
+
 let decl_name dcl =
   match dcl with
   | Define {name; _} ->
@@ -26,14 +29,16 @@ let to_inf decl =
     Tm.make @@ Tm.Down {ty; tm}
 
 
-let rec check_document cx decls =
-  match decls with
-  | [] ->
-    ()
+let rec check_document decls =
+  let rec go cx decls =
+    match decls with
+    | [] ->
+      ()
 
-  | decl :: decls ->
-    let cx' = check_decl cx decl in
-    check_document cx' decls
+    | decl :: decls ->
+      let cx' = check_decl cx decl in
+      go cx' decls
+  in go LocalCx.emp decls
 
 and check_decl cx decl =
   match decl with
