@@ -5,6 +5,8 @@ sig
   val init : size:int -> ('k, 'a) t
   val get : 'k -> ('k, 'a) t -> 'a
   val set : 'k -> 'a -> ('k, 'a) t -> ('k, 'a) t
+
+  val find : 'k -> ('k, 'a) t -> 'a option
 end
 
 module M : S =
@@ -54,6 +56,12 @@ struct
         | _ ->
           raise Fatal
       end
+
+  let find k t =
+    try
+      Some (get k t)
+    with
+    | _ -> None
 
   let set k v t =
     reroot t;

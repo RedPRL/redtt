@@ -632,6 +632,9 @@ and eval : type x. rel -> env -> x Tm.t -> value =
         | _ -> failwith "Expected value in environment"
       end
 
+    | Tm.Global _ ->
+      failwith "TODO: eval global"
+
     | Tm.Pi (dom, cod) ->
       let dom = eval rel rho dom in
       let cod = clo cod rel rho in
