@@ -3,6 +3,8 @@ type t =
 
 type document = t list
 
+module Typing = Typing.M (struct let globals = GlobalCx.emp end)
+
 let decl_name dcl =
   match dcl with
   | Define {name; _} ->
@@ -40,10 +42,10 @@ and check_decl cx decl =
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
     let inf = Tm.make @@ Tm.Down {ty; tm} in
     let vty = Typing.infer cx inf in
-    let el = Typing.Cx.eval cx tm in
-    let tm' = Typing.Cx.quote cx ~ty:vty el in
+    let el = LocalCx.eval cx tm in
+    let tm' = LocalCx.quote cx ~ty:vty el in
     let nm = Some (decl_name decl) in
-    let ppenv = Typing.Cx.ppenv cx in
+    let ppenv = LocalCx.ppenv cx in
     Format.fprintf
       Format.std_formatter
       "@[<v 0>%a@, : @[%a@]@, %a @[%a@]@, %a @[%a@]@]@,@."
@@ -56,4 +58,4 @@ and check_decl cx decl =
       (Uuseg_string.pp_utf_8)
       "↡"
       (Tm.pp ppenv) tm';
-    Typing.Cx.def cx ~nm ~ty:vty ~el
+    LocalCx.def cx ~nm ~ty:vty ~el
