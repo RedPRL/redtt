@@ -19,6 +19,30 @@ and dev =
   | Node of cell * dev
   | Ret of tm
 
+(** Given a {e pure} development calculus term (one which has no holes), return a core language term. *)
+let rec extract : dev -> tm =
+  function
+  | Hole _ ->
+    failwith "extract: encountered impure development term (Hole)"
+  | Node (cell, dev) ->
+    begin
+      match cell with
+      | Guess _ ->
+        failwith "extract: encountered impure development term (Guess)"
+      | Lam {nm; _} ->
+        Tm.lam nm @@ extract dev
+      | Constrain _ ->
+        extract dev
+      | Restrict _ ->
+        extract dev
+      | Let {ty; def; nm} ->
+        let tm = Tm.make @@ Tm.Down {ty; tm = def} in
+        Tm.let_ nm tm @@ extract dev
+    end
+  | Ret tm ->
+    tm
+
+
 (** We now proceed to unleash the proof state zipper. *)
 
 type (_, _) frame =
@@ -213,6 +237,8 @@ sig
 
   type ('i, 'o) move = ('i, 'o, unit) m
 
+  val run : ty -> (dev, dev) move -> tm
+
   (** The names of these moves are not yet perfected. *)
 
   val push_guess : (cell, dev) move
@@ -244,6 +270,11 @@ struct
 
   type ('i, 'o) move = ('i, 'o, unit) m
 
+
+  let run ty m : tm =
+    let init = {foc = Hole ty; stk = Top} in
+    let _, final = State.run {cx = Cx.emp; cmd = init} m in
+    extract final.cmd.foc
 
   let push_guess : _ m =
     get >>= fun state ->
@@ -347,4 +378,27 @@ struct
       set_foc @@ Node (lam, Hole cod)
     | _ ->
       failwith "lambda: expected pi type"
+end
+
+module Test =
+struct
+  type eterm =
+    | Lambda of string * eterm
+    | Tt
+
+  include (IxMonad.Notation (IxM))
+
+  let rec eval : eterm -> (dev, dev) IxM.move =
+    function
+    | Tt ->
+      IxM.fill @@ Tm.make Tm.Tt
+
+    | Lambda (x, etm) ->
+      IxM.lambda (Some x) >>
+      IxM.down >>
+      eval etm >>
+      IxM.up
+
+  let test_script = eval @@ Lambda ("x", Tt)
+  let test_ty = Tm.pi None (Tm.make Tm.Bool) (Tm.make Tm.Bool)
 end
