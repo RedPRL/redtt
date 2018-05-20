@@ -199,39 +199,68 @@ struct
     | Emp -> raise EmptyContext
     | Ext (cx, _) -> cx
 
-  let rec core sg dcx =
+  let rec core sg =
     let module Sig = GlobalCx.M (struct let globals = sg end) in
     let module V = Val.M (Sig) in
     let module LocalCx = LocalCx.M (V) in
-    match dcx with
-    | Emp ->
-      LocalCx.emp
+    let rec go dcx =
+      match dcx with
+      | Emp ->
+        LocalCx.emp
 
-    | Ext (dcx, c) ->
-      let tcx = core sg dcx in
-      begin
-        match c with
-        | Guess {ty; nm; _} ->
-          let vty = LocalCx.eval tcx ty in
-          fst @@ LocalCx.ext_ty tcx ~nm vty
+      | Ext (dcx, c) ->
+        let tcx = go dcx in
+        begin
+          match c with
+          | Guess {ty; nm; _} ->
+            let vty = LocalCx.eval tcx ty in
+            fst @@ LocalCx.ext_ty tcx ~nm vty
 
-        | Let {ty; nm; def} ->
-          let vty = LocalCx.eval tcx ty in
-          let vdef = LocalCx.eval tcx def in
-          LocalCx.def tcx ~nm ~ty:vty ~el:vdef
+          | Let {ty; nm; def} ->
+            let vty = LocalCx.eval tcx ty in
+            let vdef = LocalCx.eval tcx def in
+            LocalCx.def tcx ~nm ~ty:vty ~el:vdef
 
-        | Lam {ty; nm} ->
-          let vty = LocalCx.eval tcx ty in
-          fst @@ LocalCx.ext_ty tcx ~nm vty
+          | Lam {ty; nm} ->
+            let vty = LocalCx.eval tcx ty in
+            fst @@ LocalCx.ext_ty tcx ~nm vty
 
-        | Constrain _ ->
-          tcx
+          | Constrain _ ->
+            tcx
 
-        | Restrict {r; r'} ->
-          let vr = LocalCx.eval_dim tcx r in
-          let vr' = LocalCx.eval_dim tcx r' in
-          LocalCx.restrict tcx vr vr'
-      end
+          | Restrict {r; r'} ->
+            let vr = LocalCx.eval_dim tcx r in
+            let vr' = LocalCx.eval_dim tcx r' in
+            LocalCx.restrict tcx vr vr'
+        end
+    in go
+
+  let rec skolemize sg dcx cod =
+    let module Sig = GlobalCx.M (struct let globals = sg end) in
+    let module V = Val.M (Sig) in
+    let module LocalCx = LocalCx.M (V) in
+    let rec go dcx cod =
+      match dcx with
+      | Emp ->
+        cod
+      | Ext (dcx, c) ->
+        go dcx @@
+        begin
+          match c with
+          | Guess {ty; nm; _} ->
+            Tm.make @@ Tm.Pi (ty, Tm.B (nm, cod))
+          | Let {ty; def; _} ->
+            let inf = Tm.make @@ Tm.Down {ty; tm = def} in
+            Tm.subst (Tm.inst0 inf) cod
+          | Lam {ty; nm} ->
+            Tm.make @@ Tm.Pi (ty, Tm.B (nm, cod))
+          | Constrain _ ->
+            cod
+          | Restrict _ ->
+            cod
+        end
+
+    in go dcx cod
 end
 
 module IxM :
