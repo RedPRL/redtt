@@ -896,26 +896,25 @@ struct
   and unleash_pi ?debug:(debug = []) v =
     match unleash v with
     | Pi {dom; cod} -> dom, cod
+    | Rst rst -> unleash_pi ~debug rst.ty
     | _ ->
       Format.eprintf "%a: tried to unleash %a as pi type@."
         pp_trace debug
         pp_value v;
       failwith "unleash_pi"
 
-  and pp_trace fmt trace =
-    Format.fprintf fmt "@[[%a]@]"
-      (Format.pp_print_list Format.pp_print_string)
-      trace
-
   and unleash_sg v =
     match unleash v with
     | Sg {dom; cod} -> dom, cod
+    | Rst rst -> unleash_sg rst.ty
     | _ -> failwith "unleash_sg"
 
   and unleash_ext v rs =
     match unleash v with
     | Ext abs ->
       ExtAbs.inst abs rs
+    | Rst rst ->
+      unleash_ext rst.ty rs
     | _ ->
       Format.printf "unleash_ext: %a@." pp_value v;
       failwith "unleash_ext"
@@ -924,8 +923,17 @@ struct
     match unleash v with
     | V {x; ty0; ty1; equiv} ->
       x, ty0, ty1, equiv
+    | Rst rst ->
+      unleash_v rst.ty
     | _ ->
       failwith "unleash_v"
+
+  and pp_trace fmt trace =
+    Format.fprintf fmt "@[[%a]@]"
+      (Format.pp_print_list Format.pp_print_string)
+      trace
+
+
 
   and apply vfun varg =
     match unleash vfun with
