@@ -9,10 +9,10 @@ type t = (string, entry) T.t
 
 let emp = T.init 100
 
-let add_hole sg nm ~ty =
+let add_hole sg nm ~ty ~sys =
   match T.find nm sg with
   | None ->
-    T.set nm {ty; sys = []} sg
+    T.set nm {ty; sys} sg
   | _ ->
     failwith "GlobalCx: name already used"
 
