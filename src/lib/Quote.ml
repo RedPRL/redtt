@@ -69,7 +69,7 @@ struct
   include V
 
   let generic env ty =
-    make @@ Up {ty = ty; neu = Lvl (None, Env.len env)}
+    make @@ Up {ty = ty; neu = Lvl (None, Env.len env); sys = []}
 
   let rec equate env ty el0 el1 =
     match unleash ty with
@@ -198,7 +198,7 @@ struct
       let t1 = equate env nf0.ty nf0.el nf1.el in
       Tm.make @@ Tm.FunApp (t0, t1)
 
-    | ExtApp (neu0, _, rs0), ExtApp (neu1, _, rs1) ->
+    | ExtApp (neu0, rs0), ExtApp (neu1, rs1) ->
       let t = equate_neu env neu0 neu1 in
       let ts = equate_dims env rs0 rs1 in
       Tm.make @@ Tm.ExtApp (t, ts)

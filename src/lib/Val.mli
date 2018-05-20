@@ -37,13 +37,13 @@ type con =
   | Tt : con
   | Ff : con
 
-  | Up : {ty : value; neu : neu} -> con
+  | Up : {ty : value; neu : neu; sys : val_sys} -> con
 
 and neu =
   | Lvl : string option * int -> neu
   | Global : string -> neu
   | FunApp : neu * nf -> neu
-  | ExtApp : neu * val_sys * dim list -> neu
+  | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu

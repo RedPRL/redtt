@@ -38,13 +38,13 @@ type con =
   | Tt : con
   | Ff : con
 
-  | Up : {ty : value; neu : neu} -> con
+  | Up : {ty : value; neu : neu; sys : val_sys} -> con
 
 and neu =
   | Lvl : string option * int -> neu
   | Global : string -> neu
   | FunApp : neu * nf -> neu
-  | ExtApp : neu * val_sys * dim list -> neu
+  | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
 
@@ -251,15 +251,17 @@ struct
       match con with
       | Up up ->
         begin
-          match unleash up.ty with
-          | Rst info ->
+          match force_val_sys up.sys with
+          | `Proj el -> el
+          | `Rigid _ ->
             begin
-              match force_val_sys info.sys with
-              | `Proj el -> el
-              | `Rigid _ -> ref @@ Node {con; action = D.idn}
+              match unleash up.ty with
+              | Rst rst ->
+                let con = Up {ty = rst.ty; neu = up.neu; sys = rst.sys} in
+                ref @@ Node {con; action = D.idn}
+              | _ ->
+                ref @@ Node {con; action = D.idn}
             end
-          | _ ->
-            ref @@ Node {con; action = D.idn}
         end
       | _ ->
         ref @@ Node {con; action = D.idn}
@@ -340,10 +342,11 @@ struct
 
     | Up info ->
       let ty = Val.act phi info.ty in
+      let sys = ValSys.act phi info.sys in
       begin
         match act_neu phi info.neu with
         | Ret neu ->
-          make @@ Up {ty; neu}
+          make @@ Up {ty; neu; sys}
         | Step v ->
           v
       end
@@ -359,7 +362,7 @@ struct
         match act_neu phi info.neu with
         | Ret neu ->
           let vty = make_v mx ty0 ty1 equiv in
-          let el = make @@ Up {ty = vty; neu = neu} in
+          let el = make @@ Up {ty = vty; neu = neu; sys = []} in
           step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
         | Step el ->
           step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
@@ -376,19 +379,12 @@ struct
           step @@ apply v el
       end
 
-    | ExtApp (neu, sys, rs) ->
-      let sys = ValSys.act phi sys in
+    | ExtApp (neu, rs) ->
       let rs = List.map (Dim.act phi) rs in
       begin
         match act_neu phi neu with
         | Ret neu ->
-          begin
-            match force_val_sys sys with
-            | `Rigid _ ->
-              ret @@ ExtApp (neu, sys, rs)
-            | `Proj v ->
-              step v
-          end
+          ret @@ ExtApp (neu, rs)
         | Step v ->
           step @@ ext_apply v rs
       end
@@ -687,7 +683,7 @@ struct
       | Tm.Global name ->
         let tty = Sig.lookup name in
         let vty = eval rel [] tty in
-        make @@ Up {ty = vty; neu = Global name}
+        make @@ Up {ty = vty; neu = Global name; sys = []}
 
       | Tm.Pi (dom, cod) ->
         let dom = eval rel rho dom in
@@ -940,7 +936,12 @@ struct
       let dom, cod = unleash_pi ~debug:["apply"; "up"] info.ty in
       let cod' = inst_clo cod varg in
       let app = FunApp (info.neu, {ty = dom; el = varg}) in
-      make @@ Up {ty = cod'; neu = app}
+      let app_face =
+        Face.map @@ fun r r' a ->
+        apply a @@ Val.act (D.equate r r') varg
+      in
+      let app_sys = List.map app_face info.sys in
+      make @@ Up {ty = cod'; neu = app; sys = app_sys}
 
     | Coe info ->
       let r, r' = Star.unleash info.dir in
@@ -988,8 +989,13 @@ struct
       begin
         match force_val_sys sysr with
         | `Rigid _ ->
-          let app = ExtApp (info.neu, sysr, ss) in
-          make @@ Up {ty = tyr; neu = app}
+          let app = ExtApp (info.neu, ss) in
+          let app_face =
+            Face.map @@ fun r r' a ->
+            ext_apply a @@ List.map (Dim.act (Dim.equate r r')) ss
+          in
+          let app_sys = List.map app_face info.sys in
+          make @@ Up {ty = tyr; neu = app; sys = sysr @ app_sys}
         | `Proj v ->
           v
       end
@@ -1055,7 +1061,13 @@ struct
       info.el1
     | Up up ->
       let neu = VProj {x; ty0; ty1; equiv; neu = up.neu} in
-      make @@ Up {ty = ty1; neu}
+      let vproj_face =
+        Face.map @@ fun r r' a ->
+        let phi = Dim.equate r r' in
+        vproj (Gen.act phi x) ~ty0:(Val.act phi ty0) ~ty1:(Val.act phi ty1) ~equiv:(Val.act phi equiv) ~el:a
+      in
+      let vproj_sys = List.map vproj_face up.sys in
+      make @@ Up {ty = ty1; neu; sys = vproj_sys}
     | _ ->
       failwith "rigid_vproj"
 
@@ -1068,7 +1080,13 @@ struct
     | Up up ->
       let neu = If {mot; neu = up.neu; tcase; fcase} in
       let mot' = inst_clo mot scrut in
-      make @@ Up {ty = mot'; neu}
+      let if_face =
+        Face.map @@ fun r r' a ->
+        let phi = Dim.equate r r' in
+        if_ (Clo.act phi mot) a (Val.act phi tcase) (Val.act phi fcase)
+      in
+      let if_sys = List.map if_face up.sys in
+      make @@ Up {ty = mot'; neu; sys = if_sys}
     | _ ->
       failwith "if_"
 
@@ -1079,7 +1097,8 @@ struct
 
     | Up info ->
       let dom, _ = unleash_sg info.ty in
-      make @@ Up {ty = dom; neu = Car info.neu}
+      let car_sys = List.map (Face.map (fun _ _ a -> car a)) info.sys in
+      make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
 
     | Coe info ->
       let x, tyx = Abs.unleash1 info.abs in
@@ -1106,6 +1125,12 @@ struct
     match unleash v with
     | Cons (_, v1) ->
       v1
+
+    | Up info ->
+      let _, cod = unleash_sg info.ty in
+      let cdr_sys = List.map (Face.map (fun _ _ a -> cdr a)) info.sys in
+      let cod_car = inst_clo cod @@ car v in
+      make @@ Up {ty = cod_car; neu = Cdr info.neu; sys = cdr_sys}
 
     | Coe info ->
       let abs =
@@ -1242,7 +1267,7 @@ struct
     | FunApp (neu, arg) ->
       Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
 
-    | ExtApp (neu, _, args) ->
+    | ExtApp (neu, args) ->
       Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
 
     | Car neu ->

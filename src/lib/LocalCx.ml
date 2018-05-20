@@ -57,7 +57,7 @@ struct
 
   let ext_ty {env; qenv; tys; rel; ppenv} ~nm vty =
     let n = Quote.Env.len qenv in
-    let var = V.make @@ Val.Up {ty = vty; neu = Val.Lvl (nm, n)} in
+    let var = V.make @@ Val.Up {ty = vty; neu = Val.Lvl (nm, n); sys = []} in
     {env = Val.Val var :: env;
      tys = `Ty vty :: tys;
      qenv = Quote.Env.succ qenv;
