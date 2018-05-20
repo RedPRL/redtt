@@ -9,6 +9,7 @@ type inf = [`Inf]
 type info = Lexing.position * Lexing.position
 
 type _ f =
+  | Global : string -> inf f
   | Var : int -> inf f
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
@@ -95,6 +96,7 @@ let rec substf : type x. subst -> x f -> x f =
       | Var ix ->
         proj sub ix
 
+      | Global _ -> con
       | Bool -> con
       | Tt -> con
       | Ff -> con
@@ -252,9 +254,11 @@ let rec pp : type a. a t Pretty.t =
   fun env fmt tm ->
     match unleash tm with
     | Var i ->
-      Format.fprintf fmt "%a"
-        Uuseg_string.pp_utf_8
-        (Pretty.Env.var i env)
+      Uuseg_string.pp_utf_8 fmt @@
+      Pretty.Env.var i env
+
+    | Global nm ->
+      Uuseg_string.pp_utf_8 fmt nm
 
     | Down {ty; tm} ->
       Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm

@@ -157,7 +157,7 @@ sig
       Guess binders turn into variable bindings (the guessed term is invisible), just like
       lambda binders. Let binders turn into definitions (which can be seen in type checking).
       Restrictions get turned into restrictions. *)
-  val core : t -> Typing.cx
+  val core : GlobalCx.t -> t -> Typing.cx
 
 
   exception EmptyContext
@@ -199,35 +199,38 @@ struct
     | Emp -> raise EmptyContext
     | Ext (cx, _) -> cx
 
-  let rec core dcx =
+  let rec core sg dcx =
+    let module Sig = GlobalCx.M (struct let globals = sg end) in
+    let module V = Val.M (Sig) in
+    let module LocalCx = LocalCx.M (V) in
     match dcx with
     | Emp ->
-      Typing.Cx.emp
+      LocalCx.emp
 
     | Ext (dcx, c) ->
-      let tcx = core dcx in
+      let tcx = core sg dcx in
       begin
         match c with
         | Guess {ty; nm; _} ->
-          let vty = Typing.Cx.eval tcx ty in
-          fst @@ Typing.Cx.ext_ty tcx ~nm vty
+          let vty = LocalCx.eval tcx ty in
+          fst @@ LocalCx.ext_ty tcx ~nm vty
 
         | Let {ty; nm; def} ->
-          let vty = Typing.Cx.eval tcx ty in
-          let vdef = Typing.Cx.eval tcx def in
-          Typing.Cx.def tcx ~nm ~ty:vty ~el:vdef
+          let vty = LocalCx.eval tcx ty in
+          let vdef = LocalCx.eval tcx def in
+          LocalCx.def tcx ~nm ~ty:vty ~el:vdef
 
         | Lam {ty; nm} ->
-          let vty = Typing.Cx.eval tcx ty in
-          fst @@ Typing.Cx.ext_ty tcx ~nm vty
+          let vty = LocalCx.eval tcx ty in
+          fst @@ LocalCx.ext_ty tcx ~nm vty
 
         | Constrain _ ->
           tcx
 
         | Restrict {r; r'} ->
-          let vr = Typing.Cx.eval_dim tcx r in
-          let vr' = Typing.Cx.eval_dim tcx r' in
-          Typing.Cx.restrict tcx vr vr'
+          let vr = LocalCx.eval_dim tcx r in
+          let vr' = LocalCx.eval_dim tcx r' in
+          LocalCx.restrict tcx vr vr'
       end
 end
 
@@ -267,7 +270,7 @@ struct
   type 's cmd = {foc : 's; stk : ('s, dev) stack}
 
   (* TODO: we need a signature. *)
-  type 's state = {cx : Cx.t; cmd : 's cmd}
+  type 's state = {gcx : GlobalCx.t; cx : Cx.t; cmd : 's cmd}
 
   module State = IxStateMonad.M (struct type 'i t = 'i state end)
   include State include IxMonad.Notation (State)
@@ -279,7 +282,7 @@ struct
 
   let run ty m : tm =
     let init = {foc = Hole ty; stk = Top} in
-    let _, final = State.run {cx = Cx.emp; cmd = init} m in
+    let _, final = State.run {gcx = GlobalCx.emp; cx = Cx.emp; cmd = init} m in
     extract final.cmd.foc
 
   let push_guess : _ m =
@@ -335,7 +338,7 @@ struct
       let stk = Push (KNodeDev (cell, ()), state.cmd.stk) in
       let cmd = {foc = dev; stk = stk} in
       let cx = Cx.ext state.cx cell in
-      set {cmd; cx}
+      set {state with cmd; cx}
 
     | _ ->
       Format.eprintf "Tried to descend into %a"
@@ -350,7 +353,7 @@ struct
       let foc = Node (cell, state.cmd.foc) in
       let cmd = {foc; stk} in
       let cx = Cx.pop state.cx in
-      set {cmd; cx}
+      set {state with cmd; cx}
     | _ ->
       raise InvalidMove
 
@@ -369,11 +372,18 @@ struct
     set {state with cmd}
 
 
+  let check ~ty ~tm : ('i, 'i) move =
+    get >>= fun state ->
+    let module Sig = struct let globals = state.gcx end in
+    let module T = Typing.M (Sig) in
+    let tcx = Cx.core state.gcx state.cx in
+    let vty = T.Cx.eval tcx ty in
+    T.check tcx vty tm;
+    ret ()
+
   let fill_hole tm : (dev, dev) move =
-    get_hole >>= fun (cx, ty) ->
-    let tcx = Cx.core cx in
-    let vty = Typing.Cx.eval tcx ty in
-    Typing.check tcx vty tm;
+    get_hole >>= fun (_, ty) ->
+    check ~ty ~tm >>
     set_foc @@ Ret tm
 
   let solve : (cell, cell) move =
@@ -381,9 +391,7 @@ struct
     match state.cmd.foc with
     | Guess {nm; ty; guess} ->
       let proof = extract guess in
-      let tcx = Cx.core state.cx in
-      let vty = Typing.Cx.eval tcx ty in
-      Typing.check tcx vty proof;
+      check ~ty ~tm:proof >>
       set_foc @@ Let {nm; ty; def = proof}
     | _ ->
       failwith "solve: expected guess cell"

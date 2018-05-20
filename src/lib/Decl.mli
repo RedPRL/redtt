@@ -3,4 +3,4 @@ type t =
 
 type document = t list
 
-val check_document : Typing.Cx.t -> document -> unit
+val check_document : document -> unit
