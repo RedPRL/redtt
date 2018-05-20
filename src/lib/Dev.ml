@@ -159,6 +159,8 @@ sig
       Restrictions get turned into restrictions. *)
   val core : GlobalCx.t -> t -> Typing.cx
 
+  val skolemize : t -> Tm.chk Tm.t -> Tm.chk Tm.t
+
 
   exception EmptyContext
   val pop : t -> t
@@ -235,10 +237,7 @@ struct
         end
     in go
 
-  let rec skolemize sg dcx cod =
-    let module Sig = GlobalCx.M (struct let globals = sg end) in
-    let module V = Val.M (Sig) in
-    let module LocalCx = LocalCx.M (V) in
+  let rec skolemize dcx cod =
     let rec go dcx cod =
       match dcx with
       | Emp ->
@@ -294,6 +293,8 @@ sig
   (** When the cursor is at a hole of dependent function type, replace it with
       a [Lam] cell and a hole underneath it. *)
   val lambda : string option -> (dev, dev) move
+
+  val user_hole : string -> (dev, dev) move
 end =
 struct
   type 's cmd = {foc : 's; stk : ('s, dev) stack}
@@ -400,6 +401,11 @@ struct
     let cmd = {state.cmd with foc} in
     set {state with cmd}
 
+  let add_hole name ~ty ~sys=
+    get >>= fun state ->
+    let gcx = GlobalCx.add_hole state.gcx name ~ty ~sys in
+    set {state with gcx}
+
 
   let check ~ty ~tm : ('i, 'i) move =
     get >>= fun state ->
@@ -433,12 +439,20 @@ struct
       set_foc @@ Node (lam, Hole cod)
     | _ ->
       failwith "lambda: expected pi type"
+
+  let user_hole name : (dev, dev) move =
+    get_hole >>= fun (cx, ty) ->
+    let hole_ty = Cx.skolemize cx ty in
+    add_hole name ~ty:hole_ty ~sys:[] >>
+    let hole_tm = failwith "TODO: make an application that applies the global variable to everything in the context" in
+    fill_hole hole_tm
 end
 
 module Test =
 struct
   type eterm =
     | Lambda of string * eterm
+    | Hole of string
     | Tt
 
   include (IxMonad.Notation (IxM))
@@ -447,6 +461,9 @@ struct
     function
     | Tt ->
       IxM.fill_hole @@ Tm.make Tm.Tt
+
+    | Hole str ->
+      IxM.user_hole str
 
     | Lambda (x, etm) ->
       IxM.lambda (Some x) >>
