@@ -25,6 +25,10 @@ let define sg nm ~ty ~tm =
   | _ ->
     failwith "GlobalCx: name already used"
 
+let lookup_ty sg nm =
+  let {ty; _} = T.get nm sg in
+  ty
+
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
   let lookup nm =

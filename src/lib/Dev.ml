@@ -159,7 +159,7 @@ sig
       Restrictions get turned into restrictions. *)
   val core : GlobalCx.t -> t -> Typing.cx
 
-  val skolemize : t -> Tm.chk Tm.t -> Tm.chk Tm.t
+  val skolemize : t -> Tm.chk Tm.t -> Tm.chk Tm.t * Tm.chk Tm.t list
 
 
   exception EmptyContext
@@ -238,28 +238,28 @@ struct
     in go
 
   let rec skolemize dcx cod =
-    let rec go dcx cod =
+    let rec go i dcx (cod, args) =
       match dcx with
       | Emp ->
-        cod
+        cod, List.rev args
       | Ext (dcx, c) ->
-        go dcx @@
+        go (i + 1) dcx @@
         begin
           match c with
           | Guess {ty; nm; _} ->
-            Tm.make @@ Tm.Pi (ty, Tm.B (nm, cod))
+            Tm.make @@ Tm.Pi (ty, Tm.B (nm, cod)), Tm.up (Tm.var i) :: args
           | Let {ty; def; _} ->
             let inf = Tm.make @@ Tm.Down {ty; tm = def} in
-            Tm.subst (Tm.inst0 inf) cod
+            Tm.subst (Tm.inst0 inf) cod, args
           | Lam {ty; nm} ->
-            Tm.make @@ Tm.Pi (ty, Tm.B (nm, cod))
+            Tm.make @@ Tm.Pi (ty, Tm.B (nm, cod)), Tm.up (Tm.var i) :: args
           | Constrain _ ->
-            cod
+            cod, args
           | Restrict _ ->
-            cod
+            cod, args
         end
-
-    in go dcx cod
+    in
+    go 0 dcx (cod, [])
 end
 
 module IxM :
@@ -442,10 +442,16 @@ struct
 
   let user_hole name : (dev, dev) move =
     get_hole >>= fun (cx, ty) ->
-    let hole_ty = Cx.skolemize cx ty in
+    let hole_ty, hole_args = Cx.skolemize cx ty in
     add_hole name ~ty:hole_ty ~sys:[] >>
-    let hole_tm = failwith "TODO: make an application that applies the global variable to everything in the context" in
-    fill_hole hole_tm
+    let head = Tm.make @@ Tm.Global name in
+    let hole_tm =
+      List.fold_right
+        (fun arg tm -> Tm.make @@ Tm.FunApp (tm, arg))
+        hole_args
+        head
+    in
+    fill_hole @@ Tm.up hole_tm
 end
 
 module Test =
@@ -471,6 +477,10 @@ struct
       eval etm >>
       IxM.up
 
-  let test_script = eval @@ Lambda ("x", Tt)
-  let test_ty = Tm.pi None (Tm.make Tm.Bool) (Tm.make Tm.Bool)
+  let test_script = eval @@ Lambda ("y", Lambda ("x", Hole "fuck!"))
+  let bool = Tm.make Tm.Bool
+  let test_ty = Tm.pi None bool @@ Tm.pi None bool @@ bool
+  let foo () =
+    let tm = IxM.run test_ty test_script in
+    Format.printf "Result: %a@." (Tm.pp Pretty.Env.emp) tm
 end

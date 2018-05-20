@@ -350,6 +350,10 @@ struct
 
   and infer cx tm =
     match Tm.unleash tm with
+    | T.Global name ->
+      let ty = GlobalCx.lookup_ty Sig.globals name in
+      Cx.eval Cx.emp ty
+
     | T.Var ix ->
       begin
         match Cx.lookup ix cx with
