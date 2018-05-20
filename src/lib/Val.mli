@@ -115,8 +115,8 @@ end
 
 module type Sig =
 sig
-  (** Return the type of a global variable *)
-  val lookup : string -> Tm.chk Tm.t
+  (** Return the type and boundary of a global variable *)
+  val lookup : string -> Tm.chk Tm.t * Tm.chk Tm.t Tm.system
 end
 
 module M (Sig : Sig) : S

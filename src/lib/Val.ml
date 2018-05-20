@@ -123,7 +123,7 @@ end
 
 module type Sig =
 sig
-  val lookup : string -> Tm.chk Tm.t
+  val lookup : string -> Tm.chk Tm.t * Tm.chk Tm.t Tm.system
 end
 
 module M (Sig : Sig) : S =
@@ -681,9 +681,10 @@ struct
         end
 
       | Tm.Global name ->
-        let tty = Sig.lookup name in
+        let tty, tsys = Sig.lookup name in
+        let vsys = eval_tm_sys rel [] tsys in
         let vty = eval rel [] tty in
-        make @@ Up {ty = vty; neu = Global name; sys = []}
+        make @@ Up {ty = vty; neu = Global name; sys = vsys}
 
       | Tm.Pi (dom, cod) ->
         let dom = eval rel rho dom in
