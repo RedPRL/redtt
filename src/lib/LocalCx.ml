@@ -55,22 +55,22 @@ struct
      ppenv = Pretty.Env.emp;
      rel = R.emp}
 
-  let ext_ty {env; qenv; tys; rel; ppenv} ~nm vty =
+  let ext {env; qenv; tys; rel; ppenv} ~nm ty sys =
     let n = Quote.Env.len qenv in
-    let var = V.make @@ Val.Up {ty = vty; neu = Val.Lvl (nm, n); sys = []} in
+    let var = V.make @@ Val.Up {ty; neu = Val.Lvl (nm, n); sys} in
     {env = Val.Val var :: env;
-     tys = `Ty vty :: tys;
+     tys = `Ty ty :: tys;
      qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel},
     var
 
-  let def {env; qenv; tys; rel; ppenv} ~nm ~ty ~el =
-    {env = Val.Val el :: env;
-     tys = `Ty ty :: tys;
-     qenv = Quote.Env.succ qenv;
-     ppenv = snd @@ Pretty.Env.bind nm ppenv;
-     rel}
+  let ext_ty cx ~nm ty =
+    ext cx ~nm ty []
+
+  let def cx ~nm ~ty ~el =
+    let face = Face.True (Dim.dim0, Dim.dim0, el) in
+    fst @@ ext cx ~nm ty [face]
 
   let ext_dim {env; qenv; tys; rel; ppenv} ~nm =
     let x = Symbol.named nm in
