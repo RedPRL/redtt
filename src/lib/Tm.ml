@@ -101,7 +101,7 @@ let rec substf : type x. subst -> x f -> x f =
     | _ ->
       match con with
       | Var ix ->
-        proj sub ix
+        subst_var sub ix
 
       | Global _ -> con
       | Bool -> con
@@ -238,16 +238,16 @@ and subst_comp_sys sub sys =
   List.map (subst_comp_face sub) sys
 
 (* TODO: double check that this is correct *)
-and proj sub ix : inf f =
+and subst_var sub ix : inf f =
   match sub with
   | Id ->
     Var ix
   | Proj ->
     Var (ix + 1)
   | Sub (sub, t) ->
-    if ix = 0 then unleash t else proj sub (ix - 1)
+    if ix = 0 then unleash t else subst_var sub (ix - 1)
   | Cmp (sub1, sub0) ->
-    substf sub1 @@ proj sub0 ix
+    substf sub1 @@ subst_var sub0 ix
 
 and unleash : type x. x t -> x f =
   fun node ->
