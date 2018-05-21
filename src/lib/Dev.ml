@@ -269,6 +269,8 @@ sig
   (** When the cursor is at a hole of dependent function type, replace it with
       a [Lam] cell and a hole underneath it. *)
   val lambda : string option -> (dev, dev) move
+  val pi : string option -> Tm.chk Tm.t -> (dev, dev) move
+
   val pair : (dev, dev) move
 
   val user_hole : string -> (dev, dev) move
@@ -416,6 +418,19 @@ struct
       set_foc @@ Node (lam, Hole cod)
     | _ ->
       failwith "lambda: expected pi type"
+
+  (* (? : Univ) ===> ?F : (-> dom Univ). (-> [x : dom] (F x)) *)
+  let pi nm dom : (dev, dev) move =
+    get_hole >>= fun (_, univ) ->
+    match Tm.unleash univ with
+    | Tm.Univ _ ->
+      check ~ty:univ ~tm:dom >>
+      let fam_ty = Tm.pi nm dom univ in
+      let guess = Guess {nm = nm; ty = fam_ty; guess = Hole fam_ty} in
+      let pi_ty = Tm.pi nm (Tm.subst Tm.Proj dom) (Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0)) in
+      set_foc @@ Node (guess, Ret pi_ty)
+    | _ ->
+      failwith "pi: expected universe"
 
   let pair : (dev, dev) move =
     get_hole >>= fun (_, ty) ->
