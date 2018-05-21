@@ -150,6 +150,7 @@ struct
     | V.Univ _, T.Bool ->
       ()
 
+
     | V.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
       let cxx, x = Cx.ext_ty cx ~nm dom in
       let vcod = Eval.inst_clo cod x in
@@ -171,6 +172,17 @@ struct
 
     | V.Univ _, T.FCom info ->
       check_fcom cx ty info.r info.r' info.cap info.sys
+
+    | V.Univ _, T.LblTy info ->
+      check cx ty info.ty;
+      let go_arg (ty, tm) =
+        let vty = check_eval_ty cx ty in
+        check cx vty tm
+      in
+      ignore @@ List.map go_arg info.args
+
+    | V.LblTy info, T.LblRet t ->
+      check cx info.ty t
 
     | V.Bool, (T.Tt | T.Ff) ->
       ()
@@ -440,6 +452,10 @@ struct
       let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:scrut in
       Cx.eval cx_scrut mot
 
+
+    | T.LblCall t ->
+      let _, _, ty = Eval.unleash_lbl_ty @@ infer cx t in
+      ty
 
     | T.Down info ->
       let ty = check_eval_ty cx info.ty in

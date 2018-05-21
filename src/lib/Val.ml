@@ -104,7 +104,7 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> gen * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
-
+  val unleash_lbl_ty : value -> string * nf list * value
 
   val pp_value : Format.formatter -> value -> unit
   val pp_neu : Format.formatter -> neu -> unit
