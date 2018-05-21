@@ -461,6 +461,7 @@ module Test =
 struct
   type eterm =
     | Lambda of string list * eterm
+    | Pi of (string * eterm) * eterm
     | Pair of eterm * eterm
     | Hole of string
     | Tt
@@ -502,6 +503,14 @@ struct
           IxM.lambda (Some x) >>
           under_node @@ go xs
       in go xs
+
+    | Pi ((x, dom), cod) ->
+      IxM.pi (Some x) >>
+      solve_guess_node (elab dom) >>
+      under_node @@
+      IxM.lambda (Some x) >>
+      under_node @@
+      solve_guess_node (elab cod)
 
   let test_script = elab @@ Lambda (["y"; "x"], Pair (Hole "?0", Hole "?1"))
 
