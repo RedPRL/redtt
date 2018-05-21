@@ -15,7 +15,7 @@ type cell =
   | Restrict of {r : Tm.chk Tm.t; r' : Tm.chk Tm.t}
 
 and dev =
-  | Hole of ty
+  | Hole of ty (* TODO: add boundary *)
   | Node of cell * dev
   | Ret of tm
 
