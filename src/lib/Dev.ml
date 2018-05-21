@@ -5,9 +5,6 @@ type tm = Tm.chk Tm.t
     held as a reference to something in the proof state, rather in the dev term itself. This would give us a way to implement
     tactics that do complicated stuff to the global proof state without needing to remember how to get to one place or another in the zipper. *)
 
-(** A [cell] is an entry in the development context, what Conor McBride called a {e component} in his thesis.
-    These cells are also the left parts of the "binders" in the development calculus.
-*)
 type cell =
   | Guess of {nm : string option; ty : ty; guess : dev}
   | Let of {nm : string option; ty : ty; def : tm}
