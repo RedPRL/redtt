@@ -377,7 +377,7 @@ let rec pp : type a. a t Pretty.t =
 
     | Let (tm0, B (nm, tm1)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(let@ @[<1>[%a %a]@] %a)@]" Uuseg_string.pp_utf_8 x (pp env) tm0 (pp env') tm1
+      Format.fprintf fmt "@[<1>(let@ @[<1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env) tm0 (pp env') tm1
 
     | LblTy {lbl; args; ty} ->
       begin
