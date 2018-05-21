@@ -483,7 +483,7 @@ struct
           IxM.up
       in go xs
 
-  let test_script = eval @@ Lambda (["y";"x"], Hole "fuck!")
+  let test_script = eval @@ Lambda (["y"], Hole "fuck!")
   let bool = Tm.make Tm.Bool
   let test_ty = Tm.pi None bool @@ Tm.pi None bool @@ bool
   let foo () =

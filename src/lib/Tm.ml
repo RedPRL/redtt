@@ -48,6 +48,10 @@ type _ f =
 
   | Let : inf t * chk t bnd -> chk f
 
+  | LblTy : {lbl : string; args : (chk t * chk t) list; ty : chk t} -> chk f
+  | LblRet : chk t -> chk f
+  | LblCall : inf t -> inf f
+
 and subst =
   | Id
   | Proj
@@ -200,6 +204,17 @@ let rec substf : type x. subst -> x f -> x f =
 
       | Let (t, bnd) ->
         Let (subst sub t, subst_bnd sub bnd)
+
+      | LblTy {lbl; args; ty} ->
+        let args = List.map (fun (ty, tm) -> subst sub ty, subst sub tm) args in
+        let ty = subst sub ty in
+        LblTy {lbl; args; ty}
+
+      | LblRet t ->
+        LblRet (subst sub t)
+
+      | LblCall t ->
+        LblCall (subst sub t)
 
 and subst_ext_sys sub sys =
   List.map (subst_ext_face sub) sys
@@ -364,9 +379,32 @@ let rec pp : type a. a t Pretty.t =
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<1>(let@ @[<1>[%a %a]@] %a)@]" Uuseg_string.pp_utf_8 x (pp env) tm0 (pp env') tm1
 
-and pp_terms env fmt ts =
-  let pp_sep fmt () = Format.fprintf fmt " " in
-  Format.pp_print_list ~pp_sep (pp env) fmt ts
+    | LblTy {lbl; args; ty} ->
+      begin
+        match args with
+        | [] ->
+          Format.fprintf fmt "@[<1>{%a : %a}@]"
+            Uuseg_string.pp_utf_8 lbl
+            (pp env) ty
+        | _ ->
+          Format.fprintf fmt "@[<1>{%a %a : %a}@]"
+            Uuseg_string.pp_utf_8 lbl
+            (pp_terms env) (List.map snd args)
+            (pp env) ty
+      end
+
+    | LblRet t ->
+      Format.fprintf fmt "@[<1>(ret@ %a)@]"
+        (pp env) t
+
+    | LblCall t ->
+      Format.fprintf fmt "@[<1>(call@ %a)@]"
+        (pp env) t
+
+and pp_terms : type x. x t list Pretty.t =
+  fun env fmt ts ->
+    let pp_sep fmt () = Format.fprintf fmt " " in
+    Format.pp_print_list ~pp_sep (pp env) fmt ts
 
 and pp_strings fmt (xs : string list) : unit =
   let pp_sep fmt () = Format.fprintf fmt " " in

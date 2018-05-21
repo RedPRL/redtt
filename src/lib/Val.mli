@@ -39,6 +39,9 @@ type con =
 
   | Up : {ty : value; neu : neu; sys : val_sys} -> con
 
+  | LblTy : {lbl : string; args : value list; ty : value} -> con
+  | LblRet : value -> con
+
 and neu =
   | Lvl : string option * int -> neu
   | Global : string -> neu
@@ -51,6 +54,8 @@ and neu =
   (* Invariant: neu \in vty, vty is a V type
   *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
+
+  | LblCall : neu -> neu
 
 and nf = {ty : value; el : value}
 

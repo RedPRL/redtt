@@ -56,6 +56,12 @@ type _ f =
 
   | Let : inf t * chk t bnd -> chk f
 
+
+  (* Labelled types from Epigram *)
+  | LblTy : {lbl : string; args : (chk t * chk t) list; ty : chk t} -> chk f
+  | LblRet : chk t -> chk f
+  | LblCall : inf t -> inf f
+
 (** Explicit substitutions in the style of Abadi. *)
 type subst =
   | Id
