@@ -175,32 +175,11 @@ let lambda nm : (dev, dev) move =
   | _ ->
     failwith "lambda: expected pi type"
 
-(* (? : Univ) ===> ?A : Univ. ?B : (-> A Univ). (-> [x : A] (B x)) *)
-let pi nm : (dev, dev) move =
-  get_hole >>= fun (_, univ) ->
-  match Tm.unleash univ with
-  | Tm.Univ _ ->
-    let guess_dom = Guess {nm = None; ty = univ; guess = Hole univ} in
-    let fam_ty = Tm.pi nm (Tm.up @@ Tm.var 0) univ in
-    let guess_cod = Guess {nm = Some "fam"; ty = fam_ty; guess = Hole fam_ty} in
-    let pi_ty =
-      Tm.pi nm (Tm.up @@ Tm.var 1) @@
-      Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0)
-    in
-    set_foc @@ Node (guess_dom, Node (guess_cod, Ret pi_ty))
-  | _ ->
-    failwith "pi: expected universe"
+let claim nm ty : (dev, dev) move =
+  get >>= fun state ->
+  let guess = Guess {nm; ty; guess = Hole ty} in
+  set_foc @@ Node (guess, Dev.subst Tm.Proj state.cmd.foc)
 
-let pair : (dev, dev) move =
-  get_hole >>= fun (_, ty) ->
-  match Tm.unleash ty with
-  | Tm.Sg (dom, Tm.B (nm, cod)) ->
-    let guess0 = Guess {nm = nm; ty = dom; guess = Hole dom} in
-    let guess1 = Guess {nm = None; ty = cod; guess = Hole cod} in
-    let pair = Tm.cons (Tm.up @@ Tm.var 1) (Tm.up @@ Tm.var 0) in
-    set_foc @@ Node (guess0, Node (guess1, Ret pair))
-  | _ ->
-    failwith "pair: expected sg type"
 
 let user_hole name : (dev, dev) move =
   get_hole >>= fun (cx, ty) ->

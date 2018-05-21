@@ -14,6 +14,8 @@ and dev =
   | Node of cell * dev
   | Ret of tm
 
+val subst : Tm.subst -> dev -> dev
+
 val pp_dev : dev Pretty.t
 val pp_cell : cell Pretty.t
 val ppenv_cell : Pretty.env -> cell -> Pretty.env

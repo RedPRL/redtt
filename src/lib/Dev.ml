@@ -15,6 +15,27 @@ and dev =
   | Node of cell * dev
   | Ret of tm
 
+let rec subst sub =
+  function
+  | Hole ty -> Hole (Tm.subst sub ty)
+  | Node (cell, dev) -> Node (subst_cell sub cell, subst sub dev)
+  | Ret tm -> Ret (Tm.subst sub tm)
+
+and subst_cell sub =
+  function
+  | Guess info ->
+    let ty = Tm.subst sub info.ty in
+    let guess = subst sub info.guess in
+    Guess {info with ty; guess}
+  | Let info ->
+    let ty = Tm.subst sub info.ty in
+    let def = Tm.subst sub info.def in
+    Let {info with ty; def}
+  | Lam info ->
+    let ty = Tm.subst sub info.ty in
+    Lam {info with ty}
+
+
 (** Given a {e pure} development calculus term (one which has no holes), return a core language term. *)
 let rec extract : dev -> tm =
   function
