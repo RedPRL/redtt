@@ -39,6 +39,9 @@ type con =
 
   | Up : {ty : value; neu : neu; sys : val_sys} -> con
 
+  | LblTy : {lbl : string; args : nf list; ty : value} -> con
+  | LblRet : value -> con
+
 and neu =
   | Lvl : string option * int -> neu
   | Global : string -> neu
@@ -51,6 +54,8 @@ and neu =
   (* Invariant: neu \in vty, vty is a V type
   *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
+
+  | LblCall : neu -> neu
 
 and nf = {ty : value; el : value}
 
@@ -83,6 +88,7 @@ sig
   val ext_apply : value -> dim list -> value
   val car : value -> value
   val cdr : value -> value
+  val lbl_call : value -> value
 
   val inst_clo : clo -> value -> value
   val const_clo : value -> clo
@@ -91,6 +97,7 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> gen * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
+  val unleash_lbl_ty : value -> string * nf list * value
 
 
   val pp_value : Format.formatter -> value -> unit

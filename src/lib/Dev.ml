@@ -442,17 +442,13 @@ struct
 
   let user_hole name : (dev, dev) move =
     get_hole >>= fun (cx, ty) ->
-    let hole_ty, hole_args = Cx.skolemize cx ty in
+    let lbl_ty = Tm.make @@ Tm.LblTy {lbl = name; args = []; ty} in
+    let hole_ty, hole_args = Cx.skolemize cx lbl_ty in
     Format.printf "Adding hole of type %a to global context@." (Tm.pp Pretty.Env.emp) hole_ty;
     add_hole name ~ty:hole_ty ~sys:[] >>
     let head = Tm.make @@ Tm.Global name in
-    let hole_tm =
-      List.fold_right
-        (fun arg tm -> Tm.make @@ Tm.FunApp (tm, arg))
-        hole_args
-        head
-    in
-    fill_hole @@ Tm.up hole_tm
+    let hole_tm = List.fold_right (fun arg tm -> Tm.make @@ Tm.FunApp (tm, arg)) hole_args head in
+    fill_hole @@ Tm.up @@ Tm.make @@ Tm.LblCall hole_tm
 end
 
 module Test =
@@ -483,7 +479,7 @@ struct
           IxM.up
       in go xs
 
-  let test_script = eval @@ Lambda (["y";"x"], Hole "fuck!")
+  let test_script = eval @@ Lambda (["y"], Hole "fuck!")
   let bool = Tm.make Tm.Bool
   let test_ty = Tm.pi None bool @@ Tm.pi None bool @@ bool
   let foo () =

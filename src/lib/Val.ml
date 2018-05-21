@@ -40,6 +40,9 @@ type con =
 
   | Up : {ty : value; neu : neu; sys : val_sys} -> con
 
+  | LblTy : {lbl : string; args : nf list; ty : value} -> con
+  | LblRet : value -> con
+
 and neu =
   | Lvl : string option * int -> neu
   | Global : string -> neu
@@ -52,6 +55,8 @@ and neu =
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
+
+  | LblCall : neu -> neu
 
 and nf = {ty : value; el : value}
 
@@ -91,6 +96,7 @@ sig
   val ext_apply : value -> dim list -> value
   val car : value -> value
   val cdr : value -> value
+  val lbl_call : value -> value
 
   val inst_clo : clo -> value -> value
   val const_clo : value -> clo
@@ -99,7 +105,7 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> gen * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
-
+  val unleash_lbl_ty : value -> string * nf list * value
 
   val pp_value : Format.formatter -> value -> unit
   val pp_neu : Format.formatter -> neu -> unit
@@ -340,6 +346,12 @@ struct
     | Cons (v0, v1) ->
       make @@ Cons (Val.act phi v0, Val.act phi v1)
 
+    | LblTy {lbl; ty; args} ->
+      make @@ LblTy {lbl; ty = Val.act phi ty; args = List.map (act_nf phi) args}
+
+    | LblRet v ->
+      make @@ LblRet (Val.act phi v)
+
     | Up info ->
       let ty = Val.act phi info.ty in
       let sys = ValSys.act phi info.sys in
@@ -417,6 +429,15 @@ struct
           ret @@ If {mot; neu; tcase; fcase}
         | Step v ->
           step @@ if_ mot v tcase fcase
+      end
+
+    | LblCall neu ->
+      begin
+        match act_neu phi neu with
+        | Ret neu ->
+          ret @@ LblCall neu
+        | Step v ->
+          step @@ lbl_call v
       end
 
     | Lvl _ ->
@@ -817,6 +838,18 @@ struct
         let v0 = eval rel rho t0 in
         eval rel (Val v0 :: rho) t1
 
+      | Tm.LblTy info ->
+        let ty = eval rel rho info.ty in
+        let args = List.map (fun (ty, tm) -> {ty = eval rel rho ty; el = eval rel rho tm}) info.args in
+        make @@ LblTy {lbl = info.lbl; ty; args}
+
+      | Tm.LblRet t ->
+        make @@ LblRet (eval rel rho t)
+
+      | Tm.LblCall t ->
+        let v = eval rel rho t in
+        lbl_call v
+
 
   and eval_bnd_face rel rho (tr, tr', obnd) =
     let r = eval_dim rel rho tr in
@@ -929,12 +962,35 @@ struct
     | _ ->
       failwith "unleash_v"
 
+  and unleash_lbl_ty v =
+    match unleash v with
+    | LblTy {lbl; args; ty} ->
+      lbl, args, ty
+    | Rst rst ->
+      unleash_lbl_ty rst.ty
+    | _ ->
+      failwith "unleash_lbl_ty"
+
   and pp_trace fmt trace =
     Format.fprintf fmt "@[[%a]@]"
       (Format.pp_print_list Format.pp_print_string)
       trace
 
 
+  and lbl_call v =
+    match unleash v with
+    | LblRet v -> v
+    | Up info ->
+      let _, _, ty = unleash_lbl_ty info.ty in
+      let call = LblCall info.neu in
+      let call_face =
+        Face.map @@ fun _ _ a ->
+        lbl_call a
+      in
+      let call_sys = List.map call_face info.sys in
+      make @@ Up {ty = ty; neu = call; sys = call_sys}
+    | _ ->
+      failwith "lbl_call"
 
   and apply vfun varg =
     match unleash vfun with
@@ -1238,6 +1294,10 @@ struct
       Format.fprintf fmt "<hcom>"
     | FCom _ ->
       Format.fprintf fmt "<fcom>"
+    | LblTy _ ->
+      Format.fprintf fmt "<lbl-ty>"
+    | LblRet _ ->
+      Format.fprintf fmt "<lbl-ret>"
 
   and pp_abs fmt abs =
     let x, v = Abs.unleash1 abs in
