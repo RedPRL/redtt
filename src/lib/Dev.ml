@@ -426,7 +426,7 @@ struct
     | Tm.Univ _ ->
       let guess_dom = Guess {nm = None; ty = univ; guess = Hole univ} in
       let fam_ty = Tm.pi nm (Tm.up @@ Tm.var 0) univ in
-      let guess_cod = Guess {nm; ty = fam_ty; guess = Hole fam_ty} in
+      let guess_cod = Guess {nm = Some "fam"; ty = fam_ty; guess = Hole fam_ty} in
       let pi_ty =
         Tm.pi nm (Tm.up @@ Tm.var 1) @@
         Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0)
@@ -508,14 +508,16 @@ struct
       IxM.pi (Some x) >>
       solve_guess_node (elab dom) >>
       under_node @@
-      IxM.lambda (Some x) >>
-      under_node @@
-      solve_guess_node (elab cod)
+      solve_guess_node @@
+      begin
+        IxM.lambda (Some x) >>
+        under_node @@ elab cod
+      end
 
-  let test_script = elab @@ Lambda (["y"; "x"], Pair (Hole "?0", Hole "?1"))
+  let test_script = elab @@ Lambda (["y"; "x"], Pair (Pi (("z", Hole "?0"), Hole "?01"), Hole "?1"))
 
   let bool = Tm.make Tm.Bool
-  let test_ty = Tm.pi None bool @@ Tm.pi None bool @@ Tm.sg None bool bool
+  let test_ty = Tm.pi None bool @@ Tm.pi None bool @@ Tm.sg None (Tm.univ Kind.Kan (Lvl.Const 0)) bool
   let foo () =
     let tm = IxM.run test_ty test_script in
     Format.printf "Result: %a@." (Tm.pp Pretty.Env.emp) tm
