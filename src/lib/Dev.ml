@@ -486,7 +486,7 @@ struct
     m >>
     IxM.up
 
-  let rec eval : eterm -> (dev, dev) IxM.move =
+  let rec elab : eterm -> (dev, dev) IxM.move =
     function
     | Tt ->
       IxM.fill_hole @@ Tm.make Tm.Tt
@@ -496,20 +496,20 @@ struct
 
     | Pair (e0, e1) ->
       IxM.pair >>
-      solve_guess_node (eval e0) >>
+      solve_guess_node (elab e0) >>
       under_node @@
-      solve_guess_node (eval e1)
+      solve_guess_node (elab e1)
 
     | Lambda (xs, etm) ->
       let rec go =
         function
-        | [] -> eval etm
+        | [] -> elab etm
         | x::xs ->
           IxM.lambda (Some x) >>
           under_node @@ go xs
       in go xs
 
-  let test_script = eval @@ Lambda (["y"; "x"], Pair (Hole "?0", Hole "?1"))
+  let test_script = elab @@ Lambda (["y"; "x"], Pair (Hole "?0", Hole "?1"))
 
   let bool = Tm.make Tm.Bool
   let test_ty = Tm.pi None bool @@ Tm.pi None bool @@ Tm.sg None bool bool
