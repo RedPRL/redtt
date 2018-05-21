@@ -427,7 +427,10 @@ struct
       check ~ty:univ ~tm:dom >>
       let fam_ty = Tm.pi nm dom univ in
       let guess = Guess {nm = nm; ty = fam_ty; guess = Hole fam_ty} in
-      let pi_ty = Tm.pi nm (Tm.subst Tm.Proj dom) (Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0)) in
+      let pi_ty =
+        let dom' = Tm.subst Tm.Proj dom in
+        let cod = Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0) in
+        Tm.pi nm dom' cod in
       set_foc @@ Node (guess, Ret pi_ty)
     | _ ->
       failwith "pi: expected universe"
