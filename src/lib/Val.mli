@@ -39,7 +39,7 @@ type con =
 
   | Up : {ty : value; neu : neu; sys : val_sys} -> con
 
-  | LblTy : {lbl : string; args : value list; ty : value} -> con
+  | LblTy : {lbl : string; args : nf list; ty : value} -> con
   | LblRet : value -> con
 
 and neu =

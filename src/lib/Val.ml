@@ -40,7 +40,7 @@ type con =
 
   | Up : {ty : value; neu : neu; sys : val_sys} -> con
 
-  | LblTy : {lbl : string; args : value list; ty : value} -> con
+  | LblTy : {lbl : string; args : nf list; ty : value} -> con
   | LblRet : value -> con
 
 and neu =
@@ -346,7 +346,7 @@ struct
       make @@ Cons (Val.act phi v0, Val.act phi v1)
 
     | LblTy {lbl; ty; args} ->
-      make @@ LblTy {lbl; ty = Val.act phi ty; args = List.map (Val.act phi) args}
+      make @@ LblTy {lbl; ty = Val.act phi ty; args = List.map (act_nf phi) args}
 
     | LblRet v ->
       make @@ LblRet (Val.act phi v)
@@ -839,7 +839,7 @@ struct
 
       | Tm.LblTy info ->
         let ty = eval rel rho info.ty in
-        let args = List.map (fun (_, tm) -> eval rel rho tm) info.args in
+        let args = List.map (fun (ty, tm) -> {ty = eval rel rho ty; el = eval rel rho tm}) info.args in
         make @@ LblTy {lbl = info.lbl; ty; args}
 
       | Tm.LblRet t ->
