@@ -69,7 +69,10 @@ let into_info info tf = ref {info = info; con = tf; subst = Id}
 let info node = !node.info
 
 let var i = make @@ Var i
-let lift sub = Sub (sub, var 0)
+
+let lift sub =
+  Sub (Cmp (sub, Proj), var 0)
+
 let rec liftn n sub =
   match n with
   | 0 -> sub
