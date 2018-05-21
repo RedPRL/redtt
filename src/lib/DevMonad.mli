@@ -18,9 +18,9 @@ val down : (dev, dev) move
 val up : (dev, dev) move
 
 
-val get_hole : (dev, dev, DevCx.t * Dev.ty) m
+val get_hole : (dev, dev, DevCx.t * rty) m
 
-val claim : string option -> ty -> (dev, dev) move
+val claim : string option -> rty -> (dev, dev) move
 
 (** When the cursor is at a [Hole ty], check the supplied [tm] against [ty];
     if it matches, then replace the hole with [Ret tm]. *)

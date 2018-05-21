@@ -32,11 +32,11 @@ module Refine =
 struct
   let pi nm : (dev, dev) M.move =
     M.get_hole >>= fun (_, univ) ->
-    match Tm.unleash univ with
+    match Tm.unleash univ.ty with
     | Tm.Univ _ ->
       claim_with None univ begin
-        let fam_ty = Tm.pi nm (Tm.up @@ Tm.var 0) univ in
-        claim_with (Some "fam") fam_ty begin
+        let fam_ty = Tm.pi nm (Tm.up @@ Tm.var 0) univ.ty in
+        claim_with (Some "fam") {ty = fam_ty; sys = []} begin
           let pi_ty =
             Tm.pi nm (Tm.up @@ Tm.var 1) @@
             Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0)
@@ -49,10 +49,10 @@ struct
 
   let pair =
     M.get_hole >>= fun (_, ty) ->
-    match Tm.unleash ty with
+    match Tm.unleash ty.ty with
     | Tm.Sg (dom, Tm.B (nm, cod)) ->
-      claim_with nm dom begin
-        claim_with None cod begin
+      claim_with nm {ty = dom; sys = []} begin
+        claim_with None {ty = cod; sys = []} begin
           M.fill_hole @@ Tm.cons (Tm.up @@ Tm.var 1) (Tm.up @@ Tm.var 0)
         end
       end

@@ -167,11 +167,11 @@ let rec substf : type x. subst -> x f -> x f =
 
       | Ext (NB (nms, (cod, sys))) ->
         let sub' = liftn (List.length nms) sub in
-        Ext (NB (nms, (subst sub' cod, subst_ext_sys sub' sys)))
+        Ext (NB (nms, (subst sub' cod, subst_sys sub' sys)))
 
       | Rst info ->
         let ty = subst sub info.ty in
-        let sys = subst_ext_sys sub info.sys in
+        let sys = subst_sys sub info.sys in
         Rst {ty; sys}
 
       | V info ->
@@ -219,7 +219,7 @@ let rec substf : type x. subst -> x f -> x f =
       | LblCall t ->
         LblCall (subst sub t)
 
-and subst_ext_sys sub sys =
+and subst_sys sub sys =
   List.map (subst_ext_face sub) sys
 
 and subst_ext_face sub (r, r', otm) =

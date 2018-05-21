@@ -75,6 +75,7 @@ val unleash : 'a t -> 'a f
 (** Explicit substitutions are used under the hood, so this is a constant time operation;
     the cost of substituion is spread unleash across calls to [unleash]. *)
 val subst : subst -> 'a t -> 'a t
+val subst_sys : subst -> chk t system -> chk t system
 
 type info = Lexing.position * Lexing.position
 val into_info : info option -> 'a f -> 'a t

@@ -5,6 +5,7 @@ sig
 
   val emp : t
 
+  val ext : t -> nm:string option -> value -> Val.val_sys -> t * value
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * Val.atom
   val ext_dims : t -> nms:string option list -> t * Val.atom list
