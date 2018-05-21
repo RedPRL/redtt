@@ -458,7 +458,7 @@ end
 module Test =
 struct
   type eterm =
-    | Lambda of string * eterm
+    | Lambda of string list * eterm
     | Hole of string
     | Tt
 
@@ -472,13 +472,18 @@ struct
     | Hole str ->
       IxM.user_hole str
 
-    | Lambda (x, etm) ->
-      IxM.lambda (Some x) >>
-      IxM.down >>
-      eval etm >>
-      IxM.up
+    | Lambda (xs, etm) ->
+      let rec go =
+        function
+        | [] -> eval etm
+        | x::xs ->
+          IxM.lambda (Some x) >>
+          IxM.down >>
+          go xs >>
+          IxM.up
+      in go xs
 
-  let test_script = eval @@ Lambda ("y", Lambda ("x", Hole "fuck!"))
+  let test_script = eval @@ Lambda (["y";"x"], Hole "fuck!")
   let bool = Tm.make Tm.Bool
   let test_ty = Tm.pi None bool @@ Tm.pi None bool @@ bool
   let foo () =
