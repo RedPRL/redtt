@@ -11,8 +11,6 @@ type cell =
   | Guess of {nm : string option; ty : ty; guess : dev}
   | Let of {nm : string option; ty : ty; def : tm}
   | Lam of {nm : string option; ty : ty}
-  | Constrain of boundary
-  | Restrict of {r : Tm.chk Tm.t; r' : Tm.chk Tm.t}
 
 and dev =
   | Hole of ty (* TODO: add boundary *)
@@ -31,10 +29,6 @@ let rec extract : dev -> tm =
         failwith "extract: encountered impure development term (Guess)"
       | Lam {nm; _} ->
         Tm.lam nm @@ extract dev
-      | Constrain _ ->
-        extract dev
-      | Restrict _ ->
-        extract dev
       | Let {ty; def; nm} ->
         let tm = Tm.make @@ Tm.Down {ty; tm = def} in
         Tm.let_ nm tm @@ extract dev
@@ -82,10 +76,6 @@ let rec ppenv_cell env =
   | Lam {nm; _} ->
     let _, envx = Pretty.Env.bind nm env in
     envx
-  | Constrain _ ->
-    env
-  | Restrict _ ->
-    env
 
 let rec pp_cell env fmt cell =
   let env' = ppenv_cell env cell in
@@ -120,15 +110,6 @@ let rec pp_cell env fmt cell =
       Uuseg_string.pp_utf_8 x
       (Tm.pp env) ty
 
-  | Constrain sys ->
-    Format.fprintf fmt "constrain %a"
-      (Tm.pp_sys env) sys
-
-  | Restrict {r; r'} ->
-    Format.fprintf fmt "[%a = %a]"
-      (Tm.pp env) r
-      (Tm.pp env) r'
-
 and pp_dev env fmt =
   function
   | Hole _ ->
@@ -159,7 +140,10 @@ sig
       Restrictions get turned into restrictions. *)
   val core : GlobalCx.t -> t -> Typing.cx
 
-  val skolemize : t -> Tm.chk Tm.t -> Tm.chk Tm.t * Tm.chk Tm.t list
+
+  (** Given a type [cod], render the context into a big pi type ending in [cod]; return this type
+      together with a list of arguments that a hole can be applied to. *)
+  val skolemize : t -> cod:Tm.chk Tm.t -> Tm.chk Tm.t * Tm.chk Tm.t list
 
 
   exception EmptyContext
@@ -226,18 +210,10 @@ struct
           | Lam {ty; nm} ->
             let vty = LocalCx.eval tcx ty in
             fst @@ LocalCx.ext_ty tcx ~nm vty
-
-          | Constrain _ ->
-            tcx
-
-          | Restrict {r; r'} ->
-            let vr = LocalCx.eval_dim tcx r in
-            let vr' = LocalCx.eval_dim tcx r' in
-            LocalCx.restrict tcx vr vr'
         end
     in go
 
-  let rec skolemize dcx cod =
+  let rec skolemize dcx ~cod =
     let rec go i dcx (cod, args) =
       match dcx with
       | Emp ->
@@ -253,10 +229,6 @@ struct
             Tm.subst (Tm.inst0 inf) cod, args
           | Lam {ty; nm} ->
             Tm.make @@ Tm.Pi (ty, Tm.B (nm, cod)), Tm.up (Tm.var i) :: args
-          | Constrain _ ->
-            cod, args
-          | Restrict _ ->
-            cod, args
         end
     in
     go 0 dcx (cod, [])
@@ -455,7 +427,7 @@ struct
   let user_hole name : (dev, dev) move =
     get_hole >>= fun (cx, ty) ->
     let lbl_ty = Tm.make @@ Tm.LblTy {lbl = name; args = []; ty} in
-    let hole_ty, hole_args = Cx.skolemize cx lbl_ty in
+    let hole_ty, hole_args = Cx.skolemize cx ~cod:lbl_ty in
     Format.printf "Adding hole of type %a to global context@." (Tm.pp Pretty.Env.emp) hole_ty;
     add_hole name ~ty:hole_ty ~sys:[] >>
     let head = Tm.make @@ Tm.Global name in
