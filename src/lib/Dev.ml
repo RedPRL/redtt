@@ -299,7 +299,7 @@ end =
 struct
   type 's cmd = {foc : 's; stk : ('s, dev) stack}
 
-  (* TODO: we need a signature. *)
+  (* TODO: add a resolver environment *)
   type 's state = {gcx : GlobalCx.t; cx : Cx.t; cmd : 's cmd}
 
   module State = IxStateMonad.M (struct type 'i t = 'i state end)
@@ -443,6 +443,7 @@ struct
   let user_hole name : (dev, dev) move =
     get_hole >>= fun (cx, ty) ->
     let hole_ty, hole_args = Cx.skolemize cx ty in
+    Format.printf "Adding hole of type %a to global context@." (Tm.pp Pretty.Env.emp) hole_ty;
     add_hole name ~ty:hole_ty ~sys:[] >>
     let head = Tm.make @@ Tm.Global name in
     let hole_tm =
