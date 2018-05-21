@@ -1294,8 +1294,19 @@ struct
       Format.fprintf fmt "<hcom>"
     | FCom _ ->
       Format.fprintf fmt "<fcom>"
-    | LblTy _ ->
-      Format.fprintf fmt "<lbl-ty>"
+    | LblTy {lbl; args; ty} ->
+      begin
+        match args with
+        | [] ->
+          Format.fprintf fmt "{%a : %a}"
+            Uuseg_string.pp_utf_8 lbl
+            pp_value ty
+        | _ ->
+          Format.fprintf fmt "{%a %a : %a}"
+            Uuseg_string.pp_utf_8 lbl
+            pp_nfs args
+            pp_value ty
+      end
     | LblRet _ ->
       Format.fprintf fmt "<lbl-ret>"
 
@@ -1347,6 +1358,13 @@ struct
 
     | _ ->
       Format.fprintf fmt "<neu>"
+
+  and pp_nf fmt nf =
+    pp_value fmt nf.el
+
+  and pp_nfs fmt nfs =
+    let pp_sep fmt () = Format.fprintf fmt " " in
+    Format.pp_print_list ~pp_sep pp_nf fmt nfs
 
   and pp_dims fmt rs =
     let pp_sep fmt () = Format.fprintf fmt " " in
