@@ -293,6 +293,7 @@ sig
   (** When the cursor is at a hole of dependent function type, replace it with
       a [Lam] cell and a hole underneath it. *)
   val lambda : string option -> (dev, dev) move
+  val pair : (dev, dev) move
 
   val user_hole : string -> (dev, dev) move
 end =
@@ -440,6 +441,17 @@ struct
     | _ ->
       failwith "lambda: expected pi type"
 
+  let pair : (dev, dev) move =
+    get_hole >>= fun (_, ty) ->
+    match Tm.unleash ty with
+    | Tm.Sg (dom, Tm.B (nm, cod)) ->
+      let guess0 = Guess {nm = nm; ty = dom; guess = Hole dom} in
+      let guess1 = Guess {nm = None; ty = cod; guess = Hole cod} in
+      let pair = Tm.cons (Tm.up @@ Tm.var 1) (Tm.up @@ Tm.var 0) in
+      set_foc @@ Node (guess0, Node (guess1, Ret pair))
+    | _ ->
+      failwith "pair: expected sg type"
+
   let user_hole name : (dev, dev) move =
     get_hole >>= fun (cx, ty) ->
     let lbl_ty = Tm.make @@ Tm.LblTy {lbl = name; args = []; ty} in
@@ -455,10 +467,24 @@ module Test =
 struct
   type eterm =
     | Lambda of string list * eterm
+    | Pair of eterm * eterm
     | Hole of string
     | Tt
 
   include (IxMonad.Notation (IxM))
+
+  let solve_guess_node m =
+    IxM.push_cell >>
+    IxM.push_guess >>
+    m >>
+    IxM.pop_guess >>
+    IxM.solve >>
+    IxM.pop_cell
+
+  let under_node m =
+    IxM.down >>
+    m >>
+    IxM.up
 
   let rec eval : eterm -> (dev, dev) IxM.move =
     function
@@ -468,20 +494,25 @@ struct
     | Hole str ->
       IxM.user_hole str
 
+    | Pair (e0, e1) ->
+      IxM.pair >>
+      solve_guess_node (eval e0) >>
+      under_node @@
+      solve_guess_node (eval e1)
+
     | Lambda (xs, etm) ->
       let rec go =
         function
         | [] -> eval etm
         | x::xs ->
           IxM.lambda (Some x) >>
-          IxM.down >>
-          go xs >>
-          IxM.up
+          under_node @@ go xs
       in go xs
 
-  let test_script = eval @@ Lambda (["y"], Hole "fuck!")
+  let test_script = eval @@ Lambda (["y"; "x"], Pair (Hole "?0", Hole "?1"))
+
   let bool = Tm.make Tm.Bool
-  let test_ty = Tm.pi None bool @@ Tm.pi None bool @@ bool
+  let test_ty = Tm.pi None bool @@ Tm.pi None bool @@ Tm.sg None bool bool
   let foo () =
     let tm = IxM.run test_ty test_script in
     Format.printf "Result: %a@." (Tm.pp Pretty.Env.emp) tm
