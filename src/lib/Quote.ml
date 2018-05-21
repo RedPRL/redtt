@@ -100,6 +100,12 @@ struct
     | Rst {ty; _} ->
       equate env ty el0 el1
 
+    | LblTy {ty; _} ->
+      let call0 = lbl_call el0 in
+      let call1 = lbl_call el1 in
+      let qcall = equate env ty call0 call1 in
+      Tm.make @@ Tm.LblRet qcall
+
     (* TODO: V type, in order to get eta law *)
 
     | _ ->
@@ -147,6 +153,17 @@ struct
         let ty = equate env ty info0.ty info1.ty in
         let sys = equate_val_sys env info0.ty info0.sys info1.sys in
         Tm.make @@ Tm.Rst {ty; sys}
+
+      | LblTy info0, LblTy info1 ->
+        if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
+          let ty = equate env ty info0.ty info1.ty in
+          let go_arg (nf0, nf1) =
+            let ty = equate_ty env nf0.ty nf1.ty in
+            let tm = equate env nf0.ty nf0.el nf1.el in
+            ty, tm
+          in
+          let args = List.map go_arg @@ List.combine info0.args info1.args in
+          Tm.make @@ Tm.LblTy {lbl = info0.lbl; ty; args}
 
       | Up up0, Up up1 ->
         Tm.up @@ equate_neu env up0.neu up1.neu
@@ -227,6 +244,10 @@ struct
          let func = equate env funty vproj0.func vproj1.func in
          Tm.make @@ Tm.VProj {r = tr; tm; func} *)
       failwith "TODO"
+
+    | LblCall neu0, LblCall neu1 ->
+      let q = equate_neu env neu0 neu1 in
+      Tm.make @@ Tm.LblCall q
 
     | Global nm0, Global nm1 ->
       if nm0 = nm1 then
@@ -367,6 +388,15 @@ struct
       subtype envx ty0x ty1x;
       ignore @@ equate_val_sys envx ty0x sys0x sys1x
 
+    | LblTy info0, LblTy info1 ->
+      if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
+        subtype env info0.ty info1.ty;
+      let go_arg (nf0, nf1) =
+        equiv_ty env nf0.ty nf1.ty;
+        equiv env nf0.ty nf0.el nf1.el
+      in
+      ignore @@ List.map go_arg @@ List.combine info0.args info1.args
+
     | Univ info0, Univ info1 ->
       if (info0.kind = info1.kind or Kind.stronger info0.kind info1.kind) && (info0.lvl = info1.lvl or Lvl.greater info1.lvl info0.lvl) then
         ()
@@ -387,6 +417,7 @@ struct
       in
       subtype env ty0 ty1;
       approx_restriction env ty0 ty1 sys0 sys1
+
     | _ ->
       equiv_ty env ty0 ty1
 

@@ -96,6 +96,7 @@ sig
   val ext_apply : value -> dim list -> value
   val car : value -> value
   val cdr : value -> value
+  val lbl_call : value -> value
 
   val inst_clo : clo -> value -> value
   val const_clo : value -> clo
