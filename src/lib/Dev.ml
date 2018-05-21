@@ -269,7 +269,7 @@ sig
   (** When the cursor is at a hole of dependent function type, replace it with
       a [Lam] cell and a hole underneath it. *)
   val lambda : string option -> (dev, dev) move
-  val pi : string option -> Tm.chk Tm.t -> (dev, dev) move
+  val pi : string option -> (dev, dev) move
 
   val pair : (dev, dev) move
 
@@ -419,19 +419,19 @@ struct
     | _ ->
       failwith "lambda: expected pi type"
 
-  (* (? : Univ) ===> ?F : (-> dom Univ). (-> [x : dom] (F x)) *)
-  let pi nm dom : (dev, dev) move =
+  (* (? : Univ) ===> ?A : Univ. ?B : (-> A Univ). (-> [x : A] (B x)) *)
+  let pi nm : (dev, dev) move =
     get_hole >>= fun (_, univ) ->
     match Tm.unleash univ with
     | Tm.Univ _ ->
-      check ~ty:univ ~tm:dom >>
-      let fam_ty = Tm.pi nm dom univ in
-      let guess = Guess {nm = nm; ty = fam_ty; guess = Hole fam_ty} in
+      let guess_dom = Guess {nm = None; ty = univ; guess = Hole univ} in
+      let fam_ty = Tm.pi nm (Tm.up @@ Tm.var 0) univ in
+      let guess_cod = Guess {nm; ty = fam_ty; guess = Hole fam_ty} in
       let pi_ty =
-        let dom' = Tm.subst Tm.Proj dom in
-        let cod = Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0) in
-        Tm.pi nm dom' cod in
-      set_foc @@ Node (guess, Ret pi_ty)
+        Tm.pi nm (Tm.up @@ Tm.var 1) @@
+        Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0)
+      in
+      set_foc @@ Node (guess_dom, Node (guess_cod, Ret pi_ty))
     | _ ->
       failwith "pi: expected universe"
 
