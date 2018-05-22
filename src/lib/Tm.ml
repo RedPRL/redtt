@@ -258,6 +258,7 @@ and unleash : type x. x t -> x f =
 
 
 let up t = make @@ Up t
+let down ~ty ~tm : inf t = make @@ Down {ty; tm}
 let lam nm t = make @@ Lam (B (nm, t))
 let ext_lam nms t = make @@ ExtLam (NB (nms, t))
 let pi nm dom cod = make @@ Pi (dom, B (nm, cod))

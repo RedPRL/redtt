@@ -30,13 +30,31 @@ let claim_with nm ty m =
 
 module Refine =
 struct
+
+  let map_sys f =
+    List.map (fun (r, r', otm) -> r, r', Option.map f otm)
+
+  let pi_get_dom tm =
+    match Tm.unleash tm with
+    | Tm.Pi (dom, _) -> dom
+    | _ -> failwith "pi_get_dom"
+
+  let pi_get_cod tm =
+    match Tm.unleash tm with
+    | Tm.Pi (_, Tm.B (_, cod)) -> cod
+    | _ -> failwith "pi_get_cod"
+
   let pi nm : (dev, dev) M.move =
-    M.get_hole >>= fun (_, univ) ->
-    match Tm.unleash univ.ty with
+    M.get_hole >>= fun (_, goal) ->
+    match Tm.unleash goal.ty with
     | Tm.Univ _ ->
-      claim_with None univ begin
-        let fam_ty = Tm.pi nm (Tm.up @@ Tm.var 0) univ.ty in
-        claim_with (Some "fam") {ty = fam_ty; sys = []} begin
+      claim_with None {ty = goal.ty; sys = map_sys pi_get_dom goal.sys} begin
+        let fam_ty = Tm.pi nm (Tm.up @@ Tm.var 0) goal.ty in
+        let fam_sys =
+          let fam_face tm = Tm.lam nm @@ pi_get_cod tm in
+          map_sys fam_face @@ Tm.subst_sys Tm.Proj goal.sys
+        in
+        claim_with (Some "fam") {ty = fam_ty; sys = fam_sys} begin
           let pi_ty =
             Tm.pi nm (Tm.up @@ Tm.var 1) @@
             Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0)
@@ -48,11 +66,19 @@ struct
       failwith "pi: expected universe"
 
   let pair =
-    M.get_hole >>= fun (_, ty) ->
-    match Tm.unleash ty.ty with
+    M.get_hole >>= fun (_, goal) ->
+    match Tm.unleash goal.ty with
     | Tm.Sg (dom, Tm.B (nm, cod)) ->
-      claim_with nm {ty = dom; sys = []} begin
-        claim_with None {ty = cod; sys = []} begin
+      let car_sys =
+        let car_face tm = Tm.up @@ Tm.car @@ Tm.down ~ty:goal.ty ~tm in
+        map_sys car_face goal.sys
+      in
+      claim_with nm {ty = dom; sys = car_sys} begin
+        let cdr_sys =
+          let cdr_face tm = Tm.up @@ Tm.cdr @@ Tm.down ~ty:(Tm.subst Tm.Proj goal.ty) ~tm in
+          map_sys cdr_face @@ Tm.subst_sys Tm.Proj goal.sys
+        in
+        claim_with None {ty = cod; sys = cdr_sys} begin
           M.fill_hole @@ Tm.cons (Tm.up @@ Tm.var 1) (Tm.up @@ Tm.var 0)
         end
       end

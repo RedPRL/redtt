@@ -84,6 +84,7 @@ val info : 'a t -> info option
 val var : int -> inf t
 val inst0 : inf t -> subst
 val up : inf t -> chk t
+val down : ty:chk t -> tm:chk t -> inf t
 val lam : string option -> chk t -> chk t
 val ext_lam : string option list -> chk t -> chk t
 val pi : string option -> chk t -> chk t -> chk t
