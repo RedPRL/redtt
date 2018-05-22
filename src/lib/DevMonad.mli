@@ -31,7 +31,7 @@ val defrost_sys : Tm.chk Tm.t Tm.system frozen -> ('i, 'i, Tm.chk Tm.t Tm.system
 val defrost_rty : rty frozen -> ('i, 'i, rty) m
 
 
-val get_hole : (dev, dev, DevCx.t * rty) m
+val get_hole : (dev, dev, DevCx.t * rty frozen) m
 
 val claim : string option -> rty -> (dev, dev) move
 val claim_with : string option -> rty -> (Tm.inf Tm.t frozen -> (dev, dev) move) -> (dev, dev) move

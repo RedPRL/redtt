@@ -173,7 +173,8 @@ let get_hole =
     let sys = T.Cx.normalize_tm_sys tcx ~ty:vty ~sys:rty.sys in
     let rty' = {ty; sys} in
     set_foc @@ Hole rty' >>
-    ret (state.cx, rty')
+    freeze rty' >>= fun goal ->
+    ret (state.cx, goal)
   | _ ->
     raise InvalidMove
 
@@ -213,7 +214,8 @@ let check ~ty ~tm ~sys:_ : ('i, 'i) move =
   ret ()
 
 let fill_hole tm : (dev, dev) move =
-  get_hole >>= fun (_, {ty; sys}) ->
+  get_hole >>= fun (_, goal) ->
+  defrost_rty goal >>= fun {ty; sys} ->
   check ~ty ~tm ~sys >>
   set_foc @@ Ret tm
 
@@ -228,7 +230,8 @@ let solve : (cell, cell) move =
     failwith "solve: expected guess cell"
 
 let lambda nm : (dev, dev) move =
-  get_hole >>= fun (_, ty) ->
+  get_hole >>= fun (_, goal) ->
+  defrost_rty goal >>= fun ty ->
   match Tm.unleash ty.ty with
   | Tm.Pi (dom, Tm.B (_, cod)) ->
     let lam = Lam {nm; ty = dom} in
@@ -259,7 +262,8 @@ let claim_with nm ty kont =
   up
 
 let user_hole name : (dev, dev) move =
-  get_hole >>= fun (cx, ty) ->
+  get_hole >>= fun (cx, goal) ->
+  defrost_rty goal >>= fun ty ->
   let lbl_ty = Tm.make @@ Tm.LblTy {lbl = name; args = []; ty = ty.ty} in
   let hole_ty, hole_args = Cx.skolemize cx ~cod:lbl_ty in
   Format.printf "Adding hole of type %a to global context@." (Tm.pp Pretty.Env.emp) hole_ty;

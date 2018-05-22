@@ -44,22 +44,29 @@ struct
     | Tm.Pi (_, Tm.B (_, cod)) -> cod
     | _ -> failwith "pi_get_cod"
 
+  let unleash_rty rty =
+    M.defrost_rty rty >>= fun {ty; _} ->
+    M.ret @@ Tm.unleash ty
+
   let pi nm : (dev, dev) M.move =
     M.get_hole >>= fun (_, goal) ->
-    match Tm.unleash goal.ty with
-    | Tm.Univ univ ->
-      M.freeze goal >>= fun fgoal ->
-      M.claim_with None {ty = goal.ty; sys = map_sys pi_get_dom goal.sys} @@ fun alpha ->
+    unleash_rty goal >>=
+    function
+    | Tm.Univ _ ->
+      begin
+        M.defrost_rty goal >>= fun {ty; sys} ->
+        M.ret @@ {ty; sys = map_sys pi_get_dom sys}
+      end >>= fun dom_goal ->
+      M.claim_with None dom_goal @@ fun alpha ->
       begin
         M.defrost_tm alpha >>= fun dom ->
-        M.ret @@ Tm.Macro.arr (Tm.up dom) @@ Tm.univ ~kind:univ.kind ~lvl:univ.lvl
-      end >>= fun fam_ty ->
-      begin
-        M.defrost_rty fgoal >>= fun {sys; _} ->
+        M.defrost_rty goal >>= fun {ty; sys} ->
         let fam_face tm = Tm.lam nm @@ pi_get_cod tm in
-        M.ret @@ map_sys fam_face sys
-      end >>= fun fam_sys ->
-      M.claim_with (Some "fam") {ty = fam_ty; sys = fam_sys} @@ fun beta ->
+        let fam_ty = Tm.Macro.arr (Tm.up dom) ty in
+        let fam_sys = map_sys fam_face sys in
+        M.ret {ty = fam_ty; sys = fam_sys}
+      end >>= fun fam_goal ->
+      M.claim_with (Some "fam") fam_goal @@ fun beta ->
       M.defrost_tm alpha >>= fun dom ->
       M.defrost_tm beta >>= fun cod_fam ->
       M.fill_hole @@
@@ -70,20 +77,21 @@ struct
 
   let pair =
     M.get_hole >>= fun (_, goal) ->
-    match Tm.unleash goal.ty with
+    M.defrost_rty goal >>= fun {ty; sys} ->
+    match Tm.unleash ty with
     | Tm.Sg (dom, Tm.B (nm, cod)) ->
-      M.freeze goal >>= fun fgoal ->
       begin
-        let car_face tm = Tm.up @@ Tm.car @@ Tm.down ~ty:goal.ty ~tm in
-        M.ret @@ map_sys car_face goal.sys
-      end >>= fun car_sys ->
-      M.claim_with nm {ty = dom; sys = car_sys} @@ fun alpha ->
+        let car_face tm = Tm.up @@ Tm.car @@ Tm.down ~ty ~tm in
+        let car_sys = map_sys car_face sys in
+        M.ret {ty = dom; sys = car_sys}
+      end >>= fun car_goal ->
+      M.claim_with nm car_goal @@ fun alpha ->
       begin
-        M.defrost_rty fgoal >>= fun {sys; ty} ->
+        M.defrost_rty goal >>= fun {sys; ty} ->
         let cdr_face tm = Tm.up @@ Tm.cdr @@ Tm.down ~ty ~tm in
-        M.ret @@ map_sys cdr_face sys
-      end >>= fun cdr_sys ->
-      M.claim_with nm {ty = cod; sys = cdr_sys} @@ fun beta ->
+        M.ret {ty = cod; sys = map_sys cdr_face sys}
+      end >>= fun cdr_goal ->
+      M.claim_with nm cdr_goal @@ fun beta ->
       M.defrost_tm alpha >>= fun tm0 ->
       M.defrost_tm beta >>= fun tm1 ->
       M.fill_hole @@ Tm.cons (Tm.up tm0) (Tm.up tm1)
