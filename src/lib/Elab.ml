@@ -24,11 +24,11 @@ let under_node m =
   m >>
   M.up
 
-let claim_with nm ty m =
-  M.claim nm ty >>
-  under_node m
-
-module Refine =
+module Refine :
+sig
+  val pi : string option -> (dev, dev) M.move
+  val pair : (dev, dev) M.move
+end =
 struct
 
   let map_sys f =
@@ -47,21 +47,24 @@ struct
   let pi nm : (dev, dev) M.move =
     M.get_hole >>= fun (_, goal) ->
     match Tm.unleash goal.ty with
-    | Tm.Univ _ ->
-      claim_with None {ty = goal.ty; sys = map_sys pi_get_dom goal.sys} begin
-        let fam_ty = Tm.pi nm (Tm.up @@ Tm.var 0) goal.ty in
-        let fam_sys =
-          let fam_face tm = Tm.lam nm @@ pi_get_cod tm in
-          map_sys fam_face @@ Tm.subst_sys Tm.Proj goal.sys
-        in
-        claim_with (Some "fam") {ty = fam_ty; sys = fam_sys} begin
-          let pi_ty =
-            Tm.pi nm (Tm.up @@ Tm.var 1) @@
-            Tm.up @@ Tm.make @@ Tm.FunApp (Tm.var 1, Tm.up @@ Tm.var 0)
-          in
-          M.fill_hole pi_ty
-        end
-      end
+    | Tm.Univ univ ->
+      M.freeze goal >>= fun fgoal ->
+      M.claim_with None {ty = goal.ty; sys = map_sys pi_get_dom goal.sys} @@ fun alpha ->
+      begin
+        M.defrost_tm alpha >>= fun dom ->
+        M.ret @@ Tm.Macro.arr (Tm.up dom) @@ Tm.univ ~kind:univ.kind ~lvl:univ.lvl
+      end >>= fun fam_ty ->
+      begin
+        M.defrost_rty fgoal >>= fun {sys; _} ->
+        let fam_face tm = Tm.lam nm @@ pi_get_cod tm in
+        M.ret @@ map_sys fam_face sys
+      end >>= fun fam_sys ->
+      M.claim_with (Some "fam") {ty = fam_ty; sys = fam_sys} @@ fun beta ->
+      M.defrost_tm alpha >>= fun dom ->
+      M.defrost_tm beta >>= fun cod_fam ->
+      M.fill_hole @@
+      Tm.pi nm (Tm.up dom) @@
+      Tm.up @@ Tm.make @@ Tm.FunApp (Tm.subst Tm.Proj cod_fam, Tm.up @@ Tm.var 0)
     | _ ->
       failwith "pi: expected universe"
 
@@ -69,19 +72,21 @@ struct
     M.get_hole >>= fun (_, goal) ->
     match Tm.unleash goal.ty with
     | Tm.Sg (dom, Tm.B (nm, cod)) ->
-      let car_sys =
+      M.freeze goal >>= fun fgoal ->
+      begin
         let car_face tm = Tm.up @@ Tm.car @@ Tm.down ~ty:goal.ty ~tm in
-        map_sys car_face goal.sys
-      in
-      claim_with nm {ty = dom; sys = car_sys} begin
-        let cdr_sys =
-          let cdr_face tm = Tm.up @@ Tm.cdr @@ Tm.down ~ty:(Tm.subst Tm.Proj goal.ty) ~tm in
-          map_sys cdr_face @@ Tm.subst_sys Tm.Proj goal.sys
-        in
-        claim_with None {ty = cod; sys = cdr_sys} begin
-          M.fill_hole @@ Tm.cons (Tm.up @@ Tm.var 1) (Tm.up @@ Tm.var 0)
-        end
-      end
+        M.ret @@ map_sys car_face goal.sys
+      end >>= fun car_sys ->
+      M.claim_with nm {ty = dom; sys = car_sys} @@ fun alpha ->
+      begin
+        M.defrost_rty fgoal >>= fun {sys; ty} ->
+        let cdr_face tm = Tm.up @@ Tm.cdr @@ Tm.down ~ty ~tm in
+        M.ret @@ map_sys cdr_face sys
+      end >>= fun cdr_sys ->
+      M.claim_with nm {ty = cod; sys = cdr_sys} @@ fun beta ->
+      M.defrost_tm alpha >>= fun tm0 ->
+      M.defrost_tm beta >>= fun tm1 ->
+      M.fill_hole @@ Tm.cons (Tm.up tm0) (Tm.up tm1)
     | _ ->
       failwith "pair: expected sg type"
 end

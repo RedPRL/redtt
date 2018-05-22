@@ -78,6 +78,12 @@ let rec liftn n sub =
   | 0 -> sub
   | _ -> liftn (n - 1) @@ lift sub
 
+let rec wk n =
+  match n with
+  | 0 -> Id
+  | _ -> Cmp (Proj, wk @@ n - 1)
+
+
 let inst0 t = Sub (Id, t)
 
 let subst : type x. subst -> x t -> x t =

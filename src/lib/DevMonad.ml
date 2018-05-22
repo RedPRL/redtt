@@ -44,6 +44,34 @@ exception InvalidMove
 
 type ('i, 'o) move = ('i, 'o, unit) m
 
+type 'a frozen = Freeze of {shift : int; el : 'a}
+
+let freeze a =
+  get >>= fun state ->
+  ret @@ Freeze {shift = Cx.shift state.cx; el = a}
+
+let defrost ~subst =
+  function Freeze {shift; el} ->
+    get >>= fun state ->
+    let n = Cx.shift state.cx in
+    let d = n - shift in
+    if d >= 0 then
+      ret @@ subst (Tm.wk d) el
+    else
+      failwith "defrost: out of scope"
+
+
+
+let defrost_tm frz =
+  defrost ~subst:Tm.subst frz
+
+let defrost_sys frz =
+  defrost ~subst:Tm.subst_sys frz
+
+let defrost_rty frz =
+  let subst sub {ty; sys} =
+    {ty = Tm.subst sub ty; sys = Tm.subst_sys sub sys}
+  in defrost ~subst frz
 
 let run ty m : tm =
   let init = {foc = Hole {ty; sys = []}; stk = Top} in
@@ -221,6 +249,14 @@ let claim nm ty : (dev, dev) move =
   let guess = Guess {nm; ty; guess = Hole ty} in
   set_foc @@ Node (guess, Dev.subst Tm.Proj state.cmd.foc)
 
+let claim_with nm ty kont =
+  claim nm ty >>
+  down >>
+  begin
+    freeze (Tm.var 0) >>= fun frz ->
+    kont frz
+  end >>
+  up
 
 let user_hole name : (dev, dev) move =
   get_hole >>= fun (cx, ty) ->
@@ -231,3 +267,8 @@ let user_hole name : (dev, dev) move =
   let head = Tm.make @@ Tm.Global name in
   let hole_tm = List.fold_right (fun arg tm -> Tm.make @@ Tm.FunApp (tm, arg)) hole_args head in
   fill_hole @@ Tm.up @@ Tm.make @@ Tm.LblCall hole_tm
+
+
+
+
+

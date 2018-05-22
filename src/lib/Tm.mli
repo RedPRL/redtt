@@ -69,6 +69,8 @@ type subst =
   | Sub of subst * inf t
   | Cmp of subst * subst
 
+val wk : int -> subst
+
 val make : 'a f -> 'a t
 val unleash : 'a t -> 'a f
 
