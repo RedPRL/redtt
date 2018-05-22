@@ -17,10 +17,24 @@ val pop_cell : (cell, dev) move
 val down : (dev, dev) move
 val up : (dev, dev) move
 
+val eval : 'a Tm.t -> ('i, 'i, Val.value) m
+val evaluator : (dev, dev, (module Val.S)) m
+val typechecker : (dev, dev, (module Typing.S)) m
 
-val get_hole : (dev, dev, DevCx.t * Dev.ty) m
 
-val claim : string option -> ty -> (dev, dev) move
+
+(** an abstract type for values that need to be shifted as they descend under binders *)
+type 'a frozen
+val freeze : 'a -> ('i, 'i, 'a frozen) m
+val defrost_tm : 'a Tm.t frozen -> ('i, 'i, 'a Tm.t) m
+val defrost_sys : Tm.chk Tm.t Tm.system frozen -> ('i, 'i, Tm.chk Tm.t Tm.system) m
+val defrost_rty : rty frozen -> ('i, 'i, rty) m
+
+
+val get_hole : (dev, dev, DevCx.t * rty frozen) m
+
+val claim : string option -> rty -> (dev, dev) move
+val claim_with : string option -> rty -> (Tm.inf Tm.t frozen -> (dev, dev) move) -> (dev, dev) move
 
 (** When the cursor is at a [Hole ty], check the supplied [tm] against [ty];
     if it matches, then replace the hole with [Ret tm]. *)
@@ -36,3 +50,5 @@ val solve : (cell, cell) move
 val lambda : string option -> (dev, dev) move
 
 val user_hole : string -> (dev, dev) move
+
+

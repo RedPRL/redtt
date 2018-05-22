@@ -78,6 +78,12 @@ let rec liftn n sub =
   | 0 -> sub
   | _ -> liftn (n - 1) @@ lift sub
 
+let rec wk n =
+  match n with
+  | 0 -> Id
+  | _ -> Cmp (Proj, wk @@ n - 1)
+
+
 let inst0 t = Sub (Id, t)
 
 let subst : type x. subst -> x t -> x t =
@@ -167,11 +173,11 @@ let rec substf : type x. subst -> x f -> x f =
 
       | Ext (NB (nms, (cod, sys))) ->
         let sub' = liftn (List.length nms) sub in
-        Ext (NB (nms, (subst sub' cod, subst_ext_sys sub' sys)))
+        Ext (NB (nms, (subst sub' cod, subst_sys sub' sys)))
 
       | Rst info ->
         let ty = subst sub info.ty in
-        let sys = subst_ext_sys sub info.sys in
+        let sys = subst_sys sub info.sys in
         Rst {ty; sys}
 
       | V info ->
@@ -219,7 +225,7 @@ let rec substf : type x. subst -> x f -> x f =
       | LblCall t ->
         LblCall (subst sub t)
 
-and subst_ext_sys sub sys =
+and subst_sys sub sys =
   List.map (subst_ext_face sub) sys
 
 and subst_ext_face sub (r, r', otm) =
@@ -258,6 +264,7 @@ and unleash : type x. x t -> x f =
 
 
 let up t = make @@ Up t
+let down ~ty ~tm : inf t = make @@ Down {ty; tm}
 let lam nm t = make @@ Lam (B (nm, t))
 let ext_lam nms t = make @@ ExtLam (NB (nms, t))
 let pi nm dom cod = make @@ Pi (dom, B (nm, cod))

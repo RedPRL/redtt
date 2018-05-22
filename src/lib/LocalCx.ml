@@ -5,6 +5,7 @@ sig
 
   val emp : t
 
+  val ext : t -> nm:string option -> value -> Val.val_sys -> t * value
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * Val.atom
   val ext_dims : t -> nms:string option list -> t * Val.atom list
@@ -19,6 +20,9 @@ sig
   val eval : t -> 'a Tm.t -> value
   val eval_dim : t -> Tm.chk Tm.t -> Dim.repr
   val eval_tm_sys : t -> Tm.chk Tm.t Tm.system -> Val.val_sys
+
+  val normalize : t -> ty:value -> tm:Tm.chk Tm.t -> Tm.chk Tm.t
+  val normalize_tm_sys : t -> ty:value -> sys:Tm.chk Tm.t Tm.system -> Tm.chk Tm.t Tm.system
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
@@ -42,8 +46,9 @@ type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; rel : R.t; ppenv : P
 type t = cx
 
 
-module M (V : Val.S) : S with type t := t =
+module M (V : Val.S) : S with type t = cx =
 struct
+  type t = cx
   module Q = Quote.M (V)
 
   type value = Val.value
@@ -105,6 +110,16 @@ struct
 
   let eval_tm_sys {env; rel; _} sys =
     V.eval_tm_sys rel env sys
+
+  let quote cx ~ty ~el =
+    Q.quote_nf cx.qenv {ty; el}
+
+  let normalize cx ~ty ~tm =
+    quote cx ~ty ~el:(eval cx tm)
+
+  let normalize_tm_sys cx ~ty ~sys =
+    let vsys = eval_tm_sys cx sys in
+    Q.quote_val_sys cx.qenv ty vsys
 
   let lookup i {tys; _} =
     List.nth tys i

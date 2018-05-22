@@ -14,6 +14,9 @@ val ppenv : t -> Pretty.env
     Restrictions get turned into restrictions. *)
 val core : GlobalCx.t -> t -> Typing.cx
 
+(** The current De Bruijn shift induced by the cells of the context. *)
+val shift : t -> int
+
 
 (** Given a type [cod], render the context into a big pi type ending in [cod]; return this type
     together with a list of arguments that a hole can be applied to. *)

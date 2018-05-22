@@ -69,12 +69,15 @@ type subst =
   | Sub of subst * inf t
   | Cmp of subst * subst
 
+val wk : int -> subst
+
 val make : 'a f -> 'a t
 val unleash : 'a t -> 'a f
 
 (** Explicit substitutions are used under the hood, so this is a constant time operation;
     the cost of substituion is spread unleash across calls to [unleash]. *)
 val subst : subst -> 'a t -> 'a t
+val subst_sys : subst -> chk t system -> chk t system
 
 type info = Lexing.position * Lexing.position
 val into_info : info option -> 'a f -> 'a t
@@ -83,6 +86,7 @@ val info : 'a t -> info option
 val var : int -> inf t
 val inst0 : inf t -> subst
 val up : inf t -> chk t
+val down : ty:chk t -> tm:chk t -> inf t
 val lam : string option -> chk t -> chk t
 val ext_lam : string option list -> chk t -> chk t
 val pi : string option -> chk t -> chk t -> chk t

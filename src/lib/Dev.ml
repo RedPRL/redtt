@@ -1,5 +1,8 @@
 type ty = Tm.chk Tm.t
 type tm = Tm.chk Tm.t
+type boundary = Tm.chk Tm.t Tm.system
+type rty = {ty : ty; sys : boundary}
+
 type name = string option
 
 (** TODO: I think it might make sense to consider a version where the content of the cell (is it a guess or a let, etc.) is
@@ -7,27 +10,33 @@ type name = string option
     tactics that do complicated stuff to the global proof state without needing to remember how to get to one place or another in the zipper. *)
 
 type cell =
-  | Guess of {nm : name; ty : ty; guess : dev}
+  | Guess of {nm : name; ty : rty; guess : dev}
   | Let of {nm : name; ty : ty; def : tm}
   | Lam of {nm : name; ty : ty}
 
 and dev =
-  | Hole of ty (* TODO: add boundary *)
+  | Hole of rty
   | Node of cell * dev
   | Ret of tm
 
 let rec subst sub =
   function
-  | Hole ty -> Hole (Tm.subst sub ty)
-  | Node (cell, dev) -> Node (subst_cell sub cell, subst sub dev)
-  | Ret tm -> Ret (Tm.subst sub tm)
+  | Hole rty ->
+    let ty = Tm.subst sub rty.ty in
+    let sys = Tm.subst_sys sub rty.sys in
+    Hole {ty; sys}
+  | Node (cell, dev) ->
+    Node (subst_cell sub cell, subst sub dev)
+  | Ret tm ->
+    Ret (Tm.subst sub tm)
 
 and subst_cell sub =
   function
   | Guess info ->
-    let ty = Tm.subst sub info.ty in
+    let ty = Tm.subst sub info.ty.ty in
+    let sys = Tm.subst_sys sub info.ty.sys in
     let guess = subst sub info.guess in
-    Guess {info with ty; guess}
+    Guess {info with ty = {ty; sys}; guess}
   | Let info ->
     let ty = Tm.subst sub info.ty in
     let def = Tm.subst sub info.def in
@@ -79,11 +88,11 @@ let rec pp_cell env fmt cell =
       | Hole _ ->
         Format.fprintf fmt "?%a : %a"
           Uuseg_string.pp_utf_8 x
-          (Tm.pp env) ty
+          (pp_rty env) ty
       | _ ->
         Format.fprintf fmt "?%a : %a %a %a"
           Uuseg_string.pp_utf_8 x
-          (Tm.pp env) ty
+          (pp_rty env) ty
           Uuseg_string.pp_utf_8 "▷"
           (pp_dev env) guess
     end
@@ -101,6 +110,9 @@ let rec pp_cell env fmt cell =
     Format.fprintf fmt "λ%a : %a"
       Uuseg_string.pp_utf_8 x
       (Tm.pp env) ty
+
+and pp_rty env fmt rty =
+  Tm.pp env fmt @@ Tm.make @@ Tm.Rst {ty = rty.ty; sys = rty.sys}
 
 and pp_dev env fmt =
   function

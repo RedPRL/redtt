@@ -35,6 +35,13 @@ let pop =
   | Emp -> raise EmptyContext
   | Ext (cx, _) -> cx
 
+let rec shift =
+  let rec go n =
+    function
+    | Emp -> n
+    | Ext (cx, _) -> go (n + 1) cx
+  in go 0
+
 let rec core sg =
   let module Sig = GlobalCx.M (struct let globals = sg end) in
   let module V = Val.M (Sig) in
@@ -49,7 +56,9 @@ let rec core sg =
       begin
         match c with
         | Guess {ty; nm; _} ->
-          let vty = LocalCx.eval tcx ty in
+          let tty = Tm.make @@ Tm.Rst {ty = ty.ty; sys = ty.sys} in
+          let vty = LocalCx.eval tcx tty in
+          (* TODO: Need to get the system ty.sys right here *)
           fst @@ LocalCx.ext_ty tcx ~nm vty
 
         | Let {ty; nm; def} ->
@@ -73,6 +82,7 @@ let rec skolemize dcx ~cod =
       begin
         match c with
         | Guess {ty; nm; _} ->
+          let ty = Tm.make @@ Tm.Rst {ty = ty.ty; sys = ty.sys} in
           Tm.make @@ Tm.Pi (ty, Tm.B (nm, cod)), Tm.up (Tm.var i) :: args
         | Let {ty; def; _} ->
           let inf = Tm.make @@ Tm.Down {ty; tm = def} in
