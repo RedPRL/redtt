@@ -37,4 +37,4 @@ sig
   val equate_dim : t -> Dim.repr -> Dim.repr -> Dim.action
 end
 
-module M (V : Val.S) : S with type t := t
+module M (V : Val.S) : S with type t = t

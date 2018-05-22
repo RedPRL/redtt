@@ -142,6 +142,25 @@ let add_hole name ~ty ~sys=
   set {state with gcx}
 
 
+let typechecker =
+  get >>= fun state ->
+  let module Sig = struct let globals = state.gcx end in
+  let module T = Typing.M (Sig) in
+  ret (module T : Typing.S)
+
+let evaluator : (dev, dev, (module Val.S)) m=
+  get >>= fun state ->
+  let module Sig = struct let globals = state.gcx end in
+  let module V = Val.M (GlobalCx.M (Sig)) in
+  ret (module V : Val.S)
+
+let eval tm =
+  get >>= fun state ->
+  let module Sig = struct let globals = state.gcx end in
+  let module T = Typing.M (Sig) in
+  let tcx = Cx.core state.gcx state.cx in
+  ret @@ T.Cx.eval tcx tm
+
 let check ~ty ~tm ~sys:_ : ('i, 'i) move =
   get >>= fun state ->
   let module Sig = struct let globals = state.gcx end in

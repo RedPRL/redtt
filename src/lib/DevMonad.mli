@@ -17,6 +17,10 @@ val pop_cell : (cell, dev) move
 val down : (dev, dev) move
 val up : (dev, dev) move
 
+val eval : 'a Tm.t -> ('i, 'i, Val.value) m
+val evaluator : (dev, dev, (module Val.S)) m
+val typechecker : (dev, dev, (module Typing.S)) m
+
 
 val get_hole : (dev, dev, DevCx.t * rty) m
 

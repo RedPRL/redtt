@@ -43,8 +43,9 @@ type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; rel : R.t; ppenv : P
 type t = cx
 
 
-module M (V : Val.S) : S with type t := t =
+module M (V : Val.S) : S with type t = cx =
 struct
+  type t = cx
   module Q = Quote.M (V)
 
   type value = Val.value
