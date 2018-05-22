@@ -123,18 +123,31 @@ let up : (dev, dev) move =
     raise InvalidMove
 
 
-let get_hole =
-  get >>= fun state ->
-  match state.cmd.foc with
-  | Hole ty ->
-    ret (state.cx, ty)
-  | _ ->
-    raise InvalidMove
-
 let set_foc foc =
   get >>= fun state ->
   let cmd = {state.cmd with foc} in
   set {state with cmd}
+
+(* As far as I can tell, what matters is not whether the hole is in normal form, but
+   whether it is in weak-head normal form. So, we should develop some code that can
+   check if it is already whnf, and then if not, normalize it. Later on, we may even
+   want to develop an efficient reduction machine for whnf rather than full normal form. *)
+let get_hole =
+  get >>= fun state ->
+  match state.cmd.foc with
+  | Hole rty ->
+    let module Sig = struct let globals = state.gcx end in
+    let module T = Typing.M (Sig) in
+    let module V = Val.M (GlobalCx.M (Sig)) in
+    let tcx = Cx.core state.gcx state.cx in
+    let vty = T.Cx.eval tcx rty.ty in
+    let ty = T.Cx.quote_ty tcx vty in
+    let sys = T.Cx.normalize_tm_sys tcx ~ty:vty ~sys:rty.sys in
+    let rty' = {ty; sys} in
+    set_foc @@ Hole rty' >>
+    ret (state.cx, rty')
+  | _ ->
+    raise InvalidMove
 
 let add_hole name ~ty ~sys=
   get >>= fun state ->
