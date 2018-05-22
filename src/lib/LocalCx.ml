@@ -21,6 +21,9 @@ sig
   val eval_dim : t -> Tm.chk Tm.t -> Dim.repr
   val eval_tm_sys : t -> Tm.chk Tm.t Tm.system -> Val.val_sys
 
+  val normalize : t -> ty:value -> tm:Tm.chk Tm.t -> Tm.chk Tm.t
+  val normalize_tm_sys : t -> ty:value -> sys:Tm.chk Tm.t Tm.system -> Tm.chk Tm.t Tm.system
+
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
 
@@ -106,6 +109,14 @@ struct
 
   let eval_tm_sys {env; rel; _} sys =
     V.eval_tm_sys rel env sys
+
+  let normalize cx ~ty ~tm =
+    let el = eval cx tm in
+    Q.quote_nf cx.qenv {ty; el}
+
+  let normalize_tm_sys cx ~ty ~sys =
+    let vsys = eval_tm_sys cx sys in
+    Q.quote_val_sys cx.qenv ty vsys
 
   let lookup i {tys; _} =
     List.nth tys i

@@ -59,6 +59,8 @@ sig
   val quote_neu : env -> Val.neu -> Tm.inf Tm.t
   val quote_ty : env -> Val.value -> Tm.chk Tm.t
 
+  val quote_val_sys : env -> Val.value -> Val.val_sys -> Tm.chk Tm.t Tm.system
+
   val equiv : env -> ty:Val.value -> Val.value -> Val.value -> unit
   val equiv_ty : env -> Val.value -> Val.value -> unit
   val subtype : env -> Val.value -> Val.value -> unit
@@ -270,6 +272,9 @@ struct
     with
     | Invalid_argument _ ->
       failwith "equate_val_sys length mismatch"
+
+  and quote_val_sys env ty sys =
+    equate_val_sys env ty sys sys
 
   and equate_comp_sys env ty sys0 sys1 =
     try

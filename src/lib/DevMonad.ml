@@ -123,18 +123,28 @@ let up : (dev, dev) move =
     raise InvalidMove
 
 
-let get_hole =
-  get >>= fun state ->
-  match state.cmd.foc with
-  | Hole ty ->
-    ret (state.cx, ty)
-  | _ ->
-    raise InvalidMove
-
 let set_foc foc =
   get >>= fun state ->
   let cmd = {state.cmd with foc} in
   set {state with cmd}
+
+let get_hole =
+  get >>= fun state ->
+  match state.cmd.foc with
+  | Hole rty ->
+    let module Sig = struct let globals = state.gcx end in
+    let module T = Typing.M (Sig) in
+    let module V = Val.M (GlobalCx.M (Sig)) in
+    let tcx = Cx.core state.gcx state.cx in
+    let univ = V.make @@ Val.Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
+    let vty = T.Cx.eval tcx rty.ty in
+    let ty = T.Cx.normalize tcx ~ty:univ ~tm:rty.ty in (* TODO: don't do this twice *)
+    let sys = T.Cx.normalize_tm_sys tcx ~ty:vty ~sys:rty.sys in
+    let rty' = {ty; sys} in
+    set_foc @@ Hole rty' >>
+    ret (state.cx, rty')
+  | _ ->
+    raise InvalidMove
 
 let add_hole name ~ty ~sys=
   get >>= fun state ->

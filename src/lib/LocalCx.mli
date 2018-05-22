@@ -24,6 +24,9 @@ sig
   val eval_dim : t -> Tm.chk Tm.t -> Dim.repr
   val eval_tm_sys : t -> Tm.chk Tm.t Tm.system -> Val.val_sys
 
+  val normalize : t -> ty:value -> tm:Tm.chk Tm.t -> Tm.chk Tm.t
+  val normalize_tm_sys : t -> ty:value -> sys:Tm.chk Tm.t Tm.system -> Tm.chk Tm.t Tm.system
+
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
 
