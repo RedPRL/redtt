@@ -136,9 +136,8 @@ let get_hole =
     let module T = Typing.M (Sig) in
     let module V = Val.M (GlobalCx.M (Sig)) in
     let tcx = Cx.core state.gcx state.cx in
-    let univ = V.make @@ Val.Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
     let vty = T.Cx.eval tcx rty.ty in
-    let ty = T.Cx.normalize tcx ~ty:univ ~tm:rty.ty in (* TODO: don't do this twice *)
+    let ty = T.Cx.quote_ty tcx vty in
     let sys = T.Cx.normalize_tm_sys tcx ~ty:vty ~sys:rty.sys in
     let rty' = {ty; sys} in
     set_foc @@ Hole rty' >>

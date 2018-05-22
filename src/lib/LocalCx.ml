@@ -110,9 +110,11 @@ struct
   let eval_tm_sys {env; rel; _} sys =
     V.eval_tm_sys rel env sys
 
-  let normalize cx ~ty ~tm =
-    let el = eval cx tm in
+  let quote cx ~ty ~el =
     Q.quote_nf cx.qenv {ty; el}
+
+  let normalize cx ~ty ~tm =
+    quote cx ~ty ~el:(eval cx tm)
 
   let normalize_tm_sys cx ~ty ~sys =
     let vsys = eval_tm_sys cx sys in

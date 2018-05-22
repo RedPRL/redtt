@@ -24,6 +24,8 @@ sig
   val eval_dim : t -> Tm.chk Tm.t -> Dim.repr
   val eval_tm_sys : t -> Tm.chk Tm.t Tm.system -> Val.val_sys
 
+  val quote : t -> ty:value -> el:value -> Tm.chk Tm.t
+
   val normalize : t -> ty:value -> tm:Tm.chk Tm.t -> Tm.chk Tm.t
   val normalize_tm_sys : t -> ty:value -> sys:Tm.chk Tm.t Tm.system -> Tm.chk Tm.t Tm.system
 
