@@ -35,6 +35,13 @@ let pop =
   | Emp -> raise EmptyContext
   | Ext (cx, _) -> cx
 
+let rec shift =
+  let rec go n =
+    function
+    | Emp -> n
+    | Ext (cx, _) -> go (n + 1) cx
+  in go 0
+
 let rec core sg =
   let module Sig = GlobalCx.M (struct let globals = sg end) in
   let module V = Val.M (Sig) in
