@@ -128,6 +128,10 @@ let set_foc foc =
   let cmd = {state.cmd with foc} in
   set {state with cmd}
 
+(* As far as I can tell, what matters is not whether the hole is in normal form, but
+   whether it is in weak-head normal form. So, we should develop some code that can
+   check if it is already whnf, and then if not, normalize it. Later on, we may even
+   want to develop an efficient reduction machine for whnf rather than full normal form. *)
 let get_hole =
   get >>= fun state ->
   match state.cmd.foc with
