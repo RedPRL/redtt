@@ -263,7 +263,7 @@ and unleash : type x. x t -> x f =
     con
 
 
-let close_var : type x. Name.t -> x t -> x t =
+let close_var : type x. Name.t -> int -> x t -> x t =
   fun a ->
     let rec go : type x. int -> x t -> x t =
       fun k tm ->
@@ -388,12 +388,11 @@ let close_var : type x. Name.t -> x t -> x t =
       go k r, go k r', Option.map (go k) otm
 
     in
-    go 0
+    go
 
-
-let open_var : type x. x t -> Name.t -> x t =
-  fun t a ->
-    subst (inst0 @@ make @@ Ref a) t
+let open_var : type x. int -> Name.t -> x t -> x t =
+  fun k a t ->
+    subst (liftn k @@ inst0 @@ make @@ Ref a) t
 
 let up t = make @@ Up t
 let lam nm t = make @@ Lam (B (nm, t))

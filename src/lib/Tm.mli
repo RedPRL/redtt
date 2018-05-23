@@ -72,8 +72,8 @@ val make : 'a f -> 'a t
 val unleash : 'a t -> 'a f
 
 
-val close_var : Name.t -> 'a t -> 'a t
-val open_var : 'a t -> Name.t -> 'a t
+val close_var : Name.t -> int -> 'a t -> 'a t
+val open_var : int -> Name.t -> 'a t -> 'a t
 
 
 (** Explicit substitutions are used under the hood, so this is a constant time operation;
