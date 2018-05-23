@@ -12,8 +12,6 @@ type 'a t
 type 'a face = chk t * chk t * 'a option
 type 'a system = 'a face list
 
-(* TODO: add FCom *)
-
 (** The external view of syntactic terms, parameterized by a sort [chk] or [inf].
     We use an indexed family because it simplifies implementation by forcing terms to
     be shaped in a certain way. *)
