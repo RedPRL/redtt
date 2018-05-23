@@ -1273,7 +1273,7 @@ struct
     | Bool ->
       Format.fprintf fmt "bool"
     | Pi {dom; cod} ->
-      Format.fprintf fmt "@[<1>(������������@ %a@ %a)@]" pp_value dom pp_clo cod
+      Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
     | Sg {dom; cod} ->
       Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
     | Ext abs ->
