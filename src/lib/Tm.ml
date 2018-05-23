@@ -80,6 +80,7 @@ let rec liftn n sub =
 
 let inst0 t = Sub (Id, t)
 
+
 let subst : type x. subst -> x t -> x t =
   fun sub node ->
     ref {!node with subst = Cmp (sub, !node.subst)}
@@ -93,6 +94,30 @@ let subst_nbnd : subst -> 'a t nbnd -> 'a t nbnd =
   fun sub bnd ->
     let NB (nms, t) = bnd in
     NB (nms, subst (liftn (List.length nms) sub) t)
+
+
+let rec subst_ext_sys sub sys =
+  List.map (subst_ext_face sub) sys
+
+and subst_ext_face sub (r, r', otm) =
+  let r = subst sub r in
+  let r' = subst sub r' in
+  let otm = Option.map (subst sub) otm in
+  r, r', otm
+
+and subst_comp_face sub (r, r', obnd) =
+  let r = subst sub r in
+  let r' = subst sub r' in
+  let obnd = Option.map (subst_bnd sub) obnd in
+  r, r', obnd
+
+and subst_comp_sys sub sys =
+  List.map (subst_comp_face sub) sys
+
+
+
+
+
 
 let rec substf : type x. subst -> x f -> x f =
   fun sub con ->
@@ -219,24 +244,6 @@ let rec substf : type x. subst -> x f -> x f =
       | LblCall t ->
         LblCall (subst sub t)
 
-and subst_ext_sys sub sys =
-  List.map (subst_ext_face sub) sys
-
-and subst_ext_face sub (r, r', otm) =
-  let r = subst sub r in
-  let r' = subst sub r' in
-  let otm = Option.map (subst sub) otm in
-  r, r', otm
-
-and subst_comp_face sub (r, r', obnd) =
-  let r = subst sub r in
-  let r' = subst sub r' in
-  let obnd = Option.map (subst_bnd sub) obnd in
-  r, r', obnd
-
-and subst_comp_sys sub sys =
-  List.map (subst_comp_face sub) sys
-
 (* TODO: double check that this is correct *)
 and subst_var sub ix : inf f =
   match sub with
@@ -256,6 +263,137 @@ and unleash : type x. x t -> x f =
     con
 
 
+let close_var : type x. Name.t -> x t -> x t =
+  fun a ->
+    let rec go : type x. int -> x t -> x t =
+      fun k tm ->
+        match unleash tm with
+        | Ref b ->
+          if a = b then make @@ Ix k else tm
+        | Ix _ -> tm
+        | Univ _ -> tm
+        | Bool -> tm
+        | Tt -> tm
+        | Ff -> tm
+        | Dim0 -> tm
+        | Dim1 -> tm
+        | Car t ->
+          make @@ Car (go k t)
+        | Cdr t ->
+          make @@ Cdr (go k t)
+        | FunApp (t0, t1) ->
+          make @@ FunApp (go k t0, go k t1)
+        | ExtApp (t, ts) ->
+          make @@ ExtApp (go k t, List.map (go k) ts)
+        | Down info ->
+          let ty = go k info.ty in
+          let tm = go k info.tm in
+          make @@ Down {ty; tm}
+        | Coe info ->
+          let r = go k info.r in
+          let r' = go k info.r' in
+          let ty = go_bnd k info.ty in
+          let tm = go k info.tm in
+          make @@ Coe {r; r'; ty; tm}
+        | HCom info ->
+          let r = go k info.r in
+          let r' = go k info.r' in
+          let ty = go k info.ty in
+          let cap = go k info.cap in
+          let sys = go_comp_sys k info.sys in
+          make @@ HCom {r; r'; ty; cap; sys}
+        | Com info ->
+          let r = go k info.r in
+          let r' = go k info.r' in
+          let ty = go_bnd k info.ty in
+          let cap = go k info.cap in
+          let sys = go_comp_sys k info.sys in
+          make @@ Com {r; r'; ty; cap; sys}
+        | FCom info ->
+          let r = go k info.r in
+          let r' = go k info.r' in
+          let cap = go k info.cap in
+          let sys = go_comp_sys k info.sys in
+          make @@ FCom {r; r'; cap; sys}
+        | Up t ->
+          make @@ Up (go k t)
+        | Pi (dom, cod) ->
+          make @@ Pi (go k dom, go_bnd k cod)
+        | Sg (dom, cod) ->
+          make @@ Sg (go k dom, go_bnd k cod)
+        | Ext nbnd ->
+          make @@ Ext (go_ext_bnd k nbnd)
+        | Rst info ->
+          let ty = go k info.ty in
+          let sys = go_tm_sys k info.sys in
+          make @@ Rst {ty; sys}
+        | V info ->
+          let r = go k info.r in
+          let ty0 = go k info.ty0 in
+          let ty1 = go k info.ty1 in
+          let equiv = go k info.equiv in
+          make @@ V {r; ty0; ty1; equiv}
+        | If info ->
+          let mot = go_bnd k info.mot in
+          let scrut = go k info.scrut in
+          let tcase = go k info.tcase in
+          let fcase = go k info.fcase in
+          make @@ If {mot; scrut; tcase; fcase}
+        | VProj info ->
+          let r = go k info.r in
+          let tm = go k info.tm in
+          let ty0 = go k info.ty0 in
+          let ty1 = go k info.ty1 in
+          let equiv = go k info.equiv in
+          make @@ VProj {r; tm; ty0; ty1; equiv}
+        | Lam bnd ->
+          make @@ Lam (go_bnd k bnd)
+        | ExtLam nbnd ->
+          make @@ ExtLam (go_nbnd k nbnd)
+        | Cons (t0, t1) ->
+          make @@ Cons (go k t0, go k t1)
+        | Let (t, bnd) ->
+          make @@ Let (go k t, go_bnd k bnd)
+        | LblTy info ->
+          let args = List.map (fun (t0, t1) -> go k t0, go k t1) info.args in
+          let ty = go k info.ty in
+          make @@ LblTy {info with args; ty}
+        | LblRet t ->
+          make @@ LblRet (go k t)
+        | LblCall t ->
+          make @@ LblCall (go k t)
+
+    and go_bnd : type x. int -> x t bnd -> x t bnd =
+      fun k (B (nm, t)) ->
+        B (nm, go (k + 1) t)
+
+    and go_comp_sys k sys =
+      List.map (go_comp_face k) sys
+
+    and go_comp_face k (r, r', obnd) =
+      go k r, go k r', Option.map (go_bnd k) obnd
+
+    and go_ext_bnd k (NB (nms, (ty, sys))) =
+      let k' = k + List.length nms in
+      NB (nms, (go k' ty, go_tm_sys k' sys))
+
+    and go_nbnd k (NB (nms, t)) =
+      let k' = k + List.length nms in
+      NB (nms, go k' t)
+
+    and go_tm_sys k sys =
+      List.map (go_tm_face k) sys
+
+    and go_tm_face k (r, r', otm) =
+      go k r, go k r', Option.map (go k) otm
+
+    in
+    go 0
+
+
+let open_var : type x. x t -> Name.t -> x t =
+  fun t a ->
+    subst (inst0 @@ make @@ Ref a) t
 
 let up t = make @@ Up t
 let lam nm t = make @@ Lam (B (nm, t))

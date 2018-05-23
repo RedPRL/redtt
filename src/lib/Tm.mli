@@ -71,6 +71,11 @@ type subst =
 val make : 'a f -> 'a t
 val unleash : 'a t -> 'a f
 
+
+val close_var : Name.t -> 'a t -> 'a t
+val open_var : 'a t -> Name.t -> 'a t
+
+
 (** Explicit substitutions are used under the hood, so this is a constant time operation;
     the cost of substituion is spread unleash across calls to [unleash]. *)
 val subst : subst -> 'a t -> 'a t
