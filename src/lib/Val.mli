@@ -44,7 +44,7 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Global : string -> neu
+  | Ref : Name.t -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
@@ -123,7 +123,7 @@ end
 module type Sig =
 sig
   (** Return the type and boundary of a global variable *)
-  val lookup : string -> Tm.chk Tm.t * Tm.chk Tm.t Tm.system
+  val lookup : Name.t -> Tm.chk Tm.t * Tm.chk Tm.t Tm.system
 end
 
 module M (Sig : Sig) : S

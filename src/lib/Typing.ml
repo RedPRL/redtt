@@ -26,7 +26,7 @@ struct
 
   let infer_dim cx tr =
     match T.unleash tr with
-    | T.Var ix ->
+    | T.Ix ix ->
       begin
         match Cx.lookup ix cx with
         | `Dim -> ()
@@ -362,11 +362,11 @@ struct
 
   and infer cx tm =
     match Tm.unleash tm with
-    | T.Global name ->
+    | T.Ref name ->
       let ty = GlobalCx.lookup_ty Sig.globals name in
       Cx.eval Cx.emp ty
 
-    | T.Var ix ->
+    | T.Ix ix ->
       begin
         match Cx.lookup ix cx with
         | `Ty ty -> ty

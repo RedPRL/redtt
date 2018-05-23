@@ -163,7 +163,7 @@ inf:
   | a = ATOM
     { fun env ->
       make_node $startpos $endpos @@
-      Tm.Var (R.get a env) }
+      Tm.Ix (R.get a env) }
 
   | LPR; CAR; e = inf
     { fun env ->

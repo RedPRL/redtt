@@ -16,8 +16,9 @@ type 'a system = 'a face list
     We use an indexed family because it simplifies implementation by forcing terms to
     be shaped in a certain way. *)
 type _ f =
-  | Global : string -> inf f
-  | Var : int -> inf f
+  | Ref : Name.t -> inf f
+  | Ix : int -> inf f
+
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
   | FunApp : inf t * chk t -> inf f
@@ -69,6 +70,11 @@ type subst =
 
 val make : 'a f -> 'a t
 val unleash : 'a t -> 'a f
+
+
+val close_var : Name.t -> 'a t -> 'a t
+val open_var : 'a t -> Name.t -> 'a t
+
 
 (** Explicit substitutions are used under the hood, so this is a constant time operation;
     the cost of substituion is spread unleash across calls to [unleash]. *)
