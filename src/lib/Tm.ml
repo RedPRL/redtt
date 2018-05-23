@@ -9,8 +9,8 @@ type inf = [`Inf]
 type info = Lexing.position * Lexing.position
 
 type _ f =
-  | Global : string -> inf f
-  | Var : int -> inf f
+  | Ref : Name.t -> inf f
+  | Ix : int -> inf f
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
   | FunApp : inf t * chk t -> inf f
@@ -68,7 +68,7 @@ let make tf = ref {info = None; con = tf; subst = Id}
 let into_info info tf = ref {info = info; con = tf; subst = Id}
 let info node = !node.info
 
-let var i = make @@ Var i
+let var i = make @@ Ix i
 
 let lift sub =
   Sub (Cmp (sub, Proj), var 0)
@@ -100,10 +100,10 @@ let rec substf : type x. subst -> x f -> x f =
     | Id -> con
     | _ ->
       match con with
-      | Var ix ->
+      | Ix ix ->
         subst_var sub ix
 
-      | Global _ -> con
+      | Ref _ -> con
       | Bool -> con
       | Tt -> con
       | Ff -> con
@@ -241,9 +241,9 @@ and subst_comp_sys sub sys =
 and subst_var sub ix : inf f =
   match sub with
   | Id ->
-    Var ix
+    Ix ix
   | Proj ->
-    Var (ix + 1)
+    Ix (ix + 1)
   | Sub (sub, t) ->
     if ix = 0 then unleash t else subst_var sub (ix - 1)
   | Cmp (sub1, sub0) ->
@@ -271,12 +271,12 @@ let cdr t = make @@ Cdr t
 let rec pp : type a. a t Pretty.t =
   fun env fmt tm ->
     match unleash tm with
-    | Var i ->
+    | Ix i ->
       Uuseg_string.pp_utf_8 fmt @@
       Pretty.Env.var i env
 
-    | Global nm ->
-      Uuseg_string.pp_utf_8 fmt nm
+    | Ref nm ->
+      Name.pp fmt nm
 
     | Down {ty; tm} ->
       Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm

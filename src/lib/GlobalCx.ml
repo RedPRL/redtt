@@ -5,7 +5,7 @@ module T = PersistentTable.M
 
 type ty = Tm.chk Tm.t
 type entry = {ty : ty; sys : Tm.chk Tm.t Tm.system}
-type t = (string, entry) T.t
+type t = (Name.t, entry) T.t
 
 let emp = T.init 100
 

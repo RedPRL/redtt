@@ -186,7 +186,8 @@ let user_hole name : (dev, dev) move =
   let lbl_ty = Tm.make @@ Tm.LblTy {lbl = name; args = []; ty} in
   let hole_ty, hole_args = Cx.skolemize cx ~cod:lbl_ty in
   Format.printf "Adding hole of type %a to global context@." (Tm.pp Pretty.Env.emp) hole_ty;
+  let name = Name.const name in
   add_hole name ~ty:hole_ty ~sys:[] >>
-  let head = Tm.make @@ Tm.Global name in
+  let head = Tm.make @@ Tm.Ref name in
   let hole_tm = List.fold_right (fun arg tm -> Tm.make @@ Tm.FunApp (tm, arg)) hole_args head in
   fill_hole @@ Tm.up @@ Tm.make @@ Tm.LblCall hole_tm

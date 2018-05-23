@@ -16,8 +16,9 @@ type 'a system = 'a face list
     We use an indexed family because it simplifies implementation by forcing terms to
     be shaped in a certain way. *)
 type _ f =
-  | Global : string -> inf f
-  | Var : int -> inf f
+  | Ref : Name.t -> inf f
+  | Ix : int -> inf f
+
   | Car : inf t -> inf f
   | Cdr : inf t -> inf f
   | FunApp : inf t * chk t -> inf f

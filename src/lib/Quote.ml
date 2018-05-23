@@ -249,9 +249,9 @@ struct
       let q = equate_neu env neu0 neu1 in
       Tm.make @@ Tm.LblCall q
 
-    | Global nm0, Global nm1 ->
+    | Ref nm0, Ref nm1 ->
       if nm0 = nm1 then
-        Tm.make @@ Tm.Global nm0
+        Tm.make @@ Tm.Ref nm0
       else
         failwith "global variable name mismatch"
 

@@ -45,7 +45,7 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Global : string -> neu
+  | Ref : Name.t -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
@@ -129,7 +129,7 @@ end
 
 module type Sig =
 sig
-  val lookup : string -> Tm.chk Tm.t * Tm.chk Tm.t Tm.system
+  val lookup : Name.t -> Tm.chk Tm.t * Tm.chk Tm.t Tm.system
 end
 
 module M (Sig : Sig) : S =
@@ -236,7 +236,7 @@ struct
         eval_dim rel rho tm
       | Tm.Down {tm; _} ->
         eval_dim rel rho tm
-      | Tm.Var i ->
+      | Tm.Ix i ->
         begin
           match List.nth rho i with
           | Atom x ->
@@ -443,7 +443,7 @@ struct
     | Lvl _ ->
       ret con
 
-    | Global _ ->
+    | Ref _ ->
       ret con
 
   and act_nf phi (nf : nf) =
@@ -694,18 +694,18 @@ struct
   and eval : type x. rel -> env -> x Tm.t -> value =
     fun rel rho tm ->
       match Tm.unleash tm with
-      | Tm.Var i ->
+      | Tm.Ix i ->
         begin
           match List.nth rho i with
           | Val v -> v
           | _ -> failwith "Expected value in environment"
         end
 
-      | Tm.Global name ->
+      | Tm.Ref name ->
         let tty, tsys = Sig.lookup name in
         let vsys = eval_tm_sys rel [] tsys in
         let vty = eval rel [] tty in
-        make @@ Up {ty = vty; neu = Global name; sys = vsys}
+        make @@ Up {ty = vty; neu = Ref name; sys = vsys}
 
       | Tm.Pi (dom, cod) ->
         let dom = eval rel rho dom in
@@ -1273,7 +1273,7 @@ struct
     | Bool ->
       Format.fprintf fmt "bool"
     | Pi {dom; cod} ->
-      Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
+      Format.fprintf fmt "@[<1>(������������@ %a@ %a)@]" pp_value dom pp_clo cod
     | Sg {dom; cod} ->
       Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
     | Ext abs ->
