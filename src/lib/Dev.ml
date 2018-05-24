@@ -1,117 +1,91 @@
 type ty = Tm.chk Tm.t
 type tm = Tm.chk Tm.t
-type name = string option
 
-(** TODO: I think it might make sense to consider a version where the content of the cell (is it a guess or a let, etc.) is
-    held as a reference to something in the proof state, rather in the dev term itself. This would give us a way to implement
-    tactics that do complicated stuff to the global proof state without needing to remember how to get to one place or another in the zipper. *)
+module I =
+struct
+  type dev =
+    | Ret of tm
+    | Hole of ty
+    | Node of cell * dev
 
-type cell =
-  | Guess of {nm : name; ty : ty; guess : dev}
-  | Let of {nm : name; ty : ty; def : tm}
-  | Lam of {nm : name; ty : ty}
+  and cell =
+    | Lam of ty
+    | Guess of ty * dev
+    | Let of ty * tm
 
-and dev =
-  | Hole of ty (* TODO: add boundary *)
-  | Node of cell * dev
-  | Ret of tm
-
-let rec subst sub =
-  function
-  | Hole ty -> Hole (Tm.subst sub ty)
-  | Node (cell, dev) -> Node (subst_cell sub cell, subst sub dev)
-  | Ret tm -> Ret (Tm.subst sub tm)
-
-and subst_cell sub =
-  function
-  | Guess info ->
-    let ty = Tm.subst sub info.ty in
-    let guess = subst sub info.guess in
-    Guess {info with ty; guess}
-  | Let info ->
-    let ty = Tm.subst sub info.ty in
-    let def = Tm.subst sub info.def in
-    Let {info with ty; def}
-  | Lam info ->
-    let ty = Tm.subst sub info.ty in
-    Lam {info with ty}
-
-
-(** Given a {e pure} development calculus term (one which has no holes), return a core language term. *)
-let rec extract : dev -> tm =
-  function
-  | Hole _ ->
-    failwith "extract: encountered impure development term (Hole)"
-  | Node (cell, dev) ->
-    begin
+  let rec close_var x k =
+    function
+    | Ret tm ->
+      Ret (Tm.close_var x k tm)
+    | Hole ty ->
+      Hole (Tm.close_var x k ty)
+    | Node (cell, dev) ->
       match cell with
-      | Guess _ ->
-        failwith "extract: encountered impure development term (Guess)"
-      | Lam {nm; _} ->
-        Tm.lam nm @@ extract dev
-      | Let {ty; def; nm} ->
-        let tm = Tm.make @@ Tm.Down {ty; tm = def} in
-        Tm.let_ nm tm @@ extract dev
-    end
-  | Ret tm ->
-    tm
+      | Lam ty ->
+        Node (Lam (Tm.close_var x k ty), close_var x (k + 1) dev)
+      | Guess (ty, guess) ->
+        Node (Guess (Tm.close_var x k ty, close_var x k guess), close_var x (k + 1) dev)
+      | Let (ty, tm) ->
+        Node (Let (Tm.close_var x k ty, Tm.close_var x k tm), close_var x (k + 1) dev)
 
+  let rec open_var k x =
+    function
+    | Ret tm ->
+      Ret (Tm.open_var k x tm)
+    | Hole ty ->
+      Hole (Tm.open_var k x ty)
+    | Node (cell, dev) ->
+      match cell with
+      | Lam ty ->
+        Node (Lam (Tm.open_var k x ty), open_var (k + 1) x dev)
+      | Guess (ty, guess) ->
+        Node (Guess (Tm.open_var k x ty, open_var k x guess), open_var (k + 1) x dev)
+      | Let (ty, tm) ->
+        Node (Let (Tm.open_var k x ty, Tm.open_var k x tm), open_var (k + 1) x dev)
+end
 
-let rec ppenv_cell env =
+type 'a dev_view =
+  | Ret of tm
+  | Hole of ty
+  | Node of 'a cell_view * 'a
+
+and 'a cell_view =
+  | Lam of {x : Name.t; ty : ty}
+  | Guess of {x : Name.t; ty : ty; guess : 'a}
+  | Let of {x : Name.t; ty : ty; tm : tm}
+
+type dev = I.dev
+type cell = I.cell
+
+let make : type a. dev dev_view -> dev =
   function
-  | Guess {nm; _} ->
-    let _, envx = Pretty.Env.bind nm env in
-    envx
-  | Let {nm; _} ->
-    let _, envx = Pretty.Env.bind nm env in
-    envx
-  | Lam {nm; _} ->
-    let _, envx = Pretty.Env.bind nm env in
-    envx
-
-let rec pp_cell env fmt cell =
-  let env' = ppenv_cell env cell in
-  match cell with
-  | Guess {ty; guess; _} ->
-    let x = Pretty.Env.var 0 env' in
-    begin
-      match guess with
-      | Hole _ ->
-        Format.fprintf fmt "?%a : %a"
-          Uuseg_string.pp_utf_8 x
-          (Tm.pp env) ty
-      | _ ->
-        Format.fprintf fmt "?%a : %a %a %a"
-          Uuseg_string.pp_utf_8 x
-          (Tm.pp env) ty
-          Uuseg_string.pp_utf_8 "▷"
-          (pp_dev env) guess
-    end
-
-  | Let {ty; def; _} ->
-    let x = Pretty.Env.var 0 env' in
-    Format.fprintf fmt "!%a : %a %a %a"
-      Uuseg_string.pp_utf_8 x
-      (Tm.pp env) ty
-      Uuseg_string.pp_utf_8 "▷"
-      (Tm.pp env) def
-
-  | Lam {ty; _} ->
-    let x = Pretty.Env.var 0 env' in
-    Format.fprintf fmt "λ%a : %a"
-      Uuseg_string.pp_utf_8 x
-      (Tm.pp env) ty
-
-and pp_dev env fmt =
-  function
-  | Hole _ ->
-    Format.fprintf fmt "?"
   | Ret tm ->
-    Format.fprintf fmt "`%a"
-      (Tm.pp env) tm
+    I.Ret tm
+  | Hole ty ->
+    I.Hole ty
   | Node (cell, dev) ->
-    let env' = ppenv_cell env cell in
-    Format.fprintf fmt "%a. %a"
-      (pp_cell env) cell
-      (pp_dev env') dev
+    match cell with
+    | Lam {x; ty} ->
+      I.Node (I.Lam ty, I.close_var x 0 dev)
+    | Let {x; ty; tm} ->
+      I.Node (I.Let (ty, tm), I.close_var x 0 dev)
+    | Guess {x; ty; guess} ->
+      I.Node (I.Guess (ty, guess), I.close_var x 0 dev)
 
+let unleash : type a. dev -> dev dev_view =
+  function
+  | I.Ret tm ->
+    Ret tm
+  | I.Hole ty ->
+    Hole ty
+  | I.Node (cell, dev) ->
+    match cell with
+    | I.Lam ty ->
+      let x = Name.fresh () in
+      Node (Lam {x; ty}, I.open_var 0 x dev)
+    | I.Let (ty, tm) ->
+      let x = Name.fresh () in
+      Node (Let {x; ty; tm}, I.open_var 0 x dev)
+    | I.Guess (ty, guess) ->
+      let x = Name.fresh () in
+      Node (Guess {x; ty; guess}, I.open_var 0 x dev)

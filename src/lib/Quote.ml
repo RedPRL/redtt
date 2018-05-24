@@ -232,18 +232,16 @@ struct
       let fcase = equate env vmot_ff if0.fcase if1.fcase in
       Tm.make @@ Tm.If {mot = Tm.B (None, mot); scrut; tcase; fcase}
 
-    | VProj _vproj0, VProj _vproj1 ->
-      (* let r0 = DimGeneric.unleash vproj0.x in *)
-      (* let r1 = DimGeneric.unleash vproj1.x in *)
-      (* let tr = equate_dim env r0 r1 in
-         let tm = equate_neu env vproj0.neu vproj1.neu in
-         let funty =
-         let _, ty0, ty1, _ = unleash_v vproj0.vty in
-         make @@ Pi {dom = ty0; cod = const_clo ty1}
-         in
-         let func = equate env funty vproj0.func vproj1.func in
-         Tm.make @@ Tm.VProj {r = tr; tm; func} *)
-      failwith "TODO"
+    | VProj vproj0, VProj vproj1 ->
+      let r0 = DimGeneric.unleash vproj0.x in
+      let r1 = DimGeneric.unleash vproj1.x in
+      let tr = equate_dim env r0 r1 in
+      let tm = equate_neu env vproj0.neu vproj1.neu in
+      let ty0 = equate_ty env vproj0.ty0 vproj1.ty0 in
+      let ty1 = equate_ty env vproj0.ty1 vproj1.ty1 in
+      let equiv_ty = V.Macro.equiv vproj0.ty0 vproj0.ty1 in
+      let equiv = equate env equiv_ty vproj0.equiv vproj1.equiv in
+      Tm.make @@ Tm.VProj {r = tr; tm; ty0; ty1; equiv}
 
     | LblCall neu0, LblCall neu1 ->
       let q = equate_neu env neu0 neu1 in

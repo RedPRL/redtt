@@ -1,24 +1,18 @@
-type tm = Tm.chk Tm.t
 type ty = Tm.chk Tm.t
-type name = string option
+type tm = Tm.chk Tm.t
 
-(** A [cell] is an entry in the development context, what Conor McBride called a {e component} in his thesis.
-    These cells are also the left parts of the "binders" in the development calculus.
-*)
-type cell =
-  | Guess of {nm : name; ty : ty; guess : dev}
-  | Let of {nm : name; ty : ty; def : tm}
-  | Lam of {nm : name; ty : ty}
-
-and dev =
-  | Hole of ty (* TODO: add boundary *)
-  | Node of cell * dev
+type 'a dev_view =
   | Ret of tm
+  | Hole of ty
+  | Node of 'a cell_view * 'a
 
-val subst : Tm.subst -> dev -> dev
+and 'a cell_view =
+  | Lam of {x : Name.t; ty : ty}
+  | Guess of {x : Name.t; ty : ty; guess : 'a}
+  | Let of {x : Name.t; ty : ty; tm : tm}
 
-val pp_dev : dev Pretty.t
-val pp_cell : cell Pretty.t
-val ppenv_cell : Pretty.env -> cell -> Pretty.env
+type dev
 
-val extract : dev -> tm
+val make : dev dev_view -> dev
+val unleash : dev -> dev dev_view
+

@@ -44,7 +44,7 @@ type _ f =
   | Tt : chk f
   | Ff : chk f
   | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
-  | VProj : {r : chk t; tm : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> inf f
+  | VProj : {r : chk t; tm : inf t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
   | ExtLam : chk t nbnd -> chk f
@@ -72,8 +72,8 @@ val make : 'a f -> 'a t
 val unleash : 'a t -> 'a f
 
 
-val close_var : Name.t -> 'a t -> 'a t
-val open_var : 'a t -> Name.t -> 'a t
+val close_var : Name.t -> int -> 'a t -> 'a t
+val open_var : int -> Name.t -> 'a t -> 'a t
 
 
 (** Explicit substitutions are used under the hood, so this is a constant time operation;
