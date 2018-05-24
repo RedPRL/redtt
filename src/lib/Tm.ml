@@ -37,7 +37,7 @@ type _ f =
   | Tt : chk f
   | Ff : chk f
   | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
-  | VProj : {r : chk t; tm : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> inf f
+  | VProj : {r : chk t; tm : inf t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> inf f
 
   | Lam : chk t bnd -> chk f
   | ExtLam : chk t nbnd -> chk f

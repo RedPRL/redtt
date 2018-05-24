@@ -398,7 +398,8 @@ struct
         check_eval_ty cx @@
         T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
       in
-      check cx v_ty info.tm;
+      let v_ty' = infer cx info.tm in
+      Cx.check_eq_ty cx v_ty v_ty';
       Cx.eval cx info.ty1
 
     | T.Coe info ->
