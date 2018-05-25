@@ -238,8 +238,8 @@ struct
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
-        | Tm.Ref _ ->
-          failwith "TODO: eval_dim/ref"
+        | Tm.Ref a ->
+          R.canonize (D.Atom (Name.symbol a)) rel
         | _ -> failwith "eval_dim"
       end
     | _ -> failwith "eval_dim"

@@ -5,6 +5,11 @@ type t =
 let const str = Const str
 let fresh () = Symbol (Symbol.fresh ())
 
+let symbol =
+  function
+  | Const _ -> failwith "symbol"
+  | Symbol sym -> sym
+
 let pp fmt =
   function
   | Const str ->
