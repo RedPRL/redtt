@@ -16,15 +16,15 @@ sig
   val ppenv : t -> Pretty.env
   val lookup : int -> t -> [`Ty of value | `Dim]
 
-  val eval : t -> 'a Tm.t -> value
-  val eval_dim : t -> Tm.chk Tm.t -> Dim.repr
-  val eval_tm_sys : t -> Tm.chk Tm.t Tm.system -> Val.val_sys
+  val eval : t -> Tm.tm -> value
+  val eval_dim : t -> Tm.tm -> Dim.repr
+  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
 
-  val quote : t -> ty:value -> value -> Tm.chk Tm.t
-  val quote_ty : t -> value -> Tm.chk Tm.t
+  val quote : t -> ty:value -> value -> Tm.tm
+  val quote_ty : t -> value -> Tm.tm
 
   val check_eq_ty : t -> value -> value -> unit
 
