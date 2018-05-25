@@ -73,29 +73,26 @@ struct
 
   let rec equate env ty el0 el1 =
     match unleash ty with
-    (* | Pi {dom; cod} ->
-       let var = generic env dom in
-       let vcod = inst_clo cod var in
-       let app0 = apply el0 var in
-       let app1 = apply el1 var in
-       Tm.lam None @@ equate (Env.succ env) vcod app0 app1
-
-
-       | Sg {dom; cod} ->
-       let el00 = car el0 in
-       let el10 = car el1 in
-       let q0 = equate env dom el00 el10 in
-       let vcod = inst_clo cod el00 in
-       let q1 = equate env vcod (cdr el0) (cdr el1) in
-       Tm.cons q0 q1
-
-       | Ext abs ->
-       let xs, (tyx, _) = ExtAbs.unleash abs in
-       let rs = List.map Dim.named xs in
-       let app0 = ext_apply el0 rs in
-       let app1 = ext_apply el1 rs in
-       Tm.ext_lam (List.map (fun _ -> None) xs) @@
-       equate (Env.abs env xs) tyx app0 app1 *)
+    | Pi {dom; cod} ->
+      let var = generic env dom in
+      let vcod = inst_clo cod var in
+      let app0 = apply el0 var in
+      let app1 = apply el1 var in
+      Tm.lam None @@ equate (Env.succ env) vcod app0 app1
+    | Sg {dom; cod} ->
+      let el00 = car el0 in
+      let el10 = car el1 in
+      let q0 = equate env dom el00 el10 in
+      let vcod = inst_clo cod el00 in
+      let q1 = equate env vcod (cdr el0) (cdr el1) in
+      Tm.cons q0 q1
+    | Ext abs ->
+      let xs, (tyx, _) = ExtAbs.unleash abs in
+      let rs = List.map Dim.named xs in
+      let app0 = ext_apply el0 rs in
+      let app1 = ext_apply el1 rs in
+      Tm.ext_lam (List.map (fun _ -> None) xs) @@
+      equate (Env.abs env xs) tyx app0 app1
 
     | Rst {ty; _} ->
       equate env ty el0 el1
@@ -110,11 +107,11 @@ struct
 
     | _ ->
       match unleash el0, unleash el1 with
-      (* | Univ info0, Univ info1 ->
-         if info0.kind = info1.kind && info0.lvl = info1.lvl then
+      | Univ info0, Univ info1 ->
+        if info0.kind = info1.kind && info0.lvl = info1.lvl then
           Tm.univ ~kind:info0.kind ~lvl:info0.lvl
-         else
-          failwith "Expected equal universe levels" *)
+        else
+          failwith "Expected equal universe levels"
 
       | Bool, Bool ->
         Tm.make Tm.Bool
@@ -125,21 +122,21 @@ struct
       | Ff, Ff ->
         Tm.make Tm.Ff
 
-      (* | Pi pi0, Pi pi1 ->
-         let dom = equate env ty pi0.dom pi1.dom in
-         let var = generic env pi0.dom in
-         let vcod0 = inst_clo pi0.cod var in
-         let vcod1 = inst_clo pi1.cod var in
-         let cod = equate env ty vcod0 vcod1 in
-         Tm.pi None dom cod
+      | Pi pi0, Pi pi1 ->
+        let dom = equate env ty pi0.dom pi1.dom in
+        let var = generic env pi0.dom in
+        let vcod0 = inst_clo pi0.cod var in
+        let vcod1 = inst_clo pi1.cod var in
+        let cod = equate env ty vcod0 vcod1 in
+        Tm.pi None dom cod
 
-         | Sg sg0, Sg sg1 ->
-         let dom = equate env ty sg0.dom sg1.dom in
-         let var = generic env sg0.dom in
-         let vcod0 = inst_clo sg0.cod var in
-         let vcod1 = inst_clo sg1.cod var in
-         let cod = equate env ty vcod0 vcod1 in
-         Tm.sg None dom cod *)
+      | Sg sg0, Sg sg1 ->
+        let dom = equate env ty sg0.dom sg1.dom in
+        let var = generic env sg0.dom in
+        let vcod0 = inst_clo sg0.cod var in
+        let vcod1 = inst_clo sg1.cod var in
+        let cod = equate env ty vcod0 vcod1 in
+        Tm.sg None dom cod
 
       | Ext abs0, Ext abs1 ->
         let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in

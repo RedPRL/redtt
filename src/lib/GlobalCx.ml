@@ -3,8 +3,8 @@
 open RedBasis
 module T = PersistentTable.M
 
-type ty = Tm.chk Tm.t
-type entry = {ty : ty; sys : Tm.chk Tm.t Tm.system}
+type ty = Tm.tm
+type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
 type t = (Name.t, entry) T.t
 
 let emp = T.init 100

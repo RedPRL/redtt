@@ -76,6 +76,12 @@ val subst : subst -> tm -> tm
 
 val up : tm cmd -> tm
 val var : int -> tm cmd
+val lam : string option -> tm -> tm
+val ext_lam : string option list -> tm -> tm
+val pi : string option -> tm -> tm -> tm
+val sg : string option -> tm -> tm -> tm
+val cons : tm -> tm -> tm
+val univ : kind:Kind.t -> lvl:Lvl.t -> tm
 
 module Macro :
 sig
