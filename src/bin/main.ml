@@ -18,11 +18,12 @@ let cmd_help =
 
 let cmd_load_file =
   let doc = "load file" in
-  let file_name = Arg.
-                    ( required
-                      & pos ~rev:true 0 (some string) None
-                      & info [] ~doc ~docv:"FILE"
-                    ) in
+  let file_name =
+    Arg.
+      ( required
+        & pos ~rev:true 0 (some string) None
+        & info [] ~doc ~docv:"FILE"
+      ) in
   Term.
     ( pure Frontend.load_file $ file_name
     , info "load-file" ~doc
