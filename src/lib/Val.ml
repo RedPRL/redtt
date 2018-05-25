@@ -4,7 +4,7 @@ module D = Dim
 module Star = DimStar
 module Gen = DimGeneric
 
-type atom = Symbol.t
+type atom = Name.t
 type dim = D.t
 type star = Star.t
 type gen = Gen.t
@@ -63,8 +63,7 @@ and nf = {ty : value; el : value}
 and ('x, 'a) face = ('x, 'a) Face.face
 
 and clo =
-  | Clo of {bnd : Tm.chk Tm.t Tm.bnd; rho : env; rel : rel; action : D.action}
-  | Const of value
+  | Clo of {bnd : Tm.tm Tm.bnd; rho : env; rel : rel; action : D.action}
 
 and env_el = Val of value | Atom of atom
 and env = env_el list
@@ -88,9 +87,12 @@ sig
   val make : con -> value
   val unleash : value -> con
 
-  val eval : rel -> env -> 'a Tm.t -> value
-  val eval_dim : rel -> env -> 'a Tm.t -> Dim.repr
-  val eval_tm_sys : rel -> env -> Tm.chk Tm.t Tm.system -> val_sys
+  val eval : rel -> env -> Tm.tm -> value
+  val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
+  val eval_head : rel -> env -> Tm.tm Tm.head -> value
+  val eval_frame : rel -> env -> value -> Tm.tm Tm.frame -> value
+  val eval_dim : rel -> env -> Tm.tm -> Dim.repr
+  val eval_tm_sys : rel -> env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
@@ -99,7 +101,6 @@ sig
   val lbl_call : value -> value
 
   val inst_clo : clo -> value -> value
-  val const_clo : value -> clo
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : value -> value * clo
@@ -129,7 +130,7 @@ end
 
 module type Sig =
 sig
-  val lookup : Name.t -> Tm.chk Tm.t * Tm.chk Tm.t Tm.system
+  val lookup : Name.t -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
 module M (Sig : Sig) : S =
@@ -169,8 +170,6 @@ struct
       match clo with
       | Clo info ->
         Clo {info with action = D.cmp phi info.action}
-      | Const v ->
-        Const (Val.act phi v)
   end
 
   module CompSys :
@@ -225,31 +224,31 @@ struct
   exception ProjVal of value
 
 
-  let rec eval_dim : type x. rel -> env -> x Tm.t -> D.repr =
-    fun rel rho tm ->
-      match Tm.unleash tm with
-      | Tm.Dim0 ->
-        D.Dim0
-      | Tm.Dim1 ->
-        D.Dim1
-      | Tm.Up tm ->
-        eval_dim rel rho tm
-      | Tm.Down {tm; _} ->
-        eval_dim rel rho tm
-      | Tm.Ix i ->
-        begin
-          match List.nth rho i with
-          | Atom x ->
-            R.canonize (D.Atom x) rel
-          | _ ->
-            failwith "eval_dim: expected atom in environment"
-        end
-      | _ ->
-        failwith "eval_dim"
+  let rec eval_dim rel rho tm =
+    match Tm.unleash tm with
+    | Tm.Dim0 ->
+      D.Dim0
+    | Tm.Dim1 ->
+      D.Dim1
+    | Tm.Up (Tm.Cut (hd, [])) ->
+      begin
+        match hd with
+        | Tm.Ix i ->
+          begin
+            match List.nth rho i with
+            | Atom x ->
+              R.canonize (D.Atom x) rel
+            | _ ->
+              failwith "eval_dim: expected atom in environment"
+          end
+        | Tm.Ref a ->
+          R.canonize (D.Atom a) rel
+        | _ -> failwith "eval_dim"
+      end
+    | _ -> failwith "eval_dim"
 
-  let eval_dim_class : type x. rel -> env -> x Tm.t -> D.t =
-    fun rel rho tm ->
-      R.unleash (eval_dim rel rho tm) rel
+  let eval_dim_class rel rho tm =
+    R.unleash (eval_dim rel rho tm) rel
 
 
   let rec make : con -> value =
@@ -601,10 +600,10 @@ struct
               force_abs_sys @@
               let face0 =
                 AbsFace.make r' D.dim0 @@
-                let y = Symbol.fresh () in
+                let y = Name.fresh () in
                 Abs.bind1 y @@ ext_apply (cdr el0) [D.named y]
               in
-              let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Symbol.fresh ()] coe1r'el in
+              let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Name.fresh ()] coe1r'el in
               [face0; face1]
             in
             make_hcom (Star.make D.dim1 D.dim0) ty1r' cap sys
@@ -691,164 +690,169 @@ struct
   and clo bnd rel rho =
     Clo {bnd; rho; rel; action = D.idn}
 
-  and eval : type x. rel -> env -> x Tm.t -> value =
-    fun rel rho tm ->
-      match Tm.unleash tm with
-      | Tm.Ix i ->
-        begin
-          match List.nth rho i with
-          | Val v -> v
-          | _ -> failwith "Expected value in environment"
-        end
+  and eval rel rho tm =
+    match Tm.unleash tm with
+    | Tm.Pi (dom, cod) ->
+      let dom = eval rel rho dom in
+      let cod = clo cod rel rho in
+      make @@ Pi {dom; cod}
 
-      | Tm.Ref name ->
-        let tty, tsys = Sig.lookup name in
-        let vsys = eval_tm_sys rel [] tsys in
-        let vty = eval rel [] tty in
-        make @@ Up {ty = vty; neu = Ref name; sys = vsys}
+    | Tm.Sg (dom, cod) ->
+      let dom = eval rel rho dom in
+      let cod = clo cod rel rho in
+      make @@ Sg {dom; cod}
 
-      | Tm.Pi (dom, cod) ->
-        let dom = eval rel rho dom in
-        let cod = clo cod rel rho in
-        make @@ Pi {dom; cod}
+    | Tm.Ext bnd ->
+      let abs = eval_ext_bnd rel rho bnd in
+      make @@ Ext abs
 
-      | Tm.Sg (dom, cod) ->
-        let dom = eval rel rho dom in
-        let cod = clo cod rel rho in
-        make @@ Sg {dom; cod}
+    | Tm.Rst info ->
+      let ty = eval rel rho info.ty in
+      let sys = eval_tm_sys rel rho info.sys in
+      make @@ Rst {ty; sys}
 
-      | Tm.Ext bnd ->
-        let abs = eval_ext_bnd rel rho bnd in
-        make @@ Ext abs
+    | Tm.V info ->
+      let r = eval_dim_class rel rho info.r in
+      let ty0 = eval rel rho info.ty0 in
+      let ty1 = eval rel rho info.ty1 in
+      let equiv = eval rel rho info.equiv in
+      make_v (Gen.make r) ty0 ty1 equiv
 
-      | Tm.Rst info ->
-        let ty = eval rel rho info.ty in
-        let sys = eval_tm_sys rel rho info.sys in
-        make @@ Rst {ty; sys}
+    | Tm.Lam bnd ->
+      make @@ Lam (clo bnd rel rho)
 
-      | Tm.V info ->
-        let r = eval_dim_class rel rho info.r in
-        let ty0 = eval rel rho info.ty0 in
-        let ty1 = eval rel rho info.ty1 in
-        let equiv = eval rel rho info.equiv in
-        make_v (Gen.make r) ty0 ty1 equiv
+    | Tm.ExtLam bnd ->
+      let abs = eval_nbnd rel rho bnd in
+      make @@ ExtLam abs
 
-      | Tm.Lam bnd ->
-        make @@ Lam (clo bnd rel rho)
+    | Tm.Cons (t0, t1) ->
+      let v0 = eval rel rho t0 in
+      let v1 = eval rel rho t1 in
+      make @@ Cons (v0, v1)
 
-      | Tm.ExtLam bnd ->
-        let abs = eval_nbnd rel rho bnd in
-        make @@ ExtLam abs
+    | Tm.FCom info ->
+      let r = eval_dim_class rel rho info.r  in
+      let r' = eval_dim_class rel rho info.r' in
+      let dir = Star.make r r' in
+      let cap = eval rel rho info.cap in
+      let sys = eval_bnd_sys rel rho info.sys in
+      make_fcom dir cap sys
 
-      | Tm.Cons (t0, t1) ->
-        let v0 = eval rel rho t0 in
-        let v1 = eval rel rho t1 in
-        make @@ Cons (v0, v1)
+    | Tm.Univ {kind; lvl} ->
+      make @@ Univ {kind; lvl}
 
-      | Tm.Coe info ->
-        let r = eval_dim_class rel rho info.r in
-        let r' = eval_dim_class rel rho info.r' in
-        let dir = Star.make r r' in
-        let abs = eval_bnd rel rho info.ty  in
-        let el = eval rel rho info.tm in
-        make_coe dir abs el
+    | Tm.Bool ->
+      make Bool
 
-      | Tm.HCom info ->
-        let r = eval_dim_class rel rho info.r in
-        let r' = eval_dim_class rel rho info.r' in
-        let dir = Star.make r r' in
-        let ty = eval rel rho info.ty in
-        let cap = eval rel rho info.cap in
-        let sys = eval_bnd_sys rel rho info.sys in
-        make_hcom dir ty cap sys
+    | Tm.Tt ->
+      make Tt
 
-      | Tm.Com info ->
-        let r = eval_dim_class rel rho info.r in
-        let r' = eval_dim_class rel rho info.r' in
-        let dir = Star.make r r' in
-        let abs = eval_bnd rel rho info.ty in
-        let cap = eval rel rho info.cap in
-        let sys = eval_bnd_sys rel rho info.sys in
-        make_com dir abs cap sys
+    | Tm.Ff ->
+      make Ff
 
-      | Tm.FCom info ->
-        let r = eval_dim_class rel rho info.r  in
-        let r' = eval_dim_class rel rho info.r' in
-        let dir = Star.make r r' in
-        let cap = eval rel rho info.cap in
-        let sys = eval_bnd_sys rel rho info.sys in
-        make_fcom dir cap sys
+    | Tm.Dim0 ->
+      failwith "0 is a dimension"
 
-      | Tm.FunApp (t0, t1) ->
-        let v0 = eval rel rho t0 in
-        let v1 = eval rel rho t1 in
-        apply v0 v1
+    | Tm.Dim1 ->
+      failwith "1 is a dimension"
 
-      | Tm.ExtApp (t, ts) ->
-        let v = eval rel rho t in
-        let rs = List.map (eval_dim_class rel rho) ts in
-        ext_apply v rs
+    | Tm.Up cmd ->
+      eval_cmd rel rho cmd
 
-      | Tm.Car t ->
-        car @@ eval rel rho t
+    | Tm.Let (cmd, Tm.B (_, t)) ->
+      let v0 = eval_cmd rel rho cmd in
+      eval rel (Val v0 :: rho) t
 
-      | Tm.Cdr t ->
-        cdr @@ eval rel rho t
+    | Tm.LblTy info ->
+      let ty = eval rel rho info.ty in
+      let args = List.map (fun (ty, tm) -> {ty = eval rel rho ty; el = eval rel rho tm}) info.args in
+      make @@ LblTy {lbl = info.lbl; ty; args}
 
-      | Tm.VProj info ->
-        let r = eval_dim_class rel rho info.r in
-        let ty0 = eval rel rho info.ty0 in
-        let ty1 = eval rel rho info.ty1 in
-        let el = eval rel rho info.tm in
-        let equiv = eval rel rho info.equiv in
-        vproj (Gen.make r) ~ty0 ~ty1 ~equiv ~el
+    | Tm.LblRet t ->
+      make @@ LblRet (eval rel rho t)
 
-      | Tm.Univ {kind; lvl} ->
-        make @@ Univ {kind; lvl}
+  and eval_cmd rel rho =
+    function Tm.Cut (hd, stk) ->
+      let vhd = eval_head rel rho hd in
+      eval_stack rel rho vhd stk
 
-      | Tm.Bool ->
-        make Bool
+  and eval_stack rel rho vhd =
+    function
+    | [] -> vhd
+    | frm :: stk ->
+      let vhd = eval_frame rel rho vhd frm in
+      eval_stack rel rho vhd stk
 
-      | Tm.Tt ->
-        make Tt
+  and eval_frame rel rho vhd =
+    function
+    | Tm.LblCall ->
+      lbl_call vhd
+    | Tm.FunApp t ->
+      let v = eval rel rho t in
+      apply vhd v
+    | Tm.ExtApp ts ->
+      let rs = List.map (eval_dim_class rel rho) ts in
+      ext_apply vhd rs
+    | Tm.Car ->
+      car vhd
+    | Tm.Cdr ->
+      cdr vhd
+    | Tm.VProj info ->
+      let r = eval_dim_class rel rho info.r in
+      let ty0 = eval rel rho info.ty0 in
+      let ty1 = eval rel rho info.ty1 in
+      let equiv = eval rel rho info.equiv in
+      vproj (Gen.make r) ~ty0 ~ty1 ~equiv ~el:vhd
+    | Tm.If info ->
+      let mot = clo info.mot rel rho in
+      let tcase = eval rel rho info.tcase in
+      let fcase = eval rel rho info.fcase in
+      if_ mot vhd tcase fcase
 
-      | Tm.Ff ->
-        make Ff
 
-      | Tm.Dim0 ->
-        failwith "0 is a dimension"
+  and eval_head rel rho =
+    function
+    | Tm.Down info ->
+      eval rel rho info.tm
 
-      | Tm.Dim1 ->
-        failwith "1 is a dimension"
+    | Tm.Coe info ->
+      let r = eval_dim_class rel rho info.r in
+      let r' = eval_dim_class rel rho info.r' in
+      let dir = Star.make r r' in
+      let abs = eval_bnd rel rho info.ty  in
+      let el = eval rel rho info.tm in
+      make_coe dir abs el
 
-      | Tm.Down info ->
-        eval rel rho info.tm
+    | Tm.HCom info ->
+      let r = eval_dim_class rel rho info.r in
+      let r' = eval_dim_class rel rho info.r' in
+      let dir = Star.make r r' in
+      let ty = eval rel rho info.ty in
+      let cap = eval rel rho info.cap in
+      let sys = eval_bnd_sys rel rho info.sys in
+      make_hcom dir ty cap sys
 
-      | Tm.Up t ->
-        eval rel rho t
+    | Tm.Com info ->
+      let r = eval_dim_class rel rho info.r in
+      let r' = eval_dim_class rel rho info.r' in
+      let dir = Star.make r r' in
+      let abs = eval_bnd rel rho info.ty in
+      let cap = eval rel rho info.cap in
+      let sys = eval_bnd_sys rel rho info.sys in
+      make_com dir abs cap sys
 
-      | Tm.If info ->
-        let mot = clo info.mot rel rho in
-        let scrut = eval rel rho info.scrut in
-        let tcase = eval rel rho info.tcase in
-        let fcase = eval rel rho info.fcase in
-        if_ mot scrut tcase fcase
+    | Tm.Ix i ->
+      begin
+        match List.nth rho i with
+        | Val v -> v
+        | _ -> failwith "Expected value in environment"
+      end
 
-      | Tm.Let (t0, Tm.B (_, t1)) ->
-        let v0 = eval rel rho t0 in
-        eval rel (Val v0 :: rho) t1
-
-      | Tm.LblTy info ->
-        let ty = eval rel rho info.ty in
-        let args = List.map (fun (ty, tm) -> {ty = eval rel rho ty; el = eval rel rho tm}) info.args in
-        make @@ LblTy {lbl = info.lbl; ty; args}
-
-      | Tm.LblRet t ->
-        make @@ LblRet (eval rel rho t)
-
-      | Tm.LblCall t ->
-        let v = eval rel rho t in
-        lbl_call v
+    | Tm.Ref name ->
+      let tty, tsys = Sig.lookup name in
+      let vsys = eval_tm_sys rel [] tsys in
+      let vty = eval rel [] tty in
+      make @@ Up {ty = vty; neu = Ref name; sys = vsys}
 
 
   and eval_bnd_face rel rho (tr, tr', obnd) =
@@ -911,19 +915,19 @@ struct
 
   and eval_bnd rel rho bnd =
     let Tm.B (_, tm) = bnd in
-    let x = Symbol.fresh () in
+    let x = Name.fresh () in
     let rho = Atom x :: rho in
     Abs.bind1 x @@ eval rel rho tm
 
   and eval_nbnd rel rho bnd =
     let Tm.NB (nms, tm) = bnd in
-    let xs = List.map (fun _ -> Symbol.fresh ()) nms in
+    let xs = List.map (fun _ -> Name.fresh ()) nms in
     let rho = List.map (fun x -> Atom x) xs @ rho in
     Abs.bind xs @@ eval rel rho tm
 
   and eval_ext_bnd rel rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
-    let xs = List.map (fun _ -> Symbol.fresh ()) nms in
+    let xs = List.map (fun _ -> Name.fresh ()) nms in
     let rho = List.map (fun x -> Atom x) xs @ rho in
     ExtAbs.bind xs (eval rel rho tm, eval_tm_sys rel rho sys)
 
@@ -1100,7 +1104,7 @@ struct
         | `Rigid boundary_sys ->
           let cap = ext_apply info.cap ss in
           let correction_sys =
-            let face = Face.map @@ fun _ _ v -> Abs.bind [Symbol.fresh ()] v in
+            let face = Face.map @@ fun _ _ v -> Abs.bind [Name.fresh ()] v in
             List.map face boundary_sys
           in
           rigid_hcom info.dir ty_s cap @@ correction_sys @ info.sys
@@ -1217,7 +1221,7 @@ struct
       let abs =
         let r, _ = Star.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
-        let z = Symbol.fresh () in
+        let z = Name.fresh () in
         let sys =
           let face =
             Face.map @@ fun _ _ absi ->
@@ -1254,8 +1258,6 @@ struct
       let Tm.B (_, tm) = info.bnd in
       Val.act info.action @@
       eval info.rel (Val varg :: info.rho) tm
-    | Const v ->
-      v
 
 
   and pp_value fmt value =
@@ -1312,11 +1314,11 @@ struct
 
   and pp_abs fmt abs =
     let x, v = Abs.unleash1 abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@]" Uuseg_string.pp_utf_8 (Symbol.to_string x) pp_value v
+    Format.fprintf fmt "@[<1><%a>@ %a@]" Name.pp x pp_value v
 
   and pp_ext_abs fmt abs =
     let x, (tyx, sysx) = ExtAbs.unleash1 abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" Uuseg_string.pp_utf_8 (Symbol.to_string x) pp_value tyx pp_val_sys sysx
+    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" Name.pp x pp_value tyx pp_val_sys sysx
 
   and pp_val_sys fmt sys =
     let pp_sep fmt () = Format.fprintf fmt " " in
@@ -1369,9 +1371,6 @@ struct
   and pp_dims fmt rs =
     let pp_sep fmt () = Format.fprintf fmt " " in
     Format.pp_print_list ~pp_sep Dim.pp fmt rs
-
-  let const_clo v =
-    Const v
 
   module Macro =
   struct

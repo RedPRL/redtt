@@ -1,4 +1,4 @@
-type atom = Symbol.t
+type atom = Name.t
 type star = DimStar.t
 type gen = DimGeneric.t
 type rel = Restriction.t
@@ -80,9 +80,12 @@ sig
   val make : con -> value
   val unleash : value -> con
 
-  val eval : rel -> env -> 'a Tm.t -> value
-  val eval_dim : rel -> env -> 'a Tm.t -> Dim.repr
-  val eval_tm_sys : rel -> env -> Tm.chk Tm.t Tm.system -> val_sys
+  val eval : rel -> env -> Tm.tm -> value
+  val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
+  val eval_head : rel -> env -> Tm.tm Tm.head -> value
+  val eval_frame : rel -> env -> value -> Tm.tm Tm.frame -> value
+  val eval_dim : rel -> env -> Tm.tm -> Dim.repr
+  val eval_tm_sys : rel -> env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
@@ -91,7 +94,6 @@ sig
   val lbl_call : value -> value
 
   val inst_clo : clo -> value -> value
-  val const_clo : value -> clo
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : value -> value * clo
@@ -123,7 +125,7 @@ end
 module type Sig =
 sig
   (** Return the type and boundary of a global variable *)
-  val lookup : Name.t -> Tm.chk Tm.t * Tm.chk Tm.t Tm.system
+  val lookup : Name.t -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
 module M (Sig : Sig) : S

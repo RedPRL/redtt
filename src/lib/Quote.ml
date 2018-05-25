@@ -10,13 +10,13 @@ sig
   val emp : t
   val make : int -> t
   val succ : t -> t
-  val abs : t -> Symbol.t list -> t
+  val abs : t -> Name.t list -> t
 
   val ix_of_lvl : int -> t -> int
-  val ix_of_atom : Symbol.t -> t -> int
+  val ix_of_atom : Name.t -> t -> int
 end =
 struct
-  module M = Map.Make (Symbol)
+  module M = Map.Make (Name)
   type t = {n : int; atoms : int M.t}
 
   let len env =
@@ -55,9 +55,9 @@ type env = Env.t
 
 module type S =
 sig
-  val quote_nf : env -> Val.nf -> Tm.chk Tm.t
-  val quote_neu : env -> Val.neu -> Tm.inf Tm.t
-  val quote_ty : env -> Val.value -> Tm.chk Tm.t
+  val quote_nf : env -> Val.nf -> Tm.tm
+  val quote_neu : env -> Val.neu -> Tm.tm Tm.cmd
+  val quote_ty : env -> Val.value -> Tm.tm
 
   val equiv : env -> ty:Val.value -> Val.value -> Val.value -> unit
   val equiv_ty : env -> Val.value -> Val.value -> unit
@@ -79,8 +79,6 @@ struct
       let app0 = apply el0 var in
       let app1 = apply el1 var in
       Tm.lam None @@ equate (Env.succ env) vcod app0 app1
-
-
     | Sg {dom; cod} ->
       let el00 = car el0 in
       let el10 = car el1 in
@@ -88,7 +86,6 @@ struct
       let vcod = inst_clo cod el00 in
       let q1 = equate env vcod (cdr el0) (cdr el1) in
       Tm.cons q0 q1
-
     | Ext abs ->
       let xs, (tyx, _) = ExtAbs.unleash abs in
       let rs = List.map Dim.named xs in
@@ -147,7 +144,7 @@ struct
         let envx = Env.abs env xs in
         let tyx = equate envx ty ty0x ty1x in
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
-        Tm.make @@ Tm.Ext (Tm.NB (List.map (fun x -> Some (Symbol.to_string x)) xs, (tyx, sysx)))
+        Tm.make @@ Tm.Ext (Tm.NB (List.map (fun x -> Some (Name.to_string x)) xs, (tyx, sysx)))
 
       | Rst info0, Rst info1 ->
         let ty = equate env ty info0.ty info1.ty in
@@ -179,7 +176,7 @@ struct
         let ty = equate_ty env hcom0.ty hcom1.ty in
         let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
         let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
-        Tm.up @@ Tm.make @@ Tm.HCom {r = tr; r' = tr'; ty; cap; sys}
+        Tm.up @@ Tm.Cut (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, [])
 
       | Coe coe0, Coe coe1 ->
         let tr, tr' = equate_star env coe0.dir coe1.dir in
@@ -190,74 +187,65 @@ struct
           Abs.inst1 coe0.abs r
         in
         let tm = equate env tyr coe0.el coe1.el in
-        Tm.up @@ Tm.make @@ Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}
+        Tm.up @@ Tm.Cut (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, [])
 
       | _ ->
         Format.eprintf "Failed to equate@; @[<1>%a = %a ∈ %a@] @." pp_value el0 pp_value el1 pp_value ty;
         failwith "equate"
 
-  and equate_neu env neu0 neu1 =
+  and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
     | Lvl (_, l0), Lvl (_, l1) ->
       if l0 = l1 then
-        Tm.var @@ Env.ix_of_lvl l0 env
+        Tm.Cut (Tm.Ix (Env.ix_of_lvl l0 env), stk)
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
-
+    | Ref nm0, Ref nm1 ->
+      if nm0 = nm1 then
+        Tm.Cut (Tm.Ref nm0, [])
+      else
+        failwith "global variable name mismatch"
     | Car neu0, Car neu1 ->
-      Tm.car @@ equate_neu env neu0 neu1
-
+      equate_neu_ env neu0 neu1 @@ Tm.Car :: stk
     | Cdr neu0, Cdr neu1 ->
-      Tm.cdr @@ equate_neu env neu0 neu1
-
+      equate_neu_ env neu0 neu1 @@ Tm.Cdr :: stk
     | FunApp (neu0, nf0), FunApp (neu1, nf1) ->
-      let t0 = equate_neu env neu0 neu1 in
-      let t1 = equate env nf0.ty nf0.el nf1.el in
-      Tm.make @@ Tm.FunApp (t0, t1)
-
+      let t = equate env nf0.ty nf0.el nf1.el in
+      equate_neu_ env neu0 neu1 @@ Tm.FunApp t :: stk
     | ExtApp (neu0, rs0), ExtApp (neu1, rs1) ->
-      let t = equate_neu env neu0 neu1 in
       let ts = equate_dims env rs0 rs1 in
-      Tm.make @@ Tm.ExtApp (t, ts)
-
+      equate_neu_ env neu0 neu1 @@ Tm.ExtApp ts :: stk
     | If if0, If if1 ->
       let var = generic env @@ make Bool in
       let vmot0 = inst_clo if0.mot var in
       let vmot1 = inst_clo if1.mot var in
       let mot = equate_ty (Env.succ env) vmot0 vmot1 in
-      let scrut = equate_neu env if0.neu if1.neu in
       let vmot_tt = inst_clo if0.mot @@ make Tt in
       let vmot_ff = inst_clo if0.mot @@ make Ff in
       let tcase = equate env vmot_tt if0.tcase if1.tcase in
       let fcase = equate env vmot_ff if0.fcase if1.fcase in
-      Tm.make @@ Tm.If {mot = Tm.B (None, mot); scrut; tcase; fcase}
-
+      let frame = Tm.If {mot = Tm.B (None, mot); tcase; fcase} in
+      equate_neu_ env if0.neu if1.neu @@ frame :: stk
     | VProj vproj0, VProj vproj1 ->
       let r0 = DimGeneric.unleash vproj0.x in
       let r1 = DimGeneric.unleash vproj1.x in
       let tr = equate_dim env r0 r1 in
-      let tm = equate_neu env vproj0.neu vproj1.neu in
       let ty0 = equate_ty env vproj0.ty0 vproj1.ty0 in
       let ty1 = equate_ty env vproj0.ty1 vproj1.ty1 in
       let equiv_ty = V.Macro.equiv vproj0.ty0 vproj0.ty1 in
       let equiv = equate env equiv_ty vproj0.equiv vproj1.equiv in
-      Tm.make @@ Tm.VProj {r = tr; tm; ty0; ty1; equiv}
-
+      let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
+      equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
     | LblCall neu0, LblCall neu1 ->
-      let q = equate_neu env neu0 neu1 in
-      Tm.make @@ Tm.LblCall q
-
-    | Ref nm0, Ref nm1 ->
-      if nm0 = nm1 then
-        Tm.make @@ Tm.Ref nm0
-      else
-        failwith "global variable name mismatch"
-
+      equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
     | _ ->
       Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1;
       failwith "equate_neu"
 
-  and equate_ty env ty0 ty1 : Tm.chk Tm.t =
+  and equate_neu env neu0 neu1 =
+    equate_neu_ env neu0 neu1 []
+
+  and equate_ty env ty0 ty1 =
     let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
     equate env univ ty0 ty1
 
@@ -345,8 +333,12 @@ struct
     | Dim.Dim0 -> Tm.make Tm.Dim0
     | Dim.Dim1 -> Tm.make Tm.Dim1
     | Dim.Atom x ->
-      let ix = Env.ix_of_atom x env in
-      Tm.up @@ Tm.var ix
+      try
+        let ix = Env.ix_of_atom x env in
+        Tm.up @@ Tm.var ix
+      with
+      | _ ->
+        Tm.up @@ Tm.Cut (Tm.Ref x, [])
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1

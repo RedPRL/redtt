@@ -1,5 +1,5 @@
 type t =
-  | Define of {name : string; info : Tm.info; args : TmUtil.tele; body : Tm.chk Tm.t }
+  | Define of {name : string; info : Tm.info; args : TmUtil.tele; body : Tm.tm }
 
 type document = t list
 
@@ -21,12 +21,12 @@ let rec tele_to_multibind tele bdy =
   | TmUtil.TCons (nm, _, tele) ->
     TmUtil.MBConsVar (nm, tele_to_multibind tele bdy)
 
-let to_inf decl =
+let to_cmd decl =
   match decl with
   | Define {info; args; body; _} ->
     let ty = TmUtil.pi_from_tele (Some info) args in
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
-    Tm.make @@ Tm.Down {ty; tm}
+    Tm.Cut (Tm.Down {ty; tm}, [])
 
 
 let rec check_document decls =
@@ -45,8 +45,8 @@ and check_decl cx decl =
   | Define {info; args; body} ->
     let ty = TmUtil.pi_from_tele (Some info) args in
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
-    let inf = Tm.make @@ Tm.Down {ty; tm} in
-    let vty = Typing.infer cx inf in
+    let cmd = Tm.Cut (Tm.Down {ty; tm}, []) in
+    let vty = Typing.infer cx cmd in
     let el = LocalCx.eval cx tm in
     let tm' = LocalCx.quote cx ~ty:vty el in
     let nm = Some (decl_name decl) in

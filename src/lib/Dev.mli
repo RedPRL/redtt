@@ -1,5 +1,5 @@
-type ty = Tm.chk Tm.t
-type tm = Tm.chk Tm.t
+type ty = Tm.tm
+type tm = Tm.tm
 
 type 'a dev_view =
   | Ret of tm

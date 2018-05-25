@@ -16,15 +16,18 @@ sig
   val ppenv : t -> Pretty.env
   val lookup : int -> t -> [`Ty of value | `Dim]
 
-  val eval : t -> 'a Tm.t -> value
-  val eval_dim : t -> Tm.chk Tm.t -> Dim.repr
-  val eval_tm_sys : t -> Tm.chk Tm.t Tm.system -> Val.val_sys
+  val eval : t -> Tm.tm -> value
+  val eval_cmd : t -> Tm.tm Tm.cmd -> value
+  val eval_head : t -> Tm.tm Tm.head -> value
+  val eval_frame : t -> value -> Tm.tm Tm.frame -> value
+  val eval_dim : t -> Tm.tm -> Dim.repr
+  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
 
-  val quote : t -> ty:value -> value -> Tm.chk Tm.t
-  val quote_ty : t -> value -> Tm.chk Tm.t
+  val quote : t -> ty:value -> value -> Tm.tm
+  val quote_ty : t -> value -> Tm.tm
 
   val check_eq_ty : t -> value -> value -> unit
 
@@ -73,7 +76,7 @@ struct
     fst @@ ext cx ~nm ty [face]
 
   let ext_dim {env; qenv; tys; rel; ppenv} ~nm =
-    let x = Symbol.named nm in
+    let x = Name.named nm in
     {env = Val.Atom x :: env;
      tys = `Dim :: tys;
      qenv = Quote.Env.abs qenv [x];
@@ -98,6 +101,25 @@ struct
     with
     | exn ->
       Format.eprintf "Failed to evaluate: %a@." (Tm.pp ppenv) tm;
+      raise exn
+
+  let eval_cmd {env; rel; ppenv; _} cmd =
+    try
+      V.eval_cmd rel env cmd
+    with
+    | exn ->
+      Format.eprintf "Failed to evaluate: %a@." (Tm.pp_cmd ppenv) cmd;
+      raise exn
+
+  let eval_frame {env; rel; _} frm hd =
+    V.eval_frame rel env frm hd
+
+  let eval_head {env; rel; ppenv; _} hd =
+    try
+      V.eval_head rel env hd
+    with
+    | exn ->
+      Format.eprintf "Failed to evaluate: %a@." (Tm.pp_head ppenv) hd;
       raise exn
 
   let eval_dim {env; rel; _} tm =

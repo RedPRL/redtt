@@ -3,72 +3,74 @@ open RedBasis
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option list * 'a
 
-type chk = [`Chk]
-type inf = [`Inf]
-
 type info = Lexing.position * Lexing.position
 
-type _ f =
-  | Ref : Name.t -> inf f
-  | Ix : int -> inf f
-  | Car : inf t -> inf f
-  | Cdr : inf t -> inf f
-  | FunApp : inf t * chk t -> inf f
-  | ExtApp : inf t * chk t list -> inf f
+type ('r, 'a) face = 'r * 'r * 'a option
+type ('r, 'a) system = ('r, 'a) face list
 
-  | Down : {ty : chk t; tm : chk t} -> inf f
-  | Coe : {r : chk t; r' : chk t; ty : chk t bnd; tm : chk t} -> inf f
-  | HCom : {r : chk t; r' : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> inf f
-  | Com : {r : chk t; r' : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> inf f
+type 'a tmf =
+  | FCom of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a bnd) system}
 
-  | FCom : {r : chk t; r' : chk t; cap : chk t; sys : chk t bnd system} -> chk f
+  | Univ of {kind : Kind.t; lvl : Lvl.t}
+  | Pi of 'a * 'a bnd
+  | Ext of ('a * ('a, 'a) system) nbnd
+  | Rst of {ty : 'a; sys : ('a, 'a) system}
+  | Sg of 'a * 'a bnd
 
-  | Up : inf t -> chk f
+  | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
 
-  | Univ : {kind : Kind.t; lvl : Lvl.t} -> chk f
-  | Pi : chk t * chk t bnd -> chk f
-  | Ext : (chk t * chk t system) nbnd -> chk f
-  | Rst : {ty : chk t; sys : chk t system} -> chk f
-  | Sg : chk t * chk t bnd -> chk f
+  | Bool
+  | Tt
+  | Ff
 
-  | V : {r : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> chk f
+  | Lam of 'a bnd
+  | ExtLam of 'a nbnd
 
-  | Bool : chk f
-  | Tt : chk f
-  | Ff : chk f
-  | If : {mot : chk t bnd; scrut : inf t; tcase : chk t; fcase : chk t} -> inf f
-  | VProj : {r : chk t; tm : inf t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> inf f
+  | Cons of 'a * 'a
+  | Dim0
+  | Dim1
 
-  | Lam : chk t bnd -> chk f
-  | ExtLam : chk t nbnd -> chk f
+  (* Labelled types from Epigram *)
+  | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
+  | LblRet of 'a
 
-  | Cons : chk t * chk t -> chk f
-  | Dim0 : chk f
-  | Dim1 : chk f
+  | Up of 'a cmd
+  | Let of 'a cmd * 'a bnd
 
-  | Let : inf t * chk t bnd -> chk f
+and 'a head =
+  | Ref of Name.t
+  | Ix of int
+  | Down of {ty : 'a; tm : 'a}
+  | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
+  | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
+  | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
 
-  | LblTy : {lbl : string; args : (chk t * chk t) list; ty : chk t} -> chk f
-  | LblRet : chk t -> chk f
-  | LblCall : inf t -> inf f
 
-and subst =
+and 'a frame =
+  | Car
+  | Cdr
+  | FunApp of 'a
+  | ExtApp of 'a list
+  | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
+  | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
+  | LblCall
+
+and 'a stack = 'a frame list
+and 'a cmd = Cut of 'a head * 'a stack
+
+type tm = Tm of tm tmf
+
+type subst =
   | Id
   | Proj
-  | Sub of subst * inf t
+  | Sub of subst * tm cmd
   | Cmp of subst * subst
 
-and 'a node = {info : info option; con : 'a f; subst : subst}
-and 'a t = 'a node ref
-and 'a face = chk t * chk t * 'a option
-and 'a system = 'a face list
+let ($$) hd stk =
+  Cut (hd, stk)
 
-
-let make tf = ref {info = None; con = tf; subst = Id}
-let into_info info tf = ref {info = info; con = tf; subst = Id}
-let info node = !node.info
-
-let var i = make @@ Ix i
+let var i =
+  Ix i $$ []
 
 let lift sub =
   Sub (Cmp (sub, Proj), var 0)
@@ -81,22 +83,168 @@ let rec liftn n sub =
 let inst0 t = Sub (Id, t)
 
 
-let subst : type x. subst -> x t -> x t =
-  fun sub node ->
-    ref {!node with subst = Cmp (sub, !node.subst)}
+let rec subst (sub : subst) (Tm con) =
+  Tm (subst_f sub con)
 
-let subst_bnd : subst -> 'a t bnd -> 'a t bnd =
-  fun sub bnd ->
-    let B (nm, t) = bnd in
-    B (nm, subst (lift sub) t)
+and subst_f (sub : subst) =
+  function
+  | (Dim0 | Dim1 | Univ _ | Bool | Tt | Ff) as con ->
+    con
 
-let subst_nbnd : subst -> 'a t nbnd -> 'a t nbnd =
-  fun sub bnd ->
-    let NB (nms, t) = bnd in
-    NB (nms, subst (liftn (List.length nms) sub) t)
+  | FCom info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let cap = subst sub info.cap in
+    let sys = subst_comp_sys sub info.sys in
+    FCom {r; r'; cap; sys}
+
+  | Up cmd ->
+    Up (subst_cmd sub cmd)
+
+  | Pi (dom, cod) ->
+    Pi (subst sub dom, subst_bnd sub cod)
+
+  | Sg (dom, cod) ->
+    Sg (subst sub dom, subst_bnd sub cod)
+
+  | Ext ebnd ->
+    Ext (subst_ext_bnd sub ebnd)
+
+  | Rst info ->
+    let ty = subst sub info.ty in
+    let sys = subst_tm_sys sub info.sys in
+    Rst {ty; sys}
+
+  | V info ->
+    let r = subst sub info.r in
+    let ty0 = subst sub info.ty0 in
+    let ty1 = subst sub info.ty1 in
+    let equiv = subst sub info.equiv in
+    V {r; ty0; ty1; equiv}
+
+  | Lam bnd ->
+    Lam (subst_bnd sub bnd)
+
+  | ExtLam nbnd ->
+    ExtLam (subst_nbnd sub nbnd)
+
+  | Cons (t0, t1) ->
+    Cons (subst sub t0, subst sub t1)
+
+  | LblTy info ->
+    let args = List.map (fun (ty, tm) -> subst sub ty, subst sub tm) info.args in
+    let ty = subst sub info.ty in
+    LblTy {info with args; ty}
+
+  | LblRet t ->
+    LblRet (subst sub t)
+
+  | Let (cmd, bnd) ->
+    Let (subst_cmd sub cmd, subst_bnd sub bnd)
+
+and subst_tm_sys sub  =
+  List.map (subst_tm_face sub)
+
+and subst_tm_face sub (r, r', otm) =
+  subst sub r, subst sub r', Option.map (subst sub) otm
 
 
-let rec subst_ext_sys sub sys =
+and subst_cmd sub =
+  function Cut (head, spine) ->
+    let Cut (head', spine') = subst_head sub head in
+    let spine'' = subst_spine sub spine in
+    Cut (head', spine' @ spine'')
+
+and subst_spine sub spine =
+  List.map (subst_frame sub) spine
+
+and subst_frame sub frame =
+  match frame with
+  | (Car | Cdr | LblCall) ->
+    frame
+  | FunApp t ->
+    FunApp (subst sub t)
+  | ExtApp ts ->
+    ExtApp (List.map (subst sub) ts)
+  | If info ->
+    let mot = subst_bnd sub info.mot in
+    let tcase = subst sub info.tcase in
+    let fcase = subst sub info.fcase in
+    If {mot; tcase; fcase}
+  | VProj info ->
+    let r = subst sub info.r in
+    let ty0 = subst sub info.ty0 in
+    let ty1 = subst sub info.ty1 in
+    let equiv = subst sub info.equiv in
+    VProj {r; ty0; ty1; equiv}
+
+and subst_head sub head =
+  match head with
+  | Ix i ->
+    subst_ix sub i
+
+  | Ref a ->
+    Ref a $$ []
+
+  | Down info ->
+    let ty = subst sub info.ty in
+    let tm = subst sub info.tm in
+    Down {ty; tm} $$ []
+
+  | HCom info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst sub info.ty in
+    let cap = subst sub info.cap in
+    let sys = subst_comp_sys sub info.sys in
+    HCom {r; r'; ty; cap; sys} $$ []
+
+  | Coe info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst_bnd sub info.ty in
+    let tm = subst sub info.tm in
+    Coe {r; r'; ty; tm} $$ []
+
+  | Com info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst_bnd sub info.ty in
+    let cap = subst sub info.cap in
+    let sys = subst_comp_sys sub info.sys in
+    Com {r; r'; ty; cap; sys} $$ []
+
+and subst_ix sub ix  =
+  match sub with
+  | Id ->
+    Ix ix $$ []
+  | Proj ->
+    Ix (ix + 1) $$ []
+
+  | Sub (sub, cmd) ->
+    if ix = 0 then cmd else subst_ix sub (ix - 1)
+
+  | Cmp (sub1, sub0) ->
+    subst_cmd sub1 @@
+    subst_ix sub0 ix
+
+and subst_bnd sub bnd =
+  let B (nm, t) = bnd in
+  B (nm, subst (lift sub) t)
+
+and subst_nbnd sub bnd =
+  let NB (nms, t) = bnd in
+  NB (nms, subst (liftn (List.length nms) sub) t)
+
+and subst_ext_bnd sub ebnd =
+  let NB (nms, (ty, sys)) = ebnd in
+  let sub' = liftn (List.length nms) sub in
+  let ty' = subst sub' ty in
+  let sys' = subst_tm_sys sub' sys in
+  NB (nms, (ty', sys'))
+
+
+and subst_ext_sys sub sys =
   List.map (subst_ext_face sub) sys
 
 and subst_ext_face sub (r, r', otm) =
@@ -114,437 +262,309 @@ and subst_comp_face sub (r, r', obnd) =
 and subst_comp_sys sub sys =
   List.map (subst_comp_face sub) sys
 
+let make con = Tm con
+let unleash (Tm con) = con
 
-
-
-
-
-let rec substf : type x. subst -> x f -> x f =
-  fun sub con ->
-    match sub with
-    | Id -> con
-    | _ ->
-      match con with
-      | Ix ix ->
-        subst_var sub ix
-
-      | Ref _ -> con
-      | Bool -> con
-      | Tt -> con
-      | Ff -> con
-      | Dim0 -> con
-      | Dim1 -> con
-      | Univ _ -> con
-
-      | Car t ->
-        Car (subst sub t)
-
-      | Cdr t ->
-        Cdr (subst sub t)
-
-      | FunApp (t0, t1) ->
-        FunApp (subst sub t0, subst sub t1)
-
-      | ExtApp (t0, ts) ->
-        ExtApp (subst sub t0, List.map (subst sub) ts)
-
-      | Down {ty; tm} ->
-        Down {ty = subst sub ty; tm = subst sub tm}
-
-      | Coe info ->
-        let r = subst sub info.r in
-        let r' = subst sub info.r' in
-        let ty = subst_bnd sub info.ty in
-        let tm = subst sub info.tm in
-        Coe {r; r'; ty; tm}
-
-      | HCom info ->
-        let r = subst sub info.r in
-        let r' = subst sub info.r' in
-        let ty = subst sub info.ty in
-        let cap = subst sub info.cap in
-        let sys = subst_comp_sys sub info.sys in
-        HCom {r; r'; ty; cap; sys}
-
-      | FCom info ->
-        let r = subst sub info.r in
-        let r' = subst sub info.r' in
-        let cap = subst sub info.cap in
-        let sys = subst_comp_sys sub info.sys in
-        FCom {r; r'; cap; sys}
-
-      | Com info ->
-        let r = subst sub info.r in
-        let r' = subst sub info.r' in
-        let ty = subst_bnd sub info.ty in
-        let cap = subst sub info.cap in
-        let sys = subst_comp_sys sub info.sys in
-        Com {r; r'; ty; cap; sys}
-
-      | Up t ->
-        Up (subst sub t)
-
-      | Pi (dom, cod) ->
-        Pi (subst sub dom, subst_bnd sub cod)
-
-      | Sg (dom, cod) ->
-        Sg (subst sub dom, subst_bnd sub cod)
-
-      | Ext (NB (nms, (cod, sys))) ->
-        let sub' = liftn (List.length nms) sub in
-        Ext (NB (nms, (subst sub' cod, subst_ext_sys sub' sys)))
-
-      | Rst info ->
-        let ty = subst sub info.ty in
-        let sys = subst_ext_sys sub info.sys in
-        Rst {ty; sys}
-
-      | V info ->
-        let r = subst sub info.r in
-        let ty0 = subst sub info.ty0 in
-        let ty1 = subst sub info.ty1 in
-        let equiv = subst sub info.equiv in
-        V {r; ty0; ty1; equiv}
-
-      | If info ->
-        let mot = subst_bnd sub info.mot in
-        let scrut = subst sub info.scrut in
-        let tcase = subst sub info.tcase in
-        let fcase = subst sub info.fcase in
-        If {mot; scrut; tcase; fcase}
-
-      | VProj info ->
-        let r = subst sub info.r in
-        let tm = subst sub info.tm in
-        let ty0 = subst sub info.ty0 in
-        let ty1 = subst sub info.ty1 in
-        let equiv = subst sub info.equiv in
-        VProj {r; tm; ty0; ty1; equiv}
-
-      | Lam bnd ->
-        Lam (subst_bnd sub bnd)
-
-      | ExtLam bnd ->
-        ExtLam (subst_nbnd sub bnd)
-
-      | Cons (t0, t1) ->
-        Cons (subst sub t0, subst sub t1)
-
-      | Let (t, bnd) ->
-        Let (subst sub t, subst_bnd sub bnd)
-
-      | LblTy {lbl; args; ty} ->
-        let args = List.map (fun (ty, tm) -> subst sub ty, subst sub tm) args in
-        let ty = subst sub ty in
-        LblTy {lbl; args; ty}
-
-      | LblRet t ->
-        LblRet (subst sub t)
-
-      | LblCall t ->
-        LblCall (subst sub t)
-
-(* TODO: double check that this is correct *)
-and subst_var sub ix : inf f =
-  match sub with
-  | Id ->
-    Ix ix
-  | Proj ->
-    Ix (ix + 1)
-  | Sub (sub, t) ->
-    if ix = 0 then unleash t else subst_var sub (ix - 1)
-  | Cmp (sub1, sub0) ->
-    substf sub1 @@ subst_var sub0 ix
-
-and unleash : type x. x t -> x f =
-  fun node ->
-    let con = substf !node.subst !node.con in
-    node := {!node with con; subst = Id};
-    con
-
-
-let close_var : type x. Name.t -> int -> x t -> x t =
-  fun a ->
-    let rec go : type x. int -> x t -> x t =
-      fun k tm ->
-        match unleash tm with
-        | Ref b ->
-          if a = b then make @@ Ix k else tm
-        | Ix _ -> tm
-        | Univ _ -> tm
-        | Bool -> tm
-        | Tt -> tm
-        | Ff -> tm
-        | Dim0 -> tm
-        | Dim1 -> tm
-        | Car t ->
-          make @@ Car (go k t)
-        | Cdr t ->
-          make @@ Cdr (go k t)
-        | FunApp (t0, t1) ->
-          make @@ FunApp (go k t0, go k t1)
-        | ExtApp (t, ts) ->
-          make @@ ExtApp (go k t, List.map (go k) ts)
-        | Down info ->
-          let ty = go k info.ty in
-          let tm = go k info.tm in
-          make @@ Down {ty; tm}
-        | Coe info ->
-          let r = go k info.r in
-          let r' = go k info.r' in
-          let ty = go_bnd k info.ty in
-          let tm = go k info.tm in
-          make @@ Coe {r; r'; ty; tm}
-        | HCom info ->
-          let r = go k info.r in
-          let r' = go k info.r' in
-          let ty = go k info.ty in
-          let cap = go k info.cap in
-          let sys = go_comp_sys k info.sys in
-          make @@ HCom {r; r'; ty; cap; sys}
-        | Com info ->
-          let r = go k info.r in
-          let r' = go k info.r' in
-          let ty = go_bnd k info.ty in
-          let cap = go k info.cap in
-          let sys = go_comp_sys k info.sys in
-          make @@ Com {r; r'; ty; cap; sys}
-        | FCom info ->
-          let r = go k info.r in
-          let r' = go k info.r' in
-          let cap = go k info.cap in
-          let sys = go_comp_sys k info.sys in
-          make @@ FCom {r; r'; cap; sys}
-        | Up t ->
-          make @@ Up (go k t)
-        | Pi (dom, cod) ->
-          make @@ Pi (go k dom, go_bnd k cod)
-        | Sg (dom, cod) ->
-          make @@ Sg (go k dom, go_bnd k cod)
-        | Ext nbnd ->
-          make @@ Ext (go_ext_bnd k nbnd)
-        | Rst info ->
-          let ty = go k info.ty in
-          let sys = go_tm_sys k info.sys in
-          make @@ Rst {ty; sys}
-        | V info ->
-          let r = go k info.r in
-          let ty0 = go k info.ty0 in
-          let ty1 = go k info.ty1 in
-          let equiv = go k info.equiv in
-          make @@ V {r; ty0; ty1; equiv}
-        | If info ->
-          let mot = go_bnd k info.mot in
-          let scrut = go k info.scrut in
-          let tcase = go k info.tcase in
-          let fcase = go k info.fcase in
-          make @@ If {mot; scrut; tcase; fcase}
-        | VProj info ->
-          let r = go k info.r in
-          let tm = go k info.tm in
-          let ty0 = go k info.ty0 in
-          let ty1 = go k info.ty1 in
-          let equiv = go k info.equiv in
-          make @@ VProj {r; tm; ty0; ty1; equiv}
-        | Lam bnd ->
-          make @@ Lam (go_bnd k bnd)
-        | ExtLam nbnd ->
-          make @@ ExtLam (go_nbnd k nbnd)
-        | Cons (t0, t1) ->
-          make @@ Cons (go k t0, go k t1)
-        | Let (t, bnd) ->
-          make @@ Let (go k t, go_bnd k bnd)
-        | LblTy info ->
-          let args = List.map (fun (t0, t1) -> go k t0, go k t1) info.args in
-          let ty = go k info.ty in
-          make @@ LblTy {info with args; ty}
-        | LblRet t ->
-          make @@ LblRet (go k t)
-        | LblCall t ->
-          make @@ LblCall (go k t)
-
-    and go_bnd : type x. int -> x t bnd -> x t bnd =
-      fun k (B (nm, t)) ->
-        B (nm, go (k + 1) t)
-
-    and go_comp_sys k sys =
-      List.map (go_comp_face k) sys
-
-    and go_comp_face k (r, r', obnd) =
-      go k r, go k r', Option.map (go_bnd k) obnd
-
-    and go_ext_bnd k (NB (nms, (ty, sys))) =
-      let k' = k + List.length nms in
-      NB (nms, (go k' ty, go_tm_sys k' sys))
-
-    and go_nbnd k (NB (nms, t)) =
-      let k' = k + List.length nms in
-      NB (nms, go k' t)
-
-    and go_tm_sys k sys =
-      List.map (go_tm_face k) sys
-
-    and go_tm_face k (r, r', otm) =
-      go k r, go k r', Option.map (go k) otm
-
-    in
-    go
-
-let open_var : type x. int -> Name.t -> x t -> x t =
-  fun k a t ->
-    subst (liftn k @@ inst0 @@ make @@ Ref a) t
-
-let up t = make @@ Up t
-let lam nm t = make @@ Lam (B (nm, t))
-let ext_lam nms t = make @@ ExtLam (NB (nms, t))
-let pi nm dom cod = make @@ Pi (dom, B (nm, cod))
-let sg nm dom cod = make @@ Sg (dom, B (nm, cod))
-let let_ nm t0 t1 = make @@ Let (t0, B (nm, t1))
-let cons t0 t1 = make @@ Cons (t0, t1)
-let univ ~kind ~lvl = make @@ Univ {kind; lvl}
-let car t = make @@ Car t
-let cdr t = make @@ Cdr t
-
-let rec pp : type a. a t Pretty.t =
-  fun env fmt tm ->
-    match unleash tm with
-    | Ix i ->
-      Uuseg_string.pp_utf_8 fmt @@
-      Pretty.Env.var i env
-
-    | Ref nm ->
-      Name.pp fmt nm
-
-    | Down {ty; tm} ->
-      Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
-
-    | Pi (dom, B (nm, cod)) ->
-      let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(%a [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 "→" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
-
-    | Sg (dom, B (nm, cod)) ->
-      let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(%a [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 "×" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
-
-    | Ext (NB (nms, (cod, sys))) ->
-      let xs, env' = Pretty.Env.bindn nms env in
-      begin
-        match sys with
-        | [] ->
-          Format.fprintf fmt "@[<1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
-        | _ ->
-          Format.fprintf fmt "@[<1>(# @[<1><%a>@ %a@ @[%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
-      end
-
-
-    | Rst {ty; sys}  ->
-      begin
-        match sys with
-        | [] ->
-          Format.fprintf fmt "%a" (pp env) ty
-        | _ ->
-          Format.fprintf fmt "@[<1>(%a@ @[%a@])@]" (pp env) ty (pp_sys env) sys
-      end
-
+let traverse ~f ~var ~ref =
+  let rec go k =
+    function
+    | Univ info -> Univ info
+    | Bool -> Bool
+    | Tt -> Tt
+    | Ff -> Ff
+    | Dim0 -> Dim0
+    | Dim1 -> Dim1
+    | Lam bnd ->
+      Lam (go_bnd k bnd)
+    | Pi (dom, cod) ->
+      Pi (f k dom, go_bnd k cod)
+    | Sg (dom, cod) ->
+      Sg (f k dom, go_bnd k cod)
+    | Ext ebnd ->
+      Ext (go_ext_bnd k ebnd)
+    | Rst info ->
+      let ty = f k info.ty in
+      let sys = go_tm_sys k info.sys in
+      Rst {ty; sys}
+    | FCom info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let cap = f k info.cap in
+      let sys = go_comp_sys k info.sys in
+      FCom {r; r'; cap; sys}
     | V info ->
-      Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
-
-    | Lam (B (nm, tm)) ->
-      let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(λ [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') tm
-
-    | ExtLam (NB (nms, tm)) ->
-      let xs, env' = Pretty.Env.bindn nms env in
-      Format.fprintf fmt "@[<1>(λ <%a>@ %a)@]" pp_strings xs (pp env') tm
-
-    | FunApp (tm0, tm1) ->
-      Format.fprintf fmt "@[<1>(%a@ %a)@]" (pp env) tm0 (pp env) tm1
-
-    | ExtApp (tm, tms) ->
-      Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" (pp env) tm (pp_terms env) tms
-
-    | Car tm ->
-      Format.fprintf fmt "@[<1>(car@ %a)@]" (pp env) tm
-
-    | Cdr tm ->
-      Format.fprintf fmt "@[<1>(cdr@ %a)@]" (pp env) tm
-
-    | VProj {r; tm; _} ->
-      (* TODO *)
-      Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r (pp env) tm
-
-    | Up tm ->
-      pp env fmt tm
-
-    | Bool ->
-      Format.fprintf fmt "bool"
-
-    | Tt ->
-      Format.fprintf fmt "tt"
-
-    | Ff ->
-      Format.fprintf fmt "ff"
-
-    | Dim0 ->
-      Format.fprintf fmt "0"
-
-    | Dim1 ->
-      Format.fprintf fmt "1"
-
-    | Univ {kind; lvl} ->
-      Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
-
-    | Coe {r; r'; ty = B (nm, ty); tm} ->
-      let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(coe %a %a@ [%a] %a@ %a)@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) tm
-
-    | HCom {r; r'; ty; cap; sys} ->
-      Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
-
-    | FCom {r; r'; cap; sys} ->
-      Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_bsys env) sys
-
-    | Com {r; r'; ty = B (nm, ty); cap; sys} ->
-      let x, _env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env) ty (pp env) cap (pp_bsys env) sys
-
-    | If {mot = B (nm, mot); scrut; tcase; fcase} ->
-      let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(if@ [%a] %a@ %a %a %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot (pp env) scrut (pp env) tcase (pp env) fcase
-
-    | Cons (tm0, tm1) ->
-      Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
-
-    | Let (tm0, B (nm, tm1)) ->
-      let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<1>(let@ @[<1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env) tm0 (pp env') tm1
-
-    | LblTy {lbl; args; ty} ->
-      begin
-        match args with
-        | [] ->
-          Format.fprintf fmt "@[<1>{%a : %a}@]"
-            Uuseg_string.pp_utf_8 lbl
-            (pp env) ty
-        | _ ->
-          Format.fprintf fmt "@[<1>{%a %a : %a}@]"
-            Uuseg_string.pp_utf_8 lbl
-            (pp_terms env) (List.map snd args)
-            (pp env) ty
-      end
-
+      let r = f k info.r in
+      let ty0 = f k info.ty0 in
+      let ty1 = f k info.ty1 in
+      let equiv = f k info.equiv in
+      V {r; ty0; ty1; equiv}
+    | ExtLam nbnd ->
+      ExtLam (go_nbnd k nbnd)
+    | Cons (t0, t1) ->
+      Cons (f k t0, f k t1)
+    | LblTy info ->
+      let args = List.map (fun (t0, t1) -> f k t0, f k t1) info.args in
+      let ty = f k info.ty in
+      LblTy {info with args; ty}
     | LblRet t ->
-      Format.fprintf fmt "@[<1>(ret@ %a)@]"
-        (pp env) t
+      LblRet (f k t)
+    | Up cmd ->
+      Up (go_cmd k cmd)
+    | Let (cmd, bnd) ->
+      Let (go_cmd k cmd, go_bnd k bnd)
 
-    | LblCall t ->
-      Format.fprintf fmt "@[<1>(call@ %a)@]"
-        (pp env) t
+  and go_cmd k =
+    function Cut (hd, stk) ->
+      let Cut (hd', stk') = go_hd k hd in
+      let stk'' = go_stk k stk in
+      Cut (hd', stk' @ stk'')
 
-and pp_terms : type x. x t list Pretty.t =
-  fun env fmt ts ->
-    let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep (pp env) fmt ts
+  and go_hd k =
+    function
+    | Ix i ->
+      var i
+    | Ref a ->
+      ref k a
+    | Down info ->
+      let ty = f k info.ty in
+      let tm = f k info.tm in
+      Down {ty; tm} $$ []
+    | Coe info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = go_bnd k info.ty in
+      let tm = f k info.tm in
+      Coe {r; r'; ty; tm} $$ []
+    | HCom info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = f k info.ty in
+      let cap = f k info.cap in
+      let sys = go_comp_sys k info.sys in
+      HCom {r; r'; ty; cap; sys} $$ []
+    | Com info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = go_bnd k info.ty in
+      let cap = f k info.cap in
+      let sys = go_comp_sys k info.sys in
+      Com {r; r'; ty; cap; sys} $$ []
+
+  and go_stk k =
+    List.map (go_frm k)
+
+  and go_frm k =
+    function
+    | (Car | Cdr | LblCall) as frm -> frm
+    | FunApp t ->
+      FunApp (f k t)
+    | ExtApp ts ->
+      ExtApp (List.map (f k) ts)
+    | If info ->
+      let mot = go_bnd k info.mot in
+      let tcase = f k info.tcase in
+      let fcase = f k info.fcase in
+      If {mot; tcase; fcase}
+    | VProj info ->
+      let r = f k info.r in
+      let ty0 = f k info.ty0 in
+      let ty1 = f k info.ty1 in
+      let equiv = f k info.equiv in
+      VProj {r; ty0; ty1; equiv}
+
+
+  and go_comp_sys k sys =
+    List.map (go_comp_face k) sys
+
+  and go_comp_face k (r, r', obnd) =
+    f k r, f k r', Option.map (go_bnd k) obnd
+
+  and go_ext_bnd k (NB (nms, (ty, sys))) =
+    let k' = k + List.length nms in
+    NB (nms, (f k' ty, go_tm_sys k' sys))
+
+  and go_nbnd k (NB (nms, t)) =
+    let k' = k + List.length nms in
+    NB (nms, f k' t)
+
+  and go_tm_sys k sys =
+    List.map (go_tm_face k) sys
+
+  and go_tm_face k (r, r', otm) =
+    f k r, f k r', Option.map (f k) otm
+
+  and go_bnd k : 'a bnd -> 'b bnd =
+    function B (nm, t) ->
+      B (nm, f (k + 1) t)
+
+  in go
+
+let fix_traverse ~var ~ref  =
+  let rec go k (Tm tm) =
+    Tm (traverse ~f:go ~var ~ref k tm)
+  in
+  go 0
+
+let close_var a k =
+  let var i = Ix i $$ [] in
+  let ref n b = if b = a then Ix (n + k) $$ [] else Ref b $$ [] in
+  fix_traverse ~var ~ref
+
+let subst sub =
+  let ref _ b = Ref b $$ [] in
+  let rec go k (Tm tm) =
+    let var i = subst_ix (liftn k sub) i in
+    Tm (traverse ~f:go ~var ~ref k tm)
+  in
+  go 0
+
+let open_var k a t =
+  subst (liftn k @@ inst0 @@ Cut (Ref a, [])) t
+
+let rec pp env fmt (Tm tm) =
+  match tm with
+
+  | Pi (dom, B (nm, cod)) ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>(%a [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 "→" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
+
+  | Sg (dom, B (nm, cod)) ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>(%a [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 "×" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
+
+  | Ext (NB (nms, (cod, sys))) ->
+    let xs, env' = Pretty.Env.bindn nms env in
+    begin
+      match sys with
+      | [] ->
+        Format.fprintf fmt "@[<1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
+      | _ ->
+        Format.fprintf fmt "@[<1>(# @[<1><%a>@ %a@ @[%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
+    end
+
+
+  | Rst {ty; sys}  ->
+    begin
+      match sys with
+      | [] ->
+        Format.fprintf fmt "%a" (pp env) ty
+      | _ ->
+        Format.fprintf fmt "@[<1>(%a@ @[%a@])@]" (pp env) ty (pp_sys env) sys
+    end
+
+  | V info ->
+    Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
+
+  | Lam (B (nm, tm)) ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>(λ [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') tm
+
+  | ExtLam (NB (nms, tm)) ->
+    let xs, env' = Pretty.Env.bindn nms env in
+    Format.fprintf fmt "@[<1>(λ <%a>@ %a)@]" pp_strings xs (pp env') tm
+
+  | Bool ->
+    Format.fprintf fmt "bool"
+
+  | Tt ->
+    Format.fprintf fmt "tt"
+
+  | Ff ->
+    Format.fprintf fmt "ff"
+
+  | Dim0 ->
+    Format.fprintf fmt "0"
+
+  | Dim1 ->
+    Format.fprintf fmt "1"
+
+  | Univ {kind; lvl} ->
+    Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
+
+  | FCom {r; r'; cap; sys} ->
+    Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_bsys env) sys
+
+  | LblTy {lbl; args; ty} ->
+    begin
+      match args with
+      | [] ->
+        Format.fprintf fmt "@[<1>{%a : %a}@]"
+          Uuseg_string.pp_utf_8 lbl
+          (pp env) ty
+      | _ ->
+        Format.fprintf fmt "@[<1>{%a %a : %a}@]"
+          Uuseg_string.pp_utf_8 lbl
+          (pp_terms env) (List.map snd args)
+          (pp env) ty
+    end
+
+  | LblRet t ->
+    Format.fprintf fmt "@[<1>(ret@ %a)@]"
+      (pp env) t
+
+  | Cons (tm0, tm1) ->
+    Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
+
+  | Let (cmd, B (nm, t)) ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>(let@ @[<1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
+
+  | Up cmd ->
+    pp_cmd env fmt cmd
+
+and pp_head env fmt =
+  function
+  | Coe {r; r'; ty = B (nm, ty); tm} ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>(coe %a %a@ [%a] %a@ %a)@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) tm
+
+  | HCom {r; r'; ty; cap; sys} ->
+    Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
+
+
+  | Com {r; r'; ty = B (nm, ty); cap; sys} ->
+    let x, _env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env) ty (pp env) cap (pp_bsys env) sys
+
+  | Ix i ->
+    Uuseg_string.pp_utf_8 fmt @@
+    Pretty.Env.var i env
+
+  | Ref nm ->
+    Name.pp fmt nm
+
+  | Down {ty; tm} ->
+    Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
+
+and pp_cmd env fmt =
+  function Cut (hd, sp) ->
+    let rec go fmt sp =
+      match sp with
+      | [] -> pp_head env fmt hd
+      | f :: sp ->
+        match f with
+        | Car ->
+          Format.fprintf fmt "@[<1>(car@ %a)@]" go sp
+        | Cdr ->
+          Format.fprintf fmt "@[<1>(cdr@ %a)@]" go sp
+        | FunApp t ->
+          Format.fprintf fmt "@[<1>(%a@ %a)@]" go sp (pp env) t
+        | ExtApp ts ->
+          Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" go sp (pp_terms env) ts
+        | If {mot = B (nm, mot); tcase; fcase} ->
+          let x, env' = Pretty.Env.bind nm env in
+          Format.fprintf fmt "@[<1>(if@ [%a] %a@ %a %a %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot go sp (pp env) tcase (pp env) fcase
+        | VProj {r; _} ->
+          (* TODO *)
+          Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r go sp
+        | LblCall ->
+          Format.fprintf fmt "@[<1>(call@ %a)@]" go sp
+    in
+    go fmt (List.rev sp)
+
+and pp_terms env fmt ts =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep (pp env) fmt ts
 
 and pp_strings fmt (xs : string list) : unit =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -591,6 +611,24 @@ and pp_bface env fmt face =
     let x, env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>[%a=%a@ <%a> %a]@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') tm
 
+let up cmd = make @@ Up cmd
+
+let car =
+  function Cut (hd, sp) ->
+    Cut (hd, sp @ [Car])
+
+let cdr =
+  function Cut (hd, sp) ->
+    Cut (hd, sp @ [Cdr])
+
+let lam nm t = make @@ Lam (B (nm, t))
+let ext_lam nms t = make @@ ExtLam (NB (nms, t))
+let pi nm dom cod = make @@ Pi (dom, B (nm, cod))
+let sg nm dom cod = make @@ Sg (dom, B (nm, cod))
+let let_ nm t0 t1 = make @@ Let (t0, B (nm, t1))
+let cons t0 t1 = make @@ Cons (t0, t1)
+let univ ~kind ~lvl = make @@ Univ {kind; lvl}
+
 module Macro =
 struct
   let arr ty0 ty1 =
@@ -612,7 +650,7 @@ struct
     sg None ty0 @@
     path
       (subst Proj ty1)
-      (up @@ make @@ FunApp (subst Proj f, up @@ var 0))
+      (up @@ (Ix 0 $$ [FunApp (subst Proj f)]))
       (subst Proj x)
 
   let proj2 = Cmp (Proj, Proj)
@@ -632,6 +670,6 @@ struct
     fiber
       ~ty0:(subst proj2 ty0)
       ~ty1:(subst proj2 ty1)
-      ~f:(var 1)
+      ~f:(up @@ var 1)
       ~x:(up @@ var 0)
 end

@@ -1,4 +1,4 @@
-type atom = Symbol.t
+type atom = Name.t
 
 type repr =
   | Dim0
