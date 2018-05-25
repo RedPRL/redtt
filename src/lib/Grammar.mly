@@ -18,7 +18,7 @@
 %start <ResEnv.t -> Decl.t list> prog
 %%
 prog:
-  | LPR; DEFINE; name = ATOM; args = tele_with_env; COLON_ANGLE; body = chk; _rpr = RPR; p = prog
+  | LPR; DEFINE; name = ATOM; args = tele_with_env; COLON_ANGLE; body = tm; _rpr = RPR; p = prog
     { fun env ->
       let tele, env_bdy = args env in
       let info = $startpos, $endpos(_rpr) in
@@ -29,19 +29,19 @@ prog:
     { fun _env -> [] }
 
 tele_with_env:
-  | dom = chk; rest = tele_with_env
+  | dom = tm; rest = tele_with_env
     { fun env ->
       let env' = R.bind "_" env in
       let tele, env'' = rest env' in
       TCons (Some "_", dom env, tele), env'' }
 
-  | LSQ; x = ATOM; COLON; dom = chk; RSQ; rest = tele_with_env
+  | LSQ; x = ATOM; COLON; dom = tm; RSQ; rest = tele_with_env
     { fun env ->
       let env' = R.bind x env in
       let tele, env'' = rest env' in
       TCons (Some x, dom env, tele), env'' }
 
-  | cod = chk
+  | cod = tm
     { fun env ->
       TEnd (cod env), env }
 
@@ -51,7 +51,7 @@ tele:
       fst @@ tl env}
 
 face(X):
-  | LSQ; r0 = chk; EQUALS; r1 = chk; e = X; RSQ
+  | LSQ; r0 = tm; EQUALS; r1 = tm; e = X; RSQ
     { fun env ->
       r0 env, r1 env, Some (e env) }
 
@@ -85,7 +85,7 @@ elist(X):
       List.map (fun x -> x env) xs}
 
 constrained:
-  | ty = chk; sys = elist(face(chk))
+  | ty = tm; sys = elist(face(tm))
     { fun env ->
       ty env, sys env }
 
@@ -96,7 +96,7 @@ kind:
     { Kind.Pre }
   | { Kind.Kan }
 
-chk:
+tm:
   | BOOL
     { fun _env ->
       make_node $startpos $endpos @@ Tm.Bool }
@@ -140,68 +140,70 @@ chk:
       make_node $startpos $endpos @@
       Tm.Rst {ty; sys}}
 
-  | LPR; LAM; mb = multibind(chk); RPR
+  | LPR; LAM; mb = multibind(tm); RPR
     { fun env ->
       lam_from_multibind (Some ($startpos, $endpos)) @@ mb env }
 
-  | LPR; CONS; e0 = chk; e1 = chk; RPR
+  | LPR; CONS; e0 = tm; e1 = tm; RPR
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Cons (e0 env, e1 env) }
 
-(*
-  | LPR; LET; LSQ; x = ATOM; e0 = inf; RSQ; e1 = chk; RPR
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.Let (e0 env, Tm.B (Some x, e1 @@ R.bind x env))}
-
-  | e = inf
+  | e = cmd
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Up (e env) }
 
-*)
+  | LPR; LET; LSQ; x = ATOM; e0 = cmd; RSQ; e1 = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Let (e0 env, Tm.B (Some x, e1 @@ R.bind x env))}
 
-(*
-inf:
+head:
   | a = ATOM
     { fun env ->
-      make_node $startpos $endpos @@
       Tm.Ix (R.get a env) }
-
-  | LPR; CAR; e = inf
+  | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->
-      make_node $startpos $endpos @@
-      Tm.Car (e env)}
-
-  | LPR; CDR; e = inf
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.Cdr (e env)}
-
-  | LPR; e = inf; arg0 = chk; rest = elist(chk); RPR
-    { fun env ->
-      make_multi_funapp $startpos $endpos (e env) @@
-      List.rev @@ arg0 env :: rest env }
-
-  | LPR; AT; e = inf; args = elist(chk); RPR
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.ExtApp (e env, args env) }
-
-  | LPR; IF; mot = bind(chk); scrut = inf; tcase = chk; fcase = chk; RPR
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.If {mot = mot env; scrut = scrut env; tcase = tcase env; fcase = fcase env} }
-
-  | LPR; HCOM; r0 = chk; r1 = chk; ty = chk; cap = chk; sys = elist(face(dimbind(chk))); RPR
-    { fun env ->
-      make_node $startpos $endpos @@
       Tm.HCom {r = r0 env; r' = r1 env; ty = ty env; cap = cap env; sys = sys env} }
 
-  | LPR; COLON_ANGLE; ty = chk; tm = chk; RPR
+  | LPR; COLON_ANGLE; ty = tm; tm = tm; RPR
     { fun env ->
-      make_node $startpos $endpos @@
       Tm.Down {ty = ty env; tm = tm env} }
 
-*)
+cmd:
+  | c = cut
+    { fun env ->
+      let hd, fs = c env in
+      Tm.Cut (hd, List.rev fs) }
+
+cut:
+  | hd = head
+    { fun env ->
+      hd env, [] }
+
+  | LPR; CAR; e = cut; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, Tm.Car :: fs }
+
+  | LPR; CDR; e = cut; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, Tm.Cdr :: fs }
+
+  | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
+    { fun env ->
+      let hd, fs = e env in
+      let args = arg0 env :: rest env in
+      hd, List.fold_right (fun t fs -> Tm.FunApp t :: fs) args fs }
+
+  | LPR; AT; e = cut; args = elist(tm); RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, Tm.ExtApp (args env) :: fs }
+
+  | LPR; IF; mot = bind(tm); scrut = cut; tcase = tm; fcase = tm; RPR
+    { fun env ->
+      let hd, fs = scrut env in
+      hd, Tm.If {mot = mot env; tcase = tcase env; fcase = fcase env} :: fs }
