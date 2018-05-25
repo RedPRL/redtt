@@ -1,4 +1,4 @@
-type atom = Symbol.t
+type atom = Name.t
 
 type repr =
   | Dim0
@@ -121,7 +121,7 @@ let pp_repr fmt r =
     Format.fprintf fmt "1"
   | Atom x ->
     Uuseg_string.pp_utf_8 fmt @@
-    Symbol.to_string x
+    Name.to_string x
 
 let pp_repr_set fmt rs =
   let comma fmt () = Format.fprintf fmt ", " in

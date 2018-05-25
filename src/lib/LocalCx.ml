@@ -73,7 +73,7 @@ struct
     fst @@ ext cx ~nm ty [face]
 
   let ext_dim {env; qenv; tys; rel; ppenv} ~nm =
-    let x = Symbol.named nm in
+    let x = Name.named nm in
     {env = Val.Atom x :: env;
      tys = `Dim :: tys;
      qenv = Quote.Env.abs qenv [x];

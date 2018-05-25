@@ -1,4 +1,4 @@
-type atom = Symbol.t
+type atom = Name.t
 type star = DimStar.t
 type gen = DimGeneric.t
 type rel = Restriction.t

@@ -1,4 +1,4 @@
-type atom = Symbol.t
+type atom = Name.t
 type 'a abs = {atoms : atom list; node : 'a}
 
 module D = Dim
@@ -28,7 +28,7 @@ struct
     match xs with
     | [] -> List.rev acc, phi
     | x :: xs ->
-      let y = Symbol.fresh () in
+      let y = Name.fresh () in
       freshen_atoms xs (y :: acc) @@
       D.cmp (D.swap y x) phi
 

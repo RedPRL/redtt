@@ -10,13 +10,13 @@ sig
   val emp : t
   val make : int -> t
   val succ : t -> t
-  val abs : t -> Symbol.t list -> t
+  val abs : t -> Name.t list -> t
 
   val ix_of_lvl : int -> t -> int
-  val ix_of_atom : Symbol.t -> t -> int
+  val ix_of_atom : Name.t -> t -> int
 end =
 struct
-  module M = Map.Make (Symbol)
+  module M = Map.Make (Name)
   type t = {n : int; atoms : int M.t}
 
   let len env =
@@ -144,7 +144,7 @@ struct
         let envx = Env.abs env xs in
         let tyx = equate envx ty ty0x ty1x in
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
-        Tm.make @@ Tm.Ext (Tm.NB (List.map (fun x -> Some (Symbol.to_string x)) xs, (tyx, sysx)))
+        Tm.make @@ Tm.Ext (Tm.NB (List.map (fun x -> Some (Name.to_string x)) xs, (tyx, sysx)))
 
       | Rst info0, Rst info1 ->
         let ty = equate env ty info0.ty info1.ty in
@@ -338,7 +338,7 @@ struct
         Tm.up @@ Tm.var ix
       with
       | _ ->
-        Tm.up @@ Tm.Cut (Tm.Ref (Name.from_symbol x), [])
+        Tm.up @@ Tm.Cut (Tm.Ref x, [])
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1

@@ -7,10 +7,10 @@ sig
   val emp : t
   val make : int -> t
   val succ : t -> t
-  val abs : t -> Symbol.t list -> t
+  val abs : t -> Name.t list -> t
 
   val ix_of_lvl : int -> t -> int
-  val ix_of_atom : Symbol.t -> t -> int
+  val ix_of_atom : Name.t -> t -> int
 end
 
 type env = Env.t

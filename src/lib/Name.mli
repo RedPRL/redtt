@@ -1,11 +1,10 @@
-(** TODO: just merge this module with Symbol *)
-
-type t
+include Map.OrderedType
 
 val const : string -> t
+
+val named : string option -> t
 val fresh : unit -> t
 
-val from_symbol : Symbol.t -> t
-val symbol : t -> Symbol.t
+val to_string : t -> string
 
 val pp : t Pretty.t0

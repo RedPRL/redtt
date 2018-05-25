@@ -1,6 +1,6 @@
 type 'a abs
 
-type atom = Symbol.t
+type atom = Name.t
 
 module type S =
 sig

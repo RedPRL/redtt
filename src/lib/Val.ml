@@ -4,7 +4,7 @@ module D = Dim
 module Star = DimStar
 module Gen = DimGeneric
 
-type atom = Symbol.t
+type atom = Name.t
 type dim = D.t
 type star = Star.t
 type gen = Gen.t
@@ -239,7 +239,7 @@ struct
               failwith "eval_dim: expected atom in environment"
           end
         | Tm.Ref a ->
-          R.canonize (D.Atom (Name.symbol a)) rel
+          R.canonize (D.Atom a) rel
         | _ -> failwith "eval_dim"
       end
     | _ -> failwith "eval_dim"
@@ -597,10 +597,10 @@ struct
               force_abs_sys @@
               let face0 =
                 AbsFace.make r' D.dim0 @@
-                let y = Symbol.fresh () in
+                let y = Name.fresh () in
                 Abs.bind1 y @@ ext_apply (cdr el0) [D.named y]
               in
-              let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Symbol.fresh ()] coe1r'el in
+              let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Name.fresh ()] coe1r'el in
               [face0; face1]
             in
             make_hcom (Star.make D.dim1 D.dim0) ty1r' cap sys
@@ -912,19 +912,19 @@ struct
 
   and eval_bnd rel rho bnd =
     let Tm.B (_, tm) = bnd in
-    let x = Symbol.fresh () in
+    let x = Name.fresh () in
     let rho = Atom x :: rho in
     Abs.bind1 x @@ eval rel rho tm
 
   and eval_nbnd rel rho bnd =
     let Tm.NB (nms, tm) = bnd in
-    let xs = List.map (fun _ -> Symbol.fresh ()) nms in
+    let xs = List.map (fun _ -> Name.fresh ()) nms in
     let rho = List.map (fun x -> Atom x) xs @ rho in
     Abs.bind xs @@ eval rel rho tm
 
   and eval_ext_bnd rel rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
-    let xs = List.map (fun _ -> Symbol.fresh ()) nms in
+    let xs = List.map (fun _ -> Name.fresh ()) nms in
     let rho = List.map (fun x -> Atom x) xs @ rho in
     ExtAbs.bind xs (eval rel rho tm, eval_tm_sys rel rho sys)
 
@@ -1101,7 +1101,7 @@ struct
         | `Rigid boundary_sys ->
           let cap = ext_apply info.cap ss in
           let correction_sys =
-            let face = Face.map @@ fun _ _ v -> Abs.bind [Symbol.fresh ()] v in
+            let face = Face.map @@ fun _ _ v -> Abs.bind [Name.fresh ()] v in
             List.map face boundary_sys
           in
           rigid_hcom info.dir ty_s cap @@ correction_sys @ info.sys
@@ -1218,7 +1218,7 @@ struct
       let abs =
         let r, _ = Star.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
-        let z = Symbol.fresh () in
+        let z = Name.fresh () in
         let sys =
           let face =
             Face.map @@ fun _ _ absi ->
@@ -1311,11 +1311,11 @@ struct
 
   and pp_abs fmt abs =
     let x, v = Abs.unleash1 abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@]" Uuseg_string.pp_utf_8 (Symbol.to_string x) pp_value v
+    Format.fprintf fmt "@[<1><%a>@ %a@]" Uuseg_string.pp_utf_8 (Name.to_string x) pp_value v
 
   and pp_ext_abs fmt abs =
     let x, (tyx, sysx) = ExtAbs.unleash1 abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" Uuseg_string.pp_utf_8 (Symbol.to_string x) pp_value tyx pp_val_sys sysx
+    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" Uuseg_string.pp_utf_8 (Name.to_string x) pp_value tyx pp_val_sys sysx
 
   and pp_val_sys fmt sys =
     let pp_sep fmt () = Format.fprintf fmt " " in

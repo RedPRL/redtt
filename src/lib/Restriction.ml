@@ -1,6 +1,6 @@
 open RedBasis
 
-type atom = Symbol.t
+type atom = Name.t
 type dim = Dim.repr
 module D = Dim
 
@@ -82,7 +82,7 @@ let equate r0 r1 t =
 
 let test =
   try
-    let x = D.Atom (Symbol.named (Some "i")) in
+    let x = D.Atom (Name.named (Some "i")) in
     let rst = equate x D.Dim0 @@ equate x D.Dim1 emp in
     Format.printf "Test failure: {@[<1>%a@]}@.\n" pp_chronicle rst.chronicle;
     failwith "Test failed"
@@ -90,7 +90,7 @@ let test =
   | Inconsistent -> ()
 
 let test2 =
-  let x = D.Atom (Symbol.named (Some "i")) in
+  let x = D.Atom (Name.named (Some "i")) in
   let rst = equate x D.Dim0 emp in
   assert (canonize x rst = D.Dim0)
 
