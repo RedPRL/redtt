@@ -1,112 +1,91 @@
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option list * 'a
 
-(* sorts *)
-type chk
-type head
+type info = Lexing.position * Lexing.position
 
-type 'a t
+type ('r, 'a) face = 'r * 'r * 'a option
+type ('r, 'a) system = ('r, 'a) face list
 
-type 'a face = chk t * chk t * 'a option
-type 'a system = 'a face list
+type 'a tmf =
+  | FCom of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a bnd) system}
 
-type _ f =
-  | FCom : {r : chk t; r' : chk t; cap : chk t; sys : chk t bnd system} -> chk f
+  | Univ of {kind : Kind.t; lvl : Lvl.t}
+  | Pi of 'a * 'a bnd
+  | Ext of ('a * ('a, 'a) system) nbnd
+  | Rst of {ty : 'a; sys : ('a, 'a) system}
+  | Sg of 'a * 'a bnd
 
-  | Univ : {kind : Kind.t; lvl : Lvl.t} -> chk f
-  | Pi : chk t * chk t bnd -> chk f
-  | Ext : (chk t * chk t system) nbnd -> chk f
-  | Rst : {ty : chk t; sys : chk t system} -> chk f
-  | Sg : chk t * chk t bnd -> chk f
+  | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
 
-  | V : {r : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t} -> chk f
+  | Bool
+  | Tt
+  | Ff
 
-  | Bool : chk f
-  | Tt : chk f
-  | Ff : chk f
+  | Lam of 'a bnd
+  | ExtLam of 'a nbnd
 
-  | Lam : chk t bnd -> chk f
-  | ExtLam : chk t nbnd -> chk f
-
-  | Cons : chk t * chk t -> chk f
-  | Dim0 : chk f
-  | Dim1 : chk f
+  | Cons of 'a * 'a
+  | Dim0
+  | Dim1
 
   (* Labelled types from Epigram *)
-  | LblTy : {lbl : string; args : (chk t * chk t) list; ty : chk t} -> chk f
-  | LblRet : chk t -> chk f
+  | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
+  | LblRet of 'a
 
-  | Ref : Name.t -> head f
-  | Ix : int -> head f
-  | Down : {ty : chk t; tm : chk t} -> head f
-  | Coe : {r : chk t; r' : chk t; ty : chk t bnd; tm : chk t} -> head f
-  | HCom : {r : chk t; r' : chk t; ty : chk t; cap : chk t; sys : chk t bnd system} -> head f
-  | Com : {r : chk t; r' : chk t; ty : chk t bnd; cap : chk t; sys : chk t bnd system} -> head f
+  | Up of 'a cmd
+  | Let of 'a cmd * 'a bnd
 
-  | Let : cmd * chk t bnd -> chk f
-  | Cut : cmd -> chk f
+and 'a head =
+  | Ref of Name.t
+  | Ix of int
+  | Down of {ty : 'a; tm : 'a}
+  | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
+  | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
+  | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
 
-and spine = frame list
 
-and frame =
+and 'a frame =
   | Car
   | Cdr
-  | FunApp of chk t
-  | ExtApp of chk t list
-  | If of {mot : chk t bnd; tcase : chk t; fcase : chk t}
-  | VProj of {r : chk t; ty0 : chk t; ty1 : chk t; equiv : chk t}
+  | FunApp of 'a
+  | ExtApp of 'a list
+  | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
+  | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | LblCall
 
-and cmd = head t * spine
+and 'a stack = 'a frame list
+and 'a cmd = Cut of 'a head * 'a stack
 
-(** Explicit substitutions in the style of Abadi. *)
+type tm
+
 type subst =
   | Id
   | Proj
-  | Sub of subst * cmd
+  | Sub of subst * tm cmd
   | Cmp of subst * subst
 
-val make : 'a f -> 'a t
-val unleash : 'a t -> 'a f
 
+val make : tm tmf -> tm
+val unleash : tm -> tm tmf
 
-val close_var : Name.t -> int -> 'a t -> 'a t
-val open_var : int -> Name.t -> 'a t -> 'a t
+val close_var : Name.t -> int -> tm -> tm
+val open_var : int -> Name.t -> tm -> tm
 
+val subst : subst -> tm -> tm
 
-(** Explicit substitutions are used under the hood, so this is a constant time operation;
-    the cost of substituion is spread unleash across calls to [unleash]. *)
-val subst : subst -> 'a t -> 'a t
-
-type info = Lexing.position * Lexing.position
-val into_info : info option -> 'a f -> 'a t
-val info : 'a t -> info option
-
-val var : int -> cmd
-val inst0 : cmd -> subst
-val up : cmd -> chk t
-val lam : string option -> chk t -> chk t
-val ext_lam : string option list -> chk t -> chk t
-val pi : string option -> chk t -> chk t -> chk t
-val sg : string option -> chk t -> chk t -> chk t
-val let_ : string option -> cmd -> chk t -> chk t
-val cons : chk t -> chk t -> chk t
-val univ : kind:Kind.t -> lvl:Lvl.t -> chk t
-val car : cmd -> cmd
-val cdr : cmd -> cmd
 
 module Macro :
 sig
-  val arr : chk t -> chk t -> chk t
-  val times : chk t -> chk t -> chk t
+  val arr : tm -> tm -> tm
+  val times : tm -> tm -> tm
 
   (* non-dependent path *)
-  val path : chk t -> chk t -> chk t -> chk t
+  val path : tm -> tm -> tm -> tm
 
-  val is_contr : chk t -> chk t
-  val fiber : ty0:chk t -> ty1:chk t -> f:cmd -> x:chk t -> chk t
-  val equiv : chk t -> chk t -> chk t
+  val is_contr : tm -> tm
+  val fiber : ty0:tm -> ty1:tm -> f:tm cmd -> x:tm -> tm
+  val equiv : tm -> tm -> tm
 end
 
-val pp : 'a t Pretty.t
-val pp_sys : chk t system Pretty.t
+val pp : tm Pretty.t
+val pp_sys : (tm, tm) system Pretty.t
