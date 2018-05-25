@@ -171,23 +171,23 @@ struct
         let sys = equate_comp_sys env ty fcom0.sys fcom1.sys in
         Tm.make @@ Tm.FCom {r = tr; r' = tr'; cap; sys}
 
-      (* | HCom hcom0, HCom hcom1 ->
-         let tr, tr' = equate_star env hcom0.dir hcom1.dir in
-         let ty = equate_ty env hcom0.ty hcom1.ty in
-         let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
-         let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
-         Tm.up @@ Tm.make @@ Tm.HCom {r = tr; r' = tr'; ty; cap; sys}
+      | HCom hcom0, HCom hcom1 ->
+        let tr, tr' = equate_star env hcom0.dir hcom1.dir in
+        let ty = equate_ty env hcom0.ty hcom1.ty in
+        let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
+        let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
+        Tm.up @@ Tm.Cut (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, [])
 
-         | Coe coe0, Coe coe1 ->
-         let tr, tr' = equate_star env coe0.dir coe1.dir in
-         let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
-         let bnd = equate_val_abs env univ coe0.abs coe1.abs in
-         let tyr =
+      | Coe coe0, Coe coe1 ->
+        let tr, tr' = equate_star env coe0.dir coe1.dir in
+        let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+        let bnd = equate_val_abs env univ coe0.abs coe1.abs in
+        let tyr =
           let r, _ = DimStar.unleash coe0.dir in
           Abs.inst1 coe0.abs r
-         in
-         let tm = equate env tyr coe0.el coe1.el in
-         Tm.up @@ Tm.make @@ Tm.Coe {r = tr; r' = tr'; ty = bnd; tm} *)
+        in
+        let tm = equate env tyr coe0.el coe1.el in
+        Tm.up @@ Tm.Cut (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, [])
 
       | _ ->
         Format.eprintf "Failed to equate@; @[<1>%a = %a ∈ %a@] @." pp_value el0 pp_value el1 pp_value ty;
