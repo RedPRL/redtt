@@ -83,7 +83,7 @@ sig
   val path : tm -> tm -> tm -> tm
 
   val is_contr : tm -> tm
-  val fiber : ty0:tm -> ty1:tm -> f:tm cmd -> x:tm -> tm
+  val fiber : ty0:tm -> ty1:tm -> f:tm -> x:tm -> tm
   val equiv : tm -> tm -> tm
 end
 

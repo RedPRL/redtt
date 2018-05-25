@@ -80,9 +80,9 @@ sig
   val make : con -> value
   val unleash : value -> con
 
-  val eval : rel -> env -> 'a Tm.t -> value
-  val eval_dim : rel -> env -> 'a Tm.t -> Dim.repr
-  val eval_tm_sys : rel -> env -> Tm.chk Tm.t Tm.system -> val_sys
+  val eval : rel -> env -> Tm.tm -> value
+  val eval_dim : rel -> env -> Tm.tm -> Dim.repr
+  val eval_tm_sys : rel -> env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
@@ -123,7 +123,7 @@ end
 module type Sig =
 sig
   (** Return the type and boundary of a global variable *)
-  val lookup : Name.t -> Tm.chk Tm.t * Tm.chk Tm.t Tm.system
+  val lookup : Name.t -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
 module M (Sig : Sig) : S
