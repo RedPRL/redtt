@@ -74,6 +74,9 @@ val open_var : int -> Name.t -> tm -> tm
 val subst : subst -> tm -> tm
 
 
+val up : tm cmd -> tm
+val var : int -> tm cmd
+
 module Macro :
 sig
   val arr : tm -> tm -> tm

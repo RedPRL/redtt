@@ -225,31 +225,31 @@ struct
   exception ProjVal of value
 
 
-  let rec eval_dim : type x. rel -> env -> x Tm.t -> D.repr =
-    fun rel rho tm ->
-      match Tm.unleash tm with
-      | Tm.Dim0 ->
-        D.Dim0
-      | Tm.Dim1 ->
-        D.Dim1
-      | Tm.Up tm ->
-        eval_dim rel rho tm
-      | Tm.Down {tm; _} ->
-        eval_dim rel rho tm
-      | Tm.Ix i ->
-        begin
-          match List.nth rho i with
-          | Atom x ->
-            R.canonize (D.Atom x) rel
-          | _ ->
-            failwith "eval_dim: expected atom in environment"
-        end
-      | _ ->
-        failwith "eval_dim"
+  let rec eval_dim rel rho tm =
+    match Tm.unleash tm with
+    | Tm.Dim0 ->
+      D.Dim0
+    | Tm.Dim1 ->
+      D.Dim1
+    | Tm.Up (Tm.Cut (hd, [])) ->
+      begin
+        match hd with
+        | Tm.Ix i ->
+          begin
+            match List.nth rho i with
+            | Atom x ->
+              R.canonize (D.Atom x) rel
+            | _ ->
+              failwith "eval_dim: expected atom in environment"
+          end
+        | Tm.Ref a ->
+          failwith "TODO: eval_dim/ref"
+        | _ -> failwith "eval_dim"
+      end
+    | _ -> failwith "eval_dim"
 
-  let eval_dim_class : type x. rel -> env -> x Tm.t -> D.t =
-    fun rel rho tm ->
-      R.unleash (eval_dim rel rho tm) rel
+  let eval_dim_class rel rho tm =
+    R.unleash (eval_dim rel rho tm) rel
 
 
   let rec make : con -> value =
@@ -691,164 +691,165 @@ struct
   and clo bnd rel rho =
     Clo {bnd; rho; rel; action = D.idn}
 
-  and eval : type x. rel -> env -> x Tm.t -> value =
-    fun rel rho tm ->
-      match Tm.unleash tm with
-      | Tm.Ix i ->
-        begin
-          match List.nth rho i with
-          | Val v -> v
-          | _ -> failwith "Expected value in environment"
-        end
+  and eval rel rho tm =
+    match Tm.unleash tm with
+    (* | Tm.Ix i ->
+       begin
+        match List.nth rho i with
+        | Val v -> v
+        | _ -> failwith "Expected value in environment"
+       end
 
-      | Tm.Ref name ->
-        let tty, tsys = Sig.lookup name in
-        let vsys = eval_tm_sys rel [] tsys in
-        let vty = eval rel [] tty in
-        make @@ Up {ty = vty; neu = Ref name; sys = vsys}
+       | Tm.Ref name ->
+       let tty, tsys = Sig.lookup name in
+       let vsys = eval_tm_sys rel [] tsys in
+       let vty = eval rel [] tty in
+       make @@ Up {ty = vty; neu = Ref name; sys = vsys} *)
 
-      | Tm.Pi (dom, cod) ->
-        let dom = eval rel rho dom in
-        let cod = clo cod rel rho in
-        make @@ Pi {dom; cod}
+    | Tm.Pi (dom, cod) ->
+      let dom = eval rel rho dom in
+      let cod = clo cod rel rho in
+      make @@ Pi {dom; cod}
 
-      | Tm.Sg (dom, cod) ->
-        let dom = eval rel rho dom in
-        let cod = clo cod rel rho in
-        make @@ Sg {dom; cod}
+    | Tm.Sg (dom, cod) ->
+      let dom = eval rel rho dom in
+      let cod = clo cod rel rho in
+      make @@ Sg {dom; cod}
 
-      | Tm.Ext bnd ->
-        let abs = eval_ext_bnd rel rho bnd in
-        make @@ Ext abs
+    | Tm.Ext bnd ->
+      let abs = eval_ext_bnd rel rho bnd in
+      make @@ Ext abs
 
-      | Tm.Rst info ->
-        let ty = eval rel rho info.ty in
-        let sys = eval_tm_sys rel rho info.sys in
-        make @@ Rst {ty; sys}
+    | Tm.Rst info ->
+      let ty = eval rel rho info.ty in
+      let sys = eval_tm_sys rel rho info.sys in
+      make @@ Rst {ty; sys}
 
-      | Tm.V info ->
-        let r = eval_dim_class rel rho info.r in
-        let ty0 = eval rel rho info.ty0 in
-        let ty1 = eval rel rho info.ty1 in
-        let equiv = eval rel rho info.equiv in
-        make_v (Gen.make r) ty0 ty1 equiv
+    | Tm.V info ->
+      let r = eval_dim_class rel rho info.r in
+      let ty0 = eval rel rho info.ty0 in
+      let ty1 = eval rel rho info.ty1 in
+      let equiv = eval rel rho info.equiv in
+      make_v (Gen.make r) ty0 ty1 equiv
 
-      | Tm.Lam bnd ->
-        make @@ Lam (clo bnd rel rho)
+    | Tm.Lam bnd ->
+      make @@ Lam (clo bnd rel rho)
 
-      | Tm.ExtLam bnd ->
-        let abs = eval_nbnd rel rho bnd in
-        make @@ ExtLam abs
+    | Tm.ExtLam bnd ->
+      let abs = eval_nbnd rel rho bnd in
+      make @@ ExtLam abs
 
-      | Tm.Cons (t0, t1) ->
-        let v0 = eval rel rho t0 in
-        let v1 = eval rel rho t1 in
-        make @@ Cons (v0, v1)
+    | Tm.Cons (t0, t1) ->
+      let v0 = eval rel rho t0 in
+      let v1 = eval rel rho t1 in
+      make @@ Cons (v0, v1)
 
-      | Tm.Coe info ->
-        let r = eval_dim_class rel rho info.r in
-        let r' = eval_dim_class rel rho info.r' in
-        let dir = Star.make r r' in
-        let abs = eval_bnd rel rho info.ty  in
-        let el = eval rel rho info.tm in
-        make_coe dir abs el
+    (* | Tm.Coe info ->
+       let r = eval_dim_class rel rho info.r in
+       let r' = eval_dim_class rel rho info.r' in
+       let dir = Star.make r r' in
+       let abs = eval_bnd rel rho info.ty  in
+       let el = eval rel rho info.tm in
+       make_coe dir abs el
 
-      | Tm.HCom info ->
-        let r = eval_dim_class rel rho info.r in
-        let r' = eval_dim_class rel rho info.r' in
-        let dir = Star.make r r' in
-        let ty = eval rel rho info.ty in
-        let cap = eval rel rho info.cap in
-        let sys = eval_bnd_sys rel rho info.sys in
-        make_hcom dir ty cap sys
+       | Tm.HCom info ->
+       let r = eval_dim_class rel rho info.r in
+       let r' = eval_dim_class rel rho info.r' in
+       let dir = Star.make r r' in
+       let ty = eval rel rho info.ty in
+       let cap = eval rel rho info.cap in
+       let sys = eval_bnd_sys rel rho info.sys in
+       make_hcom dir ty cap sys
 
-      | Tm.Com info ->
-        let r = eval_dim_class rel rho info.r in
-        let r' = eval_dim_class rel rho info.r' in
-        let dir = Star.make r r' in
-        let abs = eval_bnd rel rho info.ty in
-        let cap = eval rel rho info.cap in
-        let sys = eval_bnd_sys rel rho info.sys in
-        make_com dir abs cap sys
+       | Tm.Com info ->
+       let r = eval_dim_class rel rho info.r in
+       let r' = eval_dim_class rel rho info.r' in
+       let dir = Star.make r r' in
+       let abs = eval_bnd rel rho info.ty in
+       let cap = eval rel rho info.cap in
+       let sys = eval_bnd_sys rel rho info.sys in
+       make_com dir abs cap sys *)
 
-      | Tm.FCom info ->
-        let r = eval_dim_class rel rho info.r  in
-        let r' = eval_dim_class rel rho info.r' in
-        let dir = Star.make r r' in
-        let cap = eval rel rho info.cap in
-        let sys = eval_bnd_sys rel rho info.sys in
-        make_fcom dir cap sys
+    | Tm.FCom info ->
+      let r = eval_dim_class rel rho info.r  in
+      let r' = eval_dim_class rel rho info.r' in
+      let dir = Star.make r r' in
+      let cap = eval rel rho info.cap in
+      let sys = eval_bnd_sys rel rho info.sys in
+      make_fcom dir cap sys
 
-      | Tm.FunApp (t0, t1) ->
-        let v0 = eval rel rho t0 in
-        let v1 = eval rel rho t1 in
-        apply v0 v1
+    (* | Tm.FunApp (t0, t1) ->
+       let v0 = eval rel rho t0 in
+       let v1 = eval rel rho t1 in
+       apply v0 v1
 
-      | Tm.ExtApp (t, ts) ->
-        let v = eval rel rho t in
-        let rs = List.map (eval_dim_class rel rho) ts in
-        ext_apply v rs
+       | Tm.ExtApp (t, ts) ->
+       let v = eval rel rho t in
+       let rs = List.map (eval_dim_class rel rho) ts in
+       ext_apply v rs
 
-      | Tm.Car t ->
-        car @@ eval rel rho t
+       | Tm.Car t ->
+       car @@ eval rel rho t
 
-      | Tm.Cdr t ->
-        cdr @@ eval rel rho t
+       | Tm.Cdr t ->
+       cdr @@ eval rel rho t
 
-      | Tm.VProj info ->
-        let r = eval_dim_class rel rho info.r in
-        let ty0 = eval rel rho info.ty0 in
-        let ty1 = eval rel rho info.ty1 in
-        let el = eval rel rho info.tm in
-        let equiv = eval rel rho info.equiv in
-        vproj (Gen.make r) ~ty0 ~ty1 ~equiv ~el
+       | Tm.VProj info ->
+       let r = eval_dim_class rel rho info.r in
+       let ty0 = eval rel rho info.ty0 in
+       let ty1 = eval rel rho info.ty1 in
+       let el = eval rel rho info.tm in
+       let equiv = eval rel rho info.equiv in
+       vproj (Gen.make r) ~ty0 ~ty1 ~equiv ~el *)
 
-      | Tm.Univ {kind; lvl} ->
-        make @@ Univ {kind; lvl}
+    | Tm.Univ {kind; lvl} ->
+      make @@ Univ {kind; lvl}
 
-      | Tm.Bool ->
-        make Bool
+    | Tm.Bool ->
+      make Bool
 
-      | Tm.Tt ->
-        make Tt
+    | Tm.Tt ->
+      make Tt
 
-      | Tm.Ff ->
-        make Ff
+    | Tm.Ff ->
+      make Ff
 
-      | Tm.Dim0 ->
-        failwith "0 is a dimension"
+    | Tm.Dim0 ->
+      failwith "0 is a dimension"
 
-      | Tm.Dim1 ->
-        failwith "1 is a dimension"
+    | Tm.Dim1 ->
+      failwith "1 is a dimension"
 
-      | Tm.Down info ->
-        eval rel rho info.tm
+    (* | Tm.Down info ->
+       eval rel rho info.tm *)
 
-      | Tm.Up t ->
-        eval rel rho t
+    (* | Tm.Up t ->
+       eval rel rho t *)
 
-      | Tm.If info ->
-        let mot = clo info.mot rel rho in
-        let scrut = eval rel rho info.scrut in
-        let tcase = eval rel rho info.tcase in
-        let fcase = eval rel rho info.fcase in
-        if_ mot scrut tcase fcase
+    (* | Tm.If info ->
+       let mot = clo info.mot rel rho in
+       let scrut = eval rel rho info.scrut in
+       let tcase = eval rel rho info.tcase in
+       let fcase = eval rel rho info.fcase in
+       if_ mot scrut tcase fcase *)
 
-      | Tm.Let (t0, Tm.B (_, t1)) ->
-        let v0 = eval rel rho t0 in
-        eval rel (Val v0 :: rho) t1
+    (* | Tm.Let (t0, Tm.B (_, t1)) ->
+       let v0 = eval rel rho t0 in
+       eval rel (Val v0 :: rho) t1 *)
 
-      | Tm.LblTy info ->
-        let ty = eval rel rho info.ty in
-        let args = List.map (fun (ty, tm) -> {ty = eval rel rho ty; el = eval rel rho tm}) info.args in
-        make @@ LblTy {lbl = info.lbl; ty; args}
+    | Tm.LblTy info ->
+      let ty = eval rel rho info.ty in
+      let args = List.map (fun (ty, tm) -> {ty = eval rel rho ty; el = eval rel rho tm}) info.args in
+      make @@ LblTy {lbl = info.lbl; ty; args}
 
-      | Tm.LblRet t ->
-        make @@ LblRet (eval rel rho t)
+    | Tm.LblRet t ->
+      make @@ LblRet (eval rel rho t)
 
-      | Tm.LblCall t ->
-        let v = eval rel rho t in
-        lbl_call v
+    (* | Tm.LblCall t ->
+       let v = eval rel rho t in
+       lbl_call v *)
+
+    | _ -> failwith "TODO: fix"
 
 
   and eval_bnd_face rel rho (tr, tr', obnd) =
