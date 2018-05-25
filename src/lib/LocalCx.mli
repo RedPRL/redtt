@@ -20,6 +20,9 @@ sig
   val lookup : int -> t -> [`Ty of value | `Dim]
 
   val eval : t -> Tm.tm -> value
+  val eval_cmd : t -> Tm.tm Tm.cmd -> value
+  val eval_head : t -> Tm.tm Tm.head -> value
+  val eval_frame : t -> value -> Tm.tm Tm.frame -> value
   val eval_dim : t -> Tm.tm -> Dim.repr
   val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
 

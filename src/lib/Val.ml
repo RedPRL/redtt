@@ -88,6 +88,9 @@ sig
   val unleash : value -> con
 
   val eval : rel -> env -> Tm.tm -> value
+  val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
+  val eval_head : rel -> env -> Tm.tm Tm.head -> value
+  val eval_frame : rel -> env -> value -> Tm.tm Tm.frame -> value
   val eval_dim : rel -> env -> Tm.tm -> Dim.repr
   val eval_tm_sys : rel -> env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 

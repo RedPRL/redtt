@@ -17,6 +17,9 @@ sig
   val lookup : int -> t -> [`Ty of value | `Dim]
 
   val eval : t -> Tm.tm -> value
+  val eval_cmd : t -> Tm.tm Tm.cmd -> value
+  val eval_head : t -> Tm.tm Tm.head -> value
+  val eval_frame : t -> value -> Tm.tm Tm.frame -> value
   val eval_dim : t -> Tm.tm -> Dim.repr
   val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
 
@@ -98,6 +101,25 @@ struct
     with
     | exn ->
       Format.eprintf "Failed to evaluate: %a@." (Tm.pp ppenv) tm;
+      raise exn
+
+  let eval_cmd {env; rel; ppenv; _} cmd =
+    try
+      V.eval_cmd rel env cmd
+    with
+    | exn ->
+      Format.eprintf "Failed to evaluate: %a@." (Tm.pp_cmd ppenv) cmd;
+      raise exn
+
+  let eval_frame {env; rel; _} frm hd =
+    V.eval_frame rel env frm hd
+
+  let eval_head {env; rel; ppenv; _} hd =
+    try
+      V.eval_head rel env hd
+    with
+    | exn ->
+      Format.eprintf "Failed to evaluate: %a@." (Tm.pp_head ppenv) hd;
       raise exn
 
   let eval_dim {env; rel; _} tm =

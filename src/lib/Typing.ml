@@ -11,9 +11,9 @@ type cx = LocalCx.t
 module type S =
 sig
   module Cx : LocalCx.S
-  val check : cx -> Val.value -> Tm.chk Tm.t -> unit
-  val infer : cx -> Tm.inf Tm.t -> value
-  val check_boundary : cx -> Val.value -> Val.val_sys -> Tm.chk Tm.t -> unit
+  val check : cx -> Val.value -> Tm.tm -> unit
+  val infer : cx -> Tm.tm Tm.cmd -> value
+  val check_boundary : cx -> Val.value -> Val.val_sys -> Tm.tm -> unit
 end
 
 
@@ -24,27 +24,35 @@ struct
   module Eval = Val.M (GlobalCx.M (Sig))
   module Cx = LocalCx.M (Eval)
 
-  let infer_dim cx tr =
-    match T.unleash tr with
-    | T.Ix ix ->
-      begin
-        match Cx.lookup ix cx with
-        | `Dim -> ()
-        | _ -> failwith "infer_dim: expected dimension"
-      end
-    | _ ->
-      failwith "infer_dim: expected dimension"
-
-  let check_dim cx tr =
+  let rec check_dim cx tr =
     match T.unleash tr with
     | T.Dim0 ->
       ()
     | T.Dim1 ->
       ()
-    | T.Up tr ->
-      infer_dim cx tr
+    | T.Up cmd ->
+      check_dim_cmd cx cmd
     | _ ->
       failwith "check_dim: expected dimension"
+
+  and check_dim_cmd cx =
+    function
+    | Tm.Cut (hd, []) ->
+      begin
+        match hd with
+        | Tm.Ix ix ->
+          begin
+            match Cx.lookup ix cx with
+            | `Dim -> ()
+            | _ -> failwith "check_dim_cmd: expected dimension"
+          end
+        | Tm.Ref _a ->
+          (* TODO: lookup in global context, make sure it is a dimension *)
+          ()
+        | _ -> failwith ""
+      end
+    | _ ->
+      failwith "check_dim_cmd"
 
   let check_dim_in_class cx ocls r : unit =
     match ocls with
@@ -191,9 +199,9 @@ struct
       let ty' = infer cx tm in
       Cx.check_subtype cx ty' ty
 
-    | _, T.Let (t0, T.B (nm, t1)) ->
-      let ty' = infer cx t0 in
-      let el = Cx.eval cx t0 in
+    | _, T.Let (cmd, T.B (nm, t1)) ->
+      let ty' = infer cx cmd in
+      let el = Cx.eval_cmd cx cmd in
       let cx' = Cx.def cx ~nm ~ty:ty' ~el in
       check cx' ty t1
 
@@ -201,7 +209,7 @@ struct
       Format.eprintf "Failed to check term %a@." (Tm.pp (Cx.ppenv cx)) tm;
       failwith "Type error"
 
-  and cofibration_of_sys : 'a. cx -> 'a Tm.system -> cofibration =
+  and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
     fun cx sys ->
       let face (tr, tr', _) =
         let r = Cx.eval_dim cx tr in
@@ -360,8 +368,72 @@ struct
 
     in go sys []
 
-  and infer cx tm =
-    match Tm.unleash tm with
+  and infer cx =
+    function Cut (hd, stk) ->
+      let ty_hd = infer_head cx hd in
+      let vhd = Cx.eval_head cx hd in
+      infer_stack cx ~ty:ty_hd ~hd:vhd stk
+
+  and infer_stack cx ~ty ~hd =
+    function
+    | [] -> ty
+    | frm :: stk ->
+      let ty = infer_frame cx ~ty ~hd frm in
+      let hd = Cx.eval_frame cx hd frm in
+      infer_stack cx ~ty ~hd stk
+
+  and infer_frame cx ~ty ~hd =
+    function
+    | T.Car ->
+      let dom, _ = Eval.unleash_sg ty in
+      dom
+
+    | T.Cdr ->
+      let _, cod = Eval.unleash_sg ty in
+      Eval.inst_clo cod @@ Eval.car hd
+
+    | T.FunApp t ->
+      let dom, cod = Eval.unleash_pi ~debug:["infer_frame"] ty in
+      let v = check_eval cx dom t in
+      Eval.inst_clo cod v
+
+    | T.ExtApp ts ->
+      let rs = List.map (check_eval_dim cx) ts in
+      let ty, _ = Eval.unleash_ext ty @@ List.map (Cx.unleash_dim cx) rs in
+      ty
+
+    | T.VProj info ->
+      let v_ty =
+        check_eval_ty cx @@
+        T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
+      in
+      Cx.check_eq_ty cx v_ty ty;
+      Cx.eval cx info.ty1
+
+    | T.If info ->
+      let T.B (nm, mot) = info.mot in
+      let bool = Eval.make V.Bool in
+      let cxx, _= Cx.ext_ty cx ~nm bool in
+      check_ty cxx mot;
+
+      Cx.check_eq_ty cx ty bool;
+
+      let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Tt) in
+      let cx_ff = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Ff) in
+      let mot_tt = Cx.eval cx_tt mot in
+      let mot_ff = Cx.eval cx_ff mot in
+      check cx mot_tt info.tcase;
+      check cx mot_ff info.fcase;
+
+      let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:hd in
+      Cx.eval cx_scrut mot
+
+    | T.LblCall ->
+      let _, _, ty = Eval.unleash_lbl_ty ty in
+      ty
+
+  and infer_head cx =
+    function
     | T.Ref name ->
       let ty = GlobalCx.lookup_ty Sig.globals name in
       Cx.eval Cx.emp ty
@@ -372,35 +444,6 @@ struct
         | `Ty ty -> ty
         | `Dim -> failwith "infer: expected type hypothesis"
       end
-
-    | T.Car tm ->
-      let dom, _ = Eval.unleash_sg @@ infer cx tm in
-      dom
-
-    | T.Cdr tm ->
-      let _, cod = Eval.unleash_sg @@ infer cx tm in
-      let v = Cx.eval cx tm in
-      Eval.inst_clo cod @@ Eval.car v
-
-    | T.FunApp (tm0, tm1) ->
-      let dom, cod = Eval.unleash_pi ~debug:["infer"] @@ infer cx tm0 in
-      let v1 = check_eval cx dom tm1 in
-      Eval.inst_clo cod v1
-
-    | T.ExtApp (tm, tr) ->
-      let rs = List.map (check_eval_dim cx) tr in
-      let ext_ty = infer cx tm in
-      let ty, _ = Eval.unleash_ext ext_ty @@ List.map (Cx.unleash_dim cx) rs in
-      ty
-
-    | T.VProj info ->
-      let v_ty =
-        check_eval_ty cx @@
-        T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
-      in
-      let v_ty' = infer cx info.tm in
-      Cx.check_eq_ty cx v_ty v_ty';
-      Cx.eval cx info.ty1
 
     | T.Coe info ->
       let r = check_eval_dim cx info.r in
@@ -433,38 +476,10 @@ struct
       check_comp_sys cx r (cxx, x, vty) cap info.sys;
       vty
 
-    | T.If info ->
-      let T.B (nm, mot) = info.mot in
-      let bool = Eval.make V.Bool in
-      let cxx, _= Cx.ext_ty cx ~nm bool in
-      check_ty cxx mot;
-
-      let scrut_ty = infer cx info.scrut in
-      Cx.check_eq_ty cx scrut_ty bool;
-      let scrut = Cx.eval cx info.scrut in
-
-      let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Tt) in
-      let cx_ff = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Ff) in
-      let mot_tt = Cx.eval cx_tt mot in
-      let mot_ff = Cx.eval cx_ff mot in
-      check cx mot_tt info.tcase;
-      check cx mot_ff info.fcase;
-
-      let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:scrut in
-      Cx.eval cx_scrut mot
-
-
-    | T.LblCall t ->
-      let _, _, ty = Eval.unleash_lbl_ty @@ infer cx t in
-      ty
-
     | T.Down info ->
       let ty = check_eval_ty cx info.ty in
       check cx ty info.tm;
       ty
-
-    | _ ->
-      failwith "infer"
 
 
   and check_eval cx ty tm =
