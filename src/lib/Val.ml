@@ -64,7 +64,6 @@ and ('x, 'a) face = ('x, 'a) Face.face
 
 and clo =
   | Clo of {bnd : Tm.tm Tm.bnd; rho : env; rel : rel; action : D.action}
-  | Const of value
 
 and env_el = Val of value | Atom of atom
 and env = env_el list
@@ -99,7 +98,6 @@ sig
   val lbl_call : value -> value
 
   val inst_clo : clo -> value -> value
-  val const_clo : value -> clo
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : value -> value * clo
@@ -169,8 +167,6 @@ struct
       match clo with
       | Clo info ->
         Clo {info with action = D.cmp phi info.action}
-      | Const v ->
-        Const (Val.act phi v)
   end
 
   module CompSys :
@@ -242,7 +238,7 @@ struct
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
-        | Tm.Ref a ->
+        | Tm.Ref _ ->
           failwith "TODO: eval_dim/ref"
         | _ -> failwith "eval_dim"
       end
@@ -1259,8 +1255,6 @@ struct
       let Tm.B (_, tm) = info.bnd in
       Val.act info.action @@
       eval info.rel (Val varg :: info.rho) tm
-    | Const v ->
-      v
 
 
   and pp_value fmt value =
@@ -1374,9 +1368,6 @@ struct
   and pp_dims fmt rs =
     let pp_sep fmt () = Format.fprintf fmt " " in
     Format.pp_print_list ~pp_sep Dim.pp fmt rs
-
-  let const_clo v =
-    Const v
 
   module Macro =
   struct

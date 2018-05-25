@@ -91,7 +91,6 @@ sig
   val lbl_call : value -> value
 
   val inst_clo : clo -> value -> value
-  val const_clo : value -> clo
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : value -> value * clo
