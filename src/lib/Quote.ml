@@ -333,8 +333,12 @@ struct
     | Dim.Dim0 -> Tm.make Tm.Dim0
     | Dim.Dim1 -> Tm.make Tm.Dim1
     | Dim.Atom x ->
-      let ix = Env.ix_of_atom x env in
-      Tm.up @@ Tm.var ix
+      try
+        let ix = Env.ix_of_atom x env in
+        Tm.up @@ Tm.var ix
+      with
+      | _ ->
+        Tm.up @@ Tm.Cut (Tm.Ref (Name.from_symbol x), [])
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1

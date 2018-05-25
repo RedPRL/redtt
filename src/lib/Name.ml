@@ -5,6 +5,9 @@ type t =
 let const str = Const str
 let fresh () = Symbol (Symbol.fresh ())
 
+let from_symbol x =
+  Symbol x
+
 let symbol =
   function
   | Const _ -> failwith "symbol"
