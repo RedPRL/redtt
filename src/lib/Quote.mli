@@ -17,9 +17,9 @@ type env = Env.t
 
 module type S =
 sig
-  val quote_nf : env -> Val.nf -> Tm.chk Tm.t
-  val quote_neu : env -> Val.neu -> Tm.inf Tm.t
-  val quote_ty : env -> Val.value -> Tm.chk Tm.t
+  val quote_nf : env -> Val.nf -> Tm.tm
+  val quote_neu : env -> Val.neu -> Tm.tm Tm.cmd
+  val quote_ty : env -> Val.value -> Tm.tm
 
   val equiv : env -> ty:Val.value -> Val.value -> Val.value -> unit
   val equiv_ty : env -> Val.value -> Val.value -> unit
