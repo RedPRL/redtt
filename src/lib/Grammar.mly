@@ -149,6 +149,7 @@ chk:
       make_node $startpos $endpos @@
       Tm.Cons (e0 env, e1 env) }
 
+(*
   | LPR; LET; LSQ; x = ATOM; e0 = inf; RSQ; e1 = chk; RPR
     { fun env ->
       make_node $startpos $endpos @@
@@ -159,6 +160,9 @@ chk:
       make_node $startpos $endpos @@
       Tm.Up (e env) }
 
+*)
+
+(*
 inf:
   | a = ATOM
     { fun env ->
@@ -199,3 +203,5 @@ inf:
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Down {ty = ty env; tm = tm env} }
+
+*)
