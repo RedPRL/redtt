@@ -195,7 +195,7 @@ cut:
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->
       let hd, fs = e env in
-      let args = arg0 env :: rest env in
+      let args = List.rev @@ arg0 env :: rest env in
       hd, List.fold_right (fun t fs -> Tm.FunApp t :: fs) args fs }
 
   | LPR; AT; e = cut; args = elist(tm); RPR
