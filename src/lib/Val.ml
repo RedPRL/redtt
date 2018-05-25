@@ -1311,11 +1311,11 @@ struct
 
   and pp_abs fmt abs =
     let x, v = Abs.unleash1 abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@]" Uuseg_string.pp_utf_8 (Name.to_string x) pp_value v
+    Format.fprintf fmt "@[<1><%a>@ %a@]" Name.pp x pp_value v
 
   and pp_ext_abs fmt abs =
     let x, (tyx, sysx) = ExtAbs.unleash1 abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" Uuseg_string.pp_utf_8 (Name.to_string x) pp_value tyx pp_val_sys sysx
+    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" Name.pp x pp_value tyx pp_val_sys sysx
 
   and pp_val_sys fmt sys =
     let pp_sep fmt () = Format.fprintf fmt " " in

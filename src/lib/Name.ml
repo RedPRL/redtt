@@ -32,10 +32,10 @@ let to_string nm =
 let pp fmt =
   function
   | Const x ->
-    Format.fprintf fmt "%s" x
+    Uuseg_string.pp_utf_8 fmt x
   | Gen i ->
     match Hashtbl.find names i with
     | Some x ->
-      Format.print_string x
+      Uuseg_string.pp_utf_8 fmt x
     | None ->
       Format.fprintf fmt "%s%i" "%" i
