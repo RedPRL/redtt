@@ -29,6 +29,16 @@ let rec pis gm tm =
   | Snoc (gm, (x, ty)) ->
     pis gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
 
+let hole gm ty f =
+  let alpha = Name.fresh () in
+  pushl (E (alpha, pis gm ty, Hole)) >>
+  let hd = Tm.Meta alpha in
+  (* TODO: might be backwards *)
+  let sp = Bwd.map (fun (x, _) -> Tm.FunApp (Tm.up @@ Tm.Cut (Tm.Ref x, Emp))) gm in
+  f (hd, sp) >>= fun r ->
+  go_left >>
+  ret r
+
 let define gm alpha ty tm =
   let ty' = pis gm ty in
   let tm' = lambdas (Bwd.map fst gm) tm in
@@ -221,16 +231,33 @@ let rec intersect tele sp0 sp1 =
   | _ ->
     None
 
+type instantiation = Name.t * ty * (tm -> tm)
+
+let rec instantiate inst =
+  let alpha, ty, f = inst in
+  popl >>= function
+  | E (beta, ty', Hole) when alpha = beta ->
+    hole Emp ty @@ fun t ->
+    define Emp beta ty' @@ f t
+  | e ->
+    pushr e >>
+    instantiate inst
+
 let flex_flex_same q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   (* invariant: same alpha *)
   | Tm.Up (Tm.Cut (Tm.Meta alpha, sp0)), Tm.Up (Tm.Cut (Tm.Meta _, sp1)) ->
     lookup_meta alpha >>= fun ty_alpha ->
-    let tele, _cod = telescope ty_alpha in
+    let tele, cod = telescope ty_alpha in
     begin
       match intersect tele sp0 sp1 with
-      | Some _ ->
-        failwith "TODO"
+      | Some tele' ->
+        let f (hd, sp) =
+          lambdas (Bwd.map fst tele) @@
+          let sp' = Bwd.map (fun (x, _) -> Tm.FunApp (Tm.up @@ Tm.Cut (Tm.Ref x, Emp))) tele in
+          Tm.up @@ Tm.Cut (hd, sp <.> sp')
+        in
+        instantiate (alpha, pis tele' cod, f)
       | None ->
         block @@ Unify q
     end
