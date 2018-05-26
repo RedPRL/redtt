@@ -2,6 +2,7 @@
   open TmUtil
   open RedBasis
   open Bwd
+  open BwdNotation
   module R = ResEnv
 %}
 
@@ -177,35 +178,35 @@ cmd:
   | c = cut
     { fun env ->
       let hd, fs = c env in
-      Tm.Cut (hd, Bwd.from_list @@ List.rev fs) }
+      Tm.Cut (hd, fs) }
 
 cut:
   | hd = head
     { fun env ->
-      hd env, [] }
+      hd env, Emp }
 
   | LPR; CAR; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, Tm.Car :: fs }
+      hd, fs #< Tm.Car }
 
   | LPR; CDR; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, Tm.Cdr :: fs }
+      hd, fs #< Tm.Cdr }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->
       let hd, fs = e env in
-      let args = List.rev @@ arg0 env :: rest env in
-      hd, List.fold_right (fun t fs -> Tm.FunApp t :: fs) args fs }
+      let args = arg0 env :: rest env in
+      hd, (fs <>< List.map (fun t -> Tm.FunApp t) args) }
 
   | LPR; AT; e = cut; args = elist(tm); RPR
     { fun env ->
       let hd, fs = e env in
-      hd, Tm.ExtApp (args env) :: fs }
+      hd, fs #< (Tm.ExtApp (args env)) }
 
   | LPR; IF; mot = bind(tm); scrut = cut; tcase = tm; fcase = tm; RPR
     { fun env ->
       let hd, fs = scrut env in
-      hd, Tm.If {mot = mot env; tcase = tcase env; fcase = fcase env} :: fs }
+      hd, fs #< (Tm.If {mot = mot env; tcase = tcase env; fcase = fcase env}) }
