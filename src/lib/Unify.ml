@@ -5,6 +5,35 @@ open Dev
 module Notation = Monad.Notation (Contextual)
 open Notation
 
+type telescope = (Name.t * ty) list
+
+let rec telescope ty =
+  match Tm.unleash ty with
+  | Tm.Pi (dom, cod) ->
+    let x, codx = Tm.unbind cod in
+    let (tel, ty) = telescope codx in
+    (x, dom) :: tel, ty
+  | _ ->
+    [], ty
+
+let rec lambdas gm tm =
+  match gm with
+  | [] -> tm
+  | (x, _) :: gm ->
+    lambdas gm @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+
+let rec pis gm tm =
+  match gm with
+  | [] -> tm
+  | (x, ty) :: gm ->
+    pis gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
+
+let define gm alpha ty tm =
+  let ty' = pis gm ty in
+  let tm' = lambdas gm tm in
+  (* In Gundry/McBride, a substitution is also unleashed to the right. We're going to find out if we need it. *)
+  pushr @@ E (alpha, ty', Defn tm')
+
 
 let invert alpha ty stk t =
   failwith ""
@@ -17,7 +46,7 @@ let try_invert q ty =
       | None -> ret false
       | Some t ->
         active (Unify q) >>
-        (* define [] alpha ty t *)
+        define [] alpha ty t >>
         ret true
     end
   | _ ->

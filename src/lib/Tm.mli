@@ -72,6 +72,9 @@ val unleash : tm -> tm tmf
 val close_var : Name.t -> int -> tm -> tm
 val open_var : int -> Name.t -> tm -> tm
 
+val bind : Name.t -> tm -> tm bnd
+val unbind : tm bnd -> Name.t * tm
+
 val subst : subst -> tm -> tm
 
 

@@ -427,6 +427,13 @@ let subst sub =
 let open_var k a t =
   subst (liftn k @@ inst0 @@ Cut (Ref a, [])) t
 
+let unbind (B (nm, t)) =
+  let x = Name.named nm in
+  x, open_var 0 x t
+
+let bind x tx =
+  B (Some (Name.to_string x), close_var x 0 tx)
+
 let rec pp env fmt (Tm tm) =
   match tm with
 
