@@ -40,10 +40,54 @@ let occurs_check alpha tm =
   Occurs.Set.mem alpha @@
   Tm.free `Metas tm
 
+
+let rec eta_contract t =
+  match Tm.unleash t with
+  | Tm.Lam bnd ->
+    let y, tmy = Tm.unbind bnd in
+    let tm'y = eta_contract tmy in
+    begin
+      match Tm.unleash tm'y with
+      | Tm.Up (Tm.Cut (Tm.Ref f, Tm.FunApp arg :: stk)) ->
+        begin
+          match Tm.unleash arg with
+          | Tm.Up (Tm.Cut (Tm.Ref y', []))
+            when
+              y = y'
+              && not @@ Occurs.Set.mem y @@ Tm.Stk.free `Vars stk
+            ->
+            Tm.up @@ Tm.Cut (Tm.Ref f, stk)
+          | _ ->
+            Tm.make @@ Tm.Lam (Tm.bind y tm'y)
+        end
+      | _ ->
+        Tm.make @@ Tm.Lam (Tm.bind y tm'y)
+    end
+
+  | Tm.Cons (t0, t1) -> failwith ""
+
+  | _ -> t
+
+let to_var t =
+  match Tm.unleash @@ eta_contract t with
+  | Tm.Up (Tm.Cut (Tm.Ref a, [])) ->
+    Some a
+  | _ ->
+    None
+
+let rec to_vars ts =
+  match ts with
+  | [] -> Some []
+  | v :: ts ->
+    match to_var v with
+    | Some x -> Option.map (fun xs -> x :: xs) @@ to_vars ts
+    | None -> None
+
 let invert alpha ty stk t =
   if occurs_check alpha t then
     failwith "occurs check"
   else (* alpha does not occur in t *)
+
     failwith "TODO"
 
 let try_invert q ty =

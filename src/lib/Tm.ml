@@ -691,37 +691,38 @@ struct
       ~x:(up @@ var 0)
 end
 
-let free fl  =
-  let rec go tm acc =
+module OccursAux =
+struct
+  let rec go fl tm acc =
     match unleash tm with
     | Lam bnd ->
-      go_bnd bnd acc
+      go_bnd fl bnd acc
     | Pi (dom, cod) ->
-      go_bnd cod @@
-      go dom acc
+      go_bnd fl cod @@
+      go fl dom acc
     | Sg (dom, cod) ->
-      go_bnd cod @@
-      go dom acc
+      go_bnd fl cod @@
+      go fl dom acc
     | Ext ebnd ->
-      go_ext_bnd ebnd acc
+      go_ext_bnd fl ebnd acc
     | Up cmd ->
-      go_cmd cmd acc
+      go_cmd fl cmd acc
     | _ -> failwith ""
 
-  and go_cmd cmd acc =
+  and go_cmd fl cmd acc =
     match cmd with
     | Cut (hd, stk) ->
       match fl, hd with
       | `RigVars, Ref x ->
-        go_stack stk @@
+        go_stack fl stk @@
         Occurs.Set.add x acc
       | `RigVars, Meta _ ->
         acc
       | _ ->
-        go_stack stk @@
-        go_head hd acc
+        go_stack fl stk @@
+        go_head fl hd acc
 
-  and go_head hd acc =
+  and go_head fl hd acc =
     match fl, hd with
     | _, Ix _ -> acc
     | `Vars, Meta _ -> acc
@@ -732,73 +733,80 @@ let free fl  =
       Occurs.Set.add x acc
     | `Metas, Ref _ -> acc
     | _, Down {ty; tm} ->
-      go tm @@ go ty acc
+      go fl tm @@ go fl ty acc
     | _, Coe info ->
-      go info.r @@
-      go info.r' @@
-      go_bnd info.ty @@
-      go info.tm acc
+      go fl info.r @@
+      go fl info.r' @@
+      go_bnd fl info.ty @@
+      go fl info.tm acc
     | _, HCom info ->
-      go info.r @@
-      go info.r' @@
-      go info.ty @@
-      go info.cap @@
-      go_comp_sys info.sys acc
+      go fl info.r @@
+      go fl info.r' @@
+      go fl info.ty @@
+      go fl info.cap @@
+      go_comp_sys fl info.sys acc
     | _, Com info ->
-      go info.r @@
-      go info.r' @@
-      go_bnd info.ty @@
-      go info.cap @@
-      go_comp_sys info.sys acc
+      go fl info.r @@
+      go fl info.r' @@
+      go_bnd fl info.ty @@
+      go fl info.cap @@
+      go_comp_sys fl info.sys acc
 
-  and go_stack stk =
-    List.fold_right go_frame stk
+  and go_stack fl stk =
+    List.fold_right (go_frame fl) stk
 
-  and go_frame frm acc =
+  and go_frame fl frm acc =
     match frm with
     | Car -> acc
     | Cdr -> acc
     | LblCall -> acc
     | FunApp t ->
-      go t acc
+      go fl t acc
     | ExtApp ts ->
-      List.fold_right go ts acc
+      List.fold_right (go fl) ts acc
     | If info ->
-      go_bnd info.mot @@
-      go info.tcase @@
-      go info.fcase acc
+      go_bnd fl info.mot @@
+      go fl info.tcase @@
+      go fl info.fcase acc
     | VProj info ->
-      go info.r @@
-      go info.ty0 @@
-      go info.ty1 @@
-      go info.equiv acc
+      go fl info.r @@
+      go fl info.ty0 @@
+      go fl info.ty1 @@
+      go fl info.equiv acc
 
-  and go_ext_bnd bnd acc =
+  and go_ext_bnd fl bnd acc =
     let NB (_, (ty, sys)) = bnd in
-    go ty @@ go_tm_sys sys acc
+    go fl ty @@ go_tm_sys fl sys acc
 
-  and go_bnd bnd acc =
+  and go_bnd fl bnd acc =
     let B (_, tm) = bnd in
-    go tm acc
+    go fl tm acc
 
-  and go_tm_sys sys =
-    List.fold_right go_tm_face sys
+  and go_tm_sys fl =
+    List.fold_right @@ go_tm_face fl
 
-  and go_comp_sys sys =
-    List.fold_right go_comp_face sys
+  and go_comp_sys fl =
+    List.fold_right @@ go_comp_face fl
 
-  and go_tm_face (r, r', otm) acc =
-    go r @@ go r' @@
+  and go_tm_face fl (r, r', otm) acc =
+    go fl r @@ go fl r' @@
     match otm with
     | None -> acc
-    | Some tm -> go tm acc
+    | Some tm -> go fl tm acc
 
-  and go_comp_face (r, r', obnd) acc =
-    go r @@ go r' @@
+  and go_comp_face fl (r, r', obnd) acc =
+    go fl r @@ go fl r' @@
     match obnd with
     | None -> acc
-    | Some bnd -> go_bnd bnd acc
+    | Some bnd -> go_bnd fl bnd acc
+end
 
+let free fl tm =
+  OccursAux.go fl tm Occurs.Set.empty
 
-  in
-  fun tm -> go tm Occurs.Set.empty
+module Stk =
+struct
+  type t = tm stack
+  let free fl stk =
+    OccursAux.go_stack fl stk Occurs.Set.empty
+end

@@ -107,3 +107,5 @@ val pp_sys : (tm, tm) system Pretty.t
 
 
 include Occurs.S with type t := tm
+
+module Stk : Occurs.S with type t = tm stack
