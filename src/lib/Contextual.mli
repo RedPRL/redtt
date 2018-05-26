@@ -4,6 +4,7 @@ open Dev
 include Monad.S
 
 val ask : params m
+val local : (params -> params) -> 'a m -> 'a m
 
 val popl : entry m
 val popr : entry m

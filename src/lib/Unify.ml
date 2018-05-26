@@ -1,6 +1,6 @@
 open RedBasis
+open Bwd open BwdNotation
 open Contextual
-open Bwd
 open Dev
 
 module Notation = Monad.Notation (Contextual)
@@ -91,20 +91,36 @@ let to_var t =
   | _ ->
     None
 
-let rec to_vars ts =
-  match ts with
-  | [] -> Some []
-  | v :: ts ->
-    match to_var v with
-    | Some x -> Option.map (fun xs -> x :: xs) @@ to_vars ts
-    | None -> None
+let rec spine_to_vars sp =
+  match sp with
+  | Emp -> Some []
+  | Snoc (sp, Tm.FunApp t) ->
+    begin
+      match to_var t with
+      | Some x -> Option.map (fun xs -> x :: xs) @@ spine_to_vars sp
+      | None -> None
+    end
+  | _ -> None
 
-let invert alpha _ty _sp t =
+let linear_on t =
+  let fvs = Tm.free `Vars t in
+  let rec go xs =
+    match xs with
+    | [] -> true
+    | x :: xs->
+      not (Occurs.Set.mem x fvs && List.mem x xs) && go xs
+  in go
+
+let invert alpha _ty sp t =
   if occurs_check alpha t then
     failwith "occurs check"
   else (* alpha does not occur in t *)
-
-    failwith "TODO"
+    match spine_to_vars sp with
+    | Some xs when linear_on t xs ->
+      local (fun _ -> Emp) @@
+      failwith ""
+    | _ ->
+      ret None
 
 let try_invert q ty =
   match Tm.unleash q.tm0 with
@@ -124,7 +140,7 @@ let try_invert q ty =
 let rec flex_term ~deps q =
   match Tm.unleash q.tm0 with
   | Tm.Up (Tm.Cut (Meta alpha, _)) ->
-    List.map snd <@> ask >>= fun gm ->
+    Bwd.map snd <@> ask >>= fun gm ->
     popl >>= fun e ->
     begin
       match e with

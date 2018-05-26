@@ -1,3 +1,4 @@
+open RedBasis.Bwd
 
 type tm = Tm.tm
 type ty = Tm.tm
@@ -19,7 +20,7 @@ type param =
   | P of ty
   | Tw of ty * ty
 
-type params = (Name.t * param) list
+type params = (Name.t * param) bwd
 
 type 'a bind = B of 'a
 
@@ -48,7 +49,7 @@ struct
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)
 end
 
-module Params = Occurs.List (Param)
+module Params = Occurs.Bwd (Param)
 
 module Decl =
 struct

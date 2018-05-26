@@ -65,19 +65,19 @@ let go_left =
 
 let in_scope x p =
   local @@ fun ps ->
-  (x, p) :: ps
+  ps #< (x, p)
 
 
 let lookup_var x w =
   let rec go gm =
     match w, gm with
-    | `Only, (y, P ty) :: gm ->
+    | `Only, Snoc (gm, (y, P ty)) ->
       if x = y then M.ret ty else go gm
-    | `TwinL, (y, Tw (ty0, _)) :: gm ->
+    | `TwinL, Snoc (gm, (y, Tw (ty0, _))) ->
       if x = y then M.ret ty0 else go gm
-    | `TwinR, (y, Tw (_, ty1)) :: gm ->
+    | `TwinR, Snoc (gm, (y, Tw (_, ty1))) ->
       if x = y then M.ret ty1 else go gm
-    | _, _ :: gm ->
+    | _, Snoc (gm, _) ->
       go gm
     | _ ->
       failwith "lookup_var: not found"
@@ -99,7 +99,14 @@ let lookup_meta x =
 
 let postpone s p =
   ask >>= fun ps ->
-  let wrapped = List.fold_right (fun (x, e) p -> All (e, Dev.bind x p)) ps p in
+  let wrapped =
+    let rec go ps p =
+      match ps with
+      | Snoc (ps, (x, e)) ->
+        go ps @@ All (e, Dev.bind x p)
+      | Emp -> p
+    in go ps p
+  in
   pushr @@ Q (s, wrapped)
 
 

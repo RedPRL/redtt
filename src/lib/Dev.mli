@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 type tm = Tm.tm
 type ty = Tm.tm
 
@@ -16,7 +18,7 @@ type param =
   | P of ty
   | Tw of ty * ty
 
-type params = (Name.t * param) list
+type params = (Name.t * param) bwd
 
 type 'a bind
 
@@ -44,7 +46,7 @@ sig
 end
 
 module Param : Occurs.S with type t = param
-module Params : Occurs.S with type t = param list
+module Params : Occurs.S with type t = param bwd
 module Equation : Occurs.S with type t = equation
 module Decl : Occurs.S with type t = tm decl
 module Entry : Occurs.S with type t = entry
