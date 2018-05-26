@@ -42,6 +42,8 @@ let occurs_check alpha tm =
   Tm.free `Metas tm
 
 
+
+(* A very crappy eta contraction function. It's horrific that this is actually a thing that we do! *)
 let rec eta_contract t =
   match Tm.unleash t with
   | Tm.Lam bnd ->
@@ -49,9 +51,6 @@ let rec eta_contract t =
     let tm'y = eta_contract tmy in
     begin
       match Tm.unleash tm'y with
-      (* TODO: I think this is backwards:
-         FunApp should be at the end of the stack, not at the beginning
-      *)
       | Tm.Up (Tm.Cut (Tm.Ref f, Snoc (sp, Tm.FunApp arg))) ->
         begin
           match Tm.unleash arg with
@@ -73,10 +72,13 @@ let rec eta_contract t =
     let t1' = eta_contract t1 in
     begin
       match Tm.unleash t0', Tm.unleash t1' with
-      | Tm.Up _, Tm.Up _ ->
-        failwith ""
+      | Tm.Up (Tm.Cut (hd0, Snoc (sp0, Tm.Car))), Tm.Up (Tm.Cut (hd1, Snoc (sp1, Tm.Cdr)))
+        when
+          hd0 = hd1 && sp0 = sp1
+        ->
+        Tm.up @@ Tm.Cut (hd0, sp0)
       | _ ->
-        failwith "TODO"
+        Tm.cons t0' t1'
     end
 
   | con ->
