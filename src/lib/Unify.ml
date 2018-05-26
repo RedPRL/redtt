@@ -44,7 +44,8 @@ let invert alpha ty stk t =
   if occurs_check alpha t then
     failwith "occurs check"
   else (* alpha does not occur in t *)
-    failwith "TODO"
+    match Tm.unleash q.tm0 with
+    | _ -> failwith "TODO"
 
 let try_invert q ty =
   match Tm.unleash q.tm0 with
@@ -68,27 +69,23 @@ let rec flex_term ~deps q =
     popl >>= fun e ->
     begin
       match e with
-      | E (beta, ty, Hole) ->
-        if alpha = beta then
-          if Occurs.Set.mem alpha @@ Entries.free `Metas deps then
-            pushls (e :: deps) >>
-            block (Unify q)
-          else
-            pushls deps >>
-            try_invert q ty <||
-            begin
-              block (Unify q) >>
-              pushl e
-            end
-        else
-        if Occurs.Set.mem beta (Params.free `Metas gm)
-        || Occurs.Set.mem beta (Entries.free `Metas deps)
-        || Occurs.Set.mem beta (Equation.free `Metas q)
-        then
-          flex_term ~deps:(e :: deps) q
-        else
-          pushr e >>
-          flex_term ~deps q
+      | E (beta, ty, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+        pushls (e :: deps) >>
+        block (Unify q)
+      | E (beta, ty, Hole) when alpha = beta ->
+        pushls deps >>
+        try_invert q ty <||
+        begin
+          block (Unify q) >>
+          pushl e
+        end
+      | E (beta, _, Hole)
+        when
+          Occurs.Set.mem beta (Params.free `Metas gm)
+          || Occurs.Set.mem beta (Entries.free `Metas deps)
+          || Occurs.Set.mem beta (Equation.free `Metas q)
+        ->
+        flex_term ~deps:(e :: deps) q
       | _ ->
         pushr e >>
         flex_term ~deps q
