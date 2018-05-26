@@ -97,7 +97,7 @@ let rec to_vars ts =
     | Some x -> Option.map (fun xs -> x :: xs) @@ to_vars ts
     | None -> None
 
-let invert alpha ty stk t =
+let invert alpha _ty _sp t =
   if occurs_check alpha t then
     failwith "occurs check"
   else (* alpha does not occur in t *)
@@ -106,9 +106,9 @@ let invert alpha ty stk t =
 
 let try_invert q ty =
   match Tm.unleash q.tm0 with
-  | Tm.Up (Tm.Cut (Meta alpha, stk)) ->
+  | Tm.Up (Tm.Cut (Meta alpha, sp)) ->
     begin
-      invert alpha ty stk q.tm1 >>= function
+      invert alpha ty sp q.tm1 >>= function
       | None ->
         ret false
       | Some t ->
@@ -126,7 +126,7 @@ let rec flex_term ~deps q =
     popl >>= fun e ->
     begin
       match e with
-      | E (beta, ty, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+      | E (beta, _, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
         pushls (e :: deps) >>
         block (Unify q)
       | E (beta, ty, Hole) when alpha = beta ->
