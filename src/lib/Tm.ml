@@ -554,7 +554,7 @@ and pp_head env fmt =
     Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
 
 and pp_cmd env fmt =
-  function Cut (hd, sp) ->
+  function Cut (hd, stk) ->
     let rec go fmt sp =
       match sp with
       | [] -> pp_head env fmt hd
@@ -577,7 +577,7 @@ and pp_cmd env fmt =
         | LblCall ->
           Format.fprintf fmt "@[<1>(call@ %a)@]" go sp
     in
-    go fmt (List.rev sp)
+    go fmt (List.rev stk)
 
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt " " in
