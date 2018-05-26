@@ -19,3 +19,6 @@ val lookup_meta : Name.t -> ty m
 val postpone : status -> problem -> unit m
 val active : problem -> unit m
 val block : problem -> unit m
+
+
+(* TODO: 'define' function *)
