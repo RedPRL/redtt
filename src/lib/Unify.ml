@@ -226,7 +226,12 @@ let flex_flex_same q =
   (* invariant: same alpha *)
   | Tm.Up (Tm.Cut (Tm.Meta alpha, sp0)), Tm.Up (Tm.Cut (Tm.Meta _, sp1)) ->
     lookup_meta alpha >>= fun ty_alpha ->
-    let _tele, _cod = telescope ty_alpha in
-    (* TODO: intersect the spines, etc. *)
-    failwith "TODO"
+    let tele, _cod = telescope ty_alpha in
+    begin
+      match intersect tele sp0 sp1 with
+      | Some _ ->
+        failwith "TODO"
+      | None ->
+        block @@ Unify q
+    end
   | _ -> failwith ""
