@@ -25,8 +25,8 @@ struct
     match nms with
     | [] -> [], t
     | nm :: nms ->
-      let xs, t = bindn nms t in
       let x, t = bind nm t in
+      let xs, t = bindn nms t in
       x :: xs, t
 end
 
