@@ -35,9 +35,16 @@ val unbind : problem bind -> Name.t * problem
 type twin = [`Only | `TwinL | `TwinR]
 
 
-module Prob :
+module Problem :
 sig
+  include Occurs.S with type t = problem
   val eqn : ty -> tm -> ty -> tm -> problem
   val all : Name.t -> ty -> problem -> problem
   val all_twins : Name.t -> ty -> ty -> problem -> problem
 end
+
+module Param : Occurs.S with type t = param
+module Equation : Occurs.S with type t = equation
+module Decl : Occurs.S with type t = tm decl
+module Entry : Occurs.S with type t = entry
+module Entries : Occurs.S with type t = entry list
