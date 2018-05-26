@@ -1,5 +1,6 @@
 open RedBasis
 open Contextual
+open Bwd
 open Dev
 
 module Notation = Monad.Notation (Contextual)
@@ -51,15 +52,15 @@ let rec eta_contract t =
       (* TODO: I think this is backwards:
          FunApp should be at the end of the stack, not at the beginning
       *)
-      | Tm.Up (Tm.Cut (Tm.Ref f, Tm.FunApp arg :: stk)) ->
+      | Tm.Up (Tm.Cut (Tm.Ref f, Snoc (sp, Tm.FunApp arg))) ->
         begin
           match Tm.unleash arg with
-          | Tm.Up (Tm.Cut (Tm.Ref y', []))
+          | Tm.Up (Tm.Cut (Tm.Ref y', Emp))
             when
               y = y'
-              && not @@ Occurs.Set.mem y @@ Tm.Stk.free `Vars stk
+              && not @@ Occurs.Set.mem y @@ Tm.Sp.free `Vars sp
             ->
-            Tm.up @@ Tm.Cut (Tm.Ref f, stk)
+            Tm.up @@ Tm.Cut (Tm.Ref f, sp)
           | _ ->
             Tm.make @@ Tm.Lam (Tm.bind y tm'y)
         end
@@ -83,7 +84,7 @@ let rec eta_contract t =
 
 let to_var t =
   match Tm.unleash @@ eta_contract t with
-  | Tm.Up (Tm.Cut (Tm.Ref a, [])) ->
+  | Tm.Up (Tm.Cut (Tm.Ref a, Emp)) ->
     Some a
   | _ ->
     None
@@ -96,7 +97,7 @@ let rec to_vars ts =
     | Some x -> Option.map (fun xs -> x :: xs) @@ to_vars ts
     | None -> None
 
-let invert alpha ty stk t =
+let invert alpha _ty _sp t =
   if occurs_check alpha t then
     failwith "occurs check"
   else (* alpha does not occur in t *)
@@ -105,9 +106,9 @@ let invert alpha ty stk t =
 
 let try_invert q ty =
   match Tm.unleash q.tm0 with
-  | Tm.Up (Tm.Cut (Meta alpha, stk)) ->
+  | Tm.Up (Tm.Cut (Meta alpha, sp)) ->
     begin
-      invert alpha ty stk q.tm1 >>= function
+      invert alpha ty sp q.tm1 >>= function
       | None ->
         ret false
       | Some t ->
@@ -125,7 +126,7 @@ let rec flex_term ~deps q =
     popl >>= fun e ->
     begin
       match e with
-      | E (beta, ty, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+      | E (beta, _, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
         pushls (e :: deps) >>
         block (Unify q)
       | E (beta, ty, Hole) when alpha = beta ->
