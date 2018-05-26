@@ -94,3 +94,13 @@ let lookup_meta x =
       failwith "lookup_meta: not found"
   in
   getl >>= look
+
+
+let postpone s p =
+  ask >>= fun ps ->
+  let wrapped = List.fold_right (fun (x, e) p -> All (e, Dev.bind x p)) ps p in
+  pushr @@ Q (s, wrapped)
+
+
+let active = postpone Active
+let block = postpone Blocked

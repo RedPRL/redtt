@@ -33,7 +33,7 @@ type entry =
 
 let bind _ _ = failwith ""
 
-let unbind (B prob) =
+let unbind (B _prob) =
   let _x = Name.fresh () in
   failwith ""
 
