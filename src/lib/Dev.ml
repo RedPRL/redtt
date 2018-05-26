@@ -48,6 +48,8 @@ struct
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)
 end
 
+module Params = Occurs.List (Param)
+
 module Decl =
 struct
   type t = Tm.tm decl

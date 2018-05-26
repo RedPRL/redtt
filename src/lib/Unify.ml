@@ -15,29 +15,24 @@ let rec flex_term deps q =
       match e with
       | E (beta, ty, Hole) ->
         if alpha = beta then
-          (* If alpha mentioned in deps, then:
-
-              pushls (e :: deps) >>
-              block (Unify q)
-
-             else:
-
-              pushls deps >>
-                invert, blah blah
-          *)
-          failwith ""
+          if Occurs.Set.mem alpha @@ Entries.free `Metas deps then
+            pushls (e :: deps) >>
+            block (Unify q)
+          else
+            (*
+                pushls deps >>
+                  invert, blah blah
+            *)
+            failwith "TODO"
         else
-          (* if beta is mentiond in gm, deps or q :
-
-               flex_term (e :: deps) q
-
-             else:
-
-               pushr e >>
-               flex_term deps q
-          *)
-          failwith ""
-
+        if Occurs.Set.mem beta (Params.free `Metas gm)
+        || Occurs.Set.mem beta (Entries.free `Metas deps)
+        || Occurs.Set.mem beta (Equation.free `Metas q)
+        then
+          flex_term (e :: deps) q
+        else
+          pushr e >>
+          flex_term deps q
       | _ ->
         pushr e >>
         flex_term deps q

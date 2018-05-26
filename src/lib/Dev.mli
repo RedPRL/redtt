@@ -44,6 +44,7 @@ sig
 end
 
 module Param : Occurs.S with type t = param
+module Params : Occurs.S with type t = param list
 module Equation : Occurs.S with type t = equation
 module Decl : Occurs.S with type t = tm decl
 module Entry : Occurs.S with type t = entry
