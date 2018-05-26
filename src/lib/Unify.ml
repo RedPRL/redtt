@@ -44,8 +44,7 @@ let invert alpha ty stk t =
   if occurs_check alpha t then
     failwith "occurs check"
   else (* alpha does not occur in t *)
-    match Tm.unleash q.tm0 with
-    | _ -> failwith "TODO"
+    failwith "TODO"
 
 let try_invert q ty =
   match Tm.unleash q.tm0 with
