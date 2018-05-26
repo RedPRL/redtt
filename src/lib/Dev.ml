@@ -71,6 +71,9 @@ struct
         Tm.free fl ty1;
         Tm.free fl tm1 ]
     in List.fold_right Occurs.Set.union sets Occurs.Set.empty
+
+  let sym q =
+    {ty0 = q.ty1; tm0 = q.tm1; ty1 = q.ty0; tm1 = q.tm0}
 end
 
 module Problem =

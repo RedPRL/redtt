@@ -47,7 +47,12 @@ end
 
 module Param : Occurs.S with type t = param
 module Params : Occurs.S with type t = param bwd
-module Equation : Occurs.S with type t = equation
+module Equation :
+sig
+  include Occurs.S with type t = equation
+  val sym : t -> t
+end
+
 module Decl : Occurs.S with type t = tm decl
 module Entry : Occurs.S with type t = entry
 module Entries : Occurs.S with type t = entry list

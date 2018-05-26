@@ -170,3 +170,39 @@ let rec flex_term ~deps q =
         flex_term ~deps q
     end
   | _ -> failwith "flex_term"
+
+
+let rec flex_flex ~deps q =
+  match Tm.unleash q.tm0, Tm.unleash q.tm1 with
+  | Tm.Up (Tm.Cut (Tm.Meta alpha0, _)), Tm.Up (Tm.Cut (Tm.Meta alpha1, _)) ->
+    Bwd.map snd <@> ask >>= fun gm ->
+    begin
+      popl >>= function
+      | E (gamma, _, Hole) as e
+        when
+          (alpha0 = gamma || alpha1 = gamma)
+          && Occurs.Set.mem gamma @@ Entries.free `Metas deps
+        ->
+        pushls (e :: deps) >>
+        block (Unify q)
+
+      | E (gamma, ty, Hole) as e when gamma = alpha0 ->
+        pushls deps >>
+        try_invert q ty <||
+        flex_term [e] (Equation.sym q)
+
+      | E (gamma, _, Hole) as e
+        when
+          Occurs.Set.mem gamma @@ Params.free `Metas gm
+          || Occurs.Set.mem gamma @@ Entries.free `Metas deps
+          || Occurs.Set.mem gamma @@ Equation.free `Metas q
+        ->
+        flex_flex ~deps:(e :: deps) q
+
+      | e ->
+        pushr e >>
+        flex_flex ~deps q
+    end
+
+  | _ ->
+    failwith "flex_flex"
