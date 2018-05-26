@@ -22,6 +22,11 @@ include M
 
 open Notation
 
+let local f m ps =
+  m (f ps)
+
+let ask ps cx = cx, ps
+
 let get _ cx = cx, cx
 
 let modify f _ cx = f cx, ()
@@ -55,3 +60,37 @@ let popr =
 
 let go_left =
   popl >>= pushr
+
+
+let in_scope x p =
+  local @@ fun ps ->
+  (x, p) :: ps
+
+
+let lookup_var x w =
+  let rec go gm =
+    match w, gm with
+    | `Only, (y, P ty) :: gm ->
+      if x = y then M.ret ty else go gm
+    | `TwinL, (y, Tw (ty0, _)) :: gm ->
+      if x = y then M.ret ty0 else go gm
+    | `TwinR, (y, Tw (_, ty1)) :: gm ->
+      if x = y then M.ret ty1 else go gm
+    | _, _ :: gm ->
+      go gm
+    | _ ->
+      failwith "lookup_var: not found"
+  in
+  ask >>= go
+
+let lookup_meta x =
+  let rec look =
+    function
+    | E (y, ty, _) :: mcx ->
+      if x = y then M.ret ty else look mcx
+    | _ :: mcx ->
+      look mcx
+    | [] ->
+      failwith "lookup_meta: not found"
+  in
+  getl >>= look

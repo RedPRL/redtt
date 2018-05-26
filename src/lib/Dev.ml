@@ -2,6 +2,8 @@
 type tm = Tm.tm
 type ty = Tm.tm
 
+type twin = [`Only | `TwinL | `TwinR]
+
 type 'a decl =
   | Hole
   | Defn of 'a

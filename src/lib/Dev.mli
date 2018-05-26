@@ -30,3 +30,6 @@ type entry =
 
 val bind : Name.t -> problem -> problem bind
 val unbind : problem bind -> Name.t * problem
+
+
+type twin = [`Only | `TwinL | `TwinR]
