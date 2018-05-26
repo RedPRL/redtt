@@ -1,7 +1,8 @@
 open Dev
 open RedBasis
+open Bwd open BwdNotation
 
-type cx_l = entry list
+type cx_l = entry bwd
 type cx_r = entry list
 
 type cx = cx_l * cx_r
@@ -37,7 +38,7 @@ let modifyl f = modify @@ fun (l, r) -> f l, r
 let modifyr f = modify @@ fun (l, r) -> l, f r
 let setl l = modifyl @@ fun _ -> l
 let setr r = modifyr @@ fun _ -> r
-let pushl e = modifyl @@ fun es -> e :: es
+let pushl e = modifyl @@ fun es -> es #< e
 let pushr e = modifyr @@ fun es -> e :: es
 
 let rec pushls es =
@@ -49,7 +50,7 @@ let rec pushls es =
 
 let popl =
   getl >>= function
-  | e :: mcx -> setl mcx >> ret e
+  | Snoc (mcx, e) -> setl mcx >> ret e
   | _ -> failwith "popl: empty"
 
 let popr =
@@ -86,11 +87,11 @@ let lookup_var x w =
 let lookup_meta x =
   let rec look =
     function
-    | E (y, ty, _) :: mcx ->
+    | Snoc (mcx, E (y, ty, _)) ->
       if x = y then M.ret ty else look mcx
-    | _ :: mcx ->
+    | Snoc (mcx, _) ->
       look mcx
-    | [] ->
+    | Emp ->
       failwith "lookup_meta: not found"
   in
   getl >>= look
