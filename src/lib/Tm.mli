@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option list * 'a
 
@@ -54,14 +56,14 @@ and 'a frame =
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | LblCall
 
-and 'a stack = 'a frame list
-and 'a cmd = Cut of 'a head * 'a stack
+and 'a spine = 'a frame bwd
+and 'a cmd = Cut of 'a head * 'a spine
 
 type tm
 
 val map_head : (tm -> tm) -> tm head -> tm head
 val map_frame : (tm -> tm) -> tm frame -> tm frame
-val map_stack : (tm -> tm) -> tm stack -> tm stack
+val map_spine : (tm -> tm) -> tm spine -> tm spine
 val map_tmf : (tm -> tm) -> tm tmf -> tm tmf
 
 
@@ -117,7 +119,7 @@ val pp_sys : (tm, tm) system Pretty.t
 
 include Occurs.S with type t := tm
 
-module Stk :
+module Sp :
 sig
-  include Occurs.S with type t = tm stack
+  include Occurs.S with type t = tm spine
 end

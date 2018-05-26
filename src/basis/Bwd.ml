@@ -2,10 +2,16 @@ type 'a bwd =
   | Emp
   | Snoc of 'a bwd * 'a
 
-module Notation =
+module BwdNotation =
 struct
   let (#<) xs x =
     Snoc (xs, x)
+
+  let rec (<.>) xs ys =
+    match ys with
+    | Emp -> xs
+    | Snoc (ys, y) ->
+      Snoc (xs <.> ys, y)
 
 
   let rec (<><) xs ys =
@@ -21,7 +27,12 @@ end
 
 module Bwd =
 struct
-  open Notation
+  open BwdNotation
+
+  let rec map f xs =
+    match xs with
+    | Emp -> Emp
+    | Snoc (xs, x) -> Snoc (map f xs, f x)
 
   let to_list xs =
     xs <>> []

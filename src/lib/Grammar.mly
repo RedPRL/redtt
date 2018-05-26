@@ -1,5 +1,7 @@
 %{
   open TmUtil
+  open RedBasis
+  open Bwd
   module R = ResEnv
 %}
 
@@ -175,7 +177,7 @@ cmd:
   | c = cut
     { fun env ->
       let hd, fs = c env in
-      Tm.Cut (hd, List.rev fs) }
+      Tm.Cut (hd, Bwd.from_list @@ List.rev fs) }
 
 cut:
   | hd = head

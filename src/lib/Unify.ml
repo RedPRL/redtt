@@ -1,5 +1,6 @@
 open RedBasis
 open Contextual
+open Bwd
 open Dev
 
 module Notation = Monad.Notation (Contextual)
@@ -51,15 +52,15 @@ let rec eta_contract t =
       (* TODO: I think this is backwards:
          FunApp should be at the end of the stack, not at the beginning
       *)
-      | Tm.Up (Tm.Cut (Tm.Ref f, Tm.FunApp arg :: stk)) ->
+      | Tm.Up (Tm.Cut (Tm.Ref f, Snoc (sp, Tm.FunApp arg))) ->
         begin
           match Tm.unleash arg with
-          | Tm.Up (Tm.Cut (Tm.Ref y', []))
+          | Tm.Up (Tm.Cut (Tm.Ref y', Emp))
             when
               y = y'
-              && not @@ Occurs.Set.mem y @@ Tm.Stk.free `Vars stk
+              && not @@ Occurs.Set.mem y @@ Tm.Sp.free `Vars sp
             ->
-            Tm.up @@ Tm.Cut (Tm.Ref f, stk)
+            Tm.up @@ Tm.Cut (Tm.Ref f, sp)
           | _ ->
             Tm.make @@ Tm.Lam (Tm.bind y tm'y)
         end
@@ -83,7 +84,7 @@ let rec eta_contract t =
 
 let to_var t =
   match Tm.unleash @@ eta_contract t with
-  | Tm.Up (Tm.Cut (Tm.Ref a, [])) ->
+  | Tm.Up (Tm.Cut (Tm.Ref a, Emp)) ->
     Some a
   | _ ->
     None

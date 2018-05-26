@@ -1,4 +1,6 @@
 open RedBasis
+open Bwd
+open BwdNotation
 
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option list * 'a
@@ -56,8 +58,8 @@ and 'a frame =
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | LblCall
 
-and 'a stack = 'a frame list
-and 'a cmd = Cut of 'a head * 'a stack
+and 'a spine = 'a frame bwd
+and 'a cmd = Cut of 'a head * 'a spine
 
 type tm = Tm of tm tmf
 
@@ -71,7 +73,7 @@ let ($$) hd stk =
   Cut (hd, stk)
 
 let var i =
-  Ix i $$ []
+  Ix i $$ Emp
 
 let lift sub =
   Sub (Cmp (sub, Proj), var 0)
@@ -150,14 +152,15 @@ and subst_tm_face sub (r, r', otm) =
   subst sub r, subst sub r', Option.map (subst sub) otm
 
 
+(* TODO: I don't know if this is backwards or not *)
 and subst_cmd sub =
   function Cut (head, spine) ->
     let Cut (head', spine') = subst_head sub head in
     let spine'' = subst_spine sub spine in
-    Cut (head', spine' @ spine'')
+    Cut (head', spine'' <.> spine')
 
 and subst_spine sub spine =
-  List.map (subst_frame sub) spine
+  Bwd.map (subst_frame sub) spine
 
 and subst_frame sub frame =
   match frame with
@@ -185,15 +188,15 @@ and subst_head sub head =
     subst_ix sub i
 
   | Ref a ->
-    Ref a $$ []
+    Ref a $$ Emp
 
   | Meta a ->
-    Meta a $$ []
+    Meta a $$ Emp
 
   | Down info ->
     let ty = subst sub info.ty in
     let tm = subst sub info.tm in
-    Down {ty; tm} $$ []
+    Down {ty; tm} $$ Emp
 
   | HCom info ->
     let r = subst sub info.r in
@@ -201,14 +204,14 @@ and subst_head sub head =
     let ty = subst sub info.ty in
     let cap = subst sub info.cap in
     let sys = subst_comp_sys sub info.sys in
-    HCom {r; r'; ty; cap; sys} $$ []
+    HCom {r; r'; ty; cap; sys} $$ Emp
 
   | Coe info ->
     let r = subst sub info.r in
     let r' = subst sub info.r' in
     let ty = subst_bnd sub info.ty in
     let tm = subst sub info.tm in
-    Coe {r; r'; ty; tm} $$ []
+    Coe {r; r'; ty; tm} $$ Emp
 
   | Com info ->
     let r = subst sub info.r in
@@ -216,14 +219,14 @@ and subst_head sub head =
     let ty = subst_bnd sub info.ty in
     let cap = subst sub info.cap in
     let sys = subst_comp_sys sub info.sys in
-    Com {r; r'; ty; cap; sys} $$ []
+    Com {r; r'; ty; cap; sys} $$ Emp
 
 and subst_ix sub ix  =
   match sub with
   | Id ->
-    Ix ix $$ []
+    Ix ix $$ Emp
   | Proj ->
-    Ix (ix + 1) $$ []
+    Ix (ix + 1) $$ Emp
 
   | Sub (sub, cmd) ->
     if ix = 0 then cmd else subst_ix sub (ix - 1)
@@ -317,11 +320,12 @@ let traverse ~f ~var ~ref =
     | Let (cmd, bnd) ->
       Let (go_cmd k cmd, go_bnd k bnd)
 
+  (* TODO: not sure if this is backwards !!!! *)
   and go_cmd k =
-    function Cut (hd, stk) ->
-      let Cut (hd', stk') = go_hd k hd in
-      let stk'' = go_stk k stk in
-      Cut (hd', stk' @ stk'')
+    function Cut (hd, sp) ->
+      let Cut (hd', sp') = go_hd k hd in
+      let sp'' = go_spine k sp in
+      Cut (hd', sp' <.> sp'')
 
   and go_hd k =
     function
@@ -330,34 +334,34 @@ let traverse ~f ~var ~ref =
     | Ref a ->
       ref k a
     | Meta a ->
-      Meta a $$ []
+      Meta a $$ Emp
     | Down info ->
       let ty = f k info.ty in
       let tm = f k info.tm in
-      Down {ty; tm} $$ []
+      Down {ty; tm} $$ Emp
     | Coe info ->
       let r = f k info.r in
       let r' = f k info.r' in
       let ty = go_bnd k info.ty in
       let tm = f k info.tm in
-      Coe {r; r'; ty; tm} $$ []
+      Coe {r; r'; ty; tm} $$ Emp
     | HCom info ->
       let r = f k info.r in
       let r' = f k info.r' in
       let ty = f k info.ty in
       let cap = f k info.cap in
       let sys = go_comp_sys k info.sys in
-      HCom {r; r'; ty; cap; sys} $$ []
+      HCom {r; r'; ty; cap; sys} $$ Emp
     | Com info ->
       let r = f k info.r in
       let r' = f k info.r' in
       let ty = go_bnd k info.ty in
       let cap = f k info.cap in
       let sys = go_comp_sys k info.sys in
-      Com {r; r'; ty; cap; sys} $$ []
+      Com {r; r'; ty; cap; sys} $$ Emp
 
-  and go_stk k =
-    List.map (go_frm k)
+  and go_spine k =
+    Bwd.map (go_frm k)
 
   and go_frm k =
     function
@@ -412,12 +416,12 @@ let fix_traverse ~var ~ref  =
   go 0
 
 let close_var a k =
-  let var i = Ix i $$ [] in
-  let ref n b = if b = a then Ix (n + k) $$ [] else Ref b $$ [] in
+  let var i = Ix i $$ Emp in
+  let ref n b = if b = a then Ix (n + k) $$ Emp else Ref b $$ Emp in
   fix_traverse ~var ~ref
 
 let subst sub =
-  let ref _ b = Ref b $$ [] in
+  let ref _ b = Ref b $$ Emp in
   let rec go k (Tm tm) =
     let var i = subst_ix (liftn k sub) i in
     Tm (traverse ~f:go ~var ~ref k tm)
@@ -425,7 +429,7 @@ let subst sub =
   go 0
 
 let open_var k a t =
-  subst (liftn k @@ inst0 @@ Cut (Ref a, [])) t
+  subst (liftn k @@ inst0 @@ Cut (Ref a, Emp)) t
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
@@ -554,11 +558,11 @@ and pp_head env fmt =
     Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
 
 and pp_cmd env fmt =
-  function Cut (hd, stk) ->
+  function Cut (hd, sp) ->
     let rec go fmt sp =
       match sp with
-      | [] -> pp_head env fmt hd
-      | f :: sp ->
+      | Emp -> pp_head env fmt hd
+      | Snoc (sp, f)->
         match f with
         | Car ->
           Format.fprintf fmt "@[<1>(car@ %a)@]" go sp
@@ -577,7 +581,8 @@ and pp_cmd env fmt =
         | LblCall ->
           Format.fprintf fmt "@[<1>(call@ %a)@]" go sp
     in
-    go fmt (List.rev stk)
+    (* TODO: backwards ??? *)
+    go fmt sp
 
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -632,11 +637,11 @@ let up cmd = make @@ Up cmd
 
 let car =
   function Cut (hd, sp) ->
-    Cut (hd, sp @ [Car])
+    Cut (hd, sp #< Car)
 
 let cdr =
   function Cut (hd, sp) ->
-    Cut (hd, sp @ [Cdr])
+    Cut (hd, sp #< Cdr)
 
 let lam nm t = make @@ Lam (B (nm, t))
 let ext_lam nms t = make @@ ExtLam (NB (nms, t))
@@ -667,7 +672,7 @@ struct
     sg None ty0 @@
     path
       (subst Proj ty1)
-      (up @@ (Ix 0 $$ [FunApp (subst Proj f)]))
+      (up @@ (Ix 0 $$ Emp #< (FunApp (subst Proj f))))
       (subst Proj x)
 
   let proj2 = Cmp (Proj, Proj)
@@ -714,12 +719,12 @@ struct
     | Cut (hd, stk) ->
       match fl, hd with
       | `RigVars, Ref x ->
-        go_stack fl stk @@
+        go_spine fl stk @@
         Occurs.Set.add x acc
       | `RigVars, Meta _ ->
         acc
       | _ ->
-        go_stack fl stk @@
+        go_spine fl stk @@
         go_head fl hd acc
 
   and go_head fl hd acc =
@@ -752,8 +757,8 @@ struct
       go fl info.cap @@
       go_comp_sys fl info.sys acc
 
-  and go_stack fl stk =
-    List.fold_right (go_frame fl) stk
+  and go_spine fl sp =
+    List.fold_right (go_frame fl) @@ Bwd.to_list sp
 
   and go_frame fl frm acc =
     match frm with
@@ -804,11 +809,11 @@ end
 let free fl tm =
   OccursAux.go fl tm Occurs.Set.empty
 
-module Stk =
+module Sp =
 struct
-  type t = tm stack
-  let free fl stk =
-    OccursAux.go_stack fl stk Occurs.Set.empty
+  type t = tm spine
+  let free fl sp =
+    OccursAux.go_spine fl sp Occurs.Set.empty
 end
 
 let map_bnd f bnd =
@@ -883,8 +888,8 @@ let map_frame f =
     let equiv = f info.equiv in
     VProj {r; ty0; ty1; equiv}
 
-let map_stack f =
-  List.map @@ map_frame f
+let map_spine f =
+  Bwd.map @@ map_frame f
 
 let map_tm_face f (r, r', otm) =
   f r, f r', Option.map f otm
@@ -905,8 +910,8 @@ let rec map_ext_bnd f nbnd =
     NB (nm :: nms, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
 
 let map_cmd f =
-  function Cut (hd, stk) ->
-    Cut (map_head f hd, map_stack f stk)
+  function Cut (hd, sp) ->
+    Cut (map_head f hd, map_spine f sp)
 
 let map_tmf f =
   function

@@ -1,4 +1,5 @@
 open RedBasis
+open Bwd
 
 module D = Dim
 module Star = DimStar
@@ -231,7 +232,7 @@ struct
       D.Dim0
     | Tm.Dim1 ->
       D.Dim1
-    | Tm.Up (Tm.Cut (hd, [])) ->
+    | Tm.Up (Tm.Cut (hd, Emp)) ->
       begin
         match hd with
         | Tm.Ix i ->
@@ -778,9 +779,9 @@ struct
       make @@ LblRet (eval rel rho t)
 
   and eval_cmd rel rho =
-    function Tm.Cut (hd, stk) ->
+    function Tm.Cut (hd, sp) ->
       let vhd = eval_head rel rho hd in
-      eval_stack rel rho vhd stk
+      eval_stack rel rho vhd @@ Bwd.to_list sp
 
   and eval_stack rel rho vhd =
     function
