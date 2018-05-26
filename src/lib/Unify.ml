@@ -254,6 +254,7 @@ let flex_flex_same q =
       | Some tele' ->
         let f (hd, sp) =
           lambdas (Bwd.map fst tele) @@
+          (* might be backwards *)
           let sp' = Bwd.map (fun (x, _) -> Tm.FunApp (Tm.up @@ Tm.Cut (Tm.Ref x, Emp))) tele in
           Tm.up @@ Tm.Cut (hd, sp <.> sp')
         in
