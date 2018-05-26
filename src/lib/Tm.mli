@@ -101,3 +101,6 @@ val pp : tm Pretty.t
 val pp_cmd : tm cmd Pretty.t
 val pp_head : tm head Pretty.t
 val pp_sys : (tm, tm) system Pretty.t
+
+
+include Occurs.S with type t := tm

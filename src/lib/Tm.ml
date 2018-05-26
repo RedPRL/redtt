@@ -683,3 +683,115 @@ struct
       ~f:(up @@ var 1)
       ~x:(up @@ var 0)
 end
+
+let free fl  =
+  let rec go tm acc =
+    match unleash tm with
+    | Lam bnd ->
+      go_bnd bnd acc
+    | Pi (dom, cod) ->
+      go_bnd cod @@
+      go dom acc
+    | Sg (dom, cod) ->
+      go_bnd cod @@
+      go dom acc
+    | Ext ebnd ->
+      go_ext_bnd ebnd acc
+    | Up cmd ->
+      go_cmd cmd acc
+    | _ -> failwith ""
+
+  and go_cmd cmd acc =
+    match cmd with
+    | Cut (hd, stk) ->
+      match fl, hd with
+      | `RigVars, Ref x ->
+        go_stack stk @@
+        Occurs.Set.add x acc
+      | `RigVars, Meta _ ->
+        acc
+      | _ ->
+        go_stack stk @@
+        go_head hd acc
+
+  and go_head hd acc =
+    match fl, hd with
+    | _, Ix _ -> acc
+    | `Vars, Meta _ -> acc
+    | `RigVars, Meta _ -> acc
+    | `Metas, Meta alpha ->
+      Occurs.Set.add alpha acc
+    | (`Vars | `RigVars), Ref x ->
+      Occurs.Set.add x acc
+    | `Metas, Ref _ -> acc
+    | _, Down {ty; tm} ->
+      go tm @@ go ty acc
+    | _, Coe info ->
+      go info.r @@
+      go info.r' @@
+      go_bnd info.ty @@
+      go info.tm acc
+    | _, HCom info ->
+      go info.r @@
+      go info.r' @@
+      go info.ty @@
+      go info.cap @@
+      go_comp_sys info.sys acc
+    | _, Com info ->
+      go info.r @@
+      go info.r' @@
+      go_bnd info.ty @@
+      go info.cap @@
+      go_comp_sys info.sys acc
+
+  and go_stack stk =
+    List.fold_right go_frame stk
+
+  and go_frame frm acc =
+    match frm with
+    | Car -> acc
+    | Cdr -> acc
+    | LblCall -> acc
+    | FunApp t ->
+      go t acc
+    | ExtApp ts ->
+      List.fold_right go ts acc
+    | If info ->
+      go_bnd info.mot @@
+      go info.tcase @@
+      go info.fcase acc
+    | VProj info ->
+      go info.r @@
+      go info.ty0 @@
+      go info.ty1 @@
+      go info.equiv acc
+
+  and go_ext_bnd bnd acc =
+    let NB (_, (ty, sys)) = bnd in
+    go ty @@ go_tm_sys sys acc
+
+  and go_bnd bnd acc =
+    let B (_, tm) = bnd in
+    go tm acc
+
+  and go_tm_sys sys =
+    List.fold_right go_tm_face sys
+
+  and go_comp_sys sys =
+    List.fold_right go_comp_face sys
+
+  and go_tm_face (r, r', otm) acc =
+    go r @@ go r' @@
+    match otm with
+    | None -> acc
+    | Some tm -> go tm acc
+
+  and go_comp_face (r, r', obnd) acc =
+    go r @@ go r' @@
+    match obnd with
+    | None -> acc
+    | Some bnd -> go_bnd bnd acc
+
+
+  in
+  fun tm -> go tm Occurs.Set.empty

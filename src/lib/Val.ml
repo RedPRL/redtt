@@ -864,7 +864,7 @@ struct
       let tty, tsys = Sig.lookup name in
       let vsys = eval_tm_sys rel [] tsys in
       let vty = eval rel [] tty in
-      make @@ Up {ty = vty; neu = Ref name; sys = vsys}
+      make @@ Up {ty = vty; neu = Meta name; sys = vsys}
 
   and eval_bnd_face rel rho (tr, tr', obnd) =
     let r = eval_dim rel rho tr in
