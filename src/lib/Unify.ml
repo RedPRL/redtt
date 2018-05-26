@@ -34,16 +34,25 @@ let define gm alpha ty tm =
   (* In Gundry/McBride, a substitution is also unleashed to the right. We're going to find out if we need it. *)
   pushr @@ E (alpha, ty', Defn tm')
 
+(* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
+   Later on, we can improve it. *)
+let occurs_check alpha tm =
+  Occurs.Set.mem alpha @@
+  Tm.free `Metas tm
 
 let invert alpha ty stk t =
-  failwith ""
+  if occurs_check alpha t then
+    failwith "occurs check"
+  else (* alpha does not occur in t *)
+    failwith "TODO"
 
 let try_invert q ty =
   match Tm.unleash q.tm0 with
   | Tm.Up (Tm.Cut (Meta alpha, stk)) ->
     begin
       invert alpha ty stk q.tm1 >>= function
-      | None -> ret false
+      | None ->
+        ret false
       | Some t ->
         active (Unify q) >>
         define [] alpha ty t >>
