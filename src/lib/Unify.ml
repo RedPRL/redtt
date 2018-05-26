@@ -17,21 +17,21 @@ let rec telescope ty =
   | _ ->
     [], ty
 
-let rec lambdas gm tm =
-  match gm with
-  | [] -> tm
-  | (x, _) :: gm ->
-    lambdas gm @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+let rec lambdas xs tm =
+  match xs with
+  | Emp -> tm
+  | Snoc (xs, x) ->
+    lambdas xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
 
 let rec pis gm tm =
   match gm with
-  | [] -> tm
-  | (x, ty) :: gm ->
+  | Emp -> tm
+  | Snoc (gm, (x, ty)) ->
     pis gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
 
 let define gm alpha ty tm =
   let ty' = pis gm ty in
-  let tm' = lambdas gm tm in
+  let tm' = lambdas (Bwd.map fst gm) tm in
   (* In Gundry/McBride, a substitution is also unleashed to the right. We're going to find out if we need it. *)
   pushr @@ E (alpha, ty', Defn tm')
 
@@ -93,11 +93,11 @@ let to_var t =
 
 let rec spine_to_vars sp =
   match sp with
-  | Emp -> Some []
+  | Emp -> Some Emp
   | Snoc (sp, Tm.FunApp t) ->
     begin
       match to_var t with
-      | Some x -> Option.map (fun xs -> x :: xs) @@ spine_to_vars sp
+      | Some x -> Option.map (fun xs -> xs #< x) @@ spine_to_vars sp
       | None -> None
     end
   | _ -> None
@@ -106,9 +106,9 @@ let linear_on t =
   let fvs = Tm.free `Vars t in
   let rec go xs =
     match xs with
-    | [] -> true
-    | x :: xs->
-      not (Occurs.Set.mem x fvs && List.mem x xs) && go xs
+    | Emp -> true
+    | Snoc (xs, x) ->
+      not (Occurs.Set.mem x fvs && List.mem x @@ Bwd.to_list xs) && go xs
   in go
 
 let invert alpha _ty sp t =
@@ -117,8 +117,12 @@ let invert alpha _ty sp t =
   else (* alpha does not occur in t *)
     match spine_to_vars sp with
     | Some xs when linear_on t xs ->
-      local (fun _ -> Emp) @@
-      failwith ""
+      let lam_tm = lambdas xs t in
+      local (fun _ -> Emp) begin
+        (* TODO: typecheck (lam xs ... t) *)
+        ret true
+      end >>= fun b ->
+      ret @@ if b then Some lam_tm else None
     | _ ->
       ret None
 
@@ -131,7 +135,7 @@ let try_invert q ty =
         ret false
       | Some t ->
         active (Unify q) >>
-        define [] alpha ty t >>
+        define Emp alpha ty t >>
         ret true
     end
   | _ ->
