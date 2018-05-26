@@ -207,6 +207,19 @@ let rec flex_flex_diff ~deps q =
   | _ ->
     failwith "flex_flex_diff"
 
+let rec intersect tele sp0 sp1 =
+  match tele, sp0, sp1 with
+  | Emp, Emp, Emp ->
+    Some Emp
+  | Snoc (tele, (z, ty)), Snoc (sp0, Tm.FunApp t0), Snoc (sp1, Tm.FunApp t1) ->
+    begin
+      match intersect tele sp0 sp1, to_var t0, to_var t1 with
+      | Some tele', Some x, Some y ->
+        if x = y then Some (tele' #< (z, ty)) else Some tele'
+      | _ -> None
+    end
+  | _ ->
+    None
 
 let flex_flex_same q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
