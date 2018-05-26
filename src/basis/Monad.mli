@@ -11,7 +11,13 @@ sig
 
   val (>>=) : 'a m -> ('a -> 'b m) -> 'b m
   val (>>) : 'a m -> 'b m -> 'b m
-  val (<$>) : ('a -> 'b) -> 'a m -> 'b m
+  val (<@>) : ('a -> 'b) -> 'a m -> 'b m
 end
 
 module Notation (M : S) : Notation with type 'a m := 'a M.m
+
+module Util (M : S) :
+sig
+  val traverse : ('a -> 'b) -> 'a M.m list -> 'a list M.m
+end
+
