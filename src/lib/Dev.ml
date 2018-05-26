@@ -13,7 +13,7 @@ type status =
   | Active
 
 type equation =
-  | Eqn of {ty0 : ty; tm0 : tm; ty1 : ty; tm1 : ty}
+  {ty0 : ty; tm0 : tm; ty1 : ty; tm1 : ty}
 
 type param =
   | P of ty
@@ -37,3 +37,15 @@ let unbind (B prob) =
   let _x = Name.fresh () in
   failwith ""
 
+
+module Prob =
+struct
+  let eqn ty0 tm0 ty1 tm1 =
+    Unify {ty0; tm0; ty1; tm1}
+
+  let all x ty prob =
+    All (P ty, bind x prob)
+
+  let all_twins x ty0 ty1 prob =
+    All (Tw (ty0, ty1), bind x prob)
+end

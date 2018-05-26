@@ -10,7 +10,7 @@ type status =
   | Active
 
 type equation =
-  | Eqn of {ty0 : ty; tm0 : tm; ty1 : ty; tm1 : ty}
+  {ty0 : ty; tm0 : tm; ty1 : ty; tm1 : ty}
 
 type param =
   | P of ty
@@ -33,3 +33,11 @@ val unbind : problem bind -> Name.t * problem
 
 
 type twin = [`Only | `TwinL | `TwinR]
+
+
+module Prob :
+sig
+  val eqn : ty -> tm -> ty -> tm -> problem
+  val all : Name.t -> ty -> problem -> problem
+  val all_twins : Name.t -> ty -> ty -> problem -> problem
+end
