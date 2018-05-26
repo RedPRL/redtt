@@ -48,6 +48,9 @@ let rec eta_contract t =
     let tm'y = eta_contract tmy in
     begin
       match Tm.unleash tm'y with
+      (* TODO: I think this is backwards:
+         FunApp should be at the end of the stack, not at the beginning
+      *)
       | Tm.Up (Tm.Cut (Tm.Ref f, Tm.FunApp arg :: stk)) ->
         begin
           match Tm.unleash arg with
@@ -64,9 +67,19 @@ let rec eta_contract t =
         Tm.make @@ Tm.Lam (Tm.bind y tm'y)
     end
 
-  | Tm.Cons (t0, t1) -> failwith ""
+  | Tm.Cons (t0, t1) ->
+    let t0' = eta_contract t0 in
+    let t1' = eta_contract t1 in
+    begin
+      match Tm.unleash t0', Tm.unleash t1' with
+      | Tm.Up _, Tm.Up _ ->
+        failwith ""
+      | _ ->
+        failwith "TODO"
+    end
 
-  | _ -> t
+  | con ->
+    Tm.make @@ Tm.map_tmf eta_contract con
 
 let to_var t =
   match Tm.unleash @@ eta_contract t with

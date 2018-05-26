@@ -59,6 +59,12 @@ and 'a cmd = Cut of 'a head * 'a stack
 
 type tm
 
+val map_head : (tm -> tm) -> tm head -> tm head
+val map_frame : (tm -> tm) -> tm frame -> tm frame
+val map_stack : (tm -> tm) -> tm stack -> tm stack
+val map_tmf : (tm -> tm) -> tm tmf -> tm tmf
+
+
 type subst =
   | Id
   | Proj
@@ -87,6 +93,9 @@ val sg : string option -> tm -> tm -> tm
 val cons : tm -> tm -> tm
 val univ : kind:Kind.t -> lvl:Lvl.t -> tm
 
+
+
+
 module Macro :
 sig
   val arr : tm -> tm -> tm
@@ -108,4 +117,7 @@ val pp_sys : (tm, tm) system Pretty.t
 
 include Occurs.S with type t := tm
 
-module Stk : Occurs.S with type t = tm stack
+module Stk :
+sig
+  include Occurs.S with type t = tm stack
+end

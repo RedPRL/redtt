@@ -810,3 +810,141 @@ struct
   let free fl stk =
     OccursAux.go_stack fl stk Occurs.Set.empty
 end
+
+let map_bnd f bnd =
+  let x, tx = unbind bnd in
+  bind x @@ f tx
+
+(* TODO: clean up *)
+let rec map_nbnd f nbnd =
+  match nbnd with
+  | NB ([], t) ->
+    NB ([], f t)
+  | NB (nm :: nms, t) ->
+    let x = Name.fresh () in
+    let tx = open_var 0 x t in
+    let NB (_, tx') = map_nbnd f (NB (nms, tx)) in
+    NB (nm :: nms, close_var x 0 tx')
+
+
+let map_comp_face f (r, r', obnd) =
+  f r, f r', Option.map (map_bnd f) obnd
+
+let map_comp_sys f =
+  List.map @@ map_comp_face f
+
+let map_head f =
+  function
+  | Ref a -> Ref a
+  | Meta a -> Meta a
+  | Ix i -> Ix i
+  | Down info ->
+    let ty = f info.ty in
+    let tm = f info.tm in
+    Down {ty; tm}
+  | Coe info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let ty = map_bnd f info.ty in
+    let tm = f info.tm in
+    Coe {r; r'; ty; tm}
+  | HCom info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let ty = f info.ty in
+    let cap = f info.cap in
+    let sys = map_comp_sys f info.sys in
+    HCom {r; r'; ty; cap; sys}
+  | Com info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let ty = map_bnd f info.ty in
+    let cap = f info.cap in
+    let sys = map_comp_sys f info.sys in
+    Com {r; r'; ty; cap; sys}
+
+let map_frame f =
+  function
+  | (Car | Cdr | LblCall) as frm ->
+    frm
+  | FunApp t ->
+    FunApp (f t)
+  | ExtApp ts ->
+    ExtApp (List.map f ts)
+  | If info ->
+    let mot = map_bnd f info.mot in
+    let tcase = f info.tcase in
+    let fcase = f info.fcase in
+    If {mot; tcase; fcase}
+  | VProj info ->
+    let r = f info.r in
+    let ty0 = f info.ty0 in
+    let ty1 = f info.ty1 in
+    let equiv = f info.equiv in
+    VProj {r; ty0; ty1; equiv}
+
+let map_stack f =
+  List.map @@ map_frame f
+
+let map_tm_face f (r, r', otm) =
+  f r, f r', Option.map f otm
+
+let map_tm_sys f =
+  List.map @@ map_tm_face f
+
+(* TODO: clean up: this is catastrophically bad *)
+let rec map_ext_bnd f nbnd =
+  match nbnd with
+  | NB ([], (ty, sys)) ->
+    NB ([], (f ty, map_tm_sys f sys))
+  | NB (nm :: nms, (ty, sys)) ->
+    let x = Name.fresh () in
+    let tyx = open_var 0 x ty in
+    let sysx = map_tm_sys (open_var 0 x) sys in
+    let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
+    NB (nm :: nms, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
+
+let map_cmd f =
+  function Cut (hd, stk) ->
+    Cut (map_head f hd, map_stack f stk)
+
+let map_tmf f =
+  function
+  | (Univ _ | Bool | Tt | Ff | Dim0 | Dim1) as con ->
+    con
+  | Cons (t0, t1) ->
+    Cons (f t0, f t1)
+  | LblRet t ->
+    LblRet (f t)
+  | FCom info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let cap = f info.cap in
+    let sys = map_comp_sys f info.sys in
+    FCom {r; r'; cap; sys}
+  | Pi (dom, cod) ->
+    Pi (f dom, map_bnd f cod)
+  | Sg (dom, cod) ->
+    Sg (f dom, map_bnd f cod)
+  | Ext ebnd ->
+    Ext (map_ext_bnd f ebnd)
+  | Rst {ty; sys} ->
+    Rst {ty = f ty; sys = map_tm_sys f sys}
+  | V info ->
+    let r = f info.r in
+    let ty0 = f info.ty0 in
+    let ty1 = f info.ty1 in
+    let equiv = f info.equiv in
+    V {r; ty0; ty1; equiv}
+  | Lam bnd ->
+    Lam (map_bnd f bnd)
+  | ExtLam nbnd ->
+    ExtLam (map_nbnd f nbnd)
+  | LblTy info ->
+    let ty = f info.ty in
+    let args = List.map (fun (t0, t1) -> f t0, f t1) info.args in
+    LblTy {info with ty; args}
+  | Up cmd ->
+    Up (map_cmd f cmd)
+  | Let (cmd, bnd) ->
+    Let (map_cmd f cmd, map_bnd f bnd)
