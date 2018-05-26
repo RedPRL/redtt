@@ -46,6 +46,7 @@ type con =
 and neu =
   | Lvl : string option * int -> neu
   | Ref : Name.t -> neu
+  | Meta : Name.t -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
@@ -242,6 +243,8 @@ struct
               failwith "eval_dim: expected atom in environment"
           end
         | Tm.Ref a ->
+          R.canonize (D.Atom a) rel
+        | Tm.Meta a ->
           R.canonize (D.Atom a) rel
         | _ -> failwith "eval_dim"
       end
@@ -443,6 +446,9 @@ struct
       ret con
 
     | Ref _ ->
+      ret con
+
+    | Meta _ ->
       ret con
 
   and act_nf phi (nf : nf) =
@@ -854,6 +860,11 @@ struct
       let vty = eval rel [] tty in
       make @@ Up {ty = vty; neu = Ref name; sys = vsys}
 
+    | Tm.Meta name ->
+      let tty, tsys = Sig.lookup name in
+      let vsys = eval_tm_sys rel [] tsys in
+      let vty = eval rel [] tty in
+      make @@ Up {ty = vty; neu = Ref name; sys = vsys}
 
   and eval_bnd_face rel rho (tr, tr', obnd) =
     let r = eval_dim rel rho tr in

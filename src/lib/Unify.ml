@@ -8,7 +8,7 @@ open Notation
 
 let rec flex_term deps q =
   match Tm.unleash q.tm0 with
-  | Tm.Up (Tm.Cut (Ref alpha, _)) ->
+  | Tm.Up (Tm.Cut (Meta alpha, _)) ->
     List.map snd <@> ask >>= fun gm ->
     popl >>= fun e ->
     begin

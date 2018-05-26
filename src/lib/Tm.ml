@@ -38,6 +38,7 @@ type 'a tmf =
   | Let of 'a cmd * 'a bnd
 
 and 'a head =
+  | Meta of Name.t
   | Ref of Name.t
   | Ix of int
   | Down of {ty : 'a; tm : 'a}
@@ -186,6 +187,9 @@ and subst_head sub head =
   | Ref a ->
     Ref a $$ []
 
+  | Meta a ->
+    Meta a $$ []
+
   | Down info ->
     let ty = subst sub info.ty in
     let tm = subst sub info.tm in
@@ -325,6 +329,8 @@ let traverse ~f ~var ~ref =
       var i
     | Ref a ->
       ref k a
+    | Meta a ->
+      Meta a $$ []
     | Down info ->
       let ty = f k info.ty in
       let tm = f k info.tm in
@@ -532,6 +538,10 @@ and pp_head env fmt =
 
   | Ref nm ->
     Name.pp fmt nm
+
+  | Meta nm ->
+    Format.fprintf fmt "?%a"
+      Name.pp nm
 
   | Down {ty; tm} ->
     Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm

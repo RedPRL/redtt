@@ -205,6 +205,11 @@ struct
         Tm.Cut (Tm.Ref nm0, [])
       else
         failwith "global variable name mismatch"
+    | Meta nm0, Meta nm1 ->
+      if nm0 = nm1 then
+        Tm.Cut (Tm.Meta nm0, [])
+      else
+        failwith "global variable name mismatch"
     | Car neu0, Car neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Car :: stk
     | Cdr neu0, Cdr neu1 ->

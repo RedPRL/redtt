@@ -36,6 +36,7 @@ type 'a tmf =
   | Let of 'a cmd * 'a bnd
 
 and 'a head =
+  | Meta of Name.t
   | Ref of Name.t
   | Ix of int
   | Down of {ty : 'a; tm : 'a}

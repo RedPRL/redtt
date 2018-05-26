@@ -12,6 +12,7 @@ sig
   val (>>=) : 'a m -> ('a -> 'b m) -> 'b m
   val (>>) : 'a m -> 'b m -> 'b m
   val (<@>) : ('a -> 'b) -> 'a m -> 'b m
+  val (<||) : bool m -> unit m -> unit m
 end
 
 module Notation (M : S) : Notation with type 'a m := 'a M.m

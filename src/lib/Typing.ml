@@ -438,6 +438,10 @@ struct
       let ty = GlobalCx.lookup_ty Sig.globals name in
       Cx.eval Cx.emp ty
 
+    | T.Meta name ->
+      let ty = GlobalCx.lookup_ty Sig.globals name in
+      Cx.eval Cx.emp ty
+
     | T.Ix ix ->
       begin
         match Cx.lookup ix cx with
