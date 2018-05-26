@@ -13,9 +13,9 @@ let rec telescope ty =
   | Tm.Pi (dom, cod) ->
     let x, codx = Tm.unbind cod in
     let (tel, ty) = telescope codx in
-    (x, dom) :: tel, ty
+    (Emp #< (x, dom)) <.> tel, ty
   | _ ->
-    [], ty
+    Emp, ty
 
 let rec lambdas xs tm =
   match xs with
@@ -172,7 +172,7 @@ let rec flex_term ~deps q =
   | _ -> failwith "flex_term"
 
 
-let rec flex_flex ~deps q =
+let rec flex_flex_diff ~deps q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Up (Tm.Cut (Tm.Meta alpha0, _)), Tm.Up (Tm.Cut (Tm.Meta alpha1, _)) ->
     Bwd.map snd <@> ask >>= fun gm ->
@@ -197,12 +197,23 @@ let rec flex_flex ~deps q =
           || Occurs.Set.mem gamma @@ Entries.free `Metas deps
           || Occurs.Set.mem gamma @@ Equation.free `Metas q
         ->
-        flex_flex ~deps:(e :: deps) q
+        flex_flex_diff ~deps:(e :: deps) q
 
       | e ->
         pushr e >>
-        flex_flex ~deps q
+        flex_flex_diff ~deps q
     end
 
   | _ ->
-    failwith "flex_flex"
+    failwith "flex_flex_diff"
+
+
+let flex_flex_same q =
+  match Tm.unleash q.tm0, Tm.unleash q.tm1 with
+  (* invariant: same alpha *)
+  | Tm.Up (Tm.Cut (Tm.Meta alpha, sp0)), Tm.Up (Tm.Cut (Tm.Meta _, sp1)) ->
+    lookup_meta alpha >>= fun ty_alpha ->
+    let _tele, _cod = telescope ty_alpha in
+    (* TODO: intersect the spines, etc. *)
+    failwith "TODO"
+  | _ -> failwith ""
