@@ -287,6 +287,13 @@ let normalize (module T : Typing.S) ~ty tm =
 
 module HSubst (T : Typing.S) =
 struct
+  let inst_ty_bnd bnd (arg_ty, arg) =
+    let Tm.B (nm, tm) = bnd in
+    let varg = T.Cx.eval T.Cx.emp arg in
+    let lcx = T.Cx.def T.Cx.emp ~nm ~ty:arg_ty ~el:varg in
+    let el = T.Cx.eval lcx tm in
+    T.Cx.quote_ty T.Cx.emp el
+
   let inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
     let Tm.B (nm, tm) = tm_bnd in
     let varg = T.Cx.eval T.Cx.emp arg in
@@ -330,6 +337,7 @@ let is_orthogonal _q =
 
 let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
   typechecker >>= fun (module T) ->
+  let module HSubst = HSubst (T) in
   let rec go sp0 sp1 =
     match sp0, sp1 with
     | Emp, Emp ->
@@ -366,6 +374,35 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp @@ Tm.Cut (Tm.Ref (x0, tw0), sp0 #< Tm.Car) in
       let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp @@ Tm.Cut (Tm.Ref (x1, tw1), sp1 #< Tm.Car) in
       ret (cod0, cod1)
+
+    | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
+      go sp0 sp1 >>= fun (ty0, ty1) ->
+      let _, _, ty0 = T.Cx.Eval.unleash_lbl_ty ty0 in
+      let _, _, ty1 = T.Cx.Eval.unleash_lbl_ty ty1 in
+      ret (ty0, ty1)
+
+    | Snoc (sp0, Tm.If info0), Snoc (sp1, Tm.If info1) ->
+      go sp0 sp1 >>= fun (_ty0, _ty1) ->
+      let y = Name.fresh () in
+      let mot0y = Tm.unbind_with y `TwinL info0.mot in
+      let mot1y = Tm.unbind_with y `TwinR info1.mot in
+      let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+      active @@ Problem.all y (Tm.make Tm.Bool) @@
+      Problem.eqn ~ty0:univ ~ty1:univ ~tm0:mot0y ~tm1:mot1y
+      >>
+      let bool = T.Cx.Eval.make Val.Bool in
+      let mot0_tt = HSubst.inst_ty_bnd info0.mot (bool, Tm.make Tm.Tt) in
+      let mot0_ff = HSubst.inst_ty_bnd info0.mot (bool, Tm.make Tm.Ff) in
+      let mot1_tt = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Tt) in
+      let mot1_ff = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Ff) in
+      active @@ Problem.eqn ~ty0:mot0_tt ~tm0:info0.tcase ~ty1:mot1_tt ~tm1:info1.tcase >>
+      active @@ Problem.eqn ~ty0:mot0_ff ~tm0:info0.fcase ~ty1:mot1_ff ~tm1:info1.fcase >>
+      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up @@ Tm.Cut (Tm.Ref (x0, tw0), sp0)) in
+      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up @@ Tm.Cut (Tm.Ref (x1, tw1), sp1)) in
+      ret (ty0, ty1)
+
+    | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
+      failwith "TODO: match_spine/vproj"
 
     | _ -> failwith "spine mismatch"
 
