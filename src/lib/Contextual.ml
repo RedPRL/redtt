@@ -113,8 +113,54 @@ let postpone s p =
 let active = postpone Active
 let block = postpone Blocked
 
-let check ~ty:_ _tm =
-  failwith "TODO: implement check"
 
-let check_eq ~ty:_ _tm0 _tm1 =
-  failwith "TODO: implement check_eq"
+let cx_core : cx_l -> GlobalCx.t =
+  let rec go es =
+    match es with
+    | Emp -> GlobalCx.emp
+    | Snoc (es, e) ->
+      match e with
+      | E (x, ty, Hole) ->
+        let cx = go es in
+        GlobalCx.add_hole cx x ty []
+      | E (x, ty, Defn t) ->
+        let cx = go es in
+        GlobalCx.define cx x ty t
+      | Q _ ->
+        go es
+  in
+  go
+
+let check ~ty tm =
+  getl >>= fun entries ->
+  let globals = cx_core entries in
+  let module G = struct let globals = globals end in
+  let module V = Val.M (GlobalCx.M (G)) in
+  let module Cx = LocalCx.M (V) in
+  let module T = Typing.M (G) in
+  let lcx = Cx.emp in
+  let vty = Cx.eval lcx ty in
+  try
+    T.check lcx vty tm;
+    ret true
+  with
+  | _ ->
+    ret false
+
+let check_eq ~ty tm0 tm1 =
+  getl >>= fun entries ->
+  let globals = cx_core entries in
+  let module G = struct let globals = globals end in
+  let module V = Val.M (GlobalCx.M (G)) in
+  let module Cx = LocalCx.M (V) in
+  let module T = Typing.M (G) in
+  let lcx = Cx.emp in
+  let vty = Cx.eval lcx ty in
+  let el0 = Cx.eval lcx tm0 in
+  let el1 = Cx.eval lcx tm1 in
+  try
+    Cx.check_eq lcx ~ty:vty el0 el1;
+    ret true
+  with
+  | _ ->
+    ret false
