@@ -332,7 +332,7 @@ let traverse ~f ~var ~ref =
   and go_hd k =
     function
     | Ix (i, tw) ->
-      Ix (i, tw) $$ Emp
+      var (i, tw)
     | Ref (a, tw) ->
       ref k (a, tw)
     | Meta a ->
@@ -431,17 +431,17 @@ let subst sub =
   go 0
 
 (* TODO: check that this isn't catastrophically wrong *)
-let open_var k a =
-  let var (i, tw) = if i = k then Ref (a, tw) $$ Emp else Ix (i, tw) $$ Emp in
+let open_var k a tw =
+  let var (i, _) = if i = k then Ref (a, tw) $$ Emp else Ix (i, tw) $$ Emp in
   let ref _n (b, tw) = Ref (b, tw) $$ Emp in
   fix_traverse ~var ~ref
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
-  x, open_var 0 x t
+  x, open_var 0 x `Only t
 
-let unbind_with x (B (_, t)) =
-  x, open_var 0 x t
+let unbind_with x tw (B (_, t)) =
+  x, open_var 0 x tw t
 
 let bind x tx =
   B (Some (Name.to_string x), close_var x 0 tx)
@@ -824,18 +824,18 @@ struct
     OccursAux.go_spine fl sp Occurs.Set.empty
 end
 
-let map_bnd f bnd =
+let map_bnd (f : tm -> tm) (bnd : tm bnd) : tm bnd =
   let x, tx = unbind bnd in
   bind x @@ f tx
 
 (* TODO: clean up *)
-let rec map_nbnd f nbnd =
+let rec map_nbnd (f : tm -> tm) (nbnd : tm nbnd) : tm nbnd =
   match nbnd with
   | NB ([], t) ->
     NB ([], f t)
   | NB (nm :: nms, t) ->
     let x = Name.fresh () in
-    let tx = open_var 0 x t in
+    let tx = open_var 0 x `Only t in
     let NB (_, tx') = map_nbnd f (NB (nms, tx)) in
     NB (nm :: nms, close_var x 0 tx')
 
@@ -912,8 +912,8 @@ let rec map_ext_bnd f nbnd =
     NB ([], (f ty, map_tm_sys f sys))
   | NB (nm :: nms, (ty, sys)) ->
     let x = Name.fresh () in
-    let tyx = open_var 0 x ty in
-    let sysx = map_tm_sys (open_var 0 x) sys in
+    let tyx = open_var 0 x `Only ty in
+    let sysx = map_tm_sys (open_var 0 x `Only) sys in
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
     NB (nm :: nms, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
 

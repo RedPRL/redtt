@@ -267,7 +267,7 @@ let flex_flex_same q =
     end
   | _ -> failwith ""
 
-let try_prune q =
+let try_prune _q =
   (* TODO: implement pruning *)
   ret false
 
