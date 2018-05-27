@@ -29,6 +29,9 @@ let lookup_ty sg nm _tw =
   let {ty; _} = T.get nm sg in
   ty
 
+let merge sg0 sg1 =
+  T.merge sg0 sg1
+
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
   let lookup nm =

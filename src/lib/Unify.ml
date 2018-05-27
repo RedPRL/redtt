@@ -46,7 +46,7 @@ let hole gm ty f =
 let define gm alpha ty tm =
   let ty' = pis gm ty in
   let tm' = lambdas (Bwd.map fst gm) tm in
-  (* In Gundry/McBride, a substitution is also unleashed to the right. We're going to find out if we need it. *)
+  unleash_subst alpha tm' >>
   pushr @@ E (alpha, ty', Defn tm')
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.

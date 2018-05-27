@@ -5,6 +5,7 @@ sig
   val init : size:int -> ('k, 'a) t
   val get : 'k -> ('k, 'a) t -> 'a
   val set : 'k -> 'a -> ('k, 'a) t -> ('k, 'a) t
+  val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
 
   val find : 'k -> ('k, 'a) t -> 'a option
 end
@@ -72,6 +73,24 @@ struct
       let res = ref n in
       t := Diff (k, old, res);
       res
+    | _ ->
+      raise Fatal
+
+  let set_without_replacing k v t =
+    match find k t with
+    | None ->
+      set k v t
+    | Some v' ->
+      if v = v' then
+        set k v t
+      else
+        failwith "table merge error"
+
+  let merge t0 t1 =
+    reroot t0;
+    match !t0 with
+    | Tbl a ->
+      Hashtbl.fold set a t1
     | _ ->
       raise Fatal
 

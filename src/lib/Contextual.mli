@@ -8,10 +8,14 @@ val local : (params -> params) -> 'a m -> 'a m
 
 val popl : entry m
 val popr : entry m
+val optional : 'a m -> 'a option m
+
 val pushl : entry -> unit m
 val pushr : entry -> unit m
 val pushls : entry list -> unit m
 val go_left : unit m
+
+val unleash_subst : Name.t -> tm -> unit m
 
 val in_scope : Name.t -> param -> 'a m -> 'a m
 val lookup_var : Name.t -> twin -> ty m
