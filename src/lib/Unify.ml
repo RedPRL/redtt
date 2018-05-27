@@ -271,8 +271,7 @@ let try_prune _q =
   (* TODO: implement pruning *)
   ret false
 
-let normalize ~ty tm =
-  typechecker >>= fun (module T) ->
+let normalize (module T : Typing.S) ~ty tm =
   let lcx = T.Cx.emp in
   let vty = T.Cx.eval lcx ty in
   let el = T.Cx.eval lcx tm in
@@ -288,14 +287,43 @@ let unify q =
     begin
       let hd = Tm.Down {ty = q.ty0; tm = q.tm0} in
       let var = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
-      normalize ~ty:ty0 @@
-      Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var))
+      normalize (module T) ~ty:ty0 @@ Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var))
     end >>= fun tm0 ->
     begin
       let hd = Tm.Down {ty = q.ty1; tm = q.tm1} in
       let var = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
-      normalize ~ty:ty1 @@
-      Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var))
+      normalize (module T) ~ty:ty1 @@ Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var))
     end >>= fun tm1 ->
     active @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
+
+  | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
+    let univ = Tm.make @@ Tm.Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
+    typechecker >>= fun (module T) ->
+    begin
+      let hd = Tm.Down {ty = q.ty0; tm = q.tm0} in
+      normalize (module T) ~ty:dom0 @@ Tm.up @@ Tm.Cut (hd, Emp #< Tm.Car)
+    end >>= fun car0 ->
+    begin
+      let hd = Tm.Down {ty = q.ty1; tm = q.tm1} in
+      normalize (module T) ~ty:dom1 @@ Tm.up @@ Tm.Cut (hd, Emp #< Tm.Car)
+    end >>= fun car1 ->
+    begin
+      let cmd = Tm.Cut (Tm.Down {ty = dom0; tm = car0}, Emp) in
+      normalize (module T) ~ty:univ @@ Tm.make @@ Tm.Let (cmd, cod0)
+    end >>= fun ty_cdr0 ->
+    begin
+      let cmd = Tm.Cut (Tm.Down {ty = dom1; tm = car1}, Emp) in
+      normalize (module T) ~ty:univ @@ Tm.make @@ Tm.Let (cmd, cod1)
+    end >>= fun ty_cdr1 ->
+    begin
+      let hd = Tm.Down {ty = q.ty0; tm = q.tm0} in
+      normalize (module T) ~ty:ty_cdr0 @@ Tm.up @@ Tm.Cut (hd, Emp #< Tm.Cdr)
+    end >>= fun cdr0 ->
+    begin
+      let hd = Tm.Down {ty = q.ty1; tm = q.tm1} in
+      normalize (module T) ~ty:ty_cdr1 @@ Tm.up @@ Tm.Cut (hd, Emp #< Tm.Cdr)
+    end >>= fun cdr1 ->
+    active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
+    active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
+
   | _ -> failwith ""
