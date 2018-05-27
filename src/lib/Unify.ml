@@ -287,7 +287,7 @@ let normalize (module T : Typing.S) ~ty tm =
 
 module HSubst (T : Typing.S) =
 struct
-  let rec inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
+  let inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
     let Tm.B (nm, tm) = tm_bnd in
     let varg = T.Cx.eval T.Cx.emp arg in
     let lcx = T.Cx.def T.Cx.emp ~nm ~ty:arg_ty ~el:varg in
@@ -295,7 +295,7 @@ struct
     let vty = T.Cx.Eval.inst_clo ty_clo varg in
     T.Cx.quote T.Cx.emp ~ty:vty el
 
-  and plug (ty, tm) frame =
+  let plug (ty, tm) frame =
     let rec unleash_ty ty =
       match T.Cx.Eval.unleash ty with
       | Val.Rst info -> unleash_ty info.ty
@@ -325,23 +325,52 @@ struct
 end
 
 
-let is_orthogonal q =
+let is_orthogonal _q =
   failwith "todo: implement is_orthogonal"
 
-let match_spine x0 tw0 sp0 x1 tw1 sp1 =
-  match sp0, sp1 with
-  | Emp, Emp ->
-    if x0 = x1 then
-      lookup_var x0 tw0 >>= fun ty0 ->
-      lookup_var x1 tw1 >>= fun ty1 ->
-      ret (ty0, ty1)
-    else
-      failwith "rigid head mismatch"
+let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
+  typechecker >>= fun (module T) ->
+  let rec go sp0 sp1 =
+    match sp0, sp1 with
+    | Emp, Emp ->
+      if x0 = x1 then
+        lookup_var x0 tw0 >>= fun ty0 ->
+        lookup_var x1 tw1 >>= fun ty1 ->
+        let vty0 = T.Cx.eval T.Cx.emp ty0 in
+        let vty1 = T.Cx.eval T.Cx.emp ty1 in
+        ret (vty0, vty1)
+      else
+        failwith "rigid head mismatch"
 
-  | Snoc (sp0, Tm.FunApp t0), Snoc (sp1, Tm.FunApp t1) ->
-    failwith "TODO"
+    | Snoc (sp0, Tm.FunApp t0), Snoc (sp1, Tm.FunApp t1) ->
+      go sp0 sp1 >>= fun (ty0, ty1) ->
+      let dom0, cod0 = T.Cx.Eval.unleash_pi ty0 in
+      let dom1, cod1 = T.Cx.Eval.unleash_pi ty1 in
+      let tdom0 = T.Cx.quote_ty T.Cx.emp dom0 in
+      let tdom1 = T.Cx.quote_ty T.Cx.emp dom1 in
+      active @@ Problem.eqn ~ty0:tdom0 ~ty1:tdom1 ~tm0:t0 ~tm1:t1 >>
+      let cod0t0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval T.Cx.emp t0 in
+      let cod0t1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval T.Cx.emp t1 in
+      ret (cod0t0, cod0t1)
 
-  | _ -> failwith "spine mismatch"
+    | Snoc (sp0, Tm.Car), Snoc (sp1, Tm.Car) ->
+      go sp0 sp1 >>= fun (ty0, ty1) ->
+      let dom0, _ = T.Cx.Eval.unleash_sg ty0 in
+      let dom1, _ = T.Cx.Eval.unleash_sg ty1 in
+      ret (dom0, dom1)
+
+    | Snoc (sp0, Tm.Cdr), Snoc (sp1, Tm.Cdr) ->
+      go sp0 sp1 >>= fun (ty0, ty1) ->
+      let _, cod0 = T.Cx.Eval.unleash_sg ty0 in
+      let _, cod1 = T.Cx.Eval.unleash_sg ty1 in
+      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp @@ Tm.Cut (Tm.Ref (x0, tw0), sp0 #< Tm.Car) in
+      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp @@ Tm.Cut (Tm.Ref (x1, tw1), sp1 #< Tm.Car) in
+      ret (cod0, cod1)
+
+    | _ -> failwith "spine mismatch"
+
+  in
+  go sp0 sp1
 
 (* invariant: will not be called on equations which are already reflexive *)
 let rigid_rigid q =
