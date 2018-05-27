@@ -2,6 +2,8 @@ open RedBasis
 open Bwd
 open BwdNotation
 
+type twin = [`Only | `TwinL | `TwinR]
+
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option list * 'a
 

@@ -34,7 +34,7 @@ val bind : Name.t -> problem -> problem bind
 val unbind : problem bind -> Name.t * problem
 
 
-type twin = [`Only | `TwinL | `TwinR]
+type twin = Tm.twin
 
 
 module Problem :
