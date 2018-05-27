@@ -363,7 +363,8 @@ let rigid_rigid q =
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
   | Tm.Up (Tm.Cut (Tm.Ref (x0, tw0), sp0)), Tm.Up (Tm.Cut (Tm.Ref (x1, tw1), sp1)) ->
-    match_spine x0 tw0 sp0 x1 tw1 sp1
+    match_spine x0 tw0 sp0 x1 tw1 sp1 >>
+    ret ()
 
   | _ ->
     if is_orthogonal q then
