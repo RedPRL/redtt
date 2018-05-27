@@ -1,6 +1,15 @@
+
+type hyp = [`Ty of Val.value | `Dim]
+module R = Restriction
+
+(* The way that we model dimensions is now incompatible with the union-find version of things.
+   We need to find a new way. *)
+type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; rel : R.t; ppenv : Pretty.env}
+type t = cx
+
 module type S =
 sig
-  type t
+  type t = cx
   module Eval : Val.S
 
   type value = Val.value
@@ -38,16 +47,8 @@ sig
   val equate_dim : t -> Dim.repr -> Dim.repr -> Dim.action
 end
 
-type hyp = [`Ty of Val.value | `Dim]
-module R = Restriction
 
-(* The way that we model dimensions is now incompatible with the union-find version of things.
-   We need to find a new way. *)
-type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; rel : R.t; ppenv : Pretty.env}
-type t = cx
-
-
-module M (V : Val.S) : S with type t = t =
+module M (V : Val.S) : S =
 struct
   type t = cx
 

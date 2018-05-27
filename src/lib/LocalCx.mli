@@ -1,8 +1,9 @@
-type t
+type cx
+type t = cx
 
 module type S =
 sig
-  type t
+  type t = cx
 
   module Eval : Val.S
 
