@@ -45,8 +45,8 @@ type con =
   | LblRet : value -> con
 
 and neu =
-  | Lvl : string option * int -> neu
-  | Ref : Name.t -> neu
+  | Lvl : string option * int * Tm.twin -> neu
+  | Ref : Name.t * Tm.twin-> neu
   | Meta : Name.t -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
@@ -235,7 +235,7 @@ struct
     | Tm.Up (Tm.Cut (hd, Emp)) ->
       begin
         match hd with
-        | Tm.Ix i ->
+        | Tm.Ix (i, _) ->
           begin
             match List.nth rho i with
             | Atom x ->
@@ -243,7 +243,7 @@ struct
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
-        | Tm.Ref a ->
+        | Tm.Ref (a, _) ->
           R.canonize (D.Atom a) rel
         | Tm.Meta a ->
           R.canonize (D.Atom a) rel
@@ -848,18 +848,18 @@ struct
       let sys = eval_bnd_sys rel rho info.sys in
       make_com dir abs cap sys
 
-    | Tm.Ix i ->
+    | Tm.Ix (i, _) ->
       begin
         match List.nth rho i with
         | Val v -> v
         | _ -> failwith "Expected value in environment"
       end
 
-    | Tm.Ref name ->
+    | Tm.Ref (name, tw) ->
       let tty, tsys = Sig.lookup name in
       let vsys = eval_tm_sys rel [] tsys in
       let vty = eval rel [] tty in
-      make @@ Up {ty = vty; neu = Ref name; sys = vsys}
+      make @@ Up {ty = vty; neu = Ref (name, tw); sys = vsys}
 
     | Tm.Meta name ->
       let tty, tsys = Sig.lookup name in
@@ -1352,10 +1352,10 @@ struct
 
   and pp_neu fmt neu =
     match neu with
-    | Lvl (None, i) ->
+    | Lvl (None, i, _) ->
       Format.fprintf fmt "#%i" i
 
-    | Lvl (Some x, _) ->
+    | Lvl (Some x, _, _) ->
       Uuseg_string.pp_utf_8 fmt x
 
     | FunApp (neu, arg) ->

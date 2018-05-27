@@ -165,7 +165,7 @@ tm:
 head:
   | a = ATOM
     { fun env ->
-      Tm.Ix (R.get a env) }
+      Tm.Ix (R.get a env, `Only) }
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->
       Tm.HCom {r = r0 env; r' = r1 env; ty = ty env; cap = cap env; sys = sys env} }

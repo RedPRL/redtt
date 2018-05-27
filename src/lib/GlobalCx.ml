@@ -25,7 +25,7 @@ let define sg nm ~ty ~tm =
   | _ ->
     failwith "GlobalCx: name already used"
 
-let lookup_ty sg nm =
+let lookup_ty sg nm _tw =
   let {ty; _} = T.get nm sg in
   ty
 

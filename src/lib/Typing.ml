@@ -42,13 +42,13 @@ struct
     | Tm.Cut (hd, Emp) ->
       begin
         match hd with
-        | Tm.Ix ix ->
+        | Tm.Ix (ix, _) ->
           begin
             match Cx.lookup ix cx with
             | `Dim -> ()
             | _ -> failwith "check_dim_cmd: expected dimension"
           end
-        | Tm.Ref _a ->
+        | Tm.Ref (_a, _) ->
           (* TODO: lookup in global context, make sure it is a dimension *)
           ()
         | _ -> failwith ""
@@ -437,20 +437,21 @@ struct
 
   and infer_head cx =
     function
-    | T.Ref name ->
-      let ty = GlobalCx.lookup_ty Sig.globals name in
+    | T.Ref (name, tw) ->
+      let ty = GlobalCx.lookup_ty Sig.globals name tw in
       Cx.eval Cx.emp ty
 
-    | T.Meta name ->
-      let ty = GlobalCx.lookup_ty Sig.globals name in
-      Cx.eval Cx.emp ty
-
-    | T.Ix ix ->
+    | T.Ix (ix, _) ->
       begin
+        (* TODO: account for twins *)
         match Cx.lookup ix cx with
         | `Ty ty -> ty
         | `Dim -> failwith "infer: expected type hypothesis"
       end
+
+    | T.Meta name ->
+      let ty = GlobalCx.lookup_ty Sig.globals name `Only in
+      Cx.eval Cx.emp ty
 
     | T.Coe info ->
       let r = check_eval_dim cx info.r in

@@ -43,8 +43,8 @@ type 'a tmf =
 
 and 'a head =
   | Meta of Name.t
-  | Ref of Name.t
-  | Ix of int
+  | Ref of Name.t * twin
+  | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
@@ -75,7 +75,7 @@ let ($$) hd stk =
   Cut (hd, stk)
 
 let var i =
-  Ix i $$ Emp
+  Ix (i, `Only) $$ Emp
 
 let lift sub =
   Sub (Cmp (sub, Proj), var 0)
@@ -186,11 +186,11 @@ and subst_frame sub frame =
 
 and subst_head sub head =
   match head with
-  | Ix i ->
-    subst_ix sub i
+  | Ix (i, tw) ->
+    subst_ix sub (i, tw)
 
-  | Ref a ->
-    Ref a $$ Emp
+  | Ref (a, tw) ->
+    Ref (a, tw) $$ Emp
 
   | Meta a ->
     Meta a $$ Emp
@@ -223,19 +223,19 @@ and subst_head sub head =
     let sys = subst_comp_sys sub info.sys in
     Com {r; r'; ty; cap; sys} $$ Emp
 
-and subst_ix sub ix  =
+and subst_ix sub (ix, tw) =
   match sub with
   | Id ->
-    Ix ix $$ Emp
+    Ix (ix, tw) $$ Emp
   | Proj ->
-    Ix (ix + 1) $$ Emp
+    Ix (ix + 1, tw) $$ Emp
 
   | Sub (sub, cmd) ->
-    if ix = 0 then cmd else subst_ix sub (ix - 1)
+    if ix = 0 then cmd else subst_ix sub (ix - 1, tw)
 
   | Cmp (sub1, sub0) ->
     subst_cmd sub1 @@
-    subst_ix sub0 ix
+    subst_ix sub0 (ix, tw)
 
 and subst_bnd sub bnd =
   let B (nm, t) = bnd in
@@ -331,10 +331,10 @@ let traverse ~f ~var ~ref =
 
   and go_hd k =
     function
-    | Ix i ->
-      var i
-    | Ref a ->
-      ref k a
+    | Ix (i, tw) ->
+      Ix (i, tw) $$ Emp
+    | Ref (a, tw) ->
+      ref k (a, tw)
     | Meta a ->
       Meta a $$ Emp
     | Down info ->
@@ -418,27 +418,29 @@ let fix_traverse ~var ~ref  =
   go 0
 
 let close_var a k =
-  let var i = Ix i $$ Emp in
-  let ref n b = if b = a then Ix (n + k) $$ Emp else Ref b $$ Emp in
+  let var (i, tw) = Ix (i, tw) $$ Emp in
+  let ref n (b, tw) = if b = a then Ix (n + k, tw) $$ Emp else Ref (b, tw) $$ Emp in
   fix_traverse ~var ~ref
 
 let subst sub =
-  let ref _ b = Ref b $$ Emp in
+  let ref _ (b, tw) = Ref (b, tw) $$ Emp in
   let rec go k (Tm tm) =
     let var i = subst_ix (liftn k sub) i in
     Tm (traverse ~f:go ~var ~ref k tm)
   in
   go 0
 
-let open_var k a t =
-  subst (liftn k @@ inst0 @@ Cut (Ref a, Emp)) t
+(* TODO: check that this isn't catastrophically wrong *)
+let open_var k a =
+  let var (i, tw) = if i = k then Ref (a, tw) $$ Emp else Ix (i, tw) $$ Emp in
+  let ref _n (b, tw) = Ref (b, tw) $$ Emp in
+  fix_traverse ~var ~ref
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
   x, open_var 0 x t
 
-let unbind_with x (B (nm, t)) =
-  let x = Name.named nm in
+let unbind_with x (B (_, t)) =
   x, open_var 0 x t
 
 let bind x tx =
@@ -549,11 +551,11 @@ and pp_head env fmt =
     let x, _env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env) ty (pp env) cap (pp_bsys env) sys
 
-  | Ix i ->
+  | Ix (i, _) ->
     Uuseg_string.pp_utf_8 fmt @@
     Pretty.Env.var i env
 
-  | Ref nm ->
+  | Ref (nm, _) ->
     Name.pp fmt nm
 
   | Meta nm ->
@@ -678,7 +680,7 @@ struct
     sg None ty0 @@
     path
       (subst Proj ty1)
-      (up @@ (Ix 0 $$ Emp #< (FunApp (subst Proj f))))
+      (up @@ (Ix (0, `Only) $$ Emp #< (FunApp (subst Proj f))))
       (subst Proj x)
 
   let proj2 = Cmp (Proj, Proj)
@@ -724,7 +726,7 @@ struct
     match cmd with
     | Cut (hd, stk) ->
       match fl, hd with
-      | `RigVars, Ref x ->
+      | `RigVars, Ref (x, _) ->
         go_spine fl stk @@
         Occurs.Set.add x acc
       | `RigVars, Meta _ ->
@@ -740,7 +742,7 @@ struct
     | `RigVars, Meta _ -> acc
     | `Metas, Meta alpha ->
       Occurs.Set.add alpha acc
-    | (`Vars | `RigVars), Ref x ->
+    | (`Vars | `RigVars), Ref (x, _) ->
       Occurs.Set.add x acc
     | `Metas, Ref _ -> acc
     | _, Down {ty; tm} ->
@@ -846,9 +848,9 @@ let map_comp_sys f =
 
 let map_head f =
   function
-  | Ref a -> Ref a
+  | Ref (a, tw) -> Ref (a, tw)
   | Meta a -> Meta a
-  | Ix i -> Ix i
+  | Ix (i, tw) -> Ix (i, tw)
   | Down info ->
     let ty = f info.ty in
     let tm = f info.tm in

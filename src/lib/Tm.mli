@@ -41,8 +41,8 @@ type 'a tmf =
 
 and 'a head =
   | Meta of Name.t
-  | Ref of Name.t
-  | Ix of int
+  | Ref of Name.t * twin
+  | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
