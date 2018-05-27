@@ -275,10 +275,24 @@ let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
     let x = Name.fresh () in
-    active @@ Problem.all_twins x dom0 dom1 @@
-    Problem.eqn
-      ~ty0:(Tm.unbind_with x `TwinL cod0)
-      ~tm0:(failwith "todo")
-      ~ty1:(Tm.unbind_with x `TwinR cod1)
-      ~tm1:(failwith "todo")
+    let ty0 = Tm.unbind_with x `TwinL cod0 in
+    let ty1 = Tm.unbind_with x `TwinR cod1 in
+    typechecker >>= fun (module T) ->
+    begin
+      let hd = Tm.Down {ty = q.ty0; tm = q.tm0} in
+      let var = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
+      let tm = Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var)) in
+      let lcx = T.Cx.emp in
+      let vty = T.Cx.eval lcx ty0 in
+      ret @@ T.Cx.quote lcx ~ty:vty @@ T.Cx.eval lcx tm
+    end >>= fun tm0 ->
+    begin
+      let hd = Tm.Down {ty = q.ty1; tm = q.tm1} in
+      let var = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
+      let tm = Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var)) in
+      let lcx = T.Cx.emp in
+      let vty = T.Cx.eval lcx ty1 in
+      ret @@ T.Cx.quote lcx ~ty:vty @@ T.Cx.eval lcx tm
+    end >>= fun tm1 ->
+    active @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
   | _ -> failwith ""
