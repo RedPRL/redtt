@@ -4,6 +4,8 @@ module type S =
 sig
   type t
 
+  module Eval : Val.S
+
   type value = Val.value
 
   val emp : t
@@ -39,4 +41,4 @@ sig
   val equate_dim : t -> Dim.repr -> Dim.repr -> Dim.action
 end
 
-module M (V : Val.S) : S with type t := t
+module M (V : Val.S) : S with type t = t

@@ -1,6 +1,8 @@
 module type S =
 sig
   type t
+  module Eval : Val.S
+
   type value = Val.value
 
   val emp : t
@@ -45,8 +47,11 @@ type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; rel : R.t; ppenv : P
 type t = cx
 
 
-module M (V : Val.S) : S with type t := t =
+module M (V : Val.S) : S with type t = t =
 struct
+  type t = cx
+
+  module Eval = V
   module Q = Quote.M (V)
 
   type value = Val.value

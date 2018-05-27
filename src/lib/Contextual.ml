@@ -131,15 +131,18 @@ let cx_core : cx_l -> GlobalCx.t =
   in
   go
 
-let check ~ty tm =
+
+let typechecker : (module Typing.S) m =
   getl >>= fun entries ->
   let globals = cx_core entries in
   let module G = struct let globals = globals end in
-  let module V = Val.M (GlobalCx.M (G)) in
-  let module Cx = LocalCx.M (V) in
   let module T = Typing.M (G) in
-  let lcx = Cx.emp in
-  let vty = Cx.eval lcx ty in
+  ret @@ (module T : Typing.S)
+
+let check ~ty tm =
+  typechecker >>= fun (module T) ->
+  let lcx = T.Cx.emp in
+  let vty = T.Cx.eval lcx ty in
   try
     T.check lcx vty tm;
     ret true
@@ -148,18 +151,13 @@ let check ~ty tm =
     ret false
 
 let check_eq ~ty tm0 tm1 =
-  getl >>= fun entries ->
-  let globals = cx_core entries in
-  let module G = struct let globals = globals end in
-  let module V = Val.M (GlobalCx.M (G)) in
-  let module Cx = LocalCx.M (V) in
-  let module T = Typing.M (G) in
-  let lcx = Cx.emp in
-  let vty = Cx.eval lcx ty in
-  let el0 = Cx.eval lcx tm0 in
-  let el1 = Cx.eval lcx tm1 in
+  typechecker >>= fun (module T) ->
+  let lcx = T.Cx.emp in
+  let vty = T.Cx.eval lcx ty in
+  let el0 = T.Cx.eval lcx tm0 in
+  let el1 = T.Cx.eval lcx tm1 in
   try
-    Cx.check_eq lcx ~ty:vty el0 el1;
+    T.Cx.check_eq lcx ~ty:vty el0 el1;
     ret true
   with
   | _ ->

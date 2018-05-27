@@ -25,5 +25,6 @@ val block : problem -> unit m
 val check : ty:ty -> tm -> bool m
 val check_eq : ty:ty -> tm -> tm -> bool m
 
+val typechecker : (module Typing.S) m
 
 (* TODO: 'define' function *)
