@@ -125,7 +125,7 @@ let linear_on t =
       not (Occurs.Set.mem x fvs && List.mem x @@ Bwd.to_list xs) && go xs
   in go
 
-let invert alpha _ty sp t =
+let invert alpha ty sp t =
   if occurs_check alpha t then
     failwith "occurs check"
   else (* alpha does not occur in t *)
@@ -133,7 +133,7 @@ let invert alpha _ty sp t =
     | Some xs when linear_on t xs ->
       let lam_tm = lambdas xs t in
       local (fun _ -> Emp) begin
-        (* TODO: typecheck (lam xs ... t) *)
+        check ~ty lam_tm >>
         ret true
       end >>= fun b ->
       ret @@ if b then Some lam_tm else None
@@ -265,4 +265,20 @@ let flex_flex_same q =
       | None ->
         block @@ Unify q
     end
+  | _ -> failwith ""
+
+let try_prune q =
+(* TODO: implement pruning *)
+  ret false
+
+let unify q =
+  match Tm.unleash q.ty0, Tm.unleash q.ty1 with
+  | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
+    let x = Name.fresh () in
+    active @@ Problem.all_twins x dom0 dom1 @@
+    Problem.eqn
+      (failwith "todo")
+      (failwith "todo")
+      (failwith "todo")
+      (failwith "todo")
   | _ -> failwith ""

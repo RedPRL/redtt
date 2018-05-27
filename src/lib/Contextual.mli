@@ -22,4 +22,8 @@ val active : problem -> unit m
 val block : problem -> unit m
 
 
+val check : ty:ty -> tm -> bool m
+val check_eq : ty:ty -> tm -> tm -> bool m
+
+
 (* TODO: 'define' function *)

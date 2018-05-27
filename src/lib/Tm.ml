@@ -435,6 +435,10 @@ let unbind (B (nm, t)) =
   let x = Name.named nm in
   x, open_var 0 x t
 
+let unbind_with x (B (nm, t)) =
+  let x = Name.named nm in
+  x, open_var 0 x t
+
 let bind x tx =
   B (Some (Name.to_string x), close_var x 0 tx)
 

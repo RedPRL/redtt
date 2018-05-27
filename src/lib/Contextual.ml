@@ -112,3 +112,9 @@ let postpone s p =
 
 let active = postpone Active
 let block = postpone Blocked
+
+let check ~ty:_ _tm =
+  failwith "TODO: implement check"
+
+let check_eq ~ty:_ _tm0 _tm1 =
+  failwith "TODO: implement check_eq"
