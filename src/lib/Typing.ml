@@ -42,7 +42,7 @@ struct
     | Tm.Cut (hd, Emp) ->
       begin
         match hd with
-        | Tm.Ix (ix, _) ->
+        | Tm.Ix ix ->
           begin
             match Cx.lookup ix cx with
             | `Dim -> ()
@@ -441,9 +441,8 @@ struct
       let ty = GlobalCx.lookup_ty Sig.globals name tw in
       Cx.eval Cx.emp ty
 
-    | T.Ix (ix, _) ->
+    | T.Ix ix ->
       begin
-        (* TODO: account for twins *)
         match Cx.lookup ix cx with
         | `Ty ty -> ty
         | `Dim -> failwith "infer: expected type hypothesis"

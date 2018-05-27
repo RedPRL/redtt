@@ -43,7 +43,7 @@ type con =
   | LblRet : value -> con
 
 and neu =
-  | Lvl : string option * int * Tm.twin -> neu
+  | Lvl : string option * int -> neu
   | Ref : Name.t * Tm.twin -> neu
   | Meta : Name.t -> neu
   | FunApp : neu * nf -> neu

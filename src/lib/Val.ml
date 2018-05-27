@@ -45,8 +45,8 @@ type con =
   | LblRet : value -> con
 
 and neu =
-  | Lvl : string option * int * Tm.twin -> neu
-  | Ref : Name.t * Tm.twin-> neu
+  | Lvl : string option * int -> neu
+  | Ref : Name.t * Tm.twin -> neu
   | Meta : Name.t -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
@@ -235,7 +235,7 @@ struct
     | Tm.Up (Tm.Cut (hd, Emp)) ->
       begin
         match hd with
-        | Tm.Ix (i, _) ->
+        | Tm.Ix i ->
           begin
             match List.nth rho i with
             | Atom x ->
@@ -848,7 +848,7 @@ struct
       let sys = eval_bnd_sys rel rho info.sys in
       make_com dir abs cap sys
 
-    | Tm.Ix (i, _) ->
+    | Tm.Ix i ->
       begin
         match List.nth rho i with
         | Val v -> v
@@ -1352,10 +1352,10 @@ struct
 
   and pp_neu fmt neu =
     match neu with
-    | Lvl (None, i, _) ->
+    | Lvl (None, i) ->
       Format.fprintf fmt "#%i" i
 
-    | Lvl (Some x, _, _) ->
+    | Lvl (Some x, _) ->
       Uuseg_string.pp_utf_8 fmt x
 
     | FunApp (neu, arg) ->

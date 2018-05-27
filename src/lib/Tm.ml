@@ -44,7 +44,7 @@ type 'a tmf =
 and 'a head =
   | Meta of Name.t
   | Ref of Name.t * twin
-  | Ix of int * twin
+  | Ix of int
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
@@ -75,7 +75,7 @@ let ($$) hd stk =
   Cut (hd, stk)
 
 let var i =
-  Ix (i, `Only) $$ Emp
+  Ix i $$ Emp
 
 let lift sub =
   Sub (Cmp (sub, Proj), var 0)
@@ -186,8 +186,8 @@ and subst_frame sub frame =
 
 and subst_head sub head =
   match head with
-  | Ix (i, tw) ->
-    subst_ix sub (i, tw)
+  | Ix i ->
+    subst_ix sub i
 
   | Ref (a, tw) ->
     Ref (a, tw) $$ Emp
@@ -223,19 +223,19 @@ and subst_head sub head =
     let sys = subst_comp_sys sub info.sys in
     Com {r; r'; ty; cap; sys} $$ Emp
 
-and subst_ix sub (ix, tw) =
+and subst_ix sub ix =
   match sub with
   | Id ->
-    Ix (ix, tw) $$ Emp
+    Ix ix $$ Emp
   | Proj ->
-    Ix (ix + 1, tw) $$ Emp
+    Ix (ix + 1) $$ Emp
 
   | Sub (sub, cmd) ->
-    if ix = 0 then cmd else subst_ix sub (ix - 1, tw)
+    if ix = 0 then cmd else subst_ix sub (ix - 1)
 
   | Cmp (sub1, sub0) ->
     subst_cmd sub1 @@
-    subst_ix sub0 (ix, tw)
+    subst_ix sub0 ix
 
 and subst_bnd sub bnd =
   let B (nm, t) = bnd in
@@ -331,8 +331,8 @@ let traverse ~f ~var ~ref =
 
   and go_hd k =
     function
-    | Ix (i, tw) ->
-      var (i, tw)
+    | Ix i ->
+      var i
     | Ref (a, tw) ->
       ref k (a, tw)
     | Meta a ->
@@ -418,8 +418,8 @@ let fix_traverse ~var ~ref  =
   go 0
 
 let close_var a k =
-  let var (i, tw) = Ix (i, tw) $$ Emp in
-  let ref n (b, tw) = if b = a then Ix (n + k, tw) $$ Emp else Ref (b, tw) $$ Emp in
+  let var i = Ix i $$ Emp in
+  let ref n (b, tw) = if b = a then Ix (n + k) $$ Emp else Ref (b, tw) $$ Emp in
   fix_traverse ~var ~ref
 
 let subst sub =
@@ -432,7 +432,7 @@ let subst sub =
 
 (* TODO: check that this isn't catastrophically wrong *)
 let open_var k a tw =
-  let var (i, _) = if i = k then Ref (a, tw) $$ Emp else Ix (i, tw) $$ Emp in
+  let var i = if i = k then Ref (a, tw) $$ Emp else Ix i $$ Emp in
   let ref _n (b, tw) = Ref (b, tw) $$ Emp in
   fix_traverse ~var ~ref
 
@@ -551,9 +551,9 @@ and pp_head env fmt =
     let x, _env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env) ty (pp env) cap (pp_bsys env) sys
 
-  | Ix (i, _) ->
+  | Ix ix ->
     Uuseg_string.pp_utf_8 fmt @@
-    Pretty.Env.var i env
+    Pretty.Env.var ix env
 
   | Ref (nm, _) ->
     Name.pp fmt nm
@@ -680,7 +680,7 @@ struct
     sg None ty0 @@
     path
       (subst Proj ty1)
-      (up @@ (Ix (0, `Only) $$ Emp #< (FunApp (subst Proj f))))
+      (up @@ (Ix 0 $$ Emp #< (FunApp (subst Proj f))))
       (subst Proj x)
 
   let proj2 = Cmp (Proj, Proj)
@@ -850,7 +850,7 @@ let map_head f =
   function
   | Ref (a, tw) -> Ref (a, tw)
   | Meta a -> Meta a
-  | Ix (i, tw) -> Ix (i, tw)
+  | Ix i -> Ix i
   | Down info ->
     let ty = f info.ty in
     let tm = f info.tm in

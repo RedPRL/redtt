@@ -70,7 +70,7 @@ struct
   include V
 
   let generic env ty =
-    make @@ Up {ty = ty; neu = Lvl (None, Env.len env, `Only); sys = []}
+    make @@ Up {ty = ty; neu = Lvl (None, Env.len env); sys = []}
 
   let rec equate env ty el0 el1 =
     match unleash ty with
@@ -196,9 +196,9 @@ struct
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
-    | Lvl (_, l0, tw0), Lvl (_, l1, tw1) ->
-      if l0 = l1 && tw0 = tw1 then
-        Tm.Cut (Tm.Ix (Env.ix_of_lvl l0 env, tw0), Bwd.from_list stk)
+    | Lvl (_, l0), Lvl (_, l1) ->
+      if l0 = l1 then
+        Tm.Cut (Tm.Ix (Env.ix_of_lvl l0 env), Bwd.from_list stk)
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
     | Ref (nm0, tw0), Ref (nm1, tw1) ->
