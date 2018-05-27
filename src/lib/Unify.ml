@@ -325,8 +325,52 @@ struct
 end
 
 
-let rigid_rigid _q =
-  failwith "TODO: rigid_rigid"
+let is_orthogonal q =
+  failwith "todo: implement is_orthogonal"
+
+let match_spine x0 tw0 sp0 x1 tw1 sp1 =
+  match sp0, sp1 with
+  | Emp, Emp ->
+    if x0 = x1 then
+      lookup_var x0 tw0 >>= fun ty0 ->
+      lookup_var x1 tw1 >>= fun ty1 ->
+      ret (ty0, ty1)
+    else
+      failwith "rigid head mismatch"
+
+  | Snoc (sp0, Tm.FunApp t0), Snoc (sp1, Tm.FunApp t1) ->
+    failwith "TODO"
+
+  | _ -> failwith "spine mismatch"
+
+(* invariant: will not be called on equations which are already reflexive *)
+let rigid_rigid q =
+  match Tm.unleash q.tm0, Tm.unleash q.tm1 with
+  | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
+    let x = Name.fresh () in
+    let cod0x = Tm.unbind_with x `TwinL cod0 in
+    let cod1x = Tm.unbind_with x `TwinR cod1 in
+    active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
+    active @@ Problem.all_twins x dom0 dom1 @@
+    Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
+
+  | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
+    let x = Name.fresh () in
+    let cod0x = Tm.unbind_with x `TwinL cod0 in
+    let cod1x = Tm.unbind_with x `TwinR cod1 in
+    active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
+    active @@ Problem.all_twins x dom0 dom1 @@
+    Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
+
+  | Tm.Up (Tm.Cut (Tm.Ref (x0, tw0), sp0)), Tm.Up (Tm.Cut (Tm.Ref (x1, tw1), sp1)) ->
+    match_spine x0 tw0 sp0 x1 tw1 sp1
+
+  | _ ->
+    if is_orthogonal q then
+      failwith "rigid-rigid mismatch"
+    else
+      block @@ Unify q
+
 
 let unify q =
   typechecker >>= fun (module T) ->
