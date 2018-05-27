@@ -325,6 +325,10 @@ struct
     ty', tm'
 end
 
+
+let rigid_rigid q =
+  failwith "TODO: rigid_rigid"
+
 let unify q =
   typechecker >>= fun (module T) ->
   let module HS = HSubst (T) in
@@ -347,4 +351,29 @@ let unify q =
     active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
     active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
 
-  | _ -> failwith ""
+  | _ ->
+    match Tm.unleash q.tm0, Tm.unleash q.tm1 with
+    | Tm.Up (Tm.Cut (Tm.Meta alpha0, _)), Tm.Up (Tm.Cut (Tm.Meta alpha1, _))
+      when
+        alpha0 = alpha1
+      ->
+      try_prune q <|| begin
+        try_prune (Equation.sym q) <||
+        flex_flex_same q
+      end
+
+    | Tm.Up (Tm.Cut (Tm.Meta _, _)), Tm.Up (Tm.Cut (Tm.Meta _, _)) ->
+      try_prune q <|| begin
+        try_prune (Equation.sym q) <||
+        flex_flex_diff [] q
+      end
+
+    | Tm.Up (Tm.Cut (Tm.Meta _, _)), _ ->
+      try_prune q <|| flex_term [] q
+
+    | _, Tm.Up (Tm.Cut (Tm.Meta _, _)) ->
+      let q' = Equation.sym q in
+      try_prune q' <|| flex_term [] q'
+
+    | _ ->
+      rigid_rigid q
