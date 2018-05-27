@@ -40,7 +40,7 @@ type twin = Tm.twin
 module Problem :
 sig
   include Occurs.S with type t = problem
-  val eqn : ty -> tm -> ty -> tm -> problem
+  val eqn : ty0:ty -> tm0:tm -> ty1:ty -> tm1:tm -> problem
   val all : Name.t -> ty -> problem -> problem
   val all_twins : Name.t -> ty -> ty -> problem -> problem
 end

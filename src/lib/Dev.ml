@@ -86,7 +86,7 @@ struct
     | All (p, B prob) ->
       Occurs.Set.union (Param.free fl p) (free fl prob)
 
-  let eqn ty0 tm0 ty1 tm1 =
+  let eqn ~ty0 ~tm0 ~ty1 ~tm1 =
     Unify {ty0; tm0; ty1; tm1}
 
   let all x ty prob =
