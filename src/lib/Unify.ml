@@ -29,12 +29,16 @@ let rec pis gm tm =
   | Snoc (gm, (x, ty)) ->
     pis gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
 
+let telescope_to_spine =
+  (* TODO: might be backwards *)
+  Bwd.map @@ fun (x, _) ->
+  Tm.FunApp (Tm.up @@ Tm.Cut (Tm.Ref x, Emp))
+
 let hole gm ty f =
   let alpha = Name.fresh () in
   pushl (E (alpha, pis gm ty, Hole)) >>
   let hd = Tm.Meta alpha in
-  (* TODO: might be backwards *)
-  let sp = Bwd.map (fun (x, _) -> Tm.FunApp (Tm.up @@ Tm.Cut (Tm.Ref x, Emp))) gm in
+  let sp = telescope_to_spine gm in
   f (hd, sp) >>= fun r ->
   go_left >>
   ret r
@@ -254,8 +258,7 @@ let flex_flex_same q =
       | Some tele' ->
         let f (hd, sp) =
           lambdas (Bwd.map fst tele) @@
-          (* might be backwards *)
-          let sp' = Bwd.map (fun (x, _) -> Tm.FunApp (Tm.up @@ Tm.Cut (Tm.Ref x, Emp))) tele in
+          let sp' = telescope_to_spine tele in
           Tm.up @@ Tm.Cut (hd, sp <.> sp')
         in
         instantiate (alpha, pis tele' cod, f)
