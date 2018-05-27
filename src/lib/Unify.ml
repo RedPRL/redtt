@@ -277,8 +277,8 @@ let unify q =
     let x = Name.fresh () in
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn
+      (Tm.unbind_with x `TwinL cod0)
       (failwith "todo")
-      (failwith "todo")
-      (failwith "todo")
+      (Tm.unbind_with x `TwinR cod1)
       (failwith "todo")
   | _ -> failwith ""

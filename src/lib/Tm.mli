@@ -84,7 +84,7 @@ val open_var : int -> Name.t -> twin -> tm -> tm
 
 val bind : Name.t -> tm -> tm bnd
 val unbind : tm bnd -> Name.t * tm
-val unbind_with : Name.t -> twin -> tm bnd -> Name.t * tm
+val unbind_with : Name.t -> twin -> tm bnd -> tm
 
 val subst : subst -> tm -> tm
 

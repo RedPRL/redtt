@@ -441,7 +441,7 @@ let unbind (B (nm, t)) =
   x, open_var 0 x `Only t
 
 let unbind_with x tw (B (_, t)) =
-  x, open_var 0 x tw t
+  open_var 0 x tw t
 
 let bind x tx =
   B (Some (Name.to_string x), close_var x 0 tx)
