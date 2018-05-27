@@ -1,4 +1,4 @@
-let make_node start stop con =
+let make_node _start _stop con =
   Tm.make con
 
 type tele =
@@ -45,15 +45,6 @@ let rec ext_from_multibind start stop mb =
   | _ ->
     failwith "ext_from_multibind"
 
-
-let rec make_multi_funapp start stop fn rest =
-  failwith "TODO"
-(* match rest with
-   | [] ->
-   fn
-   | arg :: rest ->
-   let fn' = make_multi_funapp start stop fn rest in
-   make_node start stop @@ Tm.FunApp (fn', arg) *)
 
 let make_dim_const start stop i =
   match i with
