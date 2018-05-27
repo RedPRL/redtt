@@ -69,11 +69,11 @@ val map_spine : (tm -> tm) -> tm spine -> tm spine
 val map_tmf : (tm -> tm) -> tm tmf -> tm tmf
 
 
-type subst =
+type 'a subst =
   | Id
   | Proj
-  | Sub of subst * tm cmd
-  | Cmp of subst * subst
+  | Sub of 'a subst * 'a
+  | Cmp of 'a subst * 'a subst
 
 
 val make : tm tmf -> tm
@@ -86,7 +86,7 @@ val bind : Name.t -> tm -> tm bnd
 val unbind : tm bnd -> Name.t * tm
 val unbind_with : Name.t -> twin -> tm bnd -> tm
 
-val subst : subst -> tm -> tm
+val subst : tm cmd subst -> tm -> tm
 
 
 val up : tm cmd -> tm

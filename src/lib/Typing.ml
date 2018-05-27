@@ -15,6 +15,7 @@ sig
   module Cx : LocalCx.S
   val check : cx -> Val.value -> Tm.tm -> unit
   val infer : cx -> Tm.tm Tm.cmd -> value
+  val infer_frame : cx -> ty:value -> hd:value -> Tm.tm Tm.frame -> value
   val check_boundary : cx -> Val.value -> Val.val_sys -> Tm.tm -> unit
 end
 

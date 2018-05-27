@@ -65,11 +65,11 @@ and 'a cmd = Cut of 'a head * 'a spine
 
 type tm = Tm of tm tmf
 
-type subst =
+type 'a subst =
   | Id
   | Proj
-  | Sub of subst * tm cmd
-  | Cmp of subst * subst
+  | Sub of 'a subst * 'a
+  | Cmp of 'a subst * 'a subst
 
 let ($$) hd stk =
   Cut (hd, stk)
@@ -88,10 +88,10 @@ let rec liftn n sub =
 let inst0 t = Sub (Id, t)
 
 
-let rec subst (sub : subst) (Tm con) =
+let rec subst (sub : tm cmd subst) (Tm con) =
   Tm (subst_f sub con)
 
-and subst_f (sub : subst) =
+and subst_f (sub : tm cmd subst) =
   function
   | (Dim0 | Dim1 | Univ _ | Bool | Tt | Ff) as con ->
     con

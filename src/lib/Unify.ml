@@ -285,52 +285,65 @@ let normalize (module T : Typing.S) ~ty tm =
    unification would be better served by a purely syntactic approach based on hereditary
    substitution. *)
 
+
+module HSubst (T : Typing.S) =
+struct
+  let rec inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
+    let Tm.B (nm, tm) = tm_bnd in
+    let varg = T.Cx.eval T.Cx.emp arg in
+    let lcx = T.Cx.def T.Cx.emp ~nm ~ty:arg_ty ~el:varg in
+    let el = T.Cx.eval lcx tm in
+    let vty = T.Cx.Eval.inst_clo ty_clo varg in
+    T.Cx.quote T.Cx.emp ~ty:vty el
+
+  and plug (ty, tm) frame =
+    let rec unleash_ty ty =
+      match T.Cx.Eval.unleash ty with
+      | Val.Rst info -> unleash_ty info.ty
+      | con -> con
+    in
+    match Tm.unleash tm, unleash_ty ty, frame with
+    | Tm.Up (Tm.Cut (hd, sp)), _, _ ->
+      Tm.up @@ Tm.Cut (hd, sp #< frame)
+    | Tm.Lam bnd, Val.Pi {dom; cod}, Tm.FunApp arg ->
+      inst_bnd (cod, bnd) (dom, arg)
+    | _, _, Tm.ExtApp _ ->
+      failwith "TODO: %%/ExtApp"
+    | Tm.Cons (t0, _), _, Tm.Car -> t0
+    | Tm.Cons (_, t1), _, Tm.Cdr -> t1
+    | Tm.LblRet t, _, Tm.LblCall -> t
+    | Tm.Tt, _, Tm.If info -> info.tcase
+    | Tm.Ff, _, Tm.If info -> info.fcase
+    | _ -> failwith "TODO: %%"
+
+  let (%%) (ty, tm) frame =
+    let vty = T.Cx.eval T.Cx.emp ty in
+    let tm' = plug (vty, tm) frame in
+    let el = T.Cx.eval T.Cx.emp tm' in
+    let vty' = T.infer_frame T.Cx.emp ~ty:vty ~hd:el frame in
+    let ty' = T.Cx.quote_ty T.Cx.emp vty' in
+    ty', tm'
+end
+
 let unify q =
+  typechecker >>= fun (module T) ->
+  let module HS = HSubst (T) in
+  let open HS in
+
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
-  | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
+  | Tm.Pi (dom0, _), Tm.Pi (dom1, _) ->
     let x = Name.fresh () in
-    let ty0 = Tm.unbind_with x `TwinL cod0 in
-    let ty1 = Tm.unbind_with x `TwinR cod1 in
-    typechecker >>= fun (module T) ->
-    begin
-      let hd = Tm.Down {ty = q.ty0; tm = q.tm0} in
-      let var = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
-      normalize (module T) ~ty:ty0 @@ Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var))
-    end >>= fun tm0 ->
-    begin
-      let hd = Tm.Down {ty = q.ty1; tm = q.tm1} in
-      let var = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
-      normalize (module T) ~ty:ty1 @@ Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var))
-    end >>= fun tm1 ->
+    let x_l = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
+    let x_r = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinR), Emp) in
+    let ty0, tm0 = (q.ty0, q.tm0) %% Tm.FunApp x_l in
+    let ty1, tm1 = (q.ty1, q.tm1) %% Tm.FunApp x_r in
     active @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
 
-  | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
-    let univ = Tm.make @@ Tm.Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
-    typechecker >>= fun (module T) ->
-    begin
-      let hd = Tm.Down {ty = q.ty0; tm = q.tm0} in
-      normalize (module T) ~ty:dom0 @@ Tm.up @@ Tm.Cut (hd, Emp #< Tm.Car)
-    end >>= fun car0 ->
-    begin
-      let hd = Tm.Down {ty = q.ty1; tm = q.tm1} in
-      normalize (module T) ~ty:dom1 @@ Tm.up @@ Tm.Cut (hd, Emp #< Tm.Car)
-    end >>= fun car1 ->
-    begin
-      let cmd = Tm.Cut (Tm.Down {ty = dom0; tm = car0}, Emp) in
-      normalize (module T) ~ty:univ @@ Tm.make @@ Tm.Let (cmd, cod0)
-    end >>= fun ty_cdr0 ->
-    begin
-      let cmd = Tm.Cut (Tm.Down {ty = dom1; tm = car1}, Emp) in
-      normalize (module T) ~ty:univ @@ Tm.make @@ Tm.Let (cmd, cod1)
-    end >>= fun ty_cdr1 ->
-    begin
-      let hd = Tm.Down {ty = q.ty0; tm = q.tm0} in
-      normalize (module T) ~ty:ty_cdr0 @@ Tm.up @@ Tm.Cut (hd, Emp #< Tm.Cdr)
-    end >>= fun cdr0 ->
-    begin
-      let hd = Tm.Down {ty = q.ty1; tm = q.tm1} in
-      normalize (module T) ~ty:ty_cdr1 @@ Tm.up @@ Tm.Cut (hd, Emp #< Tm.Cdr)
-    end >>= fun cdr1 ->
+  | Tm.Sg (dom0, _), Tm.Sg (dom1, _) ->
+    let _, car0 = (q.ty0, q.tm0) %% Tm.Car in
+    let _, car1 = (q.ty1, q.tm1) %% Tm.Car in
+    let ty_cdr0, cdr0 = (q.ty0, q.tm0) %% Tm.Cdr in
+    let ty_cdr1, cdr1 = (q.ty1, q.tm1) %% Tm.Cdr in
     active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
     active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
 
