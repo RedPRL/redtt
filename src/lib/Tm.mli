@@ -41,7 +41,7 @@ type 'a tmf =
 
 and 'a head =
   | Meta of Name.t
-  | Ref of Name.t
+  | Ref of Name.t * twin
   | Ix of int
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
@@ -80,11 +80,11 @@ val make : tm tmf -> tm
 val unleash : tm -> tm tmf
 
 val close_var : Name.t -> int -> tm -> tm
-val open_var : int -> Name.t -> tm -> tm
+val open_var : int -> Name.t -> twin -> tm -> tm
 
 val bind : Name.t -> tm -> tm bnd
 val unbind : tm bnd -> Name.t * tm
-val unbind_with : Name.t -> tm bnd -> Name.t * tm
+val unbind_with : Name.t -> twin -> tm bnd -> tm
 
 val subst : subst -> tm -> tm
 

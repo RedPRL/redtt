@@ -46,7 +46,7 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Ref : Name.t -> neu
+  | Ref : Name.t * Tm.twin -> neu
   | Meta : Name.t -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
@@ -243,7 +243,7 @@ struct
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
-        | Tm.Ref a ->
+        | Tm.Ref (a, _) ->
           R.canonize (D.Atom a) rel
         | Tm.Meta a ->
           R.canonize (D.Atom a) rel
@@ -855,11 +855,11 @@ struct
         | _ -> failwith "Expected value in environment"
       end
 
-    | Tm.Ref name ->
+    | Tm.Ref (name, tw) ->
       let tty, tsys = Sig.lookup name in
       let vsys = eval_tm_sys rel [] tsys in
       let vty = eval rel [] tty in
-      make @@ Up {ty = vty; neu = Ref name; sys = vsys}
+      make @@ Up {ty = vty; neu = Ref (name, tw); sys = vsys}
 
     | Tm.Meta name ->
       let tty, tsys = Sig.lookup name in

@@ -201,9 +201,9 @@ struct
         Tm.Cut (Tm.Ix (Env.ix_of_lvl l0 env), Bwd.from_list stk)
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
-    | Ref nm0, Ref nm1 ->
-      if nm0 = nm1 then
-        Tm.Cut (Tm.Ref nm0, Bwd.from_list stk)
+    | Ref (nm0, tw0), Ref (nm1, tw1) ->
+      if nm0 = nm1 && tw0 = tw1 then
+        Tm.Cut (Tm.Ref (nm0, tw0), Bwd.from_list stk)
       else
         failwith "global variable name mismatch"
     | Meta nm0, Meta nm1 ->
@@ -344,7 +344,7 @@ struct
         Tm.up @@ Tm.var ix
       with
       | _ ->
-        Tm.up @@ Tm.Cut (Tm.Ref x, Emp)
+        Tm.up @@ Tm.Cut (Tm.Ref (x, `Only), Emp)
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1

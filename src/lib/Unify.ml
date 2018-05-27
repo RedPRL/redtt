@@ -32,7 +32,7 @@ let rec pis gm tm =
 let telescope_to_spine =
   (* TODO: might be backwards *)
   Bwd.map @@ fun (x, _) ->
-  Tm.FunApp (Tm.up @@ Tm.Cut (Tm.Ref x, Emp))
+  Tm.FunApp (Tm.up @@ Tm.Cut (Tm.Ref (x, `Only), Emp))
 
 let hole gm ty f =
   let alpha = Name.fresh () in
@@ -65,15 +65,15 @@ let rec eta_contract t =
     let tm'y = eta_contract tmy in
     begin
       match Tm.unleash tm'y with
-      | Tm.Up (Tm.Cut (Tm.Ref f, Snoc (sp, Tm.FunApp arg))) ->
+      | Tm.Up (Tm.Cut (Tm.Ref (f, twf), Snoc (sp, Tm.FunApp arg))) ->
         begin
           match Tm.unleash arg with
-          | Tm.Up (Tm.Cut (Tm.Ref y', Emp))
+          | Tm.Up (Tm.Cut (Tm.Ref (y', _), Emp))
             when
               y = y'
               && not @@ Occurs.Set.mem y @@ Tm.Sp.free `Vars sp
             ->
-            Tm.up @@ Tm.Cut (Tm.Ref f, sp)
+            Tm.up @@ Tm.Cut (Tm.Ref (f, twf), sp)
           | _ ->
             Tm.make @@ Tm.Lam (Tm.bind y tm'y)
         end
@@ -100,7 +100,7 @@ let rec eta_contract t =
 
 let to_var t =
   match Tm.unleash @@ eta_contract t with
-  | Tm.Up (Tm.Cut (Tm.Ref a, Emp)) ->
+  | Tm.Up (Tm.Cut (Tm.Ref (a, _), Emp)) ->
     Some a
   | _ ->
     None
@@ -267,8 +267,8 @@ let flex_flex_same q =
     end
   | _ -> failwith ""
 
-let try_prune q =
-(* TODO: implement pruning *)
+let try_prune _q =
+  (* TODO: implement pruning *)
   ret false
 
 let unify q =
@@ -277,8 +277,8 @@ let unify q =
     let x = Name.fresh () in
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn
-      (failwith "todo")
-      (failwith "todo")
-      (failwith "todo")
-      (failwith "todo")
+      ~ty0:(Tm.unbind_with x `TwinL cod0)
+      ~tm0:(failwith "todo")
+      ~ty1:(Tm.unbind_with x `TwinR cod1)
+      ~tm1:(failwith "todo")
   | _ -> failwith ""
