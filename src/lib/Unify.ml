@@ -271,6 +271,13 @@ let try_prune _q =
   (* TODO: implement pruning *)
   ret false
 
+let normalize ~ty tm =
+  typechecker >>= fun (module T) ->
+  let lcx = T.Cx.emp in
+  let vty = T.Cx.eval lcx ty in
+  let el = T.Cx.eval lcx tm in
+  ret @@ T.Cx.quote lcx ~ty:vty el
+
 let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
@@ -281,18 +288,14 @@ let unify q =
     begin
       let hd = Tm.Down {ty = q.ty0; tm = q.tm0} in
       let var = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
-      let tm = Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var)) in
-      let lcx = T.Cx.emp in
-      let vty = T.Cx.eval lcx ty0 in
-      ret @@ T.Cx.quote lcx ~ty:vty @@ T.Cx.eval lcx tm
+      normalize ~ty:ty0 @@
+      Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var))
     end >>= fun tm0 ->
     begin
       let hd = Tm.Down {ty = q.ty1; tm = q.tm1} in
       let var = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
-      let tm = Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var)) in
-      let lcx = T.Cx.emp in
-      let vty = T.Cx.eval lcx ty1 in
-      ret @@ T.Cx.quote lcx ~ty:vty @@ T.Cx.eval lcx tm
+      normalize ~ty:ty1 @@
+      Tm.up @@ Tm.Cut (hd, Emp #< (Tm.FunApp var))
     end >>= fun tm1 ->
     active @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
   | _ -> failwith ""
