@@ -332,8 +332,64 @@ struct
 end
 
 
-let is_orthogonal _q =
-  failwith "todo: implement is_orthogonal"
+(* Check if the equation can *never* be satisfied.
+   Remember that the equation is constrained to be well-typed in the appropriate
+   heterogeneous sense, which means that if ty0,ty1 could never become equal, there
+   is no need to compare tm0, tm1: such a case cannot arise based on how this
+   function is called.
+
+   LOL: I probably missed some cases. how horrific.
+*)
+let is_orthogonal q =
+  match Tm.unleash q.tm0, Tm.unleash q.tm1 with
+  | Tm.Up (Tm.Cut (Tm.Ref _, _)), Tm.Up (Tm.Cut (Tm.Ref _, _)) -> false
+  | Tm.Up (Tm.Cut (Tm.Ref _, _)), Tm.Up (Tm.Cut (Tm.Meta _, _)) -> false
+  | Tm.Up (Tm.Cut (Tm.Ref _, _)), _ -> true
+
+  | Tm.Up (Tm.Cut (Tm.Meta _, _)), Tm.Up (Tm.Cut (Tm.Ref _, _)) -> false
+  | Tm.Up (Tm.Cut (Tm.Meta _, _)), Tm.Up (Tm.Cut (Tm.Meta _, _)) -> false
+  | _, Tm.Up (Tm.Cut (Tm.Ref _, _)) -> true
+
+  | Tm.Pi _, Tm.Univ _ -> true
+  | Tm.Pi _, Tm.Sg _ -> true
+  | Tm.Pi _, Tm.Bool -> true
+  | Tm.Pi _, Tm.Rst _ -> true
+  | Tm.Pi _, Tm.Ext _ -> true
+
+  | Tm.Univ _, Tm.Pi _ -> true
+  | Tm.Univ _, Tm.Sg _ -> true
+  | Tm.Univ _, Tm.Bool -> true
+  | Tm.Univ _, Tm.Rst _ -> true
+  | Tm.Univ _, Tm.Ext _ -> true
+
+  | Tm.Sg _, Tm.Pi _ -> true
+  | Tm.Sg _, Tm.Univ _ -> true
+  | Tm.Sg _, Tm.Bool -> true
+  | Tm.Sg _, Tm.Rst _ -> true
+  | Tm.Sg _, Tm.Ext _ -> true
+
+  | Tm.Bool, Tm.Univ _ -> true
+  | Tm.Bool, Tm.Sg _ -> true
+  | Tm.Bool, Tm.Ext _ -> true
+  | Tm.Bool, Tm.Pi _ -> true
+  | Tm.Bool, Tm.Rst _ -> true
+
+  | Tm.Rst _, Tm.Univ _ -> true
+  | Tm.Rst _, Tm.Pi _ -> true
+  | Tm.Rst _, Tm.Sg _ -> true
+  | Tm.Rst _, Tm.Ext _ -> true
+  | Tm.Rst _, Tm.Bool -> true
+
+  | Tm.Ext _, Tm.Pi _ -> true
+  | Tm.Ext _, Tm.Sg _ -> true
+  | Tm.Ext _, Tm.Univ _ -> true
+  | Tm.Ext _, Tm.Bool -> true
+  | Tm.Ext _, Tm.Rst _ -> true
+
+  | Tm.Tt, Tm.Ff -> true
+  | Tm.Ff, Tm.Tt -> true
+
+  | _ -> false
 
 let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
   typechecker >>= fun (module T) ->
