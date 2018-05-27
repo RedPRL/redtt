@@ -13,8 +13,11 @@ type status =
   | Blocked
   | Active
 
-type equation =
-  {ty0 : ty; tm0 : tm; ty1 : ty; tm1 : ty}
+type ('a, 'b) equation =
+  {ty0 : ty;
+   tm0 : 'a;
+   ty1 : ty;
+   tm1 : 'b}
 
 type param =
   | P of ty
@@ -25,7 +28,7 @@ type params = (Name.t * param) bwd
 type 'a bind = B of 'a
 
 type problem =
-  | Unify of equation
+  | Unify of (tm, tm) equation
   | All of param * problem bind
 
 type entry =
@@ -63,7 +66,7 @@ end
 
 module Equation =
 struct
-  type t = equation
+  type t = (tm, tm) equation
   let free fl {ty0; tm0; ty1; tm1} =
     let sets =
       [ Tm.free fl ty0;

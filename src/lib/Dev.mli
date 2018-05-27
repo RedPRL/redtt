@@ -11,8 +11,11 @@ type status =
   | Blocked
   | Active
 
-type equation =
-  {ty0 : ty; tm0 : tm; ty1 : ty; tm1 : ty}
+type ('a, 'b) equation =
+  {ty0 : ty;
+   tm0 : 'a;
+   ty1 : ty;
+   tm1 : 'b}
 
 type param =
   | P of ty
@@ -23,7 +26,7 @@ type params = (Name.t * param) bwd
 type 'a bind
 
 type problem =
-  | Unify of equation
+  | Unify of (tm, tm) equation
   | All of param * problem bind
 
 type entry =
@@ -49,8 +52,8 @@ module Param : Occurs.S with type t = param
 module Params : Occurs.S with type t = param bwd
 module Equation :
 sig
-  include Occurs.S with type t = equation
-  val sym : t -> t
+  include Occurs.S with type t = (tm, tm) equation
+  val sym : ('a, 'b) equation -> ('b, 'a) equation
 end
 
 module Decl : Occurs.S with type t = tm decl

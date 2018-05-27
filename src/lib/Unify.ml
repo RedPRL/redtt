@@ -248,24 +248,23 @@ let rec instantiate inst =
     instantiate inst
 
 let flex_flex_same q =
-  match Tm.unleash q.tm0, Tm.unleash q.tm1 with
-  (* invariant: same alpha *)
-  | Tm.Up (Tm.Cut (Tm.Meta alpha, sp0)), Tm.Up (Tm.Cut (Tm.Meta _, sp1)) ->
-    lookup_meta alpha >>= fun ty_alpha ->
-    let tele, cod = telescope ty_alpha in
-    begin
-      match intersect tele sp0 sp1 with
-      | Some tele' ->
-        let f (hd, sp) =
-          lambdas (Bwd.map fst tele) @@
-          let sp' = telescope_to_spine tele in
-          Tm.up @@ Tm.Cut (hd, sp <.> sp')
-        in
-        instantiate (alpha, pis tele' cod, f)
-      | None ->
-        block @@ Unify q
-    end
-  | _ -> failwith ""
+  let alpha, sp0 = q.tm0 in
+  let sp1 = q.tm1 in
+  lookup_meta alpha >>= fun ty_alpha ->
+  let tele, cod = telescope ty_alpha in
+  match intersect tele sp0 sp1 with
+  | Some tele' ->
+    let f (hd, sp) =
+      lambdas (Bwd.map fst tele) @@
+      let sp' = telescope_to_spine tele in
+      Tm.up @@ Tm.Cut (hd, sp <.> sp')
+    in
+    instantiate (alpha, pis tele' cod, f)
+  | None ->
+    block @@ Unify
+      {q with
+       tm0 = Tm.up @@ Tm.Cut (Tm.Meta alpha, sp0);
+       tm1 = Tm.up @@ Tm.Cut (Tm.Meta alpha, sp1)}
 
 let try_prune _q =
   (* TODO: implement pruning *)
@@ -326,7 +325,7 @@ struct
 end
 
 
-let rigid_rigid q =
+let rigid_rigid _q =
   failwith "TODO: rigid_rigid"
 
 let unify q =
@@ -353,13 +352,13 @@ let unify q =
 
   | _ ->
     match Tm.unleash q.tm0, Tm.unleash q.tm1 with
-    | Tm.Up (Tm.Cut (Tm.Meta alpha0, _)), Tm.Up (Tm.Cut (Tm.Meta alpha1, _))
+    | Tm.Up (Tm.Cut (Tm.Meta alpha0, sp0)), Tm.Up (Tm.Cut (Tm.Meta alpha1, sp1))
       when
         alpha0 = alpha1
       ->
       try_prune q <|| begin
         try_prune (Equation.sym q) <||
-        flex_flex_same q
+        flex_flex_same {q with tm0 = alpha0, sp0; tm1 = sp1}
       end
 
     | Tm.Up (Tm.Cut (Tm.Meta _, _)), Tm.Up (Tm.Cut (Tm.Meta _, _)) ->
