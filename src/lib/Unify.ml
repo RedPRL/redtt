@@ -277,6 +277,14 @@ let normalize (module T : Typing.S) ~ty tm =
   let el = T.Cx.eval lcx tm in
   ret @@ T.Cx.quote lcx ~ty:vty el
 
+
+(* This is all so horrible because we don't have hereditary-substitution-style operations
+   directly on the syntax. So we have to factor through evaluation and quotation all the time.
+
+   While checking conversion is most convenient with NBE, it seems that elaboration and
+   unification would be better served by a purely syntactic approach based on hereditary
+   substitution. *)
+
 let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
