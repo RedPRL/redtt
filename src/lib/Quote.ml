@@ -177,7 +177,7 @@ struct
         let ty = equate_ty env hcom0.ty hcom1.ty in
         let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
         let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
-        Tm.up @@ Tm.Cut (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, Emp)
+        Tm.up (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, Emp)
 
       | Coe coe0, Coe coe1 ->
         let tr, tr' = equate_star env coe0.dir coe1.dir in
@@ -188,7 +188,7 @@ struct
           Abs.inst1 coe0.abs r
         in
         let tm = equate env tyr coe0.el coe1.el in
-        Tm.up @@ Tm.Cut (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Emp)
+        Tm.up (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Emp)
 
       | _ ->
         Format.eprintf "Failed to equate@; @[<1>%a = %a ∈ %a@] @." pp_value el0 pp_value el1 pp_value ty;
@@ -198,17 +198,17 @@ struct
     match neu0, neu1 with
     | Lvl (_, l0), Lvl (_, l1) ->
       if l0 = l1 then
-        Tm.Cut (Tm.Ix (Env.ix_of_lvl l0 env), Bwd.from_list stk)
+        Tm.Ix (Env.ix_of_lvl l0 env), Bwd.from_list stk
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
     | Ref (nm0, tw0), Ref (nm1, tw1) ->
       if nm0 = nm1 && tw0 = tw1 then
-        Tm.Cut (Tm.Ref (nm0, tw0), Bwd.from_list stk)
+        Tm.Ref (nm0, tw0), Bwd.from_list stk
       else
         failwith "global variable name mismatch"
     | Meta nm0, Meta nm1 ->
       if nm0 = nm1 then
-        Tm.Cut (Tm.Meta nm0, Bwd.from_list stk)
+        Tm.Meta nm0, Bwd.from_list stk
       else
         failwith "global variable name mismatch"
     | Car neu0, Car neu1 ->
@@ -344,7 +344,7 @@ struct
         Tm.up @@ Tm.var ix
       with
       | _ ->
-        Tm.up @@ Tm.Cut (Tm.Ref (x, `Only), Emp)
+        Tm.up (Tm.Ref (x, `Only), Emp)
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1

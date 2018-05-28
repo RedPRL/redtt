@@ -40,7 +40,7 @@ struct
 
   and check_dim_cmd cx =
     function
-    | Tm.Cut (hd, Emp) ->
+    | hd, Emp ->
       begin
         match hd with
         | Tm.Ix ix ->
@@ -371,11 +371,10 @@ struct
 
     in go sys []
 
-  and infer cx =
-    function Cut (hd, sp) ->
-      let ty_hd = infer_head cx hd in
-      let vhd = Cx.eval_head cx hd in
-      infer_stack cx ~ty:ty_hd ~hd:vhd @@ Bwd.to_list sp
+  and infer cx (hd, sp) =
+    let ty_hd = infer_head cx hd in
+    let vhd = Cx.eval_head cx hd in
+    infer_stack cx ~ty:ty_hd ~hd:vhd @@ Bwd.to_list sp
   (* TODO: should just write inference directly for spines ! *)
 
   and infer_stack cx ~ty ~hd =

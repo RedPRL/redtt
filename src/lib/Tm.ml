@@ -61,7 +61,7 @@ and 'a frame =
   | LblCall
 
 and 'a spine = 'a frame bwd
-and 'a cmd = Cut of 'a head * 'a spine
+and 'a cmd = 'a head * 'a spine
 
 type tm = Tm of tm tmf
 
@@ -71,11 +71,8 @@ type 'a subst =
   | Sub of 'a subst * 'a
   | Cmp of 'a subst * 'a subst
 
-let ($$) hd stk =
-  Cut (hd, stk)
-
 let var i =
-  Ix i $$ Emp
+  Ix i, Emp
 
 let lift sub =
   Sub (Cmp (sub, Proj), var 0)
@@ -155,11 +152,10 @@ and subst_tm_face sub (r, r', otm) =
 
 
 (* TODO: I don't know if this is backwards or not *)
-and subst_cmd sub =
-  function Cut (head, spine) ->
-    let Cut (head', spine') = subst_head sub head in
-    let spine'' = subst_spine sub spine in
-    Cut (head', spine'' <.> spine')
+and subst_cmd sub (head, spine) =
+  let head', spine' = subst_head sub head in
+  let spine'' = subst_spine sub spine in
+  head', spine'' <.> spine'
 
 and subst_spine sub spine =
   Bwd.map (subst_frame sub) spine
@@ -190,15 +186,15 @@ and subst_head sub head =
     subst_ix sub i
 
   | Ref (a, tw) ->
-    Ref (a, tw) $$ Emp
+    Ref (a, tw), Emp
 
   | Meta a ->
-    Meta a $$ Emp
+    Meta a, Emp
 
   | Down info ->
     let ty = subst sub info.ty in
     let tm = subst sub info.tm in
-    Down {ty; tm} $$ Emp
+    Down {ty; tm}, Emp
 
   | HCom info ->
     let r = subst sub info.r in
@@ -206,14 +202,14 @@ and subst_head sub head =
     let ty = subst sub info.ty in
     let cap = subst sub info.cap in
     let sys = subst_comp_sys sub info.sys in
-    HCom {r; r'; ty; cap; sys} $$ Emp
+    HCom {r; r'; ty; cap; sys}, Emp
 
   | Coe info ->
     let r = subst sub info.r in
     let r' = subst sub info.r' in
     let ty = subst_bnd sub info.ty in
     let tm = subst sub info.tm in
-    Coe {r; r'; ty; tm} $$ Emp
+    Coe {r; r'; ty; tm}, Emp
 
   | Com info ->
     let r = subst sub info.r in
@@ -221,14 +217,14 @@ and subst_head sub head =
     let ty = subst_bnd sub info.ty in
     let cap = subst sub info.cap in
     let sys = subst_comp_sys sub info.sys in
-    Com {r; r'; ty; cap; sys} $$ Emp
+    Com {r; r'; ty; cap; sys}, Emp
 
 and subst_ix sub ix =
   match sub with
   | Id ->
-    Ix ix $$ Emp
+    Ix ix, Emp
   | Proj ->
-    Ix (ix + 1) $$ Emp
+    Ix (ix + 1), Emp
 
   | Sub (sub, cmd) ->
     if ix = 0 then cmd else subst_ix sub (ix - 1)
@@ -323,11 +319,10 @@ let traverse ~f ~var ~ref =
       Let (go_cmd k cmd, go_bnd k bnd)
 
   (* TODO: not sure if this is backwards !!!! *)
-  and go_cmd k =
-    function Cut (hd, sp) ->
-      let Cut (hd', sp') = go_hd k hd in
-      let sp'' = go_spine k sp in
-      Cut (hd', sp' <.> sp'')
+  and go_cmd k (hd, sp) =
+    let hd', sp' = go_hd k hd in
+    let sp'' = go_spine k sp in
+    hd', sp' <.> sp''
 
   and go_hd k =
     function
@@ -336,31 +331,31 @@ let traverse ~f ~var ~ref =
     | Ref (a, tw) ->
       ref k (a, tw)
     | Meta a ->
-      Meta a $$ Emp
+      Meta a, Emp
     | Down info ->
       let ty = f k info.ty in
       let tm = f k info.tm in
-      Down {ty; tm} $$ Emp
+      Down {ty; tm}, Emp
     | Coe info ->
       let r = f k info.r in
       let r' = f k info.r' in
       let ty = go_bnd k info.ty in
       let tm = f k info.tm in
-      Coe {r; r'; ty; tm} $$ Emp
+      Coe {r; r'; ty; tm}, Emp
     | HCom info ->
       let r = f k info.r in
       let r' = f k info.r' in
       let ty = f k info.ty in
       let cap = f k info.cap in
       let sys = go_comp_sys k info.sys in
-      HCom {r; r'; ty; cap; sys} $$ Emp
+      HCom {r; r'; ty; cap; sys}, Emp
     | Com info ->
       let r = f k info.r in
       let r' = f k info.r' in
       let ty = go_bnd k info.ty in
       let cap = f k info.cap in
       let sys = go_comp_sys k info.sys in
-      Com {r; r'; ty; cap; sys} $$ Emp
+      Com {r; r'; ty; cap; sys}, Emp
 
   and go_spine k =
     Bwd.map (go_frm k)
@@ -418,12 +413,12 @@ let fix_traverse ~var ~ref  =
   go 0
 
 let close_var a k =
-  let var i = Ix i $$ Emp in
-  let ref n (b, tw) = if b = a then Ix (n + k) $$ Emp else Ref (b, tw) $$ Emp in
+  let var i = Ix i, Emp in
+  let ref n (b, tw) = if b = a then Ix (n + k), Emp else Ref (b, tw), Emp in
   fix_traverse ~var ~ref
 
 let subst sub =
-  let ref _ (b, tw) = Ref (b, tw) $$ Emp in
+  let ref _ (b, tw) = Ref (b, tw), Emp in
   let rec go k (Tm tm) =
     let var i = subst_ix (liftn k sub) i in
     Tm (traverse ~f:go ~var ~ref k tm)
@@ -432,8 +427,8 @@ let subst sub =
 
 (* TODO: check that this isn't catastrophically wrong *)
 let open_var k a tw =
-  let var i = if i = k then Ref (a, tw) $$ Emp else Ix i $$ Emp in
-  let ref _n (b, tw) = Ref (b, tw) $$ Emp in
+  let var i = if i = k then Ref (a, tw), Emp else Ix i, Emp in
+  let ref _n (b, tw) = Ref (b, tw), Emp in
   fix_traverse ~var ~ref
 
 let unbind (B (nm, t)) =
@@ -565,32 +560,31 @@ and pp_head env fmt =
   | Down {ty; tm} ->
     Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
 
-and pp_cmd env fmt =
-  function Cut (hd, sp) ->
-    let rec go fmt sp =
-      match sp with
-      | Emp -> pp_head env fmt hd
-      | Snoc (sp, f)->
-        match f with
-        | Car ->
-          Format.fprintf fmt "@[<1>(car@ %a)@]" go sp
-        | Cdr ->
-          Format.fprintf fmt "@[<1>(cdr@ %a)@]" go sp
-        | FunApp t ->
-          Format.fprintf fmt "@[<1>(%a@ %a)@]" go sp (pp env) t
-        | ExtApp ts ->
-          Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" go sp (pp_terms env) ts
-        | If {mot = B (nm, mot); tcase; fcase} ->
-          let x, env' = Pretty.Env.bind nm env in
-          Format.fprintf fmt "@[<1>(if@ [%a] %a@ %a %a %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot go sp (pp env) tcase (pp env) fcase
-        | VProj {r; _} ->
-          (* TODO *)
-          Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r go sp
-        | LblCall ->
-          Format.fprintf fmt "@[<1>(call@ %a)@]" go sp
-    in
-    (* TODO: backwards ??? *)
-    go fmt sp
+and pp_cmd env fmt (hd, sp) =
+  let rec go fmt sp =
+    match sp with
+    | Emp -> pp_head env fmt hd
+    | Snoc (sp, f)->
+      match f with
+      | Car ->
+        Format.fprintf fmt "@[<1>(car@ %a)@]" go sp
+      | Cdr ->
+        Format.fprintf fmt "@[<1>(cdr@ %a)@]" go sp
+      | FunApp t ->
+        Format.fprintf fmt "@[<1>(%a@ %a)@]" go sp (pp env) t
+      | ExtApp ts ->
+        Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" go sp (pp_terms env) ts
+      | If {mot = B (nm, mot); tcase; fcase} ->
+        let x, env' = Pretty.Env.bind nm env in
+        Format.fprintf fmt "@[<1>(if@ [%a] %a@ %a %a %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot go sp (pp env) tcase (pp env) fcase
+      | VProj {r; _} ->
+        (* TODO *)
+        Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r go sp
+      | LblCall ->
+        Format.fprintf fmt "@[<1>(call@ %a)@]" go sp
+  in
+  (* TODO: backwards ??? *)
+  go fmt sp
 
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -643,13 +637,11 @@ and pp_bface env fmt face =
 
 let up cmd = make @@ Up cmd
 
-let car =
-  function Cut (hd, sp) ->
-    Cut (hd, sp #< Car)
+let car (hd, sp) =
+  hd, sp #< Car
 
-let cdr =
-  function Cut (hd, sp) ->
-    Cut (hd, sp #< Cdr)
+let cdr (hd, sp) =
+  hd, sp #< Cdr
 
 let lam nm t = make @@ Lam (B (nm, t))
 let ext_lam nms t = make @@ ExtLam (NB (nms, t))
@@ -680,7 +672,7 @@ struct
     sg None ty0 @@
     path
       (subst Proj ty1)
-      (up @@ (Ix 0 $$ Emp #< (FunApp (subst Proj f))))
+      (up @@ (Ix 0, Emp #< (FunApp (subst Proj f))))
       (subst Proj x)
 
   let proj2 = Cmp (Proj, Proj)
@@ -722,18 +714,16 @@ struct
       go_cmd fl cmd acc
     | _ -> failwith ""
 
-  and go_cmd fl cmd acc =
-    match cmd with
-    | Cut (hd, stk) ->
-      match fl, hd with
-      | `RigVars, Ref (x, _) ->
-        go_spine fl stk @@
-        Occurs.Set.add x acc
-      | `RigVars, Meta _ ->
-        acc
-      | _ ->
-        go_spine fl stk @@
-        go_head fl hd acc
+  and go_cmd fl (hd, sp) acc =
+    match fl, hd with
+    | `RigVars, Ref (x, _) ->
+      go_spine fl sp @@
+      Occurs.Set.add x acc
+    | `RigVars, Meta _ ->
+      acc
+    | _ ->
+      go_spine fl sp @@
+      go_head fl hd acc
 
   and go_head fl hd acc =
     match fl, hd with
@@ -917,9 +907,8 @@ let rec map_ext_bnd f nbnd =
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
     NB (nm :: nms, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
 
-let map_cmd f =
-  function Cut (hd, sp) ->
-    Cut (map_head f hd, map_spine f sp)
+let map_cmd f (hd, sp) =
+  map_head f hd, map_spine f sp
 
 let map_tmf f =
   function

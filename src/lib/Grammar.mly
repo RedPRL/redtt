@@ -177,8 +177,7 @@ head:
 cmd:
   | c = cut
     { fun env ->
-      let hd, fs = c env in
-      Tm.Cut (hd, fs) }
+      c env }
 
 cut:
   | hd = head

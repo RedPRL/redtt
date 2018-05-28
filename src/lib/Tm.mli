@@ -59,7 +59,7 @@ and 'a frame =
   | LblCall
 
 and 'a spine = 'a frame bwd
-and 'a cmd = Cut of 'a head * 'a spine
+and 'a cmd = 'a head * 'a spine
 
 type tm
 

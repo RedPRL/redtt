@@ -32,7 +32,7 @@ let rec pis gm tm =
 let telescope_to_spine =
   (* TODO: might be backwards *)
   Bwd.map @@ fun (x, _) ->
-  Tm.FunApp (Tm.up @@ Tm.Cut (Tm.Ref (x, `Only), Emp))
+  Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
 
 let hole gm ty f =
   let alpha = Name.fresh () in
@@ -65,15 +65,15 @@ let rec eta_contract t =
     let tm'y = eta_contract tmy in
     begin
       match Tm.unleash tm'y with
-      | Tm.Up (Tm.Cut (Tm.Ref (f, twf), Snoc (sp, Tm.FunApp arg))) ->
+      | Tm.Up (Tm.Ref (f, twf), Snoc (sp, Tm.FunApp arg)) ->
         begin
           match Tm.unleash arg with
-          | Tm.Up (Tm.Cut (Tm.Ref (y', _), Emp))
+          | Tm.Up (Tm.Ref (y', _), Emp)
             when
               y = y'
               && not @@ Occurs.Set.mem y @@ Tm.Sp.free `Vars sp
             ->
-            Tm.up @@ Tm.Cut (Tm.Ref (f, twf), sp)
+            Tm.up (Tm.Ref (f, twf), sp)
           | _ ->
             Tm.make @@ Tm.Lam (Tm.bind y tm'y)
         end
@@ -86,11 +86,11 @@ let rec eta_contract t =
     let t1' = eta_contract t1 in
     begin
       match Tm.unleash t0', Tm.unleash t1' with
-      | Tm.Up (Tm.Cut (hd0, Snoc (sp0, Tm.Car))), Tm.Up (Tm.Cut (hd1, Snoc (sp1, Tm.Cdr)))
+      | Tm.Up (hd0, Snoc (sp0, Tm.Car)), Tm.Up (hd1, Snoc (sp1, Tm.Cdr))
         when
           hd0 = hd1 && sp0 = sp1
         ->
-        Tm.up @@ Tm.Cut (hd0, sp0)
+        Tm.up (hd0, sp0)
       | _ ->
         Tm.cons t0' t1'
     end
@@ -100,7 +100,7 @@ let rec eta_contract t =
 
 let to_var t =
   match Tm.unleash @@ eta_contract t with
-  | Tm.Up (Tm.Cut (Tm.Ref (a, _), Emp)) ->
+  | Tm.Up (Tm.Ref (a, _), Emp) ->
     Some a
   | _ ->
     None
@@ -142,7 +142,7 @@ let invert alpha ty sp t =
 
 let try_invert q ty =
   match Tm.unleash q.tm0 with
-  | Tm.Up (Tm.Cut (Meta alpha, sp)) ->
+  | Tm.Up (Meta alpha, sp) ->
     begin
       invert alpha ty sp q.tm1 >>= function
       | None ->
@@ -157,7 +157,7 @@ let try_invert q ty =
 
 let rec flex_term ~deps q =
   match Tm.unleash q.tm0 with
-  | Tm.Up (Tm.Cut (Meta alpha, _)) ->
+  | Tm.Up (Meta alpha, _) ->
     Bwd.map snd <@> ask >>= fun gm ->
     popl >>= fun e ->
     begin
@@ -188,7 +188,7 @@ let rec flex_term ~deps q =
 
 let rec flex_flex_diff ~deps q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
-  | Tm.Up (Tm.Cut (Tm.Meta alpha0, _)), Tm.Up (Tm.Cut (Tm.Meta alpha1, _)) ->
+  | Tm.Up (Tm.Meta alpha0, _), Tm.Up (Tm.Meta alpha1, _) ->
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
@@ -257,14 +257,14 @@ let flex_flex_same q =
     let f (hd, sp) =
       lambdas (Bwd.map fst tele) @@
       let sp' = telescope_to_spine tele in
-      Tm.up @@ Tm.Cut (hd, sp <.> sp')
+      Tm.up (hd, sp <.> sp')
     in
     instantiate (alpha, pis tele' cod, f)
   | None ->
     block @@ Unify
       {q with
-       tm0 = Tm.up @@ Tm.Cut (Tm.Meta alpha, sp0);
-       tm1 = Tm.up @@ Tm.Cut (Tm.Meta alpha, sp1)}
+       tm0 = Tm.up (Tm.Meta alpha, sp0);
+       tm1 = Tm.up (Tm.Meta alpha, sp1)}
 
 let try_prune _q =
   (* TODO: implement pruning *)
@@ -309,8 +309,8 @@ struct
       | con -> con
     in
     match Tm.unleash tm, unleash_ty ty, frame with
-    | Tm.Up (Tm.Cut (hd, sp)), _, _ ->
-      Tm.up @@ Tm.Cut (hd, sp #< frame)
+    | Tm.Up (hd, sp), _, _ ->
+      Tm.up (hd, sp #< frame)
     | Tm.Lam bnd, Val.Pi {dom; cod}, Tm.FunApp arg ->
       inst_bnd (cod, bnd) (dom, arg)
     | _, _, Tm.ExtApp _ ->
@@ -342,13 +342,13 @@ end
 *)
 let is_orthogonal q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
-  | Tm.Up (Tm.Cut (Tm.Ref _, _)), Tm.Up (Tm.Cut (Tm.Ref _, _)) -> false
-  | Tm.Up (Tm.Cut (Tm.Ref _, _)), Tm.Up (Tm.Cut (Tm.Meta _, _)) -> false
-  | Tm.Up (Tm.Cut (Tm.Ref _, _)), _ -> true
+  | Tm.Up (Tm.Ref _, _), Tm.Up (Tm.Ref _, _) -> false
+  | Tm.Up (Tm.Ref _, _), Tm.Up (Tm.Meta _, _) -> false
+  | Tm.Up (Tm.Ref _, _), _ -> true
 
-  | Tm.Up (Tm.Cut (Tm.Meta _, _)), Tm.Up (Tm.Cut (Tm.Ref _, _)) -> false
-  | Tm.Up (Tm.Cut (Tm.Meta _, _)), Tm.Up (Tm.Cut (Tm.Meta _, _)) -> false
-  | _, Tm.Up (Tm.Cut (Tm.Ref _, _)) -> true
+  | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Ref _, _) -> false
+  | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) -> false
+  | _, Tm.Up (Tm.Ref _, _) -> true
 
   | Tm.Pi _, Tm.Univ _ -> true
   | Tm.Pi _, Tm.Sg _ -> true
@@ -427,8 +427,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       go sp0 sp1 >>= fun (ty0, ty1) ->
       let _, cod0 = T.Cx.Eval.unleash_sg ty0 in
       let _, cod1 = T.Cx.Eval.unleash_sg ty1 in
-      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp @@ Tm.Cut (Tm.Ref (x0, tw0), sp0 #< Tm.Car) in
-      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp @@ Tm.Cut (Tm.Ref (x1, tw1), sp1 #< Tm.Car) in
+      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref (x0, tw0), sp0 #< Tm.Car) in
+      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref (x1, tw1), sp1 #< Tm.Car) in
       ret (cod0, cod1)
 
     | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
@@ -453,8 +453,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let mot1_ff = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Ff) in
       active @@ Problem.eqn ~ty0:mot0_tt ~tm0:info0.tcase ~ty1:mot1_tt ~tm1:info1.tcase >>
       active @@ Problem.eqn ~ty0:mot0_ff ~tm0:info0.fcase ~ty1:mot1_ff ~tm1:info1.fcase >>
-      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up @@ Tm.Cut (Tm.Ref (x0, tw0), sp0)) in
-      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up @@ Tm.Cut (Tm.Ref (x1, tw1), sp1)) in
+      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up (Tm.Ref (x0, tw0), sp0)) in
+      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up (Tm.Ref (x1, tw1), sp1)) in
       ret (ty0, ty1)
 
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
@@ -484,7 +484,7 @@ let rigid_rigid q =
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
-  | Tm.Up (Tm.Cut (Tm.Ref (x0, tw0), sp0)), Tm.Up (Tm.Cut (Tm.Ref (x1, tw1), sp1)) ->
+  | Tm.Up (Tm.Ref (x0, tw0), sp0), Tm.Up (Tm.Ref (x1, tw1), sp1) ->
     match_spine x0 tw0 sp0 x1 tw1 sp1 >>
     ret ()
 
@@ -503,8 +503,8 @@ let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, _), Tm.Pi (dom1, _) ->
     let x = Name.fresh () in
-    let x_l = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinL), Emp) in
-    let x_r = Tm.up @@ Tm.Cut (Tm.Ref (x, `TwinR), Emp) in
+    let x_l = Tm.up (Tm.Ref (x, `TwinL), Emp) in
+    let x_r = Tm.up (Tm.Ref (x, `TwinR), Emp) in
     let ty0, tm0 = (q.ty0, q.tm0) %% Tm.FunApp x_l in
     let ty1, tm1 = (q.ty1, q.tm1) %% Tm.FunApp x_r in
     active @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
@@ -519,7 +519,7 @@ let unify q =
 
   | _ ->
     match Tm.unleash q.tm0, Tm.unleash q.tm1 with
-    | Tm.Up (Tm.Cut (Tm.Meta alpha0, sp0)), Tm.Up (Tm.Cut (Tm.Meta alpha1, sp1))
+    | Tm.Up (Tm.Meta alpha0, sp0), Tm.Up (Tm.Meta alpha1, sp1)
       when
         alpha0 = alpha1
       ->
@@ -528,16 +528,16 @@ let unify q =
         flex_flex_same {q with tm0 = alpha0, sp0; tm1 = sp1}
       end
 
-    | Tm.Up (Tm.Cut (Tm.Meta _, _)), Tm.Up (Tm.Cut (Tm.Meta _, _)) ->
+    | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
       try_prune q <|| begin
         try_prune (Equation.sym q) <||
         flex_flex_diff [] q
       end
 
-    | Tm.Up (Tm.Cut (Tm.Meta _, _)), _ ->
+    | Tm.Up (Tm.Meta _, _), _ ->
       try_prune q <|| flex_term [] q
 
-    | _, Tm.Up (Tm.Cut (Tm.Meta _, _)) ->
+    | _, Tm.Up (Tm.Meta _, _) ->
       let q' = Equation.sym q in
       try_prune q' <|| flex_term [] q'
 

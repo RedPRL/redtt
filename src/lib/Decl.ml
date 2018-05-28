@@ -28,7 +28,7 @@ let to_cmd decl =
   | Define {info; args; body; _} ->
     let ty = TmUtil.pi_from_tele (Some info) args in
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
-    Tm.Cut (Tm.Down {ty; tm}, Emp)
+    Tm.Down {ty; tm}, Emp
 
 
 let rec check_document decls =
@@ -47,7 +47,7 @@ and check_decl cx decl =
   | Define {info; args; body} ->
     let ty = TmUtil.pi_from_tele (Some info) args in
     let tm = TmUtil.lam_from_multibind (Some info) @@ tele_to_multibind args body in
-    let cmd = Tm.Cut (Tm.Down {ty; tm}, Emp) in
+    let cmd = Tm.Down {ty; tm}, Emp in
     let vty = Typing.infer cx cmd in
     let el = LocalCx.eval cx tm in
     let tm' = LocalCx.quote cx ~ty:vty el in
