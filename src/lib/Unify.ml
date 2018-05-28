@@ -578,3 +578,29 @@ let rec solver =
         | false ->
           in_scope x (Tw (ty0, ty1)) @@
           solver probx
+
+
+let lower _tele _alpha _ty =
+  (* TODO: implement lowering *)
+  ret false
+
+(* guess who named this function, lol *)
+let rec ambulando () =
+  optional popr >>= function
+  | None -> ret ()
+  | Some e ->
+    match e with
+    | E (alpha, ty, Hole) ->
+      begin
+        lower Emp alpha ty <||
+        pushl e
+      end >>
+      ambulando ()
+
+    | Q (Active, prob) ->
+      solver prob >>
+      ambulando ()
+
+    | _ ->
+      pushl e >>
+      ambulando ()
