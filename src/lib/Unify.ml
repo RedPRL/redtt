@@ -540,3 +540,41 @@ let unify q =
 
     | _ ->
       rigid_rigid q
+
+
+let is_reflexive q =
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  check_eq ~ty:univ q.ty0 q.ty1 >>= function
+  | true ->
+    check_eq ~ty:q.ty0 q.tm0 q.tm1
+  | false ->
+    ret false
+
+let rec solver =
+  function
+  | Unify q ->
+    is_reflexive q <||
+    unify q
+
+  | All (param, prob) ->
+    let x, probx = unbind prob in
+    if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
+      active probx
+    else
+      match param with
+      | P ty ->
+        (* TODO: split sigma, blah blah *)
+        in_scope x (P ty) @@
+        solver probx
+
+      | Tw (ty0, ty1) ->
+        let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+        check_eq ~ty:univ ty0 ty1 >>= function
+        | true ->
+          let var = Tm.up (Tm.Ref (x, `Only), Emp) in
+          let sigma = Subst.define Subst.emp x ~ty:ty0 ~tm:var in
+          solver @@ Problem.all x ty0 @@
+          Problem.subst sigma probx
+        | false ->
+          in_scope x (Tw (ty0, ty1)) @@
+          solver probx

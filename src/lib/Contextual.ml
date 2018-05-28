@@ -2,8 +2,6 @@ open Dev
 open RedBasis
 open Bwd open BwdNotation
 
-module Subst = GlobalCx
-
 type cx_l = entry bwd
 type cx_r = [`Entry of entry | `Subst of Subst.t] list
 
@@ -63,62 +61,12 @@ let popl =
   | _ -> failwith "popl: empty"
 
 
-let subst_tm sub ~ty tm =
-  let module T = Typing.M (struct let globals = sub end) in
-  let vty = T.Cx.eval T.Cx.emp ty in
-  let el = T.Cx.eval T.Cx.emp tm in
-  T.Cx.quote T.Cx.emp ~ty:vty el
-
-let subst_decl sub ~ty =
-  function
-  | Hole ->
-    Hole
-  | Defn t ->
-    Defn (subst_tm sub ~ty t)
-
-let subst_equation sub q =
-  let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
-  let ty0 = subst_tm sub ~ty:univ q.ty0 in
-  let ty1 = subst_tm sub ~ty:univ q.ty1 in
-  let tm0 = subst_tm sub ~ty:ty0 q.tm0 in
-  let tm1 = subst_tm sub ~ty:ty1 q.tm1 in
-  {ty0; ty1; tm0; tm1}
-
-let subst_param sub =
-  let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
-  function
-  | P ty ->
-    P (subst_tm sub ~ty:univ ty)
-  | Tw (ty0, ty1) ->
-    Tw (subst_tm sub ~ty:univ ty0, subst_tm sub ~ty:univ ty1)
-
-let rec subst_problem sub =
-  function
-  | Unify q ->
-    Unify (subst_equation sub q)
-  | All (param, prob) ->
-    let param' = subst_param sub param in
-    let x, probx = unbind prob in
-    let probx' = subst_problem sub probx in
-    let prob' = Dev.bind x probx' in
-    All (param', prob')
-
-
-let subst_entry sub =
-  function
-  | E (x, ty, decl) ->
-    let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
-    E (x, subst_tm sub ~ty:univ ty, subst_decl sub ~ty decl)
-  | Q (s, p) ->
-    let p' = subst_problem sub p in
-    let s' = if p = p' then s else Active in
-    Q (s', p')
 
 let popr =
   let rec go sub =
     getr >>= function
     | `Entry e :: mcx ->
-      let e' = subst_entry sub e in
+      let e' = Entry.subst sub e in
       setr (`Subst sub :: mcx) >>
       ret e'
     | `Subst sub' :: mcx ->
