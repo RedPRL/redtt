@@ -35,11 +35,54 @@ type entry =
   | E of Name.t * ty * tm decl
   | Q of status * problem
 
-let bind _ _ = failwith ""
+let eqn_open_var k x q =
+  let ty0 = Tm.open_var k x `Only q.ty0 in
+  let ty1 = Tm.open_var k x `Only q.ty1 in
+  let tm0 = Tm.open_var k x `Only q.tm0 in
+  let tm1 = Tm.open_var k x `Only q.tm1 in
+  {ty0; ty1; tm0; tm1}
 
-let unbind (B _prob) =
-  let _x = Name.fresh () in
-  failwith ""
+let rec eqn_close_var x k q =
+  let ty0 = Tm.close_var x k q.ty0 in
+  let ty1 = Tm.close_var x k q.ty1 in
+  let tm0 = Tm.close_var x k q.tm0 in
+  let tm1 = Tm.close_var x k q.tm1 in
+  {ty0; ty1; tm0; tm1}
+
+let param_open_var k x =
+  function
+  | P ty ->
+    P (Tm.open_var k x `Only ty)
+  | Tw (ty0, ty1) ->
+    Tw (Tm.open_var k x `Only ty0, Tm.open_var k x `Only ty1)
+
+let param_close_var x k =
+  function
+  | P ty ->
+    P (Tm.close_var x k ty)
+  | Tw (ty0, ty1) ->
+    Tw (Tm.close_var x k ty0, Tm.close_var x k ty1)
+
+let rec prob_open_var k x =
+  function
+  | Unify q ->
+    Unify (eqn_open_var k x q)
+  | All (p, B prob) ->
+    All (param_open_var k x p, B (prob_open_var (k + 1) x prob))
+
+let rec prob_close_var x k =
+  function
+  | Unify q ->
+    Unify (eqn_close_var x k q)
+  | All (p, B prob) ->
+    All (param_close_var x k p, B (prob_close_var x (k + 1) prob))
+
+let bind x probx =
+  B (prob_close_var x 0 probx)
+
+let unbind (B prob) =
+  let x = Name.fresh () in
+  x, prob_open_var 0 x prob
 
 module Subst = GlobalCx
 

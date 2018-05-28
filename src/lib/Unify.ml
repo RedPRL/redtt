@@ -587,7 +587,9 @@ let lower _tele _alpha _ty =
 (* guess who named this function, lol *)
 let rec ambulando () =
   optional popr >>= function
-  | None -> ret ()
+  | None ->
+    ret ()
+
   | Some e ->
     match e with
     | E (alpha, ty, Hole) ->
