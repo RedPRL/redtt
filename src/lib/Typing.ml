@@ -141,7 +141,7 @@ struct
     | V.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
       let cxx, xs = Cx.ext_dims cx ~nms in
       let vcod = check_eval cxx ty cod in
-      if not @@ Kind.stronger Kind.Kan univ.kind then
+      if Kind.lte univ.kind Kind.Kan then
         check_extension_cofibration cx xs @@ cofibration_of_sys cxx sys
       else
         ();

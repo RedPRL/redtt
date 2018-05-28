@@ -6,6 +6,8 @@ let greater l0 l1 =
   | Const i0, Const i1 -> i0 > i1
   | _ -> false
 
+let lte l0 l1 = l0 = l1 or greater l1 l0
+
 let to_string l =
   match l with
   | Omega -> "omega"

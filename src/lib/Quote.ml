@@ -394,7 +394,7 @@ struct
       ignore @@ List.map go_arg @@ List.combine info0.args info1.args
 
     | Univ info0, Univ info1 ->
-      if (info0.kind = info1.kind or Kind.stronger info0.kind info1.kind) && (info0.lvl = info1.lvl or Lvl.greater info1.lvl info0.lvl) then
+      if Kind.lte info0.kind info1.kind && Lvl.lte info0.lvl info1.lvl then
         ()
       else
         failwith "Universe subtyping error"
