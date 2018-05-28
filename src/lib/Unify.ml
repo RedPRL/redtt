@@ -303,23 +303,19 @@ struct
     T.Cx.quote T.Cx.emp ~ty:vty el
 
   let plug (ty, tm) frame =
-    let rec unleash_ty ty =
-      match T.Cx.Eval.unleash ty with
-      | Val.Rst info -> unleash_ty info.ty
-      | con -> con
-    in
-    match Tm.unleash tm, unleash_ty ty, frame with
-    | Tm.Up (hd, sp), _, _ ->
+    match Tm.unleash tm, frame with
+    | Tm.Up (hd, sp), __ ->
       Tm.up (hd, sp #< frame)
-    | Tm.Lam bnd, Val.Pi {dom; cod}, Tm.FunApp arg ->
+    | Tm.Lam bnd, Tm.FunApp arg ->
+      let dom, cod = T.Cx.Eval.unleash_pi ty in
       inst_bnd (cod, bnd) (dom, arg)
-    | _, _, Tm.ExtApp _ ->
+    | _, Tm.ExtApp _ ->
       failwith "TODO: %%/ExtApp"
-    | Tm.Cons (t0, _), _, Tm.Car -> t0
-    | Tm.Cons (_, t1), _, Tm.Cdr -> t1
-    | Tm.LblRet t, _, Tm.LblCall -> t
-    | Tm.Tt, _, Tm.If info -> info.tcase
-    | Tm.Ff, _, Tm.If info -> info.fcase
+    | Tm.Cons (t0, _), Tm.Car -> t0
+    | Tm.Cons (_, t1), Tm.Cdr -> t1
+    | Tm.LblRet t, Tm.LblCall -> t
+    | Tm.Tt, Tm.If info -> info.tcase
+    | Tm.Ff, Tm.If info -> info.fcase
     | _ -> failwith "TODO: %%"
 
   let (%%) (ty, tm) frame =
