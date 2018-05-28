@@ -304,7 +304,7 @@ struct
 
   let plug (ty, tm) frame =
     match Tm.unleash tm, frame with
-    | Tm.Up (hd, sp), __ ->
+    | Tm.Up (hd, sp), _ ->
       Tm.up (hd, sp #< frame)
     | Tm.Lam bnd, Tm.FunApp arg ->
       let dom, cod = T.Cx.Eval.unleash_pi ty in
@@ -318,6 +318,7 @@ struct
     | Tm.Ff, Tm.If info -> info.fcase
     | _ -> failwith "TODO: %%"
 
+  (* TODO: this sorry attempt results in things getting repeatedly evaluated *)
   let (%%) (ty, tm) frame =
     let vty = T.Cx.eval T.Cx.emp ty in
     let tm' = plug (vty, tm) frame in
