@@ -46,7 +46,6 @@ let hole gm ty f =
 let define gm alpha ~ty tm =
   let ty' = pis gm ty in
   let tm' = lambdas (Bwd.map fst gm) tm in
-  unleash_subst alpha ~ty:ty' tm' >>
   pushr @@ E (alpha, ty', Defn tm')
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.

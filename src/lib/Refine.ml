@@ -74,6 +74,7 @@ type eterm =
   | Lam of string * eterm
   | Tt
   | Ff
+  | Underscore
 
 let rec elab =
   function
@@ -94,6 +95,9 @@ let rec elab =
     refine_lam x >>
     elab e
 
+  | Underscore ->
+    go_right
+
 let test_script : unit m =
   let alpha = Name.fresh () in
   let bool = Tm.make Tm.Bool in
@@ -102,6 +106,6 @@ let test_script : unit m =
   pushr @@ E (alpha, goal_ty, Hole) >>
   dump_state Format.std_formatter >>
   begin
-    elab @@ Lam ("x", Pair (Tt, Tt))
+    elab @@ Lam ("x", Pair (Tt, Underscore))
   end >>
   dump_state Format.std_formatter

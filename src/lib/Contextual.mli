@@ -16,8 +16,6 @@ val pushls : entry list -> unit m
 val go_left : unit m
 val go_right : unit m
 
-val unleash_subst : Name.t -> ty:ty -> tm -> unit m
-
 val in_scope : Name.t -> param -> 'a m -> 'a m
 val lookup_var : Name.t -> twin -> ty m
 val lookup_meta : Name.t -> ty m

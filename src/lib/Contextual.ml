@@ -3,7 +3,7 @@ open RedBasis
 open Bwd open BwdNotation
 
 type cx_l = entry bwd
-type cx_r = [`Entry of entry | `Subst of Subst.t] list
+type cx_r = entry list
 
 type cx = cx_l * cx_r
 
@@ -24,12 +24,10 @@ let rec pp_cx_r fmt =
   function
   | [] ->
     ()
-  | `Subst _ :: cx ->
-    pp_cx_r fmt cx
-  | `Entry e :: []->
+  | e :: []->
     Format.fprintf fmt "@[<1>%a@]"
       pp_entry e
-  | `Entry e :: cx ->
+  | e :: cx ->
     Format.fprintf fmt "@[<1>%a@];@; %a"
       pp_entry e
       pp_cx_r cx
@@ -79,7 +77,7 @@ let modifyr f = modify @@ fun (l, r) -> l, f r
 let setl l = modifyl @@ fun _ -> l
 let setr r = modifyr @@ fun _ -> r
 let pushl e = modifyl @@ fun es -> es #< e
-let pushr e = modifyr @@ fun es -> `Entry e :: es
+let pushr e = modifyr @@ fun es -> e :: es
 
 let dump_state fmt =
   get >>= fun cx ->
@@ -104,20 +102,32 @@ let popl =
 
 
 
-let popr =
-  let rec go sub =
-    getr >>= function
-    | `Entry e :: mcx ->
-      let e' = Entry.subst sub e in
-      setr (`Subst sub :: mcx) >>
-      ret e'
-    | `Subst sub' :: mcx ->
-      setr mcx >>
-      go @@ Subst.merge sub sub'
-    | [] ->
-      failwith "popr: empty"
+let cx_core : cx_l -> GlobalCx.t =
+  let rec go es =
+    match es with
+    | Emp -> GlobalCx.emp
+    | Snoc (es, e) ->
+      match e with
+      | E (x, ty, Hole) ->
+        let cx = go es in
+        GlobalCx.add_hole cx x ty []
+      | E (x, ty, Defn t) ->
+        let cx = go es in
+        GlobalCx.define cx x ty t
+      | Q _ ->
+        go es
   in
-  go Subst.emp
+  go
+
+let popr =
+  getl >>= fun lcx ->
+  let sub = cx_core lcx in
+  getr >>= function
+  | e :: mcx ->
+    setr mcx >>
+    ret @@ Entry.subst sub e
+  | _ ->
+    failwith "popr: empty"
 
 let go_left =
   popl >>= pushr
@@ -159,11 +169,6 @@ let lookup_meta x =
   getl >>= look
 
 
-let unleash_subst x ~ty tm =
-  modifyr @@ fun es ->
-  let sub = Subst.define Subst.emp x ~ty ~tm in
-  `Subst sub :: es
-
 let postpone s p =
   ask >>= fun ps ->
   let wrapped =
@@ -180,23 +185,6 @@ let postpone s p =
 let active = postpone Active
 let block = postpone Blocked
 
-
-let cx_core : cx_l -> GlobalCx.t =
-  let rec go es =
-    match es with
-    | Emp -> GlobalCx.emp
-    | Snoc (es, e) ->
-      match e with
-      | E (x, ty, Hole) ->
-        let cx = go es in
-        GlobalCx.add_hole cx x ty []
-      | E (x, ty, Defn t) ->
-        let cx = go es in
-        GlobalCx.define cx x ty t
-      | Q _ ->
-        go es
-  in
-  go
 
 
 let typechecker : (module Typing.S) m =
