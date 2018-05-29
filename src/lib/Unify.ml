@@ -6,7 +6,7 @@ open Dev
 module Notation = Monad.Notation (Contextual)
 open Notation
 
-type telescope = (Name.t * ty) list
+type telescope = (Name.t * ty) bwd
 
 let rec telescope ty =
   match Tm.unleash ty with
@@ -43,7 +43,7 @@ let hole gm ty f =
   go_left >>
   ret r
 
-let define gm alpha ty tm =
+let define gm alpha ~ty tm =
   let ty' = pis gm ty in
   let tm' = lambdas (Bwd.map fst gm) tm in
   unleash_subst alpha tm' >>
@@ -149,7 +149,7 @@ let try_invert q ty =
         ret false
       | Some t ->
         active (Unify q) >>
-        define Emp alpha ty t >>
+        define Emp alpha ~ty t >>
         ret true
     end
   | _ ->
@@ -235,14 +235,14 @@ let rec intersect tele sp0 sp1 =
   | _ ->
     None
 
-type instantiation = Name.t * ty * (tm -> tm)
+type instantiation = Name.t * ty * (tm Tm.cmd -> tm)
 
-let rec instantiate inst =
+let rec instantiate (inst : instantiation) =
   let alpha, ty, f = inst in
   popl >>= function
   | E (beta, ty', Hole) when alpha = beta ->
-    hole Emp ty @@ fun t ->
-    define Emp beta ty' @@ f t
+    hole Emp ty @@ fun cmd ->
+    define Emp beta ~ty:ty' @@ f cmd
   | e ->
     pushr e >>
     instantiate inst
