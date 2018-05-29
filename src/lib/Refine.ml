@@ -30,13 +30,6 @@ let push_goal lbl gm ty kont =
   let ty' = Tm.make @@ Tm.LblTy {lbl; args = []; ty} in
   hole gm ty' kont
 
-let discharge tac =
-  tac >>
-  popr >>= function
-  | E (_, _, Defn _) ->
-    ret ()
-  | _ -> failwith "Incomplete subgoal"
-
 let refine_pair =
   pop_goal >>= fun goal ->
   match Tm.unleash goal.ty with
@@ -56,6 +49,14 @@ let refine_tt =
   | _ ->
     failwith "refine_tt"
 
+let refine_ff =
+  pop_goal >>= fun goal ->
+  match Tm.unleash goal.ty with
+  | Tm.Bool ->
+    goal.solve @@ Tm.make Tm.Ff
+  | _ ->
+    failwith "refine_ff"
+
 
 let refine_lam nm =
   pop_goal >>= fun goal ->
@@ -72,29 +73,38 @@ type eterm =
   | Pair of eterm * eterm
   | Lam of string * eterm
   | Tt
+  | Ff
 
 let rec elab =
   function
   | Tt ->
     refine_tt
 
+  | Ff ->
+    refine_tt
+
   | Pair (e0, e1) ->
     refine_pair >>
-    discharge @@ elab e0 >>
-    discharge @@ elab e1
+    elab e0 >>
+    go_right >>
+    elab e1 >>
+    go_right
 
   | Lam (x, e) ->
     refine_lam x >>
-    discharge @@ elab e
+    elab e
+
+let under tac =
+  go_right >> tac >> go_left
 
 let test_script : unit m =
   let alpha = Name.fresh () in
   let bool = Tm.make Tm.Bool in
-  let goal_ty = Tm.make @@ Tm.LblTy {lbl = "my-goal"; args = []; ty = Tm.sg None bool bool} in
+  let ty = Tm.Macro.arr bool @@ Tm.sg None bool bool in
+  let goal_ty = Tm.make @@ Tm.LblTy {lbl = "my-goal"; args = []; ty} in
   pushr @@ E (alpha, goal_ty, Hole) >>
+  dump_state Format.std_formatter >>
   begin
-    refine_pair >>
-    discharge refine_tt >>
-    discharge refine_tt
+    elab @@ Lam ("x", Pair (Tt, Tt))
   end >>
-  failwith "now, the proof state *should* contain just one entry: a definition of !alpha = (cons tt tt)"
+  dump_state Format.std_formatter
