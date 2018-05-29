@@ -90,7 +90,7 @@ let rec elab =
 let test_script : unit m =
   let alpha = Name.fresh () in
   let bool = Tm.make Tm.Bool in
-  let goal_ty = Tm.sg None bool bool in
+  let goal_ty = Tm.make @@ Tm.LblTy {lbl = "my-goal"; args = []; ty = Tm.sg None bool bool} in
   pushr @@ E (alpha, goal_ty, Hole) >>
   begin
     refine_pair >>
