@@ -163,7 +163,7 @@ struct
       Q.equiv cx.qenv ~ty el0 el1
     with
     | exn ->
-      Format.eprintf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1;
+      (* Format.eprintf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1; *)
       raise exn
 
   let check_eq_ty cx el0 el1 =

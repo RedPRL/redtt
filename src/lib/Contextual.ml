@@ -79,9 +79,9 @@ let setr r = modifyr @@ fun _ -> r
 let pushl e = modifyl @@ fun es -> es #< e
 let pushr e = modifyr @@ fun es -> e :: es
 
-let dump_state fmt =
+let dump_state fmt str =
   get >>= fun cx ->
-  Format.fprintf fmt "%a@.@." pp_cx cx;
+  Format.fprintf fmt "%s@.%a@.@." str pp_cx cx;
   ret ()
 
 let run (m : 'a m) : 'a  =
@@ -116,24 +116,44 @@ let cx_core : cx_l -> GlobalCx.t =
         GlobalCx.define cx x ty t
       | Q _ ->
         go es
+      | Bracket _ ->
+        go es
   in
   go
 
-let popr =
+
+let popr_opt =
   getl >>= fun lcx ->
   let sub = cx_core lcx in
   getr >>= function
   | e :: mcx ->
     setr mcx >>
-    ret @@ Entry.subst sub e
+    begin
+      try
+        ret @@ Some (Entry.subst sub e)
+      with
+      | e ->
+        Format.eprintf "Failed to substitute: %s !!!!!@." (Printexc.to_string e);
+        raise e
+    end
   | _ ->
-    failwith "popr: empty"
+    ret None
+
+let popr =
+  popr_opt >>= function
+  | Some e -> ret e
+  | None -> failwith "popr: empty"
 
 let go_left =
   popl >>= pushr
 
 let go_right =
   popr >>= pushl
+
+let go_to_top =
+  get >>= fun (lcx, rcx) ->
+  setl Emp >>
+  setr (lcx <>> rcx)
 
 let in_scope x p =
   local @@ fun ps ->

@@ -11,4 +11,4 @@ val define : telescope -> Name.t -> ty:ty -> tm -> unit m
 
 
 (** Run this in a proof state to solve unification problems. *)
-val ambulando : unit -> unit m
+val ambulando : Name.t -> unit m

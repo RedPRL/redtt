@@ -579,13 +579,19 @@ let rec solver =
           solver probx
 
 
-let lower _tele _alpha _ty =
-  (* TODO: implement lowering *)
-  ret false
+let lower tele alpha ty =
+  match Tm.unleash ty with
+  | Tm.LblTy info ->
+    hole tele info.ty @@ fun t ->
+    define tele alpha ~ty (Tm.make @@ Tm.LblRet (Tm.up t)) >>
+    ret true
+  | _ ->
+    (* TODO: implement lowering *)
+    ret false
 
 (* guess who named this function, lol *)
-let rec ambulando () =
-  optional popr >>= function
+let rec ambulando bracket =
+  popr_opt >>= function
   | None ->
     ret ()
 
@@ -596,12 +602,15 @@ let rec ambulando () =
         lower Emp alpha ty <||
         pushl e
       end >>
-      ambulando ()
+      ambulando bracket
 
     | Q (Active, prob) ->
       solver prob >>
-      ambulando ()
+      ambulando bracket
+
+    | Bracket bracket' when bracket = bracket' ->
+      ret ()
 
     | _ ->
       pushl e >>
-      ambulando ()
+      ambulando bracket

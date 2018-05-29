@@ -191,7 +191,7 @@ struct
         Tm.up (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Emp)
 
       | _ ->
-        Format.eprintf "Failed to equate@; @[<1>%a = %a ∈ %a@] @." pp_value el0 pp_value el1 pp_value ty;
+        (* Format.eprintf "Failed to equate@; @[<1>%a = %a ∈ %a@] @." pp_value el0 pp_value el1 pp_value ty; *)
         failwith "equate"
 
   and equate_neu_ env neu0 neu1 stk =

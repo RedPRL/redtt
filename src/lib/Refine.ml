@@ -57,6 +57,20 @@ let refine_ff =
   | _ ->
     failwith "refine_ff"
 
+let unify_ty ty0 ty1 =
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  let brack = Name.fresh () in
+  pushr @@ Bracket brack >>
+  active @@ Unify {ty0 = univ; ty1 = univ; tm0 = ty0; tm1 = ty1} >>
+  go_to_top >>
+  ambulando brack
+
+
+let soft_ff =
+  pop_goal >>= fun goal ->
+  unify_ty goal.ty @@ Tm.make Tm.Bool >>
+  goal.solve @@ Tm.make Tm.Ff
+
 
 let refine_lam nm =
   pop_goal >>= fun goal ->
@@ -98,14 +112,24 @@ let rec elab =
   | Underscore ->
     go_right
 
+let make_goal_ty lbl ty =
+  Tm.make @@ Tm.LblTy {lbl; args = []; ty}
+
 let test_script : unit m =
-  let alpha = Name.fresh () in
-  let bool = Tm.make Tm.Bool in
-  let ty = Tm.Macro.arr bool @@ Tm.sg None bool bool in
-  let goal_ty = Tm.make @@ Tm.LblTy {lbl = "my-goal"; args = []; ty} in
-  pushr @@ E (alpha, goal_ty, Hole) >>
-  dump_state Format.std_formatter >>
+  (* let bool = Tm.make Tm.Bool in *)
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  (* let ty = make_goal_ty "fun" @@ Tm.Macro.arr bool @@ Tm.sg None bool bool in *)
   begin
-    elab @@ Lam ("x", Pair (Tt, Underscore))
+    hole Emp (make_goal_ty "ty" univ) @@ fun (hd, sp) ->
+    hole Emp (make_goal_ty "el" @@ Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ ->
+    ret ()
   end >>
-  dump_state Format.std_formatter
+  (* dump_state Format.std_formatter >> *)
+  begin
+    go_right >>
+    soft_ff
+    (* elab @@ Lam ("x", Pair (Tt, Underscore)) *)
+  end >>
+  dump_state Format.std_formatter "result"
+
+(* dump_state Format.std_formatter *)

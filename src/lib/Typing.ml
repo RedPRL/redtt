@@ -209,7 +209,7 @@ struct
       check cx' ty t1
 
     | _ ->
-      Format.eprintf "Failed to check term %a@." (Tm.pp (Cx.ppenv cx)) tm;
+      (* Format.eprintf "Failed to check term %a@." (Tm.pp (Cx.ppenv cx)) tm; *)
       failwith "Type error"
 
   and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =

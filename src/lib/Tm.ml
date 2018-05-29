@@ -712,7 +712,9 @@ struct
       go_ext_bnd fl ebnd acc
     | Up cmd ->
       go_cmd fl cmd acc
-    | _ -> failwith ""
+    | Bool -> acc
+    | _ ->
+      failwith "TODO"
 
   and go_cmd fl (hd, sp) acc =
     match fl, hd with

@@ -8,11 +8,15 @@ val local : (params -> params) -> 'a m -> 'a m
 
 val popl : entry m
 val popr : entry m
+val popr_opt : entry option m
+
 val optional : 'a m -> 'a option m
 
 val pushl : entry -> unit m
 val pushr : entry -> unit m
 val pushls : entry list -> unit m
+
+val go_to_top : unit m
 val go_left : unit m
 val go_right : unit m
 
@@ -31,6 +35,6 @@ val check_eq : ty:ty -> tm -> tm -> bool m
 
 val typechecker : (module Typing.S) m
 
-val dump_state : Format.formatter -> unit m
+val dump_state : Format.formatter -> string -> unit m
 
 val run : 'a m -> 'a

@@ -34,7 +34,21 @@ type problem =
 type entry =
   | E of Name.t * ty * tm decl
   | Q of status * problem
+  | Bracket of Name.t
 
+let pp_equation fmt q =
+  Format.fprintf fmt "{%a : %a = %a : %a}"
+    (Tm.pp Pretty.Env.emp) q.tm0
+    (Tm.pp Pretty.Env.emp) q.ty0
+    (Tm.pp Pretty.Env.emp) q.tm1
+    (Tm.pp Pretty.Env.emp) q.ty1
+
+let pp_problem fmt =
+  function
+  | Unify q ->
+    pp_equation fmt q
+  | _ ->
+    Format.fprintf fmt "<problem>"
 
 let pp_entry fmt =
   function
@@ -49,8 +63,12 @@ let pp_entry fmt =
       (Tm.pp Pretty.Env.emp) ty
       (Tm.pp Pretty.Env.emp) tm
 
-  | Q (_, _prob) ->
-    Format.fprintf fmt "<query>"
+  | Q (_, prob) ->
+    Format.fprintf fmt "%a"
+      pp_problem prob
+
+  | Bracket _ ->
+    Format.fprintf fmt "<bracket>"
 
 let eqn_open_var k x q =
   let ty0 = Tm.open_var k x `Only q.ty0 in
@@ -158,6 +176,8 @@ let subst_entry sub =
     let p' = subst_problem sub p in
     let s' = if p = p' then s else Active in
     Q (s', p')
+  | Bracket a ->
+    Bracket a
 
 
 module Param =
@@ -234,6 +254,8 @@ struct
       Decl.free fl d
     | Q (_, p) ->
       Problem.free fl p
+    | Bracket _ ->
+      Occurs.Set.empty
 
   let subst = subst_entry
 end
