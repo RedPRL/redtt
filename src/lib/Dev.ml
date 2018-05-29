@@ -35,6 +35,23 @@ type entry =
   | E of Name.t * ty * tm decl
   | Q of status * problem
 
+
+let pp_entry fmt =
+  function
+  | E (x, ty, Hole) ->
+    Format.fprintf fmt "?%a : %a"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty
+
+  | E (x, ty, Defn tm) ->
+    Format.fprintf fmt "!%a : %a = %a"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty
+      (Tm.pp Pretty.Env.emp) tm
+
+  | Q (_, _prob) ->
+    Format.fprintf fmt "<query>"
+
 let eqn_open_var k x q =
   let ty0 = Tm.open_var k x `Only q.ty0 in
   let ty1 = Tm.open_var k x `Only q.ty1 in

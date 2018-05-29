@@ -37,6 +37,9 @@ val bind : Name.t -> problem -> problem bind
 val unbind : problem bind -> Name.t * problem
 
 
+val pp_entry : entry Pretty.t0
+
+
 type twin = Tm.twin
 
 module Subst = GlobalCx

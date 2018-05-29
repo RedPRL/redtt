@@ -7,6 +7,39 @@ type cx_r = [`Entry of entry | `Subst of Subst.t] list
 
 type cx = cx_l * cx_r
 
+
+let rec pp_cx_l fmt =
+  function
+  | Emp ->
+    ()
+  | Snoc (Emp, e) ->
+    Format.fprintf fmt "@[<1>%a@]"
+      pp_entry e
+  | Snoc (cx, e) ->
+    Format.fprintf fmt "%a;@; @[<1>%a@]"
+      pp_cx_l cx
+      pp_entry e
+
+let rec pp_cx_r fmt =
+  function
+  | [] ->
+    ()
+  | `Subst _ :: cx ->
+    pp_cx_r fmt cx
+  | `Entry e :: []->
+    Format.fprintf fmt "@[<1>%a@]"
+      pp_entry e
+  | `Entry e :: cx ->
+    Format.fprintf fmt "@[<1>%a@];@; %a"
+      pp_entry e
+      pp_cx_r cx
+
+let pp_cx fmt (lcx, rcx) =
+  Format.fprintf fmt "@[<1>%a@] |@ @[<1>%a@]"
+    pp_cx_l lcx
+    pp_cx_r rcx
+
+
 module M =
 struct
   type 'a m = params -> cx -> cx * 'a
@@ -48,6 +81,15 @@ let setr r = modifyr @@ fun _ -> r
 let pushl e = modifyl @@ fun es -> es #< e
 let pushr e = modifyr @@ fun es -> `Entry e :: es
 
+let dump_state fmt =
+  get >>= fun cx ->
+  Format.fprintf fmt "%a@.@." pp_cx cx;
+  ret ()
+
+let run (m : 'a m) : 'a  =
+  let _, r = m Emp (Emp, []) in
+  r
+
 let rec pushls es =
   match es with
   | [] -> ret ()
@@ -78,9 +120,10 @@ let popr =
   go Subst.emp
 
 let go_left =
-  popl >>= fun e ->
-  pushr e
+  popl >>= pushr
 
+let go_right =
+  popr >>= pushl
 
 let in_scope x p =
   local @@ fun ps ->
@@ -116,8 +159,7 @@ let lookup_meta x =
   getl >>= look
 
 
-let unleash_subst x tm =
-  lookup_meta x >>= fun ty ->
+let unleash_subst x ~ty tm =
   modifyr @@ fun es ->
   let sub = Subst.define Subst.emp x ~ty ~tm in
   `Subst sub :: es

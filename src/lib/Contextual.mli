@@ -14,8 +14,9 @@ val pushl : entry -> unit m
 val pushr : entry -> unit m
 val pushls : entry list -> unit m
 val go_left : unit m
+val go_right : unit m
 
-val unleash_subst : Name.t -> tm -> unit m
+val unleash_subst : Name.t -> ty:ty -> tm -> unit m
 
 val in_scope : Name.t -> param -> 'a m -> 'a m
 val lookup_var : Name.t -> twin -> ty m
@@ -29,4 +30,9 @@ val block : problem -> unit m
 val check : ty:ty -> tm -> bool m
 val check_eq : ty:ty -> tm -> tm -> bool m
 
+
 val typechecker : (module Typing.S) m
+
+val dump_state : Format.formatter -> unit m
+
+val run : 'a m -> 'a
