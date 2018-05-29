@@ -583,8 +583,15 @@ let lower tele alpha ty =
   match Tm.unleash ty with
   | Tm.LblTy info ->
     hole tele info.ty @@ fun t ->
-    define tele alpha ~ty (Tm.make @@ Tm.LblRet (Tm.up t)) >>
+    define tele alpha ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
     ret true
+
+  | Tm.Sg (dom, Tm.B (_, cod)) ->
+    hole tele dom @@ fun t0 ->
+    hole tele (Tm.subst (Tm.Sub (Tm.Id, t0)) cod) @@ fun t1 ->
+    define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
+    ret true
+
   | _ ->
     (* TODO: implement lowering *)
     ret false
