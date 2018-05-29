@@ -17,7 +17,8 @@ let pop_goal =
         let solve tm = define gm alpha ~ty:cod @@ Tm.make @@ Tm.LblRet tm in
         let subgoal lbl gm' ty kont =
           let ty' = Tm.make @@ Tm.LblTy {lbl; args = []; ty} in
-          hole (gm <.> gm') ty' kont
+          hole (gm <.> gm') ty' @@ fun (hd, sp) ->
+          kont @@ (hd, sp #< Tm.LblCall)
         in
         ret {ty = info.ty; solve; subgoal}
       | _ ->
