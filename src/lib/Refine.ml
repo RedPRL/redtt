@@ -94,9 +94,6 @@ let rec elab =
     refine_lam x >>
     elab e
 
-let under tac =
-  go_right >> tac >> go_left
-
 let test_script : unit m =
   let alpha = Name.fresh () in
   let bool = Tm.make Tm.Bool in
