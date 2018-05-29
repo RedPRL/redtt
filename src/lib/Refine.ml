@@ -5,11 +5,18 @@ open RedBasis
 module Notation = Monad.Notation (Contextual)
 open Notation
 
-let rec pop_hole =
+let pop_hole =
   popr >>= function
   | E (alpha, ty, Hole) ->
     ret (alpha, ty)
   | _ -> failwith "No hole"
+
+let discharge tac =
+  tac >>
+  popr >>= function
+  | E (_, _, Defn _) ->
+    ret ()
+  | _ -> failwith "Incomplete subgoal"
 
 let refine_pair =
   pop_hole >>= fun (alpha, ty) ->
@@ -38,11 +45,10 @@ let test_script : unit m =
   let goal_ty = Tm.sg None bool bool in
   pushr @@ E (alpha, goal_ty, Hole) >>
   begin
-    (* This isn't quite right: I need to descend past the Defn notes that get unleashed *)
     refine_pair >>
-    refine_tt >>
-    refine_tt
+    discharge refine_tt >>
+    discharge refine_tt
   end >>
-  failwith "what now? Lol"
+  failwith "now, the proof state *should* contain just one entry: a definition of !alpha = (cons tt tt)"
 
 
