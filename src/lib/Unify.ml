@@ -413,6 +413,17 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let cod0t1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval T.Cx.emp t1 in
       ret (cod0t0, cod0t1)
 
+    | Snoc (sp0, Tm.ExtApp ts0), Snoc (sp1, Tm.ExtApp ts1) ->
+      go sp0 sp1 >>= fun (ty0, ty1) ->
+      let rs0 = List.map (fun t -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp t) ts0 in
+      let rs1 = List.map (fun t -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp t) ts1 in
+      (* TODO: unify the dimension spines ts0, ts1 *)
+      let ty'0, sys0 = T.Cx.Eval.unleash_ext ty0 rs0 in
+      let ty'1, sys1 = T.Cx.Eval.unleash_ext ty1 rs1 in
+      let rst0 = T.Cx.Eval.make @@ Val.Rst {ty = ty'0; sys = sys0} in
+      let rst1 = T.Cx.Eval.make @@ Val.Rst {ty = ty'1; sys = sys1} in
+      ret (rst0, rst1)
+
     | Snoc (sp0, Tm.Car), Snoc (sp1, Tm.Car) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
       let dom0, _ = T.Cx.Eval.unleash_sg ty0 in
