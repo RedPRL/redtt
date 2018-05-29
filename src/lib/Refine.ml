@@ -1,6 +1,7 @@
 open Unify
 open Contextual
 open RedBasis
+open Bwd
 
 module Notation = Monad.Notation (Contextual)
 open Notation
@@ -30,6 +31,7 @@ let refine_pair =
   | _ ->
     failwith "refine_pair"
 
+
 let refine_tt =
   pop_hole >>= fun (alpha, ty) ->
   match Tm.unleash ty with
@@ -38,6 +40,24 @@ let refine_tt =
     Tm.make Tm.Tt
   | _ ->
     failwith "refine_tt"
+
+type eterm =
+  | Pair of eterm * eterm
+  | Lam of eterm
+  | Tt
+
+let rec elab =
+  function
+  | Tt ->
+    refine_tt
+
+  | Pair (e0, e1) ->
+    refine_pair >>
+    discharge @@ elab e0 >>
+    discharge @@ elab e1
+
+  | Lam e ->
+    failwith "No idea how to implement Lam yet; probably need to enrich the proof state zipper"
 
 let test_script : unit m =
   let alpha = Name.fresh () in
