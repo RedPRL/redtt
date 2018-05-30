@@ -1,3 +1,5 @@
+(* Experimental code *)
+
 open Unify open Dev open Contextual open RedBasis open Bwd open BwdNotation
 module Notation = Monad.Notation (Contextual)
 open Notation
@@ -66,6 +68,7 @@ let unify_ty ty0 ty1 =
   ambulando brack
 
 
+(* Just to test the unifier *)
 let soft_ff =
   pop_goal >>= fun goal ->
   unify_ty goal.ty @@ Tm.make Tm.Bool >>
