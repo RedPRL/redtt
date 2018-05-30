@@ -189,6 +189,11 @@ and elab_term renv =
     let renvx = ResEnv.global name x renv in
     refine_lam x >>
     elab_term renvx e
+  | Pair (e0, e1) ->
+    refine_pair >>
+    elab_term renv e0 >>
+    go_right >>
+    elab_term renv e1
   | _ ->
     failwith ""
 
