@@ -14,7 +14,7 @@
 %token COLON COLON_ANGLE
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
-%token AST TIMES HASH AT BACKTICK
+%token AST TIMES HASH AT BACKTICK QUESTION_MARK
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG
 %token PRE KAN
 %token EOF
@@ -54,6 +54,8 @@ egadget:
 eterm:
   | BACKTICK; t = tm
     { E.Quo t }
+  | QUESTION_MARK
+    { E.Hole }
 
 esig:
   | d = edecl; esig = esig

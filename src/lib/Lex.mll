@@ -53,7 +53,7 @@ let number =
 let whitespace =
   [' ' '\t']+
 let atom_initial =
-  [^ '0'-'9' '-' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' '`' ' ' '\t' '\n' '\r']
+  [^ '0'-'9' '-' '?' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' '`' ' ' '\t' '\n' '\r']
 let atom_subsequent =
   [^             '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' ' ' '\t' '\n' '\r']
 
@@ -102,6 +102,8 @@ rule token = parse
     { Lwt.return RGL }
   | "λ"
     { Lwt.return LAM }
+  | "?"
+    { Lwt.return QUESTION_MARK }
   | line_ending
     { new_line lexbuf; token lexbuf }
   | whitespace

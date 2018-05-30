@@ -1,4 +1,4 @@
-let welp [x : `bool] [y : `bool] `bool
-debug asdf
-welp x y => `y
-debug asdf2
+let Path [A : `(U 0)] [M : `A] [N : `A] `(U 0)
+Path A M N => `(# <i> A [i=0 M] [i=1 N])
+
+debug path

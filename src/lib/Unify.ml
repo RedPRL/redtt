@@ -48,7 +48,15 @@ let hole gm ty f =
 let define gm alpha ~ty tm =
   let ty' = pis gm ty in
   let tm' = lambdas (Bwd.map fst gm) tm in
-  pushr @@ E (alpha, ty', Defn tm')
+  check ~ty:ty' tm' >>= fun b ->
+  if not b then
+    dump_state Format.err_formatter "Type error" >>= fun _ ->
+    begin
+      Format.eprintf "error checking: %a : %a@." (Tm.pp Pretty.Env.emp) tm' (Tm.pp Pretty.Env.emp) ty';
+      failwith "define: type error"
+    end
+  else
+    pushr @@ E (alpha, ty', Defn tm')
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)

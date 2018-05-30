@@ -331,7 +331,7 @@ let traverse ~f ~var ~ref =
   and go_hd k =
     function
     | Ix i ->
-      var i
+      var k i
     | Ref (a, tw) ->
       ref k (a, tw)
     | Meta a ->
@@ -417,21 +417,21 @@ let fix_traverse ~var ~ref  =
   go 0
 
 let close_var a k =
-  let var i = Ix i, Emp in
+  let var _ i = Ix i, Emp in
   let ref n (b, tw) = if b = a then Ix (n + k), Emp else Ref (b, tw), Emp in
   fix_traverse ~var ~ref
 
 let subst sub =
   let ref _ (b, tw) = Ref (b, tw), Emp in
   let rec go k (Tm tm) =
-    let var i = subst_ix (liftn k sub) i in
+    let var _ i = subst_ix (liftn k sub) i in
     Tm (traverse ~f:go ~var ~ref k tm)
   in
   go 0
 
 (* TODO: check that this isn't catastrophically wrong *)
 let open_var k a tw =
-  let var i = if i = k then Ref (a, tw), Emp else Ix i, Emp in
+  let var k' i = if i = (k + k') then Ref (a, tw), Emp else Ix i, Emp in
   let ref _n (b, tw) = Ref (b, tw), Emp in
   fix_traverse ~var ~ref
 
@@ -518,7 +518,7 @@ let rec pp env fmt (Tm tm) =
       | _ ->
         Format.fprintf fmt "@[<1>{%a %a : %a}@]"
           Uuseg_string.pp_utf_8 lbl
-          (pp_terms env) (List.map snd args)
+          (pp_lbl_args env) args
           (pp env) ty
     end
 
@@ -589,6 +589,11 @@ and pp_cmd env fmt (hd, sp) =
   in
   (* TODO: backwards ??? *)
   go fmt sp
+
+and pp_lbl_args env fmt args =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  let pp_arg fmt (ty, tm) = Format.fprintf fmt "[%a : %a]" (pp env) tm (pp env) ty in
+  Format.pp_print_list ~pp_sep pp_arg fmt args
 
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt " " in

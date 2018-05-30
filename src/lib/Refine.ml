@@ -62,6 +62,16 @@ let refine_pair =
   | _ ->
     failwith "refine_pair"
 
+
+let rec pp_telescope fmt =
+  function
+  | Emp -> Format.fprintf fmt "[]"
+  | Snoc (tele, (x, ty)) ->
+    Format.fprintf fmt "%a; %a : %a"
+      pp_telescope tele
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty
+
 let refine_tt =
   pop_goal >>= fun goal ->
   match Tm.unleash goal.ty with
@@ -163,7 +173,6 @@ struct
 
     | Make (name, scheme) :: esig ->
       push_program name >>= fun x ->
-      dump_state Format.std_formatter "elab" >>
       elab_scheme renv Emp name scheme >>
       go_right >>
       let renvx = ResEnv.global name x renv in
@@ -188,10 +197,9 @@ struct
         goal.subgoal "foo" Emp goal.ty @@ fun ty ->
         let cx = Bwd.to_list goal.context in
         let args = List.map (fun (x, ty) -> (ty, Tm.up (Tm.Ref (x, `Only), Emp))) cx in
-        goal.solve @@ Tm.make @@
-        Tm.LblTy {lbl; ty = Tm.up ty; args}
+        let lbl_ty = Tm.make @@ Tm.LblTy {lbl; ty = Tm.up ty; args} in
+        goal.solve lbl_ty
       end >>
-      dump_state Format.std_formatter "ASDFADF" >>
       elab_term renv names ecod >>
       go_right
 
@@ -205,7 +213,6 @@ struct
 
 
   and elab_lhs renv (lbl, pats) =
-    dump_state Format.err_formatter "elab_lhs" >>
     pop_goal >>= fun goal ->
     if lbl = goal.lbl then
       goal.abort >>
@@ -219,7 +226,6 @@ struct
       ret (renv, names)
 
     | PVar name :: pats, _ :: args ->
-      dump_state Format.err_formatter "taste" >>
       elab_pats renv (names #< name) (pats, args)
 
     | _ ->
