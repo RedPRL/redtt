@@ -79,16 +79,17 @@ let soft_ff =
   goal.solve @@ Tm.make Tm.Ff
 
 
-let refine_lam nm =
+let refine_lam x =
   pop_goal >>= fun goal ->
   match Tm.unleash goal.ty with
   | Tm.Pi (dom, cod) ->
-    let x = Name.named @@ Some nm in
     let codx = Tm.unbind_with x `Only cod in
     goal.subgoal "body" (Emp #< (x, dom)) codx @@ fun bdyx ->
     goal.solve @@ Tm.make @@ Tm.Lam (Tm.bind x @@ Tm.up bdyx)
   | _ ->
     failwith "refine_lam"
+
+
 
 type edecl =
   | Make of string * eterm
@@ -183,6 +184,11 @@ and elab_term renv =
     let tm = fam renv in
     pop_goal >>= fun goal ->
     goal.solve tm
+  | Lam (name, e) ->
+    let x = Name.named @@ Some name in
+    let renvx = ResEnv.global name x renv in
+    refine_lam x >>
+    elab_term renvx e
   | _ ->
     failwith ""
 
