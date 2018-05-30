@@ -34,14 +34,16 @@ let telescope_to_spine =
   Bwd.map @@ fun (x, _) ->
   Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
 
-let hole gm ty f =
-  let alpha = Name.fresh () in
+let hole_named alpha gm ty f =
   pushl (E (alpha, pis gm ty, Hole)) >>
   let hd = Tm.Meta alpha in
   let sp = telescope_to_spine gm in
   f (hd, sp) >>= fun r ->
   go_left >>
   ret r
+
+let hole gm ty f =
+  hole_named (Name.fresh ()) gm ty f
 
 let define gm alpha ~ty tm =
   let ty' = pis gm ty in

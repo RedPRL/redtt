@@ -86,53 +86,131 @@ let refine_lam nm =
   | _ ->
     failwith "refine_lam"
 
-type eterm =
-  | Pair of eterm * eterm
+type edecl =
+  | Make of string * eterm
+  | Refine of egadget
+  | Debug of string
+
+and egadget =
+  | Ret of eterm
+
+and eterm =
+  | Hole
   | Lam of string * eterm
-  | Tt
-  | Ff
-  | Underscore
+  | Pair of eterm * eterm
+  | Quo of (ResEnv.t -> tm)
 
-let rec elab =
+type esig =
+  edecl list
+
+let make_goal_ty lbl ty =
+  Tm.make @@ Tm.LblTy {lbl; args = []; ty}
+
+let push_program name =
+  let x = Name.fresh () in
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  begin
+    hole Emp (make_goal_ty (name ^ ".type") univ) @@ fun (hd, sp) ->
+    hole_named x Emp (make_goal_ty name @@ Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ -> ret ()
+  end >>
+  ret x
+
+let rec elab_sig renv =
   function
-  | Tt ->
+  | [] ->
+    ret ()
+
+  | Make (name, eterm) :: esig ->
+    push_program name >>= fun x ->
+    elab_term renv eterm >>
+    go_right >>
+    let renvx = ResEnv.global name x renv in
+    elab_sig renvx esig
+
+  | Refine gadg :: esig ->
+    elab_gadget renv gadg >>
+    go_right >>
+    elab_sig renv esig
+
+  | Debug msg :: esig ->
+    dump_state Format.std_formatter msg >>
+    elab_sig renv esig
+
+and elab_gadget renv =
+  function
+  | Ret e ->
+    elab_term renv e
+
+and elab_term renv =
+  function
+  | Hole ->
+    ret ()
+  | Quo fam ->
+    let tm = fam renv in
+    pop_goal >>= fun goal ->
+    goal.solve tm
+  | _ ->
+    failwith ""
+
+let test_script =
+  elab_sig ResEnv.init
+    [ Make ("foo", Quo (fun _ -> Tm.make Tm.Bool))
+    ; Debug "test0"
+    ; Refine (Ret Hole)
+    ; Debug "test1"
+    ; Make ("bar", Hole)
+    ; Debug "test2"
+    ]
+
+
+
+(* type eterm =
+   | Pair of eterm * eterm
+   | Lam of string * eterm
+   | Tt
+   | Ff
+   | Underscore
+
+   let rec elab =
+   function
+   | Tt ->
     refine_tt
 
-  | Ff ->
+   | Ff ->
     refine_tt
 
-  | Pair (e0, e1) ->
+   | Pair (e0, e1) ->
     refine_pair >>
     elab e0 >>
     go_right >>
     elab e1 >>
     go_right
 
-  | Lam (x, e) ->
+   | Lam (x, e) ->
     refine_lam x >>
     elab e
 
-  | Underscore ->
+   | Underscore ->
     go_right
 
-let make_goal_ty lbl ty =
-  Tm.make @@ Tm.LblTy {lbl; args = []; ty}
+   let make_goal_ty lbl ty =
+   Tm.make @@ Tm.LblTy {lbl; args = []; ty}
 
-let test_script : unit m =
-  (* let bool = Tm.make Tm.Bool in *)
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  (* let ty = make_goal_ty "fun" @@ Tm.Macro.arr bool @@ Tm.sg None bool bool in *)
-  begin
+   let test_script : unit m =
+   (* let bool = Tm.make Tm.Bool in *)
+   let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+   (* let ty = make_goal_ty "fun" @@ Tm.Macro.arr bool @@ Tm.sg None bool bool in *)
+   begin
     hole Emp (make_goal_ty "ty" univ) @@ fun (hd, sp) ->
     hole Emp (make_goal_ty "el" @@ Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ ->
     ret ()
-  end >>
-  (* dump_state Format.std_formatter >> *)
-  begin
+   end >>
+   (* dump_state Format.std_formatter >> *)
+   begin
     go_right >>
     soft_ff
     (* elab @@ Lam ("x", Pair (Tt, Underscore)) *)
-  end >>
-  dump_state Format.std_formatter "result"
+   end >>
+   dump_state Format.std_formatter "result"
 
-(* dump_state Format.std_formatter *)
+   dump_state Format.std_formatter *)
