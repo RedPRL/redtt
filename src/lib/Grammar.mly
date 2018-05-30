@@ -3,7 +3,7 @@
   open RedBasis
   open Bwd
   open BwdNotation
-  module E = Refine.SourceLang
+  module E = Refine
   module R = ResEnv
 %}
 
@@ -19,7 +19,7 @@
 %token PRE KAN
 %token EOF
 
-%start <Refine.SourceLang.esig> esig
+%start <Refine.esig> esig
 %%
 
 edecl:

@@ -66,7 +66,7 @@ let loop lexbuf tokens =
         go (I.resume checkpoint) ()
 
       | I.Accepted result ->
-        let script = Refine.SourceLang.elab_sig ResEnv.init result in
+        let script = Refine.elab_sig ResEnv.init result in
         Lwt.return @@ Contextual.run script
 
       | I.HandlingError env ->

@@ -4,6 +4,31 @@ open Unify open Dev open Contextual open RedBasis open Bwd open BwdNotation
 module Notation = Monad.Notation (Contextual)
 open Notation
 
+type edecl =
+  | Make of string * escheme
+  | Refine of elhs * egadget
+  | Debug of string
+
+and escheme = etele * eterm
+and etele = (string * eterm) list
+
+and egadget =
+  | Ret of eterm
+
+and eterm =
+  | Hole
+  | Lam of string * eterm
+  | Pair of eterm * eterm
+  | Quo of (ResEnv.t -> tm)
+
+and elhs = string * epat list
+
+and epat =
+  | PVar of string
+
+type esig =
+  edecl list
+
 type goal =
   {ty : ty;
    lbl : string;
@@ -11,7 +36,7 @@ type goal =
    solve : tm -> unit m;
    abort : unit m;
    context : telescope;
-   resolve : ResEnv.t -> string bwd -> ResEnv.t;
+   resolve : ResEnv.t -> epat bwd -> (ResEnv.t -> tm) -> tm ;
    subgoal : 'a. string -> telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m}
 
 let pop_goal =
@@ -28,15 +53,16 @@ let pop_goal =
           kont @@ (hd, sp #< Tm.LblCall)
         in
 
-        let resolve renv names =
-          let rec go renv names gm =
-            match names, gm with
-            | Emp, Emp -> renv
-            | Snoc (names, name), Snoc (gm, (x, _)) ->
+        let resolve renv pats fam =
+          let rec go renv pats args fam =
+            match pats, args with
+            | Emp, Emp -> fam renv
+            | Snoc (pats, PVar name), Snoc (gm, (x, _)) ->
               let renv' = ResEnv.global name x renv in
-              go renv' names gm
+              go renv' pats gm @@ fun renv' ->
+              fam renv'
             | _ -> failwith "resolve"
-          in go renv names gm
+          in go renv pats gm fam
         in
 
         let abort = pushr e in
@@ -126,131 +152,93 @@ let refine_pi x =
     failwith "refine_pi"
 
 
-module SourceLang =
-struct
 
-  type edecl =
-    | Make of string * escheme
-    | Refine of elhs * egadget
-    | Debug of string
 
-  and escheme = etele * eterm
-  and etele = (string * eterm) list
+let make_goal_ty lbl ty =
+  Tm.make @@ Tm.LblTy {lbl; args = []; ty}
 
-  and egadget =
-    | Ret of eterm
+let push_program name =
+  let x = Name.fresh () in
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  begin
+    hole Emp (make_goal_ty (name ^ ".type") univ) @@ fun (hd, sp) ->
+    hole_named x Emp (Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ -> ret ()
+  end >>
+  ret x
 
-  and eterm =
-    | Hole
-    | Lam of string * eterm
-    | Pair of eterm * eterm
-    | Quo of (ResEnv.t -> tm)
+let rec elab_sig renv =
+  function
+  | [] ->
+    ret ()
 
-  and elhs = string * epat list
+  | Make (name, scheme) :: esig ->
+    push_program name >>= fun x ->
+    elab_scheme renv Emp name scheme >>
+    go_right >>
+    let renvx = ResEnv.global name x renv in
+    elab_sig renvx esig
 
-  and epat =
-    | PVar of string
+  | Refine (lhs, gadg) :: esig ->
+    elab_lhs lhs >>= fun pats ->
+    elab_gadget renv pats gadg >>
+    go_right >>
+    elab_sig renv esig
 
-  type esig =
-    edecl list
+  | Debug msg :: esig ->
+    dump_state Format.std_formatter msg >>
+    elab_sig renv esig
 
-  let make_goal_ty lbl ty =
-    Tm.make @@ Tm.LblTy {lbl; args = []; ty}
 
-  let push_program name =
-    let x = Name.fresh () in
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+and elab_scheme renv (pats : epat bwd) lbl (etele, ecod) =
+  match etele with
+  | [] ->
     begin
-      hole Emp (make_goal_ty (name ^ ".type") univ) @@ fun (hd, sp) ->
-      hole_named x Emp (Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ -> ret ()
-    end >>
-    ret x
-
-  let rec elab_sig renv =
-    function
-    | [] ->
-      ret ()
-
-    | Make (name, scheme) :: esig ->
-      push_program name >>= fun x ->
-      elab_scheme renv Emp name scheme >>
-      go_right >>
-      let renvx = ResEnv.global name x renv in
-      elab_sig renvx esig
-
-    | Refine (lhs, gadg) :: esig ->
-      elab_lhs renv lhs >>= fun (renv', names') ->
-      elab_gadget renv' names' gadg >>
-      go_right >>
-      elab_sig renv esig
-
-    | Debug msg :: esig ->
-      dump_state Format.std_formatter msg >>
-      elab_sig renv esig
-
-
-  and elab_scheme renv (names : string bwd) lbl (etele, ecod) =
-    match etele with
-    | [] ->
-      begin
-        pop_goal >>= fun goal ->
-        goal.subgoal "foo" Emp goal.ty @@ fun ty ->
-        let cx = Bwd.to_list goal.context in
-        let args = List.map (fun (x, ty) -> (ty, Tm.up (Tm.Ref (x, `Only), Emp))) cx in
-        let lbl_ty = Tm.make @@ Tm.LblTy {lbl; ty = Tm.up ty; args} in
-        goal.solve lbl_ty
-      end >>
-      elab_term renv names ecod >>
-      go_right
-
-    | (name, ety) :: etele ->
-      let x = Name.named @@ Some name in
-      refine_pi x >>
-      elab_term renv names ety >>
-      go_right >>
-      elab_scheme renv (names #< name) lbl (etele, ecod) >>
-      go_right
-
-
-  and elab_lhs renv (lbl, pats) =
-    pop_goal >>= fun goal ->
-    if lbl = goal.lbl then
-      goal.abort >>
-      elab_pats renv Emp (pats, goal.args)
-    else
-      failwith "goal label mismatch"
-
-  and elab_pats renv names (pats, args)=
-    match pats, args with
-    | [], [] ->
-      ret (renv, names)
-
-    | PVar name :: pats, _ :: args ->
-      elab_pats renv (names #< name) (pats, args)
-
-    | _ ->
-      failwith "TODO"
-
-  and elab_gadget renv names =
-    function
-    | Ret e ->
-      elab_term renv names e
-
-  and elab_term renv names =
-    function
-    | Hole ->
-      ret ()
-    | Quo fam ->
       pop_goal >>= fun goal ->
-      let tm = fam @@ goal.resolve ResEnv.init names in
-      goal.solve tm
-    | Lam (name, e) ->
-      let x = Name.named @@ Some name in
-      refine_lam x >>
-      elab_term renv (names #< name) e
-    | Pair (e0, e1) ->
-      refine_pair >>
-      elab_term renv names e0 >>
-      go_right >>
-      elab_term renv names e1
-end
+      goal.subgoal "foo" Emp goal.ty @@ fun ty ->
+      let cx = Bwd.to_list goal.context in
+      let args = List.map (fun (x, ty) -> (ty, Tm.up (Tm.Ref (x, `Only), Emp))) cx in
+      let lbl_ty = Tm.make @@ Tm.LblTy {lbl; ty = Tm.up ty; args} in
+      goal.solve lbl_ty
+    end >>
+    elab_term renv pats ecod >>
+    go_right
+
+  | (name, ety) :: etele ->
+    let x = Name.named @@ Some name in
+    refine_pi x >>
+    elab_term renv pats ety >>
+    go_right >>
+    elab_scheme renv (pats #< (PVar name)) lbl (etele, ecod) >>
+    go_right
+
+
+and elab_lhs (lbl, pats) : epat bwd m =
+  pop_goal >>= fun goal ->
+  if lbl = goal.lbl then
+    goal.abort >>
+    ret @@ Bwd.from_list pats
+  else
+    failwith "goal label mismatch"
+
+and elab_gadget renv pats =
+  function
+  | Ret e ->
+    elab_term renv pats e
+
+and elab_term renv pats =
+  function
+  | Hole ->
+    ret ()
+  | Quo fam ->
+    pop_goal >>= fun goal ->
+    let tm = goal.resolve ResEnv.init pats fam in
+    goal.solve tm
+  | Lam (name, e) ->
+    let x = Name.named @@ Some name in
+    refine_lam x >>
+    elab_term renv (pats #< (PVar name)) e
+  | Pair (e0, e1) ->
+    refine_pair >>
+    elab_term renv pats e0 >>
+    go_right >>
+    elab_term renv pats e1
