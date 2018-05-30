@@ -17,6 +17,7 @@ and egadget =
 
 and eterm =
   | Hole
+  | Var of string
   | Lam of string * eterm
   | Pair of eterm * eterm
   | Quo of (ResEnv.t -> tm)
@@ -229,14 +230,26 @@ and elab_term renv pats =
   function
   | Hole ->
     ret ()
+
   | Quo fam ->
     pop_goal >>= fun goal ->
-    let tm = goal.resolve ResEnv.init pats fam in
+    let tm = goal.resolve renv pats fam in
     goal.solve tm
+
+  | Var str ->
+    pop_goal >>= fun goal ->
+    let tm = goal.resolve renv pats @@ fun renv ->
+      match ResEnv.get str renv with
+      | `Ix ix -> Tm.up (Tm.Ix ix, Emp)
+      | `Ref a -> Tm.up (Tm.Ref (a, `Only), Emp)
+    in
+    goal.solve tm
+
   | Lam (name, e) ->
     let x = Name.named @@ Some name in
     refine_lam x >>
     elab_term renv (pats #< (PVar name)) e
+
   | Pair (e0, e1) ->
     refine_pair >>
     elab_term renv pats e0 >>

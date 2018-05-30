@@ -54,6 +54,8 @@ egadget:
 eterm:
   | BACKTICK; t = tm
     { E.Quo t }
+  | a = ATOM;
+    { E.Var a }
   | QUESTION_MARK
     { E.Hole }
 
