@@ -19,7 +19,7 @@ help:
 	@${DUNE} exec -- redtt help
 
 examples:
-	@${DUNE} exec -- redtt load-file test.red
+	@${DUNE} exec -- redtt load-file test2.red
 
 test:
 	@${DUNE} build @runtest

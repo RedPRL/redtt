@@ -40,6 +40,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("pre", PRE);
       ("kan", KAN);
       ("U", UNIV);
+      ("debug", DEBUG);
     ]
 }
 
@@ -52,7 +53,7 @@ let number =
 let whitespace =
   [' ' '\t']+
 let atom_initial =
-  [^ '0'-'9' '-' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' ' ' '\t' '\n' '\r']
+  [^ '0'-'9' '-' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' '`' ' ' '\t' '\n' '\r']
 let atom_subsequent =
   [^             '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' ' ' '\t' '\n' '\r']
 
@@ -75,6 +76,8 @@ rule token = parse
     { Lwt.return HASH }
   | '@'
     { Lwt.return AT }
+  | '`'
+    { Lwt.return BACKTICK }
   | '*'
     { Lwt.return AST }
   | "×"
@@ -89,6 +92,8 @@ rule token = parse
     { Lwt.return EQUALS }
   | "->"
     { Lwt.return RIGHT_ARROW }
+  | "=>"
+    { Lwt.return RRIGHT_ARROW }
   | "→"
     { Lwt.return RIGHT_ARROW }
   | "<"

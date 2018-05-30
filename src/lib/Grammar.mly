@@ -3,6 +3,7 @@
   open RedBasis
   open Bwd
   open BwdNotation
+  module E = Refine.SourceLang
   module R = ResEnv
 %}
 
@@ -12,14 +13,50 @@
 %token LSQ RSQ LPR RPR LGL RGL
 %token COLON COLON_ANGLE
 %token EQUALS
-%token RIGHT_ARROW
-%token AST TIMES HASH AT
-%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET
+%token RIGHT_ARROW RRIGHT_ARROW
+%token AST TIMES HASH AT BACKTICK
+%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG
 %token PRE KAN
 %token EOF
 
-%start <ResEnv.t -> Decl.t list> prog
+%start <Refine.SourceLang.esig> esig
 %%
+
+edecl:
+  | LET; a = ATOM; COLON; ty = eterm
+    { E.Make (a, ty) }
+  | lhs = elhs; gdg = egadget
+    { E.Refine (lhs, gdg) }
+  | DEBUG; msg = ATOM
+    { E.Debug msg }
+
+elhs:
+  | a = ATOM
+    { (a, []) }
+
+egadget:
+  | RRIGHT_ARROW; e = eterm
+    { E.Ret e }
+
+eterm:
+  | BACKTICK; t = tm
+    { E.Quo t }
+
+esig:
+  | d = edecl; esig = esig
+    { d :: esig }
+  | EOF
+    { [] }
+
+
+
+
+
+
+
+
+
+
 prog:
   | LPR; DEFINE; name = ATOM; args = tele_with_env; COLON_ANGLE; body = tm; _rpr = RPR; p = prog
     { fun env ->
