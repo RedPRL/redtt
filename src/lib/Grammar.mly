@@ -9,14 +9,13 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
-%token DEFINE
 %token LSQ RSQ LPR RPR LGL RGL
 %token COLON COLON_ANGLE
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK QUESTION_MARK
-%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG
-%token PRE KAN
+%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
+%token TYPE PRE KAN
 %token EOF
 
 %start <Refine.esig> esig
@@ -35,7 +34,7 @@ etele_cell:
     { (a, e) }
 
 escheme:
-  | cs = list(etele_cell); e = eterm
+  | cs = list(etele_cell); COLON; e = eterm
     { cs, e }
 
 
@@ -58,6 +57,10 @@ eterm:
     { E.Var a }
   | QUESTION_MARK
     { E.Hole }
+  | TYPE
+    { E.Type }
+  | LAM; x = ATOM; RIGHT_ARROW; e = eterm
+    { E.Lam (x, e) }
 
 esig:
   | d = edecl; esig = esig
@@ -73,17 +76,6 @@ esig:
 
 
 
-
-prog:
-  | LPR; DEFINE; name = ATOM; args = tele_with_env; COLON_ANGLE; body = tm; _rpr = RPR; p = prog
-    { fun env ->
-      let tele, env_bdy = args env in
-      let info = $startpos, $endpos(_rpr) in
-      let decl = Decl.Define {name; info; args = tele; body = body env_bdy} in
-      let env' = R.bind name env in
-      decl :: p env' }
-  | EOF
-    { fun _env -> [] }
 
 tele_with_env:
   | dom = tm; rest = tele_with_env
@@ -249,6 +241,11 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.Cdr }
+
+  | LPR; CALL; e = cut; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, fs #< Tm.LblCall }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->

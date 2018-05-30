@@ -592,7 +592,7 @@ and pp_cmd env fmt (hd, sp) =
 
 and pp_lbl_args env fmt args =
   let pp_sep fmt () = Format.fprintf fmt " " in
-  let pp_arg fmt (ty, tm) = Format.fprintf fmt "[%a : %a]" (pp env) tm (pp env) ty in
+  let pp_arg fmt (_, tm) = pp env fmt tm in
   Format.pp_print_list ~pp_sep pp_arg fmt args
 
 and pp_terms env fmt ts =

@@ -20,6 +20,7 @@ and eterm =
   | Var of string
   | Lam of string * eterm
   | Pair of eterm * eterm
+  | Type
   | Quo of (ResEnv.t -> tm)
 
 and elhs = string * epat list
@@ -37,6 +38,7 @@ type goal =
    solve : tm -> unit m;
    abort : unit m;
    context : telescope;
+   pp : Format.formatter -> unit;
    resolve : ResEnv.t -> epat bwd -> (ResEnv.t -> tm) -> tm ;
    subgoal : 'a. string -> telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m}
 
@@ -66,8 +68,12 @@ let pop_goal =
           in go renv pats gm fam
         in
 
+        let pp fmt =
+          Format.fprintf fmt "%a@." (Tm.pp Pretty.Env.emp) ty
+        in
+
         let abort = pushr e in
-        ret {ty = info.ty; lbl = info.lbl; args = info.args; context = gm; solve; subgoal; abort; resolve}
+        ret {ty = info.ty; lbl = info.lbl; args = info.args; context = gm; solve; subgoal; abort; resolve; pp}
       | _ ->
         dump_state Format.err_formatter "Error/pop_goal" >>= fun _ ->
         failwith "pop_goal"
@@ -159,7 +165,7 @@ let make_goal_ty lbl ty =
   Tm.make @@ Tm.LblTy {lbl; args = []; ty}
 
 let push_program name =
-  let x = Name.fresh () in
+  let x = Name.named @@ Some name in
   let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
   begin
     hole Emp (make_goal_ty (name ^ ".type") univ) @@ fun (hd, sp) ->
@@ -229,7 +235,9 @@ and elab_gadget renv pats =
 and elab_term renv pats =
   function
   | Hole ->
-    ret ()
+    pop_goal >>= fun goal ->
+    goal.pp Format.std_formatter;
+    goal.abort
 
   | Quo fam ->
     pop_goal >>= fun goal ->
@@ -244,6 +252,10 @@ and elab_term renv pats =
       | `Ref a -> Tm.up (Tm.Ref (a, `Only), Emp)
     in
     goal.solve tm
+
+  | Type ->
+    pop_goal >>= fun goal ->
+    goal.solve @@ Tm.univ ~lvl:(Lvl.Const 0) ~kind:Kind.Kan
 
   | Lam (name, e) ->
     let x = Name.named @@ Some name in

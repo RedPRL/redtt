@@ -30,17 +30,18 @@ module Make (R : SOURCE) : LEXER = struct
       ("coe", COE);
       ("com", COM);
       ("cons", CONS);
-      ("define", DEFINE);
       ("hcom", HCOM);
       ("if", IF);
       ("let", LET);
       ("lam", LAM);
+      ("call", CALL);
       ("tt", TT);
       ("ff", FF);
       ("pre", PRE);
       ("kan", KAN);
       ("U", UNIV);
       ("debug", DEBUG);
+      ("type", TYPE);
     ]
 }
 
