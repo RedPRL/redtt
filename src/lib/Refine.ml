@@ -194,8 +194,6 @@ and elab_term renv =
     elab_term renv e0 >>
     go_right >>
     elab_term renv e1
-  | _ ->
-    failwith ""
 
 let test_script =
   elab_sig ResEnv.init
