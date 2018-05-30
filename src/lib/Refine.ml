@@ -11,6 +11,7 @@ type goal =
    solve : tm -> unit m;
    abort : unit m;
    context : telescope;
+   resolve : ResEnv.t -> string bwd -> ResEnv.t;
    subgoal : 'a. string -> telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m}
 
 let pop_goal =
@@ -26,8 +27,20 @@ let pop_goal =
           hole (gm <.> gm') ty' @@ fun (hd, sp) ->
           kont @@ (hd, sp #< Tm.LblCall)
         in
+
+        let resolve renv names =
+          let rec go renv names gm =
+            match names, gm with
+            | Emp, Emp -> renv
+            | Snoc (names, name), Snoc (gm, (x, _)) ->
+              let renv' = ResEnv.global name x renv in
+              go renv' names gm
+            | _ -> failwith "resolve"
+          in go renv names gm
+        in
+
         let abort = pushr e in
-        ret {ty = info.ty; lbl = info.lbl; args = info.args; context = gm; solve; subgoal; abort}
+        ret {ty = info.ty; lbl = info.lbl; args = info.args; context = gm; solve; subgoal; abort; resolve}
       | _ ->
         dump_state Format.err_formatter "Error/pop_goal" >>= fun _ ->
         failwith "pop_goal"
@@ -151,14 +164,14 @@ struct
     | Make (name, scheme) :: esig ->
       push_program name >>= fun x ->
       dump_state Format.std_formatter "elab" >>
-      elab_scheme renv name scheme >>
+      elab_scheme renv Emp name scheme >>
       go_right >>
       let renvx = ResEnv.global name x renv in
       elab_sig renvx esig
 
     | Refine (lhs, gadg) :: esig ->
-      elab_lhs renv lhs >>= fun renv' ->
-      elab_gadget renv' gadg >>
+      elab_lhs renv lhs >>= fun (renv', names') ->
+      elab_gadget renv' names' gadg >>
       go_right >>
       elab_sig renv esig
 
@@ -167,7 +180,7 @@ struct
       elab_sig renv esig
 
 
-  and elab_scheme renv lbl (etele, ecod) =
+  and elab_scheme renv (names : string bwd) lbl (etele, ecod) =
     match etele with
     | [] ->
       begin
@@ -179,16 +192,15 @@ struct
         Tm.LblTy {lbl; ty = Tm.up ty; args}
       end >>
       dump_state Format.std_formatter "ASDFADF" >>
-      elab_term renv ecod >>
+      elab_term renv names ecod >>
       go_right
 
     | (name, ety) :: etele ->
       let x = Name.named @@ Some name in
-      let renvx = ResEnv.global name x renv in
       refine_pi x >>
-      elab_term renv ety >>
+      elab_term renv names ety >>
       go_right >>
-      elab_scheme renvx lbl (etele, ecod) >>
+      elab_scheme renv (names #< name) lbl (etele, ecod) >>
       go_right
 
 
@@ -197,47 +209,42 @@ struct
     pop_goal >>= fun goal ->
     if lbl = goal.lbl then
       goal.abort >>
-      elab_pats renv (pats, Bwd.to_list goal.context)
+      elab_pats renv Emp (pats, goal.args)
     else
       failwith "goal label mismatch"
 
-  and elab_pats renv (pats, cx) =
-    match pats, cx with
+  and elab_pats renv names (pats, args)=
+    match pats, args with
     | [], [] ->
-      ret renv
+      ret (renv, names)
 
-    | PVar name :: pats, (x, _) :: cx ->
-      (* Untested *)
-      let renvx = ResEnv.global name x renv in
+    | PVar name :: pats, _ :: args ->
       dump_state Format.err_formatter "taste" >>
-      (* define Emp x ~ty (Tm.make Tm.Tt) >>
-         go_right >> *)
-      elab_pats renvx (pats, cx)
+      elab_pats renv (names #< name) (pats, args)
 
     | _ ->
       failwith "TODO"
 
-  and elab_gadget renv =
+  and elab_gadget renv names =
     function
     | Ret e ->
-      elab_term renv e
+      elab_term renv names e
 
-  and elab_term renv =
+  and elab_term renv names =
     function
     | Hole ->
       ret ()
     | Quo fam ->
-      let tm = fam renv in
       pop_goal >>= fun goal ->
+      let tm = fam @@ goal.resolve ResEnv.init names in
       goal.solve tm
     | Lam (name, e) ->
       let x = Name.named @@ Some name in
-      let renvx = ResEnv.global name x renv in
       refine_lam x >>
-      elab_term renvx e
+      elab_term renv (names #< name) e
     | Pair (e0, e1) ->
       refine_pair >>
-      elab_term renv e0 >>
+      elab_term renv names e0 >>
       go_right >>
-      elab_term renv e1
+      elab_term renv names e1
 end
