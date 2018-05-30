@@ -6,12 +6,15 @@ open Notation
 
 type goal =
   {ty : ty;
+   lbl : string;
+   args : (ty * tm) list;
    solve : tm -> unit m;
+   abort : unit m;
    subgoal : string -> telescope -> ty -> (tm Tm.cmd -> unit m) -> unit m}
 
 let pop_goal =
   popr >>= function
-  | E (alpha, ty, Hole) ->
+  | E (alpha, ty, Hole) as e ->
     let gm, cod = telescope ty in
     begin
       match Tm.unleash cod with
@@ -22,7 +25,8 @@ let pop_goal =
           hole (gm <.> gm') ty' @@ fun (hd, sp) ->
           kont @@ (hd, sp #< Tm.LblCall)
         in
-        ret {ty = info.ty; solve; subgoal}
+        let abort = pushr e in
+        ret {ty = info.ty; lbl = info.lbl; args = info.args; solve; subgoal; abort}
       | _ ->
         failwith "pop_goal"
     end
@@ -88,7 +92,7 @@ let refine_lam nm =
 
 type edecl =
   | Make of string * eterm
-  | Refine of egadget
+  | Refine of elhs * egadget
   | Debug of string
 
 and egadget =
@@ -99,6 +103,11 @@ and eterm =
   | Lam of string * eterm
   | Pair of eterm * eterm
   | Quo of (ResEnv.t -> tm)
+
+and elhs = string * epat list
+
+and epat =
+  | PVar of string
 
 type esig =
   edecl list
@@ -127,14 +136,39 @@ let rec elab_sig renv =
     let renvx = ResEnv.global name x renv in
     elab_sig renvx esig
 
-  | Refine gadg :: esig ->
-    elab_gadget renv gadg >>
+  | Refine (lhs, gadg) :: esig ->
+    elab_lhs renv lhs >>= fun renv' ->
+    elab_gadget renv' gadg >>
     go_right >>
     elab_sig renv esig
 
   | Debug msg :: esig ->
     dump_state Format.std_formatter msg >>
     elab_sig renv esig
+
+and elab_lhs renv (lbl, pats) =
+  pop_goal >>= fun goal ->
+  if lbl = goal.lbl then
+    goal.abort >>
+    elab_pats renv (pats, goal.args)
+  else
+    failwith "goal label mismatch"
+
+and elab_pats renv (pats, args) =
+  match pats, args with
+  | [], [] ->
+    ret renv
+
+  | PVar name :: pats, (ty, tm) :: args ->
+    (* Untested *)
+    let x = Name.named @@ Some name in
+    let renvx = ResEnv.global name x renv in
+    define Emp x ~ty tm >>
+    go_right >>
+    elab_pats renvx (pats, args)
+
+  | _ ->
+    failwith "TODO"
 
 and elab_gadget renv =
   function
@@ -156,7 +190,7 @@ let test_script =
   elab_sig ResEnv.init
     [ Make ("foo", Quo (fun _ -> Tm.make Tm.Bool))
     ; Debug "test0"
-    ; Refine (Ret Hole)
+    ; Refine (("foo", []), Ret Hole)
     ; Debug "test1"
     ; Make ("bar", Hole)
     ; Debug "test2"
