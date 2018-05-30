@@ -11,5 +11,7 @@ val hole : telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m
 val define : telescope -> Name.t -> ty:ty -> tm -> unit m
 
 
+val pis : telescope -> ty -> ty
+
 (** Run this in a proof state to solve unification problems. *)
 val ambulando : Name.t -> unit m

@@ -23,16 +23,29 @@
 %%
 
 edecl:
-  | LET; a = ATOM; COLON; ty = eterm
-    { E.Make (a, ty) }
+  | LET; a = ATOM; sch = escheme
+    { E.Make (a, sch) }
   | lhs = elhs; gdg = egadget
     { E.Refine (lhs, gdg) }
   | DEBUG; msg = ATOM
     { E.Debug msg }
 
+etele_cell:
+  | LSQ; a = ATOM; COLON; e = eterm; RSQ
+    { (a, e) }
+
+escheme:
+  | cs = list(etele_cell); e = eterm
+    { cs, e }
+
+
 elhs:
+  | a = ATOM; ps = list(epat)
+    { (a, ps) }
+
+epat:
   | a = ATOM
-    { (a, []) }
+    { E.PVar a }
 
 egadget:
   | RRIGHT_ARROW; e = eterm

@@ -10,7 +10,8 @@ type goal =
    args : (ty * tm) list;
    solve : tm -> unit m;
    abort : unit m;
-   subgoal : string -> telescope -> ty -> (tm Tm.cmd -> unit m) -> unit m}
+   context : telescope;
+   subgoal : 'a. string -> telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m}
 
 let pop_goal =
   popr >>= function
@@ -26,8 +27,9 @@ let pop_goal =
           kont @@ (hd, sp #< Tm.LblCall)
         in
         let abort = pushr e in
-        ret {ty = info.ty; lbl = info.lbl; args = info.args; solve; subgoal; abort}
+        ret {ty = info.ty; lbl = info.lbl; args = info.args; context = gm; solve; subgoal; abort}
       | _ ->
+        dump_state Format.err_formatter "Error/pop_goal" >>= fun _ ->
         failwith "pop_goal"
     end
   | _ -> failwith "No hole"
@@ -89,14 +91,28 @@ let refine_lam x =
   | _ ->
     failwith "refine_lam"
 
+let refine_pi x =
+  pop_goal >>= fun goal ->
+  match Tm.unleash goal.ty with
+  | Tm.Univ _ ->
+    goal.subgoal "dom" Emp goal.ty @@ fun dom ->
+    goal.subgoal "cod" (Emp #< (x, Tm.up dom)) goal.ty @@ fun codx ->
+    goal.solve @@ Tm.make @@ Tm.Pi (Tm.up dom, Tm.bind x @@ Tm.up codx) >>
+    ret (dom, codx)
+  | _ ->
+    failwith "refine_pi"
+
 
 module SourceLang =
 struct
 
   type edecl =
-    | Make of string * eterm
+    | Make of string * escheme
     | Refine of elhs * egadget
     | Debug of string
+
+  and escheme = etele * eterm
+  and etele = (string * eterm) list
 
   and egadget =
     | Ret of eterm
@@ -123,7 +139,7 @@ struct
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
     begin
       hole Emp (make_goal_ty (name ^ ".type") univ) @@ fun (hd, sp) ->
-      hole_named x Emp (make_goal_ty name @@ Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ -> ret ()
+      hole_named x Emp (Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ -> ret ()
     end >>
     ret x
 
@@ -132,9 +148,10 @@ struct
     | [] ->
       ret ()
 
-    | Make (name, eterm) :: esig ->
+    | Make (name, scheme) :: esig ->
       push_program name >>= fun x ->
-      elab_term renv eterm >>
+      dump_state Format.std_formatter "elab" >>
+      elab_scheme renv name scheme >>
       go_right >>
       let renvx = ResEnv.global name x renv in
       elab_sig renvx esig
@@ -149,26 +166,53 @@ struct
       dump_state Format.std_formatter msg >>
       elab_sig renv esig
 
+
+  and elab_scheme renv lbl (etele, ecod) =
+    match etele with
+    | [] ->
+      begin
+        pop_goal >>= fun goal ->
+        goal.subgoal "foo" Emp goal.ty @@ fun ty ->
+        let cx = Bwd.to_list goal.context in
+        let args = List.map (fun (x, ty) -> (ty, Tm.up (Tm.Ref (x, `Only), Emp))) cx in
+        goal.solve @@ Tm.make @@
+        Tm.LblTy {lbl; ty = Tm.up ty; args}
+      end >>
+      dump_state Format.std_formatter "ASDFADF" >>
+      elab_term renv ecod >>
+      go_right
+
+    | (name, ety) :: etele ->
+      let x = Name.named @@ Some name in
+      let renvx = ResEnv.global name x renv in
+      refine_pi x >>
+      elab_term renv ety >>
+      go_right >>
+      elab_scheme renvx lbl (etele, ecod) >>
+      go_right
+
+
   and elab_lhs renv (lbl, pats) =
+    dump_state Format.err_formatter "elab_lhs" >>
     pop_goal >>= fun goal ->
     if lbl = goal.lbl then
       goal.abort >>
-      elab_pats renv (pats, goal.args)
+      elab_pats renv (pats, Bwd.to_list goal.context)
     else
       failwith "goal label mismatch"
 
-  and elab_pats renv (pats, args) =
-    match pats, args with
+  and elab_pats renv (pats, cx) =
+    match pats, cx with
     | [], [] ->
       ret renv
 
-    | PVar name :: pats, (ty, tm) :: args ->
+    | PVar name :: pats, (x, _) :: cx ->
       (* Untested *)
-      let x = Name.named @@ Some name in
       let renvx = ResEnv.global name x renv in
-      define Emp x ~ty tm >>
-      go_right >>
-      elab_pats renvx (pats, args)
+      dump_state Format.err_formatter "taste" >>
+      (* define Emp x ~ty (Tm.make Tm.Tt) >>
+         go_right >> *)
+      elab_pats renvx (pats, cx)
 
     | _ ->
       failwith "TODO"
@@ -196,15 +240,4 @@ struct
       elab_term renv e0 >>
       go_right >>
       elab_term renv e1
-
-  let test_script =
-    elab_sig ResEnv.init
-      [ Make ("foo", Quo (fun _ -> Tm.make Tm.Bool))
-      ; Debug "test0"
-      ; Refine (("foo", []), Ret Hole)
-      ; Debug "test1"
-      ; Make ("bar", Hole)
-      ; Debug "test2"
-      ]
-
 end
