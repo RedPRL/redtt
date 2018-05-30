@@ -90,117 +90,121 @@ let refine_lam x =
     failwith "refine_lam"
 
 
+module SourceLang =
+struct
 
-type edecl =
-  | Make of string * eterm
-  | Refine of elhs * egadget
-  | Debug of string
+  type edecl =
+    | Make of string * eterm
+    | Refine of elhs * egadget
+    | Debug of string
 
-and egadget =
-  | Ret of eterm
+  and egadget =
+    | Ret of eterm
 
-and eterm =
-  | Hole
-  | Lam of string * eterm
-  | Pair of eterm * eterm
-  | Quo of (ResEnv.t -> tm)
+  and eterm =
+    | Hole
+    | Lam of string * eterm
+    | Pair of eterm * eterm
+    | Quo of (ResEnv.t -> tm)
 
-and elhs = string * epat list
+  and elhs = string * epat list
 
-and epat =
-  | PVar of string
+  and epat =
+    | PVar of string
 
-type esig =
-  edecl list
+  type esig =
+    edecl list
 
-let make_goal_ty lbl ty =
-  Tm.make @@ Tm.LblTy {lbl; args = []; ty}
+  let make_goal_ty lbl ty =
+    Tm.make @@ Tm.LblTy {lbl; args = []; ty}
 
-let push_program name =
-  let x = Name.fresh () in
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  begin
-    hole Emp (make_goal_ty (name ^ ".type") univ) @@ fun (hd, sp) ->
-    hole_named x Emp (make_goal_ty name @@ Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ -> ret ()
-  end >>
-  ret x
+  let push_program name =
+    let x = Name.fresh () in
+    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    begin
+      hole Emp (make_goal_ty (name ^ ".type") univ) @@ fun (hd, sp) ->
+      hole_named x Emp (make_goal_ty name @@ Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ -> ret ()
+    end >>
+    ret x
 
-let rec elab_sig renv =
-  function
-  | [] ->
-    ret ()
+  let rec elab_sig renv =
+    function
+    | [] ->
+      ret ()
 
-  | Make (name, eterm) :: esig ->
-    push_program name >>= fun x ->
-    elab_term renv eterm >>
-    go_right >>
-    let renvx = ResEnv.global name x renv in
-    elab_sig renvx esig
+    | Make (name, eterm) :: esig ->
+      push_program name >>= fun x ->
+      elab_term renv eterm >>
+      go_right >>
+      let renvx = ResEnv.global name x renv in
+      elab_sig renvx esig
 
-  | Refine (lhs, gadg) :: esig ->
-    elab_lhs renv lhs >>= fun renv' ->
-    elab_gadget renv' gadg >>
-    go_right >>
-    elab_sig renv esig
+    | Refine (lhs, gadg) :: esig ->
+      elab_lhs renv lhs >>= fun renv' ->
+      elab_gadget renv' gadg >>
+      go_right >>
+      elab_sig renv esig
 
-  | Debug msg :: esig ->
-    dump_state Format.std_formatter msg >>
-    elab_sig renv esig
+    | Debug msg :: esig ->
+      dump_state Format.std_formatter msg >>
+      elab_sig renv esig
 
-and elab_lhs renv (lbl, pats) =
-  pop_goal >>= fun goal ->
-  if lbl = goal.lbl then
-    goal.abort >>
-    elab_pats renv (pats, goal.args)
-  else
-    failwith "goal label mismatch"
-
-and elab_pats renv (pats, args) =
-  match pats, args with
-  | [], [] ->
-    ret renv
-
-  | PVar name :: pats, (ty, tm) :: args ->
-    (* Untested *)
-    let x = Name.named @@ Some name in
-    let renvx = ResEnv.global name x renv in
-    define Emp x ~ty tm >>
-    go_right >>
-    elab_pats renvx (pats, args)
-
-  | _ ->
-    failwith "TODO"
-
-and elab_gadget renv =
-  function
-  | Ret e ->
-    elab_term renv e
-
-and elab_term renv =
-  function
-  | Hole ->
-    ret ()
-  | Quo fam ->
-    let tm = fam renv in
+  and elab_lhs renv (lbl, pats) =
     pop_goal >>= fun goal ->
-    goal.solve tm
-  | Lam (name, e) ->
-    let x = Name.named @@ Some name in
-    let renvx = ResEnv.global name x renv in
-    refine_lam x >>
-    elab_term renvx e
-  | Pair (e0, e1) ->
-    refine_pair >>
-    elab_term renv e0 >>
-    go_right >>
-    elab_term renv e1
+    if lbl = goal.lbl then
+      goal.abort >>
+      elab_pats renv (pats, goal.args)
+    else
+      failwith "goal label mismatch"
 
-let test_script =
-  elab_sig ResEnv.init
-    [ Make ("foo", Quo (fun _ -> Tm.make Tm.Bool))
-    ; Debug "test0"
-    ; Refine (("foo", []), Ret Hole)
-    ; Debug "test1"
-    ; Make ("bar", Hole)
-    ; Debug "test2"
-    ]
+  and elab_pats renv (pats, args) =
+    match pats, args with
+    | [], [] ->
+      ret renv
+
+    | PVar name :: pats, (ty, tm) :: args ->
+      (* Untested *)
+      let x = Name.named @@ Some name in
+      let renvx = ResEnv.global name x renv in
+      define Emp x ~ty tm >>
+      go_right >>
+      elab_pats renvx (pats, args)
+
+    | _ ->
+      failwith "TODO"
+
+  and elab_gadget renv =
+    function
+    | Ret e ->
+      elab_term renv e
+
+  and elab_term renv =
+    function
+    | Hole ->
+      ret ()
+    | Quo fam ->
+      let tm = fam renv in
+      pop_goal >>= fun goal ->
+      goal.solve tm
+    | Lam (name, e) ->
+      let x = Name.named @@ Some name in
+      let renvx = ResEnv.global name x renv in
+      refine_lam x >>
+      elab_term renvx e
+    | Pair (e0, e1) ->
+      refine_pair >>
+      elab_term renv e0 >>
+      go_right >>
+      elab_term renv e1
+
+  let test_script =
+    elab_sig ResEnv.init
+      [ Make ("foo", Quo (fun _ -> Tm.make Tm.Bool))
+      ; Debug "test0"
+      ; Refine (("foo", []), Ret Hole)
+      ; Debug "test1"
+      ; Make ("bar", Hole)
+      ; Debug "test2"
+      ]
+
+end

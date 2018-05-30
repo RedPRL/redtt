@@ -1320,8 +1320,8 @@ struct
             pp_nfs args
             pp_value ty
       end
-    | LblRet _ ->
-      Format.fprintf fmt "<lbl-ret>"
+    | LblRet v ->
+      Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
 
   and pp_abs fmt abs =
     let x, v = Abs.unleash1 abs in

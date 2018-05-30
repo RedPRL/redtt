@@ -267,7 +267,11 @@ and subst_comp_face sub (r, r', obnd) =
 and subst_comp_sys sub sys =
   List.map (subst_comp_face sub) sys
 
-let make con = Tm con
+let make con =
+  match con with
+  | Up (Ix ix, _) when ix < 0 -> failwith "make: Ix with negative index, wtf!!"
+  | _ -> Tm con
+
 let unleash (Tm con) = con
 
 let traverse ~f ~var ~ref =
