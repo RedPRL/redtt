@@ -128,7 +128,7 @@ struct
         let var = generic env pi0.dom in
         let vcod0 = inst_clo pi0.cod var in
         let vcod1 = inst_clo pi1.cod var in
-        let cod = equate env ty vcod0 vcod1 in
+        let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi None dom cod
 
       | Sg sg0, Sg sg1 ->
@@ -136,7 +136,7 @@ struct
         let var = generic env sg0.dom in
         let vcod0 = inst_clo sg0.cod var in
         let vcod1 = inst_clo sg1.cod var in
-        let cod = equate env ty vcod0 vcod1 in
+        let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.sg None dom cod
 
       | Ext abs0, Ext abs1 ->
