@@ -368,14 +368,14 @@ struct
       let var = generic env pi0.dom in
       let vcod0 = inst_clo pi0.cod var in
       let vcod1 = inst_clo pi1.cod var in
-      subtype env vcod0 vcod1
+      subtype (Env.succ env) vcod0 vcod1
 
     | Sg sg0, Sg sg1 ->
       subtype env sg0.dom sg1.dom;
       let var = generic env sg0.dom in
       let vcod0 = inst_clo sg0.cod var in
       let vcod1 = inst_clo sg1.cod var in
-      subtype env vcod0 vcod1
+      subtype (Env.succ env) vcod0 vcod1
 
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
