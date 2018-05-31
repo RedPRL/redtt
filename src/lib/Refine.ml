@@ -4,7 +4,7 @@ open Unify open Dev open Contextual open RedBasis open Bwd open BwdNotation
 module Notation = Monad.Notation (Contextual)
 open Notation
 
-module T = PersistentTable.M
+module T = Map.Make (String)
 
 type edecl =
   | Make of string * escheme
@@ -36,16 +36,23 @@ let get_tele =
   in
   ret @@ Bwd.map go psi
 
-let get_resolver =
-  let rec go renv =
+let get_resolver env =
+  let rec go_globals renv  =
     function
-    | Emp -> renv
+    | [] -> renv
+    | (name, (x, _, _)) :: env ->
+      let renvx = ResEnv.global name x renv in
+      go_globals renvx env
+  in
+  let rec go_locals renv =
+    function
+    | Emp -> go_globals renv @@ T.bindings env
     | Snoc (psi, (x, _)) ->
       let renvx = ResEnv.global (Name.to_string x) x renv in
-      go renvx psi
+      go_locals renvx psi
   in
   ask >>= fun psi ->
-  ret @@ go ResEnv.init psi
+  ret @@ go_locals ResEnv.init psi
 
 let rec elab_sig env =
   function
@@ -62,12 +69,14 @@ and elab_decl env =
     hole Emp univ @@ fun ty ->
     hole Emp (Tm.up ty) @@ fun tm ->
     elab_scheme env (Tm.up ty) scheme >>
-    ret @@ T.set name (ty, tm) env
+    let alpha = Name.named @@ Some name in
+    define Emp alpha (Tm.up ty) (Tm.up tm) >>
+    ret @@ T.add name (alpha, ty, tm) env
 
   | Refine (name, e) ->
     begin
-      match T.find name env with
-      | Some (ty, tm) ->
+      match T.find_opt name env with
+      | Some (_, ty, tm) ->
         elab_term env (Tm.up ty, Tm.up tm) e >>
         ret env
       | None ->
@@ -122,7 +131,7 @@ and elab_term env (ty,tm) =
     elab_term env (Tm.up tau1x, Tm.up bdyx) e
 
   | Quo tmfam ->
-    get_resolver >>= fun renv ->
+    get_resolver env >>= fun renv ->
     active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tmfam renv}
 
   | Hole ->
@@ -137,4 +146,4 @@ let script =
   ]
 
 
-let test = elab_sig (T.init ~size:10) script
+let test = elab_sig T.empty script
