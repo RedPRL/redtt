@@ -245,7 +245,7 @@ struct
     | LblCall neu0, LblCall neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
     | _ ->
-      Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1;
+      (* Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1; *)
       failwith "equate_neu"
 
   and equate_neu env neu0 neu1 =

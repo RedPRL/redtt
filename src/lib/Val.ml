@@ -1369,8 +1369,21 @@ struct
     | Cdr neu ->
       Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
 
-    | _ ->
-      Format.fprintf fmt "<neu>"
+    | Ref (a, _) ->
+      Name.pp fmt a
+
+    | Meta alpha ->
+      Name.pp fmt alpha
+
+    | If _ ->
+      Format.fprintf fmt "<if>"
+
+    | VProj _ ->
+      Format.fprintf fmt "<vproj>"
+
+    | LblCall neu ->
+      Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
+
 
   and pp_nf fmt nf =
     pp_value fmt nf.el

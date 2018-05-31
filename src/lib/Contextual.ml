@@ -155,6 +155,11 @@ let go_to_top =
   setl Emp >>
   setr (lcx <>> rcx)
 
+let go_to_bottom =
+  get >>= fun (lcx, rcx) ->
+  setl (lcx <>< rcx) >>
+  setr []
+
 let in_scope x p =
   local @@ fun ps ->
   ps #< (x, p)

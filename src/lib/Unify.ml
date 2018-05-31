@@ -514,6 +514,8 @@ let rigid_rigid q =
 
 let unify q =
   typechecker >>= fun (module T) ->
+  (* TODO: there's a problem here, as we're calling HSubst on the global context,
+     but not remembering to deal with things like the 'x' that we define fresh below. *)
   let module HS = HSubst (T) in
   let open HS in
 

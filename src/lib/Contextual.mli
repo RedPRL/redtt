@@ -17,6 +17,7 @@ val pushr : entry -> unit m
 val pushls : entry list -> unit m
 
 val go_to_top : unit m
+val go_to_bottom : unit m
 val go_left : unit m
 val go_right : unit m
 

@@ -722,6 +722,7 @@ struct
     | Up cmd ->
       go_cmd fl cmd acc
     | Bool -> acc
+    | Univ _ -> acc
     | _ ->
       failwith "TODO"
 
