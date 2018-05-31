@@ -279,12 +279,6 @@ let try_prune _q =
   (* TODO: implement pruning *)
   ret false
 
-let normalize (module T : Typing.S) ~ty tm =
-  let lcx = T.Cx.emp in
-  let vty = T.Cx.eval lcx ty in
-  let el = T.Cx.eval lcx tm in
-  ret @@ T.Cx.quote lcx ~ty:vty el
-
 
 (* This is all so horrible because we don't have hereditary-substitution-style operations
    directly on the syntax. So we have to factor through evaluation and quotation all the time.
@@ -319,13 +313,13 @@ struct
       let dom, cod = T.Cx.Eval.unleash_pi ty in
       inst_bnd (cod, bnd) (dom, arg)
     | _, Tm.ExtApp _ ->
-      failwith "TODO: %%/ExtApp"
+      failwith "TODO: plug/ExtApp"
     | Tm.Cons (t0, _), Tm.Car -> t0
     | Tm.Cons (_, t1), Tm.Cdr -> t1
     | Tm.LblRet t, Tm.LblCall -> t
     | Tm.Tt, Tm.If info -> info.tcase
     | Tm.Ff, Tm.If info -> info.fcase
-    | _ -> failwith "TODO: %%"
+    | _ -> failwith "TODO: plug"
 
   (* TODO: this sorry attempt results in things getting repeatedly evaluated *)
   let (%%) (ty, tm) frame =
@@ -398,11 +392,11 @@ let is_orthogonal q =
   | _ -> false
 
 let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
-  typechecker >>= fun (module T) ->
-  let module HSubst = HSubst (T) in
   let rec go sp0 sp1 =
     match sp0, sp1 with
     | Emp, Emp ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       if x0 = x1 then
         lookup_var x0 tw0 >>= fun ty0 ->
         lookup_var x1 tw1 >>= fun ty1 ->
@@ -414,6 +408,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 
     | Snoc (sp0, Tm.FunApp t0), Snoc (sp1, Tm.FunApp t1) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       let dom0, cod0 = T.Cx.Eval.unleash_pi ty0 in
       let dom1, cod1 = T.Cx.Eval.unleash_pi ty1 in
       let tdom0 = T.Cx.quote_ty T.Cx.emp dom0 in
@@ -425,6 +421,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 
     | Snoc (sp0, Tm.ExtApp ts0), Snoc (sp1, Tm.ExtApp ts1) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       let rs0 = List.map (fun t -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp t) ts0 in
       let rs1 = List.map (fun t -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp t) ts1 in
       (* TODO: unify the dimension spines ts0, ts1 *)
@@ -436,12 +434,16 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 
     | Snoc (sp0, Tm.Car), Snoc (sp1, Tm.Car) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       let dom0, _ = T.Cx.Eval.unleash_sg ty0 in
       let dom1, _ = T.Cx.Eval.unleash_sg ty1 in
       ret (dom0, dom1)
 
     | Snoc (sp0, Tm.Cdr), Snoc (sp1, Tm.Cdr) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       let _, cod0 = T.Cx.Eval.unleash_sg ty0 in
       let _, cod1 = T.Cx.Eval.unleash_sg ty1 in
       let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref (x0, tw0), sp0 #< Tm.Car) in
@@ -450,12 +452,16 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 
     | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       let _, _, ty0 = T.Cx.Eval.unleash_lbl_ty ty0 in
       let _, _, ty1 = T.Cx.Eval.unleash_lbl_ty ty1 in
       ret (ty0, ty1)
 
     | Snoc (sp0, Tm.If info0), Snoc (sp1, Tm.If info1) ->
       go sp0 sp1 >>= fun (_ty0, _ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       let y = Name.fresh () in
       let mot0y = Tm.unbind_with y `TwinL info0.mot in
       let mot1y = Tm.unbind_with y `TwinR info1.mot in
@@ -486,7 +492,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 let rigid_rigid q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
-    let x = Name.fresh () in
+    let x = Name.named @@ Some "rigidrigid-pi" in
     let cod0x = Tm.unbind_with x `TwinL cod0 in
     let cod1x = Tm.unbind_with x `TwinR cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
@@ -494,7 +500,7 @@ let rigid_rigid q =
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
   | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
-    let x = Name.fresh () in
+    let x = Name.named @@ Some "rigidrigid-sg" in
     let cod0x = Tm.unbind_with x `TwinL cod0 in
     let cod1x = Tm.unbind_with x `TwinR cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
@@ -511,28 +517,33 @@ let rigid_rigid q =
     else
       block @@ Unify q
 
+let (%%) (ty, tm) frame =
+  typechecker >>= fun (module T) ->
+  let module HSubst = HSubst (T) in
+  let open HSubst in
+  ret @@ (ty, tm) %% frame
+
 
 let unify q =
-  typechecker >>= fun (module T) ->
-  (* TODO: there's a problem here, as we're calling HSubst on the global context,
-     but not remembering to deal with things like the 'x' that we define fresh below. *)
-  let module HS = HSubst (T) in
-  let open HS in
-
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, _), Tm.Pi (dom1, _) ->
-    let x = Name.fresh () in
+    let x = Name.named @@ Some "foo" in
     let x_l = Tm.up (Tm.Ref (x, `TwinL), Emp) in
     let x_r = Tm.up (Tm.Ref (x, `TwinR), Emp) in
-    let ty0, tm0 = (q.ty0, q.tm0) %% Tm.FunApp x_l in
-    let ty1, tm1 = (q.ty1, q.tm1) %% Tm.FunApp x_r in
-    active @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
+
+    in_scope x (Tw (dom0, dom1))
+      begin
+        (q.ty0, q.tm0) %% Tm.FunApp x_l >>= fun (ty0, tm0) ->
+        (q.ty1, q.tm1) %% Tm.FunApp x_r >>= fun (ty1, tm1) ->
+        ret @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
+      end >>= fun prob ->
+    active prob
 
   | Tm.Sg (dom0, _), Tm.Sg (dom1, _) ->
-    let _, car0 = (q.ty0, q.tm0) %% Tm.Car in
-    let _, car1 = (q.ty1, q.tm1) %% Tm.Car in
-    let ty_cdr0, cdr0 = (q.ty0, q.tm0) %% Tm.Cdr in
-    let ty_cdr1, cdr1 = (q.ty1, q.tm1) %% Tm.Cdr in
+    (q.ty0, q.tm0) %% Tm.Car >>= fun (_, car0) ->
+    (q.ty1, q.tm1) %% Tm.Car >>= fun (_, car1) ->
+    (q.ty0, q.tm0) %% Tm.Cdr >>= fun (ty_cdr0, cdr0) ->
+    (q.ty1, q.tm1) %% Tm.Cdr >>= fun (ty_cdr1, cdr1) ->
     active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
     active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
 
@@ -593,10 +604,17 @@ let rec solver =
         let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
         check_eq ~ty:univ ty0 ty1 >>= function
         | true ->
-          let var = Tm.up (Tm.Ref (x, `Only), Emp) in
-          let sigma = Subst.define Subst.emp x ~ty:ty0 ~tm:var in
+          get_global_cx >>= fun sub ->
+          let y = Name.fresh () in
+          (*  This weird crap is needed to avoid creating a cycle in the environment.
+              What we should really do is kill 'twin variables' altogether and switch to
+              a representation based on having two contexts. *)
+          let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
+          let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
+          let sub_y = Subst.define (Subst.add_hole sub y ty0 []) x ~ty:ty0 ~tm:var_y in
+          let sub_x = Subst.define (Subst.add_hole sub x ty0 []) y ~ty:ty0 ~tm:var_x in
           solver @@ Problem.all x ty0 @@
-          Problem.subst sigma probx
+          Problem.subst sub_x @@ Problem.subst sub_y probx
         | false ->
           in_scope x (Tw (ty0, ty1)) @@
           solver probx

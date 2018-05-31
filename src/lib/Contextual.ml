@@ -121,10 +121,22 @@ let cx_core : cx_l -> GlobalCx.t =
   in
   go
 
+let get_global_cx =
+  get >>= fun (cxl, cxr) ->
+  let rec go_params =
+    function
+    | Emp ->cx_core (cxl <>< cxr)
+    | Snoc (psi, (x, P ty)) ->
+      GlobalCx.add_hole (go_params psi) x ty []
+    | Snoc (psi, (x, Tw (ty, _))) (* TODO *) ->
+      GlobalCx.add_hole (go_params psi) x ty []
+  in
+  ask >>= fun psi ->
+  ret @@ go_params psi
+
 
 let popr_opt =
-  getl >>= fun lcx ->
-  let sub = cx_core lcx in
+  get_global_cx >>= fun sub ->
   getr >>= function
   | e :: mcx ->
     setr mcx >>
@@ -211,10 +223,23 @@ let active = postpone Active
 let block = postpone Blocked
 
 
-
 let typechecker : (module Typing.S) m =
   getl >>= fun entries ->
-  let globals = cx_core entries in
+  let rec go_tele cx =
+    function
+    | Emp -> cx
+    | Snoc (psi, (x, P ty)) ->
+      let cx' = GlobalCx.add_hole cx x ~ty:ty ~sys:[] in
+      go_tele cx' psi
+
+    | Snoc (psi, (x, Tw (ty0, _ty1))) ->
+      (* TODO: properly handle twin *)
+      let cx' = GlobalCx.add_hole cx x ~ty:ty0 ~sys:[] in
+      go_tele cx' psi
+  in
+
+  ask >>= fun psi ->
+  let globals = go_tele (cx_core entries) psi  in
   let module G = struct let globals = globals end in
   let module T = Typing.M (G) in
   ret @@ (module T : Typing.S)

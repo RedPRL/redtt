@@ -34,6 +34,7 @@ val check : ty:ty -> tm -> bool m
 val check_eq : ty:ty -> tm -> tm -> bool m
 
 
+val get_global_cx : Subst.t m
 val typechecker : (module Typing.S) m
 
 val dump_state : Format.formatter -> string -> unit m

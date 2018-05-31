@@ -123,10 +123,6 @@ and elab_term env (ty,tm) =
 
   | Quo tmfam ->
     get_resolver >>= fun renv ->
-    Format.eprintf "ty: %a; tm0 : %a; tm1 : %a@.@."
-      (Tm.pp Pretty.Env.emp) ty
-      (Tm.pp Pretty.Env.emp) tm
-      (Tm.pp Pretty.Env.emp) (tmfam renv);
     active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tmfam renv}
 
   | Hole ->

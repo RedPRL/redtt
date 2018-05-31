@@ -106,7 +106,7 @@ struct
       V.eval rel env tm
     with
     | exn ->
-      Format.eprintf "Failed to evaluate: %a@." (Tm.pp ppenv) tm;
+      Format.eprintf "Failed to evaluate: %a because of %s@." (Tm.pp ppenv) tm (Printexc.to_string exn);
       raise exn
 
   let eval_cmd {env; rel; ppenv; _} cmd =
