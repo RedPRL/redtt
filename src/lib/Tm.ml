@@ -721,8 +721,10 @@ struct
       go_ext_bnd fl ebnd acc
     | Up cmd ->
       go_cmd fl cmd acc
-    | Bool -> acc
-    | Univ _ -> acc
+    | ExtLam nbnd ->
+      go_nbnd fl nbnd acc
+    | (Bool | Tt | Ff | Dim0 | Dim1 | Univ _) ->
+      acc
     | _ ->
       failwith "TODO"
 
@@ -793,6 +795,11 @@ struct
     let NB (_, (ty, sys)) = bnd in
     go fl ty @@ go_tm_sys fl sys acc
 
+
+  and go_nbnd fl bnd acc =
+    let NB (_, tm) = bnd in
+    go fl tm acc
+
   and go_bnd fl bnd acc =
     let B (_, tm) = bnd in
     go fl tm acc
@@ -817,6 +824,7 @@ struct
 end
 
 let free fl tm =
+  Format.eprintf "Free: %a@." (pp Pretty.Env.emp) tm;
   OccursAux.go fl tm Occurs.Set.empty
 
 module Sp =

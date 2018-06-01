@@ -36,40 +36,6 @@ type entry =
   | Q of status * problem
   | Bracket of Name.t
 
-let pp_equation fmt q =
-  Format.fprintf fmt "{%a : %a = %a : %a}"
-    (Tm.pp Pretty.Env.emp) q.tm0
-    (Tm.pp Pretty.Env.emp) q.ty0
-    (Tm.pp Pretty.Env.emp) q.tm1
-    (Tm.pp Pretty.Env.emp) q.ty1
-
-let pp_problem fmt =
-  function
-  | Unify q ->
-    pp_equation fmt q
-  | _ ->
-    Format.fprintf fmt "<problem>"
-
-let pp_entry fmt =
-  function
-  | E (x, ty, Hole) ->
-    Format.fprintf fmt "?%a : %a"
-      Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
-
-  | E (x, ty, Defn tm) ->
-    Format.fprintf fmt "!%a : %a = %a"
-      Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
-      (Tm.pp Pretty.Env.emp) tm
-
-  | Q (_, prob) ->
-    Format.fprintf fmt "%a"
-      pp_problem prob
-
-  | Bracket _ ->
-    Format.fprintf fmt "<bracket>"
-
 let eqn_open_var k x q =
   let ty0 = Tm.open_var k x `Only q.ty0 in
   let ty1 = Tm.open_var k x `Only q.ty1 in
@@ -119,11 +85,63 @@ let unbind (B prob) =
   let x = Name.fresh () in
   x, prob_open_var 0 x prob
 
+
+let pp_equation fmt q =
+  Format.fprintf fmt "@[<1>{@[<1>%a@ :@ %a@]@ =@ @[<1>%a@ :@ %a@]}@]"
+    (Tm.pp Pretty.Env.emp) q.tm0
+    (Tm.pp Pretty.Env.emp) q.ty0
+    (Tm.pp Pretty.Env.emp) q.tm1
+    (Tm.pp Pretty.Env.emp) q.ty1
+
+let pp_param fmt =
+  function
+  | P ty ->
+    Tm.pp Pretty.Env.emp fmt ty
+  | Tw (ty0, ty1) ->
+    Format.fprintf fmt "{%a | %a}"
+      (Tm.pp Pretty.Env.emp) ty0
+      (Tm.pp Pretty.Env.emp) ty1
+
+
+let rec pp_problem fmt =
+  function
+  | Unify q ->
+    pp_equation fmt q
+  | All (prm, prob) ->
+    let x, probx = unbind prob in
+    Format.fprintf fmt "@[%a : %a@]@ >>@ @[<1>%a@]"
+      Name.pp x
+      pp_param prm
+      pp_problem probx
+
+
+
+let pp_entry fmt =
+  function
+  | E (x, ty, Hole) ->
+    Format.fprintf fmt "?%a : %a"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty
+
+  | E (x, ty, Defn tm) ->
+    Format.fprintf fmt "!%a : %a = %a"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty
+      (Tm.pp Pretty.Env.emp) tm
+
+  | Q (_, prob) ->
+    Format.fprintf fmt "%a"
+      pp_problem prob
+
+  | Bracket _ ->
+    Format.fprintf fmt "<bracket>"
+
 module Subst = GlobalCx
 
 module type DevSort =
 sig
   include Occurs.S
+  val pp : t Pretty.t0
   val subst : Subst.t -> t -> t
 end
 
@@ -190,6 +208,8 @@ let subst_entry sub =
 module Param =
 struct
   type t = param
+  let pp = pp_param
+
   let free fl =
     function
     | P ty -> Tm.free fl ty
@@ -216,6 +236,8 @@ end
 module Equation =
 struct
   type t = (tm, tm) equation
+  let pp = pp_equation
+
   let free fl {ty0; tm0; ty1; tm1} =
     let sets =
       [ Tm.free fl ty0;
@@ -233,6 +255,9 @@ end
 module Problem =
 struct
   type t = problem
+
+  let pp = pp_problem
+
   let rec free fl =
     function
     | Unify q ->
@@ -255,6 +280,9 @@ end
 module Entry =
 struct
   type t = entry
+
+  let pp = pp_entry
+
   let free fl =
     function
     | E (_, _, d) ->

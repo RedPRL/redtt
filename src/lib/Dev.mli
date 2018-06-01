@@ -48,6 +48,7 @@ module Subst = GlobalCx
 module type DevSort =
 sig
   include Occurs.S
+  val pp : t Pretty.t0
   val subst : Subst.t -> t -> t
 end
 
