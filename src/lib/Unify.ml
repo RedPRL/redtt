@@ -22,6 +22,9 @@ let rec lambdas xs tm =
   | Emp -> tm
   | Snoc (xs, `Var x) ->
     lambdas xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+  | Snoc (xs, `Dim x) ->
+    let bnd = Tm.NB ([None], failwith "") in
+    lambdas xs @@ Tm.make @@ Tm.ExtLam bnd
 
 let rec pis gm tm =
   match gm with
@@ -118,6 +121,15 @@ let to_var t =
     Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t;
     None
 
+
+let rec opt_traverse f xs =
+  match xs with
+  | [] -> Some []
+  | x::xs ->
+    match f x with
+    | Some y -> Option.map (fun ys -> y :: ys) @@ opt_traverse f xs
+    | None -> None
+
 let rec spine_to_vars sp =
   match sp with
   | Emp -> Some Emp
@@ -128,7 +140,11 @@ let rec spine_to_vars sp =
       | None -> None
     end
   | Snoc (sp, Tm.ExtApp ts) ->
-    failwith "todo: spine_to_vars"
+    begin
+      match opt_traverse to_var ts with
+      | Some xs -> Option.map (fun ys -> ys <>< List.map (fun x -> `Dim x) xs) @@ spine_to_vars sp
+      | None -> None
+    end
   | _ -> None
 
 let linear_on t =
@@ -138,6 +154,8 @@ let linear_on t =
     | Emp -> true
     | Snoc (xs, `Var x) ->
       not (Occurs.Set.mem x fvs && List.mem (`Var x) @@ Bwd.to_list xs) && go xs
+    | Snoc (xs, `Dim x) ->
+      not (Occurs.Set.mem x fvs && List.mem (`Dim x) @@ Bwd.to_list xs) && go xs
   in go
 
 let invert alpha ty sp t =
