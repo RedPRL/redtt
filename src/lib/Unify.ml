@@ -104,6 +104,9 @@ let rec eta_contract t =
         Tm.cons t0' t1'
     end
 
+  | Tm.ExtLam _nbnd ->
+    failwith "eta contract ext-lam"
+
   | con ->
     Tm.make @@ Tm.map_tmf eta_contract con
 
@@ -172,12 +175,15 @@ let rec flex_term ~deps q =
     begin
       match e with
       | E (beta, _, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+        Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q;
         pushls (e :: deps) >>
         block (Unify q)
       | E (beta, ty, Hole) when alpha = beta ->
+        Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q;
         pushls deps >>
         try_invert q ty <||
         begin
+          Format.eprintf "flex_term failed to invert.@.";
           block (Unify q) >>
           pushl e
         end
@@ -187,8 +193,10 @@ let rec flex_term ~deps q =
           || Occurs.Set.mem beta (Entries.free `Metas deps)
           || Occurs.Set.mem beta (Equation.free `Metas q)
         ->
+        Format.eprintf "flex_term/3: @[<1>%a@]@." Equation.pp q;
         flex_term ~deps:(e :: deps) q
       | _ ->
+        Format.eprintf "flex_term/4: @[<1>%a@]@." Equation.pp q;
         pushr e >>
         flex_term ~deps q
     end
@@ -305,6 +313,7 @@ struct
     let vty = T.Cx.Eval.inst_clo ty_clo varg in
     T.Cx.quote T.Cx.emp ~ty:vty el
 
+
   let plug (ty, tm) frame =
     match Tm.unleash tm, frame with
     | Tm.Up (hd, sp), _ ->
@@ -312,8 +321,12 @@ struct
     | Tm.Lam bnd, Tm.FunApp arg ->
       let dom, cod = T.Cx.Eval.unleash_pi ty in
       inst_bnd (cod, bnd) (dom, arg)
-    | _, Tm.ExtApp _ ->
-      failwith "TODO: plug/ExtApp"
+    | Tm.ExtLam _, Tm.ExtApp args ->
+      let vargs = List.map (fun x -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp x) args in
+      let ty, _ = T.Cx.Eval.unleash_ext ty vargs in
+      let vlam = T.Cx.eval T.Cx.emp tm in
+      let vapp = T.Cx.Eval.ext_apply vlam vargs in
+      T.Cx.quote T.Cx.emp ~ty vapp
     | Tm.Cons (t0, _), Tm.Car -> t0
     | Tm.Cons (_, t1), Tm.Cdr -> t1
     | Tm.LblRet t, Tm.LblCall -> t
@@ -557,7 +570,7 @@ let unify q =
       begin
         (q.ty0, q.tm0) %% Tm.ExtApp vars >>= fun (ty0, tm0) ->
         (q.ty1, q.tm1) %% Tm.ExtApp vars >>= fun (ty1, tm1) ->
-        failwith "TODO: make a unification problem that quantifies over all the dimensions"
+        ret @@ Problem.all_dims xs @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
       end >>= fun prob ->
     active prob
 

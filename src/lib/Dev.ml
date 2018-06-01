@@ -283,6 +283,12 @@ struct
   let all x ty prob =
     All (P ty, bind x prob)
 
+  let rec all_dims xs prob =
+    match xs with
+    | [] -> prob
+    | x :: xs ->
+      All (I, bind x @@ all_dims xs prob)
+
   let all_twins x ty0 ty1 prob =
     All (Tw (ty0, ty1), bind x prob)
 
