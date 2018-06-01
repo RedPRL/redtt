@@ -9,7 +9,7 @@ type t = (Name.t, entry) T.t
 
 let emp = T.init 100
 
-let add_hole sg nm ~ty ~sys =
+let ext sg nm ~ty ~sys =
   match T.find nm sg with
   | None ->
     T.set nm {ty; sys} sg

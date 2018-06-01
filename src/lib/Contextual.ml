@@ -110,7 +110,7 @@ let cx_core : cx_l -> GlobalCx.t =
       match e with
       | E (x, ty, Hole) ->
         let cx = go es in
-        GlobalCx.add_hole cx x ty []
+        GlobalCx.ext cx x ty []
       | E (x, ty, Defn t) ->
         let cx = go es in
         GlobalCx.define cx x ty t
@@ -127,9 +127,9 @@ let get_global_cx =
     function
     | Emp ->cx_core (cxl <>< cxr)
     | Snoc (psi, (x, P ty)) ->
-      GlobalCx.add_hole (go_params psi) x ty []
+      GlobalCx.ext (go_params psi) x ty []
     | Snoc (psi, (x, Tw (ty, _))) (* TODO *) ->
-      GlobalCx.add_hole (go_params psi) x ty []
+      GlobalCx.ext (go_params psi) x ty []
   in
   ask >>= fun psi ->
   ret @@ go_params psi
@@ -233,12 +233,12 @@ let typechecker : (module Typing.S) m =
     function
     | Emp -> cx
     | Snoc (psi, (x, P ty)) ->
-      let cx' = GlobalCx.add_hole cx x ~ty:ty ~sys:[] in
+      let cx' = GlobalCx.ext cx x ~ty:ty ~sys:[] in
       go_tele cx' psi
 
     | Snoc (psi, (x, Tw (ty0, _ty1))) ->
       (* TODO: properly handle twin *)
-      let cx' = GlobalCx.add_hole cx x ~ty:ty0 ~sys:[] in
+      let cx' = GlobalCx.ext cx x ~ty:ty0 ~sys:[] in
       go_tele cx' psi
   in
 

@@ -525,6 +525,7 @@ let (%%) (ty, tm) frame =
 
 
 let unify q =
+  Format.eprintf "Unify: @[<1>%a@]@.@." Equation.pp q ;
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, _), Tm.Pi (dom1, _) ->
     let x = Name.named @@ Some "foo" in
@@ -593,41 +594,42 @@ let is_reflexive q =
   | false ->
     ret false
 
-let rec solver =
-  function
+let rec solver prob =
+  Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob;
+  match prob with
   | Unify q ->
     is_reflexive q <||
     unify q
 
   | All (param, prob) ->
     let x, probx = unbind prob in
-    if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
-      active probx
-    else
-      match param with
-      | P ty ->
-        (* TODO: split sigma, blah blah *)
-        in_scope x (P ty) @@
-        solver probx
+    (* if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
+       active probx
+       else *)
+    match param with
+    | P ty ->
+      (* TODO: split sigma, blah blah *)
+      in_scope x (P ty) @@
+      solver probx
 
-      | Tw (ty0, ty1) ->
-        let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-        check_eq ~ty:univ ty0 ty1 >>= function
-        | true ->
-          get_global_cx >>= fun sub ->
-          let y = Name.fresh () in
-          (*  This weird crap is needed to avoid creating a cycle in the environment.
-              What we should really do is kill 'twin variables' altogether and switch to
-              a representation based on having two contexts. *)
-          let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
-          let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
-          let sub_y = Subst.define (Subst.add_hole sub y ty0 []) x ~ty:ty0 ~tm:var_y in
-          let sub_x = Subst.define (Subst.add_hole sub x ty0 []) y ~ty:ty0 ~tm:var_x in
-          solver @@ Problem.all x ty0 @@
-          Problem.subst sub_x @@ Problem.subst sub_y probx
-        | false ->
-          in_scope x (Tw (ty0, ty1)) @@
-          solver probx
+    | Tw (ty0, ty1) ->
+      let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+      check_eq ~ty:univ ty0 ty1 >>= function
+      | true ->
+        get_global_cx >>= fun sub ->
+        let y = Name.fresh () in
+        (*  This weird crap is needed to avoid creating a cycle in the environment.
+            What we should really do is kill 'twin variables' altogether and switch to
+            a representation based on having two contexts. *)
+        let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
+        let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
+        let sub_y = Subst.define (Subst.ext sub y ty0 []) x ~ty:ty0 ~tm:var_y in
+        let sub_x = Subst.define (Subst.ext sub x ty0 []) y ~ty:ty0 ~tm:var_x in
+        solver @@ Problem.all x ty0 @@
+        Problem.subst sub_x @@ Problem.subst sub_y probx
+      | false ->
+        in_scope x (Tw (ty0, ty1)) @@
+        solver probx
 
 
 let lower tele alpha ty =
@@ -651,11 +653,13 @@ let lower tele alpha ty =
 let rec ambulando bracket =
   popr_opt >>= function
   | None ->
+    Format.eprintf "ambulando: done@.";
     ret ()
 
   | Some e ->
     match e with
     | E (alpha, ty, Hole) ->
+      Format.eprintf "ambulando: hole@.";
       begin
         lower Emp alpha ty <||
         pushl e
@@ -663,12 +667,15 @@ let rec ambulando bracket =
       ambulando bracket
 
     | Q (Active, prob) ->
+      Format.eprintf "ambulando: @[<1>%a@]@.@." Problem.pp prob;
       solver prob >>
       ambulando bracket
 
     | Bracket bracket' when bracket = bracket' ->
+      Format.eprintf "ambulando: bracket@.";
       ret ()
 
     | _ ->
+      Format.eprintf "ambulando: push past@.";
       pushl e >>
       ambulando bracket

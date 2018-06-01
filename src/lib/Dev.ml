@@ -187,7 +187,7 @@ let rec subst_problem sub =
       (* TODO *)
       | Tw (ty0, _ty1) -> ty0
     in
-    let sub' = GlobalCx.add_hole sub x ~ty:(param_ty param) ~sys:[] in
+    let sub' = GlobalCx.ext sub x ~ty:(param_ty param) ~sys:[] in
     let probx' = subst_problem sub' probx in
     let prob' = bind x probx' in
     All (param', prob')
