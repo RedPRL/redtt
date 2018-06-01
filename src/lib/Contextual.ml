@@ -176,6 +176,10 @@ let in_scope x p =
   local @@ fun ps ->
   ps #< (x, p)
 
+let in_scopes ps =
+  local @@ fun ps' ->
+  ps' <>< ps
+
 
 let lookup_var x w =
   let rec go gm =

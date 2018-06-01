@@ -547,8 +547,15 @@ let unify q =
     active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
     active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
 
-  | Tm.Ext (Tm.NB (_nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
+  | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
+    let xs = List.map Name.named nms0 in
+    let _lxs = List.map (fun x -> Tm.up (Tm.Ref (x, `TwinL), Emp)) xs in
+    let _rxs = List.map (fun x -> Tm.up (Tm.Ref (x, `TwinR), Emp)) xs in
+
     failwith "TODO: unify elements of extension type"
+
+  | Tm.Rst info0, Tm.Rst info1 ->
+    active @@ Unify {q with ty0 = info0.ty; ty1 = info1.ty}
 
   | _ ->
     match Tm.unleash q.tm0, Tm.unleash q.tm1 with
