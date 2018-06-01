@@ -20,7 +20,7 @@ let rec telescope ty =
 let rec lambdas xs tm =
   match xs with
   | Emp -> tm
-  | Snoc (xs, x) ->
+  | Snoc (xs, `Var x) ->
     lambdas xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
 
 let rec pis gm tm =
@@ -47,7 +47,7 @@ let hole gm ty f =
 
 let define gm alpha ~ty tm =
   let ty' = pis gm ty in
-  let tm' = lambdas (Bwd.map fst gm) tm in
+  let tm' = lambdas (Bwd.map (fun (x, _) -> `Var x) gm) tm in
   check ~ty:ty' tm' >>= fun b ->
   if not b then
     dump_state Format.err_formatter "Type error" >>= fun _ ->
@@ -115,6 +115,7 @@ let to_var t =
   | Tm.Up (Tm.Ref (a, _), Emp) ->
     Some a
   | _ ->
+    Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t;
     None
 
 let rec spine_to_vars sp =
@@ -123,9 +124,11 @@ let rec spine_to_vars sp =
   | Snoc (sp, Tm.FunApp t) ->
     begin
       match to_var t with
-      | Some x -> Option.map (fun xs -> xs #< x) @@ spine_to_vars sp
+      | Some x -> Option.map (fun xs -> xs #< (`Var x)) @@ spine_to_vars sp
       | None -> None
     end
+  | Snoc (sp, Tm.ExtApp ts) ->
+    failwith "todo: spine_to_vars"
   | _ -> None
 
 let linear_on t =
@@ -133,8 +136,8 @@ let linear_on t =
   let rec go xs =
     match xs with
     | Emp -> true
-    | Snoc (xs, x) ->
-      not (Occurs.Set.mem x fvs && List.mem x @@ Bwd.to_list xs) && go xs
+    | Snoc (xs, `Var x) ->
+      not (Occurs.Set.mem x fvs && List.mem (`Var x) @@ Bwd.to_list xs) && go xs
   in go
 
 let invert alpha ty sp t =
@@ -145,11 +148,11 @@ let invert alpha ty sp t =
     | Some xs when linear_on t xs ->
       let lam_tm = lambdas xs t in
       local (fun _ -> Emp) begin
-        check ~ty lam_tm >>
-        ret true
+        check ~ty lam_tm
       end >>= fun b ->
       ret @@ if b then Some lam_tm else None
     | _ ->
+      Format.eprintf "Invert: nope@.@.";
       ret None
 
 let try_invert q ty =
@@ -272,7 +275,7 @@ let flex_flex_same q =
   match intersect tele sp0 sp1 with
   | Some tele' ->
     let f (hd, sp) =
-      lambdas (Bwd.map fst tele) @@
+      lambdas (Bwd.map (fun (x, _) -> `Var x) tele) @@
       let sp' = telescope_to_spine tele in
       Tm.up (hd, sp <.> sp')
     in
