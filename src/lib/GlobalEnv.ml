@@ -14,7 +14,7 @@ let ext sg nm ~ty ~sys =
   | None ->
     T.set nm {ty; sys} sg
   | _ ->
-    failwith "GlobalCx: name already used"
+    failwith "GlobalEnv: name already used"
 
 let define sg nm ~ty ~tm =
   match T.find nm sg with
@@ -23,7 +23,7 @@ let define sg nm ~ty ~tm =
     let sys = [face] in
     T.set nm {ty; sys} sg
   | _ ->
-    failwith "GlobalCx: name already used"
+    failwith "GlobalEnv: name already used"
 
 let lookup_ty sg nm _tw =
   let {ty; _} = T.get nm sg in

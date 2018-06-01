@@ -43,7 +43,7 @@ val pp_entry : entry Pretty.t0
 
 type twin = Tm.twin
 
-module Subst = GlobalCx
+module Subst = GlobalEnv
 
 module type DevSort =
 sig

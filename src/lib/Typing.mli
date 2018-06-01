@@ -10,4 +10,4 @@ sig
   val check_boundary : cx -> value -> Val.val_sys -> Tm.tm -> unit
 end
 
-module M (Sig : sig val globals : GlobalCx.t end) : S
+module M (Sig : sig val globals : GlobalEnv.t end) : S

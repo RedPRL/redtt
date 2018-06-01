@@ -102,18 +102,18 @@ let popl =
 
 
 
-let cx_core : cx_l -> GlobalCx.t =
+let cx_core : cx_l -> GlobalEnv.t =
   let rec go es =
     match es with
-    | Emp -> GlobalCx.emp
+    | Emp -> GlobalEnv.emp
     | Snoc (es, e) ->
       match e with
       | E (x, ty, Hole) ->
         let cx = go es in
-        GlobalCx.ext cx x ty []
+        GlobalEnv.ext cx x ty []
       | E (x, ty, Defn t) ->
         let cx = go es in
-        GlobalCx.define cx x ty t
+        GlobalEnv.define cx x ty t
       | Q _ ->
         go es
       | Bracket _ ->
@@ -127,9 +127,9 @@ let get_global_cx =
     function
     | Emp ->cx_core (cxl <>< cxr)
     | Snoc (psi, (x, P ty)) ->
-      GlobalCx.ext (go_params psi) x ty []
+      GlobalEnv.ext (go_params psi) x ty []
     | Snoc (psi, (x, Tw (ty, _))) (* TODO *) ->
-      GlobalCx.ext (go_params psi) x ty []
+      GlobalEnv.ext (go_params psi) x ty []
   in
   ask >>= fun psi ->
   ret @@ go_params psi
@@ -233,12 +233,12 @@ let typechecker : (module Typing.S) m =
     function
     | Emp -> cx
     | Snoc (psi, (x, P ty)) ->
-      let cx' = GlobalCx.ext cx x ~ty:ty ~sys:[] in
+      let cx' = GlobalEnv.ext cx x ~ty:ty ~sys:[] in
       go_tele cx' psi
 
     | Snoc (psi, (x, Tw (ty0, _ty1))) ->
       (* TODO: properly handle twin *)
-      let cx' = GlobalCx.ext cx x ~ty:ty0 ~sys:[] in
+      let cx' = GlobalEnv.ext cx x ~ty:ty0 ~sys:[] in
       go_tele cx' psi
   in
 

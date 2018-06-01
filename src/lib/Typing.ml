@@ -22,9 +22,9 @@ end
 
 type cofibration = (R.dim * R.dim) list
 
-module M (Sig : sig val globals : GlobalCx.t end) =
+module M (Sig : sig val globals : GlobalEnv.t end) =
 struct
-  module Eval = Val.M (GlobalCx.M (Sig))
+  module Eval = Val.M (GlobalEnv.M (Sig))
   module Cx = LocalCx.M (Eval)
 
   let rec check_dim cx tr =
@@ -438,7 +438,7 @@ struct
   and infer_head cx =
     function
     | T.Ref (name, tw) ->
-      let ty = GlobalCx.lookup_ty Sig.globals name tw in
+      let ty = GlobalEnv.lookup_ty Sig.globals name tw in
       Cx.eval Cx.emp ty
 
     | T.Ix ix ->
@@ -449,7 +449,7 @@ struct
       end
 
     | T.Meta name ->
-      let ty = GlobalCx.lookup_ty Sig.globals name `Only in
+      let ty = GlobalEnv.lookup_ty Sig.globals name `Only in
       Cx.eval Cx.emp ty
 
     | T.Coe info ->
