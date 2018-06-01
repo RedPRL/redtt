@@ -552,6 +552,7 @@ let unify q =
     let xs = List.map Name.named nms0 in
     let _lxs = List.map (fun x -> Tm.up (Tm.Ref (x, `TwinL), Emp)) xs in
     let _rxs = List.map (fun x -> Tm.up (Tm.Ref (x, `TwinR), Emp)) xs in
+    (* To complete this definition, I need to extend parameters with dimensions... *)
 
     failwith "TODO: unify elements of extension type"
 
@@ -607,6 +608,10 @@ let rec solver prob =
        active probx
        else *)
     match param with
+    | I ->
+      in_scope x I @@
+      solver probx
+
     | P ty ->
       (* TODO: split sigma, blah blah *)
       in_scope x (P ty) @@

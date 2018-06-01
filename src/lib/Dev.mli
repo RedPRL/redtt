@@ -18,6 +18,7 @@ type ('a, 'b) equation =
    tm1 : 'b}
 
 type param =
+  | I
   | P of ty
   | Tw of ty * ty
 

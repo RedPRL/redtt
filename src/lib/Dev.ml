@@ -20,6 +20,7 @@ type ('a, 'b) equation =
    tm1 : 'b}
 
 type param =
+  | I
   | P of ty
   | Tw of ty * ty
 
@@ -52,6 +53,7 @@ let rec eqn_close_var x k q =
 
 let param_open_var k x =
   function
+  | I -> I
   | P ty ->
     P (Tm.open_var k x `Only ty)
   | Tw (ty0, ty1) ->
@@ -59,6 +61,7 @@ let param_open_var k x =
 
 let param_close_var x k =
   function
+  | I -> I
   | P ty ->
     P (Tm.close_var x k ty)
   | Tw (ty0, ty1) ->
@@ -95,6 +98,8 @@ let pp_equation fmt q =
 
 let pp_param fmt =
   function
+  | I ->
+    Format.fprintf fmt "dim"
   | P ty ->
     Tm.pp Pretty.Env.emp fmt ty
   | Tw (ty0, ty1) ->
@@ -169,6 +174,7 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
   function
+  | I -> I
   | P ty ->
     P (subst_tm sub ~ty:univ ty)
   | Tw (ty0, ty1) ->
@@ -181,16 +187,21 @@ let rec subst_problem sub =
   | All (param, prob) ->
     let param' = subst_param sub param in
     let x, probx = unbind prob in
-    let param_ty =
-      function
-      | P ty -> ty
-      (* TODO *)
-      | Tw (ty0, _ty1) -> ty0
-    in
-    let sub' = GlobalEnv.ext sub x ~ty:(param_ty param) ~sys:[] in
-    let probx' = subst_problem sub' probx in
-    let prob' = bind x probx' in
-    All (param', prob')
+    match param with
+    | P ty ->
+      let sub' = GlobalEnv.ext sub x ~ty ~sys:[] in
+      let probx' = subst_problem sub' probx in
+      let prob' = bind x probx' in
+      All (param', prob')
+    | Tw (ty0, _) -> (* TODO: properly deal with twins *)
+      let sub' = GlobalEnv.ext sub x ~ty:ty0 ~sys:[] in
+      let probx' = subst_problem sub' probx in
+      let prob' = bind x probx' in
+      All (param', prob')
+    | I ->
+      let probx' = subst_problem sub probx in
+      let prob' = bind x probx' in
+      All (param', prob')
 
 let subst_entry sub =
   function
@@ -212,6 +223,7 @@ struct
 
   let free fl =
     function
+    | I -> Occurs.Set.empty
     | P ty -> Tm.free fl ty
     | Tw (ty0, ty1) ->
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)

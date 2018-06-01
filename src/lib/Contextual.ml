@@ -125,7 +125,9 @@ let get_global_cx =
   get >>= fun (cxl, cxr) ->
   let rec go_params =
     function
-    | Emp ->cx_core (cxl <>< cxr)
+    | Emp -> cx_core (cxl <>< cxr)
+    | Snoc (psi, (_, I)) ->
+      go_params psi
     | Snoc (psi, (x, P ty)) ->
       GlobalEnv.ext (go_params psi) x ty []
     | Snoc (psi, (x, Tw (ty, _))) (* TODO *) ->
@@ -232,10 +234,11 @@ let typechecker : (module Typing.S) m =
   let rec go_tele cx =
     function
     | Emp -> cx
+    | Snoc (psi, (_, I)) ->
+      go_tele cx psi
     | Snoc (psi, (x, P ty)) ->
       let cx' = GlobalEnv.ext cx x ~ty:ty ~sys:[] in
       go_tele cx' psi
-
     | Snoc (psi, (x, Tw (ty0, _ty1))) ->
       (* TODO: properly handle twin *)
       let cx' = GlobalEnv.ext cx x ~ty:ty0 ~sys:[] in
