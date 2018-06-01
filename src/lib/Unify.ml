@@ -550,11 +550,16 @@ let unify q =
 
   | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
     let xs = List.map Name.named nms0 in
-    let _lxs = List.map (fun x -> Tm.up (Tm.Ref (x, `TwinL), Emp)) xs in
-    let _rxs = List.map (fun x -> Tm.up (Tm.Ref (x, `TwinR), Emp)) xs in
-    (* To complete this definition, I need to extend parameters with dimensions... *)
+    let vars = List.map (fun x -> Tm.up (Tm.Ref (x, `Only), Emp)) xs in
+    let psi = List.map (fun x -> (x, I)) xs in
 
-    failwith "TODO: unify elements of extension type"
+    in_scopes psi
+      begin
+        (q.ty0, q.tm0) %% Tm.ExtApp vars >>= fun (ty0, tm0) ->
+        (q.ty1, q.tm1) %% Tm.ExtApp vars >>= fun (ty1, tm1) ->
+        failwith "TODO: make a unification problem that quantifies over all the dimensions"
+      end >>= fun prob ->
+    active prob
 
   | Tm.Rst info0, Tm.Rst info1 ->
     active @@ Unify {q with ty0 = info0.ty; ty1 = info1.ty}
