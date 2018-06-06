@@ -14,10 +14,10 @@ let rec pp_lcx fmt =
   | Emp ->
     ()
   | Snoc (Emp, e) ->
-    Format.fprintf fmt "@[<1>%a@]"
+    Format.fprintf fmt "@[<v>%a@]"
       pp_entry e
   | Snoc (cx, e) ->
-    Format.fprintf fmt "%a;@; @[<1>%a@]"
+    Format.fprintf fmt "%a;@;@; @[<v>%a@]"
       pp_lcx cx
       pp_entry e
 
@@ -29,12 +29,12 @@ let rec pp_rcx fmt =
     Format.fprintf fmt "@[<1>%a@]"
       pp_entry e
   | e :: cx ->
-    Format.fprintf fmt "@[<1>%a@];@; %a"
+    Format.fprintf fmt "@[<1>%a@];@;@; %a"
       pp_entry e
       pp_rcx cx
 
 let pp_cx fmt {lcx; rcx} =
-  Format.fprintf fmt "@[<1>%a@] |@ @[<1>%a@]"
+  Format.fprintf fmt "@[<v>%a@] |@ @[<v>%a@]"
     pp_lcx lcx
     pp_rcx rcx
 
@@ -143,7 +143,7 @@ let get_global_env =
 
 let dump_state fmt str =
   get >>= fun cx ->
-  Format.fprintf fmt "%s@.%a@.@." str pp_cx cx;
+  Format.fprintf fmt "%s@.@[<v>%a@]@.@." str pp_cx cx;
   ret ()
 
 

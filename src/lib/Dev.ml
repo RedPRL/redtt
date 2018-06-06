@@ -148,12 +148,12 @@ let rec pp_problem fmt =
 let pp_entry fmt =
   function
   | E (x, ty, Hole) ->
-    Format.fprintf fmt "?%a : %a"
+    Format.fprintf fmt "?%a@ :@ %a"
       Name.pp x
       (Tm.pp Pretty.Env.emp) ty
 
   | E (x, ty, Defn tm) ->
-    Format.fprintf fmt "!%a : %a = %a"
+    Format.fprintf fmt "!%a@ : %a@ = %a"
       Name.pp x
       (Tm.pp Pretty.Env.emp) ty
       (Tm.pp Pretty.Env.emp) tm
