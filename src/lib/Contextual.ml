@@ -17,7 +17,7 @@ let rec pp_lcx fmt =
     Format.fprintf fmt "@[<v>%a@]"
       pp_entry e
   | Snoc (cx, e) ->
-    Format.fprintf fmt "%a;@;@; @[<v>%a@]"
+    Format.fprintf fmt "%a;@;@;@[<v>%a@]"
       pp_lcx cx
       pp_entry e
 
@@ -29,7 +29,7 @@ let rec pp_rcx fmt =
     Format.fprintf fmt "@[<1>%a@]"
       pp_entry e
   | e :: cx ->
-    Format.fprintf fmt "@[<1>%a@];@;@; %a"
+    Format.fprintf fmt "@[<1>%a@];@;@;%a"
       pp_entry e
       pp_rcx cx
 
