@@ -23,7 +23,7 @@ let rec lambdas xs tm =
   | Snoc (xs, `Var x) ->
     lambdas xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
   | Snoc (xs, `Dim x) ->
-    let bnd = Tm.NB ([None], Tm.close_var x 0 tm) in
+    let bnd = Tm.NB ([None], Tm.close_var x `Only 0 tm) in
     lambdas xs @@ Tm.make @@ Tm.ExtLam bnd
 
 let rec pis gm tm =
@@ -589,7 +589,7 @@ let unify q =
     let x_l = Tm.up (Tm.Ref (x, `TwinL), Emp) in
     let x_r = Tm.up (Tm.Ref (x, `TwinR), Emp) in
 
-    in_scope x (Tw (dom0, dom1))
+    in_scope x (`Tw (dom0, dom1))
       begin
         (q.ty0, q.tm0) %% Tm.FunApp x_l >>= fun (ty0, tm0) ->
         (q.ty1, q.tm1) %% Tm.FunApp x_r >>= fun (ty1, tm1) ->
@@ -611,7 +611,7 @@ let unify q =
   | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
     let xs = List.map Name.named nms0 in
     let vars = List.map (fun x -> Tm.up (Tm.Ref (x, `Only), Emp)) xs in
-    let psi = List.map (fun x -> (x, I)) xs in
+    let psi = List.map (fun x -> (x, `I)) xs in
 
     in_scopes psi
       begin
@@ -673,16 +673,16 @@ let rec solver prob =
        active probx
        else *)
     match param with
-    | I ->
-      in_scope x I @@
+    | `I ->
+      in_scope x `I @@
       solver probx
 
-    | P ty ->
+    | `P ty ->
       (* TODO: split sigma, blah blah *)
-      in_scope x (P ty) @@
+      in_scope x (`P ty) @@
       solver probx
 
-    | Tw (ty0, ty1) ->
+    | `Tw (ty0, ty1) ->
       let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
       check_eq ~ty:univ ty0 ty1 >>= function
       | true ->
@@ -693,12 +693,12 @@ let rec solver prob =
             a representation based on having two contexts. *)
         let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
         let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
-        let sub_y = Subst.define (Subst.ext sub y ty0 []) x ~ty:ty0 ~tm:var_y in
-        let sub_x = Subst.define (Subst.ext sub x ty0 []) y ~ty:ty0 ~tm:var_x in
+        let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
+        let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
         solver @@ Problem.all x ty0 @@
         Problem.subst sub_x @@ Problem.subst sub_y probx
       | false ->
-        in_scope x (Tw (ty0, ty1)) @@
+        in_scope x (`Tw (ty0, ty1)) @@
         solver probx
 
 

@@ -17,18 +17,15 @@ type ('a, 'b) equation =
    ty1 : ty;
    tm1 : 'b}
 
-type param =
-  | I
-  | P of ty
-  | Tw of ty * ty
+type 'a param = [ `I | `P of 'a | `Tw of 'a * 'a ]
 
-type params = (Name.t * param) bwd
+type params = (Name.t * ty param) bwd
 
 type 'a bind
 
 type problem =
   | Unify of (tm, tm) equation
-  | All of param * problem bind
+  | All of ty param * problem bind
 
 type entry =
   | E of Name.t * ty * tm decl
@@ -62,9 +59,9 @@ sig
   val all_dims : Name.t list -> problem -> problem
 end
 
-module Param : DevSort with type t = param
+module Param : DevSort with type t = ty param
 
-module Params : Occurs.S with type t = param bwd
+module Params : Occurs.S with type t = ty param bwd
 
 module Equation :
 sig

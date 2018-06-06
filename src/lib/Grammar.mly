@@ -193,7 +193,7 @@ head:
   | a = ATOM
     { fun env ->
       match R.get a env with
-      | `Ix i -> Tm.Ix i
+      | `Ix i -> Tm.Ix (i, `Only)
       | `Ref r -> Tm.Ref (r, `Only) }
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->

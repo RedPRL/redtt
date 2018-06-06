@@ -21,8 +21,8 @@ val go_to_bottom : unit m
 val go_left : unit m
 val go_right : unit m
 
-val in_scope : Name.t -> param -> 'a m -> 'a m
-val in_scopes : (Name.t * param) list -> 'a m -> 'a m
+val in_scope : Name.t -> ty param -> 'a m -> 'a m
+val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
 val lookup_var : Name.t -> twin -> ty m
 val lookup_meta : Name.t -> ty m
 

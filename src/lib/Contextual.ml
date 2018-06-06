@@ -83,7 +83,7 @@ let update_env e =
   let env =
     match e with
     | E (nm, ty, Hole) ->
-      GlobalEnv.ext st.env nm ty []
+      GlobalEnv.ext st.env nm @@ `P {ty; sys = []}
     | E (nm, ty, Defn t) ->
       GlobalEnv.define st.env nm ty t
     | _ ->
@@ -125,7 +125,7 @@ let cx_core : lcx -> GlobalEnv.t =
       match e with
       | E (x, ty, Hole) ->
         let cx = go es in
-        GlobalEnv.ext cx x ty []
+        GlobalEnv.ext cx x @@ `P {ty; sys = []}
       | E (x, ty, Defn t) ->
         let cx = go es in
         GlobalEnv.define cx x ty t
@@ -141,19 +141,18 @@ let get_global_cx =
   let rec go_params =
     function
     | Emp -> st.env
-    | Snoc (psi, (_, I)) ->
+    | Snoc (psi, (_, `I)) ->
       go_params psi
-    | Snoc (psi, (x, P ty)) ->
-      GlobalEnv.ext (go_params psi) x ty []
-    | Snoc (psi, (x, Tw (ty, _))) (* TODO *) ->
-      GlobalEnv.ext (go_params psi) x ty []
+    | Snoc (psi, (x, `P ty)) ->
+      GlobalEnv.ext (go_params psi) x @@ `P {ty; sys = []}
+    | Snoc (psi, (x, `Tw (ty0, ty1))) ->
+      GlobalEnv.ext (go_params psi) x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []})
   in
   ask >>= fun psi ->
   ret @@ go_params psi
 
 let dump_state fmt str =
   get >>= fun cx ->
-  get_global_cx >>= fun env ->
   Format.fprintf fmt "%s@.%a@.@." str pp_cx cx;
   ret ()
 
@@ -207,11 +206,11 @@ let in_scopes ps =
 let lookup_var x w =
   let rec go gm =
     match w, gm with
-    | `Only, Snoc (gm, (y, P ty)) ->
+    | `Only, Snoc (gm, (y, `P ty)) ->
       if x = y then M.ret ty else go gm
-    | `TwinL, Snoc (gm, (y, Tw (ty0, _))) ->
+    | `TwinL, Snoc (gm, (y, `Tw (ty0, _))) ->
       if x = y then M.ret ty0 else go gm
-    | `TwinR, Snoc (gm, (y, Tw (_, ty1))) ->
+    | `TwinR, Snoc (gm, (y, `Tw (_, ty1))) ->
       if x = y then M.ret ty1 else go gm
     | _, Snoc (gm, _) ->
       go gm
@@ -238,8 +237,8 @@ let postpone s p =
   let wrapped =
     let rec go ps p =
       match ps with
-      | Snoc (ps, (x, e)) ->
-        go ps @@ All (e, Dev.bind x p)
+      | Snoc (ps, (x, param)) ->
+        go ps @@ All (param, Dev.bind x p)
       | Emp -> p
     in go ps p
   in

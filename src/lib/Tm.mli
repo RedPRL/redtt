@@ -42,7 +42,7 @@ type 'a tmf =
 and 'a head =
   | Meta of Name.t
   | Ref of Name.t * twin
-  | Ix of int
+  | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
@@ -79,7 +79,7 @@ type 'a subst =
 val make : tm tmf -> tm
 val unleash : tm -> tm tmf
 
-val close_var : Name.t -> int -> tm -> tm
+val close_var : Name.t -> twin -> int -> tm -> tm
 val open_var : int -> Name.t -> twin -> tm -> tm
 
 val bind : Name.t -> tm -> tm bnd
@@ -92,7 +92,7 @@ val subst : tm cmd subst -> tm -> tm
 
 
 val up : tm cmd -> tm
-val var : int -> tm cmd
+val var : int -> twin -> tm cmd
 val lam : string option -> tm -> tm
 val ext_lam : string option list -> tm -> tm
 val pi : string option -> tm -> tm -> tm

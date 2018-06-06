@@ -132,7 +132,7 @@ end
 
 module type Sig =
 sig
-  val lookup : Name.t -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
+  val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
 module M (Sig : Sig) : S =
@@ -235,7 +235,7 @@ struct
     | Tm.Up (hd, Emp) ->
       begin
         match hd with
-        | Tm.Ix i ->
+        | Tm.Ix (i, _) ->
           begin
             match List.nth rho i with
             | Atom x ->
@@ -847,7 +847,7 @@ struct
       let sys = eval_bnd_sys rel rho info.sys in
       make_com dir abs cap sys
 
-    | Tm.Ix i ->
+    | Tm.Ix (i, _) ->
       begin
         match List.nth rho i with
         | Val v -> v
@@ -855,13 +855,13 @@ struct
       end
 
     | Tm.Ref (name, tw) ->
-      let tty, tsys = Sig.lookup name in
+      let tty, tsys = Sig.lookup name tw in
       let vsys = eval_tm_sys rel [] tsys in
       let vty = eval rel [] tty in
       make @@ Up {ty = vty; neu = Ref (name, tw); sys = vsys}
 
     | Tm.Meta name ->
-      let tty, tsys = Sig.lookup name in
+      let tty, tsys = Sig.lookup name `Only in
       let vsys = eval_tm_sys rel [] tsys in
       let vty = eval rel [] tty in
       make @@ Up {ty = vty; neu = Meta name; sys = vsys}
@@ -1406,8 +1406,8 @@ struct
       let rho = [Val ty0; Val ty1] in
       eval R.emp rho @@
       Tm.Macro.equiv
-        (Tm.up @@ Tm.var 0)
-        (Tm.up @@ Tm.var 1)
+        (Tm.up @@ Tm.var 0 `Only)
+        (Tm.up @@ Tm.var 1 `Only)
 
   end
 

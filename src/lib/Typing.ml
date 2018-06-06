@@ -43,7 +43,7 @@ struct
     | hd, Emp ->
       begin
         match hd with
-        | Tm.Ix ix ->
+        | Tm.Ix (ix, _) ->
           begin
             match Cx.lookup ix cx with
             | `Dim -> ()
@@ -441,7 +441,7 @@ struct
       let ty = GlobalEnv.lookup_ty Sig.globals name tw in
       Cx.eval Cx.emp ty
 
-    | T.Ix ix ->
+    | T.Ix (ix, _) ->
       begin
         match Cx.lookup ix cx with
         | `Ty ty -> ty

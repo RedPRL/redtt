@@ -198,7 +198,8 @@ struct
     match neu0, neu1 with
     | Lvl (_, l0), Lvl (_, l1) ->
       if l0 = l1 then
-        Tm.Ix (Env.ix_of_lvl l0 env), Bwd.from_list stk
+        (* TODO: twin *)
+        Tm.Ix (Env.ix_of_lvl l0 env, `Only), Bwd.from_list stk
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
     | Ref (nm0, tw0), Ref (nm1, tw1) ->
@@ -341,7 +342,7 @@ struct
     | Dim.Atom x ->
       try
         let ix = Env.ix_of_atom x env in
-        Tm.up @@ Tm.var ix
+        Tm.up @@ Tm.var ix `Only
       with
       | _ ->
         Tm.up (Tm.Ref (x, `Only), Emp)
