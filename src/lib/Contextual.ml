@@ -6,7 +6,7 @@ type lcx = entry bwd
 type rcx = entry list
 
 type env = GlobalEnv.t
-type cx = {lcx : lcx; rcx : rcx}
+type cx = {env : env; lcx : lcx; rcx : rcx}
 
 
 let rec pp_lcx fmt =
@@ -77,11 +77,30 @@ let modifyl f = modify @@ fun st -> {st with lcx = f st.lcx}
 let modifyr f = modify @@ fun st -> {st with rcx = f st.rcx}
 let setl l = modifyl @@ fun _ -> l
 let setr r = modifyr @@ fun _ -> r
-let pushl e = modifyl @@ fun es -> es #< e
-let pushr e = modifyr @@ fun es -> e :: es
+
+let update_env e =
+  modify @@ fun st ->
+  let env =
+    match e with
+    | E (nm, ty, Hole) ->
+      GlobalEnv.ext st.env nm ty []
+    | E (nm, ty, Defn t) ->
+      GlobalEnv.define st.env nm ty t
+    | _ ->
+      st.env
+  in
+  {st with env}
+
+let pushl e =
+  modifyl (fun es -> es #< e) >>
+  update_env e
+
+let pushr e =
+  modifyr (fun es -> e :: es) >>
+  update_env e
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; rcx = []} in
+  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []} in
   r
 
 let rec pushls es =
@@ -118,10 +137,10 @@ let cx_core : lcx -> GlobalEnv.t =
   go
 
 let get_global_cx =
-  get >>= fun {lcx; rcx} ->
+  get >>= fun st ->
   let rec go_params =
     function
-    | Emp -> cx_core (lcx <>< rcx)
+    | Emp -> st.env
     | Snoc (psi, (_, I)) ->
       go_params psi
     | Snoc (psi, (x, P ty)) ->
@@ -232,24 +251,8 @@ let block = postpone Blocked
 
 
 let typechecker : (module Typing.S) m =
-  getl >>= fun entries ->
-  let rec go_tele cx =
-    function
-    | Emp -> cx
-    | Snoc (psi, (_, I)) ->
-      go_tele cx psi
-    | Snoc (psi, (x, P ty)) ->
-      let cx' = GlobalEnv.ext cx x ~ty:ty ~sys:[] in
-      go_tele cx' psi
-    | Snoc (psi, (x, Tw (ty0, _ty1))) ->
-      (* TODO: properly handle twin *)
-      let cx' = GlobalEnv.ext cx x ~ty:ty0 ~sys:[] in
-      go_tele cx' psi
-  in
-
-  ask >>= fun psi ->
-  let globals = go_tele (cx_core entries) psi  in
-  let module G = struct let globals = globals end in
+  get_global_cx >>= fun env ->
+  let module G = struct let globals = env end in
   let module T = Typing.M (G) in
   ret @@ (module T : Typing.S)
 

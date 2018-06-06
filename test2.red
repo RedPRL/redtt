@@ -18,3 +18,9 @@ let funext :
 
 funext =>
   `(λ [A] [B] [f] [g] [p] <i> [x] (@ (p x) i))
+
+
+let taste : `(* bool bool)
+taste =>
+  < `tt, `ff >
+debug
