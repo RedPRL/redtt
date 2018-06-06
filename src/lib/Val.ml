@@ -671,8 +671,41 @@ struct
     | FCom _info ->
       failwith "hcom in fcom, taste it!!"
 
-    | V _info ->
-      failwith "hcom in V, taste it!!!"
+    | V {x; ty0; ty1; equiv} ->
+      let r, r' = Star.unleash dir in
+      let phi0 = D.equate (Gen.unleash x) D.dim0 in
+      let phi1 = D.equate (Gen.unleash x) D.dim1 in
+      let el0 = make_hcom (Star.make (D.act phi0 r) (D.act phi0 r')) (Val.act phi0 ty0) (Val.act phi0 cap) (CompSys.act phi0 sys) in
+      let el1 =
+        let hcom r' ty = make_hcom (Star.make r r') ty cap (`Ok sys) in
+        let face0 =
+          AbsFace.gen_const x `Dim0 @@
+          let y = Name.fresh () in
+          Abs.bind1 y @@
+          Val.act phi0 @@
+          apply (car equiv) @@
+          hcom (D.named y) ty0
+        in
+        let face1 =
+          AbsFace.gen_const x `Dim1 @@
+          let y = Name.fresh () in
+          Abs.bind1 y @@
+          Val.act phi1 @@
+          hcom (D.named y) ty1
+        in
+        let el1_cap = vproj (`Ok x) ~ty0 ~ty1 ~equiv ~el:cap in
+        let el1_sys =
+          let face =
+            Face.map @@ fun ri r'i absi ->
+            let phi = D.equate ri r'i in
+            let yi, eli = Abs.unleash absi in
+            Abs.bind yi @@ vproj (Gen.act phi x) ~ty0:(Val.act phi ty0) ~ty1:(Val.act phi ty1) ~equiv:(Val.act phi equiv) ~el:eli
+          in
+          [face0; face1] @ List.map face sys
+        in
+        make_hcom (Star.make r r') ty1 el1_cap (`Ok el1_sys)
+      in
+      make_vin (`Ok x) el0 el1
 
     | _ ->
       failwith "TODO: rigid_hcom"
