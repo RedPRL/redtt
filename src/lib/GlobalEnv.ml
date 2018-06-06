@@ -38,6 +38,16 @@ let lookup_ty sg nm tw =
 let restriction sg =
   sg.rel
 
+let restrict tr0 tr1 sg =
+  let ev_dim tr =
+    match Tm.unleash tr with
+    | Tm.Up (Tm.Ref (a, _), Emp) -> Dim.Atom a
+    | Tm.Dim0 -> Dim.Dim0
+    | Tm.Dim1 -> Dim.Dim1
+    | _ -> failwith "Restrict: expected dimension"
+  in
+  {sg with rel = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel}
+
 let pp fmt sg =
   let pp_sep fmt () = Format.fprintf fmt "; " in
   let go fmt (nm, p) =
