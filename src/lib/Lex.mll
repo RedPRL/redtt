@@ -95,6 +95,8 @@ rule token = parse
     { Lwt.return EQUALS }
   | "->"
     { Lwt.return RIGHT_ARROW }
+  | "⇒"
+    { Lwt.return RRIGHT_ARROW }
   | "=>"
     { Lwt.return RRIGHT_ARROW }
   | "→"

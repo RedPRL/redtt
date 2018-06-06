@@ -93,8 +93,9 @@ and elab_chk env {ty; _} : E.echk -> tm m =
   | E.Hole ->
     get_tele >>= fun psi ->
     begin
-      Format.printf "Hole:@ @[<1>%a >> %a@]@."
+      Format.printf "Hole:@ @[<1>%a %a %a@]@."
         pp_tele psi
+        Uuseg_string.pp_utf_8 "⊢"
         (Tm.pp Pretty.Env.emp) ty;
 
       hole psi ty @@ fun tm -> ret tm
