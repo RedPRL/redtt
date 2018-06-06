@@ -195,7 +195,9 @@ let invert alpha ty sp t =
       end >>= fun b ->
       ret @@ if b then Some lam_tm else None
     | _ ->
-      Format.eprintf "Invert: nope@.@.";
+      Format.eprintf "Invert: nope %a @.@."
+        (Tm.pp_spine Pretty.Env.emp) sp
+      ;
       ret None
 
 let try_invert q ty =
@@ -660,6 +662,34 @@ let is_reflexive q =
   | false ->
     ret false
 
+let rec split_sigma tele x ty =
+  match Tm.unleash ty with
+  | Tm.Sg (dom, cod) ->
+    let y, cody = Tm.unbind cod in
+    let z = Name.fresh () in
+    let tele' = Bwd.map (fun (x, _) -> `Var x) tele in
+    let sp_tele = telescope_to_spine tele in
+
+    ret @@ Some
+      ( y
+      , pis tele dom
+      , z
+      , pis tele cody
+      , lambdas tele' @@ Tm.cons (Tm.up (Tm.Ref (y, `Only), sp_tele)) (Tm.up (Tm.Ref (z, `Only), sp_tele))
+      , ( lambdas tele' @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Car)
+        , lambdas tele' @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Cdr)
+        )
+      )
+
+
+  | Tm.Pi (dom, cod) ->
+    let y, cody = Tm.unbind cod in
+    split_sigma (tele #< (y, dom)) x cody
+
+  | _ ->
+    ret None
+
+
 let rec solver prob =
   Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob;
   match prob with
@@ -669,40 +699,47 @@ let rec solver prob =
 
   | All (param, prob) ->
     let x, probx = unbind param prob in
-    (* if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
-       active probx
-       else *)
-    match param with
-    | `I ->
-      in_scope x `I @@
-      solver probx
-
-    | `P ty ->
-      (* TODO: split sigma, blah blah *)
-      in_scope x (`P ty) @@
-      solver probx
-
-    | `Tw (ty0, ty1) ->
-      let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-      check_eq ~ty:univ ty0 ty1 >>= function
-      | true ->
-        get_global_cx >>= fun sub ->
-        let y = Name.fresh () in
-        (*  This weird crap is needed to avoid creating a cycle in the environment.
-            What we should really do is kill 'twin variables' altogether and switch to
-            a representation based on having two contexts. *)
-        let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
-        let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
-        let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
-        let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
-        solver @@ Problem.all x ty0 @@
-        Problem.subst sub_x @@ Problem.subst sub_y probx
-      | false ->
-        in_scope x (`Tw (ty0, ty1)) @@
+    if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
+      active probx
+    else
+      match param with
+      | `I ->
+        in_scope x `I @@
         solver probx
 
+      | `P ty ->
+        begin
+          split_sigma Emp x ty >>= function
+          | Some (y, ty0, z, ty1, s, _) ->
+            get_global_cx >>= fun env ->
+            solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
+            Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
+          | None ->
+            in_scope x (`P ty) @@
+            solver probx
+        end
 
-let lower tele alpha ty =
+      | `Tw (ty0, ty1) ->
+        let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+        check_eq ~ty:univ ty0 ty1 >>= function
+        | true ->
+          get_global_cx >>= fun sub ->
+          let y = Name.fresh () in
+          (*  This weird crap is needed to avoid creating a cycle in the environment.
+              What we should really do is kill 'twin variables' altogether and switch to
+              a representation based on having two contexts. *)
+          let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
+          let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
+          let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
+          let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
+          solver @@ Problem.all x ty0 @@
+          Problem.subst sub_x @@ Problem.subst sub_y probx
+        | false ->
+          in_scope x (`Tw (ty0, ty1)) @@
+          solver probx
+
+
+let rec lower tele alpha ty =
   match Tm.unleash ty with
   | Tm.LblTy info ->
     hole tele info.ty @@ fun t ->
@@ -715,8 +752,26 @@ let lower tele alpha ty =
     define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
 
+  | Tm.Pi (dom, cod) ->
+    let x = Name.fresh () in
+    begin
+      split_sigma Emp x dom >>= function
+      | None ->
+        let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+        lower (tele #< (x, dom)) alpha codx
+
+      | Some (y, ty0, z, ty1, s, (u, v)) ->
+        typechecker >>= fun (module T) ->
+        let module HS = HSubst (T) in
+        let vty = T.Cx.eval T.Cx.emp @@ pis tele dom in
+        let pi_ty = pis (Emp #< (y, ty0) #< (z, ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
+        hole tele pi_ty @@ fun (whd, wsp) ->
+        let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
+        define tele alpha ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
+        ret true
+    end
+
   | _ ->
-    (* TODO: implement lowering *)
     ret false
 
 (* guess who named this function, lol *)

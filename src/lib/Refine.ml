@@ -135,11 +135,19 @@ and elab_term env (ty,tm) =
     get_resolver env >>= fun renv ->
     active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tmfam renv}
 
+  | Var name ->
+    get_resolver env >>= fun renv ->
+    begin
+      match ResEnv.get name renv with
+      | `Ix ix ->
+        active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = Tm.up @@ Tm.var ix `Only}
+      | `Ref a ->
+        active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = Tm.up (Tm.Ref (a, `Only), Emp)}
+    end
+
   | Hole ->
     ret ()
 
-  | _ ->
-    failwith "TODO: elab_term"
 
 
 let script =

@@ -609,6 +609,28 @@ and pp_cmd env fmt (hd, sp) =
   (* TODO: backwards ??? *)
   go fmt sp
 
+and pp_spine env fmt sp =
+  match sp with
+  | Emp ->
+    Format.fprintf fmt "[]"
+  | Snoc (sp, f) ->
+    Format.fprintf fmt "%a; %a"
+      (pp_spine env) sp
+      (pp_frame env) f
+
+and pp_frame _ fmt =
+  function
+  | FunApp _ ->
+    Format.fprintf fmt "fun-app"
+  | ExtApp _ ->
+    Format.fprintf fmt "ext-app"
+  | Car ->
+    Format.fprintf fmt "car"
+  | Cdr ->
+    Format.fprintf fmt "cdr"
+  | _ ->
+    Format.fprintf fmt "<frame>"
+
 and pp_lbl_args env fmt args =
   let pp_sep fmt () = Format.fprintf fmt " " in
   let pp_arg fmt (_, tm) = pp env fmt tm in
