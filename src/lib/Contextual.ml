@@ -79,11 +79,6 @@ let setr r = modifyr @@ fun _ -> r
 let pushl e = modifyl @@ fun es -> es #< e
 let pushr e = modifyr @@ fun es -> e :: es
 
-let dump_state fmt str =
-  get >>= fun cx ->
-  Format.fprintf fmt "%s@.%a@.@." str pp_cx cx;
-  ret ()
-
 let run (m : 'a m) : 'a  =
   let _, r = m Emp (Emp, []) in
   r
@@ -135,6 +130,12 @@ let get_global_cx =
   in
   ask >>= fun psi ->
   ret @@ go_params psi
+
+let dump_state fmt str =
+  get >>= fun cx ->
+  get_global_cx >>= fun env ->
+  Format.fprintf fmt "%s@.%a@.Env: {@[<1>%a@]}@." str pp_cx cx GlobalEnv.pp env;
+  ret ()
 
 
 let popr_opt =

@@ -388,7 +388,7 @@ struct
   and infer_frame cx ~ty ~hd =
     function
     | T.Car ->
-      let dom, _ = Eval.unleash_sg ty in
+      let dom, _ = Eval.unleash_sg ~debug:["infer-frame/car"] ty in
       dom
 
     | T.Cdr ->

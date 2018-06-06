@@ -45,8 +45,8 @@ let hole_named alpha gm ty f =
   go_left >>
   ret r
 
-let hole gm ty f =
-  hole_named (Name.fresh ()) gm ty f
+let hole ?debug:(debug = None) gm ty f =
+  hole_named (Name.named debug) gm ty f
 
 let define gm alpha ~ty tm =
   let ty' = pis gm ty in
@@ -384,8 +384,7 @@ struct
   let (%%) (ty, tm) frame =
     let vty = T.Cx.eval T.Cx.emp ty in
     let tm' = plug (vty, tm) frame in
-    let el = T.Cx.eval T.Cx.emp tm' in
-    let vty' = T.infer_frame T.Cx.emp ~ty:vty ~hd:el frame in
+    let vty' = T.infer_frame T.Cx.emp ~ty:vty ~hd:(T.Cx.eval T.Cx.emp tm) frame in
     let ty' = T.Cx.quote_ty T.Cx.emp vty' in
     ty', tm'
 end
@@ -495,16 +494,16 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       go sp0 sp1 >>= fun (ty0, ty1) ->
       typechecker >>= fun (module T) ->
       let module HSubst = HSubst (T) in
-      let dom0, _ = T.Cx.Eval.unleash_sg ty0 in
-      let dom1, _ = T.Cx.Eval.unleash_sg ty1 in
+      let dom0, _ = T.Cx.Eval.unleash_sg ~debug:["match-spine/car"] ty0 in
+      let dom1, _ = T.Cx.Eval.unleash_sg ~debug:["match-spine/car"] ty1 in
       ret (dom0, dom1)
 
     | Snoc (sp0, Tm.Cdr), Snoc (sp1, Tm.Cdr) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
       typechecker >>= fun (module T) ->
       let module HSubst = HSubst (T) in
-      let _, cod0 = T.Cx.Eval.unleash_sg ty0 in
-      let _, cod1 = T.Cx.Eval.unleash_sg ty1 in
+      let _, cod0 = T.Cx.Eval.unleash_sg ~debug:["match_spine/cdr"] ty0 in
+      let _, cod1 = T.Cx.Eval.unleash_sg ~debug:["match-spine/cdr"] ty1 in
       let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref (x0, tw0), sp0 #< Tm.Car) in
       let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref (x1, tw1), sp1 #< Tm.Car) in
       ret (cod0, cod1)
@@ -584,7 +583,6 @@ let (%%) (ty, tm) frame =
 
 
 let unify q =
-  Format.eprintf "Unify: @[<1>%a@]@.@." Equation.pp q ;
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, _), Tm.Pi (dom1, _) ->
     let x = Name.named @@ Some "foo" in
@@ -600,12 +598,15 @@ let unify q =
     active prob
 
   | Tm.Sg (dom0, _), Tm.Sg (dom1, _) ->
+    Format.eprintf "Unify: @[<1>%a@]@.@." Equation.pp q ;
     (q.ty0, q.tm0) %% Tm.Car >>= fun (_, car0) ->
     (q.ty1, q.tm1) %% Tm.Car >>= fun (_, car1) ->
     (q.ty0, q.tm0) %% Tm.Cdr >>= fun (ty_cdr0, cdr0) ->
     (q.ty1, q.tm1) %% Tm.Cdr >>= fun (ty_cdr1, cdr1) ->
     active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
-    active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
+    let prob = Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1 in
+    Format.eprintf "problem: %a@.@." (Problem.pp) prob;
+    active @@ prob
 
   | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
     let xs = List.map Name.named nms0 in

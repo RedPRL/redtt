@@ -97,7 +97,7 @@ sig
   val inst_clo : clo -> value -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
-  val unleash_sg : value -> value * clo
+  val unleash_sg : ?debug:string list -> value -> value * clo
   val unleash_v : value -> gen * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value

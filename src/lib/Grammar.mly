@@ -10,7 +10,7 @@
 %token <int> NUMERAL
 %token <string> ATOM
 %token LSQ RSQ LPR RPR LGL RGL
-%token COLON COLON_ANGLE
+%token COLON COLON_ANGLE COMMA
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK QUESTION_MARK
@@ -40,6 +40,8 @@ eterm:
     { E.Type }
   | LAM; x = ATOM; RIGHT_ARROW; e = eterm
     { E.Lam (x, e) }
+  | LGL; e0 = eterm; COMMA; e1 = eterm; RGL
+    { E.Pair (e0, e1) }
 
 esig:
   | d = edecl; esig = esig

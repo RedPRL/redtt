@@ -105,7 +105,7 @@ sig
   val inst_clo : clo -> value -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
-  val unleash_sg : value -> value * clo
+  val unleash_sg : ?debug:string list -> value -> value * clo
   val unleash_v : value -> gen * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
@@ -952,11 +952,15 @@ struct
         pp_value v;
       failwith "unleash_pi"
 
-  and unleash_sg v =
+  and unleash_sg ?debug:(debug = []) v =
     match unleash v with
     | Sg {dom; cod} -> dom, cod
     | Rst rst -> unleash_sg rst.ty
-    | _ -> failwith "unleash_sg"
+    | _ ->
+      Format.eprintf "%a: tried to unleash %a as sigma type@."
+        pp_trace debug
+        pp_value v;
+      failwith "unleash_sg"
 
   and unleash_ext v rs =
     match unleash v with
@@ -1176,7 +1180,7 @@ struct
       v0
 
     | Up info ->
-      let dom, _ = unleash_sg info.ty in
+      let dom, _ = unleash_sg ~debug:["Val.car"] info.ty in
       let car_sys = List.map (Face.map (fun _ _ a -> car a)) info.sys in
       make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
 
