@@ -3,7 +3,7 @@
   open RedBasis
   open Bwd
   open BwdNotation
-  module E = Refine
+  module E = ESig
   module R = ResEnv
 %}
 
@@ -18,12 +18,14 @@
 %token TYPE PRE KAN
 %token EOF
 
-%start <Refine.esig> esig
+%start <ESig.esig> esig
 %%
 
 edecl:
   | LET; a = ATOM; COLON; ty = echk
     { E.Make (a, ty) }
+  | LET; a = ATOM; COLON; ty = echk; RRIGHT_ARROW; tm = echk
+    { E.MakeRefine (a, ty, tm) }
   | a = ATOM; RRIGHT_ARROW; e = echk
     { E.Refine (a, e) }
   | DEBUG

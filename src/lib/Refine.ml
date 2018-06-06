@@ -4,29 +4,10 @@ open Unify open Dev open Contextual open RedBasis open Bwd open BwdNotation
 module Notation = Monad.Notation (Contextual)
 open Notation
 
+open ESig
+
 module T = Map.Make (String)
 
-type edecl =
-  | Make of string * escheme
-  | Refine of string * echk
-  | Debug
-
-and escheme = echk
-
-and echk =
-  | Hole
-  | Lam of string * echk
-  | Pair of echk * echk
-  | Type
-  | Quo of (ResEnv.t -> tm)
-  | Up of einf
-
-and einf =
-  | Var of string
-
-(* e-sigarette ;-) *)
-type esig =
-  edecl list
 
 let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre
 
@@ -64,6 +45,9 @@ let solve goal tm =
   active @@ Unify {ty0 = goal.ty; ty1 = goal.ty; tm0 = goal.tm; tm1 = tm}
 
 
+
+
+
 let rec elab_sig env =
   function
   | [] ->
@@ -82,6 +66,9 @@ and elab_decl env =
     let alpha = Name.named @@ Some name in
     define Emp alpha (Tm.up ty) (Tm.up tm) >>
     ret @@ T.add name (alpha, ty, tm) env
+
+  | MakeRefine (_name, _scheme, _e) ->
+    failwith "MakeRefine not yet supported"
 
   | Refine (name, e) ->
     typechecker >>= fun (module Ty) ->
