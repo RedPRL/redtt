@@ -22,8 +22,8 @@
 %%
 
 edecl:
-  | LET; a = ATOM; COLON; ty = echk; RRIGHT_ARROW; tm = echk
-    { E.Define (a, ty, tm) }
+  | LET; a = ATOM; sch = escheme; RRIGHT_ARROW; tm = echk
+    { E.Define (a, sch, tm) }
   | DEBUG
     { E.Debug }
 
@@ -40,6 +40,14 @@ echk:
     { E.Pair (e0, e1) }
   | e = einf
     { E.Up e }
+
+escheme:
+  | tele = list(escheme_cell); COLON; cod = echk
+    { (tele, cod) }
+
+escheme_cell:
+  | LSQ; a = ATOM; COLON; ty = echk; RSQ
+    { (a, ty) }
 
 einf:
   | a = ATOM;

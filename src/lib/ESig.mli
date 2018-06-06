@@ -2,7 +2,8 @@ type edecl =
   | Define of string * escheme * echk
   | Debug
 
-and escheme = echk
+and escheme = etele * echk
+and etele = (string * echk) list
 
 and echk =
   | Hole

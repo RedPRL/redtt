@@ -1,6 +1,6 @@
 (* Experimental code *)
 
-open Unify open Dev open Contextual open RedBasis open Bwd
+open Unify open Dev open Contextual open RedBasis open Bwd open BwdNotation
 module Notation = Monad.Notation (Contextual)
 open Notation
 
@@ -24,7 +24,7 @@ let get_resolver env =
   let rec go_globals renv  =
     function
     | [] -> renv
-    | (name, (x, _, _)) :: env ->
+    | (name, x) :: env ->
       let renvx = ResEnv.global name x renv in
       go_globals renvx env
   in
@@ -48,12 +48,12 @@ let rec pp_tele fmt =
     ()
 
   | Snoc (Emp, (x, ty)) ->
-    Format.fprintf fmt "%a : %a"
+    Format.fprintf fmt "@[<1>%a : %a@]"
       Name.pp x
       (Tm.pp Pretty.Env.emp) ty
 
   | Snoc (tele, (x, ty)) ->
-    Format.fprintf fmt "%a, %a : %a"
+    Format.fprintf fmt "%a,@,@[<1>%a : %a@]"
       pp_tele tele
       Name.pp x
       (Tm.pp Pretty.Env.emp) ty
@@ -70,18 +70,31 @@ let rec elab_sig env =
 and elab_decl env =
   function
   | E.Define (name, scheme, e) ->
-    elab_scheme env scheme >>= fun sch ->
-    elab_chk env {ty = sch; sys = []} e >>= fun tm ->
+    elab_scheme env scheme @@ fun cod ->
+    elab_chk env {ty = cod; sys = []} e >>= fun tm ->
     let alpha = Name.named @@ Some name in
-    define Emp alpha sch tm >>
-    ret @@ T.add name (alpha, sch, tm) env
+
+    get_tele >>= fun psi ->
+    define psi alpha cod tm >>
+    ret @@ T.add name alpha env
 
   | E.Debug ->
     dump_state Format.std_formatter "debug" >>
     ret env
 
-and elab_scheme env scheme =
-  elab_chk env {ty = univ; sys = []} scheme
+and elab_scheme env (cells, ecod) kont =
+  let rec go gm =
+    function
+    | [] ->
+      elab_chk env {ty = univ; sys = []} ecod >>= fun cod ->
+      kont cod
+    | (name, edom) :: cells ->
+      elab_chk env {ty = univ; sys = []} edom >>= fun dom ->
+      let x = Name.named @@ Some name in
+      in_scope x (`P dom) @@
+      go (gm #< (x, dom)) cells
+  in
+  go Emp cells
 
 and elab_chk env {ty; _} : E.echk -> tm m =
   function
@@ -93,7 +106,7 @@ and elab_chk env {ty; _} : E.echk -> tm m =
   | E.Hole ->
     get_tele >>= fun psi ->
     begin
-      Format.printf "Hole:@ @[<1>%a %a %a@]@."
+      Format.printf "Hole:@, @[<v>@[<v>%a@]@;%a@,%a@]@."
         pp_tele psi
         Uuseg_string.pp_utf_8 "⊢"
         (Tm.pp Pretty.Env.emp) ty;
@@ -138,6 +151,16 @@ and elab_chk env {ty; _} : E.echk -> tm m =
       | _ ->
         failwith "pair"
     end
+
+  | Type ->
+    begin
+      match Tm.unleash ty with
+      | Tm.Univ _ ->
+        ret @@ Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0)
+      | _ ->
+        failwith "Type"
+    end
+
 
   | _ ->
     failwith "TODO"
