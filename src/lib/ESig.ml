@@ -6,7 +6,7 @@ and escheme = echk
 
 and echk =
   | Hole
-  | Lam of string * echk
+  | Lam of string list * echk
   | Pair of echk * echk
   | Type
   | Quo of (ResEnv.t -> Tm.tm)

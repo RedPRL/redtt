@@ -103,19 +103,24 @@ and elab_chk env {ty; _} : E.echk -> tm m =
     go_right >>
     ret @@ Tm.up tm
 
-  | E.Lam (name, e) ->
-    let x = Name.named @@ Some name in
+  | E.Lam (names, e) ->
     begin
-      match Tm.unleash ty with
-      | Tm.Pi (dom, cod) ->
-        let codx = Tm.unbind_with x (fun _ -> `Only) cod in
-        in_scope x (`P dom) begin
-          elab_chk env {ty = codx; sys = []} e
-        end >>= fun bdyx ->
-        ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
+      match names with
+      | [] ->
+        elab_chk env {ty; sys = []} e
+      | name :: names ->
+        let x = Name.named @@ Some name in
+        match Tm.unleash ty with
+        | Tm.Pi (dom, cod) ->
+          let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+          in_scope x (`P dom) begin
+            elab_chk env {ty = codx; sys = []} @@
+            E.Lam (names, e)
+          end >>= fun bdyx ->
+          ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
 
-      | _ ->
-        failwith "lam"
+        | _ ->
+          failwith "lam"
     end
 
   | Pair (e0, e1) ->

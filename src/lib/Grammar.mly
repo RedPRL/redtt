@@ -34,8 +34,8 @@ echk:
     { E.Hole }
   | TYPE
     { E.Type }
-  | LAM; x = ATOM; RIGHT_ARROW; e = echk
-    { E.Lam (x, e) }
+  | LAM; xs = list(ATOM); RIGHT_ARROW; e = echk
+    { E.Lam (xs, e) }
   | LGL; e0 = echk; COMMA; e1 = echk; RGL
     { E.Pair (e0, e1) }
   | e = einf
