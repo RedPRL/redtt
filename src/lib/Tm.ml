@@ -744,6 +744,8 @@ struct
       go_nbnd fl nbnd acc
     | (Bool | Tt | Ff | Dim0 | Dim1 | Univ _) ->
       acc
+    | Cons (t0, t1) ->
+      go fl t1 @@ go fl t0 acc
     | _ ->
       failwith "TODO"
 

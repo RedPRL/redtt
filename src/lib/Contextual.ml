@@ -154,7 +154,7 @@ let get_global_cx =
 let dump_state fmt str =
   get >>= fun cx ->
   get_global_cx >>= fun env ->
-  Format.fprintf fmt "%s@.%a@.Env: {@[<1>%a@]}@." str pp_cx cx GlobalEnv.pp env;
+  Format.fprintf fmt "%s@.%a@.@." str pp_cx cx;
   ret ()
 
 
