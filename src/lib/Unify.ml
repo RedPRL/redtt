@@ -801,6 +801,5 @@ let rec ambulando bracket =
       ret ()
 
     | _ ->
-      Format.eprintf "ambulando: push past@.";
       pushl e >>
       ambulando bracket

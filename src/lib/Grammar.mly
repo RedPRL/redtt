@@ -22,26 +22,30 @@
 %%
 
 edecl:
-  | LET; a = ATOM; COLON; ty = eterm
+  | LET; a = ATOM; COLON; ty = echk
     { E.Make (a, ty) }
-  | a = ATOM; RRIGHT_ARROW; e = eterm
+  | a = ATOM; RRIGHT_ARROW; e = echk
     { E.Refine (a, e) }
   | DEBUG
     { E.Debug }
 
-eterm:
+echk:
   | BACKTICK; t = tm
     { E.Quo t }
-  | a = ATOM;
-    { E.Var a }
   | QUESTION_MARK
     { E.Hole }
   | TYPE
     { E.Type }
-  | LAM; x = ATOM; RIGHT_ARROW; e = eterm
+  | LAM; x = ATOM; RIGHT_ARROW; e = echk
     { E.Lam (x, e) }
-  | LGL; e0 = eterm; COMMA; e1 = eterm; RGL
+  | LGL; e0 = echk; COMMA; e1 = echk; RGL
     { E.Pair (e0, e1) }
+  | e = einf
+    { E.Up e }
+
+einf:
+  | a = ATOM;
+    { E.Var a }
 
 esig:
   | d = edecl; esig = esig

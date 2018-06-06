@@ -8,18 +8,21 @@ module T = Map.Make (String)
 
 type edecl =
   | Make of string * escheme
-  | Refine of string * eterm
+  | Refine of string * echk
   | Debug
 
-and escheme = eterm
+and escheme = echk
 
-and eterm =
+and echk =
   | Hole
-  | Var of string
-  | Lam of string * eterm
-  | Pair of eterm * eterm
+  | Lam of string * echk
+  | Pair of echk * echk
   | Type
   | Quo of (ResEnv.t -> tm)
+  | Up of einf
+
+and einf =
+  | Var of string
 
 (* e-sigarette ;-) *)
 type esig =
@@ -54,6 +57,13 @@ let get_resolver env =
   ask >>= fun psi ->
   ret @@ go_locals ResEnv.init psi
 
+
+type goal = {ty : ty; tm : tm}
+
+let solve goal tm =
+  active @@ Unify {ty0 = goal.ty; ty1 = goal.ty; tm0 = goal.tm; tm1 = tm}
+
+
 let rec elab_sig env =
   function
   | [] ->
@@ -74,10 +84,13 @@ and elab_decl env =
     ret @@ T.add name (alpha, ty, tm) env
 
   | Refine (name, e) ->
+    typechecker >>= fun (module Ty) ->
     begin
       match T.find_opt name env with
       | Some (_, ty, tm) ->
-        elab_term env (Tm.up ty, Tm.up tm) e >>
+        let vty = Ty.Cx.eval Ty.Cx.emp @@ Tm.up ty in
+        let ty = Ty.Cx.quote_ty Ty.Cx.emp vty in
+        elab_chk env {ty; tm = Tm.up tm} e >>
         ret env
       | None ->
         failwith "Refine"
@@ -89,70 +102,90 @@ and elab_decl env =
 
 
 and elab_scheme env tm scheme =
-  elab_term env (univ, tm) scheme
+  elab_chk env {ty = univ; tm} scheme
 
-and elab_term env (ty,tm) =
+
+and make_pair goal kont =
+  match Tm.unleash goal.ty with
+  | Tm.Sg (dom, cod) ->
+    get_tele >>= fun psi ->
+    hole psi dom @@ fun tm0 ->
+    typechecker >>= fun (module T) ->
+    let module HS = HSubst (T) in
+    let vdom = T.Cx.eval T.Cx.emp dom in
+    let cod' = HS.inst_ty_bnd cod (vdom, Tm.up tm0) in
+    hole psi cod' @@ fun tm1 ->
+    kont {ty = dom; tm = Tm.up tm0} {ty = cod'; tm = Tm.up tm1} >>
+    solve goal @@ Tm.cons (Tm.up tm0) (Tm.up tm1)
+  | _ ->
+    failwith "make_pair"
+
+and make_lambda name goal kont =
+  match Tm.unleash goal.ty with
+  | Tm.Pi (dom, cod) ->
+    get_tele >>= fun psi ->
+    let x = Name.named @@ Some name in
+    let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+    hole (psi #< (x, dom)) codx @@ fun bdyx ->
+    in_scope x (`P dom) begin
+      kont {ty = codx; tm = Tm.up bdyx}
+    end >>
+    solve goal @@ Tm.make @@ Tm.Lam (Tm.bind x @@ Tm.up bdyx)
+
+  | _ ->
+    Format.eprintf "lambda failed: %a@." (Tm.pp Pretty.Env.emp) goal.ty;
+    failwith "lambda"
+
+and make_pi name goal kdom kcod =
+  match Tm.unleash goal.ty with
+  | Tm.Univ _ ->
+    get_tele >>= fun psi ->
+    hole psi univ @@ fun dom->
+    let x = Name.named @@ Some name in
+    hole (psi #< (x, Tm.up dom)) univ @@ fun codx ->
+    kdom {ty = univ; tm = Tm.up dom} >>
+    in_scope x (`P (Tm.up dom)) begin
+      kcod {ty = univ; tm = Tm.up codx}
+    end >>
+    solve goal @@ Tm.make @@ Tm.Pi (Tm.up dom, Tm.bind x @@ Tm.up codx)
+
+  | _ ->
+    failwith "make_pi"
+
+
+and elab_chk env (goal : goal) =
   function
   | Type ->
-    let q = {ty0 = univ; ty1 = univ; tm0 = tm; tm1 = Tm.univ ~lvl:(Lvl.Const 0) ~kind:Kind.Kan} in
-    active @@ Unify q
+    solve goal @@ Tm.univ ~lvl:(Lvl.Const 0) ~kind:Kind.Kan
 
   | Pair (e0, e1) ->
-    get_tele >>= fun psi ->
-    let x = Name.fresh () in
-    hole ~debug:(Some "tau0") psi univ @@ fun tau0 ->
-    hole ~debug:(Some "tau1x") (psi #< (x, Tm.up tau0)) univ @@ fun tau1x ->
-    hole ~debug:(Some "tm0") psi (Tm.up tau0) @@ fun tm0 ->
-    let tau1 = Tm.subst (Tm.Sub (Tm.Id, tm0)) @@ Tm.close_var x (fun _ -> `Only) 0 @@ Tm.up tau1x in
-    hole ~debug:(Some "tm1") psi tau1 @@ fun tm1 ->
-    let sigma_ty = Tm.make @@ Tm.Sg (Tm.up tau0, Tm.bind x @@ Tm.up tau1x) in
-    let pair = Tm.cons (Tm.up tm0) (Tm.up tm1) in
-    active @@ Unify {ty0 = univ; ty1 = univ; tm0 = ty; tm1 = sigma_ty} >>
-    active @@ Unify {ty0 = ty; tm0 = tm; ty1 = sigma_ty; tm1 = pair} >>
-    elab_term env (Tm.up tau0, Tm.up tm0) e0 >>
-    elab_term env (tau1, Tm.up tm1) e1 >>
-    dump_state Format.err_formatter "pair"
+    make_pair goal @@ fun goal0 goal1 ->
+    elab_chk env goal0 e0 >>
+    elab_chk env goal1 e1
 
   | Lam (name, e) ->
-    get_tele >>= fun psi ->
-
-    let x = Name.named @@ Some name in
-
-    hole psi univ @@ fun tau0 ->
-    hole (psi #< (x, Tm.up tau0)) univ @@ fun tau1x ->
-    hole (psi #< (x, Tm.up tau0)) (Tm.up tau1x) @@ fun bdyx ->
-
-    let pi_ty = Tm.make @@ Tm.Pi (Tm.up tau0, Tm.bind x @@ Tm.up tau1x) in
-    let lam_tm = Tm.make @@ Tm.Lam (Tm.bind x @@ Tm.up bdyx) in
-
-    active @@ Unify {ty0 = univ; ty1 = univ; tm0 = ty; tm1 = pi_ty} >>
-    active @@ Unify {ty0 = ty; ty1 = pi_ty; tm0 = tm; tm1 = lam_tm} >>
-
-    in_scope x (`P (Tm.up tau0)) @@
-    elab_term env (Tm.up tau1x, Tm.up bdyx) e
+    make_lambda name goal @@ fun goal_bdy ->
+    elab_chk env goal_bdy e
 
   | Quo tmfam ->
     get_resolver env >>= fun renv ->
-    active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tmfam renv}
+    solve goal @@ tmfam renv
 
-  | Var name ->
-    get_resolver env >>= fun renv ->
-    begin
-      match ResEnv.get name renv with
-      | `Ix ix ->
-        active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = Tm.up @@ Tm.var ix `Only}
-      | `Ref a ->
-        active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = Tm.up (Tm.Ref (a, `Only), Emp)}
-    end
+  | Up inf ->
+    elab_inf env goal inf
 
   | Hole ->
     ret ()
 
+and elab_inf env goal =
+  function
+  | Var name ->
+    get_resolver env >>= fun renv ->
+    begin
+      match ResEnv.get name renv with
+      | `Ref a ->
+        lookup_var a `Only >>= fun ty ->
+        active @@ Unify {ty0 = goal.ty; ty1 = ty; tm0 = goal.tm; tm1 = Tm.up (Tm.Ref (a, `Only), Emp)}
+      | _ -> failwith "var"
+    end
 
-
-let script =
-  [ Make ("foo", Type)
-  ]
-
-
-let test = elab_sig T.empty script
