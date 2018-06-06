@@ -274,3 +274,13 @@ let check_eq ~ty tm0 tm1 =
   with
   | _ ->
     ret false
+
+let check_eq_dim tr0 tr1 =
+  typechecker >>= fun (module T) ->
+  let r0 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr0 in
+  let r1 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr1 in
+  match Dim.compare r0 r1 with
+  | Same ->
+    ret true
+  | _ ->
+    ret false

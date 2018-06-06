@@ -742,7 +742,11 @@ let rec solver prob =
           end
       end
   | Restrict (r0, r1, prob) ->
-    under_restriction r0 r1 @@ solver prob
+    check_eq_dim r0 r1 >>= function
+    | true ->
+      solver prob
+    | false ->
+      under_restriction r0 r1 @@ solver prob
 
 
 let rec lower tele alpha ty =
