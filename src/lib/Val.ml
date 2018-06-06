@@ -128,15 +128,22 @@ sig
   module Macro : sig
     val equiv : value -> value -> value
   end
+
+
+  val base_restriction : Restriction.t
 end
 
 module type Sig =
 sig
+  val restriction : Restriction.t
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
 module M (Sig : Sig) : S =
 struct
+
+  let base_restriction = Sig.restriction
+
   type step =
     | Ret : neu -> step
     | Step : value -> step
@@ -148,6 +155,7 @@ struct
 
   module Val : Sort with type t = value with type 'a m = 'a =
   struct
+
     type 'a m = 'a
     type t = value
 

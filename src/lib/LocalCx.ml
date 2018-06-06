@@ -62,7 +62,7 @@ struct
      qenv = Quote.Env.emp;
      tys = [];
      ppenv = Pretty.Env.emp;
-     rel = R.emp}
+     rel = V.base_restriction}
 
   let ext {env; qenv; tys; rel; ppenv} ~nm ty sys =
     let n = Quote.Env.len qenv in

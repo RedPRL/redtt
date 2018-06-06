@@ -8,18 +8,20 @@ type 'a param =
 
 type ty = Tm.tm
 type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
-type t = entry param T.t
+type t = {env : entry param T.t; rel : Restriction.t}
 
 
-let emp = T.empty
+let emp =
+  {env = T.empty;
+   rel = Restriction.emp}
 
 let ext (sg : t) nm param : t =
-  T.add nm param sg
+  {sg with env = T.add nm param sg.env}
 
 let define (sg : t) nm ~ty ~tm =
   let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm in
   let sys = [face] in
-  T.add nm (`P {ty; sys}) sg
+  {sg with env = T.add nm (`P {ty; sys}) sg.env}
 
 
 let lookup_entry sg nm tw =
@@ -30,8 +32,11 @@ let lookup_entry sg nm tw =
   | _ -> failwith "GlobalEnv.lookup_entry"
 
 let lookup_ty sg nm tw =
-  let {ty; _} = lookup_entry sg nm tw in
+  let {ty; _} = lookup_entry sg.env nm tw in
   ty
+
+let restriction sg =
+  sg.rel
 
 let pp fmt sg =
   let pp_sep fmt () = Format.fprintf fmt "; " in
@@ -44,7 +49,7 @@ let pp fmt sg =
       Format.fprintf fmt "%a[twin]"
         Name.pp nm
   in
-  Format.pp_print_list ~pp_sep go fmt @@ T.bindings sg
+  Format.pp_print_list ~pp_sep go fmt @@ T.bindings sg.env
 
 let pp_twin fmt =
   function
@@ -57,9 +62,11 @@ let pp_twin fmt =
 
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
+  let restriction = Sig.globals.rel
+
   let lookup nm tw =
     try
-      let {ty; sys} = lookup_entry Sig.globals nm tw
+      let {ty; sys} = lookup_entry Sig.globals.env nm tw
       in ty, sys
     with
     | exn ->

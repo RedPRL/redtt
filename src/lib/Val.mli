@@ -121,10 +121,13 @@ sig
   module Macro : sig
     val equiv : value -> value -> value
   end
+
+  val base_restriction : Restriction.t
 end
 
 module type Sig =
 sig
+  val restriction : Restriction.t
   (** Return the type and boundary of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
