@@ -702,41 +702,47 @@ let rec solver prob =
     if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
       active probx
     else
-      match param with
-      | `I ->
-        in_scope x `I @@
-        solver probx
-
-      | `P ty ->
-        begin
-          split_sigma Emp x ty >>= function
-          | Some (y, ty0, z, ty1, s, _) ->
-            get_global_cx >>= fun env ->
-            solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
-            Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
-          | None ->
-            in_scope x (`P ty) @@
-            solver probx
-        end
-
-      | `Tw (ty0, ty1) ->
-        let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-        check_eq ~ty:univ ty0 ty1 >>= function
-        | true ->
-          get_global_cx >>= fun sub ->
-          let y = Name.fresh () in
-          (*  This weird crap is needed to avoid creating a cycle in the environment.
-              What we should really do is kill 'twin variables' altogether and switch to
-              a representation based on having two contexts. *)
-          let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
-          let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
-          let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
-          let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
-          solver @@ Problem.all x ty0 @@
-          Problem.subst sub_x @@ Problem.subst sub_y probx
-        | false ->
-          in_scope x (`Tw (ty0, ty1)) @@
+      begin
+        match param with
+        | `I ->
+          in_scope x `I @@
           solver probx
+
+        | `P ty ->
+          begin
+            split_sigma Emp x ty >>= function
+            | Some (y, ty0, z, ty1, s, _) ->
+              get_global_env >>= fun env ->
+              solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
+              Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
+            | None ->
+              in_scope x (`P ty) @@
+              solver probx
+          end
+
+        | `Tw (ty0, ty1) ->
+          let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+          begin
+            check_eq ~ty:univ ty0 ty1 >>= function
+            | true ->
+              get_global_env >>= fun sub ->
+              let y = Name.fresh () in
+              (*  This weird crap is needed to avoid creating a cycle in the environment.
+                  What we should really do is kill 'twin variables' altogether and switch to
+                  a representation based on having two contexts. *)
+              let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
+              let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
+              let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
+              let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
+              solver @@ Problem.all x ty0 @@
+              Problem.subst sub_x @@ Problem.subst sub_y probx
+            | false ->
+              in_scope x (`Tw (ty0, ty1)) @@
+              solver probx
+          end
+      end
+  | Restrict (r0, r1, prob) ->
+    under_restriction r0 r1 @@ solver prob
 
 
 let rec lower tele alpha ty =

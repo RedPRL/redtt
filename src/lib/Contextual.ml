@@ -116,7 +116,7 @@ let popl =
   | _ -> failwith "popl: empty"
 
 
-let get_global_cx =
+let get_global_env =
   get >>= fun st ->
   let rec go_params =
     function
@@ -138,7 +138,7 @@ let dump_state fmt str =
 
 
 let popr_opt =
-  get_global_cx >>= fun sub ->
+  get_global_env >>= fun sub ->
   getr >>= function
   | e :: mcx ->
     setr mcx >>
@@ -181,6 +181,9 @@ let in_scope x p =
 let in_scopes ps =
   local @@ fun ps' ->
   ps' <>< ps
+
+let under_restriction r0 r1 m =
+  failwith "TODO: under_restriction"
 
 
 let lookup_var x w =
@@ -230,7 +233,7 @@ let block = postpone Blocked
 
 
 let typechecker : (module Typing.S) m =
-  get_global_cx >>= fun env ->
+  get_global_env >>= fun env ->
   let module G = struct let globals = env end in
   let module T = Typing.M (G) in
   ret @@ (module T : Typing.S)

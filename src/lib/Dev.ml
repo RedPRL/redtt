@@ -27,6 +27,7 @@ type 'a bind = B of 'a
 type problem =
   | Unify of (tm, tm) equation
   | All of ty param * problem bind
+  | Restrict of tm * tm * problem
 
 type entry =
   | E of Name.t * ty * tm decl
@@ -81,6 +82,8 @@ let rec prob_open_var k x tw =
     Unify (eqn_open_var k x tw q)
   | All (p, B prob) ->
     All (param_open_var k x p, B (prob_open_var (k + 1) x tw prob))
+  | Restrict (r0, r1, prob) ->
+    Restrict (Tm.open_var k x (fun tw -> tw) r0, Tm.open_var k x (fun tw -> tw) r1, prob_open_var k x tw prob)
 
 let rec prob_close_var x tw k =
   function
@@ -88,6 +91,8 @@ let rec prob_close_var x tw k =
     Unify (eqn_close_var x tw k q)
   | All (p, B prob) ->
     All (param_close_var x k p, B (prob_close_var x tw (k + 1) prob))
+  | Restrict (r0, r1, prob) ->
+    Restrict (Tm.close_var x (fun tw -> tw) k r0, Tm.close_var x (fun tw -> tw) k r1, prob_close_var x tw k prob)
 
 let bind x param probx =
   let tw = match param with `Tw _ -> `Tw | _ -> `P in
@@ -132,6 +137,11 @@ let rec pp_problem fmt =
       Name.pp x
       pp_param prm
       pp_problem probx
+  | Restrict (r0, r1, prob) ->
+    Format.fprintf fmt "@[%a=%a@]@ >>@ @[<1> %a@]"
+      (Tm.pp Pretty.Env.emp) r0
+      (Tm.pp Pretty.Env.emp) r1
+      pp_problem prob
 
 
 
@@ -202,21 +212,26 @@ let rec subst_problem sub =
   | All (param, prob) ->
     let param' = subst_param sub param in
     let x, probx = unbind param prob in
-    match param with
-    | `P ty ->
-      let sub' = GlobalEnv.ext sub x @@ `P {ty; sys = []}  in
-      let probx' = subst_problem sub' probx in
-      let prob' = bind x param probx' in
-      All (param', prob')
-    | `Tw (ty0, ty1) -> (* TODO: properly deal with twins *)
-      let sub' = GlobalEnv.ext sub x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []}) in
-      let probx' = subst_problem sub' probx in
-      let prob' = bind x param probx' in
-      All (param', prob')
-    | `I ->
-      let probx' = subst_problem sub probx in
-      let prob' = bind x param probx' in
-      All (param', prob')
+    begin
+      match param with
+      | `P ty ->
+        let sub' = GlobalEnv.ext sub x @@ `P {ty; sys = []}  in
+        let probx' = subst_problem sub' probx in
+        let prob' = bind x param probx' in
+        All (param', prob')
+      | `Tw (ty0, ty1) -> (* TODO: properly deal with twins *)
+        let sub' = GlobalEnv.ext sub x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []}) in
+        let probx' = subst_problem sub' probx in
+        let prob' = bind x param probx' in
+        All (param', prob')
+      | `I ->
+        let probx' = subst_problem sub probx in
+        let prob' = bind x param probx' in
+        All (param', prob')
+    end
+  | Restrict (r0, r1, prob) ->
+    (* TODO: do we need to do anything with r0, r1? *)
+    Restrict (r0, r1, subst_problem sub prob)
 
 let subst_entry sub =
   function
@@ -291,6 +306,8 @@ struct
       Equation.free fl q
     | All (p, B prob) ->
       Occurs.Set.union (Param.free fl p) (free fl prob)
+    | Restrict (r0, r1, prob) ->
+      Occurs.Set.union (Tm.free fl r0) @@ Occurs.Set.union (Tm.free fl r1) @@ free fl prob
 
   let eqn ~ty0 ~tm0 ~ty1 ~tm1 =
     Unify {ty0; tm0; ty1; tm1}
