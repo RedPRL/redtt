@@ -673,15 +673,14 @@ struct
 
     | V {x; ty0; ty1; equiv} ->
       let r, r' = Star.unleash dir in
-      let el0 =
-        let phi0 = D.equate (Gen.unleash x) D.dim0 in
-        make_hcom (Star.make (D.act phi0 r) (D.act phi0 r')) (Val.act phi0 ty0) (Val.act phi0 cap) (CompSys.act phi0 sys) in
+      let phi0 = D.equate (Gen.unleash x) D.dim0 in
+      let phi1 = D.equate (Gen.unleash x) D.dim1 in
+      let el0 = make_hcom (Star.make (D.act phi0 r) (D.act phi0 r')) (Val.act phi0 ty0) (Val.act phi0 cap) (CompSys.act phi0 sys) in
       let el1 =
         let hcom r' ty = make_hcom (Star.make r r') ty cap (`Ok sys) in
         let face0 =
           AbsFace.gen_const x `Dim0 @@
           let y = Name.fresh () in
-          let phi0 = D.equate (Gen.unleash x) D.dim0 in
           Abs.bind1 y @@
           Val.act phi0 @@
           apply (car equiv) @@
@@ -690,7 +689,6 @@ struct
         let face1 =
           AbsFace.gen_const x `Dim1 @@
           let y = Name.fresh () in
-          let phi1 = D.equate (Gen.unleash x) D.dim1 in
           Abs.bind1 y @@
           Val.act phi1 @@
           hcom (D.named y) ty1
