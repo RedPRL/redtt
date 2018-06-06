@@ -23,7 +23,7 @@ let rec lambdas xs tm =
   | Snoc (xs, `Var x) ->
     lambdas xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
   | Snoc (xs, `Dim x) ->
-    let bnd = Tm.NB ([None], failwith "") in
+    let bnd = Tm.NB ([None], Tm.close_var x 0 tm) in
     lambdas xs @@ Tm.make @@ Tm.ExtLam bnd
 
 let rec pis gm tm =
