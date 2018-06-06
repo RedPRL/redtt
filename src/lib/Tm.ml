@@ -416,9 +416,9 @@ let fix_traverse ~var ~ref  =
   in
   go 0
 
-let close_var a tw k =
-  let var _ i tw' = Ix (i, tw'), Emp in
-  let ref n (b, tw') = if b = a then Ix (n + k, tw), Emp else Ref (b, tw'), Emp in
+let close_var a f k =
+  let var _ i tw = Ix (i, tw), Emp in
+  let ref n (b, tw) = if b = a then Ix (n + k, f tw), Emp else Ref (b, tw), Emp in
   fix_traverse ~var ~ref
 
 let subst sub =
@@ -430,14 +430,14 @@ let subst sub =
   go 0
 
 (* TODO: check that this isn't catastrophically wrong *)
-let open_var k a tw =
-  let var k' i tw' = if i = (k + k') then Ref (a, tw), Emp else Ix (i, tw'), Emp in
-  let ref _n (b, tw') = Ref (b, tw'), Emp in
+let open_var k a f =
+  let var k' i tw = if i = (k + k') then Ref (a, f tw), Emp else Ix (i, tw), Emp in
+  let ref _n (b, tw) = Ref (b, tw), Emp in
   fix_traverse ~var ~ref
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
-  x, open_var 0 x `Only t
+  x, open_var 0 x (fun _ -> `Only) t
 
 let unbind_with x tw (B (_, t)) =
   open_var 0 x tw t
@@ -448,19 +448,19 @@ let unbindn (NB (nms, t)) =
     | [] -> xs, t
     | nm :: nms ->
       let x = Name.named nm in
-      go nms (xs #< x) @@ open_var 0 x `Only t
+      go nms (xs #< x) @@ open_var 0 x (fun _ -> `Only) t
   in
   go nms Emp t
 
 let bind x tx =
-  B (Some (Name.to_string x), close_var x `Only 0 tx)
+  B (Some (Name.to_string x), close_var x (fun _ -> `Only) 0 tx)
 
 let rec bindn xs txs =
   let rec go xs txs =
     match xs with
     | Emp -> txs
     | Snoc (xs, x) ->
-      go xs @@ close_var x `Only 0 txs
+      go xs @@ close_var x (fun _ -> `Only) 0 txs
   in
   NB (List.map (fun x -> Some (Name.to_string x)) @@ Bwd.to_list xs, go xs txs)
 
@@ -937,10 +937,10 @@ let rec map_ext_bnd f nbnd =
     NB ([], (f ty, map_tm_sys f sys))
   | NB (nm :: nms, (ty, sys)) ->
     let x = Name.fresh () in
-    let tyx = open_var 0 x `Only ty in
-    let sysx = map_tm_sys (open_var 0 x `Only) sys in
+    let tyx = open_var 0 x (fun _ -> `Only) ty in
+    let sysx = map_tm_sys (open_var 0 x (fun _ -> `Only)) sys in
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
-    NB (nm :: nms, (close_var x `Only 0 tyx', map_tm_sys (close_var x `Only 0) sysx'))
+    NB (nm :: nms, (close_var x (fun _ -> `Only) 0 tyx', map_tm_sys (close_var x (fun _ -> `Only) 0) sysx'))
 
 let map_cmd f (hd, sp) =
   map_head f hd, map_spine f sp

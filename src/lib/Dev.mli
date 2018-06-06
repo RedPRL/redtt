@@ -32,8 +32,8 @@ type entry =
   | Q of status * problem
   | Bracket of Name.t
 
-val bind : Name.t -> problem -> problem bind
-val unbind : problem bind -> Name.t * problem
+val bind : Name.t -> 'a param -> problem -> problem bind
+val unbind : 'a param -> problem bind -> Name.t * problem
 
 
 val pp_entry : entry Pretty.t0

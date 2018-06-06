@@ -24,7 +24,7 @@ let define (sg : t) nm ~ty ~tm =
 
 let lookup_entry sg nm tw =
   match T.find nm sg, tw with
-  | `P x, `Only -> x
+  | `P x, _ -> x
   | `Tw (x, _), `TwinL -> x
   | `Tw (_, x), `TwinR -> x
   | _ -> failwith "GlobalEnv.lookup_entry"

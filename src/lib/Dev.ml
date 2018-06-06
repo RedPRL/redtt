@@ -19,74 +19,88 @@ type ('a, 'b) equation =
    ty1 : ty;
    tm1 : 'b}
 
-type param =
-  | I
-  | P of ty
-  | Tw of ty * ty
-
-type params = (Name.t * param) bwd
+type 'a param = [ `I | `P of 'a | `Tw of 'a * 'a ]
+type params = (Name.t * ty param) bwd
 
 type 'a bind = B of 'a
 
 type problem =
   | Unify of (tm, tm) equation
-  | All of param * problem bind
+  | All of ty param * problem bind
 
 type entry =
   | E of Name.t * ty * tm decl
   | Q of status * problem
   | Bracket of Name.t
 
-let eqn_open_var k x q =
-  let ty0 = Tm.open_var k x `Only q.ty0 in
-  let ty1 = Tm.open_var k x `Only q.ty1 in
-  let tm0 = Tm.open_var k x `Only q.tm0 in
-  let tm1 = Tm.open_var k x `Only q.tm1 in
+let eqn_open_var k x tw q =
+  let twl, twr =
+    match tw with
+    | `P -> `Only, `Only
+    | `Tw -> `TwinL, `TwinR
+  in
+  let ty0 = Tm.open_var k x (fun _ -> twl) q.ty0 in
+  let ty1 = Tm.open_var k x (fun _ -> twr) q.ty1 in
+  let tm0 = Tm.open_var k x (fun _ -> twl) q.tm0 in
+  let tm1 = Tm.open_var k x (fun _ -> twr) q.tm1 in
   {ty0; ty1; tm0; tm1}
 
-let rec eqn_close_var x k q =
-  let ty0 = Tm.close_var x k q.ty0 in
-  let ty1 = Tm.close_var x k q.ty1 in
-  let tm0 = Tm.close_var x k q.tm0 in
-  let tm1 = Tm.close_var x k q.tm1 in
+let rec eqn_close_var x tw k q =
+  let twl, twr =
+    match tw with
+    | `P -> `Only, `Only
+    | `Tw -> `TwinL, `TwinR
+  in
+  let ty0 = Tm.close_var x (fun _ -> twl) k q.ty0 in
+  let ty1 = Tm.close_var x (fun _ -> twr) k q.ty1 in
+  let tm0 = Tm.close_var x (fun _ -> twl) k q.tm0 in
+  let tm1 = Tm.close_var x (fun _ -> twr) k q.tm1 in
   {ty0; ty1; tm0; tm1}
 
 let param_open_var k x =
   function
-  | I -> I
-  | P ty ->
-    P (Tm.open_var k x `Only ty)
-  | Tw (ty0, ty1) ->
-    Tw (Tm.open_var k x `Only ty0, Tm.open_var k x `Only ty1)
+  | `I ->
+    `I
+  | `P ty ->
+    `P (Tm.open_var k x (fun tw -> tw) ty)
+  | `Tw (ty0, ty1) ->
+    `Tw (Tm.open_var k x (fun tw -> tw) ty0, Tm.open_var k x (fun tw -> tw) ty1)
 
 let param_close_var x k =
   function
-  | I -> I
-  | P ty ->
-    P (Tm.close_var x k ty)
-  | Tw (ty0, ty1) ->
-    Tw (Tm.close_var x k ty0, Tm.close_var x k ty1)
+  | `I ->
+    `I
+  | `P ty ->
+    `P (Tm.close_var x (fun tw -> tw) k ty)
+  | `Tw (ty0, ty1) ->
+    `Tw (Tm.close_var x (fun tw -> tw) k ty0, Tm.close_var x (fun tw -> tw) k ty1)
 
-let rec prob_open_var k x =
+let rec prob_open_var k x tw =
   function
   | Unify q ->
-    Unify (eqn_open_var k x q)
+    Unify (eqn_open_var k x tw q)
   | All (p, B prob) ->
-    All (param_open_var k x p, B (prob_open_var (k + 1) x prob))
+    All (param_open_var k x p, B (prob_open_var (k + 1) x tw prob))
 
-let rec prob_close_var x k =
+let rec prob_close_var x tw k =
   function
   | Unify q ->
-    Unify (eqn_close_var x k q)
+    Unify (eqn_close_var x tw k q)
   | All (p, B prob) ->
-    All (param_close_var x k p, B (prob_close_var x (k + 1) prob))
+    All (param_close_var x k p, B (prob_close_var x tw (k + 1) prob))
 
-let bind x probx =
-  B (prob_close_var x 0 probx)
+let bind x param probx =
+  let tw = match param with `Tw _ -> `Tw | _ -> `P in
+  B (prob_close_var x tw 0 probx)
 
-let unbind (B prob) =
+let unbind param (B prob) =
   let x = Name.fresh () in
-  x, prob_open_var 0 x prob
+  x,
+  match param with
+  | `Tw _ ->
+    prob_open_var 0 x `Tw prob
+  | _ ->
+    prob_open_var 0 x `P prob
 
 
 let pp_equation fmt q =
@@ -98,11 +112,11 @@ let pp_equation fmt q =
 
 let pp_param fmt =
   function
-  | I ->
+  | `I ->
     Format.fprintf fmt "dim"
-  | P ty ->
+  | `P ty ->
     Tm.pp Pretty.Env.emp fmt ty
-  | Tw (ty0, ty1) ->
+  | `Tw (ty0, ty1) ->
     Format.fprintf fmt "{%a | %a}"
       (Tm.pp Pretty.Env.emp) ty0
       (Tm.pp Pretty.Env.emp) ty1
@@ -113,7 +127,7 @@ let rec pp_problem fmt =
   | Unify q ->
     pp_equation fmt q
   | All (prm, prob) ->
-    let x, probx = unbind prob in
+    let x, probx = unbind prm prob in
     Format.fprintf fmt "@[%a : %a@]@ >>@ @[<1>%a@]"
       Name.pp x
       pp_param prm
@@ -174,11 +188,12 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
   function
-  | I -> I
-  | P ty ->
-    P (subst_tm sub ~ty:univ ty)
-  | Tw (ty0, ty1) ->
-    Tw (subst_tm sub ~ty:univ ty0, subst_tm sub ~ty:univ ty1)
+  | `I ->
+    `I
+  | `P ty ->
+    `P (subst_tm sub ~ty:univ ty)
+  | `Tw (ty0, ty1) ->
+    `Tw (subst_tm sub ~ty:univ ty0, subst_tm sub ~ty:univ ty1)
 
 let rec subst_problem sub =
   function
@@ -186,21 +201,21 @@ let rec subst_problem sub =
     Unify (subst_equation sub q)
   | All (param, prob) ->
     let param' = subst_param sub param in
-    let x, probx = unbind prob in
+    let x, probx = unbind param prob in
     match param with
-    | P ty ->
-      let sub' = GlobalEnv.ext sub x ~ty ~sys:[] in
+    | `P ty ->
+      let sub' = GlobalEnv.ext sub x @@ `P {ty; sys = []}  in
       let probx' = subst_problem sub' probx in
-      let prob' = bind x probx' in
+      let prob' = bind x param probx' in
       All (param', prob')
-    | Tw (ty0, _) -> (* TODO: properly deal with twins *)
-      let sub' = GlobalEnv.ext sub x ~ty:ty0 ~sys:[] in
+    | `Tw (ty0, ty1) -> (* TODO: properly deal with twins *)
+      let sub' = GlobalEnv.ext sub x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []}) in
       let probx' = subst_problem sub' probx in
-      let prob' = bind x probx' in
+      let prob' = bind x param probx' in
       All (param', prob')
-    | I ->
+    | `I ->
       let probx' = subst_problem sub probx in
-      let prob' = bind x probx' in
+      let prob' = bind x param probx' in
       All (param', prob')
 
 let subst_entry sub =
@@ -218,14 +233,14 @@ let subst_entry sub =
 
 module Param =
 struct
-  type t = param
+  type t = ty param
   let pp = pp_param
 
   let free fl =
     function
-    | I -> Occurs.Set.empty
-    | P ty -> Tm.free fl ty
-    | Tw (ty0, ty1) ->
+    | `I -> Occurs.Set.empty
+    | `P ty -> Tm.free fl ty
+    | `Tw (ty0, ty1) ->
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)
 
   let subst = subst_param
@@ -281,16 +296,16 @@ struct
     Unify {ty0; tm0; ty1; tm1}
 
   let all x ty prob =
-    All (P ty, bind x prob)
+    All (`P ty, bind x (`P ty) prob)
 
   let rec all_dims xs prob =
     match xs with
     | [] -> prob
     | x :: xs ->
-      All (I, bind x @@ all_dims xs prob)
+      All (`I, bind x `I @@ all_dims xs prob)
 
   let all_twins x ty0 ty1 prob =
-    All (Tw (ty0, ty1), bind x prob)
+    All (`Tw (ty0, ty1), bind x (`Tw (ty0, ty1)) prob)
 
   let subst = subst_problem
 end

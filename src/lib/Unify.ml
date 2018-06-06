@@ -23,7 +23,7 @@ let rec lambdas xs tm =
   | Snoc (xs, `Var x) ->
     lambdas xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
   | Snoc (xs, `Dim x) ->
-    let bnd = Tm.NB ([None], Tm.close_var x `Only 0 tm) in
+    let bnd = Tm.NB ([None], Tm.close_var x (fun _ -> `Only) 0 tm) in
     lambdas xs @@ Tm.make @@ Tm.ExtLam bnd
 
 let rec pis gm tm =
@@ -521,8 +521,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       typechecker >>= fun (module T) ->
       let module HSubst = HSubst (T) in
       let y = Name.fresh () in
-      let mot0y = Tm.unbind_with y `TwinL info0.mot in
-      let mot1y = Tm.unbind_with y `TwinR info1.mot in
+      let mot0y = Tm.unbind_with y (fun _ -> `TwinL) info0.mot in
+      let mot1y = Tm.unbind_with y (fun _ -> `TwinR) info1.mot in
       let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
       active @@ Problem.all y (Tm.make Tm.Bool) @@
       Problem.eqn ~ty0:univ ~ty1:univ ~tm0:mot0y ~tm1:mot1y
@@ -551,16 +551,16 @@ let rigid_rigid q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-pi" in
-    let cod0x = Tm.unbind_with x `TwinL cod0 in
-    let cod1x = Tm.unbind_with x `TwinR cod1 in
+    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
   | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-sg" in
-    let cod0x = Tm.unbind_with x `TwinL cod0 in
-    let cod1x = Tm.unbind_with x `TwinR cod1 in
+    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
@@ -668,7 +668,7 @@ let rec solver prob =
     unify q
 
   | All (param, prob) ->
-    let x, probx = unbind prob in
+    let x, probx = unbind param prob in
     (* if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
        active probx
        else *)

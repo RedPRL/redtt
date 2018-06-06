@@ -116,26 +116,6 @@ let popl =
   | _ -> failwith "popl: empty"
 
 
-
-let cx_core : lcx -> GlobalEnv.t =
-  let rec go es =
-    match es with
-    | Emp -> GlobalEnv.emp
-    | Snoc (es, e) ->
-      match e with
-      | E (x, ty, Hole) ->
-        let cx = go es in
-        GlobalEnv.ext cx x @@ `P {ty; sys = []}
-      | E (x, ty, Defn t) ->
-        let cx = go es in
-        GlobalEnv.define cx x ty t
-      | Q _ ->
-        go es
-      | Bracket _ ->
-        go es
-  in
-  go
-
 let get_global_cx =
   get >>= fun st ->
   let rec go_params =
@@ -238,7 +218,7 @@ let postpone s p =
     let rec go ps p =
       match ps with
       | Snoc (ps, (x, param)) ->
-        go ps @@ All (param, Dev.bind x p)
+        go ps @@ All (param, Dev.bind x param p)
       | Emp -> p
     in go ps p
   in

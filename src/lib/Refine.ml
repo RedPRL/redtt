@@ -103,7 +103,7 @@ and elab_term env (ty,tm) =
     hole ~debug:(Some "tau0") psi univ @@ fun tau0 ->
     hole ~debug:(Some "tau1x") (psi #< (x, Tm.up tau0)) univ @@ fun tau1x ->
     hole ~debug:(Some "tm0") psi (Tm.up tau0) @@ fun tm0 ->
-    let tau1 = Tm.subst (Tm.Sub (Tm.Id, tm0)) @@ Tm.close_var x `Only 0 @@ Tm.up tau1x in
+    let tau1 = Tm.subst (Tm.Sub (Tm.Id, tm0)) @@ Tm.close_var x (fun _ -> `Only) 0 @@ Tm.up tau1x in
     hole ~debug:(Some "tm1") psi tau1 @@ fun tm1 ->
     let sigma_ty = Tm.make @@ Tm.Sg (Tm.up tau0, Tm.bind x @@ Tm.up tau1x) in
     let pair = Tm.cons (Tm.up tm0) (Tm.up tm1) in
