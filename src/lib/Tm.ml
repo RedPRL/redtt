@@ -442,8 +442,27 @@ let unbind (B (nm, t)) =
 let unbind_with x tw (B (_, t)) =
   open_var 0 x tw t
 
+let unbindn (NB (nms, t)) =
+  let rec go nms xs t =
+    match nms with
+    | [] -> xs, t
+    | nm :: nms ->
+      let x = Name.named nm in
+      go nms (xs #< x) @@ open_var 0 x `Only t
+  in
+  go nms Emp t
+
 let bind x tx =
   B (Some (Name.to_string x), close_var x 0 tx)
+
+let rec bindn xs txs =
+  let rec go xs txs =
+    match xs with
+    | Emp -> txs
+    | Snoc (xs, x) ->
+      go xs @@ close_var x 0 txs
+  in
+  NB (List.map (fun x -> Some (Name.to_string x)) @@ Bwd.to_list xs, go xs txs)
 
 let rec pp env fmt (Tm tm) =
   match tm with
@@ -839,15 +858,9 @@ let map_bnd (f : tm -> tm) (bnd : tm bnd) : tm bnd =
   bind x @@ f tx
 
 (* TODO: clean up *)
-let rec map_nbnd (f : tm -> tm) (nbnd : tm nbnd) : tm nbnd =
-  match nbnd with
-  | NB ([], t) ->
-    NB ([], f t)
-  | NB (nm :: nms, t) ->
-    let x = Name.fresh () in
-    let tx = open_var 0 x `Only t in
-    let NB (_, tx') = map_nbnd f (NB (nms, tx)) in
-    NB (nm :: nms, close_var x 0 tx')
+let map_nbnd (f : tm -> tm) (nbnd : tm nbnd) : tm nbnd =
+  let xs, txs = unbindn nbnd in
+  bindn xs @@ f txs
 
 
 let map_comp_face f (r, r', obnd) =

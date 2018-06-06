@@ -68,6 +68,21 @@ let occurs_check alpha tm =
   Tm.free `Metas tm
 
 
+let rec opt_traverse f xs =
+  match xs with
+  | [] -> Some []
+  | x::xs ->
+    match f x with
+    | Some y -> Option.map (fun ys -> y :: ys) @@ opt_traverse f xs
+    | None -> None
+
+
+let as_plain_var t =
+  match Tm.unleash t with
+  | Tm.Up (Tm.Ref (x, _), Emp) ->
+    Some x
+  | _ ->
+    None
 
 (* A very crappy eta contraction function. It's horrific that this is actually a thing that we do! *)
 let rec eta_contract t =
@@ -79,8 +94,8 @@ let rec eta_contract t =
       match Tm.unleash tm'y with
       | Tm.Up (Tm.Ref (f, twf), Snoc (sp, Tm.FunApp arg)) ->
         begin
-          match Tm.unleash arg with
-          | Tm.Up (Tm.Ref (y', _), Emp)
+          match as_plain_var arg with
+          | Some y'
             when
               y = y'
               && not @@ Occurs.Set.mem y @@ Tm.Sp.free `Vars sp
@@ -92,6 +107,27 @@ let rec eta_contract t =
       | _ ->
         Tm.make @@ Tm.Lam (Tm.bind y tm'y)
     end
+
+  | Tm.ExtLam nbnd ->
+    let ys, tmys = Tm.unbindn nbnd in
+    let tm'ys = eta_contract tmys in
+    begin
+      match Tm.unleash tm'ys with
+      | Tm.Up (Tm.Ref (p, twp), Snoc (sp, Tm.ExtApp args)) ->
+        begin
+          match opt_traverse as_plain_var args with
+          | Some y's
+            when Bwd.to_list ys = y's
+            (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)
+            ->
+            Tm.up (Tm.Ref (p, twp), sp)
+          | _ ->
+            Tm.make @@ Tm.ExtLam (Tm.bindn ys tm'ys)
+        end
+      | _ ->
+        Tm.make @@ Tm.ExtLam (Tm.bindn ys tm'ys)
+    end
+
 
   | Tm.Cons (t0, t1) ->
     let t0' = eta_contract t0 in
@@ -107,9 +143,6 @@ let rec eta_contract t =
         Tm.cons t0' t1'
     end
 
-  | Tm.ExtLam _nbnd ->
-    failwith "eta contract ext-lam"
-
   | con ->
     Tm.make @@ Tm.map_tmf eta_contract con
 
@@ -121,14 +154,6 @@ let to_var t =
     Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t;
     None
 
-
-let rec opt_traverse f xs =
-  match xs with
-  | [] -> Some []
-  | x::xs ->
-    match f x with
-    | Some y -> Option.map (fun ys -> y :: ys) @@ opt_traverse f xs
-    | None -> None
 
 let rec spine_to_vars sp =
   match sp with
