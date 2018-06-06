@@ -36,8 +36,8 @@ echk:
     { E.Type }
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = echk
     { E.Lam (xs, e) }
-  | LGL; e0 = echk; COMMA; e1 = echk; RGL
-    { E.Pair (e0, e1) }
+  | LGL; es = separated_list(COMMA, echk); RGL
+    { E.Tuple es }
   | e = einf
     { E.Up e }
 

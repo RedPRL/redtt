@@ -8,7 +8,7 @@ and etele = (string * echk) list
 and echk =
   | Hole
   | Lam of string list * echk
-  | Pair of echk * echk
+  | Tuple of echk list
   | Type
   | Quo of (ResEnv.t -> Tm.tm)
   | Up of einf

@@ -115,4 +115,8 @@ let connection/and
      [j=1 <k> (@ face k i)]
      [i=j <k> (@ face k i)])))
 
+
+let foo [x : `bool] : `(* bool bool bool) ⇒
+  < `x, `x, `x >
+
 debug

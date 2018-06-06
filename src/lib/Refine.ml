@@ -136,20 +136,27 @@ and elab_chk env {ty; _} : E.echk -> tm m =
           failwith "lam"
     end
 
-  | Pair (e0, e1) ->
+  | Tuple es ->
     begin
-      match Tm.unleash ty with
-      | Tm.Sg (dom, cod) ->
-        elab_chk env {ty = dom; sys = []} e0 >>= fun tm0 ->
-        typechecker >>= fun (module T) ->
-        let module HS = HSubst (T) in
-        let vdom = T.Cx.eval T.Cx.emp dom in
-        let cod' = HS.inst_ty_bnd cod (vdom, tm0) in
-        elab_chk env {ty = cod'; sys = []} e1 >>= fun tm1 ->
-        ret @@ Tm.cons tm0 tm1
-
-      | _ ->
-        failwith "pair"
+      match es with
+      | [] ->
+        failwith "empty tuple"
+      | [e] ->
+        elab_chk env {ty; sys = []} e
+      | e :: es ->
+        begin
+          match Tm.unleash ty with
+          | Tm.Sg (dom, cod) ->
+            elab_chk env {ty = dom; sys = []} e >>= fun tm0 ->
+            typechecker >>= fun (module T) ->
+            let module HS = HSubst (T) in
+            let vdom = T.Cx.eval T.Cx.emp dom in
+            let cod' = HS.inst_ty_bnd cod (vdom, tm0) in
+            elab_chk env {ty = cod'; sys = []} (Tuple es) >>= fun tm1 ->
+            ret @@ Tm.cons tm0 tm1
+          | _ ->
+            failwith "pair"
+        end
     end
 
   | Type ->
