@@ -2,13 +2,14 @@ open Dev
 open RedBasis
 open Bwd open BwdNotation
 
-type cx_l = entry bwd
-type cx_r = entry list
+type lcx = entry bwd
+type rcx = entry list
 
-type cx = cx_l * cx_r
+type env = GlobalEnv.t
+type cx = {lcx : lcx; rcx : rcx}
 
 
-let rec pp_cx_l fmt =
+let rec pp_lcx fmt =
   function
   | Emp ->
     ()
@@ -17,10 +18,10 @@ let rec pp_cx_l fmt =
       pp_entry e
   | Snoc (cx, e) ->
     Format.fprintf fmt "%a;@; @[<1>%a@]"
-      pp_cx_l cx
+      pp_lcx cx
       pp_entry e
 
-let rec pp_cx_r fmt =
+let rec pp_rcx fmt =
   function
   | [] ->
     ()
@@ -30,12 +31,12 @@ let rec pp_cx_r fmt =
   | e :: cx ->
     Format.fprintf fmt "@[<1>%a@];@; %a"
       pp_entry e
-      pp_cx_r cx
+      pp_rcx cx
 
-let pp_cx fmt (lcx, rcx) =
+let pp_cx fmt {lcx; rcx} =
   Format.fprintf fmt "@[<1>%a@] |@ @[<1>%a@]"
-    pp_cx_l lcx
-    pp_cx_r rcx
+    pp_lcx lcx
+    pp_rcx rcx
 
 
 module M =
@@ -70,17 +71,17 @@ let get _ cx = cx, cx
 
 let modify f _ cx = f cx, ()
 
-let getl = fst <@> get
-let getr = snd <@> get
-let modifyl f = modify @@ fun (l, r) -> f l, r
-let modifyr f = modify @@ fun (l, r) -> l, f r
+let getl = (fun x -> x.lcx) <@> get
+let getr = (fun x -> x.rcx) <@> get
+let modifyl f = modify @@ fun st -> {st with lcx = f st.lcx}
+let modifyr f = modify @@ fun st -> {st with rcx = f st.rcx}
 let setl l = modifyl @@ fun _ -> l
 let setr r = modifyr @@ fun _ -> r
 let pushl e = modifyl @@ fun es -> es #< e
 let pushr e = modifyr @@ fun es -> e :: es
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp (Emp, []) in
+  let _, r = m Emp {lcx = Emp; rcx = []} in
   r
 
 let rec pushls es =
@@ -97,7 +98,7 @@ let popl =
 
 
 
-let cx_core : cx_l -> GlobalEnv.t =
+let cx_core : lcx -> GlobalEnv.t =
   let rec go es =
     match es with
     | Emp -> GlobalEnv.emp
@@ -117,10 +118,10 @@ let cx_core : cx_l -> GlobalEnv.t =
   go
 
 let get_global_cx =
-  get >>= fun (cxl, cxr) ->
+  get >>= fun {lcx; rcx} ->
   let rec go_params =
     function
-    | Emp -> cx_core (cxl <>< cxr)
+    | Emp -> cx_core (lcx <>< rcx)
     | Snoc (psi, (_, I)) ->
       go_params psi
     | Snoc (psi, (x, P ty)) ->
@@ -166,12 +167,12 @@ let go_right =
   popr >>= pushl
 
 let go_to_top =
-  get >>= fun (lcx, rcx) ->
+  get >>= fun {lcx; rcx} ->
   setl Emp >>
   setr (lcx <>> rcx)
 
 let go_to_bottom =
-  get >>= fun (lcx, rcx) ->
+  get >>= fun {lcx; rcx} ->
   setl (lcx <>< rcx) >>
   setr []
 
