@@ -778,13 +778,11 @@ let rec lower tele alpha ty =
 let rec ambulando bracket =
   popr_opt >>= function
   | None ->
-    Format.eprintf "ambulando: done@.";
     ret ()
 
   | Some e ->
     match e with
     | E (alpha, ty, Hole) ->
-      Format.eprintf "ambulando: hole@.";
       begin
         lower Emp alpha ty <||
         pushl e
@@ -792,12 +790,10 @@ let rec ambulando bracket =
       ambulando bracket
 
     | Q (Active, prob) ->
-      Format.eprintf "ambulando: @[<1>%a@]@.@." Problem.pp prob;
       solver prob >>
       ambulando bracket
 
     | Bracket bracket' when bracket = bracket' ->
-      Format.eprintf "ambulando: bracket@.";
       ret ()
 
     | _ ->

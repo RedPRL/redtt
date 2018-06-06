@@ -1,7 +1,5 @@
 type edecl =
-  | Make of string * escheme
-  | Refine of string * echk
-  | MakeRefine of string * escheme * echk
+  | Define of string * escheme * echk
   | Debug
 
 and escheme = echk

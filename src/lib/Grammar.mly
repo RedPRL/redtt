@@ -22,12 +22,8 @@
 %%
 
 edecl:
-  | LET; a = ATOM; COLON; ty = echk
-    { E.Make (a, ty) }
   | LET; a = ATOM; COLON; ty = echk; RRIGHT_ARROW; tm = echk
-    { E.MakeRefine (a, ty, tm) }
-  | a = ATOM; RRIGHT_ARROW; e = echk
-    { E.Refine (a, e) }
+    { E.Define (a, ty, tm) }
   | DEBUG
     { E.Debug }
 
