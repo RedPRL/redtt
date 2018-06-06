@@ -1,10 +1,10 @@
 (* Experimental code *)
 
-open Unify open Dev open Contextual open RedBasis open Bwd open BwdNotation
+open Unify open Dev open Contextual open RedBasis open Bwd
 module Notation = Monad.Notation (Contextual)
 open Notation
 
-open ESig
+module E = ESig
 
 module T = Map.Make (String)
 
@@ -69,28 +69,28 @@ let rec elab_sig env =
 
 and elab_decl env =
   function
-  | Define (name, scheme, e) ->
+  | E.Define (name, scheme, e) ->
     elab_scheme env scheme >>= fun sch ->
     elab_chk env {ty = sch; sys = []} e >>= fun tm ->
     let alpha = Name.named @@ Some name in
     define Emp alpha sch tm >>
     ret @@ T.add name (alpha, sch, tm) env
 
-  | Debug ->
+  | E.Debug ->
     dump_state Format.std_formatter "debug" >>
     ret env
 
 and elab_scheme env scheme =
   elab_chk env {ty = univ; sys = []} scheme
 
-and elab_chk env {ty; _} : echk -> tm m =
+and elab_chk env {ty; _} : E.echk -> tm m =
   function
-  | Quo tmfam ->
+  | E.Quo tmfam ->
     get_resolver env >>= fun renv ->
     (* TODO: unify with boundary *)
     ret @@ tmfam renv
 
-  | Hole ->
+  | E.Hole ->
     get_tele >>= fun psi ->
     begin
       Format.printf "Hole:@ @[<1>%a >> %a@]@."
@@ -102,7 +102,7 @@ and elab_chk env {ty; _} : echk -> tm m =
     go_right >>
     ret @@ Tm.up tm
 
-  | Lam (name, e) ->
+  | E.Lam (name, e) ->
     let x = Name.named @@ Some name in
     begin
       match Tm.unleash ty with
