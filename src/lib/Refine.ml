@@ -164,38 +164,3 @@ and elab_chk env {ty; _} : E.echk -> tm m =
 
   | _ ->
     failwith "TODO"
-
-
-(* solve goal @@ Tm.univ ~lvl:(Lvl.Const 0) ~kind:Kind.Kan *)
-
-(* | Pair (e0, e1) ->
-   make_pair goal @@ fun goal0 goal1 ->
-   elab_chk env goal0 e0 >>
-   elab_chk env goal1 e1
-
-   | Lam (name, e) ->
-   make_lambda name goal @@ fun goal_bdy ->
-   elab_chk env goal_bdy e
-
-   | Quo tmfam ->
-   get_resolver env >>= fun renv ->
-   solve goal @@ tmfam renv
-
-   | Up inf ->
-   elab_inf env goal inf
-
-   | Hole ->
-   ret () *)
-
-(* and elab_inf env goal =
-   function
-   | Var name ->
-    get_resolver env >>= fun renv ->
-    begin
-      match ResEnv.get name renv with
-      | `Ref a ->
-        lookup_var a `Only >>= fun ty ->
-        active @@ Unify {ty0 = goal.ty; ty1 = ty; tm0 = goal.tm; tm1 = Tm.up (Tm.Ref (a, `Only), Emp)}
-      | _ -> failwith "var"
-    end *)
-
