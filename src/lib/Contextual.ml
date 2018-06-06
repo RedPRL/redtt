@@ -41,7 +41,8 @@ let pp_cx fmt {lcx; rcx} =
 
 module M =
 struct
-  type 'a m = params -> cx -> cx * 'a
+  type rst = (tm * tm) bwd
+  type 'a m = params * rst -> cx -> cx * 'a
 
   let ret a _ cx = cx, a
 
@@ -55,8 +56,11 @@ include M
 
 open Notation
 
-let local f m ps =
-  m (f ps)
+let local_ f m (ps, rst) =
+  m (f (ps, rst))
+
+let local f m (ps, rst) =
+  m (f ps, rst)
 
 let optional m ps cx =
   try
@@ -65,7 +69,8 @@ let optional m ps cx =
   with
   | _ -> cx, None
 
-let ask ps cx = cx, ps
+let ask_ x cx = cx, x
+let ask (ps, _) cx = cx, ps
 
 let get _ cx = cx, cx
 
@@ -100,7 +105,7 @@ let pushr e =
   update_env e
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []} in
+  let _, r = m (Emp, Emp) {lcx = Emp; env = GlobalEnv.emp; rcx = []} in
   r
 
 let rec pushls es =
@@ -118,18 +123,23 @@ let popl =
 
 let get_global_env =
   get >>= fun st ->
-  let rec go_params =
+  let rec go_params rst =
     function
-    | Emp -> st.env
+    | Emp -> go_rst st.env rst
     | Snoc (psi, (_, `I)) ->
-      go_params psi
+      go_params rst psi
     | Snoc (psi, (x, `P ty)) ->
-      GlobalEnv.ext (go_params psi) x @@ `P {ty; sys = []}
+      GlobalEnv.ext (go_params rst psi) x @@ `P {ty; sys = []}
     | Snoc (psi, (x, `Tw (ty0, ty1))) ->
-      GlobalEnv.ext (go_params psi) x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []})
+      GlobalEnv.ext (go_params rst psi) x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []})
+  and go_rst env =
+    function
+    | Emp -> env
+    | Snoc (rst, (r0, r1)) ->
+      go_rst (GlobalEnv.restrict r0 r1 env) rst
   in
-  ask >>= fun psi ->
-  ret @@ go_params psi
+  ask_ >>= fun (psi, rst) ->
+  ret @@ go_params rst psi
 
 let dump_state fmt str =
   get >>= fun cx ->
@@ -182,8 +192,9 @@ let in_scopes ps =
   local @@ fun ps' ->
   ps' <>< ps
 
-let under_restriction r0 r1 m =
-  failwith "TODO: under_restriction"
+let under_restriction (r0 : tm) r1 =
+  local_ @@ fun (ps, rst) ->
+  ps, rst #< (r0, r1)
 
 
 let lookup_var x w =
@@ -216,14 +227,16 @@ let lookup_meta x =
 
 
 let postpone s p =
-  ask >>= fun ps ->
+  ask_ >>= fun (ps, rst) ->
   let wrapped =
-    let rec go ps p =
-      match ps with
-      | Snoc (ps, (x, param)) ->
-        go ps @@ All (param, Dev.bind x param p)
-      | Emp -> p
-    in go ps p
+    let rec go ps rst p =
+      match ps, rst with
+      | Snoc (ps, (x, param)), rst ->
+        go ps rst @@ All (param, Dev.bind x param p)
+      | Emp, Emp -> p
+      | Emp, Snoc (rst, (r, r')) ->
+        go Emp rst @@ Restrict (r, r', p)
+    in go ps rst p
   in
   pushr @@ Q (s, wrapped)
 
