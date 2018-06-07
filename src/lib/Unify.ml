@@ -14,6 +14,10 @@ let rec telescope ty : telescope * ty =
     let x, codx = Tm.unbind cod in
     let (tel, ty) = telescope codx in
     (Emp #< (x, `P dom)) <.> tel, ty
+  | Tm.CoR (r, r', Some ty) ->
+    let x = Name.fresh () in
+    let (tel, ty) = telescope ty in
+    (Emp #< (x, `R (r, r'))) <.> tel, ty
   | _ ->
     Emp, ty
 
@@ -28,11 +32,13 @@ let rec abstract_tm xs tm =
   | _ ->
     failwith "abstract_tm"
 
-let rec abstract_ty (gm : telescope) tm =
+let rec abstract_ty (gm : telescope) cod =
   match gm with
-  | Emp -> tm
-  | Snoc (gm, (x, `P ty)) ->
-    abstract_ty gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
+  | Emp -> cod
+  | Snoc (gm, (x, `P dom)) ->
+    abstract_ty gm @@ Tm.make @@ Tm.Pi (dom, Tm.bind x cod)
+  | Snoc (gm, (_, `R (r, r'))) ->
+    abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
   | _ ->
     failwith "abstract_ty"
 
