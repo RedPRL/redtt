@@ -1,8 +1,7 @@
 open Dev
 open Contextual
-open RedBasis.Bwd
 
-type telescope = (Name.t * ty) bwd
+type telescope = params
 val telescope : ty -> telescope * ty
 val telescope_to_spine : telescope -> tm Tm.spine
 
@@ -12,7 +11,8 @@ val define : telescope -> Name.t -> ty:ty -> tm -> unit m
 
 
 val to_var : tm -> Name.t option
-val pis : telescope -> ty -> ty
+
+val abstract_ty : telescope -> ty -> ty
 
 (** Run this in a proof state to solve unification problems. *)
 val ambulando : Name.t -> unit m

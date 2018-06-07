@@ -47,16 +47,32 @@ let rec pp_tele fmt =
   | Emp ->
     ()
 
-  | Snoc (Emp, (x, ty)) ->
+  | Snoc (Emp, (x, cell)) ->
+    pp_tele_cell fmt (x, cell)
+
+  | Snoc (tele, (x, cell)) ->
+    Format.fprintf fmt "%a,@,@,%a"
+      pp_tele tele
+      pp_tele_cell (x, cell)
+
+and pp_tele_cell fmt (x, cell) =
+  match cell with
+  | `P ty ->
     Format.fprintf fmt "@[<1>%a : %a@]"
       Name.pp x
       (Tm.pp Pretty.Env.emp) ty
 
-  | Snoc (tele, (x, ty)) ->
-    Format.fprintf fmt "%a,@,@[<1>%a : %a@]"
-      pp_tele tele
+  | `Tw (ty0, ty1) ->
+    Format.fprintf fmt "@[<1>%a : %a | %a@]"
       Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
+      (Tm.pp Pretty.Env.emp) ty0
+      (Tm.pp Pretty.Env.emp) ty1
+
+  | `I ->
+    Format.fprintf fmt "@[<1>%a : dim@]"
+      Name.pp x
+
+
 
 let rec elab_sig env =
   function
@@ -74,7 +90,7 @@ and elab_decl env =
     elab_chk env {ty = cod; sys = []} e >>= fun tm ->
     let alpha = Name.named @@ Some name in
 
-    get_tele >>= fun psi ->
+    ask >>= fun psi ->
     define psi alpha cod tm >>
     ret @@ T.add name alpha env
 
@@ -104,7 +120,7 @@ and elab_chk env {ty; _} : E.echk -> tm m =
     ret @@ tmfam renv
 
   | E.Hole ->
-    get_tele >>= fun psi ->
+    ask >>= fun psi ->
     begin
       Format.printf "Hole:@, @[<v>@[<v>%a@]@;%a@,%a@]@."
         pp_tele psi

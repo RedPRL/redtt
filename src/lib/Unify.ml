@@ -6,39 +6,43 @@ open Dev
 module Notation = Monad.Notation (Contextual)
 open Notation
 
-type telescope = (Name.t * ty) bwd
+type telescope = params
 
-let rec telescope ty =
+let rec telescope ty : telescope * ty =
   match Tm.unleash ty with
   | Tm.Pi (dom, cod) ->
     let x, codx = Tm.unbind cod in
     let (tel, ty) = telescope codx in
-    (Emp #< (x, dom)) <.> tel, ty
+    (Emp #< (x, `P dom)) <.> tel, ty
   | _ ->
     Emp, ty
 
-let rec lambdas xs tm =
+let rec abstract_tm xs tm =
   match xs with
   | Emp -> tm
-  | Snoc (xs, `Var x) ->
-    lambdas xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
-  | Snoc (xs, `Dim x) ->
+  | Snoc (xs, (x, `P _)) ->
+    abstract_tm xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+  | Snoc (xs, (x, `I)) ->
     let bnd = Tm.NB ([None], Tm.close_var x (fun _ -> `Only) 0 tm) in
-    lambdas xs @@ Tm.make @@ Tm.ExtLam bnd
+    abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
+  | _ ->
+    failwith "abstract_tm"
 
-let rec pis gm tm =
+let rec abstract_ty (gm : telescope) tm =
   match gm with
   | Emp -> tm
-  | Snoc (gm, (x, ty)) ->
-    pis gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
+  | Snoc (gm, (x, `P ty)) ->
+    abstract_ty gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
+  | _ ->
+    failwith "abstract_ty"
 
-let telescope_to_spine =
+let telescope_to_spine : telescope -> tm Tm.spine =
   (* TODO: might be backwards *)
   Bwd.map @@ fun (x, _) ->
   Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
 
-let hole_named alpha gm ty f =
-  pushl (E (alpha, pis gm ty, Hole)) >>
+let hole_named alpha (gm : telescope) ty f =
+  pushl (E (alpha, abstract_ty gm ty, Hole)) >>
   let hd = Tm.Meta alpha in
   let sp = telescope_to_spine gm in
   f (hd, sp) >>= fun r ->
@@ -49,8 +53,8 @@ let hole ?debug:(debug = None) gm ty f =
   hole_named (Name.named debug) gm ty f
 
 let define gm alpha ~ty tm =
-  let ty' = pis gm ty in
-  let tm' = lambdas (Bwd.map (fun (x, _) -> `Var x) gm) tm in
+  let ty' = abstract_ty gm ty in
+  let tm' = abstract_tm gm tm in
   check ~ty:ty' tm' >>= fun b ->
   if not b then
     dump_state Format.err_formatter "Type error" >>= fun _ ->
@@ -155,41 +159,52 @@ let to_var t =
     None
 
 
-let rec spine_to_vars sp =
+let rec spine_to_tele sp =
   match sp with
   | Emp -> Some Emp
   | Snoc (sp, Tm.FunApp t) ->
     begin
       match to_var t with
-      | Some x -> Option.map (fun xs -> xs #< (`Var x)) @@ spine_to_vars sp
+      | Some x -> Option.map (fun xs -> xs #< (x, `P ())) @@ spine_to_tele sp
       | None -> None
     end
   | Snoc (sp, Tm.ExtApp ts) ->
     begin
       match opt_traverse to_var ts with
-      | Some xs -> Option.map (fun ys -> ys <>< List.map (fun x -> `Dim x) xs) @@ spine_to_vars sp
+      | Some xs -> Option.map (fun ys -> ys <>< List.map (fun x -> (x, `I)) xs) @@ spine_to_tele sp
       | None -> None
     end
   | _ -> None
 
-let linear_on t =
+let linear_on t tele =
   let fvs = Tm.free `Vars t in
+  let names = Hashtbl.create 20 in
   let rec go xs =
     match xs with
     | Emp -> true
-    | Snoc (xs, `Var x) ->
-      not (Occurs.Set.mem x fvs && List.mem (`Var x) @@ Bwd.to_list xs) && go xs
-    | Snoc (xs, `Dim x) ->
-      not (Occurs.Set.mem x fvs && List.mem (`Dim x) @@ Bwd.to_list xs) && go xs
-  in go
+    | Snoc (xs, (x, `P _)) ->
+      if Hashtbl.mem names x then false else
+        begin
+          Hashtbl.add names x ();
+          not (Occurs.Set.mem x fvs) && go xs
+        end
+    | Snoc (xs, (x, `I)) ->
+      if Hashtbl.mem names x then false else
+        begin
+          Hashtbl.add names x ();
+          not (Occurs.Set.mem x fvs) && go xs
+        end
+    | Snoc (_, _) ->
+      failwith "linear_on"
+  in go tele
 
 let invert alpha ty sp t =
   if occurs_check alpha t then
     failwith "occurs check"
   else (* alpha does not occur in t *)
-    match spine_to_vars sp with
+    match spine_to_tele sp with
     | Some xs when linear_on t xs ->
-      let lam_tm = lambdas xs t in
+      let lam_tm = abstract_tm xs t in
       local (fun _ -> Emp) begin
         check ~ty lam_tm
       end >>= fun b ->
@@ -320,11 +335,11 @@ let flex_flex_same q =
   match intersect tele sp0 sp1 with
   | Some tele' ->
     let f (hd, sp) =
-      lambdas (Bwd.map (fun (x, _) -> `Var x) tele) @@
+      abstract_tm tele @@
       let sp' = telescope_to_spine tele in
       Tm.up (hd, sp <.> sp')
     in
-    instantiate (alpha, pis tele' cod, f)
+    instantiate (alpha, abstract_ty tele' cod, f)
   | None ->
     block @@ Unify
       {q with
@@ -667,24 +682,23 @@ let rec split_sigma tele x ty =
   | Tm.Sg (dom, cod) ->
     let y, cody = Tm.unbind cod in
     let z = Name.fresh () in
-    let tele' = Bwd.map (fun (x, _) -> `Var x) tele in
     let sp_tele = telescope_to_spine tele in
 
     ret @@ Some
       ( y
-      , pis tele dom
+      , abstract_ty tele dom
       , z
-      , pis tele cody
-      , lambdas tele' @@ Tm.cons (Tm.up (Tm.Ref (y, `Only), sp_tele)) (Tm.up (Tm.Ref (z, `Only), sp_tele))
-      , ( lambdas tele' @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Car)
-        , lambdas tele' @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Cdr)
+      , abstract_ty tele cody
+      , abstract_tm tele @@ Tm.cons (Tm.up (Tm.Ref (y, `Only), sp_tele)) (Tm.up (Tm.Ref (z, `Only), sp_tele))
+      , ( abstract_tm tele @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Car)
+        , abstract_tm tele @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Cdr)
         )
       )
 
 
   | Tm.Pi (dom, cod) ->
     let y, cody = Tm.unbind cod in
-    split_sigma (tele #< (y, dom)) x cody
+    split_sigma (tele #< (y, `P dom)) x cody
 
   | _ ->
     ret None
@@ -768,13 +782,13 @@ let rec lower tele alpha ty =
       split_sigma Emp x dom >>= function
       | None ->
         let codx = Tm.unbind_with x (fun _ -> `Only) cod in
-        lower (tele #< (x, dom)) alpha codx
+        lower (tele #< (x, `P dom)) alpha codx
 
       | Some (y, ty0, z, ty1, s, (u, v)) ->
         typechecker >>= fun (module T) ->
         let module HS = HSubst (T) in
-        let vty = T.Cx.eval T.Cx.emp @@ pis tele dom in
-        let pi_ty = pis (Emp #< (y, ty0) #< (z, ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
+        let vty = T.Cx.eval T.Cx.emp @@ abstract_ty tele dom in
+        let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
         hole tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
         define tele alpha ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
