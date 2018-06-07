@@ -37,7 +37,7 @@ type con =
   | Tt : con
   | Ff : con
 
-  | Up : {ty : value; neu : neu; sys : val_sys} -> con
+  | Up : {ty : value; neu : neu; sys : rigid_val_sys} -> con
 
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
   | LblRet : value -> con
@@ -68,8 +68,7 @@ and rigid_val_face = ([`Rigid], value) face
 
 and comp_sys = rigid_abs_face list
 and val_sys = val_face list
-and box_sys = rigid_val_face list
-and cap_sys = rigid_abs_face list
+and rigid_val_sys = rigid_val_face list
 and ext_abs = (value * val_sys) Abstraction.abs
 
 and env_el = Val of value | Atom of atom
@@ -80,6 +79,8 @@ module type S =
 sig
   val make : con -> value
   val unleash : value -> con
+
+  val reflect : value -> neu -> val_sys -> value
 
   val eval : rel -> env -> Tm.tm -> value
   val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
@@ -97,7 +98,7 @@ sig
   val inst_clo : clo -> value -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
-  val unleash_sg : value -> value * clo
+  val unleash_sg : ?debug:string list -> value -> value * clo
   val unleash_v : value -> gen * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
@@ -121,12 +122,16 @@ sig
   module Macro : sig
     val equiv : value -> value -> value
   end
+
+  val base_restriction : Restriction.t
 end
 
 module type Sig =
 sig
+  val restriction : Restriction.t
+
   (** Return the type and boundary of a global variable *)
-  val lookup : Name.t -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
+  val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
 module M (Sig : Sig) : S

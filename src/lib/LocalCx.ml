@@ -62,11 +62,11 @@ struct
      qenv = Quote.Env.emp;
      tys = [];
      ppenv = Pretty.Env.emp;
-     rel = R.emp}
+     rel = V.base_restriction}
 
   let ext {env; qenv; tys; rel; ppenv} ~nm ty sys =
     let n = Quote.Env.len qenv in
-    let var = V.make @@ Val.Up {ty; neu = Val.Lvl (nm, n); sys} in
+    let var = V.reflect ty (Val.Lvl (nm, n)) sys in
     {env = Val.Val var :: env;
      tys = `Ty ty :: tys;
      qenv = Quote.Env.succ qenv;
@@ -106,7 +106,7 @@ struct
       V.eval rel env tm
     with
     | exn ->
-      Format.eprintf "Failed to evaluate: %a@." (Tm.pp ppenv) tm;
+      Format.eprintf "Failed to evaluate: %a because of %s@." (Tm.pp ppenv) tm (Printexc.to_string exn);
       raise exn
 
   let eval_cmd {env; rel; ppenv; _} cmd =

@@ -30,16 +30,18 @@ module Make (R : SOURCE) : LEXER = struct
       ("coe", COE);
       ("com", COM);
       ("cons", CONS);
-      ("define", DEFINE);
       ("hcom", HCOM);
       ("if", IF);
       ("let", LET);
       ("lam", LAM);
+      ("call", CALL);
       ("tt", TT);
       ("ff", FF);
       ("pre", PRE);
       ("kan", KAN);
       ("U", UNIV);
+      ("debug", DEBUG);
+      ("type", TYPE);
     ]
 }
 
@@ -52,9 +54,9 @@ let number =
 let whitespace =
   [' ' '\t']+
 let atom_initial =
-  [^ '0'-'9' '-' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' ' ' '\t' '\n' '\r']
+  [^ '0'-'9' '-' '?' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ',' ';' '=' '"' '`' ' ' '\t' '\n' '\r']
 let atom_subsequent =
-  [^             '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ';' '=' '"' ' ' '\t' '\n' '\r']
+  [^             '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ',' ';' '=' '"' ' ' '\t' '\n' '\r']
 
 refill {refill_handler}
 
@@ -75,12 +77,16 @@ rule token = parse
     { Lwt.return HASH }
   | '@'
     { Lwt.return AT }
+  | '`'
+    { Lwt.return BACKTICK }
   | '*'
     { Lwt.return AST }
   | "×"
     { Lwt.return TIMES }
   | ':'
     { Lwt.return COLON }
+  | ','
+    { Lwt.return COMMA }
   | ":>"
     { Lwt.return COLON_ANGLE }
   | "▷"
@@ -89,6 +95,10 @@ rule token = parse
     { Lwt.return EQUALS }
   | "->"
     { Lwt.return RIGHT_ARROW }
+  | "⇒"
+    { Lwt.return RRIGHT_ARROW }
+  | "=>"
+    { Lwt.return RRIGHT_ARROW }
   | "→"
     { Lwt.return RIGHT_ARROW }
   | "<"
@@ -97,6 +107,8 @@ rule token = parse
     { Lwt.return RGL }
   | "λ"
     { Lwt.return LAM }
+  | "?"
+    { Lwt.return QUESTION_MARK }
   | line_ending
     { new_line lexbuf; token lexbuf }
   | whitespace

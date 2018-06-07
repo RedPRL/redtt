@@ -44,7 +44,7 @@ type 'a tmf =
 and 'a head =
   | Meta of Name.t
   | Ref of Name.t * twin
-  | Ix of int
+  | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
@@ -71,16 +71,16 @@ type 'a subst =
   | Sub of 'a subst * 'a
   | Cmp of 'a subst * 'a subst
 
-let var i =
-  Ix i, Emp
+let var i tw =
+  Ix (i, tw), Emp
 
-let lift sub =
-  Sub (Cmp (sub, Proj), var 0)
+let lift sub tw =
+  Sub (Cmp (sub, Proj), var 0 tw)
 
 let rec liftn n sub =
   match n with
   | 0 -> sub
-  | _ -> liftn (n - 1) @@ lift sub
+  | _ -> liftn (n - 1) @@ lift sub `Only (* TODO *)
 
 let inst0 t = Sub (Id, t)
 
@@ -182,8 +182,8 @@ and subst_frame sub frame =
 
 and subst_head sub head =
   match head with
-  | Ix i ->
-    subst_ix sub i
+  | Ix (i, tw) ->
+    subst_ix sub i tw
 
   | Ref (a, tw) ->
     Ref (a, tw), Emp
@@ -219,23 +219,23 @@ and subst_head sub head =
     let sys = subst_comp_sys sub info.sys in
     Com {r; r'; ty; cap; sys}, Emp
 
-and subst_ix sub ix =
+and subst_ix sub ix tw =
   match sub with
   | Id ->
-    Ix ix, Emp
+    Ix (ix, tw), Emp
   | Proj ->
-    Ix (ix + 1), Emp
+    Ix (ix + 1, tw), Emp
 
   | Sub (sub, cmd) ->
-    if ix = 0 then cmd else subst_ix sub (ix - 1)
+    if ix = 0 then cmd else subst_ix sub (ix - 1) tw
 
   | Cmp (sub1, sub0) ->
     subst_cmd sub1 @@
-    subst_ix sub0 ix
+    subst_ix sub0 ix tw
 
 and subst_bnd sub bnd =
   let B (nm, t) = bnd in
-  B (nm, subst (lift sub) t)
+  B (nm, subst (lift sub `Only) t)
 
 and subst_nbnd sub bnd =
   let NB (nms, t) = bnd in
@@ -267,7 +267,11 @@ and subst_comp_face sub (r, r', obnd) =
 and subst_comp_sys sub sys =
   List.map (subst_comp_face sub) sys
 
-let make con = Tm con
+let make con =
+  match con with
+  | Up (Ix (ix, _), _) when ix < 0 -> failwith "make: Ix with negative index, wtf!!"
+  | _ -> Tm con
+
 let unleash (Tm con) = con
 
 let traverse ~f ~var ~ref =
@@ -326,8 +330,8 @@ let traverse ~f ~var ~ref =
 
   and go_hd k =
     function
-    | Ix i ->
-      var i
+    | Ix (i, tw) ->
+      var k i tw
     | Ref (a, tw) ->
       ref k (a, tw)
     | Meta a ->
@@ -412,34 +416,53 @@ let fix_traverse ~var ~ref  =
   in
   go 0
 
-let close_var a k =
-  let var i = Ix i, Emp in
-  let ref n (b, tw) = if b = a then Ix (n + k), Emp else Ref (b, tw), Emp in
+let close_var a f k =
+  let var _ i tw = Ix (i, tw), Emp in
+  let ref n (b, tw) = if b = a then Ix (n + k, f tw), Emp else Ref (b, tw), Emp in
   fix_traverse ~var ~ref
 
 let subst sub =
   let ref _ (b, tw) = Ref (b, tw), Emp in
   let rec go k (Tm tm) =
-    let var i = subst_ix (liftn k sub) i in
+    let var _ i = subst_ix (liftn k sub) i in
     Tm (traverse ~f:go ~var ~ref k tm)
   in
   go 0
 
 (* TODO: check that this isn't catastrophically wrong *)
-let open_var k a tw =
-  let var i = if i = k then Ref (a, tw), Emp else Ix i, Emp in
+let open_var k a f =
+  let var k' i tw = if i = (k + k') then Ref (a, f tw), Emp else Ix (i, tw), Emp in
   let ref _n (b, tw) = Ref (b, tw), Emp in
   fix_traverse ~var ~ref
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
-  x, open_var 0 x `Only t
+  x, open_var 0 x (fun _ -> `Only) t
 
 let unbind_with x tw (B (_, t)) =
   open_var 0 x tw t
 
+let unbindn (NB (nms, t)) =
+  let rec go nms xs t =
+    match nms with
+    | [] -> xs, t
+    | nm :: nms ->
+      let x = Name.named nm in
+      go nms (xs #< x) @@ open_var 0 x (fun _ -> `Only) t
+  in
+  go nms Emp t
+
 let bind x tx =
-  B (Some (Name.to_string x), close_var x 0 tx)
+  B (Some (Name.to_string x), close_var x (fun _ -> `Only) 0 tx)
+
+let rec bindn xs txs =
+  let rec go xs txs =
+    match xs with
+    | Emp -> txs
+    | Snoc (xs, x) ->
+      go xs @@ close_var x (fun _ -> `Only) 0 txs
+  in
+  NB (List.map (fun x -> Some (Name.to_string x)) @@ Bwd.to_list xs, go xs txs)
 
 let rec pp env fmt (Tm tm) =
   match tm with
@@ -514,7 +537,7 @@ let rec pp env fmt (Tm tm) =
       | _ ->
         Format.fprintf fmt "@[<1>{%a %a : %a}@]"
           Uuseg_string.pp_utf_8 lbl
-          (pp_terms env) (List.map snd args)
+          (pp_lbl_args env) args
           (pp env) ty
     end
 
@@ -546,7 +569,7 @@ and pp_head env fmt =
     let x, _env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env) ty (pp env) cap (pp_bsys env) sys
 
-  | Ix ix ->
+  | Ix (ix, _tw) ->
     Uuseg_string.pp_utf_8 fmt @@
     Pretty.Env.var ix env
 
@@ -585,6 +608,33 @@ and pp_cmd env fmt (hd, sp) =
   in
   (* TODO: backwards ??? *)
   go fmt sp
+
+and pp_spine env fmt sp =
+  match sp with
+  | Emp ->
+    Format.fprintf fmt "[]"
+  | Snoc (sp, f) ->
+    Format.fprintf fmt "%a; %a"
+      (pp_spine env) sp
+      (pp_frame env) f
+
+and pp_frame _ fmt =
+  function
+  | FunApp _ ->
+    Format.fprintf fmt "fun-app"
+  | ExtApp _ ->
+    Format.fprintf fmt "ext-app"
+  | Car ->
+    Format.fprintf fmt "car"
+  | Cdr ->
+    Format.fprintf fmt "cdr"
+  | _ ->
+    Format.fprintf fmt "<frame>"
+
+and pp_lbl_args env fmt args =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  let pp_arg fmt (_, tm) = pp env fmt tm in
+  Format.pp_print_list ~pp_sep pp_arg fmt args
 
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -663,8 +713,8 @@ struct
 
   let path ty tm0 tm1 =
     let ty' = subst Proj ty in
-    let face0 = up (var 0), make Dim0, Some (subst Proj tm0) in
-    let face1 = up (var 0), make Dim1, Some (subst Proj tm1) in
+    let face0 = up (var 0 `Only), make Dim0, Some (subst Proj tm0) in
+    let face1 = up (var 0 `Only), make Dim1, Some (subst Proj tm1) in
     let sys = [face0; face1] in
     make @@ Ext (NB ([None], (ty', sys)))
 
@@ -672,7 +722,7 @@ struct
     sg None ty0 @@
     path
       (subst Proj ty1)
-      (up @@ (Ix 0, Emp #< (FunApp (subst Proj f))))
+      (up @@ (Ix (0, `Only), Emp #< (FunApp (subst Proj f))))
       (subst Proj x)
 
   let proj2 = Cmp (Proj, Proj)
@@ -682,8 +732,8 @@ struct
     pi None (subst Proj ty) @@
     path
       (subst proj2 ty)
-      (up @@ var 0)
-      (up @@ var 1)
+      (up @@ var 0 `Only)
+      (up @@ var 1 `Only)
 
   let equiv ty0 ty1 =
     sg None (arr ty0 ty1) @@
@@ -692,8 +742,8 @@ struct
     fiber
       ~ty0:(subst proj2 ty0)
       ~ty1:(subst proj2 ty1)
-      ~f:(up @@ var 1)
-      ~x:(up @@ var 0)
+      ~f:(up @@ var 1 `Only)
+      ~x:(up @@ var 0 `Only)
 end
 
 module OccursAux =
@@ -712,7 +762,12 @@ struct
       go_ext_bnd fl ebnd acc
     | Up cmd ->
       go_cmd fl cmd acc
-    | Bool -> acc
+    | ExtLam nbnd ->
+      go_nbnd fl nbnd acc
+    | (Bool | Tt | Ff | Dim0 | Dim1 | Univ _) ->
+      acc
+    | Cons (t0, t1) ->
+      go fl t1 @@ go fl t0 acc
     | _ ->
       failwith "TODO"
 
@@ -783,6 +838,11 @@ struct
     let NB (_, (ty, sys)) = bnd in
     go fl ty @@ go_tm_sys fl sys acc
 
+
+  and go_nbnd fl bnd acc =
+    let NB (_, tm) = bnd in
+    go fl tm acc
+
   and go_bnd fl bnd acc =
     let B (_, tm) = bnd in
     go fl tm acc
@@ -807,6 +867,7 @@ struct
 end
 
 let free fl tm =
+  Format.eprintf "Free: %a@." (pp Pretty.Env.emp) tm;
   OccursAux.go fl tm Occurs.Set.empty
 
 module Sp =
@@ -821,15 +882,9 @@ let map_bnd (f : tm -> tm) (bnd : tm bnd) : tm bnd =
   bind x @@ f tx
 
 (* TODO: clean up *)
-let rec map_nbnd (f : tm -> tm) (nbnd : tm nbnd) : tm nbnd =
-  match nbnd with
-  | NB ([], t) ->
-    NB ([], f t)
-  | NB (nm :: nms, t) ->
-    let x = Name.fresh () in
-    let tx = open_var 0 x `Only t in
-    let NB (_, tx') = map_nbnd f (NB (nms, tx)) in
-    NB (nm :: nms, close_var x 0 tx')
+let map_nbnd (f : tm -> tm) (nbnd : tm nbnd) : tm nbnd =
+  let xs, txs = unbindn nbnd in
+  bindn xs @@ f txs
 
 
 let map_comp_face f (r, r', obnd) =
@@ -842,7 +897,7 @@ let map_head f =
   function
   | Ref (a, tw) -> Ref (a, tw)
   | Meta a -> Meta a
-  | Ix i -> Ix i
+  | Ix (i, tw) -> Ix (i, tw)
   | Down info ->
     let ty = f info.ty in
     let tm = f info.tm in
@@ -904,10 +959,10 @@ let rec map_ext_bnd f nbnd =
     NB ([], (f ty, map_tm_sys f sys))
   | NB (nm :: nms, (ty, sys)) ->
     let x = Name.fresh () in
-    let tyx = open_var 0 x `Only ty in
-    let sysx = map_tm_sys (open_var 0 x `Only) sys in
+    let tyx = open_var 0 x (fun _ -> `Only) ty in
+    let sysx = map_tm_sys (open_var 0 x (fun _ -> `Only)) sys in
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
-    NB (nm :: nms, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
+    NB (nm :: nms, (close_var x (fun _ -> `Only) 0 tyx', map_tm_sys (close_var x (fun _ -> `Only) 0) sysx'))
 
 let map_cmd f (hd, sp) =
   map_head f hd, map_spine f sp

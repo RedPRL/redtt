@@ -1,135 +1,193 @@
+(* Experimental code *)
+
 open Unify open Dev open Contextual open RedBasis open Bwd open BwdNotation
 module Notation = Monad.Notation (Contextual)
 open Notation
 
-type goal =
-  {ty : ty;
-   solve : tm -> unit m;
-   subgoal : string -> telescope -> ty -> (tm Tm.cmd -> unit m) -> unit m}
+module E = ESig
 
-let pop_goal =
-  popr >>= function
-  | E (alpha, ty, Hole) ->
-    let gm, cod = telescope ty in
-    begin
-      match Tm.unleash cod with
-      | Tm.LblTy info ->
-        let solve tm = define gm alpha ~ty:cod @@ Tm.make @@ Tm.LblRet tm in
-        let subgoal lbl gm' ty kont =
-          let ty' = Tm.make @@ Tm.LblTy {lbl; args = []; ty} in
-          hole (gm <.> gm') ty' @@ fun (hd, sp) ->
-          kont @@ (hd, sp #< Tm.LblCall)
-        in
-        ret {ty = info.ty; solve; subgoal}
-      | _ ->
-        failwith "pop_goal"
-    end
-  | _ -> failwith "No hole"
-
-let push_goal lbl gm ty kont =
-  let ty' = Tm.make @@ Tm.LblTy {lbl; args = []; ty} in
-  hole gm ty' kont
-
-let refine_pair =
-  pop_goal >>= fun goal ->
-  match Tm.unleash goal.ty with
-  | Tm.Sg (dom, Tm.B (_, cod)) ->
-    goal.subgoal "proj0" Emp dom @@ fun proj0 ->
-    let cod' = Tm.subst (Tm.Sub (Tm.Id, proj0)) cod in
-    goal.subgoal "proj1" Emp cod' @@ fun proj1 ->
-    goal.solve @@ Tm.cons (Tm.up proj0) (Tm.up proj1)
-  | _ ->
-    failwith "refine_pair"
-
-let refine_tt =
-  pop_goal >>= fun goal ->
-  match Tm.unleash goal.ty with
-  | Tm.Bool ->
-    goal.solve @@ Tm.make Tm.Tt
-  | _ ->
-    failwith "refine_tt"
-
-let refine_ff =
-  pop_goal >>= fun goal ->
-  match Tm.unleash goal.ty with
-  | Tm.Bool ->
-    goal.solve @@ Tm.make Tm.Ff
-  | _ ->
-    failwith "refine_ff"
-
-let unify_ty ty0 ty1 =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  let brack = Name.fresh () in
-  pushr @@ Bracket brack >>
-  active @@ Unify {ty0 = univ; ty1 = univ; tm0 = ty0; tm1 = ty1} >>
-  go_to_top >>
-  ambulando brack
+module T = Map.Make (String)
 
 
-let soft_ff =
-  pop_goal >>= fun goal ->
-  unify_ty goal.ty @@ Tm.make Tm.Bool >>
-  goal.solve @@ Tm.make Tm.Ff
+let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre
+
+let get_tele =
+  ask >>= fun psi ->
+  let go (x, p) =
+    match p with
+    | `P ty -> x, ty
+    | _ -> failwith "get_tele"
+  in
+  ret @@ Bwd.map go psi
+
+let get_resolver env =
+  let rec go_globals renv  =
+    function
+    | [] -> renv
+    | (name, x) :: env ->
+      let renvx = ResEnv.global name x renv in
+      go_globals renvx env
+  in
+  let rec go_locals renv =
+    function
+    | Emp -> go_globals renv @@ T.bindings env
+    | Snoc (psi, (x, _)) ->
+      let renvx = ResEnv.global (Name.to_string x) x renv in
+      go_locals renvx psi
+  in
+  ask >>= fun psi ->
+  ret @@ go_locals ResEnv.init psi
 
 
-let refine_lam nm =
-  pop_goal >>= fun goal ->
-  match Tm.unleash goal.ty with
-  | Tm.Pi (dom, cod) ->
-    let x = Name.named @@ Some nm in
-    let codx = Tm.unbind_with x `Only cod in
-    goal.subgoal "body" (Emp #< (x, dom)) codx @@ fun bdyx ->
-    goal.solve @@ Tm.make @@ Tm.Lam (Tm.bind x @@ Tm.up bdyx)
-  | _ ->
-    failwith "refine_lam"
+type goal = {ty : ty; sys : (tm, tm) Tm.system}
 
-type eterm =
-  | Pair of eterm * eterm
-  | Lam of string * eterm
-  | Tt
-  | Ff
-  | Underscore
 
-let rec elab =
+let rec pp_tele fmt =
   function
-  | Tt ->
-    refine_tt
+  | Emp ->
+    ()
 
-  | Ff ->
-    refine_tt
+  | Snoc (Emp, (x, cell)) ->
+    pp_tele_cell fmt (x, cell)
 
-  | Pair (e0, e1) ->
-    refine_pair >>
-    elab e0 >>
-    go_right >>
-    elab e1 >>
-    go_right
+  | Snoc (tele, (x, cell)) ->
+    Format.fprintf fmt "%a,@,@,%a"
+      pp_tele tele
+      pp_tele_cell (x, cell)
 
-  | Lam (x, e) ->
-    refine_lam x >>
-    elab e
+and pp_tele_cell fmt (x, cell) =
+  match cell with
+  | `P ty ->
+    Format.fprintf fmt "@[<1>%a : %a@]"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty
 
-  | Underscore ->
-    go_right
+  | `Tw (ty0, ty1) ->
+    Format.fprintf fmt "@[<1>%a : %a | %a@]"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty0
+      (Tm.pp Pretty.Env.emp) ty1
 
-let make_goal_ty lbl ty =
-  Tm.make @@ Tm.LblTy {lbl; args = []; ty}
+  | `I ->
+    Format.fprintf fmt "@[<1>%a : dim@]"
+      Name.pp x
 
-let test_script : unit m =
-  (* let bool = Tm.make Tm.Bool in *)
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  (* let ty = make_goal_ty "fun" @@ Tm.Macro.arr bool @@ Tm.sg None bool bool in *)
-  begin
-    hole Emp (make_goal_ty "ty" univ) @@ fun (hd, sp) ->
-    hole Emp (make_goal_ty "el" @@ Tm.up (hd, sp #< Tm.LblCall)) @@ fun _ ->
+  | `R (r0, r1) ->
+    Format.fprintf fmt "@[<1>%a = %a@]"
+      (Tm.pp Pretty.Env.emp) r0
+      (Tm.pp Pretty.Env.emp) r1
+
+
+let rec elab_sig env =
+  function
+  | [] ->
     ret ()
-  end >>
-  (* dump_state Format.std_formatter >> *)
-  begin
-    go_right >>
-    soft_ff
-    (* elab @@ Lam ("x", Pair (Tt, Underscore)) *)
-  end >>
-  dump_state Format.std_formatter "result"
+  | dcl :: esig ->
+    elab_decl env dcl >>= fun env' ->
+    ambulando (Name.fresh ()) >>
+    elab_sig env' esig
 
-(* dump_state Format.std_formatter *)
+and elab_decl env =
+  function
+  | E.Define (name, scheme, e) ->
+    elab_scheme env scheme @@ fun cod ->
+    elab_chk env {ty = cod; sys = []} e >>= fun tm ->
+    let alpha = Name.named @@ Some name in
+
+    ask >>= fun psi ->
+    define psi alpha cod tm >>
+    ret @@ T.add name alpha env
+
+  | E.Debug ->
+    dump_state Format.std_formatter "debug" >>
+    ret env
+
+and elab_scheme env (cells, ecod) kont =
+  let rec go gm =
+    function
+    | [] ->
+      elab_chk env {ty = univ; sys = []} ecod >>= fun cod ->
+      kont cod
+    | (name, edom) :: cells ->
+      elab_chk env {ty = univ; sys = []} edom >>= fun dom ->
+      let x = Name.named @@ Some name in
+      in_scope x (`P dom) @@
+      go (gm #< (x, dom)) cells
+  in
+  go Emp cells
+
+and elab_chk env {ty; _} : E.echk -> tm m =
+  function
+  | E.Quo tmfam ->
+    get_resolver env >>= fun renv ->
+    (* TODO: unify with boundary *)
+    ret @@ tmfam renv
+
+  | E.Hole ->
+    ask >>= fun psi ->
+    begin
+      Format.printf "Hole:@, @[<v>@[<v>%a@]@;%a@,%a@]@."
+        pp_tele psi
+        Uuseg_string.pp_utf_8 "⊢"
+        (Tm.pp Pretty.Env.emp) ty;
+
+      hole psi ty @@ fun tm -> ret tm
+    end >>= fun tm ->
+    go_right >>
+    ret @@ Tm.up tm
+
+  | E.Lam (names, e) ->
+    begin
+      match names with
+      | [] ->
+        elab_chk env {ty; sys = []} e
+      | name :: names ->
+        let x = Name.named @@ Some name in
+        match Tm.unleash ty with
+        | Tm.Pi (dom, cod) ->
+          let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+          in_scope x (`P dom) begin
+            elab_chk env {ty = codx; sys = []} @@
+            E.Lam (names, e)
+          end >>= fun bdyx ->
+          ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
+
+        | _ ->
+          failwith "lam"
+    end
+
+  | Tuple es ->
+    begin
+      match es with
+      | [] ->
+        failwith "empty tuple"
+      | [e] ->
+        elab_chk env {ty; sys = []} e
+      | e :: es ->
+        begin
+          match Tm.unleash ty with
+          | Tm.Sg (dom, cod) ->
+            elab_chk env {ty = dom; sys = []} e >>= fun tm0 ->
+            typechecker >>= fun (module T) ->
+            let module HS = HSubst (T) in
+            let vdom = T.Cx.eval T.Cx.emp dom in
+            let cod' = HS.inst_ty_bnd cod (vdom, tm0) in
+            elab_chk env {ty = cod'; sys = []} (Tuple es) >>= fun tm1 ->
+            ret @@ Tm.cons tm0 tm1
+          | _ ->
+            failwith "pair"
+        end
+    end
+
+  | Type ->
+    begin
+      match Tm.unleash ty with
+      | Tm.Univ _ ->
+        ret @@ Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0)
+      | _ ->
+        failwith "Type"
+    end
+
+
+  | _ ->
+    failwith "TODO"

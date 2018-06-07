@@ -2,25 +2,26 @@ open Dev
 open RedBasis
 open Bwd open BwdNotation
 
-type cx_l = entry bwd
-type cx_r = entry list
+type lcx = entry bwd
+type rcx = entry list
 
-type cx = cx_l * cx_r
+type env = GlobalEnv.t
+type cx = {env : env; lcx : lcx; rcx : rcx}
 
 
-let rec pp_cx_l fmt =
+let rec pp_lcx fmt =
   function
   | Emp ->
     ()
   | Snoc (Emp, e) ->
-    Format.fprintf fmt "@[<1>%a@]"
+    Format.fprintf fmt "@[<v>%a@]"
       pp_entry e
   | Snoc (cx, e) ->
-    Format.fprintf fmt "%a;@; @[<1>%a@]"
-      pp_cx_l cx
+    Format.fprintf fmt "%a;@;@;@[<v>%a@]"
+      pp_lcx cx
       pp_entry e
 
-let rec pp_cx_r fmt =
+let rec pp_rcx fmt =
   function
   | [] ->
     ()
@@ -28,14 +29,14 @@ let rec pp_cx_r fmt =
     Format.fprintf fmt "@[<1>%a@]"
       pp_entry e
   | e :: cx ->
-    Format.fprintf fmt "@[<1>%a@];@; %a"
+    Format.fprintf fmt "@[<1>%a@];@;@;%a"
       pp_entry e
-      pp_cx_r cx
+      pp_rcx cx
 
-let pp_cx fmt (lcx, rcx) =
-  Format.fprintf fmt "@[<1>%a@] |@ @[<1>%a@]"
-    pp_cx_l lcx
-    pp_cx_r rcx
+let pp_cx fmt {lcx; rcx} =
+  Format.fprintf fmt "@[<v>%a@] |@ @[<v>%a@]"
+    pp_lcx lcx
+    pp_rcx rcx
 
 
 module M =
@@ -70,22 +71,36 @@ let get _ cx = cx, cx
 
 let modify f _ cx = f cx, ()
 
-let getl = fst <@> get
-let getr = snd <@> get
-let modifyl f = modify @@ fun (l, r) -> f l, r
-let modifyr f = modify @@ fun (l, r) -> l, f r
+let getl = (fun x -> x.lcx) <@> get
+let getr = (fun x -> x.rcx) <@> get
+let modifyl f = modify @@ fun st -> {st with lcx = f st.lcx}
+let modifyr f = modify @@ fun st -> {st with rcx = f st.rcx}
 let setl l = modifyl @@ fun _ -> l
 let setr r = modifyr @@ fun _ -> r
-let pushl e = modifyl @@ fun es -> es #< e
-let pushr e = modifyr @@ fun es -> e :: es
 
-let dump_state fmt str =
-  get >>= fun cx ->
-  Format.fprintf fmt "%s@.%a@.@." str pp_cx cx;
-  ret ()
+let update_env e =
+  modify @@ fun st ->
+  let env =
+    match e with
+    | E (nm, ty, Hole) ->
+      GlobalEnv.ext st.env nm @@ `P {ty; sys = []}
+    | E (nm, ty, Defn t) ->
+      GlobalEnv.define st.env nm ty t
+    | _ ->
+      st.env
+  in
+  {st with env}
+
+let pushl e =
+  modifyl (fun es -> es #< e) >>
+  update_env e
+
+let pushr e =
+  modifyr (fun es -> e :: es) >>
+  update_env e
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp (Emp, []) in
+  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []} in
   r
 
 let rec pushls es =
@@ -101,30 +116,31 @@ let popl =
   | _ -> failwith "popl: empty"
 
 
-
-let cx_core : cx_l -> GlobalCx.t =
-  let rec go es =
-    match es with
-    | Emp -> GlobalCx.emp
-    | Snoc (es, e) ->
-      match e with
-      | E (x, ty, Hole) ->
-        let cx = go es in
-        GlobalCx.add_hole cx x ty []
-      | E (x, ty, Defn t) ->
-        let cx = go es in
-        GlobalCx.define cx x ty t
-      | Q _ ->
-        go es
-      | Bracket _ ->
-        go es
+let get_global_env =
+  get >>= fun st ->
+  let rec go_params =
+    function
+    | Emp -> st.env
+    | Snoc (psi, (_, `I)) ->
+      go_params psi
+    | Snoc (psi, (x, `P ty)) ->
+      GlobalEnv.ext (go_params psi) x @@ `P {ty; sys = []}
+    | Snoc (psi, (x, `Tw (ty0, ty1))) ->
+      GlobalEnv.ext (go_params psi) x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []})
+    | Snoc (psi, (_, `R (r0, r1))) ->
+      GlobalEnv.restrict r0 r1 (go_params psi)
   in
-  go
+  ask >>= fun psi ->
+  ret @@ go_params psi
+
+let dump_state fmt str =
+  get >>= fun cx ->
+  Format.fprintf fmt "%s@.@[<v>%a@]@.@." str pp_cx cx;
+  ret ()
 
 
 let popr_opt =
-  getl >>= fun lcx ->
-  let sub = cx_core lcx in
+  get_global_env >>= fun sub ->
   getr >>= function
   | e :: mcx ->
     setr mcx >>
@@ -151,23 +167,35 @@ let go_right =
   popr >>= pushl
 
 let go_to_top =
-  get >>= fun (lcx, rcx) ->
+  get >>= fun {lcx; rcx} ->
   setl Emp >>
   setr (lcx <>> rcx)
+
+let go_to_bottom =
+  get >>= fun {lcx; rcx} ->
+  setl (lcx <>< rcx) >>
+  setr []
 
 let in_scope x p =
   local @@ fun ps ->
   ps #< (x, p)
 
+let in_scopes ps =
+  local @@ fun ps' ->
+  ps' <>< ps
+
+let under_restriction r0 r1 =
+  in_scope (Name.fresh ()) @@ `R (r0, r1)
+
 
 let lookup_var x w =
   let rec go gm =
     match w, gm with
-    | `Only, Snoc (gm, (y, P ty)) ->
+    | `Only, Snoc (gm, (y, `P ty)) ->
       if x = y then M.ret ty else go gm
-    | `TwinL, Snoc (gm, (y, Tw (ty0, _))) ->
+    | `TwinL, Snoc (gm, (y, `Tw (ty0, _))) ->
       if x = y then M.ret ty0 else go gm
-    | `TwinR, Snoc (gm, (y, Tw (_, ty1))) ->
+    | `TwinR, Snoc (gm, (y, `Tw (_, ty1))) ->
       if x = y then M.ret ty1 else go gm
     | _, Snoc (gm, _) ->
       go gm
@@ -194,9 +222,10 @@ let postpone s p =
   let wrapped =
     let rec go ps p =
       match ps with
-      | Snoc (ps, (x, e)) ->
-        go ps @@ All (e, Dev.bind x p)
-      | Emp -> p
+      | Emp ->
+        p
+      | Snoc (ps, (x, param)) ->
+        go ps @@ All (param, Dev.bind x param p)
     in go ps p
   in
   pushr @@ Q (s, wrapped)
@@ -206,11 +235,9 @@ let active = postpone Active
 let block = postpone Blocked
 
 
-
 let typechecker : (module Typing.S) m =
-  getl >>= fun entries ->
-  let globals = cx_core entries in
-  let module G = struct let globals = globals end in
+  get_global_env >>= fun env ->
+  let module G = struct let globals = env end in
   let module T = Typing.M (G) in
   ret @@ (module T : Typing.S)
 
@@ -235,5 +262,15 @@ let check_eq ~ty tm0 tm1 =
     T.Cx.check_eq lcx ~ty:vty el0 el1;
     ret true
   with
+  | _ ->
+    ret false
+
+let check_eq_dim tr0 tr1 =
+  typechecker >>= fun (module T) ->
+  let r0 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr0 in
+  let r1 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr1 in
+  match Dim.compare r0 r1 with
+  | Same ->
+    ret true
   | _ ->
     ret false

@@ -3,7 +3,14 @@ struct
   type t = int * string list
 
   let emp = 0, []
-  let var i (_, xs) = List.nth xs i
+  let var i (_, xs) =
+    try
+      List.nth xs i
+    with
+    | _ ->
+      "{" ^ string_of_int i ^ "}"
+  (* failwith "Pretty printer: tried to resolve bound variable out of range" *)
+
   let bind_fresh (i, xs) =
     let x = "x" ^ string_of_int i in
     x, (i + 1, x :: xs)

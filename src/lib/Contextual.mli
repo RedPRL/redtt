@@ -17,10 +17,14 @@ val pushr : entry -> unit m
 val pushls : entry list -> unit m
 
 val go_to_top : unit m
+val go_to_bottom : unit m
 val go_left : unit m
 val go_right : unit m
 
-val in_scope : Name.t -> param -> 'a m -> 'a m
+val in_scope : Name.t -> ty param -> 'a m -> 'a m
+val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
+val under_restriction : tm -> tm -> 'a m -> 'a m
+
 val lookup_var : Name.t -> twin -> ty m
 val lookup_meta : Name.t -> ty m
 
@@ -31,8 +35,10 @@ val block : problem -> unit m
 
 val check : ty:ty -> tm -> bool m
 val check_eq : ty:ty -> tm -> tm -> bool m
+val check_eq_dim : tm -> tm -> bool m
 
 
+val get_global_env : Subst.t m
 val typechecker : (module Typing.S) m
 
 val dump_state : Format.formatter -> string -> unit m

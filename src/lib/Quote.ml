@@ -128,7 +128,7 @@ struct
         let var = generic env pi0.dom in
         let vcod0 = inst_clo pi0.cod var in
         let vcod1 = inst_clo pi1.cod var in
-        let cod = equate env ty vcod0 vcod1 in
+        let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi None dom cod
 
       | Sg sg0, Sg sg1 ->
@@ -136,7 +136,7 @@ struct
         let var = generic env sg0.dom in
         let vcod0 = inst_clo sg0.cod var in
         let vcod1 = inst_clo sg1.cod var in
-        let cod = equate env ty vcod0 vcod1 in
+        let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.sg None dom cod
 
       | Ext abs0, Ext abs1 ->
@@ -198,7 +198,8 @@ struct
     match neu0, neu1 with
     | Lvl (_, l0), Lvl (_, l1) ->
       if l0 = l1 then
-        Tm.Ix (Env.ix_of_lvl l0 env), Bwd.from_list stk
+        (* TODO: twin *)
+        Tm.Ix (Env.ix_of_lvl l0 env, `Only), Bwd.from_list stk
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
     | Ref (nm0, tw0), Ref (nm1, tw1) ->
@@ -245,7 +246,7 @@ struct
     | LblCall neu0, LblCall neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
     | _ ->
-      Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1;
+      (* Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1; *)
       failwith "equate_neu"
 
   and equate_neu env neu0 neu1 =
@@ -341,7 +342,7 @@ struct
     | Dim.Atom x ->
       try
         let ix = Env.ix_of_atom x env in
-        Tm.up @@ Tm.var ix
+        Tm.up @@ Tm.var ix `Only
       with
       | _ ->
         Tm.up (Tm.Ref (x, `Only), Emp)
@@ -368,14 +369,14 @@ struct
       let var = generic env pi0.dom in
       let vcod0 = inst_clo pi0.cod var in
       let vcod1 = inst_clo pi1.cod var in
-      subtype env vcod0 vcod1
+      subtype (Env.succ env) vcod0 vcod1
 
     | Sg sg0, Sg sg1 ->
       subtype env sg0.dom sg1.dom;
       let var = generic env sg0.dom in
       let vcod0 = inst_clo sg0.cod var in
       let vcod1 = inst_clo sg1.cod var in
-      subtype env vcod0 vcod1
+      subtype (Env.succ env) vcod0 vcod1
 
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
@@ -418,14 +419,22 @@ struct
       equiv_ty env ty0 ty1
 
   and approx_restriction env ty0 ty1 sys0 sys1 =
+    (* A semantic indeterminate of the first type *)
     let gen = generic env ty0 in
+
     let check_face ty face =
       match face with
       | Face.True (_, _, v) ->
+        (* In this case, we need to see that the indeterminate is already equal to the face *)
         begin try equiv env ~ty gen v; true with _ -> false end
+
       | Face.False _ ->
-        true
+        (* This one is vacuous *)
+        false
+
       | Face.Indet (p, v) ->
+        (* In this case, we check that the semantic indeterminate will become equal to the face under the
+           stipulated restriction. *)
         let r, r' = DimStar.unleash p in
         let gen_rr' = Val.act (Dim.equate r r') gen in
         let ty_rr' = Val.act (Dim.equate r r') ty in

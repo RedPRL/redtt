@@ -3,33 +3,70 @@
   open RedBasis
   open Bwd
   open BwdNotation
+  module E = ESig
   module R = ResEnv
 %}
 
 %token <int> NUMERAL
 %token <string> ATOM
-%token DEFINE
 %token LSQ RSQ LPR RPR LGL RGL
-%token COLON COLON_ANGLE
+%token COLON COLON_ANGLE COMMA
 %token EQUALS
-%token RIGHT_ARROW
-%token AST TIMES HASH AT
-%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET
-%token PRE KAN
+%token RIGHT_ARROW RRIGHT_ARROW
+%token AST TIMES HASH AT BACKTICK QUESTION_MARK
+%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
+%token TYPE PRE KAN
 %token EOF
 
-%start <ResEnv.t -> Decl.t list> prog
+%start <ESig.esig> esig
 %%
-prog:
-  | LPR; DEFINE; name = ATOM; args = tele_with_env; COLON_ANGLE; body = tm; _rpr = RPR; p = prog
-    { fun env ->
-      let tele, env_bdy = args env in
-      let info = $startpos, $endpos(_rpr) in
-      let decl = Decl.Define {name; info; args = tele; body = body env_bdy} in
-      let env' = R.bind name env in
-      decl :: p env' }
+
+edecl:
+  | LET; a = ATOM; sch = escheme; RRIGHT_ARROW; tm = echk
+    { E.Define (a, sch, tm) }
+  | DEBUG
+    { E.Debug }
+
+echk:
+  | BACKTICK; t = tm
+    { E.Quo t }
+  | QUESTION_MARK
+    { E.Hole }
+  | TYPE
+    { E.Type }
+  | LAM; xs = list(ATOM); RIGHT_ARROW; e = echk
+    { E.Lam (xs, e) }
+  | LGL; es = separated_list(COMMA, echk); RGL
+    { E.Tuple es }
+  | e = einf
+    { E.Up e }
+
+escheme:
+  | tele = list(escheme_cell); COLON; cod = echk
+    { (tele, cod) }
+
+escheme_cell:
+  | LSQ; a = ATOM; COLON; ty = echk; RSQ
+    { (a, ty) }
+
+einf:
+  | a = ATOM;
+    { E.Var a }
+
+esig:
+  | d = edecl; esig = esig
+    { d :: esig }
   | EOF
-    { fun _env -> [] }
+    { [] }
+
+
+
+
+
+
+
+
+
 
 tele_with_env:
   | dom = tm; rest = tele_with_env
@@ -165,7 +202,9 @@ tm:
 head:
   | a = ATOM
     { fun env ->
-      Tm.Ix (R.get a env) }
+      match R.get a env with
+      | `Ix i -> Tm.Ix (i, `Only)
+      | `Ref r -> Tm.Ref (r, `Only) }
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->
       Tm.HCom {r = r0 env; r' = r1 env; ty = ty env; cap = cap env; sys = sys env} }
@@ -193,6 +232,11 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.Cdr }
+
+  | LPR; CALL; e = cut; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, fs #< Tm.LblCall }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->

@@ -6,47 +6,64 @@ open Dev
 module Notation = Monad.Notation (Contextual)
 open Notation
 
-type telescope = (Name.t * ty) bwd
+type telescope = params
 
-let rec telescope ty =
+let rec telescope ty : telescope * ty =
   match Tm.unleash ty with
   | Tm.Pi (dom, cod) ->
     let x, codx = Tm.unbind cod in
     let (tel, ty) = telescope codx in
-    (Emp #< (x, dom)) <.> tel, ty
+    (Emp #< (x, `P dom)) <.> tel, ty
   | _ ->
     Emp, ty
 
-let rec lambdas xs tm =
+let rec abstract_tm xs tm =
   match xs with
   | Emp -> tm
-  | Snoc (xs, x) ->
-    lambdas xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+  | Snoc (xs, (x, `P _)) ->
+    abstract_tm xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+  | Snoc (xs, (x, `I)) ->
+    let bnd = Tm.NB ([None], Tm.close_var x (fun _ -> `Only) 0 tm) in
+    abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
+  | _ ->
+    failwith "abstract_tm"
 
-let rec pis gm tm =
+let rec abstract_ty (gm : telescope) tm =
   match gm with
   | Emp -> tm
-  | Snoc (gm, (x, ty)) ->
-    pis gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
+  | Snoc (gm, (x, `P ty)) ->
+    abstract_ty gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
+  | _ ->
+    failwith "abstract_ty"
 
-let telescope_to_spine =
+let telescope_to_spine : telescope -> tm Tm.spine =
   (* TODO: might be backwards *)
   Bwd.map @@ fun (x, _) ->
   Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
 
-let hole gm ty f =
-  let alpha = Name.fresh () in
-  pushl (E (alpha, pis gm ty, Hole)) >>
+let hole_named alpha (gm : telescope) ty f =
+  pushl (E (alpha, abstract_ty gm ty, Hole)) >>
   let hd = Tm.Meta alpha in
   let sp = telescope_to_spine gm in
   f (hd, sp) >>= fun r ->
   go_left >>
   ret r
 
+let hole ?debug:(debug = None) gm ty f =
+  hole_named (Name.named debug) gm ty f
+
 let define gm alpha ~ty tm =
-  let ty' = pis gm ty in
-  let tm' = lambdas (Bwd.map fst gm) tm in
-  pushr @@ E (alpha, ty', Defn tm')
+  let ty' = abstract_ty gm ty in
+  let tm' = abstract_tm gm tm in
+  check ~ty:ty' tm' >>= fun b ->
+  if not b then
+    dump_state Format.err_formatter "Type error" >>= fun _ ->
+    begin
+      Format.eprintf "error checking: %a : %a@." (Tm.pp Pretty.Env.emp) tm' (Tm.pp Pretty.Env.emp) ty';
+      failwith "define: type error"
+    end
+  else
+    pushr @@ E (alpha, ty', Defn tm')
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)
@@ -55,6 +72,21 @@ let occurs_check alpha tm =
   Tm.free `Metas tm
 
 
+let rec opt_traverse f xs =
+  match xs with
+  | [] -> Some []
+  | x::xs ->
+    match f x with
+    | Some y -> Option.map (fun ys -> y :: ys) @@ opt_traverse f xs
+    | None -> None
+
+
+let as_plain_var t =
+  match Tm.unleash t with
+  | Tm.Up (Tm.Ref (x, _), Emp) ->
+    Some x
+  | _ ->
+    None
 
 (* A very crappy eta contraction function. It's horrific that this is actually a thing that we do! *)
 let rec eta_contract t =
@@ -66,8 +98,8 @@ let rec eta_contract t =
       match Tm.unleash tm'y with
       | Tm.Up (Tm.Ref (f, twf), Snoc (sp, Tm.FunApp arg)) ->
         begin
-          match Tm.unleash arg with
-          | Tm.Up (Tm.Ref (y', _), Emp)
+          match as_plain_var arg with
+          | Some y'
             when
               y = y'
               && not @@ Occurs.Set.mem y @@ Tm.Sp.free `Vars sp
@@ -79,6 +111,27 @@ let rec eta_contract t =
       | _ ->
         Tm.make @@ Tm.Lam (Tm.bind y tm'y)
     end
+
+  | Tm.ExtLam nbnd ->
+    let ys, tmys = Tm.unbindn nbnd in
+    let tm'ys = eta_contract tmys in
+    begin
+      match Tm.unleash tm'ys with
+      | Tm.Up (Tm.Ref (p, twp), Snoc (sp, Tm.ExtApp args)) ->
+        begin
+          match opt_traverse as_plain_var args with
+          | Some y's
+            when Bwd.to_list ys = y's
+            (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)
+            ->
+            Tm.up (Tm.Ref (p, twp), sp)
+          | _ ->
+            Tm.make @@ Tm.ExtLam (Tm.bindn ys tm'ys)
+        end
+      | _ ->
+        Tm.make @@ Tm.ExtLam (Tm.bindn ys tm'ys)
+    end
+
 
   | Tm.Cons (t0, t1) ->
     let t0' = eta_contract t0 in
@@ -102,41 +155,64 @@ let to_var t =
   | Tm.Up (Tm.Ref (a, _), Emp) ->
     Some a
   | _ ->
+    Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t;
     None
 
-let rec spine_to_vars sp =
+
+let rec spine_to_tele sp =
   match sp with
   | Emp -> Some Emp
   | Snoc (sp, Tm.FunApp t) ->
     begin
       match to_var t with
-      | Some x -> Option.map (fun xs -> xs #< x) @@ spine_to_vars sp
+      | Some x -> Option.map (fun xs -> xs #< (x, `P ())) @@ spine_to_tele sp
+      | None -> None
+    end
+  | Snoc (sp, Tm.ExtApp ts) ->
+    begin
+      match opt_traverse to_var ts with
+      | Some xs -> Option.map (fun ys -> ys <>< List.map (fun x -> (x, `I)) xs) @@ spine_to_tele sp
       | None -> None
     end
   | _ -> None
 
-let linear_on t =
+let linear_on t tele =
   let fvs = Tm.free `Vars t in
+  let names = Hashtbl.create 20 in
   let rec go xs =
     match xs with
     | Emp -> true
-    | Snoc (xs, x) ->
-      not (Occurs.Set.mem x fvs && List.mem x @@ Bwd.to_list xs) && go xs
-  in go
+    | Snoc (xs, (x, `P _)) ->
+      if Hashtbl.mem names x then false else
+        begin
+          Hashtbl.add names x ();
+          not (Occurs.Set.mem x fvs) && go xs
+        end
+    | Snoc (xs, (x, `I)) ->
+      if Hashtbl.mem names x then false else
+        begin
+          Hashtbl.add names x ();
+          not (Occurs.Set.mem x fvs) && go xs
+        end
+    | Snoc (_, _) ->
+      failwith "linear_on"
+  in go tele
 
 let invert alpha ty sp t =
   if occurs_check alpha t then
     failwith "occurs check"
   else (* alpha does not occur in t *)
-    match spine_to_vars sp with
+    match spine_to_tele sp with
     | Some xs when linear_on t xs ->
-      let lam_tm = lambdas xs t in
+      let lam_tm = abstract_tm xs t in
       local (fun _ -> Emp) begin
-        check ~ty lam_tm >>
-        ret true
+        check ~ty lam_tm
       end >>= fun b ->
       ret @@ if b then Some lam_tm else None
     | _ ->
+      Format.eprintf "Invert: nope %a @.@."
+        (Tm.pp_spine Pretty.Env.emp) sp
+      ;
       ret None
 
 let try_invert q ty =
@@ -162,12 +238,15 @@ let rec flex_term ~deps q =
     begin
       match e with
       | E (beta, _, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+        Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q;
         pushls (e :: deps) >>
         block (Unify q)
       | E (beta, ty, Hole) when alpha = beta ->
+        Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q;
         pushls deps >>
         try_invert q ty <||
         begin
+          Format.eprintf "flex_term failed to invert.@.";
           block (Unify q) >>
           pushl e
         end
@@ -177,8 +256,10 @@ let rec flex_term ~deps q =
           || Occurs.Set.mem beta (Entries.free `Metas deps)
           || Occurs.Set.mem beta (Equation.free `Metas q)
         ->
+        Format.eprintf "flex_term/3: @[<1>%a@]@." Equation.pp q;
         flex_term ~deps:(e :: deps) q
       | _ ->
+        Format.eprintf "flex_term/4: @[<1>%a@]@." Equation.pp q;
         pushr e >>
         flex_term ~deps q
     end
@@ -254,11 +335,11 @@ let flex_flex_same q =
   match intersect tele sp0 sp1 with
   | Some tele' ->
     let f (hd, sp) =
-      lambdas (Bwd.map fst tele) @@
+      abstract_tm tele @@
       let sp' = telescope_to_spine tele in
       Tm.up (hd, sp <.> sp')
     in
-    instantiate (alpha, pis tele' cod, f)
+    instantiate (alpha, abstract_ty tele' cod, f)
   | None ->
     block @@ Unify
       {q with
@@ -268,12 +349,6 @@ let flex_flex_same q =
 let try_prune _q =
   (* TODO: implement pruning *)
   ret false
-
-let normalize (module T : Typing.S) ~ty tm =
-  let lcx = T.Cx.emp in
-  let vty = T.Cx.eval lcx ty in
-  let el = T.Cx.eval lcx tm in
-  ret @@ T.Cx.quote lcx ~ty:vty el
 
 
 (* This is all so horrible because we don't have hereditary-substitution-style operations
@@ -301,6 +376,7 @@ struct
     let vty = T.Cx.Eval.inst_clo ty_clo varg in
     T.Cx.quote T.Cx.emp ~ty:vty el
 
+
   let plug (ty, tm) frame =
     match Tm.unleash tm, frame with
     | Tm.Up (hd, sp), _ ->
@@ -308,21 +384,24 @@ struct
     | Tm.Lam bnd, Tm.FunApp arg ->
       let dom, cod = T.Cx.Eval.unleash_pi ty in
       inst_bnd (cod, bnd) (dom, arg)
-    | _, Tm.ExtApp _ ->
-      failwith "TODO: %%/ExtApp"
+    | Tm.ExtLam _, Tm.ExtApp args ->
+      let vargs = List.map (fun x -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp x) args in
+      let ty, _ = T.Cx.Eval.unleash_ext ty vargs in
+      let vlam = T.Cx.eval T.Cx.emp tm in
+      let vapp = T.Cx.Eval.ext_apply vlam vargs in
+      T.Cx.quote T.Cx.emp ~ty vapp
     | Tm.Cons (t0, _), Tm.Car -> t0
     | Tm.Cons (_, t1), Tm.Cdr -> t1
     | Tm.LblRet t, Tm.LblCall -> t
     | Tm.Tt, Tm.If info -> info.tcase
     | Tm.Ff, Tm.If info -> info.fcase
-    | _ -> failwith "TODO: %%"
+    | _ -> failwith "TODO: plug"
 
   (* TODO: this sorry attempt results in things getting repeatedly evaluated *)
   let (%%) (ty, tm) frame =
     let vty = T.Cx.eval T.Cx.emp ty in
     let tm' = plug (vty, tm) frame in
-    let el = T.Cx.eval T.Cx.emp tm' in
-    let vty' = T.infer_frame T.Cx.emp ~ty:vty ~hd:el frame in
+    let vty' = T.infer_frame T.Cx.emp ~ty:vty ~hd:(T.Cx.eval T.Cx.emp tm) frame in
     let ty' = T.Cx.quote_ty T.Cx.emp vty' in
     ty', tm'
 end
@@ -388,11 +467,11 @@ let is_orthogonal q =
   | _ -> false
 
 let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
-  typechecker >>= fun (module T) ->
-  let module HSubst = HSubst (T) in
   let rec go sp0 sp1 =
     match sp0, sp1 with
     | Emp, Emp ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       if x0 = x1 then
         lookup_var x0 tw0 >>= fun ty0 ->
         lookup_var x1 tw1 >>= fun ty1 ->
@@ -404,6 +483,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 
     | Snoc (sp0, Tm.FunApp t0), Snoc (sp1, Tm.FunApp t1) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       let dom0, cod0 = T.Cx.Eval.unleash_pi ty0 in
       let dom1, cod1 = T.Cx.Eval.unleash_pi ty1 in
       let tdom0 = T.Cx.quote_ty T.Cx.emp dom0 in
@@ -413,31 +494,52 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let cod0t1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval T.Cx.emp t1 in
       ret (cod0t0, cod0t1)
 
+    | Snoc (sp0, Tm.ExtApp ts0), Snoc (sp1, Tm.ExtApp ts1) ->
+      go sp0 sp1 >>= fun (ty0, ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
+      let rs0 = List.map (fun t -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp t) ts0 in
+      let rs1 = List.map (fun t -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp t) ts1 in
+      (* TODO: unify the dimension spines ts0, ts1 *)
+      let ty'0, sys0 = T.Cx.Eval.unleash_ext ty0 rs0 in
+      let ty'1, sys1 = T.Cx.Eval.unleash_ext ty1 rs1 in
+      let rst0 = T.Cx.Eval.make @@ Val.Rst {ty = ty'0; sys = sys0} in
+      let rst1 = T.Cx.Eval.make @@ Val.Rst {ty = ty'1; sys = sys1} in
+      ret (rst0, rst1)
+
     | Snoc (sp0, Tm.Car), Snoc (sp1, Tm.Car) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
-      let dom0, _ = T.Cx.Eval.unleash_sg ty0 in
-      let dom1, _ = T.Cx.Eval.unleash_sg ty1 in
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
+      let dom0, _ = T.Cx.Eval.unleash_sg ~debug:["match-spine/car"] ty0 in
+      let dom1, _ = T.Cx.Eval.unleash_sg ~debug:["match-spine/car"] ty1 in
       ret (dom0, dom1)
 
     | Snoc (sp0, Tm.Cdr), Snoc (sp1, Tm.Cdr) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
-      let _, cod0 = T.Cx.Eval.unleash_sg ty0 in
-      let _, cod1 = T.Cx.Eval.unleash_sg ty1 in
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
+      let _, cod0 = T.Cx.Eval.unleash_sg ~debug:["match_spine/cdr"] ty0 in
+      let _, cod1 = T.Cx.Eval.unleash_sg ~debug:["match-spine/cdr"] ty1 in
       let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref (x0, tw0), sp0 #< Tm.Car) in
       let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref (x1, tw1), sp1 #< Tm.Car) in
       ret (cod0, cod1)
 
     | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       let _, _, ty0 = T.Cx.Eval.unleash_lbl_ty ty0 in
       let _, _, ty1 = T.Cx.Eval.unleash_lbl_ty ty1 in
       ret (ty0, ty1)
 
     | Snoc (sp0, Tm.If info0), Snoc (sp1, Tm.If info1) ->
       go sp0 sp1 >>= fun (_ty0, _ty1) ->
+      typechecker >>= fun (module T) ->
+      let module HSubst = HSubst (T) in
       let y = Name.fresh () in
-      let mot0y = Tm.unbind_with y `TwinL info0.mot in
-      let mot1y = Tm.unbind_with y `TwinR info1.mot in
+      let mot0y = Tm.unbind_with y (fun _ -> `TwinL) info0.mot in
+      let mot1y = Tm.unbind_with y (fun _ -> `TwinR) info1.mot in
       let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
       active @@ Problem.all y (Tm.make Tm.Bool) @@
       Problem.eqn ~ty0:univ ~ty1:univ ~tm0:mot0y ~tm1:mot1y
@@ -465,17 +567,17 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 let rigid_rigid q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
-    let x = Name.fresh () in
-    let cod0x = Tm.unbind_with x `TwinL cod0 in
-    let cod1x = Tm.unbind_with x `TwinR cod1 in
+    let x = Name.named @@ Some "rigidrigid-pi" in
+    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
   | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
-    let x = Name.fresh () in
-    let cod0x = Tm.unbind_with x `TwinL cod0 in
-    let cod1x = Tm.unbind_with x `TwinR cod1 in
+    let x = Name.named @@ Some "rigidrigid-sg" in
+    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
@@ -490,28 +592,54 @@ let rigid_rigid q =
     else
       block @@ Unify q
 
+let (%%) (ty, tm) frame =
+  typechecker >>= fun (module T) ->
+  let module HSubst = HSubst (T) in
+  let open HSubst in
+  ret @@ (ty, tm) %% frame
+
 
 let unify q =
-  typechecker >>= fun (module T) ->
-  let module HS = HSubst (T) in
-  let open HS in
-
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, _), Tm.Pi (dom1, _) ->
-    let x = Name.fresh () in
+    let x = Name.named @@ Some "foo" in
     let x_l = Tm.up (Tm.Ref (x, `TwinL), Emp) in
     let x_r = Tm.up (Tm.Ref (x, `TwinR), Emp) in
-    let ty0, tm0 = (q.ty0, q.tm0) %% Tm.FunApp x_l in
-    let ty1, tm1 = (q.ty1, q.tm1) %% Tm.FunApp x_r in
-    active @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
+
+    in_scope x (`Tw (dom0, dom1))
+      begin
+        (q.ty0, q.tm0) %% Tm.FunApp x_l >>= fun (ty0, tm0) ->
+        (q.ty1, q.tm1) %% Tm.FunApp x_r >>= fun (ty1, tm1) ->
+        ret @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
+      end >>= fun prob ->
+    active prob
 
   | Tm.Sg (dom0, _), Tm.Sg (dom1, _) ->
-    let _, car0 = (q.ty0, q.tm0) %% Tm.Car in
-    let _, car1 = (q.ty1, q.tm1) %% Tm.Car in
-    let ty_cdr0, cdr0 = (q.ty0, q.tm0) %% Tm.Cdr in
-    let ty_cdr1, cdr1 = (q.ty1, q.tm1) %% Tm.Cdr in
+    Format.eprintf "Unify: @[<1>%a@]@.@." Equation.pp q ;
+    (q.ty0, q.tm0) %% Tm.Car >>= fun (_, car0) ->
+    (q.ty1, q.tm1) %% Tm.Car >>= fun (_, car1) ->
+    (q.ty0, q.tm0) %% Tm.Cdr >>= fun (ty_cdr0, cdr0) ->
+    (q.ty1, q.tm1) %% Tm.Cdr >>= fun (ty_cdr1, cdr1) ->
     active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
-    active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
+    let prob = Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1 in
+    Format.eprintf "problem: %a@.@." (Problem.pp) prob;
+    active @@ prob
+
+  | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
+    let xs = List.map Name.named nms0 in
+    let vars = List.map (fun x -> Tm.up (Tm.Ref (x, `Only), Emp)) xs in
+    let psi = List.map (fun x -> (x, `I)) xs in
+
+    in_scopes psi
+      begin
+        (q.ty0, q.tm0) %% Tm.ExtApp vars >>= fun (ty0, tm0) ->
+        (q.ty1, q.tm1) %% Tm.ExtApp vars >>= fun (ty1, tm1) ->
+        ret @@ Problem.all_dims xs @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
+      end >>= fun prob ->
+    active prob
+
+  | Tm.Rst info0, Tm.Rst info1 ->
+    active @@ Unify {q with ty0 = info0.ty; ty1 = info1.ty}
 
   | _ ->
     match Tm.unleash q.tm0, Tm.unleash q.tm1 with
@@ -549,44 +677,132 @@ let is_reflexive q =
   | false ->
     ret false
 
-let rec solver =
-  function
+let rec split_sigma tele x ty =
+  match Tm.unleash ty with
+  | Tm.Sg (dom, cod) ->
+    let y, cody = Tm.unbind cod in
+    let z = Name.fresh () in
+    let sp_tele = telescope_to_spine tele in
+
+    ret @@ Some
+      ( y
+      , abstract_ty tele dom
+      , z
+      , abstract_ty tele cody
+      , abstract_tm tele @@ Tm.cons (Tm.up (Tm.Ref (y, `Only), sp_tele)) (Tm.up (Tm.Ref (z, `Only), sp_tele))
+      , ( abstract_tm tele @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Car)
+        , abstract_tm tele @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Cdr)
+        )
+      )
+
+
+  | Tm.Pi (dom, cod) ->
+    let y, cody = Tm.unbind cod in
+    split_sigma (tele #< (y, `P dom)) x cody
+
+  | _ ->
+    ret None
+
+
+let rec solver prob =
+  Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob;
+  match prob with
   | Unify q ->
     is_reflexive q <||
     unify q
 
   | All (param, prob) ->
-    let x, probx = unbind prob in
+    let x, probx = unbind param prob in
     if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
       active probx
     else
-      match param with
-      | P ty ->
-        (* TODO: split sigma, blah blah *)
-        in_scope x (P ty) @@
-        solver probx
-
-      | Tw (ty0, ty1) ->
-        let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-        check_eq ~ty:univ ty0 ty1 >>= function
-        | true ->
-          let var = Tm.up (Tm.Ref (x, `Only), Emp) in
-          let sigma = Subst.define Subst.emp x ~ty:ty0 ~tm:var in
-          solver @@ Problem.all x ty0 @@
-          Problem.subst sigma probx
-        | false ->
-          in_scope x (Tw (ty0, ty1)) @@
+      begin
+        match param with
+        | `I ->
+          in_scope x `I @@
           solver probx
 
+        | `P ty ->
+          begin
+            split_sigma Emp x ty >>= function
+            | Some (y, ty0, z, ty1, s, _) ->
+              get_global_env >>= fun env ->
+              solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
+              Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
+            | None ->
+              in_scope x (`P ty) @@
+              solver probx
+          end
 
-let lower tele alpha ty =
+        | `Tw (ty0, ty1) ->
+          let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+          begin
+            check_eq ~ty:univ ty0 ty1 >>= function
+            | true ->
+              get_global_env >>= fun sub ->
+              let y = Name.fresh () in
+              (*  This weird crap is needed to avoid creating a cycle in the environment.
+                  What we should really do is kill 'twin variables' altogether and switch to
+                  a representation based on having two contexts. *)
+              let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
+              let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
+              let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
+              let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
+              solver @@ Problem.all x ty0 @@
+              Problem.subst sub_x @@ Problem.subst sub_y probx
+            | false ->
+              in_scope x (`Tw (ty0, ty1)) @@
+              solver probx
+          end
+
+        | `R (r0, r1) ->
+          check_eq_dim r0 r1 >>= function
+          | true ->
+            solver probx
+          | false ->
+            under_restriction r0 r1 @@ solver probx
+      end
+  | Restrict (r0, r1, prob) ->
+    check_eq_dim r0 r1 >>= function
+    | true ->
+      solver prob
+    | false ->
+      under_restriction r0 r1 @@ solver prob
+
+
+let rec lower tele alpha ty =
   match Tm.unleash ty with
   | Tm.LblTy info ->
     hole tele info.ty @@ fun t ->
-    define tele alpha ~ty (Tm.make @@ Tm.LblRet (Tm.up t)) >>
+    define tele alpha ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
     ret true
+
+  | Tm.Sg (dom, Tm.B (_, cod)) ->
+    hole tele dom @@ fun t0 ->
+    hole tele (Tm.subst (Tm.Sub (Tm.Id, t0)) cod) @@ fun t1 ->
+    define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
+    ret true
+
+  | Tm.Pi (dom, cod) ->
+    let x = Name.fresh () in
+    begin
+      split_sigma Emp x dom >>= function
+      | None ->
+        let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+        lower (tele #< (x, `P dom)) alpha codx
+
+      | Some (y, ty0, z, ty1, s, (u, v)) ->
+        typechecker >>= fun (module T) ->
+        let module HS = HSubst (T) in
+        let vty = T.Cx.eval T.Cx.emp @@ abstract_ty tele dom in
+        let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
+        hole tele pi_ty @@ fun (whd, wsp) ->
+        let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
+        define tele alpha ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
+        ret true
+    end
+
   | _ ->
-    (* TODO: implement lowering *)
     ret false
 
 (* guess who named this function, lol *)
