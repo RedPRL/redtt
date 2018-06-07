@@ -639,10 +639,10 @@ and pp_spine env fmt sp =
       (pp_spine env) sp
       (pp_frame env) f
 
-and pp_frame _ fmt =
+and pp_frame env fmt =
   function
-  | FunApp _ ->
-    Format.fprintf fmt "fun-app"
+  | FunApp t ->
+    Format.fprintf fmt "@[<1>(app %a)@]" (pp env) t
   | ExtApp _ ->
     Format.fprintf fmt "ext-app"
   | Car ->
@@ -781,6 +781,9 @@ struct
       go fl dom acc
     | Ext ebnd ->
       go_ext_bnd fl ebnd acc
+    | Rst info ->
+      go fl info.ty @@
+      go_tm_sys fl info.sys acc
     | Up cmd ->
       go_cmd fl cmd acc
     | ExtLam nbnd ->
