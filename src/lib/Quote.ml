@@ -98,6 +98,34 @@ struct
     | Rst {ty; _} ->
       equate env ty el0 el1
 
+    | CoR face ->
+      begin
+        match face with
+        | Face.False p ->
+          let r, r' = DimStar.unleash p in
+          let tr = quote_dim env r in
+          let tr' = quote_dim env r' in
+          Tm.make @@ Tm.CoRThunk (tr, tr', None)
+
+        | Face.True (r, r', ty) ->
+          let tr = quote_dim env r in
+          let tr' = quote_dim env r' in
+          let force0 = corestriction_force el0 in
+          let force1 = corestriction_force el1 in
+          let tm = equate env ty force0 force1 in
+          Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
+
+        | Face.Indet (p, ty) ->
+          let r, r' = DimStar.unleash p in
+          let tr = quote_dim env r in
+          let tr' = quote_dim env r' in
+          let phi = Dim.equate r r' in
+          let force0 = corestriction_force @@ Val.act phi el0 in
+          let force1 = corestriction_force @@ Val.act phi el1 in
+          let tm = equate env ty force0 force1 in
+          Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
+      end
+
     | LblTy {ty; _} ->
       let call0 = lbl_call el0 in
       let call1 = lbl_call el1 in
@@ -151,6 +179,11 @@ struct
         let ty = equate env ty info0.ty info1.ty in
         let sys = equate_val_sys env info0.ty info0.sys info1.sys in
         Tm.make @@ Tm.Rst {ty; sys}
+
+      | CoR face0, CoR face1 ->
+        let univ = V.make @@ Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
+        let face = equate_val_face env univ face0 face1 in
+        Tm.make @@ Tm.CoR face
 
       | LblTy info0, LblTy info1 ->
         if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else

@@ -14,6 +14,10 @@ let rec telescope ty : telescope * ty =
     let x, codx = Tm.unbind cod in
     let (tel, ty) = telescope codx in
     (Emp #< (x, `P dom)) <.> tel, ty
+  | Tm.CoR (r, r', Some ty) ->
+    let x = Name.fresh () in
+    let (tel, ty) = telescope ty in
+    (Emp #< (x, `R (r, r'))) <.> tel, ty
   | _ ->
     Emp, ty
 
@@ -28,11 +32,13 @@ let rec abstract_tm xs tm =
   | _ ->
     failwith "abstract_tm"
 
-let rec abstract_ty (gm : telescope) tm =
+let rec abstract_ty (gm : telescope) cod =
   match gm with
-  | Emp -> tm
-  | Snoc (gm, (x, `P ty)) ->
-    abstract_ty gm @@ Tm.make @@ Tm.Pi (ty, Tm.bind x tm)
+  | Emp -> cod
+  | Snoc (gm, (x, `P dom)) ->
+    abstract_ty gm @@ Tm.make @@ Tm.Pi (dom, Tm.bind x cod)
+  | Snoc (gm, (_, `R (r, r'))) ->
+    abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
   | _ ->
     failwith "abstract_ty"
 
@@ -49,8 +55,8 @@ let hole_named alpha (gm : telescope) ty f =
   go_left >>
   ret r
 
-let hole ?debug:(debug = None) gm ty f =
-  hole_named (Name.named debug) gm ty f
+let hole ?name:(name = None) gm ty f =
+  hole_named (Name.named name) gm ty f
 
 let define gm alpha ~ty tm =
   let ty' = abstract_ty gm ty in
@@ -130,6 +136,17 @@ let rec eta_contract t =
         end
       | _ ->
         Tm.make @@ Tm.ExtLam (Tm.bindn ys tm'ys)
+    end
+
+
+  | Tm.CoRThunk (r, r', Some tm) ->
+    let tm' = eta_contract tm in
+    begin
+      match Tm.unleash tm' with
+      | Tm.Up (Tm.Ref (p, twp), Snoc (sp, Tm.CoRForce)) ->
+        Tm.up (Tm.Ref (p, twp), sp)
+      | _ ->
+        Tm.make @@ Tm.CoRThunk (r, r', Some tm')
     end
 
 

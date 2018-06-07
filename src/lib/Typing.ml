@@ -152,6 +152,21 @@ struct
       let ty = check_eval cx ty info.ty in
       check_ext_sys cx ty info.sys
 
+    | V.Univ univ, T.CoR (tr, tr', oty) ->
+      if univ.kind = Kind.Pre then () else failwith "Co-restriction type is not known to be Kan";
+      let r = check_eval_dim cx tr in
+      let r' = check_eval_dim cx tr' in
+      begin
+        match Cx.compare_dim cx r r', oty with
+        | Apart, None ->
+          ()
+        | _, Some ty' ->
+          let cxrr' = Cx.restrict cx r r' in
+          check cxrr' ty ty'
+        | _ ->
+          failwith "co-restriction type malformed"
+      end
+
     | V.Univ _, T.V info ->
       check_dim cx info.r;
       let ty0 = check_eval cx ty info.ty0 in
@@ -176,6 +191,36 @@ struct
       let cxx, xs = Cx.ext_dims cx ~nms in
       let codx, sysx = Eval.ExtAbs.inst ext_abs @@ List.map Dim.named xs in
       check_boundary cxx codx sysx tm
+
+    | V.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
+      let r'0 = check_eval_dim cx tr0 in
+      let r'1 = check_eval_dim cx tr1 in
+      begin
+        match ty_face, otm with
+        | Face.False _, None ->
+          ()
+        | Face.True (r0, r1, ty), Some tm ->
+          begin
+            match Dim.compare (Cx.unleash_dim cx r'0) r0, Dim.compare (Cx.unleash_dim cx r'1) r1 with
+            | Same, Same ->
+              check cx ty tm
+            | _ ->
+              failwith "co-restriction mismatch"
+          end
+        | Face.Indet (p, _), Some tm ->
+          let r0, r1 = DimStar.unleash p in
+          begin
+            match Dim.compare (Cx.unleash_dim cx r'0) r0, Dim.compare (Cx.unleash_dim cx r'1) r1 with
+            | Same, Same ->
+              let cx' = Cx.restrict cx r'0 r'1 in
+              let phi = Cx.equate_dim cx r'0 r'1 in
+              check cx' (Eval.Val.act phi ty) tm
+            | _ ->
+              failwith "co-restriction mismatch"
+          end
+        | _ ->
+          failwith "Malformed element of co-restriction type"
+      end
 
     | V.Rst {ty; sys}, _ ->
       check cx ty tm;
@@ -434,6 +479,13 @@ struct
     | T.LblCall ->
       let _, _, ty = Eval.unleash_lbl_ty ty in
       ty
+
+    | Tm.CoRForce ->
+      begin
+        match Eval.unleash_corestriction_ty ty with
+        | Face.True (_, _, ty) -> ty
+        | _ -> failwith "Cannot force co-restriction when it is not true!"
+      end
 
   and infer_head cx =
     function

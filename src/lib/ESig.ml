@@ -6,7 +6,7 @@ and escheme = etele * echk
 and etele = (string * echk) list
 
 and echk =
-  | Hole
+  | Hole of string option
   | Lam of string list * echk
   | Tuple of echk list
   | Type

@@ -19,6 +19,7 @@ type 'a tmf =
   | Pi of 'a * 'a bnd
   | Ext of ('a * ('a, 'a) system) nbnd
   | Rst of {ty : 'a; sys : ('a, 'a) system}
+  | CoR of ('a, 'a) face
   | Sg of 'a * 'a bnd
 
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
@@ -29,6 +30,7 @@ type 'a tmf =
 
   | Lam of 'a bnd
   | ExtLam of 'a nbnd
+  | CoRThunk of ('a, 'a) face
 
   | Cons of 'a * 'a
   | Dim0
@@ -59,6 +61,7 @@ and 'a frame =
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | LblCall
+  | CoRForce
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
@@ -117,6 +120,9 @@ and subst_f (sub : tm cmd subst) =
     let sys = subst_tm_sys sub info.sys in
     Rst {ty; sys}
 
+  | CoR face ->
+    CoR (subst_tm_face sub face)
+
   | V info ->
     let r = subst sub info.r in
     let ty0 = subst sub info.ty0 in
@@ -129,6 +135,9 @@ and subst_f (sub : tm cmd subst) =
 
   | ExtLam nbnd ->
     ExtLam (subst_nbnd sub nbnd)
+
+  | CoRThunk face ->
+    CoRThunk (subst_tm_face sub face)
 
   | Cons (t0, t1) ->
     Cons (subst sub t0, subst sub t1)
@@ -162,7 +171,7 @@ and subst_spine sub spine =
 
 and subst_frame sub frame =
   match frame with
-  | (Car | Cdr | LblCall) ->
+  | (Car | Cdr | LblCall | CoRForce) ->
     frame
   | FunApp t ->
     FunApp (subst sub t)
@@ -295,6 +304,8 @@ let traverse ~f ~var ~ref =
       let ty = f k info.ty in
       let sys = go_tm_sys k info.sys in
       Rst {ty; sys}
+    | CoR face ->
+      CoR (go_tm_face k face)
     | FCom info ->
       let r = f k info.r in
       let r' = f k info.r' in
@@ -309,6 +320,8 @@ let traverse ~f ~var ~ref =
       V {r; ty0; ty1; equiv}
     | ExtLam nbnd ->
       ExtLam (go_nbnd k nbnd)
+    | CoRThunk face ->
+      CoRThunk (go_tm_face k face)
     | Cons (t0, t1) ->
       Cons (f k t0, f k t1)
     | LblTy info ->
@@ -366,7 +379,7 @@ let traverse ~f ~var ~ref =
 
   and go_frm k =
     function
-    | (Car | Cdr | LblCall) as frm -> frm
+    | (Car | Cdr | LblCall | CoRForce) as frm -> frm
     | FunApp t ->
       FunApp (f k t)
     | ExtApp ts ->
@@ -495,6 +508,9 @@ let rec pp env fmt (Tm tm) =
         Format.fprintf fmt "@[<1>(%a@ @[%a@])@]" (pp env) ty (pp_sys env) sys
     end
 
+  | CoR face ->
+    Format.fprintf fmt "@[<1>(=>@ %a)@]" (pp_face env) face
+
   | V info ->
     Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
 
@@ -505,6 +521,9 @@ let rec pp env fmt (Tm tm) =
   | ExtLam (NB (nms, tm)) ->
     let xs, env' = Pretty.Env.bindn nms env in
     Format.fprintf fmt "@[<1>(λ <%a>@ %a)@]" pp_strings xs (pp env') tm
+
+  | CoRThunk face ->
+    pp_face env fmt face
 
   | Bool ->
     Format.fprintf fmt "bool"
@@ -605,6 +624,8 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r go sp
       | LblCall ->
         Format.fprintf fmt "@[<1>(call@ %a)@]" go sp
+      | CoRForce ->
+        Format.fprintf fmt "@[<1>(force@ %a)@]" go sp
   in
   (* TODO: backwards ??? *)
   go fmt sp
@@ -817,9 +838,7 @@ struct
 
   and go_frame fl frm acc =
     match frm with
-    | Car -> acc
-    | Cdr -> acc
-    | LblCall -> acc
+    | (Car | Cdr | LblCall | CoRForce) -> acc
     | FunApp t ->
       go fl t acc
     | ExtApp ts ->
@@ -925,7 +944,7 @@ let map_head f =
 
 let map_frame f =
   function
-  | (Car | Cdr | LblCall) as frm ->
+  | (Car | Cdr | LblCall | CoRForce) as frm ->
     frm
   | FunApp t ->
     FunApp (f t)
@@ -989,6 +1008,8 @@ let map_tmf f =
     Ext (map_ext_bnd f ebnd)
   | Rst {ty; sys} ->
     Rst {ty = f ty; sys = map_tm_sys f sys}
+  | CoR face ->
+    CoR (map_tm_face f face)
   | V info ->
     let r = f info.r in
     let ty0 = f info.ty0 in
@@ -999,6 +1020,8 @@ let map_tmf f =
     Lam (map_bnd f bnd)
   | ExtLam nbnd ->
     ExtLam (map_nbnd f nbnd)
+  | CoRThunk face ->
+    CoRThunk (map_tm_face f face)
   | LblTy info ->
     let ty = f info.ty in
     let args = List.map (fun (t0, t1) -> f t0, f t1) info.args in

@@ -20,6 +20,7 @@ type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con
   | Rst : {ty : value; sys : val_sys} -> con
+  | CoR : val_face -> con
   | Ext : ext_abs -> con
 
   | Coe : {dir : star; abs : abs; el : value} -> con
@@ -32,6 +33,8 @@ type con =
 
   | Lam : clo -> con
   | ExtLam : abs -> con
+  | CoRThunk : val_face -> con
+
   | Cons : value * value -> con
   | Bool : con
   | Tt : con
@@ -57,6 +60,7 @@ and neu =
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
   | LblCall : neu -> neu
+  | CoRForce : neu -> neu
 
 and nf = {ty : value; el : value}
 
@@ -94,6 +98,7 @@ sig
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
+  val corestriction_force : value -> value
 
   val inst_clo : clo -> value -> value
 
@@ -102,6 +107,7 @@ sig
   val unleash_v : value -> gen * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
+  val unleash_corestriction_ty : value -> val_face
 
 
   val pp_value : Format.formatter -> value -> unit
