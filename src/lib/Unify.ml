@@ -195,22 +195,19 @@ let rec spine_to_tele sp =
 
 let linear_on t tele =
   let fvs = Tm.free `Vars t in
-  let names = Hashtbl.create 20 in
+  let rec occurs_in x xs =
+    match xs with
+    | Emp -> false
+    | Snoc (xs, (y, _)) -> if x = y then true else occurs_in x xs
+  in
+
   let rec go xs =
     match xs with
     | Emp -> true
     | Snoc (xs, (x, `P _)) ->
-      if Hashtbl.mem names x then false else
-        begin
-          Hashtbl.add names x ();
-          not (Occurs.Set.mem x fvs) && go xs
-        end
+      not (occurs_in x xs && Occurs.Set.mem x fvs) && go xs
     | Snoc (xs, (x, `I)) ->
-      if Hashtbl.mem names x then false else
-        begin
-          Hashtbl.add names x ();
-          not (Occurs.Set.mem x fvs) && go xs
-        end
+      not (occurs_in x xs && Occurs.Set.mem x fvs) && go xs
     | Snoc (_, _) ->
       failwith "linear_on"
   in go tele
