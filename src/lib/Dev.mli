@@ -31,7 +31,6 @@ type 'a bind
 type problem =
   | Unify of (tm, tm) equation
   | All of ty param * problem bind
-  | Restrict of tm * tm * problem
 
 type entry =
   | E of Name.t * ty * tm decl
