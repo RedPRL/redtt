@@ -98,6 +98,7 @@ sig
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
+  val corestriction_force : value -> value
 
   val inst_clo : clo -> value -> value
 
