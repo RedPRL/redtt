@@ -78,6 +78,11 @@ and pp_tele_cell fmt (x, cell) =
       (Tm.pp Pretty.Env.emp) r1
 
 
+let normalize_ty ty =
+  typechecker >>= fun (module T) ->
+  let vty = T.Cx.eval T.Cx.emp ty in
+  ret @@ T.Cx.quote_ty T.Cx.emp vty
+
 let rec elab_sig env =
   function
   | [] ->
@@ -86,6 +91,7 @@ let rec elab_sig env =
     elab_decl env dcl >>= fun env' ->
     ambulando (Name.fresh ()) >>
     elab_sig env' esig
+
 
 and elab_decl env =
   function
@@ -106,10 +112,11 @@ and elab_scheme env (cells, ecod) kont =
   let rec go gm =
     function
     | [] ->
-      elab_chk env {ty = univ; sys = []} ecod >>= fun cod ->
-      kont cod
+      elab_chk env {ty = univ; sys = []} ecod >>=
+      normalize_ty >>=
+      kont
     | (name, edom) :: cells ->
-      elab_chk env {ty = univ; sys = []} edom >>= fun dom ->
+      elab_chk env {ty = univ; sys = []} edom >>= normalize_ty >>= fun dom ->
       let x = Name.named @@ Some name in
       in_scope x (`P dom) @@
       go (gm #< (x, dom)) cells
@@ -184,3 +191,4 @@ and elab_chk env {ty; sys} e : tm m =
 
   | _ ->
     failwith "TODO"
+
