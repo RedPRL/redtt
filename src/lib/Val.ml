@@ -224,7 +224,7 @@ struct
         `Proj abs
   end
 
-  (* merge this with CompSys *)
+  (* TODO merge this with CompSys *)
   module BoxSys :
   sig
     include Sort
