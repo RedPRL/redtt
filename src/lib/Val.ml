@@ -467,7 +467,7 @@ struct
       begin
         match act_neu phi info.neu with
         | Ret neu ->
-            (* TODO *)
+          (* this is dumb; should refactor this with `cap`. *)
           let el = make @@ Up {ty = info.ty; neu; sys = []} in
           step @@ cap mdir el info.ty msys
         | Step el ->
