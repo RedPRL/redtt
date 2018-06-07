@@ -419,14 +419,22 @@ struct
       equiv_ty env ty0 ty1
 
   and approx_restriction env ty0 ty1 sys0 sys1 =
+    (* A semantic indeterminate of the first type *)
     let gen = generic env ty0 in
+
     let check_face ty face =
       match face with
       | Face.True (_, _, v) ->
+        (* In this case, we need to see that the indeterminate is already equal to the face *)
         begin try equiv env ~ty gen v; true with _ -> false end
+
       | Face.False _ ->
-        true
+        (* This one is vacuous *)
+        false
+
       | Face.Indet (p, v) ->
+        (* In this case, we check that the semantic indeterminate will become equal to the face under the
+           stipulated restriction. *)
         let r, r' = DimStar.unleash p in
         let gen_rr' = Val.act (Dim.equate r r') gen in
         let ty_rr' = Val.act (Dim.equate r r') ty in
