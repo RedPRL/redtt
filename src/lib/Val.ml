@@ -1307,17 +1307,17 @@ struct
   and pp_value fmt value =
     match unleash value with
     | Up up ->
-      Format.fprintf fmt "%a" pp_neu up.neu
+      Format.fprintf fmt "@[<1>(🆙@ %a)@]" pp_neu up.neu
     | Lam clo ->
       Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
     | ExtLam abs ->
       Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
     | Tt ->
-      Format.fprintf fmt "tt"
+      Format.fprintf fmt "✅️"
     | Ff ->
-      Format.fprintf fmt "ff"
+      Format.fprintf fmt "⛔️"
     | Bool ->
-      Format.fprintf fmt "bool"
+      Format.fprintf fmt "②"
     | Pi {dom; cod} ->
       Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
     | Sg {dom; cod} ->
@@ -1331,7 +1331,7 @@ struct
     | Cons (v0, v1) ->
       Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
     | V _ ->
-      Format.fprintf fmt "<v-type>"
+      Format.fprintf fmt "Ⓥ"
     | VIn _ ->
       Format.fprintf fmt "<vin>"
     | Coe _ ->
@@ -1371,13 +1371,13 @@ struct
   and pp_val_face fmt face =
     match face with
     | Face.True (r0, r1, v) ->
-      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
+      Format.fprintf fmt "@[<1>[✅️%a=%a@ %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
     | Face.False p ->
       let r0, r1 = Star.unleash p in
-      Format.fprintf fmt "@[<1>[%a/=%a]@]" Dim.pp r0 Dim.pp r1
+      Format.fprintf fmt "@[<1>[⛔️%a=%a]@]" Dim.pp r0 Dim.pp r1
     | Face.Indet (p, v) ->
       let r0, r1 = Star.unleash p in
-      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
+      Format.fprintf fmt "@[<1>[❓️%a=%a %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
 
   and pp_clo fmt _ =
     Format.fprintf fmt "<clo>"
