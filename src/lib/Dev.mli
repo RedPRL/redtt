@@ -17,7 +17,12 @@ type ('a, 'b) equation =
    ty1 : ty;
    tm1 : 'b}
 
-type 'a param = [ `I | `P of 'a | `Tw of 'a * 'a ]
+type 'a param =
+  [ `I
+  | `P of 'a
+  | `Tw of 'a * 'a
+  | `R of 'a * 'a
+  ]
 
 type params = (Name.t * ty param) bwd
 

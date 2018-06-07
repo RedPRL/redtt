@@ -72,6 +72,10 @@ and pp_tele_cell fmt (x, cell) =
     Format.fprintf fmt "@[<1>%a : dim@]"
       Name.pp x
 
+  | `R (r0, r1) ->
+    Format.fprintf fmt "@[<1>%a = %a@]"
+      (Tm.pp Pretty.Env.emp) r0
+      (Tm.pp Pretty.Env.emp) r1
 
 
 let rec elab_sig env =

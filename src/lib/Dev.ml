@@ -19,7 +19,13 @@ type ('a, 'b) equation =
    ty1 : ty;
    tm1 : 'b}
 
-type 'a param = [ `I | `P of 'a | `Tw of 'a * 'a ]
+type 'a param =
+  [ `I
+  | `P of 'a
+  | `Tw of 'a * 'a
+  | `R of 'a * 'a
+  ]
+
 type params = (Name.t * ty param) bwd
 
 type 'a bind = B of 'a
@@ -66,6 +72,9 @@ let param_open_var k x =
     `P (Tm.open_var k x (fun tw -> tw) ty)
   | `Tw (ty0, ty1) ->
     `Tw (Tm.open_var k x (fun tw -> tw) ty0, Tm.open_var k x (fun tw -> tw) ty1)
+  | `R (r0, r1) ->
+    `R (Tm.open_var k x (fun tw -> tw) r0, Tm.open_var k x (fun tw -> tw) r1)
+
 
 let param_close_var x k =
   function
@@ -75,6 +84,8 @@ let param_close_var x k =
     `P (Tm.close_var x (fun tw -> tw) k ty)
   | `Tw (ty0, ty1) ->
     `Tw (Tm.close_var x (fun tw -> tw) k ty0, Tm.close_var x (fun tw -> tw) k ty1)
+  | `R (r0, r1) ->
+    `R (Tm.close_var x (fun tw -> tw) k r0, Tm.close_var x (fun tw -> tw) k r1)
 
 let rec prob_open_var k x tw =
   function
@@ -125,6 +136,11 @@ let pp_param fmt =
     Format.fprintf fmt "{%a | %a}"
       (Tm.pp Pretty.Env.emp) ty0
       (Tm.pp Pretty.Env.emp) ty1
+  | `R (r0, r1) ->
+    Format.fprintf fmt "{%a = %a}"
+      (Tm.pp Pretty.Env.emp) r0
+      (Tm.pp Pretty.Env.emp) r1
+
 
 
 let rec pp_problem fmt =
@@ -204,6 +220,9 @@ let subst_param sub =
     `P (subst_tm sub ~ty:univ ty)
   | `Tw (ty0, ty1) ->
     `Tw (subst_tm sub ~ty:univ ty0, subst_tm sub ~ty:univ ty1)
+  | `R (r0, r1) ->
+    (* TODO: ??? *)
+    `R (r0, r1)
 
 let rec subst_problem sub =
   function
@@ -217,16 +236,20 @@ let rec subst_problem sub =
       | `P ty ->
         let sub' = GlobalEnv.ext sub x @@ `P {ty; sys = []}  in
         let probx' = subst_problem sub' probx in
-        let prob' = bind x param probx' in
+        let prob' = bind x param' probx' in
         All (param', prob')
-      | `Tw (ty0, ty1) -> (* TODO: properly deal with twins *)
+      | `Tw (ty0, ty1) ->
         let sub' = GlobalEnv.ext sub x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []}) in
         let probx' = subst_problem sub' probx in
-        let prob' = bind x param probx' in
+        let prob' = bind x param' probx' in
         All (param', prob')
       | `I ->
         let probx' = subst_problem sub probx in
-        let prob' = bind x param probx' in
+        let prob' = bind x param' probx' in
+        All (param', prob')
+      | `R (_, _) ->
+        let probx' = subst_problem sub probx in
+        let prob' = bind x param' probx' in
         All (param', prob')
     end
   | Restrict (r0, r1, prob) ->
@@ -257,6 +280,8 @@ struct
     | `P ty -> Tm.free fl ty
     | `Tw (ty0, ty1) ->
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)
+    | `R (r0, r1) ->
+      Occurs.Set.union (Tm.free fl r0) (Tm.free fl r1)
 
   let subst = subst_param
 end

@@ -754,6 +754,13 @@ let rec solver prob =
               in_scope x (`Tw (ty0, ty1)) @@
               solver probx
           end
+
+        | `R (r0, r1) ->
+          check_eq_dim r0 r1 >>= function
+          | true ->
+            solver probx
+          | false ->
+            under_restriction r0 r1 @@ solver probx
       end
   | Restrict (r0, r1, prob) ->
     check_eq_dim r0 r1 >>= function
