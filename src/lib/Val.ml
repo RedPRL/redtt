@@ -22,7 +22,7 @@ type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con
   | Rst : {ty : value; sys : val_sys} -> con
-  | CoR : {r : dim; r' : dim; ty : value} -> con
+  | CoR : val_face -> con
   | Ext : ext_abs -> con
 
   | Coe : {dir : star; abs : abs; el : value} -> con
@@ -35,6 +35,8 @@ type con =
 
   | Lam : clo -> con
   | ExtLam : abs -> con
+  | CoRThunk : val_face -> con
+
   | Cons : value * value -> con
   | Bool : con
   | Tt : con
@@ -60,6 +62,7 @@ and neu =
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
   | LblCall : neu -> neu
+  | CoRForce : neu -> neu
 
 and nf = {ty : value; el : value}
 
@@ -111,6 +114,7 @@ sig
   val unleash_v : value -> gen * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
+  val unleash_corestriction_ty : value -> val_face
 
   val pp_value : Format.formatter -> value -> unit
   val pp_neu : Format.formatter -> neu -> unit
@@ -317,11 +321,9 @@ struct
       let sys = ValSys.act phi info.sys in
       make @@ Rst {ty; sys}
 
-    | CoR info ->
-      let r = Dim.act phi info.r in
-      let r' = Dim.act phi info.r' in
-      let ty = Val.act phi info.ty in
-      make @@ CoR {r; r'; ty}
+    | CoR face ->
+      let face = ValFace.act phi face in
+      make @@ CoR face
 
     | Coe info ->
       make_coe
@@ -372,6 +374,9 @@ struct
 
     | ExtLam abs ->
       make @@ ExtLam (Abs.act phi abs)
+
+    | CoRThunk v ->
+      make @@ CoRThunk (ValFace.act phi v)
 
     | Cons (v0, v1) ->
       make @@ Cons (Val.act phi v0, Val.act phi v1)
@@ -471,6 +476,15 @@ struct
           ret @@ LblCall neu
         | Step v ->
           step @@ lbl_call v
+      end
+
+    | CoRForce neu ->
+      begin
+        match act_neu phi neu with
+        | Ret neu ->
+          ret @@ CoRForce neu
+        | Step v ->
+          step @@ corestriction_force v
       end
 
     | Lvl _ ->
@@ -781,11 +795,8 @@ struct
       let sys = eval_tm_sys rel rho info.sys in
       make @@ Rst {ty; sys}
 
-    | Tm.CoR info ->
-      let r = eval_dim_class rel rho info.r in
-      let r' = eval_dim_class rel rho info.r' in
-      let ty = eval rel rho info.ty in
-      make @@ CoR {r; r'; ty}
+    | Tm.CoR _ ->
+      failwith "TODO: eval co-restriction"
 
     | Tm.V info ->
       let r = eval_dim_class rel rho info.r in
@@ -1065,6 +1076,15 @@ struct
     | _ ->
       failwith "unleash_lbl_ty"
 
+  and unleash_corestriction_ty v =
+    match unleash v with
+    | CoR face ->
+      face
+    | Rst rst ->
+      unleash_corestriction_ty rst.ty
+    | _ ->
+      failwith "unleash_corestriction_ty"
+
   and pp_trace fmt trace =
     Format.fprintf fmt "@[[%a]@]"
       (Format.pp_print_list Format.pp_print_string)
@@ -1082,9 +1102,37 @@ struct
         lbl_call a
       in
       let call_sys = List.map call_face info.sys in
-      make @@ Up {ty = ty; neu = call; sys = call_sys}
+      make @@ Up {ty; neu = call; sys = call_sys}
     | _ ->
       failwith "lbl_call"
+
+  and corestriction_force v =
+    match unleash v with
+    | CoRThunk face ->
+      begin
+        match face with
+        | Face.True (_, _, v) -> v
+        | _ -> failwith "Cannot force corestriction when it doesn't hold"
+      end
+
+    | Up info ->
+      begin
+        match unleash_corestriction_ty info.ty with
+        | Face.True _ -> failwith ""
+        | Face.False _ -> failwith ""
+        | Face.Indet _ -> failwith ""
+        (*
+      let _, _, ty = unleash_corestriction_ty info.ty in
+      let force = CoRForce info.neu in
+      let force_face =
+        Face.map @@ fun _ _ a ->
+        corestriction_force v
+      in
+      let force_sys = List.map force_face info.sys in
+      make @@ Up {ty; neu = force; sys = force_sys} *)
+      end
+    | _ ->
+      failwith "corestriction_force"
 
   and apply vfun varg =
     match unleash vfun with
@@ -1358,6 +1406,8 @@ struct
       Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
     | ExtLam abs ->
       Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
+    | CoRThunk face ->
+      Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
     | Tt ->
       Format.fprintf fmt "tt"
     | Ff ->
@@ -1372,8 +1422,8 @@ struct
       Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
     | Rst {ty; sys} ->
       Format.fprintf fmt "@[<1>(restrict@ %a@ %a)@]" pp_value ty pp_val_sys sys
-    | CoR {r; r'; ty} ->
-      Format.fprintf fmt "@[<1>(Π@ %a=%a@ %a)@]" Dim.pp r Dim.pp r' pp_value ty
+    | CoR face ->
+      Format.fprintf fmt "@[<1>(corestrict@ %a)@]" pp_val_face face
     | Univ {kind; lvl} ->
       Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
     | Cons (v0, v1) ->
@@ -1466,6 +1516,9 @@ struct
 
     | LblCall neu ->
       Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
+
+    | CoRForce neu ->
+      Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
 
 
   and pp_nf fmt nf =

@@ -155,11 +155,10 @@ struct
         let sys = equate_val_sys env info0.ty info0.sys info1.sys in
         Tm.make @@ Tm.Rst {ty; sys}
 
-      | CoR info0, CoR info1 ->
-        let r = equate_dim env info0.r info1.r in
-        let r' = equate_dim env info0.r' info1.r' in
-        let ty = equate_ty env info0.ty info1.ty in
-        Tm.make @@ Tm.CoR {r; r'; ty}
+      | CoR face0, CoR face1 ->
+        let univ = V.make @@ Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
+        let face = equate_val_face env univ face0 face1 in
+        Tm.make @@ Tm.CoR face
 
       | LblTy info0, LblTy info1 ->
         if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else

@@ -17,7 +17,7 @@ type 'a tmf =
   | Pi of 'a * 'a bnd
   | Ext of ('a * ('a, 'a) system) nbnd
   | Rst of {ty : 'a; sys : ('a, 'a) system}
-  | CoR of {r : 'a; r' : 'a; ty : 'a}
+  | CoR of ('a, 'a) face
   | Sg of 'a * 'a bnd
 
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
