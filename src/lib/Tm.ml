@@ -30,6 +30,7 @@ type 'a tmf =
 
   | Lam of 'a bnd
   | ExtLam of 'a nbnd
+  | CoRThunk of ('a, 'a) face
 
   | Cons of 'a * 'a
   | Dim0
@@ -60,6 +61,7 @@ and 'a frame =
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | LblCall
+  | CoRForce
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
@@ -134,6 +136,9 @@ and subst_f (sub : tm cmd subst) =
   | ExtLam nbnd ->
     ExtLam (subst_nbnd sub nbnd)
 
+  | CoRThunk face ->
+    CoRThunk (subst_tm_face sub face)
+
   | Cons (t0, t1) ->
     Cons (subst sub t0, subst sub t1)
 
@@ -166,7 +171,7 @@ and subst_spine sub spine =
 
 and subst_frame sub frame =
   match frame with
-  | (Car | Cdr | LblCall) ->
+  | (Car | Cdr | LblCall | CoRForce) ->
     frame
   | FunApp t ->
     FunApp (subst sub t)
@@ -315,6 +320,8 @@ let traverse ~f ~var ~ref =
       V {r; ty0; ty1; equiv}
     | ExtLam nbnd ->
       ExtLam (go_nbnd k nbnd)
+    | CoRThunk face ->
+      CoRThunk (go_tm_face k face)
     | Cons (t0, t1) ->
       Cons (f k t0, f k t1)
     | LblTy info ->
@@ -372,7 +379,7 @@ let traverse ~f ~var ~ref =
 
   and go_frm k =
     function
-    | (Car | Cdr | LblCall) as frm -> frm
+    | (Car | Cdr | LblCall | CoRForce) as frm -> frm
     | FunApp t ->
       FunApp (f k t)
     | ExtApp ts ->
@@ -515,6 +522,9 @@ let rec pp env fmt (Tm tm) =
     let xs, env' = Pretty.Env.bindn nms env in
     Format.fprintf fmt "@[<1>(λ <%a>@ %a)@]" pp_strings xs (pp env') tm
 
+  | CoRThunk face ->
+    pp_face env fmt face
+
   | Bool ->
     Format.fprintf fmt "bool"
 
@@ -614,6 +624,8 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r go sp
       | LblCall ->
         Format.fprintf fmt "@[<1>(call@ %a)@]" go sp
+      | CoRForce ->
+        Format.fprintf fmt "@[<1>(force@ %a)@]" go sp
   in
   (* TODO: backwards ??? *)
   go fmt sp
@@ -826,9 +838,7 @@ struct
 
   and go_frame fl frm acc =
     match frm with
-    | Car -> acc
-    | Cdr -> acc
-    | LblCall -> acc
+    | (Car | Cdr | LblCall | CoRForce) -> acc
     | FunApp t ->
       go fl t acc
     | ExtApp ts ->
@@ -934,7 +944,7 @@ let map_head f =
 
 let map_frame f =
   function
-  | (Car | Cdr | LblCall) as frm ->
+  | (Car | Cdr | LblCall | CoRForce) as frm ->
     frm
   | FunApp t ->
     FunApp (f t)
@@ -1010,6 +1020,8 @@ let map_tmf f =
     Lam (map_bnd f bnd)
   | ExtLam nbnd ->
     ExtLam (map_nbnd f nbnd)
+  | CoRThunk face ->
+    CoRThunk (map_tm_face f face)
   | LblTy info ->
     let ty = f info.ty in
     let args = List.map (fun (t0, t1) -> f t0, f t1) info.args in

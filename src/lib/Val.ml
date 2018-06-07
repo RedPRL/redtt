@@ -812,6 +812,10 @@ struct
       let abs = eval_nbnd rel rho bnd in
       make @@ ExtLam abs
 
+    | Tm.CoRThunk face ->
+      let vface = eval_tm_face rel rho face in
+      make @@ CoRThunk vface
+
     | Tm.Cons (t0, t1) ->
       let v0 = eval rel rho t0 in
       let v1 = eval rel rho t1 in
@@ -873,6 +877,8 @@ struct
     function
     | Tm.LblCall ->
       lbl_call vhd
+    | Tm.CoRForce ->
+      corestriction_force vhd
     | Tm.FunApp t ->
       let v = eval rel rho t in
       apply vhd v

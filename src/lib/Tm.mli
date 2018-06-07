@@ -28,6 +28,7 @@ type 'a tmf =
 
   | Lam of 'a bnd
   | ExtLam of 'a nbnd
+  | CoRThunk of ('a, 'a) face
 
   | Cons of 'a * 'a
   | Dim0
@@ -58,6 +59,7 @@ and 'a frame =
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | LblCall
+  | CoRForce
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine

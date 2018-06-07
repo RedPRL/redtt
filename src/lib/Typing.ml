@@ -192,6 +192,36 @@ struct
       let codx, sysx = Eval.ExtAbs.inst ext_abs @@ List.map Dim.named xs in
       check_boundary cxx codx sysx tm
 
+    | V.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
+      let r'0 = check_eval_dim cx tr0 in
+      let r'1 = check_eval_dim cx tr1 in
+      begin
+        match ty_face, otm with
+        | Face.False _, None ->
+          ()
+        | Face.True (r0, r1, ty), Some tm ->
+          begin
+            match Dim.compare (Cx.unleash_dim cx r'0) r0, Dim.compare (Cx.unleash_dim cx r'1) r1 with
+            | Same, Same ->
+              check cx ty tm
+            | _ ->
+              failwith "co-restriction mismatch"
+          end
+        | Face.Indet (p, _), Some tm ->
+          let r0, r1 = DimStar.unleash p in
+          begin
+            match Dim.compare (Cx.unleash_dim cx r'0) r0, Dim.compare (Cx.unleash_dim cx r'1) r1 with
+            | Same, Same ->
+              let cx' = Cx.restrict cx r'0 r'1 in
+              let phi = Cx.equate_dim cx r'0 r'1 in
+              check cx' (Eval.Val.act phi ty) tm
+            | _ ->
+              failwith "co-restriction mismatch"
+          end
+        | _ ->
+          failwith "Malformed element of co-restriction type"
+      end
+
     | V.Rst {ty; sys}, _ ->
       check cx ty tm;
       check_boundary cx ty sys tm
@@ -449,6 +479,13 @@ struct
     | T.LblCall ->
       let _, _, ty = Eval.unleash_lbl_ty ty in
       ty
+
+    | Tm.CoRForce ->
+      begin
+        match Eval.unleash_corestriction_ty ty with
+        | Face.True (_, _, ty) -> ty
+        | _ -> failwith "Cannot force co-restriction when it is not true!"
+      end
 
   and infer_head cx =
     function
