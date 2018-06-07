@@ -116,71 +116,63 @@ and elab_scheme env (cells, ecod) kont =
   in
   go Emp cells
 
-and elab_chk env {ty; _} : E.echk -> tm m =
-  function
-  | E.Quo tmfam ->
+and elab_chk env {ty; sys} e : tm m =
+  match Tm.unleash ty, e with
+  | Tm.Rst info, _ ->
+    let sys' = info.sys @ sys in
+    elab_chk env {ty = info.ty; sys = sys'} e
+
+  | _, E.Quo tmfam ->
     get_resolver env >>= fun renv ->
     (* TODO: unify with boundary *)
     ret @@ tmfam renv
 
-  | E.Hole name ->
+  | _, E.Hole name ->
     ask >>= fun psi ->
     begin
-      Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a@]@."
+      let pp_sys fmt sys =
+        match sys with
+        | [] -> ()
+        | _ -> Tm.pp_sys Pretty.Env.emp fmt sys
+      in
+      Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a %a@]@."
         (match name with Some s -> s | None -> "Hole")
         pp_tele psi
         Uuseg_string.pp_utf_8 "⊢"
-        (Tm.pp Pretty.Env.emp) ty;
+        (Tm.pp Pretty.Env.emp) ty
+        pp_sys sys;
 
-      hole psi ty @@ fun tm -> ret tm
+      hole psi (Tm.make @@ Tm.Rst {ty; sys}) @@ fun tm -> ret tm
     end >>= fun tm ->
     go_right >>
     ret @@ Tm.up tm
 
-  | E.Lam (names, e) ->
-    begin
-      match names with
-      | [] ->
-        elab_chk env {ty; sys = []} e
-      | name :: names ->
-        let x = Name.named @@ Some name in
-        match Tm.unleash ty with
-        | Tm.Pi (dom, cod) ->
-          let codx = Tm.unbind_with x (fun _ -> `Only) cod in
-          in_scope x (`P dom) begin
-            elab_chk env {ty = codx; sys = []} @@
-            E.Lam (names, e)
-          end >>= fun bdyx ->
-          ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
+  | _, E.Lam ([], e) ->
+    elab_chk env {ty; sys = []} e
 
-        | _ ->
-          failwith "lam"
-    end
+  | Tm.Pi (dom, cod), E.Lam (name :: names, e) ->
+    let x = Name.named @@ Some name in
+    let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+    in_scope x (`P dom) begin
+      elab_chk env {ty = codx; sys = []} @@
+      E.Lam (names, e)
+    end >>= fun bdyx ->
+    ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
 
-  | Tuple es ->
-    begin
-      match es with
-      | [] ->
-        failwith "empty tuple"
-      | [e] ->
-        elab_chk env {ty; sys = []} e
-      | e :: es ->
-        begin
-          match Tm.unleash ty with
-          | Tm.Sg (dom, cod) ->
-            elab_chk env {ty = dom; sys = []} e >>= fun tm0 ->
-            typechecker >>= fun (module T) ->
-            let module HS = HSubst (T) in
-            let vdom = T.Cx.eval T.Cx.emp dom in
-            let cod' = HS.inst_ty_bnd cod (vdom, tm0) in
-            elab_chk env {ty = cod'; sys = []} (Tuple es) >>= fun tm1 ->
-            ret @@ Tm.cons tm0 tm1
-          | _ ->
-            failwith "pair"
-        end
-    end
+  | _, Tuple [] ->
+    failwith "empty tuple"
+  | _, Tuple [e] ->
+    elab_chk env {ty; sys = []} e
+  | Tm.Sg (dom, cod), Tuple (e :: es) ->
+    elab_chk env {ty = dom; sys = []} e >>= fun tm0 ->
+    typechecker >>= fun (module T) ->
+    let module HS = HSubst (T) in
+    let vdom = T.Cx.eval T.Cx.emp dom in
+    let cod' = HS.inst_ty_bnd cod (vdom, tm0) in
+    elab_chk env {ty = cod'; sys = []} (Tuple es) >>= fun tm1 ->
+    ret @@ Tm.cons tm0 tm1
 
-  | Type ->
+  | _, Type ->
     begin
       match Tm.unleash ty with
       | Tm.Univ _ ->
