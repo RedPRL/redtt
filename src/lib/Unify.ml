@@ -133,6 +133,17 @@ let rec eta_contract t =
     end
 
 
+  | Tm.CoRThunk (r, r', Some tm) ->
+    let tm' = eta_contract tm in
+    begin
+      match Tm.unleash tm' with
+      | Tm.Up (Tm.Ref (p, twp), Snoc (sp, Tm.CoRForce)) ->
+        Tm.up (Tm.Ref (p, twp), sp)
+      | _ ->
+        Tm.make @@ Tm.CoRThunk (r, r', Some tm')
+    end
+
+
   | Tm.Cons (t0, t1) ->
     let t0' = eta_contract t0 in
     let t1' = eta_contract t1 in
