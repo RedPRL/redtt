@@ -51,7 +51,7 @@ let rec pp_tele fmt =
     pp_tele_cell fmt (x, cell)
 
   | Snoc (tele, (x, cell)) ->
-    Format.fprintf fmt "%a,@,@,%a"
+    Format.fprintf fmt "%a,@,%a"
       pp_tele tele
       pp_tele_cell (x, cell)
 
