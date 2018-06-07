@@ -129,6 +129,7 @@ end
 module type Sig =
 sig
   val restriction : Restriction.t
+
   (** Return the type and boundary of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
