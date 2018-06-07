@@ -20,6 +20,7 @@ type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con
   | Rst : {ty : value; sys : val_sys} -> con
+  | CoR : {r : dim; r' : dim; ty : value} -> con
   | Ext : ext_abs -> con
 
   | Coe : {dir : star; abs : abs; el : value} -> con

@@ -98,6 +98,9 @@ struct
     | Rst {ty; _} ->
       equate env ty el0 el1
 
+    | CoR _info ->
+      failwith "TODO: equate CoR"
+
     | LblTy {ty; _} ->
       let call0 = lbl_call el0 in
       let call1 = lbl_call el1 in
@@ -151,6 +154,12 @@ struct
         let ty = equate env ty info0.ty info1.ty in
         let sys = equate_val_sys env info0.ty info0.sys info1.sys in
         Tm.make @@ Tm.Rst {ty; sys}
+
+      | CoR info0, CoR info1 ->
+        let r = equate_dim env info0.r info1.r in
+        let r' = equate_dim env info0.r' info1.r' in
+        let ty = equate_ty env info0.ty info1.ty in
+        Tm.make @@ Tm.CoR {r; r'; ty}
 
       | LblTy info0, LblTy info1 ->
         if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else

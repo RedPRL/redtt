@@ -152,6 +152,13 @@ struct
       let ty = check_eval cx ty info.ty in
       check_ext_sys cx ty info.sys
 
+    | V.Univ univ, T.CoR info ->
+      if univ.kind = Kind.Pre then () else failwith "Co-restriction type is not known to be Kan";
+      let r = Cx.eval_dim cx info.r in
+      let r' = Cx.eval_dim cx info.r' in
+      let cxrr' = Cx.restrict cx r r' in
+      check cxrr' ty info.ty
+
     | V.Univ _, T.V info ->
       check_dim cx info.r;
       let ty0 = check_eval cx ty info.ty0 in

@@ -22,6 +22,7 @@ type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con
   | Rst : {ty : value; sys : val_sys} -> con
+  | CoR : {r : dim; r' : dim; ty : value} -> con
   | Ext : ext_abs -> con
 
   | Coe : {dir : star; abs : abs; el : value} -> con
@@ -315,6 +316,12 @@ struct
       let ty = Val.act phi info.ty in
       let sys = ValSys.act phi info.sys in
       make @@ Rst {ty; sys}
+
+    | CoR info ->
+      let r = Dim.act phi info.r in
+      let r' = Dim.act phi info.r' in
+      let ty = Val.act phi info.ty in
+      make @@ CoR {r; r'; ty}
 
     | Coe info ->
       make_coe
@@ -773,6 +780,12 @@ struct
       let ty = eval rel rho info.ty in
       let sys = eval_tm_sys rel rho info.sys in
       make @@ Rst {ty; sys}
+
+    | Tm.CoR info ->
+      let r = eval_dim_class rel rho info.r in
+      let r' = eval_dim_class rel rho info.r' in
+      let ty = eval rel rho info.ty in
+      make @@ CoR {r; r'; ty}
 
     | Tm.V info ->
       let r = eval_dim_class rel rho info.r in
@@ -1359,6 +1372,8 @@ struct
       Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
     | Rst {ty; sys} ->
       Format.fprintf fmt "@[<1>(restrict@ %a@ %a)@]" pp_value ty pp_val_sys sys
+    | CoR {r; r'; ty} ->
+      Format.fprintf fmt "@[<1>(Π@ %a=%a@ %a)@]" Dim.pp r Dim.pp r' pp_value ty
     | Univ {kind; lvl} ->
       Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
     | Cons (v0, v1) ->

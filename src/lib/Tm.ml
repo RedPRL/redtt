@@ -19,6 +19,7 @@ type 'a tmf =
   | Pi of 'a * 'a bnd
   | Ext of ('a * ('a, 'a) system) nbnd
   | Rst of {ty : 'a; sys : ('a, 'a) system}
+  | CoR of {r : 'a; r' : 'a; ty : 'a}
   | Sg of 'a * 'a bnd
 
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
@@ -116,6 +117,12 @@ and subst_f (sub : tm cmd subst) =
     let ty = subst sub info.ty in
     let sys = subst_tm_sys sub info.sys in
     Rst {ty; sys}
+
+  | CoR info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst sub info.ty in
+    CoR {r; r'; ty}
 
   | V info ->
     let r = subst sub info.r in
@@ -295,6 +302,11 @@ let traverse ~f ~var ~ref =
       let ty = f k info.ty in
       let sys = go_tm_sys k info.sys in
       Rst {ty; sys}
+    | CoR info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = f k info.ty in
+      CoR {r; r'; ty}
     | FCom info ->
       let r = f k info.r in
       let r' = f k info.r' in
@@ -494,6 +506,9 @@ let rec pp env fmt (Tm tm) =
       | _ ->
         Format.fprintf fmt "@[<1>(%a@ @[%a@])@]" (pp env) ty (pp_sys env) sys
     end
+
+  | CoR {r; r'; ty} ->
+    Format.fprintf fmt "@[<1>(=>@ %a=%a@ %a)@]" (pp env) r (pp env) r' (pp env) ty
 
   | V info ->
     Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
@@ -989,6 +1004,8 @@ let map_tmf f =
     Ext (map_ext_bnd f ebnd)
   | Rst {ty; sys} ->
     Rst {ty = f ty; sys = map_tm_sys f sys}
+  | CoR {r; r'; ty} ->
+    CoR {r = f r; r' = f r'; ty = f ty}
   | V info ->
     let r = f info.r in
     let ty0 = f info.ty0 in
