@@ -6,6 +6,7 @@ type ty = Tm.tm
 type 'a decl =
   | Hole
   | Defn of 'a
+  | Guess of {ty : 'a; tm : 'a}
 
 type status =
   | Blocked

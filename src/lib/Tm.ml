@@ -889,7 +889,7 @@ struct
 end
 
 let free fl tm =
-  Format.eprintf "Free: %a@." (pp Pretty.Env.emp) tm;
+  (* Format.eprintf "Free: %a@." (pp Pretty.Env.emp) tm; *)
   OccursAux.go fl tm Occurs.Set.empty
 
 module Sp =

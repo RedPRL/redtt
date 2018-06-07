@@ -420,6 +420,26 @@ struct
     ty', tm'
 end
 
+let guess gm ~ty0 ~ty1 tm kont =
+  let alpha = Name.fresh () in
+  let ty0' = abstract_ty gm ty0 in
+  let ty1' = abstract_ty gm ty1 in
+  let tm' = abstract_tm gm tm in
+  check ~ty:ty0' tm' >>= fun b ->
+  if not b then
+    let hd = Tm.Meta alpha in
+    let sp = telescope_to_spine gm in
+    pushl @@ E (alpha, ty0', Guess {ty = ty1'; tm = tm'}) >>
+    kont (Tm.up (hd, sp)) >>= fun r ->
+    go_left >>
+    ret r
+  else
+    pushl @@ E (alpha, ty0', Defn tm') >>
+    kont tm >>= fun r ->
+    go_left >>
+    ret r
+
+
 
 (* Check if the equation can *never* be satisfied.
    Remember that the equation is constrained to be well-typed in the appropriate
@@ -827,6 +847,17 @@ let rec ambulando bracket =
         pushl e
       end >>
       ambulando bracket
+
+    | E (alpha, ty, Guess info) ->
+      begin
+        check ~ty info.tm >>= function
+        | true ->
+          pushl @@ E (alpha, ty, Defn info.tm) >>
+          ambulando bracket
+        | false ->
+          pushl e >>
+          ambulando bracket
+      end
 
     | Q (Active, prob) ->
       solver prob >>

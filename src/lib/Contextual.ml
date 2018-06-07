@@ -84,6 +84,8 @@ let update_env e =
     match e with
     | E (nm, ty, Hole) ->
       GlobalEnv.ext st.env nm @@ `P {ty; sys = []}
+    | E (nm, ty, Guess _) ->
+      GlobalEnv.ext st.env nm @@ `P {ty; sys = []}
     | E (nm, ty, Defn t) ->
       GlobalEnv.define st.env nm ty t
     | _ ->

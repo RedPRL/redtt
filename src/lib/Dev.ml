@@ -8,6 +8,7 @@ type twin = [`Only | `TwinL | `TwinR]
 type 'a decl =
   | Hole
   | Defn of 'a
+  | Guess of {ty : 'a; tm : 'a}
 
 type status =
   | Blocked
@@ -164,6 +165,11 @@ let pp_entry fmt =
       (Tm.pp Pretty.Env.emp) ty
       (Tm.pp Pretty.Env.emp) tm
 
+  | E (x, ty, Guess _) ->
+    Format.fprintf fmt "?%a@ :@ %a"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty
+
   | Q (_, prob) ->
     Format.fprintf fmt "%a"
       pp_problem prob
@@ -192,6 +198,10 @@ let subst_decl sub ~ty =
     Hole
   | Defn t ->
     Defn (subst_tm sub ~ty t)
+  | Guess info ->
+    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    let ty' = subst_tm sub ~ty:univ info.ty in
+    Guess {ty = ty'; tm = subst_tm sub ~ty:ty' info.tm}
 
 let subst_equation sub q =
   let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
@@ -282,8 +292,7 @@ struct
     function
     | Hole -> Occurs.Set.empty
     | Defn t -> Tm.free fl t
-
-  let subst = subst_decl
+    | Guess {tm; _} -> Tm.free fl tm
 end
 
 

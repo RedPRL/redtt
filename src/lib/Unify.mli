@@ -7,6 +7,7 @@ val telescope_to_spine : telescope -> tm Tm.spine
 
 val hole : ?name:string option -> telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m
 val define : telescope -> Name.t -> ty:ty -> tm -> unit m
+val guess : telescope -> ty0:ty -> ty1:ty -> tm -> (tm -> 'a m) -> 'a m
 
 
 val to_var : tm -> Name.t option

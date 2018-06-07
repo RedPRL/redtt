@@ -8,17 +8,7 @@ module E = ESig
 
 module T = Map.Make (String)
 
-
 let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre
-
-let get_tele =
-  ask >>= fun psi ->
-  let go (x, p) =
-    match p with
-    | `P ty -> x, ty
-    | _ -> failwith "get_tele"
-  in
-  ret @@ Bwd.map go psi
 
 let get_resolver env =
   let rec go_globals renv  =
@@ -38,8 +28,6 @@ let get_resolver env =
   ask >>= fun psi ->
   ret @@ go_locals ResEnv.init psi
 
-
-type goal = {ty : ty; sys : (tm, tm) Tm.system}
 
 
 let rec pp_tele fmt =
@@ -97,7 +85,7 @@ and elab_decl env =
   function
   | E.Define (name, scheme, e) ->
     elab_scheme env scheme @@ fun cod ->
-    elab_chk env {ty = cod; sys = []} e >>= fun tm ->
+    elab_chk env cod e >>= fun tm ->
     let alpha = Name.named @@ Some name in
 
     ask >>= fun psi ->
@@ -112,22 +100,52 @@ and elab_scheme env (cells, ecod) kont =
   let rec go gm =
     function
     | [] ->
-      elab_chk env {ty = univ; sys = []} ecod >>=
+      elab_chk env univ ecod >>=
       normalize_ty >>=
       kont
     | (name, edom) :: cells ->
-      elab_chk env {ty = univ; sys = []} edom >>= normalize_ty >>= fun dom ->
+      elab_chk env univ edom >>= normalize_ty >>= fun dom ->
       let x = Name.named @@ Some name in
       in_scope x (`P dom) @@
       go (gm #< (x, dom)) cells
   in
   go Emp cells
 
-and elab_chk env {ty; sys} e : tm m =
+and guess_restricted ty sys tm =
+  let rec go =
+    function
+    | [] ->
+      ret ()
+    | (r, r', Some tm') :: sys ->
+      begin
+        Format.eprintf "Unifying %a = %a@."
+          (Tm.pp Pretty.Env.emp) tm
+          (Tm.pp Pretty.Env.emp) tm';
+        under_restriction r r' @@
+        active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
+      end >>
+      go sys
+    | _ :: sys ->
+      go sys
+  in
+  go sys >>
+  let rty = Tm.make @@ Tm.Rst {ty; sys} in
+  ask >>= fun psi ->
+  guess psi ~ty0:rty ~ty1:ty tm ret >>= fun tm' ->
+  go_right >>= fun _ ->
+  Format.eprintf "%a vs %a @."
+    (Tm.pp Pretty.Env.emp) tm
+    (Tm.pp Pretty.Env.emp) tm';
+  ret tm'
+
+and elab_chk env ty e : tm m =
   match Tm.unleash ty, e with
   | Tm.Rst info, _ ->
-    let sys' = info.sys @ sys in
-    elab_chk env {ty = info.ty; sys = sys'} e
+    elab_chk env info.ty e >>=
+    guess_restricted info.ty info.sys
+  (* go_right >>
+     Format.printf "Taste it: %a@." (Tm.pp Pretty.Env.emp) tm;
+     ret tm *)
 
   | _, E.Quo tmfam ->
     get_resolver env >>= fun renv ->
@@ -136,32 +154,23 @@ and elab_chk env {ty; sys} e : tm m =
 
   | _, E.Hole name ->
     ask >>= fun psi ->
-    begin
-      let pp_sys fmt sys =
-        match sys with
-        | [] -> ()
-        | _ -> Tm.pp_sys Pretty.Env.emp fmt sys
-      in
-      Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a %a@]@."
-        (match name with Some s -> s | None -> "Hole")
-        pp_tele psi
-        Uuseg_string.pp_utf_8 "⊢"
-        (Tm.pp Pretty.Env.emp) ty
-        pp_sys sys;
-
-      hole psi (Tm.make @@ Tm.Rst {ty; sys}) @@ fun tm -> ret tm
-    end >>= fun tm ->
+    Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a@]@."
+      (match name with Some s -> s | None -> "Hole")
+      pp_tele psi
+      Uuseg_string.pp_utf_8 "⊢"
+      (Tm.pp Pretty.Env.emp) ty;
+    hole psi ty ret >>= fun tm ->
     go_right >>
     ret @@ Tm.up tm
 
   | _, E.Lam ([], e) ->
-    elab_chk env {ty; sys = []} e
+    elab_chk env ty e
 
   | Tm.Pi (dom, cod), E.Lam (name :: names, e) ->
     let x = Name.named @@ Some name in
     let codx = Tm.unbind_with x (fun _ -> `Only) cod in
     in_scope x (`P dom) begin
-      elab_chk env {ty = codx; sys = []} @@
+      elab_chk env codx @@
       E.Lam (names, e)
     end >>= fun bdyx ->
     ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
@@ -169,14 +178,14 @@ and elab_chk env {ty; sys} e : tm m =
   | _, Tuple [] ->
     failwith "empty tuple"
   | _, Tuple [e] ->
-    elab_chk env {ty; sys = []} e
+    elab_chk env ty e
   | Tm.Sg (dom, cod), Tuple (e :: es) ->
-    elab_chk env {ty = dom; sys = []} e >>= fun tm0 ->
+    elab_chk env dom e >>= fun tm0 ->
     typechecker >>= fun (module T) ->
     let module HS = HSubst (T) in
     let vdom = T.Cx.eval T.Cx.emp dom in
     let cod' = HS.inst_ty_bnd cod (vdom, tm0) in
-    elab_chk env {ty = cod'; sys = []} (Tuple es) >>= fun tm1 ->
+    elab_chk env cod' (Tuple es) >>= fun tm1 ->
     ret @@ Tm.cons tm0 tm1
 
   | _, Type ->
