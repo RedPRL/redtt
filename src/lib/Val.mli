@@ -37,7 +37,7 @@ type con =
   | Tt : con
   | Ff : con
 
-  | Up : {ty : value; neu : neu; sys : val_sys} -> con
+  | Up : {ty : value; neu : neu; sys : rigid_val_sys} -> con
 
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
   | LblRet : value -> con
@@ -68,8 +68,7 @@ and rigid_val_face = ([`Rigid], value) face
 
 and comp_sys = rigid_abs_face list
 and val_sys = val_face list
-and box_sys = rigid_val_face list
-and cap_sys = rigid_abs_face list
+and rigid_val_sys = rigid_val_face list
 and ext_abs = (value * val_sys) Abstraction.abs
 
 and env_el = Val of value | Atom of atom
@@ -80,6 +79,8 @@ module type S =
 sig
   val make : con -> value
   val unleash : value -> con
+
+  val reflect : value -> neu -> val_sys -> value
 
   val eval : rel -> env -> Tm.tm -> value
   val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value

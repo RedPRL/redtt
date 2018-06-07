@@ -39,7 +39,7 @@ type con =
   | Tt : con
   | Ff : con
 
-  | Up : {ty : value; neu : neu; sys : val_sys} -> con
+  | Up : {ty : value; neu : neu; sys : rigid_val_sys} -> con
 
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
   | LblRet : value -> con
@@ -78,8 +78,7 @@ and rigid_val_face = ([`Rigid], value) face
 
 and comp_sys = rigid_abs_face list
 and val_sys = val_face list
-and box_sys = rigid_val_face list
-and cap_sys = rigid_abs_face list
+and rigid_val_sys = rigid_val_face list
 
 and node = Node of {con : con; action : D.action}
 and value = node ref
@@ -88,6 +87,8 @@ module type S =
 sig
   val make : con -> value
   val unleash : value -> con
+
+  val reflect : value -> neu -> val_sys -> value
 
   val eval : rel -> env -> Tm.tm -> value
   val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
@@ -218,6 +219,8 @@ struct
     include Sort
       with type t = val_sys
       with type 'a m = 'a
+
+    val from_rigid : rigid_val_sys -> t
   end =
   struct
     type t = val_sys
@@ -225,7 +228,16 @@ struct
 
     let act phi =
       List.map (ValFace.act phi)
+
+    let from_rigid sys =
+      let face : rigid_val_face -> val_face =
+        function
+        | Face.False p -> Face.False p
+        | Face.Indet (p, a) -> Face.Indet (p, a)
+      in
+      List.map face sys
   end
+
 
   module ExtAbs : Abstraction.S with type el = value * val_sys =
     Abstraction.M (Sort.Prod (Val) (ValSys))
@@ -268,17 +280,17 @@ struct
       match con with
       | Up up ->
         begin
-          match force_val_sys up.sys with
-          | `Proj el -> el
-          | `Rigid _ ->
+          match unleash up.ty with
+          | Rst rst ->
             begin
-              match unleash up.ty with
-              | Rst rst ->
-                let con = Up {ty = rst.ty; neu = up.neu; sys = rst.sys} in
-                ref @@ Node {con; action = D.idn}
-              | _ ->
+              match force_val_sys rst.sys with
+              | `Proj el -> el
+              | `Rigid sys ->
+                let con = Up {ty = rst.ty; neu = up.neu; sys} in
                 ref @@ Node {con; action = D.idn}
             end
+          | _ ->
+            ref @@ Node {con; action = D.idn}
         end
       | _ ->
         ref @@ Node {con; action = D.idn}
@@ -365,13 +377,16 @@ struct
 
     | Up info ->
       let ty = Val.act phi info.ty in
-      let sys = ValSys.act phi info.sys in
+      let sys = ValSys.act phi @@ ValSys.from_rigid info.sys in
       begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          make @@ Up {ty; neu; sys}
-        | Step v ->
-          v
+        match force_val_sys sys with
+        | `Proj v -> v
+        | `Rigid sys ->
+          match act_neu phi info.neu with
+          | Ret neu ->
+            make @@ Up {ty; neu; sys}
+          | Step v ->
+            v
       end
 
   and act_neu phi con =
@@ -866,13 +881,19 @@ struct
       let tty, tsys = Sig.lookup name tw in
       let vsys = eval_tm_sys rel [] tsys in
       let vty = eval rel [] tty in
-      make @@ Up {ty = vty; neu = Ref (name, tw); sys = vsys}
+      reflect vty (Ref (name, tw)) vsys
 
     | Tm.Meta name ->
       let tty, tsys = Sig.lookup name `Only in
       let vsys = eval_tm_sys rel [] tsys in
       let vty = eval rel [] tty in
-      make @@ Up {ty = vty; neu = Meta name; sys = vsys}
+      reflect vty (Meta name) vsys
+
+  and reflect ty neu sys =
+    match force_val_sys sys with
+    | `Proj el -> el
+    | `Rigid sys ->
+      make @@ Up {ty; neu; sys}
 
   and eval_bnd_face rel rho (tr, tr', obnd) =
     let r = eval_dim rel rho tr in
@@ -1080,7 +1101,7 @@ struct
       let tyr, sysr = unleash_ext info.ty ss in
       begin
         match force_val_sys sysr with
-        | `Rigid _ ->
+        | `Rigid sysr ->
           let app = ExtApp (info.neu, ss) in
           let app_face =
             Face.map @@ fun r r' a ->
@@ -1286,7 +1307,7 @@ struct
   and pp_value fmt value =
     match unleash value with
     | Up up ->
-      Format.fprintf fmt "%a" pp_neu up.neu
+      Format.fprintf fmt "%a{%a}" pp_neu up.neu pp_val_sys up.sys
     | Lam clo ->
       Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
     | ExtLam abs ->
@@ -1343,20 +1364,22 @@ struct
     let x, (tyx, sysx) = ExtAbs.unleash1 abs in
     Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" Name.pp x pp_value tyx pp_val_sys sysx
 
-  and pp_val_sys fmt sys =
-    let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep pp_val_face fmt sys
+  and pp_val_sys : type x. Format.formatter -> (x, value) face list -> unit =
+    fun fmt ->
+      let pp_sep fmt () = Format.fprintf fmt " " in
+      Format.pp_print_list ~pp_sep pp_val_face fmt
 
-  and pp_val_face fmt face =
-    match face with
-    | Face.True (r0, r1, v) ->
-      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
-    | Face.False p ->
-      let r0, r1 = Star.unleash p in
-      Format.fprintf fmt "@[<1>[%a/=%a]@]" Dim.pp r0 Dim.pp r1
-    | Face.Indet (p, v) ->
-      let r0, r1 = Star.unleash p in
-      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
+  and pp_val_face : type x. _ -> (x, value) face -> unit =
+    fun fmt ->
+      function
+      | Face.True (r0, r1, v) ->
+        Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
+      | Face.False p ->
+        let r0, r1 = Star.unleash p in
+        Format.fprintf fmt "@[<1>[%a/=%a]@]" Dim.pp r0 Dim.pp r1
+      | Face.Indet (p, v) ->
+        let r0, r1 = Star.unleash p in
+        Format.fprintf fmt "@[<1>[?%a=%a %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
 
   and pp_clo fmt _ =
     Format.fprintf fmt "<clo>"

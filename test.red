@@ -119,4 +119,8 @@ let connection/and
 let foo [x : `bool] : `(* bool bool bool) ⇒
   < `x, `x, `x >
 
+
+let testing [x : `(bool [0=0 tt])] : `(bool [0=0 tt]) ⇒
+  ?
+
 debug
