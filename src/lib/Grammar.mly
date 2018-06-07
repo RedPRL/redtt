@@ -31,7 +31,9 @@ echk:
   | BACKTICK; t = tm
     { E.Quo t }
   | QUESTION_MARK
-    { E.Hole }
+    { E.Hole None }
+  | QUESTION_MARK; a = ATOM
+    { E.Hole (Some a) }
   | TYPE
     { E.Type }
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = echk

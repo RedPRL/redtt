@@ -55,8 +55,8 @@ let hole_named alpha (gm : telescope) ty f =
   go_left >>
   ret r
 
-let hole ?debug:(debug = None) gm ty f =
-  hole_named (Name.named debug) gm ty f
+let hole ?name:(name = None) gm ty f =
+  hole_named (Name.named name) gm ty f
 
 let define gm alpha ~ty tm =
   let ty' = abstract_ty gm ty in

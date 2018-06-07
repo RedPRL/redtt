@@ -123,10 +123,11 @@ and elab_chk env {ty; _} : E.echk -> tm m =
     (* TODO: unify with boundary *)
     ret @@ tmfam renv
 
-  | E.Hole ->
+  | E.Hole name ->
     ask >>= fun psi ->
     begin
-      Format.printf "Hole:@, @[<v>@[<v>%a@]@;%a@,%a@]@."
+      Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a@]@."
+        (match name with Some s -> s | None -> "Hole")
         pp_tele psi
         Uuseg_string.pp_utf_8 "⊢"
         (Tm.pp Pretty.Env.emp) ty;
