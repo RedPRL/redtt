@@ -252,15 +252,15 @@ let rec flex_term ~deps q =
     begin
       match e with
       | E (beta, _, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
-        Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q;
+        (* Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q; *)
         pushls (e :: deps) >>
         block (Unify q)
       | E (beta, ty, Hole) when alpha = beta ->
-        Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q;
+        (* Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q; *)
         pushls deps >>
         try_invert q ty <||
         begin
-          Format.eprintf "flex_term failed to invert.@.";
+          (* Format.eprintf "flex_term failed to invert.@."; *)
           block (Unify q) >>
           pushl e
         end
@@ -270,10 +270,10 @@ let rec flex_term ~deps q =
           || Occurs.Set.mem beta (Entries.free `Metas deps)
           || Occurs.Set.mem beta (Equation.free `Metas q)
         ->
-        Format.eprintf "flex_term/3: @[<1>%a@]@." Equation.pp q;
+        (* Format.eprintf "flex_term/3: @[<1>%a@]@." Equation.pp q; *)
         flex_term ~deps:(e :: deps) q
       | _ ->
-        Format.eprintf "flex_term/4: @[<1>%a@]@." Equation.pp q;
+        (* Format.eprintf "flex_term/4: @[<1>%a@]@." Equation.pp q; *)
         pushr e >>
         flex_term ~deps q
     end
@@ -649,7 +649,7 @@ let unify q =
     active prob
 
   | Tm.Sg (dom0, _), Tm.Sg (dom1, _) ->
-    Format.eprintf "Unify: @[<1>%a@]@.@." Equation.pp q ;
+    (* Format.eprintf "Unify: @[<1>%a@]@.@." Equation.pp q ; *)
     (q.ty0, q.tm0) %% Tm.Car >>= fun (_, car0) ->
     (q.ty1, q.tm1) %% Tm.Car >>= fun (_, car1) ->
     (q.ty0, q.tm0) %% Tm.Cdr >>= fun (ty_cdr0, cdr0) ->
@@ -739,7 +739,7 @@ let rec split_sigma tele x ty =
 
 
 let rec solver prob =
-  Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob;
+  (* Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob; *)
   match prob with
   | Unify q ->
     is_reflexive q <||

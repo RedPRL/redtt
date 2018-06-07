@@ -118,9 +118,6 @@ and guess_restricted ty sys tm =
       ret ()
     | (r, r', Some tm') :: sys ->
       begin
-        Format.eprintf "Unifying %a = %a@."
-          (Tm.pp Pretty.Env.emp) tm
-          (Tm.pp Pretty.Env.emp) tm';
         under_restriction r r' @@
         active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
       end >>
@@ -132,10 +129,7 @@ and guess_restricted ty sys tm =
   let rty = Tm.make @@ Tm.Rst {ty; sys} in
   ask >>= fun psi ->
   guess psi ~ty0:rty ~ty1:ty tm ret >>= fun tm' ->
-  go_right >>= fun _ ->
-  Format.eprintf "%a vs %a @."
-    (Tm.pp Pretty.Env.emp) tm
-    (Tm.pp Pretty.Env.emp) tm';
+  go_right >>
   ret tm'
 
 and elab_chk env ty e : tm m =
@@ -143,9 +137,6 @@ and elab_chk env ty e : tm m =
   | Tm.Rst info, _ ->
     elab_chk env info.ty e >>=
     guess_restricted info.ty info.sys
-  (* go_right >>
-     Format.printf "Taste it: %a@." (Tm.pp Pretty.Env.emp) tm;
-     ret tm *)
 
   | _, E.Quo tmfam ->
     get_resolver env >>= fun renv ->
