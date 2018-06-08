@@ -62,7 +62,7 @@ and neu =
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
-  | Cap : {dir : star; neu : neu; ty : value; sys : comp_sys} -> neu
+  | Cap : {dir : star; ty : value; sys : comp_sys; neu : neu} -> neu
 
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
@@ -469,9 +469,9 @@ struct
         | Ret neu ->
           (* this is dumb; should refactor this with `cap`. *)
           let el = make @@ Up {ty = info.ty; neu; sys = []} in
-          step @@ cap mdir el info.ty msys
+          step @@ cap mdir info.ty msys el
         | Step el ->
-          step @@ cap mdir el info.ty msys
+          step @@ cap mdir info.ty msys el
       end
 
     | FunApp (neu, arg) ->
@@ -1465,25 +1465,25 @@ struct
 
     | _ -> failwith "TODO: cdr"
 
-  and cap mdir el ty msys : value =
+  and cap mdir ty msys el : value =
     match mdir with
     | `Ok dir ->
       begin
         match msys with
         | `Ok sys ->
-          rigid_cap dir el ty sys
+          rigid_cap dir ty sys el
         | `Proj abs ->
           rigid_coe dir abs el
       end
     | `Same _ ->
       el
 
-  and rigid_cap dir el ty sys : value =
+  and rigid_cap dir ty sys el : value =
     match unleash el with
     | Box info -> info.cap
     | Up info ->
       let dom, _ = unleash_sg info.ty in
-      let cap_sys = List.map (Face.map (fun _ _ a -> rigid_cap dir a ty sys)) info.sys in
+      let cap_sys = List.map (Face.map (fun _ _ a -> rigid_cap dir ty sys a)) info.sys in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
     | _ -> failwith "rigid_cap"
 

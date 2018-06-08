@@ -60,7 +60,7 @@ and neu =
   *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
-  | Cap : {dir : star; neu : neu; ty : value; sys : comp_sys} -> neu
+  | Cap : {dir : star; ty : value; sys : comp_sys; neu : neu} -> neu
 
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
