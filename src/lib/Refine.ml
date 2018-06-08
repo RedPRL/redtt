@@ -46,18 +46,20 @@ struct
 
   let print_diagnostic =
     function
-    | UserHole {name; tele; ty; _} ->
+    | UserHole {name; tele; ty; tm} ->
       C.local (fun _ -> tele) @@
       begin
-        (* C.bind C.typechecker @@ fun (module T) -> *)
-        (* let vty = T.Cx.eval T.Cx.emp ty in
-           let vtm = T.Cx.eval T.Cx.emp tm in
-           let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in *)
-        Format.printf "?%s:@,  @[<v>@[<v>%a@]@;%a@,%a@]@.@."
+        C.bind C.typechecker @@ fun (module T) ->
+        let vty = T.Cx.eval T.Cx.emp ty in
+        let vtm = T.Cx.eval T.Cx.emp tm in
+        let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in
+        Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@,%a %a@]@.@."
           (match name with Some name -> name | None -> "Hole")
-          U.pp_tele tele
+          Dev.pp_params tele
           Uuseg_string.pp_utf_8 "⊢"
-          (Tm.pp Pretty.Env.emp) ty;
+          Tm.pp0 ty
+          Uuseg_string.pp_utf_8 "⟿"
+          Tm.pp0 tm;
         C.ret ()
       end
 
@@ -168,8 +170,13 @@ and elab_decl env =
     M.lift @@ U.define psi alpha cod tm >>
     M.ret @@ T.add name alpha env
 
-  | E.Debug ->
-    M.lift @@ C.dump_state Format.std_formatter "debug" >>
+  | E.Debug filter ->
+    let title =
+      match filter with
+      | `All -> "Development state:"
+      | `Constraints -> "Unsolved constraints:"
+    in
+    M.lift @@ C.dump_state Format.std_formatter title filter >>
     M.ret env
 
 and elab_scheme env (cells, ecod) kont =

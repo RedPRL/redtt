@@ -9,41 +9,6 @@ open Notation
 type telescope = params
 
 
-let rec pp_tele fmt =
-  function
-  | Emp ->
-    ()
-
-  | Snoc (Emp, (x, cell)) ->
-    pp_tele_cell fmt (x, cell)
-
-  | Snoc (tele, (x, cell)) ->
-    Format.fprintf fmt "%a,@,%a"
-      pp_tele tele
-      pp_tele_cell (x, cell)
-
-and pp_tele_cell fmt (x, cell) =
-  match cell with
-  | `P ty ->
-    Format.fprintf fmt "@[<1>%a : %a@]"
-      Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
-
-  | `Tw (ty0, ty1) ->
-    Format.fprintf fmt "@[<1>%a : %a | %a@]"
-      Name.pp x
-      (Tm.pp Pretty.Env.emp) ty0
-      (Tm.pp Pretty.Env.emp) ty1
-
-  | `I ->
-    Format.fprintf fmt "@[<1>%a : dim@]"
-      Name.pp x
-
-  | `R (r0, r1) ->
-    Format.fprintf fmt "@[<1>%a = %a@]"
-      (Tm.pp Pretty.Env.emp) r0
-      (Tm.pp Pretty.Env.emp) r1
-
 
 let rec telescope ty : telescope * ty =
   match Tm.unleash ty with
@@ -109,9 +74,9 @@ let define gm alpha ~ty tm =
   let tm' = abstract_tm gm tm in
   check ~ty:ty' tm' >>= fun b ->
   if not b then
-    dump_state Format.err_formatter "Type error" >>= fun _ ->
+    dump_state Format.err_formatter "Type error" `All >>= fun _ ->
     begin
-      Format.eprintf "error checking: %a : %a@." (Tm.pp Pretty.Env.emp) tm' (Tm.pp Pretty.Env.emp) ty';
+      Format.eprintf "error checking: %a : %a@." Tm.pp0 tm' Tm.pp0 ty';
       failwith "define: type error"
     end
   else
@@ -124,6 +89,7 @@ let occurs_check alpha tm =
   Tm.free `Metas tm
 
 
+(* TODO: move to some code dumping ground, perhaps the basis *)
 let rec opt_traverse f xs =
   match xs with
   | [] -> Some []
@@ -132,89 +98,8 @@ let rec opt_traverse f xs =
     | Some y -> Option.map (fun ys -> y :: ys) @@ opt_traverse f xs
     | None -> None
 
-
-let as_plain_var t =
-  match Tm.unleash t with
-  | Tm.Up (Tm.Ref (x, _), Emp) ->
-    Some x
-  | _ ->
-    None
-
-(* A very crappy eta contraction function. It's horrific that this is actually a thing that we do! *)
-let rec eta_contract t =
-  match Tm.unleash t with
-  | Tm.Lam bnd ->
-    let y, tmy = Tm.unbind bnd in
-    let tm'y = eta_contract tmy in
-    begin
-      match Tm.unleash tm'y with
-      | Tm.Up (Tm.Ref (f, twf), Snoc (sp, Tm.FunApp arg)) ->
-        begin
-          match as_plain_var arg with
-          | Some y'
-            when
-              y = y'
-              && not @@ Occurs.Set.mem y @@ Tm.Sp.free `Vars sp
-            ->
-            Tm.up (Tm.Ref (f, twf), sp)
-          | _ ->
-            Tm.make @@ Tm.Lam (Tm.bind y tm'y)
-        end
-      | _ ->
-        Tm.make @@ Tm.Lam (Tm.bind y tm'y)
-    end
-
-  | Tm.ExtLam nbnd ->
-    let ys, tmys = Tm.unbindn nbnd in
-    let tm'ys = eta_contract tmys in
-    begin
-      match Tm.unleash tm'ys with
-      | Tm.Up (Tm.Ref (p, twp), Snoc (sp, Tm.ExtApp args)) ->
-        begin
-          match opt_traverse as_plain_var args with
-          | Some y's
-            when Bwd.to_list ys = y's
-            (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)
-            ->
-            Tm.up (Tm.Ref (p, twp), sp)
-          | _ ->
-            Tm.make @@ Tm.ExtLam (Tm.bindn ys tm'ys)
-        end
-      | _ ->
-        Tm.make @@ Tm.ExtLam (Tm.bindn ys tm'ys)
-    end
-
-
-  | Tm.CoRThunk (r, r', Some tm) ->
-    let tm' = eta_contract tm in
-    begin
-      match Tm.unleash tm' with
-      | Tm.Up (Tm.Ref (p, twp), Snoc (sp, Tm.CoRForce)) ->
-        Tm.up (Tm.Ref (p, twp), sp)
-      | _ ->
-        Tm.make @@ Tm.CoRThunk (r, r', Some tm')
-    end
-
-
-  | Tm.Cons (t0, t1) ->
-    let t0' = eta_contract t0 in
-    let t1' = eta_contract t1 in
-    begin
-      match Tm.unleash t0', Tm.unleash t1' with
-      | Tm.Up (hd0, Snoc (sp0, Tm.Car)), Tm.Up (hd1, Snoc (sp1, Tm.Cdr))
-        when
-          hd0 = hd1 && sp0 = sp1
-        ->
-        Tm.up (hd0, sp0)
-      | _ ->
-        Tm.cons t0' t1'
-    end
-
-  | con ->
-    Tm.make @@ Tm.map_tmf eta_contract con
-
 let to_var t =
-  match Tm.unleash @@ eta_contract t with
+  match Tm.unleash @@ Tm.eta_contract t with
   | Tm.Up (Tm.Ref (a, _), Emp) ->
     Some a
   | _ ->
