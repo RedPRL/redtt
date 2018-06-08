@@ -652,11 +652,17 @@ let normalize ~ty tm =
   let vtm = T.Cx.eval T.Cx.emp tm in
   ret @@ T.Cx.quote T.Cx.emp ~ty:vty vtm
 
+let normalize_eqn q =
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  normalize ~ty:univ q.ty0 >>= fun ty0 ->
+  normalize ~ty:univ q.ty1 >>= fun ty1 ->
+  normalize ~ty:ty0 q.tm0 >>= fun tm0 ->
+  normalize ~ty:ty1 q.tm1 >>= fun tm1 ->
+  ret @@ {ty0; ty1; tm0; tm1}
+
 (* invariant: will not be called on equations which are already reflexive *)
 let rigid_rigid q =
-  normalize ~ty:q.ty0 q.tm0 >>= fun tm0 ->
-  normalize ~ty:q.ty1 q.tm1 >>= fun tm1 ->
-  match Tm.unleash tm0, Tm.unleash tm1 with
+  match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-pi" in
     let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
@@ -694,6 +700,7 @@ let (%%) (ty, tm) frame =
 
 
 let unify q =
+  normalize_eqn q >>= fun q ->
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, Tm.B (nm, _)), Tm.Pi (dom1, _) ->
     let x = Name.named nm in
