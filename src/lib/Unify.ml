@@ -650,8 +650,8 @@ let (%%) (ty, tm) frame =
 
 let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
-  | Tm.Pi (dom0, _), Tm.Pi (dom1, _) ->
-    let x = Name.named @@ Some "foo" in
+  | Tm.Pi (dom0, Tm.B (nm, _)), Tm.Pi (dom1, _) ->
+    let x = Name.named nm in
     let x_l = Tm.up (Tm.Ref (x, `TwinL), Emp) in
     let x_r = Tm.up (Tm.Ref (x, `TwinR), Emp) in
 
