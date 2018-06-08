@@ -138,11 +138,12 @@ let pp_param fmt =
   | `P ty ->
     Tm.pp Pretty.Env.emp fmt ty
   | `Tw (ty0, ty1) ->
-    Format.fprintf fmt "{%a | %a}"
+    Format.fprintf fmt "%a %a %a"
       Tm.pp0 ty0
+      Uuseg_string.pp_utf_8 "‡"
       Tm.pp0 ty1
   | `R (r0, r1) ->
-    Format.fprintf fmt "{%a = %a}"
+    Format.fprintf fmt "%a = %a"
       Tm.pp0 r0
       Tm.pp0 r1
 
@@ -155,8 +156,9 @@ let pp_param_cell fmt (x, param) =
       Tm.pp0 ty
 
   | `Tw (ty0, ty1) ->
-    Format.fprintf fmt "@[<1>%a : %a | %a@]"
+    Format.fprintf fmt "@[<1>%a : %a %a %a@]"
       Name.pp x
+      Uuseg_string.pp_utf_8 "‡"
       Tm.pp0 ty0
       Tm.pp0 ty1
 
