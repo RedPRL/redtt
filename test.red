@@ -14,7 +14,8 @@ let funext
   [p : `(→ [x : A] (Path (B x) (f x) (g x)))]
   : `(Path (→ [x : A] (B x)) f g)
   ⇒
-  `(λ <i> [x] (@ (p x) i))
+  λ i x →
+    `(@ (p x) i)
 
 
 let not [x : `bool] : `bool ⇒
@@ -34,18 +35,18 @@ let not∘not/id/pt [x : `bool] : `(Path bool (not∘not x) x) ⇒
    (λ <i> ff))
 
 let not∘not/id : `(Path (→ bool bool) not∘not (id bool)) ⇒
- `(λ <i> [x]
-   (@ (not∘not/id/pt x) i))
+  λ i x →
+   `(@ (not∘not/id/pt x) i)
 
 let symm
   [A : type]
   [p : `(# <i> A)]
   : `(Path A (@ p 1) (@ p 0))
   ⇒
-  `(λ <i>
-    (hcom 0 1 A (@ p 0)
+  λ i →
+   `(hcom 0 1 A (@ p 0)
      [i=0 <j> (@ p j)]
-     [i=1 <_> (@ p 0)]))
+     [i=1 <_> (@ p 0)])
 
 let trans
   [A : type]
@@ -54,10 +55,10 @@ let trans
   [q : `(Path A (@ p 1) x)]
   : `(Path A (@ p 0) (@ q 1))
   ⇒
-  `(λ <i>
-    (hcom 0 1 A (@ p i)
+  λ i →
+   `(hcom 0 1 A (@ p i)
      [i=0 <_> (@ p 0)]
-     [i=1 <j> (@ q j)]))
+     [i=1 <j> (@ q j)])
 
 let singleton [A : type] [M : `A] : `(U pre 0) ⇒
   `(A [0=0 M])
@@ -74,8 +75,8 @@ let connection/or
  [p : `(Path A a b)]
  : `(# <i j> A [j=0 (@ p i)] [i=0 (@ p j)] [j=1 b] [i=1 b])
  ⇒
- `(λ <i j>
-   (let
+ λ i j →
+  `(let
     ; this is an example of something that is much nicer here than in redprl and yacctt.
     ; we can define using line types all the faces of the composition at once.
     ; definitional equivalence kicks in to make this work.
@@ -85,7 +86,7 @@ let connection/or
      [i=1 <k> (@ face k 1)]
      [j=0 <k> (@ face k i)]
      [j=1 <k> (@ face k 1)]
-     [i=j <k> (@ face k i)])))
+     [i=j <k> (@ face k i)]))
 
 ; an example of using the singleton type to establish an exact equality
 let connection/or/diagonal
@@ -95,25 +96,25 @@ let connection/or/diagonal
  [p : `(Path A a b)]
  : `(singleton (Path A a b) p)
  ⇒
- `(λ <i>
-   (@ (connection/or A a b p) i i))
+ λ i →
+  `(@ (connection/or A a b p) i i)
 
-let connection/and
- [A : type]
- [a : `A]
- [b : `A]
- [p : `(Path A a b)]
- : `(# <i j> A [j=0 a] [i=0 a] [j=1 (@ p i)] [i=1 (@ p j)])
- ⇒
- `(λ <i j>
-   (let
-    [face (▷ (# <_ _> A) (λ <k l> (hcom 1 l A (@ p k) [k=0 <_> a] [k=1 <m> (@ p m)])))]
-    (hcom 0 1 A a
-     [i=0 <k> (@ face k 0)]
-     [i=1 <k> (@ face k j)]
-     [j=0 <k> (@ face k 0)]
-     [j=1 <k> (@ face k i)]
-     [i=j <k> (@ face k i)])))
+ let connection/and
+  [A : type]
+  [a : `A]
+  [b : `A]
+  [p : `(Path A a b)]
+  : `(# <i j> A [j=0 a] [i=0 a] [j=1 (@ p i)] [i=1 (@ p j)])
+  ⇒
+  λ i j →
+   `(let
+     [face (▷ (# <_ _> A) (λ <k l> (hcom 1 l A (@ p k) [k=0 <_> a] [k=1 <m> (@ p m)])))]
+     (hcom 0 1 A a
+      [i=0 <k> (@ face k 0)]
+      [i=1 <k> (@ face k j)]
+      [j=0 <k> (@ face k 0)]
+      [j=1 <k> (@ face k i)]
+      [i=j <k> (@ face k i)]))
 
 
 let foo [x : `bool] : `(* bool bool bool) ⇒

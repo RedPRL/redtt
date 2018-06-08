@@ -8,6 +8,43 @@ open Notation
 
 type telescope = params
 
+
+let rec pp_tele fmt =
+  function
+  | Emp ->
+    ()
+
+  | Snoc (Emp, (x, cell)) ->
+    pp_tele_cell fmt (x, cell)
+
+  | Snoc (tele, (x, cell)) ->
+    Format.fprintf fmt "%a,@,%a"
+      pp_tele tele
+      pp_tele_cell (x, cell)
+
+and pp_tele_cell fmt (x, cell) =
+  match cell with
+  | `P ty ->
+    Format.fprintf fmt "@[<1>%a : %a@]"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty
+
+  | `Tw (ty0, ty1) ->
+    Format.fprintf fmt "@[<1>%a : %a | %a@]"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty0
+      (Tm.pp Pretty.Env.emp) ty1
+
+  | `I ->
+    Format.fprintf fmt "@[<1>%a : dim@]"
+      Name.pp x
+
+  | `R (r0, r1) ->
+    Format.fprintf fmt "@[<1>%a = %a@]"
+      (Tm.pp Pretty.Env.emp) r0
+      (Tm.pp Pretty.Env.emp) r1
+
+
 let rec telescope ty : telescope * ty =
   match Tm.unleash ty with
   | Tm.Pi (dom, cod) ->
@@ -39,13 +76,22 @@ let rec abstract_ty (gm : telescope) cod =
     abstract_ty gm @@ Tm.make @@ Tm.Pi (dom, Tm.bind x cod)
   | Snoc (gm, (_, `R (r, r'))) ->
     abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
+  | Snoc (gm, (x, `I)) ->
+    let cod' = Tm.close_var x (fun tw -> tw) 0 cod in
+    abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB ([Name.name x], (cod', [])))
   | _ ->
     failwith "abstract_ty"
 
 let telescope_to_spine : telescope -> tm Tm.spine =
   (* TODO: might be backwards *)
-  Bwd.map @@ fun (x, _) ->
-  Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
+  Bwd.map @@ fun (x, param) ->
+  match param with
+  | `I ->
+    Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]
+  | `P _ ->
+    Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
+  | _ ->
+    failwith "TODO: telescope_to_spine"
 
 let hole_named alpha (gm : telescope) ty f =
   pushl (E (alpha, abstract_ty gm ty, Hole)) >>
@@ -513,7 +559,10 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
         let vty1 = T.Cx.eval T.Cx.emp ty1 in
         ret (vty0, vty1)
       else
-        failwith "rigid head mismatch"
+        begin
+          Format.eprintf "rigid head mismatch: %a <> %a@." Name.pp x0 Name.pp x1;
+          failwith "rigid head mismatch"
+        end
 
     | Snoc (sp0, Tm.FunApp t0), Snoc (sp1, Tm.FunApp t1) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
@@ -597,6 +646,20 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
   in
   go sp0 sp1
 
+let normalize ~ty tm =
+  typechecker >>= fun (module T) ->
+  let vty = T.Cx.eval T.Cx.emp ty in
+  let vtm = T.Cx.eval T.Cx.emp tm in
+  ret @@ T.Cx.quote T.Cx.emp ~ty:vty vtm
+
+let normalize_eqn q =
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  normalize ~ty:univ q.ty0 >>= fun ty0 ->
+  normalize ~ty:univ q.ty1 >>= fun ty1 ->
+  normalize ~ty:ty0 q.tm0 >>= fun tm0 ->
+  normalize ~ty:ty1 q.tm1 >>= fun tm1 ->
+  ret @@ {ty0; ty1; tm0; tm1}
+
 (* invariant: will not be called on equations which are already reflexive *)
 let rigid_rigid q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
@@ -622,7 +685,10 @@ let rigid_rigid q =
 
   | _ ->
     if is_orthogonal q then
-      failwith "rigid-rigid mismatch"
+      begin
+        Format.eprintf "rigid-rigid mismatch: %a@." Equation.pp q;
+        failwith "rigid-rigid mismatch"
+      end
     else
       block @@ Unify q
 
@@ -634,9 +700,10 @@ let (%%) (ty, tm) frame =
 
 
 let unify q =
+  normalize_eqn q >>= fun q ->
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
-  | Tm.Pi (dom0, _), Tm.Pi (dom1, _) ->
-    let x = Name.named @@ Some "foo" in
+  | Tm.Pi (dom0, Tm.B (nm, _)), Tm.Pi (dom1, _) ->
+    let x = Name.named nm in
     let x_l = Tm.up (Tm.Ref (x, `TwinL), Emp) in
     let x_r = Tm.up (Tm.Ref (x, `TwinR), Emp) in
 
@@ -738,6 +805,11 @@ let rec split_sigma tele x ty =
     ret None
 
 
+let is_restriction =
+  function
+  | `R _ -> true
+  | _ -> false
+
 let rec solver prob =
   (* Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob; *)
   match prob with
@@ -747,7 +819,7 @@ let rec solver prob =
 
   | All (param, prob) ->
     let x, probx = unbind param prob in
-    if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
+    if not (is_restriction param || Occurs.Set.mem x @@ Problem.free `Vars probx) then
       active probx
     else
       begin
@@ -774,7 +846,7 @@ let rec solver prob =
             check_eq ~ty:univ ty0 ty1 >>= function
             | true ->
               get_global_env >>= fun sub ->
-              let y = Name.fresh () in
+              let y = Name.named (Name.name x) in
               (*  This weird crap is needed to avoid creating a cycle in the environment.
                   What we should really do is kill 'twin variables' altogether and switch to
                   a representation based on having two contexts. *)
@@ -811,8 +883,8 @@ let rec lower tele alpha ty =
     define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
 
-  | Tm.Pi (dom, cod) ->
-    let x = Name.fresh () in
+  | Tm.Pi (dom, (Tm.B (nm, _) as cod)) ->
+    let x = Name.named nm in
     begin
       split_sigma Emp x dom >>= function
       | None ->

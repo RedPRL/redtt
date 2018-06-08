@@ -79,7 +79,7 @@ struct
       let vcod = inst_clo cod var in
       let app0 = apply el0 var in
       let app1 = apply el1 var in
-      Tm.lam None @@ equate (Env.succ env) vcod app0 app1
+      Tm.lam (clo_name cod) @@ equate (Env.succ env) vcod app0 app1
     | Sg {dom; cod} ->
       let el00 = car el0 in
       let el10 = car el1 in
@@ -92,7 +92,7 @@ struct
       let rs = List.map Dim.named xs in
       let app0 = ext_apply el0 rs in
       let app1 = ext_apply el1 rs in
-      Tm.ext_lam (List.map (fun _ -> None) xs) @@
+      Tm.ext_lam (List.map Name.name xs) @@
       equate (Env.abs env xs) tyx app0 app1
 
     | Rst {ty; _} ->
@@ -157,7 +157,7 @@ struct
         let vcod0 = inst_clo pi0.cod var in
         let vcod1 = inst_clo pi1.cod var in
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
-        Tm.pi None dom cod
+        Tm.pi (clo_name pi0.cod) dom cod
 
       | Sg sg0, Sg sg1 ->
         let dom = equate env ty sg0.dom sg1.dom in
@@ -165,7 +165,7 @@ struct
         let vcod0 = inst_clo sg0.cod var in
         let vcod1 = inst_clo sg1.cod var in
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
-        Tm.sg None dom cod
+        Tm.sg (clo_name sg0.cod) dom cod
 
       | Ext abs0, Ext abs1 ->
         let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
@@ -264,7 +264,7 @@ struct
       let vmot_ff = inst_clo if0.mot @@ make Ff in
       let tcase = equate env vmot_tt if0.tcase if1.tcase in
       let fcase = equate env vmot_ff if0.fcase if1.fcase in
-      let frame = Tm.If {mot = Tm.B (None, mot); tcase; fcase} in
+      let frame = Tm.If {mot = Tm.B (clo_name if0.mot, mot); tcase; fcase} in
       equate_neu_ env if0.neu if1.neu @@ frame :: stk
     | VProj vproj0, VProj vproj1 ->
       let r0 = DimGeneric.unleash vproj0.x in
@@ -342,7 +342,7 @@ struct
     let v1x = Abs.inst abs1 @@ List.map Dim.named xs in
     let envx = Env.abs env xs in
     let tm = equate envx ty v0x v1x in
-    Tm.B (None, tm)
+    Tm.B (Name.name @@ List.hd xs, tm)
 
   and equate_star env p0 p1 =
     let r0, r'0 = DimStar.unleash p0 in

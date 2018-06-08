@@ -70,6 +70,7 @@ val map_head : (tm -> tm) -> tm head -> tm head
 val map_frame : (tm -> tm) -> tm frame -> tm frame
 val map_spine : (tm -> tm) -> tm spine -> tm spine
 val map_tmf : (tm -> tm) -> tm tmf -> tm tmf
+val map_tm_sys : (tm -> tm) -> (tm, tm) system -> (tm, tm) system
 
 
 type 'a subst =
@@ -89,6 +90,9 @@ val bind : Name.t -> tm -> tm bnd
 val bindn : Name.t bwd -> tm -> tm nbnd
 val unbind : tm bnd -> Name.t * tm
 val unbindn : tm nbnd -> Name.t bwd * tm
+val unbind_ext : (tm * (tm, tm) system) nbnd -> Name.t bwd * tm * (tm, tm) system
+val bind_ext : Name.t bwd -> tm -> (tm, tm) system -> (tm * (tm, tm) system) nbnd
+
 val unbind_with : Name.t -> (twin -> twin) -> tm bnd -> tm
 
 val subst : tm cmd subst -> tm -> tm
@@ -120,6 +124,7 @@ sig
 end
 
 val pp : tm Pretty.t
+val pp0 : tm Pretty.t0
 val pp_cmd : tm cmd Pretty.t
 val pp_head : tm head Pretty.t
 val pp_spine : tm spine Pretty.t

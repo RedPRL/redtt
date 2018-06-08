@@ -6,42 +6,6 @@ open Bwd open BwdNotation open Dev
 module C = Contextual
 module U = Unify
 
-let rec pp_tele fmt =
-  function
-  | Emp ->
-    ()
-
-  | Snoc (Emp, (x, cell)) ->
-    pp_tele_cell fmt (x, cell)
-
-  | Snoc (tele, (x, cell)) ->
-    Format.fprintf fmt "%a,@,%a"
-      pp_tele tele
-      pp_tele_cell (x, cell)
-
-and pp_tele_cell fmt (x, cell) =
-  match cell with
-  | `P ty ->
-    Format.fprintf fmt "@[<1>%a : %a@]"
-      Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
-
-  | `Tw (ty0, ty1) ->
-    Format.fprintf fmt "@[<1>%a : %a | %a@]"
-      Name.pp x
-      (Tm.pp Pretty.Env.emp) ty0
-      (Tm.pp Pretty.Env.emp) ty1
-
-  | `I ->
-    Format.fprintf fmt "@[<1>%a : dim@]"
-      Name.pp x
-
-  | `R (r0, r1) ->
-    Format.fprintf fmt "@[<1>%a = %a@]"
-      (Tm.pp Pretty.Env.emp) r0
-      (Tm.pp Pretty.Env.emp) r1
-
-
 module M :
 sig
   include Monad.S
@@ -82,18 +46,17 @@ struct
 
   let print_diagnostic =
     function
-    | UserHole {name; tele; ty; tm} ->
+    | UserHole {name; tele; ty; _} ->
       C.local (fun _ -> tele) @@
       begin
-        C.bind C.typechecker @@ fun (module T) ->
-        let vty = T.Cx.eval T.Cx.emp ty in
-        let vtm = T.Cx.eval T.Cx.emp tm in
-        let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in
-        Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a : %a@]@.@."
+        (* C.bind C.typechecker @@ fun (module T) -> *)
+        (* let vty = T.Cx.eval T.Cx.emp ty in
+           let vtm = T.Cx.eval T.Cx.emp tm in
+           let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in *)
+        Format.printf "?%s:@,  @[<v>@[<v>%a@]@;%a@,%a@]@.@."
           (match name with Some name -> name | None -> "Hole")
-          pp_tele tele
+          U.pp_tele tele
           Uuseg_string.pp_utf_8 "⊢"
-          (Tm.pp Pretty.Env.emp) tm
           (Tm.pp Pretty.Env.emp) ty;
         C.ret ()
       end
@@ -157,7 +120,24 @@ let get_resolver env =
   M.ret @@ go_locals ResEnv.init psi
 
 
+let should_split_ext_bnd ebnd =
+  match ebnd with
+  | Tm.NB ([_], (_, [])) -> false
+  | _ -> true
 
+
+let split_ext_bnd ebnd =
+  let xs, ty, sys = Tm.unbind_ext ebnd in
+  let rec go xs =
+    match xs with
+    | [] ->
+      Tm.make @@ Tm.Rst {ty; sys}
+    | x :: xs ->
+      let ty' = go xs in
+      Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty' [])
+  in
+  let ty = go @@ Bwd.to_list xs in
+  List.map Name.name (Bwd.to_list xs), ty
 
 
 
@@ -172,6 +152,7 @@ let rec elab_sig env =
     M.ret ()
   | dcl :: esig ->
     elab_decl env dcl >>= fun env' ->
+    M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing ;-) *)
     M.lift (U.ambulando @@ Name.fresh ()) >>
     elab_sig env' esig
 
@@ -224,7 +205,7 @@ and guess_restricted ty sys tm =
   let rty = Tm.make @@ Tm.Rst {ty; sys} in
   M.lift C.ask >>= fun psi ->
   M.lift @@ U.guess psi ~ty0:rty ~ty1:ty tm C.ret >>= fun tm' ->
-  M.lift C.go_right >>
+  M.lift C.go_to_bottom >> (* This is suspicious ! *)
   M.ret tm'
 
 and elab_chk env ty e : tm M.m =
@@ -237,12 +218,6 @@ and elab_chk env ty e : tm M.m =
     get_resolver env >>= fun renv ->
     M.ret @@ tmfam renv
 
-  | _, E.Hole name ->
-    M.lift C.ask >>= fun psi ->
-    M.lift @@ U.hole psi ty C.ret >>= fun tm ->
-    M.lift C.go_right >>
-    M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
-    M.ret @@ Tm.up tm
 
   | _, E.Lam ([], e) ->
     elab_chk env ty e
@@ -256,10 +231,30 @@ and elab_chk env ty e : tm M.m =
     end >>= fun bdyx ->
     M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
 
-  (* | Tm.Ext ebnd, E.Lam (name :: names, e) ->
-     begin
-      failwith ""
-     end *)
+
+  | Tm.Ext (Tm.NB ([_], (cod, []))), E.Lam (name :: names, e) ->
+    let x = Name.named @@ Some name in
+    let codx = Tm.open_var 0 x (fun _ -> `Only) cod in
+    M.in_scope x `I begin
+      elab_chk env codx @@
+      E.Lam (names, e)
+    end >>= fun bdyx ->
+    M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn (Emp #< x) bdyx)
+
+  | Tm.Ext ebnd, e when should_split_ext_bnd ebnd->
+    let names, ety = split_ext_bnd ebnd in
+    elab_chk env ety e >>= fun tm ->
+    let bdy =
+      let xs = List.map Name.named names in
+      Tm.bindn (Bwd.from_list xs) @@
+      let hd = Tm.Down {ty = ety; tm = tm} in
+      let args = List.map (fun x -> Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]) xs in
+      let spine = Emp <>< args in
+      Tm.up (hd, spine)
+    in
+    M.ret @@ Tm.make @@ Tm.ExtLam bdy
+
+
 
   | _, Tuple [] ->
     failwith "empty tuple"
@@ -283,6 +278,12 @@ and elab_chk env ty e : tm M.m =
         failwith "Type"
     end
 
+  | _, E.Hole name ->
+    M.lift C.ask >>= fun psi ->
+    M.lift @@ U.hole psi ty C.ret >>= fun tm ->
+    M.lift C.go_right >>
+    M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
+    M.ret @@ Tm.up tm
 
   | _ ->
     failwith "TODO"
