@@ -982,7 +982,7 @@ let rec map_ext_bnd f nbnd =
   | NB ([], (ty, sys)) ->
     NB ([], (f ty, map_tm_sys f sys))
   | NB (nm :: nms, (ty, sys)) ->
-    let x = Name.fresh () in
+    let x = Name.named nm in
     let tyx = open_var 0 x (fun _ -> `Only) ty in
     let sysx = map_tm_sys (open_var 0 x (fun _ -> `Only)) sys in
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in

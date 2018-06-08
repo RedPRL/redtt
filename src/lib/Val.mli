@@ -82,6 +82,7 @@ and ext_abs = (value * val_sys) Abstraction.abs
 and env_el = Val of value | Atom of atom
 and env = env_el list
 
+val clo_name : clo -> string option
 
 module type S =
 sig

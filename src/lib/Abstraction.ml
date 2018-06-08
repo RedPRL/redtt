@@ -28,7 +28,7 @@ struct
     match xs with
     | [] -> List.rev acc, phi
     | x :: xs ->
-      let y = Name.fresh () in
+      let y = Name.named @@ Name.name x in
       freshen_atoms xs (y :: acc) @@
       D.cmp (D.swap y x) phi
 

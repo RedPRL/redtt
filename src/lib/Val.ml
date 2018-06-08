@@ -91,6 +91,10 @@ and box_sys = val_sys
 and node = Node of {con : con; action : D.action}
 and value = node ref
 
+let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
+  nm
+
+
 module type S =
 sig
   val make : con -> value
@@ -1093,13 +1097,13 @@ struct
 
   and eval_nbnd rel rho bnd =
     let Tm.NB (nms, tm) = bnd in
-    let xs = List.map (fun _ -> Name.fresh ()) nms in
+    let xs = List.map Name.named nms in
     let rho = List.map (fun x -> Atom x) xs @ rho in
     Abs.bind xs @@ eval rel rho tm
 
   and eval_ext_bnd rel rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
-    let xs = List.map (fun _ -> Name.fresh ()) nms in
+    let xs = List.map Name.named nms in
     let rho = List.map (fun x -> Atom x) xs @ rho in
     ExtAbs.bind xs (eval rel rho tm, eval_tm_sys rel rho sys)
 
