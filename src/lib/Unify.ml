@@ -646,9 +646,17 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
   in
   go sp0 sp1
 
+let normalize ~ty tm =
+  typechecker >>= fun (module T) ->
+  let vty = T.Cx.eval T.Cx.emp ty in
+  let vtm = T.Cx.eval T.Cx.emp tm in
+  ret @@ T.Cx.quote T.Cx.emp ~ty:vty vtm
+
 (* invariant: will not be called on equations which are already reflexive *)
 let rigid_rigid q =
-  match Tm.unleash q.tm0, Tm.unleash q.tm1 with
+  normalize ~ty:q.ty0 q.tm0 >>= fun tm0 ->
+  normalize ~ty:q.ty1 q.tm1 >>= fun tm1 ->
+  match Tm.unleash tm0, Tm.unleash tm1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-pi" in
     let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
