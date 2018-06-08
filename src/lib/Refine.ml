@@ -152,6 +152,7 @@ let rec elab_sig env =
     M.ret ()
   | dcl :: esig ->
     elab_decl env dcl >>= fun env' ->
+    M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing ;-) *)
     M.lift (U.ambulando @@ Name.fresh ()) >>
     elab_sig env' esig
 
@@ -204,7 +205,7 @@ and guess_restricted ty sys tm =
   let rty = Tm.make @@ Tm.Rst {ty; sys} in
   M.lift C.ask >>= fun psi ->
   M.lift @@ U.guess psi ~ty0:rty ~ty1:ty tm C.ret >>= fun tm' ->
-  M.lift C.go_right >>
+  M.lift C.go_to_bottom >> (* This is suspicious ! *)
   M.ret tm'
 
 and elab_chk env ty e : tm M.m =

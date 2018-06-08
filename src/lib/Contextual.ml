@@ -112,10 +112,17 @@ let rec pushls es =
     pushl e >>
     pushls es
 
+let dump_state fmt str =
+  get >>= fun cx ->
+  Format.fprintf fmt "%s@.@[<v>%a@]@.@." str pp_cx cx;
+  ret ()
+
 let popl =
   getl >>= function
   | Snoc (mcx, e) -> setl mcx >> ret e
-  | _ -> failwith "popl: empty"
+  | _ ->
+    dump_state Format.err_formatter "Tried to pop-left" >>= fun _ ->
+    failwith "popl: empty"
 
 
 let get_global_env =
@@ -134,11 +141,6 @@ let get_global_env =
   in
   ask >>= fun psi ->
   ret @@ go_params psi
-
-let dump_state fmt str =
-  get >>= fun cx ->
-  Format.fprintf fmt "%s@.@[<v>%a@]@.@." str pp_cx cx;
-  ret ()
 
 
 let popr_opt =
