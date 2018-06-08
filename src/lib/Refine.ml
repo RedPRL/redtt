@@ -46,18 +46,17 @@ struct
 
   let print_diagnostic =
     function
-    | UserHole {name; tele; ty; tm} ->
+    | UserHole {name; tele; ty; _} ->
       C.local (fun _ -> tele) @@
       begin
-        C.bind C.typechecker @@ fun (module T) ->
-        let vty = T.Cx.eval T.Cx.emp ty in
-        let vtm = T.Cx.eval T.Cx.emp tm in
-        let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in
-        Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a : %a@]@.@."
+        (* C.bind C.typechecker @@ fun (module T) -> *)
+        (* let vty = T.Cx.eval T.Cx.emp ty in
+           let vtm = T.Cx.eval T.Cx.emp tm in
+           let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in *)
+        Format.printf "?%s:@,  @[<v>@[<v>%a@]@;%a@,%a@]@.@."
           (match name with Some name -> name | None -> "Hole")
           U.pp_tele tele
           Uuseg_string.pp_utf_8 "⊢"
-          (Tm.pp Pretty.Env.emp) tm
           (Tm.pp Pretty.Env.emp) ty;
         C.ret ()
       end
@@ -243,7 +242,6 @@ and elab_chk env ty e : tm M.m =
 
   | Tm.Ext ebnd, e when should_split_ext_bnd ebnd->
     let names, ety = split_ext_bnd ebnd in
-    Format.eprintf "ext: %a@." Tm.pp0 ety;
     elab_chk env ety e >>= fun tm ->
     let bdy =
       let xs = List.map Name.named names in
