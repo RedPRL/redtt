@@ -585,7 +585,6 @@ let (%%) (ty, tm) frame =
 
 
 let unify q =
-  normalize_eqn q >>= fun q ->
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, Tm.B (nm, _)), Tm.Pi (dom1, _) ->
     let x = Name.named nm in
@@ -699,6 +698,7 @@ let rec solver prob =
   (* Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob; *)
   match prob with
   | Unify q ->
+    normalize_eqn q >>= fun q ->
     is_reflexive q <||
     unify q
 
