@@ -125,19 +125,19 @@ let should_split_ext_bnd ebnd =
   | Tm.NB ([_], (_, [])) -> false
   | _ -> true
 
+
 let split_ext_bnd ebnd =
-  let rec go names ty sys =
-    match names with
+  let xs, ty, sys = Tm.unbind_ext ebnd in
+  let rec go xs =
+    match xs with
     | [] ->
       Tm.make @@ Tm.Rst {ty; sys}
-    | name :: names ->
-      let x = Name.named name in
-      let ty' = Tm.open_var 0 x (fun tw -> tw) ty in
-      let sys' = Tm.map_tm_sys (Tm.open_var 0 x (fun tw -> tw)) sys in
-      Tm.make @@ Tm.Ext (Tm.NB ([name], (Tm.close_var x (fun tw -> tw) 0 @@ go names ty' sys', [])))
+    | x :: xs ->
+      let ty' = go xs in
+      Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty' [])
   in
-  let Tm.NB (names, (ty, sys)) = ebnd in
-  names, go names ty sys
+  let ty = go @@ Bwd.to_list xs in
+  List.map Name.name (Bwd.to_list xs), ty
 
 
 
@@ -245,10 +245,11 @@ and elab_chk env ty e : tm M.m =
     elab_chk env ety e >>= fun tm ->
     let bdy =
       let xs = List.map Name.named names in
-      Tm.bindn (Bwd.from_list @@ xs) @@
+      Tm.bindn (Bwd.from_list xs) @@
       let hd = Tm.Down {ty = ety; tm = tm} in
       let args = List.map (fun x -> Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]) xs in
-      Tm.up (hd, Emp <>< args)
+      let spine = Emp <>< args in
+      Tm.up (hd, spine)
     in
     M.ret @@ Tm.make @@ Tm.ExtLam bdy
 

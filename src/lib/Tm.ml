@@ -456,26 +456,53 @@ let unbind_with x tw (B (_, t)) =
   open_var 0 x tw t
 
 let unbindn (NB (nms, t)) =
-  let rec go nms xs t =
+  let rec go k nms xs t =
     match nms with
     | [] -> xs, t
     | nm :: nms ->
       let x = Name.named nm in
-      go nms (xs #< x) @@ open_var 0 x (fun _ -> `Only) t
+      go (k + 1) nms (xs #< x) @@ open_var k x (fun _ -> `Only) t
   in
-  go nms Emp t
+  go 0 nms Emp t
+
+let map_tm_face f (r, r', otm) =
+  f r, f r', Option.map f otm
+
+let map_tm_sys f =
+  List.map @@ map_tm_face f
+
+let unbind_ext (NB (nms, (ty, sys))) =
+  let rec go k nms xs ty sys =
+    match nms with
+    | [] -> xs, ty, sys
+    | nm :: nms ->
+      let x = Name.named nm in
+      go (k + 1) nms (xs #< x) (open_var k x (fun _ -> `Only) ty) (map_tm_sys (open_var k x (fun _ -> `Only)) sys)
+  in
+  go 0 nms Emp ty sys
+
+
 
 let bind x tx =
   B (Name.name x, close_var x (fun _ -> `Only) 0 tx)
 
 let rec bindn xs txs =
-  let rec go xs txs =
+  let rec go k xs txs =
     match xs with
     | Emp -> txs
     | Snoc (xs, x) ->
-      go xs @@ close_var x (fun _ -> `Only) 0 txs
+      go (k + 1) xs @@ close_var x (fun _ -> `Only) k txs
   in
-  NB (List.map Name.name @@ Bwd.to_list xs, go xs txs)
+  NB (List.map Name.name @@ Bwd.to_list xs, go 0 xs txs)
+
+let rec bind_ext xs tyxs sysxs =
+  let rec go k xs tyxs sysxs =
+    match xs with
+    | Emp -> tyxs, sysxs
+    | Snoc (xs, x) ->
+      go (k + 1) xs (close_var x (fun _ -> `Only) k tyxs) (map_tm_sys (close_var x (fun _ -> `Only) k) sysxs)
+  in
+  NB (List.map Name.name @@ Bwd.to_list xs, go 0 xs tyxs sysxs)
 
 let rec pp env fmt (Tm tm) =
   match tm with
@@ -643,8 +670,8 @@ and pp_frame env fmt =
   function
   | FunApp t ->
     Format.fprintf fmt "@[<1>(app %a)@]" (pp env) t
-  | ExtApp _ ->
-    Format.fprintf fmt "ext-app"
+  | ExtApp ts ->
+    Format.fprintf fmt "@[<1>(ext-app %a)@]" (pp_terms env) ts
   | Car ->
     Format.fprintf fmt "car"
   | Cdr ->
@@ -970,11 +997,6 @@ let map_frame f =
 let map_spine f =
   Bwd.map @@ map_frame f
 
-let map_tm_face f (r, r', otm) =
-  f r, f r', Option.map f otm
-
-let map_tm_sys f =
-  List.map @@ map_tm_face f
 
 (* TODO: clean up: this is catastrophically bad *)
 let rec map_ext_bnd f nbnd =
