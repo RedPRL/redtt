@@ -476,22 +476,28 @@ struct
 
     let exception Break in
     let n0 = List.length sys0 in
-    let n1 = List.length sys0 in
+    let n1 = List.length sys1 in
     begin
       try
         for i = 0 to n0 - 1 do
-          let cond_i = check_face ty0 @@ List.nth sys0 i in
-          if cond_i then
-            for j = 0 to n1 - 1 do
-              let cond_j = check_face ty1 @@ List.nth sys1 j in
-              if cond_j then () else raise Break
-            done
+          if n0 > 0 then
+            let cond_i = check_face ty0 @@ List.nth sys0 i in
+            if cond_i && n1 > 0 then
+              for j = 0 to n1 - 1 do
+                let cond_j = check_face ty1 @@ List.nth sys1 j in
+                if cond_j then () else raise Break
+              done
+            else
+              ()
           else
             ()
         done
       with
       | Break ->
         failwith "restriction subtyping"
+      | exn ->
+        Format.eprintf "Unexpected error in subtyping: %s@." (Printexc.to_string exn);
+        raise exn
     end
 
 end
