@@ -4,7 +4,6 @@ open Contextual
 type telescope = params
 val telescope : ty -> telescope * ty
 val telescope_to_spine : telescope -> tm Tm.spine
-val pp_tele : telescope Pretty.t0
 
 val hole : ?name:string option -> telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m
 val define : telescope -> Name.t -> ty:ty -> tm -> unit m

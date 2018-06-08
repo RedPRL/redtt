@@ -1,4 +1,5 @@
 open RedBasis.Bwd
+open BwdNotation
 
 type tm = Tm.tm
 type ty = Tm.tm
@@ -116,7 +117,7 @@ let unbind param (B (nm, prob)) =
 
 
 let pp_equation fmt q =
-  Format.fprintf fmt "@[<1>{@[<1>%a@ :@ %a@]@ =@ @[<1>%a@ :@ %a@]}@]"
+  Format.fprintf fmt "@[<1>@[<1>%a@ :@ %a@]@ =@ @[<1>%a@ :@ %a@]@]"
     (Tm.pp Pretty.Env.emp) q.tm0
     (Tm.pp Pretty.Env.emp) q.ty0
     (Tm.pp Pretty.Env.emp) q.tm1
@@ -138,18 +139,60 @@ let pp_param fmt =
       (Tm.pp Pretty.Env.emp) r1
 
 
-
-let rec pp_problem fmt =
-  function
-  | Unify q ->
-    pp_equation fmt q
-  | All (prm, prob) ->
-    let x, probx = unbind prm prob in
-    Format.fprintf fmt "@[%a : %a@]@ >>@ @[<1>%a@]"
+let pp_param_cell fmt (x, param) =
+  match param with
+  | `P ty ->
+    Format.fprintf fmt "@[<1>%a : %a@]"
       Name.pp x
-      pp_param prm
-      pp_problem probx
+      (Tm.pp Pretty.Env.emp) ty
 
+  | `Tw (ty0, ty1) ->
+    Format.fprintf fmt "@[<1>%a : %a | %a@]"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty0
+      (Tm.pp Pretty.Env.emp) ty1
+
+  | `I ->
+    Format.fprintf fmt "@[<1>%a : dim@]"
+      Name.pp x
+
+  | `R (r0, r1) ->
+    Format.fprintf fmt "@[<1>%a = %a@]"
+      (Tm.pp Pretty.Env.emp) r0
+      (Tm.pp Pretty.Env.emp) r1
+
+let rec pp_params fmt =
+  function
+  | Emp ->
+    ()
+
+  | Snoc (Emp, (x, cell)) ->
+    pp_param_cell fmt (x, cell)
+
+  | Snoc (tele, (x, cell)) ->
+    Format.fprintf fmt "%a,@,%a"
+      pp_params tele
+      pp_param_cell (x, cell)
+
+
+let unfurl_problem prob =
+  let rec go tele =
+    function
+    | Unify q ->
+      tele, q
+    | All (prm, prob) ->
+      let x, probx = unbind prm prob in
+      go (tele #< (x, prm)) probx
+  in
+  go Emp prob
+
+
+let rec pp_problem fmt prob =
+  let tele, q = unfurl_problem prob in
+  Format.fprintf fmt "@[<v>@[<v>%a@]@,%a %a@]"
+    pp_params tele
+    Uuseg_string.pp_utf_8 "⊢"
+    pp_equation q
 
 
 let pp_entry fmt =

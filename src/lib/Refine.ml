@@ -55,7 +55,7 @@ struct
         let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in
         Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@,%a %a@]@.@."
           (match name with Some name -> name | None -> "Hole")
-          U.pp_tele tele
+          Dev.pp_params tele
           Uuseg_string.pp_utf_8 "⊢"
           (Tm.pp Pretty.Env.emp) ty
           Uuseg_string.pp_utf_8 "⟿"
