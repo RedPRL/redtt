@@ -117,9 +117,10 @@ let unbind param (B (nm, prob)) =
 
 
 let pp_equation fmt q =
-  Format.fprintf fmt "@[<1>@[<1>%a@ :@ %a@]@ =@ @[<1>%a@ :@ %a@]@]"
+  Format.fprintf fmt "@[<1>@[<1>%a@ :@ %a@]@ %a@ @[<1>%a@ :@ %a@]@]"
     (Tm.pp Pretty.Env.emp) q.tm0
     (Tm.pp Pretty.Env.emp) q.ty0
+    Uuseg_string.pp_utf_8 "≐"
     (Tm.pp Pretty.Env.emp) q.tm1
     (Tm.pp Pretty.Env.emp) q.ty1
 
