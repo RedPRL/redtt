@@ -42,8 +42,9 @@ let filter_entry filter entry =
     | _ -> false
 
 let pp_cx filter fmt {lcx; rcx} =
-  Format.fprintf fmt "@[<v>%a@] |@ @[<v>%a@]"
+  Format.fprintf fmt "@[<v>%a@]@ %a@ @[<v>%a@]"
     pp_lcx (Bwd.filter (filter_entry filter) lcx)
+    Uuseg_string.pp_utf_8 "❚"
     pp_rcx (List.filter (filter_entry filter) rcx)
 
 
