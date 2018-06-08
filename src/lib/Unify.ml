@@ -789,7 +789,7 @@ let rec solver prob =
             check_eq ~ty:univ ty0 ty1 >>= function
             | true ->
               get_global_env >>= fun sub ->
-              let y = Name.fresh () in
+              let y = Name.named (Name.name x) in
               (*  This weird crap is needed to avoid creating a cycle in the environment.
                   What we should really do is kill 'twin variables' altogether and switch to
                   a representation based on having two contexts. *)
@@ -826,8 +826,8 @@ let rec lower tele alpha ty =
     define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
 
-  | Tm.Pi (dom, cod) ->
-    let x = Name.fresh () in
+  | Tm.Pi (dom, (Tm.B (nm, _) as cod)) ->
+    let x = Name.named nm in
     begin
       split_sigma Emp x dom >>= function
       | None ->

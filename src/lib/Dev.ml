@@ -29,7 +29,7 @@ type 'a param =
 
 type params = (Name.t * ty param) bwd
 
-type 'a bind = B of 'a
+type 'a bind = B of string option * 'a
 
 type problem =
   | Unify of (tm, tm) equation
@@ -91,22 +91,22 @@ let rec prob_open_var k x tw =
   function
   | Unify q ->
     Unify (eqn_open_var k x tw q)
-  | All (p, B prob) ->
-    All (param_open_var k x p, B (prob_open_var (k + 1) x tw prob))
+  | All (p, B (nm, prob)) ->
+    All (param_open_var k x p, B (nm, prob_open_var (k + 1) x tw prob))
 
 let rec prob_close_var x tw k =
   function
   | Unify q ->
     Unify (eqn_close_var x tw k q)
-  | All (p, B prob) ->
-    All (param_close_var x k p, B (prob_close_var x tw (k + 1) prob))
+  | All (p, B (nm, prob)) ->
+    All (param_close_var x k p, B (nm, prob_close_var x tw (k + 1) prob))
 
 let bind x param probx =
   let tw = match param with `Tw _ -> `Tw | _ -> `P in
-  B (prob_close_var x tw 0 probx)
+  B (Name.name x, prob_close_var x tw 0 probx)
 
-let unbind param (B prob) =
-  let x = Name.fresh () in
+let unbind param (B (nm, prob)) =
+  let x = Name.named nm in
   x,
   match param with
   | `Tw _ ->
@@ -325,7 +325,7 @@ struct
     function
     | Unify q ->
       Equation.free fl q
-    | All (p, B prob) ->
+    | All (p, B (_, prob)) ->
       Occurs.Set.union (Param.free fl p) (free fl prob)
 
   let eqn ~ty0 ~tm0 ~ty1 ~tm1 =
