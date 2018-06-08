@@ -67,7 +67,7 @@ let loop lexbuf tokens =
 
       | I.Accepted result ->
         let script = Refine.elab_sig Refine.T.empty result in
-        Lwt.return @@ Contextual.run script
+        Lwt.return @@ Refine.M.run @@ Refine.M.report script
 
       | I.HandlingError env ->
         begin match I.top env with

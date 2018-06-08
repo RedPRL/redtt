@@ -1,34 +1,10 @@
 (* Experimental code *)
 
-open Unify open Dev open Contextual open RedBasis open Bwd open BwdNotation
-module Notation = Monad.Notation (Contextual)
-open Notation
+open RedBasis
+open Bwd open BwdNotation open Dev
 
-module E = ESig
-
-module T = Map.Make (String)
-
-let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre
-
-let get_resolver env =
-  let rec go_globals renv  =
-    function
-    | [] -> renv
-    | (name, x) :: env ->
-      let renvx = ResEnv.global name x renv in
-      go_globals renvx env
-  in
-  let rec go_locals renv =
-    function
-    | Emp -> go_globals renv @@ T.bindings env
-    | Snoc (psi, (x, _)) ->
-      let renvx = ResEnv.global (Name.to_string x) x renv in
-      go_locals renvx psi
-  in
-  ask >>= fun psi ->
-  ret @@ go_locals ResEnv.init psi
-
-
+module C = Contextual
+module U = Unify
 
 let rec pp_tele fmt =
   function
@@ -66,18 +42,131 @@ and pp_tele_cell fmt (x, cell) =
       (Tm.pp Pretty.Env.emp) r1
 
 
+module M :
+sig
+  include Monad.S
+
+  val lift : 'a C.m -> 'a m
+  val in_scope : Name.t -> ty param -> 'a m -> 'a m
+  val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
+  val under_restriction : tm -> tm -> 'a m -> 'a m
+
+  type diagnostic =
+    | UserHole of {name : string option; tele : U.telescope; ty : Tm.tm; tm : Tm.tm}
+
+  val emit : diagnostic -> unit m
+  val report : 'a m -> 'a m
+
+  val run : 'a m -> 'a
+end =
+struct
+  type diagnostic =
+    | UserHole of {name : string option; tele : U.telescope; ty : Tm.tm; tm : Tm.tm}
+
+  type 'a m = ('a * diagnostic bwd) C.m
+
+
+  let ret a =
+    C.ret (a, Emp)
+
+  let bind m k =
+    C.bind m @@ fun (a, w) ->
+    C.bind (k a) @@ fun (b, w') ->
+    C.ret (b, w <.> w')
+
+  let lift m =
+    C.bind m ret
+
+  let emit d =
+    C.ret ((), Emp #< d)
+
+  let print_diagnostic =
+    function
+    | UserHole {name; tele; ty; tm} ->
+      C.local (fun _ -> tele) @@
+      begin
+        C.bind C.typechecker @@ fun (module T) ->
+        let vty = T.Cx.eval T.Cx.emp ty in
+        let vtm = T.Cx.eval T.Cx.emp tm in
+        let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in
+        Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a : %a@]@.@."
+          (match name with Some name -> name | None -> "Hole")
+          pp_tele tele
+          Uuseg_string.pp_utf_8 "⊢"
+          (Tm.pp Pretty.Env.emp) tm
+          (Tm.pp Pretty.Env.emp) ty;
+        C.ret ()
+      end
+
+  let rec print_diagnostics =
+    function
+    | Emp ->
+      C.ret ()
+    | Snoc (w, d) ->
+      C.bind (print_diagnostics w) @@ fun _ ->
+      print_diagnostic d
+
+  let report (m : 'a m) : 'a m =
+    C.bind m @@ fun (a, w) ->
+    C.bind (print_diagnostics w) @@ fun _ ->
+    ret a
+
+
+  let under_restriction = C.under_restriction
+  let in_scopes = C.in_scopes
+  let in_scope = C.in_scope
+
+
+  let run m =
+    fst @@ C.run m
+end
+
+
+
+open Dev open Unify
+module Notation = Monad.Notation (M)
+open Notation
+
+module E = ESig
+module T = Map.Make (String)
+
+let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre
+
+let get_resolver env =
+  let rec go_globals renv  =
+    function
+    | [] -> renv
+    | (name, x) :: env ->
+      let renvx = ResEnv.global name x renv in
+      go_globals renvx env
+  in
+  let rec go_locals renv =
+    function
+    | Emp -> go_globals renv @@ T.bindings env
+    | Snoc (psi, (x, _)) ->
+      let renvx = ResEnv.global (Name.to_string x) x renv in
+      go_locals renvx psi
+  in
+  M.lift C.ask >>= fun psi ->
+  M.ret @@ go_locals ResEnv.init psi
+
+
+
+
+
+
 let normalize_ty ty =
-  typechecker >>= fun (module T) ->
+  M.lift C.typechecker >>= fun (module T) ->
   let vty = T.Cx.eval T.Cx.emp ty in
-  ret @@ T.Cx.quote_ty T.Cx.emp vty
+  M.ret @@ T.Cx.quote_ty T.Cx.emp vty
 
 let rec elab_sig env =
   function
   | [] ->
-    ret ()
+    M.ret ()
   | dcl :: esig ->
     elab_decl env dcl >>= fun env' ->
-    ambulando (Name.fresh ()) >>
+    M.lift (U.ambulando @@ Name.fresh ()) >>
     elab_sig env' esig
 
 
@@ -88,13 +177,13 @@ and elab_decl env =
     elab_chk env cod e >>= fun tm ->
     let alpha = Name.named @@ Some name in
 
-    ask >>= fun psi ->
-    define psi alpha cod tm >>
-    ret @@ T.add name alpha env
+    M.lift C.ask >>= fun psi ->
+    M.lift @@ U.define psi alpha cod tm >>
+    M.ret @@ T.add name alpha env
 
   | E.Debug ->
-    dump_state Format.std_formatter "debug" >>
-    ret env
+    M.lift @@ C.dump_state Format.std_formatter "debug" >>
+    M.ret env
 
 and elab_scheme env (cells, ecod) kont =
   let rec go gm =
@@ -106,7 +195,7 @@ and elab_scheme env (cells, ecod) kont =
     | (name, edom) :: cells ->
       elab_chk env univ edom >>= normalize_ty >>= fun dom ->
       let x = Name.named @@ Some name in
-      in_scope x (`P dom) @@
+      M.in_scope x (`P dom) @@
       go (gm #< (x, dom)) cells
   in
   go Emp cells
@@ -115,11 +204,11 @@ and guess_restricted ty sys tm =
   let rec go =
     function
     | [] ->
-      ret ()
+      M.ret ()
     | (r, r', Some tm') :: sys ->
       begin
-        under_restriction r r' @@
-        active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
+        M.under_restriction r r' @@
+        M.lift @@ C.active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
       end >>
       go sys
     | _ :: sys ->
@@ -127,12 +216,12 @@ and guess_restricted ty sys tm =
   in
   go sys >>
   let rty = Tm.make @@ Tm.Rst {ty; sys} in
-  ask >>= fun psi ->
-  guess psi ~ty0:rty ~ty1:ty tm ret >>= fun tm' ->
-  go_right >>
-  ret tm'
+  M.lift C.ask >>= fun psi ->
+  M.lift @@ U.guess psi ~ty0:rty ~ty1:ty tm C.ret >>= fun tm' ->
+  M.lift C.go_right >>
+  M.ret tm'
 
-and elab_chk env ty e : tm m =
+and elab_chk env ty e : tm M.m =
   match Tm.unleash ty, e with
   | Tm.Rst info, _ ->
     elab_chk env info.ty e >>=
@@ -140,19 +229,14 @@ and elab_chk env ty e : tm m =
 
   | _, E.Quo tmfam ->
     get_resolver env >>= fun renv ->
-    (* TODO: unify with boundary *)
-    ret @@ tmfam renv
+    M.ret @@ tmfam renv
 
   | _, E.Hole name ->
-    ask >>= fun psi ->
-    Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a@]@."
-      (match name with Some s -> s | None -> "Hole")
-      pp_tele psi
-      Uuseg_string.pp_utf_8 "⊢"
-      (Tm.pp Pretty.Env.emp) ty;
-    hole psi ty ret >>= fun tm ->
-    go_right >>
-    ret @@ Tm.up tm
+    M.lift C.ask >>= fun psi ->
+    M.lift @@ U.hole psi ty C.ret >>= fun tm ->
+    M.lift C.go_right >>
+    M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
+    M.ret @@ Tm.up tm
 
   | _, E.Lam ([], e) ->
     elab_chk env ty e
@@ -160,11 +244,16 @@ and elab_chk env ty e : tm m =
   | Tm.Pi (dom, cod), E.Lam (name :: names, e) ->
     let x = Name.named @@ Some name in
     let codx = Tm.unbind_with x (fun _ -> `Only) cod in
-    in_scope x (`P dom) begin
+    M.in_scope x (`P dom) begin
       elab_chk env codx @@
       E.Lam (names, e)
     end >>= fun bdyx ->
-    ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
+    M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
+
+  (* | Tm.Ext ebnd, E.Lam (name :: names, e) ->
+     begin
+      failwith ""
+     end *)
 
   | _, Tuple [] ->
     failwith "empty tuple"
@@ -172,18 +261,18 @@ and elab_chk env ty e : tm m =
     elab_chk env ty e
   | Tm.Sg (dom, cod), Tuple (e :: es) ->
     elab_chk env dom e >>= fun tm0 ->
-    typechecker >>= fun (module T) ->
+    M.lift C.typechecker >>= fun (module T) ->
     let module HS = HSubst (T) in
     let vdom = T.Cx.eval T.Cx.emp dom in
     let cod' = HS.inst_ty_bnd cod (vdom, tm0) in
     elab_chk env cod' (Tuple es) >>= fun tm1 ->
-    ret @@ Tm.cons tm0 tm1
+    M.ret @@ Tm.cons tm0 tm1
 
   | _, Type ->
     begin
       match Tm.unleash ty with
       | Tm.Univ _ ->
-        ret @@ Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0)
+        M.ret @@ Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0)
       | _ ->
         failwith "Type"
     end
