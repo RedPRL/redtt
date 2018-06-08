@@ -70,6 +70,7 @@ val map_head : (tm -> tm) -> tm head -> tm head
 val map_frame : (tm -> tm) -> tm frame -> tm frame
 val map_spine : (tm -> tm) -> tm spine -> tm spine
 val map_tmf : (tm -> tm) -> tm tmf -> tm tmf
+val map_tm_sys : (tm -> tm) -> (tm, tm) system -> (tm, tm) system
 
 
 type 'a subst =

@@ -160,6 +160,17 @@ let get_resolver env =
 
 
 
+let peel_ext_bnd ebnd =
+  let Tm.NB (names, (ty, sys)) = ebnd in
+  match names with
+  | [] ->
+    `Done (Tm.make @@ Tm.Rst {ty; sys})
+  | name :: names ->
+    let x = Name.named name in
+    let ty' = Tm.open_var 0 x (fun tw -> tw) ty in
+    let sys' = Tm.map_tm_sys (Tm.open_var 0 x (fun tw -> tw)) sys in
+    let ext_ty = Tm.make @@ Tm.Ext (Tm.NB (names, (ty', sys'))) in
+    `Ext (x, ext_ty)
 
 let normalize_ty ty =
   M.lift C.typechecker >>= fun (module T) ->
@@ -256,10 +267,24 @@ and elab_chk env ty e : tm M.m =
     end >>= fun bdyx ->
     M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
 
-  (* | Tm.Ext ebnd, E.Lam (name :: names, e) ->
-     begin
-      failwith ""
-     end *)
+  | Tm.Ext ebnd, E.Lam (name :: names, e) ->
+    begin
+      match peel_ext_bnd ebnd with
+      | `Done ty ->
+        elab_chk env ty @@ E.Lam (name :: names, e)
+      | `Ext (x, ty) ->
+        M.in_scope x `I begin
+          elab_chk env ty @@ E.Lam (names, e)
+        end >>= fun inner ->
+        let xs = List.map (fun name -> Name.named @@ Some name) names in
+        let bdy =
+          Tm.bindn (Bwd.from_list @@ x :: xs) @@
+          let hd = Tm.Down {ty = ty; tm = inner} in
+          let args = List.map (fun x -> Tm.up (Tm.Ref (x, `Only), Emp)) xs in
+          Tm.up (hd, Emp #< (Tm.ExtApp args))
+        in
+        M.ret @@ Tm.make @@ Tm.ExtLam bdy
+    end
 
   | _, Tuple [] ->
     failwith "empty tuple"
