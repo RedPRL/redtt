@@ -6,42 +6,6 @@ open Bwd open BwdNotation open Dev
 module C = Contextual
 module U = Unify
 
-let rec pp_tele fmt =
-  function
-  | Emp ->
-    ()
-
-  | Snoc (Emp, (x, cell)) ->
-    pp_tele_cell fmt (x, cell)
-
-  | Snoc (tele, (x, cell)) ->
-    Format.fprintf fmt "%a,@,%a"
-      pp_tele tele
-      pp_tele_cell (x, cell)
-
-and pp_tele_cell fmt (x, cell) =
-  match cell with
-  | `P ty ->
-    Format.fprintf fmt "@[<1>%a : %a@]"
-      Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
-
-  | `Tw (ty0, ty1) ->
-    Format.fprintf fmt "@[<1>%a : %a | %a@]"
-      Name.pp x
-      (Tm.pp Pretty.Env.emp) ty0
-      (Tm.pp Pretty.Env.emp) ty1
-
-  | `I ->
-    Format.fprintf fmt "@[<1>%a : dim@]"
-      Name.pp x
-
-  | `R (r0, r1) ->
-    Format.fprintf fmt "@[<1>%a = %a@]"
-      (Tm.pp Pretty.Env.emp) r0
-      (Tm.pp Pretty.Env.emp) r1
-
-
 module M :
 sig
   include Monad.S
@@ -91,7 +55,7 @@ struct
         let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in
         Format.printf "?%s:@, @[<v>@[<v>%a@]@;%a@,%a : %a@]@.@."
           (match name with Some name -> name | None -> "Hole")
-          pp_tele tele
+          U.pp_tele tele
           Uuseg_string.pp_utf_8 "⊢"
           (Tm.pp Pretty.Env.emp) tm
           (Tm.pp Pretty.Env.emp) ty;

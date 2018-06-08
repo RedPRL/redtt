@@ -8,6 +8,43 @@ open Notation
 
 type telescope = params
 
+
+let rec pp_tele fmt =
+  function
+  | Emp ->
+    ()
+
+  | Snoc (Emp, (x, cell)) ->
+    pp_tele_cell fmt (x, cell)
+
+  | Snoc (tele, (x, cell)) ->
+    Format.fprintf fmt "%a,@,%a"
+      pp_tele tele
+      pp_tele_cell (x, cell)
+
+and pp_tele_cell fmt (x, cell) =
+  match cell with
+  | `P ty ->
+    Format.fprintf fmt "@[<1>%a : %a@]"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty
+
+  | `Tw (ty0, ty1) ->
+    Format.fprintf fmt "@[<1>%a : %a | %a@]"
+      Name.pp x
+      (Tm.pp Pretty.Env.emp) ty0
+      (Tm.pp Pretty.Env.emp) ty1
+
+  | `I ->
+    Format.fprintf fmt "@[<1>%a : dim@]"
+      Name.pp x
+
+  | `R (r0, r1) ->
+    Format.fprintf fmt "@[<1>%a = %a@]"
+      (Tm.pp Pretty.Env.emp) r0
+      (Tm.pp Pretty.Env.emp) r1
+
+
 let rec telescope ty : telescope * ty =
   match Tm.unleash ty with
   | Tm.Pi (dom, cod) ->
@@ -753,6 +790,11 @@ let rec split_sigma tele x ty =
     ret None
 
 
+let is_restriction =
+  function
+  | `R _ -> true
+  | _ -> false
+
 let rec solver prob =
   (* Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob; *)
   match prob with
@@ -762,7 +804,7 @@ let rec solver prob =
 
   | All (param, prob) ->
     let x, probx = unbind param prob in
-    if not @@ Occurs.Set.mem x @@ Problem.free `Vars probx then
+    if not (is_restriction param || Occurs.Set.mem x @@ Problem.free `Vars probx) then
       active probx
     else
       begin
