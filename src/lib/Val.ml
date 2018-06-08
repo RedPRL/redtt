@@ -1482,7 +1482,6 @@ struct
     match unleash el with
     | Box info -> info.cap
     | Up info ->
-      let dom, _ = unleash_sg info.ty in
       let cap_sys = List.map (Face.map (fun _ _ a -> rigid_cap dir ty sys a)) info.sys in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
     | _ -> failwith "rigid_cap"
