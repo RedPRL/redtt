@@ -157,20 +157,26 @@ let get_resolver env =
   M.ret @@ go_locals ResEnv.init psi
 
 
+let should_split_ext_bnd ebnd =
+  match ebnd with
+  | Tm.NB ([_], (_, [])) -> false
+  | _ -> true
 
-
-
-let peel_ext_bnd ebnd =
+let split_ext_bnd ebnd =
+  let rec go names ty sys =
+    match names with
+    | [] ->
+      Tm.make @@ Tm.Rst {ty; sys}
+    | name :: names ->
+      let x = Name.named name in
+      let ty' = Tm.open_var 0 x (fun tw -> tw) ty in
+      let sys' = Tm.map_tm_sys (Tm.open_var 0 x (fun tw -> tw)) sys in
+      Tm.make @@ Tm.Ext (Tm.NB ([name], (Tm.close_var x (fun tw -> tw) 0 @@ go names ty' sys', [])))
+  in
   let Tm.NB (names, (ty, sys)) = ebnd in
-  match names with
-  | [] ->
-    `Done (Tm.make @@ Tm.Rst {ty; sys})
-  | name :: names ->
-    let x = Name.named name in
-    let ty' = Tm.open_var 0 x (fun tw -> tw) ty in
-    let sys' = Tm.map_tm_sys (Tm.open_var 0 x (fun tw -> tw)) sys in
-    let ext_ty = Tm.make @@ Tm.Ext (Tm.NB (names, (ty', sys'))) in
-    `Ext (x, ext_ty)
+  names, go names ty sys
+
+
 
 let normalize_ty ty =
   M.lift C.typechecker >>= fun (module T) ->
@@ -248,12 +254,6 @@ and elab_chk env ty e : tm M.m =
     get_resolver env >>= fun renv ->
     M.ret @@ tmfam renv
 
-  | _, E.Hole name ->
-    M.lift C.ask >>= fun psi ->
-    M.lift @@ U.hole psi ty C.ret >>= fun tm ->
-    M.lift C.go_right >>
-    M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
-    M.ret @@ Tm.up tm
 
   | _, E.Lam ([], e) ->
     elab_chk env ty e
@@ -267,24 +267,30 @@ and elab_chk env ty e : tm M.m =
     end >>= fun bdyx ->
     M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
 
-  | Tm.Ext ebnd, E.Lam (name :: names, e) ->
-    begin
-      match peel_ext_bnd ebnd with
-      | `Done ty ->
-        elab_chk env ty @@ E.Lam (name :: names, e)
-      | `Ext (x, ty) ->
-        M.in_scope x `I begin
-          elab_chk env ty @@ E.Lam (names, e)
-        end >>= fun inner ->
-        let xs = List.map (fun name -> Name.named @@ Some name) names in
-        let bdy =
-          Tm.bindn (Bwd.from_list @@ x :: xs) @@
-          let hd = Tm.Down {ty = ty; tm = inner} in
-          let args = List.map (fun x -> Tm.up (Tm.Ref (x, `Only), Emp)) xs in
-          Tm.up (hd, Emp #< (Tm.ExtApp args))
-        in
-        M.ret @@ Tm.make @@ Tm.ExtLam bdy
-    end
+
+  | Tm.Ext (Tm.NB ([_], (cod, []))), E.Lam (name :: names, e) ->
+    let x = Name.named @@ Some name in
+    let codx = Tm.open_var 0 x (fun _ -> `Only) cod in
+    M.in_scope x `I begin
+      elab_chk env codx @@
+      E.Lam (names, e)
+    end >>= fun bdyx ->
+    M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn (Emp #< x) bdyx)
+
+  | Tm.Ext ebnd, e when should_split_ext_bnd ebnd->
+    let names, ety = split_ext_bnd ebnd in
+    Format.eprintf "ext: %a@." Tm.pp0 ety;
+    elab_chk env ety e >>= fun tm ->
+    let bdy =
+      let xs = List.map Name.named names in
+      Tm.bindn (Bwd.from_list @@ xs) @@
+      let hd = Tm.Down {ty = ety; tm = tm} in
+      let args = List.map (fun x -> Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]) xs in
+      Tm.up (hd, Emp <>< args)
+    in
+    M.ret @@ Tm.make @@ Tm.ExtLam bdy
+
+
 
   | _, Tuple [] ->
     failwith "empty tuple"
@@ -308,6 +314,12 @@ and elab_chk env ty e : tm M.m =
         failwith "Type"
     end
 
+  | _, E.Hole name ->
+    M.lift C.ask >>= fun psi ->
+    M.lift @@ U.hole psi ty C.ret >>= fun tm ->
+    M.lift C.go_right >>
+    M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
+    M.ret @@ Tm.up tm
 
   | _ ->
     failwith "TODO"

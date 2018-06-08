@@ -706,6 +706,8 @@ and pp_bface env fmt face =
     let x, env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>[%a=%a@ <%a> %a]@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') tm
 
+let pp0 = pp Pretty.Env.emp
+
 let up cmd = make @@ Up cmd
 
 let car (hd, sp) =

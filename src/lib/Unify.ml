@@ -39,13 +39,22 @@ let rec abstract_ty (gm : telescope) cod =
     abstract_ty gm @@ Tm.make @@ Tm.Pi (dom, Tm.bind x cod)
   | Snoc (gm, (_, `R (r, r'))) ->
     abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
+  | Snoc (gm, (x, `I)) ->
+    let cod' = Tm.close_var x (fun tw -> tw) 0 cod in
+    abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB ([Name.name x], (cod', [])))
   | _ ->
     failwith "abstract_ty"
 
 let telescope_to_spine : telescope -> tm Tm.spine =
   (* TODO: might be backwards *)
-  Bwd.map @@ fun (x, _) ->
-  Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
+  Bwd.map @@ fun (x, param) ->
+  match param with
+  | `I ->
+    Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]
+  | `P _ ->
+    Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
+  | _ ->
+    failwith "TODO: telescope_to_spine"
 
 let hole_named alpha (gm : telescope) ty f =
   pushl (E (alpha, abstract_ty gm ty, Hole)) >>
@@ -513,7 +522,10 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
         let vty1 = T.Cx.eval T.Cx.emp ty1 in
         ret (vty0, vty1)
       else
-        failwith "rigid head mismatch"
+        begin
+          Format.eprintf "rigid head mismatch: %a <> %a@." Name.pp x0 Name.pp x1;
+          failwith "rigid head mismatch"
+        end
 
     | Snoc (sp0, Tm.FunApp t0), Snoc (sp1, Tm.FunApp t1) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
@@ -622,7 +634,10 @@ let rigid_rigid q =
 
   | _ ->
     if is_orthogonal q then
-      failwith "rigid-rigid mismatch"
+      begin
+        Format.eprintf "rigid-rigid mismatch: %a@." Equation.pp q;
+        failwith "rigid-rigid mismatch"
+      end
     else
       block @@ Unify q
 

@@ -121,6 +121,7 @@ sig
 end
 
 val pp : tm Pretty.t
+val pp0 : tm Pretty.t0
 val pp_cmd : tm cmd Pretty.t
 val pp_head : tm head Pretty.t
 val pp_spine : tm spine Pretty.t
