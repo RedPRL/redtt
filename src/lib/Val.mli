@@ -26,6 +26,7 @@ type con =
   | Coe : {dir : star; abs : abs; el : value} -> con
   | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
   | FCom : {dir : star; cap : value; sys : comp_sys} -> con
+  | Box : {dir : star; cap : value; sys : box_sys} -> con
 
   | Univ : {kind : Kind.t; lvl : Lvl.t} -> con
   | V : {x : gen; ty0 : value; ty1 : value; equiv : value} -> con
@@ -59,6 +60,8 @@ and neu =
   *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
+  | Cap : {dir : star; ty : value; sys : comp_sys; neu : neu} -> neu
+
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
 
@@ -73,6 +76,7 @@ and rigid_val_face = ([`Rigid], value) face
 and comp_sys = rigid_abs_face list
 and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
+and box_sys = val_sys
 and ext_abs = (value * val_sys) Abstraction.abs
 
 and env_el = Val of value | Atom of atom

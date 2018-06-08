@@ -28,6 +28,7 @@ type con =
   | Coe : {dir : star; abs : abs; el : value} -> con
   | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
   | FCom : {dir : star; cap : value; sys : comp_sys} -> con
+  | Box : {dir : star; cap : value; sys : box_sys} -> con
 
   | Univ : {kind : Kind.t; lvl : Lvl.t} -> con
   | V : {x : gen; ty0 : value; ty1 : value; equiv : value} -> con
@@ -61,6 +62,8 @@ and neu =
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
+  | Cap : {dir : star; ty : value; sys : comp_sys; neu : neu} -> neu
+
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
 
@@ -83,6 +86,7 @@ and rigid_val_face = ([`Rigid], value) face
 and comp_sys = rigid_abs_face list
 and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
+and box_sys = val_sys
 
 and node = Node of {con : con; action : D.action}
 and value = node ref
@@ -220,6 +224,38 @@ struct
         `Proj abs
   end
 
+  (* TODO merge this with CompSys *)
+  module BoxSys :
+  sig
+    include Sort
+      with type t = box_sys
+      with type 'a m = [`Ok of box_sys | `Proj of value]
+  end =
+  struct
+    type t = box_sys
+    type 'a m = [`Ok of box_sys | `Proj of value]
+
+    exception Proj of value
+
+    let rec act_aux phi (sys : t) =
+      match sys with
+      | [] -> []
+      | face :: sys ->
+        match ValFace.act phi face with
+        | Face.True (_, _, value) ->
+          raise @@ Proj value
+        | Face.False p ->
+          Face.False p :: act_aux phi sys
+        | Face.Indet (p, t) ->
+          Face.Indet (p, t) :: act_aux phi sys
+
+    let act phi sys =
+      try `Ok (act_aux phi sys)
+      with
+      | Proj value ->
+        `Proj value
+  end
+
   module ValSys :
   sig
     include Sort
@@ -345,6 +381,12 @@ struct
         (Val.act phi info.cap)
         (CompSys.act phi info.sys)
 
+    | Box info ->
+      make_box
+        (Star.act phi info.dir)
+        (Val.act phi info.cap)
+        (BoxSys.act phi info.sys)
+
     | V info ->
       make_v
         (Gen.act phi info.x)
@@ -417,6 +459,19 @@ struct
           step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
         | Step el ->
           step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
+      end
+
+    | Cap info ->
+      let mdir = Star.act phi info.dir in
+      let msys = CompSys.act phi info.sys in
+      begin
+        match act_neu phi info.neu with
+        | Ret neu ->
+          (* this is dumb; should refactor this with `cap`. *)
+          let el = make @@ Up {ty = info.ty; neu; sys = []} in
+          step @@ cap mdir info.ty msys el
+        | Step el ->
+          step @@ cap mdir info.ty msys el
       end
 
     | FunApp (neu, arg) ->
@@ -613,6 +668,19 @@ struct
           let _, r' = Star.unleash dir in
           let x, el = Abs.unleash1 abs in
           Val.act (D.subst r' x) el
+      end
+    | `Same _ ->
+      cap
+
+  and make_box mdir cap msys : value =
+    match mdir with
+    | `Ok dir ->
+      begin
+        match msys with
+        | `Ok sys ->
+          make @@ Box {dir; cap; sys}
+        | `Proj el ->
+          el
       end
     | `Same _ ->
       cap
@@ -1397,6 +1465,29 @@ struct
 
     | _ -> failwith "TODO: cdr"
 
+  and cap mdir ty msys el : value =
+    match mdir with
+    | `Ok dir ->
+      begin
+        match msys with
+        | `Ok sys ->
+          rigid_cap dir ty sys el
+        | `Proj abs ->
+          rigid_coe dir abs el
+      end
+    | `Same _ ->
+      el
+
+  and rigid_cap dir ty sys el : value =
+    match unleash el with
+    | Box info -> info.cap
+    | Up info ->
+      let dom, _ = unleash_sg info.ty in
+      let cap_sys = List.map (Face.map (fun _ _ a -> rigid_cap dir ty sys a)) info.sys in
+      make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
+    | _ -> failwith "rigid_cap"
+
+
   and inst_clo clo varg =
     match clo with
     | Clo info ->
@@ -1445,6 +1536,8 @@ struct
       Format.fprintf fmt "<hcom>"
     | FCom _ ->
       Format.fprintf fmt "<fcom>"
+    | Box _ ->
+      Format.fprintf fmt "<box>" (* 📦 *)
     | LblTy {lbl; args; ty} ->
       begin
         match args with
@@ -1517,6 +1610,9 @@ struct
 
     | If _ ->
       Format.fprintf fmt "<if>"
+
+    | Cap _ ->
+      Format.fprintf fmt "<cap>"
 
     | VProj _ ->
       Format.fprintf fmt "<vproj>"
