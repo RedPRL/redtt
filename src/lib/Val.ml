@@ -332,8 +332,7 @@ struct
               match force_val_sys rst.sys with
               | `Proj el -> el
               | `Rigid sys ->
-                let con = Up {ty = rst.ty; neu = up.neu; sys} in
-                ref @@ Node {con; action = D.idn}
+                make @@ Up {ty = rst.ty; neu = up.neu; sys}
             end
           | _ ->
             ref @@ Node {con; action = D.idn}
