@@ -173,7 +173,7 @@ struct
         let envx = Env.abs env xs in
         let tyx = equate envx ty ty0x ty1x in
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
-        Tm.make @@ Tm.Ext (Tm.NB (List.map (fun x -> Some (Name.to_string x)) xs, (tyx, sysx)))
+        Tm.make @@ Tm.Ext (Tm.NB (List.map Name.name xs, (tyx, sysx)))
 
       | Rst info0, Rst info1 ->
         let ty = equate env ty info0.ty info1.ty in

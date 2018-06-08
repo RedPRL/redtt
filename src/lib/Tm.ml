@@ -466,7 +466,7 @@ let unbindn (NB (nms, t)) =
   go nms Emp t
 
 let bind x tx =
-  B (Some (Name.to_string x), close_var x (fun _ -> `Only) 0 tx)
+  B (Name.name x, close_var x (fun _ -> `Only) 0 tx)
 
 let rec bindn xs txs =
   let rec go xs txs =
@@ -475,7 +475,7 @@ let rec bindn xs txs =
     | Snoc (xs, x) ->
       go xs @@ close_var x (fun _ -> `Only) 0 txs
   in
-  NB (List.map (fun x -> Some (Name.to_string x)) @@ Bwd.to_list xs, go xs txs)
+  NB (List.map Name.name @@ Bwd.to_list xs, go xs txs)
 
 let rec pp env fmt (Tm tm) =
   match tm with

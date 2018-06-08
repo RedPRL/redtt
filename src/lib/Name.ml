@@ -20,6 +20,15 @@ let fresh () =
 let compare =
   Pervasives.compare
 
+let name =
+  function
+  | Const s ->
+    Some s
+  | Gen i ->
+    match Hashtbl.find names i with
+    | Some x -> Some x
+    | None -> None
+
 let to_string nm =
   match nm with
   | Const s ->

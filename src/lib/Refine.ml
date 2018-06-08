@@ -144,8 +144,14 @@ let get_resolver env =
     function
     | Emp -> go_globals renv @@ T.bindings env
     | Snoc (psi, (x, _)) ->
-      let renvx = ResEnv.global (Name.to_string x) x renv in
-      go_locals renvx psi
+      begin
+        match Name.name x with
+        | Some str ->
+          let renvx = ResEnv.global str x renv in
+          go_locals renvx psi
+        | None ->
+          go_locals renv psi
+      end
   in
   M.lift C.ask >>= fun psi ->
   M.ret @@ go_locals ResEnv.init psi
