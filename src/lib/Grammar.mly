@@ -83,7 +83,7 @@ tele_with_env:
     { fun env ->
       let env' = R.bind "_" env in
       let tele, env'' = rest env' in
-      TCons (Some "_", dom env, tele), env'' }
+      TCons (None, dom env, tele), env'' }
 
   | LSQ; x = ATOM; COLON; dom = tm; RSQ; rest = tele_with_env
     { fun env ->
