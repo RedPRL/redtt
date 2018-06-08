@@ -123,7 +123,7 @@ let rec pushls es =
 
 let dump_state fmt str filter =
   get >>= fun cx ->
-  Format.fprintf fmt "%s@.@[<v>%a@]@.@." str (pp_cx filter) cx;
+  Format.fprintf fmt "@[<v2>%s@,@,@[<v>%a@]@]@.@." str (pp_cx filter) cx;
   ret ()
 
 let popl =

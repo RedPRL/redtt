@@ -171,7 +171,12 @@ and elab_decl env =
     M.ret @@ T.add name alpha env
 
   | E.Debug filter ->
-    M.lift @@ C.dump_state Format.std_formatter "debug" filter >>
+    let title =
+      match filter with
+      | `All -> "Development state:"
+      | `Constraints -> "Unsolved constraints:"
+    in
+    M.lift @@ C.dump_state Format.std_formatter title filter >>
     M.ret env
 
 and elab_scheme env (cells, ecod) kont =
