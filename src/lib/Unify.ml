@@ -172,7 +172,7 @@ let to_var t =
   | Tm.Up (Tm.Ref (a, _), Emp) ->
     Some a
   | _ ->
-    Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t;
+    (* Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t; *)
     None
 
 
@@ -224,9 +224,9 @@ let invert alpha ty sp t =
       end >>= fun b ->
       ret @@ if b then Some lam_tm else None
     | _ ->
-      Format.eprintf "Invert: nope %a @.@."
-        (Tm.pp_spine Pretty.Env.emp) sp
-      ;
+      (* Format.eprintf "Invert: nope %a @.@."
+         (Tm.pp_spine Pretty.Env.emp) sp
+         ; *)
       ret None
 
 let try_invert q ty =
