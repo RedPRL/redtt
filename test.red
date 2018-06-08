@@ -14,7 +14,8 @@ let funext
   [p : `(→ [x : A] (Path (B x) (f x) (g x)))]
   : `(Path (→ [x : A] (B x)) f g)
   ⇒
-  `(λ <i> [x] (@ (p x) i))
+  λ i x →
+    `(@ (p x) i)
 
 
 let not [x : `bool] : `bool ⇒
@@ -34,18 +35,18 @@ let not∘not/id/pt [x : `bool] : `(Path bool (not∘not x) x) ⇒
    (λ <i> ff))
 
 let not∘not/id : `(Path (→ bool bool) not∘not (id bool)) ⇒
- `(λ <i> [x]
-   (@ (not∘not/id/pt x) i))
+  λ i x →
+   `(@ (not∘not/id/pt x) i)
 
 let symm
   [A : type]
   [p : `(# <i> A)]
   : `(Path A (@ p 1) (@ p 0))
   ⇒
-  `(λ <i>
-    (hcom 0 1 A (@ p 0)
+  λ i →
+   `(hcom 0 1 A (@ p 0)
      [i=0 <j> (@ p j)]
-     [i=1 <_> (@ p 0)]))
+     [i=1 <_> (@ p 0)])
 
 let trans
   [A : type]
@@ -54,10 +55,10 @@ let trans
   [q : `(Path A (@ p 1) x)]
   : `(Path A (@ p 0) (@ q 1))
   ⇒
-  `(λ <i>
-    (hcom 0 1 A (@ p i)
+  λ i →
+   `(hcom 0 1 A (@ p i)
      [i=0 <_> (@ p 0)]
-     [i=1 <j> (@ q j)]))
+     [i=1 <j> (@ q j)])
 
 let singleton [A : type] [M : `A] : `(U pre 0) ⇒
   `(A [0=0 M])
@@ -95,8 +96,8 @@ let connection/or/diagonal
  [p : `(Path A a b)]
  : `(singleton (Path A a b) p)
  ⇒
- `(λ <i>
-   (@ (connection/or A a b p) i i))
+ λ i →
+  `(@ (connection/or A a b p) i i)
 
 let connection/and
  [A : type]
