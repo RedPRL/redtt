@@ -29,10 +29,17 @@ module Bwd =
 struct
   open BwdNotation
 
-  let rec map f xs =
-    match xs with
+  let rec map f =
+    function
     | Emp -> Emp
     | Snoc (xs, x) -> Snoc (map f xs, f x)
+
+  let rec filter f =
+    function
+    | Emp -> Emp
+    | Snoc (xs, x) ->
+      let xs' = filter f xs in
+      if f x then Snoc (xs', x) else xs'
 
   let to_list xs =
     xs <>> []

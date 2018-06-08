@@ -168,8 +168,8 @@ and elab_decl env =
     M.lift @@ U.define psi alpha cod tm >>
     M.ret @@ T.add name alpha env
 
-  | E.Debug ->
-    M.lift @@ C.dump_state Format.std_formatter "debug" >>
+  | E.Debug filter ->
+    M.lift @@ C.dump_state Format.std_formatter "debug" filter >>
     M.ret env
 
 and elab_scheme env (cells, ecod) kont =

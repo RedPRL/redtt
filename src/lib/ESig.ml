@@ -1,6 +1,6 @@
 type edecl =
   | Define of string * escheme * echk
-  | Debug
+  | Debug of [ `All | `Constraints ]
 
 and escheme = etele * echk
 and etele = (string * echk) list

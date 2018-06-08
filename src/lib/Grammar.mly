@@ -24,8 +24,16 @@
 edecl:
   | LET; a = ATOM; sch = escheme; RRIGHT_ARROW; tm = echk
     { E.Define (a, sch, tm) }
-  | DEBUG
-    { E.Debug }
+  | DEBUG; f = debug_filter
+    { E.Debug f }
+
+debug_filter:
+  | { `All }
+  | a = ATOM
+    { match a with
+      | "all" -> `All
+      | "constraints" -> `Constraints
+      | _ -> failwith "Invalid debug filter: try 'all' or 'constraints' " }
 
 echk:
   | BACKTICK; t = tm

@@ -25,7 +25,7 @@ let rec pp_rcx fmt =
   function
   | [] ->
     ()
-  | e :: []->
+  | e :: [] ->
     Format.fprintf fmt "@[<1>%a@]"
       pp_entry e
   | e :: cx ->
@@ -33,10 +33,18 @@ let rec pp_rcx fmt =
       pp_entry e
       pp_rcx cx
 
-let pp_cx fmt {lcx; rcx} =
+let filter_entry filter entry =
+  match filter with
+  | `All -> true
+  | `Constraints ->
+    match entry with
+    | Q _ -> true
+    | _ -> false
+
+let pp_cx filter fmt {lcx; rcx} =
   Format.fprintf fmt "@[<v>%a@] |@ @[<v>%a@]"
-    pp_lcx lcx
-    pp_rcx rcx
+    pp_lcx (Bwd.filter (filter_entry filter) lcx)
+    pp_rcx (List.filter (filter_entry filter) rcx)
 
 
 module M =
@@ -112,16 +120,16 @@ let rec pushls es =
     pushl e >>
     pushls es
 
-let dump_state fmt str =
+let dump_state fmt str filter =
   get >>= fun cx ->
-  Format.fprintf fmt "%s@.@[<v>%a@]@.@." str pp_cx cx;
+  Format.fprintf fmt "%s@.@[<v>%a@]@.@." str (pp_cx filter) cx;
   ret ()
 
 let popl =
   getl >>= function
   | Snoc (mcx, e) -> setl mcx >> ret e
   | _ ->
-    dump_state Format.err_formatter "Tried to pop-left" >>= fun _ ->
+    dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
 
 

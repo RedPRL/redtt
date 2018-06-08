@@ -109,7 +109,7 @@ let define gm alpha ~ty tm =
   let tm' = abstract_tm gm tm in
   check ~ty:ty' tm' >>= fun b ->
   if not b then
-    dump_state Format.err_formatter "Type error" >>= fun _ ->
+    dump_state Format.err_formatter "Type error" `All >>= fun _ ->
     begin
       Format.eprintf "error checking: %a : %a@." (Tm.pp Pretty.Env.emp) tm' (Tm.pp Pretty.Env.emp) ty';
       failwith "define: type error"
