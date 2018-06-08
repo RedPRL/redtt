@@ -57,9 +57,9 @@ struct
           (match name with Some name -> name | None -> "Hole")
           Dev.pp_params tele
           Uuseg_string.pp_utf_8 "⊢"
-          (Tm.pp Pretty.Env.emp) ty
+          Tm.pp0 ty
           Uuseg_string.pp_utf_8 "⟿"
-          (Tm.pp Pretty.Env.emp) tm;
+          Tm.pp0 tm;
         C.ret ()
       end
 

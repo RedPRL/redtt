@@ -97,6 +97,9 @@ val unbind_with : Name.t -> (twin -> twin) -> tm bnd -> tm
 
 val subst : tm cmd subst -> tm -> tm
 
+(* make sure you know what you are doing, LOL *)
+val eta_contract : tm -> tm
+
 
 val up : tm cmd -> tm
 val var : int -> twin -> tm cmd
@@ -137,3 +140,5 @@ module Sp :
 sig
   include Occurs.S with type t = tm spine
 end
+
+

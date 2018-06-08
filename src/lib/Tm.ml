@@ -733,7 +733,6 @@ and pp_bface env fmt face =
     let x, env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>[%a=%a@ <%a> %a]@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') tm
 
-let pp0 = pp Pretty.Env.emp
 
 let up cmd = make @@ Up cmd
 
@@ -1057,3 +1056,70 @@ let map_tmf f =
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
     Let (map_cmd f cmd, map_bnd f bnd)
+
+
+
+let rec opt_traverse f xs =
+  match xs with
+  | [] -> Some []
+  | x::xs ->
+    match f x with
+    | Some y -> Option.map (fun ys -> y :: ys) @@ opt_traverse f xs
+    | None -> None
+
+
+let as_plain_var t =
+  match unleash t with
+  | Up (Ref (x, _), Emp) ->
+    Some x
+  | _ ->
+    None
+
+(* A very crappy eta contraction function. It's horrific that this is actually a thing that we do! *)
+let rec eta_contract t =
+  match unleash t with
+  | Lam bnd ->
+    let y, tmy = unbind bnd in
+    let tm'y = eta_contract tmy in
+    begin
+      match unleash tm'y with
+      | Up (Ref (f, twf), Snoc (sp, FunApp arg)) ->
+        begin
+          match as_plain_var arg with
+          | Some y'
+            when
+              y = y'
+              && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
+            ->
+            up (Ref (f, twf), sp)
+          | _ ->
+            make @@ Lam (bind y tm'y)
+        end
+      | _ ->
+        make @@ Lam (bind y tm'y)
+    end
+
+  | ExtLam nbnd ->
+    let ys, tmys = unbindn nbnd in
+    let tm'ys = eta_contract tmys in
+    begin
+      match unleash tm'ys with
+      | Up (Ref (p, twp), Snoc (sp, ExtApp args)) ->
+        begin
+          match opt_traverse as_plain_var args with
+          | Some y's
+            when Bwd.to_list ys = y's
+            (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)
+            ->
+            up (Ref (p, twp), sp)
+          | _ ->
+            make @@ ExtLam (bindn ys tm'ys)
+        end
+      | _ ->
+        make @@ ExtLam (bindn ys tm'ys)
+    end
+
+  | con ->
+    make @@ map_tmf eta_contract con
+
+let pp0 fmt tm = pp Pretty.Env.emp fmt @@ eta_contract tm

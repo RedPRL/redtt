@@ -119,17 +119,17 @@ let unbind param (B (nm, prob)) =
 let pp_equation fmt q =
   if q.ty0 = q.ty1 then
     Format.fprintf fmt "@[<1>@[<1>%a@]@ %a@ @[<1>%a@ :@ %a@]@]"
-      (Tm.pp Pretty.Env.emp) q.tm0
+      Tm.pp0 q.tm0
       Uuseg_string.pp_utf_8 "≐"
-      (Tm.pp Pretty.Env.emp) q.tm1
-      (Tm.pp Pretty.Env.emp) q.ty1
+      Tm.pp0 q.tm1
+      Tm.pp0 q.ty1
   else
     Format.fprintf fmt "@[<1>@[<1>%a@ :@ %a@]@ %a@ @[<1>%a@ :@ %a@]@]"
-      (Tm.pp Pretty.Env.emp) q.tm0
-      (Tm.pp Pretty.Env.emp) q.ty0
+      Tm.pp0 q.tm0
+      Tm.pp0 q.ty0
       Uuseg_string.pp_utf_8 "≐"
-      (Tm.pp Pretty.Env.emp) q.tm1
-      (Tm.pp Pretty.Env.emp) q.ty1
+      Tm.pp0 q.tm1
+      Tm.pp0 q.ty1
 
 let pp_param fmt =
   function
@@ -139,12 +139,12 @@ let pp_param fmt =
     Tm.pp Pretty.Env.emp fmt ty
   | `Tw (ty0, ty1) ->
     Format.fprintf fmt "{%a | %a}"
-      (Tm.pp Pretty.Env.emp) ty0
-      (Tm.pp Pretty.Env.emp) ty1
+      Tm.pp0 ty0
+      Tm.pp0 ty1
   | `R (r0, r1) ->
     Format.fprintf fmt "{%a = %a}"
-      (Tm.pp Pretty.Env.emp) r0
-      (Tm.pp Pretty.Env.emp) r1
+      Tm.pp0 r0
+      Tm.pp0 r1
 
 
 let pp_param_cell fmt (x, param) =
@@ -152,13 +152,13 @@ let pp_param_cell fmt (x, param) =
   | `P ty ->
     Format.fprintf fmt "@[<1>%a : %a@]"
       Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
+      Tm.pp0 ty
 
   | `Tw (ty0, ty1) ->
     Format.fprintf fmt "@[<1>%a : %a | %a@]"
       Name.pp x
-      (Tm.pp Pretty.Env.emp) ty0
-      (Tm.pp Pretty.Env.emp) ty1
+      Tm.pp0 ty0
+      Tm.pp0 ty1
 
   | `I ->
     Format.fprintf fmt "@[<1>%a : dim@]"
@@ -166,8 +166,8 @@ let pp_param_cell fmt (x, param) =
 
   | `R (r0, r1) ->
     Format.fprintf fmt "@[<1>%a = %a@]"
-      (Tm.pp Pretty.Env.emp) r0
-      (Tm.pp Pretty.Env.emp) r1
+      Tm.pp0 r0
+      Tm.pp0 r1
 
 let rec pp_params fmt =
   function
@@ -208,18 +208,18 @@ let pp_entry fmt =
   | E (x, ty, Hole) ->
     Format.fprintf fmt "?%a@ :@ %a"
       Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
+      Tm.pp0 ty
 
   | E (x, ty, Defn tm) ->
     Format.fprintf fmt "!%a@ : %a@ = %a"
       Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
-      (Tm.pp Pretty.Env.emp) tm
+      Tm.pp0 ty
+      Tm.pp0 tm
 
   | E (x, ty, Guess _) ->
     Format.fprintf fmt "?%a@ :@ %a"
       Name.pp x
-      (Tm.pp Pretty.Env.emp) ty
+      Tm.pp0 ty
 
   | Q (_, prob) ->
     Format.fprintf fmt "%a"
