@@ -10,6 +10,8 @@ let make c d =
   | _ ->
     `Ok (c, d)
 
+let swap (c, d) = (d, c)
+
 let unleash p = p
 
 let act phi (r, r') =

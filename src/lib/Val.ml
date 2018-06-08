@@ -1473,7 +1473,7 @@ struct
         | `Ok sys ->
           rigid_cap dir ty sys el
         | `Proj abs ->
-          rigid_coe dir abs el
+          rigid_coe (Star.swap dir) abs el
       end
     | `Same _ ->
       el
