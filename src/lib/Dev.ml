@@ -117,12 +117,19 @@ let unbind param (B (nm, prob)) =
 
 
 let pp_equation fmt q =
-  Format.fprintf fmt "@[<1>@[<1>%a@ :@ %a@]@ %a@ @[<1>%a@ :@ %a@]@]"
-    (Tm.pp Pretty.Env.emp) q.tm0
-    (Tm.pp Pretty.Env.emp) q.ty0
-    Uuseg_string.pp_utf_8 "≐"
-    (Tm.pp Pretty.Env.emp) q.tm1
-    (Tm.pp Pretty.Env.emp) q.ty1
+  if q.ty0 = q.ty1 then
+    Format.fprintf fmt "@[<1>@[<1>%a@]@ %a@ @[<1>%a@ :@ %a@]@]"
+      (Tm.pp Pretty.Env.emp) q.tm0
+      Uuseg_string.pp_utf_8 "≐"
+      (Tm.pp Pretty.Env.emp) q.tm1
+      (Tm.pp Pretty.Env.emp) q.ty1
+  else
+    Format.fprintf fmt "@[<1>@[<1>%a@ :@ %a@]@ %a@ @[<1>%a@ :@ %a@]@]"
+      (Tm.pp Pretty.Env.emp) q.tm0
+      (Tm.pp Pretty.Env.emp) q.ty0
+      Uuseg_string.pp_utf_8 "≐"
+      (Tm.pp Pretty.Env.emp) q.tm1
+      (Tm.pp Pretty.Env.emp) q.ty1
 
 let pp_param fmt =
   function
