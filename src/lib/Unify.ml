@@ -762,11 +762,14 @@ let rec lower tele alpha ty =
     define tele alpha ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
     ret true
 
-  | Tm.Sg (dom, Tm.B (_, cod)) ->
+  | Tm.Sg (dom, cod) ->
     hole tele dom @@ fun t0 ->
-    hole tele (Tm.subst (Tm.Sub (Tm.Id, t0)) cod) @@ fun t1 ->
+    typechecker >>= fun (module T) ->
+    let module HS = HSubst (T) in
+    let cod' = HS.inst_ty_bnd cod (T.Cx.eval T.Cx.emp dom, Tm.up t0) in
+    hole tele cod' @@ fun t1 ->
     define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
-    ret true
+    ret false
 
   | Tm.Pi (dom, (Tm.B (nm, _) as cod)) ->
     let x = Name.named nm in
