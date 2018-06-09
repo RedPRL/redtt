@@ -469,9 +469,9 @@ struct
         | Ret neu ->
           (* this is dumb; should refactor this with `cap`. *)
           let el = make @@ Up {ty = info.ty; neu; sys = []} in
-          step @@ cap mdir info.ty msys el
+          step @@ make_cap mdir info.ty msys el
         | Step el ->
-          step @@ cap mdir info.ty msys el
+          step @@ make_cap mdir info.ty msys el
       end
 
     | FunApp (neu, arg) ->
@@ -785,17 +785,15 @@ struct
       failwith "hcom in fcom, taste it!!"
 
     | V {x; ty0; ty1; equiv} ->
-      let r, r' = Star.unleash dir in
+      let r, _ = Star.unleash dir in
       let phi0 = D.equate (Gen.unleash x) D.dim0 in
-      let phi1 = D.equate (Gen.unleash x) D.dim1 in
-      let el0 = make_hcom (Star.make (D.act phi0 r) (D.act phi0 r')) (Val.act phi0 ty0) (Val.act phi0 cap) (CompSys.act phi0 sys) in
+      let el0 = Val.act phi0 @@ make_hcom (`Ok dir) ty0 cap (`Ok sys) in
       let el1 =
         let hcom r' ty = make_hcom (Star.make r r') ty cap (`Ok sys) in
         let face0 =
           AbsFace.gen_const x `Dim0 @@
           let y = Name.fresh () in
           Abs.bind1 y @@
-          Val.act phi0 @@
           apply (car equiv) @@
           hcom (D.named y) ty0
         in
@@ -803,7 +801,6 @@ struct
           AbsFace.gen_const x `Dim1 @@
           let y = Name.fresh () in
           Abs.bind1 y @@
-          Val.act phi1 @@
           hcom (D.named y) ty1
         in
         let el1_cap = vproj (`Ok x) ~ty0 ~ty1 ~equiv ~el:cap in
@@ -811,12 +808,12 @@ struct
           let face =
             Face.map @@ fun ri r'i absi ->
             let phi = D.equate ri r'i in
-            let yi, eli = Abs.unleash absi in
-            Abs.bind yi @@ vproj (Gen.act phi x) ~ty0:(Val.act phi ty0) ~ty1:(Val.act phi ty1) ~equiv:(Val.act phi equiv) ~el:eli
+            let yi, el = Abs.unleash absi in
+            Abs.bind yi @@ Val.act phi @@ rigid_vproj x ~ty0 ~ty1 ~equiv ~el
           in
           [face0; face1] @ List.map face sys
         in
-        make_hcom (Star.make r r') ty1 el1_cap (`Ok el1_sys)
+        make_hcom (`Ok dir) ty1 el1_cap (`Ok el1_sys)
       in
       make_vin (`Ok x) el0 el1
 
@@ -1465,7 +1462,7 @@ struct
 
     | _ -> failwith "TODO: cdr"
 
-  and cap mdir ty msys el : value =
+  and make_cap mdir ty msys el : value =
     match mdir with
     | `Ok dir ->
       begin
