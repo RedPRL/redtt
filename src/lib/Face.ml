@@ -40,35 +40,30 @@ end =
 struct
   type 'x t = ('x, X.t) face
 
+  let rigid : type x. DimStar.t -> X.t -> (x, X.t) face =
+    fun eq a ->
+      let r, r' = DimStar.unleash eq in
+      match Dim.compare r r' with
+      | Dim.Apart ->
+        False eq
+      | _ ->
+        Indet (eq, X.act (Dim.equate r r') a)
 
   let make : Dim.t -> Dim.t -> X.t -> ([`Any], X.t) face =
     fun r r' a ->
       match DimStar.make r r' with
       | `Ok p ->
-        begin
-          match Dim.compare r r' with
-          | Dim.Apart ->
-            False p
-          | _ ->
-            Indet (p, X.act (Dim.equate r r') a)
-        end
+        rigid p a
       | `Same _ ->
         True (r, r', a)
 
   let gen_const : type x. DimGeneric.t -> [`Dim0 | `Dim1] -> X.t -> (x, X.t) face =
     fun x eps a ->
-      let r =
-        match eps with
-        | `Dim0 -> Dim.dim0
-        | `Dim1 -> Dim.dim1
-      in
-      match make (DimGeneric.unleash x) r a with
-      | True (_, _, _) ->
+      match DimStar.gen_const x eps with
+      | `Ok p ->
+        rigid p a
+      | `Same _ ->
         failwith "Impossible"
-      | False p ->
-        False p
-      | Indet (p, a) ->
-        Indet (p, a)
 
 
   let act : type x. Dim.action -> x t -> _ t =
