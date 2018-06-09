@@ -10,6 +10,9 @@ val forall : Dim.atom -> ('x, 'a) face -> [`Delete | `Keep]
 module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
+
+  val rigid : DimStar.t -> X.t -> ('x, X.t) face
+
   val make : Dim.t -> Dim.t -> X.t -> ([`Any], X.t) face
 
   (* convenience function for generating rigid faces x = ε *)

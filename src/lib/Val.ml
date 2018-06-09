@@ -86,7 +86,7 @@ and rigid_val_face = ([`Rigid], value) face
 and comp_sys = rigid_abs_face list
 and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
-and box_sys = val_sys
+and box_sys = rigid_val_sys
 
 and node = Node of {con : con; action : D.action}
 and value = node ref
@@ -612,10 +612,13 @@ struct
     | `Const `Dim1 ->
       ty1
 
+  and rigid_vin x el0 el1 : value =
+    make @@ VIn {x; el0; el1}
+
   and make_vin mgen el0 el1 : value =
     match mgen with
     | `Ok x ->
-      make @@ VIn {x; el0; el1}
+      rigid_vin x el0 el1
     | `Const `Dim0 ->
       el0
     | `Const `Dim1 ->
@@ -657,13 +660,16 @@ struct
     | `Same _ ->
       cap
 
+  and rigid_fcom dir cap sys : value =
+    make @@ FCom {dir; cap; sys}
+
   and make_fcom mdir cap msys : value =
     match mdir with
     | `Ok dir ->
       begin
         match msys with
         | `Ok sys ->
-          make @@ FCom {dir; cap; sys}
+          rigid_fcom dir cap sys
         | `Proj abs ->
           let _, r' = Star.unleash dir in
           let x, el = Abs.unleash1 abs in
@@ -672,13 +678,16 @@ struct
     | `Same _ ->
       cap
 
+  and rigid_box dir cap sys : value =
+    make @@ Box {dir; cap; sys}
+
   and make_box mdir cap msys : value =
     match mdir with
     | `Ok dir ->
       begin
         match msys with
         | `Ok sys ->
-          make @@ Box {dir; cap; sys}
+          rigid_box dir cap sys
         | `Proj el ->
           el
       end
@@ -803,7 +812,7 @@ struct
           Abs.bind1 y @@
           hcom (D.named y) ty1
         in
-        let el1_cap = vproj (`Ok x) ~ty0 ~ty1 ~equiv ~el:cap in
+        let el1_cap = rigid_vproj x ~ty0 ~ty1 ~equiv ~el:cap in
         let el1_sys =
           let face =
             Face.map @@ fun ri r'i absi ->
@@ -813,9 +822,9 @@ struct
           in
           [face0; face1] @ List.map face sys
         in
-        make_hcom (`Ok dir) ty1 el1_cap (`Ok el1_sys)
+        rigid_hcom dir ty1 el1_cap el1_sys
       in
-      make_vin (`Ok x) el0 el1
+      rigid_vin x el0 el1
 
     | _ ->
       failwith "TODO: rigid_hcom"
