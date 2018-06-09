@@ -794,7 +794,7 @@ struct
       begin
         (* adapted from RedPRL *)
 
-        let r, r' = Star.unleash dir in
+        let _, r' = Star.unleash dir in
         let s, s' = Star.unleash info.dir in
         let cap_in_wall = rigid_coe (Star.swap info.dir) in
         let hcom_of_coe abs =
@@ -828,7 +828,7 @@ struct
             let x, el = Abs.unleash1 absi in
             Abs.bind1 x @@
             Val.act (D.equate ri r'i) @@
-            cap_in_wall abs cap
+            cap_in_wall abs el
           in
           begin
             match force_abs_sys [face0; face1] with
@@ -857,7 +857,7 @@ struct
           let fcom_faces =
             let face = Face.map @@
               fun ri r'i absi ->
-              let y, el = Abs.unleash1 absi in
+              let y = Name.fresh () in
               Abs.bind1 y @@ Val.act (D.equate ri r'i) @@
               recovery absi (D.named y)
             in
