@@ -1083,7 +1083,7 @@ let rec eta_contract t =
     let tm'y = eta_contract tmy in
     begin
       match unleash tm'y with
-      | Up (Ref (f, twf), Snoc (sp, FunApp arg)) ->
+      | Up (hd, Snoc (sp, FunApp arg)) ->
         begin
           match as_plain_var arg with
           | Some y'
@@ -1091,7 +1091,7 @@ let rec eta_contract t =
               y = y'
               && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
             ->
-            up (Ref (f, twf), sp)
+            up (hd, sp)
           | _ ->
             make @@ Lam (bind y tm'y)
         end
@@ -1104,19 +1104,34 @@ let rec eta_contract t =
     let tm'ys = eta_contract tmys in
     begin
       match unleash tm'ys with
-      | Up (Ref (p, twp), Snoc (sp, ExtApp args)) ->
+      | Up (hd, Snoc (sp, ExtApp args)) ->
         begin
           match opt_traverse as_plain_var args with
           | Some y's
             when Bwd.to_list ys = y's
             (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)
             ->
-            up (Ref (p, twp), sp)
+            up (hd, sp)
           | _ ->
             make @@ ExtLam (bindn ys tm'ys)
         end
       | _ ->
         make @@ ExtLam (bindn ys tm'ys)
+    end
+
+  | Cons (tm0, tm1) ->
+    let tm0' = eta_contract tm0 in
+    let tm1' = eta_contract tm1 in
+    begin
+      match unleash tm0', unleash tm1' with
+      | Up (hd0, Snoc (sp0, Car)), Up (hd1, Snoc (sp1, Cdr))
+        when
+          hd0 = hd1 && sp0 = sp1
+        ->
+        up (hd0, sp0)
+
+      | _ ->
+        make @@ Cons (tm0', tm1')
     end
 
   | con ->

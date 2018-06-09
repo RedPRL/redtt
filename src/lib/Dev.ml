@@ -136,7 +136,7 @@ let pp_param fmt =
   | `I ->
     Format.fprintf fmt "dim"
   | `P ty ->
-    Tm.pp Pretty.Env.emp fmt ty
+    Tm.pp0 fmt ty
   | `Tw (ty0, ty1) ->
     Format.fprintf fmt "%a %a %a"
       Tm.pp0 ty0
