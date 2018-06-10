@@ -545,12 +545,18 @@ let normalize_eqn q =
   normalize ~ty:ty1 q.tm1 >>= fun tm1 ->
   ret @@ {ty0; ty1; tm0; tm1}
 
-(* TODO! Unleash constraints appropriately *)
+(* TODO! Unleash constraints appropriately.contents
+   In the future, this should throw an error when the subtyping goal is known to be false
+   (the two types are subtyping-orthogonal), and it should only block when it is still possible. *)
 let subtype ty0 ty1 =
   typechecker >>= fun (module T) ->
   let vty0 = T.Cx.eval T.Cx.emp ty0 in
   let vty1 = T.Cx.eval T.Cx.emp ty1 in
-  ret @@ T.Cx.check_subtype T.Cx.emp vty0 vty1
+  try
+    ret @@ T.Cx.check_subtype T.Cx.emp vty0 vty1
+  with
+  | _ ->
+    block @@ Dev.Subtype {ty0; ty1}
 
 
 (* invariant: will not be called on equations which are already reflexive *)

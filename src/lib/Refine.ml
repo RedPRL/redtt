@@ -319,7 +319,10 @@ and elab_chk env ty e : tm M.m =
   | _, E.Up inf ->
     elab_inf env inf >>= fun (ty', cmd) ->
     M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-    M.ret @@ Tm.up cmd
+    M.lift C.ask >>= fun psi ->
+    M.lift @@ U.guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd) C.ret >>= fun tm ->
+    M.lift C.go_to_bottom >> (* This is suspicious ! *)
+    M.ret @@ tm
 
   | _ ->
     failwith "TODO"
