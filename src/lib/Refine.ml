@@ -108,7 +108,7 @@ let get_resolver env =
   in
   let rec go_locals renv =
     function
-    | Emp -> go_globals renv @@ T.bindings env
+    | Emp -> renv
     | Snoc (psi, (x, _)) ->
       begin
         match Name.name x with
@@ -120,7 +120,8 @@ let get_resolver env =
       end
   in
   M.lift C.ask >>= fun psi ->
-  M.ret @@ go_locals ResEnv.init psi
+  let renv = go_globals ResEnv.init @@ T.bindings env in
+  M.ret @@ go_locals renv psi
 
 
 let should_split_ext_bnd ebnd =
@@ -228,8 +229,16 @@ and elab_chk env ty e : tm M.m =
   match Tm.unleash ty, e with
 
   | _, E.Let info ->
-    elab_chk env univ info.ty >>= fun let_ty ->
-    elab_chk env let_ty info.tm >>= fun let_tm ->
+    begin
+      match info.ty with
+      | None ->
+        elab_inf env info.tm >>= fun (let_ty, let_tm) ->
+        M.ret (let_ty, Tm.up let_tm)
+      | Some ety ->
+        elab_chk env univ ety >>= fun let_ty ->
+        elab_chk env let_ty info.tm >>= fun let_tm ->
+        M.ret (let_ty, let_tm)
+    end >>= fun (let_ty, let_tm) ->
     let singleton_ty =
       let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some let_tm in
       Tm.make @@ Tm.Rst {ty = let_ty; sys = [face]}
@@ -363,7 +372,7 @@ and elab_inf env e : (ty * tm Tm.cmd) M.m =
   let rec unleash_sg tm =
     match Tm.unleash tm with
     | Tm.Sg (dom, cod) -> dom, cod
-    | Tm.Rst {ty; _} -> unleash_sg tm
+    | Tm.Rst {ty; _} -> unleash_sg ty
     | _ -> failwith "Expected sigma type"
   in
   match e with

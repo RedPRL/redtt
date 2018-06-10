@@ -13,7 +13,7 @@ and eterm =
   | Tuple of eterm list
   | Type
   | Quo of (ResEnv.t -> Tm.tm)
-  | Let of {name : string; ty : eterm; tm : eterm; body : eterm}
+  | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
 
   | Pi of etele * eterm
 

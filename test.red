@@ -147,14 +147,13 @@ let hset/exponential-ideal
   : hset (A → B)
   =>
   λ f g α β i j x →
-    `(@
-      (@
-       (hset/B
+    let foo =>
+      hset/B
         (f x)
         (g x)
-        (λ <k> ((@ α k) x))
-        (λ <k> ((@ β k) x)))
-       i)
-      j)
+        (λ k → `(@ α k) x)
+        (λ k → `(@ β k) x)
+    in
+    `(@ (@ foo i) j)
 
 

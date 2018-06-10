@@ -67,7 +67,9 @@ eterm:
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = eterm
     { E.Lam (xs, e)   }
   | LET; name = ATOM; COLON; ty = eterm; RRIGHT_ARROW; tm = eterm; IN; body = eterm
-    { E.Let {name; ty; tm; body} }
+    { E.Let {name; ty = Some ty; tm; body} }
+  | LET; name = ATOM; RRIGHT_ARROW; tm = eterm; IN; body = eterm
+    { E.Let {name; ty = None; tm; body} }
 
   | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
     { E.Pi (tele, cod) }
