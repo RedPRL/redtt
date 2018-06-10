@@ -758,7 +758,7 @@ let rec solver prob =
           begin
             match split_sigma Emp x ty with
             | Some (y, ty0, z, ty1, s, _) ->
-              get_global_env >>= fun env ->
+              (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
             | None ->
