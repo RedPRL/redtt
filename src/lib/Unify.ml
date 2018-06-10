@@ -556,45 +556,74 @@ let restriction_subtype ty0 sys0 ty1 sys1 =
   active @@ Subtype {ty0; ty1} >>
   approx_sys ty0 sys0 ty1 sys1
 
+let should_split_ext_bnd ebnd =
+  match ebnd with
+  | Tm.NB ([_], (_, [])) -> false
+  | _ -> true
+
+
+let split_ext_bnd ebnd =
+  let xs, ty, sys = Tm.unbind_ext ebnd in
+  let rec go xs =
+    match xs with
+    | [] ->
+      Tm.make @@ Tm.Rst {ty; sys}
+    | x :: xs ->
+      let ty' = go xs in
+      Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty' [])
+  in
+  let ty = go @@ Bwd.to_list xs in
+  List.map Name.name (Bwd.to_list xs), ty
+
 
 (* invariant: will not be called on inequations which are already reflexive *)
-let subtype ty0 ty1 =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  match Tm.unleash ty0, Tm.unleash ty1 with
-  | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
-    let x = Name.fresh () in
-    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
-    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
-    active @@ Subtype {ty0 = dom1; ty1 = dom0} >>
-    active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
+let rec subtype ty0 ty1 =
+  if ty0 = ty1 then ret () else
+    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    match Tm.unleash ty0, Tm.unleash ty1 with
+    | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
+      let x = Name.fresh () in
+      let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+      let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+      active @@ Subtype {ty0 = dom1; ty1 = dom0} >>
+      active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
 
-  | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
-    let x = Name.fresh () in
-    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
-    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
-    active @@ Subtype {ty0 = dom0; ty1 = dom1} >>
-    active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
+    | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
+      let x = Name.fresh () in
+      let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+      let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+      active @@ Subtype {ty0 = dom0; ty1 = dom1} >>
+      active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
 
-  | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
-    (* no idea what to do in flex-flex case, don't worry about it *)
-    block @@ Subtype {ty0; ty1}
+    | Tm.Ext ebnd0, _ when should_split_ext_bnd ebnd0 ->
+      let _, ty0 = split_ext_bnd ebnd0 in
+      active @@ Subtype {ty0; ty1}
 
-  (* The following two cases are sketchy: they do not yield most general solutions for subtyping.
-     But it seems to be analogous to what happens in Agda. *)
-  | Tm.Up (Tm.Meta _, _), _ ->
-    active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
+    | _, Tm.Ext ebnd1 when should_split_ext_bnd ebnd1 ->
+      let _, ty1 = split_ext_bnd ebnd1 in
+      active @@ Subtype {ty0; ty1}
 
-  | _, Tm.Up (Tm.Meta _, _) ->
-    active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
+    | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
+      (* no idea what to do in flex-flex case, don't worry about it *)
+      block @@ Subtype {ty0; ty1}
 
-  | Tm.Rst rst0, Tm.Rst rst1 ->
-    restriction_subtype rst0.ty rst0.sys rst1.ty rst1.sys
+    (* The following two cases are sketchy: they do not yield most general solutions for subtyping.
+       But it seems to be analogous to what happens in Agda. *)
+    | Tm.Up (Tm.Meta _, _), _ ->
+      active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
-  | Tm.Rst _, _ ->
-    active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}}
+    | _, Tm.Up (Tm.Meta _, _) ->
+      active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
-  | _ ->
-    block @@ Subtype {ty0; ty1}
+    | Tm.Rst rst0, Tm.Rst rst1 ->
+      restriction_subtype rst0.ty rst0.sys rst1.ty rst1.sys
+
+    | Tm.Rst _, _ ->
+      active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}}
+
+    | _ ->
+      Format.eprintf "Blocking: %a <= %a@." Tm.pp0 ty0 Tm.pp0 ty1;
+      block @@ Subtype {ty0; ty1}
 
 
 

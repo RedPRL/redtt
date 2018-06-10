@@ -91,6 +91,7 @@ val bindn : Name.t bwd -> tm -> tm nbnd
 val unbind : tm bnd -> Name.t * tm
 val unbindn : tm nbnd -> Name.t bwd * tm
 val unbind_ext : (tm * (tm, tm) system) nbnd -> Name.t bwd * tm * (tm, tm) system
+val unbind_ext_with : Name.t list -> (tm * (tm, tm) system) nbnd -> tm * (tm, tm) system
 val bind_ext : Name.t bwd -> tm -> (tm, tm) system -> (tm * (tm, tm) system) nbnd
 
 val unbind_with : Name.t -> (twin -> twin) -> tm bnd -> tm
