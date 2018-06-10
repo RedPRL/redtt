@@ -14,37 +14,37 @@ let funext
   [f : `(→ [x : A] (B x))]
   [g : `(→ [x : A] (B x))]
   [p : `(→ [x : A] (Path (B x) (f x) (g x)))]
-  : `(Path (→ [x : A] (B x)) f g)
+  : Path `(→ [x : A] (B x)) f g
   ⇒
   λ i x →
     `(@ (p x) i)
 
 
-let not [x : `bool] : `bool ⇒
+let not [x : `bool] : _ ⇒
   `(if [_] bool x ff tt)
 
 let id [A : type] [x : A] : A ⇒
   x
 
-let not∘not [x : `bool] : `bool ⇒
+let not∘not [x : `bool] : _ ⇒
  `(not (not x))
 
 
-let not∘not/id/pt [x : `bool] : `(Path bool (not∘not x) x) ⇒
+let not∘not/id/pt [x : `bool] : _ ⇒
  `(if
    [x] (Path bool (not∘not x) x)
    x
    (λ <i> tt)
    (λ <i> ff))
 
-let not∘not/id : `(Path (→ bool bool) not∘not (id bool)) ⇒
+let not∘not/id : Path `(→ bool bool) _ _ ⇒
   λ i x →
    `(@ (not∘not/id/pt x) i)
 
 let symm
   [A : type]
   [p : `(# <i> A)]
-  : `(Path A (@ p 1) (@ p 0))
+  : Path _ _ _
   ⇒
   λ i →
    `(hcom 0 1 A (@ p 0)
@@ -56,7 +56,7 @@ let trans
   [x : A]
   [p : `(# <i> A)]
   [q : `(Path A (@ p 1) x)]
-  : `(Path A (@ p 0) (@ q 1))
+  : Path A `(@ p 0) `(@ q 1)
   ⇒
   λ i →
    `(hcom 0 1 A (@ p i)
@@ -66,8 +66,8 @@ let trans
 let singleton [A : type] [M : A] : `(U pre 0) ⇒
   `(A [0=0 M])
 
-let restriction-test : `(singleton bool tt) ⇒ `tt
-let _ : `(bool [1=1 tt]) ⇒ `restriction-test
+let restriction-test : `(singleton bool tt) ⇒ _
+let _ : `(bool [1=1 tt]) ⇒ restriction-test
 let _ [M : `(singleton bool tt)] : `bool ⇒ M
 
 
@@ -75,7 +75,7 @@ let connection/or
  [A : type]
  [a : A]
  [b : A]
- [p : `(Path A a b)]
+ [p : Path A a b]
  : `(# <i j> A [j=0 (@ p i)] [i=0 (@ p j)] [j=1 b] [i=1 b])
  ⇒
  λ i j →
@@ -98,7 +98,7 @@ let connection/or/diagonal
  [A : type]
  [a : A]
  [b : A]
- [p : `(Path A a b)]
+ [p : Path A a b]
  : `(singleton (Path A a b) p)
  ⇒
  λ i →
@@ -158,4 +158,4 @@ let hset/exponential-ideal
        i)
       j)
 
-debug
+

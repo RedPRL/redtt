@@ -73,7 +73,7 @@ struct
 
   let report (m : 'a m) : 'a m =
     C.bind m @@ fun (a, w) ->
-    C.bind (C.dump_state Format.err_formatter "Unsolved constraints:" `Constraints) @@ fun _ ->
+    C.bind (C.dump_state Format.err_formatter "Unsolved:" `Unsolved) @@ fun _ ->
     C.bind (print_diagnostics w) @@ fun _ ->
     ret a
 
@@ -183,6 +183,7 @@ and elab_decl env =
       match filter with
       | `All -> "Development state:"
       | `Constraints -> "Unsolved constraints:"
+      | `Unsolved -> "Unsolved entries:"
     in
     M.lift @@ C.dump_state Format.std_formatter title filter >>
     M.ret env
@@ -247,7 +248,14 @@ and elab_chk env ty e : tm M.m =
 
   | _, E.Quo tmfam ->
     get_resolver env >>= fun renv ->
-    M.ret @@ tmfam renv
+    let tm = tmfam renv in
+    begin
+      match Tm.unleash tm with
+      | Tm.Up _ ->
+        elab_up env ty @@ E.Quo tmfam
+      | _ ->
+        M.ret @@ tmfam renv
+    end
 
 
   | _, E.Lam ([], e) ->
@@ -316,18 +324,31 @@ and elab_chk env ty e : tm M.m =
     M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
     M.ret @@ Tm.up tm
 
-  | _, E.Up inf ->
-    elab_inf env inf >>= fun (ty', cmd) ->
-    M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+  | _, E.Hope ->
     M.lift C.ask >>= fun psi ->
-    M.lift @@ U.guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd) C.ret >>= fun tm ->
-    M.lift C.go_to_bottom >> (* This is suspicious ! *)
-    M.ret @@ tm
+    M.lift @@ U.hole psi ty C.ret >>= fun tm ->
+    M.lift C.go_right >>
+    M.ret @@ Tm.up tm
 
-  | _ ->
-    failwith "TODO"
+  | _, inf ->
+    elab_up env ty inf
+
+and elab_up env ty inf =
+  elab_inf env inf >>= fun (ty', cmd) ->
+  M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+  M.lift C.ask >>= fun psi ->
+  M.lift @@ U.guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd) C.ret >>= fun tm ->
+  M.lift C.go_to_bottom >> (* This is suspicious ! *)
+  M.ret @@ tm
 
 and elab_inf env e : (ty * tm Tm.cmd) M.m =
+  let rec unleash_pi_or_ext tm =
+    match Tm.unleash tm with
+    | Tm.Pi (dom, cod) -> `Pi (dom, cod)
+    | Tm.Ext _ebnd -> failwith "TODO: unleash_pi_or_ext/ext"
+    | Tm.Rst {ty; _} -> unleash_pi_or_ext ty
+    | _ -> failwith "expected pi type"
+  in
   match e with
   | E.Var name ->
     get_resolver env >>= fun renv ->
@@ -340,3 +361,31 @@ and elab_inf env e : (ty * tm Tm.cmd) M.m =
       | `Ix _ ->
         failwith "elab_inf: expected locally closed"
     end
+  | E.App (e0, e1) ->
+    elab_inf env e0 >>= fun (fun_ty, (hd, sp)) ->
+    begin
+      match unleash_pi_or_ext fun_ty with
+      | `Pi (dom, cod) ->
+        elab_chk env dom e1 >>= fun t1 ->
+        M.lift C.typechecker >>= fun (module T) ->
+        let module HS = HSubst (T) in
+        let vdom = T.Cx.eval T.Cx.emp dom in
+        let cod' = HS.inst_ty_bnd cod (vdom, t1) in
+        M.ret @@ (cod', (hd, sp #< (Tm.FunApp t1)))
+    end
+
+  | Quo tmfam ->
+    get_resolver env >>= fun renv ->
+    let tm = tmfam renv in
+    begin
+      match Tm.unleash tm with
+      | Tm.Up cmd ->
+        M.lift C.typechecker >>= fun (module T) ->
+        let vty = T.infer T.Cx.emp cmd in
+        M.ret (T.Cx.quote_ty T.Cx.emp vty, cmd)
+      | _ ->
+        failwith "Cannot elaborate `term"
+    end
+
+  | _ ->
+    failwith "Can't infer"

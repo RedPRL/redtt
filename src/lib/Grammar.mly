@@ -18,11 +18,12 @@
 %token TYPE PRE KAN
 %token EOF
 
+
 %start <ESig.esig> esig
 %%
 
 edecl:
-  | LET; a = ATOM; sch = escheme; RRIGHT_ARROW; tm = echk
+  | LET; a = ATOM; sch = escheme; RRIGHT_ARROW; tm = eterm
     { E.Define (a, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
@@ -35,35 +36,38 @@ debug_filter:
       | "constraints" -> `Constraints
       | _ -> failwith "Invalid debug filter: try 'all' or 'constraints' " }
 
-echk:
+atomic_eterm:
   | BACKTICK; t = tm
     { E.Quo t }
-  | QUESTION_MARK
-    { E.Hole None }
   | QUESTION_MARK; a = ATOM
     { E.Hole (Some a) }
   | TYPE
     { E.Type }
-  | LAM; xs = list(ATOM); RIGHT_ARROW; e = echk
-    { E.Lam (xs, e) }
-  | LGL; es = separated_list(COMMA, echk); RGL
+  | LGL; es = separated_list(COMMA, eterm); RGL
     { E.Tuple es }
-  | LET; name = ATOM; COLON; ty = echk; RRIGHT_ARROW; tm = echk; IN; body = echk
+  | LPR; e = eterm; RPR
+    { e }
+  | a = ATOM;
+    { if a = "_" then E.Hope else E.Var a }
+
+eterm:
+  | e = atomic_eterm
+    { e }
+  | e0 = atomic_eterm; es = nonempty_list(atomic_eterm)
+    { List.fold_left (fun e arg -> E.App (e, arg)) e0 es }
+  | LAM; xs = list(ATOM); RIGHT_ARROW; e = eterm
+    { E.Lam (xs, e)   }
+  | LET; name = ATOM; COLON; ty = eterm; RRIGHT_ARROW; tm = eterm; IN; body = eterm
     { E.Let {name; ty; tm; body} }
-  | e = einf
-    { E.Up e }
+
 
 escheme:
-  | tele = list(escheme_cell); COLON; cod = echk
+  | tele = list(escheme_cell); COLON; cod = eterm
     { (tele, cod) }
 
 escheme_cell:
-  | LSQ; a = ATOM; COLON; ty = echk; RSQ
+  | LSQ; a = ATOM; COLON; ty = eterm; RSQ
     { (a, ty) }
-
-einf:
-  | a = ATOM;
-    { E.Var a }
 
 esig:
   | d = edecl; esig = esig

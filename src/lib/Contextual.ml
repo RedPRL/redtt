@@ -37,9 +37,19 @@ let filter_entry filter entry =
   match filter with
   | `All -> true
   | `Constraints ->
-    match entry with
-    | Q _ -> true
-    | _ -> false
+    begin
+      match entry with
+      | Q _ -> true
+      | _ -> false
+    end
+  | `Unsolved ->
+    begin
+      match entry with
+      | Q _ -> true
+      | E (_, _, Hole) -> true
+      | E (_, _, Guess _) -> true
+      | _ -> false
+    end
 
 let pp_cx filter fmt {lcx; rcx} =
   Format.fprintf fmt "@[<v>%a@]@ %a@ @[<v>%a@]"

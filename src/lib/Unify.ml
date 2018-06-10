@@ -212,10 +212,10 @@ let rec flex_term ~deps q =
     end
   | _ -> failwith "flex_term"
 
-let rec subtype_flex_term ~deps ty0 ty1 =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  match Tm.unleash ty0, Tm.unleash ty1 with
-  | Tm.Up (Tm.Meta alpha, _), _ ->
+(* let rec subtype_flex_term ~deps ty0 ty1 =
+   let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+   match Tm.unleash ty0, Tm.unleash ty1 with
+   | Tm.Up (Tm.Meta alpha, _), _ ->
     ask >>= fun tele ->
     let gm = Bwd.map snd tele in
     begin
@@ -255,7 +255,7 @@ let rec subtype_flex_term ~deps ty0 ty1 =
         subtype_flex_term ~deps ty0 ty1
     end
 
-  | _, Tm.Up (Tm.Meta alpha, _) ->
+   | _, Tm.Up (Tm.Meta alpha, _) ->
     ask >>= fun tele ->
     let gm = Bwd.map snd tele in
     begin
@@ -295,8 +295,8 @@ let rec subtype_flex_term ~deps ty0 ty1 =
         subtype_flex_term ~deps ty0 ty1
     end
 
-  | _ ->
-    failwith "subtype_flex_term: impossible"
+   | _ ->
+    failwith "subtype_flex_term: impossible" *)
 
 
 let rec flex_flex_diff ~deps q =
@@ -633,8 +633,19 @@ let normalize_eqn q =
   normalize ~ty:ty1 q.tm1 >>= fun tm1 ->
   ret @@ {ty0; ty1; tm0; tm1}
 
+
+let approx_sys _ty0 _ty1 _sys0 _sys1 =
+  Format.eprintf "TODO!!!!@.";
+  ret ()
+
+let restriction_subtype ty0 sys0 ty1 sys1 =
+  active @@ Subtype {ty0; ty1} >>
+  approx_sys ty0 sys0 ty1 sys1
+
+
 (* invariant: will not be called on inequations which are already reflexive *)
 let subtype ty0 ty1 =
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
   match Tm.unleash ty0, Tm.unleash ty1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
     let x = Name.fresh () in
@@ -654,11 +665,19 @@ let subtype ty0 ty1 =
     (* no idea what to do in flex-flex case, don't worry about it *)
     block @@ Subtype {ty0; ty1}
 
+  (* The following two cases are sketchy: they do not yield most general solutions for subtyping.
+     But it seems to be analogous to what happens in Agda. *)
   | Tm.Up (Tm.Meta _, _), _ ->
-    subtype_flex_term ~deps:[] ty0 ty1
+    active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
   | _, Tm.Up (Tm.Meta _, _) ->
-    subtype_flex_term ~deps:[] ty0 ty1
+    active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
+
+  | Tm.Rst rst0, Tm.Rst rst1 ->
+    restriction_subtype rst0.ty rst0.sys rst1.ty rst1.sys
+
+  | Tm.Rst _, _ ->
+    active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}}
 
   | _ ->
     block @@ Subtype {ty0; ty1}
