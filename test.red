@@ -10,7 +10,7 @@ let Path
 
 let funext
   [A : type]
-  [B : A → `(U 0)]
+  [B : A → type]
   [f : (x : A) → B x]
   [g : (x : A) → B x]
   [p : (x : A) → Path (B x) (f x) (g x)]
