@@ -18,6 +18,9 @@ and eterm =
   | Pi of etele * eterm
 
   | App of eterm * eterm
+  | Car of eterm
+  | Cdr of eterm
+
   | Var of string
 
 (* e-sigarette ;-) *)

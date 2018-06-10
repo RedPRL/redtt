@@ -11,7 +11,7 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL
-%token COLON COLON_ANGLE COMMA
+%token COLON COLON_ANGLE COMMA DOT
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN
@@ -51,11 +51,19 @@ atomic_eterm:
   | a = ATOM;
     { if a = "_" then E.Hope else E.Var a }
 
+eframe:
+  | e = atomic_eterm
+    { fun h -> E.App (h, e) }
+  | DOT CAR
+    { fun h -> E.Car h }
+  | DOT CDR
+    { fun h -> E.Cdr h }
+
 eterm:
   | e = atomic_eterm
     { e }
-  | e0 = atomic_eterm; es = nonempty_list(atomic_eterm)
-    { List.fold_left (fun e arg -> E.App (e, arg)) e0 es }
+  | e0 = atomic_eterm; es = nonempty_list(eframe)
+    { List.fold_left (fun e frame -> frame e) e0 es }
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = eterm
     { E.Lam (xs, e)   }
   | LET; name = ATOM; COLON; ty = eterm; RRIGHT_ARROW; tm = eterm; IN; body = eterm

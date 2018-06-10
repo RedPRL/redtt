@@ -360,6 +360,12 @@ and elab_inf env e : (ty * tm Tm.cmd) M.m =
     | Tm.Rst {ty; _} -> unleash_pi_or_ext ty
     | _ -> failwith "expected pi type"
   in
+  let rec unleash_sg tm =
+    match Tm.unleash tm with
+    | Tm.Sg (dom, cod) -> dom, cod
+    | Tm.Rst {ty; _} -> unleash_sg tm
+    | _ -> failwith "Expected sigma type"
+  in
   match e with
   | E.Var name ->
     get_resolver env >>= fun renv ->
@@ -372,6 +378,7 @@ and elab_inf env e : (ty * tm Tm.cmd) M.m =
       | `Ix _ ->
         failwith "elab_inf: expected locally closed"
     end
+
   | E.App (e0, e1) ->
     elab_inf env e0 >>= fun (fun_ty, (hd, sp)) ->
     begin
@@ -382,8 +389,21 @@ and elab_inf env e : (ty * tm Tm.cmd) M.m =
         let module HS = HSubst (T) in
         let vdom = T.Cx.eval T.Cx.emp dom in
         let cod' = HS.inst_ty_bnd cod (vdom, t1) in
-        M.ret @@ (cod', (hd, sp #< (Tm.FunApp t1)))
+        M.ret (cod', (hd, sp #< (Tm.FunApp t1)))
     end
+
+  | E.Car e ->
+    elab_inf env e >>= fun (sg_ty, (hd, sp)) ->
+    let dom, _= unleash_sg sg_ty in
+    M.ret (dom, (hd, sp #< Tm.Car))
+
+  | E.Cdr e ->
+    elab_inf env e >>= fun (sg_ty, (hd, sp)) ->
+    let _, Tm.B (_, cod) = unleash_sg sg_ty in
+    let t0 = (hd, sp #< Tm.Car) in
+    let cod' = Tm.subst (Tm.Sub (Tm.Id, t0)) cod in
+    let t1 = (hd, sp #< Tm.Cdr) in
+    M.ret (cod', t1)
 
   | Quo tmfam ->
     get_resolver env >>= fun renv ->

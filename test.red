@@ -125,9 +125,10 @@ let connection/and
 
 
 let foo [x : `(× bool bool)] : `(× bool bool) ⇒
-  let z0 : `bool ⇒ `(car x) in
-  let z1 : `bool ⇒ `tt in
+  let z0 : `bool ⇒ x.car in
+  let z1 : `bool ⇒ x.cdr in
   < z0, z1 >
+
 
 let testing [x : `(bool [1=1 tt])] : singleton `bool `tt ⇒
   x

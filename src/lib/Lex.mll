@@ -88,6 +88,8 @@ rule token = parse
     { Lwt.return COLON }
   | ','
     { Lwt.return COMMA }
+  | '.'
+    { Lwt.return DOT }
   | ":>"
     { Lwt.return COLON_ANGLE }
   | "▷"
