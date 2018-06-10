@@ -43,6 +43,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("U", UNIV);
       ("debug", DEBUG);
       ("type", TYPE);
+      ("import", IMPORT);
     ]
 }
 
