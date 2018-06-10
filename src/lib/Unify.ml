@@ -653,15 +653,6 @@ let unify q =
     | _ ->
       rigid_rigid q
 
-
-let is_reflexive q =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  check_eq ~ty:univ q.ty0 q.ty1 >>= function
-  | true ->
-    check_eq ~ty:q.ty0 q.tm0 q.tm1
-  | false ->
-    ret false
-
 let rec split_sigma tele x ty =
   match Tm.unleash ty with
   | Tm.Sg (dom, cod) ->
@@ -669,7 +660,7 @@ let rec split_sigma tele x ty =
     let z = Name.fresh () in
     let sp_tele = telescope_to_spine tele in
 
-    ret @@ Some
+    Some
       ( y
       , abstract_ty tele dom
       , z
@@ -686,7 +677,57 @@ let rec split_sigma tele x ty =
     split_sigma (tele #< (y, `P dom)) x cody
 
   | _ ->
-    ret None
+    None
+
+
+let rec lower tele alpha ty =
+  match Tm.unleash ty with
+  | Tm.LblTy info ->
+    hole tele info.ty @@ fun t ->
+    define tele alpha ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
+    ret true
+
+  | Tm.Sg (dom, cod) ->
+    hole tele dom @@ fun t0 ->
+    (in_scopes (Bwd.to_list tele) typechecker) >>= fun (module T) ->
+    let module HS = HSubst (T) in
+    let vdom = T.Cx.eval T.Cx.emp dom in
+    let cod' = HS.inst_ty_bnd cod (vdom, Tm.up t0) in
+    hole tele cod' @@ fun t1 ->
+    define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
+    ret true
+
+
+  | Tm.Pi (dom, (Tm.B (nm, _) as cod)) ->
+    let x = Name.named nm in
+    begin
+      match split_sigma Emp x dom with
+      | None ->
+        let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+        lower (tele #< (x, `P dom)) alpha codx
+
+      | Some (y, ty0, z, ty1, s, (u, v)) ->
+        let tele' = tele #< (y, `P ty0) #< (z, `P ty1) in
+        (in_scopes (Bwd.to_list tele') typechecker) >>= fun (module T) ->
+        let module HS = HSubst (T) in
+        let vty = T.Cx.eval T.Cx.emp @@ abstract_ty tele dom in
+        let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
+        hole tele pi_ty @@ fun (whd, wsp) ->
+        let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
+        define tele alpha ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
+        ret true
+    end
+
+  | _ ->
+    ret false
+
+let is_reflexive q =
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  check_eq ~ty:univ q.ty0 q.ty1 >>= function
+  | true ->
+    check_eq ~ty:q.ty0 q.tm0 q.tm1
+  | false ->
+    ret false
 
 
 let is_restriction =
@@ -715,7 +756,7 @@ let rec solver prob =
 
         | `P ty ->
           begin
-            split_sigma Emp x ty >>= function
+            match split_sigma Emp x ty with
             | Some (y, ty0, z, ty1, s, _) ->
               get_global_env >>= fun env ->
               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
@@ -754,44 +795,6 @@ let rec solver prob =
             under_restriction r0 r1 @@ solver probx
       end
 
-
-let rec lower tele alpha ty =
-  match Tm.unleash ty with
-  | Tm.LblTy info ->
-    hole tele info.ty @@ fun t ->
-    define tele alpha ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
-    ret true
-
-  | Tm.Sg (dom, cod) ->
-    hole tele dom @@ fun t0 ->
-    typechecker >>= fun (module T) ->
-    let module HS = HSubst (T) in
-    let cod' = HS.inst_ty_bnd cod (T.Cx.eval T.Cx.emp dom, Tm.up t0) in
-    hole tele cod' @@ fun t1 ->
-    define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
-    ret true
-
-  | Tm.Pi (dom, (Tm.B (nm, _) as cod)) ->
-    let x = Name.named nm in
-    begin
-      split_sigma Emp x dom >>= function
-      | None ->
-        let codx = Tm.unbind_with x (fun _ -> `Only) cod in
-        lower (tele #< (x, `P dom)) alpha codx
-
-      | Some (y, ty0, z, ty1, s, (u, v)) ->
-        typechecker >>= fun (module T) ->
-        let module HS = HSubst (T) in
-        let vty = T.Cx.eval T.Cx.emp @@ abstract_ty tele dom in
-        let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
-        hole tele pi_ty @@ fun (whd, wsp) ->
-        let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
-        define tele alpha ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
-        ret true
-    end
-
-  | _ ->
-    ret false
 
 (* guess who named this function, lol *)
 let rec ambulando bracket =
