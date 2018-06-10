@@ -769,7 +769,7 @@ let rec lower tele alpha ty =
     let cod' = HS.inst_ty_bnd cod (T.Cx.eval T.Cx.emp dom, Tm.up t0) in
     hole tele cod' @@ fun t1 ->
     define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
-    ret false
+    ret true
 
   | Tm.Pi (dom, (Tm.B (nm, _) as cod)) ->
     let x = Name.named nm in
