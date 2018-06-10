@@ -280,17 +280,18 @@ let check ~ty tm =
     ret false
 
 let check_eq ~ty tm0 tm1 =
-  typechecker >>= fun (module T) ->
-  let lcx = T.Cx.emp in
-  let vty = T.Cx.eval lcx ty in
-  let el0 = T.Cx.eval lcx tm0 in
-  let el1 = T.Cx.eval lcx tm1 in
-  try
-    T.Cx.check_eq lcx ~ty:vty el0 el1;
-    ret true
-  with
-  | _ ->
-    ret false
+  if tm0 = tm1 then ret true else
+    typechecker >>= fun (module T) ->
+    let lcx = T.Cx.emp in
+    let vty = T.Cx.eval lcx ty in
+    let el0 = T.Cx.eval lcx tm0 in
+    let el1 = T.Cx.eval lcx tm1 in
+    try
+      T.Cx.check_eq lcx ~ty:vty el0 el1;
+      ret true
+    with
+    | _ ->
+      ret false
 
 let check_subtype ty0 ty1 =
   typechecker >>= fun (module T) ->

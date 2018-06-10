@@ -261,6 +261,17 @@ and elab_chk env ty e : tm M.m =
   | _, E.Lam ([], e) ->
     elab_chk env ty e
 
+  | Tm.Univ _, E.Pi ([], e) ->
+    elab_chk env ty e
+
+  | Tm.Univ _, E.Pi ((name, edom) :: etele, ecod) ->
+    elab_chk env ty edom >>= fun dom ->
+    let x = Name.named @@ Some name in
+    M.in_scope x (`P dom) begin
+      elab_chk env ty @@ E.Pi (etele, ecod)
+    end >>= fun codx ->
+    M.ret @@ Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
+
   | Tm.Pi (dom, cod), E.Lam (name :: names, e) ->
     let x = Name.named @@ Some name in
     let codx = Tm.unbind_with x (fun _ -> `Only) cod in

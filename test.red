@@ -10,11 +10,11 @@ let Path
 
 let funext
   [A : type]
-  [B : `(→ A (U 0))]
-  [f : `(→ [x : A] (B x))]
-  [g : `(→ [x : A] (B x))]
-  [p : `(→ [x : A] (Path (B x) (f x) (g x)))]
-  : Path `(→ [x : A] (B x)) f g
+  [B : A → `(U 0)]
+  [f : (x : A) → B x]
+  [g : (x : A) → B x]
+  [p : (x : A) → Path (B x) (f x) (g x)]
+  : Path ((x : A) -> B x) f g
   ⇒
   λ i x →
     `(@ (p x) i)
@@ -55,7 +55,7 @@ let trans
   [A : type]
   [x : A]
   [p : `(# <i> A)]
-  [q : `(Path A (@ p 1) x)]
+  [q : Path A `(@ p 1) x]
   : Path A `(@ p 0) `(@ q 1)
   ⇒
   λ i →

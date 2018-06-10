@@ -3,7 +3,8 @@ type edecl =
   | Debug of [ `All | `Constraints | `Unsolved ]
 
 and escheme = etele * eterm
-and etele = (string * eterm) list
+and ecell = string * eterm
+and etele = ecell list
 
 and eterm =
   | Hole of string option
@@ -13,6 +14,8 @@ and eterm =
   | Type
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; ty : eterm; tm : eterm; body : eterm}
+
+  | Pi of etele * eterm
 
   | App of eterm * eterm
   | Var of string

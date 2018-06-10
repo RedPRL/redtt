@@ -60,6 +60,12 @@ eterm:
   | LET; name = ATOM; COLON; ty = eterm; RRIGHT_ARROW; tm = eterm; IN; body = eterm
     { E.Let {name; ty; tm; body} }
 
+  | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
+    { E.Pi (tele, cod) }
+
+  | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
+    { E.Pi (["_", dom], cod) }
+
 
 escheme:
   | tele = list(escheme_cell); COLON; cod = eterm
@@ -67,6 +73,10 @@ escheme:
 
 escheme_cell:
   | LSQ; a = ATOM; COLON; ty = eterm; RSQ
+    { (a, ty) }
+
+epi_cell:
+  | LPR; a = ATOM; COLON; ty = eterm; RPR
     { (a, ty) }
 
 esig:
