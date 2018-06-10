@@ -31,29 +31,28 @@ let _ [M : singleton `bool `tt] : `bool ⇒ M
 
 
 let foo [x : `(× bool bool)] : `(× bool bool) ⇒
-  let z0 : `bool ⇒ x.car in
-  let z1 : `bool ⇒ x.cdr in
+  let z0 ⇒ x.car in
+  let z1 ⇒ x.cdr in
   < z0, z1 >
 
 
 let testing [x : `(bool [1=1 tt])] : singleton `bool `tt ⇒
   x
 
-let hset [A : type] : type =>
+let hset [A : _] : type =>
   (x : A)
   (y : A)
-  (p : Path A x y)
-  (q : Path A x y)
+  (p : Path _ x y)
+  (q : Path _ x y)
   → Path (Path A x y) p q
 
 let hset/exponential-ideal
-  [A : type]
-  [B : type]
+  [A : _]
+  [B : _]
   [hset/B : hset B]
   : hset (A → B)
   =>
   λ f g α β i j x →
     let foo => hset/B _ _ (λ k → `(@ α k) x) (λ k → `(@ β k) x) in
     `(@ (@ foo i) j)
-
 

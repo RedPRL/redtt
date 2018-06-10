@@ -27,5 +27,5 @@ let load_file file_name =
   let module Refine = Refine.Make (I) in
   let open Lwt.Infix in
   read_file file_name >>= fun esig ->
-  let _ = Refine.M.run @@ Refine.elab_sig Refine.T.empty esig in
+  let _ = Refine.M.run @@ Refine.M.report @@ Refine.elab_sig Refine.T.empty esig in
   Lwt.return_unit
