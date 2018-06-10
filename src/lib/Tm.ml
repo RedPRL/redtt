@@ -481,6 +481,17 @@ let unbind_ext (NB (nms, (ty, sys))) =
   in
   go 0 nms Emp ty sys
 
+let unbind_ext_with xs (NB (nms, (ty, sys))) =
+  let rec go k xs ty sys =
+    match xs with
+    | [] -> ty, sys
+    | x :: xs ->
+      go (k + 1) xs (open_var k x (fun _ -> `Only) ty) (map_tm_sys (open_var k x (fun _ -> `Only)) sys)
+  in
+  if List.length nms = List.length xs then
+    go 0 xs ty sys
+  else
+    failwith "unbind_ext_with: length mismatch"
 
 
 let bind x tx =

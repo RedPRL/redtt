@@ -5,6 +5,7 @@ include Monad.S
 
 val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
+val fix : ('a m -> 'a m) -> 'a m
 
 val popl : entry m
 val popr : entry m
@@ -34,6 +35,7 @@ val block : problem -> unit m
 
 
 val check : ty:ty -> tm -> bool m
+val check_subtype : ty -> ty -> bool m
 val check_eq : ty:ty -> tm -> tm -> bool m
 val check_eq_dim : tm -> tm -> bool m
 
@@ -41,6 +43,6 @@ val check_eq_dim : tm -> tm -> bool m
 val get_global_env : Subst.t m
 val typechecker : (module Typing.S) m
 
-val dump_state : Format.formatter -> string -> [`All | `Constraints] -> unit m
+val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 
 val run : 'a m -> 'a

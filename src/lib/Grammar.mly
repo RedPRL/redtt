@@ -9,20 +9,22 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
+%token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL
-%token COLON COLON_ANGLE COMMA
+%token COLON COLON_ANGLE COMMA DOT
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
-%token AST TIMES HASH AT BACKTICK QUESTION_MARK IN
+%token AST TIMES HASH AT BACKTICK IN
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
 %token TYPE PRE KAN
 %token EOF
+
 
 %start <ESig.esig> esig
 %%
 
 edecl:
-  | LET; a = ATOM; sch = escheme; RRIGHT_ARROW; tm = echk
+  | LET; a = ATOM; sch = escheme; RRIGHT_ARROW; tm = eterm
     { E.Define (a, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
@@ -35,35 +37,56 @@ debug_filter:
       | "constraints" -> `Constraints
       | _ -> failwith "Invalid debug filter: try 'all' or 'constraints' " }
 
-echk:
+atomic_eterm:
   | BACKTICK; t = tm
     { E.Quo t }
-  | QUESTION_MARK
-    { E.Hole None }
-  | QUESTION_MARK; a = ATOM
-    { E.Hole (Some a) }
+  | a = HOLE_NAME;
+    { E.Hole a }
   | TYPE
     { E.Type }
-  | LAM; xs = list(ATOM); RIGHT_ARROW; e = echk
-    { E.Lam (xs, e) }
-  | LGL; es = separated_list(COMMA, echk); RGL
+  | LGL; es = separated_list(COMMA, eterm); RGL
     { E.Tuple es }
-  | LET; name = ATOM; COLON; ty = echk; RRIGHT_ARROW; tm = echk; IN; body = echk
+  | LPR; e = eterm; RPR
+    { e }
+  | a = ATOM;
+    { if a = "_" then E.Hope else E.Var a }
+
+eframe:
+  | e = atomic_eterm
+    { fun h -> E.App (h, e) }
+  | DOT CAR
+    { fun h -> E.Car h }
+  | DOT CDR
+    { fun h -> E.Cdr h }
+
+eterm:
+  | e = atomic_eterm
+    { e }
+  | e0 = atomic_eterm; es = nonempty_list(eframe)
+    { List.fold_left (fun e frame -> frame e) e0 es }
+  | LAM; xs = list(ATOM); RIGHT_ARROW; e = eterm
+    { E.Lam (xs, e)   }
+  | LET; name = ATOM; COLON; ty = eterm; RRIGHT_ARROW; tm = eterm; IN; body = eterm
     { E.Let {name; ty; tm; body} }
-  | e = einf
-    { E.Up e }
+
+  | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
+    { E.Pi (tele, cod) }
+
+  | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
+    { E.Pi (["_", dom], cod) }
+
 
 escheme:
-  | tele = list(escheme_cell); COLON; cod = echk
+  | tele = list(escheme_cell); COLON; cod = eterm
     { (tele, cod) }
 
 escheme_cell:
-  | LSQ; a = ATOM; COLON; ty = echk; RSQ
+  | LSQ; a = ATOM; COLON; ty = eterm; RSQ
     { (a, ty) }
 
-einf:
-  | a = ATOM;
-    { E.Var a }
+epi_cell:
+  | LPR; a = ATOM; COLON; ty = eterm; RPR
+    { (a, ty) }
 
 esig:
   | d = edecl; esig = esig

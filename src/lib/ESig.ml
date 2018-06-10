@@ -1,23 +1,28 @@
 type edecl =
-  | Define of string * escheme * echk
-  | Debug of [ `All | `Constraints ]
+  | Define of string * escheme * eterm
+  | Debug of [ `All | `Constraints | `Unsolved ]
 
-and escheme = etele * echk
-and etele = (string * echk) list
+and escheme = etele * eterm
+and ecell = string * eterm
+and etele = ecell list
 
-and echk =
+and eterm =
   | Hole of string option
-  | Lam of string list * echk
-  | Tuple of echk list
+  | Hope
+  | Lam of string list * eterm
+  | Tuple of eterm list
   | Type
   | Quo of (ResEnv.t -> Tm.tm)
-  | Let of {name : string; ty : echk; tm : echk; body : echk}
-  | Up of einf
+  | Let of {name : string; ty : eterm; tm : eterm; body : eterm}
 
-and einf =
+  | Pi of etele * eterm
+
+  | App of eterm * eterm
+  | Car of eterm
+  | Cdr of eterm
+
   | Var of string
 
 (* e-sigarette ;-) *)
 type esig =
   edecl list
-

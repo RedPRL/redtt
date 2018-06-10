@@ -15,7 +15,7 @@ val to_var : tm -> Name.t option
 val abstract_ty : telescope -> ty -> ty
 
 (** Run this in a proof state to solve unification problems. *)
-val ambulando : Name.t -> unit m
+val ambulando : unit m
 
 module HSubst (T : Typing.S) :
 sig

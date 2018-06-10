@@ -31,15 +31,17 @@ type 'a bind
 
 type problem =
   | Unify of (tm, tm) equation
+  | Subtype of {ty0 : ty; ty1 : ty}
   | All of ty param * problem bind
 
 type entry =
   | E of Name.t * ty * tm decl
   | Q of status * problem
-  | Bracket of Name.t
 
 val bind : Name.t -> 'a param -> problem -> problem bind
 val unbind : 'a param -> problem bind -> Name.t * problem
+
+val inst_with_vars : Name.t list -> problem -> [`Unify of (tm, tm) equation | `Subtype of tm * tm] option
 
 
 val pp_params : params Pretty.t0

@@ -73,7 +73,7 @@ struct
 
   let report (m : 'a m) : 'a m =
     C.bind m @@ fun (a, w) ->
-    C.bind (C.dump_state Format.err_formatter "Unsolved constraints:" `Constraints) @@ fun _ ->
+    C.bind (C.dump_state Format.err_formatter "Unsolved:" `Unsolved) @@ fun _ ->
     C.bind (print_diagnostics w) @@ fun _ ->
     ret a
 
@@ -149,6 +149,13 @@ let normalize_ty ty =
   let vty = T.Cx.eval T.Cx.emp ty in
   M.ret @@ T.Cx.quote_ty T.Cx.emp vty
 
+
+let (<+>) m n =
+  C.bind (C.optional m) @@
+  function
+  | Some x -> C.ret x
+  | None -> n
+
 let rec elab_sig env =
   function
   | [] ->
@@ -156,7 +163,7 @@ let rec elab_sig env =
   | dcl :: esig ->
     elab_decl env dcl >>= fun env' ->
     M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing ;-) *)
-    M.lift (U.ambulando @@ Name.fresh ()) >>
+    M.lift U.ambulando >>
     elab_sig env' esig
 
 
@@ -176,6 +183,7 @@ and elab_decl env =
       match filter with
       | `All -> "Development state:"
       | `Constraints -> "Unsolved constraints:"
+      | `Unsolved -> "Unsolved entries:"
     in
     M.lift @@ C.dump_state Format.std_formatter title filter >>
     M.ret env
@@ -240,11 +248,29 @@ and elab_chk env ty e : tm M.m =
 
   | _, E.Quo tmfam ->
     get_resolver env >>= fun renv ->
-    M.ret @@ tmfam renv
+    let tm = tmfam renv in
+    begin
+      match Tm.unleash tm with
+      | Tm.Up _ ->
+        elab_up env ty @@ E.Quo tmfam
+      | _ ->
+        M.ret @@ tmfam renv
+    end
 
 
   | _, E.Lam ([], e) ->
     elab_chk env ty e
+
+  | Tm.Univ _, E.Pi ([], e) ->
+    elab_chk env ty e
+
+  | Tm.Univ _, E.Pi ((name, edom) :: etele, ecod) ->
+    elab_chk env ty edom >>= fun dom ->
+    let x = Name.named @@ Some name in
+    M.in_scope x (`P dom) begin
+      elab_chk env ty @@ E.Pi (etele, ecod)
+    end >>= fun codx ->
+    M.ret @@ Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
 
   | Tm.Pi (dom, cod), E.Lam (name :: names, e) ->
     let x = Name.named @@ Some name in
@@ -309,6 +335,88 @@ and elab_chk env ty e : tm M.m =
     M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
     M.ret @@ Tm.up tm
 
-  | _ ->
-    failwith "TODO"
+  | _, E.Hope ->
+    M.lift C.ask >>= fun psi ->
+    M.lift @@ U.hole psi ty C.ret >>= fun tm ->
+    M.lift C.go_right >>
+    M.ret @@ Tm.up tm
 
+  | _, inf ->
+    elab_up env ty inf
+
+and elab_up env ty inf =
+  elab_inf env inf >>= fun (ty', cmd) ->
+  M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+  M.lift C.ask >>= fun psi ->
+  M.lift @@ U.guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd) C.ret >>= fun tm ->
+  M.lift C.go_to_bottom >> (* This is suspicious ! *)
+  M.ret @@ tm
+
+and elab_inf env e : (ty * tm Tm.cmd) M.m =
+  let rec unleash_pi_or_ext tm =
+    match Tm.unleash tm with
+    | Tm.Pi (dom, cod) -> `Pi (dom, cod)
+    | Tm.Ext _ebnd -> failwith "TODO: unleash_pi_or_ext/ext"
+    | Tm.Rst {ty; _} -> unleash_pi_or_ext ty
+    | _ -> failwith "expected pi type"
+  in
+  let rec unleash_sg tm =
+    match Tm.unleash tm with
+    | Tm.Sg (dom, cod) -> dom, cod
+    | Tm.Rst {ty; _} -> unleash_sg tm
+    | _ -> failwith "Expected sigma type"
+  in
+  match e with
+  | E.Var name ->
+    get_resolver env >>= fun renv ->
+    begin
+      match ResEnv.get name renv with
+      | `Ref a ->
+        M.lift (C.lookup_var a `Only <+> C.lookup_meta a) >>= fun ty ->
+        let cmd = Tm.Ref (a, `Only), Emp in
+        M.ret (ty, cmd)
+      | `Ix _ ->
+        failwith "elab_inf: expected locally closed"
+    end
+
+  | E.App (e0, e1) ->
+    elab_inf env e0 >>= fun (fun_ty, (hd, sp)) ->
+    begin
+      match unleash_pi_or_ext fun_ty with
+      | `Pi (dom, cod) ->
+        elab_chk env dom e1 >>= fun t1 ->
+        M.lift C.typechecker >>= fun (module T) ->
+        let module HS = HSubst (T) in
+        let vdom = T.Cx.eval T.Cx.emp dom in
+        let cod' = HS.inst_ty_bnd cod (vdom, t1) in
+        M.ret (cod', (hd, sp #< (Tm.FunApp t1)))
+    end
+
+  | E.Car e ->
+    elab_inf env e >>= fun (sg_ty, (hd, sp)) ->
+    let dom, _= unleash_sg sg_ty in
+    M.ret (dom, (hd, sp #< Tm.Car))
+
+  | E.Cdr e ->
+    elab_inf env e >>= fun (sg_ty, (hd, sp)) ->
+    let _, Tm.B (_, cod) = unleash_sg sg_ty in
+    let t0 = (hd, sp #< Tm.Car) in
+    let cod' = Tm.subst (Tm.Sub (Tm.Id, t0)) cod in
+    let t1 = (hd, sp #< Tm.Cdr) in
+    M.ret (cod', t1)
+
+  | Quo tmfam ->
+    get_resolver env >>= fun renv ->
+    let tm = tmfam renv in
+    begin
+      match Tm.unleash tm with
+      | Tm.Up cmd ->
+        M.lift C.typechecker >>= fun (module T) ->
+        let vty = T.infer T.Cx.emp cmd in
+        M.ret (T.Cx.quote_ty T.Cx.emp vty, cmd)
+      | _ ->
+        failwith "Cannot elaborate `term"
+    end
+
+  | _ ->
+    failwith "Can't infer"

@@ -179,23 +179,24 @@ let rec flex_term ~deps q =
   match Tm.unleash q.tm0 with
   | Tm.Up (Meta alpha, _) ->
     Bwd.map snd <@> ask >>= fun gm ->
-    popl >>= fun e ->
     begin
-      match e with
-      | E (beta, _, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+      popl >>= function
+      | E (beta, _, Hole) as e when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
         (* Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q; *)
         pushls (e :: deps) >>
-        block (Unify q)
-      | (E (beta, ty, Hole) | E (beta, ty, Guess _)) when alpha = beta ->
+        block @@ Unify q
+
+      | (E (beta, ty, Hole) | E (beta, ty, Guess _)) as e when alpha = beta ->
         (* Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q; *)
         pushls deps >>
         try_invert q ty <||
         begin
           (* Format.eprintf "flex_term failed to invert.@."; *)
-          block (Unify q) >>
+          block @@ Unify q >>
           pushl e
         end
-      | E (beta, _, Hole)
+
+      | (E (beta, _, Hole) | E (beta, _, Guess _)) as e
         when
           Occurs.Set.mem beta (Params.free `Metas gm)
           || Occurs.Set.mem beta (Entries.free `Metas deps)
@@ -203,7 +204,8 @@ let rec flex_term ~deps q =
         ->
         (* Format.eprintf "flex_term/3: @[<1>%a@]@." Equation.pp q; *)
         flex_term ~deps:(e :: deps) q
-      | _ ->
+
+      | e ->
         (* Format.eprintf "flex_term/else: @[<1>%a@] --------- @[<1>%a@]@." Name.pp alpha Entry.pp e; *)
         pushr e >>
         flex_term ~deps q
@@ -545,6 +547,85 @@ let normalize_eqn q =
   normalize ~ty:ty1 q.tm1 >>= fun tm1 ->
   ret @@ {ty0; ty1; tm0; tm1}
 
+
+let approx_sys _ty0 _ty1 _sys0 _sys1 =
+  Format.eprintf "TODO!!!!@.";
+  ret ()
+
+let restriction_subtype ty0 sys0 ty1 sys1 =
+  active @@ Subtype {ty0; ty1} >>
+  approx_sys ty0 sys0 ty1 sys1
+
+let should_split_ext_bnd ebnd =
+  match ebnd with
+  | Tm.NB ([_], (_, [])) -> false
+  | _ -> true
+
+
+let split_ext_bnd ebnd =
+  let xs, ty, sys = Tm.unbind_ext ebnd in
+  let rec go xs =
+    match xs with
+    | [] ->
+      Tm.make @@ Tm.Rst {ty; sys}
+    | x :: xs ->
+      let ty' = go xs in
+      Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty' [])
+  in
+  let ty = go @@ Bwd.to_list xs in
+  List.map Name.name (Bwd.to_list xs), ty
+
+
+(* invariant: will not be called on inequations which are already reflexive *)
+let rec subtype ty0 ty1 =
+  if ty0 = ty1 then ret () else
+    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    match Tm.unleash ty0, Tm.unleash ty1 with
+    | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
+      let x = Name.fresh () in
+      let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+      let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+      active @@ Subtype {ty0 = dom1; ty1 = dom0} >>
+      active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
+
+    | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
+      let x = Name.fresh () in
+      let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+      let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+      active @@ Subtype {ty0 = dom0; ty1 = dom1} >>
+      active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
+
+    | Tm.Ext ebnd0, _ when should_split_ext_bnd ebnd0 ->
+      let _, ty0 = split_ext_bnd ebnd0 in
+      active @@ Subtype {ty0; ty1}
+
+    | _, Tm.Ext ebnd1 when should_split_ext_bnd ebnd1 ->
+      let _, ty1 = split_ext_bnd ebnd1 in
+      active @@ Subtype {ty0; ty1}
+
+    | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
+      (* no idea what to do in flex-flex case, don't worry about it *)
+      block @@ Subtype {ty0; ty1}
+
+    (* The following two cases are sketchy: they do not yield most general solutions for subtyping.
+       But it seems to be analogous to what happens in Agda. *)
+    | Tm.Up (Tm.Meta _, _), _ ->
+      active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
+
+    | _, Tm.Up (Tm.Meta _, _) ->
+      active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
+
+    | Tm.Rst rst0, Tm.Rst rst1 ->
+      restriction_subtype rst0.ty rst0.sys rst1.ty rst1.sys
+
+    | Tm.Rst _, _ ->
+      active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}}
+
+    | _ ->
+      block @@ Subtype {ty0; ty1}
+
+
+
 (* invariant: will not be called on equations which are already reflexive *)
 let rigid_rigid q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
@@ -736,12 +817,19 @@ let is_restriction =
   | _ -> false
 
 let rec solver prob =
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
   (* Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob; *)
   match prob with
   | Unify q ->
     normalize_eqn q >>= fun q ->
     is_reflexive q <||
     unify q
+
+  | Subtype {ty0; ty1} ->
+    normalize ~ty:univ ty0 >>= fun ty0 ->
+    normalize ~ty:univ ty1 >>= fun ty1 ->
+    check_subtype ty0 ty1 <||
+    subtype ty0 ty1
 
   | All (param, prob) ->
     let x, probx = unbind param prob in
@@ -758,7 +846,7 @@ let rec solver prob =
           begin
             match split_sigma Emp x ty with
             | Some (y, ty0, z, ty1, s, _) ->
-              get_global_env >>= fun env ->
+              (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
             | None ->
@@ -797,7 +885,8 @@ let rec solver prob =
 
 
 (* guess who named this function, lol *)
-let rec ambulando bracket =
+let ambulando =
+  fix @@ fun loop ->
   popr_opt >>= function
   | None ->
     ret ()
@@ -809,26 +898,23 @@ let rec ambulando bracket =
         lower Emp alpha ty <||
         pushl e
       end >>
-      ambulando bracket
+      loop
 
     | E (alpha, ty, Guess info) ->
       begin
         check ~ty info.tm >>= function
         | true ->
           pushl @@ E (alpha, ty, Defn info.tm) >>
-          ambulando bracket
+          loop
         | false ->
           pushl e >>
-          ambulando bracket
+          loop
       end
 
     | Q (Active, prob) ->
       solver prob >>
-      ambulando bracket
-
-    | Bracket bracket' when bracket = bracket' ->
-      ret ()
+      loop
 
     | _ ->
       pushl e >>
-      ambulando bracket
+      loop
