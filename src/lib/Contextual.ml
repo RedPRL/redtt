@@ -74,6 +74,10 @@ include M
 
 open Notation
 
+
+let rec fix f ps cx =
+  f (fix f) ps cx
+
 let local f m ps =
   m (f ps)
 

@@ -37,7 +37,6 @@ type problem =
 type entry =
   | E of Name.t * ty * tm decl
   | Q of status * problem
-  | Bracket of Name.t
 
 val bind : Name.t -> 'a param -> problem -> problem bind
 val unbind : 'a param -> problem bind -> Name.t * problem

@@ -40,7 +40,6 @@ type problem =
 type entry =
   | E of Name.t * ty * tm decl
   | Q of status * problem
-  | Bracket of Name.t
 
 let eqn_open_var k x tw q =
   let twl, twr =
@@ -273,9 +272,6 @@ let pp_entry fmt =
     Format.fprintf fmt "%a"
       pp_problem prob
 
-  | Bracket _ ->
-    Format.fprintf fmt "<bracket>"
-
 module Subst = GlobalEnv
 
 module type DevSort =
@@ -366,8 +362,6 @@ let subst_entry sub =
     let p' = subst_problem sub p in
     let s' = if p = p' then s else Active in
     Q (s', p')
-  | Bracket a ->
-    Bracket a
 
 
 module Param =
@@ -464,8 +458,6 @@ struct
       Decl.free fl d
     | Q (_, p) ->
       Problem.free fl p
-    | Bracket _ ->
-      Occurs.Set.empty
 
   let subst = subst_entry
 end

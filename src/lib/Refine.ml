@@ -163,7 +163,7 @@ let rec elab_sig env =
   | dcl :: esig ->
     elab_decl env dcl >>= fun env' ->
     M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing ;-) *)
-    M.lift (U.ambulando @@ Name.fresh ()) >>
+    M.lift U.ambulando >>
     elab_sig env' esig
 
 

@@ -943,7 +943,8 @@ let rec solver prob =
 
 
 (* guess who named this function, lol *)
-let rec ambulando bracket =
+let ambulando =
+  fix @@ fun loop ->
   popr_opt >>= function
   | None ->
     ret ()
@@ -955,26 +956,23 @@ let rec ambulando bracket =
         lower Emp alpha ty <||
         pushl e
       end >>
-      ambulando bracket
+      loop
 
     | E (alpha, ty, Guess info) ->
       begin
         check ~ty info.tm >>= function
         | true ->
           pushl @@ E (alpha, ty, Defn info.tm) >>
-          ambulando bracket
+          loop
         | false ->
           pushl e >>
-          ambulando bracket
+          loop
       end
 
     | Q (Active, prob) ->
       solver prob >>
-      ambulando bracket
-
-    | Bracket bracket' when bracket = bracket' ->
-      ret ()
+      loop
 
     | _ ->
       pushl e >>
-      ambulando bracket
+      loop
