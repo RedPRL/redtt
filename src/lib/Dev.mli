@@ -31,6 +31,7 @@ type 'a bind
 
 type problem =
   | Unify of (tm, tm) equation
+  | Subtype of {ty0 : ty; ty1 : ty}
   | All of ty param * problem bind
 
 type entry =

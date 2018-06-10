@@ -545,6 +545,14 @@ let normalize_eqn q =
   normalize ~ty:ty1 q.tm1 >>= fun tm1 ->
   ret @@ {ty0; ty1; tm0; tm1}
 
+(* TODO! Unleash constraints appropriately *)
+let subtype ty0 ty1 =
+  typechecker >>= fun (module T) ->
+  let vty0 = T.Cx.eval T.Cx.emp ty0 in
+  let vty1 = T.Cx.eval T.Cx.emp ty1 in
+  ret @@ T.Cx.check_subtype T.Cx.emp vty0 vty1
+
+
 (* invariant: will not be called on equations which are already reflexive *)
 let rigid_rigid q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
@@ -736,12 +744,19 @@ let is_restriction =
   | _ -> false
 
 let rec solver prob =
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
   (* Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob; *)
   match prob with
   | Unify q ->
     normalize_eqn q >>= fun q ->
     is_reflexive q <||
     unify q
+
+  | Subtype {ty0; ty1} ->
+    normalize ~ty:univ ty0 >>= fun ty0 ->
+    normalize ~ty:univ ty1 >>= fun ty1 ->
+    check_eq ~ty:univ ty0 ty1 <||
+    subtype ty0 ty1
 
   | All (param, prob) ->
     let x, probx = unbind param prob in

@@ -34,6 +34,7 @@ type 'a bind = B of string option * 'a
 
 type problem =
   | Unify of (tm, tm) equation
+  | Subtype of {ty0 : ty; ty1 : ty}
   | All of ty param * problem bind
 
 type entry =
@@ -92,6 +93,10 @@ let rec prob_open_var k x tw =
   function
   | Unify q ->
     Unify (eqn_open_var k x tw q)
+  | Subtype q ->
+    let ty0 = Tm.open_var k x (fun tw -> tw) q.ty0 in
+    let ty1 = Tm.open_var k x (fun tw -> tw) q.ty1 in
+    Subtype {ty0; ty1}
   | All (p, B (nm, prob)) ->
     All (param_open_var k x p, B (nm, prob_open_var (k + 1) x tw prob))
 
@@ -99,6 +104,10 @@ let rec prob_close_var x tw k =
   function
   | Unify q ->
     Unify (eqn_close_var x tw k q)
+  | Subtype q ->
+    let ty0 = Tm.close_var x (fun tw -> tw) k q.ty0 in
+    let ty1 = Tm.close_var x (fun tw -> tw) k q.ty1 in
+    Subtype {ty0; ty1}
   | All (p, B (nm, prob)) ->
     All (param_close_var x k p, B (nm, prob_close_var x tw (k + 1) prob))
 
@@ -130,6 +139,16 @@ let pp_equation fmt q =
       Uuseg_string.pp_utf_8 "≐"
       Tm.pp0 q.tm1
       Tm.pp0 q.ty1
+
+let pp_atomic_problem fmt =
+  function
+  | `Unify q ->
+    pp_equation fmt q
+  | `Subtype (ty0, ty1) ->
+    Format.fprintf fmt "@[<1>%a %a %a@]"
+      Tm.pp0 ty0
+      Uuseg_string.pp_utf_8 "≼"
+      Tm.pp0 ty1
 
 let pp_param fmt =
   function
@@ -189,7 +208,9 @@ let unfurl_problem prob =
   let rec go tele =
     function
     | Unify q ->
-      tele, q
+      tele, `Unify q
+    | Subtype q ->
+      tele, `Subtype (q.ty0, q.ty1)
     | All (prm, prob) ->
       let x, probx = unbind prm prob in
       go (tele #< (x, prm)) probx
@@ -202,7 +223,7 @@ let rec pp_problem fmt prob =
   Format.fprintf fmt "@[<v>@[<v>%a@]@,%a %a@]"
     pp_params tele
     Uuseg_string.pp_utf_8 "⊢"
-    pp_equation q
+    pp_atomic_problem q
 
 
 let pp_entry fmt =
@@ -278,9 +299,14 @@ let subst_param sub =
     `R (r0, r1)
 
 let rec subst_problem sub =
+  let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
   function
   | Unify q ->
     Unify (subst_equation sub q)
+  | Subtype q ->
+    let ty0 = subst_tm sub ~ty:univ q.ty0 in
+    let ty1 = subst_tm sub ~ty:univ q.ty1 in
+    Subtype {ty0; ty1}
   | All (param, prob) ->
     let param' = subst_param sub param in
     let x, probx = unbind param prob in
@@ -378,6 +404,8 @@ struct
     function
     | Unify q ->
       Equation.free fl q
+    | Subtype q ->
+      Occurs.Set.union (Tm.free fl q.ty0) (Tm.free fl q.ty1)
     | All (p, B (_, prob)) ->
       Occurs.Set.union (Param.free fl p) (free fl prob)
 

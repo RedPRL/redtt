@@ -149,6 +149,13 @@ let normalize_ty ty =
   let vty = T.Cx.eval T.Cx.emp ty in
   M.ret @@ T.Cx.quote_ty T.Cx.emp vty
 
+
+let (<+>) m n =
+  C.bind (C.optional m) @@
+  function
+  | Some x -> C.ret x
+  | None -> n
+
 let rec elab_sig env =
   function
   | [] ->
@@ -309,6 +316,24 @@ and elab_chk env ty e : tm M.m =
     M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
     M.ret @@ Tm.up tm
 
+  | _, E.Up inf ->
+    elab_inf env inf >>= fun (ty', cmd) ->
+    M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+    M.ret @@ Tm.up cmd
+
   | _ ->
     failwith "TODO"
 
+and elab_inf env e : (ty * tm Tm.cmd) M.m =
+  match e with
+  | E.Var name ->
+    get_resolver env >>= fun renv ->
+    begin
+      match ResEnv.get name renv with
+      | `Ref a ->
+        M.lift (C.lookup_var a `Only <+> C.lookup_meta a) >>= fun ty ->
+        let cmd = Tm.Ref (a, `Only), Emp in
+        M.ret (ty, cmd)
+      | `Ix _ ->
+        failwith "elab_inf: expected locally closed"
+    end
