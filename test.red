@@ -132,20 +132,18 @@ let foo [x : `(× bool bool)] : `(× bool bool) ⇒
 let testing [x : `(bool [1=1 tt])] : singleton `bool `tt ⇒
   x
 
-let hset [A : `(U 0)] : `(U 0) =>
-  `(→
-    [x : A]
-    [y : A]
-    [p : (Path A x y)]
-    [q : (Path A x y)]
-    (Path (Path A x y) p q))
-
+let hset [A : type] : type =>
+  (x : A)
+  (y : A)
+  (p : Path A x y)
+  (q : Path A x y)
+  → Path (Path A x y) p q
 
 let hset/exponential-ideal
-  [A : `(U 0)]
-  [B : `(U 0)]
-  [hset/B : `(hset B)]
-  : `(hset (→ A B))
+  [A : type]
+  [B : type]
+  [hset/B : hset B]
+  : hset (A → B)
   =>
   λ f g α β i j x →
     `(@
