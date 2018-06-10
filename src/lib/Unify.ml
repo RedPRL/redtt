@@ -622,7 +622,6 @@ let rec subtype ty0 ty1 =
       active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}}
 
     | _ ->
-      Format.eprintf "Blocking: %a <= %a@." Tm.pp0 ty0 Tm.pp0 ty1;
       block @@ Subtype {ty0; ty1}
 
 

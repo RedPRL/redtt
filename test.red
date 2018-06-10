@@ -66,9 +66,9 @@ let trans
 let singleton [A : type] [M : A] : `(U pre 0) ⇒
   `(A [0=0 M])
 
-let restriction-test : `(singleton bool tt) ⇒ _
+let restriction-test : singleton `bool `tt ⇒ _
 let _ : `(bool [1=1 tt]) ⇒ restriction-test
-let _ [M : `(singleton bool tt)] : `bool ⇒ M
+let _ [M : singleton `bool `tt] : `bool ⇒ M
 
 
 let connection/or
@@ -99,7 +99,7 @@ let connection/or/diagonal
  [a : A]
  [b : A]
  [p : Path A a b]
- : `(singleton (Path A a b) p)
+ : singleton (Path A a b) p
  ⇒
  λ i →
   `(@ (connection/or A a b p) i i)
@@ -108,7 +108,7 @@ let connection/and
  [A : type]
  [a : A]
  [b : A]
- [p : `(Path A a b)]
+ [p : Path A a b]
  : `(# <i j> A [j=0 a] [i=0 a] [j=1 (@ p i)] [i=1 (@ p j)])
  ⇒
  λ i j →
@@ -129,7 +129,7 @@ let foo [x : `(× bool bool)] : `(× bool bool) ⇒
   let z1 : `bool ⇒ `tt in
   < z0, z1 >
 
-let testing [x : `(bool [1=1 tt])] : `(singleton bool tt) ⇒
+let testing [x : `(bool [1=1 tt])] : singleton `bool `tt ⇒
   x
 
 let hset [A : `(U 0)] : `(U 0) =>
