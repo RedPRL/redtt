@@ -76,7 +76,7 @@ and rigid_val_face = ([`Rigid], value) face
 and comp_sys = rigid_abs_face list
 and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
-and box_sys = val_sys
+and box_sys = rigid_val_sys
 and ext_abs = (value * val_sys) Abstraction.abs
 
 and env_el = Val of value | Atom of atom
