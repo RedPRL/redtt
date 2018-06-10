@@ -218,6 +218,22 @@ and guess_restricted ty sys tm =
 
 and elab_chk env ty e : tm M.m =
   match Tm.unleash ty, e with
+
+  | _, E.Let info ->
+    elab_chk env univ info.ty >>= fun let_ty ->
+    elab_chk env let_ty info.tm >>= fun let_tm ->
+    let singleton_ty =
+      let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some let_tm in
+      Tm.make @@ Tm.Rst {ty = let_ty; sys = [face]}
+    in
+    let x = Name.named @@ Some info.name in
+    M.in_scope x (`P singleton_ty)
+      begin
+        elab_chk env ty info.body
+      end >>= fun bdyx ->
+    let inf = Tm.Down {ty = let_ty; tm = let_tm}, Emp in
+    M.ret @@ Tm.make @@ Tm.Let (inf, Tm.bind x bdyx)
+
   | Tm.Rst info, _ ->
     elab_chk env info.ty e >>=
     guess_restricted info.ty info.sys
