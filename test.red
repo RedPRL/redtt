@@ -117,11 +117,37 @@ let connection/or/diagonal
       [i=j <k> (@ face k i)]))
 
 
-let foo [x : `bool] : `(* bool bool bool) ⇒
-  < `x, `x, `x >
+let foo [x : `(× bool bool)] : `(× bool bool) ⇒
+  < `(car x), `(cdr x) >
 
 
 let testing [x : `(bool [1=1 tt])] : `(singleton bool tt) ⇒
   `x
+
+let hset [A : `(U 0)] : `(U 0) =>
+  `(→
+    [x : A]
+    [y : A]
+    [p : (Path A x y)]
+    [q : (Path A x y)]
+    (Path (Path A x y) p q))
+
+
+let hset/exponential-ideal
+  [A : `(U 0)]
+  [B : `(U 0)]
+  [hset/B : `(hset B)]
+  : `(hset (→ A B))
+  =>
+  λ f g α β i j x →
+    `(@
+      (@
+       (hset/B
+        (f x)
+        (g x)
+        (λ <k> ((@ α k) x))
+        (λ <k> ((@ β k) x)))
+       i)
+      j)
 
 debug
