@@ -118,8 +118,9 @@ let connection/or/diagonal
 
 
 let foo [x : `(× bool bool)] : `(× bool bool) ⇒
-  < `(car x), `(cdr x) >
-
+  let z0 : `bool ⇒ `(car x) in
+  let z1 : `bool ⇒ `tt in
+  < `z0, `z1 >
 
 let testing [x : `(bool [1=1 tt])] : `(singleton bool tt) ⇒
   `x
@@ -149,5 +150,6 @@ let hset/exponential-ideal
         (λ <k> ((@ β k) x)))
        i)
       j)
+
 
 debug

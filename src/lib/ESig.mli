@@ -11,6 +11,7 @@ and echk =
   | Tuple of echk list
   | Type
   | Quo of (ResEnv.t -> Tm.tm)
+  | Let of {name : string; ty : echk; tm : echk; body : echk}
   | Up of einf
 
 and einf =

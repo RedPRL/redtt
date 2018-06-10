@@ -13,7 +13,7 @@
 %token COLON COLON_ANGLE COMMA
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
-%token AST TIMES HASH AT BACKTICK QUESTION_MARK
+%token AST TIMES HASH AT BACKTICK QUESTION_MARK IN
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
 %token TYPE PRE KAN
 %token EOF
@@ -48,6 +48,8 @@ echk:
     { E.Lam (xs, e) }
   | LGL; es = separated_list(COMMA, echk); RGL
     { E.Tuple es }
+  | LET; name = ATOM; COLON; ty = echk; RRIGHT_ARROW; tm = echk; IN; body = echk
+    { E.Let {name; ty; tm; body} }
   | e = einf
     { E.Up e }
 
