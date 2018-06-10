@@ -9,11 +9,12 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
+%token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL
 %token COLON COLON_ANGLE COMMA
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
-%token AST TIMES HASH AT BACKTICK QUESTION_MARK IN
+%token AST TIMES HASH AT BACKTICK IN
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
 %token TYPE PRE KAN
 %token EOF
@@ -39,8 +40,8 @@ debug_filter:
 atomic_eterm:
   | BACKTICK; t = tm
     { E.Quo t }
-  | QUESTION_MARK; a = ATOM
-    { E.Hole (Some a) }
+  | a = HOLE_NAME;
+    { E.Hole a }
   | TYPE
     { E.Type }
   | LGL; es = separated_list(COMMA, eterm); RGL

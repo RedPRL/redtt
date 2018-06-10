@@ -108,14 +108,19 @@ rule token = parse
     { Lwt.return RGL }
   | "λ"
     { Lwt.return LAM }
-  | "?"
-    { Lwt.return QUESTION_MARK }
   | line_ending
     { new_line lexbuf; token lexbuf }
   | whitespace
     { token lexbuf }
   | eof
     { Lwt.return EOF }
+  | "?" atom_initial atom_subsequent*
+    {
+      let input = lexeme lexbuf in
+      Lwt.return (Grammar.HOLE_NAME (Some input))
+    }
+  | "?"
+    { Lwt.return (Grammar.HOLE_NAME None) }
   | atom_initial atom_subsequent*
     {
       let input = lexeme lexbuf in
