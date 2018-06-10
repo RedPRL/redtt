@@ -278,6 +278,18 @@ let check_eq ~ty tm0 tm1 =
   | _ ->
     ret false
 
+let check_subtype ty0 ty1 =
+  typechecker >>= fun (module T) ->
+  let lcx = T.Cx.emp in
+  let vty0 = T.Cx.eval lcx ty0 in
+  let vty1 = T.Cx.eval lcx ty1 in
+  try
+    T.Cx.check_subtype lcx vty0 vty1;
+    ret true
+  with
+  | _ ->
+    ret false
+
 let check_eq_dim tr0 tr1 =
   typechecker >>= fun (module T) ->
   let r0 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr0 in

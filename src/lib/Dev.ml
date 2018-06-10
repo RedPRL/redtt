@@ -115,6 +115,14 @@ let bind x param probx =
   let tw = match param with `Tw _ -> `Tw | _ -> `P in
   B (Name.name x, prob_close_var x tw 0 probx)
 
+
+let unbind_with x param (B (_, prob)) =
+  match param with
+  | `Tw _ ->
+    prob_open_var 0 x `Tw prob
+  | _ ->
+    prob_open_var 0 x `P prob
+
 let unbind param (B (nm, prob)) =
   let x = Name.named nm in
   x,
@@ -217,6 +225,23 @@ let unfurl_problem prob =
   in
   go Emp prob
 
+let inst_with_vars xs prob =
+  let rec go xs prob =
+    match xs, prob with
+    | [], Unify q ->
+      `Unify q
+    | [], Subtype q ->
+      `Subtype (q.ty0, q.ty1)
+    | x :: xs, All (prm, prob) ->
+      let probx = unbind_with x prm prob in
+      go xs probx
+    | _ -> failwith "unbind_with_vars"
+  in
+  try
+    Some (go xs prob)
+  with
+  | _ ->
+    None
 
 let rec pp_problem fmt prob =
   let tele, q = unfurl_problem prob in

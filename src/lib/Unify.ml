@@ -179,23 +179,24 @@ let rec flex_term ~deps q =
   match Tm.unleash q.tm0 with
   | Tm.Up (Meta alpha, _) ->
     Bwd.map snd <@> ask >>= fun gm ->
-    popl >>= fun e ->
     begin
-      match e with
-      | E (beta, _, Hole) when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+      popl >>= function
+      | E (beta, _, Hole) as e when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
         (* Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q; *)
         pushls (e :: deps) >>
-        block (Unify q)
-      | (E (beta, ty, Hole) | E (beta, ty, Guess _)) when alpha = beta ->
+        block @@ Unify q
+
+      | (E (beta, ty, Hole) | E (beta, ty, Guess _)) as e when alpha = beta ->
         (* Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q; *)
         pushls deps >>
         try_invert q ty <||
         begin
           (* Format.eprintf "flex_term failed to invert.@."; *)
-          block (Unify q) >>
+          block @@ Unify q >>
           pushl e
         end
-      | E (beta, _, Hole)
+
+      | (E (beta, _, Hole) | E (beta, _, Guess _)) as e
         when
           Occurs.Set.mem beta (Params.free `Metas gm)
           || Occurs.Set.mem beta (Entries.free `Metas deps)
@@ -203,12 +204,99 @@ let rec flex_term ~deps q =
         ->
         (* Format.eprintf "flex_term/3: @[<1>%a@]@." Equation.pp q; *)
         flex_term ~deps:(e :: deps) q
-      | _ ->
+
+      | e ->
         (* Format.eprintf "flex_term/else: @[<1>%a@] --------- @[<1>%a@]@." Name.pp alpha Entry.pp e; *)
         pushr e >>
         flex_term ~deps q
     end
   | _ -> failwith "flex_term"
+
+let rec subtype_flex_term ~deps ty0 ty1 =
+  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  match Tm.unleash ty0, Tm.unleash ty1 with
+  | Tm.Up (Tm.Meta alpha, _), _ ->
+    ask >>= fun tele ->
+    let gm = Bwd.map snd tele in
+    begin
+      popl >>= function
+      | E (beta, _, _) as e when alpha = beta ->
+        pushls (e :: deps) >>
+        block @@ Subtype {ty0; ty1}
+
+      | (E (beta, _, Hole) | E (beta, _, Guess _)) as e
+        when
+          Occurs.Set.mem beta (Params.free `Metas gm)
+          || Occurs.Set.mem beta (Entries.free `Metas deps)
+          || Occurs.Set.mem beta (Tm.free `Metas ty0)
+          || Occurs.Set.mem beta (Tm.free `Metas ty1)
+        ->
+        pushr e >>
+        subtype_flex_term ~deps:(e :: deps) ty0 ty1
+
+      | E (_, _, _) as e ->
+        pushr e >>
+        subtype_flex_term ~deps ty0 ty1
+
+      | Q (_, prob) as e ->
+        begin
+          match inst_with_vars (Bwd.to_list @@ Bwd.map fst tele) prob with
+          | Some (`Subtype (ty0', ty1')) when ty1' = ty0 ->
+            active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0' ~tm1:ty1 >>
+            active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1'
+          | _ ->
+            pushr e >>
+            subtype_flex_term ~deps ty0 ty1
+        end
+
+
+      | e ->
+        pushr e >>
+        subtype_flex_term ~deps ty0 ty1
+    end
+
+  | _, Tm.Up (Tm.Meta alpha, _) ->
+    ask >>= fun tele ->
+    let gm = Bwd.map snd tele in
+    begin
+      popl >>= function
+      | E (beta, _, _) as e when alpha = beta ->
+        pushls (e :: deps) >>
+        block @@ Subtype {ty0; ty1}
+
+      | (E (beta, _, Hole) | E (beta, _, Guess _)) as e
+        when
+          Occurs.Set.mem beta (Params.free `Metas gm)
+          || Occurs.Set.mem beta (Entries.free `Metas deps)
+          || Occurs.Set.mem beta (Tm.free `Metas ty0)
+          || Occurs.Set.mem beta (Tm.free `Metas ty1)
+        ->
+        pushr e >>
+        subtype_flex_term ~deps:(e :: deps) ty0 ty1
+
+      | E (_, _, _) as e ->
+        pushr e >>
+        subtype_flex_term ~deps ty0 ty1
+
+      | Q (_, prob) as e ->
+        begin
+          match inst_with_vars (Bwd.to_list @@ Bwd.map fst tele) prob with
+          | Some (`Subtype (ty0', ty1')) when ty0' = ty1 ->
+            active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1' >>
+            active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty1 ~tm1:ty0'
+          | _ ->
+            pushr e >>
+            subtype_flex_term ~deps ty0 ty1
+        end
+
+
+      | e ->
+        pushr e >>
+        subtype_flex_term ~deps ty0 ty1
+    end
+
+  | _ ->
+    failwith "subtype_flex_term: impossible"
 
 
 let rec flex_flex_diff ~deps q =
@@ -545,18 +633,36 @@ let normalize_eqn q =
   normalize ~ty:ty1 q.tm1 >>= fun tm1 ->
   ret @@ {ty0; ty1; tm0; tm1}
 
-(* TODO! Unleash constraints appropriately.contents
-   In the future, this should throw an error when the subtyping goal is known to be false
-   (the two types are subtyping-orthogonal), and it should only block when it is still possible. *)
+(* invariant: will not be called on inequations which are already reflexive *)
 let subtype ty0 ty1 =
-  typechecker >>= fun (module T) ->
-  let vty0 = T.Cx.eval T.Cx.emp ty0 in
-  let vty1 = T.Cx.eval T.Cx.emp ty1 in
-  try
-    ret @@ T.Cx.check_subtype T.Cx.emp vty0 vty1
-  with
+  match Tm.unleash ty0, Tm.unleash ty1 with
+  | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
+    let x = Name.fresh () in
+    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+    active @@ Subtype {ty0 = dom1; ty1 = dom0} >>
+    active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
+
+  | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
+    let x = Name.fresh () in
+    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
+    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+    active @@ Subtype {ty0 = dom0; ty1 = dom1} >>
+    active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
+
+  | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
+    (* no idea what to do in flex-flex case, don't worry about it *)
+    block @@ Subtype {ty0; ty1}
+
+  | Tm.Up (Tm.Meta _, _), _ ->
+    subtype_flex_term ~deps:[] ty0 ty1
+
+  | _, Tm.Up (Tm.Meta _, _) ->
+    subtype_flex_term ~deps:[] ty0 ty1
+
   | _ ->
-    block @@ Dev.Subtype {ty0; ty1}
+    block @@ Subtype {ty0; ty1}
+
 
 
 (* invariant: will not be called on equations which are already reflexive *)
@@ -761,7 +867,7 @@ let rec solver prob =
   | Subtype {ty0; ty1} ->
     normalize ~ty:univ ty0 >>= fun ty0 ->
     normalize ~ty:univ ty1 >>= fun ty1 ->
-    check_eq ~ty:univ ty0 ty1 <||
+    check_subtype ty0 ty1 <||
     subtype ty0 ty1
 
   | All (param, prob) ->

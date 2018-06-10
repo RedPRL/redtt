@@ -42,6 +42,8 @@ type entry =
 val bind : Name.t -> 'a param -> problem -> problem bind
 val unbind : 'a param -> problem bind -> Name.t * problem
 
+val inst_with_vars : Name.t list -> problem -> [`Unify of (tm, tm) equation | `Subtype of tm * tm] option
+
 
 val pp_params : params Pretty.t0
 val pp_entry : entry Pretty.t0

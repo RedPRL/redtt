@@ -34,6 +34,7 @@ val block : problem -> unit m
 
 
 val check : ty:ty -> tm -> bool m
+val check_subtype : ty -> ty -> bool m
 val check_eq : ty:ty -> tm -> tm -> bool m
 val check_eq_dim : tm -> tm -> bool m
 
