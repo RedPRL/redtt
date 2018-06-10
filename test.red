@@ -1,5 +1,5 @@
 import path
-
+import connection
 
 let not [x : `bool] : _ ⇒
   `(if [_] bool x ff tt)
@@ -23,8 +23,6 @@ let not∘not/id : Path `(→ bool bool) _ _ ⇒
    `(@ (not∘not/id/pt x) i)
 
 
-let singleton [A : type] [M : A] : `(U pre 0) ⇒
-  `(A [0=0 M])
 
 let restriction-test : singleton `bool `tt ⇒ _
 let _ : `(bool [1=1 tt]) ⇒ restriction-test

@@ -1,3 +1,8 @@
+import path
+
+let singleton [A : type] [M : A] : `(U pre 0) ⇒
+  `(A [0=0 M])
+
 let connection/or
  [A : type]
  [a : A]
