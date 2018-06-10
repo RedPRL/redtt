@@ -186,7 +186,7 @@ let rec flex_term ~deps q =
         (* Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q; *)
         pushls (e :: deps) >>
         block (Unify q)
-      | E (beta, ty, Hole) when alpha = beta ->
+      | (E (beta, ty, Hole) | E (beta, ty, Guess _)) when alpha = beta ->
         (* Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q; *)
         pushls deps >>
         try_invert q ty <||
@@ -204,7 +204,7 @@ let rec flex_term ~deps q =
         (* Format.eprintf "flex_term/3: @[<1>%a@]@." Equation.pp q; *)
         flex_term ~deps:(e :: deps) q
       | _ ->
-        (* Format.eprintf "flex_term/4: @[<1>%a@]@." Equation.pp q; *)
+        (* Format.eprintf "flex_term/else: @[<1>%a@] --------- @[<1>%a@]@." Name.pp alpha Entry.pp e; *)
         pushr e >>
         flex_term ~deps q
     end
