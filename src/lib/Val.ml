@@ -853,12 +853,10 @@ struct
             Val.act (D.equate ri r'i) @@
             cap_in_wall abs el
           in
-          begin
-            match force_abs_sys [face0; face1] with
-            | `Proj el -> Abs.inst1 el r'
-            | `Ok faces ->
-              rigid_hcom dir info.cap (cap_in_wall abs cap) @@ (faces @ List.map face sys)
-          end
+          match force_abs_sys [face0; face1] with
+          | `Proj abs -> Abs.inst1 abs r'
+          | `Ok faces ->
+            rigid_hcom dir info.cap (cap_in_wall abs cap) @@ (faces @ List.map face sys)
         in
 
         let cap_aux el = rigid_cap info.dir info.cap info.sys el in
