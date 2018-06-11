@@ -2,11 +2,12 @@ open Dev
 open RedBasis
 open Bwd open BwdNotation
 
-type lcx = entry bwd
-type rcx = entry list
+type stamped = {stamp : float; entry : entry}
+type lcx = stamped bwd
+type rcx = stamped list
 
 type env = GlobalEnv.t
-type cx = {env : env; lcx : lcx; rcx : rcx}
+type cx = {env : env; lcx : lcx; rcx : rcx; last_updated : float}
 
 
 let rec pp_lcx fmt =
@@ -15,11 +16,11 @@ let rec pp_lcx fmt =
     ()
   | Snoc (Emp, e) ->
     Format.fprintf fmt "@[<v>%a@]"
-      pp_entry e
+      pp_entry e.entry
   | Snoc (cx, e) ->
     Format.fprintf fmt "%a;@;@;@[<v>%a@]"
       pp_lcx cx
-      pp_entry e
+      pp_entry e.entry
 
 let rec pp_rcx fmt =
   function
@@ -27,10 +28,10 @@ let rec pp_rcx fmt =
     ()
   | e :: [] ->
     Format.fprintf fmt "@[<1>%a@]"
-      pp_entry e
+      pp_entry e.entry
   | e :: cx ->
     Format.fprintf fmt "@[<1>%a@];@;@;%a"
-      pp_entry e
+      pp_entry e.entry
       pp_rcx cx
 
 let filter_entry filter entry =
@@ -38,13 +39,13 @@ let filter_entry filter entry =
   | `All -> true
   | `Constraints ->
     begin
-      match entry with
+      match entry.entry with
       | Q _ -> true
       | _ -> false
     end
   | `Unsolved ->
     begin
-      match entry with
+      match entry.entry with
       | Q _ -> true
       | E (_, _, Hole) -> true
       | E (_, _, Guess _) -> true
@@ -103,36 +104,55 @@ let setr r = modifyr @@ fun _ -> r
 
 let update_env e =
   modify @@ fun st ->
-  let env =
-    match e with
-    | E (nm, ty, Hole) ->
-      GlobalEnv.ext st.env nm @@ `P {ty; sys = []}
-    | E (nm, ty, Guess _) ->
-      GlobalEnv.ext st.env nm @@ `P {ty; sys = []}
-    | E (nm, ty, Defn t) ->
-      GlobalEnv.define st.env nm ty t
-    | _ ->
-      st.env
-  in
-  {st with env}
+  match e with
+  | E (nm, ty, Hole) ->
+    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}}
+  | E (nm, ty, Guess _) ->
+    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}}
+  | E (nm, ty, Defn t) ->
+    {st with env = GlobalEnv.define st.env nm ty t}
+  | _ ->
+    st
+
+let get_position_left =
+  getl >>= function
+  | Emp -> ret 0.0
+  | Snoc (_, e) -> ret e.stamp
+
+let get_position_right =
+  getr >>= function
+  | [] -> ret 1000.0
+  | e :: _ -> ret e.stamp
+
+let get_position_between =
+  get_position_left >>= fun l ->
+  get_position_right >>= fun r ->
+  ret @@ (r -. l) /. 2.0
 
 let pushl e =
-  modifyl (fun es -> es #< e) >>
+  get_position_between >>= fun stamp->
+  modifyl (fun es -> es #< {stamp; entry = e}) >>
   update_env e
 
 let pushr e =
-  modifyr (fun es -> e :: es) >>
+  get_position_between >>= fun stamp->
+  modifyr (fun es -> {stamp; entry = e} :: es) >>
   update_env e
 
+let notify_stale =
+  get_position_right >>= fun stamp ->
+  modify @@ fun st ->
+  {st with last_updated = stamp}
+
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []} in
+  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []; last_updated = 10000.0} in
   r
 
 
 let isolate (m : 'a m) : 'a m =
   fun ps st ->
     let st', a = m ps {st with lcx = Emp; rcx = []} in
-    {env = st'.env; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx}, a
+    {env = st'.env; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; last_updated = st.last_updated}, a
 
 let rec pushls es =
   match es with
@@ -148,7 +168,7 @@ let dump_state fmt str filter =
 
 let popl =
   getl >>= function
-  | Snoc (mcx, e) -> setl mcx >> ret e
+  | Snoc (mcx, e) -> setl mcx >> ret e.entry
   | _ ->
     dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
@@ -173,18 +193,17 @@ let get_global_env =
 
 
 let popr_opt =
-  get_global_env >>= fun sub ->
+  get >>= fun st ->
   getr >>= function
   | e :: mcx ->
     setr mcx >>
-    begin
-      try
-        ret @@ Some (Entry.subst sub e)
-      with
-      | e ->
-        Format.eprintf "Failed to substitute: %s !!!!!@." (Printexc.to_string e);
-        raise e
-    end
+    if e.stamp > st.last_updated then
+      get_global_env >>= fun sub ->
+      ret @@ Some (Entry.subst sub e.entry)
+    else
+      begin
+        ret @@ Some e.entry
+      end
   | _ ->
     ret None
 
@@ -274,7 +293,8 @@ let check ~ty tm =
     T.check lcx vty tm;
     ret true
   with
-  | _ ->
+  | _exn ->
+    (* Format.eprintf "type error: %s@." @@ Printexc.to_string exn; *)
     ret false
 
 let check_eq ~ty tm0 tm1 =

@@ -80,7 +80,8 @@ let define gm alpha ~ty tm =
       failwith "define: type error"
     end
   else
-    pushr @@ E (alpha, ty', Defn tm')
+    pushr @@ E (alpha, ty', Defn tm') >>
+    notify_stale
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)
@@ -816,20 +817,32 @@ let is_restriction =
   | `R _ -> true
   | _ -> false
 
-let rec solver prob =
+let rec solver ?should_refresh:(should_refresh = false) prob =
   let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  (* Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob; *)
+  (* Format.eprintf "solver: %b @[<1>%a@]@.@." should_refresh Problem.pp prob; *)
   match prob with
   | Unify q ->
-    normalize_eqn q >>= fun q ->
     is_reflexive q <||
-    unify q
+    begin
+      begin
+        if should_refresh then normalize_eqn q else ret q
+      end >>= fun q ->
+      unify q
+    end
 
   | Subtype {ty0; ty1} ->
-    normalize ~ty:univ ty0 >>= fun ty0 ->
-    normalize ~ty:univ ty1 >>= fun ty1 ->
     check_subtype ty0 ty1 <||
-    subtype ty0 ty1
+    begin
+      begin
+        if should_refresh then
+          normalize ~ty:univ ty0 >>= fun ty0 ->
+          normalize ~ty:univ ty1 >>= fun ty1 ->
+          ret (ty0, ty1)
+        else
+          ret (ty0, ty1)
+      end >>= fun (ty0, ty1) ->
+      subtype ty0 ty1
+    end
 
   | All (param, prob) ->
     let x, probx = unbind param prob in
@@ -880,7 +893,7 @@ let rec solver prob =
           | true ->
             solver probx
           | false ->
-            under_restriction r0 r1 @@ solver probx
+            under_restriction r0 r1 @@ solver ~should_refresh:true probx
       end
 
 
