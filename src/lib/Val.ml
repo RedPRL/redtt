@@ -949,6 +949,9 @@ struct
 
   and rigid_ghcom dir ty cap sys : value =
     match unleash ty with
+    (* Who knows whether we can delay the expansion
+     * in `Up _`? Please move `Up _` to the second
+     * list if this does not work out. *)
     | (Pi _ | Sg _ | Up _) ->
       let rec drop_false sys =
         match sys with
