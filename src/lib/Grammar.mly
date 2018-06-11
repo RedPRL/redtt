@@ -16,6 +16,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
+%token IMPORT
 %token TYPE PRE KAN
 %token EOF
 
@@ -28,6 +29,8 @@ edecl:
     { E.Define (a, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
+  | IMPORT; a = ATOM
+    { E.Import a }
 
 debug_filter:
   | { `All }

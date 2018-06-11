@@ -1,6 +1,7 @@
 type edecl =
   | Define of string * escheme * eterm
   | Debug of [ `All | `Constraints | `Unsolved ]
+  | Import of string
 
 and escheme = etele * eterm
 and ecell = string * eterm

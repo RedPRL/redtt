@@ -66,15 +66,15 @@ let loop lexbuf tokens =
         go (I.resume checkpoint) ()
 
       | I.Accepted result ->
-        let script = Refine.elab_sig Refine.T.empty result in
-        Lwt.return @@ Refine.M.run @@ Refine.M.report script
+        Lwt.return result
 
       | I.HandlingError env ->
         begin match I.top env with
           | None ->
-            Lwt.return_unit
+            Lwt.return []
           | Some element ->
-            Message.render @@ Element.handle lexbuf element
+            Lwt.bind (Message.render @@ Element.handle lexbuf element) @@ fun _ ->
+            Lwt.return []
         end
 
       | I.InputNeeded _env ->
