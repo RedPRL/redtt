@@ -949,7 +949,7 @@ struct
 
   and rigid_ghcom dir ty cap sys : value =
     match unleash ty with
-    | (Pi _ | Sg _ | Ext _ | Up _) ->
+    | (Pi _ | Sg _ | Up _) ->
       let rec drop_false sys =
         match sys with
         (* This is assuming false equations are made
@@ -960,7 +960,9 @@ struct
       in
       make @@ GHCom {dir; ty; cap; sys = drop_false sys}
 
-    | (Bool | Univ _ | FCom _ | V _) ->
+    (* `Ext _`: the expansion will stop after a valid
+     * correction system, so it is not so bad. *)
+    | (Ext _ | Bool | Univ _ | FCom _ | V _) ->
       let rec aux sys =
         match sys with
         | [] -> cap
@@ -1463,6 +1465,18 @@ struct
       let sys = List.map app_face info.sys in
       rigid_hcom info.dir ty cap sys
 
+    | GHCom info ->
+      let _, cod = unleash_pi ~debug:["apply"; "ghcom"] info.ty in
+      let ty = inst_clo cod varg in
+      let cap = apply info.cap varg in
+      let app_face =
+        Face.map @@ fun r r' abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ apply v (Val.act (D.equate r r') varg)
+      in
+      let sys = List.map app_face info.sys in
+      rigid_ghcom info.dir ty cap sys
+
     | _ ->
       failwith "apply"
 
@@ -1605,6 +1619,17 @@ struct
       let sys = List.map face info.sys in
       rigid_hcom info.dir dom cap sys
 
+    | GHCom info ->
+      let dom, _ = unleash_sg info.ty in
+      let cap = car info.cap in
+      let face =
+        Face.map @@ fun _ _ abs ->
+        let y, v = Abs.unleash1 abs in
+        Abs.bind1 y @@ car v
+      in
+      let sys = List.map face info.sys in
+      rigid_ghcom info.dir dom cap sys
+
     | _ ->
       failwith "car"
 
@@ -1640,7 +1665,7 @@ struct
         let r, _ = Star.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
         let z = Name.fresh () in
-        let sys =
+        let msys =
           let face =
             Face.map @@ fun _ _ absi ->
             let yi, vi = Abs.unleash absi in
@@ -1653,7 +1678,7 @@ struct
             (Star.make r (D.named z))
             dom
             (car info.cap)
-            sys
+            msys
         in
         Abs.bind1 z @@ inst_clo cod hcom
       in
@@ -1667,6 +1692,39 @@ struct
         List.map face info.sys
       in
       rigid_com info.dir abs cap sys
+
+    | GHCom info ->
+      let abs =
+        let r, _ = Star.unleash info.dir in
+        let dom, cod = unleash_sg info.ty in
+        let z = Name.fresh () in
+        let msys =
+          let face =
+            Face.map @@ fun _ _ absi ->
+            let yi, vi = Abs.unleash absi in
+            Abs.bind yi @@ car vi
+          in
+          `Ok (List.map face info.sys)
+        in
+        let hcom =
+          make_ghcom
+            (Star.make r (D.named z))
+            dom
+            (car info.cap)
+            msys
+        in
+        Abs.bind1 z @@ inst_clo cod hcom
+      in
+      let cap = cdr info.cap in
+      let sys =
+        let face =
+          Face.map @@ fun _ _ absi ->
+          let yi, vi = Abs.unleash absi in
+          Abs.bind yi @@ cdr vi
+        in
+        List.map face info.sys
+      in
+      rigid_gcom info.dir abs cap sys
 
     | _ -> failwith "TODO: cdr"
 
