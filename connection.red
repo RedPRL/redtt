@@ -1,13 +1,13 @@
 import path
 
-let singleton [A : type] [M : A] : `(U pre 0) ⇒
+let singleton (A : type) (M : A) : `(U pre 0) ⇒
   `(A [0=0 M])
 
 let connection/or
- [A : type]
- [a : A]
- [b : A]
- [p : Path A a b]
+ (A : type)
+ (a : A)
+ (b : A)
+ (p : Path A a b)
  : `(# <i j> A [j=0 (@ p i)] [i=0 (@ p j)] [j=1 b] [i=1 b])
  ⇒
  λ i j →
@@ -27,20 +27,20 @@ let connection/or
 ;
 ; ; an example of using the singleton type to establish an exact equality
 let connection/or/diagonal
- [A : type]
- [a : A]
- [b : A]
- [p : Path A a b]
+ (A : type)
+ (a : A)
+ (b : A)
+ (p : Path A a b)
  : singleton (Path A a b) p
  ⇒
  λ i →
   `(@ (connection/or A a b p) i i)
 
 let connection/and
- [A : type]
- [a : A]
- [b : A]
- [p : Path A a b]
+ (A : type)
+ (a : A)
+ (b : A)
+ (p : Path A a b)
  : `(# <i j> A [j=0 a] [i=0 a] [j=1 (@ p i)] [i=1 (@ p j)])
  ⇒
  λ i j →

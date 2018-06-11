@@ -86,7 +86,7 @@ escheme:
     { (tele, cod) }
 
 escheme_cell:
-  | LSQ; a = ATOM; COLON; ty = eterm; RSQ
+  | LPR; a = ATOM; COLON; ty = eterm; RPR
     { (a, ty) }
 
 epi_cell:
