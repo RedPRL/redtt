@@ -942,14 +942,58 @@ struct
   and rigid_ghcom dir ty cap sys : value =
     match unleash ty with
     | (Pi _ | Sg _ | Ext _ | Up _) ->
-      let rec drop_false faces =
-        begin
-          match faces with
-          | Face.False _ :: faces -> drop_false faces
-          | _ -> faces
-        end
+      let rec drop_false sys =
+        match sys with
+        (* This is assuming false equations are made
+         * of constants. Needs to revisit this when
+         * we consider more cofibrations. *)
+        | Face.False _ :: sys -> drop_false sys
+        | _ -> sys
       in
       make @@ GHCom {dir; ty; cap; sys = drop_false sys}
+
+    | (Bool | Univ _ | FCom _ | V _) ->
+      let rec aux sys =
+        match sys with
+        | [] -> cap
+        | Face.False _ :: sys -> aux sys
+        | Face.Indet (eqi, absi) :: rest ->
+          let ri, r'i = Star.unleash eqi in
+          let r, r' = Star.unleash dir in
+          let face (dim0, dim1) =
+            AbsFace.make ri D.dim0 @@
+            (* XXX this would stop the expansion early, but is
+             * unfortunately duplicate under `AbsFace.make` *)
+            match CompSys.act (D.equate ri D.dim0) rest with
+            | `Proj abs -> abs
+            | `Ok rest0 ->
+              let r'i = Dim.act (D.equate ri D.dim0) r'i in
+              let ghcom00 = AbsFace.make r'i dim0 absi in
+              let ghcom01 = AbsFace.make r'i dim1 @@
+                let y = Name.fresh () in
+                Abs.bind1 y @@
+                (* TODO this can be optimized further by expanding
+                 * `make_ghcom` because `ty` is not changed and
+                 * in degenerate cases there is redundant renaming. *)
+                make_ghcom (Star.make r (D.named y)) ty cap @@
+                (* XXX this would stop the expansion early, but is
+                 * unfortunately duplicate under `AbsFace.make` *)
+                CompSys.act (D.equate r'i dim1) rest0
+              in
+              match force_abs_sys [ghcom00; ghcom01] with
+              | `Proj abs -> abs
+              | `Ok faces ->
+                let y = Name.fresh () in
+                Abs.bind1 y @@
+                make_hcom (Star.make r (D.named y)) ty cap (`Ok (faces @ rest))
+          in
+          let face0 = face (D.dim0, D.dim1) in
+          let face1 = face (D.dim1, D.dim0) in
+          match force_abs_sys [face0; face1] with
+          | `Proj abs -> Abs.inst1 abs r'
+          | `Ok faces -> rigid_hcom dir ty cap (faces @ sys)
+      in
+      aux sys
 
     | _ ->
       failwith "TODO: rigid_ghcom"
