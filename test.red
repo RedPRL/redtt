@@ -47,8 +47,8 @@ let hset [A : _] : type =>
   → Path (Path A x y) p q
 
 let hset/exponential-ideal
-  [A : type]
-  [B : type]
+  [A : _]
+  [B : _]
   [hset/B : hset B]
   : hset (A → B)
   =>
