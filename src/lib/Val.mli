@@ -25,6 +25,7 @@ type con =
 
   | Coe : {dir : star; abs : abs; el : value} -> con
   | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
+  | GHCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
   | FCom : {dir : star; cap : value; sys : comp_sys} -> con
   | Box : {dir : star; cap : value; sys : box_sys} -> con
 

@@ -27,6 +27,7 @@ type con =
 
   | Coe : {dir : star; abs : abs; el : value} -> con
   | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
+  | GHCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
   | FCom : {dir : star; cap : value; sys : comp_sys} -> con
   | Box : {dir : star; cap : value; sys : box_sys} -> con
 
@@ -378,6 +379,13 @@ struct
         (Val.act phi info.cap)
         (CompSys.act phi info.sys)
 
+    | GHCom info ->
+      make_ghcom
+        (Star.act phi info.dir)
+        (Val.act phi info.ty)
+        (Val.act phi info.cap)
+        (CompSys.act phi info.sys)
+
     | FCom info ->
       make_fcom
         (Star.act phi info.dir)
@@ -643,8 +651,21 @@ struct
           rigid_hcom dir ty cap sys
         | `Proj abs ->
           let _, r' = Star.unleash dir in
-          let x, el = Abs.unleash1 abs in
-          Val.act (D.subst r' x) el
+          Abs.inst1 abs r'
+      end
+    | `Same _ ->
+      cap
+
+  and make_ghcom mdir ty cap msys : value =
+    match mdir with
+    | `Ok dir ->
+      begin
+        match msys with
+        | `Ok sys ->
+          rigid_ghcom dir ty cap sys
+        | `Proj abs ->
+          let _, r' = Star.unleash dir in
+          Abs.inst1 abs r'
       end
     | `Same _ ->
       cap
@@ -675,8 +696,7 @@ struct
           rigid_fcom dir cap sys
         | `Proj abs ->
           let _, r' = Star.unleash dir in
-          let x, el = Abs.unleash1 abs in
-          Val.act (D.subst r' x) el
+          Abs.inst1 abs r'
       end
     | `Same _ ->
       cap
@@ -920,6 +940,21 @@ struct
 
     | _ ->
       failwith "TODO: rigid_hcom"
+
+  and rigid_ghcom dir ty cap sys : value =
+    match unleash ty with
+    | (Pi _ | Sg _ | Ext _ | Up _) ->
+      let rec drop_false faces =
+        begin
+          match faces with
+          | Face.False _ :: faces -> drop_false faces
+          | _ -> faces
+        end
+      in
+      make @@ GHCom {dir; ty; cap; sys = drop_false sys}
+
+    | _ ->
+      failwith "TODO: rigid_ghcom"
 
   and rigid_com dir abs cap (sys : comp_sys) : value =
     let _, r' = Star.unleash dir in
@@ -1631,6 +1666,8 @@ struct
       Format.fprintf fmt "<coe>"
     | HCom _ ->
       Format.fprintf fmt "<hcom>"
+    | GHCom _ ->
+      Format.fprintf fmt "<ghcom>"
     | FCom _ ->
       Format.fprintf fmt "<fcom>"
     | Box _ ->
