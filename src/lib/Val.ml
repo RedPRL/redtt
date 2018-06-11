@@ -1458,7 +1458,7 @@ struct
       let app_face =
         Face.map @@ fun r r' abs ->
         let x, v = Abs.unleash1 abs in
-        Abs.bind1 x @@ apply v (Val.act (D.equate r r') v)
+        Abs.bind1 x @@ apply v (Val.act (D.equate r r') varg)
       in
       let sys = List.map app_face info.sys in
       rigid_hcom info.dir ty cap sys
