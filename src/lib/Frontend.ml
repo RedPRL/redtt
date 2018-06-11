@@ -21,7 +21,15 @@ let read_file file_name =
 let load_file file_name =
   let module I =
   struct
-    let import f = Lwt_main.run @@ read_file @@ f ^ ".red"
+    let cache =
+      Hashtbl.create 20
+
+    let import f =
+      match Hashtbl.find_opt cache f with
+      | None ->
+        Lwt_main.run @@ read_file @@ f ^ ".red"
+      | Some esig ->
+        esig
   end
   in
   let module Refine = Refine.Make (I) in
