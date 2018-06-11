@@ -367,11 +367,13 @@ struct
 
   and elab_up env ty inf =
     elab_inf env inf >>= fun (ty', cmd) ->
-    M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-    M.lift C.ask >>= fun psi ->
-    M.lift @@ U.guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd) C.ret >>= fun tm ->
-    M.lift C.go_to_bottom >> (* This is suspicious ! *)
-    M.ret @@ tm
+    M.lift (C.check_subtype ty' ty) >>= fun b ->
+    if b then M.ret @@ Tm.up cmd else
+      M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+      M.lift C.ask >>= fun psi ->
+      M.lift @@ U.guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd) C.ret >>= fun tm ->
+      M.lift C.go_to_bottom >> (* This is suspicious ! *)
+      M.ret @@ tm
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
     let rec unleash_pi_or_ext tm =
