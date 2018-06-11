@@ -831,7 +831,10 @@ struct
       acc
     | Cons (t0, t1) ->
       go fl t1 @@ go fl t0 acc
+    | Let (cmd, bnd) ->
+      go_bnd fl bnd @@ go_cmd fl cmd acc
     | _ ->
+      Format.eprintf "Tried to get free variables, but we didn't implement the case for: %a@." (pp Pretty.Env.emp) tm;
       failwith "TODO"
 
   and go_cmd fl (hd, sp) acc =
