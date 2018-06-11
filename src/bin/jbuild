@@ -2,6 +2,7 @@
 
 (executables
  ((names (main))
+  (ocamlopt_flags (:standard -p -ccopt -no-pie))
   (libraries (cmdliner lwt.unix redtt))))
 
 (install
