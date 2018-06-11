@@ -73,13 +73,20 @@ struct
       | True (c, d, t) ->
         True (Dim.act phi c, Dim.act phi d, X.act phi t)
       | False p ->
-        False p
+        begin
+          match DimStar.act phi p with
+          | `Ok p' -> False p'
+          | _ -> failwith "Unexpected thing happened in Face.act"
+        end
       | Indet (p, t) ->
-        let r, r' = DimStar.unleash p in
-        let t' = X.act (Dim.cmp (Dim.equate r r') phi) t in
-        match DimStar.act phi p with
-        | `Ok p' ->
-          Indet (p', t')
-        | `Same (c, d) ->
-          True (c, d, t')
+        begin
+          match DimStar.act phi p with
+          | `Same (c, d) ->
+            let t' = X.act phi t in
+            True (c, d, t')
+          | `Ok p' ->
+            let r, r' = DimStar.unleash p' in
+            let t' = X.act (Dim.cmp (Dim.equate r r') phi) t in
+            Indet (p', t')
+        end
 end
