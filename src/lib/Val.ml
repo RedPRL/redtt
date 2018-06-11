@@ -684,8 +684,6 @@ struct
     | `Same _ ->
       cap
 
-  and rigid_fcom dir cap sys : value =
-    make @@ FCom {dir; cap; sys}
 
   and make_fcom mdir cap msys : value =
     match mdir with
@@ -700,9 +698,6 @@ struct
       end
     | `Same _ ->
       cap
-
-  and rigid_box dir cap sys : value =
-    make @@ Box {dir; cap; sys}
 
   and make_box mdir cap msys : value =
     match mdir with
@@ -1013,6 +1008,12 @@ struct
       List.map face sys
     in
     rigid_hcom dir ty capcoe syscoe
+
+  and rigid_fcom dir cap sys : value =
+    make @@ FCom {dir; cap; sys}
+
+  and rigid_box dir cap sys : value =
+    make @@ Box {dir; cap; sys}
 
 
   and clo bnd rel rho =
