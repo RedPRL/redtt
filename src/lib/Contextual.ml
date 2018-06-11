@@ -128,6 +128,12 @@ let run (m : 'a m) : 'a  =
   let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []} in
   r
 
+
+let isolate (m : 'a m) : 'a m =
+  fun ps st ->
+    let st', a = m ps {st with lcx = Emp; rcx = []} in
+    {env = st'.env; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx}, a
+
 let rec pushls es =
   match es with
   | [] -> ret ()
@@ -232,16 +238,8 @@ let lookup_var x w =
   ask >>= go
 
 let lookup_meta x =
-  let rec look =
-    function
-    | Snoc (mcx, E (y, ty, _)) ->
-      if x = y then M.ret ty else look mcx
-    | Snoc (mcx, _) ->
-      look mcx
-    | Emp ->
-      failwith "lookup_meta: not found"
-  in
-  getl >>= look
+  get >>= fun {env; _} ->
+  ret @@ GlobalEnv.lookup_ty env x `Only
 
 
 let postpone s p =

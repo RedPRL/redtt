@@ -23,6 +23,8 @@ struct
     val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
     val under_restriction : tm -> tm -> 'a m -> 'a m
 
+    val isolate : 'a m -> 'a m
+
     type diagnostic =
       | UserHole of {name : string option; tele : U.telescope; ty : Tm.tm; tm : Tm.tm}
 
@@ -89,6 +91,7 @@ struct
     let under_restriction = C.under_restriction
     let in_scopes = C.in_scopes
     let in_scope = C.in_scope
+    let isolate = C.isolate
 
 
     let run m =
@@ -170,9 +173,12 @@ struct
     | [] ->
       M.ret env
     | dcl :: esig ->
-      elab_decl env dcl >>= fun env' ->
-      M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing ;-) *)
-      M.lift U.ambulando >>
+      M.isolate begin
+        elab_decl env dcl >>= fun env' ->
+        M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing ;-) *)
+        M.lift U.ambulando >>
+        M.ret env'
+      end >>= fun env' ->
       elab_sig env' esig
 
 

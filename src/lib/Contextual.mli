@@ -7,6 +7,8 @@ val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
+val isolate : 'a m -> 'a m
+
 val popl : entry m
 val popr : entry m
 val popr_opt : entry option m
