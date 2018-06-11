@@ -44,6 +44,10 @@ type con =
   | Tt : con
   | Ff : con
 
+  | S1 : con
+  | Base : con
+  | Loop : gen -> con
+
   | Up : {ty : value; neu : neu; sys : rigid_val_sys} -> con
 
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
@@ -59,6 +63,8 @@ and neu =
   | Cdr : neu -> neu
 
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
+
+  | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
@@ -443,6 +449,15 @@ struct
     | Ff ->
       make con
 
+    | S1 ->
+      make con
+
+    | Base ->
+      make con
+
+    | Loop x ->
+      make_loop (Gen.act phi x)
+
     | Lam clo ->
       make @@ Lam (Clo.act phi clo)
 
@@ -556,6 +571,18 @@ struct
           step @@ if_ mot v tcase fcase
       end
 
+    | S1Rec info ->
+      let mot = Clo.act phi info.mot in
+      let bcase = Val.act phi info.bcase in
+      let lcase = Abs.act phi info.lcase in
+      begin
+        match act_neu phi info.neu with
+        | Ret neu ->
+          ret @@ S1Rec {mot; neu; bcase; lcase}
+        | Step v ->
+          step @@ s1_rec mot v bcase lcase
+      end
+
     | LblCall neu ->
       begin
         match act_neu phi neu with
@@ -656,6 +683,13 @@ struct
     | `Const `Dim1 ->
       el0
 
+  and make_loop mx : value =
+    match mx with
+    | `Ok x ->
+      rigid_loop x
+    | `Const _ ->
+      make @@ Base
+
   and make_coe mdir abs el : value =
     match mdir with
     | `Ok dir ->
@@ -748,6 +782,9 @@ struct
 
   and rigid_vin x el0 el1 : value =
     make @@ VIn {x; el0; el1}
+
+  and rigid_loop x : value =
+    make @@ Loop x
 
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
@@ -1292,6 +1329,15 @@ struct
     | Tm.Ff ->
       make Ff
 
+    | Tm.S1 ->
+      make S1
+
+    | Tm.Base ->
+      make Base
+
+    | Tm.Loop r ->
+      make_loop (Gen.make (eval_dim_class rel rho r))
+
     | Tm.Dim0 ->
       failwith "0 is a dimension"
 
@@ -1351,6 +1397,11 @@ struct
       let tcase = eval rel rho info.tcase in
       let fcase = eval rel rho info.fcase in
       if_ mot vhd tcase fcase
+    | Tm.S1Rec info ->
+      let mot = clo info.mot rel rho in
+      let bcase = eval rel rho info.bcase in
+      let lcase = eval_bnd rel rho info.lcase in
+      s1_rec mot vhd bcase lcase
 
 
   and eval_head rel rho =
@@ -1757,6 +1808,25 @@ struct
     | _ ->
       failwith "if_"
 
+  and s1_rec mot scrut bcase lcase =
+    match unleash scrut with
+    | Base ->
+      bcase
+    | Loop x ->
+      Abs.inst1 lcase (Gen.unleash x)
+    | Up up ->
+      let neu = S1Rec {mot; neu = up.neu; bcase; lcase} in
+      let mot' = inst_clo mot scrut in
+      let s1_rec_face =
+        Face.map @@ fun r r' a ->
+        let phi = Dim.equate r r' in
+        s1_rec (Clo.act phi mot) a (Val.act phi bcase) (Abs.act phi lcase)
+      in
+      let s1_rec_sys = List.map s1_rec_face up.sys in
+      make @@ Up {ty = mot'; neu; sys = s1_rec_sys}
+    | _ ->
+      failwith "s1_rec"
+
   and car v =
     match unleash v with
     | Cons (v0, _) ->
@@ -1940,6 +2010,12 @@ struct
       Format.fprintf fmt "ff"
     | Bool ->
       Format.fprintf fmt "bool"
+    | S1 ->
+      Format.fprintf fmt "S1"
+    | Base ->
+      Format.fprintf fmt "base"
+    | Loop _x ->
+      Format.fprintf fmt "<loop>"
     | Pi {dom; cod} ->
       Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
     | Sg {dom; cod} ->
@@ -2040,6 +2116,9 @@ struct
 
     | If _ ->
       Format.fprintf fmt "<if>"
+
+    | S1Rec _ ->
+      Format.fprintf fmt "<S1rec>"
 
     | Cap _ ->
       Format.fprintf fmt "<cap>"
