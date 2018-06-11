@@ -684,6 +684,19 @@ struct
     | `Same _ ->
       cap
 
+  and make_gcom mdir abs cap msys : value =
+    match mdir with
+    | `Ok dir ->
+      let _, r' = Star.unleash dir in
+      begin
+        match msys with
+        | `Ok sys ->
+          rigid_gcom dir abs cap sys
+        | `Proj abs ->
+          Abs.inst1 abs r'
+      end
+    | `Same _ ->
+      cap
 
   and make_fcom mdir cap msys : value =
     match mdir with
@@ -1008,6 +1021,22 @@ struct
       List.map face sys
     in
     rigid_hcom dir ty capcoe syscoe
+
+  and rigid_gcom dir abs cap (sys : comp_sys) : value =
+    let _, r' = Star.unleash dir in
+    let ty = Abs.inst1 abs r' in
+    let capcoe = rigid_coe dir abs cap in
+    let syscoe : comp_sys =
+      let face =
+        Face.map @@ fun ri r'i absi ->
+        let phi = D.equate ri r'i in
+        let yi, vi = Abs.unleash1 absi in
+        let y2r' = Star.make (D.named yi) (D.act phi r') in
+        Abs.bind1 yi @@ make_coe y2r' (Abs.act phi abs) @@ Val.act phi vi
+      in
+      List.map face sys
+    in
+    rigid_ghcom dir ty capcoe syscoe
 
   and rigid_fcom dir cap sys : value =
     make @@ FCom {dir; cap; sys}
