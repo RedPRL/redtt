@@ -175,7 +175,7 @@ struct
     | dcl :: esig ->
       M.isolate begin
         elab_decl env dcl >>= fun env' ->
-        M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing ;-) *)
+        M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing *)
         M.lift U.ambulando >>
         M.ret env'
       end >>= fun env' ->
@@ -318,18 +318,18 @@ struct
       end >>= fun bdyx ->
       M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn (Emp #< x) bdyx)
 
-    | Tm.Ext ebnd, e when should_split_ext_bnd ebnd->
-      let names, ety = split_ext_bnd ebnd in
-      elab_chk env ety e >>= fun tm ->
-      let bdy =
+    (* | Tm.Ext ebnd, e when should_split_ext_bnd ebnd->
+       let names, ety = split_ext_bnd ebnd in
+       elab_chk env ety e >>= fun tm ->
+       let bdy =
         let xs = List.map Name.named names in
         Tm.bindn (Bwd.from_list xs) @@
         let hd = Tm.Down {ty = ety; tm = tm} in
         let args = List.map (fun x -> Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]) xs in
         let spine = Emp <>< args in
         Tm.up (hd, spine)
-      in
-      M.ret @@ Tm.make @@ Tm.ExtLam bdy
+       in
+       M.ret @@ Tm.make @@ Tm.ExtLam bdy *)
 
 
 
