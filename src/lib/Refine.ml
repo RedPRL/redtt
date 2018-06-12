@@ -396,7 +396,7 @@ struct
       begin
         match ResEnv.get name renv with
         | `Ref a ->
-          M.lift (C.lookup_var a `Only <+> C.lookup_meta a) >>= fun ty ->
+          M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) >>= fun ty ->
           let cmd = Tm.Ref (a, `Only), Emp in
           M.ret (ty, cmd)
         | `Ix _ ->
