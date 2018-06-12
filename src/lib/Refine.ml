@@ -23,6 +23,8 @@ struct
     val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
     val under_restriction : tm -> tm -> 'a m -> 'a m
 
+    val isolate : 'a m -> 'a m
+
     type diagnostic =
       | UserHole of {name : string option; tele : U.telescope; ty : Tm.tm; tm : Tm.tm}
 
@@ -58,9 +60,6 @@ struct
         C.local (fun _ -> tele) @@
         begin
           C.bind C.typechecker @@ fun (module T) ->
-          let vty = T.Cx.eval T.Cx.emp ty in
-          let vtm = T.Cx.eval T.Cx.emp tm in
-          let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in
           Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@,%a %a@]@.@."
             (match name with Some name -> name | None -> "Hole")
             Dev.pp_params tele
@@ -89,6 +88,7 @@ struct
     let under_restriction = C.under_restriction
     let in_scopes = C.in_scopes
     let in_scope = C.in_scope
+    let isolate = C.isolate
 
 
     let run m =
@@ -128,7 +128,7 @@ struct
         end
     in
     M.lift C.ask >>= fun psi ->
-    let renv = go_globals ResEnv.init @@ T.bindings env in
+    let renv = go_globals (ResEnv.init ()) @@ T.bindings env in
     M.ret @@ go_locals renv psi
 
 
@@ -169,10 +169,17 @@ struct
     function
     | [] ->
       M.ret env
+    | E.Debug f :: esig ->
+      elab_decl env (E.Debug f) >>= fun env' ->
+      elab_sig env' esig
     | dcl :: esig ->
-      elab_decl env dcl >>= fun env' ->
-      M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing ;-) *)
-      M.lift U.ambulando >>
+      M.isolate
+        begin
+          elab_decl env dcl >>= fun env' ->
+          M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing *)
+          M.lift U.ambulando >>
+          M.ret env'
+        end >>= fun env' ->
       elab_sig env' esig
 
 
@@ -184,7 +191,8 @@ struct
       let alpha = Name.named @@ Some name in
 
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.define psi alpha cod tm >>
+      M.lift @@ U.define psi alpha cod tm >>= fun _ ->
+      Format.printf "Defined %s.@." name;
       M.ret @@ T.add name alpha env
 
     | E.Debug filter ->
@@ -233,9 +241,7 @@ struct
     go sys >>
     let rty = Tm.make @@ Tm.Rst {ty; sys} in
     M.lift C.ask >>= fun psi ->
-    M.lift @@ U.guess psi ~ty0:rty ~ty1:ty tm C.ret >>= fun tm' ->
-    M.lift C.go_to_bottom >> (* This is suspicious ! *)
-    M.ret tm'
+    M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
 
   and elab_chk env ty e : tm M.m =
     match Tm.unleash ty, e with
@@ -312,7 +318,7 @@ struct
       end >>= fun bdyx ->
       M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn (Emp #< x) bdyx)
 
-    | Tm.Ext ebnd, e when should_split_ext_bnd ebnd->
+    | Tm.Ext ebnd, (E.Lam _ as e) when should_split_ext_bnd ebnd->
       let names, ety = split_ext_bnd ebnd in
       elab_chk env ety e >>= fun tm ->
       let bdy =
@@ -351,15 +357,13 @@ struct
 
     | _, E.Hole name ->
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.hole psi ty C.ret >>= fun tm ->
-      M.lift C.go_right >>
+      M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
       M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
       M.ret @@ Tm.up tm
 
     | _, E.Hope ->
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.hole psi ty C.ret >>= fun tm ->
-      M.lift C.go_right >>
+      M.lift @@ U.push_hole `Flex psi ty >>= fun tm ->
       M.ret @@ Tm.up tm
 
     | _, inf ->
@@ -371,9 +375,7 @@ struct
     if b then M.ret @@ Tm.up cmd else
       M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd) C.ret >>= fun tm ->
-      M.lift C.go_to_bottom >> (* This is suspicious ! *)
-      M.ret @@ tm
+      M.lift @@ U.push_guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd)
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
     let rec unleash_pi_or_ext tm =
@@ -395,7 +397,7 @@ struct
       begin
         match ResEnv.get name renv with
         | `Ref a ->
-          M.lift (C.lookup_var a `Only <+> C.lookup_meta a) >>= fun ty ->
+          M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) >>= fun ty ->
           let cmd = Tm.Ref (a, `Only), Emp in
           M.ret (ty, cmd)
         | `Ix _ ->

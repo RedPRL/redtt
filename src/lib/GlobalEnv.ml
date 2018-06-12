@@ -11,9 +11,9 @@ type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
 type t = {env : entry param T.t; rel : Restriction.t}
 
 
-let emp =
+let emp () =
   {env = T.empty;
-   rel = Restriction.emp}
+   rel = Restriction.emp ()}
 
 let ext (sg : t) nm param : t =
   {sg with env = T.add nm param sg.env}

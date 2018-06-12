@@ -3,10 +3,12 @@ open RedBasis
 open Bwd open BwdNotation
 
 type lcx = entry bwd
-type rcx = entry list
+type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
+
+module Map = Map.Make (Name)
 
 type env = GlobalEnv.t
-type cx = {env : env; lcx : lcx; rcx : rcx}
+type cx = {env : env; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
 
 
 let rec pp_lcx fmt =
@@ -33,6 +35,13 @@ let rec pp_rcx fmt =
       pp_entry e
       pp_rcx cx
 
+let rec rcx_entries es =
+  match es with
+  | [] -> []
+  | `Entry e :: es -> e :: rcx_entries es
+  | _ :: es -> rcx_entries es
+
+
 let filter_entry filter entry =
   match filter with
   | `All -> true
@@ -46,7 +55,7 @@ let filter_entry filter entry =
     begin
       match entry with
       | Q _ -> true
-      | E (_, _, Hole) -> true
+      | E (_, _, Hole _) -> true
       | E (_, _, Guess _) -> true
       | _ -> false
     end
@@ -55,7 +64,7 @@ let pp_cx filter fmt {lcx; rcx} =
   Format.fprintf fmt "@[<v>%a@]@ %a@ @[<v>%a@]"
     pp_lcx (Bwd.filter (filter_entry filter) lcx)
     Uuseg_string.pp_utf_8 "❚"
-    pp_rcx (List.filter (filter_entry filter) rcx)
+    pp_rcx (List.filter (filter_entry filter) @@ rcx_entries rcx)
 
 
 module M =
@@ -103,30 +112,33 @@ let setr r = modifyr @@ fun _ -> r
 
 let update_env e =
   modify @@ fun st ->
-  let env =
-    match e with
-    | E (nm, ty, Hole) ->
-      GlobalEnv.ext st.env nm @@ `P {ty; sys = []}
-    | E (nm, ty, Guess _) ->
-      GlobalEnv.ext st.env nm @@ `P {ty; sys = []}
-    | E (nm, ty, Defn t) ->
-      GlobalEnv.define st.env nm ty t
-    | _ ->
-      st.env
-  in
-  {st with env}
+  match e with
+  | E (nm, ty, Hole info) ->
+    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm info st.info}
+  | E (nm, ty, Guess _) ->
+    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
+  | E (nm, ty, Defn t) ->
+    {st with env = GlobalEnv.define st.env nm ty t; info = Map.add nm `Rigid st.info}
+  | _ ->
+    st
 
 let pushl e =
   modifyl (fun es -> es #< e) >>
   update_env e
 
 let pushr e =
-  modifyr (fun es -> e :: es) >>
+  modifyr (fun es -> `Entry e :: es) >>
   update_env e
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []} in
+  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp (); info = Map.empty; rcx = []} in
   r
+
+
+let isolate (m : 'a m) : 'a m =
+  fun ps st ->
+    let st', a = m ps {st with lcx = Emp; rcx = []} in
+    {env = st'.env; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; info = st'.info}, a
 
 let rec pushls es =
   match es with
@@ -147,7 +159,6 @@ let popl =
     dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
 
-
 let get_global_env =
   get >>= fun st ->
   let rec go_params =
@@ -167,20 +178,26 @@ let get_global_env =
 
 
 let popr_opt =
-  get_global_env >>= fun sub ->
-  getr >>= function
-  | e :: mcx ->
-    setr mcx >>
-    begin
-      try
-        ret @@ Some (Entry.subst sub e)
-      with
-      | e ->
-        Format.eprintf "Failed to substitute: %s !!!!!@." (Printexc.to_string e);
-        raise e
-    end
-  | _ ->
-    ret None
+  let rec go theta =
+    getr >>= function
+    | `Entry e :: rcx ->
+      setr (`Update theta :: rcx) >>
+      if Occurs.Set.is_empty theta then
+        ret @@ Some e
+      else
+        get >>= fun st ->
+        ret @@ Some (Entry.subst st.env e)
+    | `Update theta' :: rcx ->
+      setr rcx >>
+      go @@ Occurs.Set.union theta theta'
+    | [] ->
+      ret None
+  in
+  go Occurs.Set.empty
+
+let push_update x =
+  modifyr @@ fun rcx ->
+  `Update (Occurs.Set.singleton x) :: rcx
 
 let popr =
   popr_opt >>= function
@@ -190,18 +207,11 @@ let popr =
 let go_left =
   popl >>= pushr
 
-let go_right =
-  popr >>= pushl
 
 let go_to_top =
   get >>= fun {lcx; rcx} ->
   setl Emp >>
-  setr (lcx <>> rcx)
-
-let go_to_bottom =
-  get >>= fun {lcx; rcx} ->
-  setl (lcx <>< rcx) >>
-  setr []
+  setr (Bwd.map (fun e -> `Entry e) lcx <>> rcx)
 
 let in_scope x p =
   local @@ fun ps ->
@@ -232,16 +242,10 @@ let lookup_var x w =
   ask >>= go
 
 let lookup_meta x =
-  let rec look =
-    function
-    | Snoc (mcx, E (y, ty, _)) ->
-      if x = y then M.ret ty else look mcx
-    | Snoc (mcx, _) ->
-      look mcx
-    | Emp ->
-      failwith "lookup_meta: not found"
-  in
-  getl >>= look
+  get >>= fun st ->
+  let ty = GlobalEnv.lookup_ty st.env x `Only in
+  let info = Map.find x st.info in
+  ret (ty, info)
 
 
 let postpone s p =
@@ -276,7 +280,8 @@ let check ~ty tm =
     T.check lcx vty tm;
     ret true
   with
-  | _ ->
+  | _exn ->
+    (* Format.eprintf "type error: %s@." @@ Printexc.to_string exn; *)
     ret false
 
 let check_eq ~ty tm0 tm1 =

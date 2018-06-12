@@ -311,7 +311,7 @@ struct
         let r1 = check_eval_dim cx tr1 in
         begin
           match Cx.compare_dim cx r0 r1, otm with
-          | Dim.Apart, None ->
+          | Dim.Apart, _ ->
             go sys acc
 
           | (Dim.Same | Dim.Indeterminate), Some tm ->
@@ -328,7 +328,7 @@ struct
             end;
             go sys @@ (r0, r1, tm) :: acc
 
-          | _ ->
+          | _, None ->
             failwith "check_ext_sys"
         end
 
@@ -362,7 +362,7 @@ struct
         let r1 = check_eval_dim cx tr1 in
         begin
           match Cx.compare_dim cx r0 r1, obnd with
-          | Dim.Apart, None ->
+          | Dim.Apart, _ ->
             go sys acc
 
           | (Dim.Same | Dim.Indeterminate), Some bnd ->
@@ -390,8 +390,8 @@ struct
 
             go sys @@ (r0, r1, bnd) :: acc
 
-          | _ ->
-            failwith "check_ext_sys"
+          | _, None ->
+            failwith "check_comp_sys"
         end
 
     and go_adj cxx faces face =

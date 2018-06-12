@@ -30,7 +30,7 @@ let pp fmt rst =
   pp_chronicle fmt rst.chronicle
 
 
-let emp =
+let emp () =
   {classes = UF.init 100;
    chronicle = [];
    size = 0}
@@ -83,7 +83,7 @@ let equate r0 r1 t =
 let test =
   try
     let x = D.Atom (Name.named (Some "i")) in
-    let rst = equate x D.Dim0 @@ equate x D.Dim1 emp in
+    let rst = equate x D.Dim0 @@ equate x D.Dim1 @@ emp () in
     Format.printf "Test failure: {@[<1>%a@]}@.\n" pp_chronicle rst.chronicle;
     failwith "Test failed"
   with
@@ -91,7 +91,7 @@ let test =
 
 let test2 =
   let x = D.Atom (Name.named (Some "i")) in
-  let rst = equate x D.Dim0 emp in
+  let rst = equate x D.Dim0 @@ emp () in
   assert (canonize x rst = D.Dim0)
 
 

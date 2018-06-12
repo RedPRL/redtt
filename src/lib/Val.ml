@@ -27,6 +27,7 @@ type con =
 
   | Coe : {dir : star; abs : abs; el : value} -> con
   | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
+  | GHCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
   | FCom : {dir : star; cap : value; sys : comp_sys} -> con
   | Box : {dir : star; cap : value; sys : box_sys} -> con
 
@@ -378,6 +379,13 @@ struct
         (Val.act phi info.cap)
         (CompSys.act phi info.sys)
 
+    | GHCom info ->
+      make_ghcom
+        (Star.act phi info.dir)
+        (Val.act phi info.ty)
+        (Val.act phi info.cap)
+        (CompSys.act phi info.sys)
+
     | FCom info ->
       make_fcom
         (Star.act phi info.dir)
@@ -643,8 +651,21 @@ struct
           rigid_hcom dir ty cap sys
         | `Proj abs ->
           let _, r' = Star.unleash dir in
-          let x, el = Abs.unleash1 abs in
-          Val.act (D.subst r' x) el
+          Abs.inst1 abs r'
+      end
+    | `Same _ ->
+      cap
+
+  and make_ghcom mdir ty cap msys : value =
+    match mdir with
+    | `Ok dir ->
+      begin
+        match msys with
+        | `Ok sys ->
+          rigid_ghcom dir ty cap sys
+        | `Proj abs ->
+          let _, r' = Star.unleash dir in
+          Abs.inst1 abs r'
       end
     | `Same _ ->
       cap
@@ -663,8 +684,19 @@ struct
     | `Same _ ->
       cap
 
-  and rigid_fcom dir cap sys : value =
-    make @@ FCom {dir; cap; sys}
+  and make_gcom mdir abs cap msys : value =
+    match mdir with
+    | `Ok dir ->
+      let _, r' = Star.unleash dir in
+      begin
+        match msys with
+        | `Ok sys ->
+          rigid_gcom dir abs cap sys
+        | `Proj abs ->
+          Abs.inst1 abs r'
+      end
+    | `Same _ ->
+      cap
 
   and make_fcom mdir cap msys : value =
     match mdir with
@@ -675,14 +707,10 @@ struct
           rigid_fcom dir cap sys
         | `Proj abs ->
           let _, r' = Star.unleash dir in
-          let x, el = Abs.unleash1 abs in
-          Val.act (D.subst r' x) el
+          Abs.inst1 abs r'
       end
     | `Same _ ->
       cap
-
-  and rigid_box dir cap sys : value =
-    make @@ Box {dir; cap; sys}
 
   and make_box mdir cap msys : value =
     match mdir with
@@ -833,12 +861,10 @@ struct
             Val.act (D.equate ri r'i) @@
             cap_in_wall abs el
           in
-          begin
-            match force_abs_sys [face0; face1] with
-            | `Proj el -> Abs.inst1 el r'
-            | `Ok faces ->
-              rigid_hcom dir info.cap (cap_in_wall abs cap) @@ (faces @ List.map face sys)
-          end
+          match force_abs_sys [face0; face1] with
+          | `Proj abs -> Abs.inst1 abs r'
+          | `Ok faces ->
+            rigid_hcom dir info.cap (cap_in_wall abs cap) @@ (faces @ List.map face sys)
         in
 
         let cap_aux el = rigid_cap info.dir info.cap info.sys el in
@@ -873,7 +899,7 @@ struct
           in
           rigid_hcom info.dir info.cap
             (rigid_hcom dir info.cap (cap_aux cap)
-              (List.map inner_face sys))
+               (List.map inner_face sys))
             (diag_face :: hcom_faces @ fcom_faces)
         in
         let boundary = Face.map @@
@@ -921,6 +947,70 @@ struct
     | _ ->
       failwith "TODO: rigid_hcom"
 
+  and rigid_ghcom dir ty cap sys : value =
+    match unleash ty with
+    (* Who knows whether we can delay the expansion
+     * in `Up _`? Please move `Up _` to the second
+     * list if this does not work out. *)
+    | (Pi _ | Sg _ | Up _) ->
+      let rec drop_false sys =
+        match sys with
+        (* This is assuming false equations are made
+         * of constants. Needs to revisit this when
+         * we consider more cofibrations. *)
+        | Face.False _ :: sys -> drop_false sys
+        | _ -> sys
+      in
+      make @@ GHCom {dir; ty; cap; sys = drop_false sys}
+
+    (* `Ext _`: the expansion will stop after a valid
+     * correction system, so it is not so bad. *)
+    | (Ext _ | Bool | Univ _ | FCom _ | V _) ->
+      let rec aux sys =
+        match sys with
+        | [] -> cap
+        | Face.False _ :: sys -> aux sys
+        | Face.Indet (eqi, absi) :: rest ->
+          let ri, r'i = Star.unleash eqi in
+          let r, r' = Star.unleash dir in
+          let face (dim0, dim1) =
+            AbsFace.make ri D.dim0 @@
+            (* XXX this would stop the expansion early, but is
+             * unfortunately duplicate under `AbsFace.make` *)
+            match CompSys.act (D.equate ri D.dim0) rest with
+            | `Proj abs -> abs
+            | `Ok rest0 ->
+              let r'i = Dim.act (D.equate ri D.dim0) r'i in
+              let ghcom00 = AbsFace.make r'i dim0 absi in
+              let ghcom01 = AbsFace.make r'i dim1 @@
+                let y = Name.fresh () in
+                Abs.bind1 y @@
+                (* TODO this can be optimized further by expanding
+                 * `make_ghcom` because `ty` is not changed and
+                 * in degenerate cases there is redundant renaming. *)
+                make_ghcom (Star.make r (D.named y)) ty cap @@
+                (* XXX this would stop the expansion early, but is
+                 * unfortunately duplicate under `AbsFace.make` *)
+                CompSys.act (D.equate r'i dim1) rest0
+              in
+              match force_abs_sys [ghcom00; ghcom01] with
+              | `Proj abs -> abs
+              | `Ok faces ->
+                let y = Name.fresh () in
+                Abs.bind1 y @@
+                make_hcom (Star.make r (D.named y)) ty cap (`Ok (faces @ rest))
+          in
+          let face0 = face (D.dim0, D.dim1) in
+          let face1 = face (D.dim1, D.dim0) in
+          match force_abs_sys [face0; face1] with
+          | `Proj abs -> Abs.inst1 abs r'
+          | `Ok faces -> rigid_hcom dir ty cap (faces @ sys)
+      in
+      aux sys
+
+    | _ ->
+      failwith "TODO: rigid_ghcom"
+
   and rigid_com dir abs cap (sys : comp_sys) : value =
     let _, r' = Star.unleash dir in
     let ty = Abs.inst1 abs r' in
@@ -936,6 +1026,28 @@ struct
       List.map face sys
     in
     rigid_hcom dir ty capcoe syscoe
+
+  and rigid_gcom dir abs cap (sys : comp_sys) : value =
+    let _, r' = Star.unleash dir in
+    let ty = Abs.inst1 abs r' in
+    let capcoe = rigid_coe dir abs cap in
+    let syscoe : comp_sys =
+      let face =
+        Face.map @@ fun ri r'i absi ->
+        let phi = D.equate ri r'i in
+        let yi, vi = Abs.unleash1 absi in
+        let y2r' = Star.make (D.named yi) (D.act phi r') in
+        Abs.bind1 yi @@ make_coe y2r' (Abs.act phi abs) @@ Val.act phi vi
+      in
+      List.map face sys
+    in
+    rigid_ghcom dir ty capcoe syscoe
+
+  and rigid_fcom dir cap sys : value =
+    make @@ FCom {dir; cap; sys}
+
+  and rigid_box dir cap sys : value =
+    make @@ Box {dir; cap; sys}
 
 
   and clo bnd rel rho =
@@ -1351,10 +1463,22 @@ struct
       let app_face =
         Face.map @@ fun r r' abs ->
         let x, v = Abs.unleash1 abs in
-        Abs.bind1 x @@ apply v (Val.act (D.equate r r') v)
+        Abs.bind1 x @@ apply v (Val.act (D.equate r r') varg)
       in
       let sys = List.map app_face info.sys in
       rigid_hcom info.dir ty cap sys
+
+    | GHCom info ->
+      let _, cod = unleash_pi ~debug:["apply"; "ghcom"] info.ty in
+      let ty = inst_clo cod varg in
+      let cap = apply info.cap varg in
+      let app_face =
+        Face.map @@ fun r r' abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ apply v (Val.act (D.equate r r') varg)
+      in
+      let sys = List.map app_face info.sys in
+      rigid_ghcom info.dir ty cap sys
 
     | _ ->
       failwith "apply"
@@ -1498,6 +1622,17 @@ struct
       let sys = List.map face info.sys in
       rigid_hcom info.dir dom cap sys
 
+    | GHCom info ->
+      let dom, _ = unleash_sg info.ty in
+      let cap = car info.cap in
+      let face =
+        Face.map @@ fun _ _ abs ->
+        let y, v = Abs.unleash1 abs in
+        Abs.bind1 y @@ car v
+      in
+      let sys = List.map face info.sys in
+      rigid_ghcom info.dir dom cap sys
+
     | _ ->
       failwith "car"
 
@@ -1533,7 +1668,7 @@ struct
         let r, _ = Star.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
         let z = Name.fresh () in
-        let sys =
+        let msys =
           let face =
             Face.map @@ fun _ _ absi ->
             let yi, vi = Abs.unleash absi in
@@ -1546,7 +1681,7 @@ struct
             (Star.make r (D.named z))
             dom
             (car info.cap)
-            sys
+            msys
         in
         Abs.bind1 z @@ inst_clo cod hcom
       in
@@ -1560,6 +1695,39 @@ struct
         List.map face info.sys
       in
       rigid_com info.dir abs cap sys
+
+    | GHCom info ->
+      let abs =
+        let r, _ = Star.unleash info.dir in
+        let dom, cod = unleash_sg info.ty in
+        let z = Name.fresh () in
+        let msys =
+          let face =
+            Face.map @@ fun _ _ absi ->
+            let yi, vi = Abs.unleash absi in
+            Abs.bind yi @@ car vi
+          in
+          `Ok (List.map face info.sys)
+        in
+        let hcom =
+          make_ghcom
+            (Star.make r (D.named z))
+            dom
+            (car info.cap)
+            msys
+        in
+        Abs.bind1 z @@ inst_clo cod hcom
+      in
+      let cap = cdr info.cap in
+      let sys =
+        let face =
+          Face.map @@ fun _ _ absi ->
+          let yi, vi = Abs.unleash absi in
+          Abs.bind yi @@ cdr vi
+        in
+        List.map face info.sys
+      in
+      rigid_gcom info.dir abs cap sys
 
     | _ -> failwith "TODO: cdr"
 
@@ -1631,6 +1799,8 @@ struct
       Format.fprintf fmt "<coe>"
     | HCom _ ->
       Format.fprintf fmt "<hcom>"
+    | GHCom _ ->
+      Format.fprintf fmt "<ghcom>"
     | FCom _ ->
       Format.fprintf fmt "<fcom>"
     | Box _ ->
@@ -1736,7 +1906,7 @@ struct
   struct
     let equiv ty0 ty1 : value =
       let rho = [Val ty0; Val ty1] in
-      eval R.emp rho @@
+      eval (R.emp ()) rho @@
       Tm.Macro.equiv
         (Tm.up @@ Tm.var 0 `Only)
         (Tm.up @@ Tm.var 1 `Only)
