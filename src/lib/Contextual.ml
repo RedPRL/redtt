@@ -2,9 +2,8 @@ open Dev
 open RedBasis
 open Bwd open BwdNotation
 
-type stamped = {entry : entry}
-type lcx = stamped bwd
-type rcx = stamped list
+type lcx = entry bwd
+type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 
 type env = GlobalEnv.t
 type cx = {env : env; lcx : lcx; rcx : rcx}
@@ -16,11 +15,11 @@ let rec pp_lcx fmt =
     ()
   | Snoc (Emp, e) ->
     Format.fprintf fmt "@[<v>%a@]"
-      pp_entry e.entry
+      pp_entry e
   | Snoc (cx, e) ->
     Format.fprintf fmt "%a;@;@;@[<v>%a@]"
       pp_lcx cx
-      pp_entry e.entry
+      pp_entry e
 
 let rec pp_rcx fmt =
   function
@@ -28,24 +27,31 @@ let rec pp_rcx fmt =
     ()
   | e :: [] ->
     Format.fprintf fmt "@[<1>%a@]"
-      pp_entry e.entry
+      pp_entry e
   | e :: cx ->
     Format.fprintf fmt "@[<1>%a@];@;@;%a"
-      pp_entry e.entry
+      pp_entry e
       pp_rcx cx
+
+let rec rcx_entries es =
+  match es with
+  | [] -> []
+  | `Entry e :: es -> e :: rcx_entries es
+  | _ :: es -> rcx_entries es
+
 
 let filter_entry filter entry =
   match filter with
   | `All -> true
   | `Constraints ->
     begin
-      match entry.entry with
+      match entry with
       | Q _ -> true
       | _ -> false
     end
   | `Unsolved ->
     begin
-      match entry.entry with
+      match entry with
       | Q _ -> true
       | E (_, _, Hole) -> true
       | E (_, _, Guess _) -> true
@@ -56,7 +62,7 @@ let pp_cx filter fmt {lcx; rcx} =
   Format.fprintf fmt "@[<v>%a@]@ %a@ @[<v>%a@]"
     pp_lcx (Bwd.filter (filter_entry filter) lcx)
     Uuseg_string.pp_utf_8 "❚"
-    pp_rcx (List.filter (filter_entry filter) rcx)
+    pp_rcx (List.filter (filter_entry filter) @@ rcx_entries rcx)
 
 
 module M =
@@ -115,11 +121,11 @@ let update_env e =
     st
 
 let pushl e =
-  modifyl (fun es -> es #< {entry = e}) >>
+  modifyl (fun es -> es #< e) >>
   update_env e
 
 let pushr e =
-  modifyr (fun es -> {entry = e} :: es) >>
+  modifyr (fun es -> `Entry e :: es) >>
   update_env e
 
 let run (m : 'a m) : 'a  =
@@ -146,7 +152,7 @@ let dump_state fmt str filter =
 
 let popl =
   getl >>= function
-  | Snoc (mcx, e) -> setl mcx >> ret e.entry
+  | Snoc (mcx, e) -> setl mcx >> ret e
   | _ ->
     dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
@@ -171,20 +177,26 @@ let get_global_env =
 
 
 let popr_opt =
-  get >>= fun st ->
-  getr >>= function
-  | e :: mcx ->
-    setr mcx >>
-    (* TODO: this is so slow that it brings everything to a halt. We need to limit when this is unleashed. *)
-    (* if e.stamp > st.last_updated then
-       get_global_env >>= fun sub ->
-       ret @@ Some (Entry.subst sub e.entry)
-       else
-       begin *)
-    ret @@ Some e.entry
-  (* end *)
-  | _ ->
-    ret None
+  let rec go theta =
+    getr >>= function
+    | `Entry e :: rcx ->
+      setr (`Update theta :: rcx) >>
+      if Occurs.Set.is_empty @@ Occurs.Set.inter theta @@ Entry.free `Metas e then
+        ret @@ Some e
+      else
+        get >>= fun st ->
+        ret @@ Some (Entry.subst st.env e)
+    | `Update theta' :: rcx ->
+      setr rcx >>
+      go @@ Occurs.Set.union theta theta'
+    | [] ->
+      ret None
+  in
+  go Occurs.Set.empty
+
+let push_update x =
+  modifyr @@ fun rcx ->
+  `Update (Occurs.Set.singleton x) :: rcx
 
 let popr =
   popr_opt >>= function
@@ -194,18 +206,11 @@ let popr =
 let go_left =
   popl >>= pushr
 
-let go_right =
-  popr >>= pushl
 
 let go_to_top =
   get >>= fun {lcx; rcx} ->
   setl Emp >>
-  setr (lcx <>> rcx)
-
-let go_to_bottom =
-  get >>= fun {lcx; rcx} ->
-  setl (lcx <>< rcx) >>
-  setr []
+  setr (Bwd.map (fun e -> `Entry e) lcx <>> rcx)
 
 let in_scope x p =
   local @@ fun ps ->

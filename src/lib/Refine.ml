@@ -30,6 +30,7 @@ struct
 
     val emit : diagnostic -> unit m
     val report : 'a m -> 'a m
+    val hole : U.telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m
 
     val run : 'a m -> 'a
   end =
@@ -89,6 +90,10 @@ struct
     let in_scopes = C.in_scopes
     let in_scope = C.in_scope
     let isolate = C.isolate
+
+    let hole : type a. params -> ty -> (ty Tm.cmd -> a m) -> a m =
+      fun ps ty kont ->
+        U.hole ?name:None ps ty kont
 
 
     let run m =
@@ -237,7 +242,7 @@ struct
     let rty = Tm.make @@ Tm.Rst {ty; sys} in
     M.lift C.ask >>= fun psi ->
     M.lift @@ U.guess psi ~ty0:rty ~ty1:ty tm C.ret >>= fun tm' ->
-    M.lift C.go_to_bottom >> (* This is suspicious ! *)
+    (* M.lift C.go_to_bottom >> *)
     M.ret tm'
 
   and elab_chk env ty e : tm M.m =
@@ -354,15 +359,13 @@ struct
 
     | _, E.Hole name ->
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.hole psi ty C.ret >>= fun tm ->
-      M.lift C.go_right >>
+      M.hole psi ty @@ fun tm ->
       M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
       M.ret @@ Tm.up tm
 
     | _, E.Hope ->
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.hole psi ty C.ret >>= fun tm ->
-      M.lift C.go_right >>
+      M.hole psi ty @@ fun tm ->
       M.ret @@ Tm.up tm
 
     | _, inf ->
@@ -375,7 +378,7 @@ struct
       M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
       M.lift C.ask >>= fun psi ->
       M.lift @@ U.guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd) C.ret >>= fun tm ->
-      M.lift C.go_to_bottom >> (* This is suspicious ! *)
+      (* M.lift C.go_to_bottom >>  *)
       M.ret @@ tm
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
