@@ -58,15 +58,15 @@ let telescope_to_spine : telescope -> tm Tm.spine =
   | _ ->
     failwith "TODO: telescope_to_spine"
 
-let push_hole gm ty =
+let push_hole tag gm ty =
   let alpha = Name.fresh () in
-  pushl (E (alpha, abstract_ty gm ty, Hole)) >>
+  pushl (E (alpha, abstract_ty gm ty, Hole tag)) >>
   let hd = Tm.Meta alpha in
   let sp = telescope_to_spine gm in
   ret (hd, sp)
 
-let hole gm ty f =
-  push_hole gm ty >>= fun cmd ->
+let hole tag gm ty f =
+  push_hole tag gm ty >>= fun cmd ->
   f cmd >>= fun r ->
   go_left >>
   ret r
@@ -184,12 +184,17 @@ let rec flex_term ~deps q =
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
-      | E (beta, _, Hole) as e when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+        (* TODO: try this:
+           | E (beta, _, Hole `Rigid) ->
+           pushls (e :: deps) >>
+           block @@ Unify q
+        *)
+      | E (beta, _, Hole _) as e when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
         (* Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q; *)
         pushls (e :: deps) >>
         block @@ Unify q
 
-      | (E (beta, ty, Hole) | E (beta, ty, Guess _)) as e when alpha = beta ->
+      | (E (beta, ty, Hole _) | E (beta, ty, Guess _)) as e when alpha = beta ->
         (* Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q; *)
         pushls deps >>
         try_invert q ty <||
@@ -199,7 +204,7 @@ let rec flex_term ~deps q =
           pushl e
         end
 
-      | (E (beta, _, Hole) | E (beta, _, Guess _)) as e
+      | (E (beta, _, Hole _) | E (beta, _, Guess _)) as e
         when
           Occurs.Set.mem beta (Params.free `Metas gm)
           || Occurs.Set.mem beta (Entries.free `Metas deps)
@@ -222,7 +227,7 @@ let rec flex_flex_diff ~deps q =
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
-      | (E (gamma, _, Hole) | E (gamma, _, Guess _)) as e
+      | (E (gamma, _, Hole _) | E (gamma, _, Guess _)) as e
         when
           (alpha0 = gamma || alpha1 = gamma)
           && Occurs.Set.mem gamma @@ Entries.free `Metas deps
@@ -231,13 +236,13 @@ let rec flex_flex_diff ~deps q =
         pushls (e :: deps) >>
         block (Unify q)
 
-      | (E (gamma, ty, Hole) | E (gamma, ty, Guess _)) as e when gamma = alpha0 ->
+      | (E (gamma, ty, Hole _) | E (gamma, ty, Guess _)) as e when gamma = alpha0 ->
         (* Format.eprintf "flex_flex_diff / popl / 2: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
         pushls deps >>
         try_invert q ty <||
         flex_term [e] (Equation.sym q)
 
-      | (E (gamma, _, Hole) | E (gamma, _, Guess _)) as e
+      | (E (gamma, _, Hole _) | E (gamma, _, Guess _)) as e
         when
           Occurs.Set.mem gamma @@ Params.free `Metas gm
           || Occurs.Set.mem gamma @@ Entries.free `Metas deps
@@ -274,8 +279,8 @@ type instantiation = Name.t * ty * (tm Tm.cmd -> tm)
 let rec instantiate (inst : instantiation) =
   let alpha, ty, f = inst in
   popl >>= function
-  | E (beta, ty', Hole) when alpha = beta ->
-    hole Emp ty @@ fun cmd ->
+  | E (beta, ty', Hole `Flex) when alpha = beta ->
+    hole `Flex Emp ty @@ fun cmd ->
     define Emp beta ~ty:ty' @@ f cmd
   | e ->
     pushr e >>
@@ -721,17 +726,17 @@ let rec split_sigma tele x ty =
 let rec lower tele alpha ty =
   match Tm.unleash ty with
   | Tm.LblTy info ->
-    hole tele info.ty @@ fun t ->
+    hole `Flex tele info.ty @@ fun t ->
     define tele alpha ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
     ret true
 
   | Tm.Sg (dom, cod) ->
-    hole tele dom @@ fun t0 ->
+    hole `Flex tele dom @@ fun t0 ->
     (in_scopes (Bwd.to_list tele) typechecker) >>= fun (module T) ->
     let module HS = HSubst (T) in
     let vdom = T.Cx.eval T.Cx.emp dom in
     let cod' = HS.inst_ty_bnd cod (vdom, Tm.up t0) in
-    hole tele cod' @@ fun t1 ->
+    hole `Flex tele cod' @@ fun t1 ->
     define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
 
@@ -750,7 +755,7 @@ let rec lower tele alpha ty =
         let module HS = HSubst (T) in
         let vty = T.Cx.eval T.Cx.emp @@ abstract_ty tele dom in
         let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
-        hole tele pi_ty @@ fun (whd, wsp) ->
+        hole `Flex tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
         define tele alpha ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
         ret true
@@ -846,11 +851,15 @@ let ambulando =
 
   | Some e ->
     match e with
-    | E (alpha, ty, Hole) ->
+    | E (alpha, ty, Hole `Flex) ->
       begin
         lower Emp alpha ty <||
         pushl e
       end >>
+      loop
+
+    | E (_, _, Hole `Rigid) ->
+      pushl e >>
       loop
 
     | E (alpha, ty, Guess info) ->

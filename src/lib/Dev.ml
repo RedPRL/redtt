@@ -7,7 +7,7 @@ type ty = Tm.tm
 type twin = [`Only | `TwinL | `TwinR]
 
 type 'a decl =
-  | Hole
+  | Hole of [`Rigid | `Flex]
   | Defn of 'a
   | Guess of {ty : 'a; tm : 'a}
 
@@ -252,7 +252,7 @@ let rec pp_problem fmt prob =
 
 let pp_entry fmt =
   function
-  | E (x, ty, Hole) ->
+  | E (x, ty, Hole _) ->
     Format.fprintf fmt "?%a@ :@ %a"
       Name.pp x
       Tm.pp0 ty
@@ -291,8 +291,8 @@ let subst_tm sub ~ty tm =
 
 let subst_decl sub ~ty =
   function
-  | Hole ->
-    Hole
+  | Hole x ->
+    Hole x
   | Defn t ->
     Defn (subst_tm sub ~ty t)
   | Guess info ->
@@ -390,7 +390,7 @@ struct
   type t = Tm.tm decl
   let free fl =
     function
-    | Hole -> Occurs.Set.empty
+    | Hole _ -> Occurs.Set.empty
     | Defn t -> Tm.free fl t
     | Guess {tm; _} -> Tm.free fl tm
 end

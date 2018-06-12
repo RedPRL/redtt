@@ -4,7 +4,7 @@ type tm = Tm.tm
 type ty = Tm.tm
 
 type 'a decl =
-  | Hole
+  | Hole of [`Rigid | `Flex]
   | Defn of 'a
   | Guess of {ty : 'a; tm : 'a}
 

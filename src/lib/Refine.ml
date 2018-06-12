@@ -356,13 +356,13 @@ struct
 
     | _, E.Hole name ->
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_hole psi ty >>= fun tm ->
+      M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
       M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
       M.ret @@ Tm.up tm
 
     | _, E.Hope ->
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_hole psi ty >>= fun tm ->
+      M.lift @@ U.push_hole `Flex psi ty >>= fun tm ->
       M.ret @@ Tm.up tm
 
     | _, inf ->

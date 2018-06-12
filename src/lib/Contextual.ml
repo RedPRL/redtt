@@ -53,7 +53,7 @@ let filter_entry filter entry =
     begin
       match entry with
       | Q _ -> true
-      | E (_, _, Hole) -> true
+      | E (_, _, Hole _) -> true
       | E (_, _, Guess _) -> true
       | _ -> false
     end
@@ -111,7 +111,7 @@ let setr r = modifyr @@ fun _ -> r
 let update_env e =
   modify @@ fun st ->
   match e with
-  | E (nm, ty, Hole) ->
+  | E (nm, ty, Hole _) ->
     {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}}
   | E (nm, ty, Guess _) ->
     {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}}
