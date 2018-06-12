@@ -559,24 +559,6 @@ let restriction_subtype ty0 sys0 ty1 sys1 =
   active @@ Subtype {ty0; ty1} >>
   approx_sys ty0 sys0 ty1 sys1
 
-let should_split_ext_bnd ebnd =
-  match ebnd with
-  | Tm.NB ([_], (_, [])) -> false
-  | _ -> true
-
-
-let split_ext_bnd ebnd =
-  let xs, ty, sys = Tm.unbind_ext ebnd in
-  let rec go xs =
-    match xs with
-    | [] ->
-      Tm.make @@ Tm.Rst {ty; sys}
-    | x :: xs ->
-      let ty' = go xs in
-      Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty' [])
-  in
-  let ty = go @@ Bwd.to_list xs in
-  List.map Name.name (Bwd.to_list xs), ty
 
 
 (* invariant: will not be called on inequations which are already reflexive *)
@@ -597,14 +579,6 @@ let rec subtype ty0 ty1 =
       let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
       active @@ Subtype {ty0 = dom0; ty1 = dom1} >>
       active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
-
-    | Tm.Ext ebnd0, _ when should_split_ext_bnd ebnd0 ->
-      let _, ty0 = split_ext_bnd ebnd0 in
-      active @@ Subtype {ty0; ty1}
-
-    | _, Tm.Ext ebnd1 when should_split_ext_bnd ebnd1 ->
-      let _, ty1 = split_ext_bnd ebnd1 in
-      active @@ Subtype {ty0; ty1}
 
     | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
       (* no idea what to do in flex-flex case, don't worry about it *)
