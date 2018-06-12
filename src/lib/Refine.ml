@@ -169,14 +169,17 @@ struct
     function
     | [] ->
       M.ret env
+    | E.Debug f :: esig ->
+      elab_decl env (E.Debug f) >>= fun env' ->
+      elab_sig env' esig
     | dcl :: esig ->
-      (* M.isolate *)
-      begin
-        elab_decl env dcl >>= fun env' ->
-        M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing *)
-        M.lift U.ambulando >>
-        M.ret env'
-      end >>= fun env' ->
+      M.isolate
+        begin
+          elab_decl env dcl >>= fun env' ->
+          M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing *)
+          M.lift U.ambulando >>
+          M.ret env'
+        end >>= fun env' ->
       elab_sig env' esig
 
 
