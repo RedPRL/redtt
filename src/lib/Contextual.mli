@@ -18,7 +18,6 @@ val optional : 'a m -> 'a option m
 val pushl : entry -> unit m
 val pushr : entry -> unit m
 val pushls : entry list -> unit m
-val notify_stale : unit m
 
 val go_to_top : unit m
 val go_to_bottom : unit m

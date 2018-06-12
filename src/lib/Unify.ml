@@ -80,8 +80,7 @@ let define gm alpha ~ty tm =
       failwith "define: type error"
      end
      else *)
-  pushr @@ E (alpha, ty', Defn tm') >>
-  notify_stale
+  pushr @@ E (alpha, ty', Defn tm')
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)

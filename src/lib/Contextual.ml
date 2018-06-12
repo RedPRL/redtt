@@ -2,12 +2,12 @@ open Dev
 open RedBasis
 open Bwd open BwdNotation
 
-type stamped = {stamp : float; entry : entry}
+type stamped = {entry : entry}
 type lcx = stamped bwd
 type rcx = stamped list
 
 type env = GlobalEnv.t
-type cx = {env : env; lcx : lcx; rcx : rcx; last_updated : float}
+type cx = {env : env; lcx : lcx; rcx : rcx}
 
 
 let rec pp_lcx fmt =
@@ -114,45 +114,23 @@ let update_env e =
   | _ ->
     st
 
-let get_position_left =
-  getl >>= function
-  | Emp -> ret 0.0
-  | Snoc (_, e) -> ret e.stamp
-
-let get_position_right =
-  getr >>= function
-  | [] -> ret 1000.0
-  | e :: _ -> ret e.stamp
-
-let get_position_between =
-  get_position_left >>= fun l ->
-  get_position_right >>= fun r ->
-  ret @@ (r -. l) /. 2.0
-
 let pushl e =
-  get_position_between >>= fun stamp->
-  modifyl (fun es -> es #< {stamp; entry = e}) >>
+  modifyl (fun es -> es #< {entry = e}) >>
   update_env e
 
 let pushr e =
-  get_position_between >>= fun stamp->
-  modifyr (fun es -> {stamp; entry = e} :: es) >>
+  modifyr (fun es -> {entry = e} :: es) >>
   update_env e
 
-let notify_stale =
-  get_position_right >>= fun stamp ->
-  modify @@ fun st ->
-  {st with last_updated = stamp}
-
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []; last_updated = 10000.0} in
+  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []} in
   r
 
 
 let isolate (m : 'a m) : 'a m =
   fun ps st ->
     let st', a = m ps {st with lcx = Emp; rcx = []} in
-    {env = st'.env; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; last_updated = st.last_updated}, a
+    {env = st'.env; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx}, a
 
 let rec pushls es =
   match es with
