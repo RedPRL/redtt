@@ -129,7 +129,7 @@ let pushr e =
   update_env e
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp; rcx = []} in
+  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp (); rcx = []} in
   r
 
 
@@ -156,7 +156,6 @@ let popl =
   | _ ->
     dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
-
 
 let get_global_env =
   get >>= fun st ->

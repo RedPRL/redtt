@@ -128,7 +128,7 @@ struct
         end
     in
     M.lift C.ask >>= fun psi ->
-    let renv = go_globals ResEnv.init @@ T.bindings env in
+    let renv = go_globals (ResEnv.init ()) @@ T.bindings env in
     M.ret @@ go_locals renv psi
 
 

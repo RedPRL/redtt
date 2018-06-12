@@ -3,7 +3,7 @@ open RedBasis
 module T = PersistentTable.M
 type t = string option list * (string, Name.t) T.t
 
-let init = [], T.init ~size:30
+let init () = [], T.init ~size:30
 let bind x (env, tbl) = Some x :: env, tbl
 
 (* TODO: is this backwards? *)
