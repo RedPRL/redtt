@@ -373,6 +373,7 @@ let push_guess gm ~ty0 ~ty1 tm  =
     ret @@ Tm.up (hd, sp)
   else
     pushl @@ E (alpha, ty0', Defn tm') >>
+    push_update alpha >>
     ret tm
 
 
@@ -894,6 +895,7 @@ let ambulando =
         check ~ty info.tm >>= function
         | true ->
           pushl @@ E (alpha, ty, Defn info.tm) >>
+          push_update alpha >>
           loop
         | false ->
           pushl e >>
