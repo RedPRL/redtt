@@ -262,7 +262,7 @@ struct
         Tm.make @@ Tm.Rst {ty = let_ty; sys = [face]}
       in
       let x = Name.named @@ Some info.name in
-      M.in_scope x (`P let_ty)
+      M.in_scope x (`P singleton_ty)
         begin
           elab_chk env ty info.body
         end >>= fun bdyx ->
