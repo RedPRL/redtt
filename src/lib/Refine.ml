@@ -60,9 +60,6 @@ struct
         C.local (fun _ -> tele) @@
         begin
           C.bind C.typechecker @@ fun (module T) ->
-          let vty = T.Cx.eval T.Cx.emp ty in
-          let vtm = T.Cx.eval T.Cx.emp tm in
-          let tm = T.Cx.quote T.Cx.emp ~ty:vty vtm in
           Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@,%a %a@]@.@."
             (match name with Some name -> name | None -> "Hole")
             Dev.pp_params tele
