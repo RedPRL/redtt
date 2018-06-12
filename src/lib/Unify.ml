@@ -184,17 +184,20 @@ let rec flex_term ~deps q =
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
-        (* TODO: try this:
-           | E (beta, _, Hole `Rigid) ->
-           pushls (e :: deps) >>
-           block @@ Unify q
-        *)
+      | E (beta, _, Hole `Rigid) as e when alpha = beta ->
+        pushls (e :: deps) >>
+        block @@ Unify q
+
+      | E (beta, _, Guess _) as e when alpha = beta ->
+        pushls (e :: deps) >>
+        block @@ Unify q
+
       | E (beta, _, Hole _) as e when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
         (* Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q; *)
         pushls (e :: deps) >>
         block @@ Unify q
 
-      | (E (beta, ty, Hole _) | E (beta, ty, Guess _)) as e when alpha = beta ->
+      | E (beta, ty, Hole _) as e when alpha = beta ->
         (* Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q; *)
         pushls deps >>
         try_invert q ty <||
@@ -227,7 +230,15 @@ let rec flex_flex_diff ~deps q =
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
-      | (E (gamma, _, Hole _) | E (gamma, _, Guess _)) as e
+      | E (gamma, _, Hole `Rigid) as e when (alpha0 = gamma || alpha1 = gamma) ->
+        pushls (e :: deps) >>
+        block (Unify q)
+
+      | E (gamma, _, Guess _) as e when (alpha0 = gamma || alpha1 = gamma) ->
+        pushls (e :: deps) >>
+        block (Unify q)
+
+      | E (gamma, _, Hole `Flex) as e
         when
           (alpha0 = gamma || alpha1 = gamma)
           && Occurs.Set.mem gamma @@ Entries.free `Metas deps
