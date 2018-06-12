@@ -72,16 +72,16 @@ let hole ?name:(name = None) gm ty f =
 let define gm alpha ~ty tm =
   let ty' = abstract_ty gm ty in
   let tm' = abstract_tm gm tm in
-  check ~ty:ty' tm' >>= fun b ->
-  if not b then
-    dump_state Format.err_formatter "Type error" `All >>= fun _ ->
-    begin
+  (* check ~ty:ty' tm' >>= fun b -> *)
+  (* if not b then
+     dump_state Format.err_formatter "Type error" `All >>= fun _ ->
+     begin
       Format.eprintf "error checking: %a : %a@." Tm.pp0 tm' Tm.pp0 ty';
       failwith "define: type error"
-    end
-  else
-    pushr @@ E (alpha, ty', Defn tm') >>
-    notify_stale
+     end
+     else *)
+  pushr @@ E (alpha, ty', Defn tm') >>
+  notify_stale
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)
