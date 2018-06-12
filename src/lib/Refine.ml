@@ -191,7 +191,8 @@ struct
       let alpha = Name.named @@ Some name in
 
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.define psi alpha cod tm >>
+      M.lift @@ U.define psi alpha cod tm >>= fun _ ->
+      Format.printf "Defined %s.@." name;
       M.ret @@ T.add name alpha env
 
     | E.Debug filter ->
