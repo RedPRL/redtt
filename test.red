@@ -54,6 +54,6 @@ let hset/exponential-ideal
   : hset (A → B)
   =>
   λ f g α β i j x →
-    let foo => hset/B _ _ (λ k → `(@ α k) x) (λ k → `(@ β k) x) in
+    let foo => hset/B (f x) (g x) (λ k → `(@ α k) x) (λ k → `(@ β k) x) in
     `(@ (@ foo i) j)
 
