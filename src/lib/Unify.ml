@@ -222,28 +222,32 @@ let rec flex_flex_diff ~deps q =
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
-      | E (gamma, _, Hole) as e
+      | (E (gamma, _, Hole) | E (gamma, _, Guess _)) as e
         when
           (alpha0 = gamma || alpha1 = gamma)
           && Occurs.Set.mem gamma @@ Entries.free `Metas deps
         ->
+        (* Format.eprintf "flex_flex_diff / popl / 1: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
         pushls (e :: deps) >>
         block (Unify q)
 
-      | E (gamma, ty, Hole) as e when gamma = alpha0 ->
+      | (E (gamma, ty, Hole) | E (gamma, ty, Guess _)) as e when gamma = alpha0 ->
+        (* Format.eprintf "flex_flex_diff / popl / 2: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
         pushls deps >>
         try_invert q ty <||
         flex_term [e] (Equation.sym q)
 
-      | E (gamma, _, Hole) as e
+      | (E (gamma, _, Hole) | E (gamma, _, Guess _)) as e
         when
           Occurs.Set.mem gamma @@ Params.free `Metas gm
           || Occurs.Set.mem gamma @@ Entries.free `Metas deps
           || Occurs.Set.mem gamma @@ Equation.free `Metas q
         ->
+        (* Format.eprintf "flex_flex_diff / popl / 3: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
         flex_flex_diff ~deps:(e :: deps) q
 
       | e ->
+        (* Format.eprintf "flex_flex_diff / popl / 4: %a %a at @[%a@]@.@." Name.pp alpha0 Name.pp alpha1 Entry.pp e; *)
         pushr e >>
         flex_flex_diff ~deps q
     end
