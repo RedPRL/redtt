@@ -537,21 +537,6 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
   in
   go sp0 sp1
 
-let normalize ~ty tm =
-  typechecker >>= fun (module T) ->
-  let vty = T.Cx.eval T.Cx.emp ty in
-  let vtm = T.Cx.eval T.Cx.emp tm in
-  ret @@ T.Cx.quote T.Cx.emp ~ty:vty vtm
-
-let normalize_eqn q =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  normalize ~ty:univ q.ty0 >>= fun ty0 ->
-  normalize ~ty:univ q.ty1 >>= fun ty1 ->
-  normalize ~ty:ty0 q.tm0 >>= fun tm0 ->
-  normalize ~ty:ty1 q.tm1 >>= fun tm1 ->
-  ret @@ {ty0; ty1; tm0; tm1}
-
-
 let approx_sys _ty0 _ty1 _sys0 _sys1 =
   Format.eprintf "TODO!!!!@.";
   ret ()
@@ -794,32 +779,15 @@ let is_restriction =
   | `R _ -> true
   | _ -> false
 
-let rec solver ?should_refresh:(should_refresh = false) prob =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  (* Format.eprintf "solver: %b @[<1>%a@]@.@." should_refresh Problem.pp prob; *)
+let rec solver prob =
   match prob with
   | Unify q ->
     is_reflexive q <||
-    begin
-      begin
-        if should_refresh then normalize_eqn q else ret q
-      end >>= fun q ->
-      unify q
-    end
+    unify q
 
   | Subtype {ty0; ty1} ->
     check_subtype ty0 ty1 <||
-    begin
-      begin
-        if should_refresh then
-          normalize ~ty:univ ty0 >>= fun ty0 ->
-          normalize ~ty:univ ty1 >>= fun ty1 ->
-          ret (ty0, ty1)
-        else
-          ret (ty0, ty1)
-      end >>= fun (ty0, ty1) ->
-      subtype ty0 ty1
-    end
+    subtype ty0 ty1
 
   | All (param, prob) ->
     let x, probx = unbind param prob in
@@ -870,7 +838,8 @@ let rec solver ?should_refresh:(should_refresh = false) prob =
           | true ->
             solver probx
           | false ->
-            under_restriction r0 r1 @@ solver ~should_refresh:true probx
+            under_restriction r0 r1 @@
+            solver probx
       end
 
 
