@@ -181,7 +181,7 @@ let popr_opt =
     getr >>= function
     | `Entry e :: rcx ->
       setr (`Update theta :: rcx) >>
-      if Occurs.Set.is_empty @@ Occurs.Set.inter theta @@ Entry.free `Metas e then
+      if Occurs.Set.is_empty theta then
         ret @@ Some e
       else
         get >>= fun st ->
