@@ -365,16 +365,10 @@ let push_guess gm ~ty0 ~ty1 tm  =
   let ty0' = abstract_ty gm ty0 in
   let ty1' = abstract_ty gm ty1 in
   let tm' = abstract_tm gm tm in
-  check ~ty:ty0' tm' >>= fun b ->
-  if not b then
-    let hd = Tm.Meta alpha in
-    let sp = telescope_to_spine gm in
-    pushl @@ E (alpha, ty0', Guess {ty = ty1'; tm = tm'}) >>
-    ret @@ Tm.up (hd, sp)
-  else
-    pushl @@ E (alpha, ty0', Defn tm') >>
-    push_update alpha >>
-    ret tm
+  let hd = Tm.Meta alpha in
+  let sp = telescope_to_spine gm in
+  pushl @@ E (alpha, ty0', Guess {ty = ty1'; tm = tm'}) >>
+  ret @@ Tm.up (hd, sp)
 
 
 
