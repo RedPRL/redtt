@@ -894,10 +894,13 @@ let ambulando =
       begin
         check ~ty info.tm >>= function
         | true ->
+          (* Format.eprintf "solved guess %a??@." Name.pp alpha; *)
           pushl @@ E (alpha, ty, Defn info.tm) >>
           push_update alpha >>
           loop
         | false ->
+          (* dump_state Format.err_formatter "failed to solve guess" `All >>= fun _ -> *)
+          (* Format.eprintf "Failed to solve guess %a@." Name.pp alpha; *)
           pushl e >>
           loop
       end

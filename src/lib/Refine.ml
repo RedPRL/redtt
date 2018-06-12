@@ -170,7 +170,8 @@ struct
     | [] ->
       M.ret env
     | dcl :: esig ->
-      M.isolate begin
+      (* M.isolate *)
+      begin
         elab_decl env dcl >>= fun env' ->
         M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing *)
         M.lift U.ambulando >>
