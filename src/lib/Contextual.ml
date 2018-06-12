@@ -197,6 +197,7 @@ let popr_opt =
   getr >>= function
   | e :: mcx ->
     setr mcx >>
+    (* TODO: this is so slow that it brings everything to a halt. We need to limit when this is unleashed. *)
     (* if e.stamp > st.last_updated then
        get_global_env >>= fun sub ->
        ret @@ Some (Entry.subst sub e.entry)
