@@ -242,7 +242,6 @@ struct
     let rty = Tm.make @@ Tm.Rst {ty; sys} in
     M.lift C.ask >>= fun psi ->
     M.lift @@ U.guess psi ~ty0:rty ~ty1:ty tm C.ret >>= fun tm' ->
-    (* M.lift C.go_to_bottom >> *)
     M.ret tm'
 
   and elab_chk env ty e : tm M.m =
@@ -320,18 +319,18 @@ struct
       end >>= fun bdyx ->
       M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn (Emp #< x) bdyx)
 
-    (* | Tm.Ext ebnd, e when should_split_ext_bnd ebnd->
-       let names, ety = split_ext_bnd ebnd in
-       elab_chk env ety e >>= fun tm ->
-       let bdy =
+    | Tm.Ext ebnd, (E.Lam _ as e) when should_split_ext_bnd ebnd->
+      let names, ety = split_ext_bnd ebnd in
+      elab_chk env ety e >>= fun tm ->
+      let bdy =
         let xs = List.map Name.named names in
         Tm.bindn (Bwd.from_list xs) @@
         let hd = Tm.Down {ty = ety; tm = tm} in
         let args = List.map (fun x -> Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]) xs in
         let spine = Emp <>< args in
         Tm.up (hd, spine)
-       in
-       M.ret @@ Tm.make @@ Tm.ExtLam bdy *)
+      in
+      M.ret @@ Tm.make @@ Tm.ExtLam bdy
 
 
 
@@ -378,7 +377,6 @@ struct
       M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
       M.lift C.ask >>= fun psi ->
       M.lift @@ U.guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd) C.ret >>= fun tm ->
-      (* M.lift C.go_to_bottom >>  *)
       M.ret @@ tm
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
