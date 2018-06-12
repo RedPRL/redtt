@@ -5,8 +5,10 @@ open Bwd open BwdNotation
 type lcx = entry bwd
 type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 
+module Map = Map.Make (Name)
+
 type env = GlobalEnv.t
-type cx = {env : env; lcx : lcx; rcx : rcx}
+type cx = {env : env; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
 
 
 let rec pp_lcx fmt =
@@ -111,12 +113,12 @@ let setr r = modifyr @@ fun _ -> r
 let update_env e =
   modify @@ fun st ->
   match e with
-  | E (nm, ty, Hole _) ->
-    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}}
+  | E (nm, ty, Hole info) ->
+    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm info st.info}
   | E (nm, ty, Guess _) ->
-    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}}
+    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
   | E (nm, ty, Defn t) ->
-    {st with env = GlobalEnv.define st.env nm ty t}
+    {st with env = GlobalEnv.define st.env nm ty t; info = Map.add nm `Rigid st.info}
   | _ ->
     st
 
@@ -129,14 +131,14 @@ let pushr e =
   update_env e
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp (); rcx = []} in
+  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp (); info = Map.empty; rcx = []} in
   r
 
 
 let isolate (m : 'a m) : 'a m =
   fun ps st ->
     let st', a = m ps {st with lcx = Emp; rcx = []} in
-    {env = st'.env; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx}, a
+    {env = st'.env; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; info = st'.info}, a
 
 let rec pushls es =
   match es with
@@ -240,8 +242,10 @@ let lookup_var x w =
   ask >>= go
 
 let lookup_meta x =
-  get >>= fun {env; _} ->
-  ret @@ GlobalEnv.lookup_ty env x `Only
+  get >>= fun st ->
+  let ty = GlobalEnv.lookup_ty st.env x `Only in
+  let info = Map.find x st.info in
+  ret (ty, info)
 
 
 let postpone s p =

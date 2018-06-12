@@ -300,7 +300,7 @@ let rec instantiate (inst : instantiation) =
 let flex_flex_same q =
   let alpha, sp0 = q.tm0 in
   let sp1 = q.tm1 in
-  lookup_meta alpha >>= fun ty_alpha ->
+  lookup_meta alpha >>= fun (ty_alpha, _) ->
   let tele, cod = telescope ty_alpha in
   match intersect tele sp0 sp1 with
   | Some tele' ->
