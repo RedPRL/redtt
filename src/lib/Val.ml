@@ -899,7 +899,7 @@ struct
           in
           rigid_hcom info.dir info.cap
             (rigid_hcom dir info.cap (cap_aux cap)
-              (List.map inner_face sys))
+               (List.map inner_face sys))
             (diag_face :: hcom_faces @ fcom_faces)
         in
         let boundary = Face.map @@
@@ -1906,7 +1906,7 @@ struct
   struct
     let equiv ty0 ty1 : value =
       let rho = [Val ty0; Val ty1] in
-      eval R.emp rho @@
+      eval (R.emp ()) rho @@
       Tm.Macro.equiv
         (Tm.up @@ Tm.var 0 `Only)
         (Tm.up @@ Tm.var 1 `Only)

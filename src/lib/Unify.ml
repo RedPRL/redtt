@@ -58,29 +58,32 @@ let telescope_to_spine : telescope -> tm Tm.spine =
   | _ ->
     failwith "TODO: telescope_to_spine"
 
-let hole_named alpha (gm : telescope) ty f =
-  pushl (E (alpha, abstract_ty gm ty, Hole)) >>
+let push_hole tag gm ty =
+  let alpha = Name.fresh () in
+  pushl (E (alpha, abstract_ty gm ty, Hole tag)) >>
   let hd = Tm.Meta alpha in
   let sp = telescope_to_spine gm in
-  f (hd, sp) >>= fun r ->
+  ret (hd, sp)
+
+let hole tag gm ty f =
+  push_hole tag gm ty >>= fun cmd ->
+  f cmd >>= fun r ->
   go_left >>
   ret r
-
-let hole ?name:(name = None) gm ty f =
-  hole_named (Name.named name) gm ty f
 
 let define gm alpha ~ty tm =
   let ty' = abstract_ty gm ty in
   let tm' = abstract_tm gm tm in
-  check ~ty:ty' tm' >>= fun b ->
-  if not b then
-    dump_state Format.err_formatter "Type error" `All >>= fun _ ->
-    begin
+  (* check ~ty:ty' tm' >>= fun b -> *)
+  (* if not b then
+     dump_state Format.err_formatter "Type error" `All >>= fun _ ->
+     begin
       Format.eprintf "error checking: %a : %a@." Tm.pp0 tm' Tm.pp0 ty';
       failwith "define: type error"
-    end
-  else
-    pushr @@ E (alpha, ty', Defn tm')
+     end
+     else *)
+  push_update alpha >>
+  pushr @@ E (alpha, ty', Defn tm')
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)
@@ -181,12 +184,20 @@ let rec flex_term ~deps q =
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
-      | E (beta, _, Hole) as e when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+      | E (beta, _, Hole `Rigid) as e when alpha = beta ->
+        pushls (e :: deps) >>
+        block @@ Unify q
+
+      | E (beta, _, Guess _) as e when alpha = beta ->
+        pushls (e :: deps) >>
+        block @@ Unify q
+
+      | E (beta, _, Hole _) as e when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
         (* Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q; *)
         pushls (e :: deps) >>
         block @@ Unify q
 
-      | (E (beta, ty, Hole) | E (beta, ty, Guess _)) as e when alpha = beta ->
+      | E (beta, ty, Hole _) as e when alpha = beta ->
         (* Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q; *)
         pushls deps >>
         try_invert q ty <||
@@ -196,7 +207,7 @@ let rec flex_term ~deps q =
           pushl e
         end
 
-      | (E (beta, _, Hole) | E (beta, _, Guess _)) as e
+      | (E (beta, _, Hole _) | E (beta, _, Guess _)) as e
         when
           Occurs.Set.mem beta (Params.free `Metas gm)
           || Occurs.Set.mem beta (Entries.free `Metas deps)
@@ -219,28 +230,40 @@ let rec flex_flex_diff ~deps q =
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
-      | E (gamma, _, Hole) as e
+      | E (gamma, _, Hole `Rigid) as e when (alpha0 = gamma || alpha1 = gamma) ->
+        pushls (e :: deps) >>
+        block (Unify q)
+
+      | E (gamma, _, Guess _) as e when (alpha0 = gamma || alpha1 = gamma) ->
+        pushls (e :: deps) >>
+        block (Unify q)
+
+      | E (gamma, _, Hole `Flex) as e
         when
           (alpha0 = gamma || alpha1 = gamma)
           && Occurs.Set.mem gamma @@ Entries.free `Metas deps
         ->
+        (* Format.eprintf "flex_flex_diff / popl / 1: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
         pushls (e :: deps) >>
         block (Unify q)
 
-      | E (gamma, ty, Hole) as e when gamma = alpha0 ->
+      | (E (gamma, ty, Hole _) | E (gamma, ty, Guess _)) as e when gamma = alpha0 ->
+        (* Format.eprintf "flex_flex_diff / popl / 2: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
         pushls deps >>
         try_invert q ty <||
         flex_term [e] (Equation.sym q)
 
-      | E (gamma, _, Hole) as e
+      | (E (gamma, _, Hole _) | E (gamma, _, Guess _)) as e
         when
           Occurs.Set.mem gamma @@ Params.free `Metas gm
           || Occurs.Set.mem gamma @@ Entries.free `Metas deps
           || Occurs.Set.mem gamma @@ Equation.free `Metas q
         ->
+        (* Format.eprintf "flex_flex_diff / popl / 3: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
         flex_flex_diff ~deps:(e :: deps) q
 
       | e ->
+        (* Format.eprintf "flex_flex_diff / popl / 4: %a %a at @[%a@]@.@." Name.pp alpha0 Name.pp alpha1 Entry.pp e; *)
         pushr e >>
         flex_flex_diff ~deps q
     end
@@ -267,8 +290,8 @@ type instantiation = Name.t * ty * (tm Tm.cmd -> tm)
 let rec instantiate (inst : instantiation) =
   let alpha, ty, f = inst in
   popl >>= function
-  | E (beta, ty', Hole) when alpha = beta ->
-    hole Emp ty @@ fun cmd ->
+  | E (beta, ty', Hole `Flex) when alpha = beta ->
+    hole `Flex Emp ty @@ fun cmd ->
     define Emp beta ~ty:ty' @@ f cmd
   | e ->
     pushr e >>
@@ -277,7 +300,7 @@ let rec instantiate (inst : instantiation) =
 let flex_flex_same q =
   let alpha, sp0 = q.tm0 in
   let sp1 = q.tm1 in
-  lookup_meta alpha >>= fun ty_alpha ->
+  lookup_meta alpha >>= fun (ty_alpha, _) ->
   let tele, cod = telescope ty_alpha in
   match intersect tele sp0 sp1 with
   | Some tele' ->
@@ -353,24 +376,15 @@ struct
     ty', tm'
 end
 
-let guess gm ~ty0 ~ty1 tm kont =
+let push_guess gm ~ty0 ~ty1 tm  =
   let alpha = Name.fresh () in
   let ty0' = abstract_ty gm ty0 in
   let ty1' = abstract_ty gm ty1 in
   let tm' = abstract_tm gm tm in
-  check ~ty:ty0' tm' >>= fun b ->
-  if not b then
-    let hd = Tm.Meta alpha in
-    let sp = telescope_to_spine gm in
-    pushl @@ E (alpha, ty0', Guess {ty = ty1'; tm = tm'}) >>
-    kont (Tm.up (hd, sp)) >>= fun r ->
-    go_left >>
-    ret r
-  else
-    pushl @@ E (alpha, ty0', Defn tm') >>
-    kont tm >>= fun r ->
-    go_left >>
-    ret r
+  let hd = Tm.Meta alpha in
+  let sp = telescope_to_spine gm in
+  pushl @@ E (alpha, ty0', Guess {ty = ty1'; tm = tm'}) >>
+  ret @@ Tm.up (hd, sp)
 
 
 
@@ -533,21 +547,6 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
   in
   go sp0 sp1
 
-let normalize ~ty tm =
-  typechecker >>= fun (module T) ->
-  let vty = T.Cx.eval T.Cx.emp ty in
-  let vtm = T.Cx.eval T.Cx.emp tm in
-  ret @@ T.Cx.quote T.Cx.emp ~ty:vty vtm
-
-let normalize_eqn q =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  normalize ~ty:univ q.ty0 >>= fun ty0 ->
-  normalize ~ty:univ q.ty1 >>= fun ty1 ->
-  normalize ~ty:ty0 q.tm0 >>= fun tm0 ->
-  normalize ~ty:ty1 q.tm1 >>= fun tm1 ->
-  ret @@ {ty0; ty1; tm0; tm1}
-
-
 let approx_sys _ty0 _ty1 _sys0 _sys1 =
   Format.eprintf "TODO!!!!@.";
   ret ()
@@ -556,24 +555,6 @@ let restriction_subtype ty0 sys0 ty1 sys1 =
   active @@ Subtype {ty0; ty1} >>
   approx_sys ty0 sys0 ty1 sys1
 
-let should_split_ext_bnd ebnd =
-  match ebnd with
-  | Tm.NB ([_], (_, [])) -> false
-  | _ -> true
-
-
-let split_ext_bnd ebnd =
-  let xs, ty, sys = Tm.unbind_ext ebnd in
-  let rec go xs =
-    match xs with
-    | [] ->
-      Tm.make @@ Tm.Rst {ty; sys}
-    | x :: xs ->
-      let ty' = go xs in
-      Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty' [])
-  in
-  let ty = go @@ Bwd.to_list xs in
-  List.map Name.name (Bwd.to_list xs), ty
 
 
 (* invariant: will not be called on inequations which are already reflexive *)
@@ -594,14 +575,6 @@ let rec subtype ty0 ty1 =
       let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
       active @@ Subtype {ty0 = dom0; ty1 = dom1} >>
       active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
-
-    | Tm.Ext ebnd0, _ when should_split_ext_bnd ebnd0 ->
-      let _, ty0 = split_ext_bnd ebnd0 in
-      active @@ Subtype {ty0; ty1}
-
-    | _, Tm.Ext ebnd1 when should_split_ext_bnd ebnd1 ->
-      let _, ty1 = split_ext_bnd ebnd1 in
-      active @@ Subtype {ty0; ty1}
 
     | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
       (* no idea what to do in flex-flex case, don't worry about it *)
@@ -764,17 +737,17 @@ let rec split_sigma tele x ty =
 let rec lower tele alpha ty =
   match Tm.unleash ty with
   | Tm.LblTy info ->
-    hole tele info.ty @@ fun t ->
+    hole `Flex tele info.ty @@ fun t ->
     define tele alpha ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
     ret true
 
   | Tm.Sg (dom, cod) ->
-    hole tele dom @@ fun t0 ->
+    hole `Flex tele dom @@ fun t0 ->
     (in_scopes (Bwd.to_list tele) typechecker) >>= fun (module T) ->
     let module HS = HSubst (T) in
     let vdom = T.Cx.eval T.Cx.emp dom in
     let cod' = HS.inst_ty_bnd cod (vdom, Tm.up t0) in
-    hole tele cod' @@ fun t1 ->
+    hole `Flex tele cod' @@ fun t1 ->
     define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
 
@@ -793,7 +766,7 @@ let rec lower tele alpha ty =
         let module HS = HSubst (T) in
         let vty = T.Cx.eval T.Cx.emp @@ abstract_ty tele dom in
         let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
-        hole tele pi_ty @@ fun (whd, wsp) ->
+        hole `Flex tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
         define tele alpha ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
         ret true
@@ -817,17 +790,12 @@ let is_restriction =
   | _ -> false
 
 let rec solver prob =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-  (* Format.eprintf "solver: @[<1>%a@]@.@." Problem.pp prob; *)
   match prob with
   | Unify q ->
-    normalize_eqn q >>= fun q ->
     is_reflexive q <||
     unify q
 
   | Subtype {ty0; ty1} ->
-    normalize ~ty:univ ty0 >>= fun ty0 ->
-    normalize ~ty:univ ty1 >>= fun ty1 ->
     check_subtype ty0 ty1 <||
     subtype ty0 ty1
 
@@ -880,7 +848,8 @@ let rec solver prob =
           | true ->
             solver probx
           | false ->
-            under_restriction r0 r1 @@ solver probx
+            under_restriction r0 r1 @@
+            solver probx
       end
 
 
@@ -893,20 +862,28 @@ let ambulando =
 
   | Some e ->
     match e with
-    | E (alpha, ty, Hole) ->
+    | E (alpha, ty, Hole `Flex) ->
       begin
         lower Emp alpha ty <||
         pushl e
       end >>
       loop
 
+    | E (_, _, Hole `Rigid) ->
+      pushl e >>
+      loop
+
     | E (alpha, ty, Guess info) ->
       begin
         check ~ty info.tm >>= function
         | true ->
+          (* Format.eprintf "solved guess %a??@." Name.pp alpha; *)
           pushl @@ E (alpha, ty, Defn info.tm) >>
+          push_update alpha >>
           loop
         | false ->
+          (* dump_state Format.err_formatter "failed to solve guess" `All >>= fun _ -> *)
+          (* Format.eprintf "Failed to solve guess %a@." Name.pp alpha; *)
           pushl e >>
           loop
       end

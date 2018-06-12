@@ -7,7 +7,7 @@ type ty = Tm.tm
 type twin = [`Only | `TwinL | `TwinR]
 
 type 'a decl =
-  | Hole
+  | Hole of [`Rigid | `Flex]
   | Defn of 'a
   | Guess of {ty : 'a; tm : 'a}
 
@@ -252,7 +252,7 @@ let rec pp_problem fmt prob =
 
 let pp_entry fmt =
   function
-  | E (x, ty, Hole) ->
+  | E (x, ty, Hole _) ->
     Format.fprintf fmt "?%a@ :@ %a"
       Name.pp x
       Tm.pp0 ty
@@ -263,10 +263,12 @@ let pp_entry fmt =
       Tm.pp0 ty
       Tm.pp0 tm
 
-  | E (x, ty, Guess _) ->
-    Format.fprintf fmt "?%a@ :@ %a"
+  | E (x, ty, Guess {ty = ty'; tm}) ->
+    Format.fprintf fmt "?%a@ :@ %a ? %a = %a"
       Name.pp x
       Tm.pp0 ty
+      Tm.pp0 ty'
+      Tm.pp0 tm
 
   | Q (_, prob) ->
     Format.fprintf fmt "%a"
@@ -289,8 +291,8 @@ let subst_tm sub ~ty tm =
 
 let subst_decl sub ~ty =
   function
-  | Hole ->
-    Hole
+  | Hole x ->
+    Hole x
   | Defn t ->
     Defn (subst_tm sub ~ty t)
   | Guess info ->
@@ -310,14 +312,14 @@ let subst_param sub =
   let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
   function
   | `I ->
-    `I
+    `I, sub
   | `P ty ->
-    `P (subst_tm sub ~ty:univ ty)
+    `P (subst_tm sub ~ty:univ ty), sub
   | `Tw (ty0, ty1) ->
-    `Tw (subst_tm sub ~ty:univ ty0, subst_tm sub ~ty:univ ty1)
+    `Tw (subst_tm sub ~ty:univ ty0, subst_tm sub ~ty:univ ty1), sub
   | `R (r0, r1) ->
     (* TODO: ??? *)
-    `R (r0, r1)
+    `R (r0, r1), GlobalEnv.restrict r0 r1 sub
 
 let rec subst_problem sub =
   let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
@@ -329,26 +331,26 @@ let rec subst_problem sub =
     let ty1 = subst_tm sub ~ty:univ q.ty1 in
     Subtype {ty0; ty1}
   | All (param, prob) ->
-    let param' = subst_param sub param in
+    let param', sub' = subst_param sub param in
     let x, probx = unbind param prob in
     begin
       match param with
       | `P ty ->
-        let sub' = GlobalEnv.ext sub x @@ `P {ty; sys = []}  in
-        let probx' = subst_problem sub' probx in
+        let sub'' = GlobalEnv.ext sub' x @@ `P {ty; sys = []}  in
+        let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
       | `Tw (ty0, ty1) ->
-        let sub' = GlobalEnv.ext sub x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []}) in
-        let probx' = subst_problem sub' probx in
+        let sub'' = GlobalEnv.ext sub' x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []}) in
+        let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
       | `I ->
-        let probx' = subst_problem sub probx in
+        let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
       | `R (_, _) ->
-        let probx' = subst_problem sub probx in
+        let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
     end
@@ -378,7 +380,7 @@ struct
     | `R (r0, r1) ->
       Occurs.Set.union (Tm.free fl r0) (Tm.free fl r1)
 
-  let subst = subst_param
+  let subst sub p = fst @@ subst_param sub p
 end
 
 module Params = Occurs.Bwd (Param)
@@ -388,7 +390,7 @@ struct
   type t = Tm.tm decl
   let free fl =
     function
-    | Hole -> Occurs.Set.empty
+    | Hole _ -> Occurs.Set.empty
     | Defn t -> Tm.free fl t
     | Guess {tm; _} -> Tm.free fl tm
 end

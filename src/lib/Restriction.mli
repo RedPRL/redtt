@@ -3,7 +3,7 @@ type dim = Dim.repr
 
 type t
 
-val emp : t
+val emp : unit -> t
 val equate : dim -> dim -> t -> t
 
 val compare : dim -> dim -> t -> Dim.compare

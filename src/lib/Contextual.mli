@@ -7,9 +7,13 @@ val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
+val isolate : 'a m -> 'a m
+
 val popl : entry m
 val popr : entry m
 val popr_opt : entry option m
+
+val push_update : Name.t -> unit m
 
 val optional : 'a m -> 'a option m
 
@@ -18,16 +22,14 @@ val pushr : entry -> unit m
 val pushls : entry list -> unit m
 
 val go_to_top : unit m
-val go_to_bottom : unit m
 val go_left : unit m
-val go_right : unit m
 
 val in_scope : Name.t -> ty param -> 'a m -> 'a m
 val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
 val under_restriction : tm -> tm -> 'a m -> 'a m
 
 val lookup_var : Name.t -> twin -> ty m
-val lookup_meta : Name.t -> ty m
+val lookup_meta : Name.t -> (ty * [`Rigid | `Flex]) m
 
 val postpone : status -> problem -> unit m
 val active : problem -> unit m
