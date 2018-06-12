@@ -58,16 +58,18 @@ let telescope_to_spine : telescope -> tm Tm.spine =
   | _ ->
     failwith "TODO: telescope_to_spine"
 
-let hole_named alpha (gm : telescope) ty f =
+let push_hole gm ty =
+  let alpha = Name.fresh () in
   pushl (E (alpha, abstract_ty gm ty, Hole)) >>
   let hd = Tm.Meta alpha in
   let sp = telescope_to_spine gm in
-  f (hd, sp) >>= fun r ->
+  ret (hd, sp)
+
+let hole gm ty f =
+  push_hole gm ty >>= fun cmd ->
+  f cmd >>= fun r ->
   go_left >>
   ret r
-
-let hole ?name:(name = None) gm ty f =
-  hole_named (Name.named name) gm ty f
 
 let define gm alpha ~ty tm =
   let ty' = abstract_ty gm ty in
@@ -354,7 +356,7 @@ struct
     ty', tm'
 end
 
-let guess gm ~ty0 ~ty1 tm kont =
+let push_guess gm ~ty0 ~ty1 tm  =
   let alpha = Name.fresh () in
   let ty0' = abstract_ty gm ty0 in
   let ty1' = abstract_ty gm ty1 in
@@ -364,14 +366,10 @@ let guess gm ~ty0 ~ty1 tm kont =
     let hd = Tm.Meta alpha in
     let sp = telescope_to_spine gm in
     pushl @@ E (alpha, ty0', Guess {ty = ty1'; tm = tm'}) >>
-    kont (Tm.up (hd, sp)) >>= fun r ->
-    go_left >>
-    ret r
+    ret @@ Tm.up (hd, sp)
   else
     pushl @@ E (alpha, ty0', Defn tm') >>
-    kont tm >>= fun r ->
-    go_left >>
-    ret r
+    ret tm
 
 
 
