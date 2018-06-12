@@ -197,13 +197,13 @@ let popr_opt =
   getr >>= function
   | e :: mcx ->
     setr mcx >>
-    if e.stamp > st.last_updated then
-      get_global_env >>= fun sub ->
-      ret @@ Some (Entry.subst sub e.entry)
-    else
-      begin
-        ret @@ Some e.entry
-      end
+    (* if e.stamp > st.last_updated then
+       get_global_env >>= fun sub ->
+       ret @@ Some (Entry.subst sub e.entry)
+       else
+       begin *)
+    ret @@ Some e.entry
+  (* end *)
   | _ ->
     ret None
 
