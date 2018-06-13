@@ -747,6 +747,7 @@ struct
     | V info ->
       begin
         let r, r' = Star.unleash dir in
+        let abs0 = Abs.bind1 x info.ty0 in
         let abs1 = Abs.bind1 x info.ty1 in
 
         match D.compare (Gen.unleash info.x) (D.named x) with
@@ -786,7 +787,32 @@ struct
                 match Gen.make r with
                 | `Const `Dim0 -> el, face0
                 | `Const `Dim1 -> car (fiber0 (base1 D.dim0)), face1
-                | `Ok r_gen -> failwith "favonia is lazy; maybe candy will help" (* AbsFace.make r' D.dim0 @@ *)
+                | `Ok r_gen ->
+                  let fixer =
+                    let el0 dest =
+                      make_coe (Star.make D.dim0 dest) abs0 @@
+                      failwith "how should I implement `Val.act (D.subst D.dim0 r_gen) el`?!"
+                    in
+                    let el1 dest =
+                      let ty =
+                        let w = Name.fresh () in
+                        Abs.bind1 w @@
+                        make_path
+                          (Abs.bind [Name.fresh ()] (Val.act (D.subst D.dim0 x) info.ty1))
+                          (apply (car equiv0) (el0 (D.named w)))
+                          (base r D.dim0)
+                      in
+                      make_coe (Star.make D.dim0 dest) ty (make @@ ExtLam (Abs.bind [Name.fresh ()] (base0 D.dim0)))
+                    in
+                    contr0 @@ make @@ Cons (el0 r, el1 r)
+                  in
+                  let el0 = car fixer in
+                  let face_front =
+                    AbsFace.make r' D.dim0 @@
+                    let w = Name.fresh () in
+                    Abs.bind1 w (ext_apply (cdr fixer) [D.named w])
+                  in
+                  el0, face_front
               end
             | `UNIFORM_HCOM ->
               (* favonia: because there is no (easy) way to generate Sg in the semanitc domain,
@@ -845,7 +871,6 @@ struct
           make_vin (Gen.make r') el0 el1
 
         | D.Apart ->
-          let abs0 = Abs.bind1 x info.ty0 in
           let el0 = rigid_coe dir abs0 el in
           let el1 =
             let cap =
