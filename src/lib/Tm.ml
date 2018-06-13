@@ -641,32 +641,35 @@ and pp_head env fmt =
     Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
 
 and pp_cmd env fmt (hd, sp) =
-  let rec go fmt sp =
+  let rec go mode fmt sp =
     match sp with
     | Emp -> pp_head env fmt hd
     | Snoc (sp, f)->
       match f with
       | Car ->
-        Format.fprintf fmt "@[<1>(car@ %a)@]" go sp
+        Format.fprintf fmt "@[<1>(car@ %a)@]" (go `Car) sp
       | Cdr ->
-        Format.fprintf fmt "@[<1>(cdr@ %a)@]" go sp
+        Format.fprintf fmt "@[<1>(cdr@ %a)@]" (go `Car) sp
       | FunApp t ->
-        Format.fprintf fmt "@[<1>(%a@ %a)@]" go sp (pp env) t
+        if mode = `FunApp then
+          Format.fprintf fmt "@[<1>%a@ %a@]" (go `FunApp) sp (pp env) t
+        else
+          Format.fprintf fmt "@[<1>(%a@ %a)@]" (go `FunApp) sp (pp env) t
       | ExtApp ts ->
-        Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" go sp (pp_terms env) ts
+        Format.fprintf fmt "@[<1>(%s %a@ %a)@]" "@" (go `ExtApp) sp (pp_terms env) ts
       | If {mot = B (nm, mot); tcase; fcase} ->
         let x, env' = Pretty.Env.bind nm env in
-        Format.fprintf fmt "@[<1>(if@ [%a] %a@ %a %a %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot go sp (pp env) tcase (pp env) fcase
+        Format.fprintf fmt "@[<1>(if@ [%a] %a@ %a %a %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot (go `If) sp (pp env) tcase (pp env) fcase
       | VProj {r; _} ->
         (* TODO *)
-        Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r go sp
+        Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r (go `VProj) sp
       | LblCall ->
-        Format.fprintf fmt "@[<1>(call@ %a)@]" go sp
+        Format.fprintf fmt "@[<1>(call@ %a)@]" (go `Call) sp
       | CoRForce ->
-        Format.fprintf fmt "@[<1>(force@ %a)@]" go sp
+        Format.fprintf fmt "@[<1>(force@ %a)@]" (go `Force) sp
   in
   (* TODO: backwards ??? *)
-  go fmt sp
+  go `Start fmt sp
 
 and pp_spine env fmt sp =
   match sp with

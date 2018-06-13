@@ -16,6 +16,7 @@ val define : telescope -> Name.t -> ty:ty -> tm -> unit m
 val to_var : tm -> Name.t option
 
 val abstract_ty : telescope -> ty -> ty
+val abstract_tm : telescope -> tm -> tm
 
 (** Run this in a proof state to solve unification problems. *)
 val ambulando : unit m
