@@ -1,42 +1,36 @@
 import path
 import connection
 
-let not (x : `bool) : _ =>
-  `(if [_] bool x ff tt)
+let not (x : bool) : bool =>
+  if x then ff else tt
 
-let id (A : type) (x : A) : A =>
-  x
-
-let not∘not (x : `bool) : _ =>
- `(not (not x))
+let not∘not (x : bool) : _ =>
+  not (not x)
 
 
-let not∘not/id/pt (x : `bool) : _ =>
- `(if
-   [x] (Path bool (not∘not x) x)
-   x
-   (λ <i> tt)
-   (λ <i> ff))
+let not∘not/id/pt (x : bool) : Path bool (not∘not x) x =>
+  if x then λ _ → tt else λ _ → ff
 
-let not∘not/id : Path (`bool → `bool) _ _ =>
+
+let not∘not/id : Path (bool → bool) _ _ =>
   λ i x →
     not∘not/id/pt x i
 
 
 
-let restriction-test : singleton `bool `tt => _
+let restriction-test : singleton bool tt => _
 let _ : `(bool [1=1 tt]) => restriction-test
-let _ (M : singleton `bool `tt) : `bool => M
+let _ (M : singleton bool tt) : bool => M
 
 
 
-let foo (x : `(× bool bool)) : `(× bool bool) =>
+let foo (x : bool × bool) : bool × bool =>
   let z0 => x.car in
   let z1 => x.cdr in
   < z0, z1 >
 
 
-let testing (x : `(bool [1=1 tt])) : singleton `bool `tt =>
+let testing (x : `(bool [1=1 tt])) : singleton bool tt =>
   x
 
 let hset (A : _) : type =>

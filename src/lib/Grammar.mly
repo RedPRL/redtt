@@ -16,6 +16,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
+%token THEN ELSE
 %token IMPORT
 %token TYPE PRE KAN
 %token EOF
@@ -55,6 +56,13 @@ atomic_eterm:
     { if a = "_" then E.Hope else E.Var a }
   | n = NUMERAL;
     { E.Num n }
+  | BOOL
+    { E.Bool }
+  | TT
+    { E.Tt }
+  | FF
+    { E.Ff }
+
 
 eframe:
   | e = atomic_eterm
@@ -76,11 +84,20 @@ eterm:
   | LET; name = ATOM; RRIGHT_ARROW; tm = eterm; IN; body = eterm
     { E.Let {name; ty = None; tm; body} }
 
+  | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
+    { E.If (e0, e1, e2) }
+
   | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
     { E.Pi (tele, cod) }
 
+  | tele = nonempty_list(epi_cell); TIMES; cod = eterm
+    { E.Sg (tele, cod) }
+
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
     { E.Pi (["_", dom], cod) }
+
+  | dom = atomic_eterm; TIMES; cod = eterm
+    { E.Sg (["_", dom], cod) }
 
 
 escheme:

@@ -16,7 +16,11 @@ and eterm =
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
 
+  | If of eterm * eterm * eterm
+
+  | Bool | Tt | Ff
   | Pi of etele * eterm
+  | Sg of etele * eterm
 
   | Cut of eterm * frame list
 
@@ -31,3 +35,16 @@ and frame =
 (* e-sigarette ;-) *)
 type esig =
   edecl list
+
+
+(* Please fill this in. I'm just using it for debugging. *)
+let pp fmt =
+  function
+  | Hole _ ->
+    Format.fprintf fmt "<hole>"
+  | Hope ->
+    Format.fprintf fmt "<hope>"
+  | Lam _ ->
+    Format.fprintf fmt "<lam>"
+  | _ ->
+    Format.fprintf fmt "<eterm>"
