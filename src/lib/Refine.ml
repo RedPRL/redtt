@@ -357,18 +357,17 @@ struct
         | [], _ -> lnames, E.Lam (rnames, e)
         | _ :: nms, name :: rnames ->
           let x = Name.named @@ Some name in
-          bite nms (lnames #< x) rnames
+          bite nms (x :: lnames) rnames
         | _ -> failwith "Elab: incorrect number of binders when refining extension type"
       in
-      let xs, e' = bite nms Emp names in
-      let fwd_xs = Bwd.to_list xs in
-      let ty, sys = Tm.unbind_ext_with fwd_xs ebnd in
+      let xs, e' = bite nms [] names in
+      let ty, sys = Tm.unbind_ext_with xs ebnd in
       let rty = Tm.make @@ Tm.Rst {ty; sys} in
-      let ps = List.map (fun x -> (x, `I)) fwd_xs in
+      let ps = List.map (fun x -> (x, `I)) xs in
       M.in_scopes ps begin
         elab_chk env rty e'
       end >>= fun bdyxs ->
-      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs)
+      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn (Bwd.from_list xs) bdyxs)
 
 
     | _, Tuple [] ->
