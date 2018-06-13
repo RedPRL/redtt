@@ -406,6 +406,10 @@ struct
         | `Ix _ ->
           failwith "elab_inf: expected locally closed"
       end
+    | E.Num 0 ->
+      M.ret @@ Tm.make Tm.Dim0
+    | E.Num 1 ->
+      M.ret @@ Tm.make Tm.Dim1
     | _ ->
       failwith "TODO: elab_dim"
 

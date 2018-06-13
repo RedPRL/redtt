@@ -53,6 +53,8 @@ atomic_eterm:
     { e }
   | a = ATOM;
     { if a = "_" then E.Hope else E.Var a }
+  | n = NUMERAL;
+    { E.Num n }
 
 eframe:
   | e = atomic_eterm
