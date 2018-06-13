@@ -15,7 +15,7 @@ let funext
   : Path ((x : A) -> B x) f g
   ⇒
   λ i x →
-    `(@ (p x) i)
+    p x i
 
 let symm
   (A : type)
@@ -31,8 +31,8 @@ let trans
   (A : type)
   (x : A)
   (p : `(# <i> A))
-  (q : Path A `(@ p 1) x)
-  : Path A `(@ p 0) `(@ q 1)
+  (q : Path A (p 1) x)
+  : Path A (p 0) (q 1)
   ⇒
   λ i →
    `(hcom 0 1 A (@ p i)
