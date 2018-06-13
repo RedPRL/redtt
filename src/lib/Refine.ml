@@ -308,6 +308,15 @@ struct
       let frm = Tm.If {mot = bmot; tcase; fcase} in
       M.ret @@ Tm.up (hd, Emp #< frm)
 
+    | Tm.Univ _, E.Bool ->
+      M.ret @@ Tm.make Tm.Bool
+
+    | Tm.Bool, E.Tt ->
+      M.ret @@ Tm.make Tm.Tt
+
+    | Tm.Bool, E.Ff ->
+      M.ret @@ Tm.make Tm.Ff
+
     | Tm.Univ _, E.Pi ([], e) ->
       elab_chk env ty e
 

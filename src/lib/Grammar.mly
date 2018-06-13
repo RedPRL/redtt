@@ -56,6 +56,13 @@ atomic_eterm:
     { if a = "_" then E.Hope else E.Var a }
   | n = NUMERAL;
     { E.Num n }
+  | BOOL
+    { E.Bool }
+  | TT
+    { E.Tt }
+  | FF
+    { E.Ff }
+
 
 eframe:
   | e = atomic_eterm

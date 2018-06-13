@@ -18,6 +18,7 @@ and eterm =
 
   | If of eterm * eterm * eterm
 
+  | Bool | Tt | Ff
   | Pi of etele * eterm
 
   | Cut of eterm * frame list
