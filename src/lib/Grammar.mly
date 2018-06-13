@@ -245,9 +245,18 @@ head:
       match R.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
       | `Ref r -> Tm.Ref (r, `Only) }
+
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->
       Tm.HCom {r = r0 env; r' = r1 env; ty = ty env; cap = cap env; sys = sys env} }
+
+  | LPR; COM; r0 = tm; r1 = tm; ty = dimbind(tm); cap = tm; sys = elist(face(dimbind(tm))); RPR
+    { fun env ->
+      Tm.Com {r = r0 env; r' = r1 env; ty = ty env; cap = cap env; sys = sys env} }
+
+  | LPR; COE; r0 = tm; r1 = tm; ty = dimbind(tm); tm = tm; RPR
+    { fun env ->
+      Tm.Coe {r = r0 env; r' = r1 env; ty = ty env; tm = tm env} }
 
   | LPR; COLON_ANGLE; ty = tm; tm = tm; RPR
     { fun env ->
