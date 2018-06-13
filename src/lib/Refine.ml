@@ -516,7 +516,7 @@ struct
             go ext_ty (hd, sp #< (Tm.ExtApp rs)) efs mode
 
           | Tm.Sg (dom, _), E.Car :: efs ->
-            go dom (hd, sp) efs mode
+            go dom (hd, sp #< Tm.Car) efs mode
 
           | Tm.Sg (_, Tm.B (_, cod)), E.Cdr :: efs ->
             let cod' = Tm.subst (Tm.Sub (Tm.Id, (hd, sp #< Tm.Car))) cod in
