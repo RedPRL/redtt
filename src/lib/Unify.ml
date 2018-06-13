@@ -576,6 +576,29 @@ let rec subtype ty0 ty1 =
       active @@ Subtype {ty0 = dom0; ty1 = dom1} >>
       active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
 
+    | Tm.Ext ebnd0, Tm.Ext ebnd1 ->
+      let xs, ty0, sys0 = Tm.unbind_ext ebnd0 in
+      let xs_fwd = Bwd.to_list xs in
+      let ty1, sys1 = Tm.unbind_ext_with xs_fwd ebnd1 in
+      let ps = List.map (fun x -> (x, `I)) xs_fwd in
+      let rec go sys0 sys1 =
+        match sys0, sys1 with
+        | [], [] -> ret ()
+        | (_, _, None) :: sys0, (_, _, None) :: sys1 ->
+          go sys0 sys1
+        | (r0, r0', Some tm0) :: sys0, (r1, r1', Some tm1) :: sys1 when r0 = r1 && r0' = r1' ->
+          under_restriction r0 r0' begin
+            active @@ Problem.eqn ~ty0 ~ty1 ~tm0 ~tm1
+          end >>
+          go sys0 sys1
+        | _ ->
+          failwith "Extension subtype: nope"
+      in
+      in_scopes ps begin
+        active @@ Subtype {ty0; ty1} >>
+        go sys0 sys1
+      end
+
     | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
       (* no idea what to do in flex-flex case, don't worry about it *)
       block @@ Subtype {ty0; ty1}

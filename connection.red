@@ -34,8 +34,7 @@ let connection/or/diagonal
  : singleton (Path A a b) p
  ⇒
  λ i →
-   ; TODO: try using more underscores once the unifier works betters
-   connection/or _ a b p i i
+   connection/or _ _ _ p i i
 
 let connection/and
  (A : type)
