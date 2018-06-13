@@ -630,9 +630,6 @@ struct
     | `Const `Dim1 ->
       ty1
 
-  and rigid_vin x el0 el1 : value =
-    make @@ VIn {x; el0; el1}
-
   and make_vin mgen el0 el1 : value =
     match mgen with
     | `Ok x ->
@@ -731,6 +728,9 @@ struct
       end
     | `Same _ ->
       cap
+
+  and rigid_vin x el0 el1 : value =
+    make @@ VIn {x; el0; el1}
 
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
