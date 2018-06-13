@@ -22,8 +22,10 @@ struct
     val in_scope : Name.t -> ty param -> 'a m -> 'a m
     val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
     val under_restriction : tm -> tm -> 'a m -> 'a m
+    val local : (params -> params) -> 'a m -> 'a m
 
     val isolate : 'a m -> 'a m
+    val unify : unit m
 
     type diagnostic =
       | UserHole of {name : string option; tele : U.telescope; ty : Tm.tm; tm : Tm.tm}
@@ -89,6 +91,8 @@ struct
     let in_scopes = C.in_scopes
     let in_scope = C.in_scope
     let isolate = C.isolate
+    let unify = lift @@ C.bind C.go_to_top @@ fun _ -> C.local (fun _ -> Emp) U.ambulando
+    let local = C.local
 
 
     let run m =
@@ -155,13 +159,7 @@ struct
       elab_decl env (E.Debug f) >>= fun env' ->
       elab_sig env' esig
     | dcl :: esig ->
-      M.isolate
-        begin
-          elab_decl env dcl >>= fun env' ->
-          M.lift C.go_to_top >> (* This is suspicious, in connection with the other suspicious thing *)
-          M.lift U.ambulando >>
-          M.ret env'
-        end >>= fun env' ->
+      M.isolate (elab_decl env dcl) >>= fun env' ->
       elab_sig env' esig
 
 
@@ -169,11 +167,14 @@ struct
     function
     | E.Define (name, scheme, e) ->
       elab_scheme env scheme @@ fun cod ->
+      M.unify >>
       elab_chk env cod e >>= fun tm ->
       let alpha = Name.named @@ Some name in
 
       M.lift C.ask >>= fun psi ->
       M.lift @@ U.define psi alpha cod tm >>= fun _ ->
+      M.lift C.go_to_top >>
+      M.unify >>= fun _ ->
       Format.printf "Defined %s.@." name;
       M.ret @@ T.add name alpha env
 

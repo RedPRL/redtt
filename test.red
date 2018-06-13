@@ -47,11 +47,11 @@ let hset (A : _) : type =>
   → Path (Path A x y) p q
 
 let hset/exponential-ideal
-  (A : type)
-  (B : type)
+  (A : _)
+  (B : _)
   (hset/B : hset B)
   : hset (A → B)
   =>
-  λ f g α β i j x →
-    hset/B (f x) (g x) (λ k → α k x) (λ k → β k x) i j
+   λ f g α β i j x →
+     hset/B _ _ (λ k → α k x) (λ k → β k x) i j
 
