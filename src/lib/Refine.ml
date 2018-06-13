@@ -210,23 +210,25 @@ struct
     go Emp cells
 
   and guess_restricted ty sys tm =
-    let rec go =
-      function
-      | [] ->
-        M.ret ()
-      | (r, r', Some tm') :: sys ->
-        begin
-          M.under_restriction r r' @@
-          M.lift @@ C.active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
-        end >>
-        go sys
-      | _ :: sys ->
-        go sys
-    in
-    go sys >>
     let rty = Tm.make @@ Tm.Rst {ty; sys} in
-    M.lift C.ask >>= fun psi ->
-    M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
+    M.lift @@ C.check ~ty:rty tm >>= fun b ->
+    if b then M.ret tm else
+      let rec go =
+        function
+        | [] ->
+          M.ret ()
+        | (r, r', Some tm') :: sys ->
+          begin
+            M.under_restriction r r' @@
+            M.lift @@ C.active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
+          end >>
+          go sys
+        | _ :: sys ->
+          go sys
+      in
+      go sys >>
+      M.lift C.ask >>= fun psi ->
+      M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
 
   and elab_chk env ty e : tm M.m =
     match Tm.unleash ty, e with
