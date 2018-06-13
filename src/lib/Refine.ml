@@ -132,27 +132,6 @@ struct
     M.ret @@ go_locals renv psi
 
 
-  let should_split_ext_bnd ebnd =
-    match ebnd with
-    | Tm.NB ([_], (_, [])) -> false
-    | _ -> true
-
-
-  let split_ext_bnd ebnd =
-    let xs, ty, sys = Tm.unbind_ext ebnd in
-    let rec go xs =
-      match xs with
-      | [] ->
-        Tm.make @@ Tm.Rst {ty; sys}
-      | x :: xs ->
-        let ty' = go xs in
-        Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty' [])
-    in
-    let ty = go @@ Bwd.to_list xs in
-    List.map Name.name (Bwd.to_list xs), ty
-
-
-
   let normalize_ty ty =
     M.lift C.typechecker >>= fun (module T) ->
     let vty = T.Cx.eval T.Cx.emp ty in
@@ -309,28 +288,24 @@ struct
       M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
 
 
-    | Tm.Ext (Tm.NB ([_], (cod, []))), E.Lam (name :: names, e) ->
-      let x = Name.named @@ Some name in
-      let codx = Tm.open_var 0 x (fun _ -> `Only) cod in
-      M.in_scope x `I begin
-        elab_chk env codx @@
-        E.Lam (names, e)
-      end >>= fun bdyx ->
-      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn (Emp #< x) bdyx)
-
-    | Tm.Ext ebnd, (E.Lam _ as e) when should_split_ext_bnd ebnd->
-      let names, ety = split_ext_bnd ebnd in
-      elab_chk env ety e >>= fun tm ->
-      let bdy =
-        let xs = List.map Name.named names in
-        Tm.bindn (Bwd.from_list xs) @@
-        let hd = Tm.Down {ty = ety; tm = tm} in
-        let args = List.map (fun x -> Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]) xs in
-        let spine = Emp <>< args in
-        Tm.up (hd, spine)
+    | Tm.Ext ((Tm.NB (nms, _)) as ebnd), E.Lam (names, e) ->
+      let rec bite nms lnames rnames =
+        match nms, rnames with
+        | [], _ -> lnames, E.Lam (rnames, e)
+        | _ :: nms, name :: rnames ->
+          let x = Name.named @@ Some name in
+          bite nms (lnames #< x) rnames
+        | _ -> failwith "Elab: incorrect number of binders when refining extension type"
       in
-      M.ret @@ Tm.make @@ Tm.ExtLam bdy
-
+      let xs, e' = bite nms Emp names in
+      let fwd_xs = Bwd.to_list xs in
+      let ty, sys = Tm.unbind_ext_with fwd_xs ebnd in
+      let rty = Tm.make @@ Tm.Rst {ty; sys} in
+      let ps = List.map (fun x -> (x, `I)) fwd_xs in
+      M.in_scopes ps begin
+        elab_chk env rty e'
+      end >>= fun bdyxs ->
+      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs)
 
 
     | _, Tuple [] ->
@@ -373,9 +348,11 @@ struct
     elab_inf env inf >>= fun (ty', cmd) ->
     M.lift (C.check_subtype ty' ty) >>= fun b ->
     if b then M.ret @@ Tm.up cmd else
-      M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd)
+      begin
+        M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+        M.lift C.ask >>= fun psi ->
+        M.lift @@ U.push_guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd)
+      end
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
     let rec unleash_pi_or_ext tm =
