@@ -90,8 +90,14 @@ eterm:
   | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
     { E.Pi (tele, cod) }
 
+  | tele = nonempty_list(epi_cell); TIMES; cod = eterm
+    { E.Sg (tele, cod) }
+
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
     { E.Pi (["_", dom], cod) }
+
+  | dom = atomic_eterm; TIMES; cod = eterm
+    { E.Sg (["_", dom], cod) }
 
 
 escheme:

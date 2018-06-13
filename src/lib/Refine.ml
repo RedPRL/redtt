@@ -328,6 +328,7 @@ struct
       end >>= fun codx ->
       M.ret @@ Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
 
+
     | Tm.Pi (dom, cod), E.Lam (name :: names, e) ->
       let x = Name.named @@ Some name in
       let codx = Tm.unbind_with x (fun _ -> `Only) cod in
@@ -337,6 +338,16 @@ struct
       end >>= fun bdyx ->
       M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
 
+    | Tm.Univ _, E.Sg ([], e) ->
+      elab_chk env ty e
+
+    | Tm.Univ _, E.Sg ((name, edom) :: etele, ecod) ->
+      elab_chk env ty edom >>= fun dom ->
+      let x = Name.named @@ Some name in
+      M.in_scope x (`P dom) begin
+        elab_chk env ty @@ E.Sg (etele, ecod)
+      end >>= fun codx ->
+      M.ret @@ Tm.make @@ Tm.Sg (dom, Tm.bind x codx)
 
     | Tm.Ext ((Tm.NB (nms, _)) as ebnd), E.Lam (names, e) ->
       let rec bite nms lnames rnames =

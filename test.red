@@ -24,7 +24,7 @@ let _ (M : singleton bool tt) : bool => M
 
 
 
-let foo (x : `(× bool bool)) : `(× bool bool) =>
+let foo (x : bool × bool) : bool × bool =>
   let z0 => x.car in
   let z1 => x.cdr in
   < z0, z1 >

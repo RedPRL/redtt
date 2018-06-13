@@ -20,6 +20,7 @@ and eterm =
 
   | Bool | Tt | Ff
   | Pi of etele * eterm
+  | Sg of etele * eterm
 
   | Cut of eterm * frame list
 
