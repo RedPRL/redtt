@@ -104,6 +104,10 @@ struct
   module E = ESig
   module T = Map.Make (String)
 
+  type _ mode =
+    | Chk : ty -> tm mode
+    | Inf : (ty * tm Tm.cmd) mode
+
   let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre
 
   let get_resolver env =
@@ -342,7 +346,7 @@ struct
 
     | _, E.Cut (e, fs) ->
       elab_inf env e >>= fun (hty, hd) ->
-      elab_chk_cut env (hty, hd) fs ty
+      elab_cut env (hty, hd) fs (Chk ty)
 
     | _, e ->
       elab_up env ty e
@@ -385,8 +389,8 @@ struct
       end
 
     | E.Cut (e, fs) ->
-      elab_inf_cut env e (Bwd.from_list fs)
-
+      elab_inf env e >>= fun (ty, cmd) ->
+      elab_cut env (ty, cmd) fs Inf
 
     | _ ->
       failwith "Can't infer"
@@ -405,100 +409,64 @@ struct
     | _ ->
       failwith "TODO: elab_dim"
 
-  and elab_chk_cut env (hty, cmd) efs ty =
-    let rec go hty (hd, sp) efs =
-      match Tm.unleash hty, efs with
-      | _, [] ->
-        let tm = Tm.up (hd, sp) in
-        M.lift (C.check_subtype hty ty) >>= fun b ->
-        if b then M.ret tm else
-          begin
-            M.lift @@ C.active @@ Dev.Subtype {ty0 = hty; ty1 = ty} >>
-            M.lift C.ask >>= fun psi ->
-            M.lift @@ U.push_guess psi ~ty0:ty ~ty1:hty tm
-          end
+  and elab_cut : type x. _ -> (ty * tm Tm.cmd) -> E.frame list -> x mode -> x M.m =
+    fun env ->
+      let rec go : type x. _ -> _ -> _ -> x mode -> x M.m =
+        fun hty (hd, sp) efs mode ->
+          match Tm.unleash hty, efs with
+          | _, [] ->
+            begin
+              match mode with
+              | Chk ty ->
+                M.lift (C.check_subtype hty ty) >>= fun b ->
+                if b then M.ret (Tm.up (hd, sp)) else
+                  let tm = Tm.up (hd, sp) in
+                  M.lift @@ C.active @@ Dev.Subtype {ty0 = hty; ty1 = ty} >>
+                  M.lift C.ask >>= fun psi ->
+                  M.lift @@ U.push_guess psi ~ty0:ty ~ty1:hty tm >>= fun tm ->
+                  M.ret tm
 
-      | Tm.Pi (dom, cod), E.App e :: efs ->
-        elab_chk env dom e >>= fun t ->
-        M.lift C.typechecker >>= fun (module T) ->
-        let module HS = HSubst (T) in
-        let vdom = T.Cx.eval T.Cx.emp dom in
-        let cod' = HS.inst_ty_bnd cod (vdom, t) in
-        go cod' (hd, sp #< (Tm.FunApp t)) efs
+              | Inf ->
+                M.ret (hty, (hd, sp))
+            end
 
-      | Tm.Ext ebnd, efs ->
-        let xs, ext_ty, _ = Tm.unbind_ext ebnd in
-        let rec bite rs xs efs =
-          match xs, efs with
-          | Emp, _ ->
-            M.ret (Bwd.to_list rs, efs)
-          | Snoc (xs, _), E.App e :: efs ->
-            elab_dim env e >>= fun r ->
-            bite (rs #< r) xs efs
-          | _ ->
-            failwith "elab_chk_cut: problem biting extension type"
-        in
-        bite Emp xs efs >>= fun (rs, efs) ->
-        go ext_ty (hd, sp #< (Tm.ExtApp rs)) efs
+          | Tm.Pi (dom, cod), E.App e :: efs ->
+            elab_chk env dom e >>= fun t ->
+            M.lift C.typechecker >>= fun (module T) ->
+            let module HS = HSubst (T) in
+            let vdom = T.Cx.eval T.Cx.emp dom in
+            let cod' = HS.inst_ty_bnd cod (vdom, t) in
+            go cod' (hd, sp #< (Tm.FunApp t)) efs mode
 
-      | Tm.Sg (dom, _), E.Car :: efs ->
-        go dom (hd, sp) efs
+          | Tm.Ext ebnd, efs ->
+            let xs, ext_ty, _ = Tm.unbind_ext ebnd in
+            let rec bite rs xs efs =
+              match xs, efs with
+              | Emp, _ ->
+                M.ret (Bwd.to_list rs, efs)
+              | Snoc (xs, _), E.App e :: efs ->
+                elab_dim env e >>= fun r ->
+                bite (rs #< r) xs efs
+              | _ ->
+                failwith "elab_cut: problem biting extension type"
+            in
+            bite Emp xs efs >>= fun (rs, efs) ->
+            go ext_ty (hd, sp #< (Tm.ExtApp rs)) efs mode
 
-      | Tm.Sg (_, Tm.B (_, cod)), E.Cdr :: efs ->
-        let cod' = Tm.subst (Tm.Sub (Tm.Id, (hd, sp #< Tm.Car))) cod in
-        go cod' (hd, sp #< Tm.Cdr) efs
+          | Tm.Sg (dom, _), E.Car :: efs ->
+            go dom (hd, sp) efs mode
 
-      | Tm.Rst rst, efs ->
-        go rst.ty (hd, sp) efs
+          | Tm.Sg (_, Tm.B (_, cod)), E.Cdr :: efs ->
+            let cod' = Tm.subst (Tm.Sub (Tm.Id, (hd, sp #< Tm.Car))) cod in
+            go cod' (hd, sp #< Tm.Cdr) efs mode
 
-      | _ -> failwith "elab_chk_cut: unexpected case"
-    in
-    go hty cmd efs
+          | Tm.Rst rst, efs ->
+            go rst.ty (hd, sp) efs mode
 
-  and elab_inf_cut env e efs =
-    match efs with
-    | Emp ->
-      elab_inf env e
-    | Snoc (efs, frm) ->
-      elab_inf_cut env e efs >>= fun (ty, (hd, sp)) ->
-      elab_inf_frame env (ty, (hd, sp)) frm
-
-  and elab_inf_frame env (ty, (hd, sp)) efs =
-    match Tm.unleash ty, efs with
-    | Tm.Rst rst, _ ->
-      elab_inf_frame env (rst.ty, (hd, sp)) efs
-
-    | Tm.Pi (dom, cod), E.App e ->
-      elab_chk env dom e >>= fun t ->
-      M.lift C.typechecker >>= fun (module T) ->
-      let module HS = HSubst (T) in
-      let vdom = T.Cx.eval T.Cx.emp dom in
-      let cod' = HS.inst_ty_bnd cod (vdom, t) in
-      M.ret (cod', (hd, sp #< (Tm.FunApp t)))
-
-    | Tm.Sg (dom, _), E.Car ->
-      M.ret (dom, (hd, sp #< Tm.Car))
-
-    | Tm.Sg (_, Tm.B (_, cod)), E.Cdr ->
-      let cod' = Tm.subst (Tm.Sub (Tm.Id, (hd, sp #< Tm.Car))) cod in
-      M.ret (cod', (hd, sp #< Tm.Cdr))
-
-    (* | Tm.Ext ebnd, efs ->
-       let xs, ext_ty, _ = Tm.unbind_ext ebnd in
-       let rec bite rs xs efs =
-        match xs, efs with
-        | Emp, _ ->
-          M.ret (Bwd.to_list rs, efs)
-        | Snoc (xs, _), E.App e :: efs ->
-          elab_dim env e >>= fun r ->
-          bite (rs #< r) xs efs
-        | _ ->
-          failwith "elab_chk_cut: problem biting extension type"
-       in
-       bite Emp xs efs >>= fun (rs, efs) ->
-       M.ret (ext_ty, (hd, sp #< (Tm.ExtApp rs))) *)
-
-    | _ -> failwith "TODO: elab_inf_frame"
+          | _ -> failwith "elab_cut: unexpected case"
+      in
+      fun (hty, cmd) ->
+        go hty cmd
 
 end
 

@@ -20,7 +20,7 @@ let not∘not/id/pt (x : `bool) : _ =>
 
 let not∘not/id : Path (`bool → `bool) _ _ =>
   λ i x →
-   `(@ (not∘not/id/pt x) i)
+    not∘not/id/pt x i
 
 
 
@@ -53,6 +53,5 @@ let hset/exponential-ideal
   : hset (A → B)
   =>
   λ f g α β i j x →
-    let foo => hset/B (f x) (g x) (λ k → `(@ α k) x) (λ k → `(@ β k) x) in
-    `(@ (@ foo i) j)
+    hset/B (f x) (g x) (λ k → α k x) (λ k → β k x) i j
 
