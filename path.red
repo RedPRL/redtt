@@ -20,7 +20,7 @@ let funext
 let symm
   (A : type)
   (p : `(# <i> A))
-  : Path _ _ _
+  : Path A _ _
   ⇒
   λ i →
    `(hcom 0 1 A (@ p 0)
