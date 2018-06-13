@@ -784,14 +784,14 @@ struct
             match mode with
             | `SPLIT_COERCION ->
               begin
-                match Gen.make r with
-                | `Const `Dim0 -> el, face0
-                | `Const `Dim1 -> car (fiber0 (base1 D.dim0)), face1
-                | `Ok r_gen ->
+                match D.unleash r (* favonia: is this really okay?! *) with
+                | D.Dim0 -> el, face0
+                | D.Dim1 -> car (fiber0 (base1 D.dim0)), face1
+                | D.Atom r_atom ->
                   let fixer =
                     let el0 dest =
                       make_coe (Star.make D.dim0 dest) abs0 @@
-                      failwith "how should I implement `Val.act (D.subst D.dim0 r_gen) el`?!"
+                      Val.act (D.subst D.dim0 r_atom) el
                     in
                     let el1 dest =
                       let ty =
