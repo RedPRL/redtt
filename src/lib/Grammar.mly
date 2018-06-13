@@ -56,17 +56,17 @@ atomic_eterm:
 
 eframe:
   | e = atomic_eterm
-    { fun h -> E.App (h, e) }
+    { E.App e }
   | DOT CAR
-    { fun h -> E.Car h }
+    { E.Car }
   | DOT CDR
-    { fun h -> E.Cdr h }
+    { E.Cdr }
 
 eterm:
   | e = atomic_eterm
     { e }
-  | e0 = atomic_eterm; es = nonempty_list(eframe)
-    { List.fold_left (fun e frame -> frame e) e0 es }
+  | e = atomic_eterm; fs = nonempty_list(eframe)
+    { E.Cut (e, fs) }
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = eterm
     { E.Lam (xs, e)   }
   | LET; name = ATOM; COLON; ty = eterm; RRIGHT_ARROW; tm = eterm; IN; body = eterm

@@ -18,11 +18,14 @@ and eterm =
 
   | Pi of etele * eterm
 
-  | App of eterm * eterm
-  | Car of eterm
-  | Cdr of eterm
+  | Cut of eterm * frame list
 
   | Var of string
+
+and frame =
+  | App of eterm
+  | Car
+  | Cdr
 
 (* e-sigarette ;-) *)
 type esig =
