@@ -845,70 +845,37 @@ struct
           make_vin (Gen.make r') el0 el1
 
         | D.Apart ->
-          failwith "wow"
+          let abs0 = Abs.bind1 x info.ty0 in
+          let el0 = rigid_coe dir abs0 el in
+          let el1 =
+            let cap =
+              let phi = Dim.subst r x in
+              let ty0r = Val.act phi info.ty0 in
+              let ty1r = Val.act phi info.ty1 in
+              let equivr = Val.act phi info.equiv in
+              rigid_vproj info.x ~el ~ty0:ty0r ~ty1:ty1r ~equiv:equivr
+            in
+            let r2x = Star.make r (D.named x) in
+            let sys =
+              let face0 =
+                AbsFace.gen_const info.x `Dim0 @@
+                Abs.bind1 x @@ apply (car info.equiv) @@
+                make_coe r2x abs0 el
+              in
+              let face1 =
+                AbsFace.gen_const info.x `Dim1 @@
+                Abs.bind1 x @@
+                make_coe r2x abs1 el
+              in
+              [face0; face1]
+            in
+            rigid_com dir abs1 cap sys
+          in
+          rigid_vin info.x el0 el1
+
         | D.Indeterminate ->
           failwith "impossible"
       end
-      (*
-        match Gen.make r with
-        | `Const `Dim0 ->
-          make_vin (Gen.make r') el el1
-
-        | `Const `Dim1 ->
-          let coe1r'el = rigid_coe dir xty1 el in
-          let el0 = car @@ apply (cdr @@ Val.act (D.subst r' x) info.equiv) coe1r'el in
-          let el1 =
-            let ty1r' = Val.act (D.subst r' x) info.ty1 in
-            let cap = coe1r'el in
-            let sys =
-              force_abs_sys @@
-              let face0 =
-                AbsFace.make r' D.dim0 @@
-                let y = Name.fresh () in
-                Abs.bind1 y @@ ext_apply (cdr el0) [D.named y]
-              in
-              let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Name.fresh ()] coe1r'el in
-              [face0; face1]
-            in
-            make_hcom (Star.make D.dim1 D.dim0) ty1r' cap sys
-          in
-          make_vin (Gen.make r') (car el0) el1
-
-        | `Ok _ ->
-          begin
-              failwith "This is the hard one"
-
-            | _ ->
-              let xty0 = Abs.bind1 x info.ty0 in
-              let el0 = rigid_coe dir xty0 el in
-              let el1 =
-                let cap =
-                  let phi = Dim.subst r x in
-                  let ty0r = Val.act phi info.ty0 in
-                  let ty1r = Val.act phi info.ty1 in
-                  let equivr = Val.act phi info.equiv in
-                  rigid_vproj info.x ~el ~ty0:ty0r ~ty1:ty1r ~equiv:equivr
-                in
-                let r2x = Star.make r (D.named x) in
-                let sys =
-                  let face0 =
-                    AbsFace.gen_const info.x `Dim0 @@
-                    Abs.bind1 x @@ apply (car info.equiv) @@
-                    make_coe r2x xty0 el
-                  in
-                  let face1 =
-                    AbsFace.gen_const info.x `Dim1 @@
-                    Abs.bind1 x @@
-                    make_coe r2x xty1 el
-                  in
-                  [face0; face1]
-                in
-                rigid_com dir xty1 cap sys
-              in
-              make @@ VIn {x = info.x; el0; el1}
-          end
-      end
-      *)
 
     | _ ->
       failwith "TODO: rigid_coe"
