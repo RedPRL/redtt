@@ -639,8 +639,8 @@ and pp_head env fmt =
 
 
   | Com {r; r'; ty = B (nm, ty); cap; sys} ->
-    let x, _env' = Pretty.Env.bind nm env in
-    Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env) ty (pp env) cap (pp_bsys env) sys
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
 
   | Ix (ix, _tw) ->
     Uuseg_string.pp_utf_8 fmt @@
