@@ -31,9 +31,6 @@ let J/eq
     `(com 0 1
       <i> (C (@ cube i 1 k) (λ <j> (@ cube i j k)))
       d
-      [k=0 <i>
-        (coe 0 i
-         <j> (C (@ square j 1) (λ <k> (@ square j k)))
-         d)]
+      [k=0 <i> (coe 0 i <j> (C (@ square j 1) (λ <k> (@ square j k))) d)]
       [k=1 <_> d])
 
