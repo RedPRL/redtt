@@ -515,102 +515,118 @@ let rec bind_ext xs tyxs sysxs =
   in
   NB (List.map Name.name @@ Bwd.to_list xs, go 0 xs tyxs sysxs)
 
-let rec pp env fmt (Tm tm) =
-  match tm with
+let rec pp env fmt =
 
-  | Pi (dom, B (nm, cod)) ->
-    let x, env' = Pretty.Env.bind nm env in
-    Format.fprintf fmt "@[<1>(%a [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 "→" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
+  let rec go env mode fmt (Tm t) =
+    match t with
+    | Pi (dom, B (nm, cod)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      if mode = `Pi then
+        Format.fprintf fmt "[%a : %a]@ %a" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Pi) cod
+      else
+        Format.fprintf fmt "@[<1>(%a @[<hv>[%a : %a]@ %a@])@]" Uuseg_string.pp_utf_8 "→" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Pi) cod
 
-  | Sg (dom, B (nm, cod)) ->
-    let x, env' = Pretty.Env.bind nm env in
-    Format.fprintf fmt "@[<1>(%a [%a : %a]@ %a)@]" Uuseg_string.pp_utf_8 "×" Uuseg_string.pp_utf_8 x (pp env) dom (pp env') cod
+    | Sg (dom, B (nm, cod)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      if mode = `Sg then
+        Format.fprintf fmt "[%a : %a]@ %a" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Sg) cod
+      else
+        Format.fprintf fmt "@[<1>(%a @[<hv>[%a : %a]@ %a@])@]" Uuseg_string.pp_utf_8 "×" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Sg) cod
 
-  | Ext (NB (nms, (cod, sys))) ->
-    let xs, env' = Pretty.Env.bindn nms env in
-    begin
-      match sys with
-      | [] ->
-        Format.fprintf fmt "@[<1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
-      | _ ->
-        Format.fprintf fmt "@[<1>(# @[<1><%a>@ %a@ @[%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
-    end
+    | Ext (NB (nms, (cod, sys))) ->
+      let xs, env' = Pretty.Env.bindn nms env in
+      begin
+        match sys with
+        | [] ->
+          Format.fprintf fmt "@[<1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
+        | _ ->
+          Format.fprintf fmt "@[<1>(# @[<1><%a>@ %a@ @[%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
+      end
 
 
-  | Rst {ty; sys}  ->
-    begin
-      match sys with
-      | [] ->
-        Format.fprintf fmt "%a" (pp env) ty
-      | _ ->
-        Format.fprintf fmt "@[<1>(%a@ @[%a@])@]" (pp env) ty (pp_sys env) sys
-    end
+    | Rst {ty; sys}  ->
+      begin
+        match sys with
+        | [] ->
+          Format.fprintf fmt "%a" (pp env) ty
+        | _ ->
+          Format.fprintf fmt "@[<1>(%a@ @[%a@])@]" (pp env) ty (pp_sys env) sys
+      end
 
-  | CoR face ->
-    Format.fprintf fmt "@[<1>(=>@ %a)@]" (pp_face env) face
+    | CoR face ->
+      Format.fprintf fmt "@[<1>(=>@ %a)@]" (pp_face env) face
 
-  | V info ->
-    Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
+    | V info ->
+      Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
 
-  | Lam (B (nm, tm)) ->
-    let x, env' = Pretty.Env.bind nm env in
-    Format.fprintf fmt "@[<1>(λ [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') tm
+    | Lam (B (nm, tm)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      if mode = `Lam then
+        Format.fprintf fmt "[%a]@ %a" Uuseg_string.pp_utf_8 x (go env' `Lam) tm
+      else
+        Format.fprintf fmt "@[<1>(λ [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (go env' `Lam) tm
 
-  | ExtLam (NB (nms, tm)) ->
-    let xs, env' = Pretty.Env.bindn nms env in
-    Format.fprintf fmt "@[<1>(λ <%a>@ %a)@]" pp_strings xs (pp env') tm
+    | ExtLam (NB (nms, tm)) ->
+      let xs, env' = Pretty.Env.bindn nms env in
+      if mode = `Lam then
+        Format.fprintf fmt "<%a>@ %a" pp_strings xs (go env' `Lam) tm
+      else
+        Format.fprintf fmt "@[<1>(λ <%a>@ %a)@]" pp_strings xs (go env' `Lam) tm
 
-  | CoRThunk face ->
-    pp_face env fmt face
+    | CoRThunk face ->
+      pp_face env fmt face
 
-  | Bool ->
-    Format.fprintf fmt "bool"
+    | Bool ->
+      Format.fprintf fmt "bool"
 
-  | Tt ->
-    Format.fprintf fmt "tt"
+    | Tt ->
+      Format.fprintf fmt "tt"
 
-  | Ff ->
-    Format.fprintf fmt "ff"
+    | Ff ->
+      Format.fprintf fmt "ff"
 
-  | Dim0 ->
-    Format.fprintf fmt "0"
+    | Dim0 ->
+      Format.fprintf fmt "0"
 
-  | Dim1 ->
-    Format.fprintf fmt "1"
+    | Dim1 ->
+      Format.fprintf fmt "1"
 
-  | Univ {kind; lvl} ->
-    Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
+    | Univ {kind; lvl} ->
+      Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
 
-  | FCom {r; r'; cap; sys} ->
-    Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_bsys env) sys
+    | FCom {r; r'; cap; sys} ->
+      Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_bsys env) sys
 
-  | LblTy {lbl; args; ty} ->
-    begin
-      match args with
-      | [] ->
-        Format.fprintf fmt "@[<1>{%a : %a}@]"
-          Uuseg_string.pp_utf_8 lbl
-          (pp env) ty
-      | _ ->
-        Format.fprintf fmt "@[<1>{%a %a : %a}@]"
-          Uuseg_string.pp_utf_8 lbl
-          (pp_lbl_args env) args
-          (pp env) ty
-    end
+    | LblTy {lbl; args; ty} ->
+      begin
+        match args with
+        | [] ->
+          Format.fprintf fmt "@[<1>{%a : %a}@]"
+            Uuseg_string.pp_utf_8 lbl
+            (pp env) ty
+        | _ ->
+          Format.fprintf fmt "@[<1>{%a %a : %a}@]"
+            Uuseg_string.pp_utf_8 lbl
+            (pp_lbl_args env) args
+            (pp env) ty
+      end
 
-  | LblRet t ->
-    Format.fprintf fmt "@[<1>(ret@ %a)@]"
-      (pp env) t
+    | LblRet t ->
+      Format.fprintf fmt "@[<1>(ret@ %a)@]"
+        (pp env) t
 
-  | Cons (tm0, tm1) ->
-    Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
+    | Cons (tm0, tm1) ->
+      Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
 
-  | Let (cmd, B (nm, t)) ->
-    let x, env' = Pretty.Env.bind nm env in
-    Format.fprintf fmt "@[<1>(let@ @[<1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
+    | Let (cmd, B (nm, t)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<1>(let@ @[<1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
 
-  | Up cmd ->
-    pp_cmd env fmt cmd
+    | Up cmd ->
+      pp_cmd env fmt cmd
+
+  in
+  go env `Start fmt
 
 and pp_head env fmt =
   function
