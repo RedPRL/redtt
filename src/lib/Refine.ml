@@ -62,6 +62,8 @@ struct
         C.local (fun _ -> tele) @@
         begin
           C.bind C.typechecker @@ fun (module T) ->
+          let vty = T.Cx.eval T.Cx.emp ty in
+          let ty = T.Cx.quote_ty T.Cx.emp vty in
           Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@,%a %a@]@.@."
             (match name with Some name -> name | None -> "Hole")
             Dev.pp_params tele
@@ -270,6 +272,41 @@ struct
 
     | _, E.Lam ([], e) ->
       elab_chk env ty e
+
+    | _, E.If (escrut, etcase, efcase) ->
+      let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+      let bool = Tm.make @@ Tm.Bool in
+      elab_chk env bool escrut >>= fun scrut ->
+
+      let is_dependent =
+        match Tm.unleash scrut with
+        | Tm.Up (Tm.Ref (a, _), _) when Occurs.Set.mem a @@ Tm.free `Vars ty -> true
+        | _ -> false
+      in
+
+      begin
+        if is_dependent then
+          M.lift @@ push_hole `Flex Emp (Tm.pi None bool univ) >>= fun (mothd, motsp) ->
+          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
+          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
+          M.unify >>
+
+          normalize_ty (mot @@ Tm.make Tm.Tt) >>= fun mot_tt ->
+          normalize_ty (mot @@ Tm.make Tm.Ff) >>= fun mot_ff ->
+          M.ret (mot, mot_tt, mot_ff)
+        else
+          M.ret ((fun _ -> ty), ty, ty)
+      end >>= fun (mot, mot_tt, mot_ff) ->
+
+      elab_chk env mot_tt etcase >>= fun tcase ->
+      elab_chk env mot_ff efcase >>= fun fcase ->
+      let hd = Tm.Down {ty = bool; tm = scrut} in
+      let bmot =
+        let x = Name.fresh () in
+        Tm.bind x @@ mot @@ Tm.up (Tm.Ref (x, `Only), Emp)
+      in
+      let frm = Tm.If {mot = bmot; tcase; fcase} in
+      M.ret @@ Tm.up (hd, Emp #< frm)
 
     | Tm.Univ _, E.Pi ([], e) ->
       elab_chk env ty e

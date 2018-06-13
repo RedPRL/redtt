@@ -16,6 +16,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
+%token THEN ELSE
 %token IMPORT
 %token TYPE PRE KAN
 %token EOF
@@ -75,6 +76,9 @@ eterm:
     { E.Let {name; ty = Some ty; tm; body} }
   | LET; name = ATOM; RRIGHT_ARROW; tm = eterm; IN; body = eterm
     { E.Let {name; ty = None; tm; body} }
+
+  | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
+    { E.If (e0, e1, e2) }
 
   | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
     { E.Pi (tele, cod) }

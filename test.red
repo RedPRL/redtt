@@ -1,22 +1,16 @@
 import path
 import connection
 
-let not (x : `bool) : _ =>
-  `(if [_] bool x ff tt)
-
-let id (A : type) (x : A) : A =>
-  x
+let not (x : `bool) : `bool =>
+  if x then `ff else `tt
 
 let not∘not (x : `bool) : _ =>
- `(not (not x))
+  not (not x)
 
 
-let not∘not/id/pt (x : `bool) : _ =>
- `(if
-   [x] (Path bool (not∘not x) x)
-   x
-   (λ <i> tt)
-   (λ <i> ff))
+let not∘not/id/pt (x : `bool) : Path `bool (not∘not x) x =>
+  if x then λ _ → `tt else λ _ → `ff
+
 
 let not∘not/id : Path (`bool → `bool) _ _ =>
   λ i x →
