@@ -616,13 +616,6 @@ struct
 
   and make_cons (a, b) = make @@ Cons (a, b)
 
-  and make_path abs a b =
-    let ext_abs =
-      let x, ty = Abs.unleash1 abs in
-      ExtAbs.bind1 x (ty, [ValFace.make (D.named x) D.dim0 a; ValFace.make (D.named x) D.dim0 b])
-    in
-    make @@ Ext ext_abs
-
   and make_extlam abs = make @@ ExtLam abs
 
   and make_v mgen ty0 ty1 equiv : value =
