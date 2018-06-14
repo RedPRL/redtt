@@ -784,10 +784,11 @@ struct
             match mode with
             | `SPLIT_COERCION ->
               begin
-                match D.unleash r (* favonia: is this really okay?! *) with
-                | D.Dim0 -> el, face0
-                | D.Dim1 -> car (fiber0 (base1 D.dim0)), face1
-                | D.Atom r_atom ->
+                match Gen.make r with
+                | `Const `Dim0 -> el, face0
+                | `Const `Dim1 -> car (fiber0 (base1 D.dim0)), face1
+                | `Ok r_gen ->
+                  let r_atom = Gen.atom r_gen in
                   let fixer =
                     let el0 dest =
                       make_coe (Star.make D.dim0 dest) abs0 @@
