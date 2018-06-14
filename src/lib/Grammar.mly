@@ -16,7 +16,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
-%token THEN ELSE
+%token THEN ELSE FROM TO
 %token IMPORT
 %token TYPE PRE KAN
 %token EOF
@@ -86,6 +86,9 @@ eterm:
 
   | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
     { E.If (e0, e1, e2) }
+
+  | COE; tm = eterm; FROM; r0 = eterm; TO; r1 = eterm; IN; ty = eterm
+    { E.Coe {r = r0; r' = r1; ty; tm} }
 
   | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
     { E.Pi (tele, cod) }

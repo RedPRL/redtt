@@ -451,6 +451,23 @@ struct
       elab_inf env e >>= fun (ty, cmd) ->
       elab_cut env (ty, cmd) fs Inf
 
+    | E.Coe info ->
+      elab_dim env info.r >>= fun tr ->
+      elab_dim env info.r' >>= fun tr' ->
+      let x = Name.fresh () in
+      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
+      let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
+      elab_chk env univ_fam info.ty >>= fun fam ->
+      M.lift C.typechecker >>= fun (module T) ->
+      let module HS = HSubst (T) in
+      let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
+      elab_chk env fam_r info.tm >>= fun tm ->
+      let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
+      let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+      let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
+      let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
+      M.ret (fam_r', (coe, Emp))
+
     | _ ->
       failwith "Can't infer"
 
