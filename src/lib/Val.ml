@@ -791,7 +791,7 @@ struct
             eval (R.emp ()) [Val ty00; Val ty10; Val (car equiv0); Val b] @@
             Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
           in
-          let el0, face_front =
+          let fixer_fiber =
             let mode = `SPLIT_COERCION in (* how should we switch this? *)
             match mode with
             | `SPLIT_COERCION ->
@@ -801,69 +801,31 @@ struct
                 | `Const `Dim1 -> car (fiber0 (base1 D.dim0)), face1
                 | `Ok r_gen ->
                   let r_atom = Gen.atom r_gen in
-                  let fixer = contr0 @@
+                  contr0 @@
                     make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
                     make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.bind [Name.fresh ()] (base0 D.dim0))
-                  in
-                  let el0 = car fixer in
-                  let face_front =
-                    AbsFace.make r' D.dim0 @@
-                    let w = Name.fresh () in
-                    Abs.bind1 w (ext_apply (cdr fixer) [D.named w])
-                  in
-                  el0, face_front
               end
             | `UNIFORM_HCOM ->
-              (* favonia: because there is no (easy) way to generate Sg in the semanitc domain,
-               * the following expands hcom_Sg. *)
-              let fixer_at_face0 =
-                contr0 @@ make @@ Cons (el, make @@ ExtLam (Abs.bind [Name.fresh ()] @@ base0 D.dim0))
+              make_hcom (Star.make D.dim1 D.dim0) (fiber0_ty (base r D.dim0) (fiber0 (base r D.dim0)) @@
+              force_abs_sys @@
+              let face0 = AbsFace.make r D.dim0 @@
+                let w = Name.fresh () in
+                Abs.bind1 w @@
+                ext_apply (contr0 @@ make_cons (el, make_extlam @@ Abs.bind [Name.fresh ()] @@ base0 D.dim0)) [D.named w]
               in
-              let el0 dest =
-                make_hcom (Star.make D.dim1 dest) (Val.act (D.subst r' x) info.ty0) (car (fiber0 (base r D.dim0))) @@
-                force_abs_sys @@
-                let face0 = AbsFace.make r D.dim0 @@
-                  let w = Name.fresh () (* fourth dimension! yay! *) in
-                  Abs.bind1 w @@ car @@ ext_apply fixer_at_face0 [D.named w]
-                in
-                let face1 =
-                  AbsFace.make r D.dim1 @@
-                  Abs.bind [Name.fresh ()] (car (fiber0 (base1 D.dim0)))
-                in
-                [face0; face1]
+              let face1 = AbsFace.make r D.dim1 @@
+                Abs.bind [Name.fresh ()] (fiber0 (base1 D.dim0))
               in
-              (* favonia: not sure if using Path types to compress is a win. *)
-              let face_front =
-                AbsFace.make r' D.dim0 @@
-                let z = Name.fresh () in
-                Abs.bind1 z @@
-                let ty =
-                  let w = Name.fresh () in
-                  Abs.bind1 w @@
-                  make_path
-                    (Abs.bind [Name.fresh ()] (Val.act (D.subst D.dim0 x) info.ty1))
-                    (apply (car equiv0) (el0 (D.named w)))
-                    (base r D.dim0)
-                in
-                let com =
-                  make_com (Star.make D.dim1 D.dim0) ty (cdr (fiber0 (base r D.dim0))) @@
-                  force_abs_sys @@
-                  let face0 = AbsFace.make r D.dim0 @@
-                    let w = Name.fresh () (* fourth dimension! yay! *) in
-                    Abs.bind1 w @@
-                    cdr @@ ext_apply fixer_at_face0 [D.named w]
-                  in
-                  let face1 = AbsFace.make r D.dim1 @@
-                    Abs.bind [Name.fresh ()] (cdr (fiber0 (base1 D.dim0)))
-                  in
-                  [face0; face1]
-                in
-                ext_apply com [D.named z]
-              in
-              (el0 D.dim1, face_front)
+              [face0; face1]
             | `UNICORN ->
               failwith "too immortal; not suitable for mortal beings"
           in
+          let el0 = car fixer_fiber in
+          let face_front =
+            AbsFace.make r' D.dim0 @@
+            let w = Name.fresh () in
+            Abs.bind1 w @@
+            ext_apply (cdr fixer_fiber) [D.named w]
           let el1 = make_hcom (Star.make D.dim1 D.dim0) info.ty1 (base r r') @@
             force_abs_sys [face0; face1; face_diag; face_front]
           in
