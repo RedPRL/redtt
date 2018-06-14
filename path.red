@@ -3,7 +3,7 @@ let Path
   (M : A)
   (N : A)
   : type
-  ⇒
+  =
   `(# <i> A [i=0 M] [i=1 N])
 
 let funext
@@ -13,7 +13,7 @@ let funext
   (g : (x : A) → B x)
   (p : (x : A) → Path (B x) (f x) (g x))
   : Path ((x : A) -> B x) f g
-  ⇒
+  =
   λ i x →
     p x i
 
@@ -21,7 +21,7 @@ let symm
   (A : type)
   (p : `(# <i> A))
   : Path A _ _
-  ⇒
+  =
   λ i →
    `(hcom 0 1 A (@ p 0)
      [i=0 <j> (@ p j)]
@@ -33,7 +33,7 @@ let trans
   (p : `(# <i> A))
   (q : Path A (p 1) x)
   : Path A (p 0) (q 1)
-  ⇒
+  =
   λ i →
    `(hcom 0 1 A (@ p i)
      [i=0 <_> (@ p 0)]

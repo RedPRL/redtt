@@ -26,7 +26,7 @@
 %%
 
 edecl:
-  | LET; a = ATOM; sch = escheme; RRIGHT_ARROW; tm = eterm
+  | LET; a = ATOM; sch = escheme; EQUALS; tm = eterm
     { E.Define (a, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
@@ -79,9 +79,9 @@ eterm:
     { E.Cut (e, fs) }
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = eterm
     { E.Lam (xs, e)   }
-  | LET; name = ATOM; COLON; ty = eterm; RRIGHT_ARROW; tm = eterm; IN; body = eterm
+  | LET; name = ATOM; COLON; ty = eterm; EQUALS; tm = eterm; IN; body = eterm
     { E.Let {name; ty = Some ty; tm; body} }
-  | LET; name = ATOM; RRIGHT_ARROW; tm = eterm; IN; body = eterm
+  | LET; name = ATOM; EQUALS; tm = eterm; IN; body = eterm
     { E.Let {name; ty = None; tm; body} }
 
   | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
