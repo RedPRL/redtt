@@ -614,12 +614,16 @@ struct
         node := Node {con = con; action = D.idn};
         con
 
+  and make_cons (a, b) = make @@ Cons (a, b)
+
   and make_path abs a b =
     let ext_abs =
       let x, ty = Abs.unleash1 abs in
       ExtAbs.bind1 x (ty, [ValFace.make (D.named x) D.dim0 a; ValFace.make (D.named x) D.dim0 b])
     in
     make @@ Ext ext_abs
+
+  and make_extlam abs = make @@ ExtLam abs
 
   and make_v mgen ty0 ty1 equiv : value =
     match mgen with
@@ -749,6 +753,10 @@ struct
         let r, r' = Star.unleash dir in
         let abs0 = Abs.bind1 x info.ty0 in
         let abs1 = Abs.bind1 x info.ty1 in
+        let subst0x = Val.act (D.subst D.dim0 x) in
+        let ty00 = subst0x info.ty0 in
+        let ty10 = subst0x info.ty1 in
+        let equiv0 = subst0x info.equiv in
 
         match D.compare (Gen.unleash info.x) (D.named x) with
         | D.Same ->
@@ -759,7 +767,6 @@ struct
           in
           let base0 dest = base D.dim0 dest in
           let base1 dest = base D.dim1 dest in
-          let equiv0 = Val.act (D.subst D.dim0 x) info.equiv in
           let fiber0 b = car @@ apply (cdr equiv0) b in
           let contr0 fib = apply (cdr @@ apply (cdr equiv0) (ext_apply (cdr fib) [D.dim1])) fib in
           let face_diag = AbsFace.make r r' @@ Abs.bind [Name.fresh ()] el in
@@ -779,6 +786,11 @@ struct
               in
               make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
           in
+          let fiber0_ty b =
+            let var i = Tm.up @@ Tm.var i `Only in
+            eval (R.emp ()) [Val ty00; Val ty10; Val (car equiv0); Val b] @@
+            Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
+          in
           let el0, face_front =
             let mode = `SPLIT_COERCION in (* how should we switch this? *)
             match mode with
@@ -789,23 +801,9 @@ struct
                 | `Const `Dim1 -> car (fiber0 (base1 D.dim0)), face1
                 | `Ok r_gen ->
                   let r_atom = Gen.atom r_gen in
-                  let fixer =
-                    let el0 dest =
-                      make_coe (Star.make D.dim0 dest) abs0 @@
-                      Val.act (D.subst D.dim0 r_atom) el
-                    in
-                    let el1 dest =
-                      let ty =
-                        let w = Name.fresh () in
-                        Abs.bind1 w @@
-                        make_path
-                          (Abs.bind [Name.fresh ()] (Val.act (D.subst D.dim0 x) info.ty1))
-                          (apply (car equiv0) (el0 (D.named w)))
-                          (base r D.dim0)
-                      in
-                      make_coe (Star.make D.dim0 dest) ty (make @@ ExtLam (Abs.bind [Name.fresh ()] (base0 D.dim0)))
-                    in
-                    contr0 @@ make @@ Cons (el0 r, el1 r)
+                  let fixer = contr0 @@
+                    make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
+                    make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.bind [Name.fresh ()] (base0 D.dim0))
                   in
                   let el0 = car fixer in
                   let face_front =
