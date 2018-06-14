@@ -7,7 +7,7 @@ let make c =
   match D.compare c D.dim0 with
   | D.Same -> `Const `Dim0
   | _ ->
-    match D.compare c D.dim0 with
+    match D.compare c D.dim1 with
     | D.Same -> `Const `Dim1
     | _ -> `Ok c
 

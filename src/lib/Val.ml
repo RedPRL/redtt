@@ -614,6 +614,17 @@ struct
         node := Node {con = con; action = D.idn};
         con
 
+  and make_cons (a, b) = make @@ Cons (a, b)
+
+  and make_path abs a b =
+    let ext_abs =
+      let x, ty = Abs.unleash1 abs in
+      ExtAbs.bind1 x (ty, [ValFace.make (D.named x) D.dim0 a; ValFace.make (D.named x) D.dim0 b])
+    in
+    make @@ Ext ext_abs
+
+  and make_extlam abs = make @@ ExtLam abs
+
   and make_v mgen ty0 ty1 equiv : value =
     match mgen with
     | `Ok x ->
@@ -622,9 +633,6 @@ struct
       ty0
     | `Const `Dim1 ->
       ty1
-
-  and rigid_vin x el0 el1 : value =
-    make @@ VIn {x; el0; el1}
 
   and make_vin mgen el0 el1 : value =
     match mgen with
@@ -725,6 +733,9 @@ struct
     | `Same _ ->
       cap
 
+  and rigid_vin x el0 el1 : value =
+    make @@ VIn {x; el0; el1}
+
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
@@ -740,71 +751,116 @@ struct
     | V info ->
       begin
         let r, r' = Star.unleash dir in
-        let xty1 = Abs.bind1 x info.ty1 in
+        let abs0 = Abs.bind1 x info.ty0 in
+        let abs1 = Abs.bind1 x info.ty1 in
+        let subst0x = Val.act (D.subst D.dim0 x) in
+        let ty00 = subst0x info.ty0 in
+        let ty10 = subst0x info.ty1 in
+        let equiv0 = subst0x info.equiv in
 
-        match Gen.make r with
-        | `Const `Dim0 ->
-          let el1 =
-            rigid_coe dir xty1 @@
-            apply (car @@ Val.act (D.subst D.dim0 x) info.equiv) el
+        match D.compare (Gen.unleash info.x) (D.named x) with
+        | D.Same ->
+          let base src dest =
+            make_coe (Star.make src dest) abs1 @@
+            let phi = D.subst src x in
+            vproj (Gen.make src) (Val.act phi info.ty0) (Val.act phi info.ty1) (Val.act phi info.equiv) el
           in
-          make_vin (Gen.make r') el el1
-
-        | `Const `Dim1 ->
-          let coe1r'el = rigid_coe dir xty1 el in
-          let el0 = car @@ apply (cdr @@ Val.act (D.subst r' x) info.equiv) coe1r'el in
-          let el1 =
-            let ty1r' = Val.act (D.subst r' x) info.ty1 in
-            let cap = coe1r'el in
-            let sys =
-              force_abs_sys @@
-              let face0 =
-                AbsFace.make r' D.dim0 @@
-                let y = Name.fresh () in
-                Abs.bind1 y @@ ext_apply (cdr el0) [D.named y]
+          let base0 dest = base D.dim0 dest in
+          let base1 dest = base D.dim1 dest in
+          let fiber0 b = car @@ apply (cdr equiv0) b in
+          let contr0 fib = apply (cdr @@ apply (cdr equiv0) (ext_apply (cdr fib) [D.dim1])) fib in
+          let face_diag = AbsFace.make r r' @@ Abs.bind [Name.fresh ()] el in
+          let face0 = AbsFace.make r D.dim0 @@ Abs.bind [Name.fresh ()] (base0 r') in
+          let face1 = AbsFace.make r D.dim1 @@
+            let y = Name.fresh () in
+            Abs.bind1 y @@
+              let ty = Val.act (D.subst r' x) info.ty1 in
+              let cap = base1 r' in
+              let msys = force_abs_sys @@
+                let face0 = AbsFace.make r' D.dim0 @@
+                  let z = Name.fresh () in
+                  Abs.bind1 z @@ ext_apply (cdr (fiber0 cap)) [D.named z]
+                in
+                let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Name.fresh ()] el in
+                [face0; face1]
               in
-              let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Name.fresh ()] coe1r'el in
+              make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
+          in
+          let fiber0_ty b =
+            let var i = Tm.up @@ Tm.var i `Only in
+            eval (R.emp ()) [Val ty00; Val ty10; Val (car equiv0); Val b] @@
+            Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
+          in
+          let fixer_fiber =
+            let mode = `SPLIT_COERCION in (* how should we switch this? *)
+            match mode with
+            | `SPLIT_COERCION ->
+              begin
+                match Gen.make r with
+                | `Const `Dim0 -> el, face0
+                | `Const `Dim1 -> car (fiber0 (base1 D.dim0)), face1
+                | `Ok r_gen ->
+                  let r_atom = Gen.atom r_gen in
+                  contr0 @@
+                    make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
+                    make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.bind [Name.fresh ()] (base0 D.dim0))
+              end
+            | `UNIFORM_HCOM ->
+              make_hcom (Star.make D.dim1 D.dim0) (fiber0_ty (base r D.dim0) (fiber0 (base r D.dim0)) @@
+              force_abs_sys @@
+              let face0 = AbsFace.make r D.dim0 @@
+                let w = Name.fresh () in
+                Abs.bind1 w @@
+                ext_apply (contr0 @@ make_cons (el, make_extlam @@ Abs.bind [Name.fresh ()] @@ base0 D.dim0)) [D.named w]
+              in
+              let face1 = AbsFace.make r D.dim1 @@
+                Abs.bind [Name.fresh ()] (fiber0 (base1 D.dim0))
+              in
+              [face0; face1]
+            | `UNICORN ->
+              failwith "too immortal; not suitable for mortal beings"
+          in
+          let el0 = car fixer_fiber in
+          let face_front =
+            AbsFace.make r' D.dim0 @@
+            let w = Name.fresh () in
+            Abs.bind1 w @@
+            ext_apply (cdr fixer_fiber) [D.named w]
+          let el1 = make_hcom (Star.make D.dim1 D.dim0) info.ty1 (base r r') @@
+            force_abs_sys [face0; face1; face_diag; face_front]
+          in
+          make_vin (Gen.make r') el0 el1
+
+        | D.Apart ->
+          let el0 = rigid_coe dir abs0 el in
+          let el1 =
+            let cap =
+              let phi = Dim.subst r x in
+              let ty0r = Val.act phi info.ty0 in
+              let ty1r = Val.act phi info.ty1 in
+              let equivr = Val.act phi info.equiv in
+              rigid_vproj info.x ~el ~ty0:ty0r ~ty1:ty1r ~equiv:equivr
+            in
+            let r2x = Star.make r (D.named x) in
+            let sys =
+              let face0 =
+                AbsFace.gen_const info.x `Dim0 @@
+                Abs.bind1 x @@ apply (car info.equiv) @@
+                make_coe r2x abs0 el
+              in
+              let face1 =
+                AbsFace.gen_const info.x `Dim1 @@
+                Abs.bind1 x @@
+                make_coe r2x abs1 el
+              in
               [face0; face1]
             in
-            make_hcom (Star.make D.dim1 D.dim0) ty1r' cap sys
+            rigid_com dir abs1 cap sys
           in
-          make_vin (Gen.make r') (car el0) el1
+          rigid_vin info.x el0 el1
 
-        | `Ok _ ->
-          begin
-            match D.compare (Gen.unleash info.x) (D.named x) with
-            | D.Same ->
-              failwith "This is the hard one"
-
-            | _ ->
-              let xty0 = Abs.bind1 x info.ty0 in
-              let el0 = rigid_coe dir xty0 el in
-              let el1 =
-                let cap =
-                  let phi = Dim.subst r x in
-                  let ty0r = Val.act phi info.ty0 in
-                  let ty1r = Val.act phi info.ty1 in
-                  let equivr = Val.act phi info.equiv in
-                  rigid_vproj info.x ~el ~ty0:ty0r ~ty1:ty1r ~equiv:equivr
-                in
-                let r2x = Star.make r (D.named x) in
-                let sys =
-                  let face0 =
-                    AbsFace.gen_const info.x `Dim0 @@
-                    Abs.bind1 x @@ apply (car info.equiv) @@
-                    make_coe r2x xty0 el
-                  in
-                  let face1 =
-                    AbsFace.gen_const info.x `Dim1 @@
-                    Abs.bind1 x @@
-                    make_coe r2x xty1 el
-                  in
-                  [face0; face1]
-                in
-                rigid_com dir xty1 cap sys
-              in
-              make @@ VIn {x = info.x; el0; el1}
-          end
+        | D.Indeterminate ->
+          failwith "impossible"
       end
 
     | _ ->
