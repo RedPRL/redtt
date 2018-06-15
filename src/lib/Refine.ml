@@ -5,7 +5,7 @@ open Bwd open BwdNotation open Dev
 
 module type Import =
 sig
-  val import : Lwt_io.file_name -> ESig.esig
+  val import : Lwt_io.file_name -> [`Elab of ESig.esig | `Cached]
 end
 
 module Make (I : Import) =
@@ -197,8 +197,13 @@ struct
       M.ret env
 
     | E.Import file_name ->
-      let esig = I.import file_name in
-      elab_sig env esig
+      begin
+        match I.import file_name with
+        | `Cached ->
+          M.ret env
+        | `Elab esig ->
+          elab_sig env esig
+      end
 
   and elab_scheme env (cells, ecod) kont =
     let rec go gm =
