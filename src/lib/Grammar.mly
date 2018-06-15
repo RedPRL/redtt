@@ -87,6 +87,9 @@ eterm:
   | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
     { E.If (e0, e1, e2) }
 
+  | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm = atomic_eterm; IN; ty = eterm
+    { E.Coe {r = r0; r' = r1; ty; tm} }
+
   | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
     { E.Pi (tele, cod) }
 

@@ -22,6 +22,8 @@ and eterm =
   | Pi of etele * eterm
   | Sg of etele * eterm
 
+  | Coe of {r : eterm; r' : eterm; ty : eterm; tm : eterm}
+
   | Cut of eterm * frame list
 
   | Var of string
