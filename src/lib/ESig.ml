@@ -23,11 +23,16 @@ and eterm =
   | Sg of etele * eterm
 
   | Coe of {r : eterm; r' : eterm; ty : eterm; tm : eterm}
+  | HCom of {r : eterm; r' : eterm; cap : eterm; sys : esys}
 
   | Cut of eterm * frame list
 
   | Var of string
   | Num of int
+
+and esys = eface list
+
+and eface = eterm * eterm * eterm
 
 and frame =
   | App of eterm

@@ -407,8 +407,59 @@ struct
       elab_inf env e >>= fun (hty, hd) ->
       elab_cut env (hty, hd) fs (Chk ty)
 
+    | _, E.HCom info ->
+      elab_dim env info.r >>= fun r ->
+      elab_dim env info.r' >>= fun r' ->
+      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kan in
+      begin
+        M.lift @@ C.check ~ty:kan_univ ty >>= function
+        | true ->
+          elab_chk env ty info.cap >>= fun cap ->
+          elab_hcom_sys env r r' ty cap info.sys >>= fun sys ->
+          let hcom = Tm.HCom {r; r'; ty; cap; sys} in
+          M.ret @@ Tm.up (hcom, Emp)
+
+        | false ->
+          failwith "Cannot compose in a type that isn't Kan"
+      end
+
     | _, e ->
       elab_up env ty e
+
+  and elab_hcom_sys env s _s' ty cap =
+    let rec go acc =
+      function
+      | [] ->
+        M.ret @@ Bwd.to_list acc
+
+      | (e_r, e_r', e) :: esys ->
+        elab_dim env e_r >>= fun r ->
+        elab_dim env e_r' >>= fun r' ->
+        let x = Name.fresh () in
+        let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+        let ext_ty =
+          let face_cap = varx, s, Some cap in
+          let face_adj (r, r', obnd) =
+            let bnd = Option.get_exn obnd in
+            let tmx = Tm.unbind_with x (fun tw -> tw) bnd in
+            r, r', Some tmx
+          in
+          let faces_adj = List.map face_adj @@ Bwd.to_list acc in
+          let faces = face_cap :: faces_adj in
+          Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty faces)
+        in
+        begin
+          M.under_restriction r r' @@
+          elab_chk env ext_ty e
+        end >>= fun line ->
+        M.lift C.typechecker >>= fun (module T) ->
+        let module HS = HSubst (T) in
+        let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
+        let bnd = Tm.bind x tmx in
+        let face = r, r', Some bnd in
+        go (acc #< face) esys
+
+    in go Emp
 
   and elab_up env ty inf =
     elab_inf env inf >>= fun (ty', cmd) ->

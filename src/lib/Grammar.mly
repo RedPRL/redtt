@@ -11,11 +11,11 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL
-%token COLON COLON_ANGLE COMMA DOT
+%token COLON COLON_ANGLE COMMA DOT PIPE
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
-%token AST TIMES HASH AT BACKTICK IN
-%token BOOL UNIV LAM CONS CAR CDR TT FF IF HCOM COM COE LET DEBUG CALL
+%token AST TIMES HASH AT BACKTICK IN WITH END
+%token BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL
 %token THEN ELSE
 %token IMPORT
 %token TYPE PRE KAN
@@ -90,6 +90,9 @@ eterm:
   | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm = atomic_eterm; IN; ty = eterm
     { E.Coe {r = r0; r' = r1; ty; tm} }
 
+  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+    { E.HCom {r = r0; r' = r1; cap; sys}}
+
   | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
     { E.Pi (tele, cod) }
 
@@ -101,6 +104,10 @@ eterm:
 
   | dom = atomic_eterm; TIMES; cod = eterm
     { E.Sg (["_", dom], cod) }
+
+eface:
+  | r0 = atomic_eterm; EQUALS; r1 = atomic_eterm; RRIGHT_ARROW; e = eterm
+    { r0, r1, e }
 
 
 escheme:

@@ -31,6 +31,8 @@ let rec abstract_tm xs tm =
   | Snoc (xs, (x, `I)) ->
     let bnd = Tm.NB ([None], Tm.close_var x (fun _ -> `Only) 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
+  | Snoc (xs, (_, `R (r, r'))) ->
+    abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
   | _ ->
     failwith "abstract_tm"
 
@@ -55,6 +57,8 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]
   | `P _ ->
     Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
+  | `R _ ->
+    Tm.CoRForce
   | _ ->
     failwith "TODO: telescope_to_spine"
 
@@ -583,8 +587,10 @@ let rec subtype ty0 ty1 =
       let ps = List.map (fun x -> (x, `I)) xs_fwd in
       let rec go sys0 sys1 =
         match sys0, sys1 with
-        | [], [] -> ret ()
-        | (_, _, None) :: sys0, (_, _, None) :: sys1 ->
+        | _, [] -> ret ()
+        | (_, _, None) :: sys0, sys1 ->
+          go sys0 sys1
+        | sys0, (_, _, None) :: sys1 ->
           go sys0 sys1
         | (r0, r0', Some tm0) :: sys0, (r1, r1', Some tm1) :: sys1 when r0 = r1 && r0' = r1' ->
           under_restriction r0 r0' begin
@@ -592,6 +598,7 @@ let rec subtype ty0 ty1 =
           end >>
           go sys0 sys1
         | _ ->
+          (* Format.eprintf "shoot??: %a <= %a@ / %a <= %a@." Tm.pp0 ty'0 Tm.pp0 ty'1 (Tm.pp_sys Pretty.Env.emp) sys0 (Tm.pp_sys Pretty.Env.emp) sys1; *)
           failwith "Extension subtype: nope"
       in
       in_scopes ps begin

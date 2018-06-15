@@ -278,6 +278,8 @@ struct
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
     | LblCall neu0, LblCall neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
+    | CoRForce neu0, CoRForce neu1 ->
+      equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
     | _ ->
       (* Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1; *)
       failwith "equate_neu"
