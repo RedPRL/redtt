@@ -769,17 +769,17 @@ struct
       let s, s' = Star.unleash info.dir in
       let cap_abs = Abs.bind1 x info.cap in
 
-      (* this is different from the O^z [SVO, F] becasue
-       * `(D.subst r x)` applies to `z` as well.
-       * This is actually what we want! *)
+      (* This is O in [SVO, F], but `(D.subst r x)` applies to `z` as well,
+       * which is actually what we want!
+       *
+       * The purpose of O is to make sure that, when r=r', we can recover the coercee
+       * after the long journey detailed below. *)
       let origin z_dest =
-        let face = Face.map @@
-          fun ri r'i absi ->
-          let y = Name.fresh () in
-          Abs.bind1 y @@
-          Val.act (D.equate ri r'i) @@
-          make_coe (Star.make (D.named y) s) absi @@
-          make_coe (Star.make s' (D.named y)) absi el
+        let face = Face.map @@ fun ri r'i absi ->
+          Abs.make1 @@ fun y ->
+            Val.act (D.equate ri r'i) @@
+            make_coe (Star.make (D.named y) s) absi @@
+            make_coe (Star.make s' (D.named y)) absi el
         in
         Val.act (D.subst r x) @@
         make_hcom
@@ -820,13 +820,9 @@ struct
       let recovery_general abs z_dest =
         let phi_r' = D.subst r' x in
         make_gcom (Star.make (D.act phi_r' s) z_dest) (Abs.act phi_r' abs) naively_coerced_cap @@
-        let diag = AbsFace.rigid dir @@
-          let y = Name.fresh () in
-          Abs.bind1 y @@ recovery_apart abs r (D.named y)
-        in
+        let diag = AbsFace.rigid dir @@ Abs.make1 @@ fun y -> recovery_apart abs r (D.named y) in
         let face = Face.map @@ fun ri r'i absi ->
-          let y = Name.fresh () in
-          Abs.bind1 y @@ Val.act (D.equate ri r'i) @@ recovery_apart absi r' (D.named y)
+          Abs.make1 @@ fun y -> Val.act (D.equate ri r'i) @@ recovery_apart absi r' (D.named y)
         in
         `Ok (diag :: List.map face (CompSys.forall x info.sys))
       in
@@ -838,13 +834,12 @@ struct
        * that will be done later. *)
       let coerced_cap =
         rigid_hcom info.dir info.cap naively_coerced_cap @@
-        let diag = AbsFace.rigid dir @@ let w = Name.fresh () in Abs.bind1 w @@ origin (D.named w) in
+        let diag = AbsFace.rigid dir @@ Abs.make1 @@ fun w -> origin (D.named w) in
         let face = Face.map @@ fun ri r'i absi ->
-          let w = Name.fresh () in
-          Abs.bind1 w @@
-          Val.act (D.equate ri r'i) @@
-          make_coe (Star.make (D.named w) s) absi @@
-          recovery_general absi (D.named w)
+          Abs.make1 @@ fun w ->
+            Val.act (D.equate ri r'i) @@
+            make_coe (Star.make (D.named w) s) absi @@
+            recovery_general absi (D.named w)
         in
         diag :: List.map face info.sys
       in
