@@ -278,6 +278,8 @@ struct
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
     | LblCall neu0, LblCall neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
+    | CoRForce neu0, CoRForce neu1 ->
+      equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
     | _ ->
       (* Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1; *)
       failwith "equate_neu"
@@ -420,7 +422,7 @@ struct
       let ty1x, sys1x = ExtAbs.inst abs1 @@ List.map Dim.named xs in
       let envx = Env.abs env xs in
       subtype envx ty0x ty1x;
-      ignore @@ equate_val_sys envx ty0x sys0x sys1x
+      approx_restriction envx ty0x ty1x sys0x sys1x
 
     | LblTy info0, LblTy info1 ->
       if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else

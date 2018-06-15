@@ -6,8 +6,15 @@ let J
   (x : A) (p : Path _ a x)
   : C x p
   =
-  let h : `(# <_ _> A) = λ i j → `(hcom 0 j A a [i=0 <_> a] [i=1 <k> (@ p k)]) in
-  let ty : `(# <_> (U 0)) = λ i → C (h i 1) (λ j → h i j) in
+  let ty : Line type = λ i →
+    let h : Line A = λ j →
+      comp 0 j a with
+      | i=0 ⇒ λ _ → a
+      | i=1 ⇒ p
+      end
+    in
+    C (h 1) h
+  in
   coe 0 1 d in ty
 
 let J/eq
@@ -15,22 +22,28 @@ let J/eq
   (C : (x : A) (p : Path A a x) → type) (d : C a (λ _ → a))
   : Path (C a _) (J _ _ C d _ (λ _ → a)) d
   =
-  let square : `(# <i j> A) =
+  let square : Line (Line A) =
     λ i j →
-      `(hcom 0 j A a [i=0 <_> a] [i=1 <_> a])
-  in
-  let cube : `(# <i j k> A) =
-    λ i j k →
-      `(hcom 0 j A a
-        [k=0 <j> (@ square i j)]
-        [k=1 <_> a]
-        [i=0 <_> a]
-        [i=1 <_> a])
+      comp 0 j a with
+      | i=0 ⇒ λ _ → a
+      | i=1 ⇒ λ _ → a
+      end
   in
   λ k →
-    `(com 0 1
-      <i> (C (@ cube i 1 k) (λ <j> (@ cube i j k)))
-      d
-      [k=0 <i> (coe 0 i <j> (C (@ square j 1) (λ <k> (@ square j k))) d)]
-      [k=1 <_> d])
-
+    comp 0 1 d in λ i →
+      let aux : Line A =
+        λ j →
+          comp 0 j a with
+          | k=0 ⇒ square i
+          | k=1 ⇒ λ _ → a
+          | i=0 ⇒ λ _ → a
+          | i=1 ⇒ λ _ → a
+          end
+      in
+      C (aux 1) aux
+    with
+    | k=0 ⇒ λ i →
+      coe 0 i d in λ j →
+        C (square j 1) (λ k → square j k)
+    | k=1 ⇒ λ _ → d
+    end

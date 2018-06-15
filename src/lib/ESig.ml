@@ -21,13 +21,21 @@ and eterm =
   | Bool | Tt | Ff
   | Pi of etele * eterm
   | Sg of etele * eterm
+  | Ext of string list * eterm * esys
+  | Rst of eterm * esys
 
-  | Coe of {r : eterm; r' : eterm; ty : eterm; tm : eterm}
+  | Coe of {r : eterm; r' : eterm; fam : eterm; tm : eterm}
+  | HCom of {r : eterm; r' : eterm; cap : eterm; sys : esys}
+  | Com of {r : eterm; r' : eterm; fam : eterm; cap : eterm; sys : esys}
 
   | Cut of eterm * frame list
 
   | Var of string
   | Num of int
+
+and esys = eface list
+
+and eface = eterm * eterm * eterm
 
 and frame =
   | App of eterm

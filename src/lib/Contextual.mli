@@ -26,7 +26,7 @@ val go_left : unit m
 
 val in_scope : Name.t -> ty param -> 'a m -> 'a m
 val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
-val under_restriction : tm -> tm -> 'a m -> 'a m
+val under_restriction : tm -> tm -> 'a m -> 'a option m
 
 val lookup_var : Name.t -> twin -> ty m
 val lookup_meta : Name.t -> (ty * [`Rigid | `Flex]) m

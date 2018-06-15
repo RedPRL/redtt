@@ -5,7 +5,7 @@ open Bwd open BwdNotation open Dev
 
 module type Import =
 sig
-  val import : Lwt_io.file_name -> ESig.esig
+  val import : Lwt_io.file_name -> [`Elab of ESig.esig | `Cached]
 end
 
 module Make (I : Import) =
@@ -21,7 +21,7 @@ struct
     val lift : 'a C.m -> 'a m
     val in_scope : Name.t -> ty param -> 'a m -> 'a m
     val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
-    val under_restriction : tm -> tm -> 'a m -> 'a m
+    val under_restriction : tm -> tm -> 'a m -> 'a option m
     val local : (params -> params) -> 'a m -> 'a m
 
     val isolate : 'a m -> 'a m
@@ -89,7 +89,13 @@ struct
       ret a
 
 
-    let under_restriction = C.under_restriction
+    let under_restriction r r' (m : 'a m) : 'a option m =
+      C.bind (C.under_restriction r r' m) @@ function
+      | None ->
+        ret None
+      | Some (x, ds) ->
+        C.ret (Some x, ds)
+
     let in_scopes = C.in_scopes
     let in_scope = C.in_scope
     let isolate = C.isolate
@@ -128,13 +134,13 @@ struct
       function
       | Emp -> renv
       | Snoc (psi, (x, _)) ->
+        let renv = go_locals renv psi in
         begin
           match Name.name x with
           | Some str ->
-            let renvx = ResEnv.global str x renv in
-            go_locals renvx psi
+            ResEnv.global str x renv
           | None ->
-            go_locals renv psi
+            renv
         end
     in
     M.lift C.ask >>= fun psi ->
@@ -191,8 +197,13 @@ struct
       M.ret env
 
     | E.Import file_name ->
-      let esig = I.import file_name in
-      elab_sig env esig
+      begin
+        match I.import file_name with
+        | `Cached ->
+          M.ret env
+        | `Elab esig ->
+          elab_sig env esig
+      end
 
   and elab_scheme env (cells, ecod) kont =
     let rec go gm =
@@ -231,7 +242,19 @@ struct
       M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
 
   and elab_chk env ty e : tm M.m =
+    normalize_ty ty >>= fun ty ->
     match Tm.unleash ty, e with
+    | _, E.Hole name ->
+      M.lift C.ask >>= fun psi ->
+      M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
+      M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
+      M.ret @@ Tm.up tm
+
+    | _, E.Hope ->
+      M.lift C.ask >>= fun psi ->
+      M.lift @@ U.push_hole `Flex psi ty >>= fun tm ->
+      M.ret @@ Tm.up tm
+
 
     | _, E.Let info ->
       begin
@@ -241,6 +264,7 @@ struct
           M.ret (let_ty, Tm.up let_tm)
         | Some ety ->
           elab_chk env univ ety >>= fun let_ty ->
+          normalize_ty let_ty >>= fun let_ty ->
           elab_chk env let_ty info.tm >>= fun let_tm ->
           M.ret (let_ty, let_tm)
       end >>= fun (let_ty, let_tm) ->
@@ -319,6 +343,25 @@ struct
     | Tm.Bool, E.Ff ->
       M.ret @@ Tm.make Tm.Ff
 
+    | Tm.Univ _, E.Ext (names, ety, esys) ->
+      let univ = ty in
+      let xs = List.map (fun x -> Name.named (Some x)) names in
+      let ps = List.map (fun x -> (x, `I)) xs in
+      M.in_scopes ps
+        begin
+          elab_chk env univ ety >>= fun ty ->
+          elab_tm_sys env ty esys >>= fun sys ->
+          M.ret (ty, sys)
+        end >>= fun (tyxs, sysxs) ->
+      let ebnd = Tm.bind_ext (Bwd.from_list xs) tyxs sysxs in
+      M.ret @@ Tm.make @@ Tm.Ext ebnd
+
+    | Tm.Univ _, E.Rst (ety, esys) ->
+      let univ = ty in
+      elab_chk env univ ety >>= fun ty ->
+      elab_tm_sys env ty esys >>= fun sys ->
+      M.ret @@ Tm.make @@ Tm.Rst {ty; sys}
+
     | Tm.Univ _, E.Pi ([], e) ->
       elab_chk env ty e
 
@@ -357,17 +400,17 @@ struct
         | [], _ -> lnames, E.Lam (rnames, e)
         | _ :: nms, name :: rnames ->
           let x = Name.named @@ Some name in
-          bite nms (x :: lnames) rnames
+          bite nms (lnames #< x) rnames
         | _ -> failwith "Elab: incorrect number of binders when refining extension type"
       in
-      let xs, e' = bite nms [] names in
-      let ty, sys = Tm.unbind_ext_with xs ebnd in
+      let xs, e' = bite nms Emp names in
+      let ty, sys = Tm.unbind_ext_with (Bwd.to_list xs) ebnd in
       let rty = Tm.make @@ Tm.Rst {ty; sys} in
-      let ps = List.map (fun x -> (x, `I)) xs in
+      let ps = List.map (fun x -> (x, `I)) @@ Bwd.to_list xs in
       M.in_scopes ps begin
         elab_chk env rty e'
       end >>= fun bdyxs ->
-      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn (Bwd.from_list xs) bdyxs)
+      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs)
 
 
     | _, Tuple [] ->
@@ -392,28 +435,129 @@ struct
           failwith "Type"
       end
 
-    | _, E.Hole name ->
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
-      M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
-      M.ret @@ Tm.up tm
-
-    | _, E.Hope ->
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_hole `Flex psi ty >>= fun tm ->
-      M.ret @@ Tm.up tm
-
     | _, E.Cut (e, fs) ->
       elab_inf env e >>= fun (hty, hd) ->
+      normalize_ty hty >>= fun hty ->
       elab_cut env (hty, hd) fs (Chk ty)
+
+    | _, E.HCom info ->
+      elab_dim env info.r >>= fun r ->
+      elab_dim env info.r' >>= fun r' ->
+      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kan in
+      begin
+        M.lift @@ C.check ~ty:kan_univ ty >>= function
+        | true ->
+          elab_chk env ty info.cap >>= fun cap ->
+          elab_hcom_sys env r ty cap info.sys >>= fun sys ->
+          let hcom = Tm.HCom {r; r'; ty; cap; sys} in
+          M.ret @@ Tm.up (hcom, Emp)
+
+        | false ->
+          failwith "Cannot compose in a type that isn't Kan"
+      end
 
     | _, e ->
       elab_up env ty e
+
+  and elab_tm_sys env ty =
+    let rec go acc =
+      function
+      | [] ->
+        M.ret @@ Bwd.to_list acc
+
+      | (e_r, e_r', e) :: esys ->
+        let rst_ty = Tm.make @@ Tm.Rst {ty; sys = Bwd.to_list acc} in
+        elab_dim env e_r >>= fun r ->
+        elab_dim env e_r' >>= fun r' ->
+        begin
+          M.under_restriction r r' begin
+            elab_chk env rst_ty e
+          end
+        end >>= fun obnd ->
+        let face = r, r', obnd in
+        go (acc #< face) esys
+    in
+    go Emp
+
+  and elab_hcom_sys env s ty cap =
+    let rec go acc =
+      function
+      | [] ->
+        M.ret @@ Bwd.to_list acc
+
+      | (e_r, e_r', e) :: esys ->
+        let x = Name.fresh () in
+        let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+        let ext_ty =
+          let face_cap = varx, s, Some cap in
+          let face_adj (r, r', obnd) =
+            let bnd = Option.get_exn obnd in
+            let tmx = Tm.unbind_with x (fun tw -> tw) bnd in
+            r, r', Some tmx
+          in
+          let faces_adj = List.map face_adj @@ Bwd.to_list acc in
+          let faces = face_cap :: faces_adj in
+          Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty faces)
+        in
+        elab_dim env e_r >>= fun r ->
+        elab_dim env e_r' >>= fun r' ->
+        begin
+          M.under_restriction r r' begin
+            elab_chk env ext_ty e >>= fun line ->
+            M.lift C.typechecker >>= fun (module T) ->
+            let module HS = HSubst (T) in
+            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
+            M.ret @@ Tm.bind x tmx
+          end
+        end >>= fun obnd ->
+        let face = r, r', obnd in
+        go (acc #< face) esys
+
+    in go Emp
+
+  and elab_com_sys env s ty_bnd cap =
+    let rec go acc =
+      function
+      | [] ->
+        M.ret @@ Bwd.to_list acc
+
+      | (e_r, e_r', e) :: esys ->
+        let x = Name.fresh () in
+        let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+        let tyx = Tm.unbind_with x (fun tw -> tw) ty_bnd in
+        let ext_ty =
+          let face_cap = varx, s, Some cap in
+          let face_adj (r, r', obnd) =
+            let bnd = Option.get_exn obnd in
+            let tmx = Tm.unbind_with x (fun tw -> tw) bnd in
+            r, r', Some tmx
+          in
+          let faces_adj = List.map face_adj @@ Bwd.to_list acc in
+          let faces = face_cap :: faces_adj in
+          Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) tyx faces)
+        in
+        elab_dim env e_r >>= fun r ->
+        elab_dim env e_r' >>= fun r' ->
+        begin
+          M.under_restriction r r' begin
+            elab_chk env ext_ty e >>= fun line ->
+            M.lift C.typechecker >>= fun (module T) ->
+            let module HS = HSubst (T) in
+            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
+            M.ret @@ Tm.bind x tmx
+          end
+        end >>= fun obnd ->
+        let face = r, r', obnd in
+        go (acc #< face) esys
+
+    in go Emp
 
   and elab_up env ty inf =
     elab_inf env inf >>= fun (ty', cmd) ->
     M.lift (C.check_subtype ty' ty) >>= fun b ->
     if b then M.ret @@ Tm.up cmd else
+      (* TODO: I really don't like this; it leads to confusing, RedPRL-style proof states where you don't know if you're wrong.
+         We should be more conservative, and try to immediately solve the problem with unification, and if that fails, throw an error. *)
       begin
         M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
         M.lift C.ask >>= fun psi ->
@@ -449,6 +593,7 @@ struct
 
     | E.Cut (e, fs) ->
       elab_inf env e >>= fun (ty, cmd) ->
+      normalize_ty ty >>= fun ty ->
       elab_cut env (ty, cmd) fs Inf
 
     | E.Coe info ->
@@ -457,7 +602,7 @@ struct
       let x = Name.fresh () in
       let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
-      elab_chk env univ_fam info.ty >>= fun fam ->
+      elab_chk env univ_fam info.fam >>= fun fam ->
       M.lift C.typechecker >>= fun (module T) ->
       let module HS = HSubst (T) in
       let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
@@ -467,6 +612,25 @@ struct
       let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
       let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
       M.ret (fam_r', (coe, Emp))
+
+    | E.Com info ->
+      elab_dim env info.r >>= fun tr ->
+      elab_dim env info.r' >>= fun tr' ->
+      let x = Name.fresh () in
+      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
+      let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
+      elab_chk env univ_fam info.fam >>= fun fam ->
+      M.lift C.typechecker >>= fun (module T) ->
+      let module HS = HSubst (T) in
+      let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
+      elab_chk env fam_r info.cap >>= fun cap ->
+      let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
+      let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+      let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
+      let tybnd = Tm.bind x tyx in
+      elab_com_sys env tr tybnd cap info.sys >>= fun sys ->
+      let com = Tm.Com {r = tr; r' = tr'; ty = tybnd; cap; sys} in
+      M.ret (fam_r', (com, Emp))
 
     | _ ->
       failwith "Can't infer"
@@ -490,9 +654,9 @@ struct
       failwith "TODO: elab_dim"
 
   and elab_cut : type x. _ -> (ty * tm Tm.cmd) -> E.frame list -> x mode -> x M.m =
-    fun env ->
-      let rec go : type x. _ -> _ -> _ -> x mode -> x M.m =
-        fun hty (hd, sp) efs mode ->
+    fun (type x) env ->
+      let rec go : ty -> _ -> _ -> x mode -> x M.m =
+        fun (hty : ty) (hd, sp) efs mode : x M.m ->
           match Tm.unleash hty, efs with
           | _, [] ->
             begin
@@ -543,7 +707,9 @@ struct
           | Tm.Rst rst, efs ->
             go rst.ty (hd, sp) efs mode
 
-          | _ -> failwith "elab_cut: unexpected case"
+          | _ ->
+            Format.eprintf "damn: %a@." Tm.pp0 hty;
+            failwith "elab_cut: unexpected case"
       in
       fun (hty, cmd) ->
         go hty cmd

@@ -221,9 +221,6 @@ let in_scopes ps =
   local @@ fun ps' ->
   ps' <>< ps
 
-let under_restriction r0 r1 =
-  in_scope (Name.fresh ()) @@ `R (r0, r1)
-
 
 let lookup_var x w =
   let rec go gm =
@@ -310,12 +307,26 @@ let check_subtype ty0 ty1 =
   | _ ->
     ret false
 
+let compare_dim tr0 tr1 =
+  typechecker >>= fun (module T) ->
+  let r0 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr0 in
+  let r1 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr1 in
+  ret @@ Dim.compare r0 r1
+
 let check_eq_dim tr0 tr1 =
   typechecker >>= fun (module T) ->
   let r0 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr0 in
   let r1 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr1 in
   match Dim.compare r0 r1 with
-  | Same ->
+  | Dim.Same ->
     ret true
   | _ ->
     ret false
+
+let under_restriction r0 r1 m =
+  compare_dim r0 r1 >>= function
+  | Dim.Apart ->
+    ret None
+  | _ ->
+    in_scope (Name.fresh ()) (`R (r0, r1)) m >>= fun x ->
+    ret (Some x)

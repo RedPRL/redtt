@@ -31,6 +31,8 @@ let rec abstract_tm xs tm =
   | Snoc (xs, (x, `I)) ->
     let bnd = Tm.NB ([None], Tm.close_var x (fun _ -> `Only) 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
+  | Snoc (xs, (_, `R (r, r'))) ->
+    abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
   | _ ->
     failwith "abstract_tm"
 
@@ -55,6 +57,8 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]
   | `P _ ->
     Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
+  | `R _ ->
+    Tm.CoRForce
   | _ ->
     failwith "TODO: telescope_to_spine"
 
@@ -542,7 +546,11 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
       failwith "TODO: match_spine/vproj"
 
-    | _ -> failwith "spine mismatch"
+    | Snoc (sp0, Tm.CoRForce), Snoc (sp1, Tm.CoRForce) ->
+      go sp0 sp1
+
+    | _ ->
+      failwith "spine mismatch"
 
   in
   go sp0 sp1
@@ -583,8 +591,10 @@ let rec subtype ty0 ty1 =
       let ps = List.map (fun x -> (x, `I)) xs_fwd in
       let rec go sys0 sys1 =
         match sys0, sys1 with
-        | [], [] -> ret ()
-        | (_, _, None) :: sys0, (_, _, None) :: sys1 ->
+        | _, [] -> ret ()
+        | (_, _, None) :: sys0, sys1 ->
+          go sys0 sys1
+        | sys0, (_, _, None) :: sys1 ->
           go sys0 sys1
         | (r0, r0', Some tm0) :: sys0, (r1, r1', Some tm1) :: sys1 when r0 = r1 && r0' = r1' ->
           under_restriction r0 r0' begin
@@ -592,6 +602,7 @@ let rec subtype ty0 ty1 =
           end >>
           go sys0 sys1
         | _ ->
+          (* Format.eprintf "shoot??: %a <= %a@ / %a <= %a@." Tm.pp0 ty'0 Tm.pp0 ty'1 (Tm.pp_sys Pretty.Env.emp) sys0 (Tm.pp_sys Pretty.Env.emp) sys1; *)
           failwith "Extension subtype: nope"
       in
       in_scopes ps begin
@@ -601,7 +612,7 @@ let rec subtype ty0 ty1 =
 
     | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
       (* no idea what to do in flex-flex case, don't worry about it *)
-      block @@ Subtype {ty0; ty1}
+      active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
     (* The following two cases are sketchy: they do not yield most general solutions for subtyping.
        But it seems to be analogous to what happens in Agda. *)
@@ -618,7 +629,7 @@ let rec subtype ty0 ty1 =
       active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}}
 
     | _ ->
-      block @@ Subtype {ty0; ty1}
+      active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
 
 
@@ -871,8 +882,8 @@ let rec solver prob =
           | true ->
             solver probx
           | false ->
-            under_restriction r0 r1 @@
-            solver probx
+            under_restriction r0 r1 @@ solver probx >>
+            ret ()
       end
 
 

@@ -17,8 +17,8 @@ let not∘not/id : Path (_ → _) _ _ =
   λ i x →
     not∘not/id/pt x i
 
-let restriction-test : singleton bool tt = _
-let _ : `(bool [1=1 tt]) = restriction-test
+let restriction-test : singleton bool tt = tt
+let _ : restrict bool with 1=1 ⇒ tt end = restriction-test
 let _ (M : singleton bool tt) : bool = M
 
 
@@ -29,14 +29,14 @@ let foo (x : bool × bool) : _ × _ =
   < z0, z1 >
 
 
-let testing (x : `(bool [1=1 tt])) : singleton bool tt =
+let testing (x : restrict bool with 1=1 ⇒ tt end) : singleton bool tt =
   x
 
 let hset (A : _) : type =
   (x : A)
   (y : A)
-  (p : Path _ x y)
-  (q : Path _ x y)
+  (p : Path A x y)
+  (q : Path A x y)
   → Path _ p q
 
 let hset/exponential-ideal

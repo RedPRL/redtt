@@ -858,17 +858,17 @@ struct
           let face1 = AbsFace.make r D.dim1 @@
             let y = Name.fresh () in
             Abs.bind1 y @@
-              let ty = Val.act (D.subst r' x) info.ty1 in
-              let cap = base1 r' in
-              let msys = force_abs_sys @@
-                let face0 = AbsFace.make r' D.dim0 @@
-                  let z = Name.fresh () in
-                  Abs.bind1 z @@ ext_apply (cdr (fiber0 cap)) [D.named z]
-                in
-                let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Name.fresh ()] el in
-                [face0; face1]
+            let ty = Val.act (D.subst r' x) info.ty1 in
+            let cap = base1 r' in
+            let msys = force_abs_sys @@
+              let face0 = AbsFace.make r' D.dim0 @@
+                let z = Name.fresh () in
+                Abs.bind1 z @@ ext_apply (cdr (fiber0 cap)) [D.named z]
               in
-              make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
+              let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Name.fresh ()] el in
+              [face0; face1]
+            in
+            make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
           in
           let fiber0_ty b =
             let var i = Tm.up @@ Tm.var i `Only in
@@ -887,8 +887,8 @@ struct
                 | `Ok r_gen ->
                   let r_atom = Gen.atom r_gen in
                   contr0 @@
-                    make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
-                    make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.bind [Name.fresh ()] (base0 D.dim0))
+                  make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
+                  make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.bind [Name.fresh ()] (base0 D.dim0))
               end
             | `UNIFORM_HCOM ->
               make_hcom (Star.make D.dim1 D.dim0) (fiber0_ty (base r D.dim0)) (fiber0 (base r D.dim0)) @@
@@ -1216,8 +1216,9 @@ struct
       let sys = eval_tm_sys rel rho info.sys in
       make @@ Rst {ty; sys}
 
-    | Tm.CoR _ ->
-      failwith "TODO: eval co-restriction"
+    | Tm.CoR tface ->
+      let face = eval_tm_face rel rho tface in
+      make @@ CoR face
 
     | Tm.V info ->
       let r = eval_dim_class rel rho info.r in
@@ -1545,18 +1546,16 @@ struct
     | Up info ->
       begin
         match unleash_corestriction_ty info.ty with
-        | Face.True _ -> failwith ""
-        | Face.False _ -> failwith ""
-        | Face.Indet _ -> failwith ""
-        (*
-      let _, _, ty = unleash_corestriction_ty info.ty in
-      let force = CoRForce info.neu in
-      let force_face =
-        Face.map @@ fun _ _ a ->
-        corestriction_force v
-      in
-      let force_sys = List.map force_face info.sys in
-      make @@ Up {ty; neu = force; sys = force_sys} *)
+        | Face.True (_, _, ty) ->
+          let force = CoRForce info.neu in
+          let force_face =
+            Face.map @@ fun _ _ a ->
+            corestriction_force a
+          in
+          let force_sys = List.map force_face info.sys in
+          make @@ Up {ty; neu = force; sys = force_sys}
+        | _ ->
+          failwith "Cannot force non-true corestriction"
       end
     | _ ->
       failwith "corestriction_force"

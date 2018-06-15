@@ -25,6 +25,8 @@ module Make (R : SOURCE) : LEXER = struct
   let keywords =
     make_table 0 [
       ("in", IN);
+      ("with", WITH);
+      ("end", END);
       ("bool", BOOL);
       ("car", CAR);
       ("cdr", CDR);
@@ -32,6 +34,8 @@ module Make (R : SOURCE) : LEXER = struct
       ("com", COM);
       ("cons", CONS);
       ("hcom", HCOM);
+      ("comp", COMP);
+      ("restrict", RESTRICT);
       ("if", IF);
       ("let", LET);
       ("lam", LAM);
@@ -58,9 +62,9 @@ let number =
 let whitespace =
   [' ' '\t']+
 let atom_initial =
-  [^ '0'-'9' '-' '?' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ',' ';' '=' '"' '`' ' ' '\t' '\n' '\r']
+  [^ '0'-'9' '-' '?' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ',' ';' '|' '=' '"' '`' ' ' '\t' '\n' '\r']
 let atom_subsequent =
-  [^             '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ',' ';' '=' '"' ' ' '\t' '\n' '\r']
+  [^             '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' ':' ',' ';' '|' '=' '"' ' ' '\t' '\n' '\r']
 
 refill {refill_handler}
 
@@ -83,6 +87,8 @@ rule token = parse
     { Lwt.return AT }
   | '`'
     { Lwt.return BACKTICK }
+  | '|'
+    { Lwt.return PIPE }
   | '*'
     { Lwt.return AST }
   | "×"
