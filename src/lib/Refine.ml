@@ -21,7 +21,7 @@ struct
     val lift : 'a C.m -> 'a m
     val in_scope : Name.t -> ty param -> 'a m -> 'a m
     val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
-    val under_restriction : tm -> tm -> 'a m -> 'a m
+    val under_restriction : tm -> tm -> 'a m -> 'a option m
     val local : (params -> params) -> 'a m -> 'a m
 
     val isolate : 'a m -> 'a m
@@ -89,7 +89,13 @@ struct
       ret a
 
 
-    let under_restriction = C.under_restriction
+    let under_restriction r r' (m : 'a m) : 'a option m =
+      C.bind (C.under_restriction r r' m) @@ function
+      | None ->
+        ret None
+      | Some (x, ds) ->
+        C.ret (Some x, ds)
+
     let in_scopes = C.in_scopes
     let in_scope = C.in_scope
     let isolate = C.isolate
@@ -449,19 +455,15 @@ struct
         elab_dim env e_r >>= fun r ->
         elab_dim env e_r' >>= fun r' ->
         begin
-          M.under_restriction r r' @@
-          elab_chk env ext_ty e
-        end >>= fun line ->
-        begin
-          M.under_restriction r r' @@
-          begin
+          M.under_restriction r r' begin
+            elab_chk env ext_ty e >>= fun line ->
             M.lift C.typechecker >>= fun (module T) ->
             let module HS = HSubst (T) in
             let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
             M.ret @@ Tm.bind x tmx
           end
-        end>>= fun bnd ->
-        let face = r, r', Some bnd in
+        end >>= fun obnd ->
+        let face = r, r', obnd in
         go (acc #< face) esys
 
     in go Emp

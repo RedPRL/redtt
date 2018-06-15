@@ -878,8 +878,8 @@ let rec solver prob =
           | true ->
             solver probx
           | false ->
-            under_restriction r0 r1 @@
-            solver probx
+            under_restriction r0 r1 @@ solver probx >>
+            ret ()
       end
 
 
