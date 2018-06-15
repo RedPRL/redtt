@@ -15,7 +15,7 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN WITH END
-%token BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL
+%token BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT
 %token THEN ELSE
 %token IMPORT
 %token TYPE PRE KAN
@@ -104,6 +104,9 @@ eterm:
 
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
     { E.Ext (dims, ty, sys)}
+
+  | RESTRICT; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+    { E.Rst (ty, sys)}
 
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
     { E.Pi (["_", dom], cod) }

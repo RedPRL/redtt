@@ -356,6 +356,12 @@ struct
       let ebnd = Tm.bind_ext (Bwd.from_list xs) tyxs sysxs in
       M.ret @@ Tm.make @@ Tm.Ext ebnd
 
+    | Tm.Univ _, E.Rst (ety, esys) ->
+      let univ = ty in
+      elab_chk env univ ety >>= fun ty ->
+      elab_tm_sys env ty esys >>= fun sys ->
+      M.ret @@ Tm.make @@ Tm.Rst {ty; sys}
+
     | Tm.Univ _, E.Pi ([], e) ->
       elab_chk env ty e
 

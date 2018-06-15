@@ -1,7 +1,9 @@
 import path
 
 let singleton (A : type) (M : A) : `(U pre 0) =
-  `(A [0=0 M])
+  restrict A with
+  | 0=0 ⇒ M
+  end
 
 let connection/or
  (A : type)
