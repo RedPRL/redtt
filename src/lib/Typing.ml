@@ -476,6 +476,31 @@ struct
       let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:hd in
       Cx.eval cx_scrut mot
 
+    | T.S1Rec info ->
+      let T.B (nm, mot) = info.mot in
+      let s1 = Eval.make V.S1 in
+      let cxx, _= Cx.ext_ty cx ~nm s1 in
+      check_ty cxx mot;
+
+      Cx.check_eq_ty cx ty s1;
+
+      let cx_base = Cx.def cx ~nm ~ty:s1 ~el:(Eval.make V.Base) in
+      let mot_base = Cx.eval cx_base mot in
+      let val_base = check_eval cx mot_base info.bcase in
+
+      let T.B (nm_loop, lcase) = info.lcase in
+      let cxx, x = Cx.ext_dim cx ~nm:nm_loop in
+      let cxx_loop = Cx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ V.Loop (DimGeneric.named x)) in
+      let mot_loop = Cx.eval cxx_loop mot in
+      let val_loopx = check_eval cx mot_loop lcase in
+      let val_loop0 = Eval.Val.act (Dim.subst Dim.dim0 x) val_loopx in
+      let val_loop1 = Eval.Val.act (Dim.subst Dim.dim1 x) val_loopx in
+      Cx.check_eq cx mot_base val_loop0 val_base;
+      Cx.check_eq cx mot_base val_loop1 val_base;
+
+      let cx_scrut = Cx.def cx ~nm ~ty:s1 ~el:hd in
+      Cx.eval cx_scrut mot
+
     | T.LblCall ->
       let _, _, ty = Eval.unleash_lbl_ty ty in
       ty
