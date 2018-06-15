@@ -833,28 +833,45 @@ struct
 
 
     | V info ->
-      begin
-        let r, r' = Star.unleash dir in
-        let abs0 = Abs.bind1 x info.ty0 in
-        let abs1 = Abs.bind1 x info.ty1 in
-        let subst0x = Val.act (D.subst D.dim0 x) in
-        let ty00 = subst0x info.ty0 in
-        let ty10 = subst0x info.ty1 in
-        let equiv0 = subst0x info.equiv in
+      (* [F]: favonia 11.00100100001111110110101010001000100001011.
+       * [SVO]: Part III (airport).
+       * [R1]: RedPRL I 9bd901466684d37f529656a6911466079435dcf1.
+       * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
 
+      (* Some helper functions to reduce typos. *)
+      let r, r' = Star.unleash dir in
+      let abs0 = Abs.bind1 x info.ty0 in
+      let abs1 = Abs.bind1 x info.ty1 in
+      let subst0x = Val.act (D.subst D.dim0 x) in
+      let ty00 = subst0x info.ty0 in
+      let ty10 = subst0x info.ty1 in
+      let equiv0 = subst0x info.equiv in
+      begin
         match D.compare (Gen.unleash info.x) (D.named x) with
         | D.Same ->
+          (* `base` is the cap of the hcom in ty1.
+           * Due to the eager semantic simplification built in
+           * `make_vproj`, `make_coe` and `make_hcom`,
+           * redtt can afford less efficient generating code. *)
           let base src dest =
             make_coe (Star.make src dest) abs1 @@
             let phi = D.subst src x in
             vproj (Gen.make src) (Val.act phi info.ty0) (Val.act phi info.ty1) (Val.act phi info.equiv) el
           in
+          (* Some helper functions to reduce typos. *)
           let base0 dest = base D.dim0 dest in
           let base1 dest = base D.dim1 dest in
           let fiber0 b = car @@ apply (cdr equiv0) b in
+          (* The prove that there is a path from the fiber `fib`
+           * to `fiber0 b` where `b` is calculated from `fib`
+           * as `ext_apply (cdr fib) [D.dim1]` directly. *)
           let contr0 fib = apply (cdr @@ apply (cdr equiv0) (ext_apply (cdr fib) [D.dim1])) fib in
+          (* The diagonal face for r=r'. *)
           let face_diag = AbsFace.make r r' @@ Abs.make1 (fun _ -> el) in
+          (* The face for r=0. *)
           let face0 = AbsFace.make r D.dim0 @@ Abs.make1 (fun _ -> base0 r') in
+          (* The face for r=1. This more optimized version is used
+           * in [Y], [F] and [R1] but not [SVO]. *)
           let face1 = AbsFace.make r D.dim1 @@
             Abs.make1 @@ fun y ->
               let ty = Val.act (D.subst r' x) info.ty1 in
@@ -868,27 +885,40 @@ struct
               in
               make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
           in
+          (* This is the type of the fiber, and is used for
+           * simplifying the generating code for the front face
+           * (r'=0). It is using the evaluator to generate the
+           * type in the semantic domain. *)
           let fiber0_ty b =
             let var i = Tm.up @@ Tm.var i `Only in
             eval (R.emp ()) [Val ty00; Val ty10; Val (car equiv0); Val b] @@
             Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
           in
+          (* This is to generate the element in `ty0` and also
+           * the face for r'=0. This is `O` in [F]. *)
           let fixer_fiber =
+            (* Turns out `fiber_at_face0` will be
+             * used for multiple times. *)
             let fiber_at_face0 = make_cons (el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0) in
             let mode = `SPLIT_COERCION in (* how should we switch this? *)
             match mode with
+            (* The implementation used in [F] and [R1]. *)
             | `SPLIT_COERCION ->
               begin
                 match Gen.make r with
-                | `Const `Dim0 -> fiber_at_face0
-                | `Const `Dim1 -> fiber0 (base1 D.dim0)
+                | `Const `Dim0 -> fiber_at_face0 (* r=0 *)
+                | `Const `Dim1 -> fiber0 (base1 D.dim0) (* r=1 *)
                 | `Ok r_gen ->
                   let r_atom = Gen.atom r_gen in
+                  (* coercion to the diagonal *)
                   contr0 @@
                   make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
+                  (* the fiber *)
                   make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0)
               end
+            (* The implementation used in [Y]. *)
             | `UNIFORM_HCOM ->
+              (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
               make_hcom (Star.make D.dim1 D.dim0) (fiber0_ty (base r D.dim0)) (fiber0 (base r D.dim0)) @@
               force_abs_sys @@
               let face0 = AbsFace.make r D.dim0 @@
@@ -898,6 +928,7 @@ struct
                 Abs.make1 @@ fun _ -> fiber0 (base1 D.dim0)
               in
               [face0; face1]
+            (* Something magical under development. *)
             | `UNICORN ->
               failwith "too immortal; not suitable for mortal beings"
           in
