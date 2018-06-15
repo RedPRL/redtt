@@ -433,8 +433,6 @@ struct
         M.ret @@ Bwd.to_list acc
 
       | (e_r, e_r', e) :: esys ->
-        elab_dim env e_r >>= fun r ->
-        elab_dim env e_r' >>= fun r' ->
         let x = Name.fresh () in
         let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
         let ext_ty =
@@ -448,14 +446,21 @@ struct
           let faces = face_cap :: faces_adj in
           Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty faces)
         in
+        elab_dim env e_r >>= fun r ->
+        elab_dim env e_r' >>= fun r' ->
         begin
           M.under_restriction r r' @@
           elab_chk env ext_ty e
         end >>= fun line ->
-        M.lift C.typechecker >>= fun (module T) ->
-        let module HS = HSubst (T) in
-        let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
-        let bnd = Tm.bind x tmx in
+        begin
+          M.under_restriction r r' @@
+          begin
+            M.lift C.typechecker >>= fun (module T) ->
+            let module HS = HSubst (T) in
+            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
+            M.ret @@ Tm.bind x tmx
+          end
+        end>>= fun bnd ->
         let face = r, r', Some bnd in
         go (acc #< face) esys
 

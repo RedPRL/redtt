@@ -1455,7 +1455,7 @@ struct
     | Up info ->
       begin
         match unleash_corestriction_ty info.ty with
-        | (Face.True (_, _, ty) | Face.Indet (_, ty)) ->
+        | Face.True (_, _, ty) ->
           let force = CoRForce info.neu in
           let force_face =
             Face.map @@ fun _ _ a ->
@@ -1463,8 +1463,8 @@ struct
           in
           let force_sys = List.map force_face info.sys in
           make @@ Up {ty; neu = force; sys = force_sys}
-        | Face.False _ ->
-          failwith "Cannot force false corestriction"
+        | _ ->
+          failwith "Cannot force non-true corestriction"
       end
     | _ ->
       failwith "corestriction_force"
