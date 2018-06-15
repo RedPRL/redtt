@@ -31,9 +31,11 @@ end up using one of these for the lexer at one point.
 | OCaml        | `>=` | [`4.06.1`](https://github.com/ocaml/ocaml/releases/tag/4.06.1)         | `opam switch 4.06.1`            |
 | utop         | `>=` | [`2.0.2`](https://github.com/diml/utop/releases/tag/2.0.2)             | `opam install utop` (optional)  |
 
+If this is your first time configuring OPAM, please run `opam init` before `opam switch`.
+
 ### Other recommended packages
 
-We recommend installing `merlin` and `ocp-indent`; the easiest way to edit
+We recommend installing `merlin` and `ocp-indent` using `opam`; the easiest way to edit
 OCaml code out of the box is to install [Visual Studio
 Code](https://code.visualstudio.com/?wt.mc_id=adw-brand&gclid=EAIaIQobChMImd3JoKeL2wIVUlmGCh1lHAQ1EAAYASAAEgLUxPD_BwE)
 along with the [OCaml and Reason
@@ -46,8 +48,8 @@ package by Darin Morrison.
 $ git clone https://github.com/jonsterling/cubical-experiment
 $ cd tt
 $ opam update
-$ opam pin add -y . # the first time you build
-$ opam upgrade      # after packages change
+$ opam pin add -y redtt . # the first time you build
+$ opam upgrade            # after packages change
 ```
 
 ### Building
