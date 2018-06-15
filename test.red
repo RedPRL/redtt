@@ -17,7 +17,7 @@ let not∘not/id : Path (_ → _) _ _ =
   λ i x →
     not∘not/id/pt x i
 
-let restriction-test : singleton bool tt = _
+let restriction-test : singleton bool tt = tt
 let _ : `(bool [1=1 tt]) = restriction-test
 let _ (M : singleton bool tt) : bool = M
 

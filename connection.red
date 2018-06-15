@@ -8,13 +8,18 @@ let connection/or
  (a : A)
  (b : A)
  (p : Path A a b)
- : `(# <i j> A [j=0 (@ p i)] [i=0 (@ p j)] [j=1 b] [i=1 b])
+ : [i j] A with
+   | j=0 ⇒ p i
+   | i=0 ⇒ p j
+   | j=1 ⇒ b
+   | i=1 ⇒ b
+   end
  =
  λ i j →
   ; this is an example of something that is much nicer here than in redprl and yacctt.
   ; we can define using line types all the faces of the composition at once.
   ; definitional equivalence kicks in to make this work.
-  let face : `(# <_> (# <_>  A)) =
+  let face : Line (Line A) =
     λ l k →
       comp 0 l (p k) with
       | k=1 ⇒ λ _ → b
@@ -45,10 +50,15 @@ let connection/and
  (a : A)
  (b : A)
  (p : Path A a b)
- : `(# <i j> A [j=0 a] [i=0 a] [j=1 (@ p i)] [i=1 (@ p j)])
+ : [i j] A with
+   | j=0 ⇒ a
+   | i=0 ⇒ a
+   | j=1 ⇒ p i
+   | i=1 ⇒ p j
+   end
  =
  λ i j →
-   let face : `(# <_> (# <_> A)) =
+   let face : Line (Line A) =
      λ l k →
        comp 1 l (p k) with
        | k=0 ⇒ λ _ → a

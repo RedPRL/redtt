@@ -1,10 +1,17 @@
+let Line (A : type) : type =
+  [_] A with end
+
 let Path
   (A : type)
   (M : A)
   (N : A)
   : type
   =
-  `(# <i> A [i=0 M] [i=1 N])
+  [i] A with
+  | i=0 ⇒ M
+  | i=1 ⇒ N
+  end
+
 
 let funext
   (A : type)
@@ -19,7 +26,7 @@ let funext
 
 let symm
   (A : type)
-  (p : `(# <i> A))
+  (p : Line A)
   : Path A (p 1) (p 0)
   =
   λ i →
@@ -31,7 +38,7 @@ let symm
 let trans
   (A : type)
   (x : A)
-  (p : `(# <i> A))
+  (p : Line A)
   (q : Path A (p 1) x)
   : Path A (p 0) (q 1)
   =

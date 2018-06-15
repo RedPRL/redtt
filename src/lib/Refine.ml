@@ -242,7 +242,19 @@ struct
       M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
 
   and elab_chk env ty e : tm M.m =
+    normalize_ty ty >>= fun ty ->
     match Tm.unleash ty, e with
+    | _, E.Hole name ->
+      M.lift C.ask >>= fun psi ->
+      M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
+      M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
+      M.ret @@ Tm.up tm
+
+    | _, E.Hope ->
+      M.lift C.ask >>= fun psi ->
+      M.lift @@ U.push_hole `Flex psi ty >>= fun tm ->
+      M.ret @@ Tm.up tm
+
 
     | _, E.Let info ->
       begin
@@ -252,6 +264,7 @@ struct
           M.ret (let_ty, Tm.up let_tm)
         | Some ety ->
           elab_chk env univ ety >>= fun let_ty ->
+          normalize_ty let_ty >>= fun let_ty ->
           elab_chk env let_ty info.tm >>= fun let_tm ->
           M.ret (let_ty, let_tm)
       end >>= fun (let_ty, let_tm) ->
@@ -330,6 +343,19 @@ struct
     | Tm.Bool, E.Ff ->
       M.ret @@ Tm.make Tm.Ff
 
+    | Tm.Univ _, E.Ext (names, ety, esys) ->
+      let univ = ty in
+      let xs = List.map (fun x -> Name.named (Some x)) names in
+      let ps = List.map (fun x -> (x, `I)) xs in
+      M.in_scopes ps
+        begin
+          elab_chk env univ ety >>= fun ty ->
+          elab_tm_sys env ty esys >>= fun sys ->
+          M.ret (ty, sys)
+        end >>= fun (tyxs, sysxs) ->
+      let ebnd = Tm.bind_ext (Bwd.from_list xs) tyxs sysxs in
+      M.ret @@ Tm.make @@ Tm.Ext ebnd
+
     | Tm.Univ _, E.Pi ([], e) ->
       elab_chk env ty e
 
@@ -403,19 +429,9 @@ struct
           failwith "Type"
       end
 
-    | _, E.Hole name ->
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
-      M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm} >>
-      M.ret @@ Tm.up tm
-
-    | _, E.Hope ->
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_hole `Flex psi ty >>= fun tm ->
-      M.ret @@ Tm.up tm
-
     | _, E.Cut (e, fs) ->
       elab_inf env e >>= fun (hty, hd) ->
+      normalize_ty hty >>= fun hty ->
       elab_cut env (hty, hd) fs (Chk ty)
 
     | _, E.HCom info ->
@@ -436,6 +452,26 @@ struct
 
     | _, e ->
       elab_up env ty e
+
+  and elab_tm_sys env ty =
+    let rec go acc =
+      function
+      | [] ->
+        M.ret @@ Bwd.to_list acc
+
+      | (e_r, e_r', e) :: esys ->
+        let rst_ty = Tm.make @@ Tm.Rst {ty; sys = Bwd.to_list acc} in
+        elab_dim env e_r >>= fun r ->
+        elab_dim env e_r' >>= fun r' ->
+        begin
+          M.under_restriction r r' begin
+            elab_chk env rst_ty e
+          end
+        end >>= fun obnd ->
+        let face = r, r', obnd in
+        go (acc #< face) esys
+    in
+    go Emp
 
   and elab_hcom_sys env s ty cap =
     let rec go acc =
@@ -551,6 +587,7 @@ struct
 
     | E.Cut (e, fs) ->
       elab_inf env e >>= fun (ty, cmd) ->
+      normalize_ty ty >>= fun ty ->
       elab_cut env (ty, cmd) fs Inf
 
     | E.Coe info ->
@@ -611,9 +648,9 @@ struct
       failwith "TODO: elab_dim"
 
   and elab_cut : type x. _ -> (ty * tm Tm.cmd) -> E.frame list -> x mode -> x M.m =
-    fun env ->
-      let rec go : type x. _ -> _ -> _ -> x mode -> x M.m =
-        fun hty (hd, sp) efs mode ->
+    fun (type x) env ->
+      let rec go : ty -> _ -> _ -> x mode -> x M.m =
+        fun (hty : ty) (hd, sp) efs mode : x M.m ->
           match Tm.unleash hty, efs with
           | _, [] ->
             begin
@@ -664,7 +701,9 @@ struct
           | Tm.Rst rst, efs ->
             go rst.ty (hd, sp) efs mode
 
-          | _ -> failwith "elab_cut: unexpected case"
+          | _ ->
+            Format.eprintf "damn: %a@." Tm.pp0 hty;
+            failwith "elab_cut: unexpected case"
       in
       fun (hty, cmd) ->
         go hty cmd

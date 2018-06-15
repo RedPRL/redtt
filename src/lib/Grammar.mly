@@ -96,11 +96,14 @@ eterm:
   | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; IN; fam = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
-  | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
+  | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = eterm
     { E.Pi (tele, cod) }
 
-  | tele = nonempty_list(epi_cell); TIMES; cod = eterm
+  | tele = nonempty_list(etele_cell); TIMES; cod = eterm
     { E.Sg (tele, cod) }
+
+  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+    { E.Ext (dims, ty, sys)}
 
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
     { E.Pi (["_", dom], cod) }
@@ -121,7 +124,7 @@ escheme_cell:
   | LPR; a = ATOM; COLON; ty = eterm; RPR
     { (a, ty) }
 
-epi_cell:
+etele_cell:
   | LPR; a = ATOM; COLON; ty = eterm; RPR
     { (a, ty) }
 
