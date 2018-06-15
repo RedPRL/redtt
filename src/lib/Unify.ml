@@ -546,7 +546,11 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
       failwith "TODO: match_spine/vproj"
 
-    | _ -> failwith "spine mismatch"
+    | Snoc (sp0, Tm.CoRForce), Snoc (sp1, Tm.CoRForce) ->
+      go sp0 sp1
+
+    | _ ->
+      failwith "spine mismatch"
 
   in
   go sp0 sp1

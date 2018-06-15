@@ -35,8 +35,8 @@ let testing (x : `(bool [1=1 tt])) : singleton bool tt =
 let hset (A : _) : type =
   (x : A)
   (y : A)
-  (p : Path _ x y)
-  (q : Path _ x y)
+  (p : Path A x y)
+  (q : Path A x y)
   → Path _ p q
 
 let hset/exponential-ideal
