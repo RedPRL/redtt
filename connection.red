@@ -38,7 +38,7 @@ let connection/or/diagonal
  : singleton (Path A a b) p
  =
  λ i →
-   connection/or A a b p i i
+   connection/or _ a b p i i
 
 let connection/and
  (A : type)
