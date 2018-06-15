@@ -46,8 +46,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("import", IMPORT);
       ("then", THEN);
       ("else", ELSE);
-      ("from", FROM);
-      ("to", TO);
     ]
 }
 

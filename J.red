@@ -8,7 +8,7 @@ let J
   =
   let h : `(# <_ _> A) = λ i j → `(hcom 0 j A a [i=0 <_> a] [i=1 <k> (@ p k)]) in
   let ty : `(# <_> (U 0)) = λ i → C (h i 1) (λ j → h i j) in
-  coe d from 0 to 1 in ty
+  coe 0 1 d in ty
 
 let J/eq
   (A : type) (a : A)
