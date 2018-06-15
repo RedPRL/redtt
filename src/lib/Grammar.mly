@@ -15,7 +15,7 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN WITH END
-%token BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT
+%token BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V
 %token THEN ELSE
 %token IMPORT
 %token TYPE PRE KAN
@@ -235,6 +235,11 @@ tm:
     { fun _env ->
       make_node $startpos $endpos @@
       Tm.Univ {kind = k; lvl = Lvl.Const i} }
+
+  | LPR; V; r = tm; ty0 = tm; ty1 = tm; equiv = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.V {r = r env; ty0 = ty0 env; ty1 = ty1 env; equiv = equiv env} }
 
   | LPR; RIGHT_ARROW; tele = tele; RPR
     { fun env ->

@@ -24,6 +24,7 @@ module Make (R : SOURCE) : LEXER = struct
 
   let keywords =
     make_table 0 [
+      ("V", V);
       ("in", IN);
       ("with", WITH);
       ("end", END);
