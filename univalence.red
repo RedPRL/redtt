@@ -36,4 +36,19 @@ let IdEquiv (A : type) : Equiv A A =
     >
   >
 
+; per Dan Licata, UA and UABeta suffice for full univalence:
+; https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
+
+; Thm UA(#l:lvl) : [
+;   (-> [ty/a ty/b : (U #l kan)]
+;       [e : (Equiv ty/a ty/b)]
+;       (path [_] (U #l kan) ty/a ty/b))
+; ] by [
+;   lam ty/a ty/b e =>
+;     abs x => `(V x ty/a ty/b e)
+; ].
+
+;; The following triggers a bug
+; let UA (A : type) (B : type) (E : Equiv A B) : Path type A B =
+;   λ i → ?
 
