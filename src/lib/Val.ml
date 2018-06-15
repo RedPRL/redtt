@@ -759,12 +759,19 @@ struct
       el
 
     | FCom info ->
+      (* [F]: favonia 11.00100100001111110110101010001000100001011.
+       * [SVO]: Part III (airport).
+       * [R1]: RedPRL I 9bd901466684d37f529656a6911466079435dcf1.
+       * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
+
+      (* Some helper functions to reduce typos. *)
       let r, r' = Star.unleash dir in
       let s, s' = Star.unleash info.dir in
       let cap_abs = Abs.bind1 x info.cap in
 
-      (* this is different from the $O^z$ Part III becasue
-       * `(D.subst r x)` applies to `z` as well. *)
+      (* this is different from the O^z [SVO, F] becasue
+       * `(D.subst r x)` applies to `z` as well.
+       * This is actually what we want! *)
       let origin z_dest =
         let face = Face.map @@
           fun ri r'i absi ->
@@ -781,12 +788,19 @@ struct
           (rigid_cap info.dir info.cap info.sys el)
           (`Ok (List.map face info.sys))
       in
-      (* as in `origin`, substition applies to z_dest as well. this turns out to be okay. *)
+      (* This is N in [F, SVO], representing the coherence conditions enforced by `info.sys`.
+       * The coercion must be equal to the coercion within the system under the restriction.
+       *
+       * Note that substitution DOES NOT apply to z_dest. This turns out to be okay, but one
+       * has to be very, very careful. *)
       let recovery_apart abs x_dest z_dest =
-        Val.act (D.subst x_dest x) @@
-        make_coe (Star.make s' z_dest) abs @@
+        let phi = D.subst x_dest x in
+        make_coe (Star.make (D.act phi s') z_dest) (Abs.act phi abs) @@
         make_coe (Star.make r x_dest) (Abs.bind1 x @@ Abs.inst1 abs s') el
       in
+      (* This is P in [F, SVO], the naive coercion of the cap part of the box within `info.cap`.
+       * The problem is that we do not have the boundaries of the box, and even if we have,
+       * this naive cap will not be the image of the boundaries. *)
       let naively_coerced_cap =
         rigid_gcom dir cap_abs (origin s) @@
         CompSys.forall x @@
@@ -798,6 +812,11 @@ struct
         in
         CompSys.forall x [diag] @ List.map face (CompSys.forall x info.sys)
       in
+      (* This is Q in [F, SVO]. This is used to calculate the preimage of the naively coerced cap
+       * for the boundaries and the fixed cap.
+       *
+       * For equations apart from `x`, the recovery_general will coincide with recovery_apart.
+       * This optimization is automatic thanks to the semantic simplification in redtt. *)
       let recovery_general abs z_dest =
         let phi_r' = D.subst r' x in
         make_gcom (Star.make (D.act phi_r' s) z_dest) (Abs.act phi_r' abs) naively_coerced_cap @@
@@ -811,8 +830,13 @@ struct
         in
         `Ok (diag :: List.map face (CompSys.forall x info.sys))
       in
+      (* This is the "cap" part of the final request in [F, SVO].
+       *
+       * Using Q, the preimages, this is to calculate the final cap based on the naive cap.
+       *
+       * Note that the entire expression is under the substitution `(D.subst r' x)`
+       * that will be done later. *)
       let coerced_cap =
-        (* this will be done in the final result: Val.act (D.subst r' x) @@ *)
         rigid_hcom info.dir info.cap naively_coerced_cap @@
         let diag = AbsFace.rigid dir @@ let w = Name.fresh () in Abs.bind1 w @@ origin (D.named w) in
         let face = Face.map @@ fun ri r'i absi ->
