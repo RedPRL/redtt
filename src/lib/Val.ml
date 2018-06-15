@@ -203,6 +203,8 @@ struct
     include Sort
       with type t = comp_sys
       with type 'a m = [`Ok of comp_sys | `Proj of abs]
+    val forall : D.atom -> t -> t
+    val forallm : D.atom -> t m -> t m
   end =
   struct
     type t = comp_sys
@@ -227,6 +229,17 @@ struct
       with
       | Proj abs ->
         `Proj abs
+
+    (* note that these functions do not commute with `make`
+     * if there is a face with equation `x=x` where `x` is
+     * the dimension. *)
+    let forall x sys =
+      List.filter (fun f -> Face.forall x f = `Keep) sys
+    let forallm x msys =
+      match msys with
+      | `Ok sys -> `Ok (forall x sys)
+      | `Proj abs -> `Proj abs
+
   end
 
   (* TODO merge this with CompSys *)
@@ -268,6 +281,7 @@ struct
       with type 'a m = 'a
 
     val from_rigid : rigid_val_sys -> t
+    val forall : D.atom -> t -> t
   end =
   struct
     type t = val_sys
@@ -283,6 +297,12 @@ struct
         | Face.Indet (p, a) -> Face.Indet (p, a)
       in
       List.map face sys
+
+    (* note that these functions do not commute with `make`
+     * if there is a face with equation `x=x` where `x` is
+     * the dimension. *)
+    let forall x sys =
+      List.filter (fun f -> Face.forall x f = `Keep) sys
   end
 
 
@@ -738,8 +758,79 @@ struct
     | (Bool | Univ _) ->
       el
 
-    | FCom _info ->
-      failwith "Coe in fcom, taste it!!"
+    | FCom info ->
+      let r, r' = Star.unleash dir in
+      let s, s' = Star.unleash info.dir in
+      let cap_abs = Abs.bind1 x info.cap in
+
+      (* this is different from the $O^z$ Part III becasue
+       * `(D.subst r x)` applies to `z` as well. *)
+      let origin z_dest =
+        let face = Face.map @@
+          fun ri r'i absi ->
+          let y = Name.fresh () in
+          Abs.bind1 y @@
+          Val.act (D.equate ri r'i) @@
+          make_coe (Star.make (D.named y) s) absi @@
+          make_coe (Star.make s' (D.named y)) absi el
+        in
+        Val.act (D.subst r x) @@
+        make_hcom
+          (Star.make s' z_dest)
+          info.cap
+          (rigid_cap info.dir info.cap info.sys el)
+          (`Ok (List.map face info.sys))
+      in
+      (* as in `origin`, substition applies to z_dest as well. this turns out to be okay. *)
+      let recovery_apart abs x_dest z_dest =
+        Val.act (D.subst x_dest x) @@
+        make_coe (Star.make s' z_dest) abs @@
+        make_coe (Star.make r x_dest) (Abs.bind1 x @@ Abs.inst1 abs s') el
+      in
+      let naively_coerced_cap =
+        rigid_gcom dir cap_abs (origin s) @@
+        CompSys.forall x @@
+        let diag = AbsFace.rigid info.dir @@ Abs.bind1 x @@ make_coe (Star.make r (D.named x)) cap_abs el in
+        let face = Face.map @@ fun ri r'i absi ->
+          Abs.bind1 x @@
+          Val.act (D.equate ri r'i) @@
+          recovery_apart absi (D.named x) s
+        in
+        CompSys.forall x [diag] @ List.map face (CompSys.forall x info.sys)
+      in
+      let recovery_general abs z_dest =
+        let phi_r' = D.subst r' x in
+        make_gcom (Star.make (D.act phi_r' s) z_dest) (Abs.act phi_r' abs) naively_coerced_cap @@
+        let diag = AbsFace.rigid dir @@
+          let y = Name.fresh () in
+          Abs.bind1 y @@ recovery_apart abs r (D.named y)
+        in
+        let face = Face.map @@ fun ri r'i absi ->
+          let y = Name.fresh () in
+          Abs.bind1 y @@ Val.act (D.equate ri r'i) @@ recovery_apart absi r' (D.named y)
+        in
+        `Ok (diag :: List.map face (CompSys.forall x info.sys))
+      in
+      let coerced_cap =
+        (* this will be done in the final result: Val.act (D.subst r' x) @@ *)
+        rigid_hcom info.dir info.cap naively_coerced_cap @@
+        let diag = AbsFace.rigid dir @@ let w = Name.fresh () in Abs.bind1 w @@ origin (D.named w) in
+        let face = Face.map @@ fun ri r'i absi ->
+          let w = Name.fresh () in
+          Abs.bind1 w @@
+          Val.act (D.equate ri r'i) @@
+          make_coe (Star.make (D.named w) s) absi @@
+          recovery_general absi (D.named w)
+        in
+        diag :: List.map face info.sys
+      in
+      Val.act (D.subst r' x) @@
+      rigid_box info.dir coerced_cap @@
+      let face = Face.map @@ fun ri r'i absi ->
+        Val.act (D.equate ri r'i) @@
+        recovery_general absi s'
+      in List.map face info.sys
+
 
     | V info ->
       begin
@@ -954,9 +1045,9 @@ struct
             (diag_face :: hcom_faces @ fcom_faces)
         in
         let boundary = Face.map @@
-          fun ri r'i abs ->
+          fun ri r'i absi ->
           Val.act (D.equate ri r'i) @@
-          cap_of_hcom_in_wall abs s'
+          cap_of_hcom_in_wall absi s'
         in
         rigid_box info.dir recovered
           (List.map boundary sys)
@@ -1558,14 +1649,7 @@ struct
     | Coe info ->
       let y, ext_y = Abs.unleash1 info.abs in
       let ty_s, sys_s = unleash_ext ext_y ss in
-      let forall_y_sys_s =
-        let filter_face face =
-          match Face.forall y face with
-          | `Keep -> true
-          | `Delete -> false
-        in
-        List.filter filter_face sys_s
-      in
+      let forall_y_sys_s = ValSys.forall y sys_s in
       begin
         match force_val_sys forall_y_sys_s with
         | `Proj v ->
