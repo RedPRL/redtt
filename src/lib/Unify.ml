@@ -695,7 +695,7 @@ let unify q =
     (q.ty1, q.tm1) %% Tm.Cdr >>= fun (ty_cdr1, cdr1) ->
     active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
     let prob = Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1 in
-    Format.eprintf "problem: %a@.@." (Problem.pp) prob;
+    (* Format.eprintf "problem: %a@.@." (Problem.pp) prob; *)
     active @@ prob
 
   | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
