@@ -608,7 +608,7 @@ let rec subtype ty0 ty1 =
 
     | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) ->
       (* no idea what to do in flex-flex case, don't worry about it *)
-      block @@ Subtype {ty0; ty1}
+      active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
     (* The following two cases are sketchy: they do not yield most general solutions for subtyping.
        But it seems to be analogous to what happens in Agda. *)
@@ -625,7 +625,7 @@ let rec subtype ty0 ty1 =
       active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}}
 
     | _ ->
-      block @@ Subtype {ty0; ty1}
+      active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
 
 

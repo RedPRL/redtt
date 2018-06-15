@@ -24,8 +24,8 @@ let connection/or
     [j=0 <k> (@ face k i)]
     [j=1 <k> (@ face k 1)]
     [i=j <k> (@ face k i)])
-;
-; ; an example of using the singleton type to establish an exact equality
+
+; an example of using the singleton type to establish an exact equality
 let connection/or/diagonal
  (A : type)
  (a : A)
@@ -34,7 +34,7 @@ let connection/or/diagonal
  : singleton (Path A a b) p
  =
  λ i →
-   connection/or _ _ _ p i i
+   connection/or A a b p i i
 
 let connection/and
  (A : type)

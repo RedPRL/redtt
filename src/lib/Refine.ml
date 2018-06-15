@@ -472,6 +472,8 @@ struct
     elab_inf env inf >>= fun (ty', cmd) ->
     M.lift (C.check_subtype ty' ty) >>= fun b ->
     if b then M.ret @@ Tm.up cmd else
+      (* TODO: I really don't like this; it leads to confusing, RedPRL-style proof states where you don't know if you're wrong.
+         We should be more conservative, and try to immediately solve the problem with unification, and if that fails, throw an error. *)
       begin
         M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
         M.lift C.ask >>= fun psi ->
