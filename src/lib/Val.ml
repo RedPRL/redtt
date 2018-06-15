@@ -761,7 +761,7 @@ struct
     | FCom info ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
        * [SVO]: Part III (airport).
-       * [R1]: RedPRL I 9bd901466684d37f529656a6911466079435dcf1.
+       * [R1]: RedPRL I ecc57a2f818069c85ee817c86b3c2b290d62c171.
        * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
 
       (* Some helper functions to reduce typos. *)
@@ -854,7 +854,7 @@ struct
     | V info ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
        * [SVO]: Part III (airport).
-       * [R1]: RedPRL I 9bd901466684d37f529656a6911466079435dcf1.
+       * [R1]: RedPRL I ecc57a2f818069c85ee817c86b3c2b290d62c171.
        * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
 
       (* Some helper functions to reduce typos. *)
@@ -1010,7 +1010,7 @@ struct
     | FCom info ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
        * [SVO]: Part III (airport).
-       * [R1]: RedPRL I 9bd901466684d37f529656a6911466079435dcf1.
+       * [R1]: RedPRL I ecc57a2f818069c85ee817c86b3c2b290d62c171.
        * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
 
       (* The algorithm is based on the alternative coe in [F]. *)
