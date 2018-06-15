@@ -22,8 +22,9 @@ and eterm =
   | Pi of etele * eterm
   | Sg of etele * eterm
 
-  | Coe of {r : eterm; r' : eterm; ty : eterm; tm : eterm}
+  | Coe of {r : eterm; r' : eterm; fam : eterm; tm : eterm}
   | HCom of {r : eterm; r' : eterm; cap : eterm; sys : esys}
+  | Com of {r : eterm; r' : eterm; fam : eterm; cap : eterm; sys : esys}
 
   | Cut of eterm * frame list
 

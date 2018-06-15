@@ -87,11 +87,14 @@ eterm:
   | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
     { E.If (e0, e1, e2) }
 
-  | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm = atomic_eterm; IN; ty = eterm
-    { E.Coe {r = r0; r' = r1; ty; tm} }
+  | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm= atomic_eterm; IN; fam = eterm
+    { E.Coe {r = r0; r' = r1; fam; tm} }
 
   | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
     { E.HCom {r = r0; r' = r1; cap; sys}}
+
+  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; IN; fam = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+    { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
   | tele = nonempty_list(epi_cell); RIGHT_ARROW; cod = eterm
     { E.Pi (tele, cod) }

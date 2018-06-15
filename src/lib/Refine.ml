@@ -134,13 +134,13 @@ struct
       function
       | Emp -> renv
       | Snoc (psi, (x, _)) ->
+        let renv = go_locals renv psi in
         begin
           match Name.name x with
           | Some str ->
-            let renvx = ResEnv.global str x renv in
-            go_locals renvx psi
+            ResEnv.global str x renv
           | None ->
-            go_locals renv psi
+            renv
         end
     in
     M.lift C.ask >>= fun psi ->
@@ -368,17 +368,17 @@ struct
         | [], _ -> lnames, E.Lam (rnames, e)
         | _ :: nms, name :: rnames ->
           let x = Name.named @@ Some name in
-          bite nms (x :: lnames) rnames
+          bite nms (lnames #< x) rnames
         | _ -> failwith "Elab: incorrect number of binders when refining extension type"
       in
-      let xs, e' = bite nms [] names in
-      let ty, sys = Tm.unbind_ext_with xs ebnd in
+      let xs, e' = bite nms Emp names in
+      let ty, sys = Tm.unbind_ext_with (Bwd.to_list xs) ebnd in
       let rty = Tm.make @@ Tm.Rst {ty; sys} in
-      let ps = List.map (fun x -> (x, `I)) xs in
+      let ps = List.map (fun x -> (x, `I)) @@ Bwd.to_list xs in
       M.in_scopes ps begin
         elab_chk env rty e'
       end >>= fun bdyxs ->
-      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn (Bwd.from_list xs) bdyxs)
+      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs)
 
 
     | _, Tuple [] ->
@@ -426,7 +426,7 @@ struct
         M.lift @@ C.check ~ty:kan_univ ty >>= function
         | true ->
           elab_chk env ty info.cap >>= fun cap ->
-          elab_hcom_sys env r r' ty cap info.sys >>= fun sys ->
+          elab_hcom_sys env r ty cap info.sys >>= fun sys ->
           let hcom = Tm.HCom {r; r'; ty; cap; sys} in
           M.ret @@ Tm.up (hcom, Emp)
 
@@ -437,7 +437,7 @@ struct
     | _, e ->
       elab_up env ty e
 
-  and elab_hcom_sys env s _s' ty cap =
+  and elab_hcom_sys env s ty cap =
     let rec go acc =
       function
       | [] ->
@@ -456,6 +456,43 @@ struct
           let faces_adj = List.map face_adj @@ Bwd.to_list acc in
           let faces = face_cap :: faces_adj in
           Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty faces)
+        in
+        elab_dim env e_r >>= fun r ->
+        elab_dim env e_r' >>= fun r' ->
+        begin
+          M.under_restriction r r' begin
+            elab_chk env ext_ty e >>= fun line ->
+            M.lift C.typechecker >>= fun (module T) ->
+            let module HS = HSubst (T) in
+            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
+            M.ret @@ Tm.bind x tmx
+          end
+        end >>= fun obnd ->
+        let face = r, r', obnd in
+        go (acc #< face) esys
+
+    in go Emp
+
+  and elab_com_sys env s ty_bnd cap =
+    let rec go acc =
+      function
+      | [] ->
+        M.ret @@ Bwd.to_list acc
+
+      | (e_r, e_r', e) :: esys ->
+        let x = Name.fresh () in
+        let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+        let tyx = Tm.unbind_with x (fun tw -> tw) ty_bnd in
+        let ext_ty =
+          let face_cap = varx, s, Some cap in
+          let face_adj (r, r', obnd) =
+            let bnd = Option.get_exn obnd in
+            let tmx = Tm.unbind_with x (fun tw -> tw) bnd in
+            r, r', Some tmx
+          in
+          let faces_adj = List.map face_adj @@ Bwd.to_list acc in
+          let faces = face_cap :: faces_adj in
+          Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) tyx faces)
         in
         elab_dim env e_r >>= fun r ->
         elab_dim env e_r' >>= fun r' ->
@@ -522,7 +559,7 @@ struct
       let x = Name.fresh () in
       let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
-      elab_chk env univ_fam info.ty >>= fun fam ->
+      elab_chk env univ_fam info.fam >>= fun fam ->
       M.lift C.typechecker >>= fun (module T) ->
       let module HS = HSubst (T) in
       let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
@@ -532,6 +569,25 @@ struct
       let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
       let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
       M.ret (fam_r', (coe, Emp))
+
+    | E.Com info ->
+      elab_dim env info.r >>= fun tr ->
+      elab_dim env info.r' >>= fun tr' ->
+      let x = Name.fresh () in
+      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
+      let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
+      elab_chk env univ_fam info.fam >>= fun fam ->
+      M.lift C.typechecker >>= fun (module T) ->
+      let module HS = HSubst (T) in
+      let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
+      elab_chk env fam_r info.cap >>= fun cap ->
+      let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
+      let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+      let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
+      let tybnd = Tm.bind x tyx in
+      elab_com_sys env tr tybnd cap info.sys >>= fun sys ->
+      let com = Tm.Com {r = tr; r' = tr'; ty = tybnd; cap; sys} in
+      M.ret (fam_r', (com, Emp))
 
     | _ ->
       failwith "Can't infer"

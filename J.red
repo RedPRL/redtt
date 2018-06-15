@@ -39,9 +39,9 @@ let J/eq
       end
   in
   λ k →
-    `(com 0 1
-      <i> (C (@ cube i 1 k) (λ <j> (@ cube i j k)))
-      d
-      [k=0 <i> (coe 0 i <j> (C (@ (@ square j) 1) (λ <k> (@ (@ square j) k))) d)]
-      [k=1 <_> d])
-
+  comp 0 1 d in `(λ <i> (C (@ cube i 1 k) (λ <j> (@ cube i j k)))) with
+  | k=0 ⇒ λ i →
+    coe 0 i d in λ j →
+      C (square j 1) (λ k → square j k)
+  | k=1 ⇒ λ _ → d
+  end
