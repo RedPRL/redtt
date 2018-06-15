@@ -853,22 +853,20 @@ struct
           let base1 dest = base D.dim1 dest in
           let fiber0 b = car @@ apply (cdr equiv0) b in
           let contr0 fib = apply (cdr @@ apply (cdr equiv0) (ext_apply (cdr fib) [D.dim1])) fib in
-          let face_diag = AbsFace.make r r' @@ Abs.bind [Name.fresh ()] el in
-          let face0 = AbsFace.make r D.dim0 @@ Abs.bind [Name.fresh ()] (base0 r') in
+          let face_diag = AbsFace.make r r' @@ Abs.make1 (fun _ -> el) in
+          let face0 = AbsFace.make r D.dim0 @@ Abs.make1 (fun _ -> base0 r') in
           let face1 = AbsFace.make r D.dim1 @@
-            let y = Name.fresh () in
-            Abs.bind1 y @@
-            let ty = Val.act (D.subst r' x) info.ty1 in
-            let cap = base1 r' in
-            let msys = force_abs_sys @@
-              let face0 = AbsFace.make r' D.dim0 @@
-                let z = Name.fresh () in
-                Abs.bind1 z @@ ext_apply (cdr (fiber0 cap)) [D.named z]
+            Abs.make1 @@ fun y ->
+              let ty = Val.act (D.subst r' x) info.ty1 in
+              let cap = base1 r' in
+              let msys = force_abs_sys @@
+                let face0 = AbsFace.make r' D.dim0 @@
+                  Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 cap)) [D.named z]
+                in
+                let face1 = AbsFace.make r' D.dim1 @@ Abs.make1 @@ fun _ -> el in
+                [face0; face1]
               in
-              let face1 = AbsFace.make r' D.dim1 @@ Abs.bind [Name.fresh ()] el in
-              [face0; face1]
-            in
-            make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
+              make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
           in
           let fiber0_ty b =
             let var i = Tm.up @@ Tm.var i `Only in
@@ -876,7 +874,7 @@ struct
             Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
           in
           let fixer_fiber =
-            let fiber_at_face0 = make_cons (el, make_extlam @@ Abs.bind [Name.fresh ()] (base0 D.dim0)) in
+            let fiber_at_face0 = make_cons (el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0) in
             let mode = `SPLIT_COERCION in (* how should we switch this? *)
             match mode with
             | `SPLIT_COERCION ->
@@ -888,18 +886,16 @@ struct
                   let r_atom = Gen.atom r_gen in
                   contr0 @@
                   make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
-                  make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.bind [Name.fresh ()] (base0 D.dim0))
+                  make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0)
               end
             | `UNIFORM_HCOM ->
               make_hcom (Star.make D.dim1 D.dim0) (fiber0_ty (base r D.dim0)) (fiber0 (base r D.dim0)) @@
               force_abs_sys @@
               let face0 = AbsFace.make r D.dim0 @@
-                let w = Name.fresh () in
-                Abs.bind1 w @@
-                ext_apply (contr0 fiber_at_face0) [D.named w]
+                Abs.make1 @@ fun w -> ext_apply (contr0 fiber_at_face0) [D.named w]
               in
               let face1 = AbsFace.make r D.dim1 @@
-                Abs.bind [Name.fresh ()] (fiber0 (base1 D.dim0))
+                Abs.make1 @@ fun _ -> fiber0 (base1 D.dim0)
               in
               [face0; face1]
             | `UNICORN ->
@@ -908,9 +904,7 @@ struct
           let el0 = car fixer_fiber in
           let face_front =
             AbsFace.make r' D.dim0 @@
-            let w = Name.fresh () in
-            Abs.bind1 w @@
-            ext_apply (cdr fixer_fiber) [D.named w]
+            Abs.make1 @@ fun w -> ext_apply (cdr fixer_fiber) [D.named w]
           in
           let el1 = make_hcom (Star.make D.dim1 D.dim0) info.ty1 (base r r') @@
             force_abs_sys [face0; face1; face_diag; face_front]
@@ -975,8 +969,7 @@ struct
             let yi, eli = Abs.unleash1 absi in
             Abs.bind1 yi @@ Val.act (D.equate ri r'i) @@
             cap_in_wall abs eli in
-          let y = Name.fresh () in
-          Abs.bind1 y @@
+          Abs.make1 @@ fun y ->
           make_hcom
             (Star.make s (D.named y))
             info.cap
@@ -993,8 +986,7 @@ struct
         let recovery abs recover_dim =
           let face0 = AbsFace.make recover_dim s @@ hcom_of_coe abs in
           let face1 = AbsFace.make recover_dim s' @@
-            let y = Name.fresh () in
-            Abs.bind1 y @@
+            Abs.make1 @@ fun y ->
             cap_of_hcom_in_wall abs (D.named y)
           in
           let face = Face.map @@ fun ri r'i absi ->
@@ -1012,26 +1004,17 @@ struct
         let cap_aux el = rigid_cap info.dir info.cap info.sys el in
 
         let recovered =
-          let diag_face = AbsFace.rigid dir @@
-            let y = Name.fresh () in
-            Abs.bind1 y @@ cap_aux cap
-          in
+          let diag_face = AbsFace.rigid dir @@ Abs.make1 @@ fun _ -> cap_aux cap in
           let hcom_faces =
-            let face = Face.map @@
-              fun _ _ absi ->
-              let y = Name.fresh () in
-              let z, el = Abs.unleash1 absi in
-              Abs.bind1 y @@ Val.act (D.subst r' z) el
-            in
+            let face = Face.map @@ fun ri r'i absi ->
+              Abs.make1 @@ fun _ ->
+                Val.act (D.equate ri r'i) @@ Abs.inst1 absi r' in
             List.map face sys
           in
           let fcom_faces =
-            let face = Face.map @@
-              fun ri r'i absi ->
-              let y = Name.fresh () in
-              Abs.bind1 y @@ Val.act (D.equate ri r'i) @@
-              recovery absi (D.named y)
-            in
+            let face = Face.map @@ fun ri r'i absi ->
+              Abs.make1 @@ fun y ->
+                Val.act (D.equate ri r'i) @@ recovery absi (D.named y) in
             List.map face info.sys
           in
           let inner_face = Face.map @@ fun ri r'i absi ->
@@ -1061,15 +1044,13 @@ struct
         let hcom r' ty = make_hcom (Star.make r r') ty cap (`Ok sys) in
         let face0 =
           AbsFace.gen_const x `Dim0 @@
-          let y = Name.fresh () in
-          Abs.bind1 y @@
+          Abs.make1 @@ fun y ->
           apply (car equiv) @@
           hcom (D.named y) ty0
         in
         let face1 =
           AbsFace.gen_const x `Dim1 @@
-          let y = Name.fresh () in
-          Abs.bind1 y @@
+          Abs.make1 @@ fun y ->
           hcom (D.named y) ty1
         in
         let el1_cap = rigid_vproj x ~ty0 ~ty1 ~equiv ~el:cap in
@@ -1125,8 +1106,7 @@ struct
               let r'i = Dim.act (D.equate ri D.dim0) r'i in
               let ghcom00 = AbsFace.make r'i dim0 absi in
               let ghcom01 = AbsFace.make r'i dim1 @@
-                let y = Name.fresh () in
-                Abs.bind1 y @@
+                Abs.make1 @@ fun y ->
                 (* TODO this can be optimized further by expanding
                  * `make_ghcom` because `ty` is not changed and
                  * in degenerate cases there is redundant renaming. *)
@@ -1138,8 +1118,7 @@ struct
               match force_abs_sys [ghcom00; ghcom01] with
               | `Proj abs -> abs
               | `Ok faces ->
-                let y = Name.fresh () in
-                Abs.bind1 y @@
+                Abs.make1 @@ fun y ->
                 make_hcom (Star.make r (D.named y)) ty cap (`Ok (faces @ rest))
           in
           let face0 = face (D.dim0, D.dim1) in
@@ -1673,7 +1652,7 @@ struct
         | `Rigid boundary_sys ->
           let cap = ext_apply info.cap ss in
           let correction_sys =
-            let face = Face.map @@ fun _ _ v -> Abs.bind [Name.fresh ()] v in
+            let face = Face.map @@ fun _ _ v -> Abs.make1 @@ fun _ -> v in
             List.map face boundary_sys
           in
           rigid_hcom info.dir ty_s cap @@ correction_sys @ info.sys
