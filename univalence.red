@@ -29,7 +29,7 @@ let IdEquiv (A : type) : Equiv A A =
       let aux : Line A =
         λ j →
         comp 1 j a with
-        | i=0 ⇒ λ k → p.cdr k   ; we should be able to eta-reduce this, but there is bug
+        | i=0 ⇒ p.cdr
         | i=1 ⇒ λ _ → a
         end
       in <aux 0, aux>
