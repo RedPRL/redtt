@@ -185,6 +185,16 @@ struct
         let face = equate_val_face env univ face0 face1 in
         Tm.make @@ Tm.CoR face
 
+      | V info0, V info1 ->
+        let r0 = DimGeneric.unleash info0.x in
+        let r1 = DimGeneric.unleash info1.x in
+        let tr = equate_dim env r0 r1 in
+        let ty0 = equate_ty env info0.ty0 info1.ty0 in
+        let ty1 = equate_ty env info0.ty1 info1.ty1 in
+        let equiv_ty = V.Macro.equiv info0.ty0 info1.ty1 in
+        let equiv = equate env equiv_ty info0.equiv info1.equiv in
+        Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
+
       | LblTy info0, LblTy info1 ->
         if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
           let ty = equate env ty info0.ty info1.ty in
