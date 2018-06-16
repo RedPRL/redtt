@@ -45,7 +45,7 @@ let UA (A : type) (B : type) (E : Equiv A B) : Path type A B =
 
 let UA/beta
   (A : type) (B : type) (E : Equiv A B) (a : A)
-  : Path B (coe 0 1 a in λ i → UA A B E i) (E.car a)
+  : Path _ (coe 0 1 a in UA _ _ E) (E.car a)
   =
   λ i →
     coe i 1 (E.car a) in λ _ → B
