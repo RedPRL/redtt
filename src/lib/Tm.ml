@@ -69,26 +69,28 @@ and 'a cmd = 'a head * 'a spine
 type tm = Tm of tm tmf
 
 type 'a subst =
-  | Id
-  | Proj
-  | Sub of 'a subst * 'a
-  | Cmp of 'a subst * 'a subst
+  | Shift of int
+  | Dot of 'a * 'a subst
 
-let var i tw =
+let rec cmp_subst sub0 sub1 =
+  match sub0, sub1 with
+  | s, Shift 0 -> s
+  | Dot (e, sub0), Shift m -> cmp_subst sub0 (Shift (m - 1))
+  | Shift m, Shift n -> Shift (m + n)
+  | sub0, Dot (e, sub1) -> Dot (subst_cmd sub0 e, cmp_subst sub0 sub1)
+
+and var i tw =
   Ix (i, tw), Emp
 
-let lift sub tw =
-  Sub (Cmp (sub, Proj), var 0 tw)
+and lift sub =
+  Dot (var 0 `Only, cmp_subst (Shift 1) sub)
 
-let rec liftn n sub =
+and liftn n sub =
   match n with
   | 0 -> sub
-  | _ -> liftn (n - 1) @@ lift sub `Only (* TODO *)
+  | _ -> liftn (n - 1) @@ lift sub
 
-let inst0 t = Sub (Id, t)
-
-
-let rec subst (sub : tm cmd subst) (Tm con) =
+and subst (sub : tm cmd subst) (Tm con) =
   Tm (subst_f sub con)
 
 and subst_f (sub : tm cmd subst) =
@@ -192,7 +194,12 @@ and subst_frame sub frame =
 and subst_head sub head =
   match head with
   | Ix (i, tw) ->
-    subst_ix sub i tw
+    begin
+      match sub, i with
+      | Shift n, _ -> Ix (i + n, tw), Emp
+      | Dot (e, sub), 0 -> e
+      | Dot (e, sub), _ -> subst_head sub @@ Ix (i - 1, tw)
+    end
 
   | Ref (a, tw) ->
     Ref (a, tw), Emp
@@ -228,23 +235,9 @@ and subst_head sub head =
     let sys = subst_comp_sys sub info.sys in
     Com {r; r'; ty; cap; sys}, Emp
 
-and subst_ix sub ix tw =
-  match sub with
-  | Id ->
-    Ix (ix, tw), Emp
-  | Proj ->
-    Ix (ix + 1, tw), Emp
-
-  | Sub (sub, cmd) ->
-    if ix = 0 then cmd else subst_ix sub (ix - 1) tw
-
-  | Cmp (sub1, sub0) ->
-    subst_cmd sub1 @@
-    subst_ix sub0 ix tw
-
 and subst_bnd sub bnd =
   let B (nm, t) = bnd in
-  B (nm, subst (lift sub `Only) t)
+  B (nm, subst (lift sub) t)
 
 and subst_nbnd sub bnd =
   let NB (nms, t) = bnd in
@@ -433,14 +426,6 @@ let close_var a f k =
   let var _ i tw = Ix (i, tw), Emp in
   let ref n (b, tw) = if b = a then Ix (n + k, f tw), Emp else Ref (b, tw), Emp in
   fix_traverse ~var ~ref
-
-let subst sub =
-  let ref _ (b, tw) = Ref (b, tw), Emp in
-  let rec go k (Tm tm) =
-    let var _ i = subst_ix (liftn k sub) i in
-    Tm (traverse ~f:go ~var ~ref k tm)
-  in
-  go 0
 
 (* TODO: check that this isn't catastrophically wrong *)
 let open_var k a f =
@@ -788,35 +773,35 @@ module Macro =
 struct
   let arr ty0 ty1 =
     pi None ty0 @@
-    subst Proj ty1
+    subst (Shift 1) ty1
 
   let times ty0 ty1 =
     sg None ty0 @@
-    subst Proj ty1
+    subst (Shift 1) ty1
 
   let path ty tm0 tm1 =
-    let ty' = subst Proj ty in
-    let face0 = up (var 0 `Only), make Dim0, Some (subst Proj tm0) in
-    let face1 = up (var 0 `Only), make Dim1, Some (subst Proj tm1) in
+    let ty' = subst (Shift 1) ty in
+    let face0 = up (var 0 `Only), make Dim0, Some (subst (Shift 1) tm0) in
+    let face1 = up (var 0 `Only), make Dim1, Some (subst (Shift 1) tm1) in
     let sys = [face0; face1] in
     make @@ Ext (NB ([None], (ty', sys)))
 
   let fiber ~ty0 ~ty1 ~f ~x =
     sg (Some "ix") ty0 @@
     let app =
-      Down {tm = subst Proj f; ty = arr ty0 ty1},
+      Down {tm = subst (Shift 1) f; ty = arr ty0 ty1},
       (Emp #< (FunApp (up (var 0 `Only))))
     in
     path
-      (subst Proj ty1)
+      (subst (Shift 1) ty1)
       (up app)
-      (subst Proj x)
+      (subst (Shift 1) x)
 
-  let proj2 = Cmp (Proj, Proj)
+  let proj2 = Shift 2
 
   let is_contr ty =
     sg (Some "center") ty @@
-    pi (Some "other") (subst Proj ty) @@
+    pi (Some "other") (subst (Shift 1) ty) @@
     path
       (subst proj2 ty)
       (up @@ var 0 `Only)
@@ -824,7 +809,7 @@ struct
 
   let equiv ty0 ty1 =
     sg (Some "fun") (arr ty0 ty1) @@
-    pi (Some "el") (subst Proj ty1) @@
+    pi (Some "el") (subst (Shift 1) ty1) @@
     is_contr @@
     fiber
       ~ty0:(subst proj2 ty0)

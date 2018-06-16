@@ -751,7 +751,7 @@ let rec split_sigma tele x ty =
 
     let ytm = Tm.Ref (y, `Only), sp_tele in
     let ztm = Tm.Ref (z, `Only), sp_tele in
-    let cody = Tm.subst (Tm.Sub (Tm.Id, ytm)) cod in
+    let cody = Tm.subst (Tm.Dot (ytm, Tm.Shift 0)) cod in
 
     Some
       ( y

@@ -74,10 +74,8 @@ val map_tm_sys : (tm -> tm) -> (tm, tm) system -> (tm, tm) system
 
 
 type 'a subst =
-  | Id
-  | Proj
-  | Sub of 'a subst * 'a
-  | Cmp of 'a subst * 'a subst
+  | Shift of int
+  | Dot of 'a * 'a subst
 
 
 val make : tm tmf -> tm

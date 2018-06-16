@@ -701,7 +701,7 @@ struct
             go dom (hd, sp #< Tm.Car) efs mode
 
           | Tm.Sg (_, Tm.B (_, cod)), E.Cdr :: efs ->
-            let cod' = Tm.subst (Tm.Sub (Tm.Id, (hd, sp #< Tm.Car))) cod in
+            let cod' = Tm.subst (Tm.Dot ((hd, sp #< Tm.Car), Tm.Shift 0)) cod in
             go cod' (hd, sp #< Tm.Cdr) efs mode
 
           | Tm.Rst rst, efs ->

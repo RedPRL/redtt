@@ -1359,7 +1359,9 @@ struct
       begin
         match List.nth rho i with
         | Val v -> v
-        | _ -> failwith "Expected value in environment"
+        | Atom a ->
+          Format.eprintf "Expected value in environment for %i, but found atom %a@." i Name.pp a;
+          failwith "Expected value in environment"
       end
 
     | Tm.Ref (name, tw) ->
@@ -1894,6 +1896,15 @@ struct
       Val.act info.action @@
       eval info.rel (Val varg :: info.rho) tm
 
+
+  and pp_env_cell fmt =
+    function
+    | Val v -> pp_value fmt v
+    | Atom a -> Name.pp fmt a
+
+  and pp_env fmt =
+    let pp_sep fmt () = Format.fprintf fmt ", " in
+    Format.pp_print_list ~pp_sep pp_env_cell fmt
 
   and pp_value fmt value =
     match unleash value with
