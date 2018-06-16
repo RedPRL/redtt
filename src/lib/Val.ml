@@ -654,7 +654,7 @@ struct
     | `Const `Dim0 ->
       el0
     | `Const `Dim1 ->
-      el0
+      el1
 
   and make_coe mdir abs el : value =
     match mdir with
