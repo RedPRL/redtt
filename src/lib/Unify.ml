@@ -86,6 +86,10 @@ let define gm alpha ~ty tm =
       failwith "define: type error"
     end
   else
+    typechecker >>= fun (module T) ->
+    let vty' = T.Cx.eval T.Cx.emp ty' in
+    let vtm' = T.Cx.eval T.Cx.emp tm' in
+    let tm' = T.Cx.quote T.Cx.emp ~ty:vty' vtm' in
     push_update alpha >>
     pushr @@ E (alpha, ty', Defn tm')
 
