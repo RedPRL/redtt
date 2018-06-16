@@ -50,8 +50,28 @@ let UA/beta
   λ i →
     coe i 1 (E.car a) in λ _ → B
 
+
+; To prove univalence from UA and UABeta, we need some basic results.
+; (What follows is adapted from the cubicaltt and RedPRL developments.)
+
 let PathToEquiv
   (A : type) (B : type) (P : Path type A B)
   : Equiv A B
   =
   coe 0 1 (IdEquiv A) in λ i → Equiv A (P i)
+
+let LemPropF
+  (A : type) (B : A → type)
+  (B/prop : (a : A) → IsProp (B a))
+  (P : Line A)
+  (b0 : B (P 0))
+  (b1 : B (P 1))
+  : [i] B (P i) with
+    | i=0 ⇒ b0
+    | i=1 ⇒ b1
+    end
+  =
+  λ i →
+    let coe0 = coe 0 i b0 in λ j → B (P j) in
+    let coe1 = coe 1 i b1 in λ j → B (P j) in
+    B/prop (P i) coe0 coe1 i
