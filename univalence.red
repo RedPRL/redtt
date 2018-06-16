@@ -50,3 +50,8 @@ let UA/beta
   λ i →
     coe i 1 (E.car a) in λ _ → B
 
+let PathToEquiv
+  (A : type) (B : type) (P : Path type A B)
+  : Equiv A B
+  =
+  coe 0 1 (IdEquiv A) in λ i → Equiv A (P i)
