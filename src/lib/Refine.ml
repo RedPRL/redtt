@@ -644,7 +644,7 @@ struct
         | `Ref a ->
           M.ret @@ Tm.up (Tm.Ref (a, `Only), Emp)
         | `Ix _ ->
-          failwith "elab_inf: expected locally closed"
+          failwith "elab_dim: expected locally closed"
       end
     | E.Num 0 ->
       M.ret @@ Tm.make Tm.Dim0
