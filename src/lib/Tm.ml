@@ -162,11 +162,10 @@ and subst_tm_face sub (r, r', otm) =
   subst sub r, subst sub r', Option.map (subst sub) otm
 
 
-(* TODO: I don't know if this is backwards or not *)
 and subst_cmd sub (head, spine) =
   let head', spine' = subst_head sub head in
   let spine'' = subst_spine sub spine in
-  head', spine'' <.> spine'
+  head', spine' <.> spine''
 
 and subst_spine sub spine =
   Bwd.map (subst_frame sub) spine
