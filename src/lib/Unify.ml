@@ -741,19 +741,24 @@ let unify q =
     | _ ->
       rigid_rigid q
 
+
 let rec split_sigma tele x ty =
   match Tm.unleash ty with
-  | Tm.Sg (dom, cod) ->
-    let y, cody = Tm.unbind cod in
+  | Tm.Sg (dom, Tm.B (_, cod)) ->
+    let y = Name.fresh () in
     let z = Name.fresh () in
     let sp_tele = telescope_to_spine tele in
+
+    let ytm = Tm.Ref (y, `Only), sp_tele in
+    let ztm = Tm.Ref (z, `Only), sp_tele in
+    let cody = Tm.subst (Tm.Sub (Tm.Id, ytm)) cod in
 
     Some
       ( y
       , abstract_ty tele dom
       , z
       , abstract_ty tele cody
-      , abstract_tm tele @@ Tm.cons (Tm.up (Tm.Ref (y, `Only), sp_tele)) (Tm.up (Tm.Ref (z, `Only), sp_tele))
+      , abstract_tm tele @@ Tm.cons (Tm.up ytm) (Tm.up ztm)
       , ( abstract_tm tele @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Car)
         , abstract_tm tele @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Cdr)
         )
