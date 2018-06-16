@@ -1814,6 +1814,18 @@ struct
       bcase
     | Loop x ->
       Abs.inst1 lcase (Gen.unleash x)
+    | FCom info ->
+      let apply_rec tm = s1_rec mot tm bcase lcase in
+      let r, _ = Star.unleash info.dir in
+      let ty = Abs.make1 @@ fun y ->
+        inst_clo mot @@
+        make_fcom (Star.make r (D.named y)) info.cap (`Ok info.sys)
+      in
+      let face = Face.map @@ fun ri r'i absi ->
+        let y, el = Abs.unleash1 absi in
+        Abs.bind1 y @@ Val.act (D.equate ri r'i) @@ apply_rec el
+      in
+      rigid_com info.dir ty (apply_rec info.cap) (List.map face info.sys)
     | Up up ->
       let neu = S1Rec {mot; neu = up.neu; bcase; lcase} in
       let mot' = inst_clo mot scrut in
