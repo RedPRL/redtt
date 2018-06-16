@@ -43,3 +43,11 @@ let UA (A : type) (B : type) (E : Equiv A B) : Path type A B =
   λ i →
     `(V i A B E)
 
+;; Uh-oh: the following normalizes to 'a', but it should normalize to ((car E) a) or something.
+let UA/bad
+  (A : type) (B : type) (E : Equiv A B) (a : A)
+  : B
+  =
+  `(coe 0 1 <i> (@ (UA A B E) i) a)
+
+debug
