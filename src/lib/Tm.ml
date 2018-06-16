@@ -802,25 +802,29 @@ struct
     make @@ Ext (NB ([None], (ty', sys)))
 
   let fiber ~ty0 ~ty1 ~f ~x =
-    sg None ty0 @@
+    sg (Some "ix") ty0 @@
+    let app =
+      Down {tm = subst Proj f; ty = arr ty0 ty1},
+      (Emp #< (FunApp (up (var 0 `Only))))
+    in
     path
       (subst Proj ty1)
-      (up @@ (Ix (0, `Only), Emp #< (FunApp (subst Proj f))))
+      (up app)
       (subst Proj x)
 
   let proj2 = Cmp (Proj, Proj)
 
   let is_contr ty =
-    sg None ty @@
-    pi None (subst Proj ty) @@
+    sg (Some "center") ty @@
+    pi (Some "other") (subst Proj ty) @@
     path
       (subst proj2 ty)
       (up @@ var 0 `Only)
       (up @@ var 1 `Only)
 
   let equiv ty0 ty1 =
-    sg None (arr ty0 ty1) @@
-    pi None (subst Proj ty1) @@
+    sg (Some "fun") (arr ty0 ty1) @@
+    pi (Some "el") (subst Proj ty1) @@
     is_contr @@
     fiber
       ~ty0:(subst proj2 ty0)
