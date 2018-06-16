@@ -75,7 +75,7 @@ type 'a subst =
 let rec cmp_subst sub0 sub1 =
   match sub0, sub1 with
   | s, Shift 0 -> s
-  | Dot (e, sub0), Shift m -> cmp_subst sub0 (Shift (m - 1))
+  | Dot (_, sub0), Shift m -> cmp_subst sub0 (Shift (m - 1))
   | Shift m, Shift n -> Shift (m + n)
   | sub0, Dot (e, sub1) -> Dot (subst_cmd sub0 e, cmp_subst sub0 sub1)
 
@@ -196,8 +196,8 @@ and subst_head sub head =
     begin
       match sub, i with
       | Shift n, _ -> Ix (i + n, tw), Emp
-      | Dot (e, sub), 0 -> e
-      | Dot (e, sub), _ -> subst_head sub @@ Ix (i - 1, tw)
+      | Dot (e, _), 0 -> e
+      | Dot (_, sub), _ -> subst_head sub @@ Ix (i - 1, tw)
     end
 
   | Ref (a, tw) ->
