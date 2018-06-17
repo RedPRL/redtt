@@ -343,6 +343,16 @@ struct
     | Tm.Bool, E.Ff ->
       M.ret @@ Tm.make Tm.Ff
 
+    | Tm.Univ _, E.S1 ->
+      M.ret @@ Tm.make Tm.S1
+
+    | Tm.S1, E.Base ->
+      M.ret @@ Tm.make Tm.Base
+
+    | Tm.S1, E.Loop r ->
+      elab_dim env r >>= fun r ->
+      M.ret @@ Tm.make (Tm.Loop r)
+
     | Tm.Univ _, E.Ext (names, ety, esys) ->
       let univ = ty in
       let xs = List.map (fun x -> Name.named (Some x)) names in

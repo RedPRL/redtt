@@ -15,7 +15,7 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN WITH END
-%token BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT
+%token BOOL S1 UNIV LAM CONS CAR CDR TT FF IF BASE LOOP S1_REC COMP HCOM COM COE LET DEBUG CALL RESTRICT
 %token THEN ELSE
 %token IMPORT
 %token TYPE PRE KAN
@@ -62,6 +62,10 @@ atomic_eterm:
     { E.Tt }
   | FF
     { E.Ff }
+  | S1
+    { E.S1 }
+  | BASE
+    { E.Base }
 
 
 eframe:
@@ -86,6 +90,12 @@ eterm:
 
   | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
     { E.If (e0, e1, e2) }
+
+  | S1_REC; e0 = eterm; WITH; option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm; END
+    { E.S1Rec (e0, eb, (x, el)) }
+
+  | LOOP; r = eterm
+    { E.Loop r }
 
   | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm= atomic_eterm; IN; fam = eterm
     { E.Coe {r = r0; r' = r1; fam; tm} }

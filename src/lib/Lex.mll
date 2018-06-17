@@ -28,6 +28,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("with", WITH);
       ("end", END);
       ("bool", BOOL);
+      ("S1", S1);
       ("car", CAR);
       ("cdr", CDR);
       ("coe", COE);
@@ -37,11 +38,14 @@ module Make (R : SOURCE) : LEXER = struct
       ("comp", COMP);
       ("restrict", RESTRICT);
       ("if", IF);
+      ("S1-rec", S1_REC);
       ("let", LET);
       ("lam", LAM);
       ("call", CALL);
       ("tt", TT);
       ("ff", FF);
+      ("base", BASE);
+      ("loop", LOOP);
       ("pre", PRE);
       ("kan", KAN);
       ("U", UNIV);
