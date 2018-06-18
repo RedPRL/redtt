@@ -893,7 +893,10 @@ struct
            * as `ext_apply (cdr fib) [D.dim1]` directly. *)
           let contr0 fib = apply (cdr @@ apply (cdr equiv0) (ext_apply (cdr fib) [D.dim1])) fib in
           (* The diagonal face for r=r'. *)
-          let face_diag = AbsFace.make r r' @@ Abs.make1 (fun _ -> el) in
+          let face_diag = AbsFace.make r r' @@ Abs.make1 @@ fun _ ->
+            (* Room for optimization: `x` is apart from `el` *)
+            Val.act (D.subst r x) @@ rigid_vproj info.x info.ty0 info.ty1 info.equiv el
+          in
           (* The face for r=0. *)
           let face0 = AbsFace.make r D.dim0 @@ Abs.make1 (fun _ -> base0 r') in
           (* The face for r=1. This more optimized version is used
