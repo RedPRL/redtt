@@ -844,6 +844,9 @@ struct
       go fl t1 @@ go fl t0 acc
     | Let (cmd, bnd) ->
       go_bnd fl bnd @@ go_cmd fl cmd acc
+    | V info ->
+      go fl info.r @@ go fl info.ty0 @@
+      go fl info.ty1 @@ go fl info.equiv acc
     | _ ->
       Format.eprintf "Tried to get free variables, but we didn't implement the case for: %a@." (pp Pretty.Env.emp) tm;
       failwith "TODO"
