@@ -23,6 +23,7 @@ type 'a tmf =
   | Sg of 'a * 'a bnd
 
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
+  | VIn of {r : 'a; tm0 : 'a; tm1 : 'a}
 
   | Bool
   | Tt
@@ -131,6 +132,12 @@ and subst_f (sub : tm cmd subst) =
     let ty1 = subst sub info.ty1 in
     let equiv = subst sub info.equiv in
     V {r; ty0; ty1; equiv}
+
+  | VIn info ->
+    let r = subst sub info.r in
+    let tm0 = subst sub info.tm0 in
+    let tm1 = subst sub info.tm1 in
+    VIn {r; tm0; tm1}
 
   | Lam bnd ->
     Lam (subst_bnd sub bnd)
@@ -310,6 +317,11 @@ let traverse ~f ~var ~ref =
       let ty1 = f k info.ty1 in
       let equiv = f k info.equiv in
       V {r; ty0; ty1; equiv}
+    | VIn info ->
+      let r = f k info.r in
+      let tm0 = f k info.tm0 in
+      let tm1 = f k info.tm1 in
+      VIn {r; tm0; tm1}
     | ExtLam nbnd ->
       ExtLam (go_nbnd k nbnd)
     | CoRThunk face ->
@@ -546,6 +558,9 @@ let rec pp env fmt =
 
     | V info ->
       Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
+
+    | VIn info ->
+      Format.fprintf fmt "@[<1>(Vin %a@ %a@ %a)!]" (pp env) info.r (pp env) info.tm0 (pp env) info.tm1
 
     | Lam (B (nm, tm)) ->
       let x, env' = Pretty.Env.bind nm env in
@@ -1073,6 +1088,11 @@ let map_tmf f =
     let ty1 = f info.ty1 in
     let equiv = f info.equiv in
     V {r; ty0; ty1; equiv}
+  | VIn info ->
+    let r = f info.r in
+    let tm0 = f info.tm0 in
+    let tm1 = f info.tm1 in
+    VIn {r; tm0; tm1}
   | Lam bnd ->
     Lam (map_bnd f bnd)
   | ExtLam nbnd ->

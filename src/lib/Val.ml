@@ -117,6 +117,9 @@ sig
   val lbl_call : value -> value
   val corestriction_force : value -> value
 
+
+  val rigid_vproj : gen -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
+
   val inst_clo : clo -> value -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
@@ -1259,6 +1262,12 @@ struct
       let equiv = eval rel rho info.equiv in
       make_v (Gen.make r) ty0 ty1 equiv
 
+    | Tm.VIn info ->
+      let r = eval_dim rel rho info.r in
+      let el0 = eval rel rho info.tm0 in
+      let el1 = eval rel rho info.tm1 in
+      make_vin (Gen.make r) el0 el1
+
     | Tm.Lam bnd ->
       make @@ Lam (clo bnd rel rho)
 
@@ -1967,8 +1976,8 @@ struct
       Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
     | V _ ->
       Format.fprintf fmt "<v-type>"
-    | VIn _ ->
-      Format.fprintf fmt "<vin>"
+    | VIn info ->
+      Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)]" Dim.pp (Gen.unleash info.x) pp_value info.el0 pp_value info.el1
     | Coe info ->
       let r, r' = Star.unleash info.dir in
       Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" Dim.pp r Dim.pp r' pp_abs info.abs pp_value info.el

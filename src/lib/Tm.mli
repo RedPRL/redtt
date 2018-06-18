@@ -21,6 +21,7 @@ type 'a tmf =
   | Sg of 'a * 'a bnd
 
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
+  | VIn of {r : 'a; tm0 : 'a; tm1 : 'a}
 
   | Bool
   | Tt

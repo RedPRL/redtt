@@ -106,6 +106,8 @@ sig
   val lbl_call : value -> value
   val corestriction_force : value -> value
 
+  val rigid_vproj : gen -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
+
   val inst_clo : clo -> value -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo

@@ -195,6 +195,16 @@ struct
         let equiv = equate env equiv_ty info0.equiv info1.equiv in
         Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
 
+      | VIn info0, VIn info1 ->
+        (* Format.eprintf "Quoting VIn: %a = %a@." pp_value el0 pp_value el1; *)
+        let x, ty0, ty1, _ = unleash_v ty in
+        let r = DimGeneric.unleash x in
+        let tr = quote_dim env r in
+        let ty0r0 = Val.act (Dim.equate r Dim.dim0) ty0 in
+        let tm0 = equate env ty0r0 info0.el0 info1.el0 in
+        let tm1 = equate env ty1 info0.el1 info1.el1 in
+        Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
+
       | LblTy info0, LblTy info1 ->
         if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
           let ty = equate env ty info0.ty info1.ty in
