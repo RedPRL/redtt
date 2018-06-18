@@ -132,6 +132,7 @@ sig
   val pp_abs : Format.formatter -> abs -> unit
   val pp_value : Format.formatter -> value -> unit
   val pp_neu : Format.formatter -> neu -> unit
+  val pp_comp_sys : Format.formatter -> comp_sys -> unit
 
 
   module Val : Sort.S
