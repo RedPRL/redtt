@@ -1041,6 +1041,9 @@ struct
     | Bool ->
       cap
 
+    | S1 ->
+      make @@ FCom {dir; cap; sys}
+
     | Univ _ ->
       rigid_fcom dir cap sys
 
