@@ -936,10 +936,13 @@ struct
                 | `Ok r_gen ->
                   let r_atom = Gen.atom r_gen in
                   (* coercion to the diagonal *)
-                  contr0 @@
-                  make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
-                  (* the fiber *)
-                  make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0)
+                  let path_in_fiber0_ty =
+                    contr0 @@
+                    make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
+                    (* the fiber *)
+                    make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0)
+                  in
+                  ext_apply path_in_fiber0_ty [r]
               end
             (* The implementation used in [Y]. *)
             | `UNIFORM_HCOM ->
