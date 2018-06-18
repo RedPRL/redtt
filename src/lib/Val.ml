@@ -1927,9 +1927,9 @@ struct
     function
     | Val v ->
       pp_value fmt v
-    | Atom (_, a) ->
-      (* TODO *)
-      Name.pp fmt a
+    | Atom (phi, a) ->
+      let r = Dim.act phi @@ Dim.named a in
+      Dim.pp fmt r
 
   and pp_env fmt =
     let pp_sep fmt () = Format.fprintf fmt ", " in
