@@ -26,6 +26,14 @@ type 'a tmf =
   | Tt
   | Ff
 
+  | Nat
+  | Zero
+  | Suc of 'a
+
+  | Int
+  | Pos of 'a
+  | NegSuc of 'a
+
   | S1
   | Base
   | Loop of 'a

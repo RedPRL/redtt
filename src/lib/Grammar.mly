@@ -15,7 +15,7 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN WITH END
-%token BOOL S1 UNIV LAM CONS CAR CDR TT FF IF BASE LOOP S1_REC COMP HCOM COM COE LET DEBUG CALL RESTRICT
+%token BOOL NAT INT S1 UNIV LAM CONS CAR CDR TT FF IF ZERO SUC NAT_REC POS NEGSUC INT_REC BASE LOOP S1_REC COMP HCOM COM COE LET DEBUG CALL RESTRICT
 %token THEN ELSE
 %token IMPORT
 %token TYPE PRE KAN
@@ -62,6 +62,12 @@ atomic_eterm:
     { E.Tt }
   | FF
     { E.Ff }
+  | NAT
+    { E.Nat }
+  | ZERO
+    { E.Zero }
+  | INT
+    { E.Int }
   | S1
     { E.S1 }
   | BASE
@@ -90,6 +96,21 @@ eterm:
 
   | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
     { E.If (e0, e1, e2) }
+
+  | SUC; n = eterm
+    { E.Suc n }
+
+  | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; WITH; n_rec = ATOM; RRIGHT_ARROW; es = eterm; END
+    { E.NatRec (e0, ez, (n, n_rec, es)) }
+
+  | POS; n = eterm
+    { E.Pos n }
+
+  | NEGSUC; n = eterm
+    { E.NegSuc n }
+
+  | INT_REC; e0 = eterm; WITH; option(PIPE); POS; np = ATOM; RRIGHT_ARROW; ep = eterm; PIPE; NEGSUC; nn = ATOM; RRIGHT_ARROW; en = eterm; END
+    { E.IntRec (e0, (np, ep), (nn, en)) }
 
   | LOOP; r = eterm
     { E.Loop r }

@@ -28,6 +28,14 @@ type 'a tmf =
   | Tt
   | Ff
 
+  | Nat
+  | Zero
+  | Suc of 'a
+
+  | Int
+  | Pos of 'a
+  | NegSuc of 'a
+
   | S1
   | Base
   | Loop of 'a
@@ -98,8 +106,13 @@ let rec subst (sub : tm cmd subst) (Tm con) =
 
 and subst_f (sub : tm cmd subst) =
   function
-  | (Dim0 | Dim1 | Univ _ | Bool | Tt | Ff | S1 | Base) as con ->
+  | (Dim0 | Dim1 | Univ _ | Bool | Tt | Ff | Nat | Zero | Int | S1 | Base) as con ->
     con
+
+  | Suc n -> Suc (subst sub n)
+
+  | Pos n -> Pos (subst sub n)
+  | NegSuc n -> NegSuc (subst sub n)
 
   | Loop r -> Loop (subst sub r)
 
@@ -302,6 +315,12 @@ let traverse ~f ~var ~ref =
     | Bool -> Bool
     | Tt -> Tt
     | Ff -> Ff
+    | Nat -> Nat
+    | Zero -> Zero
+    | Suc n -> Suc (f k n)
+    | Int -> Int
+    | Pos n -> Pos (f k n)
+    | NegSuc n -> NegSuc (f k n)
     | S1 -> S1
     | Base -> Base
     | Loop r -> Loop (f k r)
@@ -608,6 +627,24 @@ let rec pp env fmt =
 
     | Ff ->
       Format.fprintf fmt "ff"
+
+    | Nat ->
+      Format.fprintf fmt "nat"
+
+    | Zero ->
+      Format.fprintf fmt "zero"
+
+    | Suc n ->
+      Format.fprintf fmt "@[<1> (suc %a)@]" (go env `Suc) n
+
+    | Int ->
+      Format.fprintf fmt "int"
+
+    | Pos n ->
+      Format.fprintf fmt "@[<1> (pos %a)@]" (go env `Pos) n
+
+    | NegSuc n ->
+      Format.fprintf fmt "@[<1> (neg-suc %a)@]" (go env `NegSuc) n
 
     | Dim0 ->
       Format.fprintf fmt "0"
@@ -1093,8 +1130,11 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Bool | Tt | Ff | Dim0 | Dim1 | S1 | Base) as con ->
+  | (Univ _ | Bool | Tt | Ff | Nat | Zero | Int | Dim0 | Dim1 | S1 | Base) as con ->
     con
+  | Suc n -> Suc (f n)
+  | Pos n -> Pos (f n)
+  | NegSuc n -> NegSuc (f n)
   | Loop r -> Loop (f r)
   | Cons (t0, t1) ->
     Cons (f t0, f t1)

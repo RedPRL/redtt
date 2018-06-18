@@ -1400,6 +1400,27 @@ struct
     | Tm.Ff ->
       make Ff
 
+    | Tm.Nat ->
+      make Nat
+
+    | Tm.Zero ->
+      make Zero
+
+    | Tm.Suc n ->
+      let n = eval rel rho n in
+      make @@ Suc n
+
+    | Tm.Int ->
+      make Int
+
+    | Tm.Pos n ->
+      let n = eval rel rho n in
+      make @@ Pos n
+
+    | Tm.NegSuc n ->
+      let n = eval rel rho n in
+      make @@ NegSuc n
+
     | Tm.S1 ->
       make S1
 

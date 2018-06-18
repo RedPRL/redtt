@@ -38,12 +38,18 @@ module Make (R : SOURCE) : LEXER = struct
       ("comp", COMP);
       ("restrict", RESTRICT);
       ("if", IF);
+      ("nat-rec", NAT_REC);
+      ("int-rec", INT_REC);
       ("S1-rec", S1_REC);
       ("let", LET);
       ("lam", LAM);
       ("call", CALL);
       ("tt", TT);
       ("ff", FF);
+      ("zero", ZERO);
+      ("suc", SUC);
+      ("pos", POS);
+      ("negsuc", NEGSUC);
       ("base", BASE);
       ("loop", LOOP);
       ("pre", PRE);

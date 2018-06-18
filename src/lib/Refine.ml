@@ -343,6 +343,30 @@ struct
     | Tm.Bool, E.Ff ->
       M.ret @@ Tm.make Tm.Ff
 
+    | Tm.Univ _, E.Nat ->
+      M.ret @@ Tm.make Tm.Nat
+
+    | Tm.Nat, E.Zero ->
+      M.ret @@ Tm.make Tm.Zero
+
+    | Tm.Nat, E.Suc n ->
+      let nat = Tm.make @@ Tm.Nat in
+      elab_chk env nat n >>= fun n ->
+      M.ret @@ Tm.make @@ Tm.Suc n
+
+    | Tm.Univ _, E.Int ->
+      M.ret @@ Tm.make Tm.Int
+
+    | Tm.Int, E.Pos n ->
+      let nat = Tm.make @@ Tm.Nat in
+      elab_chk env nat n >>= fun n ->
+      M.ret @@ Tm.make @@ Tm.Pos n
+
+    | Tm.Int, E.NegSuc n ->
+      let nat = Tm.make @@ Tm.Nat in
+      elab_chk env nat n >>= fun n ->
+      M.ret @@ Tm.make @@ Tm.NegSuc n
+
     | Tm.Univ _, E.S1 ->
       M.ret @@ Tm.make Tm.S1
 
