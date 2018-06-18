@@ -340,8 +340,10 @@ struct
       tr, tr', None
 
     | Face.Indet (p0, v0), Face.Indet (p1, v1) ->
+      let r, r' = DimStar.unleash p0 in
+      let phi = Dim.equate r r' in
       let tr, tr' = equate_star env p0 p1 in
-      let v = equate env ty v0 v1 in
+      let v = equate env (Val.act phi ty) v0 v1 in
       tr, tr', Some v
 
     | _ -> failwith "equate_val_face"
@@ -353,8 +355,10 @@ struct
       tr, tr', None
 
     | Face.Indet (p0, abs0), Face.Indet (p1, abs1) ->
+      let r, r' = DimStar.unleash p0 in
+      let phi = Dim.equate r r' in
       let tr, tr' = equate_star env p0 p1 in
-      let bnd = equate_val_abs env ty abs0 abs1 in
+      let bnd = equate_val_abs env (Val.act phi ty) abs0 abs1 in
       tr, tr', Some bnd
 
     | _ -> failwith "equate_comp_face"
