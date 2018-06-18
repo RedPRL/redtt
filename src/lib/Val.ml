@@ -895,7 +895,8 @@ struct
           (* The diagonal face for r=r'. *)
           let face_diag = AbsFace.make r r' @@ Abs.make1 @@ fun _ ->
             (* Room for optimization: `x` is apart from `el` *)
-            Val.act (D.subst r x) @@ rigid_vproj info.x info.ty0 info.ty1 info.equiv el
+            let substrx = D.subst r x in
+            vproj (Gen.make r) (Val.act substrx info.ty0) (Val.act substrx info.ty1) (Val.act substrx info.equiv) el
           in
           (* The face for r=0. *)
           let face0 = AbsFace.make r D.dim0 @@ Abs.make1 (fun _ -> base0 r') in
