@@ -1257,14 +1257,24 @@ struct
 
     | Tm.V info ->
       let r = eval_dim rel rho info.r in
-      let ty0 = eval rel rho info.ty0 in
-      let ty1 = eval rel rho info.ty1 in
-      let equiv = eval rel rho info.equiv in
-      make_v (Gen.make r) ty0 ty1 equiv
+      begin
+        match Gen.make r with
+        | `Ok x ->
+          let rel' = R.equate (Dim.unleash r) Dim.Dim0 rel in
+          let ty0 = eval rel' rho info.ty0 in
+          let ty1 = eval rel rho info.ty1 in
+          let equiv = eval rel' rho info.equiv in
+          make_v (`Ok x) ty0 ty1 equiv
+        | `Const `Dim0 ->
+          eval rel rho info.ty0
+        | `Const `Dim1 ->
+          eval rel rho info.ty1
+      end
 
     | Tm.VIn info ->
       let r = eval_dim rel rho info.r in
-      let el0 = eval rel rho info.tm0 in
+      let rel' = R.equate (Dim.unleash r) Dim.Dim0 rel in
+      let el0 = eval rel' rho info.tm0 in
       let el1 = eval rel rho info.tm1 in
       make_vin (Gen.make r) el0 el1
 

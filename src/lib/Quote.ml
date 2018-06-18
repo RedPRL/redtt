@@ -293,7 +293,8 @@ struct
       let ty0 = equate_ty env vproj0.ty0 vproj1.ty0 in
       let ty1 = equate_ty env vproj0.ty1 vproj1.ty1 in
       let equiv_ty = V.Macro.equiv vproj0.ty0 vproj0.ty1 in
-      let equiv = equate env equiv_ty vproj0.equiv vproj1.equiv in
+      let phi = Dim.equate r0 Dim.dim0 in
+      let equiv = equate env (Val.act phi equiv_ty) vproj0.equiv vproj1.equiv in
       let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
     | LblCall neu0, LblCall neu1 ->
