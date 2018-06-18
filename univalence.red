@@ -72,8 +72,8 @@ let Retract (A : type) (B : type) (f : A → B) (g : B → A) : type =
     Path A (g (f a)) a
 debug
 
-; The following exhibits a bug:
+; The following exhibits a bug
 let EquivLemmaType (A : type) (B : type)
-  : _
-  = `(Retract^3 (Equiv A B) (Path^1 (U 0) A B) (UA A B) (PathToEquiv A B))
+  : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
+  = ?
 
