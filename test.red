@@ -1,7 +1,12 @@
 import path
 import connection
 import J
-import univalence
+
+let id (X : type) (x : X) : _ = x
+
+; demonstrate McBride-style account of uniform universe level shifting
+let id_univ : type → type =
+  id^1 _
 
 let not (x : bool) : bool =
   if x then ff else tt

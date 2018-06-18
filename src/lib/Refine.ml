@@ -566,13 +566,14 @@ struct
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
     match e with
-    | E.Var name ->
+    | E.Var (name, ushift) ->
       get_resolver env >>= fun renv ->
       begin
         match ResEnv.get name renv with
         | `Ref a ->
           M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) >>= fun ty ->
-          let cmd = Tm.Ref (a, `Only, 0), Emp in
+          let ty = Tm.shift_univ ushift ty in
+          let cmd = Tm.Ref (a, `Only, ushift), Emp in
           M.ret (ty, cmd)
         | `Ix _ ->
           failwith "elab_inf: expected locally closed"
@@ -637,7 +638,7 @@ struct
 
   and elab_dim env e =
     match e with
-    | E.Var name ->
+    | E.Var (name, 0) ->
       get_resolver env >>= fun renv ->
       begin
         match ResEnv.get name renv with

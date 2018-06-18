@@ -30,7 +30,7 @@ and eterm =
 
   | Cut of eterm * frame list
 
-  | Var of string
+  | Var of string * int
   | Num of int
 
 and esys = eface list

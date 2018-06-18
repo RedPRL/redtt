@@ -52,8 +52,10 @@ atomic_eterm:
     { E.Tuple es }
   | LPR; e = eterm; RPR
     { e }
+  | a = ATOM; CARET; k = NUMERAL
+    { E.Var (a, k) }
   | a = ATOM;
-    { if a = "_" then E.Hope else E.Var a }
+    { if a = "_" then E.Hope else E.Var (a, 0) }
   | n = NUMERAL;
     { E.Num n }
   | BOOL
