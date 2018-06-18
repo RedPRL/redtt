@@ -350,15 +350,17 @@ struct
     | _ -> failwith "equate_comp_face"
 
   and equate_val_abs env ty abs0 abs1 =
-    let xs, v0x = Abs.unleash abs0 in
-    match xs with
-    | [x] ->
-      let v1x = Abs.inst abs1 @@ List.map Dim.named xs in
-      let envx = Env.abs env xs in
+    let x, v0x = Abs.unleash1 abs0 in
+    let v1x = Abs.inst1 abs1 (Dim.named x) in
+    try
+      let envx = Env.abs env [x] in
       let tm = equate envx ty v0x v1x in
-      Tm.B (Name.name @@ x, tm)
-    | _ ->
-      failwith "equate_val_abs"
+      Tm.B (Name.name x, tm)
+    with
+    | exn ->
+      (* Format.eprintf "Failed to equate abs: @[<v>%a@,= %a@]@." pp_abs abs0 pp_abs abs1; *)
+      Format.eprintf "@[<v>%a!-@,%a@, = %a@]@." Name.pp x pp_value v0x pp_value v1x;
+      raise exn
 
   and equate_star env p0 p1 =
     let r0, r'0 = DimStar.unleash p0 in

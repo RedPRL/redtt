@@ -83,7 +83,7 @@ struct
 
   let ext_dim {env; qenv; tys; rel; ppenv} ~nm =
     let x = Name.named nm in
-    {env = Val.Atom x :: env;
+    {env = Val.Atom (Dim.idn, x) :: env;
      tys = `Dim :: tys;
      qenv = Quote.Env.abs qenv [x];
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -128,8 +128,9 @@ struct
       Format.eprintf "Failed to evaluate: %a@." (Tm.pp_head ppenv) hd;
       raise exn
 
+  (* Seems iffy? *)
   let eval_dim {env; rel; _} tm =
-    V.eval_dim rel env tm
+    Dim.unleash @@ V.eval_dim rel env tm
 
   let eval_tm_sys {env; rel; _} sys =
     V.eval_tm_sys rel env sys

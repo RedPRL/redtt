@@ -73,9 +73,9 @@ and nf = {ty : value; el : value}
 and ('x, 'a) face = ('x, 'a) Face.face
 
 and clo =
-  | Clo of {bnd : Tm.tm Tm.bnd; rho : env; rel : rel; action : D.action}
+  | Clo of {bnd : Tm.tm Tm.bnd; rho : env; rel : rel}
 
-and env_el = Val of value | Atom of atom
+and env_el = Val of value | Atom of Dim.action * atom
 and env = env_el list
 
 and abs = value Abstraction.abs
@@ -107,7 +107,7 @@ sig
   val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
   val eval_head : rel -> env -> Tm.tm Tm.head -> value
   val eval_frame : rel -> env -> value -> Tm.tm Tm.frame -> value
-  val eval_dim : rel -> env -> Tm.tm -> Dim.repr
+  val eval_dim : rel -> env -> Tm.tm -> Dim.t
   val eval_tm_sys : rel -> env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val apply : value -> value -> value
@@ -126,6 +126,7 @@ sig
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 
+  val pp_abs : Format.formatter -> abs -> unit
   val pp_value : Format.formatter -> value -> unit
   val pp_neu : Format.formatter -> neu -> unit
 
@@ -192,10 +193,15 @@ struct
     type t = clo
     type 'a m = 'a
 
+    let act_env_cell phi =
+      function
+      | Val v -> Val (Val.act phi v)
+      | Atom (psi, x) -> Atom (Dim.cmp phi psi, x)
+
     let act phi clo =
       match clo with
       | Clo info ->
-        Clo {info with action = D.cmp phi info.action}
+        Clo {info with rho = List.map (act_env_cell phi) info.rho}
   end
 
   module CompSys :
@@ -316,30 +322,27 @@ struct
   let rec eval_dim rel rho tm =
     match Tm.unleash tm with
     | Tm.Dim0 ->
-      D.Dim0
+      D.dim0
     | Tm.Dim1 ->
-      D.Dim1
+      D.dim1
     | Tm.Up (hd, Emp) ->
       begin
         match hd with
         | Tm.Ix (i, _) ->
           begin
             match List.nth rho i with
-            | Atom x ->
-              R.canonize (D.Atom x) rel
+            | Atom (phi, x) ->
+              Dim.act phi @@ R.unleash (R.canonize (D.Atom x) rel) rel
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
         | Tm.Ref (a, _, _) ->
-          R.canonize (D.Atom a) rel
+          R.unleash (R.canonize (D.Atom a) rel) rel
         | Tm.Meta meta ->
-          R.canonize (D.Atom meta.name) rel
+          R.unleash (R.canonize (D.Atom meta.name) rel) rel
         | _ -> failwith "eval_dim"
       end
     | _ -> failwith "eval_dim"
-
-  let eval_dim_class rel rho tm =
-    R.unleash (eval_dim rel rho tm) rel
 
 
   let rec make : con -> value =
@@ -1222,7 +1225,7 @@ struct
 
 
   and clo bnd rel rho =
-    Clo {bnd; rho; rel; action = D.idn}
+    Clo {bnd; rho; rel}
 
   and eval rel rho tm =
     match Tm.unleash tm with
@@ -1250,7 +1253,7 @@ struct
       make @@ CoR face
 
     | Tm.V info ->
-      let r = eval_dim_class rel rho info.r in
+      let r = eval_dim rel rho info.r in
       let ty0 = eval rel rho info.ty0 in
       let ty1 = eval rel rho info.ty1 in
       let equiv = eval rel rho info.equiv in
@@ -1273,8 +1276,8 @@ struct
       make @@ Cons (v0, v1)
 
     | Tm.FCom info ->
-      let r = eval_dim_class rel rho info.r  in
-      let r' = eval_dim_class rel rho info.r' in
+      let r = eval_dim rel rho info.r  in
+      let r' = eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let cap = eval rel rho info.cap in
       let sys = eval_bnd_sys rel rho info.sys in
@@ -1334,14 +1337,14 @@ struct
       let v = eval rel rho t in
       apply vhd v
     | Tm.ExtApp ts ->
-      let rs = List.map (eval_dim_class rel rho) ts in
+      let rs = List.map (eval_dim rel rho) ts in
       ext_apply vhd rs
     | Tm.Car ->
       car vhd
     | Tm.Cdr ->
       cdr vhd
     | Tm.VProj info ->
-      let r = eval_dim_class rel rho info.r in
+      let r = eval_dim rel rho info.r in
       let ty0 = eval rel rho info.ty0 in
       let ty1 = eval rel rho info.ty1 in
       let equiv = eval rel rho info.equiv in
@@ -1359,16 +1362,16 @@ struct
       eval rel rho info.tm
 
     | Tm.Coe info ->
-      let r = eval_dim_class rel rho info.r in
-      let r' = eval_dim_class rel rho info.r' in
+      let r = eval_dim rel rho info.r in
+      let r' = eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let abs = eval_bnd rel rho info.ty  in
       let el = eval rel rho info.tm in
       make_coe dir abs el
 
     | Tm.HCom info ->
-      let r = eval_dim_class rel rho info.r in
-      let r' = eval_dim_class rel rho info.r' in
+      let r = eval_dim rel rho info.r in
+      let r' = eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let ty = eval rel rho info.ty in
       let cap = eval rel rho info.cap in
@@ -1376,8 +1379,8 @@ struct
       make_hcom dir ty cap sys
 
     | Tm.Com info ->
-      let r = eval_dim_class rel rho info.r in
-      let r' = eval_dim_class rel rho info.r' in
+      let r = eval_dim rel rho info.r in
+      let r' = eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let abs = eval_bnd rel rho info.ty in
       let cap = eval rel rho info.cap in
@@ -1388,7 +1391,7 @@ struct
       begin
         match List.nth rho i with
         | Val v -> v
-        | Atom a ->
+        | Atom (_, a) ->
           Format.eprintf "Expected value in environment for %i, but found atom %a@." i Name.pp a;
           failwith "Expected value in environment"
       end
@@ -1412,10 +1415,8 @@ struct
       make @@ Up {ty; neu; sys}
 
   and eval_bnd_face rel rho (tr, tr', obnd) =
-    let r = eval_dim rel rho tr in
-    let r' = eval_dim rel rho tr' in
-    let sr = R.unleash r rel in
-    let sr' = R.unleash r' rel in
+    let sr = eval_dim rel rho tr in
+    let sr' = eval_dim rel rho tr' in
     match Star.make sr sr' with
     | `Ok xi ->
       begin
@@ -1424,7 +1425,7 @@ struct
           Face.False xi
         | _ ->
           let bnd = Option.get_exn obnd in
-          let rel' = R.equate r r' rel in
+          let rel' = R.equate (Dim.unleash sr) (Dim.unleash sr') rel in
           let abs = eval_bnd rel' rho bnd in
           Face.Indet (xi, abs)
       end
@@ -1447,24 +1448,22 @@ struct
   and eval_tm_face rel rho (tr, tr', otm) : val_face =
     let r = eval_dim rel rho tr in
     let r' = eval_dim rel rho tr' in
-    let sr = R.unleash r rel in
-    let sr' = R.unleash r' rel in
-    match Star.make sr sr' with
+    match Star.make r r' with
     | `Ok xi ->
       begin
-        match D.compare sr sr' with
+        match D.compare r r' with
         | D.Apart ->
           Face.False xi
         | _ ->
           let tm = Option.get_exn otm in
-          let rel' = R.equate r r' rel in
+          let rel' = R.equate (D.unleash r) (D.unleash r') rel in
           let el = eval rel' rho tm in
           Face.Indet (xi, el)
       end
     | `Same _ ->
       let tm = Option.get_exn otm in
       let el = eval rel rho tm in
-      Face.True (sr, sr', el)
+      Face.True (r, r', el)
 
   and eval_tm_sys rel rho sys : val_sys =
     List.map (eval_tm_face rel rho) sys
@@ -1472,19 +1471,19 @@ struct
   and eval_bnd rel rho bnd =
     let Tm.B (_, tm) = bnd in
     let x = Name.fresh () in
-    let rho = Atom x :: rho in
+    let rho = Atom (Dim.idn, x) :: rho in
     Abs.bind1 x @@ eval rel rho tm
 
   and eval_nbnd rel rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = List.map Name.named nms in
-    let rho = List.map (fun x -> Atom x) xs @ rho in
+    let rho = List.map (fun x -> Atom (Dim.idn, x)) xs @ rho in
     Abs.bind xs @@ eval rel rho tm
 
   and eval_ext_bnd rel rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = List.map Name.named nms in
-    let rho = List.map (fun x -> Atom x) xs @ rho in
+    let rho = List.map (fun x -> Atom (Dim.idn, x)) xs @ rho in
     ExtAbs.bind xs (eval rel rho tm, eval_tm_sys rel rho sys)
 
   and unleash_pi ?debug:(debug = []) v =
@@ -1611,22 +1610,20 @@ struct
       let r, r' = Star.unleash info.dir in
       let x, tyx = Abs.unleash1 info.abs in
       let domx, codx = unleash_pi ~debug:["apply"; "coe"] tyx in
-      let abs =
-        Abs.bind1 x @@
-        inst_clo codx @@
-        make_coe
-          (Star.make r' (D.named x))
-          (Abs.bind1 x domx)
-          varg
-      in
+      let dom = Abs.bind1 x domx in
+      let coe_r'_x = make_coe (Star.make r' (D.named x)) dom varg in
+      let cod_coe = inst_clo' codx coe_r'_x in
+      let abs = Abs.bind1 x cod_coe in
       let el =
         apply info.el @@
         make_coe
           (Star.make r' r)
-          (Abs.bind1 x domx)
+          dom
           varg
       in
-      rigid_coe info.dir abs el
+      let res = rigid_coe info.dir abs el in
+      (* Format.eprintf "apply: @[%a $ %a@ ==> %a, %a, %a, %a]@." pp_value vfun pp_value varg Name.pp x pp_value coe_r'_x pp_value cod_coe pp_abs abs; *)
+      res
 
     | HCom info ->
       let _, cod = unleash_pi ~debug:["apply"; "hcom"] info.ty in
@@ -1922,14 +1919,17 @@ struct
     match clo with
     | Clo info ->
       let Tm.B (_, tm) = info.bnd in
-      Val.act info.action @@
       eval info.rel (Val varg :: info.rho) tm
 
+  and inst_clo' clo varg = inst_clo clo varg
 
   and pp_env_cell fmt =
     function
-    | Val v -> pp_value fmt v
-    | Atom a -> Name.pp fmt a
+    | Val v ->
+      pp_value fmt v
+    | Atom (_, a) ->
+      (* TODO *)
+      Name.pp fmt a
 
   and pp_env fmt =
     let pp_sep fmt () = Format.fprintf fmt ", " in
@@ -1938,7 +1938,7 @@ struct
   and pp_value fmt value =
     match unleash value with
     | Up up ->
-      Format.fprintf fmt "%a{%a}" pp_neu up.neu pp_val_sys up.sys
+      Format.fprintf fmt "%a" pp_neu up.neu
     | Lam clo ->
       Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
     | ExtLam abs ->
@@ -1969,10 +1969,12 @@ struct
       Format.fprintf fmt "<v-type>"
     | VIn _ ->
       Format.fprintf fmt "<vin>"
-    | Coe _ ->
-      Format.fprintf fmt "<coe>"
-    | HCom _ ->
-      Format.fprintf fmt "<hcom>"
+    | Coe info ->
+      let r, r' = Star.unleash info.dir in
+      Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" Dim.pp r Dim.pp r' pp_abs info.abs pp_value info.el
+    | HCom info ->
+      let r, r' = Star.unleash info.dir in
+      Format.fprintf fmt "@[<1>(hcom %a %a %a %a %a)@]" Dim.pp r Dim.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
     | GHCom _ ->
       Format.fprintf fmt "<ghcom>"
     | FCom _ ->
@@ -2020,8 +2022,25 @@ struct
         let r0, r1 = Star.unleash p in
         Format.fprintf fmt "@[<1>[?%a=%a %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
 
-  and pp_clo fmt _ =
-    Format.fprintf fmt "<clo>"
+  and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
+    fun fmt ->
+      let pp_sep fmt () = Format.fprintf fmt " " in
+      Format.pp_print_list ~pp_sep pp_comp_face fmt
+
+  and pp_comp_face : type x. _ -> (x, abs) face -> unit =
+    fun fmt ->
+      function
+      | Face.True (r0, r1, v) ->
+        Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" Dim.pp r0 Dim.pp r1 pp_abs v
+      | Face.False p ->
+        let r0, r1 = Star.unleash p in
+        Format.fprintf fmt "@[<1>[%a/=%a]@]" Dim.pp r0 Dim.pp r1
+      | Face.Indet (p, v) ->
+        let r0, r1 = Star.unleash p in
+        Format.fprintf fmt "@[<1>[?%a=%a %a]@]" Dim.pp r0 Dim.pp r1 pp_abs v
+  and pp_clo fmt (Clo clo) =
+    let Tm.B (_, tm) = clo.bnd in
+    Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
 
   and pp_neu fmt neu =
     match neu with
