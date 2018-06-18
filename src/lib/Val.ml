@@ -881,8 +881,8 @@ struct
            * redtt can afford less efficient generating code. *)
           let base src dest =
             make_coe (Star.make src dest) abs1 @@
-            let phi = D.subst src x in
-            vproj (Gen.make src) (Val.act phi info.ty0) (Val.act phi info.ty1) (Val.act phi info.equiv) el
+            let substsx = Val.act (D.subst src x) in
+            vproj (Gen.make src) (substsx info.ty0) (substsx info.ty1) (substsx info.equiv) el
           in
           (* Some helper functions to reduce typos. *)
           let base0 dest = base D.dim0 dest in
@@ -895,8 +895,8 @@ struct
           (* The diagonal face for r=r'. *)
           let face_diag = AbsFace.make r r' @@ Abs.make1 @@ fun _ ->
             (* Room for optimization: `x` is apart from `el` *)
-            let substrx = D.subst r x in
-            vproj (Gen.make r) (Val.act substrx info.ty0) (Val.act substrx info.ty1) (Val.act substrx info.equiv) el
+            let substrx = Val.act (D.subst r x) in
+            vproj (Gen.make r) (substrx info.ty0) (substrx info.ty1) (substrx info.equiv) el
           in
           (* The face for r=0. *)
           let face0 = AbsFace.make r D.dim0 @@ Abs.make1 (fun _ -> base0 r') in
