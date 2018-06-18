@@ -374,7 +374,6 @@ struct
     with
     | exn ->
       (* Format.eprintf "Failed to equate abs: @[<v>%a@,= %a@]@." pp_abs abs0 pp_abs abs1; *)
-      Format.eprintf "@[<v>%a!-@,%a@, = %a@]@." Name.pp x pp_value v0x pp_value v1x;
       raise exn
 
   and equate_star env p0 p1 =

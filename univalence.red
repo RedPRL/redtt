@@ -70,7 +70,6 @@ let PathToEquiv
 let Retract (A : type) (B : type) (f : A → B) (g : B → A) : type =
   (a : A) →
     Path A (g (f a)) a
-debug
 
 ; The following exhibits a bug
 let EquivLemmaType (A : type) (B : type)

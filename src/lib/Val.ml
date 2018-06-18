@@ -1549,6 +1549,9 @@ struct
     | Rst rst ->
       unleash_v rst.ty
     | _ ->
+      Format.eprintf "Failed to unleash V type: %a@." pp_value v;
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
       failwith "unleash_v"
 
   and unleash_lbl_ty v =
