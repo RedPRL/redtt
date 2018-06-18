@@ -922,7 +922,7 @@ struct
             (* Turns out `fiber_at_face0` will be
              * used for multiple times. *)
             let fiber_at_face0 = make_cons (el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0) in
-            let mode = `SPLIT_COERCION in (* how should we switch this? *)
+            let mode = `UNIFORM_HCOM in (* how should we switch this? *)
             match mode with
             (* The implementation used in [F] and [R1]. *)
             | `SPLIT_COERCION ->
