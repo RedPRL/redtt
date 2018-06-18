@@ -44,6 +44,14 @@ type con =
   | Tt : con
   | Ff : con
 
+  | Nat : con
+  | Zero : con
+  | Suc : value -> con
+
+  | Int : con
+  | Pos : value -> con
+  | Neg : value -> con
+
   | S1 : con
   | Base : con
   | Loop : gen -> con
@@ -64,6 +72,10 @@ and neu =
 
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
 
+  | NatRec : {mot : clo; neu : neu; zcase : value; scase : nclo} -> neu
+
+  | IntRec : {mot : clo; neu : neu; pcase : clo; ncase : clo} -> neu
+
   | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
 
   (* Invariant: neu \in vty, vty is a V type *)
@@ -80,6 +92,9 @@ and ('x, 'a) face = ('x, 'a) Face.face
 
 and clo =
   | Clo of {bnd : Tm.tm Tm.bnd; rho : env; rel : rel; action : D.action}
+
+and nclo =
+  | NClo of {bnd : Tm.tm Tm.nbnd; rho : env; rel : rel; action : D.action}
 
 and env_el = Val of value | Atom of atom
 and env = env_el list
@@ -202,6 +217,17 @@ struct
       match clo with
       | Clo info ->
         Clo {info with action = D.cmp phi info.action}
+  end
+
+  module NClo : Sort with type t = nclo with type 'a m = 'a =
+  struct
+    type t = nclo
+    type 'a m = 'a
+
+    let act phi clo =
+      match clo with
+      | NClo info ->
+        NClo {info with action = D.cmp phi info.action}
   end
 
   module CompSys :
@@ -449,6 +475,24 @@ struct
     | Ff ->
       make con
 
+    | Nat ->
+      make con
+
+    | Zero ->
+      make con
+
+    | Suc _ ->
+      make con
+
+    | Int ->
+      make con
+
+    | Pos _ ->
+      make con
+
+    | Neg _ ->
+      make con
+
     | S1 ->
       make con
 
@@ -569,6 +613,30 @@ struct
           ret @@ If {mot; neu; tcase; fcase}
         | Step v ->
           step @@ if_ mot v tcase fcase
+      end
+
+    | NatRec info ->
+      let mot = Clo.act phi info.mot in
+      let zcase = Val.act phi info.zcase in
+      let scase = NClo.act phi info.scase in
+      begin
+        match act_neu phi info.neu with
+        | Ret neu ->
+          ret @@ NatRec {mot; neu; zcase; scase}
+        | Step v ->
+          step @@ nat_rec mot v zcase scase
+      end
+
+    | IntRec info ->
+      let mot = Clo.act phi info.mot in
+      let pcase = Clo.act phi info.pcase in
+      let ncase = Clo.act phi info.ncase in
+      begin
+        match act_neu phi info.neu with
+        | Ret neu ->
+          ret @@ IntRec {mot; neu; pcase; ncase}
+        | Step v ->
+          step @@ int_rec mot v pcase ncase
       end
 
     | S1Rec info ->
@@ -1038,7 +1106,7 @@ struct
     | (Pi _ | Sg _ | Ext _ | Up _) ->
       make @@ HCom {dir; ty; cap; sys}
 
-    | Bool ->
+    | Bool | Nat | Int ->
       cap
 
     | S1 ->
@@ -1811,6 +1879,43 @@ struct
     | _ ->
       failwith "if_"
 
+  and nat_rec mot scrut zcase scase =
+    match unleash scrut with
+    | Zero ->
+      zcase
+    | Suc n ->
+      let n_rec = nat_rec mot n zcase scase in
+      inst_nclo scase [n; n_rec]
+    | Up up ->
+      let neu = NatRec {mot; neu = up.neu; zcase; scase} in
+      let mot' = inst_clo mot scrut in
+      let nat_rec_face =
+        Face.map @@ fun r r' a ->
+        let phi = Dim.equate r r' in
+        nat_rec (Clo.act phi mot) a (Val.act phi zcase) (NClo.act phi scase)
+      in
+      let nat_rec_sys = List.map nat_rec_face up.sys in
+      make @@ Up {ty = mot'; neu; sys = nat_rec_sys}
+    | _ ->
+      failwith "nat_rec"
+
+  and int_rec mot scrut pcase ncase =
+    match unleash scrut with
+    | Pos n -> inst_clo pcase n
+    | Suc n -> inst_clo ncase n
+    | Up up ->
+      let neu = IntRec {mot; neu = up.neu; pcase; ncase} in
+      let mot' = inst_clo mot scrut in
+      let int_rec_face =
+        Face.map @@ fun r r' a ->
+        let phi = Dim.equate r r' in
+        int_rec (Clo.act phi mot) a (Clo.act phi pcase) (Clo.act phi ncase)
+      in
+      let int_rec_sys = List.map int_rec_face up.sys in
+      make @@ Up {ty = mot'; neu; sys = int_rec_sys}
+    | _ ->
+      failwith "int_rec"
+
   and s1_rec mot scrut bcase lcase =
     match unleash scrut with
     | Base ->
@@ -2008,6 +2113,13 @@ struct
       Val.act info.action @@
       eval info.rel (Val varg :: info.rho) tm
 
+  and inst_nclo nclo vargs =
+    match nclo with
+    | NClo info ->
+      let Tm.NB (_, tm) = info.bnd in
+      Val.act info.action @@
+      eval info.rel (List.map (fun v -> Val v) vargs @ info.rho) tm
+
 
   and pp_value fmt value =
     match unleash value with
@@ -2019,12 +2131,24 @@ struct
       Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
     | CoRThunk face ->
       Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
+    | Bool ->
+      Format.fprintf fmt "bool"
     | Tt ->
       Format.fprintf fmt "tt"
     | Ff ->
       Format.fprintf fmt "ff"
-    | Bool ->
-      Format.fprintf fmt "bool"
+    | Nat ->
+      Format.fprintf fmt "nat"
+    | Zero ->
+      Format.fprintf fmt "zero"
+    | Suc n ->
+      Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
+    | Int ->
+      Format.fprintf fmt "int"
+    | Pos n ->
+      Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
+    | Neg n ->
+      Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
     | S1 ->
       Format.fprintf fmt "S1"
     | Base ->
@@ -2131,6 +2255,12 @@ struct
 
     | If _ ->
       Format.fprintf fmt "<if>"
+
+    | NatRec _ ->
+      Format.fprintf fmt "<natrec>"
+
+    | IntRec _ ->
+      Format.fprintf fmt "<intrec>"
 
     | S1Rec _ ->
       Format.fprintf fmt "<S1rec>"
