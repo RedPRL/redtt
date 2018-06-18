@@ -49,7 +49,7 @@ type con =
 
   | Int : con
   | Pos : value -> con
-  | Neg : value -> con
+  | NegSuc : value -> con
 
   | S1 : con
   | Base : con

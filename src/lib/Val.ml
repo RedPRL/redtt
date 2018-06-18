@@ -50,7 +50,7 @@ type con =
 
   | Int : con
   | Pos : value -> con
-  | Neg : value -> con
+  | NegSuc : value -> con
 
   | S1 : con
   | Base : con
@@ -490,7 +490,7 @@ struct
     | Pos _ ->
       make con
 
-    | Neg _ ->
+    | NegSuc _ ->
       make con
 
     | S1 ->
@@ -2147,8 +2147,8 @@ struct
       Format.fprintf fmt "int"
     | Pos n ->
       Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
-    | Neg n ->
-      Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
+    | NegSuc n ->
+      Format.fprintf fmt "@[<1>(negsuc@ %a)@]" pp_value n
     | S1 ->
       Format.fprintf fmt "S1"
     | Base ->
