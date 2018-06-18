@@ -91,11 +91,11 @@ eterm:
   | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
     { E.If (e0, e1, e2) }
 
-  | S1_REC; e0 = eterm; WITH; option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm; END
-    { E.S1Rec (e0, eb, (x, el)) }
-
   | LOOP; r = eterm
     { E.Loop r }
+
+  | S1_REC; e0 = eterm; WITH; option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm; END
+    { E.S1Rec (e0, eb, (x, el)) }
 
   | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm= atomic_eterm; IN; fam = eterm
     { E.Coe {r = r0; r' = r1; fam; tm} }
