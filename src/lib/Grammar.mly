@@ -11,7 +11,7 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL
-%token COLON COLON_ANGLE COMMA DOT PIPE
+%token COLON COLON_ANGLE COMMA DOT PIPE CARET
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN WITH END
@@ -283,11 +283,17 @@ tm:
       Tm.Let (e0 env, Tm.B (Some x, e1 @@ R.bind x env))}
 
 head:
+  | a = ATOM; CARET; k = NUMERAL
+    { fun env ->
+      match R.get a env with
+      | `Ix _ -> failwith "Cannot shift bound variable"
+      | `Ref r -> Tm.Ref (r, `Only, k) }
+
   | a = ATOM
     { fun env ->
       match R.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
-      | `Ref r -> Tm.Ref (r, `Only) }
+      | `Ref r -> Tm.Ref (r, `Only, 0) }
 
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->

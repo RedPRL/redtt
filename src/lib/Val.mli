@@ -49,8 +49,8 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Ref : Name.t * Tm.twin -> neu
-  | Meta : Name.t -> neu
+  | Ref : Name.t * Tm.twin * int -> neu
+  | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu

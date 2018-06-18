@@ -42,8 +42,8 @@ type 'a tmf =
   | Let of 'a cmd * 'a bnd
 
 and 'a head =
-  | Meta of Name.t
-  | Ref of Name.t * twin
+  | Meta of {name: Name.t; ushift : int}
+  | Ref of Name.t * twin * int
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
@@ -95,6 +95,9 @@ val bind_ext : Name.t bwd -> tm -> (tm, tm) system -> (tm * (tm, tm) system) nbn
 val unbind_with : Name.t -> (twin -> twin) -> tm bnd -> tm
 
 val subst : tm cmd subst -> tm -> tm
+
+
+val shift_univ : int -> tm -> tm
 
 (* make sure you know what you are doing, LOL *)
 val eta_contract : tm -> tm

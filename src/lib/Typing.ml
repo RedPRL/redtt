@@ -49,7 +49,7 @@ struct
             | `Dim -> ()
             | _ -> failwith "check_dim_cmd: expected dimension"
           end
-        | Tm.Ref (_a, _) ->
+        | Tm.Ref (_a, _, _) ->
           (* TODO: lookup in global context, make sure it is a dimension *)
           ()
         | _ -> failwith ""
@@ -489,8 +489,8 @@ struct
 
   and infer_head cx =
     function
-    | T.Ref (name, tw) ->
-      let ty = GlobalEnv.lookup_ty Sig.globals name tw in
+    | T.Ref (name, tw, ush) ->
+      let ty = Tm.shift_univ ush @@ GlobalEnv.lookup_ty Sig.globals name tw in
       Cx.eval Cx.emp ty
 
     | T.Ix (ix, _) ->
@@ -500,8 +500,8 @@ struct
         | `Dim -> failwith "infer: expected type hypothesis"
       end
 
-    | T.Meta name ->
-      let ty = GlobalEnv.lookup_ty Sig.globals name `Only in
+    | T.Meta {name; ushift} ->
+      let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name `Only in
       Cx.eval Cx.emp ty
 
     | T.Coe info ->

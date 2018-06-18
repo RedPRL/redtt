@@ -51,8 +51,8 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Ref : Name.t * Tm.twin -> neu
-  | Meta : Name.t -> neu
+  | Ref : Name.t * Tm.twin * int -> neu
+  | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
@@ -330,10 +330,10 @@ struct
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
-        | Tm.Ref (a, _) ->
+        | Tm.Ref (a, _, _) ->
           R.canonize (D.Atom a) rel
-        | Tm.Meta a ->
-          R.canonize (D.Atom a) rel
+        | Tm.Meta meta ->
+          R.canonize (D.Atom meta.name) rel
         | _ -> failwith "eval_dim"
       end
     | _ -> failwith "eval_dim"
@@ -777,9 +777,9 @@ struct
       let origin z_dest =
         let face = Face.map @@ fun ri r'i absi ->
           Abs.make1 @@ fun y ->
-            Val.act (D.equate ri r'i) @@
-            make_coe (Star.make (D.named y) s) absi @@
-            make_coe (Star.make s' (D.named y)) absi el
+          Val.act (D.equate ri r'i) @@
+          make_coe (Star.make (D.named y) s) absi @@
+          make_coe (Star.make s' (D.named y)) absi el
         in
         Val.act (D.subst r x) @@
         make_hcom
@@ -837,9 +837,9 @@ struct
         let diag = AbsFace.rigid dir @@ Abs.make1 @@ fun w -> origin (D.named w) in
         let face = Face.map @@ fun ri r'i absi ->
           Abs.make1 @@ fun w ->
-            Val.act (D.equate ri r'i) @@
-            make_coe (Star.make (D.named w) s) absi @@
-            recovery_general absi (D.named w)
+          Val.act (D.equate ri r'i) @@
+          make_coe (Star.make (D.named w) s) absi @@
+          recovery_general absi (D.named w)
         in
         diag :: List.map face info.sys
       in
@@ -893,16 +893,16 @@ struct
            * in [Y], [F] and [R1] but not [SVO]. *)
           let face1 = AbsFace.make r D.dim1 @@
             Abs.make1 @@ fun y ->
-              let ty = Val.act (D.subst r' x) info.ty1 in
-              let cap = base1 r' in
-              let msys = force_abs_sys @@
-                let face0 = AbsFace.make r' D.dim0 @@
-                  Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 cap)) [D.named z]
-                in
-                let face1 = AbsFace.make r' D.dim1 @@ Abs.make1 @@ fun _ -> el in
-                [face0; face1]
+            let ty = Val.act (D.subst r' x) info.ty1 in
+            let cap = base1 r' in
+            let msys = force_abs_sys @@
+              let face0 = AbsFace.make r' D.dim0 @@
+                Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 cap)) [D.named z]
               in
-              make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
+              let face1 = AbsFace.make r' D.dim1 @@ Abs.make1 @@ fun _ -> el in
+              [face0; face1]
+            in
+            make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
           in
           (* This is the type of the fiber, and is used for
            * simplifying the generating code for the front face
@@ -1066,13 +1066,13 @@ struct
         let hcom_faces =
           let face = Face.map @@ fun ri r'i absi ->
             Abs.make1 @@ fun _ ->
-              Val.act (D.equate ri r'i) @@ Abs.inst1 absi r' in
+            Val.act (D.equate ri r'i) @@ Abs.inst1 absi r' in
           List.map face sys
         in
         let fcom_faces =
           let face = Face.map @@ fun si s'i absi ->
             Abs.make1 @@ fun y ->
-              Val.act (D.equate si s'i) @@ recovery absi (D.named y) in
+            Val.act (D.equate si s'i) @@ recovery absi (D.named y) in
           List.map face info.sys
         in
         rigid_hcom info.dir info.cap (naive_hcom r')
@@ -1393,17 +1393,17 @@ struct
           failwith "Expected value in environment"
       end
 
-    | Tm.Ref (name, tw) ->
+    | Tm.Ref (name, tw, ush) ->
       let tty, tsys = Sig.lookup name tw in
-      let vsys = eval_tm_sys rel [] tsys in
-      let vty = eval rel [] tty in
-      reflect vty (Ref (name, tw)) vsys
+      let vsys = eval_tm_sys rel [] @@ Tm.map_tm_sys (Tm.shift_univ ush) tsys in
+      let vty = eval rel [] @@ Tm.shift_univ ush tty in
+      reflect vty (Ref (name, tw, ush)) vsys
 
-    | Tm.Meta name ->
+    | Tm.Meta {name; ushift} ->
       let tty, tsys = Sig.lookup name `Only in
-      let vsys = eval_tm_sys rel [] tsys in
-      let vty = eval rel [] tty in
-      reflect vty (Meta name) vsys
+      let vsys = eval_tm_sys rel [] @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
+      let vty = eval rel [] @@ Tm.shift_univ ushift tty in
+      reflect vty (Meta {name; ushift}) vsys
 
   and reflect ty neu sys =
     match force_val_sys sys with
@@ -2043,11 +2043,11 @@ struct
     | Cdr neu ->
       Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
 
-    | Ref (a, _) ->
+    | Ref (a, _, _) ->
       Name.pp fmt a
 
-    | Meta alpha ->
-      Name.pp fmt alpha
+    | Meta {name; _} ->
+      Name.pp fmt name
 
     | If _ ->
       Format.fprintf fmt "<if>"

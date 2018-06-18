@@ -25,10 +25,6 @@ let IsSet (C : type) : type =
 ; the code in this file is adapted from yacctt and redprl
 
 
-let Retract (A : type) (B : type) (f : A → B) (g : B → A) : type =
-  (a : A) →
-    Path A (g (f a)) a
-
 
 let IdEquiv (A : type) : Equiv A A =
   < _
@@ -70,10 +66,14 @@ let PathToEquiv
   =
   coe 0 1 (IdEquiv A) in λ i → Equiv A (P i)
 
+
+let Retract (A : type) (B : type) (f : A → B) (g : B → A) : type =
+  (a : A) →
+    Path A (g (f a)) a
 debug
 
-;; The following exhibits a bug:
-; let EquivLemma (A : type) (B : type)
-;   : Retract (Equiv A B) (Path type A B) (UA A B) (PathToEquiv A B)
-;   = ?
+; The following exhibits a bug:
+let EquivLemmaType (A : type) (B : type)
+  : _
+  = `(Retract^3 (Equiv A B) (Path^1 (U 0) A B) (UA A B) (PathToEquiv A B))
 
