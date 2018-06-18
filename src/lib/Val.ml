@@ -957,7 +957,14 @@ struct
             | `UNICORN ->
               failwith "too immortal; not suitable for mortal beings"
           in
-          let el0 = car fixer_fiber in
+          let el0 =
+            try
+              car fixer_fiber
+            with
+            | exn ->
+              Format.eprintf "Not immortal enough: %a@." pp_value fixer_fiber;
+              raise exn
+          in
           let face_front =
             AbsFace.make r' D.dim0 @@
             Abs.make1 @@ fun w -> ext_apply (cdr fixer_fiber) [D.named w]
