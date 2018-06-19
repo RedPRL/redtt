@@ -425,18 +425,20 @@ struct
       elab_chk env cod' (Tuple es) >>= fun tm1 ->
       M.ret @@ Tm.cons tm0 tm1
 
-    | _, Type ->
+    | Tm.Univ info, Type ->
       begin
-        match Tm.unleash ty with
-        | Tm.Univ _ ->
-          M.ret @@ Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0)
-        | _ ->
-          failwith "Type"
+        if Lvl.greater info.lvl (Lvl.Const 0) then
+          match Tm.unleash ty with
+          | Tm.Univ _ ->
+            M.ret @@ Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0)
+          | _ ->
+            failwith "Type"
+        else
+          failwith "Elaborator: universe level error"
       end
 
     | _, E.Cut (e, fs) ->
       elab_inf env e >>= fun (hty, hd) ->
-      normalize_ty hty >>= fun hty ->
       elab_cut env (hty, hd) fs (Chk ty)
 
     | _, E.HCom info ->
