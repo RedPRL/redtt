@@ -166,7 +166,7 @@ let EquivLemma
   (P : Path (A → B) (E0.car) (E1.car))
   : Path (Equiv A B) E0 E1
   =
-  LemSig (A → B) (λ f → IsEquiv A B f) (PropIsEquiv A B) E0 E1 P
+  LemSig (A → B) (IsEquiv A B) (PropIsEquiv A B) E0 E1 P
 
 
 let UA/retract
