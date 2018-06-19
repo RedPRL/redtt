@@ -8,7 +8,7 @@ type twin = [`Only | `TwinL | `TwinR]
 
 type 'a decl =
   | Hole of [`Rigid | `Flex]
-  | Defn of 'a
+  | Defn of [`Transparent | `Opaque] * 'a
   | Guess of {ty : 'a; tm : 'a}
 
 type status =
@@ -257,11 +257,16 @@ let pp_entry fmt =
       Name.pp x
       Tm.pp0 ty
 
-  | E (x, ty, Defn tm) ->
+  | E (x, ty, Defn (`Transparent, tm)) ->
     Format.fprintf fmt "!%a@ : %a@ = %a"
       Name.pp x
       Tm.pp0 ty
       Tm.pp0 tm
+
+  | E (x, ty, Defn (`Opaque, _)) ->
+    Format.fprintf fmt "!%a@ : %a@ = <opaque>"
+      Name.pp x
+      Tm.pp0 ty
 
   | E (x, ty, Guess _) ->
     Format.fprintf fmt "?%a@ :@ %a"
@@ -291,8 +296,8 @@ let subst_decl sub ~ty =
   function
   | Hole x ->
     Hole x
-  | Defn t ->
-    Defn (subst_tm sub ~ty t)
+  | Defn (opacity, t) ->
+    Defn (opacity, subst_tm sub ~ty t)
   | Guess info ->
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
     let ty' = subst_tm sub ~ty:univ info.ty in
@@ -389,7 +394,8 @@ struct
   let free fl =
     function
     | Hole _ -> Occurs.Set.empty
-    | Defn t -> Tm.free fl t
+    | Defn (`Transparent, t) -> Tm.free fl t
+    | Defn (`Opaque, _) -> Occurs.Set.empty
     | Guess {tm; _} -> Tm.free fl tm
 end
 

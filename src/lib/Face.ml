@@ -86,7 +86,11 @@ struct
             True (c, d, t')
           | `Ok p' ->
             let r, r' = DimStar.unleash p' in
-            let t' = X.act (Dim.cmp (Dim.equate r r') phi) t in
-            Indet (p', t')
+            match Dim.compare r r' with
+            | Apart ->
+              False p'
+            | _ ->
+              let t' = X.act (Dim.cmp (Dim.equate r r') phi) t in
+              Indet (p', t')
         end
 end

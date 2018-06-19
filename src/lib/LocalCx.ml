@@ -2,6 +2,12 @@
 type hyp = [`Ty of Val.value | `Dim]
 module R = Restriction
 
+let check_eq_clock = ref 0.
+
+let _ =
+  Diagnostics.on_termination @@ fun _ ->
+  Format.eprintf "[diagnostic]: LocalCx spent %fs in checking equality@." !check_eq_clock
+
 (* The way that we model dimensions is now incompatible with the union-find version of things.
    We need to find a new way. *)
 type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; rel : R.t; ppenv : Pretty.env}
@@ -83,7 +89,7 @@ struct
 
   let ext_dim {env; qenv; tys; rel; ppenv} ~nm =
     let x = Name.named nm in
-    {env = Val.Atom x :: env;
+    {env = Val.Atom (Dim.idn, x) :: env;
      tys = `Dim :: tys;
      qenv = Quote.Env.abs qenv [x];
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -128,8 +134,9 @@ struct
       Format.eprintf "Failed to evaluate: %a@." (Tm.pp_head ppenv) hd;
       raise exn
 
+  (* Seems iffy? *)
   let eval_dim {env; rel; _} tm =
-    V.eval_dim rel env tm
+    Dim.unleash @@ V.eval_dim rel env tm
 
   let eval_tm_sys {env; rel; _} sys =
     V.eval_tm_sys rel env sys
@@ -158,9 +165,14 @@ struct
   let quote_ty cx ty =
     Q.quote_ty cx.qenv ty
 
+
   let check_eq cx ~ty el0 el1 =
+    let now0 = Unix.gettimeofday () in
+    (* Format.eprintf "check_eq: %a = %a@." Eval.pp_value el0 Eval.pp_value el1 ; *)
     try
-      Q.equiv cx.qenv ~ty el0 el1
+      Q.equiv cx.qenv ~ty el0 el1;
+      let now1 = Unix.gettimeofday () in
+      check_eq_clock := !check_eq_clock +. (now1 -. now0)
     with
     | exn ->
       (* Format.eprintf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1; *)

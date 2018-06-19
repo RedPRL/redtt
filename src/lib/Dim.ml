@@ -16,7 +16,8 @@ module S = Set.Make (Repr)
 type t = repr * S.t
 
 let singleton r = r, S.singleton r
-let from_reprs r rs = r, S.of_list rs
+let from_reprs r rs =
+  r, S.add r @@ S.of_list rs
 
 let dim0 = singleton Dim0
 let dim1 = singleton Dim1
@@ -37,14 +38,26 @@ let compare_repr r r' =
     if x = y then Same else Indeterminate
   | _ -> Indeterminate
 
+let compare_clock = ref 0.
 
-let compare (_, r) (_, r') =
+let _ =
+  Diagnostics.on_termination @@ fun _ ->
+  Format.eprintf "[diagnostic] Dim spent %fs on compare@." !compare_clock
+
+let compare' (_, r) (_, r') =
   if S.mem Dim0 r && S.mem Dim0 r' then Same
   else if S.mem Dim1 r && S.mem Dim1 r' then Same
   else if S.mem Dim0 r && S.mem Dim1 r' then Apart
   else if S.mem Dim1 r && S.mem Dim0 r' then Apart
   else if S.is_empty @@ S.inter r r' then Indeterminate
   else Same
+
+let compare r r' =
+  let now0 = Unix.gettimeofday () in
+  let res = compare' r r' in
+  let now1 = Unix.gettimeofday () in
+  compare_clock := !compare_clock +. (now1 -. now0);
+  res
 
 let entangle (r, rs) (r', rs') =
   let rs'' = S.union rs rs' in
@@ -105,6 +118,20 @@ let rec act phi t =
         if x = y then t' else t
       | _ -> t
     end
+
+let act_clock = ref 0.
+
+let _ =
+  Diagnostics.on_termination @@ fun _ ->
+  Format.eprintf "[diagnostic] Dim spent %fs in substitutions@." !act_clock
+
+let act phi t =
+  let now0 = Unix.gettimeofday () in
+  let r = act phi t in
+  let now1 = Unix.gettimeofday () in
+  act_clock := !act_clock +. (now1 -. now0);
+  r
+
 
 let unleash (r, _) = r
 

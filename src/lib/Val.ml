@@ -51,8 +51,8 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Ref : Name.t * Tm.twin -> neu
-  | Meta : Name.t -> neu
+  | Ref : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
+  | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
@@ -73,9 +73,9 @@ and nf = {ty : value; el : value}
 and ('x, 'a) face = ('x, 'a) Face.face
 
 and clo =
-  | Clo of {bnd : Tm.tm Tm.bnd; rho : env; rel : rel; action : D.action}
+  | Clo of {bnd : Tm.tm Tm.bnd; rho : env; rel : rel}
 
-and env_el = Val of value | Atom of atom
+and env_el = Val of value | Atom of Dim.action * atom
 and env = env_el list
 
 and abs = value Abstraction.abs
@@ -107,7 +107,7 @@ sig
   val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
   val eval_head : rel -> env -> Tm.tm Tm.head -> value
   val eval_frame : rel -> env -> value -> Tm.tm Tm.frame -> value
-  val eval_dim : rel -> env -> Tm.tm -> Dim.repr
+  val eval_dim : rel -> env -> Tm.tm -> Dim.t
   val eval_tm_sys : rel -> env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val apply : value -> value -> value
@@ -116,6 +116,9 @@ sig
   val cdr : value -> value
   val lbl_call : value -> value
   val corestriction_force : value -> value
+
+
+  val rigid_vproj : gen -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
 
@@ -126,8 +129,11 @@ sig
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 
+  val pp_abs : Format.formatter -> abs -> unit
   val pp_value : Format.formatter -> value -> unit
   val pp_neu : Format.formatter -> neu -> unit
+  val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
+  val pp_comp_sys : Format.formatter -> comp_sys -> unit
 
 
   module Val : Sort.S
@@ -192,10 +198,15 @@ struct
     type t = clo
     type 'a m = 'a
 
+    let act_env_cell phi =
+      function
+      | Val v -> Val (Val.act phi v)
+      | Atom (psi, x) -> Atom (Dim.cmp phi psi, x)
+
     let act phi clo =
       match clo with
       | Clo info ->
-        Clo {info with action = D.cmp phi info.action}
+        Clo {info with rho = List.map (act_env_cell phi) info.rho}
   end
 
   module CompSys :
@@ -316,30 +327,27 @@ struct
   let rec eval_dim rel rho tm =
     match Tm.unleash tm with
     | Tm.Dim0 ->
-      D.Dim0
+      D.dim0
     | Tm.Dim1 ->
-      D.Dim1
+      D.dim1
     | Tm.Up (hd, Emp) ->
       begin
         match hd with
         | Tm.Ix (i, _) ->
           begin
             match List.nth rho i with
-            | Atom x ->
-              R.canonize (D.Atom x) rel
+            | Atom (phi, x) ->
+              Dim.act phi @@ R.unleash (R.canonize (D.Atom x) rel) rel
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
-        | Tm.Ref (a, _) ->
-          R.canonize (D.Atom a) rel
-        | Tm.Meta a ->
-          R.canonize (D.Atom a) rel
+        | Tm.Ref info ->
+          R.unleash (R.canonize (D.Atom info.name) rel) rel
+        | Tm.Meta meta ->
+          R.unleash (R.canonize (D.Atom meta.name) rel) rel
         | _ -> failwith "eval_dim"
       end
     | _ -> failwith "eval_dim"
-
-  let eval_dim_class rel rho tm =
-    R.unleash (eval_dim rel rho tm) rel
 
 
   let rec make : con -> value =
@@ -654,7 +662,7 @@ struct
     | `Const `Dim0 ->
       el0
     | `Const `Dim1 ->
-      el0
+      el1
 
   and make_coe mdir abs el : value =
     match mdir with
@@ -777,9 +785,9 @@ struct
       let origin z_dest =
         let face = Face.map @@ fun ri r'i absi ->
           Abs.make1 @@ fun y ->
-            Val.act (D.equate ri r'i) @@
-            make_coe (Star.make (D.named y) s) absi @@
-            make_coe (Star.make s' (D.named y)) absi el
+          Val.act (D.equate ri r'i) @@
+          make_coe (Star.make (D.named y) s) absi @@
+          make_coe (Star.make s' (D.named y)) absi el
         in
         Val.act (D.subst r x) @@
         make_hcom
@@ -837,9 +845,9 @@ struct
         let diag = AbsFace.rigid dir @@ Abs.make1 @@ fun w -> origin (D.named w) in
         let face = Face.map @@ fun ri r'i absi ->
           Abs.make1 @@ fun w ->
-            Val.act (D.equate ri r'i) @@
-            make_coe (Star.make (D.named w) s) absi @@
-            recovery_general absi (D.named w)
+          Val.act (D.equate ri r'i) @@
+          make_coe (Star.make (D.named w) s) absi @@
+          recovery_general absi (D.named w)
         in
         diag :: List.map face info.sys
       in
@@ -874,8 +882,8 @@ struct
            * redtt can afford less efficient generating code. *)
           let base src dest =
             make_coe (Star.make src dest) abs1 @@
-            let phi = D.subst src x in
-            vproj (Gen.make src) (Val.act phi info.ty0) (Val.act phi info.ty1) (Val.act phi info.equiv) el
+            let substsx = Val.act (D.subst src x) in
+            vproj (Gen.make src) (substsx info.ty0) (substsx info.ty1) (substsx info.equiv) el
           in
           (* Some helper functions to reduce typos. *)
           let base0 dest = base D.dim0 dest in
@@ -886,23 +894,27 @@ struct
            * as `ext_apply (cdr fib) [D.dim1]` directly. *)
           let contr0 fib = apply (cdr @@ apply (cdr equiv0) (ext_apply (cdr fib) [D.dim1])) fib in
           (* The diagonal face for r=r'. *)
-          let face_diag = AbsFace.make r r' @@ Abs.make1 (fun _ -> el) in
+          let face_diag = AbsFace.make r r' @@ Abs.make1 @@ fun _ ->
+            (* Room for optimization: `x` is apart from `el` *)
+            let substrx = Val.act (D.subst r x) in
+            vproj (Gen.make r) (substrx info.ty0) (substrx info.ty1) (substrx info.equiv) el
+          in
           (* The face for r=0. *)
           let face0 = AbsFace.make r D.dim0 @@ Abs.make1 (fun _ -> base0 r') in
           (* The face for r=1. This more optimized version is used
            * in [Y], [F] and [R1] but not [SVO]. *)
           let face1 = AbsFace.make r D.dim1 @@
             Abs.make1 @@ fun y ->
-              let ty = Val.act (D.subst r' x) info.ty1 in
-              let cap = base1 r' in
-              let msys = force_abs_sys @@
-                let face0 = AbsFace.make r' D.dim0 @@
-                  Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 cap)) [D.named z]
-                in
-                let face1 = AbsFace.make r' D.dim1 @@ Abs.make1 @@ fun _ -> el in
-                [face0; face1]
+            let ty = Val.act (D.subst r' x) info.ty1 in
+            let cap = base1 r' in
+            let msys = force_abs_sys @@
+              let face0 = AbsFace.make r' D.dim0 @@
+                Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 cap)) [D.named z]
               in
-              make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
+              let face1 = AbsFace.make r' D.dim1 @@ Abs.make1 @@ fun _ -> el in
+              [face0; face1]
+            in
+            make_hcom (Star.make D.dim1 (D.named y)) ty cap msys
           in
           (* This is the type of the fiber, and is used for
            * simplifying the generating code for the front face
@@ -919,7 +931,7 @@ struct
             (* Turns out `fiber_at_face0` will be
              * used for multiple times. *)
             let fiber_at_face0 = make_cons (el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0) in
-            let mode = `SPLIT_COERCION in (* how should we switch this? *)
+            let mode = `UNIFORM_HCOM in (* how should we switch this? *)
             match mode with
             (* The implementation used in [F] and [R1]. *)
             | `SPLIT_COERCION ->
@@ -930,10 +942,13 @@ struct
                 | `Ok r_gen ->
                   let r_atom = Gen.atom r_gen in
                   (* coercion to the diagonal *)
-                  contr0 @@
-                  make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
-                  (* the fiber *)
-                  make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0)
+                  let path_in_fiber0_ty =
+                    contr0 @@
+                    make_coe (Star.make D.dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r D.dim0))) @@
+                    (* the fiber *)
+                    make_cons (Val.act (D.subst D.dim0 r_atom) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 D.dim0)
+                  in
+                  ext_apply path_in_fiber0_ty [r]
               end
             (* The implementation used in [Y]. *)
             | `UNIFORM_HCOM ->
@@ -951,7 +966,14 @@ struct
             | `UNICORN ->
               failwith "too immortal; not suitable for mortal beings"
           in
-          let el0 = car fixer_fiber in
+          let el0 =
+            try
+              car fixer_fiber
+            with
+            | exn ->
+              Format.eprintf "Not immortal enough: %a@." pp_value fixer_fiber;
+              raise exn
+          in
           let face_front =
             AbsFace.make r' D.dim0 @@
             Abs.make1 @@ fun w -> ext_apply (cdr fixer_fiber) [D.named w]
@@ -1066,13 +1088,13 @@ struct
         let hcom_faces =
           let face = Face.map @@ fun ri r'i absi ->
             Abs.make1 @@ fun _ ->
-              Val.act (D.equate ri r'i) @@ Abs.inst1 absi r' in
+            Val.act (D.equate ri r'i) @@ Abs.inst1 absi r' in
           List.map face sys
         in
         let fcom_faces =
           let face = Face.map @@ fun si s'i absi ->
             Abs.make1 @@ fun y ->
-              Val.act (D.equate si s'i) @@ recovery absi (D.named y) in
+            Val.act (D.equate si s'i) @@ recovery absi (D.named y) in
           List.map face info.sys
         in
         rigid_hcom info.dir info.cap (naive_hcom r')
@@ -1222,7 +1244,7 @@ struct
 
 
   and clo bnd rel rho =
-    Clo {bnd; rho; rel; action = D.idn}
+    Clo {bnd; rho; rel}
 
   and eval rel rho tm =
     match Tm.unleash tm with
@@ -1250,11 +1272,27 @@ struct
       make @@ CoR face
 
     | Tm.V info ->
-      let r = eval_dim_class rel rho info.r in
-      let ty0 = eval rel rho info.ty0 in
-      let ty1 = eval rel rho info.ty1 in
-      let equiv = eval rel rho info.equiv in
-      make_v (Gen.make r) ty0 ty1 equiv
+      let r = eval_dim rel rho info.r in
+      begin
+        match Gen.make r with
+        | `Ok x ->
+          let rel' = R.equate (Dim.unleash r) Dim.Dim0 rel in
+          let ty0 = eval rel' rho info.ty0 in
+          let ty1 = eval rel rho info.ty1 in
+          let equiv = eval rel' rho info.equiv in
+          make_v (`Ok x) ty0 ty1 equiv
+        | `Const `Dim0 ->
+          eval rel rho info.ty0
+        | `Const `Dim1 ->
+          eval rel rho info.ty1
+      end
+
+    | Tm.VIn info ->
+      let r = eval_dim rel rho info.r in
+      let rel' = R.equate (Dim.unleash r) Dim.Dim0 rel in
+      let el0 = eval rel' rho info.tm0 in
+      let el1 = eval rel rho info.tm1 in
+      make_vin (Gen.make r) el0 el1
 
     | Tm.Lam bnd ->
       make @@ Lam (clo bnd rel rho)
@@ -1273,8 +1311,8 @@ struct
       make @@ Cons (v0, v1)
 
     | Tm.FCom info ->
-      let r = eval_dim_class rel rho info.r  in
-      let r' = eval_dim_class rel rho info.r' in
+      let r = eval_dim rel rho info.r  in
+      let r' = eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let cap = eval rel rho info.cap in
       let sys = eval_bnd_sys rel rho info.sys in
@@ -1334,14 +1372,14 @@ struct
       let v = eval rel rho t in
       apply vhd v
     | Tm.ExtApp ts ->
-      let rs = List.map (eval_dim_class rel rho) ts in
+      let rs = List.map (eval_dim rel rho) ts in
       ext_apply vhd rs
     | Tm.Car ->
       car vhd
     | Tm.Cdr ->
       cdr vhd
     | Tm.VProj info ->
-      let r = eval_dim_class rel rho info.r in
+      let r = eval_dim rel rho info.r in
       let ty0 = eval rel rho info.ty0 in
       let ty1 = eval rel rho info.ty1 in
       let equiv = eval rel rho info.equiv in
@@ -1359,16 +1397,16 @@ struct
       eval rel rho info.tm
 
     | Tm.Coe info ->
-      let r = eval_dim_class rel rho info.r in
-      let r' = eval_dim_class rel rho info.r' in
+      let r = eval_dim rel rho info.r in
+      let r' = eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let abs = eval_bnd rel rho info.ty  in
       let el = eval rel rho info.tm in
       make_coe dir abs el
 
     | Tm.HCom info ->
-      let r = eval_dim_class rel rho info.r in
-      let r' = eval_dim_class rel rho info.r' in
+      let r = eval_dim rel rho info.r in
+      let r' = eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let ty = eval rel rho info.ty in
       let cap = eval rel rho info.cap in
@@ -1376,8 +1414,8 @@ struct
       make_hcom dir ty cap sys
 
     | Tm.Com info ->
-      let r = eval_dim_class rel rho info.r in
-      let r' = eval_dim_class rel rho info.r' in
+      let r = eval_dim rel rho info.r in
+      let r' = eval_dim rel rho info.r' in
       let dir = Star.make r r' in
       let abs = eval_bnd rel rho info.ty in
       let cap = eval rel rho info.cap in
@@ -1388,20 +1426,22 @@ struct
       begin
         match List.nth rho i with
         | Val v -> v
-        | _ -> failwith "Expected value in environment"
+        | Atom (_, a) ->
+          Format.eprintf "Expected value in environment for %i, but found atom %a@." i Name.pp a;
+          failwith "Expected value in environment"
       end
 
-    | Tm.Ref (name, tw) ->
-      let tty, tsys = Sig.lookup name tw in
-      let vsys = eval_tm_sys rel [] tsys in
-      let vty = eval rel [] tty in
-      reflect vty (Ref (name, tw)) vsys
+    | Tm.Ref info ->
+      let tty, tsys = Sig.lookup info.name info.twin in
+      let vsys = eval_tm_sys rel [] @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
+      let vty = eval rel [] @@ Tm.shift_univ info.ushift tty in
+      reflect vty (Ref {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
 
-    | Tm.Meta name ->
+    | Tm.Meta {name; ushift} ->
       let tty, tsys = Sig.lookup name `Only in
-      let vsys = eval_tm_sys rel [] tsys in
-      let vty = eval rel [] tty in
-      reflect vty (Meta name) vsys
+      let vsys = eval_tm_sys rel [] @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
+      let vty = eval rel [] @@ Tm.shift_univ ushift tty in
+      reflect vty (Meta {name; ushift}) vsys
 
   and reflect ty neu sys =
     match force_val_sys sys with
@@ -1410,10 +1450,8 @@ struct
       make @@ Up {ty; neu; sys}
 
   and eval_bnd_face rel rho (tr, tr', obnd) =
-    let r = eval_dim rel rho tr in
-    let r' = eval_dim rel rho tr' in
-    let sr = R.unleash r rel in
-    let sr' = R.unleash r' rel in
+    let sr = eval_dim rel rho tr in
+    let sr' = eval_dim rel rho tr' in
     match Star.make sr sr' with
     | `Ok xi ->
       begin
@@ -1422,7 +1460,7 @@ struct
           Face.False xi
         | _ ->
           let bnd = Option.get_exn obnd in
-          let rel' = R.equate r r' rel in
+          let rel' = R.equate (Dim.unleash sr) (Dim.unleash sr') rel in
           let abs = eval_bnd rel' rho bnd in
           Face.Indet (xi, abs)
       end
@@ -1445,24 +1483,22 @@ struct
   and eval_tm_face rel rho (tr, tr', otm) : val_face =
     let r = eval_dim rel rho tr in
     let r' = eval_dim rel rho tr' in
-    let sr = R.unleash r rel in
-    let sr' = R.unleash r' rel in
-    match Star.make sr sr' with
+    match Star.make r r' with
     | `Ok xi ->
       begin
-        match D.compare sr sr' with
+        match D.compare r r' with
         | D.Apart ->
           Face.False xi
         | _ ->
           let tm = Option.get_exn otm in
-          let rel' = R.equate r r' rel in
+          let rel' = R.equate (D.unleash r) (D.unleash r') rel in
           let el = eval rel' rho tm in
           Face.Indet (xi, el)
       end
     | `Same _ ->
       let tm = Option.get_exn otm in
       let el = eval rel rho tm in
-      Face.True (sr, sr', el)
+      Face.True (r, r', el)
 
   and eval_tm_sys rel rho sys : val_sys =
     List.map (eval_tm_face rel rho) sys
@@ -1470,19 +1506,19 @@ struct
   and eval_bnd rel rho bnd =
     let Tm.B (_, tm) = bnd in
     let x = Name.fresh () in
-    let rho = Atom x :: rho in
+    let rho = Atom (Dim.idn, x) :: rho in
     Abs.bind1 x @@ eval rel rho tm
 
   and eval_nbnd rel rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = List.map Name.named nms in
-    let rho = List.map (fun x -> Atom x) xs @ rho in
+    let rho = List.map (fun x -> Atom (Dim.idn, x)) xs @ rho in
     Abs.bind xs @@ eval rel rho tm
 
   and eval_ext_bnd rel rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = List.map Name.named nms in
-    let rho = List.map (fun x -> Atom x) xs @ rho in
+    let rho = List.map (fun x -> Atom (Dim.idn, x)) xs @ rho in
     ExtAbs.bind xs (eval rel rho tm, eval_tm_sys rel rho sys)
 
   and unleash_pi ?debug:(debug = []) v =
@@ -1522,6 +1558,9 @@ struct
     | Rst rst ->
       unleash_v rst.ty
     | _ ->
+      Format.eprintf "Failed to unleash V type: %a@." pp_value v;
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
       failwith "unleash_v"
 
   and unleash_lbl_ty v =
@@ -1609,22 +1648,20 @@ struct
       let r, r' = Star.unleash info.dir in
       let x, tyx = Abs.unleash1 info.abs in
       let domx, codx = unleash_pi ~debug:["apply"; "coe"] tyx in
-      let abs =
-        Abs.bind1 x @@
-        inst_clo codx @@
-        make_coe
-          (Star.make r' (D.named x))
-          (Abs.bind1 x domx)
-          varg
-      in
+      let dom = Abs.bind1 x domx in
+      let coe_r'_x = make_coe (Star.make r' (D.named x)) dom varg in
+      let cod_coe = inst_clo' codx coe_r'_x in
+      let abs = Abs.bind1 x cod_coe in
       let el =
         apply info.el @@
         make_coe
           (Star.make r' r)
-          (Abs.bind1 x domx)
+          dom
           varg
       in
-      rigid_coe info.dir abs el
+      let res = rigid_coe info.dir abs el in
+      (* Format.eprintf "apply: @[%a $ %a@ ==> %a, %a, %a, %a]@." pp_value vfun pp_value varg Name.pp x pp_value coe_r'_x pp_value cod_coe pp_abs abs; *)
+      res
 
     | HCom info ->
       let _, cod = unleash_pi ~debug:["apply"; "hcom"] info.ty in
@@ -1920,14 +1957,26 @@ struct
     match clo with
     | Clo info ->
       let Tm.B (_, tm) = info.bnd in
-      Val.act info.action @@
       eval info.rel (Val varg :: info.rho) tm
 
+  and inst_clo' clo varg = inst_clo clo varg
+
+  and pp_env_cell fmt =
+    function
+    | Val v ->
+      pp_value fmt v
+    | Atom (phi, a) ->
+      let r = Dim.act phi @@ Dim.named a in
+      Dim.pp fmt r
+
+  and pp_env fmt =
+    let pp_sep fmt () = Format.fprintf fmt ", " in
+    Format.pp_print_list ~pp_sep pp_env_cell fmt
 
   and pp_value fmt value =
     match unleash value with
     | Up up ->
-      Format.fprintf fmt "%a{%a}" pp_neu up.neu pp_val_sys up.sys
+      Format.fprintf fmt "%a" pp_neu up.neu
     | Lam clo ->
       Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
     | ExtLam abs ->
@@ -1956,12 +2005,14 @@ struct
       Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
     | V _ ->
       Format.fprintf fmt "<v-type>"
-    | VIn _ ->
-      Format.fprintf fmt "<vin>"
-    | Coe _ ->
-      Format.fprintf fmt "<coe>"
-    | HCom _ ->
-      Format.fprintf fmt "<hcom>"
+    | VIn info ->
+      Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)]" Dim.pp (Gen.unleash info.x) pp_value info.el0 pp_value info.el1
+    | Coe info ->
+      let r, r' = Star.unleash info.dir in
+      Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" Dim.pp r Dim.pp r' pp_abs info.abs pp_value info.el
+    | HCom info ->
+      let r, r' = Star.unleash info.dir in
+      Format.fprintf fmt "@[<1>(hcom %a %a %a %a %a)@]" Dim.pp r Dim.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
     | GHCom _ ->
       Format.fprintf fmt "<ghcom>"
     | FCom _ ->
@@ -2009,8 +2060,25 @@ struct
         let r0, r1 = Star.unleash p in
         Format.fprintf fmt "@[<1>[?%a=%a %a]@]" Dim.pp r0 Dim.pp r1 pp_value v
 
-  and pp_clo fmt _ =
-    Format.fprintf fmt "<clo>"
+  and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
+    fun fmt ->
+      let pp_sep fmt () = Format.fprintf fmt " " in
+      Format.pp_print_list ~pp_sep pp_comp_face fmt
+
+  and pp_comp_face : type x. _ -> (x, abs) face -> unit =
+    fun fmt ->
+      function
+      | Face.True (r0, r1, v) ->
+        Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" Dim.pp r0 Dim.pp r1 pp_abs v
+      | Face.False p ->
+        let r0, r1 = Star.unleash p in
+        Format.fprintf fmt "@[<1>[%a/=%a]@]" Dim.pp r0 Dim.pp r1
+      | Face.Indet (p, v) ->
+        let r0, r1 = Star.unleash p in
+        Format.fprintf fmt "@[<1>[?%a=%a %a]@]" Dim.pp r0 Dim.pp r1 pp_abs v
+  and pp_clo fmt (Clo clo) =
+    let Tm.B (_, tm) = clo.bnd in
+    Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
 
   and pp_neu fmt neu =
     match neu with
@@ -2032,11 +2100,11 @@ struct
     | Cdr neu ->
       Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
 
-    | Ref (a, _) ->
-      Name.pp fmt a
+    | Ref {name; _} ->
+      Name.pp fmt name
 
-    | Meta alpha ->
-      Name.pp fmt alpha
+    | Meta {name; _} ->
+      Name.pp fmt name
 
     | If _ ->
       Format.fprintf fmt "<if>"
