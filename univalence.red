@@ -92,13 +92,6 @@ let PropPi
   λ i a →
     B/prop _ (f a) (g a) i
 
-let LemProp
-  (A : type) (A/prop : IsProp A)
-  (a : A)
-  : IsContr A
-  =
-  < a, A/prop a >
-
 let PropSet
   (A : type) (A/prop : IsProp A)
   : (IsSet A)
@@ -134,6 +127,7 @@ let PropSig
   LemSig _ _ B/prop u v (A/prop (u.car) (v.car))
 
 
+opaque
 let PropIsContr (A : type) : IsProp (IsContr A) =
   λ contr →
     let A/prop : IsProp A =
@@ -151,9 +145,11 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
 
     contr/A/prop contr
 
+opaque
 let PropIsEquiv (A : type) (B : type) (f : A → B) : IsProp (IsEquiv A B f) =
   λ e0 e1 i b → PropIsContr (Fiber A B f b) (e0 b) (e1 b) i
 
+opaque
 let EquivLemma
   (A : type) (B : type) (E0 : Equiv A B) (E1 : Equiv A B)
   (P : Path (A → B) (E0.car) (E1.car))
@@ -194,7 +190,7 @@ let SigPathToEquiv
   , PathToEquiv A (X.car) (X.cdr)
   >
 
-
+opaque
 let UA/retract
   (A : type) (B : type)
   : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
@@ -204,6 +200,7 @@ let UA/retract
       (λ i a → UA/beta A B E (coe 1 i a in λ _ → A) i)
 
 ; VERY SLOW
+opaque
 let UA/retract/sig
   (A : type)
   : Retract^3
@@ -217,6 +214,7 @@ let UA/retract/sig
     , UA/retract A (singl.car) (singl.cdr) i
     >
 
+opaque
 let IsContrPath (A : type) : IsContr^1 ((B : type) × Path^1 type A B) =
   < <A, λ _ → A>
   , λ X i →

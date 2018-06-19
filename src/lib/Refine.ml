@@ -148,10 +148,20 @@ struct
     M.ret @@ go_locals renv psi
 
 
+  let normalization_clock = ref 0.
+
+  let _ =
+    Diagnostics.on_termination @@ fun _ ->
+    Format.eprintf "Refine spent %fs in normalizing types@." !normalization_clock
+
   let normalize_ty ty =
+    let now0 = Unix.gettimeofday () in
     M.lift C.typechecker >>= fun (module T) ->
     let vty = T.Cx.eval T.Cx.emp ty in
-    M.ret @@ T.Cx.quote_ty T.Cx.emp vty
+    let ty = T.Cx.quote_ty T.Cx.emp vty in
+    let now1 = Unix.gettimeofday () in
+    normalization_clock := !normalization_clock +. (now1 -. now0);
+    M.ret ty
 
   let (<+>) m n =
     C.bind (C.optional m) @@
