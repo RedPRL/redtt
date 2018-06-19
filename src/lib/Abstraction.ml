@@ -52,8 +52,9 @@ struct
 
   (* FYI: It may not be necessary to freshen here, depending on how substitution is implemented. *)
   let bind atoms node =
-    let xs, phi = freshen_atoms atoms [] D.idn in
-    {atoms = xs; node = X.act phi node}
+    {atoms; node}
+  (* let xs, phi = freshen_atoms atoms [] D.idn in
+     {atoms = xs; node = X.act phi node} *)
 
   let bind1 x el =
     bind [x] el
