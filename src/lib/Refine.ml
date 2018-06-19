@@ -210,7 +210,6 @@ struct
       function
       | [] ->
         elab_chk env univ ecod >>=
-        normalize_ty >>=
         kont
       | (name, edom) :: cells ->
         elab_chk env univ edom >>= normalize_ty >>= fun dom ->
@@ -594,7 +593,6 @@ struct
 
     | E.Cut (e, fs) ->
       elab_inf env e >>= fun (ty, cmd) ->
-      normalize_ty ty >>= fun ty ->
       elab_cut env (ty, cmd) fs Inf
 
     | E.Coe info ->
