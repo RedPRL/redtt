@@ -255,9 +255,9 @@ struct
         Tm.Ix (Env.ix_of_lvl l0 env, `Only), Bwd.from_list stk
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
-    | Ref (nm0, tw0, ush0), Ref (nm1, tw1, ush1) ->
-      if nm0 = nm1 && tw0 = tw1 && ush0 = ush1 then
-        Tm.Ref (nm0, tw0, ush0), Bwd.from_list stk
+    | Ref info0, Ref info1 ->
+      if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
+        Tm.Ref {name = info0.name; twin = info0.twin; ushift = info0.ushift}, Bwd.from_list stk
       else
         failwith "global variable name mismatch"
     | Meta meta0, Meta meta1 ->
@@ -391,8 +391,8 @@ struct
       quote_dim env r
     | _ ->
       (* Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-      Format.eprintf "@.";
-      Format.eprintf "Dimension mismatch: %a <> %a@." Dim.pp r Dim.pp r'; *)
+         Format.eprintf "@.";
+         Format.eprintf "Dimension mismatch: %a <> %a@." Dim.pp r Dim.pp r'; *)
       failwith "Dimensions did not match"
 
   and equate_dims env rs rs' =
@@ -415,7 +415,7 @@ struct
         Tm.up @@ Tm.var ix `Only
       with
       | _ ->
-        Tm.up (Tm.Ref (x, `Only, 0), Emp)
+        Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1

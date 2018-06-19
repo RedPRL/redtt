@@ -44,7 +44,7 @@ type 'a tmf =
 
 and 'a head =
   | Meta of {name: Name.t; ushift : int}
-  | Ref of Name.t * twin * int
+  | Ref of {name : Name.t; twin : twin; ushift : int}
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}

@@ -51,7 +51,7 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Ref : Name.t * Tm.twin * int -> neu
+  | Ref : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
   | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
@@ -341,8 +341,8 @@ struct
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
-        | Tm.Ref (a, _, _) ->
-          R.unleash (R.canonize (D.Atom a) rel) rel
+        | Tm.Ref info ->
+          R.unleash (R.canonize (D.Atom info.name) rel) rel
         | Tm.Meta meta ->
           R.unleash (R.canonize (D.Atom meta.name) rel) rel
         | _ -> failwith "eval_dim"
@@ -1431,11 +1431,11 @@ struct
           failwith "Expected value in environment"
       end
 
-    | Tm.Ref (name, tw, ush) ->
-      let tty, tsys = Sig.lookup name tw in
-      let vsys = eval_tm_sys rel [] @@ Tm.map_tm_sys (Tm.shift_univ ush) tsys in
-      let vty = eval rel [] @@ Tm.shift_univ ush tty in
-      reflect vty (Ref (name, tw, ush)) vsys
+    | Tm.Ref info ->
+      let tty, tsys = Sig.lookup info.name info.twin in
+      let vsys = eval_tm_sys rel [] @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
+      let vty = eval rel [] @@ Tm.shift_univ info.ushift tty in
+      reflect vty (Ref {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
 
     | Tm.Meta {name; ushift} ->
       let tty, tsys = Sig.lookup name `Only in
@@ -2100,8 +2100,8 @@ struct
     | Cdr neu ->
       Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
 
-    | Ref (a, _, _) ->
-      Name.pp fmt a
+    | Ref {name; _} ->
+      Name.pp fmt name
 
     | Meta {name; _} ->
       Name.pp fmt name

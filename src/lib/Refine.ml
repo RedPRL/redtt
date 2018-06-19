@@ -315,7 +315,7 @@ struct
 
       let is_dependent =
         match Tm.unleash scrut with
-        | Tm.Up (Tm.Ref (a, _, _), _) when Occurs.Set.mem a @@ Tm.free `Vars ty -> true
+        | Tm.Up (Tm.Ref {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
         | _ -> false
       in
 
@@ -338,7 +338,7 @@ struct
       let hd = Tm.Down {ty = bool; tm = scrut} in
       let bmot =
         let x = Name.fresh () in
-        Tm.bind x @@ mot @@ Tm.up (Tm.Ref (x, `Only, 0), Emp)
+        Tm.bind x @@ mot @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)
       in
       let frm = Tm.If {mot = bmot; tcase; fcase} in
       M.ret @@ Tm.up (hd, Emp #< frm)
@@ -498,7 +498,7 @@ struct
 
       | (e_r, e_r', e) :: esys ->
         let x = Name.fresh () in
-        let varx = Tm.up (Tm.Ref (x, `Only, 0), Emp) in
+        let varx = Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp) in
         let ext_ty =
           let face_cap = varx, s, Some cap in
           let face_adj (r, r', obnd) =
@@ -534,7 +534,7 @@ struct
 
       | (e_r, e_r', e) :: esys ->
         let x = Name.fresh () in
-        let varx = Tm.up (Tm.Ref (x, `Only, 0), Emp) in
+        let varx = Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp) in
         let tyx = Tm.unbind_with x (fun tw -> tw) ty_bnd in
         let ext_ty =
           let face_cap = varx, s, Some cap in
@@ -584,7 +584,7 @@ struct
         | `Ref a ->
           M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) >>= fun ty ->
           let ty = Tm.shift_univ ushift ty in
-          let cmd = Tm.Ref (a, `Only, ushift), Emp in
+          let cmd = Tm.Ref {name = a; twin = `Only; ushift}, Emp in
           M.ret (ty, cmd)
         | `Ix _ ->
           failwith "elab_inf: expected locally closed"
@@ -619,7 +619,7 @@ struct
       let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
       elab_chk env fam_r info.tm >>= fun tm ->
       let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
-      let varx = Tm.up (Tm.Ref (x, `Only, 0), Emp) in
+      let varx = Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp) in
       let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
       let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
       M.ret (fam_r', (coe, Emp))
@@ -636,7 +636,7 @@ struct
       let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
       elab_chk env fam_r info.cap >>= fun cap ->
       let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
-      let varx = Tm.up (Tm.Ref (x, `Only, 0), Emp) in
+      let varx = Tm.up (Tm.Ref {name = x; twin = `Only; ushift =0}, Emp) in
       let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
       let tybnd = Tm.bind x tyx in
       elab_com_sys env tr tybnd cap info.sys >>= fun sys ->
@@ -653,7 +653,7 @@ struct
       begin
         match ResEnv.get name renv with
         | `Ref a ->
-          M.ret @@ Tm.up (Tm.Ref (a, `Only, 0), Emp)
+          M.ret @@ Tm.up (Tm.Ref {name = a; twin = `Only; ushift = 0}, Emp)
         | `Ix _ ->
           failwith "elab_inf: expected locally closed"
       end

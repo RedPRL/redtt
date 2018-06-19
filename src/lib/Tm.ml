@@ -46,7 +46,7 @@ type 'a tmf =
 
 and 'a head =
   | Meta of {name: Name.t; ushift : int}
-  | Ref of Name.t * twin * int
+  | Ref of {name : Name.t; twin : twin; ushift : int}
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
@@ -207,8 +207,8 @@ and subst_head sub head =
       | Dot (_, sub), _ -> subst_head sub @@ Ix (i - 1, tw)
     end
 
-  | Ref (a, tw, ush) ->
-    Ref (a, tw, ush), Emp
+  | Ref info ->
+    Ref info, Emp
 
   | Meta a ->
     Meta a, Emp
@@ -349,8 +349,8 @@ let traverse ~f ~var ~ref =
     function
     | Ix (i, tw) ->
       var k i tw
-    | Ref (a, tw, ush) ->
-      ref k (a, tw, ush)
+    | Ref info ->
+      ref k (info.name, info.twin, info.ushift)
     | Meta a ->
       Meta a, Emp
     | Down info ->
@@ -435,13 +435,13 @@ let fix_traverse ~var ~ref  =
 
 let close_var a f k =
   let var _ i tw = Ix (i, tw), Emp in
-  let ref n (b, tw, ush) = if b = a then Ix (n + k, f tw), Emp else Ref (b, tw, ush), Emp in
+  let ref n (b, tw, ush) = if b = a then Ix (n + k, f tw), Emp else Ref {name = b; twin = tw; ushift = ush}, Emp in
   fix_traverse ~var ~ref
 
 (* TODO: check that this isn't catastrophically wrong *)
 let open_var k a f =
-  let var k' i tw = if i = (k + k') then Ref (a, f tw, 0), Emp else Ix (i, tw), Emp in
-  let ref _n (b, tw, ush) = Ref (b, tw, ush), Emp in
+  let var k' i tw = if i = (k + k') then Ref {name = a; twin = f tw; ushift = 0}, Emp else Ix (i, tw), Emp in
+  let ref _n (b, tw, ush) = Ref {name = b; twin = tw; ushift = ush}, Emp in
   fix_traverse ~var ~ref
 
 let unbind (B (nm, t)) =
@@ -649,10 +649,9 @@ and pp_head env fmt =
     Uuseg_string.pp_utf_8 fmt @@
     Pretty.Env.var ix env
 
-  | Ref (nm, _, ush) ->
-    Format.fprintf fmt "%a^%i"
-      Name.pp nm
-      ush
+  | Ref {name; ushift} ->
+    Name.pp fmt name;
+    if ushift > 0 then Format.fprintf fmt "^%i" ushift else ()
 
   | Meta {name; ushift} ->
     Format.fprintf fmt "?%a^%i"
@@ -871,9 +870,9 @@ struct
 
   and go_cmd fl (hd, sp) acc =
     match fl, hd with
-    | `RigVars, Ref (x, _, _) ->
+    | `RigVars, Ref {name; _} ->
       go_spine fl sp @@
-      Occurs.Set.add x acc
+      Occurs.Set.add name acc
     | `RigVars, Meta _ ->
       acc
     | _ ->
@@ -887,8 +886,8 @@ struct
     | `RigVars, Meta _ -> acc
     | `Metas, Meta {name; _} ->
       Occurs.Set.add name acc
-    | (`Vars | `RigVars), Ref (x, _, _) ->
-      Occurs.Set.add x acc
+    | (`Vars | `RigVars), Ref {name; _} ->
+      Occurs.Set.add name acc
     | `Metas, Ref _ -> acc
     | _, Down {ty; tm} ->
       go fl tm @@ go fl ty acc
@@ -991,7 +990,7 @@ let map_comp_sys f =
 
 let map_head f =
   function
-  | Ref (a, tw, ush) -> Ref (a, tw, ush)
+  | Ref info -> Ref info
   | Meta a -> Meta a
   | Ix (i, tw) -> Ix (i, tw)
   | Down info ->
@@ -1121,8 +1120,8 @@ let rec opt_traverse f xs =
 
 let as_plain_var t =
   match unleash t with
-  | Up (Ref (x, _, _), Emp) ->
-    Some x
+  | Up (Ref {name; _}, Emp) ->
+    Some name
   | _ ->
     None
 
@@ -1193,8 +1192,8 @@ let rec shift_univ k tm =
   match unleash tm with
   | Univ {lvl; kind} ->
     make @@ Univ {lvl = Lvl.shift k lvl; kind}
-  | Up (Ref (nm, tw, ush), sp) ->
-    let hd' = Ref (nm, tw, ush + k) in
+  | Up (Ref info, sp) ->
+    let hd' = Ref {info with ushift = info.ushift + k} in
     let sp' = map_spine (shift_univ k) sp in
     make @@ Up (hd', sp')
   | Up (Meta {name; ushift}, sp) ->
