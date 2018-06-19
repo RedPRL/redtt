@@ -119,6 +119,20 @@ let rec act phi t =
       | _ -> t
     end
 
+let act_clock = ref 0.
+
+let _ =
+  Diagnostics.on_termination @@ fun _ ->
+  Format.eprintf "[diagnostic] Dim spent %fs in substitutions@." !act_clock
+
+let act phi t =
+  let now0 = Unix.gettimeofday () in
+  let r = act phi t in
+  let now1 = Unix.gettimeofday () in
+  act_clock := !act_clock +. (now1 -. now0);
+  r
+
+
 let unleash (r, _) = r
 
 let action_is_id phi =
