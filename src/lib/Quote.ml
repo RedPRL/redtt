@@ -362,7 +362,9 @@ struct
       let bnd = equate_val_abs env (Val.act phi ty) abs0 abs1 in
       tr, tr', Some bnd
 
-    | _ -> failwith "equate_comp_face"
+    | _ ->
+      Format.eprintf "equate_comp_face: %a vs %a@." pp_comp_face face0 pp_comp_face face1;
+      failwith "equate_comp_face"
 
   and equate_val_abs env ty abs0 abs1 =
     let x, v0x = Abs.unleash1 abs0 in
@@ -388,7 +390,9 @@ struct
     | Same ->
       quote_dim env r
     | _ ->
-      (* Format.eprintf "Dimension mismatch: %a <> %a@." Dim.pp r Dim.pp r'; *)
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
+      Format.eprintf "Dimension mismatch: %a <> %a@." Dim.pp r Dim.pp r';
       failwith "Dimensions did not match"
 
   and equate_dims env rs rs' =
