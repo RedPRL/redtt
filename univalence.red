@@ -170,7 +170,6 @@ let UA/retract
   =
   λ E →
     EquivLemma A B (PathToEquiv A B (UA A B E)) E
-      (λ i a → UA/beta A B E `(coe 1 i <_> A a) i)
-      ; TODO: some bug prevents using refinement for coe above
+      (λ i a → UA/beta A B E (coe 1 i a in λ _ → A) i)
 
 
