@@ -59,24 +59,6 @@ let IdEquiv (A : type) : Equiv A A =
     >
   >
 
-; per Dan Licata, UA and UABeta suffice for full univalence:
-; https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
-
-let UA (A : type) (B : type) (E : Equiv A B) : Path type A B =
-  λ i →
-    `(V i A B E)
-
-let UA/beta
-  (A : type) (B : type) (E : Equiv A B) (a : A)
-  : Path _ (coe 0 1 a in UA _ _ E) (E.car a)
-  =
-  λ i →
-    coe i 1 (E.car a) in λ _ → B
-
-
-; To prove univalence from UA and UABeta, we need some basic results.
-; (What follows is adapted from the cubicaltt and RedPRL developments.)
-
 
 let PathToEquiv
   (A : type) (B : type) (P : Path type A B)
@@ -110,7 +92,6 @@ let PropPi
   λ i a →
     B/prop _ (f a) (g a) i
 
-; TODO: just inline this, it's way too short to justify a definition
 let LemProp
   (A : type) (A/prop : IsProp A)
   (a : A)
@@ -152,6 +133,7 @@ let PropSig
   =
   LemSig _ _ B/prop u v (A/prop (u.car) (v.car))
 
+
 let PropIsContr (A : type) : IsProp (IsContr A) =
   λ contr →
     let A/prop : IsProp A =
@@ -180,6 +162,39 @@ let EquivLemma
   LemSig (A → B) (IsEquiv A B) (PropIsEquiv A B) E0 E1 P
 
 
+; per Dan Licata, UA and UABeta suffice for full univalence:
+; https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
+
+let UA (A : type) (B : type) (E : Equiv A B) : Path type A B =
+  λ i →
+    `(V i A B E)
+
+let UA/beta
+  (A : type) (B : type) (E : Equiv A B) (a : A)
+  : Path _ (coe 0 1 a in UA _ _ E) (E.car a)
+  =
+  λ i →
+    coe i 1 (E.car a) in λ _ → B
+
+let SigEquivToPath
+  (A : type)
+  (X : (B : type) × Equiv A B)
+  : (B : type) × Path^1 type A B
+  =
+  < X.car
+  , UA A (X.car) (X.cdr)
+  >
+
+let SigPathToEquiv
+  (A : type)
+  (X : (B : type) × Path^1 type A B)
+  : (B : type) × (Equiv A B)
+  =
+  < X.car
+  , PathToEquiv A (X.car) (X.cdr)
+  >
+
+
 let UA/retract
   (A : type) (B : type)
   : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
@@ -188,4 +203,49 @@ let UA/retract
     EquivLemma A B (PathToEquiv A B (UA A B E)) E
       (λ i a → UA/beta A B E (coe 1 i a in λ _ → A) i)
 
+; VERY SLOW
+let UA/retract/sig
+  (A : type)
+  : Retract^3
+      ((B : type) × Equiv A B)
+      ((B : type) × Path^1 type A B)
+      (SigEquivToPath A)
+      (SigPathToEquiv A)
+  =
+  λ singl i →
+    < singl.car
+    , UA/retract A (singl.car) (singl.cdr) i
+    >
 
+let IsContrPath (A : type) : IsContr^1 ((B : type) × Path^1 type A B) =
+  < <A, λ _ → A>
+  , λ X i →
+    < comp 0 1 A with
+      | i=0 ⇒ X.cdr
+      | i=1 ⇒ λ _ → A
+      end
+    , λ j →
+      comp 0 j A with
+      | i=0 ⇒ X.cdr
+      | i=1 ⇒ λ _ → A
+      end
+    >
+  >
+
+
+; The following is a formulation of univalence proposed by Martin Escardo:
+; https://groups.google.com/forum/#!msg/homotopytypetheory/HfCB_b-PNEU/Ibb48LvUMeUJ
+; See also Theorem 5.8.4 of the HoTT Book.
+
+
+; VERY SLOW
+let univalence (A : type) : IsContr^1 ((B : type) × Equiv A B) =
+  RetIsContr^1
+    ((B : type) × Equiv A B)
+    ((B : type) × Path^1 type A B)
+    (SigEquivToPath A)
+    (SigPathToEquiv A)
+    (UA/retract/sig A)
+    (IsContrPath A)
+
+debug
