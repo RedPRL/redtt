@@ -5,7 +5,7 @@ type ty = Tm.tm
 
 type 'a decl =
   | Hole of [`Rigid | `Flex]
-  | Defn of 'a
+  | Defn of [`Transparent | `Opaque] * 'a
   | Guess of {ty : 'a; tm : 'a}
 
 type status =

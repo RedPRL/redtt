@@ -17,7 +17,7 @@
 %token AST TIMES HASH AT BACKTICK IN WITH END
 %token BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V
 %token THEN ELSE
-%token IMPORT
+%token IMPORT OPAQUE
 %token TYPE PRE KAN
 %token EOF
 
@@ -27,7 +27,9 @@
 
 edecl:
   | LET; a = ATOM; sch = escheme; EQUALS; tm = eterm
-    { E.Define (a, sch, tm) }
+    { E.Define (a, `Transparent, sch, tm) }
+  | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = eterm
+    { E.Define (a, `Opaque, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
   | IMPORT; a = ATOM

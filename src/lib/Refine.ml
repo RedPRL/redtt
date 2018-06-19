@@ -173,14 +173,14 @@ struct
 
   and elab_decl env =
     function
-    | E.Define (name, scheme, e) ->
+    | E.Define (name, opacity, scheme, e) ->
       elab_scheme env scheme @@ fun cod ->
       M.unify >>
       elab_chk env cod e >>= fun tm ->
       let alpha = Name.named @@ Some name in
 
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.define psi alpha cod tm >>= fun _ ->
+      M.lift @@ U.define psi alpha opacity cod tm >>= fun _ ->
       M.lift C.go_to_top >>
       M.unify >>= fun _ ->
       Format.printf "Defined %s.@." name;

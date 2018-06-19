@@ -1,5 +1,5 @@
 type edecl =
-  | Define of string * escheme * eterm
+  | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
   | Debug of [ `All | `Constraints | `Unsolved ]
   | Import of string
 
