@@ -15,6 +15,8 @@ sig
   val bind1 : atom -> el -> t
   val unleash1 : t -> atom * el
   val inst1 : t -> Dim.t -> el
+
+  val make1 : (atom -> el) -> t
 end
 
 module M (X : Sort.S with type 'a m = 'a) : S with type el = X.t

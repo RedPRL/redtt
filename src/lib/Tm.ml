@@ -23,6 +23,7 @@ type 'a tmf =
   | Sg of 'a * 'a bnd
 
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
+  | VIn of {r : 'a; tm0 : 'a; tm1 : 'a}
 
   | Bool
   | Tt
@@ -44,8 +45,8 @@ type 'a tmf =
   | Let of 'a cmd * 'a bnd
 
 and 'a head =
-  | Meta of Name.t
-  | Ref of Name.t * twin
+  | Meta of {name: Name.t; ushift : int}
+  | Ref of {name : Name.t; twin : twin; ushift : int}
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
@@ -69,26 +70,28 @@ and 'a cmd = 'a head * 'a spine
 type tm = Tm of tm tmf
 
 type 'a subst =
-  | Id
-  | Proj
-  | Sub of 'a subst * 'a
-  | Cmp of 'a subst * 'a subst
+  | Shift of int
+  | Dot of 'a * 'a subst
 
-let var i tw =
+let rec cmp_subst sub0 sub1 =
+  match sub0, sub1 with
+  | s, Shift 0 -> s
+  | Dot (_, sub0), Shift m -> cmp_subst sub0 (Shift (m - 1))
+  | Shift m, Shift n -> Shift (m + n)
+  | sub0, Dot (e, sub1) -> Dot (subst_cmd sub0 e, cmp_subst sub0 sub1)
+
+and var i tw =
   Ix (i, tw), Emp
 
-let lift sub tw =
-  Sub (Cmp (sub, Proj), var 0 tw)
+and lift sub =
+  Dot (var 0 `Only, cmp_subst (Shift 1) sub)
 
-let rec liftn n sub =
+and liftn n sub =
   match n with
   | 0 -> sub
-  | _ -> liftn (n - 1) @@ lift sub `Only (* TODO *)
+  | _ -> liftn (n - 1) @@ lift sub
 
-let inst0 t = Sub (Id, t)
-
-
-let rec subst (sub : tm cmd subst) (Tm con) =
+and subst (sub : tm cmd subst) (Tm con) =
   Tm (subst_f sub con)
 
 and subst_f (sub : tm cmd subst) =
@@ -130,6 +133,12 @@ and subst_f (sub : tm cmd subst) =
     let equiv = subst sub info.equiv in
     V {r; ty0; ty1; equiv}
 
+  | VIn info ->
+    let r = subst sub info.r in
+    let tm0 = subst sub info.tm0 in
+    let tm1 = subst sub info.tm1 in
+    VIn {r; tm0; tm1}
+
   | Lam bnd ->
     Lam (subst_bnd sub bnd)
 
@@ -160,11 +169,10 @@ and subst_tm_face sub (r, r', otm) =
   subst sub r, subst sub r', Option.map (subst sub) otm
 
 
-(* TODO: I don't know if this is backwards or not *)
 and subst_cmd sub (head, spine) =
   let head', spine' = subst_head sub head in
   let spine'' = subst_spine sub spine in
-  head', spine'' <.> spine'
+  head', spine' <.> spine''
 
 and subst_spine sub spine =
   Bwd.map (subst_frame sub) spine
@@ -192,10 +200,15 @@ and subst_frame sub frame =
 and subst_head sub head =
   match head with
   | Ix (i, tw) ->
-    subst_ix sub i tw
+    begin
+      match sub, i with
+      | Shift n, _ -> Ix (i + n, tw), Emp
+      | Dot (e, _), 0 -> e
+      | Dot (_, sub), _ -> subst_head sub @@ Ix (i - 1, tw)
+    end
 
-  | Ref (a, tw) ->
-    Ref (a, tw), Emp
+  | Ref info ->
+    Ref info, Emp
 
   | Meta a ->
     Meta a, Emp
@@ -228,23 +241,9 @@ and subst_head sub head =
     let sys = subst_comp_sys sub info.sys in
     Com {r; r'; ty; cap; sys}, Emp
 
-and subst_ix sub ix tw =
-  match sub with
-  | Id ->
-    Ix (ix, tw), Emp
-  | Proj ->
-    Ix (ix + 1, tw), Emp
-
-  | Sub (sub, cmd) ->
-    if ix = 0 then cmd else subst_ix sub (ix - 1) tw
-
-  | Cmp (sub1, sub0) ->
-    subst_cmd sub1 @@
-    subst_ix sub0 ix tw
-
 and subst_bnd sub bnd =
   let B (nm, t) = bnd in
-  B (nm, subst (lift sub `Only) t)
+  B (nm, subst (lift sub) t)
 
 and subst_nbnd sub bnd =
   let NB (nms, t) = bnd in
@@ -318,6 +317,11 @@ let traverse ~f ~var ~ref =
       let ty1 = f k info.ty1 in
       let equiv = f k info.equiv in
       V {r; ty0; ty1; equiv}
+    | VIn info ->
+      let r = f k info.r in
+      let tm0 = f k info.tm0 in
+      let tm1 = f k info.tm1 in
+      VIn {r; tm0; tm1}
     | ExtLam nbnd ->
       ExtLam (go_nbnd k nbnd)
     | CoRThunk face ->
@@ -345,8 +349,8 @@ let traverse ~f ~var ~ref =
     function
     | Ix (i, tw) ->
       var k i tw
-    | Ref (a, tw) ->
-      ref k (a, tw)
+    | Ref info ->
+      ref k (info.name, info.twin, info.ushift)
     | Meta a ->
       Meta a, Emp
     | Down info ->
@@ -431,21 +435,13 @@ let fix_traverse ~var ~ref  =
 
 let close_var a f k =
   let var _ i tw = Ix (i, tw), Emp in
-  let ref n (b, tw) = if b = a then Ix (n + k, f tw), Emp else Ref (b, tw), Emp in
+  let ref n (b, tw, ush) = if b = a then Ix (n + k, f tw), Emp else Ref {name = b; twin = tw; ushift = ush}, Emp in
   fix_traverse ~var ~ref
-
-let subst sub =
-  let ref _ (b, tw) = Ref (b, tw), Emp in
-  let rec go k (Tm tm) =
-    let var _ i = subst_ix (liftn k sub) i in
-    Tm (traverse ~f:go ~var ~ref k tm)
-  in
-  go 0
 
 (* TODO: check that this isn't catastrophically wrong *)
 let open_var k a f =
-  let var k' i tw = if i = (k + k') then Ref (a, f tw), Emp else Ix (i, tw), Emp in
-  let ref _n (b, tw) = Ref (b, tw), Emp in
+  let var k' i tw = if i = (k + k') then Ref {name = a; twin = f tw; ushift = 0}, Emp else Ix (i, tw), Emp in
+  let ref _n (b, tw, ush) = Ref {name = b; twin = tw; ushift = ush}, Emp in
   fix_traverse ~var ~ref
 
 let unbind (B (nm, t)) =
@@ -563,6 +559,9 @@ let rec pp env fmt =
     | V info ->
       Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
 
+    | VIn info ->
+      Format.fprintf fmt "@[<1>(Vin %a@ %a@ %a)!]" (pp env) info.r (pp env) info.tm0 (pp env) info.tm1
+
     | Lam (B (nm, tm)) ->
       let x, env' = Pretty.Env.bind nm env in
       if mode = `Lam then
@@ -650,12 +649,14 @@ and pp_head env fmt =
     Uuseg_string.pp_utf_8 fmt @@
     Pretty.Env.var ix env
 
-  | Ref (nm, _) ->
-    Name.pp fmt nm
+  | Ref {name; ushift} ->
+    Name.pp fmt name;
+    if ushift > 0 then Format.fprintf fmt "^%i" ushift else ()
 
-  | Meta nm ->
-    Format.fprintf fmt "?%a"
-      Name.pp nm
+  | Meta {name; ushift} ->
+    Format.fprintf fmt "?%a^%i"
+      Name.pp name
+      ushift
 
   | Down {ty; tm} ->
     Format.fprintf fmt "@[<1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
@@ -788,39 +789,43 @@ module Macro =
 struct
   let arr ty0 ty1 =
     pi None ty0 @@
-    subst Proj ty1
+    subst (Shift 1) ty1
 
   let times ty0 ty1 =
     sg None ty0 @@
-    subst Proj ty1
+    subst (Shift 1) ty1
 
   let path ty tm0 tm1 =
-    let ty' = subst Proj ty in
-    let face0 = up (var 0 `Only), make Dim0, Some (subst Proj tm0) in
-    let face1 = up (var 0 `Only), make Dim1, Some (subst Proj tm1) in
+    let ty' = subst (Shift 1) ty in
+    let face0 = up (var 0 `Only), make Dim0, Some (subst (Shift 1) tm0) in
+    let face1 = up (var 0 `Only), make Dim1, Some (subst (Shift 1) tm1) in
     let sys = [face0; face1] in
     make @@ Ext (NB ([None], (ty', sys)))
 
   let fiber ~ty0 ~ty1 ~f ~x =
-    sg None ty0 @@
+    sg (Some "ix") ty0 @@
+    let app =
+      Down {tm = subst (Shift 1) f; ty = arr ty0 ty1},
+      (Emp #< (FunApp (up (var 0 `Only))))
+    in
     path
-      (subst Proj ty1)
-      (up @@ (Ix (0, `Only), Emp #< (FunApp (subst Proj f))))
-      (subst Proj x)
+      (subst (Shift 1) ty1)
+      (up app)
+      (subst (Shift 1) x)
 
-  let proj2 = Cmp (Proj, Proj)
+  let proj2 = Shift 2
 
   let is_contr ty =
-    sg None ty @@
-    pi None (subst Proj ty) @@
+    sg (Some "center") ty @@
+    pi (Some "other") (subst (Shift 1) ty) @@
     path
       (subst proj2 ty)
       (up @@ var 0 `Only)
       (up @@ var 1 `Only)
 
   let equiv ty0 ty1 =
-    sg None (arr ty0 ty1) @@
-    pi None (subst Proj ty1) @@
+    sg (Some "fun") (arr ty0 ty1) @@
+    pi (Some "el") (subst (Shift 1) ty1) @@
     is_contr @@
     fiber
       ~ty0:(subst proj2 ty0)
@@ -856,15 +861,18 @@ struct
       go fl t1 @@ go fl t0 acc
     | Let (cmd, bnd) ->
       go_bnd fl bnd @@ go_cmd fl cmd acc
+    | V info ->
+      go fl info.r @@ go fl info.ty0 @@
+      go fl info.ty1 @@ go fl info.equiv acc
     | _ ->
       Format.eprintf "Tried to get free variables, but we didn't implement the case for: %a@." (pp Pretty.Env.emp) tm;
       failwith "TODO"
 
   and go_cmd fl (hd, sp) acc =
     match fl, hd with
-    | `RigVars, Ref (x, _) ->
+    | `RigVars, Ref {name; _} ->
       go_spine fl sp @@
-      Occurs.Set.add x acc
+      Occurs.Set.add name acc
     | `RigVars, Meta _ ->
       acc
     | _ ->
@@ -876,10 +884,10 @@ struct
     | _, Ix _ -> acc
     | `Vars, Meta _ -> acc
     | `RigVars, Meta _ -> acc
-    | `Metas, Meta alpha ->
-      Occurs.Set.add alpha acc
-    | (`Vars | `RigVars), Ref (x, _) ->
-      Occurs.Set.add x acc
+    | `Metas, Meta {name; _} ->
+      Occurs.Set.add name acc
+    | (`Vars | `RigVars), Ref {name; _} ->
+      Occurs.Set.add name acc
     | `Metas, Ref _ -> acc
     | _, Down {ty; tm} ->
       go fl tm @@ go fl ty acc
@@ -982,7 +990,7 @@ let map_comp_sys f =
 
 let map_head f =
   function
-  | Ref (a, tw) -> Ref (a, tw)
+  | Ref info -> Ref info
   | Meta a -> Meta a
   | Ix (i, tw) -> Ix (i, tw)
   | Down info ->
@@ -1079,6 +1087,11 @@ let map_tmf f =
     let ty1 = f info.ty1 in
     let equiv = f info.equiv in
     V {r; ty0; ty1; equiv}
+  | VIn info ->
+    let r = f info.r in
+    let tm0 = f info.tm0 in
+    let tm1 = f info.tm1 in
+    VIn {r; tm0; tm1}
   | Lam bnd ->
     Lam (map_bnd f bnd)
   | ExtLam nbnd ->
@@ -1107,8 +1120,8 @@ let rec opt_traverse f xs =
 
 let as_plain_var t =
   match unleash t with
-  | Up (Ref (x, _), Emp) ->
-    Some x
+  | Up (Ref {name; _}, Emp) ->
+    Some name
   | _ ->
     None
 
@@ -1173,5 +1186,21 @@ let rec eta_contract t =
 
   | con ->
     make @@ map_tmf eta_contract con
+
+
+let rec shift_univ k tm =
+  match unleash tm with
+  | Univ {lvl; kind} ->
+    make @@ Univ {lvl = Lvl.shift k lvl; kind}
+  | Up (Ref info, sp) ->
+    let hd' = Ref {info with ushift = info.ushift + k} in
+    let sp' = map_spine (shift_univ k) sp in
+    make @@ Up (hd', sp')
+  | Up (Meta {name; ushift}, sp) ->
+    let hd' = Meta {name; ushift = ushift + k} in
+    let sp' = map_spine (shift_univ k) sp in
+    make @@ Up (hd', sp')
+  | tmf ->
+    Tm (map_tmf (shift_univ k) tmf)
 
 let pp0 fmt tm = pp Pretty.Env.emp fmt @@ eta_contract tm

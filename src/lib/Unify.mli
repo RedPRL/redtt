@@ -9,7 +9,7 @@ val push_guess : telescope -> ty0:ty -> ty1:ty -> tm -> tm m
 val push_hole : [`Rigid | `Flex] -> telescope -> ty -> tm Tm.cmd m
 val hole : [`Rigid | `Flex] -> telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m
 
-val define : telescope -> Name.t -> ty:ty -> tm -> unit m
+val define : telescope -> Name.t -> [ `Transparent | `Opaque ] -> ty:ty -> tm -> unit m
 
 
 

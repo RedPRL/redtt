@@ -49,7 +49,7 @@ struct
             | `Dim -> ()
             | _ -> failwith "check_dim_cmd: expected dimension"
           end
-        | Tm.Ref (_a, _) ->
+        | Tm.Ref _ ->
           (* TODO: lookup in global context, make sure it is a dimension *)
           ()
         | _ -> failwith ""
@@ -124,7 +124,7 @@ struct
     match Eval.unleash ty, T.unleash tm with
     | V.Univ info0, T.Univ info1 ->
       (* TODO: what about kinds? I think it's fine, since we learned from Andy Pitts how to make
-         the pretype universe Kan. But I may need to add those "ecom" fuckers, LOL. *)
+         the pretype universe Kan. But I may need to add those "ecom" thingies, LOL. *)
       if Lvl.greater info0.lvl info1.lvl then () else
         failwith "Predicativity violation"
 
@@ -489,8 +489,8 @@ struct
 
   and infer_head cx =
     function
-    | T.Ref (name, tw) ->
-      let ty = GlobalEnv.lookup_ty Sig.globals name tw in
+    | T.Ref {name; twin; ushift} ->
+      let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name twin in
       Cx.eval Cx.emp ty
 
     | T.Ix (ix, _) ->
@@ -500,8 +500,8 @@ struct
         | `Dim -> failwith "infer: expected type hypothesis"
       end
 
-    | T.Meta name ->
-      let ty = GlobalEnv.lookup_ty Sig.globals name `Only in
+    | T.Meta {name; ushift} ->
+      let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name `Only in
       Cx.eval Cx.emp ty
 
     | T.Coe info ->

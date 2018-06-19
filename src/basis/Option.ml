@@ -10,4 +10,7 @@ exception WasNone
 let get_exn m =
   match m with
   | Some x -> x
-  | None -> raise WasNone
+  | None ->
+    Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+    Format.eprintf "@.";
+    raise WasNone

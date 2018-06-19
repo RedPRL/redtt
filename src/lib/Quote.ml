@@ -185,6 +185,26 @@ struct
         let face = equate_val_face env univ face0 face1 in
         Tm.make @@ Tm.CoR face
 
+      | V info0, V info1 ->
+        let r0 = DimGeneric.unleash info0.x in
+        let r1 = DimGeneric.unleash info1.x in
+        let tr = equate_dim env r0 r1 in
+        let ty0 = equate_ty env info0.ty0 info1.ty0 in
+        let ty1 = equate_ty env info0.ty1 info1.ty1 in
+        let equiv_ty = V.Macro.equiv info0.ty0 info1.ty1 in
+        let equiv = equate env equiv_ty info0.equiv info1.equiv in
+        Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
+
+      | VIn info0, VIn info1 ->
+        (* Format.eprintf "Quoting VIn: %a = %a@." pp_value el0 pp_value el1; *)
+        let x, ty0, ty1, _ = unleash_v ty in
+        let r = DimGeneric.unleash x in
+        let tr = quote_dim env r in
+        let ty0r0 = Val.act (Dim.equate r Dim.dim0) ty0 in
+        let tm0 = equate env ty0r0 info0.el0 info1.el0 in
+        let tm1 = equate env ty1 info0.el1 info1.el1 in
+        Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
+
       | LblTy info0, LblTy info1 ->
         if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
           let ty = equate env ty info0.ty info1.ty in
@@ -235,14 +255,14 @@ struct
         Tm.Ix (Env.ix_of_lvl l0 env, `Only), Bwd.from_list stk
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
-    | Ref (nm0, tw0), Ref (nm1, tw1) ->
-      if nm0 = nm1 && tw0 = tw1 then
-        Tm.Ref (nm0, tw0), Bwd.from_list stk
+    | Ref info0, Ref info1 ->
+      if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
+        Tm.Ref {name = info0.name; twin = info0.twin; ushift = info0.ushift}, Bwd.from_list stk
       else
         failwith "global variable name mismatch"
-    | Meta nm0, Meta nm1 ->
-      if nm0 = nm1 then
-        Tm.Meta nm0, Bwd.from_list stk
+    | Meta meta0, Meta meta1 ->
+      if meta0.name = meta1.name && meta0.ushift = meta1.ushift then
+        Tm.Meta {name = meta0.name; ushift = meta0.ushift}, Bwd.from_list stk
       else
         failwith "global variable name mismatch"
     | Car neu0, Car neu1 ->
@@ -273,7 +293,8 @@ struct
       let ty0 = equate_ty env vproj0.ty0 vproj1.ty0 in
       let ty1 = equate_ty env vproj0.ty1 vproj1.ty1 in
       let equiv_ty = V.Macro.equiv vproj0.ty0 vproj0.ty1 in
-      let equiv = equate env equiv_ty vproj0.equiv vproj1.equiv in
+      let phi = Dim.equate r0 Dim.dim0 in
+      let equiv = equate env (Val.act phi equiv_ty) vproj0.equiv vproj1.equiv in
       let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
     | LblCall neu0, LblCall neu1 ->
@@ -320,8 +341,10 @@ struct
       tr, tr', None
 
     | Face.Indet (p0, v0), Face.Indet (p1, v1) ->
+      let r, r' = DimStar.unleash p0 in
+      let phi = Dim.equate r r' in
       let tr, tr' = equate_star env p0 p1 in
-      let v = equate env ty v0 v1 in
+      let v = equate env (Val.act phi ty) v0 v1 in
       tr, tr', Some v
 
     | _ -> failwith "equate_val_face"
@@ -333,22 +356,27 @@ struct
       tr, tr', None
 
     | Face.Indet (p0, abs0), Face.Indet (p1, abs1) ->
+      let r, r' = DimStar.unleash p0 in
+      let phi = Dim.equate r r' in
       let tr, tr' = equate_star env p0 p1 in
-      let bnd = equate_val_abs env ty abs0 abs1 in
+      let bnd = equate_val_abs env (Val.act phi ty) abs0 abs1 in
       tr, tr', Some bnd
 
-    | _ -> failwith "equate_comp_face"
+    | _ ->
+      Format.eprintf "equate_comp_face: %a vs %a@." pp_comp_face face0 pp_comp_face face1;
+      failwith "equate_comp_face"
 
   and equate_val_abs env ty abs0 abs1 =
-    let xs, v0x = Abs.unleash abs0 in
-    match xs with
-    | [x] ->
-      let v1x = Abs.inst abs1 @@ List.map Dim.named xs in
-      let envx = Env.abs env xs in
+    let x, v0x = Abs.unleash1 abs0 in
+    let v1x = Abs.inst1 abs1 (Dim.named x) in
+    try
+      let envx = Env.abs env [x] in
       let tm = equate envx ty v0x v1x in
-      Tm.B (Name.name @@ x, tm)
-    | _ ->
-      failwith "equate_val_abs"
+      Tm.B (Name.name x, tm)
+    with
+    | exn ->
+      (* Format.eprintf "Failed to equate abs: @[<v>%a@,= %a@]@." pp_abs abs0 pp_abs abs1; *)
+      raise exn
 
   and equate_star env p0 p1 =
     let r0, r'0 = DimStar.unleash p0 in
@@ -362,6 +390,9 @@ struct
     | Same ->
       quote_dim env r
     | _ ->
+      (* Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+         Format.eprintf "@.";
+         Format.eprintf "Dimension mismatch: %a <> %a@." Dim.pp r Dim.pp r'; *)
       failwith "Dimensions did not match"
 
   and equate_dims env rs rs' =
@@ -384,7 +415,7 @@ struct
         Tm.up @@ Tm.var ix `Only
       with
       | _ ->
-        Tm.up (Tm.Ref (x, `Only), Emp)
+        Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1

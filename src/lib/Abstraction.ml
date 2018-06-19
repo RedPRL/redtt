@@ -16,6 +16,8 @@ sig
   val bind1 : atom -> el -> t
   val unleash1 : t -> atom * el
   val inst1 : t -> Dim.t -> el
+
+  val make1 : (atom -> el) -> t
 end
 
 module M (X : Sort.S with type 'a m = 'a) : S with type el = X.t =
@@ -51,6 +53,8 @@ struct
   (* FYI: It may not be necessary to freshen here, depending on how substitution is implemented. *)
   let bind atoms node =
     {atoms; node}
+  (* let xs, phi = freshen_atoms atoms [] D.idn in
+     {atoms = xs; node = X.act phi node} *)
 
   let bind1 x el =
     bind [x] el
@@ -63,6 +67,10 @@ struct
 
   let inst1 el r =
     inst el [r]
+
+  let make1 gen =
+    let x = Name.fresh () in
+    bind1 x (gen x)
 
   let act phi abs =
     let xs, node = unleash abs in

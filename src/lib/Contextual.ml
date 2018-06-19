@@ -117,8 +117,10 @@ let update_env e =
     {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm info st.info}
   | E (nm, ty, Guess _) ->
     {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
-  | E (nm, ty, Defn t) ->
+  | E (nm, ty, Defn (`Transparent, t)) ->
     {st with env = GlobalEnv.define st.env nm ty t; info = Map.add nm `Rigid st.info}
+  | E (nm, ty, Defn (`Opaque, _)) ->
+    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
   | _ ->
     st
 

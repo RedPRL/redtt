@@ -6,7 +6,7 @@ let J
   (x : A) (p : Path _ a x)
   : C x p
   =
-  let ty : Line type = λ i →
+  let ty : Line^1 type = λ i →
     let h : Line A = λ j →
       comp 0 j a with
       | i=0 ⇒ λ _ → a
