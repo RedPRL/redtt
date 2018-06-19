@@ -21,6 +21,7 @@ type 'a tmf =
   | Sg of 'a * 'a bnd
 
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
+  | VIn of {r : 'a; tm0 : 'a; tm1 : 'a}
 
   | Bool
   | Tt
@@ -54,8 +55,8 @@ type 'a tmf =
   | Let of 'a cmd * 'a bnd
 
 and 'a head =
-  | Meta of Name.t
-  | Ref of Name.t * twin
+  | Meta of {name: Name.t; ushift : int}
+  | Ref of {name : Name.t; twin : twin; ushift : int}
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
@@ -87,10 +88,8 @@ val map_tm_sys : (tm -> tm) -> (tm, tm) system -> (tm, tm) system
 
 
 type 'a subst =
-  | Id
-  | Proj
-  | Sub of 'a subst * 'a
-  | Cmp of 'a subst * 'a subst
+  | Shift of int
+  | Dot of 'a * 'a subst
 
 
 val make : tm tmf -> tm
@@ -110,6 +109,9 @@ val bind_ext : Name.t bwd -> tm -> (tm, tm) system -> (tm * (tm, tm) system) nbn
 val unbind_with : Name.t -> (twin -> twin) -> tm bnd -> tm
 
 val subst : tm cmd subst -> tm -> tm
+
+
+val shift_univ : int -> tm -> tm
 
 (* make sure you know what you are doing, LOL *)
 val eta_contract : tm -> tm

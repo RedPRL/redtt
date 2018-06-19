@@ -41,7 +41,7 @@ let restriction sg =
 let restrict tr0 tr1 sg =
   let ev_dim tr =
     match Tm.unleash tr with
-    | Tm.Up (Tm.Ref (a, _), Emp) -> Dim.Atom a
+    | Tm.Up (Tm.Ref {name; _}, Emp) -> Dim.Atom name
     | Tm.Dim0 -> Dim.Dim0
     | Tm.Dim1 -> Dim.Dim1
     | _ -> failwith "Restrict: expected dimension"

@@ -54,9 +54,9 @@ let telescope_to_spine : telescope -> tm Tm.spine =
   Bwd.map @@ fun (x, param) ->
   match param with
   | `I ->
-    Tm.ExtApp [Tm.up (Tm.Ref (x, `Only), Emp)]
+    Tm.ExtApp [Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)]
   | `P _ ->
-    Tm.FunApp (Tm.up (Tm.Ref (x, `Only), Emp))
+    Tm.FunApp (Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp))
   | `R _ ->
     Tm.CoRForce
   | _ ->
@@ -65,7 +65,7 @@ let telescope_to_spine : telescope -> tm Tm.spine =
 let push_hole tag gm ty =
   let alpha = Name.fresh () in
   pushl (E (alpha, abstract_ty gm ty, Hole tag)) >>
-  let hd = Tm.Meta alpha in
+  let hd = Tm.Meta {name = alpha; ushift = 0} in
   let sp = telescope_to_spine gm in
   ret (hd, sp)
 
@@ -75,19 +75,21 @@ let hole tag gm ty f =
   go_left >>
   ret r
 
-let define gm alpha ~ty tm =
+let define gm alpha opacity ~ty tm =
   let ty' = abstract_ty gm ty in
   let tm' = abstract_tm gm tm in
   check ~ty:ty' tm' >>= fun b ->
   if not b then
     dump_state Format.err_formatter "Type error" `All >>= fun _ ->
     begin
-      Format.eprintf "error checking: %a : %a@." Tm.pp0 tm' Tm.pp0 ty';
+      Format.eprintf "error checking: @[<hv>%a@ : %a@]@." Tm.pp0 tm' Tm.pp0 ty';
       failwith "define: type error"
     end
   else
-    push_update alpha >>
-    pushr @@ E (alpha, ty', Defn tm')
+    begin
+      if opacity = `Transparent then push_update alpha else ret ()
+    end >>
+    pushr @@ E (alpha, ty', Defn (opacity, tm'))
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)
@@ -107,8 +109,8 @@ let rec opt_traverse f xs =
 
 let to_var t =
   match Tm.unleash @@ Tm.eta_contract t with
-  | Tm.Up (Tm.Ref (a, _), Emp) ->
-    Some a
+  | Tm.Up (Tm.Ref {name; _}, Emp) ->
+    Some name
   | _ ->
     (* Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t; *)
     None
@@ -169,14 +171,14 @@ let invert alpha ty sp t =
 
 let try_invert q ty =
   match Tm.unleash q.tm0 with
-  | Tm.Up (Meta alpha, sp) ->
+  | Tm.Up (Meta {name = alpha; ushift = 0}, sp) ->
     begin
       invert alpha ty sp q.tm1 >>= function
       | None ->
         ret false
       | Some t ->
         active (Unify q) >>
-        define Emp alpha ~ty t >>
+        define Emp alpha `Transparent ~ty t >>
         ret true
     end
   | _ ->
@@ -184,7 +186,7 @@ let try_invert q ty =
 
 let rec flex_term ~deps q =
   match Tm.unleash q.tm0 with
-  | Tm.Up (Meta alpha, _) ->
+  | Tm.Up (Meta {name = alpha; ushift = 0}, _) ->
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
@@ -230,7 +232,7 @@ let rec flex_term ~deps q =
 
 let rec flex_flex_diff ~deps q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
-  | Tm.Up (Tm.Meta alpha0, _), Tm.Up (Tm.Meta alpha1, _) ->
+  | Tm.Up (Tm.Meta {name = alpha0; ushift = 0}, _), Tm.Up (Tm.Meta {name = alpha1; ushift = 0}, _) ->
     Bwd.map snd <@> ask >>= fun gm ->
     begin
       popl >>= function
@@ -296,7 +298,7 @@ let rec instantiate (inst : instantiation) =
   popl >>= function
   | E (beta, ty', Hole `Flex) when alpha = beta ->
     hole `Flex Emp ty @@ fun cmd ->
-    define Emp beta ~ty:ty' @@ f cmd
+    define Emp beta `Transparent ~ty:ty' @@ f cmd
   | e ->
     pushr e >>
     instantiate inst
@@ -317,8 +319,8 @@ let flex_flex_same q =
   | None ->
     block @@ Unify
       {q with
-       tm0 = Tm.up (Tm.Meta alpha, sp0);
-       tm1 = Tm.up (Tm.Meta alpha, sp1)}
+       tm0 = Tm.up (Tm.Meta {name = alpha; ushift = 0}, sp0);
+       tm1 = Tm.up (Tm.Meta {name = alpha; ushift = 0}, sp1)}
 
 let try_prune _q =
   (* TODO: implement pruning *)
@@ -385,7 +387,7 @@ let push_guess gm ~ty0 ~ty1 tm  =
   let ty0' = abstract_ty gm ty0 in
   let ty1' = abstract_ty gm ty1 in
   let tm' = abstract_tm gm tm in
-  let hd = Tm.Meta alpha in
+  let hd = Tm.Meta {name = alpha; ushift = 0} in
   let sp = telescope_to_spine gm in
   pushl @@ E (alpha, ty0', Guess {ty = ty1'; tm = tm'}) >>
   ret @@ Tm.up (hd, sp)
@@ -509,8 +511,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let module HSubst = HSubst (T) in
       let _, cod0 = T.Cx.Eval.unleash_sg ~debug:["match_spine/cdr"] ty0 in
       let _, cod1 = T.Cx.Eval.unleash_sg ~debug:["match-spine/cdr"] ty1 in
-      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref (x0, tw0), sp0 #< Tm.Car) in
-      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref (x1, tw1), sp1 #< Tm.Car) in
+      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
+      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
       ret (cod0, cod1)
 
     | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
@@ -539,8 +541,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let mot1_ff = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Ff) in
       active @@ Problem.eqn ~ty0:mot0_tt ~tm0:info0.tcase ~ty1:mot1_tt ~tm1:info1.tcase >>
       active @@ Problem.eqn ~ty0:mot0_ff ~tm0:info0.fcase ~ty1:mot1_ff ~tm1:info1.fcase >>
-      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up (Tm.Ref (x0, tw0), sp0)) in
-      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up (Tm.Ref (x1, tw1), sp1)) in
+      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up (Tm.Ref {name = x0; twin = tw0; ushift = 0}, sp0)) in
+      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up (Tm.Ref {name = x1; twin = tw1; ushift = 0}, sp1)) in
       ret (ty0, ty1)
 
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
@@ -652,8 +654,8 @@ let rigid_rigid q =
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
-  | Tm.Up (Tm.Ref (x0, tw0), sp0), Tm.Up (Tm.Ref (x1, tw1), sp1) ->
-    match_spine x0 tw0 sp0 x1 tw1 sp1 >>
+  | Tm.Up (Tm.Ref info0, sp0), Tm.Up (Tm.Ref info1, sp1) when info0.ushift = 0 && info1.ushift = 0 ->
+    match_spine info0.name info0.twin sp0 info1.name info1.twin sp1 >>
     ret ()
 
   | _ ->
@@ -676,8 +678,8 @@ let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, Tm.B (nm, _)), Tm.Pi (dom1, _) ->
     let x = Name.named nm in
-    let x_l = Tm.up (Tm.Ref (x, `TwinL), Emp) in
-    let x_r = Tm.up (Tm.Ref (x, `TwinR), Emp) in
+    let x_l = Tm.up (Tm.Ref {name = x; twin = `TwinL; ushift = 0}, Emp) in
+    let x_r = Tm.up (Tm.Ref {name = x; twin = `TwinR; ushift = 0}, Emp) in
 
     in_scope x (`Tw (dom0, dom1))
       begin
@@ -695,12 +697,12 @@ let unify q =
     (q.ty1, q.tm1) %% Tm.Cdr >>= fun (ty_cdr1, cdr1) ->
     active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
     let prob = Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1 in
-    Format.eprintf "problem: %a@.@." (Problem.pp) prob;
+    (* Format.eprintf "problem: %a@.@." (Problem.pp) prob; *)
     active @@ prob
 
   | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
     let xs = List.map Name.named nms0 in
-    let vars = List.map (fun x -> Tm.up (Tm.Ref (x, `Only), Emp)) xs in
+    let vars = List.map (fun x -> Tm.up (Tm.Ref {name = x; twin =  `Only; ushift = 0}, Emp)) xs in
     let psi = List.map (fun x -> (x, `I)) xs in
 
     in_scopes psi
@@ -716,9 +718,9 @@ let unify q =
 
   | _ ->
     match Tm.unleash q.tm0, Tm.unleash q.tm1 with
-    | Tm.Up (Tm.Meta alpha0, sp0), Tm.Up (Tm.Meta alpha1, sp1)
+    | Tm.Up (Tm.Meta {name = alpha0; ushift = ushift0}, sp0), Tm.Up (Tm.Meta {name = alpha1; ushift = ushift1}, sp1)
       when
-        alpha0 = alpha1
+        alpha0 = alpha1 && ushift0 = ushift1
       ->
       try_prune q <|| begin
         try_prune (Equation.sym q) <||
@@ -741,21 +743,26 @@ let unify q =
     | _ ->
       rigid_rigid q
 
+
 let rec split_sigma tele x ty =
   match Tm.unleash ty with
-  | Tm.Sg (dom, cod) ->
-    let y, cody = Tm.unbind cod in
+  | Tm.Sg (dom, Tm.B (_, cod)) ->
+    let y = Name.fresh () in
     let z = Name.fresh () in
     let sp_tele = telescope_to_spine tele in
+
+    let ytm = Tm.Ref {name = y; twin = `Only; ushift = 0}, sp_tele in
+    let ztm = Tm.Ref {name = z; twin = `Only; ushift = 0}, sp_tele in
+    let cody = Tm.subst (Tm.Dot (ytm, Tm.Shift 0)) cod in
 
     Some
       ( y
       , abstract_ty tele dom
       , z
       , abstract_ty tele cody
-      , abstract_tm tele @@ Tm.cons (Tm.up (Tm.Ref (y, `Only), sp_tele)) (Tm.up (Tm.Ref (z, `Only), sp_tele))
-      , ( abstract_tm tele @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Car)
-        , abstract_tm tele @@ Tm.up (Tm.Ref (x, `Only), sp_tele #< Tm.Cdr)
+      , abstract_tm tele @@ Tm.cons (Tm.up ytm) (Tm.up ztm)
+      , ( abstract_tm tele @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Car)
+        , abstract_tm tele @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Cdr)
         )
       )
 
@@ -772,7 +779,7 @@ let rec lower tele alpha ty =
   match Tm.unleash ty with
   | Tm.LblTy info ->
     hole `Flex tele info.ty @@ fun t ->
-    define tele alpha ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
+    define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
     ret true
 
   | Tm.Sg (dom, cod) ->
@@ -782,7 +789,7 @@ let rec lower tele alpha ty =
     let vdom = T.Cx.eval T.Cx.emp dom in
     let cod' = HS.inst_ty_bnd cod (vdom, Tm.up t0) in
     hole `Flex tele cod' @@ fun t1 ->
-    define tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
+    define tele alpha `Transparent ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
 
 
@@ -802,7 +809,7 @@ let rec lower tele alpha ty =
         let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
         hole `Flex tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
-        define tele alpha ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
+        define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
         ret true
     end
 
@@ -866,8 +873,8 @@ let rec solver prob =
               (*  This weird crap is needed to avoid creating a cycle in the environment.
                   What we should really do is kill 'twin variables' altogether and switch to
                   a representation based on having two contexts. *)
-              let var_y = Tm.up (Tm.Ref (y, `Only), Emp) in
-              let var_x = Tm.up (Tm.Ref (x, `Only), Emp) in
+              let var_y = Tm.up (Tm.Ref {name = y; twin = `Only; ushift = 0}, Emp) in
+              let var_x = Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp) in
               let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
               let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
               solver @@ Problem.all x ty0 @@
@@ -912,7 +919,7 @@ let ambulando =
         check ~ty info.tm >>= function
         | true ->
           (* Format.eprintf "solved guess %a??@." Name.pp alpha; *)
-          pushl @@ E (alpha, ty, Defn info.tm) >>
+          pushl @@ E (alpha, ty, Defn (`Transparent, info.tm)) >>
           push_update alpha >>
           loop
         | false ->

@@ -148,10 +148,20 @@ struct
     M.ret @@ go_locals renv psi
 
 
+  let normalization_clock = ref 0.
+
+  let _ =
+    Diagnostics.on_termination @@ fun _ ->
+    Format.eprintf "Refine spent %fs in normalizing types@." !normalization_clock
+
   let normalize_ty ty =
+    let now0 = Unix.gettimeofday () in
     M.lift C.typechecker >>= fun (module T) ->
     let vty = T.Cx.eval T.Cx.emp ty in
-    M.ret @@ T.Cx.quote_ty T.Cx.emp vty
+    let ty = T.Cx.quote_ty T.Cx.emp vty in
+    let now1 = Unix.gettimeofday () in
+    normalization_clock := !normalization_clock +. (now1 -. now0);
+    M.ret ty
 
   let (<+>) m n =
     C.bind (C.optional m) @@
@@ -173,14 +183,14 @@ struct
 
   and elab_decl env =
     function
-    | E.Define (name, scheme, e) ->
+    | E.Define (name, opacity, scheme, e) ->
       elab_scheme env scheme @@ fun cod ->
       M.unify >>
       elab_chk env cod e >>= fun tm ->
       let alpha = Name.named @@ Some name in
 
       M.lift C.ask >>= fun psi ->
-      M.lift @@ U.define psi alpha cod tm >>= fun _ ->
+      M.lift @@ U.define psi alpha opacity cod tm >>= fun _ ->
       M.lift C.go_to_top >>
       M.unify >>= fun _ ->
       Format.printf "Defined %s.@." name;
@@ -210,7 +220,6 @@ struct
       function
       | [] ->
         elab_chk env univ ecod >>=
-        normalize_ty >>=
         kont
       | (name, edom) :: cells ->
         elab_chk env univ edom >>= normalize_ty >>= fun dom ->
@@ -306,7 +315,7 @@ struct
 
       let is_dependent =
         match Tm.unleash scrut with
-        | Tm.Up (Tm.Ref (a, _), _) when Occurs.Set.mem a @@ Tm.free `Vars ty -> true
+        | Tm.Up (Tm.Ref {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
         | _ -> false
       in
 
@@ -329,7 +338,7 @@ struct
       let hd = Tm.Down {ty = bool; tm = scrut} in
       let bmot =
         let x = Name.fresh () in
-        Tm.bind x @@ mot @@ Tm.up (Tm.Ref (x, `Only), Emp)
+        Tm.bind x @@ mot @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)
       in
       let frm = Tm.If {mot = bmot; tcase; fcase} in
       M.ret @@ Tm.up (hd, Emp #< frm)
@@ -460,18 +469,20 @@ struct
       elab_chk env cod' (Tuple es) >>= fun tm1 ->
       M.ret @@ Tm.cons tm0 tm1
 
-    | _, Type ->
+    | Tm.Univ info, Type ->
       begin
-        match Tm.unleash ty with
-        | Tm.Univ _ ->
-          M.ret @@ Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0)
-        | _ ->
-          failwith "Type"
+        if Lvl.greater info.lvl (Lvl.Const 0) then
+          match Tm.unleash ty with
+          | Tm.Univ _ ->
+            M.ret @@ Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0)
+          | _ ->
+            failwith "Type"
+        else
+          failwith "Elaborator: universe level error"
       end
 
     | _, E.Cut (e, fs) ->
       elab_inf env e >>= fun (hty, hd) ->
-      normalize_ty hty >>= fun hty ->
       elab_cut env (hty, hd) fs (Chk ty)
 
     | _, E.HCom info ->
@@ -521,7 +532,7 @@ struct
 
       | (e_r, e_r', e) :: esys ->
         let x = Name.fresh () in
-        let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+        let varx = Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp) in
         let ext_ty =
           let face_cap = varx, s, Some cap in
           let face_adj (r, r', obnd) =
@@ -557,7 +568,7 @@ struct
 
       | (e_r, e_r', e) :: esys ->
         let x = Name.fresh () in
-        let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+        let varx = Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp) in
         let tyx = Tm.unbind_with x (fun tw -> tw) ty_bnd in
         let ext_ty =
           let face_cap = varx, s, Some cap in
@@ -600,13 +611,14 @@ struct
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
     match e with
-    | E.Var name ->
+    | E.Var (name, ushift) ->
       get_resolver env >>= fun renv ->
       begin
         match ResEnv.get name renv with
         | `Ref a ->
           M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) >>= fun ty ->
-          let cmd = Tm.Ref (a, `Only), Emp in
+          let ty = Tm.shift_univ ushift ty in
+          let cmd = Tm.Ref {name = a; twin = `Only; ushift}, Emp in
           M.ret (ty, cmd)
         | `Ix _ ->
           failwith "elab_inf: expected locally closed"
@@ -627,7 +639,6 @@ struct
 
     | E.Cut (e, fs) ->
       elab_inf env e >>= fun (ty, cmd) ->
-      normalize_ty ty >>= fun ty ->
       elab_cut env (ty, cmd) fs Inf
 
     | E.Coe info ->
@@ -642,7 +653,7 @@ struct
       let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
       elab_chk env fam_r info.tm >>= fun tm ->
       let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
-      let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+      let varx = Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp) in
       let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
       let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
       M.ret (fam_r', (coe, Emp))
@@ -659,7 +670,7 @@ struct
       let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
       elab_chk env fam_r info.cap >>= fun cap ->
       let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
-      let varx = Tm.up (Tm.Ref (x, `Only), Emp) in
+      let varx = Tm.up (Tm.Ref {name = x; twin = `Only; ushift =0}, Emp) in
       let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
       let tybnd = Tm.bind x tyx in
       elab_com_sys env tr tybnd cap info.sys >>= fun sys ->
@@ -671,12 +682,12 @@ struct
 
   and elab_dim env e =
     match e with
-    | E.Var name ->
+    | E.Var (name, 0) ->
       get_resolver env >>= fun renv ->
       begin
         match ResEnv.get name renv with
         | `Ref a ->
-          M.ret @@ Tm.up (Tm.Ref (a, `Only), Emp)
+          M.ret @@ Tm.up (Tm.Ref {name = a; twin = `Only; ushift = 0}, Emp)
         | `Ix _ ->
           failwith "elab_dim: expected locally closed"
       end
@@ -735,7 +746,7 @@ struct
             go dom (hd, sp #< Tm.Car) efs mode
 
           | Tm.Sg (_, Tm.B (_, cod)), E.Cdr :: efs ->
-            let cod' = Tm.subst (Tm.Sub (Tm.Id, (hd, sp #< Tm.Car))) cod in
+            let cod' = Tm.subst (Tm.Dot ((hd, sp #< Tm.Car), Tm.Shift 0)) cod in
             go cod' (hd, sp #< Tm.Cdr) efs mode
 
           | Tm.Rst rst, efs ->

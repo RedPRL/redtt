@@ -11,13 +11,13 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL
-%token COLON COLON_ANGLE COMMA DOT PIPE
+%token COLON COLON_ANGLE COMMA DOT PIPE CARET
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN WITH END
-%token BOOL NAT INT S1 UNIV LAM CONS CAR CDR TT FF IF ZERO SUC NAT_REC POS NEGSUC INT_REC BASE LOOP S1_REC COMP HCOM COM COE LET DEBUG CALL RESTRICT
+%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V
 %token THEN ELSE
-%token IMPORT
+%token IMPORT OPAQUE
 %token TYPE PRE KAN
 %token EOF
 
@@ -27,7 +27,9 @@
 
 edecl:
   | LET; a = ATOM; sch = escheme; EQUALS; tm = eterm
-    { E.Define (a, sch, tm) }
+    { E.Define (a, `Transparent, sch, tm) }
+  | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = eterm
+    { E.Define (a, `Opaque, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
   | IMPORT; a = ATOM
@@ -52,8 +54,10 @@ atomic_eterm:
     { E.Tuple es }
   | LPR; e = eterm; RPR
     { e }
+  | a = ATOM; CARET; k = NUMERAL
+    { E.Var (a, k) }
   | a = ATOM;
-    { if a = "_" then E.Hope else E.Var a }
+    { if a = "_" then E.Hope else E.Var (a, 0) }
   | n = NUMERAL;
     { E.Num n }
   | BOOL
@@ -267,6 +271,11 @@ tm:
       make_node $startpos $endpos @@
       Tm.Univ {kind = k; lvl = Lvl.Const i} }
 
+  | LPR; V; r = tm; ty0 = tm; ty1 = tm; equiv = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.V {r = r env; ty0 = ty0 env; ty1 = ty1 env; equiv = equiv env} }
+
   | LPR; RIGHT_ARROW; tele = tele; RPR
     { fun env ->
       pi_from_tele (Some ($startpos, $endpos)) @@ tele env }
@@ -309,11 +318,17 @@ tm:
       Tm.Let (e0 env, Tm.B (Some x, e1 @@ R.bind x env))}
 
 head:
+  | a = ATOM; CARET; k = NUMERAL
+    { fun env ->
+      match R.get a env with
+      | `Ix _ -> failwith "Cannot shift bound variable"
+      | `Ref r -> Tm.Ref {name = r; twin = `Only; ushift = k} }
+
   | a = ATOM
     { fun env ->
       match R.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
-      | `Ref r -> Tm.Ref (r, `Only) }
+      | `Ref r -> Tm.Ref {name = r; twin = `Only; ushift = 0} }
 
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->

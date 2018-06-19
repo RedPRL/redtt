@@ -1,5 +1,5 @@
 type edecl =
-  | Define of string * escheme * eterm
+  | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
   | Debug of [ `All | `Constraints | `Unsolved ]
   | Import of string
 
@@ -39,7 +39,7 @@ and eterm =
 
   | Cut of eterm * frame list
 
-  | Var of string
+  | Var of string * int
   | Num of int
 
 and esys = eface list

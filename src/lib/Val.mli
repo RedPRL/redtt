@@ -62,8 +62,8 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Ref : Name.t * Tm.twin -> neu
-  | Meta : Name.t -> neu
+  | Ref : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
+  | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
@@ -99,7 +99,7 @@ and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
 and ext_abs = (value * val_sys) Abstraction.abs
 
-and env_el = Val of value | Atom of atom
+and env_el = Val of value | Atom of Dim.action * atom
 and env = env_el list
 
 val clo_name : clo -> string option
@@ -115,7 +115,7 @@ sig
   val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
   val eval_head : rel -> env -> Tm.tm Tm.head -> value
   val eval_frame : rel -> env -> value -> Tm.tm Tm.frame -> value
-  val eval_dim : rel -> env -> Tm.tm -> Dim.repr
+  val eval_dim : rel -> env -> Tm.tm -> Dim.t
   val eval_tm_sys : rel -> env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val apply : value -> value -> value
@@ -124,6 +124,8 @@ sig
   val cdr : value -> value
   val lbl_call : value -> value
   val corestriction_force : value -> value
+
+  val rigid_vproj : gen -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
 
@@ -135,8 +137,11 @@ sig
   val unleash_corestriction_ty : value -> val_face
 
 
+  val pp_abs : Format.formatter -> abs -> unit
   val pp_value : Format.formatter -> value -> unit
   val pp_neu : Format.formatter -> neu -> unit
+  val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
+  val pp_comp_sys : Format.formatter -> comp_sys -> unit
 
 
   module Val : Sort.S

@@ -8,6 +8,11 @@ let greater l0 l1 =
 
 let lte l0 l1 = l0 = l1 or greater l1 l0
 
+let shift k =
+  function
+  | Omega -> Omega
+  | Const i -> Const (i + k)
+
 let to_string l =
   match l with
   | Omega -> "omega"
