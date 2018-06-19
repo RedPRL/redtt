@@ -390,9 +390,9 @@ struct
     | Same ->
       quote_dim env r
     | _ ->
-      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      (* Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
       Format.eprintf "@.";
-      Format.eprintf "Dimension mismatch: %a <> %a@." Dim.pp r Dim.pp r';
+      Format.eprintf "Dimension mismatch: %a <> %a@." Dim.pp r Dim.pp r'; *)
       failwith "Dimensions did not match"
 
   and equate_dims env rs rs' =
