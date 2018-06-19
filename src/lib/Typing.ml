@@ -124,7 +124,7 @@ struct
     match Eval.unleash ty, T.unleash tm with
     | V.Univ info0, T.Univ info1 ->
       (* TODO: what about kinds? I think it's fine, since we learned from Andy Pitts how to make
-         the pretype universe Kan. But I may need to add those "ecom" fuckers, LOL. *)
+         the pretype universe Kan. But I may need to add those "ecom" thingies, LOL. *)
       if Lvl.greater info0.lvl info1.lvl then () else
         failwith "Predicativity violation"
 
