@@ -46,6 +46,6 @@ let pp fmt =
     match Hashtbl.find names i with
     | Some x ->
       Uuseg_string.pp_utf_8 fmt x;
-      Format.fprintf fmt "%i" i
+      (* Format.fprintf fmt "%i" i *)
     | None ->
       Format.fprintf fmt "%s%i" "%" i
