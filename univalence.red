@@ -22,9 +22,11 @@ let IsProp (C : type) : type =
 let IsSet (C : type) : type =
   (c : _) (c' : _) →
     IsProp (Path C c c')
-; the code in this file is adapted from yacctt and redprl
 
 
+let Retract (A : type) (B : type) (f : A → B) (g : B → A) : type =
+  (a : A) →
+    Path A (g (f a)) a
 
 let IdEquiv (A : type) : Equiv A A =
   < _
@@ -66,10 +68,32 @@ let PathToEquiv
   =
   coe 0 1 (IdEquiv A) in λ i → Equiv A (P i)
 
+let LemPropF
+  (A : type) (B : A → type)
+  (B/prop : (a : A) → IsProp (B a))
+  (P : Line A)
+  (b0 : B (P 0))
+  (b1 : B (P 1))
+  : [i] B (P i) with
+    | i=0 ⇒ b0
+    | i=1 ⇒ b1
+    end
+  =
+  λ i →
+    let coe0 = coe 0 i b0 in λ j → B (P j) in
+    let coe1 = coe 1 i b1 in λ j → B (P j) in
+    B/prop (P i) coe0 coe1 i
 
-let Retract (A : type) (B : type) (f : A → B) (g : B → A) : type =
-  (a : A) →
-    Path A (g (f a)) a
+let LemSig
+  (A : type) (B : A → type)
+  (B/prop : (a : A) → IsProp (B a))
+  (u : (a : A) × B a)
+  (v : (a : A) × B a)
+  (P : Path A (u.car) (v.car))
+  : Path ((a : A) × B a) u v
+  =
+  λ i →
+    < P i, LemPropF A B B/prop P (u.cdr) (v.cdr) i>
 
 let EquivLemma (A : type) (B : type)
   : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
