@@ -16,7 +16,8 @@ module S = Set.Make (Repr)
 type t = repr * S.t
 
 let singleton r = r, S.singleton r
-let from_reprs r rs = r, S.of_list rs
+let from_reprs r rs =
+  r, S.add r @@ S.of_list rs
 
 let dim0 = singleton Dim0
 let dim1 = singleton Dim1
