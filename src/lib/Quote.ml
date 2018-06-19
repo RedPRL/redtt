@@ -388,6 +388,7 @@ struct
     | Same ->
       quote_dim env r
     | _ ->
+      Format.eprintf "Dimension mismatch: %a <> %a@." Dim.pp r Dim.pp r';
       failwith "Dimensions did not match"
 
   and equate_dims env rs rs' =
