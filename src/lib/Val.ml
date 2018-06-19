@@ -94,7 +94,7 @@ and clo =
   | Clo of {bnd : Tm.tm Tm.bnd; rho : env; rel : rel}
 
 and nclo =
-  | NClo of {bnd : Tm.tm Tm.nbnd; rho : env; rel : rel; action : D.action}
+  | NClo of {bnd : Tm.tm Tm.nbnd; rho : env; rel : rel}
 
 and env_el = Val of value | Atom of Dim.action * atom
 and env = env_el list
@@ -214,15 +214,16 @@ struct
   module ValFace = Face.M (Val)
   module AbsFace = Face.M (Abs)
 
+
+  let act_env_cell phi =
+    function
+    | Val v -> Val (Val.act phi v)
+    | Atom (psi, x) -> Atom (Dim.cmp phi psi, x)
+
   module Clo : Sort with type t = clo with type 'a m = 'a =
   struct
     type t = clo
     type 'a m = 'a
-
-    let act_env_cell phi =
-      function
-      | Val v -> Val (Val.act phi v)
-      | Atom (psi, x) -> Atom (Dim.cmp phi psi, x)
 
     let act phi clo =
       match clo with
@@ -238,7 +239,7 @@ struct
     let act phi clo =
       match clo with
       | NClo info ->
-        NClo {info with action = D.cmp phi info.action}
+        NClo {info with rho = List.map (act_env_cell phi) info.rho}
   end
 
   module CompSys :
@@ -2174,7 +2175,6 @@ struct
     match nclo with
     | NClo info ->
       let Tm.NB (_, tm) = info.bnd in
-      Val.act info.action @@
       eval info.rel (List.map (fun v -> Val v) vargs @ info.rho) tm
 
   and pp_env_cell fmt =
