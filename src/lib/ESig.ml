@@ -17,8 +17,17 @@ and eterm =
   | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
 
   | If of eterm * eterm * eterm
-
   | Bool | Tt | Ff
+
+  | Nat | Zero | Suc of eterm
+  | NatRec of eterm * eterm * (string * string * eterm)
+
+  | Int | Pos of eterm | NegSuc of eterm
+  | IntRec of eterm * (string * eterm) * (string * eterm)
+
+  | S1Rec of eterm * eterm * (string * eterm)
+  | S1 | Base | Loop of eterm
+
   | Pi of etele * eterm
   | Sg of etele * eterm
   | Ext of string list * eterm * esys

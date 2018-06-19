@@ -29,6 +29,18 @@ type 'a tmf =
   | Tt
   | Ff
 
+  | Nat
+  | Zero
+  | Suc of 'a
+
+  | Int
+  | Pos of 'a
+  | NegSuc of 'a
+
+  | S1
+  | Base
+  | Loop of 'a
+
   | Lam of 'a bnd
   | ExtLam of 'a nbnd
   | CoRThunk of ('a, 'a) face
@@ -60,6 +72,7 @@ and 'a frame =
   | FunApp of 'a
   | ExtApp of 'a list
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
+  | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | LblCall
   | CoRForce
@@ -96,8 +109,15 @@ and subst (sub : tm cmd subst) (Tm con) =
 
 and subst_f (sub : tm cmd subst) =
   function
-  | (Dim0 | Dim1 | Univ _ | Bool | Tt | Ff) as con ->
+  | (Dim0 | Dim1 | Univ _ | Bool | Tt | Ff | Nat | Zero | Int | S1 | Base) as con ->
     con
+
+  | Suc n -> Suc (subst sub n)
+
+  | Pos n -> Pos (subst sub n)
+  | NegSuc n -> NegSuc (subst sub n)
+
+  | Loop r -> Loop (subst sub r)
 
   | FCom info ->
     let r = subst sub info.r in
@@ -190,6 +210,11 @@ and subst_frame sub frame =
     let tcase = subst sub info.tcase in
     let fcase = subst sub info.fcase in
     If {mot; tcase; fcase}
+  | S1Rec info ->
+    let mot = subst_bnd sub info.mot in
+    let bcase = subst sub info.bcase in
+    let lcase = subst_bnd sub info.lcase in
+    S1Rec {mot; bcase; lcase}
   | VProj info ->
     let r = subst sub info.r in
     let ty0 = subst sub info.ty0 in
@@ -289,6 +314,15 @@ let traverse ~f ~var ~ref =
     | Bool -> Bool
     | Tt -> Tt
     | Ff -> Ff
+    | Nat -> Nat
+    | Zero -> Zero
+    | Suc n -> Suc (f k n)
+    | Int -> Int
+    | Pos n -> Pos (f k n)
+    | NegSuc n -> NegSuc (f k n)
+    | S1 -> S1
+    | Base -> Base
+    | Loop r -> Loop (f k r)
     | Dim0 -> Dim0
     | Dim1 -> Dim1
     | Lam bnd ->
@@ -393,6 +427,11 @@ let traverse ~f ~var ~ref =
       let tcase = f k info.tcase in
       let fcase = f k info.fcase in
       If {mot; tcase; fcase}
+    | S1Rec info ->
+      let mot = go_bnd k info.mot in
+      let bcase = f k info.bcase in
+      let lcase = go_bnd k info.lcase in
+      S1Rec {mot; bcase; lcase}
     | VProj info ->
       let r = f k info.r in
       let ty0 = f k info.ty0 in
@@ -588,11 +627,38 @@ let rec pp env fmt =
     | Ff ->
       Format.fprintf fmt "ff"
 
+    | Nat ->
+      Format.fprintf fmt "nat"
+
+    | Zero ->
+      Format.fprintf fmt "zero"
+
+    | Suc n ->
+      Format.fprintf fmt "@[<1> (suc %a)@]" (go env `Suc) n
+
+    | Int ->
+      Format.fprintf fmt "int"
+
+    | Pos n ->
+      Format.fprintf fmt "@[<1> (pos %a)@]" (go env `Pos) n
+
+    | NegSuc n ->
+      Format.fprintf fmt "@[<1> (neg-suc %a)@]" (go env `NegSuc) n
+
     | Dim0 ->
       Format.fprintf fmt "0"
 
     | Dim1 ->
       Format.fprintf fmt "1"
+
+    | S1 ->
+      Format.fprintf fmt "S1"
+
+    | Base ->
+      Format.fprintf fmt "base"
+
+    | Loop r ->
+      Format.fprintf fmt "(loop %a)" (pp env) r
 
     | Univ {kind; lvl} ->
       Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
@@ -681,6 +747,10 @@ and pp_cmd env fmt (hd, sp) =
       | If {mot = B (nm, mot); tcase; fcase} ->
         let x, env' = Pretty.Env.bind nm env in
         Format.fprintf fmt "@[<1>(if@ [%a] %a@ %a %a %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot (go `If) sp (pp env) tcase (pp env) fcase
+      | S1Rec {mot = B (nm_mot, mot); bcase; lcase = B (nm_lcase, lcase)} ->
+        let x_mot, env_mot = Pretty.Env.bind nm_mot env in
+        let x_lcase, env_lcase = Pretty.Env.bind nm_lcase env in
+        Format.fprintf fmt "@[<1>(S1rec@ [%a] %a@ %a %a [%a] %a)@]" Uuseg_string.pp_utf_8 x_mot (pp env_mot) mot (go `S1Rec) sp (pp env) bcase Uuseg_string.pp_utf_8 x_lcase (pp env_lcase) lcase
       | VProj {r; _} ->
         (* TODO *)
         Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r (go `VProj) sp
@@ -923,6 +993,10 @@ struct
       go_bnd fl info.mot @@
       go fl info.tcase @@
       go fl info.fcase acc
+    | S1Rec info ->
+      go_bnd fl info.mot @@
+      go fl info.bcase @@
+      go_bnd fl info.lcase acc
     | VProj info ->
       go fl info.r @@
       go fl info.ty0 @@
@@ -1031,6 +1105,11 @@ let map_frame f =
     let tcase = f info.tcase in
     let fcase = f info.fcase in
     If {mot; tcase; fcase}
+  | S1Rec info ->
+    let mot = map_bnd f info.mot in
+    let bcase = f info.bcase in
+    let lcase = map_bnd f info.lcase in
+    S1Rec {mot; bcase; lcase}
   | VProj info ->
     let r = f info.r in
     let ty0 = f info.ty0 in
@@ -1059,8 +1138,12 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Bool | Tt | Ff | Dim0 | Dim1) as con ->
+  | (Univ _ | Bool | Tt | Ff | Nat | Zero | Int | Dim0 | Dim1 | S1 | Base) as con ->
     con
+  | Suc n -> Suc (f n)
+  | Pos n -> Pos (f n)
+  | NegSuc n -> NegSuc (f n)
+  | Loop r -> Loop (f r)
   | Cons (t0, t1) ->
     Cons (f t0, f t1)
   | LblRet t ->

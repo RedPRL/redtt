@@ -352,6 +352,40 @@ struct
     | Tm.Bool, E.Ff ->
       M.ret @@ Tm.make Tm.Ff
 
+    | Tm.Univ _, E.Nat ->
+      M.ret @@ Tm.make Tm.Nat
+
+    | Tm.Nat, E.Zero ->
+      M.ret @@ Tm.make Tm.Zero
+
+    | Tm.Nat, E.Suc n ->
+      let nat = Tm.make @@ Tm.Nat in
+      elab_chk env nat n >>= fun n ->
+      M.ret @@ Tm.make @@ Tm.Suc n
+
+    | Tm.Univ _, E.Int ->
+      M.ret @@ Tm.make Tm.Int
+
+    | Tm.Int, E.Pos n ->
+      let nat = Tm.make @@ Tm.Nat in
+      elab_chk env nat n >>= fun n ->
+      M.ret @@ Tm.make @@ Tm.Pos n
+
+    | Tm.Int, E.NegSuc n ->
+      let nat = Tm.make @@ Tm.Nat in
+      elab_chk env nat n >>= fun n ->
+      M.ret @@ Tm.make @@ Tm.NegSuc n
+
+    | Tm.Univ _, E.S1 ->
+      M.ret @@ Tm.make Tm.S1
+
+    | Tm.S1, E.Base ->
+      M.ret @@ Tm.make Tm.Base
+
+    | Tm.S1, E.Loop r ->
+      elab_dim env r >>= fun r ->
+      M.ret @@ Tm.make (Tm.Loop r)
+
     | Tm.Univ _, E.Ext (names, ety, esys) ->
       let univ = ty in
       let xs = List.map (fun x -> Name.named (Some x)) names in
@@ -655,7 +689,7 @@ struct
         | `Ref a ->
           M.ret @@ Tm.up (Tm.Ref {name = a; twin = `Only; ushift = 0}, Emp)
         | `Ix _ ->
-          failwith "elab_inf: expected locally closed"
+          failwith "elab_dim: expected locally closed"
       end
     | E.Num 0 ->
       M.ret @@ Tm.make Tm.Dim0

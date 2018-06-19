@@ -13,9 +13,11 @@ let make c =
 
 let atom t =
   match Dim.unleash t with
-  | Dim.Dim0 -> failwith "DimGeneric.name: impossible"
-  | Dim.Dim1 -> failwith "DimGeneric.name: impossible"
+  | Dim.Dim0 -> failwith "DimGeneric.atom: impossible"
+  | Dim.Dim1 -> failwith "DimGeneric.atom: impossible"
   | Dim.Atom x -> x
+
+let named t = D.named t
 
 let unleash c = c
 

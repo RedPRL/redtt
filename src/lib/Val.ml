@@ -44,6 +44,18 @@ type con =
   | Tt : con
   | Ff : con
 
+  | Nat : con
+  | Zero : con
+  | Suc : value -> con
+
+  | Int : con
+  | Pos : value -> con
+  | NegSuc : value -> con
+
+  | S1 : con
+  | Base : con
+  | Loop : gen -> con
+
   | Up : {ty : value; neu : neu; sys : rigid_val_sys} -> con
 
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
@@ -60,6 +72,12 @@ and neu =
 
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
 
+  | NatRec : {mot : clo; neu : neu; zcase : value; scase : nclo} -> neu
+
+  | IntRec : {mot : clo; neu : neu; pcase : clo; ncase : clo} -> neu
+
+  | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
+
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
@@ -74,6 +92,9 @@ and ('x, 'a) face = ('x, 'a) Face.face
 
 and clo =
   | Clo of {bnd : Tm.tm Tm.bnd; rho : env; rel : rel}
+
+and nclo =
+  | NClo of {bnd : Tm.tm Tm.nbnd; rho : env; rel : rel}
 
 and env_el = Val of value | Atom of Dim.action * atom
 and env = env_el list
@@ -193,20 +214,32 @@ struct
   module ValFace = Face.M (Val)
   module AbsFace = Face.M (Abs)
 
+
+  let act_env_cell phi =
+    function
+    | Val v -> Val (Val.act phi v)
+    | Atom (psi, x) -> Atom (Dim.cmp phi psi, x)
+
   module Clo : Sort with type t = clo with type 'a m = 'a =
   struct
     type t = clo
     type 'a m = 'a
 
-    let act_env_cell phi =
-      function
-      | Val v -> Val (Val.act phi v)
-      | Atom (psi, x) -> Atom (Dim.cmp phi psi, x)
-
     let act phi clo =
       match clo with
       | Clo info ->
         Clo {info with rho = List.map (act_env_cell phi) info.rho}
+  end
+
+  module NClo : Sort with type t = nclo with type 'a m = 'a =
+  struct
+    type t = nclo
+    type 'a m = 'a
+
+    let act phi clo =
+      match clo with
+      | NClo info ->
+        NClo {info with rho = List.map (act_env_cell phi) info.rho}
   end
 
   module CompSys :
@@ -451,6 +484,33 @@ struct
     | Ff ->
       make con
 
+    | Nat ->
+      make con
+
+    | Zero ->
+      make con
+
+    | Suc _ ->
+      make con
+
+    | Int ->
+      make con
+
+    | Pos _ ->
+      make con
+
+    | NegSuc _ ->
+      make con
+
+    | S1 ->
+      make con
+
+    | Base ->
+      make con
+
+    | Loop x ->
+      make_loop (Gen.act phi x)
+
     | Lam clo ->
       make @@ Lam (Clo.act phi clo)
 
@@ -564,6 +624,42 @@ struct
           step @@ if_ mot v tcase fcase
       end
 
+    | NatRec info ->
+      let mot = Clo.act phi info.mot in
+      let zcase = Val.act phi info.zcase in
+      let scase = NClo.act phi info.scase in
+      begin
+        match act_neu phi info.neu with
+        | Ret neu ->
+          ret @@ NatRec {mot; neu; zcase; scase}
+        | Step v ->
+          step @@ nat_rec mot v zcase scase
+      end
+
+    | IntRec info ->
+      let mot = Clo.act phi info.mot in
+      let pcase = Clo.act phi info.pcase in
+      let ncase = Clo.act phi info.ncase in
+      begin
+        match act_neu phi info.neu with
+        | Ret neu ->
+          ret @@ IntRec {mot; neu; pcase; ncase}
+        | Step v ->
+          step @@ int_rec mot v pcase ncase
+      end
+
+    | S1Rec info ->
+      let mot = Clo.act phi info.mot in
+      let bcase = Val.act phi info.bcase in
+      let lcase = Abs.act phi info.lcase in
+      begin
+        match act_neu phi info.neu with
+        | Ret neu ->
+          ret @@ S1Rec {mot; neu; bcase; lcase}
+        | Step v ->
+          step @@ s1_rec mot v bcase lcase
+      end
+
     | LblCall neu ->
       begin
         match act_neu phi neu with
@@ -664,6 +760,13 @@ struct
     | `Const `Dim1 ->
       el1
 
+  and make_loop mx : value =
+    match mx with
+    | `Ok x ->
+      rigid_loop x
+    | `Const _ ->
+      make @@ Base
+
   and make_coe mdir abs el : value =
     match mdir with
     | `Ok dir ->
@@ -756,6 +859,9 @@ struct
 
   and rigid_vin x el0 el1 : value =
     make @@ VIn {x; el0; el1}
+
+  and rigid_loop x : value =
+    make @@ Loop x
 
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
@@ -1023,8 +1129,11 @@ struct
     | (Pi _ | Sg _ | Ext _ | Up _) ->
       make @@ HCom {dir; ty; cap; sys}
 
-    | Bool ->
+    | Bool | Nat | Int ->
       cap
+
+    | S1 ->
+      make @@ FCom {dir; cap; sys}
 
     | Univ _ ->
       rigid_fcom dir cap sys
@@ -1330,6 +1439,36 @@ struct
     | Tm.Ff ->
       make Ff
 
+    | Tm.Nat ->
+      make Nat
+
+    | Tm.Zero ->
+      make Zero
+
+    | Tm.Suc n ->
+      let n = eval rel rho n in
+      make @@ Suc n
+
+    | Tm.Int ->
+      make Int
+
+    | Tm.Pos n ->
+      let n = eval rel rho n in
+      make @@ Pos n
+
+    | Tm.NegSuc n ->
+      let n = eval rel rho n in
+      make @@ NegSuc n
+
+    | Tm.S1 ->
+      make S1
+
+    | Tm.Base ->
+      make Base
+
+    | Tm.Loop r ->
+      make_loop (Gen.make (eval_dim rel rho r))
+
     | Tm.Dim0 ->
       failwith "0 is a dimension"
 
@@ -1389,6 +1528,11 @@ struct
       let tcase = eval rel rho info.tcase in
       let fcase = eval rel rho info.fcase in
       if_ mot vhd tcase fcase
+    | Tm.S1Rec info ->
+      let mot = clo info.mot rel rho in
+      let bcase = eval rel rho info.bcase in
+      let lcase = eval_bnd rel rho info.lcase in
+      s1_rec mot vhd bcase lcase
 
 
   and eval_head rel rho =
@@ -1650,7 +1794,7 @@ struct
       let domx, codx = unleash_pi ~debug:["apply"; "coe"] tyx in
       let dom = Abs.bind1 x domx in
       let coe_r'_x = make_coe (Star.make r' (D.named x)) dom varg in
-      let cod_coe = inst_clo' codx coe_r'_x in
+      let cod_coe = inst_clo codx coe_r'_x in
       let abs = Abs.bind1 x cod_coe in
       let el =
         apply info.el @@
@@ -1793,6 +1937,74 @@ struct
       make @@ Up {ty = mot'; neu; sys = if_sys}
     | _ ->
       failwith "if_"
+
+  and nat_rec mot scrut zcase scase =
+    match unleash scrut with
+    | Zero ->
+      zcase
+    | Suc n ->
+      let n_rec = nat_rec mot n zcase scase in
+      inst_nclo scase [n; n_rec]
+    | Up up ->
+      let neu = NatRec {mot; neu = up.neu; zcase; scase} in
+      let mot' = inst_clo mot scrut in
+      let nat_rec_face =
+        Face.map @@ fun r r' a ->
+        let phi = Dim.equate r r' in
+        nat_rec (Clo.act phi mot) a (Val.act phi zcase) (NClo.act phi scase)
+      in
+      let nat_rec_sys = List.map nat_rec_face up.sys in
+      make @@ Up {ty = mot'; neu; sys = nat_rec_sys}
+    | _ ->
+      failwith "nat_rec"
+
+  and int_rec mot scrut pcase ncase =
+    match unleash scrut with
+    | Pos n -> inst_clo pcase n
+    | Suc n -> inst_clo ncase n
+    | Up up ->
+      let neu = IntRec {mot; neu = up.neu; pcase; ncase} in
+      let mot' = inst_clo mot scrut in
+      let int_rec_face =
+        Face.map @@ fun r r' a ->
+        let phi = Dim.equate r r' in
+        int_rec (Clo.act phi mot) a (Clo.act phi pcase) (Clo.act phi ncase)
+      in
+      let int_rec_sys = List.map int_rec_face up.sys in
+      make @@ Up {ty = mot'; neu; sys = int_rec_sys}
+    | _ ->
+      failwith "int_rec"
+
+  and s1_rec mot scrut bcase lcase =
+    match unleash scrut with
+    | Base ->
+      bcase
+    | Loop x ->
+      Abs.inst1 lcase (Gen.unleash x)
+    | FCom info ->
+      let apply_rec tm = s1_rec mot tm bcase lcase in
+      let r, _ = Star.unleash info.dir in
+      let ty = Abs.make1 @@ fun y ->
+        inst_clo mot @@
+        make_fcom (Star.make r (D.named y)) info.cap (`Ok info.sys)
+      in
+      let face = Face.map @@ fun ri r'i absi ->
+        let y, el = Abs.unleash1 absi in
+        Abs.bind1 y @@ Val.act (D.equate ri r'i) @@ apply_rec el
+      in
+      rigid_com info.dir ty (apply_rec info.cap) (List.map face info.sys)
+    | Up up ->
+      let neu = S1Rec {mot; neu = up.neu; bcase; lcase} in
+      let mot' = inst_clo mot scrut in
+      let s1_rec_face =
+        Face.map @@ fun r r' a ->
+        let phi = Dim.equate r r' in
+        s1_rec (Clo.act phi mot) a (Val.act phi bcase) (Abs.act phi lcase)
+      in
+      let s1_rec_sys = List.map s1_rec_face up.sys in
+      make @@ Up {ty = mot'; neu; sys = s1_rec_sys}
+    | _ ->
+      failwith "s1_rec"
 
   and car v =
     match unleash v with
@@ -1959,7 +2171,11 @@ struct
       let Tm.B (_, tm) = info.bnd in
       eval info.rel (Val varg :: info.rho) tm
 
-  and inst_clo' clo varg = inst_clo clo varg
+  and inst_nclo nclo vargs =
+    match nclo with
+    | NClo info ->
+      let Tm.NB (_, tm) = info.bnd in
+      eval info.rel (List.map (fun v -> Val v) vargs @ info.rho) tm
 
   and pp_env_cell fmt =
     function
@@ -1983,12 +2199,30 @@ struct
       Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
     | CoRThunk face ->
       Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
+    | Bool ->
+      Format.fprintf fmt "bool"
     | Tt ->
       Format.fprintf fmt "tt"
     | Ff ->
       Format.fprintf fmt "ff"
-    | Bool ->
-      Format.fprintf fmt "bool"
+    | Nat ->
+      Format.fprintf fmt "nat"
+    | Zero ->
+      Format.fprintf fmt "zero"
+    | Suc n ->
+      Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
+    | Int ->
+      Format.fprintf fmt "int"
+    | Pos n ->
+      Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
+    | NegSuc n ->
+      Format.fprintf fmt "@[<1>(negsuc@ %a)@]" pp_value n
+    | S1 ->
+      Format.fprintf fmt "S1"
+    | Base ->
+      Format.fprintf fmt "base"
+    | Loop _x ->
+      Format.fprintf fmt "<loop>"
     | Pi {dom; cod} ->
       Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
     | Sg {dom; cod} ->
@@ -2018,7 +2252,7 @@ struct
     | FCom _ ->
       Format.fprintf fmt "<fcom>"
     | Box _ ->
-      Format.fprintf fmt "<box>" (* 📦 *)
+      Format.fprintf fmt "<box>" (* �� *)
     | LblTy {lbl; args; ty} ->
       begin
         match args with
@@ -2108,6 +2342,15 @@ struct
 
     | If _ ->
       Format.fprintf fmt "<if>"
+
+    | NatRec _ ->
+      Format.fprintf fmt "<natrec>"
+
+    | IntRec _ ->
+      Format.fprintf fmt "<intrec>"
+
+    | S1Rec _ ->
+      Format.fprintf fmt "<S1rec>"
 
     | Cap _ ->
       Format.fprintf fmt "<cap>"

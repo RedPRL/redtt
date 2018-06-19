@@ -7,6 +7,7 @@ type dim = Dim.t
 
 type value
 type clo
+type nclo
 
 type ('x, 'a) face = ('x, 'a) Face.face
 
@@ -42,6 +43,18 @@ type con =
   | Tt : con
   | Ff : con
 
+  | Nat : con
+  | Zero : con
+  | Suc : value -> con
+
+  | Int : con
+  | Pos : value -> con
+  | NegSuc : value -> con
+
+  | S1 : con
+  | Base : con
+  | Loop : gen -> con
+
   | Up : {ty : value; neu : neu; sys : rigid_val_sys} -> con
 
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
@@ -56,6 +69,12 @@ and neu =
   | Car : neu -> neu
   | Cdr : neu -> neu
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
+
+  | NatRec : {mot : clo; neu : neu; zcase : value; scase : nclo} -> neu
+
+  | IntRec : {mot : clo; neu : neu; pcase : clo; ncase : clo} -> neu
+
+  | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
 
   (* Invariant: neu \in vty, vty is a V type
   *)

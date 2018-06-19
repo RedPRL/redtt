@@ -27,6 +27,18 @@ type 'a tmf =
   | Tt
   | Ff
 
+  | Nat
+  | Zero
+  | Suc of 'a
+
+  | Int
+  | Pos of 'a
+  | NegSuc of 'a
+
+  | S1
+  | Base
+  | Loop of 'a
+
   | Lam of 'a bnd
   | ExtLam of 'a nbnd
   | CoRThunk of ('a, 'a) face
@@ -58,6 +70,7 @@ and 'a frame =
   | FunApp of 'a
   | ExtApp of 'a list
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
+  | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | LblCall
   | CoRForce
