@@ -82,7 +82,7 @@ let define gm alpha ~ty tm =
   if not b then
     dump_state Format.err_formatter "Type error" `All >>= fun _ ->
     begin
-      Format.eprintf "error checking: %a : %a@." Tm.pp0 tm' Tm.pp0 ty';
+      Format.eprintf "error checking: @[<hv>%a@ : %a@]@." Tm.pp0 tm' Tm.pp0 ty';
       failwith "define: type error"
     end
   else
