@@ -84,6 +84,36 @@ let LemPropF
     let coe1 = coe 1 i b1 in λ j → B (P j) in
     B/prop (P i) coe0 coe1 i
 
+let PropPi
+  (A : type) (B : A → type)
+  (B/prop : (a : A) → IsProp (B a))
+  (f : (a : A) → B a)
+  (g : (a : A) → B a)
+  : Path ((a : A) → B a) f g
+  =
+  λ i a →
+    B/prop _ (f a) (g a) i
+
+; TODO: just inline this, it's way too short to justify a definition
+let LemProp
+  (A : type) (A/prop : IsProp A)
+  (a : A)
+  : IsContr A
+  =
+  < a, A/prop a >
+
+let PropSet
+  (A : type) (A/prop : IsProp A)
+  : (IsSet A)
+  =
+  λ a b p q i j →
+    comp 0 1 a with
+    | j=0 ⇒ A/prop a a
+    | j=1 ⇒ A/prop a b
+    | i=0 ⇒ A/prop a (p j)
+    | i=1 ⇒ A/prop a (q j)
+    end
+
 let LemSig
   (A : type) (B : A → type)
   (B/prop : (a : A) → IsProp (B a))
@@ -93,9 +123,49 @@ let LemSig
   : Path ((a : A) × B a) u v
   =
   λ i →
-    < P i, LemPropF A B B/prop P (u.cdr) (v.cdr) i>
+    <P i, LemPropF _ _ B/prop P (u.cdr) (v.cdr) i>
 
-let EquivLemma (A : type) (B : type)
-  : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
-  = ?
 
+let PropSig
+  (A : type) (B : A → type)
+  (A/prop : IsProp A)
+  (B/prop : (a : A) → IsProp (B a))
+  (u : (a : A) × B a)
+  (v : (a : A) × B a)
+  : Path ((a : A) × B a) u v
+  =
+  LemSig _ _ B/prop u v (A/prop (u.car) (v.car))
+
+let PropIsContr (A : type) : IsProp (IsContr A) =
+  λ contr →
+    let A/prop : IsProp A =
+      λ a b i →
+        comp 1 0 (contr.cdr a i) with
+        | i=0 ⇒ λ _ → a
+        | i=1 ⇒ contr.cdr b
+        end
+    in
+
+    let contr/A/prop : IsProp (IsContr A) =
+      PropSig A (λ a → (b : A) → Path A a b) A/prop
+        (λ a → PropPi A (Path A a) (λ b → PropSet A A/prop b a))
+    in
+
+    contr/A/prop contr
+
+let PropIsEquiv (A : type) (B : type) (f : A → B) : IsProp (IsEquiv A B f) =
+  λ e0 e1 i b →
+    PropIsContr
+      (Fiber A B f b)
+      (e0 b)
+      (e1 b)
+      i
+
+; let EquivLemma (A : type) (B : type)
+;   : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
+;   =
+;   LemSig
+;     (A → B)
+;     (λ f → IsEquiv A B f)
+;     (PropIsEquiv A B)
+;
