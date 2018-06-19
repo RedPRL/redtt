@@ -154,12 +154,7 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
     contr/A/prop contr
 
 let PropIsEquiv (A : type) (B : type) (f : A → B) : IsProp (IsEquiv A B f) =
-  λ e0 e1 i b →
-    PropIsContr
-      (Fiber A B f b)
-      (e0 b)
-      (e1 b)
-      i
+  λ e0 e1 i b → PropIsContr (Fiber A B f b) (e0 b) (e1 b) i
 
 let EquivLemma
   (A : type) (B : type) (E0 : Equiv A B) (E1 : Equiv A B)
@@ -174,10 +169,8 @@ let UA/retract
   : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
   =
   λ E →
-    EquivLemma A B
-      (PathToEquiv A B (UA A B E))
-      E
-      (λ i a →
-        UA/beta A B E `(coe 1 i <_> A a) i)
-
+    EquivLemma A B (PathToEquiv A B (UA A B E)) E
+      (λ i a → UA/beta A B E `(coe 1 i <_> A a) i)
       ; TODO: some bug prevents using refinement for coe above
+
+
