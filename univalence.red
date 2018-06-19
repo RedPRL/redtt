@@ -161,11 +161,23 @@ let PropIsEquiv (A : type) (B : type) (f : A → B) : IsProp (IsEquiv A B f) =
       (e1 b)
       i
 
-; let EquivLemma (A : type) (B : type)
-;   : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
-;   =
-;   LemSig
-;     (A → B)
-;     (λ f → IsEquiv A B f)
-;     (PropIsEquiv A B)
-;
+let EquivLemma
+  (A : type) (B : type) (E0 : Equiv A B) (E1 : Equiv A B)
+  (P : Path (A → B) (E0.car) (E1.car))
+  : Path (Equiv A B) E0 E1
+  =
+  LemSig (A → B) (λ f → IsEquiv A B f) (PropIsEquiv A B) E0 E1 P
+
+
+let UA/retract
+  (A : type) (B : type)
+  : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
+  =
+  λ E →
+    EquivLemma A B
+      (PathToEquiv A B (UA A B E))
+      E
+      (λ i a →
+        UA/beta A B E `(coe 1 i <_> A a) i)
+
+      ; TODO: some bug prevents using refinement for coe above
