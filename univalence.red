@@ -61,7 +61,7 @@ let IdEquiv (A : type) : Equiv A A =
 
 
 let PathToEquiv
-  (A : type) (B : type) (P : Path type A B)
+  (A : type) (B : type) (P : Path^1 type A B)
   : Equiv A B
   =
   coe 0 1 (IdEquiv A) in λ i → Equiv A (P i)
@@ -165,7 +165,7 @@ let EquivLemma
 ; per Dan Licata, UA and UABeta suffice for full univalence:
 ; https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
 
-let UA (A : type) (B : type) (E : Equiv A B) : Path type A B =
+let UA (A : type) (B : type) (E : Equiv A B) : Path^1 type A B =
   λ i →
     `(V i A B E)
 
