@@ -28,6 +28,22 @@ let Retract (A : type) (B : type) (f : A → B) (g : B → A) : type =
   (a : A) →
     Path A (g (f a)) a
 
+let RetIsContr
+  (A : type) (B : type)
+  (f : A → B)
+  (g : B → A)
+  (h : Retract A B f g)
+  (c : IsContr B)
+  : IsContr A
+  =
+  < g (c.car),
+    λ a i →
+      comp 0 1 (g (c.cdr (f a) i)) with
+      | i=0 ⇒ h a
+      | i=1 ⇒ λ _ → g (c.car)
+      end
+  >
+
 let IdEquiv (A : type) : Equiv A A =
   < _
   , λ a →
