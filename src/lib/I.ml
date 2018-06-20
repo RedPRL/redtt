@@ -1,13 +1,20 @@
+type atom = Name.t
+
 type t =
   | Dim0
   | Dim1
-  | Atom of Name.t
+  | Atom of atom
 
 type action =
-  | Subst of t * Name.t
-  | Swap of Name.t * Name.t
+  | Subst of t *atom
+  | Swap of atom * atom
   | Idn
   | Cmp of action * action
+
+let idn = Idn
+let swap a b = Swap (a, b)
+let subst r a = Subst (r, a)
+let cmp phi1 phi0 = Cmp (phi1, phi0)
 
 exception Inconsistent
 
