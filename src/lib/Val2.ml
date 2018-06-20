@@ -147,6 +147,10 @@ sig
   val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
   val pp_comp_sys : Format.formatter -> comp_sys -> unit
 
+  module Env : Sort.S'
+    with type t = env
+    with type 'a m = 'a
+
 
   module Val : Sort.S'
     with type t = value
@@ -169,7 +173,7 @@ sig
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
-module M (Sig : Sig) (* : S *) =
+module M (Sig : Sig) : S =
 struct
   type step =
     | Ret : neu -> step

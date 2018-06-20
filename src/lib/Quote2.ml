@@ -67,7 +67,9 @@ end
 
 module M (V : Val2.S) : S =
 struct
-  include V
+  module QEnv = Env
+  open V
+  module Env = QEnv
 
   let generic env ty =
     make @@ Up {ty = ty; neu = Lvl (None, Env.len env); sys = []}
