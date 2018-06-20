@@ -178,6 +178,7 @@ end
 module type Sig =
 sig
   val restriction : Restriction.t
+  val global_dim : I.atom -> I.t
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
@@ -213,19 +214,18 @@ struct
 
   let act_env_cell phi =
     function
-    | Val v -> Val (Val.act phi v)
+    | Val v ->
+      Val (Val.act phi v)
     | Atom (psi, x) ->
-      (* This seems backwards! Why does it work only this way?? *)
-      Atom (I.cmp psi phi, x)
+      Atom (I.cmp phi psi, x)
 
   module Env =
   struct
     type t = env
     type 'a m = 'a
 
-    let initial_global = Restriction.as_action Sig.restriction
+    let emp = {cells = []; global = I.idn}
 
-    let emp = {cells = []; global = initial_global}
     let push el {cells; global} =
       {cells = el :: cells; global}
 
@@ -235,7 +235,6 @@ struct
     let act phi {cells; global} =
       {cells = List.map (act_env_cell phi) cells;
        global = I.cmp phi global}
-      (* backwards ? *)
   end
 
   module Clo : Sort with type t = clo with type 'a m = 'a =
@@ -393,11 +392,11 @@ struct
               failwith "eval_dim: expected atom in environment"
           end
 
-        (* Globals must be canonized according to the global restriction *)
         | Tm.Ref info ->
-          I.act rho.global (`Atom info.name)
+          I.act rho.global @@ Sig.global_dim info.name
         | Tm.Meta meta ->
-          I.act rho.global (`Atom meta.name)
+          I.act rho.global @@ Sig.global_dim meta.name
+
         | _ -> failwith "eval_dim"
       end
     | _ -> failwith "eval_dim"

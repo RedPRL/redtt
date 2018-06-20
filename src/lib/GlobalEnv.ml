@@ -72,7 +72,12 @@ let pp_twin fmt =
 
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
+
   let restriction = Sig.globals.rel
+
+  let global_dim x =
+    let phi = Restriction.as_action restriction in
+    I.act phi @@ `Atom x
 
   let lookup nm tw =
     try
