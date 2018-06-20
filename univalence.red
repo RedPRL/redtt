@@ -199,7 +199,6 @@ let UA/retract
     EquivLemma A B (PathToEquiv A B (UA A B E)) E
       (λ i a → UA/beta A B E (coe 1 i a in λ _ → A) i)
 
-; VERY SLOW
 opaque
 let UA/retract/sig
   (A : type)
@@ -235,8 +234,6 @@ let IsContrPath (A : type) : IsContr^1 ((B : type) × Path^1 type A B) =
 ; https://groups.google.com/forum/#!msg/homotopytypetheory/HfCB_b-PNEU/Ibb48LvUMeUJ
 ; See also Theorem 5.8.4 of the HoTT Book.
 
-
-; VERY SLOW
 let univalence (A : type) : IsContr^1 ((B : type) × Equiv A B) =
   RetIsContr^1
     ((B : type) × Equiv A B)
