@@ -8,7 +8,7 @@ let _ =
 
 (* The way that we model dimensions is now incompatible with the union-find version of things.
    We need to find a new way. *)
-type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; ppenv : Pretty.env}
+type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; ppenv : Pretty.env; rel : Restriction.t}
 type t = cx
 
 module type S =
@@ -61,15 +61,17 @@ struct
     {env = [];
      qenv = Quote.Env.emp;
      tys = [];
-     ppenv = Pretty.Env.emp}
+     ppenv = Pretty.Env.emp;
+     rel = Restriction.emp ()}
 
-  let ext {env; qenv; tys; ppenv} ~nm ty sys =
+  let ext {env; qenv; tys; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in
     let var = V.reflect ty (Val.Lvl (nm, n)) sys in
     {env = Val.Val var :: env;
      tys = `Ty ty :: tys;
      qenv = Quote.Env.succ qenv;
-     ppenv = snd @@ Pretty.Env.bind nm ppenv},
+     ppenv = snd @@ Pretty.Env.bind nm ppenv;
+     rel},
     var
 
   let ext_ty cx ~nm ty =
@@ -79,12 +81,13 @@ struct
     let face = IFace.True (`Dim0, `Dim1, el) in
     fst @@ ext cx ~nm ty [face]
 
-  let ext_dim {env; qenv; tys; ppenv} ~nm =
+  let ext_dim {env; qenv; tys; ppenv; rel} ~nm =
     let x = Name.named nm in
     {env = Val.Atom (I.idn, x) :: env;
      tys = `Dim :: tys;
      qenv = Quote.Env.abs qenv [x];
-     ppenv = snd @@ Pretty.Env.bind nm ppenv}, x
+     ppenv = snd @@ Pretty.Env.bind nm ppenv;
+     rel}, x
 
   let rec ext_dims cx ~nms =
     match nms with
@@ -135,7 +138,9 @@ struct
     List.nth tys i
 
   let restrict cx r r' =
-    {cx with env = V.Env.act (I.equate r r') cx.env}
+    {cx with
+     env = V.Env.act (I.equate r r') cx.env;
+     rel = Restriction.equate r r' cx.rel}
 
 
   let quote cx ~ty el =

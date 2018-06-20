@@ -313,7 +313,7 @@ struct
                 (* Check face-face adjacency conditions *)
                 go_adj cx' acc (r0, r1, tm)
               with
-              | I.Inconsistent -> ()
+              | (I.Inconsistent | Restriction.Inconsistent) -> ()
             end;
             go sys @@ (r0, r1, tm) :: acc
 
@@ -335,7 +335,7 @@ struct
             let phi = I.cmp (I.equate r'0 r'1) (I.equate r0 r1) in
             Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) v v'
           with
-          | I.Inconsistent -> ()
+          | (I.Inconsistent | Restriction.Inconsistent) -> ()
         end;
         go_adj cx faces face
     in
@@ -374,7 +374,7 @@ struct
                 (* Check face-face adjacency conditions *)
                 go_adj cxxr0r1 acc (r0, r1, bnd)
               with
-                I.Inconsistent -> ()
+                (I.Inconsistent | Restriction.Inconsistent)-> ()
             end;
 
             go sys @@ (r0, r1, bnd) :: acc
@@ -399,7 +399,7 @@ struct
             let phi = I.cmp (I.equate r'0 r'1) (I.equate r0 r1) in
             Cx.check_eq cxx' ~ty:(Eval.Val.act phi tyx) v v'
           with
-          | I.Inconsistent -> ()
+          | (I.Inconsistent | Restriction.Inconsistent) -> ()
         end;
         go_adj cxx faces face
 
