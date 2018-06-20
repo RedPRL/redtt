@@ -5,7 +5,7 @@ module type S =
 sig
   type el
 
-  include Sort.S' with type 'a m = 'a with type t = el abs
+  include Sort.S with type 'a m = 'a with type t = el abs
 
   val bind : atom list -> el -> t
   val unleash : t -> atom list * el
@@ -18,7 +18,7 @@ sig
   val make1 : (atom -> el) -> t
 end
 
-module M (X : Sort.S' with type 'a m = 'a) : S with type el = X.t =
+module M (X : Sort.S with type 'a m = 'a) : S with type el = X.t =
 struct
   type el = X.t
   type 'a m = 'a

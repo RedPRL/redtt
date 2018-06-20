@@ -142,14 +142,14 @@ sig
 
   module Env :
   sig
-    include Sort.S'
+    include Sort.S
       with type t = env
       with type 'a m = 'a
     val emp : env
     val push : env_el -> env -> env
   end
 
-  module Val : Sort.S'
+  module Val : Sort.S
     with type t = value
     with type 'a m = 'a
 

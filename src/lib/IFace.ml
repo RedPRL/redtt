@@ -30,7 +30,7 @@ let forall : type x. I.atom -> (x, 'a) face -> [`Delete | `Keep] =
     let r, r' = get_cond face in
     if r = s or r' = s then `Delete else `Keep
 
-module M (X : Sort.S' with type 'a m = 'a) :
+module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
   val act : I.action -> 'x t -> [`Any] t

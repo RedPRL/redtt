@@ -7,7 +7,7 @@ val map : (I.t -> I.t -> 'a -> 'b) -> ('x, 'a) face -> ('x, 'b) face
 
 val forall : I.atom -> ('x, 'a) face -> [`Delete | `Keep]
 
-module M (X : Sort.S' with type 'a m = 'a) :
+module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
 

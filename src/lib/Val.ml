@@ -149,7 +149,7 @@ sig
 
   module Env :
   sig
-    include Sort.S'
+    include Sort.S
       with type t = env
       with type 'a m = 'a
     val emp : env
@@ -157,7 +157,7 @@ sig
   end
 
 
-  module Val : Sort.S'
+  module Val : Sort.S
     with type t = value
     with type 'a m = 'a
 
@@ -193,7 +193,7 @@ struct
   let ret v = Ret v
   let step v = Step v
 
-  module type Sort = Sort.S'
+  module type Sort = Sort.S
 
   module Val : Sort with type t = value with type 'a m = 'a =
   struct
@@ -369,7 +369,7 @@ struct
   end
 
   module ExtAbs : IAbs.S with type el = value * val_sys =
-    IAbs.M (Sort.Prod' (Val) (ValSys))
+    IAbs.M (Sort.Prod (Val) (ValSys))
 
   exception ProjAbs of abs
   exception ProjVal of value
