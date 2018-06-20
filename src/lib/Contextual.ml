@@ -279,8 +279,8 @@ let check ~ty tm =
     T.check lcx vty tm;
     ret true
   with
-  | exn ->
-    Format.eprintf "type error: %s@." @@ Printexc.to_string exn;
+  | _exn ->
+    (* Format.eprintf "type error: %s@." @@ Printexc.to_string exn; *)
     ret false
 
 let check_eq ~ty tm0 tm1 =

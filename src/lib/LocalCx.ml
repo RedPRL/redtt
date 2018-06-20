@@ -138,10 +138,17 @@ struct
     List.nth tys i
 
   let restrict cx r r' =
-    Format.eprintf "Restricting %a = %a@." I.pp r I.pp r';
-    {cx with
-     rel = Restriction.equate r r' cx.rel;
-     env = V.Env.act (I.equate r r') cx.env}
+    let phi = Restriction.as_action cx.rel in
+    let r = I.act phi r in
+    let r' = I.act phi r' in
+    (* Format.eprintf "Restricting %a = %a@." I.pp r I.pp r'; *)
+    let res =
+      {cx with
+       rel = Restriction.equate r r' cx.rel;
+       env = V.Env.act (I.equate r r') cx.env}
+    in
+    (* Format.eprintf "Restricted: %a@." Restriction.pp res.rel; *)
+    res
 
 
   let quote cx ~ty el =

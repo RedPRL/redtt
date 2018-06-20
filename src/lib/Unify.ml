@@ -635,8 +635,21 @@ let rec subtype ty0 ty1 =
 
 
 
+let normalize_eqn q =
+  typechecker >>= fun (module T) ->
+  let vty0 = T.Cx.eval T.Cx.emp q.ty0 in
+  let vty1 = T.Cx.eval T.Cx.emp q.ty1 in
+  let el0 = T.Cx.eval T.Cx.emp q.tm0 in
+  let el1 = T.Cx.eval T.Cx.emp q.tm1 in
+  let tm0 = T.Cx.quote T.Cx.emp vty0 el0 in
+  let tm1 = T.Cx.quote T.Cx.emp vty1 el1 in
+  let ty0 = T.Cx.quote_ty T.Cx.emp vty0 in
+  let ty1 = T.Cx.quote_ty T.Cx.emp vty1 in
+  ret {ty0; ty1; tm0; tm1}
+
 (* invariant: will not be called on equations which are already reflexive *)
 let rigid_rigid q =
+  (* normalize_eqn q >>= fun q -> *)
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-pi" in

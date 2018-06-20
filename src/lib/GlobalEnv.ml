@@ -46,7 +46,9 @@ let restrict tr0 tr1 sg =
     | Tm.Dim1 -> `Dim1
     | _ -> failwith "Restrict: expected dimension"
   in
-  {sg with rel = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel}
+  let rel' = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel in
+  (* Format.eprintf "Restrict: %a ===> %a@." Restriction.pp sg.rel Restriction.pp rel'; *)
+  {sg with rel = rel'}
 
 let pp fmt sg =
   let pp_sep fmt () = Format.fprintf fmt "; " in
@@ -77,7 +79,9 @@ struct
 
   let global_dim x =
     let phi = Restriction.as_action restriction in
-    I.act phi @@ `Atom x
+    let r = I.act phi @@ `Atom x in
+    (* Format.eprintf "[%a] != %a ==> %a@." Restriction.pp restriction Name.pp x I.pp r; *)
+    r
 
   let lookup nm tw =
     try

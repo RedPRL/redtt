@@ -300,7 +300,7 @@ struct
       | (Restriction.Inconsistent | I.Inconsistent) ->
         ()
       | exn ->
-        Format.eprintf "%a %a   Failed with %s@." I.pp r I.pp r' (Printexc.to_string exn);
+        (* Format.eprintf "%a %a   Failed with %s@." I.pp r I.pp r' (Printexc.to_string exn); *)
         raise exn
 
 

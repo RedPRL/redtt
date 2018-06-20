@@ -228,11 +228,16 @@ struct
         Tm.make @@ Tm.FCom {r = tr; r' = tr'; cap; sys}
 
       | HCom hcom0, HCom hcom1 ->
-        let tr, tr' = equate_star env hcom0.dir hcom1.dir in
-        let ty = equate_ty env hcom0.ty hcom1.ty in
-        let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
-        let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
-        Tm.up (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, Emp)
+        begin
+          try
+            let tr, tr' = equate_star env hcom0.dir hcom1.dir in
+            let ty = equate_ty env hcom0.ty hcom1.ty in
+            let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
+            let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
+            Tm.up (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, Emp)
+          with
+          | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
+        end
 
       | Coe coe0, Coe coe1 ->
         let tr, tr' = equate_star env coe0.dir coe1.dir in
@@ -395,13 +400,13 @@ struct
       (* Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
-      failwith "Dimensions did not match"
+      failwith "equate_dim: dimensions did not match"
 
   and equate_atom env x y =
     if x = y then
       quote_dim env @@ `Atom x
     else
-      failwith "Dimensions did not match"
+      failwith "equate_atom: dimensions did not match"
 
   and equate_dims env rs rs' =
     match rs, rs' with
