@@ -80,7 +80,7 @@ and neu =
 
 and nf = {ty : value; el : value}
 
-and ('x, 'a) face = ('x, 'a) Face.face
+and ('x, 'a) face = ('x, 'a) IFace.face
 
 and clo =
   | Clo of {bnd : Tm.tm Tm.bnd; rho : env}
@@ -88,7 +88,7 @@ and clo =
 and nclo =
   | NClo of {bnd : Tm.tm Tm.nbnd; rho : env}
 
-and env_el = Val of value | Atom of Dim.action * atom
+and env_el = Val of value | Atom of I.action * atom
 and env = env_el list
 
 and abs = value IAbs.abs
@@ -119,7 +119,7 @@ sig
   val eval_cmd : env -> Tm.tm Tm.cmd -> value
   val eval_head : env -> Tm.tm Tm.head -> value
   val eval_frame : env -> value -> Tm.tm Tm.frame -> value
-  val eval_dim : env -> Tm.tm -> Dim.t
+  val eval_dim : env -> Tm.tm -> I.t
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val apply : value -> value -> value
@@ -197,14 +197,10 @@ struct
   module ValFace = IFace.M (Val)
   module AbsFace = IFace.M (Abs)
 
-end
-
-(*
-
   let act_env_cell phi =
     function
     | Val v -> Val (Val.act phi v)
-    | Atom (psi, x) -> Atom (Dim.cmp phi psi, x)
+    | Atom (psi, x) -> Atom (I.cmp phi psi, x)
 
   module Clo : Sort with type t = clo with type 'a m = 'a =
   struct
@@ -233,8 +229,8 @@ end
     include Sort
       with type t = comp_sys
       with type 'a m = [`Ok of comp_sys | `Proj of abs]
-    val forall : D.atom -> t -> t
-    val forallm : D.atom -> t m -> t m
+    val forall : I.atom -> t -> t
+    val forallm : I.atom -> t m -> t m
   end =
   struct
     type t = comp_sys
@@ -247,12 +243,12 @@ end
       | [] -> []
       | face :: sys ->
         match AbsFace.act phi face with
-        | Face.True (_, _, abs) ->
+        | IFace.True (_, _, abs) ->
           raise @@ Proj abs
-        | Face.False p ->
-          Face.False p :: act_aux phi sys
-        | Face.Indet (p, t) ->
-          Face.Indet (p, t) :: act_aux phi sys
+        | IFace.False p ->
+          IFace.False p :: act_aux phi sys
+        | IFace.Indet (p, t) ->
+          IFace.Indet (p, t) :: act_aux phi sys
 
     let act phi sys =
       try `Ok (act_aux phi sys)
@@ -264,7 +260,7 @@ end
      * if there is a face with equation `x=x` where `x` is
      * the dimension. *)
     let forall x sys =
-      List.filter (fun f -> Face.forall x f = `Keep) sys
+      List.filter (fun f -> IFace.forall x f = `Keep) sys
     let forallm x msys =
       match msys with
       | `Ok sys -> `Ok (forall x sys)
@@ -290,12 +286,12 @@ end
       | [] -> []
       | face :: sys ->
         match ValFace.act phi face with
-        | Face.True (_, _, value) ->
+        | IFace.True (_, _, value) ->
           raise @@ Proj value
-        | Face.False p ->
-          Face.False p :: act_aux phi sys
-        | Face.Indet (p, t) ->
-          Face.Indet (p, t) :: act_aux phi sys
+        | IFace.False p ->
+          IFace.False p :: act_aux phi sys
+        | IFace.Indet (p, t) ->
+          IFace.Indet (p, t) :: act_aux phi sys
 
     let act phi sys =
       try `Ok (act_aux phi sys)
@@ -311,7 +307,7 @@ end
       with type 'a m = 'a
 
     val from_rigid : rigid_val_sys -> t
-    val forall : D.atom -> t -> t
+    val forall : I.atom -> t -> t
   end =
   struct
     type t = val_sys
@@ -323,8 +319,10 @@ end
     let from_rigid sys =
       let face : rigid_val_face -> val_face =
         function
-        | Face.False p -> Face.False p
-        | Face.Indet (p, a) -> Face.Indet (p, a)
+        | IFace.False p ->
+          IFace.False p
+        | IFace.Indet (p, a) ->
+          IFace.Indet (p, a)
       in
       List.map face sys
 
@@ -332,16 +330,20 @@ end
      * if there is a face with equation `x=x` where `x` is
      * the dimension. *)
     let forall x sys =
-      List.filter (fun f -> Face.forall x f = `Keep) sys
+      List.filter (fun f -> IFace.forall x f = `Keep) sys
   end
 
-
-  module ExtAbs : Abstraction.S with type el = value * val_sys =
-    Abstraction.M (Sort.Prod (Val) (ValSys))
+  module ExtAbs : IAbs.S with type el = value * val_sys =
+    IAbs.M (Sort.Prod' (Val) (ValSys))
 
   exception ProjAbs of abs
   exception ProjVal of value
 
+
+
+end
+
+(*
 
   let rec eval_dim rel rho tm =
     match Tm.unleash tm with
