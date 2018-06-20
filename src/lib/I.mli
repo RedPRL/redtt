@@ -26,3 +26,6 @@ val compare : t -> t -> compare
 
 
 val pp : t Pretty.t0
+
+
+exception Inconsistent
