@@ -1,9 +1,10 @@
 type atom = Name.t
 
 type t =
-  | Dim0
-  | Dim1
-  | Atom of atom
+  [ `Dim0
+  | `Dim1
+  | `Atom of atom
+  ]
 
 type action
 val idn : action
