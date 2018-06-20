@@ -41,9 +41,9 @@ let restriction sg =
 let restrict tr0 tr1 sg =
   let ev_dim tr =
     match Tm.unleash tr with
-    | Tm.Up (Tm.Ref {name; _}, Emp) -> Dim.Atom name
-    | Tm.Dim0 -> Dim.Dim0
-    | Tm.Dim1 -> Dim.Dim1
+    | Tm.Up (Tm.Ref {name; _}, Emp) -> `Atom name
+    | Tm.Dim0 -> `Dim0
+    | Tm.Dim1 -> `Dim1
     | _ -> failwith "Restrict: expected dimension"
   in
   {sg with rel = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel}

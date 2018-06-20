@@ -5,9 +5,9 @@ module type S =
 sig
   type t = cx
 
-  module Eval : Val2.S
+  module Eval : Val.S
 
-  type value = Val2.value
+  type value = Val.value
 
   val emp : t
 
@@ -27,7 +27,7 @@ sig
   val eval_head : t -> Tm.tm Tm.head -> value
   val eval_frame : t -> value -> Tm.tm Tm.frame -> value
   val eval_dim : t -> Tm.tm -> I.t
-  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val2.val_sys
+  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
@@ -38,4 +38,4 @@ sig
   val check_eq_ty : t -> value -> value -> unit
 end
 
-module M (V : Val2.S) : S with type t = t
+module M (V : Val.S) : S with type t = t

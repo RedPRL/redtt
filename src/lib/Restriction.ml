@@ -1,8 +1,7 @@
 open RedBasis
 
-type atom = Name.t
-type dim = Dim.repr
-module D = Dim
+type atom = I.atom
+type dim = I.t
 
 type eqn = dim * dim
 
@@ -20,7 +19,7 @@ let rec eval_chronicle dl uf =
     UF.union r r' @@ eval_chronicle dl uf
 
 let pp_eqn fmt (r, r') =
-  Format.fprintf fmt "%a=%a" Dim.pp_repr r Dim.pp_repr r'
+  Format.fprintf fmt "%a=%a" I.pp r I.pp r'
 
 let pp_chronicle fmt chr =
   let comma fmt () = Format.fprintf fmt ", " in
@@ -52,10 +51,10 @@ let find r t =
 let canonize r t =
   let rr = find r t in
   let res =
-    if rr = find D.Dim0 t then
-      D.Dim0
-    else if rr = find D.Dim1 t then
-      D.Dim1
+    if rr = find `Dim0 t then
+      `Dim0
+    else if rr = find `Dim1 t then
+      `Dim1
     else
       rr
   in
@@ -66,14 +65,14 @@ let canonize r t =
 let compare r r' t =
   let cr = canonize r t in
   let cr' = canonize r' t in
-  D.compare_repr cr cr'
+  I.compare cr cr'
 
 
 let equate r0 r1 t =
   let res = equate_ r0 r1 t in
   begin
-    match compare D.Dim0 D.Dim1 res with
-    | D.Same ->
+    match compare `Dim0 `Dim1 res with
+    | `Same ->
       raise Inconsistent
     | _ -> ()
   end;
@@ -82,21 +81,16 @@ let equate r0 r1 t =
 
 let test =
   try
-    let x = D.Atom (Name.named (Some "i")) in
-    let rst = equate x D.Dim0 @@ equate x D.Dim1 @@ emp () in
+    let x = `Atom (Name.named (Some "i")) in
+    let rst = equate x `Dim0 @@ equate x `Dim1 @@ emp () in
     Format.printf "Test failure: {@[<1>%a@]}@.\n" pp_chronicle rst.chronicle;
     failwith "Test failed"
   with
   | Inconsistent -> ()
 
 let test2 =
-  let x = D.Atom (Name.named (Some "i")) in
-  let rst = equate x D.Dim0 @@ emp () in
-  assert (canonize x rst = D.Dim0)
+  let x = `Atom (Name.named (Some "i")) in
+  let rst = equate x `Dim0 @@ emp () in
+  assert (canonize x rst = `Dim0)
 
-
-let unleash r t =
-  let r' = canonize r t in
-  let rs = UF.find_class r' t.classes in
-  Dim.from_reprs r' rs
 

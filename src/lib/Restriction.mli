@@ -1,15 +1,14 @@
-type atom = Name.t
-type dim = Dim.repr
+type atom = I.atom
+type dim = I.t
 
 type t
 
 val emp : unit -> t
 val equate : dim -> dim -> t -> t
 
-val compare : dim -> dim -> t -> Dim.compare
+val compare : dim -> dim -> t -> I.compare
 
 val canonize : dim -> t -> dim
-val unleash : dim -> t -> Dim.t
 
 exception Inconsistent
 

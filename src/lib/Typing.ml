@@ -1,5 +1,5 @@
-module V = Val2
-module Q = Quote2
+module V = Val
+module Q = Quote
 module T = Tm
 
 type value = V.value
@@ -12,17 +12,17 @@ open RedBasis.Bwd
 module type S =
 sig
   module Cx : LocalCx.S
-  val check : cx -> Val2.value -> Tm.tm -> unit
+  val check : cx -> Val.value -> Tm.tm -> unit
   val infer : cx -> Tm.tm Tm.cmd -> value
   val infer_frame : cx -> ty:value -> hd:value -> Tm.tm Tm.frame -> value
-  val check_boundary : cx -> Val2.value -> Val2.val_sys -> Tm.tm -> unit
+  val check_boundary : cx -> Val.value -> Val.val_sys -> Tm.tm -> unit
 end
 
 type cofibration = (I.t * I.t) list
 
 module M (Sig : sig val globals : GlobalEnv.t end) =
 struct
-  module Eval = Val2.M (GlobalEnv.M (Sig))
+  module Eval = Val.M (GlobalEnv.M (Sig))
   module Cx = LocalCx.M (Eval)
 
   let rec check_dim cx tr =

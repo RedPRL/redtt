@@ -23,6 +23,6 @@ val ambulando : unit m
 
 module HSubst (T : Typing.S) :
 sig
-  val inst_ty_bnd : ty Tm.bnd -> Val2.value * tm -> ty
+  val inst_ty_bnd : ty Tm.bnd -> Val.value * tm -> ty
   val (%%) : ty * tm -> tm Tm.frame -> ty * tm
 end

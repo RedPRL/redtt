@@ -1,4 +1,4 @@
-type hyp = [`Ty of Val2.value | `Dim]
+type hyp = [`Ty of Val.value | `Dim]
 
 let check_eq_clock = ref 0.
 
@@ -8,15 +8,15 @@ let _ =
 
 (* The way that we model dimensions is now incompatible with the union-find version of things.
    We need to find a new way. *)
-type cx = {tys : hyp list; env : Val2.env; qenv : Quote2.env; ppenv : Pretty.env}
+type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; ppenv : Pretty.env}
 type t = cx
 
 module type S =
 sig
   type t = cx
-  module Eval : Val2.S
+  module Eval : Val.S
 
-  type value = Val2.value
+  type value = Val.value
 
   val emp : t
 
@@ -36,7 +36,7 @@ sig
   val eval_head : t -> Tm.tm Tm.head -> value
   val eval_frame : t -> value -> Tm.tm Tm.frame -> value
   val eval_dim : t -> Tm.tm -> I.t
-  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val2.val_sys
+  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
@@ -48,27 +48,27 @@ sig
 end
 
 
-module M (V : Val2.S) : S =
+module M (V : Val.S) : S =
 struct
   type t = cx
 
   module Eval = V
-  module Q = Quote2.M (V)
+  module Q = Quote.M (V)
 
-  type value = Val2.value
+  type value = Val.value
 
   let emp : cx =
     {env = [];
-     qenv = Quote2.Env.emp;
+     qenv = Quote.Env.emp;
      tys = [];
      ppenv = Pretty.Env.emp}
 
   let ext {env; qenv; tys; ppenv} ~nm ty sys =
-    let n = Quote2.Env.len qenv in
-    let var = V.reflect ty (Val2.Lvl (nm, n)) sys in
-    {env = Val2.Val var :: env;
+    let n = Quote.Env.len qenv in
+    let var = V.reflect ty (Val.Lvl (nm, n)) sys in
+    {env = Val.Val var :: env;
      tys = `Ty ty :: tys;
-     qenv = Quote2.Env.succ qenv;
+     qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv},
     var
 
@@ -81,9 +81,9 @@ struct
 
   let ext_dim {env; qenv; tys; ppenv} ~nm =
     let x = Name.named nm in
-    {env = Val2.Atom (I.idn, x) :: env;
+    {env = Val.Atom (I.idn, x) :: env;
      tys = `Dim :: tys;
-     qenv = Quote2.Env.abs qenv [x];
+     qenv = Quote.Env.abs qenv [x];
      ppenv = snd @@ Pretty.Env.bind nm ppenv}, x
 
   let rec ext_dims cx ~nms =
