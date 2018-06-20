@@ -78,6 +78,15 @@ let equate r0 r1 t =
   end;
   res
 
+let as_action t =
+  let rec go =
+    function
+    | [] -> I.idn
+    | (r, r') :: chr ->
+      I.cmp (I.equate r r') (go chr)
+  in
+  go t.chronicle
+
 
 let test =
   try

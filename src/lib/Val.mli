@@ -97,7 +97,7 @@ and box_sys = rigid_val_sys
 and ext_abs = (value * val_sys) IAbs.abs
 
 and env_el = Val of value | Atom of I.action * atom
-and env = env_el list
+and env
 
 val clo_name : clo -> string option
 
@@ -140,9 +140,14 @@ sig
   val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
   val pp_comp_sys : Format.formatter -> comp_sys -> unit
 
-  module Env : Sort.S'
-    with type t = env
-    with type 'a m = 'a
+  module Env :
+  sig
+    include Sort.S'
+      with type t = env
+      with type 'a m = 'a
+    val emp : env
+    val push : env_el -> env -> env
+  end
 
   module Val : Sort.S'
     with type t = value
@@ -158,10 +163,14 @@ sig
   module Macro : sig
     val equiv : value -> value -> value
   end
+
+  val base_restriction : Restriction.t
 end
 
 module type Sig =
 sig
+  val restriction : Restriction.t
+
   (** Return the type and boundary of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end

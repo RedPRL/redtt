@@ -58,16 +58,16 @@ struct
   type value = Val.value
 
   let emp : cx =
-    {env = [];
+    {env = Eval.Env.emp;
      qenv = Quote.Env.emp;
      tys = [];
      ppenv = Pretty.Env.emp;
-     rel = Restriction.emp ()}
+     rel = V.base_restriction}
 
   let ext {env; qenv; tys; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in
     let var = V.reflect ty (Val.Lvl (nm, n)) sys in
-    {env = Val.Val var :: env;
+    {env = Eval.Env.push (Val.Val var) env;
      tys = `Ty ty :: tys;
      qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -83,7 +83,7 @@ struct
 
   let ext_dim {env; qenv; tys; ppenv; rel} ~nm =
     let x = Name.named nm in
-    {env = Val.Atom (I.idn, x) :: env;
+    {env = Eval.Env.push (Val.Atom (I.idn, x)) env;
      tys = `Dim :: tys;
      qenv = Quote.Env.abs qenv [x];
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -138,9 +138,10 @@ struct
     List.nth tys i
 
   let restrict cx r r' =
+    Format.eprintf "Restricting %a = %a@." I.pp r I.pp r';
     {cx with
-     env = V.Env.act (I.equate r r') cx.env;
-     rel = Restriction.equate r r' cx.rel}
+     rel = Restriction.equate r r' cx.rel;
+     env = V.Env.act (I.equate r r') cx.env}
 
 
   let quote cx ~ty el =

@@ -13,5 +13,5 @@ val canonize : dim -> t -> dim
 exception Inconsistent
 
 
-
+val as_action : t -> I.action
 val pp : Format.formatter -> t -> unit

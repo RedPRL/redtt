@@ -89,7 +89,7 @@ and nclo =
   | NClo of {bnd : Tm.tm Tm.nbnd; rho : env}
 
 and env_el = Val of value | Atom of I.action * atom
-and env = env_el list
+and env = {cells : env_el list; global : I.action}
 
 and abs = value IAbs.abs
 and ext_abs = (value * val_sys) IAbs.abs
@@ -147,9 +147,14 @@ sig
   val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
   val pp_comp_sys : Format.formatter -> comp_sys -> unit
 
-  module Env : Sort.S'
-    with type t = env
-    with type 'a m = 'a
+  module Env :
+  sig
+    include Sort.S'
+      with type t = env
+      with type 'a m = 'a
+    val emp : env
+    val push : env_el -> env -> env
+  end
 
 
   module Val : Sort.S'
@@ -166,15 +171,20 @@ sig
   module Macro : sig
     val equiv : value -> value -> value
   end
+
+  val base_restriction : Restriction.t
 end
 
 module type Sig =
 sig
+  val restriction : Restriction.t
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
 module M (Sig : Sig) : S =
 struct
+  let base_restriction = Sig.restriction
+
   type step =
     | Ret : neu -> step
     | Step : value -> step
@@ -204,15 +214,28 @@ struct
   let act_env_cell phi =
     function
     | Val v -> Val (Val.act phi v)
-    | Atom (psi, x) -> Atom (I.cmp phi psi, x)
+    | Atom (psi, x) ->
+      (* This seems backwards! Why does it work only this way?? *)
+      Atom (I.cmp psi phi, x)
 
-  module Env : Sort with type t = env with type 'a m = 'a =
+  module Env =
   struct
     type t = env
     type 'a m = 'a
 
-    let act phi =
-      List.map @@ act_env_cell phi
+    let initial_global = Restriction.as_action Sig.restriction
+
+    let emp = {cells = []; global = initial_global}
+    let push el {cells; global} =
+      {cells = el :: cells; global}
+
+    let push_many els {cells; global} =
+      {cells = els @ cells; global}
+
+    let act phi {cells; global} =
+      {cells = List.map (act_env_cell phi) cells;
+       global = I.cmp phi global}
+      (* backwards ? *)
   end
 
   module Clo : Sort with type t = clo with type 'a m = 'a =
@@ -234,7 +257,7 @@ struct
     let act phi clo =
       match clo with
       | NClo info ->
-        NClo {info with rho = List.map (act_env_cell phi) info.rho}
+        NClo {info with rho = Env.act phi info.rho}
   end
 
   module CompSys :
@@ -363,16 +386,18 @@ struct
         match hd with
         | Tm.Ix (i, _) ->
           begin
-            match List.nth rho i with
+            match List.nth rho.cells i with
             | Atom (phi, x) ->
               I.act phi @@ `Atom x
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
+
+        (* Globals must be canonized according to the global restriction *)
         | Tm.Ref info ->
-          `Atom info.name
+          I.act rho.global (`Atom info.name)
         | Tm.Meta meta ->
-          `Atom meta.name
+          I.act rho.global (`Atom meta.name)
         | _ -> failwith "eval_dim"
       end
     | _ -> failwith "eval_dim"
@@ -1027,7 +1052,7 @@ struct
            * type in the semantic domain. *)
           let fiber0_ty b =
             let var i = Tm.up @@ Tm.var i `Only in
-            eval [Val ty00; Val ty10; Val (car equiv0); Val b] @@
+            eval (Env.push_many [Val ty00; Val ty10; Val (car equiv0); Val b] Env.emp) @@
             Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
           in
           (* This is to generate the element in `ty0` and also
@@ -1350,7 +1375,7 @@ struct
   and clo bnd rho =
     Clo {bnd; rho}
 
-  and eval rho tm =
+  and eval (rho : env) tm =
     match Tm.unleash tm with
     | Tm.Pi (dom, cod) ->
       let dom = eval rho dom in
@@ -1476,7 +1501,7 @@ struct
 
     | Tm.Let (cmd, Tm.B (_, t)) ->
       let v0 = eval_cmd rho cmd in
-      eval (Val v0 :: rho) t
+      eval (Env.push (Val v0) rho) t
 
     | Tm.LblTy info ->
       let ty = eval rho info.ty in
@@ -1564,7 +1589,7 @@ struct
 
     | Tm.Ix (i, _) ->
       begin
-        match List.nth rho i with
+        match List.nth rho.cells i with
         | Val v -> v
         | Atom (_, a) ->
           Format.eprintf "Expected value in environment for %i, but found atom %a@." i Name.pp a;
@@ -1573,14 +1598,14 @@ struct
 
     | Tm.Ref info ->
       let tty, tsys = Sig.lookup info.name info.twin in
-      let vsys = eval_tm_sys [] @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
-      let vty = eval [] @@ Tm.shift_univ info.ushift tty in
+      let vsys = eval_tm_sys Env.emp @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
+      let vty = eval Env.emp @@ Tm.shift_univ info.ushift tty in
       reflect vty (Ref {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
 
     | Tm.Meta {name; ushift} ->
       let tty, tsys = Sig.lookup name `Only in
-      let vsys = eval_tm_sys [] @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
-      let vty = eval [] @@ Tm.shift_univ ushift tty in
+      let vsys = eval_tm_sys Env.emp @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
+      let vty = eval Env.emp @@ Tm.shift_univ ushift tty in
       reflect vty (Meta {name; ushift}) vsys
 
   and reflect ty neu sys =
@@ -1632,6 +1657,7 @@ struct
         | _ ->
           let tm = Option.get_exn otm in
           let rho' = Env.act (I.equate r r') rho in
+          (* The problem here is that the this is not affecting GLOBALS! *)
           let el = eval rho' tm in
           IFace.Indet (xi, el)
       end
@@ -1646,19 +1672,19 @@ struct
   and eval_bnd rho bnd =
     let Tm.B (_, tm) = bnd in
     let x = Name.fresh () in
-    let rho = Atom (I.idn, x) :: rho in
+    let rho = Env.push (Atom (I.idn, x)) rho in
     Abs.bind1 x @@ eval rho tm
 
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = List.map Name.named nms in
-    let rho = List.map (fun x -> Atom (I.idn, x)) xs @ rho in
+    let rho = Env.push_many (List.map (fun x -> Atom (I.idn, x)) xs) rho in
     Abs.bind xs @@ eval rho tm
 
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = List.map Name.named nms in
-    let rho = List.map (fun x -> Atom (I.idn, x)) xs @ rho in
+    let rho = Env.push_many (List.map (fun x -> Atom (I.idn, x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
 
   and unleash_pi ?debug:(debug = []) v =
@@ -1762,8 +1788,14 @@ struct
           in
           let force_sys = List.map force_face info.sys in
           make @@ Up {ty; neu = force; sys = force_sys}
-        | _ ->
-          failwith "Cannot force non-true corestriction"
+        | IFace.False _ ->
+          failwith "Cannot force false corestriction"
+        | IFace.Indet (p, _) ->
+          let r, r' = IStar.unleash p in
+          Format.eprintf "corestriction: %a =? %a@." I.pp r I.pp r';
+          Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+          Format.eprintf "@.";
+          failwith "Cannot force indeterminate corestriction"
       end
     | _ ->
       failwith "corestriction_force"
@@ -2165,13 +2197,13 @@ struct
     match clo with
     | Clo info ->
       let Tm.B (_, tm) = info.bnd in
-      eval (Val varg :: info.rho) tm
+      eval (Env.push (Val varg) info.rho) tm
 
   and inst_nclo nclo vargs =
     match nclo with
     | NClo info ->
       let Tm.NB (_, tm) = info.bnd in
-      eval (List.map (fun v -> Val v) vargs @ info.rho) tm
+      eval (Env.push_many (List.map (fun v -> Val v) vargs) info.rho) tm
 
   and pp_env_cell fmt =
     function
@@ -2306,9 +2338,10 @@ struct
       | IFace.Indet (p, v) ->
         let r0, r1 = IStar.unleash p in
         Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs v
+
   and pp_clo fmt (Clo clo) =
     let Tm.B (_, tm) = clo.bnd in
-    Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
+    Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
 
   and pp_neu fmt neu =
     match neu with
@@ -2375,7 +2408,7 @@ struct
   module Macro =
   struct
     let equiv ty0 ty1 : value =
-      let rho = [Val ty0; Val ty1] in
+      let rho = Env.push_many [Val ty0; Val ty1] Env.emp in
       eval rho @@
       Tm.Macro.equiv
         (Tm.up @@ Tm.var 0 `Only)

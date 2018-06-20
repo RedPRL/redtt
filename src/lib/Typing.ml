@@ -201,13 +201,19 @@ struct
           begin
             match I.compare r'0 r0, I.compare r'1 r1 with
             | `Same, `Same ->
-              let cx' = Cx.restrict cx r'0 r'1 in
-              let phi = I.equate r'0 r'1 in
-              check cx' (Eval.Val.act phi ty) tm
+              begin
+                try
+                  let cx' = Cx.restrict cx r'0 r'1 in
+                  let phi = I.equate r'0 r'1 in
+                  check cx' (Eval.Val.act phi ty) tm
+                with
+                | Restriction.Inconsistent -> ()
+              end
             | _ ->
               failwith "co-restriction mismatch"
           end
         | _ ->
+          Format.eprintf "@.@.type restriction didn't match thunk@.@.";
           failwith "Malformed element of co-restriction type"
       end
 
@@ -285,10 +291,18 @@ struct
 
     | IFace.Indet (p, el) ->
       let r, r' = IStar.unleash p in
-      let cx' = Cx.restrict cx r r' in
-      let phi = I.equate r r' in
-      Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) el @@
-      Cx.eval cx' tm
+      try
+        let cx' = Cx.restrict cx r r' in
+        let phi = I.equate r r' in
+        Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) el @@
+        Cx.eval cx' tm
+      with
+      | (Restriction.Inconsistent | I.Inconsistent) ->
+        ()
+      | exn ->
+        Format.eprintf "%a %a   Failed with %s@." I.pp r I.pp r' (Printexc.to_string exn);
+        raise exn
+
 
   and check_ext_sys cx ty sys =
     let rec go sys acc =
