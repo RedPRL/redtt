@@ -15,3 +15,11 @@ val cmp : action -> action -> action
 val equate : t -> t -> action
 
 val act : action -> t -> t
+
+type compare =
+  [ `Same
+  | `Apart
+  | `Indet
+  ]
+
+val compare : t -> t -> compare

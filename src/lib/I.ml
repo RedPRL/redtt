@@ -54,3 +54,26 @@ let rec act phi =
 
 
 
+
+type compare =
+  [ `Same
+  | `Apart
+  | `Indet
+  ]
+
+let compare r r' =
+  match r, r' with
+  | `Dim0, `Dim0 ->
+    `Same
+  | `Dim1, `Dim1 ->
+    `Same
+  | `Dim0, `Dim1 ->
+    `Apart
+  | `Dim1, `Dim0 ->
+    `Apart
+  | `Atom x, `Atom y ->
+    if x = y then `Same else `Indet
+  | `Atom _, _ ->
+    `Indet
+  | _, `Atom _ ->
+    `Indet

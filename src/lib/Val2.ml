@@ -91,8 +91,8 @@ and nclo =
 and env_el = Val of value | Atom of Dim.action * atom
 and env = env_el list
 
-and abs = value Abstraction.abs
-and ext_abs = (value * val_sys) Abstraction.abs
+and abs = value IAbs.abs
+and ext_abs = (value * val_sys) IAbs.abs
 and rigid_abs_face = ([`Rigid], abs) face
 and val_face = ([`Any], value) face
 and rigid_val_face = ([`Rigid], value) face
@@ -108,9 +108,6 @@ and value = node ref
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
   nm
 
-
-(*
-
 module type S =
 sig
   val make : con -> value
@@ -118,12 +115,12 @@ sig
 
   val reflect : value -> neu -> val_sys -> value
 
-  val eval : rel -> env -> Tm.tm -> value
-  val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
-  val eval_head : rel -> env -> Tm.tm Tm.head -> value
-  val eval_frame : rel -> env -> value -> Tm.tm Tm.frame -> value
-  val eval_dim : rel -> env -> Tm.tm -> Dim.t
-  val eval_tm_sys : rel -> env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
+  val eval : env -> Tm.tm -> value
+  val eval_cmd : env -> Tm.tm Tm.cmd -> value
+  val eval_head : env -> Tm.tm Tm.head -> value
+  val eval_frame : env -> value -> Tm.tm Tm.frame -> value
+  val eval_dim : env -> Tm.tm -> Dim.t
+  val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
@@ -139,7 +136,7 @@ sig
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : ?debug:string list -> value -> value * clo
-  val unleash_v : value -> gen * value * value * value
+  val unleash_v : value -> atom * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
@@ -151,36 +148,29 @@ sig
   val pp_comp_sys : Format.formatter -> comp_sys -> unit
 
 
-  module Val : Sort.S
+  module Val : Sort.S'
     with type t = value
     with type 'a m = 'a
 
 
-  module ExtAbs : Abstraction.S
+  module ExtAbs : IAbs.S
     with type el = value * val_sys
 
-  module Abs : Abstraction.S
+  module Abs : IAbs.S
     with type el = value
 
   module Macro : sig
     val equiv : value -> value -> value
   end
-
-
-  val base_restriction : Restriction.t
 end
 
 module type Sig =
 sig
-  val restriction : Restriction.t
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 end
 
-module M (Sig : Sig) : S =
+module M (Sig : Sig) (* : S *) =
 struct
-
-  let base_restriction = Sig.restriction
-
   type step =
     | Ret : neu -> step
     | Step : value -> step
@@ -188,7 +178,7 @@ struct
   let ret v = Ret v
   let step v = Step v
 
-  module type Sort = Sort.S
+  module type Sort = Sort.S'
 
   module Val : Sort with type t = value with type 'a m = 'a =
   struct
@@ -196,18 +186,20 @@ struct
     type 'a m = 'a
     type t = value
 
-    let act : D.action -> value -> value =
+    let act : I.action -> value -> value =
       fun phi thunk ->
         let Node node = !thunk in
-        ref @@ Node {node with action = D.cmp phi node.action}
+        ref @@ Node {node with action = I.cmp phi node.action}
   end
 
 
-  module Abs = Abstraction.M (Val)
+  module Abs = IAbs.M (Val)
+  module ValFace = IFace.M (Val)
+  module AbsFace = IFace.M (Abs)
 
-  module ValFace = Face.M (Val)
-  module AbsFace = Face.M (Abs)
+end
 
+(*
 
   let act_env_cell phi =
     function
