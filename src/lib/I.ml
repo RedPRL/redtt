@@ -77,3 +77,13 @@ let compare r r' =
     `Indet
   | _, `Atom _ ->
     `Indet
+
+
+let pp fmt =
+  function
+  | `Dim0 ->
+    Format.fprintf fmt "0"
+  | `Dim1 ->
+    Format.fprintf fmt "1"
+  | `Atom x ->
+    Name.pp fmt x

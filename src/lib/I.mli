@@ -23,3 +23,6 @@ type compare =
   ]
 
 val compare : t -> t -> compare
+
+
+val pp : t Pretty.t0
