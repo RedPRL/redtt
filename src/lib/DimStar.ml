@@ -16,7 +16,7 @@ let gen_const x eps =
     | `Dim0 -> Dim.dim0
     | `Dim1 -> Dim.dim1
   in
-  make (DimGeneric.unleash x) r
+  DimGeneric.unleash x, r
 
 let swap (c, d) = (d, c)
 

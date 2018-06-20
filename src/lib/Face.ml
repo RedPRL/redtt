@@ -60,11 +60,7 @@ struct
 
   let gen_const : type x. DimGeneric.t -> [`Dim0 | `Dim1] -> X.t -> (x, X.t) face =
     fun x eps a ->
-      match DimStar.gen_const x eps with
-      | `Ok p ->
-        rigid p a
-      | `Same _ ->
-        failwith "Impossible"
+      rigid (DimStar.gen_const x eps) a
 
 
   let act : type x. Dim.action -> x t -> _ t =
