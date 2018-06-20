@@ -335,7 +335,7 @@ let try_prune _q =
    substitution. *)
 
 
-module HSubst (T : Typing.S) =
+module HSubst (T : Typing2.S) =
 struct
   let inst_ty_bnd bnd (arg_ty, arg) =
     let Tm.B (nm, tm) = bnd in
@@ -361,7 +361,7 @@ struct
       let dom, cod = T.Cx.Eval.unleash_pi ty in
       inst_bnd (cod, bnd) (dom, arg)
     | Tm.ExtLam _, Tm.ExtApp args ->
-      let vargs = List.map (fun x -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp x) args in
+      let vargs = List.map (T.Cx.eval_dim T.Cx.emp) args in
       let ty, _ = T.Cx.Eval.unleash_ext ty vargs in
       let vlam = T.Cx.eval T.Cx.emp tm in
       let vapp = T.Cx.Eval.ext_apply vlam vargs in
@@ -488,13 +488,13 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       go sp0 sp1 >>= fun (ty0, ty1) ->
       typechecker >>= fun (module T) ->
       let module HSubst = HSubst (T) in
-      let rs0 = List.map (fun t -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp t) ts0 in
-      let rs1 = List.map (fun t -> T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp t) ts1 in
+      let rs0 = List.map (fun t -> T.Cx.eval_dim T.Cx.emp t) ts0 in
+      let rs1 = List.map (fun t -> T.Cx.eval_dim T.Cx.emp t) ts1 in
       (* TODO: unify the dimension spines ts0, ts1 *)
       let ty'0, sys0 = T.Cx.Eval.unleash_ext ty0 rs0 in
       let ty'1, sys1 = T.Cx.Eval.unleash_ext ty1 rs1 in
-      let rst0 = T.Cx.Eval.make @@ Val.Rst {ty = ty'0; sys = sys0} in
-      let rst1 = T.Cx.Eval.make @@ Val.Rst {ty = ty'1; sys = sys1} in
+      let rst0 = T.Cx.Eval.make @@ Val2.Rst {ty = ty'0; sys = sys0} in
+      let rst1 = T.Cx.Eval.make @@ Val2.Rst {ty = ty'1; sys = sys1} in
       ret (rst0, rst1)
 
     | Snoc (sp0, Tm.Car), Snoc (sp1, Tm.Car) ->
@@ -534,7 +534,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       active @@ Problem.all y (Tm.make Tm.Bool) @@
       Problem.eqn ~ty0:univ ~ty1:univ ~tm0:mot0y ~tm1:mot1y
       >>
-      let bool = T.Cx.Eval.make Val.Bool in
+      let bool = T.Cx.Eval.make Val2.Bool in
       let mot0_tt = HSubst.inst_ty_bnd info0.mot (bool, Tm.make Tm.Tt) in
       let mot0_ff = HSubst.inst_ty_bnd info0.mot (bool, Tm.make Tm.Ff) in
       let mot1_tt = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Tt) in
