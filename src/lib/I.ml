@@ -17,7 +17,7 @@ let swap a b = Swap (a, b)
 let subst r a = Subst (r, a)
 let cmp phi1 phi0 = Cmp (phi1, phi0)
 
-exception Inconsistent
+exception Inconsistent = Restriction.Inconsistent
 
 let equate r0 r1 =
   match r0, r1 with

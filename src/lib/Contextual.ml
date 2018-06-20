@@ -265,11 +265,11 @@ let active = postpone Active
 let block = postpone Blocked
 
 
-let typechecker : (module Typing2.S) m =
+let typechecker : (module Typing.S) m =
   get_global_env >>= fun env ->
   let module G = struct let globals = env end in
-  let module T = Typing2.M (G) in
-  ret @@ (module T : Typing2.S)
+  let module T = Typing.M (G) in
+  ret @@ (module T : Typing.S)
 
 let check ~ty tm =
   typechecker >>= fun (module T) ->
@@ -279,8 +279,8 @@ let check ~ty tm =
     T.check lcx vty tm;
     ret true
   with
-  | _exn ->
-    (* Format.eprintf "type error: %s@." @@ Printexc.to_string exn; *)
+  | exn ->
+    Format.eprintf "type error: %s@." @@ Printexc.to_string exn;
     ret false
 
 let check_eq ~ty tm0 tm1 =
@@ -330,5 +330,12 @@ let under_restriction r0 r1 m =
   | `Apart ->
     ret None
   | _ ->
-    in_scope (Name.fresh ()) (`R (r0, r1)) m >>= fun x ->
-    ret (Some x)
+    get_global_env >>= fun env ->
+    try
+      (* TODO: hack, fix please *)
+      let _ = GlobalEnv.restrict r0 r1 env in
+      in_scope (Name.fresh ()) (`R (r0, r1)) m >>= fun x ->
+      ret (Some x)
+    with
+    | Restriction.Inconsistent ->
+      ret None

@@ -335,7 +335,7 @@ let try_prune _q =
    substitution. *)
 
 
-module HSubst (T : Typing2.S) =
+module HSubst (T : Typing.S) =
 struct
   let inst_ty_bnd bnd (arg_ty, arg) =
     let Tm.B (nm, tm) = bnd in

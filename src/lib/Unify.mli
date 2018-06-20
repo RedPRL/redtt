@@ -21,7 +21,7 @@ val abstract_tm : telescope -> tm -> tm
 (** Run this in a proof state to solve unification problems. *)
 val ambulando : unit m
 
-module HSubst (T : Typing2.S) :
+module HSubst (T : Typing.S) :
 sig
   val inst_ty_bnd : ty Tm.bnd -> Val2.value * tm -> ty
   val (%%) : ty * tm -> tm Tm.frame -> ty * tm

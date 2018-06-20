@@ -1,7 +1,6 @@
-module V = Val
-module Q = Quote
+module V = Val2
+module Q = Quote2
 module T = Tm
-module R = Restriction
 
 type value = V.value
 
@@ -13,18 +12,17 @@ open RedBasis.Bwd
 module type S =
 sig
   module Cx : LocalCx.S
-  val check : cx -> Val.value -> Tm.tm -> unit
+  val check : cx -> Val2.value -> Tm.tm -> unit
   val infer : cx -> Tm.tm Tm.cmd -> value
   val infer_frame : cx -> ty:value -> hd:value -> Tm.tm Tm.frame -> value
-  val check_boundary : cx -> Val.value -> Val.val_sys -> Tm.tm -> unit
+  val check_boundary : cx -> Val2.value -> Val2.val_sys -> Tm.tm -> unit
 end
 
-
-type cofibration = (R.dim * R.dim) list
+type cofibration = (I.t * I.t) list
 
 module M (Sig : sig val globals : GlobalEnv.t end) =
 struct
-  module Eval = Val.M (GlobalEnv.M (Sig))
+  module Eval = Val2.M (GlobalEnv.M (Sig))
   module Cx = LocalCx.M (Eval)
 
   let rec check_dim cx tr =
@@ -57,52 +55,47 @@ struct
     | _ ->
       failwith "check_dim_cmd"
 
-  let check_dim_in_class cx ocls r : unit =
-    match ocls with
+  let check_dim_scope oxs r =
+    match oxs with
     | None -> ()
-    | Some cls ->
-      let clr = Cx.unleash_dim cx r in
-      begin
-        match Dim.compare cls clr with
-        | Dim.Same ->
-          ()
-        | _ ->
-          Format.printf "check_dim_in_class: %a in %a@." Dim.pp clr Dim.pp cls;
-          failwith "check_dim_in_class"
-      end
+    | Some xs ->
+      match r with
+      | `Atom x ->
+        if List.exists (fun y -> x = y) xs then () else failwith "Bad dimension scope"
+      | _ -> ()
 
-  let check_valid_cofibration cx ?dim_cls:(dim_cls = None) cofib =
+  let check_valid_cofibration ?xs:(xs = None) cofib =
     let zeros = Hashtbl.create 20 in
     let ones = Hashtbl.create 20 in
     let rec go eqns =
       match eqns with
       | [] -> false
       | (r, r') :: eqns ->
-        check_dim_in_class cx dim_cls r;
-        check_dim_in_class cx dim_cls r';
+        check_dim_scope xs r;
+        check_dim_scope xs r';
         begin
-          match Cx.compare_dim cx r r' with
-          | Dim.Same -> true
-          | Dim.Apart -> go eqns
-          | Dim.Indeterminate ->
+          match I.compare r r' with
+          | `Same -> true
+          | `Apart -> go eqns
+          | `Indet ->
             match r, r' with
-            | Dim.Dim0, Dim.Dim1 -> go eqns
-            | Dim.Dim1, Dim.Dim0 -> go eqns
-            | Dim.Dim0, Dim.Dim0 -> true
-            | Dim.Dim1, Dim.Dim1 -> true
-            | Dim.Atom x, Dim.Dim0 ->
+            | `Dim0, `Dim1 -> go eqns
+            | `Dim1, `Dim0 -> go eqns
+            | `Dim0, `Dim0 -> true
+            | `Dim1, `Dim1 -> true
+            | `Atom x, `Dim0 ->
               if Hashtbl.mem ones x then true else
                 begin
                   Hashtbl.add zeros x ();
                   go eqns
                 end
-            | Dim.Atom x, Dim.Dim1 ->
+            | `Atom x, `Dim1 ->
               if Hashtbl.mem zeros x then true else
                 begin
                   Hashtbl.add ones x ();
                   go eqns
                 end
-            | Dim.Atom x, Dim.Atom y ->
+            | `Atom x, `Atom y ->
               x = y or go eqns
             | _, _ ->
               go @@ (r', r) :: eqns
@@ -110,15 +103,11 @@ struct
     in
     if go cofib then () else failwith "check_valid_cofibration"
 
-  let check_extension_cofibration cx xs cofib =
-    match cofib, xs with
-    | [], _ -> ()
-    | _, x :: xs ->
-      let dim_of_atom x = Dim.Atom x in
-      let cls = Dim.from_reprs (dim_of_atom x) @@ Dim.Dim0 :: Dim.Dim1 :: dim_of_atom x :: List.map dim_of_atom xs in
-      check_valid_cofibration cx ~dim_cls:(Some cls) cofib
+  let check_extension_cofibration xs cofib =
+    match cofib with
+    | [] -> ()
     | _ ->
-      failwith "check_extension_cofibration"
+      check_valid_cofibration ~xs:(Some xs) cofib
 
   let rec check cx ty tm =
     match Eval.unleash ty, T.unleash tm with
@@ -142,7 +131,7 @@ struct
       let cxx, xs = Cx.ext_dims cx ~nms in
       let vcod = check_eval cxx ty cod in
       if Kind.lte univ.kind Kind.Kan then
-        check_extension_cofibration cx xs @@ cofibration_of_sys cxx sys
+        check_extension_cofibration xs @@ cofibration_of_sys cxx sys
       else
         ();
       check_ext_sys cxx vcod sys
@@ -157,8 +146,8 @@ struct
       let r = check_eval_dim cx tr in
       let r' = check_eval_dim cx tr' in
       begin
-        match Cx.compare_dim cx r r', oty with
-        | Apart, None ->
+        match I.compare r r', oty with
+        | `Apart, None ->
           ()
         | _, Some ty' ->
           let cxrr' = Cx.restrict cx r r' in
@@ -189,7 +178,7 @@ struct
 
     | V.Ext ext_abs, T.ExtLam (T.NB (nms, tm)) ->
       let cxx, xs = Cx.ext_dims cx ~nms in
-      let codx, sysx = Eval.ExtAbs.inst ext_abs @@ List.map Dim.named xs in
+      let codx, sysx = Eval.ExtAbs.inst ext_abs @@ List.map (fun x -> `Atom x) xs in
       check_boundary cxx codx sysx tm
 
     | V.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
@@ -197,23 +186,23 @@ struct
       let r'1 = check_eval_dim cx tr1 in
       begin
         match ty_face, otm with
-        | Face.False _, None ->
+        | IFace.False _, None ->
           ()
-        | Face.True (r0, r1, ty), Some tm ->
+        | IFace.True (r0, r1, ty), Some tm ->
           begin
-            match Dim.compare (Cx.unleash_dim cx r'0) r0, Dim.compare (Cx.unleash_dim cx r'1) r1 with
-            | Same, Same ->
+            match I.compare r'0 r0, I.compare r'1 r1 with
+            | `Same, `Same ->
               check cx ty tm
             | _ ->
               failwith "co-restriction mismatch"
           end
-        | Face.Indet (p, _), Some tm ->
-          let r0, r1 = DimStar.unleash p in
+        | IFace.Indet (p, _), Some tm ->
+          let r0, r1 = IStar.unleash p in
           begin
-            match Dim.compare (Cx.unleash_dim cx r'0) r0, Dim.compare (Cx.unleash_dim cx r'1) r1 with
-            | Same, Same ->
+            match I.compare r'0 r0, I.compare r'1 r1 with
+            | `Same, `Same ->
               let cx' = Cx.restrict cx r'0 r'1 in
-              let phi = Cx.equate_dim cx r'0 r'1 in
+              let phi = I.equate r'0 r'1 in
               check cx' (Eval.Val.act phi ty) tm
             | _ ->
               failwith "co-restriction mismatch"
@@ -271,7 +260,7 @@ struct
     check_dim cx tr';
     let cxx, x = Cx.ext_dim cx ~nm:None in
     let cap = check_eval cx ty tcap in
-    check_valid_cofibration cx @@ cofibration_of_sys cx tsys;
+    check_valid_cofibration @@ cofibration_of_sys cx tsys;
     check_comp_sys cx r (cxx, x, ty) cap tsys
 
   and check_boundary cx ty sys tm =
@@ -287,17 +276,17 @@ struct
 
   and check_boundary_face cx ty face tm =
     match face with
-    | Face.True (_, _, el) ->
+    | IFace.True (_, _, el) ->
       Cx.check_eq cx ~ty el @@
       Cx.eval cx tm
 
-    | Face.False _ ->
+    | IFace.False _ ->
       ()
 
-    | Face.Indet (p, el) ->
-      let r, r' = DimStar.unleash p in
-      let cx' = Cx.restrict cx (Dim.unleash r) (Dim.unleash r') in
-      let phi = Dim.equate r r' in
+    | IFace.Indet (p, el) ->
+      let r, r' = IStar.unleash p in
+      let cx' = Cx.restrict cx r r' in
+      let phi = I.equate r r' in
       Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) el @@
       Cx.eval cx' tm
 
@@ -310,21 +299,21 @@ struct
         let r0 = check_eval_dim cx tr0 in
         let r1 = check_eval_dim cx tr1 in
         begin
-          match Cx.compare_dim cx r0 r1, otm with
-          | Dim.Apart, _ ->
+          match I.compare r0 r1, otm with
+          | `Apart, _ ->
             go sys acc
 
-          | (Dim.Same | Dim.Indeterminate), Some tm ->
+          | (`Same | `Indet), Some tm ->
             begin
               try
-                let phi = Cx.equate_dim cx r0 r1 in
+                let phi = I.equate r0 r1 in
                 let cx' = Cx.restrict cx r0 r1 in
                 check cx' (Eval.Val.act phi ty) tm;
 
                 (* Check face-face adjacency conditions *)
                 go_adj cx' acc (r0, r1, tm)
               with
-              | R.Inconsistent -> ()
+              | I.Inconsistent -> ()
             end;
             go sys @@ (r0, r1, tm) :: acc
 
@@ -343,10 +332,10 @@ struct
             let cx' = Cx.restrict cx r'0 r'1 in
             let v = Cx.eval cx' tm in
             let v' = Cx.eval cx' tm' in
-            let phi = Dim.cmp (Cx.equate_dim cx r'0 r'1) (Cx.equate_dim cx r0 r1) in
+            let phi = I.cmp (I.equate r'0 r'1) (I.equate r0 r1) in
             Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) v v'
           with
-          | R.Inconsistent -> ()
+          | I.Inconsistent -> ()
         end;
         go_adj cx faces face
     in
@@ -361,22 +350,22 @@ struct
         let r0 = check_eval_dim cx tr0 in
         let r1 = check_eval_dim cx tr1 in
         begin
-          match Cx.compare_dim cx r0 r1, obnd with
-          | Dim.Apart, _ ->
+          match I.compare r0 r1, obnd with
+          | `Apart, _ ->
             go sys acc
 
-          | (Dim.Same | Dim.Indeterminate), Some bnd ->
+          | (`Same | `Indet), Some bnd ->
             begin
               try
                 (* check that bnd is a section of tyx under r0=r1 *)
                 let cxxr0r1 = Cx.restrict cxx r0 r1 in
-                let phir0r1 = Dim.equate (Dim.singleton r0) (Dim.singleton r1) in
+                let phir0r1 = I.equate r0 r1 in
                 let T.B (_, tm) = bnd in
                 check cxxr0r1 (Eval.Val.act phir0r1 tyx) tm;
 
                 (* check that tm<r/x> = cap under r0=r1 *)
                 let cxr0r1 = Cx.restrict cx r0 r1 in
-                let phirx = Dim.cmp phir0r1 @@ Dim.subst (Dim.singleton r) x in
+                let phirx = I.cmp phir0r1 @@ I.subst r x in
                 Cx.check_eq cxr0r1
                   ~ty:(Eval.Val.act phirx tyx)
                   (Eval.Val.act phir0r1 cap)
@@ -385,7 +374,7 @@ struct
                 (* Check face-face adjacency conditions *)
                 go_adj cxxr0r1 acc (r0, r1, bnd)
               with
-                R.Inconsistent -> ()
+                I.Inconsistent -> ()
             end;
 
             go sys @@ (r0, r1, bnd) :: acc
@@ -407,10 +396,10 @@ struct
             let cxx' = Cx.restrict cxx r'0 r'1 in
             let v = Cx.eval cxx' tm in
             let v' = Cx.eval cxx' tm' in
-            let phi = Dim.cmp (Dim.equate (Dim.singleton r'0) (Dim.singleton r'1)) (Dim.equate (Dim.singleton r0) (Dim.singleton r1)) in
+            let phi = I.cmp (I.equate r'0 r'1) (I.equate r0 r1) in
             Cx.check_eq cxx' ~ty:(Eval.Val.act phi tyx) v v'
           with
-          | R.Inconsistent -> ()
+          | I.Inconsistent -> ()
         end;
         go_adj cxx faces face
 
@@ -447,7 +436,7 @@ struct
 
     | T.ExtApp ts ->
       let rs = List.map (check_eval_dim cx) ts in
-      let ty, _ = Eval.unleash_ext ty @@ List.map (Cx.unleash_dim cx) rs in
+      let ty, _ = Eval.unleash_ext ty rs in
       ty
 
     | T.VProj info ->
@@ -490,11 +479,11 @@ struct
 
       let T.B (nm_loop, lcase) = info.lcase in
       let cxx, x = Cx.ext_dim cx ~nm:nm_loop in
-      let cxx_loop = Cx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ V.Loop (DimGeneric.named x)) in
+      let cxx_loop = Cx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ V.Loop x) in
       let mot_loop = Cx.eval cxx_loop mot in
       let val_loopx = check_eval cx mot_loop lcase in
-      let val_loop0 = Eval.Val.act (Dim.subst Dim.dim0 x) val_loopx in
-      let val_loop1 = Eval.Val.act (Dim.subst Dim.dim1 x) val_loopx in
+      let val_loop0 = Eval.Val.act (I.subst `Dim0 x) val_loopx in
+      let val_loop1 = Eval.Val.act (I.subst `Dim1 x) val_loopx in
       Cx.check_eq cx mot_base val_loop0 val_base;
       Cx.check_eq cx mot_base val_loop1 val_base;
 
@@ -508,7 +497,7 @@ struct
     | Tm.CoRForce ->
       begin
         match Eval.unleash_corestriction_ty ty with
-        | Face.True (_, _, ty) -> ty
+        | IFace.True (_, _, ty) -> ty
         | _ -> failwith "Cannot force co-restriction when it is not true!"
       end
 
@@ -535,9 +524,9 @@ struct
       let T.B (nm, ty) = info.ty in
       let cxx, x = Cx.ext_dim cx ~nm in
       let vtyx = check_eval_ty cxx ty in
-      let vtyr = Eval.Val.act (Dim.subst (Cx.unleash_dim cx r) x) vtyx in
+      let vtyr = Eval.Val.act (I.subst r x) vtyx in
       check cx vtyr info.tm;
-      Eval.Val.act (Dim.subst (Cx.unleash_dim cx r') x) vtyx
+      Eval.Val.act (I.subst r' x) vtyx
 
     | T.Com info ->
       let r = check_eval_dim cx info.r in
@@ -545,10 +534,10 @@ struct
       let T.B (nm, ty) = info.ty in
       let cxx, x = Cx.ext_dim cx ~nm in
       let vtyx = check_eval_ty cxx ty in
-      let vtyr = Eval.Val.act (Dim.subst (Dim.singleton r) x) vtyx in
+      let vtyr = Eval.Val.act (I.subst r x) vtyx in
       let cap = check_eval cx vtyr info.cap in
       check_comp_sys cx r (cxx, x, vtyx) cap info.sys;
-      Eval.Val.act (Dim.subst (Dim.singleton r') x) vtyx
+      Eval.Val.act (I.subst r' x) vtyx
 
     | T.HCom info ->
       let r = check_eval_dim cx info.r in
@@ -556,7 +545,7 @@ struct
       let cxx, x = Cx.ext_dim cx ~nm:None in
       let vty = check_eval_ty cx info.ty in
       let cap = check_eval cx vty info.cap in
-      check_valid_cofibration cx @@ cofibration_of_sys cx info.sys;
+      check_valid_cofibration @@ cofibration_of_sys cx info.sys;
       check_comp_sys cx r (cxx, x, vty) cap info.sys;
       vty
 
@@ -574,7 +563,7 @@ struct
     let univ = Eval.make @@ V.Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
     check cx univ ty
 
-  and check_eval_dim cx tr : Dim.repr =
+  and check_eval_dim cx tr =
     check_dim cx tr;
     Cx.eval_dim cx tr
 
@@ -586,3 +575,4 @@ struct
     let type_of_equiv = Eval.Macro.equiv ty0 ty1 in
     check cx type_of_equiv equiv
 end
+
