@@ -6,7 +6,7 @@ type value
 type clo
 type nclo
 
-type ('x, 'a) face = ('x, 'a) IFace.face
+type ('x, 'a) face = ('x, 'a) Face.face
 
 (* TODO: now it may be possible to semantic domain to use the fancy restriction data structure,
    instead of inventing a new dimension and doing a diagonal. Needs further investigation.

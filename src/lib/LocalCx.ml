@@ -78,7 +78,7 @@ struct
     ext cx ~nm ty []
 
   let def cx ~nm ~ty ~el =
-    let face = IFace.True (`Dim0, `Dim1, el) in
+    let face = Face.True (`Dim0, `Dim1, el) in
     fst @@ ext cx ~nm ty [face]
 
   let ext_dim {env; qenv; tys; ppenv; rel} ~nm =

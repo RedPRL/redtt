@@ -103,13 +103,13 @@ struct
     | CoR face ->
       begin
         match face with
-        | IFace.False p ->
+        | Face.False p ->
           let r, r' = IStar.unleash p in
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
           Tm.make @@ Tm.CoRThunk (tr, tr', None)
 
-        | IFace.True (r, r', ty) ->
+        | Face.True (r, r', ty) ->
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
           let force0 = corestriction_force el0 in
@@ -117,7 +117,7 @@ struct
           let tm = equate env ty force0 force1 in
           Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
 
-        | IFace.Indet (p, ty) ->
+        | Face.Indet (p, ty) ->
           let r, r' = IStar.unleash p in
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
@@ -337,17 +337,17 @@ struct
 
   and equate_val_face env ty face0 face1 =
     match face0, face1 with
-    | IFace.True (r0, r'0, v0), IFace.True (r1, r'1, v1) ->
+    | Face.True (r0, r'0, v0), Face.True (r1, r'1, v1) ->
       let tr = equate_dim env r0 r1 in
       let tr' = equate_dim env r'0 r'1 in
       let t = equate env ty v0 v1 in
       tr, tr', Some t
 
-    | IFace.False p0, IFace.False p1 ->
+    | Face.False p0, Face.False p1 ->
       let tr, tr' = equate_star env p0 p1 in
       tr, tr', None
 
-    | IFace.Indet (p0, v0), IFace.Indet (p1, v1) ->
+    | Face.Indet (p0, v0), Face.Indet (p1, v1) ->
       let r, r' = IStar.unleash p0 in
       let phi = I.equate r r' in
       let tr, tr' = equate_star env p0 p1 in
@@ -358,11 +358,11 @@ struct
 
   and equate_comp_face env ty face0 face1 =
     match face0, face1 with
-    | IFace.False p0, IFace.False p1 ->
+    | Face.False p0, Face.False p1 ->
       let tr, tr' = equate_star env p0 p1 in
       tr, tr', None
 
-    | IFace.Indet (p0, abs0), IFace.Indet (p1, abs1) ->
+    | Face.Indet (p0, abs0), Face.Indet (p1, abs1) ->
       let r, r' = IStar.unleash p0 in
       let phi = I.equate r r' in
       let tr, tr' = equate_star env p0 p1 in
@@ -507,15 +507,15 @@ struct
 
     let check_face ty face =
       match face with
-      | IFace.True (_, _, v) ->
+      | Face.True (_, _, v) ->
         (* In this case, we need to see that the indeterminate is already equal to the face *)
         begin try equiv env ~ty gen v; true with _ -> false end
 
-      | IFace.False _ ->
+      | Face.False _ ->
         (* This one is vacuous *)
         false
 
-      | IFace.Indet (p, v) ->
+      | Face.Indet (p, v) ->
         (* In this case, we check that the semantic indeterminate will become equal to the face under the
            stipulated restriction. *)
         let r, r' = IStar.unleash p in

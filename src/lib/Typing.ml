@@ -186,9 +186,9 @@ struct
       let r'1 = check_eval_dim cx tr1 in
       begin
         match ty_face, otm with
-        | IFace.False _, None ->
+        | Face.False _, None ->
           ()
-        | IFace.True (r0, r1, ty), Some tm ->
+        | Face.True (r0, r1, ty), Some tm ->
           begin
             match I.compare r'0 r0, I.compare r'1 r1 with
             | `Same, `Same ->
@@ -196,7 +196,7 @@ struct
             | _ ->
               failwith "co-restriction mismatch"
           end
-        | IFace.Indet (p, _), Some tm ->
+        | Face.Indet (p, _), Some tm ->
           let r0, r1 = IStar.unleash p in
           begin
             match I.compare r'0 r0, I.compare r'1 r1 with
@@ -282,14 +282,14 @@ struct
 
   and check_boundary_face cx ty face tm =
     match face with
-    | IFace.True (_, _, el) ->
+    | Face.True (_, _, el) ->
       Cx.check_eq cx ~ty el @@
       Cx.eval cx tm
 
-    | IFace.False _ ->
+    | Face.False _ ->
       ()
 
-    | IFace.Indet (p, el) ->
+    | Face.Indet (p, el) ->
       let r, r' = IStar.unleash p in
       try
         let cx' = Cx.restrict cx r r' in
@@ -511,7 +511,7 @@ struct
     | Tm.CoRForce ->
       begin
         match Eval.unleash_corestriction_ty ty with
-        | IFace.True (_, _, ty) -> ty
+        | Face.True (_, _, ty) -> ty
         | _ -> failwith "Cannot force co-restriction when it is not true!"
       end
 

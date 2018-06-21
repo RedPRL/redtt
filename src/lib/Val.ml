@@ -80,7 +80,7 @@ and neu =
 
 and nf = {ty : value; el : value}
 
-and ('x, 'a) face = ('x, 'a) IFace.face
+and ('x, 'a) face = ('x, 'a) Face.face
 
 and clo =
   | Clo of {bnd : Tm.tm Tm.bnd; rho : env}
@@ -209,8 +209,8 @@ struct
 
 
   module Abs = IAbs.M (Val)
-  module ValFace = IFace.M (Val)
-  module AbsFace = IFace.M (Abs)
+  module ValFace = Face.M (Val)
+  module AbsFace = Face.M (Abs)
 
   let act_env_cell phi =
     function
@@ -278,12 +278,12 @@ struct
       | [] -> []
       | face :: sys ->
         match AbsFace.act phi face with
-        | IFace.True (_, _, abs) ->
+        | Face.True (_, _, abs) ->
           raise @@ Proj abs
-        | IFace.False p ->
-          IFace.False p :: act_aux phi sys
-        | IFace.Indet (p, t) ->
-          IFace.Indet (p, t) :: act_aux phi sys
+        | Face.False p ->
+          Face.False p :: act_aux phi sys
+        | Face.Indet (p, t) ->
+          Face.Indet (p, t) :: act_aux phi sys
 
     let act phi sys =
       try `Ok (act_aux phi sys)
@@ -295,7 +295,7 @@ struct
      * if there is a face with equation `x=x` where `x` is
      * the dimension. *)
     let forall x sys =
-      List.filter (fun f -> IFace.forall x f = `Keep) sys
+      List.filter (fun f -> Face.forall x f = `Keep) sys
     let forallm x msys =
       match msys with
       | `Ok sys -> `Ok (forall x sys)
@@ -321,12 +321,12 @@ struct
       | [] -> []
       | face :: sys ->
         match ValFace.act phi face with
-        | IFace.True (_, _, value) ->
+        | Face.True (_, _, value) ->
           raise @@ Proj value
-        | IFace.False p ->
-          IFace.False p :: act_aux phi sys
-        | IFace.Indet (p, t) ->
-          IFace.Indet (p, t) :: act_aux phi sys
+        | Face.False p ->
+          Face.False p :: act_aux phi sys
+        | Face.Indet (p, t) ->
+          Face.Indet (p, t) :: act_aux phi sys
 
     let act phi sys =
       try `Ok (act_aux phi sys)
@@ -354,10 +354,10 @@ struct
     let from_rigid sys =
       let face : rigid_val_face -> val_face =
         function
-        | IFace.False p ->
-          IFace.False p
-        | IFace.Indet (p, a) ->
-          IFace.Indet (p, a)
+        | Face.False p ->
+          Face.False p
+        | Face.Indet (p, a) ->
+          Face.Indet (p, a)
       in
       List.map face sys
 
@@ -365,7 +365,7 @@ struct
      * if there is a face with equation `x=x` where `x` is
      * the dimension. *)
     let forall x sys =
-      List.filter (fun f -> IFace.forall x f = `Keep) sys
+      List.filter (fun f -> Face.forall x f = `Keep) sys
   end
 
   module ExtAbs : IAbs.S with type el = value * val_sys =
@@ -716,21 +716,21 @@ struct
 
   and force_abs_face face =
     match face with
-    | IFace.True (_, _, abs) ->
+    | Face.True (_, _, abs) ->
       raise @@ ProjAbs abs
-    | IFace.False xi ->
-      IFace.False xi
-    | IFace.Indet (xi, abs) ->
-      IFace.Indet (xi, abs)
+    | Face.False xi ->
+      Face.False xi
+    | Face.Indet (xi, abs) ->
+      Face.Indet (xi, abs)
 
   and force_val_face (face : val_face) =
     match face with
-    | IFace.True (_, _, v) ->
+    | Face.True (_, _, v) ->
       raise @@ ProjVal v
-    | IFace.False xi ->
-      IFace.False xi
-    | IFace.Indet (xi, v) ->
-      IFace.Indet (xi, v)
+    | Face.False xi ->
+      Face.False xi
+    | Face.Indet (xi, v) ->
+      Face.Indet (xi, v)
 
   and force_val_sys sys =
     try
@@ -910,7 +910,7 @@ struct
        * after the long journey detailed below. *)
       let origin z_dest =
         let face =
-          IFace.map @@ fun ri r'i absi ->
+          Face.map @@ fun ri r'i absi ->
           Abs.make1 @@ fun y ->
           Val.act (I.equate ri r'i) @@
           make_coe (IStar.make (`Atom y) s) absi @@
@@ -941,7 +941,7 @@ struct
         CompSys.forall x @@
         let diag = AbsFace.rigid info.dir @@ Abs.bind1 x @@ make_coe (IStar.make r (`Atom x)) cap_abs el in
         let face =
-          IFace.map @@ fun ri r'i absi ->
+          Face.map @@ fun ri r'i absi ->
           Abs.bind1 x @@
           Val.act (I.equate ri r'i) @@
           recovery_apart absi (`Atom x) s
@@ -958,7 +958,7 @@ struct
         make_gcom (IStar.make (I.act phi_r' s) z_dest) (Abs.act phi_r' abs) naively_coerced_cap @@
         let diag = AbsFace.rigid dir @@ Abs.make1 @@ fun y -> recovery_apart abs r (`Atom y) in
         let face =
-          IFace.map @@ fun ri r'i absi ->
+          Face.map @@ fun ri r'i absi ->
           Abs.make1 @@ fun y -> Val.act (I.equate ri r'i) @@ recovery_apart absi r' (`Atom y)
         in
         `Ok (diag :: List.map face (CompSys.forall x info.sys))
@@ -972,7 +972,7 @@ struct
       let coerced_cap =
         rigid_hcom info.dir info.cap naively_coerced_cap @@
         let diag = AbsFace.rigid dir @@ Abs.make1 @@ fun w -> origin (`Atom w) in
-        let face = IFace.map @@ fun ri r'i absi ->
+        let face = Face.map @@ fun ri r'i absi ->
           Abs.make1 @@ fun w ->
           Val.act (I.equate ri r'i) @@
           make_coe (IStar.make (`Atom w) s) absi @@
@@ -982,7 +982,7 @@ struct
       in
       Val.act (I.subst r' x) @@
       rigid_box info.dir coerced_cap @@
-      let face = IFace.map @@ fun ri r'i absi ->
+      let face = Face.map @@ fun ri r'i absi ->
         Val.act (I.equate ri r'i) @@
         recovery_general absi s'
       in List.map face info.sys
@@ -1176,7 +1176,7 @@ struct
        * This will be equal to `O` in `info.sys`, and because of the semantic
        * simplification we can probably afford not to specialize it manually. *)
       let naive_hcom dest =
-        let face = IFace.map @@ fun ri r'i absi ->
+        let face = Face.map @@ fun ri r'i absi ->
           let y, el = Abs.unleash1 absi in
           Abs.bind1 y @@ Val.act (I.equate ri r'i) @@
           cap_aux el
@@ -1198,7 +1198,7 @@ struct
         let face1 = AbsFace.make recover_dest s' @@
           Abs.make1 @@ fun y -> cap_of_hcom_in_wall abs (`Atom y)
         in
-        let face = IFace.map @@ fun ri r'i absi ->
+        let face = Face.map @@ fun ri r'i absi ->
           let x, el = Abs.unleash1 absi in
           Abs.bind1 x @@
           Val.act (I.equate ri r'i) @@
@@ -1214,13 +1214,13 @@ struct
       let recovered =
         let diag_face = AbsFace.rigid dir @@ Abs.make1 @@ fun _ -> cap_aux cap in
         let hcom_faces =
-          let face = IFace.map @@ fun ri r'i absi ->
+          let face = Face.map @@ fun ri r'i absi ->
             Abs.make1 @@ fun _ ->
             Val.act (I.equate ri r'i) @@ Abs.inst1 absi r' in
           List.map face sys
         in
         let fcom_faces =
-          let face = IFace.map @@ fun si s'i absi ->
+          let face = Face.map @@ fun si s'i absi ->
             Abs.make1 @@ fun y ->
             Val.act (I.equate si s'i) @@ recovery absi (`Atom y) in
           List.map face info.sys
@@ -1228,7 +1228,7 @@ struct
         rigid_hcom info.dir info.cap (naive_hcom r')
           (diag_face :: hcom_faces @ fcom_faces)
       in
-      let boundary = IFace.map @@
+      let boundary = Face.map @@
         fun si s'i absi ->
         Val.act (I.equate si s'i) @@
         cap_of_hcom_in_wall absi s'
@@ -1256,7 +1256,7 @@ struct
         let el1_cap = rigid_vproj x ~ty0 ~ty1 ~equiv ~el:cap in
         let el1_sys =
           let face =
-            IFace.map @@ fun ri r'i absi ->
+            Face.map @@ fun ri r'i absi ->
             let phi = I.equate ri r'i in
             let yi, el = Abs.unleash absi in
             Abs.bind yi @@ Val.act phi @@ rigid_vproj x ~ty0 ~ty1 ~equiv ~el
@@ -1281,7 +1281,7 @@ struct
         (* This is assuming false equations are made
          * of constants. Needs to revisit this when
          * we consider more cofibrations. *)
-        | IFace.False _ :: sys -> drop_false sys
+        | Face.False _ :: sys -> drop_false sys
         | _ -> sys
       in
       make @@ GHCom {dir; ty; cap; sys = drop_false sys}
@@ -1292,8 +1292,8 @@ struct
       let rec aux sys =
         match sys with
         | [] -> cap
-        | IFace.False _ :: sys -> aux sys
-        | IFace.Indet (eqi, absi) :: rest ->
+        | Face.False _ :: sys -> aux sys
+        | Face.Indet (eqi, absi) :: rest ->
           let ri, r'i = IStar.unleash eqi in
           let r, r' = IStar.unleash dir in
           let face (dim0, dim1) =
@@ -1338,7 +1338,7 @@ struct
     let capcoe = rigid_coe dir abs cap in
     let syscoe : comp_sys =
       let face =
-        IFace.map @@ fun ri r'i absi ->
+        Face.map @@ fun ri r'i absi ->
         let phi = I.equate ri r'i in
         let yi, vi = Abs.unleash1 absi in
         let y2r' = IStar.make (`Atom yi) (I.act phi r') in
@@ -1354,7 +1354,7 @@ struct
     let capcoe = rigid_coe dir abs cap in
     let syscoe : comp_sys =
       let face =
-        IFace.map @@ fun ri r'i absi ->
+        Face.map @@ fun ri r'i absi ->
         let phi = I.equate ri r'i in
         let yi, vi = Abs.unleash1 absi in
         let y2r' = IStar.make (`Atom yi) (I.act phi r') in
@@ -1621,17 +1621,17 @@ struct
       begin
         match I.compare sr sr' with
         | `Apart ->
-          IFace.False xi
+          Face.False xi
         | _ ->
           let bnd = Option.get_exn obnd in
           let rho' = Env.act (I.equate sr sr') rho in
           let abs = eval_bnd rho' bnd in
-          IFace.Indet (xi, abs)
+          Face.Indet (xi, abs)
       end
     | `Same _ ->
       let bnd = Option.get_exn obnd in
       let abs = eval_bnd rho bnd in
-      IFace.True (sr, sr', abs)
+      Face.True (sr, sr', abs)
 
   and eval_bnd_sys rho sys  =
     try
@@ -1652,18 +1652,18 @@ struct
       begin
         match I.compare r r' with
         | `Apart ->
-          IFace.False xi
+          Face.False xi
         | _ ->
           let tm = Option.get_exn otm in
           let rho' = Env.act (I.equate r r') rho in
           (* The problem here is that the this is not affecting GLOBALS! *)
           let el = eval rho' tm in
-          IFace.Indet (xi, el)
+          Face.Indet (xi, el)
       end
     | `Same _ ->
       let tm = Option.get_exn otm in
       let el = eval rho tm in
-      IFace.True (r, r', el)
+      Face.True (r, r', el)
 
   and eval_tm_sys rho sys : val_sys =
     List.map (eval_tm_face rho) sys
@@ -1759,7 +1759,7 @@ struct
       let _, _, ty = unleash_lbl_ty info.ty in
       let call = LblCall info.neu in
       let call_face =
-        IFace.map @@ fun _ _ a ->
+        Face.map @@ fun _ _ a ->
         lbl_call a
       in
       let call_sys = List.map call_face info.sys in
@@ -1772,24 +1772,24 @@ struct
     | CoRThunk face ->
       begin
         match face with
-        | IFace.True (_, _, v) -> v
+        | Face.True (_, _, v) -> v
         | _ -> failwith "Cannot force corestriction when it doesn't hold"
       end
 
     | Up info ->
       begin
         match unleash_corestriction_ty info.ty with
-        | IFace.True (_, _, ty) ->
+        | Face.True (_, _, ty) ->
           let force = CoRForce info.neu in
           let force_face =
-            IFace.map @@ fun _ _ a ->
+            Face.map @@ fun _ _ a ->
             corestriction_force a
           in
           let force_sys = List.map force_face info.sys in
           make @@ Up {ty; neu = force; sys = force_sys}
-        | IFace.False _ ->
+        | Face.False _ ->
           failwith "Cannot force false corestriction"
-        | IFace.Indet (p, _) ->
+        | Face.Indet (p, _) ->
           let r, r' = IStar.unleash p in
           Format.eprintf "corestriction: %a =? %a@." I.pp r I.pp r';
           Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
@@ -1809,7 +1809,7 @@ struct
       let cod' = inst_clo cod varg in
       let app = FunApp (info.neu, {ty = dom; el = varg}) in
       let app_face =
-        IFace.map @@ fun r r' a ->
+        Face.map @@ fun r r' a ->
         apply a @@ Val.act (I.equate r r') varg
       in
       let app_sys = List.map app_face info.sys in
@@ -1839,7 +1839,7 @@ struct
       let ty = inst_clo cod varg in
       let cap = apply info.cap varg in
       let app_face =
-        IFace.map @@ fun r r' abs ->
+        Face.map @@ fun r r' abs ->
         let x, v = Abs.unleash1 abs in
         Abs.bind1 x @@ apply v (Val.act (I.equate r r') varg)
       in
@@ -1851,7 +1851,7 @@ struct
       let ty = inst_clo cod varg in
       let cap = apply info.cap varg in
       let app_face =
-        IFace.map @@ fun r r' abs ->
+        Face.map @@ fun r r' abs ->
         let x, v = Abs.unleash1 abs in
         Abs.bind1 x @@ apply v (Val.act (I.equate r r') varg)
       in
@@ -1873,7 +1873,7 @@ struct
         | `Rigid sysr ->
           let app = ExtApp (info.neu, ss) in
           let app_face =
-            IFace.map @@ fun r r' a ->
+            Face.map @@ fun r r' a ->
             ext_apply a @@ List.map (I.act (I.equate r r')) ss
           in
           let app_sys = List.map app_face info.sys in
@@ -1893,7 +1893,7 @@ struct
 
         | `Rigid rsys ->
           let correction =
-            let face = IFace.map @@ fun _ _ v -> Abs.bind1 y v in
+            let face = Face.map @@ fun _ _ v -> Abs.bind1 y v in
             List.map face rsys
           in
           let abs = Abs.bind1 y ty_s in
@@ -1910,7 +1910,7 @@ struct
         | `Rigid boundary_sys ->
           let cap = ext_apply info.cap ss in
           let correction_sys =
-            let face = IFace.map @@ fun _ _ v -> Abs.make1 @@ fun _ -> v in
+            let face = Face.map @@ fun _ _ v -> Abs.make1 @@ fun _ -> v in
             List.map face boundary_sys
           in
           rigid_hcom info.dir ty_s cap @@ correction_sys @ info.sys
@@ -1937,7 +1937,7 @@ struct
     | Up up ->
       let neu = VProj {x; ty0; ty1; equiv; neu = up.neu} in
       let vproj_face =
-        IFace.map @@ fun r r' a ->
+        Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         vproj (I.act phi @@ `Atom x) ~ty0:(Val.act phi ty0) ~ty1:(Val.act phi ty1) ~equiv:(Val.act phi equiv) ~el:a
       in
@@ -1956,7 +1956,7 @@ struct
       let neu = If {mot; neu = up.neu; tcase; fcase} in
       let mot' = inst_clo mot scrut in
       let if_face =
-        IFace.map @@ fun r r' a ->
+        Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         if_ (Clo.act phi mot) a (Val.act phi tcase) (Val.act phi fcase)
       in
@@ -1976,7 +1976,7 @@ struct
       let neu = NatRec {mot; neu = up.neu; zcase; scase} in
       let mot' = inst_clo mot scrut in
       let nat_rec_face =
-        IFace.map @@ fun r r' a ->
+        Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         nat_rec (Clo.act phi mot) a (Val.act phi zcase) (NClo.act phi scase)
       in
@@ -1993,7 +1993,7 @@ struct
       let neu = IntRec {mot; neu = up.neu; pcase; ncase} in
       let mot' = inst_clo mot scrut in
       let int_rec_face =
-        IFace.map @@ fun r r' a ->
+        Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         int_rec (Clo.act phi mot) a (Clo.act phi pcase) (Clo.act phi ncase)
       in
@@ -2015,7 +2015,7 @@ struct
         inst_clo mot @@
         make_fcom (IStar.make r (`Atom y)) info.cap (`Ok info.sys)
       in
-      let face = IFace.map @@ fun ri r'i absi ->
+      let face = Face.map @@ fun ri r'i absi ->
         let y, el = Abs.unleash1 absi in
         Abs.bind1 y @@ Val.act (I.equate ri r'i) @@ apply_rec el
       in
@@ -2024,7 +2024,7 @@ struct
       let neu = S1Rec {mot; neu = up.neu; bcase; lcase} in
       let mot' = inst_clo mot scrut in
       let s1_rec_face =
-        IFace.map @@ fun r r' a ->
+        Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         s1_rec (Clo.act phi mot) a (Val.act phi bcase) (Abs.act phi lcase)
       in
@@ -2040,7 +2040,7 @@ struct
 
     | Up info ->
       let dom, _ = unleash_sg ~debug:["Val.car"] info.ty in
-      let car_sys = List.map (IFace.map (fun _ _ a -> car a)) info.sys in
+      let car_sys = List.map (Face.map (fun _ _ a -> car a)) info.sys in
       make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
 
     | Coe info ->
@@ -2054,7 +2054,7 @@ struct
       let dom, _ = unleash_sg info.ty in
       let cap = car info.cap in
       let face =
-        IFace.map @@ fun _ _ abs ->
+        Face.map @@ fun _ _ abs ->
         let y, v = Abs.unleash1 abs in
         Abs.bind1 y @@ car v
       in
@@ -2065,7 +2065,7 @@ struct
       let dom, _ = unleash_sg info.ty in
       let cap = car info.cap in
       let face =
-        IFace.map @@ fun _ _ abs ->
+        Face.map @@ fun _ _ abs ->
         let y, v = Abs.unleash1 abs in
         Abs.bind1 y @@ car v
       in
@@ -2082,7 +2082,7 @@ struct
 
     | Up info ->
       let _, cod = unleash_sg info.ty in
-      let cdr_sys = List.map (IFace.map (fun _ _ a -> cdr a)) info.sys in
+      let cdr_sys = List.map (Face.map (fun _ _ a -> cdr a)) info.sys in
       let cod_car = inst_clo cod @@ car v in
       make @@ Up {ty = cod_car; neu = Cdr info.neu; sys = cdr_sys}
 
@@ -2109,7 +2109,7 @@ struct
         let z = Name.fresh () in
         let msys =
           let face =
-            IFace.map @@ fun _ _ absi ->
+            Face.map @@ fun _ _ absi ->
             let yi, vi = Abs.unleash absi in
             Abs.bind yi @@ car vi
           in
@@ -2127,7 +2127,7 @@ struct
       let cap = cdr info.cap in
       let sys =
         let face =
-          IFace.map @@ fun _ _ absi ->
+          Face.map @@ fun _ _ absi ->
           let yi, vi = Abs.unleash absi in
           Abs.bind yi @@ cdr vi
         in
@@ -2142,7 +2142,7 @@ struct
         let z = Name.fresh () in
         let msys =
           let face =
-            IFace.map @@ fun _ _ absi ->
+            Face.map @@ fun _ _ absi ->
             let yi, vi = Abs.unleash absi in
             Abs.bind yi @@ car vi
           in
@@ -2160,7 +2160,7 @@ struct
       let cap = cdr info.cap in
       let sys =
         let face =
-          IFace.map @@ fun _ _ absi ->
+          Face.map @@ fun _ _ absi ->
           let yi, vi = Abs.unleash absi in
           Abs.bind yi @@ cdr vi
         in
@@ -2187,7 +2187,7 @@ struct
     match unleash el with
     | Box info -> info.cap
     | Up info ->
-      let cap_sys = List.map (IFace.map (fun _ _ a -> rigid_cap dir ty sys a)) info.sys in
+      let cap_sys = List.map (Face.map (fun _ _ a -> rigid_cap dir ty sys a)) info.sys in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
     | _ -> failwith "rigid_cap"
 
@@ -2312,12 +2312,12 @@ struct
   and pp_val_face : type x. _ -> (x, value) face -> unit =
     fun fmt ->
       function
-      | IFace.True (r0, r1, v) ->
+      | Face.True (r0, r1, v) ->
         Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_value v
-      | IFace.False p ->
+      | Face.False p ->
         let r0, r1 = IStar.unleash p in
         Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
-      | IFace.Indet (p, v) ->
+      | Face.Indet (p, v) ->
         let r0, r1 = IStar.unleash p in
         Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_value v
 
@@ -2329,12 +2329,12 @@ struct
   and pp_comp_face : type x. _ -> (x, abs) face -> unit =
     fun fmt ->
       function
-      | IFace.True (r0, r1, v) ->
+      | Face.True (r0, r1, v) ->
         Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_abs v
-      | IFace.False p ->
+      | Face.False p ->
         let r0, r1 = IStar.unleash p in
         Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
-      | IFace.Indet (p, v) ->
+      | Face.Indet (p, v) ->
         let r0, r1 = IStar.unleash p in
         Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs v
 
