@@ -15,6 +15,7 @@ sig
   val ext_dim : t -> nm:string option -> t * I.atom
   val ext_dims : t -> nms:string option list -> t * I.atom list
 
+  (** Might raise I.Inconsistent *)
   val restrict : t -> I.t -> I.t -> t * I.action
 
   val def : t -> nm:string option -> ty:value -> el:value -> t
