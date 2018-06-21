@@ -8,8 +8,6 @@ val equate : dim -> dim -> t -> t
 
 val compare : dim -> dim -> t -> I.compare
 
-val canonize : dim -> t -> dim
-
 exception Inconsistent
 
 
