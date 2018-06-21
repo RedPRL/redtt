@@ -85,11 +85,9 @@ let LemPropF
 let PropPi
   (A : type) (B : A → type)
   (B/prop : (a : A) → IsProp (B a))
-  (f : (a : A) → B a)
-  (g : (a : A) → B a)
-  : Path ((a : A) → B a) f g
+  : IsProp ((a : A) → B a)
   =
-  λ i a →
+  λ f g i a →
     B/prop _ (f a) (g a) i
 
 let PropSet
@@ -120,11 +118,10 @@ let PropSig
   (A : type) (B : A → type)
   (A/prop : IsProp A)
   (B/prop : (a : A) → IsProp (B a))
-  (u : (a : A) × B a)
-  (v : (a : A) × B a)
-  : Path ((a : A) × B a) u v
+  : IsProp ((a : A) × B a)
   =
-  LemSig _ _ B/prop u v (A/prop (u.car) (v.car))
+  λ u v →
+    LemSig _ _ B/prop u v (A/prop (u.car) (v.car))
 
 
 opaque
