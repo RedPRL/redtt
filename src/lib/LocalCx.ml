@@ -24,7 +24,7 @@ sig
   val ext_dim : t -> nm:string option -> t * I.atom
   val ext_dims : t -> nms:string option list -> t * I.atom list
 
-  val restrict : t -> I.t -> I.t -> t
+  val restrict : t -> I.t -> I.t -> t * I.action
 
   val def : t -> nm:string option -> ty:value -> el:value -> t
 
@@ -141,14 +141,8 @@ struct
     let phi = Restriction.as_action cx.rel in
     let r = I.act phi r in
     let r' = I.act phi r' in
-    (* Format.eprintf "Restricting %a = %a@." I.pp r I.pp r'; *)
-    let res =
-      {cx with
-       rel = Restriction.equate r r' cx.rel;
-       env = V.Env.act (I.equate r r') cx.env}
-    in
-    (* Format.eprintf "Restricted: %a@." Restriction.pp res.rel; *)
-    res
+    let rel, phi = Restriction.equate r r' cx.rel in
+    {cx with rel; env = V.Env.act phi cx.env}, phi
 
 
   let quote cx ~ty el =

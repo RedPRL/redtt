@@ -76,7 +76,7 @@ let equate r0 r1 t =
       raise Inconsistent
     | _ -> ()
   end;
-  res
+  res, I.equate r0 r1
 
 let as_action t =
   let rec go =
@@ -91,7 +91,8 @@ let as_action t =
 let test =
   try
     let x = `Atom (Name.named (Some "i")) in
-    let rst = equate x `Dim0 @@ equate x `Dim1 @@ emp () in
+    let rst, _ = equate x `Dim1 @@ emp () in
+    let rst, _ = equate x `Dim0 rst in
     Format.printf "Test failure: {@[<1>%a@]}@.\n" pp_chronicle rst.chronicle;
     failwith "Test failed"
   with
@@ -99,7 +100,7 @@ let test =
 
 let test2 =
   let x = `Atom (Name.named (Some "i")) in
-  let rst = equate x `Dim0 @@ emp () in
+  let rst, _ = equate x `Dim0 @@ emp () in
   assert (canonize x rst = `Dim0)
 
 

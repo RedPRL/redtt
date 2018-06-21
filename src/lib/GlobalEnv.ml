@@ -46,7 +46,7 @@ let restrict tr0 tr1 sg =
     | Tm.Dim1 -> `Dim1
     | _ -> failwith "Restrict: expected dimension"
   in
-  let rel' = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel in
+  let rel', _ = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel in
   (* Format.eprintf "Restrict: %a ===> %a@." Restriction.pp sg.rel Restriction.pp rel'; *)
   {sg with rel = rel'}
 

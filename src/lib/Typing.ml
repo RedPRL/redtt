@@ -150,7 +150,7 @@ struct
         | `Apart, None ->
           ()
         | _, Some ty' ->
-          let cxrr' = Cx.restrict cx r r' in
+          let cxrr', _ = Cx.restrict cx r r' in
           check cxrr' ty ty'
         | _ ->
           failwith "co-restriction type malformed"
@@ -203,8 +203,7 @@ struct
             | `Same, `Same ->
               begin
                 try
-                  let cx' = Cx.restrict cx r'0 r'1 in
-                  let phi = I.equate r'0 r'1 in
+                  let cx', phi = Cx.restrict cx r'0 r'1 in
                   check cx' (Eval.Val.act phi ty) tm
                 with
                 | I.Inconsistent -> ()
@@ -292,8 +291,7 @@ struct
     | Face.Indet (p, el) ->
       let r, r' = IStar.unleash p in
       try
-        let cx' = Cx.restrict cx r r' in
-        let phi = I.equate r r' in
+        let cx', phi = Cx.restrict cx r r' in
         Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) el @@
         Cx.eval cx' tm
       with
@@ -317,8 +315,7 @@ struct
           | (`Same | `Indet), Some tm ->
             begin
               try
-                let phi = I.equate r0 r1 in
-                let cx' = Cx.restrict cx r0 r1 in
+                let cx', phi = Cx.restrict cx r0 r1 in
                 check cx' (Eval.Val.act phi ty) tm;
 
                 (* Check face-face adjacency conditions *)
@@ -340,10 +337,10 @@ struct
         let r0, r1, tm = face in
         begin
           try
-            let cx' = Cx.restrict cx r'0 r'1 in
+            let cx', phi = Cx.restrict cx r'0 r'1 in
             let v = Cx.eval cx' tm in
             let v' = Cx.eval cx' tm' in
-            let phi = I.cmp (I.equate r'0 r'1) (I.equate r0 r1) in
+            let phi = I.cmp phi (I.equate r0 r1) in
             Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) v v'
           with
           | I.Inconsistent -> ()
@@ -369,13 +366,12 @@ struct
             begin
               try
                 (* check that bnd is a section of tyx under r0=r1 *)
-                let cxxr0r1 = Cx.restrict cxx r0 r1 in
-                let phir0r1 = I.equate r0 r1 in
+                let cxxr0r1, phir0r1= Cx.restrict cxx r0 r1 in
                 let T.B (_, tm) = bnd in
                 check cxxr0r1 (Eval.Val.act phir0r1 tyx) tm;
 
                 (* check that tm<r/x> = cap under r0=r1 *)
-                let cxr0r1 = Cx.restrict cx r0 r1 in
+                let cxr0r1, _ = Cx.restrict cx r0 r1 in
                 let phirx = I.cmp phir0r1 @@ I.subst r x in
                 Cx.check_eq cxr0r1
                   ~ty:(Eval.Val.act phirx tyx)
@@ -404,10 +400,10 @@ struct
         let T.B (_, tm) = bnd in
         begin
           try
-            let cxx' = Cx.restrict cxx r'0 r'1 in
+            let cxx', phir'0r'1 = Cx.restrict cxx r'0 r'1 in
             let v = Cx.eval cxx' tm in
             let v' = Cx.eval cxx' tm' in
-            let phi = I.cmp (I.equate r'0 r'1) (I.equate r0 r1) in
+            let phi = I.cmp phir'0r'1 (I.equate r0 r1) in
             Cx.check_eq cxx' ~ty:(Eval.Val.act phi tyx) v v'
           with
           | I.Inconsistent -> ()

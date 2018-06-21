@@ -6,7 +6,7 @@ type t
 val emp : unit -> t
 
 (* May raise I.Inconsistent *)
-val equate : dim -> dim -> t -> t
+val equate : dim -> dim -> t -> t * I.action
 
 val compare : dim -> dim -> t -> I.compare
 
