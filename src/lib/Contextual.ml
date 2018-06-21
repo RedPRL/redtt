@@ -337,5 +337,5 @@ let under_restriction r0 r1 m =
       in_scope (Name.fresh ()) (`R (r0, r1)) m >>= fun x ->
       ret (Some x)
     with
-    | Restriction.Inconsistent ->
+    | I.Inconsistent ->
       ret None

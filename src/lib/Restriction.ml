@@ -40,7 +40,7 @@ let equate_ r r' t =
    classes = UF.union r r' t.classes;
    size = t.size + 1}
 
-exception Inconsistent
+exception Inconsistent = I.Inconsistent
 
 let find r t =
   try

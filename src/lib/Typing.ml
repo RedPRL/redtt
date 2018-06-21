@@ -207,7 +207,7 @@ struct
                   let phi = I.equate r'0 r'1 in
                   check cx' (Eval.Val.act phi ty) tm
                 with
-                | Restriction.Inconsistent -> ()
+                | I.Inconsistent -> ()
               end
             | _ ->
               failwith "co-restriction mismatch"
@@ -297,11 +297,8 @@ struct
         Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) el @@
         Cx.eval cx' tm
       with
-      | (Restriction.Inconsistent | I.Inconsistent) ->
+      | I.Inconsistent ->
         ()
-      | exn ->
-        (* Format.eprintf "%a %a   Failed with %s@." I.pp r I.pp r' (Printexc.to_string exn); *)
-        raise exn
 
 
   and check_ext_sys cx ty sys =
@@ -327,7 +324,7 @@ struct
                 (* Check face-face adjacency conditions *)
                 go_adj cx' acc (r0, r1, tm)
               with
-              | (I.Inconsistent | Restriction.Inconsistent) -> ()
+              | I.Inconsistent -> ()
             end;
             go sys @@ (r0, r1, tm) :: acc
 
@@ -349,7 +346,7 @@ struct
             let phi = I.cmp (I.equate r'0 r'1) (I.equate r0 r1) in
             Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) v v'
           with
-          | (I.Inconsistent | Restriction.Inconsistent) -> ()
+          | I.Inconsistent -> ()
         end;
         go_adj cx faces face
     in
@@ -388,7 +385,7 @@ struct
                 (* Check face-face adjacency conditions *)
                 go_adj cxxr0r1 acc (r0, r1, bnd)
               with
-                (I.Inconsistent | Restriction.Inconsistent)-> ()
+                I.Inconsistent -> ()
             end;
 
             go sys @@ (r0, r1, bnd) :: acc
@@ -413,7 +410,7 @@ struct
             let phi = I.cmp (I.equate r'0 r'1) (I.equate r0 r1) in
             Cx.check_eq cxx' ~ty:(Eval.Val.act phi tyx) v v'
           with
-          | (I.Inconsistent | Restriction.Inconsistent) -> ()
+          | I.Inconsistent -> ()
         end;
         go_adj cxx faces face
 
