@@ -1,10 +1,24 @@
 type atom = Name.t
 
-type t =
+type 'a f =
   [ `Dim0
   | `Dim1
-  | `Atom of atom
+  | `Atom of 'a
   ]
+
+let map f =
+  function
+  | `Dim0 -> `Dim0
+  | `Dim1 -> `Dim1
+  | `Atom a -> `Atom (f a)
+
+let bind m k =
+  match m with
+  | `Dim0 -> `Dim0
+  | `Dim1 -> `Dim1
+  | `Atom a -> k a
+
+type t = atom f
 
 type action =
   | Subst of t *atom

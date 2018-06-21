@@ -1,10 +1,18 @@
 type atom = Name.t
 
-type t =
+type 'a f =
   [ `Dim0
   | `Dim1
-  | `Atom of atom
+  | `Atom of 'a
   ]
+
+val map : ('a -> 'b) -> 'a f -> 'b f
+val bind : 'a f -> ('a -> 'b f) -> 'b f
+
+
+
+
+type t = atom f
 
 type action
 val idn : action
