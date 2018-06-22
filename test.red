@@ -53,3 +53,15 @@ let hset/pi
   =
   λ f g α β i j x →
     hset/B _ _ _ (λ k → α k x) (λ k → β k x) i j
+
+
+; this is an example that doesn't work so well in redprl-style sequent calculus
+let theorem-of-choice
+  (A : type) (B : type)
+  (R : A → B → type)
+  (p : (x : A) → (y : B) × R x y)
+  : (f : A → B) × (x : A) → R x (f x)
+  =
+  < λ x → p x .car
+  , λ x → p x .cdr
+  >
