@@ -83,7 +83,7 @@ struct
 
   let ext_dim {env; qenv; tys; ppenv; rel} ~nm =
     let x = Name.named nm in
-    {env = Eval.Env.push (Val.Atom (I.idn, x)) env;
+    {env = Eval.Env.push (Val.Atom (`Atom x)) env;
      tys = `Dim :: tys;
      qenv = Quote.Env.abs qenv [x];
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
