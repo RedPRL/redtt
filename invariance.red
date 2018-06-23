@@ -27,23 +27,28 @@ let shannon (A : type) (f : bool → A) : bool → A =
 let shannon/path (A : type) (f : bool → A) : Path (bool → A) f (shannon A f) =
   funext bool (λ _ → A) f (shannon A f)
     ; for some reason the interactive version doesn't really work here
-    (λ b → `(if [b] (Path A (f b) (f b)) b (λ <_> (f tt)) (λ <_> (f ff))))
+;    (λ b →
+;      if b with λ x →
+;        Path A (f x) (shannon A f x)
+;      then ?
+;      else ?
+;      )
+
+    (λ b → `(if [b] (Path A (f b) (shannon A f b)) b (λ <_> (f tt)) (λ <_> (f ff))))
 
 let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (bool → type) (type × type) (fun-to-pair A) =
   λ pair →
     < <pair-to-fun A pair, λ a → pair>
     , λ fib →
-      let aux : Line^1 ((bool → type) × Line^1 (type × type)) =
-        λ i →
+      coe 1 0
+        (λ i →
           < λ b → if b then fib.cdr i .car else fib.cdr i .cdr
           , λ j → connection/or^1 (type × type) (fun-to-pair A (fib.car)) pair (fib.cdr) i j
-          >
-      in
-      coe 0 1 aux in λ j →
+          >)
+      in λ j →
         [i] (f : bool → type) × Path^1 (type × type) <f tt, f ff> pair with
-        | i=0 ⇒ < shannon/path^1 type (fib.car) i, fib.cdr >
+        | i=0 ⇒ < shannon/path^1 type (fib.car) j, fib.cdr >
         | i=1 ⇒ < pair-to-fun A pair, λ _ → pair >
         end
     >
 
-debug
