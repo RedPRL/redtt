@@ -55,7 +55,7 @@ let IdEquiv (A : type) : Equiv A A =
         | i=0 ⇒ p.cdr
         | i=1 ⇒ λ _ → a
         end
-      in <aux 0, aux>
+      in <aux 0, λ j → aux j>
     >
   >
 
@@ -96,10 +96,10 @@ let PropSet
   =
   λ a b p q i j →
     comp 0 1 a with
-    | j=0 ⇒ A/prop a a
-    | j=1 ⇒ A/prop a b
-    | i=0 ⇒ A/prop a (p j)
-    | i=1 ⇒ A/prop a (q j)
+    | j=0 ⇒ λ k → A/prop a a k
+    | j=1 ⇒ λ k → A/prop a b k
+    | i=0 ⇒ λ k → A/prop a (p j) k
+    | i=1 ⇒ λ k → A/prop a (q j) k
     end
 
 let LemSig
@@ -131,13 +131,13 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
       λ a b i →
         comp 1 0 (contr.cdr a i) with
         | i=0 ⇒ λ _ → a
-        | i=1 ⇒ contr.cdr b
+        | i=1 ⇒ λ j → contr.cdr b j
         end
     in
 
-    let contr/A/prop : IsProp (IsContr A) =
-      PropSig A (λ a → (b : A) → Path A a b) A/prop
-        (λ a → PropPi A (Path A a) (λ b → PropSet A A/prop b a))
+    let contr/A/prop =
+      PropSig A (λ a → (b : A) → Path A b a) A/prop
+        (λ a → PropPi A (λ b → Path A b a) (λ b → PropSet A A/prop b a))
     in
 
     contr/A/prop contr

@@ -71,8 +71,12 @@ struct
   open V
   module Env = QEnv
 
+  let generic_constrained env ty sys =
+    reflect ty (Lvl (None, Env.len env)) sys
+
   let generic env ty =
-    make @@ Up {ty = ty; neu = Lvl (None, Env.len env); sys = []}
+    generic_constrained env ty []
+
 
   let rec equate env ty el0 el1 =
     match unleash ty with
@@ -503,13 +507,13 @@ struct
 
   and approx_restriction env ty0 ty1 sys0 sys1 =
     (* A semantic indeterminate of the first type *)
-    let gen = generic env ty0 in
+    let gen = generic_constrained env ty0 sys0 in
 
-    let check_face ty face =
+    let check_face face =
       match face with
       | Face.True (_, _, v) ->
         (* In this case, we need to see that the indeterminate is already equal to the face *)
-        begin try equiv env ~ty gen v; true with _ -> false end
+        begin try equiv env ~ty:ty1 gen v; true with _ -> false end
 
       | Face.False _ ->
         (* This one is vacuous *)
@@ -520,28 +524,17 @@ struct
            stipulated restriction. *)
         let r, r' = IStar.unleash p in
         let gen_rr' = Val.act (I.equate r r') gen in
-        let ty_rr' = Val.act (I.equate r r') ty in
+        let ty_rr' = Val.act (I.equate r r') ty1 in
         begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end
     in
 
     (* This algorithm is very wrong ;-) *)
     let exception Break in
-    let n0 = List.length sys0 in
     let n1 = List.length sys1 in
     begin
       try
-        for i = 0 to n0 - 1 do
-          if n0 > 0 then
-            let cond_i = check_face ty0 @@ List.nth sys0 i in
-            if cond_i && n1 > 0 then
-              for j = 0 to n1 - 1 do
-                let cond_j = check_face ty1 @@ List.nth sys1 j in
-                if cond_j then () else raise Break
-              done
-            else
-              ()
-          else
-            ()
+        for i = 0 to n1 - 1 do
+          if check_face (List.nth sys1 i) then () else raise Break
         done
       with
       | Break ->

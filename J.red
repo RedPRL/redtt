@@ -10,10 +10,10 @@ let J
     let h : Line A = λ j →
       comp 0 j a with
       | i=0 ⇒ λ _ → a
-      | i=1 ⇒ p
+      | i=1 ⇒ λ k → p k
       end
     in
-    C (h 1) h
+    C (h 1) (λ k → h k)
   in
   coe 0 1 d in ty
 
@@ -34,13 +34,13 @@ let J/eq
       let aux : Line A =
         λ j →
           comp 0 j a with
-          | k=0 ⇒ square i
+          | k=0 ⇒ λ l → square i l
           | k=1 ⇒ λ _ → a
           | i=0 ⇒ λ _ → a
           | i=1 ⇒ λ _ → a
           end
       in
-      C (aux 1) aux
+      C (aux 1) (λ l → aux l)
     with
     | k=0 ⇒ λ i →
       coe 0 i d in λ j →

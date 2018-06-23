@@ -31,7 +31,7 @@ let symm
   =
   λ i →
     comp 0 1 (p 0) with
-    | i=0 ⇒ p
+    | i=0 ⇒ λ i → p i
     | i=1 ⇒ λ _ → p 0
     end
 
@@ -45,5 +45,5 @@ let trans
   λ i →
     comp 0 1 (p i) with
     | i=0 ⇒ λ _ → p 0
-    | i=1 ⇒ q
+    | i=1 ⇒ λ i → q i
     end
