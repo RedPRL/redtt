@@ -145,6 +145,7 @@ sig
   val pp_value : Format.formatter -> value -> unit
   val pp_neu : Format.formatter -> neu -> unit
   val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
+  val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
   val pp_comp_sys : Format.formatter -> comp_sys -> unit
 
   module Env :
