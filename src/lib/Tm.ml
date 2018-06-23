@@ -781,6 +781,8 @@ and pp_frame env fmt =
     Format.fprintf fmt "car"
   | Cdr ->
     Format.fprintf fmt "cdr"
+  | If _ ->
+    Format.fprintf fmt "<if>"
   | _ ->
     Format.fprintf fmt "<frame>"
 
@@ -934,6 +936,9 @@ struct
     | V info ->
       go fl info.r @@ go fl info.ty0 @@
       go fl info.ty1 @@ go fl info.equiv acc
+    | FCom info ->
+      go fl info.r @@ go fl info.r' @@ go fl info.cap @@
+      go_comp_sys fl info.sys @@ acc
     | _ ->
       Format.eprintf "Tried to get free variables, but we didn't implement the case for: %a@." (pp Pretty.Env.emp) tm;
       failwith "TODO"
