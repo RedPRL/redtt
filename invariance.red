@@ -26,15 +26,12 @@ let shannon (A : type) (f : bool → A) : bool → A =
 
 let shannon/path (A : type) (f : bool → A) : Path (bool → A) f (shannon A f) =
   funext bool (λ _ → A) f (shannon A f)
-    ; for some reason the interactive version doesn't really work here
-;    (λ b →
-;      if b with λ x →
-;        Path A (f x) (shannon A f x)
-;      then ?
-;      else ?
-;      )
-
-    (λ b → `(if [b] (Path A (f b) (shannon A f b)) b (λ <_> (f tt)) (λ <_> (f ff))))
+    (λ b →
+      if b with λ x →
+        Path A (f x) (shannon A f x)
+      then λ _ → f tt
+      else λ _ → f ff
+      )
 
 let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (bool → type) (type × type) (fun-to-pair A) =
   λ pair →
