@@ -524,6 +524,7 @@ struct
         begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end
     in
 
+    (* This algorithm is very wrong ;-) *)
     let exception Break in
     let n0 = List.length sys0 in
     let n1 = List.length sys1 in
