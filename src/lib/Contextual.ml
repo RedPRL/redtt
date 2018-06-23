@@ -311,24 +311,31 @@ let check_subtype ty0 ty1 =
 
 let compare_dim tr0 tr1 =
   typechecker >>= fun (module T) ->
-  let r0 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr0 in
-  let r1 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr1 in
-  ret @@ Dim.compare r0 r1
+  let r0 = T.Cx.eval_dim T.Cx.emp tr0 in
+  let r1 = T.Cx.eval_dim T.Cx.emp tr1 in
+  ret @@ I.compare r0 r1
 
 let check_eq_dim tr0 tr1 =
   typechecker >>= fun (module T) ->
-  let r0 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr0 in
-  let r1 = T.Cx.unleash_dim T.Cx.emp @@ T.Cx.eval_dim T.Cx.emp tr1 in
-  match Dim.compare r0 r1 with
-  | Dim.Same ->
+  let r0 = T.Cx.eval_dim T.Cx.emp tr0 in
+  let r1 = T.Cx.eval_dim T.Cx.emp tr1 in
+  match I.compare r0 r1 with
+  | `Same ->
     ret true
   | _ ->
     ret false
 
 let under_restriction r0 r1 m =
   compare_dim r0 r1 >>= function
-  | Dim.Apart ->
+  | `Apart ->
     ret None
   | _ ->
-    in_scope (Name.fresh ()) (`R (r0, r1)) m >>= fun x ->
-    ret (Some x)
+    get_global_env >>= fun env ->
+    try
+      (* TODO: hack, fix please *)
+      let _ = GlobalEnv.restrict r0 r1 env in
+      in_scope (Name.fresh ()) (`R (r0, r1)) m >>= fun x ->
+      ret (Some x)
+    with
+    | I.Inconsistent ->
+      ret None

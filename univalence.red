@@ -55,7 +55,7 @@ let IdEquiv (A : type) : Equiv A A =
         | i=0 ⇒ p.cdr
         | i=1 ⇒ λ _ → a
         end
-      in <aux 0, aux>
+      in <aux 0, λ j → aux j>
     >
   >
 
@@ -85,11 +85,9 @@ let LemPropF
 let PropPi
   (A : type) (B : A → type)
   (B/prop : (a : A) → IsProp (B a))
-  (f : (a : A) → B a)
-  (g : (a : A) → B a)
-  : Path ((a : A) → B a) f g
+  : IsProp ((a : A) → B a)
   =
-  λ i a →
+  λ f g i a →
     B/prop _ (f a) (g a) i
 
 let PropSet
@@ -98,10 +96,10 @@ let PropSet
   =
   λ a b p q i j →
     comp 0 1 a with
-    | j=0 ⇒ A/prop a a
-    | j=1 ⇒ A/prop a b
-    | i=0 ⇒ A/prop a (p j)
-    | i=1 ⇒ A/prop a (q j)
+    | j=0 ⇒ λ k → A/prop a a k
+    | j=1 ⇒ λ k → A/prop a b k
+    | i=0 ⇒ λ k → A/prop a (p j) k
+    | i=1 ⇒ λ k → A/prop a (q j) k
     end
 
 let LemSig
@@ -120,11 +118,10 @@ let PropSig
   (A : type) (B : A → type)
   (A/prop : IsProp A)
   (B/prop : (a : A) → IsProp (B a))
-  (u : (a : A) × B a)
-  (v : (a : A) × B a)
-  : Path ((a : A) × B a) u v
+  : IsProp ((a : A) × B a)
   =
-  LemSig _ _ B/prop u v (A/prop (u.car) (v.car))
+  λ u v →
+    LemSig _ _ B/prop u v (A/prop (u.car) (v.car))
 
 
 opaque
@@ -134,13 +131,13 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
       λ a b i →
         comp 1 0 (contr.cdr a i) with
         | i=0 ⇒ λ _ → a
-        | i=1 ⇒ contr.cdr b
+        | i=1 ⇒ λ j → contr.cdr b j
         end
     in
 
-    let contr/A/prop : IsProp (IsContr A) =
-      PropSig A (λ a → (b : A) → Path A a b) A/prop
-        (λ a → PropPi A (Path A a) (λ b → PropSet A A/prop b a))
+    let contr/A/prop =
+      PropSig A (λ a → (b : A) → Path A b a) A/prop
+        (λ a → PropPi A (λ b → Path A b a) (λ b → PropSet A A/prop b a))
     in
 
     contr/A/prop contr
@@ -199,7 +196,6 @@ let UA/retract
     EquivLemma A B (PathToEquiv A B (UA A B E)) E
       (λ i a → UA/beta A B E (coe 1 i a in λ _ → A) i)
 
-; VERY SLOW
 opaque
 let UA/retract/sig
   (A : type)
@@ -235,8 +231,6 @@ let IsContrPath (A : type) : IsContr^1 ((B : type) × Path^1 type A B) =
 ; https://groups.google.com/forum/#!msg/homotopytypetheory/HfCB_b-PNEU/Ibb48LvUMeUJ
 ; See also Theorem 5.8.4 of the HoTT Book.
 
-
-; VERY SLOW
 let univalence (A : type) : IsContr^1 ((B : type) × Equiv A B) =
   RetIsContr^1
     ((B : type) × Equiv A B)

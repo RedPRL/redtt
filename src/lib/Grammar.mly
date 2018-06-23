@@ -99,7 +99,10 @@ eterm:
     { E.Let {name; ty = None; tm; body} }
 
   | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
-    { E.If (e0, e1, e2) }
+    { E.If (None, e0, e1, e2) }
+
+  | IF; e0 = eterm; WITH mot = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
+    { E.If (Some mot, e0, e1, e2) }
 
   | SUC; n = eterm
     { E.Suc n }

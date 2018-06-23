@@ -1,18 +1,14 @@
-type atom = Name.t
-type dim = Dim.repr
+type atom = I.atom
+type dim = I.t
 
 type t
 
 val emp : unit -> t
-val equate : dim -> dim -> t -> t
 
-val compare : dim -> dim -> t -> Dim.compare
+(* May raise I.Inconsistent *)
+val equate : dim -> dim -> t -> t * I.action
 
-val canonize : dim -> t -> dim
-val unleash : dim -> t -> Dim.t
+val compare : dim -> dim -> t -> I.compare
 
-exception Inconsistent
-
-
-
+val as_action : t -> I.action
 val pp : Format.formatter -> t -> unit

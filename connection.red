@@ -25,15 +25,15 @@ let connection/or
     λ l k →
       comp 0 l (p k) with
       | k=1 ⇒ λ _ → b
-      | k=0 ⇒ p
+      | k=0 ⇒ λ m → p m
       end
   in
   comp 1 0 b with
-  | i=0 ⇒ face j
-  | i=1 ⇒ face 1
-  | j=0 ⇒ face i
-  | j=1 ⇒ face 1
-  | i=j ⇒ face i
+  | i=0 ⇒ λ k → face j k
+  | i=1 ⇒ λ k → face 1 k
+  | j=0 ⇒ λ k → face i k
+  | j=1 ⇒ λ k → face 1 k
+  | i=j ⇒ λ k → face i k
   end
 
 ; an example of using the singleton type to establish an exact equality
@@ -64,15 +64,15 @@ let connection/and
      λ l k →
        comp 1 l (p k) with
        | k=0 ⇒ λ _ → a
-       | k=1 ⇒ p
+       | k=1 ⇒ λ m → p m
        end
    in
    comp 0 1 a with
-   | i=0 ⇒ face 0
-   | i=1 ⇒ face j
-   | j=0 ⇒ face 0
-   | j=1 ⇒ face i
-   | i=j ⇒ face i
+   | i=0 ⇒ λ k → face 0 k
+   | i=1 ⇒ λ k → face j k
+   | j=0 ⇒ λ k → face 0 k
+   | j=1 ⇒ λ k → face i k
+   | i=j ⇒ λ k → face i k
    end
 
 

@@ -268,10 +268,11 @@ let pp_entry fmt =
       Name.pp x
       Tm.pp0 ty
 
-  | E (x, ty, Guess _) ->
-    Format.fprintf fmt "?%a@ :@ %a"
+  | E (x, ty, Guess {tm; _}) ->
+    Format.fprintf fmt "?%a@ :@ %a =? %a"
       Name.pp x
       Tm.pp0 ty
+      Tm.pp0 tm
 
   | Q (_, prob) ->
     Format.fprintf fmt "%a"

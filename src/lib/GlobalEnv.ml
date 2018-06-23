@@ -41,12 +41,14 @@ let restriction sg =
 let restrict tr0 tr1 sg =
   let ev_dim tr =
     match Tm.unleash tr with
-    | Tm.Up (Tm.Ref {name; _}, Emp) -> Dim.Atom name
-    | Tm.Dim0 -> Dim.Dim0
-    | Tm.Dim1 -> Dim.Dim1
+    | Tm.Up (Tm.Ref {name; _}, Emp) -> `Atom name
+    | Tm.Dim0 -> `Dim0
+    | Tm.Dim1 -> `Dim1
     | _ -> failwith "Restrict: expected dimension"
   in
-  {sg with rel = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel}
+  let rel', _ = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel in
+  (* Format.eprintf "Restrict: %a ===> %a@." Restriction.pp sg.rel Restriction.pp rel'; *)
+  {sg with rel = rel'}
 
 let pp fmt sg =
   let pp_sep fmt () = Format.fprintf fmt "; " in
@@ -72,7 +74,14 @@ let pp_twin fmt =
 
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
+
   let restriction = Sig.globals.rel
+
+  let global_dim x =
+    let phi = Restriction.as_action restriction in
+    let r = I.act phi @@ `Atom x in
+    (* Format.eprintf "[%a] != %a ==> %a@." Restriction.pp restriction Name.pp x I.pp r; *)
+    r
 
   let lookup nm tw =
     try

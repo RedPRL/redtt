@@ -1,8 +1,6 @@
 type atom = Name.t
 type 'a abs = {atoms : atom list; node : 'a}
 
-module D = Dim
-
 module type S =
 sig
   type el
@@ -11,11 +9,11 @@ sig
 
   val bind : atom list -> el -> t
   val unleash : t -> atom list * el
-  val inst : t -> Dim.t list -> el
+  val inst : t -> I.t list -> el
 
   val bind1 : atom -> el -> t
   val unleash1 : t -> atom * el
-  val inst1 : t -> Dim.t -> el
+  val inst1 : t -> I.t -> el
 
   val make1 : (atom -> el) -> t
 end
@@ -32,10 +30,10 @@ struct
     | x :: xs ->
       let y = Name.named @@ Name.name x in
       freshen_atoms xs (y :: acc) @@
-      D.cmp (D.swap y x) phi
+      I.cmp (I.swap y x) phi
 
   let unleash abs =
-    let xs, phi = freshen_atoms abs.atoms [] D.idn in
+    let xs, phi = freshen_atoms abs.atoms [] I.idn in
     xs, X.act phi abs.node
 
   let rec inst_atoms xs rs phi =
@@ -43,11 +41,11 @@ struct
     | [], [] -> phi
     | x :: xs, r :: rs ->
       inst_atoms xs rs @@
-      D.cmp phi @@ D.subst r x
+      I.cmp phi @@ I.subst r x
     | _ -> failwith "inst_atoms"
 
   let inst abs rs =
-    let phi = inst_atoms abs.atoms rs D.idn in
+    let phi = inst_atoms abs.atoms rs I.idn in
     X.act phi abs.node
 
   (* FYI: It may not be necessary to freshen here, depending on how substitution is implemented. *)
@@ -76,3 +74,4 @@ struct
     let xs, node = unleash abs in
     bind xs @@ X.act phi node
 end
+

@@ -1,9 +1,6 @@
-type atom = Name.t
-type star = DimStar.t
-type gen = DimGeneric.t
-type rel = Restriction.t
-
-type dim = Dim.t
+type atom = I.atom
+type star = IStar.t
+type dim = I.t
 
 type value
 type clo
@@ -31,8 +28,8 @@ type con =
   | Box : {dir : star; cap : value; sys : box_sys} -> con
 
   | Univ : {kind : Kind.t; lvl : Lvl.t} -> con
-  | V : {x : gen; ty0 : value; ty1 : value; equiv : value} -> con
-  | VIn : {x : gen; el0 : value; el1 : value} -> con
+  | V : {x : atom; ty0 : value; ty1 : value; equiv : value} -> con
+  | VIn : {x : atom; el0 : value; el1 : value} -> con
 
   | Lam : clo -> con
   | ExtLam : abs -> con
@@ -53,7 +50,7 @@ type con =
 
   | S1 : con
   | Base : con
-  | Loop : gen -> con
+  | Loop : atom -> con
 
   | Up : {ty : value; neu : neu; sys : rigid_val_sys} -> con
 
@@ -78,7 +75,7 @@ and neu =
 
   (* Invariant: neu \in vty, vty is a V type
   *)
-  | VProj : {x : gen; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
+  | VProj : {x : atom; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
   | Cap : {dir : star; ty : value; sys : comp_sys; neu : neu} -> neu
 
@@ -87,7 +84,7 @@ and neu =
 
 and nf = {ty : value; el : value}
 
-and abs = value Abstraction.abs
+and abs = value IAbs.abs
 
 and rigid_abs_face = ([`Rigid], abs) face
 and val_face = ([`Any], value) face
@@ -97,10 +94,10 @@ and comp_sys = rigid_abs_face list
 and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
-and ext_abs = (value * val_sys) Abstraction.abs
+and ext_abs = (value * val_sys) IAbs.abs
 
-and env_el = Val of value | Atom of Dim.action * atom
-and env = env_el list
+and env_el = Val of value | Atom of I.t
+and env
 
 val clo_name : clo -> string option
 
@@ -111,12 +108,12 @@ sig
 
   val reflect : value -> neu -> val_sys -> value
 
-  val eval : rel -> env -> Tm.tm -> value
-  val eval_cmd : rel -> env -> Tm.tm Tm.cmd -> value
-  val eval_head : rel -> env -> Tm.tm Tm.head -> value
-  val eval_frame : rel -> env -> value -> Tm.tm Tm.frame -> value
-  val eval_dim : rel -> env -> Tm.tm -> Dim.t
-  val eval_tm_sys : rel -> env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
+  val eval : env -> Tm.tm -> value
+  val eval_cmd : env -> Tm.tm Tm.cmd -> value
+  val eval_head : env -> Tm.tm Tm.head -> value
+  val eval_frame : env -> value -> Tm.tm Tm.frame -> value
+  val eval_dim : env -> Tm.tm -> I.t
+  val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
@@ -125,13 +122,13 @@ sig
   val lbl_call : value -> value
   val corestriction_force : value -> value
 
-  val rigid_vproj : gen -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
+  val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : ?debug:string list -> value -> value * clo
-  val unleash_v : value -> gen * value * value * value
+  val unleash_v : value -> atom * value * value * value
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
@@ -141,18 +138,27 @@ sig
   val pp_value : Format.formatter -> value -> unit
   val pp_neu : Format.formatter -> neu -> unit
   val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
+  val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
   val pp_comp_sys : Format.formatter -> comp_sys -> unit
 
+  module Env :
+  sig
+    include Sort.S
+      with type t = env
+      with type 'a m = 'a
+    val emp : env
+    val push : env_el -> env -> env
+  end
 
   module Val : Sort.S
     with type t = value
     with type 'a m = 'a
 
 
-  module ExtAbs : Abstraction.S
+  module ExtAbs : IAbs.S
     with type el = value * val_sys
 
-  module Abs : Abstraction.S
+  module Abs : IAbs.S
     with type el = value
 
   module Macro : sig
@@ -165,6 +171,8 @@ end
 module type Sig =
 sig
   val restriction : Restriction.t
+
+  val global_dim : I.atom -> I.t
 
   (** Return the type and boundary of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system

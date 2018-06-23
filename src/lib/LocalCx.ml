@@ -1,6 +1,4 @@
-
 type hyp = [`Ty of Val.value | `Dim]
-module R = Restriction
 
 let check_eq_clock = ref 0.
 
@@ -10,7 +8,7 @@ let _ =
 
 (* The way that we model dimensions is now incompatible with the union-find version of things.
    We need to find a new way. *)
-type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; rel : R.t; ppenv : Pretty.env}
+type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; ppenv : Pretty.env; rel : Restriction.t}
 type t = cx
 
 module type S =
@@ -23,10 +21,10 @@ sig
   val emp : t
 
   val ext_ty : t -> nm:string option -> value -> t * value
-  val ext_dim : t -> nm:string option -> t * Val.atom
-  val ext_dims : t -> nms:string option list -> t * Val.atom list
+  val ext_dim : t -> nm:string option -> t * I.atom
+  val ext_dims : t -> nms:string option list -> t * I.atom list
 
-  val restrict : t -> Dim.repr -> Dim.repr -> t
+  val restrict : t -> I.t -> I.t -> t * I.action
 
   val def : t -> nm:string option -> ty:value -> el:value -> t
 
@@ -37,7 +35,7 @@ sig
   val eval_cmd : t -> Tm.tm Tm.cmd -> value
   val eval_head : t -> Tm.tm Tm.head -> value
   val eval_frame : t -> value -> Tm.tm Tm.frame -> value
-  val eval_dim : t -> Tm.tm -> Dim.repr
+  val eval_dim : t -> Tm.tm -> I.t
   val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
 
   val check_eq : t -> ty:value -> value -> value -> unit
@@ -47,10 +45,6 @@ sig
   val quote_ty : t -> value -> Tm.tm
 
   val check_eq_ty : t -> value -> value -> unit
-
-  val unleash_dim : t -> Dim.repr -> Dim.t
-  val compare_dim : t -> Dim.repr -> Dim.repr -> Dim.compare
-  val equate_dim : t -> Dim.repr -> Dim.repr -> Dim.action
 end
 
 
@@ -64,16 +58,16 @@ struct
   type value = Val.value
 
   let emp : cx =
-    {env = [];
+    {env = Eval.Env.emp;
      qenv = Quote.Env.emp;
      tys = [];
      ppenv = Pretty.Env.emp;
      rel = V.base_restriction}
 
-  let ext {env; qenv; tys; rel; ppenv} ~nm ty sys =
+  let ext {env; qenv; tys; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in
     let var = V.reflect ty (Val.Lvl (nm, n)) sys in
-    {env = Val.Val var :: env;
+    {env = Eval.Env.push (Val.Val var) env;
      tys = `Ty ty :: tys;
      qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -84,12 +78,12 @@ struct
     ext cx ~nm ty []
 
   let def cx ~nm ~ty ~el =
-    let face = Face.True (Dim.dim0, Dim.dim0, el) in
+    let face = Face.True (`Dim0, `Dim1, el) in
     fst @@ ext cx ~nm ty [face]
 
-  let ext_dim {env; qenv; tys; rel; ppenv} ~nm =
+  let ext_dim {env; qenv; tys; ppenv; rel} ~nm =
     let x = Name.named nm in
-    {env = Val.Atom (Dim.idn, x) :: env;
+    {env = Eval.Env.push (Val.Atom (`Atom x)) env;
      tys = `Dim :: tys;
      qenv = Quote.Env.abs qenv [x];
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -107,56 +101,48 @@ struct
   let ppenv cx =
     cx.ppenv
 
-  let eval {env; rel; ppenv; _} tm =
+  let eval {env; ppenv; _} tm =
     try
-      V.eval rel env tm
+      V.eval env tm
     with
     | exn ->
       Format.eprintf "Failed to evaluate: %a because of %s@." (Tm.pp ppenv) tm (Printexc.to_string exn);
       raise exn
 
-  let eval_cmd {env; rel; ppenv; _} cmd =
+  let eval_cmd {env; ppenv; _} cmd =
     try
-      V.eval_cmd rel env cmd
+      V.eval_cmd env cmd
     with
     | exn ->
       Format.eprintf "Failed to evaluate: %a@." (Tm.pp_cmd ppenv) cmd;
       raise exn
 
-  let eval_frame {env; rel; _} frm hd =
-    V.eval_frame rel env frm hd
+  let eval_frame {env; _} frm hd =
+    V.eval_frame env frm hd
 
-  let eval_head {env; rel; ppenv; _} hd =
+  let eval_head {env; ppenv; _} hd =
     try
-      V.eval_head rel env hd
+      V.eval_head env hd
     with
     | exn ->
       Format.eprintf "Failed to evaluate: %a@." (Tm.pp_head ppenv) hd;
       raise exn
 
-  (* Seems iffy? *)
-  let eval_dim {env; rel; _} tm =
-    Dim.unleash @@ V.eval_dim rel env tm
+  let eval_dim {env; _} tm =
+    V.eval_dim env tm
 
-  let eval_tm_sys {env; rel; _} sys =
-    V.eval_tm_sys rel env sys
+  let eval_tm_sys {env; _} sys =
+    V.eval_tm_sys env sys
 
   let lookup i {tys; _} =
     List.nth tys i
 
   let restrict cx r r' =
-    {cx with rel = R.equate r r' cx.rel}
-
-  let equate_dim cx r r' =
-    let cr = R.unleash r cx.rel in
-    let cr' = R.unleash r' cx.rel in
-    Dim.equate cr cr'
-
-  let compare_dim cx r r' =
-    R.compare r r' cx.rel
-
-  let unleash_dim cx r =
-    R.unleash r cx.rel
+    let phi = Restriction.as_action cx.rel in
+    let r = I.act phi r in
+    let r' = I.act phi r' in
+    let rel, phi = Restriction.equate r r' cx.rel in
+    {cx with rel; env = V.Env.act phi cx.env}, phi
 
 
   let quote cx ~ty el =
@@ -195,3 +181,4 @@ struct
       raise exn
 
 end
+

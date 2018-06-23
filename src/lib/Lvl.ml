@@ -2,7 +2,10 @@ type t = Omega | Const of int
 
 let greater l0 l1 =
   match l0, l1 with
-  | Omega, Const _ -> true
+  | Omega, _ -> true
+  (* The above is wrong, but it lets us work around some annoying complications with defining large eliminations;
+     it's harmless, because the user is not able to type in the Omega universe. *)
+
   | Const i0, Const i1 -> i0 > i1
   | _ -> false
 
