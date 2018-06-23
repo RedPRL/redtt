@@ -16,7 +16,7 @@ and eterm =
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
 
-  | If of eterm * eterm * eterm
+  | If of eterm option * eterm * eterm * eterm
   | Bool | Tt | Ff
 
   | Nat | Zero | Suc of eterm

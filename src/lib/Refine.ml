@@ -308,31 +308,39 @@ struct
     | _, E.Lam ([], e) ->
       elab_chk env ty e
 
-    | _, E.If (escrut, etcase, efcase) ->
+    | _, E.If (omot, escrut, etcase, efcase) ->
       let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
       let bool = Tm.make @@ Tm.Bool in
       elab_chk env bool escrut >>= fun scrut ->
 
-      let is_dependent =
-        match Tm.unleash scrut with
-        | Tm.Up (Tm.Ref {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
-        | _ -> false
-      in
 
       begin
-        if is_dependent then
-          M.lift @@ push_hole `Flex Emp (Tm.pi None bool univ) >>= fun (mothd, motsp) ->
-          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
-          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
-          M.unify >>
+        match omot with
+        | None ->
+          let is_dependent =
+            match Tm.unleash scrut with
+            | Tm.Up (Tm.Ref {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
+            | _ -> false
+          in
+          if is_dependent then
+            M.lift @@ push_hole `Flex Emp (Tm.pi None bool univ) >>= fun (mothd, motsp) ->
+            let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
+            M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
+            M.unify >>
 
-          normalize_ty (mot @@ Tm.make Tm.Tt) >>= fun mot_tt ->
-          normalize_ty (mot @@ Tm.make Tm.Ff) >>= fun mot_ff ->
-          M.ret (mot, mot_tt, mot_ff)
-        else
-          M.ret ((fun _ -> ty), ty, ty)
+            normalize_ty (mot @@ Tm.make Tm.Tt) >>= fun mot_tt ->
+            normalize_ty (mot @@ Tm.make Tm.Ff) >>= fun mot_ff ->
+            M.ret (mot, mot_tt, mot_ff)
+          else
+            M.ret ((fun _ -> ty), ty, ty)
+        | Some emot ->
+          let mot_ty = Tm.pi None bool univ in
+          elab_chk env (Tm.pi None bool univ) emot >>= fun mot ->
+          let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
+          normalize_ty @@ fmot @@ Tm.make Tm.Tt >>= fun mot_tt ->
+          normalize_ty @@ fmot @@ Tm.make Tm.Ff >>= fun mot_ff ->
+          M.ret (fmot, mot_tt, mot_ff)
       end >>= fun (mot, mot_tt, mot_ff) ->
-
       elab_chk env mot_tt etcase >>= fun tcase ->
       elab_chk env mot_ff efcase >>= fun fcase ->
       let hd = Tm.Down {ty = bool; tm = scrut} in
