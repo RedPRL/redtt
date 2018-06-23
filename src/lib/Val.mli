@@ -96,7 +96,7 @@ and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
 and ext_abs = (value * val_sys) IAbs.abs
 
-and env_el = Val of value | Atom of I.action * atom
+and env_el = Val of value | Atom of I.t
 and env
 
 val clo_name : clo -> string option

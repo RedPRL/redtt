@@ -88,7 +88,7 @@ and clo =
 and nclo =
   | NClo of {bnd : Tm.tm Tm.nbnd; rho : env}
 
-and env_el = Val of value | Atom of I.action * atom
+and env_el = Val of value | Atom of I.t
 and env = {cells : env_el list; global : I.action}
 
 and abs = value IAbs.abs
@@ -216,8 +216,8 @@ struct
     function
     | Val v ->
       Val (Val.act phi v)
-    | Atom (psi, x) ->
-      Atom (I.cmp phi psi, x)
+    | Atom x ->
+      Atom (I.act phi x)
 
   module Env =
   struct
@@ -386,8 +386,7 @@ struct
         | Tm.Ix (i, _) ->
           begin
             match List.nth rho.cells i with
-            | Atom (phi, x) ->
-              I.act phi @@ `Atom x
+            | Atom x -> x
             | _ ->
               failwith "eval_dim: expected atom in environment"
           end
@@ -1590,8 +1589,8 @@ struct
       begin
         match List.nth rho.cells i with
         | Val v -> v
-        | Atom (_, a) ->
-          Format.eprintf "Expected value in environment for %i, but found atom %a@." i Name.pp a;
+        | Atom r ->
+          Format.eprintf "Expected value in environment for %i, but found dim %a@." i I.pp r;
           failwith "Expected value in environment"
       end
 
@@ -1671,19 +1670,19 @@ struct
   and eval_bnd rho bnd =
     let Tm.B (_, tm) = bnd in
     let x = Name.fresh () in
-    let rho = Env.push (Atom (I.idn, x)) rho in
+    let rho = Env.push (Atom (`Atom x)) rho in
     Abs.bind1 x @@ eval rho tm
 
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = List.map Name.named nms in
-    let rho = Env.push_many (List.map (fun x -> Atom (I.idn, x)) xs) rho in
+    let rho = Env.push_many (List.map (fun x -> Atom (`Atom x)) xs) rho in
     Abs.bind xs @@ eval rho tm
 
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = List.map Name.named nms in
-    let rho = Env.push_many (List.map (fun x -> Atom (I.idn, x)) xs) rho in
+    let rho = Env.push_many (List.map (fun x -> Atom (`Atom x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
 
   and unleash_pi ?debug:(debug = []) v =
@@ -2208,8 +2207,7 @@ struct
     function
     | Val v ->
       pp_value fmt v
-    | Atom (phi, a) ->
-      let r = I.act phi @@ `Atom a in
+    | Atom r ->
       I.pp fmt r
 
   and pp_env fmt =
