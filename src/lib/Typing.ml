@@ -196,7 +196,7 @@ struct
             | _ ->
               failwith "co-restriction mismatch"
           end
-        | Face.Indet (p, _), Some tm ->
+        | Face.Indet (p, ty), Some tm ->
           let r0, r1 = IStar.unleash p in
           begin
             match I.compare r'0 r0, I.compare r'1 r1 with
