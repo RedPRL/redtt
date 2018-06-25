@@ -2278,7 +2278,7 @@ struct
       Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
     | HCom info ->
       let r, r' = IStar.unleash info.dir in
-      Format.fprintf fmt "@[<1>(hcom %a %a %a %a %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
+      Format.fprintf fmt "@[<1>(hcom %a %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
     | GHCom _ ->
       Format.fprintf fmt "<ghcom>"
     | FCom _ ->
@@ -2377,8 +2377,12 @@ struct
     | Meta {name; _} ->
       Name.pp fmt name
 
-    | If _ ->
-      Format.fprintf fmt "<if>"
+    | If {mot; neu; tcase; fcase} ->
+      Format.fprintf fmt "@[<1>(if %a@ %a@ %a@ %a)@]"
+        pp_clo mot
+        pp_neu neu
+        pp_value tcase
+        pp_value fcase
 
     | NatRec _ ->
       Format.fprintf fmt "<natrec>"
