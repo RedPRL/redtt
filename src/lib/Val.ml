@@ -2302,8 +2302,12 @@ struct
       Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
 
   and pp_abs fmt abs =
-    let x, v = Abs.unleash1 abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@]" Name.pp x pp_value v
+    let xs, v = Abs.unleash abs in
+    Format.fprintf fmt "@[<1><%a>@ %a@]" pp_names xs pp_value v
+
+  and pp_names fmt xs =
+    let pp_sep fmt () = Format.fprintf fmt " " in
+    Format.pp_print_list ~pp_sep Name.pp fmt xs
 
   and pp_ext_abs fmt abs =
     let x, (tyx, sysx) = ExtAbs.unleash1 abs in
