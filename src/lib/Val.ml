@@ -1018,9 +1018,9 @@ struct
           let base0 dest = base `Dim0 dest in
           let base1 dest = base `Dim1 dest in
           let fiber0 b = car @@ apply (cdr equiv0) b in
-          (* The prove that there is a path from the fiber `fib`
-           * to `fiber0 b` where `b` is calculated from `fib`
-           * as `ext_apply (cdr fib) [`Dim1]` directly. *)
+          (* This gives a path from the fiber `fib` to `fiber0 b`
+           * where `b` is calculated from `fib` as
+           * `ext_apply (cdr fib) [`Dim1]` directly. *)
           let contr0 fib = apply (cdr @@ apply (cdr equiv0) (ext_apply (cdr fib) [`Dim1])) fib in
           (* The diagonal face for r=r'. *)
           let face_diag = AbsFace.make r r' @@ Abs.make1 @@ fun _ ->
