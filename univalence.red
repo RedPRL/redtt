@@ -121,7 +121,7 @@ let PropSig
   : IsProp ((a : A) × B a)
   =
   λ u v →
-    LemSig _ _ B/prop u v (A/prop (u.car) (v.car))
+    LemSig _ _ B/prop _ _ (A/prop (u.car) (v.car))
 
 
 opaque
@@ -212,7 +212,7 @@ let UA/retract/sig
 
 opaque
 let IsContrPath (A : type) : IsContr^1 ((B : type) × Path^1 type A B) =
-  < <A, λ _ → A>
+  < <_, λ _ → A>
   , λ X i →
     < comp 0 1 A with
       | i=0 ⇒ X.cdr

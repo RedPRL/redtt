@@ -51,3 +51,10 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
         end
     >
 
+let fun-to-pair-equiv (A : type) : Equiv (bool → A) (A × A) =
+  <fun-to-pair A, fun-to-pair-is-equiv A>
+
+let fun-eq-pair (A : type) : Path^1 type (bool → A) (A × A) =
+  λ i →
+    `(V i (→ bool A) (× A A) (fun-to-pair-equiv A))
+
