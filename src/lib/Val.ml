@@ -2060,7 +2060,11 @@ struct
       let face =
         Face.map @@ fun _ _ abs ->
         let y, v = Abs.unleash1 abs in
-        Abs.bind1 y @@ car v
+        try
+          Abs.bind1 y @@ car v
+        with exn ->
+          Format.eprintf "Tried to take car of:@ @[<v>%a@]@.@." pp_value v;
+          raise exn
       in
       let sys = List.map face info.sys in
       rigid_hcom info.dir dom cap sys
