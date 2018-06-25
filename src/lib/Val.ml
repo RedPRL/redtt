@@ -903,12 +903,12 @@ struct
       let s, s' = IStar.unleash info.dir in
       let cap_abs = Abs.bind1 x info.cap in
 
-      (* This is O in [SVO, F], but `(I.subst r x)` applies to `z` as well,
-       * which is actually what we want!
+      (* This is O in [SVO, F].
        *
        * The purpose of O is to make sure that, when r=r', we can recover the coercee
        * after the long journey detailed below. *)
       let origin z_dest =
+        let phi = I.subst r x in
         let face =
           Face.map @@ fun ri r'i absi ->
           Abs.make1 @@ fun y ->
@@ -916,12 +916,11 @@ struct
           make_coe (IStar.make (`Atom y) s) absi @@
           make_coe (IStar.make s' (`Atom y)) absi el
         in
-        Val.act (I.subst r x) @@
         make_hcom
-          (IStar.make s' z_dest)
-          info.cap
-          (rigid_cap info.dir info.cap info.sys el)
-          (`Ok (List.map face info.sys))
+          (IStar.make (I.act phi s') z_dest)
+          (Val.act phi info.cap)
+          (make_cap (IStar.act phi info.dir) (Val.act phi info.cap) (CompSys.act phi info.sys) el)
+          (CompSys.act phi (List.map face info.sys))
       in
       (* This is N in [F, SVO], representing the coherence conditions enforced by `info.sys`.
        * The coercion must be equal to the coercion within the system under the restriction.
@@ -937,7 +936,7 @@ struct
        * The problem is that we do not have the boundaries of the box, and even if we have,
        * this naive cap will not be the image of the boundaries. *)
       let naively_coerced_cap =
-        rigid_gcom dir cap_abs (origin s) @@
+        rigid_gcom dir cap_abs (origin (I.act (I.subst r x) s)) @@
         CompSys.forall x @@
         let diag = AbsFace.rigid info.dir @@ Abs.bind1 x @@ make_coe (IStar.make r (`Atom x)) cap_abs el in
         let face =
@@ -1177,9 +1176,10 @@ struct
        * simplification we can probably afford not to specialize it manually. *)
       let naive_hcom dest =
         let face = Face.map @@ fun ri r'i absi ->
+          let phi = I.equate ri r'i in
           let y, el = Abs.unleash1 absi in
-          Abs.bind1 y @@ Val.act (I.equate ri r'i) @@
-          cap_aux el
+          Abs.bind1 y @@
+          make_cap (IStar.act phi info.dir) (Val.act phi info.cap) (CompSys.act phi info.sys) el
         in
         make_hcom (IStar.make r dest) info.cap (cap_aux cap) (`Ok (List.map face sys))
       in
