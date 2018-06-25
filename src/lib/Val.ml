@@ -1119,7 +1119,7 @@ struct
               let ty0r = Val.act phi info.ty0 in
               let ty1r = Val.act phi info.ty1 in
               let equivr = Val.act phi info.equiv in
-              rigid_vproj info.x ~el ~ty0:ty0r ~ty1:ty1r ~equiv:equivr
+              rigid_vproj info.x ~ty0:ty0r ~ty1:ty1r ~equiv:equivr ~el
             in
             let r2x = IStar.make r (`Atom x) in
             let sys =
