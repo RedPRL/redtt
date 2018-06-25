@@ -662,7 +662,7 @@ struct
       elab_chk env fam_r info.tm >>= fun tm ->
       let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
       let varx = Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp) in
-      let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
+      let tyx = Tm.up (Tm.Down {ty = univ_fam; tm = fam}, Emp #< (Tm.ExtApp [varx])) in
       let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
       M.ret (fam_r', (coe, Emp))
 

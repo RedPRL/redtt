@@ -1701,6 +1701,9 @@ struct
     | Sg {dom; cod} -> dom, cod
     | Rst rst -> unleash_sg rst.ty
     | _ ->
+
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
       Format.eprintf "%a: tried to unleash %a as sigma type@."
         pp_trace debug
         pp_value v;
