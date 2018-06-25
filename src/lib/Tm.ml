@@ -66,6 +66,8 @@ and 'a head =
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
   | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
+  | GHCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
+  | GCom of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
 
 
 and 'a frame =
@@ -275,6 +277,22 @@ and subst_head sub head =
     let sys = subst_comp_sys sub info.sys in
     Com {r; r'; ty; cap; sys}, Emp
 
+  | GHCom info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst sub info.ty in
+    let cap = subst sub info.cap in
+    let sys = subst_comp_sys sub info.sys in
+    GHCom {r; r'; ty; cap; sys}, Emp
+
+  | GCom info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst_bnd sub info.ty in
+    let cap = subst sub info.cap in
+    let sys = subst_comp_sys sub info.sys in
+    GCom {r; r'; ty; cap; sys}, Emp
+
 and subst_bnd sub bnd =
   let B (nm, t) = bnd in
   B (nm, subst (lift sub) t)
@@ -426,6 +444,20 @@ let traverse ~f ~var ~ref =
       let cap = f k info.cap in
       let sys = go_comp_sys k info.sys in
       Com {r; r'; ty; cap; sys}, Emp
+    | GHCom info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = f k info.ty in
+      let cap = f k info.cap in
+      let sys = go_comp_sys k info.sys in
+      GHCom {r; r'; ty; cap; sys}, Emp
+    | GCom info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = go_bnd k info.ty in
+      let cap = f k info.cap in
+      let sys = go_comp_sys k info.sys in
+      GCom {r; r'; ty; cap; sys}, Emp
 
   and go_spine k =
     Bwd.map (go_frm k)
@@ -724,10 +756,16 @@ and pp_head env fmt =
   | HCom {r; r'; ty; cap; sys} ->
     Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
 
-
   | Com {r; r'; ty = B (nm, ty); cap; sys} ->
     let x, env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
+
+  | GHCom {r; r'; ty; cap; sys} ->
+    Format.fprintf fmt "@[<1>(ghcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
+
+  | GCom {r; r'; ty = B (nm, ty); cap; sys} ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>(gcom %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
 
   | Ix (ix, _tw) ->
     Uuseg_string.pp_utf_8 fmt @@
@@ -1003,6 +1041,18 @@ struct
       go_bnd fl info.ty @@
       go fl info.cap @@
       go_comp_sys fl info.sys acc
+    | _, GHCom info ->
+      go fl info.r @@
+      go fl info.r' @@
+      go fl info.ty @@
+      go fl info.cap @@
+      go_comp_sys fl info.sys acc
+    | _, GCom info ->
+      go fl info.r @@
+      go fl info.r' @@
+      go_bnd fl info.ty @@
+      go fl info.cap @@
+      go_comp_sys fl info.sys acc
 
   and go_spine fl sp =
     List.fold_right (go_frame fl) @@ Bwd.to_list sp
@@ -1116,6 +1166,20 @@ let map_head f =
     let cap = f info.cap in
     let sys = map_comp_sys f info.sys in
     Com {r; r'; ty; cap; sys}
+  | GHCom info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let ty = f info.ty in
+    let cap = f info.cap in
+    let sys = map_comp_sys f info.sys in
+    GHCom {r; r'; ty; cap; sys}
+  | GCom info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let ty = map_bnd f info.ty in
+    let cap = f info.cap in
+    let sys = map_comp_sys f info.sys in
+    GCom {r; r'; ty; cap; sys}
 
 let map_frame f =
   function

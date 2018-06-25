@@ -1595,6 +1595,24 @@ struct
       let sys = eval_rigid_bnd_sys rho info.sys in
       make_com dir abs cap sys
 
+    | Tm.GHCom info ->
+      let r = eval_dim rho info.r in
+      let r' = eval_dim rho info.r' in
+      let dir = IStar.make r r' in
+      let ty = eval rho info.ty in
+      let cap = eval rho info.cap in
+      let sys = eval_rigid_bnd_sys rho info.sys in
+      make_ghcom dir ty cap sys
+
+    | Tm.GCom info ->
+      let r = eval_dim rho info.r in
+      let r' = eval_dim rho info.r' in
+      let dir = IStar.make r r' in
+      let abs = eval_bnd rho info.ty in
+      let cap = eval rho info.cap in
+      let sys = eval_rigid_bnd_sys rho info.sys in
+      make_gcom dir abs cap sys
+
     | Tm.Ix (i, _) ->
       begin
         match List.nth rho.cells i with
