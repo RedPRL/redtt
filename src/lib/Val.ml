@@ -2193,7 +2193,9 @@ struct
     | Up info ->
       let cap_sys = List.map (Face.map (fun _ _ a -> rigid_cap dir ty sys a)) info.sys in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
-    | _ -> failwith "rigid_cap"
+    | _ ->
+      Format.eprintf "Tried to get rigid-cap of %a@." pp_value el;
+      failwith "rigid_cap"
 
 
   and inst_clo clo varg =
