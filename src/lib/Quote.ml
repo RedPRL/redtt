@@ -211,6 +211,14 @@ struct
         let tm1 = equate env ty1 info0.el1 info1.el1 in
         Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
 
+      | Box info0, Box info1 ->
+        let dir, ty_cap, ty_sys = unleash_fcom ty in
+        let _, s' = IStar.unleash dir in
+        let tr, tr' = equate_star3 env dir info0.dir info1.dir in
+        let tcap = equate env ty_cap info0.cap info1.cap in
+        let tsys = equate_box_sys env s' ty_sys info0.sys info1.sys in
+        Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
+
       | LblTy info0, LblTy info1 ->
         if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
           let ty = equate env ty info0.ty info1.ty in
@@ -338,6 +346,19 @@ struct
     | Invalid_argument _ ->
       failwith "equate_cmop_sys length mismatch"
 
+  and equate_box_sys env s' sys_ty sys0 sys1 =
+    let rec map3 f xs ys zs  =
+      match xs, ys, zs with
+      | [], [], [] -> []
+      | (x::xs), (y::ys), (z::zs) -> f x y z :: map3 f xs ys zs
+      | _ -> raise (Invalid_argument "map3")
+    in
+    try
+      map3 (equate_box_boundary env s') sys_ty sys0 sys1
+    with
+    | Invalid_argument _ ->
+      failwith "equate_cmop_sys length mismatch"
+
 
   and equate_val_face env ty face0 face1 =
     match face0, face1 with
@@ -377,6 +398,20 @@ struct
       Format.eprintf "equate_comp_face: %a vs %a@." pp_comp_face face0 pp_comp_face face1;
       failwith "equate_comp_face"
 
+  and equate_box_boundary env s' ty bdry0 bdry1 =
+    match ty, bdry0, bdry1 with
+    | Face.False p_ty, Face.False p0, Face.False p1 ->
+      let tr, tr' = equate_star3 env p_ty p0 p1 in
+      tr, tr', None
+
+    | Face.Indet (p_ty, abs), Face.Indet (p0, b0), Face.Indet (p1, b1) ->
+      let tr, tr' = equate_star3 env p_ty p0 p1 in
+      let b = equate env (Abs.inst1 abs s') b0 b1 in
+      tr, tr', Some b
+
+    | _ ->
+      failwith "equate_box_boundary"
+
   and equate_val_abs env ty abs0 abs1 =
     let x, v0x = Abs.unleash1 abs0 in
     let v1x = Abs.inst1 abs1 @@ `Atom x in
@@ -396,6 +431,14 @@ struct
     let tr' = equate_dim env r'0 r'1 in
     tr, tr'
 
+  and equate_star3 env p0 p1 p2 =
+    let r0, r'0 = IStar.unleash p0 in
+    let r1, r'1 = IStar.unleash p1 in
+    let r2, r'2 = IStar.unleash p2 in
+    let tr = equate_dim3 env r0 r1 r2 in
+    let tr' = equate_dim3 env r'0 r'1 r'2 in
+    tr, tr'
+
   and equate_dim env (r : I.t) (r' : I.t) =
     match I.compare r r' with
     | `Same ->
@@ -405,6 +448,16 @@ struct
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
       failwith "equate_dim: dimensions did not match"
+
+  and equate_dim3 env (r : I.t) (r' : I.t) (r'' : I.t) =
+    match I.compare r r', I.compare r r'' with
+    | `Same, `Same ->
+      quote_dim env r
+    | _ ->
+      (* Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+         Format.eprintf "@.";
+         Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
+      failwith "equate_dim3: dimensions did not match"
 
   and equate_atom env x y =
     if x = y then

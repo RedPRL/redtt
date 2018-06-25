@@ -47,6 +47,8 @@ type 'a tmf =
   | Dim0
   | Dim1
 
+  | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
+
   (* Labelled types from Epigram *)
   | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
   | LblRet of 'a

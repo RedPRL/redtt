@@ -49,6 +49,8 @@ type 'a tmf =
   | Dim0
   | Dim1
 
+  | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
+
   (* Labelled types from Epigram *)
   | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
   | LblRet of 'a
@@ -170,6 +172,13 @@ and subst_f (sub : tm cmd subst) =
 
   | Cons (t0, t1) ->
     Cons (subst sub t0, subst sub t1)
+
+  | Box info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let cap = subst sub info.cap in
+    let sys = subst_tm_sys sub info.sys in
+    Box {r; r'; cap; sys}
 
   | LblTy info ->
     let args = List.map (fun (ty, tm) -> subst sub ty, subst sub tm) info.args in
@@ -362,6 +371,12 @@ let traverse ~f ~var ~ref =
       CoRThunk (go_tm_face k face)
     | Cons (t0, t1) ->
       Cons (f k t0, f k t1)
+    | Box info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let cap = f k info.cap in
+      let sys = go_tm_sys k info.sys in
+      Box {r; r'; cap; sys}
     | LblTy info ->
       let args = List.map (fun (t0, t1) -> f k t0, f k t1) info.args in
       let ty = f k info.ty in
@@ -686,6 +701,9 @@ let rec pp env fmt =
 
     | Cons (tm0, tm1) ->
       Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
+
+    | Box {r; r'; cap; sys} ->
+      Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
 
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
@@ -1188,6 +1206,12 @@ let map_tmf f =
     ExtLam (map_nbnd f nbnd)
   | CoRThunk face ->
     CoRThunk (map_tm_face f face)
+  | Box info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let cap = f info.cap in
+    let sys = map_tm_sys f info.sys in
+    Box {r; r'; cap; sys}
   | LblTy info ->
     let ty = f info.ty in
     let args = List.map (fun (t0, t1) -> f t0, f t1) info.args in

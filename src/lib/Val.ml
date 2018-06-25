@@ -137,6 +137,7 @@ sig
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : ?debug:string list -> value -> value * clo
   val unleash_v : value -> atom * value * value * value
+  val unleash_fcom : value -> star * value * comp_sys
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
@@ -1444,7 +1445,7 @@ struct
       let r' = eval_dim rho info.r' in
       let dir = IStar.make r r' in
       let cap = eval rho info.cap in
-      let sys = eval_bnd_sys rho info.sys in
+      let sys = eval_rigid_bnd_sys rho info.sys in
       make_fcom dir cap sys
 
     | Tm.Univ {kind; lvl} ->
@@ -1488,6 +1489,14 @@ struct
 
     | Tm.Loop r ->
       make_loop @@ eval_dim rho r
+
+    | Tm.Box info ->
+      let r = eval_dim rho info.r  in
+      let r' = eval_dim rho info.r' in
+      let dir = IStar.make r r' in
+      let cap = eval rho info.cap in
+      let sys = eval_rigid_tm_sys rho info.sys in
+      make_box dir cap sys
 
     | Tm.Dim0 ->
       failwith "0 is a dimension"
@@ -1574,7 +1583,7 @@ struct
       let dir = IStar.make r r' in
       let ty = eval rho info.ty in
       let cap = eval rho info.cap in
-      let sys = eval_bnd_sys rho info.sys in
+      let sys = eval_rigid_bnd_sys rho info.sys in
       make_hcom dir ty cap sys
 
     | Tm.Com info ->
@@ -1583,7 +1592,7 @@ struct
       let dir = IStar.make r r' in
       let abs = eval_bnd rho info.ty in
       let cap = eval rho info.cap in
-      let sys = eval_bnd_sys rho info.sys in
+      let sys = eval_rigid_bnd_sys rho info.sys in
       make_com dir abs cap sys
 
     | Tm.Ix (i, _) ->
@@ -1633,7 +1642,7 @@ struct
       let abs = eval_bnd rho bnd in
       Face.True (sr, sr', abs)
 
-  and eval_bnd_sys rho sys  =
+  and eval_rigid_bnd_sys rho sys  =
     try
       let sys =
         List.map
@@ -1667,6 +1676,17 @@ struct
 
   and eval_tm_sys rho sys : val_sys =
     List.map (eval_tm_face rho) sys
+
+  and eval_rigid_tm_sys rho sys  =
+    try
+      let sys =
+        List.map
+          (fun x -> force_val_face @@ eval_tm_face rho x)
+          sys
+      in `Ok sys
+    with
+    | ProjVal tm ->
+      `Proj tm
 
   and eval_bnd rho bnd =
     let Tm.B (_, tm) = bnd in
@@ -1730,6 +1750,13 @@ struct
       Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
       Format.eprintf "@.";
       failwith "unleash_v"
+
+  and unleash_fcom v =
+    match unleash v with
+    | FCom info -> info.dir, info.cap, info.sys
+    | Rst rst -> unleash_fcom rst.ty
+    | _ ->
+      failwith "unleash_fcom"
 
   and unleash_lbl_ty v =
     match unleash v with
