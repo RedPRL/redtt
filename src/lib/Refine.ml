@@ -656,7 +656,7 @@ struct
       let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
       elab_chk env univ_fam info.fam >>= fun fam ->
-      M.lift C.typechecker >>= fun (module T) ->
+      M.in_scope x `I @@ M.lift C.typechecker >>= fun (module T) ->
       let module HS = HSubst (T) in
       let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
       elab_chk env fam_r info.tm >>= fun tm ->
