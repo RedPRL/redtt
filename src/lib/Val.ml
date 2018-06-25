@@ -1862,6 +1862,7 @@ struct
       rigid_ghcom info.dir ty cap sys
 
     | _ ->
+      Format.eprintf "Tried to apply: %a@." pp_value vfun;
       failwith "apply"
 
   and ext_apply vext ss =
