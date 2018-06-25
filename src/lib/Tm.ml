@@ -78,6 +78,7 @@ and 'a frame =
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
+  | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | LblCall
   | CoRForce
 
@@ -232,6 +233,12 @@ and subst_frame sub frame =
     let ty1 = subst sub info.ty1 in
     let equiv = subst sub info.equiv in
     VProj {r; ty0; ty1; equiv}
+  | Cap info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst sub info.ty in
+    let sys = subst_comp_sys sub info.sys in
+    Cap {r; r'; ty; sys}
 
 and subst_head sub head =
   match head with
@@ -485,6 +492,12 @@ let traverse ~f ~var ~ref =
       let ty1 = f k info.ty1 in
       let equiv = f k info.equiv in
       VProj {r; ty0; ty1; equiv}
+    | Cap info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = f k info.ty in
+      let sys = go_comp_sys k info.sys in
+      Cap {r; r'; ty; sys}
 
 
   and go_comp_sys k sys =
@@ -810,6 +823,9 @@ and pp_cmd env fmt (hd, sp) =
       | VProj {r; _} ->
         (* TODO *)
         Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r (go `VProj) sp
+      | Cap _ ->
+        (* FIXME *)
+        Format.fprintf fmt "@<cap>"
       | LblCall ->
         Format.fprintf fmt "@[<1>(call@ %a)@]" (go `Call) sp
       | CoRForce ->
@@ -1077,6 +1093,10 @@ struct
       go fl info.ty0 @@
       go fl info.ty1 @@
       go fl info.equiv acc
+    | Cap info ->
+      go fl info.r @@
+      go fl info.r' @@
+      go_comp_sys fl info.sys acc
 
   and go_ext_bnd fl bnd acc =
     let NB (_, (ty, sys)) = bnd in
@@ -1205,6 +1225,12 @@ let map_frame f =
     let ty1 = f info.ty1 in
     let equiv = f info.equiv in
     VProj {r; ty0; ty1; equiv}
+  | Cap info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let ty = f info.ty in
+    let sys = map_comp_sys f info.sys in
+    Cap {r; r'; ty; sys}
 
 let map_spine f =
   Bwd.map @@ map_frame f

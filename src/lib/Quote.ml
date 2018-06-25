@@ -262,6 +262,18 @@ struct
         let tm = equate env tyr coe0.el coe1.el in
         Tm.up (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Emp)
 
+      | GHCom ghcom0, GHCom ghcom1 ->
+        begin
+          try
+            let tr, tr' = equate_star env ghcom0.dir ghcom1.dir in
+            let ty = equate_ty env ghcom0.ty ghcom1.ty in
+            let cap = equate env ghcom0.ty ghcom0.cap ghcom1.cap in
+            let sys = equate_comp_sys env ghcom0.ty ghcom0.sys ghcom1.sys in
+            Tm.up (Tm.GHCom {r = tr; r' = tr'; ty; cap; sys}, Emp)
+          with
+          | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
+        end
+
       | _ ->
         (* Format.eprintf "Failed to equate@; @[<1>%a = %a ∈ %a@] @." pp_value el0 pp_value el1 pp_value ty; *)
         failwith "equate"
@@ -316,6 +328,13 @@ struct
       let equiv = equate env (Val.act phi equiv_ty) vproj0.equiv vproj1.equiv in
       let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
+    | Cap cap0, Cap cap1 ->
+      let tr, tr' = equate_star env cap0.dir cap1.dir in
+      let ty = equate_ty env cap0.ty cap1.ty in
+      let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+      let sys = equate_comp_sys env univ cap0.sys cap1.sys in
+      let frame = Tm.Cap {r = tr; r' = tr'; ty; sys} in
+      equate_neu_ env cap0.neu cap1.neu @@ frame :: stk
     | LblCall neu0, LblCall neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
     | CoRForce neu0, CoRForce neu1 ->

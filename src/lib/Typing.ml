@@ -497,6 +497,14 @@ struct
       let cx_scrut = Cx.def cx ~nm ~ty:s1 ~el:hd in
       Cx.eval cx_scrut mot
 
+    | T.Cap info ->
+      let fcom_ty =
+        check_eval_ty cx @@
+        T.make @@ T.FCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
+      in
+      Cx.check_eq_ty cx fcom_ty ty;
+      Cx.eval cx info.ty
+
     | T.LblCall ->
       let _, _, ty = Eval.unleash_lbl_ty ty in
       ty

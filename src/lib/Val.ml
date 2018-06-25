@@ -1562,6 +1562,13 @@ struct
       let bcase = eval rho info.bcase in
       let lcase = eval_bnd rho info.lcase in
       s1_rec mot vhd bcase lcase
+    | Tm.Cap info ->
+      let r = eval_dim rho info.r in
+      let r' = eval_dim rho info.r' in
+      let dir = IStar.make r r' in
+      let ty = eval rho info.ty in
+      let sys = eval_rigid_bnd_sys rho info.sys in
+      make_cap dir ty sys vhd
 
 
   and eval_head rho =
