@@ -596,7 +596,7 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<1>(=>@ %a)@]" (pp_face env) face
 
     | V info ->
-      Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)!]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
+      Format.fprintf fmt "@[<1>(V %a@ %a@ %a@ %a)@]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
 
     | VIn info ->
       Format.fprintf fmt "@[<1>(Vin %a@ %a@ %a)!]" (pp env) info.r (pp env) info.tm0 (pp env) info.tm1
