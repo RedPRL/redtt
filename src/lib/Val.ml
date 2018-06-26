@@ -137,6 +137,7 @@ sig
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : ?debug:string list -> value -> value * clo
   val unleash_v : value -> atom * value * value * value
+  val unleash_fcom : value -> star * value * comp_sys
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
@@ -903,12 +904,12 @@ struct
       let s, s' = IStar.unleash info.dir in
       let cap_abs = Abs.bind1 x info.cap in
 
-      (* This is O in [SVO, F], but `(I.subst r x)` applies to `z` as well,
-       * which is actually what we want!
+      (* This is O in [SVO, F].
        *
        * The purpose of O is to make sure that, when r=r', we can recover the coercee
        * after the long journey detailed below. *)
       let origin z_dest =
+        let phi = I.subst r x in
         let face =
           Face.map @@ fun ri r'i absi ->
           Abs.make1 @@ fun y ->
@@ -916,12 +917,11 @@ struct
           make_coe (IStar.make (`Atom y) s) absi @@
           make_coe (IStar.make s' (`Atom y)) absi el
         in
-        Val.act (I.subst r x) @@
         make_hcom
-          (IStar.make s' z_dest)
-          info.cap
-          (rigid_cap info.dir info.cap info.sys el)
-          (`Ok (List.map face info.sys))
+          (IStar.make (I.act phi s') z_dest)
+          (Val.act phi info.cap)
+          (make_cap (IStar.act phi info.dir) (Val.act phi info.cap) (CompSys.act phi info.sys) el)
+          (CompSys.act phi (List.map face info.sys))
       in
       (* This is N in [F, SVO], representing the coherence conditions enforced by `info.sys`.
        * The coercion must be equal to the coercion within the system under the restriction.
@@ -937,7 +937,7 @@ struct
        * The problem is that we do not have the boundaries of the box, and even if we have,
        * this naive cap will not be the image of the boundaries. *)
       let naively_coerced_cap =
-        rigid_gcom dir cap_abs (origin s) @@
+        rigid_gcom dir cap_abs (origin (I.act (I.subst r x) s)) @@
         CompSys.forall x @@
         let diag = AbsFace.rigid info.dir @@ Abs.bind1 x @@ make_coe (IStar.make r (`Atom x)) cap_abs el in
         let face =
@@ -1018,9 +1018,9 @@ struct
           let base0 dest = base `Dim0 dest in
           let base1 dest = base `Dim1 dest in
           let fiber0 b = car @@ apply (cdr equiv0) b in
-          (* The prove that there is a path from the fiber `fib`
-           * to `fiber0 b` where `b` is calculated from `fib`
-           * as `ext_apply (cdr fib) [`Dim1]` directly. *)
+          (* This gives a path from the fiber `fib` to `fiber0 b`
+           * where `b` is calculated from `fib` as
+           * `ext_apply (cdr fib) [`Dim1]` directly. *)
           let contr0 fib = apply (cdr @@ apply (cdr equiv0) (ext_apply (cdr fib) [`Dim1])) fib in
           (* The diagonal face for r=r'. *)
           let face_diag = AbsFace.make r r' @@ Abs.make1 @@ fun _ ->
@@ -1119,7 +1119,7 @@ struct
               let ty0r = Val.act phi info.ty0 in
               let ty1r = Val.act phi info.ty1 in
               let equivr = Val.act phi info.equiv in
-              rigid_vproj info.x ~el ~ty0:ty0r ~ty1:ty1r ~equiv:equivr
+              rigid_vproj info.x ~ty0:ty0r ~ty1:ty1r ~equiv:equivr ~el
             in
             let r2x = IStar.make r (`Atom x) in
             let sys =
@@ -1177,9 +1177,10 @@ struct
        * simplification we can probably afford not to specialize it manually. *)
       let naive_hcom dest =
         let face = Face.map @@ fun ri r'i absi ->
+          let phi = I.equate ri r'i in
           let y, el = Abs.unleash1 absi in
-          Abs.bind1 y @@ Val.act (I.equate ri r'i) @@
-          cap_aux el
+          Abs.bind1 y @@
+          make_cap (IStar.act phi info.dir) (Val.act phi info.cap) (CompSys.act phi info.sys) el
         in
         make_hcom (IStar.make r dest) info.cap (cap_aux cap) (`Ok (List.map face sys))
       in
@@ -1444,7 +1445,7 @@ struct
       let r' = eval_dim rho info.r' in
       let dir = IStar.make r r' in
       let cap = eval rho info.cap in
-      let sys = eval_bnd_sys rho info.sys in
+      let sys = eval_rigid_bnd_sys rho info.sys in
       make_fcom dir cap sys
 
     | Tm.Univ {kind; lvl} ->
@@ -1488,6 +1489,14 @@ struct
 
     | Tm.Loop r ->
       make_loop @@ eval_dim rho r
+
+    | Tm.Box info ->
+      let r = eval_dim rho info.r  in
+      let r' = eval_dim rho info.r' in
+      let dir = IStar.make r r' in
+      let cap = eval rho info.cap in
+      let sys = eval_rigid_tm_sys rho info.sys in
+      make_box dir cap sys
 
     | Tm.Dim0 ->
       failwith "0 is a dimension"
@@ -1553,6 +1562,13 @@ struct
       let bcase = eval rho info.bcase in
       let lcase = eval_bnd rho info.lcase in
       s1_rec mot vhd bcase lcase
+    | Tm.Cap info ->
+      let r = eval_dim rho info.r in
+      let r' = eval_dim rho info.r' in
+      let dir = IStar.make r r' in
+      let ty = eval rho info.ty in
+      let sys = eval_rigid_bnd_sys rho info.sys in
+      make_cap dir ty sys vhd
 
 
   and eval_head rho =
@@ -1574,7 +1590,7 @@ struct
       let dir = IStar.make r r' in
       let ty = eval rho info.ty in
       let cap = eval rho info.cap in
-      let sys = eval_bnd_sys rho info.sys in
+      let sys = eval_rigid_bnd_sys rho info.sys in
       make_hcom dir ty cap sys
 
     | Tm.Com info ->
@@ -1583,8 +1599,26 @@ struct
       let dir = IStar.make r r' in
       let abs = eval_bnd rho info.ty in
       let cap = eval rho info.cap in
-      let sys = eval_bnd_sys rho info.sys in
+      let sys = eval_rigid_bnd_sys rho info.sys in
       make_com dir abs cap sys
+
+    | Tm.GHCom info ->
+      let r = eval_dim rho info.r in
+      let r' = eval_dim rho info.r' in
+      let dir = IStar.make r r' in
+      let ty = eval rho info.ty in
+      let cap = eval rho info.cap in
+      let sys = eval_rigid_bnd_sys rho info.sys in
+      make_ghcom dir ty cap sys
+
+    | Tm.GCom info ->
+      let r = eval_dim rho info.r in
+      let r' = eval_dim rho info.r' in
+      let dir = IStar.make r r' in
+      let abs = eval_bnd rho info.ty in
+      let cap = eval rho info.cap in
+      let sys = eval_rigid_bnd_sys rho info.sys in
+      make_gcom dir abs cap sys
 
     | Tm.Ix (i, _) ->
       begin
@@ -1633,7 +1667,7 @@ struct
       let abs = eval_bnd rho bnd in
       Face.True (sr, sr', abs)
 
-  and eval_bnd_sys rho sys  =
+  and eval_rigid_bnd_sys rho sys  =
     try
       let sys =
         List.map
@@ -1667,6 +1701,17 @@ struct
 
   and eval_tm_sys rho sys : val_sys =
     List.map (eval_tm_face rho) sys
+
+  and eval_rigid_tm_sys rho sys  =
+    try
+      let sys =
+        List.map
+          (fun x -> force_val_face @@ eval_tm_face rho x)
+          sys
+      in `Ok sys
+    with
+    | ProjVal tm ->
+      `Proj tm
 
   and eval_bnd rho bnd =
     let Tm.B (_, tm) = bnd in
@@ -1730,6 +1775,13 @@ struct
       Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
       Format.eprintf "@.";
       failwith "unleash_v"
+
+  and unleash_fcom v =
+    match unleash v with
+    | FCom info -> info.dir, info.cap, info.sys
+    | Rst rst -> unleash_fcom rst.ty
+    | _ ->
+      failwith "unleash_fcom"
 
   and unleash_lbl_ty v =
     match unleash v with
@@ -1862,6 +1914,7 @@ struct
       rigid_ghcom info.dir ty cap sys
 
     | _ ->
+      Format.eprintf "Tried to apply: %a@." pp_value vfun;
       failwith "apply"
 
   and ext_apply vext ss =
@@ -2059,7 +2112,11 @@ struct
       let face =
         Face.map @@ fun _ _ abs ->
         let y, v = Abs.unleash1 abs in
-        Abs.bind1 y @@ car v
+        try
+          Abs.bind1 y @@ car v
+        with exn ->
+          Format.eprintf "Tried to take car of:@ @[<v>%a@]@.@." pp_value v;
+          raise exn
       in
       let sys = List.map face info.sys in
       rigid_hcom info.dir dom cap sys
@@ -2190,9 +2247,13 @@ struct
     match unleash el with
     | Box info -> info.cap
     | Up info ->
-      let cap_sys = List.map (Face.map (fun _ _ a -> rigid_cap dir ty sys a)) info.sys in
+      let cap_sys = List.map (Face.map (fun ri r'i a ->
+        let phi = I.equate ri r'i in
+        make_cap (IStar.act phi dir) (Val.act phi ty) (CompSys.act phi sys) a)) info.sys in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
-    | _ -> failwith "rigid_cap"
+    | _ ->
+      Format.eprintf "Tried to get rigid-cap of %a@." pp_value el;
+      failwith "rigid_cap"
 
 
   and inst_clo clo varg =
@@ -2275,7 +2336,7 @@ struct
       Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
     | HCom info ->
       let r, r' = IStar.unleash info.dir in
-      Format.fprintf fmt "@[<1>(hcom %a %a %a %a %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
+      Format.fprintf fmt "@[<1>(hcom %a %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
     | GHCom _ ->
       Format.fprintf fmt "<ghcom>"
     | FCom _ ->
@@ -2299,8 +2360,12 @@ struct
       Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
 
   and pp_abs fmt abs =
-    let x, v = Abs.unleash1 abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@]" Name.pp x pp_value v
+    let xs, v = Abs.unleash abs in
+    Format.fprintf fmt "@[<1><%a>@ %a@]" pp_names xs pp_value v
+
+  and pp_names fmt xs =
+    let pp_sep fmt () = Format.fprintf fmt " " in
+    Format.pp_print_list ~pp_sep Name.pp fmt xs
 
   and pp_ext_abs fmt abs =
     let x, (tyx, sysx) = ExtAbs.unleash1 abs in
@@ -2370,8 +2435,12 @@ struct
     | Meta {name; _} ->
       Name.pp fmt name
 
-    | If _ ->
-      Format.fprintf fmt "<if>"
+    | If {mot; neu; tcase; fcase} ->
+      Format.fprintf fmt "@[<1>(if %a@ %a@ %a@ %a)@]"
+        pp_clo mot
+        pp_neu neu
+        pp_value tcase
+        pp_value fcase
 
     | NatRec _ ->
       Format.fprintf fmt "<natrec>"

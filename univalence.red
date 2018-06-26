@@ -45,7 +45,7 @@ let RetIsContr
   >
 
 let IdEquiv (A : type) : Equiv A A =
-  < _
+  < λ a → a
   , λ a →
     < <_, λ _ → a>
     , λ p i →

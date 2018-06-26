@@ -61,7 +61,10 @@ struct
     let xs, el = unleash abs in
     match xs with
     | [x] -> x, el
-    | _ -> failwith "unleash1: incorrect binding depth"
+    | _ ->
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
+      failwith "unleash1: incorrect binding depth"
 
   let inst1 el r =
     inst el [r]

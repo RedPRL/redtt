@@ -497,6 +497,14 @@ struct
       let cx_scrut = Cx.def cx ~nm ~ty:s1 ~el:hd in
       Cx.eval cx_scrut mot
 
+    | T.Cap info ->
+      let fcom_ty =
+        check_eval_ty cx @@
+        T.make @@ T.FCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
+      in
+      Cx.check_eq_ty cx fcom_ty ty;
+      Cx.eval cx info.ty
+
     | T.LblCall ->
       let _, _, ty = Eval.unleash_lbl_ty ty in
       ty
@@ -543,6 +551,7 @@ struct
       let vtyx = check_eval_ty cxx ty in
       let vtyr = Eval.Val.act (I.subst r x) vtyx in
       let cap = check_eval cx vtyr info.cap in
+      check_valid_cofibration @@ cofibration_of_sys cx info.sys;
       check_comp_sys cx r (cxx, x, vtyx) cap info.sys;
       Eval.Val.act (I.subst r' x) vtyx
 
@@ -553,6 +562,26 @@ struct
       let vty = check_eval_ty cx info.ty in
       let cap = check_eval cx vty info.cap in
       check_valid_cofibration @@ cofibration_of_sys cx info.sys;
+      check_comp_sys cx r (cxx, x, vty) cap info.sys;
+      vty
+
+    | T.GCom info ->
+      let r = check_eval_dim cx info.r in
+      let r' = check_eval_dim cx info.r' in
+      let T.B (nm, ty) = info.ty in
+      let cxx, x = Cx.ext_dim cx ~nm in
+      let vtyx = check_eval_ty cxx ty in
+      let vtyr = Eval.Val.act (I.subst r x) vtyx in
+      let cap = check_eval cx vtyr info.cap in
+      check_comp_sys cx r (cxx, x, vtyx) cap info.sys;
+      Eval.Val.act (I.subst r' x) vtyx
+
+    | T.GHCom info ->
+      let r = check_eval_dim cx info.r in
+      check_dim cx info.r';
+      let cxx, x = Cx.ext_dim cx ~nm:None in
+      let vty = check_eval_ty cx info.ty in
+      let cap = check_eval cx vty info.cap in
       check_comp_sys cx r (cxx, x, vty) cap info.sys;
       vty
 

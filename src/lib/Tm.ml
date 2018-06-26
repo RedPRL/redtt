@@ -49,6 +49,8 @@ type 'a tmf =
   | Dim0
   | Dim1
 
+  | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
+
   (* Labelled types from Epigram *)
   | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
   | LblRet of 'a
@@ -64,6 +66,8 @@ and 'a head =
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
   | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
+  | GHCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
+  | GCom of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
 
 
 and 'a frame =
@@ -74,6 +78,7 @@ and 'a frame =
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
+  | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | LblCall
   | CoRForce
 
@@ -171,6 +176,13 @@ and subst_f (sub : tm cmd subst) =
   | Cons (t0, t1) ->
     Cons (subst sub t0, subst sub t1)
 
+  | Box info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let cap = subst sub info.cap in
+    let sys = subst_tm_sys sub info.sys in
+    Box {r; r'; cap; sys}
+
   | LblTy info ->
     let args = List.map (fun (ty, tm) -> subst sub ty, subst sub tm) info.args in
     let ty = subst sub info.ty in
@@ -221,6 +233,12 @@ and subst_frame sub frame =
     let ty1 = subst sub info.ty1 in
     let equiv = subst sub info.equiv in
     VProj {r; ty0; ty1; equiv}
+  | Cap info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst sub info.ty in
+    let sys = subst_comp_sys sub info.sys in
+    Cap {r; r'; ty; sys}
 
 and subst_head sub head =
   match head with
@@ -265,6 +283,22 @@ and subst_head sub head =
     let cap = subst sub info.cap in
     let sys = subst_comp_sys sub info.sys in
     Com {r; r'; ty; cap; sys}, Emp
+
+  | GHCom info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst sub info.ty in
+    let cap = subst sub info.cap in
+    let sys = subst_comp_sys sub info.sys in
+    GHCom {r; r'; ty; cap; sys}, Emp
+
+  | GCom info ->
+    let r = subst sub info.r in
+    let r' = subst sub info.r' in
+    let ty = subst_bnd sub info.ty in
+    let cap = subst sub info.cap in
+    let sys = subst_comp_sys sub info.sys in
+    GCom {r; r'; ty; cap; sys}, Emp
 
 and subst_bnd sub bnd =
   let B (nm, t) = bnd in
@@ -362,6 +396,12 @@ let traverse ~f ~var ~ref =
       CoRThunk (go_tm_face k face)
     | Cons (t0, t1) ->
       Cons (f k t0, f k t1)
+    | Box info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let cap = f k info.cap in
+      let sys = go_tm_sys k info.sys in
+      Box {r; r'; cap; sys}
     | LblTy info ->
       let args = List.map (fun (t0, t1) -> f k t0, f k t1) info.args in
       let ty = f k info.ty in
@@ -411,6 +451,20 @@ let traverse ~f ~var ~ref =
       let cap = f k info.cap in
       let sys = go_comp_sys k info.sys in
       Com {r; r'; ty; cap; sys}, Emp
+    | GHCom info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = f k info.ty in
+      let cap = f k info.cap in
+      let sys = go_comp_sys k info.sys in
+      GHCom {r; r'; ty; cap; sys}, Emp
+    | GCom info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = go_bnd k info.ty in
+      let cap = f k info.cap in
+      let sys = go_comp_sys k info.sys in
+      GCom {r; r'; ty; cap; sys}, Emp
 
   and go_spine k =
     Bwd.map (go_frm k)
@@ -438,6 +492,12 @@ let traverse ~f ~var ~ref =
       let ty1 = f k info.ty1 in
       let equiv = f k info.equiv in
       VProj {r; ty0; ty1; equiv}
+    | Cap info ->
+      let r = f k info.r in
+      let r' = f k info.r' in
+      let ty = f k info.ty in
+      let sys = go_comp_sys k info.sys in
+      Cap {r; r'; ty; sys}
 
 
   and go_comp_sys k sys =
@@ -687,6 +747,9 @@ let rec pp env fmt =
     | Cons (tm0, tm1) ->
       Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
 
+    | Box {r; r'; cap; sys} ->
+      Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
+
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<1>(let@ @[<1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
@@ -706,10 +769,16 @@ and pp_head env fmt =
   | HCom {r; r'; ty; cap; sys} ->
     Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
 
-
   | Com {r; r'; ty = B (nm, ty); cap; sys} ->
     let x, env' = Pretty.Env.bind nm env in
     Format.fprintf fmt "@[<1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
+
+  | GHCom {r; r'; ty; cap; sys} ->
+    Format.fprintf fmt "@[<1>(ghcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
+
+  | GCom {r; r'; ty = B (nm, ty); cap; sys} ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<1>(gcom %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
 
   | Ix (ix, _tw) ->
     Uuseg_string.pp_utf_8 fmt @@
@@ -754,6 +823,9 @@ and pp_cmd env fmt (hd, sp) =
       | VProj {r; _} ->
         (* TODO *)
         Format.fprintf fmt "@[<1>(vproj %a@ %a)@]" (pp env) r (go `VProj) sp
+      | Cap _ ->
+        (* FIXME *)
+        Format.fprintf fmt "@<cap>"
       | LblCall ->
         Format.fprintf fmt "@[<1>(call@ %a)@]" (go `Call) sp
       | CoRForce ->
@@ -985,6 +1057,18 @@ struct
       go_bnd fl info.ty @@
       go fl info.cap @@
       go_comp_sys fl info.sys acc
+    | _, GHCom info ->
+      go fl info.r @@
+      go fl info.r' @@
+      go fl info.ty @@
+      go fl info.cap @@
+      go_comp_sys fl info.sys acc
+    | _, GCom info ->
+      go fl info.r @@
+      go fl info.r' @@
+      go_bnd fl info.ty @@
+      go fl info.cap @@
+      go_comp_sys fl info.sys acc
 
   and go_spine fl sp =
     List.fold_right (go_frame fl) @@ Bwd.to_list sp
@@ -1009,6 +1093,10 @@ struct
       go fl info.ty0 @@
       go fl info.ty1 @@
       go fl info.equiv acc
+    | Cap info ->
+      go fl info.r @@
+      go fl info.r' @@
+      go_comp_sys fl info.sys acc
 
   and go_ext_bnd fl bnd acc =
     let NB (_, (ty, sys)) = bnd in
@@ -1098,6 +1186,20 @@ let map_head f =
     let cap = f info.cap in
     let sys = map_comp_sys f info.sys in
     Com {r; r'; ty; cap; sys}
+  | GHCom info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let ty = f info.ty in
+    let cap = f info.cap in
+    let sys = map_comp_sys f info.sys in
+    GHCom {r; r'; ty; cap; sys}
+  | GCom info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let ty = map_bnd f info.ty in
+    let cap = f info.cap in
+    let sys = map_comp_sys f info.sys in
+    GCom {r; r'; ty; cap; sys}
 
 let map_frame f =
   function
@@ -1123,6 +1225,12 @@ let map_frame f =
     let ty1 = f info.ty1 in
     let equiv = f info.equiv in
     VProj {r; ty0; ty1; equiv}
+  | Cap info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let ty = f info.ty in
+    let sys = map_comp_sys f info.sys in
+    Cap {r; r'; ty; sys}
 
 let map_spine f =
   Bwd.map @@ map_frame f
@@ -1188,6 +1296,12 @@ let map_tmf f =
     ExtLam (map_nbnd f nbnd)
   | CoRThunk face ->
     CoRThunk (map_tm_face f face)
+  | Box info ->
+    let r = f info.r in
+    let r' = f info.r' in
+    let cap = f info.cap in
+    let sys = map_tm_sys f info.sys in
+    Box {r; r'; cap; sys}
   | LblTy info ->
     let ty = f info.ty in
     let args = List.map (fun (t0, t1) -> f t0, f t1) info.args in
