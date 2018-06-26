@@ -1157,85 +1157,60 @@ struct
     | Univ _ ->
       rigid_fcom dir cap sys
 
-    | FCom info ->
+    | FCom fcom ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
        * [SVO]: Part III (airport).
        * [R1]: RedPRL I ddcc4ce72b1880671d842ede6b50adbee94935b5.
        * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
 
-      (* The algorithm is based on the alternative coe in [F]. *)
+      (* The algorithm is based on the Anders' alternative hcom in [F]. *)
 
       (* Helper functions. *)
       let r, r' = IStar.unleash dir in
-      let s, s' = IStar.unleash info.dir in
-      let cap_aux el = rigid_cap info.dir info.cap info.sys el in
-      let cap_in_wall = rigid_coe (IStar.swap info.dir) in
+      let s, s' = IStar.unleash fcom.dir in
 
-      (* This is the naive hcom in `info.cap`.
-       *
-       * This will be equal to `O` in `info.sys`, and because of the semantic
-       * simplification we can probably afford not to specialize it manually. *)
-      let naive_hcom dest =
-        let face = Face.map @@ fun ri r'i absi ->
-          let phi = I.equate ri r'i in
-          let y, el = Abs.unleash1 absi in
-          Abs.bind1 y @@
-          make_cap (IStar.act phi info.dir) (Val.act phi info.cap) (CompSys.act phi info.sys) el
-        in
-        make_hcom (IStar.make r dest) info.cap (cap_aux cap) (`Ok (List.map face sys))
+      (* This is C_M in [F], with an extra parameter `phi` to get along with NbE. *)
+      let cap_aux phi el = make_cap
+        (IStar.act phi fcom.dir) (Val.act phi fcom.cap) (CompSys.act phi fcom.sys) el
       in
 
-      (* This is the O' in [F], representing the cap of the eventual hcom
-       * enforced by info.sys. The mismatch between O and O' is one major
-       * source of the complexity. *)
-      let cap_of_hcom_in_wall abs dest =
-        cap_in_wall abs @@ make_hcom (IStar.make s dest) (Abs.inst1 abs s') cap (`Ok sys)
+      (* This serves as `O` and the diagonal face in [F]
+       * for the coherence conditions in `fcom.sys` and `s=s'`. *)
+      let hcom_template phi y_dest ty = make_hcom
+        (IStar.make (I.act phi r) y_dest) ty
+        (Val.act phi fcom.cap) (CompSys.act phi fcom.sys)
       in
 
-      (* This is P, the fixer to correct O to O' along `recover_dest` within `info.sys`. *)
-      let recovery abs recover_dest =
-        let face0 = AbsFace.make recover_dest s @@
-          Abs.make1 @@ fun y -> naive_hcom (`Atom y) in
-        let face1 = AbsFace.make recover_dest s' @@
-          Abs.make1 @@ fun y -> cap_of_hcom_in_wall abs (`Atom y)
-        in
-        let face = Face.map @@ fun ri r'i absi ->
-          let x, el = Abs.unleash1 absi in
-          Abs.bind1 x @@
-          Val.act (I.equate ri r'i) @@
-          cap_in_wall abs el
-        in
-        match force_abs_sys [face0; face1] with
-        | `Proj abs -> Abs.inst1 abs r'
-        | `Ok faces ->
-          rigid_hcom dir info.cap (cap_in_wall abs cap) @@ (faces @ List.map face sys)
-      in
-
-      (* This is Q, the corrected cap. *)
-      let recovered =
-        let diag_face = AbsFace.rigid dir @@ Abs.make1 @@ fun _ -> cap_aux cap in
-        let hcom_faces =
-          let face = Face.map @@ fun ri r'i absi ->
-            Abs.make1 @@ fun _ ->
-            Val.act (I.equate ri r'i) @@ Abs.inst1 absi r' in
+      (* This is `P` in [F]. *)
+      let new_cap = rigid_hcom dir fcom.cap (cap_aux I.idn cap) @@
+        let ri_faces =
+          let face = Face.map @@ fun ri r'i abs ->
+            let y, el = Abs.unleash1 abs in
+            Abs.bind1 y (cap_aux (I.equate ri r'i) el)
+          in
           List.map face sys
         in
-        let fcom_faces =
-          let face = Face.map @@ fun si s'i absi ->
+        let si_faces =
+          let face = Face.map @@ fun si s'i abs ->
+            let phi = I.equate si s'i in
             Abs.make1 @@ fun y ->
-            Val.act (I.equate si s'i) @@ recovery absi (`Atom y) in
-          List.map face info.sys
+            (* this is not the most efficient code, but maybe we can afford this? *)
+            cap_aux phi (hcom_template phi (`Atom y) (Val.act phi (Abs.inst1 abs s')))
+          in
+          List.map face fcom.sys
         in
-        rigid_hcom info.dir info.cap (naive_hcom r')
-          (diag_face :: hcom_faces @ fcom_faces)
+        let diag = AbsFace.rigid fcom.dir @@
+          let phi = I.equate s s' in
+          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Val.act phi fcom.cap)
+        in
+        diag :: (ri_faces @ si_faces)
       in
-      let boundary = Face.map @@
-        fun si s'i absi ->
-        Val.act (I.equate si s'i) @@
-        cap_of_hcom_in_wall absi s'
+      let boundary = Face.map @@ fun si s'i abs ->
+        let phi = I.equate si s'i in
+        hcom_template phi (I.act phi r') (Val.act phi (Abs.inst1 abs s'))
       in
-      rigid_box info.dir recovered
-        (List.map boundary info.sys)
+      rigid_box fcom.dir new_cap
+        (List.map boundary fcom.sys)
 
     | V {x; ty0; ty1; equiv} ->
       let r, _ = IStar.unleash dir in
