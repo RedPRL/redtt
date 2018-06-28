@@ -1199,9 +1199,12 @@ struct
           in
           List.map face fcom.sys
         in
-        let diag = AbsFace.rigid fcom.dir @@
-          let phi = I.equate s s' in
-          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Val.act phi fcom.cap)
+        let diag =
+          try
+            AbsFace.rigid fcom.dir @@
+            let phi = I.equate s s' in
+            Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Val.act phi fcom.cap)
+          with I.Inconsistent -> Face.False fcom.dir
         in
         diag :: (ri_faces @ si_faces)
       in
