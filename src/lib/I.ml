@@ -92,6 +92,12 @@ let compare r r' =
   | _, `Atom _ ->
     `Indet
 
+let absent x r =
+  match r with
+  | `Dim0 -> true
+  | `Dim1 -> true
+  | `Atom y -> x <> y
+
 
 let pp fmt =
   function

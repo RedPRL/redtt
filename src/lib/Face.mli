@@ -11,9 +11,9 @@ module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
 
-  val rigid : IStar.t -> X.t -> ('x, X.t) face
+  val rigid : IStar.t -> (unit -> X.t) -> ('x, X.t) face
 
-  val make : I.t -> I.t -> X.t -> ([`Any], X.t) face
+  val make : I.t -> I.t -> (unit -> X.t) -> ([`Any], X.t) face
 
   (* convenience function for generating rigid faces x = ε *)
   val gen_const : I.atom -> [`Dim0 | `Dim1] -> X.t -> ('x, X.t) face

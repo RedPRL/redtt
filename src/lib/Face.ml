@@ -26,41 +26,40 @@ let get_cond : type x. (x, 'a) face -> I.t * I.t =
 
 let forall : type x. I.atom -> (x, 'a) face -> [`Delete | `Keep] =
   fun x face ->
-    let s = `Atom x in
     let r, r' = get_cond face in
-    if r = s or r' = s then `Delete else `Keep
+    if I.absent x r & I.absent x r' then `Keep else `Delete
 
 module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
   val act : I.action -> 'x t -> [`Any] t
-  val rigid : IStar.t -> X.t -> ('x, X.t) face
+  val rigid : IStar.t -> (unit -> X.t) -> ('x, X.t) face
   val gen_const : I.atom -> [`Dim0 | `Dim1] -> X.t -> ('x, X.t) face
-  val make : I.t -> I.t -> X.t -> ([`Any], X.t) face
+  val make : I.t -> I.t -> (unit -> X.t) -> ([`Any], X.t) face
 end =
 struct
   type 'x t = ('x, X.t) face
 
-  let rigid : type x. IStar.t -> X.t -> (x, X.t) face =
+  let rigid : type x. IStar.t -> (unit -> X.t) -> (x, X.t) face =
     fun eq a ->
       let r, r' = IStar.unleash eq in
       match I.compare r r' with
       | `Apart ->
         False eq
       | _ ->
-        Indet (eq, X.act (I.equate r r') a)
+        Indet (eq, X.act (I.equate r r') (a ()))
 
-  let make : I.t -> I.t -> X.t -> ([`Any], X.t) face =
+  let make : I.t -> I.t -> (unit -> X.t) -> ([`Any], X.t) face =
     fun r r' a ->
       match IStar.make r r' with
       | `Ok p ->
         rigid p a
       | `Same _ ->
-        True (r, r', a)
+        True (r, r', (a ()))
 
   let gen_const : type x. I.atom -> [`Dim0 | `Dim1] -> X.t -> (x, X.t) face =
     fun x eps a ->
-      rigid (IStar.gen_const x eps) a
+      rigid (IStar.gen_const x eps) (fun _ -> a)
 
 
   let act : type x. I.action -> x t -> _ t =
