@@ -491,6 +491,7 @@ struct
 
     | _, E.Cut (e, fs) ->
       elab_inf env e >>= fun (hty, hd) ->
+      normalize_ty hty >>= fun hty ->
       elab_cut env (hty, hd) fs (Chk ty)
 
     | _, E.HCom info ->
