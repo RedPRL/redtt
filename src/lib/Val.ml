@@ -1949,7 +1949,17 @@ struct
             let face = Face.map @@ fun _ _ v -> Abs.make1 @@ fun _ -> v in
             List.map face boundary_sys
           in
-          rigid_hcom info.dir ty_s cap @@ correction_sys @ info.sys
+          let comp_sys =
+            let face =
+              Face.map @@ fun r r' abs ->
+              let phi_rr' = I.equate r r' in
+              let ss_rr' = List.map (I.act phi_rr') ss in
+              let x, v = Abs.unleash1 abs in
+              Abs.bind1 x @@ ext_apply v ss_rr'
+            in
+            List.map face info.sys
+          in
+          rigid_hcom info.dir ty_s cap @@ correction_sys @ comp_sys
       end
 
     | _ ->
