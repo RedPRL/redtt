@@ -64,6 +64,16 @@ let swap-pair (A : type) (p : A × A) : A × A =
 let swap-fun (A : type) : (bool → A) → bool → A =
   coe 1 0 (swap-pair A) in λ i →
     (fun-eq-pair A i) → fun-eq-pair A i
-;
+
+;; A bug (?) prevents the following example:
 ; let swap-fun-eqn (A : type) : (f : bool → A) → Path (bool → A) (swap-fun A f) f =
-;   ?
+;   coe 1 0 (λ pair _ → pair) in λ i →
+;     let swapcoe =
+;       coe 1 i (swap-pair A) in λ j →
+;         (fun-eq-pair A j) → fun-eq-pair A j
+;     in
+;     (elt : fun-eq-pair A i)
+;     → Path (fun-eq-pair A i)
+;         (swapcoe i (swapcoe i elt))
+;         elt
+;
