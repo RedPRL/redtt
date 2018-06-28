@@ -1171,14 +1171,14 @@ struct
 
       (* This is C_M in [F], with an extra parameter `phi` to get along with NbE. *)
       let cap_aux phi el = make_cap
-        (IStar.act phi fcom.dir) (Val.act phi fcom.cap) (CompSys.act phi fcom.sys) el
+          (IStar.act phi fcom.dir) (Val.act phi fcom.cap) (CompSys.act phi fcom.sys) el
       in
 
       (* This serves as `O` and the diagonal face in [F]
        * for the coherence conditions in `fcom.sys` and `s=s'`. *)
       let hcom_template phi y_dest ty = make_hcom
-        (IStar.make (I.act phi r) y_dest) ty
-        (Val.act phi fcom.cap) (CompSys.act phi fcom.sys)
+          (IStar.make (I.act phi r) y_dest) ty
+          (Val.act phi fcom.cap) (CompSys.act phi fcom.sys)
       in
 
       (* This is `P` in [F]. *)
@@ -2223,8 +2223,8 @@ struct
     | Box info -> info.cap
     | Up info ->
       let cap_sys = List.map (Face.map (fun ri r'i a ->
-        let phi = I.equate ri r'i in
-        make_cap (IStar.act phi dir) (Val.act phi ty) (CompSys.act phi sys) a)) info.sys in
+          let phi = I.equate ri r'i in
+          make_cap (IStar.act phi dir) (Val.act phi ty) (CompSys.act phi sys) a)) info.sys in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
     | _ ->
       Format.eprintf "Tried to get rigid-cap of %a@." pp_value el;
