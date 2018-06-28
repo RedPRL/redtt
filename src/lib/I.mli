@@ -32,6 +32,8 @@ type compare =
 
 val compare : t -> t -> compare
 
+val absent : atom -> t -> bool
+
 
 val pp : t Pretty.t0
 

@@ -61,12 +61,9 @@ let fun-eq-pair (A : type) : Path^1 type (bool → A) (A × A) =
 let swap-pair (A : type) (p : A × A) : A × A =
   <p.cdr, p.car>
 
-; let swap-fun (A : type) : (bool → A) → bool → A =
-;   `(coe 1 0 <i> (→ (@ (fun-eq-pair A) i) (@ (fun-eq-pair A) i))
-;     (swap-pair A))
-;
-;   ; coe 1 0 (swap-pair A) in λ i →
-;   ;   (fun-eq-pair A i) → fun-eq-pair A i
+let swap-fun (A : type) : (bool → A) → bool → A =
+  coe 1 0 (swap-pair A) in λ i →
+    (fun-eq-pair A i) → fun-eq-pair A i
 ;
 ; let swap-fun-eqn (A : type) : (f : bool → A) → Path (bool → A) (swap-fun A f) f =
 ;   ?

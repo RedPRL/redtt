@@ -414,7 +414,7 @@ struct
             begin
               match force_val_sys rst.sys with
               | `Proj el -> el
-              | `Rigid sys ->
+              | `Ok sys ->
                 make @@ Up {ty = rst.ty; neu = up.neu; sys}
             end
           | _ ->
@@ -483,14 +483,14 @@ struct
     | V info ->
       make_v
         (I.act phi @@ `Atom info.x)
-        (Val.act phi info.ty0)
+        (fun _ -> Val.act phi info.ty0)
         (Val.act phi info.ty1)
-        (Val.act phi info.equiv)
+        (fun _ -> Val.act phi info.equiv)
 
     | VIn info ->
       make_vin
         (I.act phi @@ `Atom info.x)
-        (Val.act phi info.el0)
+        (fun _ -> Val.act phi info.el0)
         (Val.act phi info.el1)
 
     | Univ _ ->
@@ -556,7 +556,7 @@ struct
       begin
         match force_val_sys sys with
         | `Proj v -> v
-        | `Rigid sys ->
+        | `Ok sys ->
           match act_neu phi info.neu with
           | Ret neu ->
             make @@ Up {ty; neu; sys}
@@ -568,9 +568,9 @@ struct
     match con with
     | VProj info ->
       let mx = I.act phi @@ `Atom info.x in
-      let ty0 = Val.act phi info.ty0 in
+      let ty0 () = Val.act phi info.ty0 in
       let ty1 = Val.act phi info.ty1 in
-      let equiv = Val.act phi info.equiv in
+      let equiv () = Val.act phi info.equiv in
       begin
         match act_neu phi info.neu with
         | Ret neu ->
@@ -735,7 +735,7 @@ struct
 
   and force_val_sys sys =
     try
-      `Rigid (List.map force_val_face sys)
+      `Ok (List.map force_val_face sys)
     with
     | ProjVal v ->
       `Proj v
@@ -766,18 +766,18 @@ struct
   and make_v mgen ty0 ty1 equiv : value =
     match mgen with
     | `Atom x ->
-      make @@ V {x; ty0; ty1; equiv}
+      make @@ V {x; ty0 = ty0 (); ty1; equiv = equiv ()}
     | `Dim0 ->
-      ty0
+      ty0 ()
     | `Dim1 ->
       ty1
 
   and make_vin mgen el0 el1 : value =
     match mgen with
     | `Atom x ->
-      rigid_vin x el0 el1
+      rigid_vin x (el0 ()) el1
     | `Dim0 ->
-      el0
+      el0 ()
     | `Dim1 ->
       el1
 
@@ -903,89 +903,110 @@ struct
       let r, r' = IStar.unleash dir in
       let s, s' = IStar.unleash fcom.dir in
       let cap_abs = Abs.bind1 x fcom.cap in
+      let subst_r = I.subst r x in
+      let subst_r' = I.subst r' x in
 
       (* This is O in [SVO, F].
        *
        * The purpose of O is to make sure that, when r=r', we can recover the coercee
        * after the long journey detailed below. *)
-      let origin z_dest =
-        let phi = I.subst r x in
+      let origin phi z_dest =
         let face =
-          Face.map @@ fun ri r'i absi ->
+          Face.map @@ fun sj s'j absj ->
+          let phi = I.cmp (I.equate sj s'j) phi in
           Abs.make1 @@ fun y ->
-          Val.act (I.equate ri r'i) @@
-          make_coe (IStar.make (`Atom y) s) absi @@
-          make_coe (IStar.make s' (`Atom y)) absi el
+          make_coe (IStar.make (`Atom y) (I.act (I.cmp phi subst_r) s)) absj @@
+          make_coe (IStar.make (I.act (I.cmp phi subst_r) s') (`Atom y)) absj @@
+          (Val.act phi el)
         in
         make_hcom
-          (IStar.make (I.act phi s') z_dest)
-          (Val.act phi fcom.cap)
-          (make_cap (IStar.act phi fcom.dir) (Val.act phi fcom.cap) (CompSys.act phi fcom.sys) el)
-          (CompSys.act phi (List.map face fcom.sys))
+          (IStar.make (I.act (I.cmp phi subst_r) s') z_dest)
+          (Val.act (I.cmp phi subst_r) fcom.cap)
+          (make_cap
+             (IStar.act (I.cmp phi subst_r) fcom.dir)
+             (Val.act (I.cmp phi subst_r) fcom.cap)
+             (CompSys.act (I.cmp phi subst_r) fcom.sys)
+             (Val.act phi el))
+          (force_abs_sys @@ List.map (fun b -> face (AbsFace.act (I.cmp phi subst_r) b)) fcom.sys)
       in
       (* This is N in [F, SVO], representing the coherence conditions enforced by `fcom.sys`.
        * The coercion must be equal to the coercion within the system under the restriction.
        *
-       * Note that substitution DOES NOT apply to z_dest. This turns out to be okay, but one
-       * has to be very, very careful. *)
-      let recovery_apart abs x_dest z_dest =
-        let phi = I.subst x_dest x in
-        make_coe (IStar.make (I.act phi s') z_dest) (Abs.act phi abs) @@
-        make_coe (IStar.make r x_dest) (Abs.bind1 x @@ Abs.inst1 abs s') el
+       * Precondition: `x` is apart from `phi` (thus `subst_x` commutes with `phi`),
+       *   but `x` may appear in `z_dest`.
+       *
+       * It turns out `I.act subst_x z_dest` is always `z_dest` at the call sites, but maybe it is
+       * safer to do substitution every time. *)
+      let recovery_apart phi abs x_dest z_dest =
+        let subst_x = I.subst x_dest x in
+        make_coe (IStar.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) abs @@
+        make_coe (IStar.make (I.act phi r) x_dest) (Abs.bind1 x @@ Abs.inst1 abs (I.act phi s')) @@
+        Val.act phi el
       in
       (* This is P in [F, SVO], the naive coercion of the cap part of the box within `fcom.cap`.
        * The problem is that we do not have the boundaries of the box, and even if we have,
        * this naive cap will not be the image of the boundaries. *)
-      let naively_coerced_cap =
-        rigid_gcom dir cap_abs (origin (I.act (I.subst r x) s)) @@
-        CompSys.forall x @@
-        let diag = AbsFace.rigid fcom.dir @@ Abs.bind1 x @@ make_coe (IStar.make r (`Atom x)) cap_abs el in
-        let face =
-          Face.map @@ fun ri r'i absi ->
-          Abs.bind1 x @@
-          Val.act (I.equate ri r'i) @@
-          recovery_apart absi (`Atom x) s
+      let naively_coerced_cap phi =
+        make_gcom (IStar.act phi dir) (Abs.act phi cap_abs) (origin phi (I.act (I.cmp phi subst_r) s)) @@
+        force_abs_sys @@
+        let diag =
+          if I.absent x s & I.absent x s'
+          then [
+            AbsFace.make (I.act phi s) (I.act phi s') @@ fun _ ->
+            let phi = I.cmp (I.equate s s') phi in
+            Abs.bind1 x @@ make_coe (IStar.make (I.act phi r) (`Atom x)) (Abs.act phi cap_abs) (Val.act phi el)
+          ]
+          else []
         in
-        CompSys.forall x [diag] @ List.map face (CompSys.forall x fcom.sys)
+        let face =
+          (* assuming x is apart from ri and r'i *)
+          Face.map @@ fun sj s'j absj ->
+          let phi = I.cmp (I.equate sj s'j) phi in
+          Abs.bind1 x @@ recovery_apart phi absj (`Atom x) (I.act phi s)
+        in
+        diag @ List.map (fun b -> face (AbsFace.act phi b)) (CompSys.forall x fcom.sys)
       in
       (* This is Q in [F, SVO]. This is used to calculate the preimage of the naively coerced cap
        * for the boundaries and the fixed cap.
        *
        * For equations apart from `x`, the recovery_general will coincide with recovery_apart.
        * This optimization is automatic thanks to the semantic simplification in redtt. *)
-      let recovery_general abs z_dest =
-        let phi_r' = I.subst r' x in
-        make_gcom (IStar.make (I.act phi_r' s) z_dest) (Abs.act phi_r' abs) naively_coerced_cap @@
-        let diag = AbsFace.rigid dir @@ Abs.make1 @@ fun y -> recovery_apart abs r (`Atom y) in
+      let recovery_general phi abs z_dest =
+        make_gcom (IStar.make (I.act (I.cmp phi subst_r') s) z_dest) abs (naively_coerced_cap phi) @@
+        force_abs_sys @@
+        let diag = AbsFace.make (I.act phi r) (I.act phi r') @@ fun _ ->
+          let phi = I.cmp (I.equate r r') phi in
+          Abs.make1 @@ fun y -> recovery_apart phi abs (I.act phi r) (`Atom y) in
         let face =
-          Face.map @@ fun ri r'i absi ->
-          Abs.make1 @@ fun y -> Val.act (I.equate ri r'i) @@ recovery_apart absi r' (`Atom y)
+          Face.map @@ fun sj s'j absj ->
+          let phi = I.cmp (I.equate sj s'j) phi in
+          Abs.make1 @@ fun y -> recovery_apart phi absj (I.act phi r') (`Atom y)
         in
-        `Ok (diag :: List.map face (CompSys.forall x fcom.sys))
+        diag :: List.map (fun b -> face (AbsFace.act phi b)) (CompSys.forall x fcom.sys)
       in
       (* This is the "cap" part of the final request in [F, SVO].
        *
-       * Using Q, the preimages, this is to calculate the final cap based on the naive cap.
-       *
-       * Note that the entire expression is under the substitution `(I.subst r' x)`
-       * that will be done later. *)
+       * Using Q, the preimages, this is to calculate the final cap based on the naive cap. *)
       let coerced_cap =
-        rigid_hcom fcom.dir fcom.cap naively_coerced_cap @@
-        let diag = AbsFace.rigid dir @@ Abs.make1 @@ fun w -> origin (`Atom w) in
-        let face = Face.map @@ fun ri r'i absi ->
+        make_hcom (IStar.act subst_r' fcom.dir) (Val.act subst_r' fcom.cap) (naively_coerced_cap I.idn) @@
+        force_abs_sys @@
+        let diag = AbsFace.make r r' @@ fun _ ->
+          let phi = I.equate r r' in
+          Abs.make1 @@ fun w -> origin phi (`Atom w) in
+        let face = Face.map @@ fun sj s'j absj ->
+          let phi = I.equate sj s'j in
           Abs.make1 @@ fun w ->
-          Val.act (I.equate ri r'i) @@
-          make_coe (IStar.make (`Atom w) s) absi @@
-          recovery_general absi (`Atom w)
+          make_coe (IStar.make (`Atom w) (I.act phi (I.act subst_r' s))) absj @@
+          recovery_general phi absj (`Atom w)
         in
-        diag :: List.map face fcom.sys
+        diag :: List.map (fun b -> face (AbsFace.act subst_r' b)) fcom.sys
       in
-      Val.act (I.subst r' x) @@
-      rigid_box fcom.dir coerced_cap @@
-      let face = Face.map @@ fun ri r'i absi ->
-        Val.act (I.equate ri r'i) @@
-        recovery_general absi s'
-      in List.map face fcom.sys
+      make_box (IStar.act subst_r' fcom.dir) coerced_cap @@
+      force_val_sys @@
+      let face = Face.map @@ fun sj s'j absj ->
+        let phi = I.equate sj s'j in
+        recovery_general phi absj (I.act (I.cmp phi subst_r') s')
+      in List.map (fun b -> face (AbsFace.act subst_r' b)) fcom.sys
 
 
     | V info ->
@@ -998,10 +1019,12 @@ struct
       let r, r' = IStar.unleash dir in
       let abs0 = Abs.bind1 x info.ty0 in
       let abs1 = Abs.bind1 x info.ty1 in
-      let subst0x = Val.act (I.subst `Dim0 x) in
-      let ty00 = subst0x info.ty0 in
-      let ty10 = subst0x info.ty1 in
-      let equiv0 = subst0x info.equiv in
+      let subst_0 = Val.act (I.subst `Dim0 x) in
+      let subst_r = Val.act (I.subst r x) in
+      let subst_r' = Val.act (I.subst r' x) in
+      let ty00 = subst_0 info.ty0 in
+      let ty10 = subst_0 info.ty1 in
+      let equiv0 = subst_0 info.equiv in
       begin
         match info.x = x with
         | true ->
@@ -1009,38 +1032,54 @@ struct
            * Due to the eager semantic simplification built in
            * `make_vproj`, `make_coe` and `make_hcom`,
            * redtt can afford less efficient generating code. *)
-          let base src dest =
-            make_coe (IStar.make src dest) abs1 @@
-            let substsx = Val.act (I.subst src x) in
-            vproj src (substsx info.ty0) (substsx info.ty1) (substsx info.equiv) el
+          let base phi src dest =
+            make_coe (IStar.make src dest) (Abs.act phi abs1) @@
+            let subst_src = Val.act (I.subst src x) in
+            vproj
+              (I.act phi src)
+              (fun _ -> Val.act phi @@ subst_src info.ty0)
+              (subst_src info.ty1)
+              (fun _ -> Val.act phi @@ subst_src info.equiv) el
           in
           (* Some helper functions to reduce typos. *)
-          let base0 dest = base `Dim0 dest in
-          let base1 dest = base `Dim1 dest in
-          let fiber0 b = car @@ apply (cdr equiv0) b in
+          let base0 phi dest = base phi `Dim0 dest in
+          let base1 phi dest = base phi `Dim1 dest in
+          let fiber0 phi b = car @@ apply (cdr (Val.act phi equiv0)) b in
           (* This gives a path from the fiber `fib` to `fiber0 b`
            * where `b` is calculated from `fib` as
            * `ext_apply (cdr fib) [`Dim1]` directly. *)
-          let contr0 fib = apply (cdr @@ apply (cdr equiv0) (ext_apply (cdr fib) [`Dim1])) fib in
+          let contr0 phi fib = apply (cdr @@ apply (cdr (Val.act phi equiv0)) (ext_apply (cdr fib) [`Dim1])) fib in
           (* The diagonal face for r=r'. *)
-          let face_diag = AbsFace.make r r' @@ Abs.make1 @@ fun _ ->
+          let face_diag = AbsFace.make r r' @@ fun _ ->
+            let phi = I.equate r r' in
+            Abs.make1 @@ fun _ ->
             (* Room for optimization: `x` is apart from `el` *)
-            let substrx = Val.act (I.subst r x) in
-            vproj r (substrx info.ty0) (substrx info.ty1) (substrx info.equiv) el
+            vproj
+              (I.act phi r)
+              (fun _ -> Val.act phi @@ subst_r info.ty0)
+              (subst_r info.ty1)
+              (fun _ -> Val.act phi @@ subst_r info.equiv) el
           in
           (* The face for r=0. *)
-          let face0 = AbsFace.make r `Dim0 @@ Abs.make1 (fun _ -> base0 r') in
+          let face0 = AbsFace.make r `Dim0 @@ fun _ ->
+            let phi = I.equate r `Dim0 in
+            Abs.make1 (fun _ -> base0 phi r')
+          in
           (* The face for r=1. This more optimized version is used
            * in [Y], [F] and [R1] but not [SVO]. *)
-          let face1 = AbsFace.make r `Dim1 @@
+          let face1 = AbsFace.make r `Dim1 @@ fun _ ->
+            let phi = I.equate r `Dim1 in
             Abs.make1 @@ fun y ->
-            let ty = Val.act (I.subst r' x) info.ty1 in
-            let cap = base1 r' in
+            let ty = Val.act phi @@ subst_r' info.ty1 in
+            let cap = base1 phi r' in
             let msys = force_abs_sys @@
-              let face0 = AbsFace.make r' `Dim0 @@
-                Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 cap)) [`Atom z]
+              let face0 = AbsFace.make (I.act phi r') `Dim0 @@ fun _ ->
+                let phi = I.cmp (I.equate (I.act phi r') `Dim0) phi in
+                Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 phi cap)) [`Atom z]
               in
-              let face1 = AbsFace.make r' `Dim1 @@ Abs.make1 @@ fun _ -> el in
+              let face1 = AbsFace.make (I.act phi r') `Dim1 @@ fun _ ->
+                let phi = I.cmp (I.equate (I.act phi r') `Dim1) phi in
+                Abs.make1 @@ fun _ -> Val.act phi el in
               [face0; face1]
             in
             make_hcom (IStar.make `Dim1 (`Atom y)) ty cap msys
@@ -1049,64 +1088,71 @@ struct
            * simplifying the generating code for the front face
            * (r'=0). It is using the evaluator to generate the
            * type in the semantic domain. *)
-          let fiber0_ty b =
+          let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.var i `Only in
-            eval (Env.push_many [Val ty00; Val ty10; Val (car equiv0); Val b] Env.emp) @@
+            eval (Env.push_many [Val (Val.act phi ty00); Val (Val.act phi ty10); Val (car (Val.act phi equiv0)); Val b] Env.emp) @@
             Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
           in
           (* This is to generate the element in `ty0` and also
            * the face for r'=0. This is `O` in [F]. *)
-          let fixer_fiber =
+          let fixer_fiber phi =
             (* Turns out `fiber_at_face0` will be
              * used for multiple times. *)
-            let fiber_at_face0 = make_cons (el, make_extlam @@ Abs.make1 @@ fun _ -> base0 `Dim0) in
+            let fiber_at_face0 phi = make_cons
+                (Val.act phi el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
+            in
             let mode = `UNIFORM_HCOM in (* how should we switch this? *)
             match mode with
             (* The implementation used in [F] and [R1]. *)
             | `SPLIT_COERCION ->
               begin
                 match r with
-                | `Dim0 -> fiber_at_face0 (* r=0 *)
-                | `Dim1 -> fiber0 (base1 `Dim0) (* r=1 *)
+                | `Dim0 -> fiber_at_face0 phi (* r=0 *)
+                | `Dim1 -> fiber0 phi (base1 phi `Dim0) (* r=1 *)
                 | `Atom r_atom ->
+                  (* XXX This needs to be updated with the new Thought. *)
                   (* coercion to the diagonal *)
                   let path_in_fiber0_ty =
-                    contr0 @@
-                    make_coe (IStar.make `Dim0 r) (Abs.bind1 r_atom (fiber0_ty (base r `Dim0))) @@
+                    contr0 phi @@
+                    make_coe (IStar.make `Dim0 (I.act phi r)) (Abs.bind1 r_atom (fiber0_ty phi (base phi r `Dim0))) @@
                     (* the fiber *)
-                    make_cons (Val.act (I.subst `Dim0 r_atom) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 `Dim0)
+                    make_cons (Val.act (I.cmp phi (I.subst `Dim0 r_atom)) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
                   in
                   ext_apply path_in_fiber0_ty [r]
               end
             (* The implementation used in [Y]. *)
             | `UNIFORM_HCOM ->
               (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
-              make_hcom (IStar.make `Dim1 `Dim0) (fiber0_ty (base r `Dim0)) (fiber0 (base r `Dim0)) @@
+              make_hcom (IStar.make `Dim1 `Dim0) (fiber0_ty phi (base phi r `Dim0)) (fiber0 phi (base phi r `Dim0)) @@
               force_abs_sys @@
-              let face0 = AbsFace.make r `Dim0 @@
-                Abs.make1 @@ fun w -> ext_apply (contr0 fiber_at_face0) [`Atom w]
+              let face0 = AbsFace.make (I.act phi r) `Dim0 @@ fun _ ->
+                let phi = I.cmp (I.equate (I.act phi r) `Dim0) phi in
+                Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) [`Atom w]
               in
-              let face1 = AbsFace.make r `Dim1 @@
-                Abs.make1 @@ fun _ -> fiber0 (base1 `Dim0)
+              let face1 = AbsFace.make (I.act phi r) `Dim1 @@ fun _ ->
+                let phi = I.cmp (I.equate (I.act phi r) `Dim1) phi in
+                Abs.make1 @@ fun _ -> fiber0 phi (base1 phi `Dim0)
               in
               [face0; face1]
             (* Something magical under development. *)
             | `UNICORN ->
               failwith "too immortal; not suitable for mortal beings"
           in
-          let el0 =
+          let el0 () =
+            let phi = I.equate r' `Dim0 in
             try
-              car fixer_fiber
+              car (fixer_fiber phi)
             with
             | exn ->
-              Format.eprintf "Not immortal enough: %a@." pp_value fixer_fiber;
+              Format.eprintf "Not immortal enough: %a@." pp_value (fixer_fiber phi);
               raise exn
           in
           let face_front =
-            AbsFace.make r' `Dim0 @@
-            Abs.make1 @@ fun w -> ext_apply (cdr fixer_fiber) [`Atom w]
+            AbsFace.make r' `Dim0 @@ fun _ ->
+            let phi = I.equate r' `Dim0 in
+            Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) [`Atom w]
           in
-          let el1 = make_hcom (IStar.make `Dim1 `Dim0) info.ty1 (base r r') @@
+          let el1 = make_hcom (IStar.make `Dim1 `Dim0) info.ty1 (base I.idn r r') @@
             force_abs_sys [face0; face1; face_diag; face_front]
           in
           make_vin r' el0 el1
@@ -1199,12 +1245,9 @@ struct
           in
           List.map face fcom.sys
         in
-        let diag =
-          try
-            AbsFace.rigid fcom.dir @@
-            let phi = I.equate s s' in
-            Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Val.act phi fcom.cap)
-          with I.Inconsistent -> Face.False fcom.dir
+        let diag = AbsFace.rigid fcom.dir @@ fun _ ->
+          let phi = I.equate s s' in
+          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Val.act phi fcom.cap)
         in
         diag :: (ri_faces @ si_faces)
       in
@@ -1276,7 +1319,7 @@ struct
           let ri, r'i = IStar.unleash eqi in
           let r, r' = IStar.unleash dir in
           let face (dim0, dim1) =
-            AbsFace.make ri `Dim0 @@
+            AbsFace.make ri `Dim0 @@ fun _ ->
             (* XXX this would stop the expansion early, but is
              * unfortunately duplicate under `AbsFace.make` *)
 
@@ -1285,8 +1328,8 @@ struct
             | `Proj abs -> abs
             | `Ok rest0 ->
               let r'i = I.act (I.equate ri `Dim0) r'i in
-              let ghcom00 = AbsFace.make r'i dim0 absi in
-              let ghcom01 = AbsFace.make r'i dim1 @@
+              let ghcom00 = AbsFace.make r'i dim0 @@ fun _ -> absi in
+              let ghcom01 = AbsFace.make r'i dim1 @@ fun _ ->
                 Abs.make1 @@ fun y ->
                 (* TODO this can be optimized further by expanding
                  * `make_ghcom` because `ty` is not changed and
@@ -1323,7 +1366,7 @@ struct
         let phi = I.equate ri r'i in
         let yi, vi = Abs.unleash1 absi in
         let y2r' = IStar.make (`Atom yi) (I.act phi r') in
-        Abs.bind1 yi @@ make_coe y2r' (Abs.act phi abs) @@ Val.act phi vi
+        Abs.bind1 yi @@ make_coe y2r' (Abs.act phi abs) vi
       in
       List.map face sys
     in
@@ -1339,7 +1382,7 @@ struct
         let phi = I.equate ri r'i in
         let yi, vi = Abs.unleash1 absi in
         let y2r' = IStar.make (`Atom yi) (I.act phi r') in
-        Abs.bind1 yi @@ make_coe y2r' (Abs.act phi abs) @@ Val.act phi vi
+        Abs.bind1 yi @@ make_coe y2r' (Abs.act phi abs) vi
       in
       List.map face sys
     in
@@ -1387,9 +1430,9 @@ struct
         | `Atom x ->
           let phir0 = I.equate r `Dim0 in
           let rho' = Env.act phir0 rho in
-          let ty0 = eval rho' info.ty0 in
+          let ty0 () = eval rho' info.ty0 in
           let ty1 = eval rho info.ty1 in
-          let equiv = eval rho' info.equiv in
+          let equiv () = eval rho' info.equiv in
           make_v (`Atom x) ty0 ty1 equiv
         | `Dim0 ->
           eval rho info.ty0
@@ -1400,7 +1443,7 @@ struct
     | Tm.VIn info ->
       let r = eval_dim rho info.r in
       let rho' = Env.act (I.equate r `Dim0) rho in
-      let el0 = eval rho' info.tm0 in
+      let el0 () = eval rho' info.tm0 in
       let el1 = eval rho info.tm1 in
       make_vin r el0 el1
 
@@ -1528,9 +1571,9 @@ struct
       cdr vhd
     | Tm.VProj info ->
       let r = eval_dim rho info.r in
-      let ty0 = eval rho info.ty0 in
+      let ty0 () = eval rho info.ty0 in
       let ty1 = eval rho info.ty1 in
-      let equiv = eval rho info.equiv in
+      let equiv () = eval rho info.equiv in
       vproj r ~ty0 ~ty1 ~equiv ~el:vhd
     | Tm.If info ->
       let mot = clo info.mot rho in
@@ -1624,7 +1667,7 @@ struct
   and reflect ty neu sys =
     match force_val_sys sys with
     | `Proj el -> el
-    | `Rigid sys ->
+    | `Ok sys ->
       make @@ Up {ty; neu; sys}
 
   and eval_bnd_face rho (tr, tr', obnd) =
@@ -1908,7 +1951,7 @@ struct
       let tyr, sysr = unleash_ext info.ty ss in
       begin
         match force_val_sys sysr with
-        | `Rigid sysr ->
+        | `Ok sysr ->
           let app = ExtApp (info.neu, ss) in
           let app_face =
             Face.map @@ fun r r' a ->
@@ -1929,7 +1972,7 @@ struct
         | `Proj v ->
           v
 
-        | `Rigid rsys ->
+        | `Ok rsys ->
           let correction =
             let face = Face.map @@ fun _ _ v -> Abs.bind1 y v in
             List.map face rsys
@@ -1945,7 +1988,7 @@ struct
         match force_val_sys sys_s with
         | `Proj v ->
           v
-        | `Rigid boundary_sys ->
+        | `Ok boundary_sys ->
           let cap = ext_apply info.cap ss in
           let correction_sys =
             let face = Face.map @@ fun _ _ v -> Abs.make1 @@ fun _ -> v in
@@ -1971,9 +2014,9 @@ struct
   and vproj mgen ~ty0 ~ty1 ~equiv ~el : value =
     match mgen with
     | `Atom x ->
-      rigid_vproj x ~ty0 ~ty1 ~equiv ~el
+      rigid_vproj x ~ty0:(ty0 ()) ~ty1 ~equiv:(equiv ()) ~el
     | `Dim0 ->
-      let func = car equiv in
+      let func = car (equiv ()) in
       apply func el
     | `Dim1 ->
       el
@@ -1987,7 +2030,7 @@ struct
       let vproj_face =
         Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
-        vproj (I.act phi @@ `Atom x) ~ty0:(Val.act phi ty0) ~ty1:(Val.act phi ty1) ~equiv:(Val.act phi equiv) ~el:a
+        vproj (I.act phi @@ `Atom x) ~ty0:(fun _ -> Val.act phi ty0) ~ty1:(Val.act phi ty1) ~equiv:(fun _ -> Val.act phi equiv) ~el:a
       in
       let vproj_sys = List.map vproj_face up.sys in
       make @@ Up {ty = ty1; neu; sys = vproj_sys}
