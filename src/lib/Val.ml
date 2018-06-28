@@ -1894,6 +1894,8 @@ struct
       rigid_ghcom info.dir ty cap sys
 
     | _ ->
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
       Format.eprintf "Tried to apply: %a@." pp_value vfun;
       failwith "apply"
 
