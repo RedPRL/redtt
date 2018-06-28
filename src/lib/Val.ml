@@ -1276,6 +1276,8 @@ struct
             AbsFace.make ri `Dim0 @@
             (* XXX this would stop the expansion early, but is
              * unfortunately duplicate under `AbsFace.make` *)
+
+            (* TODO: it is entirely possible that this equation is inconsistent, so we would raise an exception here. - Jon *)
             match CompSys.act (I.equate ri `Dim0) rest with
             | `Proj abs -> abs
             | `Ok rest0 ->
