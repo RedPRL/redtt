@@ -2353,7 +2353,7 @@ struct
 
   and pp_val_sys : type x. Format.formatter -> (x, value) face list -> unit =
     fun fmt ->
-      let pp_sep fmt () = Format.fprintf fmt " " in
+      let pp_sep fmt () = Format.fprintf fmt "@ " in
       Format.pp_print_list ~pp_sep pp_val_face fmt
 
   and pp_val_face : type x. _ -> (x, value) face -> unit =
@@ -2370,7 +2370,7 @@ struct
 
   and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
     fun fmt ->
-      let pp_sep fmt () = Format.fprintf fmt " " in
+      let pp_sep fmt () = Format.fprintf fmt "@ " in
       Format.pp_print_list ~pp_sep pp_comp_face fmt
 
   and pp_comp_face : type x. _ -> (x, abs) face -> unit =
