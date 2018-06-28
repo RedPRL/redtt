@@ -1063,7 +1063,7 @@ struct
           (* The face for r=0. *)
           let face0 = AbsFace.make r `Dim0 @@ fun _ ->
             let phi = I.equate r `Dim0 in
-            Abs.make1 (fun _ -> base0 phi r')
+            Abs.make1 (fun _ -> base0 phi (I.act phi r'))
           in
           (* The face for r=1. This more optimized version is used
            * in [Y], [F] and [R1] but not [SVO]. *)
@@ -1071,7 +1071,7 @@ struct
             let phi = I.equate r `Dim1 in
             Abs.make1 @@ fun y ->
             let ty = Val.act phi @@ subst_r' info.ty1 in
-            let cap = base1 phi r' in
+            let cap = base1 phi (I.act phi r') in
             let msys = force_abs_sys @@
               let face0 = AbsFace.make (I.act phi r') `Dim0 @@ fun _ ->
                 let phi = I.cmp (I.equate (I.act phi r') `Dim0) phi in
@@ -1114,7 +1114,7 @@ struct
                   (* coercion to the diagonal *)
                   let path_in_fiber0_ty =
                     contr0 phi @@
-                    make_coe (IStar.make `Dim0 (I.act phi r)) (Abs.bind1 r_atom (fiber0_ty phi (base phi r `Dim0))) @@
+                    make_coe (IStar.make `Dim0 (I.act phi r)) (Abs.bind1 r_atom (fiber0_ty phi (base phi (I.act phi r) `Dim0))) @@
                     (* the fiber *)
                     make_cons (Val.act (I.cmp phi (I.subst `Dim0 r_atom)) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
                   in
@@ -1123,7 +1123,7 @@ struct
             (* The implementation used in [Y]. *)
             | `UNIFORM_HCOM ->
               (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
-              make_hcom (IStar.make `Dim1 `Dim0) (fiber0_ty phi (base phi r `Dim0)) (fiber0 phi (base phi r `Dim0)) @@
+              make_hcom (IStar.make `Dim1 `Dim0) (fiber0_ty phi (base phi (I.act phi r) `Dim0)) (fiber0 phi (base phi (I.act phi r) `Dim0)) @@
               force_abs_sys @@
               let face0 = AbsFace.make (I.act phi r) `Dim0 @@ fun _ ->
                 let phi = I.cmp (I.equate (I.act phi r) `Dim0) phi in
