@@ -33,33 +33,33 @@ module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
   val act : I.action -> 'x t -> [`Any] t
-  val rigid : IStar.t -> (unit -> X.t) -> ('x, X.t) face
-  val gen_const : I.atom -> [`Dim0 | `Dim1] -> X.t -> ('x, X.t) face
-  val make : I.t -> I.t -> (unit -> X.t) -> ([`Any], X.t) face
+  val rigid : I.action -> IStar.t -> (I.action -> X.t) -> ('x, X.t) face
+  val gen_const : I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> X.t) -> ('x, X.t) face
+  val make : I.action -> I.t -> I.t -> (I.action -> X.t) -> ([`Any], X.t) face
 end =
 struct
   type 'x t = ('x, X.t) face
 
-  let rigid : type x. IStar.t -> (unit -> X.t) -> (x, X.t) face =
-    fun eq a ->
+  let rigid : type x. I.action -> IStar.t -> (I.action -> X.t) -> (x, X.t) face =
+    fun phi eq a ->
       let r, r' = IStar.unleash eq in
       match I.compare r r' with
       | `Apart ->
         False eq
       | _ ->
-        Indet (eq, X.act (I.equate r r') (a ()))
+        Indet (eq, a (I.cmp (I.equate r r') phi))
 
-  let make : I.t -> I.t -> (unit -> X.t) -> ([`Any], X.t) face =
-    fun r r' a ->
+  let make : I.action -> I.t -> I.t -> (I.action -> X.t) -> ([`Any], X.t) face =
+    fun phi r r' a ->
       match IStar.make r r' with
       | `Ok p ->
-        rigid p a
+        rigid phi p a
       | `Same _ ->
-        True (r, r', (a ()))
+        True (r, r', a (I.cmp (I.equate r r') phi))
 
-  let gen_const : type x. I.atom -> [`Dim0 | `Dim1] -> X.t -> (x, X.t) face =
-    fun x eps a ->
-      rigid (IStar.gen_const x eps) (fun _ -> a)
+  let gen_const : type x. I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> X.t) -> (x, X.t) face =
+    fun phi x eps a ->
+      rigid phi (IStar.gen_const x eps) a
 
 
   let act : type x. I.action -> x t -> _ t =

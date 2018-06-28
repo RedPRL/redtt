@@ -11,12 +11,12 @@ module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
 
-  val rigid : IStar.t -> (unit -> X.t) -> ('x, X.t) face
+  val rigid : I.action -> IStar.t -> (I.action -> X.t) -> ('x, X.t) face
 
-  val make : I.t -> I.t -> (unit -> X.t) -> ([`Any], X.t) face
+  val make : I.action -> I.t -> I.t -> (I.action -> X.t) -> ([`Any], X.t) face
 
   (* convenience function for generating rigid faces x = ε *)
-  val gen_const : I.atom -> [`Dim0 | `Dim1] -> X.t -> ('x, X.t) face
+  val gen_const : I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> X.t) -> ('x, X.t) face
 
   val act : I.action -> ('x, X.t) face -> [`Any] t
 end
