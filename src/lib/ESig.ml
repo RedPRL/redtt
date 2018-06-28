@@ -65,5 +65,7 @@ let pp fmt =
     Format.fprintf fmt "<hope>"
   | Lam _ ->
     Format.fprintf fmt "<lam>"
+  | Var (s, _) ->
+    Format.fprintf fmt "%s" s
   | _ ->
     Format.fprintf fmt "<eterm>"

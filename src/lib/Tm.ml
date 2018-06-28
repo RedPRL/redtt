@@ -764,7 +764,7 @@ and pp_head env fmt =
   function
   | Coe {r; r'; ty = B (nm, ty); tm} ->
     let x, env' = Pretty.Env.bind nm env in
-    Format.fprintf fmt "@[<1>(coe %a %a@ [%a] %a@ %a)@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) tm
+    Format.fprintf fmt "@[<1>(coe %a %a@ <%a> %a@ %a)@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) tm
 
   | HCom {r; r'; ty; cap; sys} ->
     Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys

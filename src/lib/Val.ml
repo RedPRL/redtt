@@ -923,10 +923,10 @@ struct
           (IStar.make (I.act (I.cmp phi subst_r) s') z_dest)
           (Val.act (I.cmp phi subst_r) fcom.cap)
           (make_cap
-            (IStar.act (I.cmp phi subst_r) fcom.dir)
-            (Val.act (I.cmp phi subst_r) fcom.cap)
-            (CompSys.act (I.cmp phi subst_r) fcom.sys)
-            (Val.act phi el))
+             (IStar.act (I.cmp phi subst_r) fcom.dir)
+             (Val.act (I.cmp phi subst_r) fcom.cap)
+             (CompSys.act (I.cmp phi subst_r) fcom.sys)
+             (Val.act phi el))
           (force_abs_sys @@ List.map (fun b -> face (AbsFace.act (I.cmp phi subst_r) b)) fcom.sys)
       in
       (* This is N in [F, SVO], representing the coherence conditions enforced by `fcom.sys`.
@@ -1099,7 +1099,7 @@ struct
             (* Turns out `fiber_at_face0` will be
              * used for multiple times. *)
             let fiber_at_face0 phi = make_cons
-              (Val.act phi el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
+                (Val.act phi el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
             in
             let mode = `UNIFORM_HCOM in (* how should we switch this? *)
             match mode with
@@ -1217,14 +1217,14 @@ struct
 
       (* This is C_M in [F], with an extra parameter `phi` to get along with NbE. *)
       let cap_aux phi el = make_cap
-        (IStar.act phi fcom.dir) (Val.act phi fcom.cap) (CompSys.act phi fcom.sys) el
+          (IStar.act phi fcom.dir) (Val.act phi fcom.cap) (CompSys.act phi fcom.sys) el
       in
 
       (* This serves as `O` and the diagonal face in [F]
        * for the coherence conditions in `fcom.sys` and `s=s'`. *)
       let hcom_template phi y_dest ty = make_hcom
-        (IStar.make (I.act phi r) y_dest) ty
-        (Val.act phi fcom.cap) (CompSys.act phi fcom.sys)
+          (IStar.make (I.act phi r) y_dest) ty
+          (Val.act phi fcom.cap) (CompSys.act phi fcom.sys)
       in
 
       (* This is `P` in [F]. *)
@@ -1322,6 +1322,8 @@ struct
             AbsFace.make ri `Dim0 @@ fun _ ->
             (* XXX this would stop the expansion early, but is
              * unfortunately duplicate under `AbsFace.make` *)
+
+            (* TODO: it is entirely possible that this equation is inconsistent, so we would raise an exception here. - Jon *)
             match CompSys.act (I.equate ri `Dim0) rest with
             | `Proj abs -> abs
             | `Ok rest0 ->
@@ -1935,6 +1937,8 @@ struct
       rigid_ghcom info.dir ty cap sys
 
     | _ ->
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
       Format.eprintf "Tried to apply: %a@." pp_value vfun;
       failwith "apply"
 
@@ -1990,7 +1994,17 @@ struct
             let face = Face.map @@ fun _ _ v -> Abs.make1 @@ fun _ -> v in
             List.map face boundary_sys
           in
-          rigid_hcom info.dir ty_s cap @@ correction_sys @ info.sys
+          let comp_sys =
+            let face =
+              Face.map @@ fun r r' abs ->
+              let phi_rr' = I.equate r r' in
+              let ss_rr' = List.map (I.act phi_rr') ss in
+              let x, v = Abs.unleash1 abs in
+              Abs.bind1 x @@ ext_apply v ss_rr'
+            in
+            List.map face info.sys
+          in
+          rigid_hcom info.dir ty_s cap @@ correction_sys @ comp_sys
       end
 
     | _ ->
@@ -2269,8 +2283,8 @@ struct
     | Box info -> info.cap
     | Up info ->
       let cap_sys = List.map (Face.map (fun ri r'i a ->
-        let phi = I.equate ri r'i in
-        make_cap (IStar.act phi dir) (Val.act phi ty) (CompSys.act phi sys) a)) info.sys in
+          let phi = I.equate ri r'i in
+          make_cap (IStar.act phi dir) (Val.act phi ty) (CompSys.act phi sys) a)) info.sys in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
     | _ ->
       Format.eprintf "Tried to get rigid-cap of %a@." pp_value el;
@@ -2348,8 +2362,8 @@ struct
       Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
     | Cons (v0, v1) ->
       Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
-    | V _ ->
-      Format.fprintf fmt "<v-type>"
+    | V info ->
+      Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
     | VIn info ->
       Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)]" Name.pp info.x pp_value info.el0 pp_value info.el1
     | Coe info ->
@@ -2394,7 +2408,7 @@ struct
 
   and pp_val_sys : type x. Format.formatter -> (x, value) face list -> unit =
     fun fmt ->
-      let pp_sep fmt () = Format.fprintf fmt " " in
+      let pp_sep fmt () = Format.fprintf fmt "@ " in
       Format.pp_print_list ~pp_sep pp_val_face fmt
 
   and pp_val_face : type x. _ -> (x, value) face -> unit =
@@ -2411,7 +2425,7 @@ struct
 
   and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
     fun fmt ->
-      let pp_sep fmt () = Format.fprintf fmt " " in
+      let pp_sep fmt () = Format.fprintf fmt "@ " in
       Format.pp_print_list ~pp_sep pp_comp_face fmt
 
   and pp_comp_face : type x. _ -> (x, abs) face -> unit =

@@ -413,7 +413,7 @@ struct
       let bnd = equate_val_abs env (Val.act phi ty) abs0 abs1 in
       tr, tr', Some bnd
 
-    | _ ->
+    | (Face.Indet _, Face.False _ | Face.False _, Face.Indet _)->
       Format.eprintf "equate_comp_face: %a vs %a@." pp_comp_face face0 pp_comp_face face1;
       failwith "equate_comp_face"
 
