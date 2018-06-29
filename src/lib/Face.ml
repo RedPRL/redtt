@@ -80,13 +80,7 @@ struct
             let t' = X.act phi t in
             True (c, d, t')
           | `Ok p' ->
-            let r, r' = IStar.unleash p' in
-            match I.compare r r' with
-            | `Apart ->
-              False p'
-            | _ ->
-              let t' = X.act (I.cmp (I.equate r r') phi) t in
-              Indet (p', t')
+            rigid phi p' (fun phi -> X.act phi t)
         end
 end
 
