@@ -1034,7 +1034,7 @@ struct
             make_coe (IStar.make src dest) (Abs.act phi abs1) @@
             let subst_src = Val.act (I.subst src x) in
             vproj phi
-              (I.act phi r)
+              (I.act phi src)
               (fun phi0 -> Val.act phi0 @@ subst_src info.ty0)
               (Val.act phi @@ subst_src info.ty1)
               (fun phi0 -> Val.act phi0 @@ subst_src info.equiv)
