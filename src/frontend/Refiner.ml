@@ -82,6 +82,15 @@ let push_restriction sys ty =
     let rty = Tm.make @@ Tm.Ext ebnd' in
     M.ret @@ `Negative rty
 
+  (* | Tm.Sg (dom, cod) ->
+     let car tm = Tm.up (Tm.Down {ty; tm}, Emp #< Tm.Car) in
+     let cdr tm = Tm.up (Tm.Down {ty; tm}, Emp #< Tm.Cdr) in
+     let x, codx = Tm.unbind cod in
+     let rdom = Tm.make @@ Tm.Rst {ty = dom; sys = on_sys car sys} in
+     let rcodx = Tm.make @@ Tm.Rst {ty = codx; sys = on_sys cdr sys} in
+     let rty = Tm.make @@ Tm.Sg (rdom, Tm.bind x rcodx) in
+     M.ret @@ `Negative rty *)
+
 
   | _ ->
     M.ret `Positive
