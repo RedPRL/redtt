@@ -1156,12 +1156,7 @@ struct
                 Abs.bind1 x @@ apply (car info.equiv) @@
                 make_coe (IStar.make (I.act phi r) (`Atom x)) (Abs.act phi abs0) (Val.act phi el)
               in
-              let face1 =
-                AbsFace.gen_const I.idn info.x `Dim1 @@ fun phi ->
-                Abs.bind1 x @@
-                make_coe (IStar.make (I.act phi r) (`Atom x)) (Abs.act phi abs1) (Val.act phi el)
-              in
-              Option.filter_map force_abs_face [face0; face1]
+              Option.filter_map force_abs_face [face0]
             in
             rigid_com dir abs1 cap sys
           in
