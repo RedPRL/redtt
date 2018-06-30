@@ -1988,6 +1988,8 @@ struct
       failwith "ext_apply"
 
 
+  (* the equation oracle `phi` is for continuations `ty0` and `equiv`
+   * waiting for an updated oracle. *)
   and vproj phi mgen ~ty0 ~ty1 ~equiv ~el : value =
     match mgen with
     | `Atom x ->
