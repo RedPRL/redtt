@@ -165,9 +165,8 @@ struct
       let inf = Tm.Down {ty = let_ty; tm = let_tm}, Emp in
       M.ret @@ Tm.make @@ Tm.Let (inf, Tm.bind x bdyx)
 
-    | Tm.Rst info, _ ->
-      elab_chk env info.ty e >>=
-      guess_restricted info.ty info.sys
+    | Tm.Rst _, _ ->
+      tac_rst (fun ty -> elab_chk env ty e) ty
 
     | _, E.Lam (names, e) ->
       let tac ty = elab_chk env ty e in

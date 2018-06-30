@@ -49,6 +49,38 @@ let guess_restricted ty sys tm =
 
 exception ChkMatch
 
+let push_restriction sys ty =
+  normalize_ty ty >>= fun ty ->
+  match Tm.unleash ty with
+  | Tm.Pi (dom, cod) ->
+    let x, codx = Tm.unbind cod in
+    let app_tm tm =
+      let var = Tm.up (Tm.Ref {name = x; ushift = 0; twin = `Only}, Emp) in
+      let hd = Tm.Down {ty; tm} in
+      Tm.up (hd , Emp #< (Tm.FunApp var))
+    in
+    let app_face (r0, r1, otm) = r0, r1, Option.map app_tm otm in
+    let app_sys = List.map app_face sys in
+    let rcodx = Tm.make @@ Tm.Rst {ty = codx; sys = app_sys} in
+    let rty = Tm.make @@ Tm.Pi (dom, Tm.bind x rcodx) in
+    M.ret @@ `Negative rty
+
+  | Tm.Ext ebnd ->
+    let xs, tyxs, sysxs = Tm.unbind_ext ebnd in
+    let app_tm tm =
+      let vars = Bwd.to_list @@ Bwd.map (fun x -> Tm.up (Tm.Ref {name = x; ushift = 0; twin = `Only}, Emp)) xs in
+      let hd = Tm.Down {ty; tm} in
+      Tm.up (hd , Emp #< (Tm.ExtApp vars))
+    in
+    let app_face (r0, r1, otm) = r0, r1, Option.map app_tm otm in
+    let ebnd' = Tm.bind_ext xs tyxs @@ sysxs @ List.map app_face sys in
+    let rty = Tm.make @@ Tm.Ext ebnd' in
+    M.ret @@ `Negative rty
+
+
+  | _ ->
+    M.ret `Positive
+
 (* For negative types, we can do beter than this!! *)
 let rec tac_rst tac ty =
   let rec go sys ty =
@@ -56,16 +88,26 @@ let rec tac_rst tac ty =
     | Tm.Rst rst ->
       go (rst.sys @ sys) rst.ty
     | _ ->
-      tac ty >>=
-      guess_restricted ty sys
+      begin
+        match sys with
+        | [] -> tac ty
+        | _ ->
+          normalize_ty ty >>= fun ty ->
+          push_restriction sys ty >>= function
+          | `Positive ->
+            tac ty >>=
+            guess_restricted ty sys
+          | `Negative rty ->
+            tac rty
+      end
   in go [] ty
 
 
 let tac_wrap_nf tac ty =
-  try tac_rst tac ty
+  try tac ty
   with
   | ChkMatch ->
-    normalize_ty ty >>= tac
+    normalize_ty ty >>= tac_rst tac
 
 let rec tac_lambda names tac ty =
   match Tm.unleash ty with
