@@ -49,18 +49,24 @@ let guess_restricted ty sys tm =
 
 exception ChkMatch
 
+(* The idea of this function is to push a restriction downward into a negative type.
+   It is perhaps a bit too ambitious to fully unleash, until we have developed the
+   subtyping and definitional equivalence theory that really gets down with eta laws. *)
 let push_restriction sys ty =
   normalize_ty ty >>= fun ty ->
+  let on_sys f =
+    List.map @@ fun (r, r', otm) ->
+    r, r', Option.map f otm
+  in
   match Tm.unleash ty with
   | Tm.Pi (dom, cod) ->
     let x, codx = Tm.unbind cod in
     let app_tm tm =
       let var = Tm.up (Tm.Ref {name = x; ushift = 0; twin = `Only}, Emp) in
       let hd = Tm.Down {ty; tm} in
-      Tm.up (hd , Emp #< (Tm.FunApp var))
+      Tm.up (hd, Emp #< (Tm.FunApp var))
     in
-    let app_face (r0, r1, otm) = r0, r1, Option.map app_tm otm in
-    let app_sys = List.map app_face sys in
+    let app_sys = on_sys app_tm sys in
     let rcodx = Tm.make @@ Tm.Rst {ty = codx; sys = app_sys} in
     let rty = Tm.make @@ Tm.Pi (dom, Tm.bind x rcodx) in
     M.ret @@ `Negative rty
@@ -72,8 +78,7 @@ let push_restriction sys ty =
       let hd = Tm.Down {ty; tm} in
       Tm.up (hd , Emp #< (Tm.ExtApp vars))
     in
-    let app_face (r0, r1, otm) = r0, r1, Option.map app_tm otm in
-    let ebnd' = Tm.bind_ext xs tyxs @@ sysxs @ List.map app_face sys in
+    let ebnd' = Tm.bind_ext xs tyxs @@ sysxs @ on_sys app_tm sys in
     let rty = Tm.make @@ Tm.Ext ebnd' in
     M.ret @@ `Negative rty
 
@@ -81,7 +86,6 @@ let push_restriction sys ty =
   | _ ->
     M.ret `Positive
 
-(* For negative types, we can do beter than this!! *)
 let rec tac_rst tac ty =
   let rec go sys ty =
     match Tm.unleash ty with
