@@ -1,3 +1,5 @@
+open RedTT_Core
+
 type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
   | Debug of [ `All | `Constraints | `Unsolved ]

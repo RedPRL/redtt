@@ -1,3 +1,4 @@
+open RedTT_Core
 open Lexing
 
 let print_position outx lexbuf =

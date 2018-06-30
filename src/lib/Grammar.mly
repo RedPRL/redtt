@@ -1,4 +1,5 @@
 %{
+  open RedTT_Core
   open TmUtil
   open RedBasis
   open Bwd

@@ -96,7 +96,7 @@ struct
                   go eqns
                 end
             | `Atom x, `Atom y ->
-              x = y or go eqns
+              x = y || go eqns
             | _, _ ->
               go @@ (r', r) :: eqns
         end

@@ -1,4 +1,5 @@
 open RedBasis.Bwd
+open RedTT_Core
 
 type tm = Tm.tm
 type ty = Tm.tm

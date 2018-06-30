@@ -1,3 +1,4 @@
+open RedTT_Core
 open RedBasis.Bwd
 open BwdNotation
 

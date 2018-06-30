@@ -1,4 +1,5 @@
 open RedBasis
+open RedTT_Core
 
 module T = PersistentTable.M
 type t = string option list * (string, Name.t) T.t
