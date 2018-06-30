@@ -481,16 +481,16 @@ struct
         (BoxSys.act phi info.sys)
 
     | V info ->
-      make_v
+      make_v phi
         (I.act phi @@ `Atom info.x)
-        (fun _ -> Val.act phi info.ty0)
+        (fun phi0 -> Val.act phi0 info.ty0)
         (Val.act phi info.ty1)
-        (fun _ -> Val.act phi info.equiv)
+        (fun phi0 -> Val.act phi0 info.equiv)
 
     | VIn info ->
-      make_vin
+      make_vin phi
         (I.act phi @@ `Atom info.x)
-        (fun _ -> Val.act phi info.el0)
+        (fun phi0 -> Val.act phi0 info.el0)
         (Val.act phi info.el1)
 
     | Univ _ ->
@@ -568,17 +568,17 @@ struct
     match con with
     | VProj info ->
       let mx = I.act phi @@ `Atom info.x in
-      let ty0 () = Val.act phi info.ty0 in
+      let ty0 phi0 = Val.act phi0 info.ty0 in
       let ty1 = Val.act phi info.ty1 in
-      let equiv () = Val.act phi info.equiv in
+      let equiv phi0 = Val.act phi0 info.equiv in
       begin
         match act_neu phi info.neu with
         | Ret neu ->
-          let vty = make_v mx ty0 ty1 equiv in
+          let vty = make_v phi mx ty0 ty1 equiv in
           let el = make @@ Up {ty = vty; neu = neu; sys = []} in
-          step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
+          step @@ vproj phi mx ~ty0 ~ty1 ~equiv ~el
         | Step el ->
-          step @@ vproj mx ~ty0 ~ty1 ~equiv ~el
+          step @@ vproj phi mx ~ty0 ~ty1 ~equiv ~el
       end
 
     | Cap info ->
@@ -763,21 +763,23 @@ struct
 
   and make_extlam abs = make @@ ExtLam abs
 
-  and make_v mgen ty0 ty1 equiv : value =
+  and make_v phi mgen ty0 ty1 equiv : value =
     match mgen with
     | `Atom x ->
-      make @@ V {x; ty0 = ty0 (); ty1; equiv = equiv ()}
+      let phi0 = I.cmp (I.equate mgen `Dim0) phi in
+      make @@ V {x; ty0 = ty0 phi0; ty1; equiv = equiv phi0}
     | `Dim0 ->
-      ty0 ()
+      ty0 phi
     | `Dim1 ->
       ty1
 
-  and make_vin mgen el0 el1 : value =
+  and make_vin phi mgen el0 el1 : value =
     match mgen with
     | `Atom x ->
-      rigid_vin x (el0 ()) el1
+      let phi0 = I.cmp (I.equate mgen `Dim0) phi in
+      rigid_vin x (el0 phi0) el1
     | `Dim0 ->
-      el0 ()
+      el0 phi
     | `Dim1 ->
       el1
 
@@ -974,7 +976,7 @@ struct
         make_gcom (IStar.make (I.act (I.cmp phi subst_r') s) z_dest) abs (naively_coerced_cap phi) @@
         force_abs_sys @@
         let diag = AbsFace.make phi (I.act phi r) (I.act phi r') @@ fun phi ->
-          Abs.make1 @@ fun y -> recovery_apart phi abs (I.act phi r) (`Atom y) in
+          Abs.make1 @@ fun y -> recovery_apart phi (Abs.act phi abs) (I.act phi r) (`Atom y) in
         let face =
           Face.map @@ fun sj s'j absj ->
           let phi = I.cmp (I.equate sj s'j) phi in
@@ -1017,7 +1019,6 @@ struct
       let abs0 = Abs.bind1 x info.ty0 in
       let abs1 = Abs.bind1 x info.ty1 in
       let subst_0 = Val.act (I.subst `Dim0 x) in
-      let subst_r = Val.act (I.subst r x) in
       let subst_r' = Val.act (I.subst r' x) in
       let ty00 = subst_0 info.ty0 in
       let ty10 = subst_0 info.ty1 in
@@ -1027,16 +1028,17 @@ struct
         | true ->
           (* `base` is the cap of the hcom in ty1.
            * Due to the eager semantic simplification built in
-           * `make_vproj`, `make_coe` and `make_hcom`,
+           * `vproj`, `make_coe` and `make_hcom`,
            * redtt can afford less efficient generating code. *)
           let base phi src dest =
             make_coe (IStar.make src dest) (Abs.act phi abs1) @@
             let subst_src = Val.act (I.subst src x) in
-            vproj
+            vproj phi
               (I.act phi src)
-              (fun _ -> Val.act phi @@ subst_src info.ty0)
-              (subst_src info.ty1)
-              (fun _ -> Val.act phi @@ subst_src info.equiv) el
+              (fun phi0 -> Val.act phi0 @@ subst_src info.ty0)
+              (Val.act phi @@ subst_src info.ty1)
+              (fun phi0 -> Val.act phi0 @@ subst_src info.equiv)
+              (Val.act phi el)
           in
           (* Some helper functions to reduce typos. *)
           let base0 phi dest = base phi `Dim0 dest in
@@ -1048,17 +1050,11 @@ struct
           let contr0 phi fib = apply (cdr @@ apply (cdr (Val.act phi equiv0)) (ext_apply (cdr fib) [`Dim1])) fib in
           (* The diagonal face for r=r'. *)
           let face_diag = AbsFace.make I.idn r r' @@ fun phi ->
-            Abs.make1 @@ fun _ ->
-            (* Room for optimization: `x` is apart from `el` *)
-            vproj
-              (I.act phi r)
-              (fun _ -> Val.act phi @@ subst_r info.ty0)
-              (subst_r info.ty1)
-              (fun _ -> Val.act phi @@ subst_r info.equiv) el
+            Abs.make1 @@ fun _ -> base phi (I.act phi r) (I.act phi r')
           in
           (* The face for r=0. *)
           let face0 = AbsFace.make I.idn r `Dim0 @@ fun phi ->
-            Abs.make1 (fun _ -> base0 phi (I.act phi r'))
+            Abs.make1 @@ fun _ -> base0 phi (I.act phi r')
           in
           (* The face for r=1. This more optimized version is used
            * in [Y], [F] and [R1] but not [SVO]. *)
@@ -1128,13 +1124,12 @@ struct
             | `UNICORN ->
               failwith "too immortal; not suitable for mortal beings"
           in
-          let el0 () =
-            let phi = I.equate r' `Dim0 in
+          let el0 phi0 =
             try
-              car (fixer_fiber phi)
+              car (fixer_fiber phi0)
             with
             | exn ->
-              Format.eprintf "Not immortal enough: %a@." pp_value (fixer_fiber phi);
+              Format.eprintf "Not immortal enough: %a@." pp_value (fixer_fiber phi0);
               raise exn
           in
           let face_front =
@@ -1144,7 +1139,7 @@ struct
           let el1 = make_hcom (IStar.make `Dim1 `Dim0) info.ty1 (base I.idn r r') @@
             force_abs_sys [face0; face1; face_diag; face_front]
           in
-          make_vin r' el0 el1
+          make_vin I.idn r' el0 el1
 
         | false ->
           let el0 =
@@ -1272,8 +1267,9 @@ struct
           let face =
             Face.map @@ fun ri r'i absi ->
             let phi = I.equate ri r'i in
+            let phi0 = I.cmp (I.equate (`Atom x) `Dim0) phi in
             let yi, el = Abs.unleash absi in
-            Abs.bind yi @@ rigid_vproj x ~ty0:(Val.act phi ty0) ~ty1:(Val.act phi ty1) ~equiv:(Val.act phi equiv) ~el
+            Abs.bind yi @@ rigid_vproj x ~ty0:(Val.act phi0 ty0) ~ty1:(Val.act phi ty1) ~equiv:(Val.act phi0 equiv) ~el
           in
           [face0; face1] @ List.map face sys
         in
@@ -1417,18 +1413,16 @@ struct
 
     | Tm.V info ->
       let r = eval_dim rho info.r in
-      let rho' () = let phir0 = I.equate r `Dim0 in Env.act phir0 rho in
-      let ty0 () = eval (rho' ()) info.ty0 in
+      let ty0 phi0 = eval (Env.act phi0 rho) info.ty0 in
       let ty1 = eval rho info.ty1 in
-      let equiv () = eval (rho' ()) info.equiv in
-      make_v r ty0 ty1 equiv
+      let equiv phi0 = eval (Env.act phi0 rho) info.equiv in
+      make_v I.idn r ty0 ty1 equiv
 
     | Tm.VIn info ->
       let r = eval_dim rho info.r in
-      let rho' = Env.act (I.equate r `Dim0) rho in
-      let el0 () = eval rho' info.tm0 in
+      let el0 phi0 = eval (Env.act phi0 rho) info.tm0 in
       let el1 = eval rho info.tm1 in
-      make_vin r el0 el1
+      make_vin I.idn r el0 el1
 
     | Tm.Lam bnd ->
       make @@ Lam (clo bnd rho)
@@ -1554,10 +1548,10 @@ struct
       cdr vhd
     | Tm.VProj info ->
       let r = eval_dim rho info.r in
-      let ty0 () = eval rho info.ty0 in
+      let ty0 phi0 = eval (Env.act phi0 rho) info.ty0 in
       let ty1 = eval rho info.ty1 in
-      let equiv () = eval rho info.equiv in
-      vproj r ~ty0 ~ty1 ~equiv ~el:vhd
+      let equiv phi0 = eval (Env.act phi0 rho) info.equiv in
+      vproj I.idn r ~ty0 ~ty1 ~equiv ~el:vhd
     | Tm.If info ->
       let mot = clo info.mot rho in
       let tcase = eval rho info.tcase in
@@ -1994,12 +1988,15 @@ struct
       failwith "ext_apply"
 
 
-  and vproj mgen ~ty0 ~ty1 ~equiv ~el : value =
+  (* the equation oracle `phi` is for continuations `ty0` and `equiv`
+   * waiting for an updated oracle. *)
+  and vproj phi mgen ~ty0 ~ty1 ~equiv ~el : value =
     match mgen with
     | `Atom x ->
-      rigid_vproj x ~ty0:(ty0 ()) ~ty1 ~equiv:(equiv ()) ~el
+      let phi0 = I.cmp (I.equate mgen `Dim0) phi in
+      rigid_vproj x ~ty0:(ty0 phi0) ~ty1 ~equiv:(equiv phi0) ~el
     | `Dim0 ->
-      let func = car (equiv ()) in
+      let func = car (equiv phi) in
       apply func el
     | `Dim1 ->
       el
@@ -2013,7 +2010,7 @@ struct
       let vproj_face =
         Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
-        vproj (I.act phi @@ `Atom x) ~ty0:(fun _ -> Val.act phi ty0) ~ty1:(Val.act phi ty1) ~equiv:(fun _ -> Val.act phi equiv) ~el:a
+        vproj phi (I.act phi @@ `Atom x) ~ty0:(fun phi0 -> Val.act phi0 ty0) ~ty1:(Val.act phi ty1) ~equiv:(fun phi0 -> Val.act phi0 equiv) ~el:a
       in
       let vproj_sys = List.map vproj_face up.sys in
       make @@ Up {ty = ty1; neu; sys = vproj_sys}
