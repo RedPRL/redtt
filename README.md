@@ -1,11 +1,10 @@
-This is an attempt to develop normalization-by-evaluation for [cartesian
-cubical type theory](https://arxiv.org/abs/1712.01800), using the interval and
-"extension types" to generalize path types.  As far as cubes are concerned,
-this implementation is mostly inspired by
-[yacctt](https://github.com/mortberg/yacctt/), [RedPRL](https://www.redprl.org)
-and [cubicaltt](https://github.com/mortberg/cubicaltt). In our (to be
-developed) source language, we aspire to be influenced by Epigram,
-[Idris](https://www.idris-lang.org/) and RedPRL.
+`redtt` is a core language for cartesian cubical type theory with extension
+types. We plan to build an extensible interactive proof assistant around it,
+using ideas from proof assistants like [RedPRL](https://www.redprl.org),
+Epigram, and [Idris](https://www.idris-lang.org/).
+
+Related work: [yacctt](https://github.com/mortberg/yacctt/), [RedPRL](https://www.redprl.org)
+and [cubicaltt](https://github.com/mortberg/cubicaltt).
 
 ## Contributing Guidelines
 
