@@ -5,6 +5,14 @@ let map f m =
   | Some a -> Some (f a)
   | None -> None
 
+let rec filter_map f =
+  function
+  | [] -> []
+  | (x :: xs) ->
+    match f x with
+    | Some y -> y :: filter_map f xs
+    | None -> filter_map f xs
+
 exception WasNone
 
 let get_exn m =

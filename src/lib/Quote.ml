@@ -402,10 +402,6 @@ struct
 
   and equate_comp_face env ty face0 face1 =
     match face0, face1 with
-    | Face.False p0, Face.False p1 ->
-      let tr, tr' = equate_star env p0 p1 in
-      tr, tr', None
-
     | Face.Indet (p0, abs0), Face.Indet (p1, abs1) ->
       let r, r' = IStar.unleash p0 in
       let phi = I.equate r r' in
@@ -413,23 +409,12 @@ struct
       let bnd = equate_val_abs env (Val.act phi ty) abs0 abs1 in
       tr, tr', Some bnd
 
-    | (Face.Indet _, Face.False _ | Face.False _, Face.Indet _)->
-      Format.eprintf "equate_comp_face: %a vs %a@." pp_comp_face face0 pp_comp_face face1;
-      failwith "equate_comp_face"
-
   and equate_box_boundary env s' ty bdry0 bdry1 =
     match ty, bdry0, bdry1 with
-    | Face.False p_ty, Face.False p0, Face.False p1 ->
-      let tr, tr' = equate_star3 env p_ty p0 p1 in
-      tr, tr', None
-
     | Face.Indet (p_ty, abs), Face.Indet (p0, b0), Face.Indet (p1, b1) ->
       let tr, tr' = equate_star3 env p_ty p0 p1 in
       let b = equate env (Abs.inst1 abs s') b0 b1 in
       tr, tr', Some b
-
-    | _ ->
-      failwith "equate_box_boundary"
 
   and equate_val_abs env ty abs0 abs1 =
     let x, v0x = Abs.unleash1 abs0 in

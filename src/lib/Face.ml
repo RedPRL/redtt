@@ -1,5 +1,5 @@
 type (_, 'a) face =
-  | False : IStar.t -> ('x, 'a) face
+  | False : IStar.t -> ([`Any], 'a) face
   | True : I.t * I.t * 'a -> ([`Any], 'a) face
   | Indet : IStar.t * 'a -> ('x, 'a) face
 
@@ -33,14 +33,14 @@ module M (X : Sort.S with type 'a m = 'a) :
 sig
   type 'x t = ('x, X.t) face
   val act : I.action -> 'x t -> [`Any] t
-  val rigid : I.action -> IStar.t -> (I.action -> X.t) -> ('x, X.t) face
-  val gen_const : I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> X.t) -> ('x, X.t) face
+  val make_from_star : I.action -> IStar.t -> (I.action -> X.t) -> ([`Any], X.t) face
+  val gen_const : I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> X.t) -> ([`Any], X.t) face
   val make : I.action -> I.t -> I.t -> (I.action -> X.t) -> ([`Any], X.t) face
 end =
 struct
   type 'x t = ('x, X.t) face
 
-  let rigid : type x. I.action -> IStar.t -> (I.action -> X.t) -> (x, X.t) face =
+  let make_from_star : I.action -> IStar.t -> (I.action -> X.t) -> [`Any] t =
     fun phi eq a ->
       let r, r' = IStar.unleash eq in
       match I.compare r r' with
@@ -49,17 +49,17 @@ struct
       | _ ->
         Indet (eq, a (I.cmp (I.equate r r') phi))
 
-  let make : I.action -> I.t -> I.t -> (I.action -> X.t) -> ([`Any], X.t) face =
+  let make : I.action -> I.t -> I.t -> (I.action -> X.t) -> [`Any] t =
     fun phi r r' a ->
       match IStar.make r r' with
       | `Ok p ->
-        rigid phi p a
+        make_from_star phi p a
       | `Same _ ->
         True (r, r', a (I.cmp (I.equate r r') phi))
 
-  let gen_const : type x. I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> X.t) -> (x, X.t) face =
+  let gen_const : I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> X.t) -> [`Any] t =
     fun phi x eps a ->
-      rigid phi (IStar.gen_const x eps) a
+      make_from_star phi (IStar.gen_const x eps) a
 
 
   let act : type x. I.action -> x t -> _ t =
@@ -80,7 +80,7 @@ struct
             let t' = X.act phi t in
             True (c, d, t')
           | `Ok p' ->
-            rigid phi p' (fun phi -> X.act phi t)
+            make_from_star phi p' (fun phi -> X.act phi t)
         end
 end
 
