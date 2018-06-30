@@ -748,7 +748,7 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
 
     | Box {r; r'; cap; sys} ->
-      Format.fprintf fmt "@[<1>(fcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
+      Format.fprintf fmt "@[<1>(box %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
 
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
