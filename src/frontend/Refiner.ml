@@ -50,8 +50,9 @@ let guess_restricted ty sys tm =
 exception ChkMatch
 
 (* The idea of this function is to push a restriction downward into a negative type.
-   It is perhaps a bit too ambitious to fully unleash, until we have developed the
-   subtyping and definitional equivalence theory that really gets down with eta laws. *)
+   It is perhaps a bit too ambitious to fully unleash, until we have developed the Immortal
+   subtyping and definitional equivalence theory that really gets down with eta laws of
+   restriction types. *)
 let push_restriction sys ty =
   normalize_ty ty >>= fun ty ->
   let on_sys f =
