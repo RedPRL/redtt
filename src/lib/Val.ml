@@ -1150,6 +1150,7 @@ struct
               let equivr = Val.act phi info.equiv in
               rigid_vproj info.x ~ty0:ty0r ~ty1:ty1r ~equiv:equivr ~el
             in
+            let mode = `INCONSISTENCY_REMOVAL in
             let sys =
               let face0 =
                 AbsFace.gen_const I.idn info.x `Dim0 @@ fun phi ->
@@ -1161,7 +1162,10 @@ struct
                 Abs.bind1 x @@
                 make_coe (IStar.make (I.act phi r) (`Atom x)) (Abs.act phi abs1) (Val.act phi el)
               in
-              Option.filter_map force_abs_face [face0; face1]
+              match mode with
+              | `OLD_SCHOOL -> Option.filter_map force_abs_face [face0; face1]
+              | `INCONSISTENCY_REMOVAL -> Option.filter_map force_abs_face [face0]
+              | `UNICORN -> failwith "I can fly!"
             in
             rigid_com dir abs1 cap sys
           in
