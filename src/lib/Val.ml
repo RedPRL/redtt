@@ -282,8 +282,8 @@ struct
         match AbsFace.act phi face with
         | Face.True (_, _, abs) ->
           raise @@ Proj abs
-        | Face.False p ->
-          Face.False p :: act_aux phi sys
+        | Face.False _ ->
+          act_aux phi sys
         | Face.Indet (p, t) ->
           Face.Indet (p, t) :: act_aux phi sys
 
@@ -325,8 +325,8 @@ struct
         match ValFace.act phi face with
         | Face.True (_, _, value) ->
           raise @@ Proj value
-        | Face.False p ->
-          Face.False p :: act_aux phi sys
+        | Face.False _ ->
+          act_aux phi sys
         | Face.Indet (p, t) ->
           Face.Indet (p, t) :: act_aux phi sys
 
@@ -356,8 +356,6 @@ struct
     let from_rigid sys =
       let face : rigid_val_face -> val_face =
         function
-        | Face.False p ->
-          Face.False p
         | Face.Indet (p, a) ->
           Face.Indet (p, a)
       in
@@ -719,30 +717,28 @@ struct
     match face with
     | Face.True (_, _, abs) ->
       raise @@ ProjAbs abs
-    | Face.False xi ->
-      Face.False xi
+    | Face.False _ -> None
     | Face.Indet (xi, abs) ->
-      Face.Indet (xi, abs)
+      Some (Face.Indet (xi, abs))
 
   and force_val_face (face : val_face) =
     match face with
     | Face.True (_, _, v) ->
       raise @@ ProjVal v
-    | Face.False xi ->
-      Face.False xi
+    | Face.False _ -> None
     | Face.Indet (xi, v) ->
-      Face.Indet (xi, v)
+      Some (Face.Indet (xi, v))
 
   and force_val_sys sys =
     try
-      `Ok (List.map force_val_face sys)
+      `Ok (Option.filter_map force_val_face sys)
     with
     | ProjVal v ->
       `Proj v
 
   and force_abs_sys sys =
     try
-      `Ok (List.map force_abs_face sys)
+      `Ok (Option.filter_map force_abs_face sys)
     with
     | ProjAbs abs ->
       `Proj abs
@@ -1154,6 +1150,7 @@ struct
               let equivr = Val.act phi info.equiv in
               rigid_vproj info.x ~ty0:ty0r ~ty1:ty1r ~equiv:equivr ~el
             in
+            let mode = `INCONSISTENCY_REMOVAL in
             let sys =
               let face0 =
                 AbsFace.gen_const I.idn info.x `Dim0 @@ fun phi ->
@@ -1165,7 +1162,10 @@ struct
                 Abs.bind1 x @@
                 make_coe (IStar.make (I.act phi r) (`Atom x)) (Abs.act phi abs1) (Val.act phi el)
               in
-              [face0; face1]
+              match mode with
+              | `OLD_SCHOOL -> Option.filter_map force_abs_face [face0; face1]
+              | `INCONSISTENCY_REMOVAL -> Option.filter_map force_abs_face [face0]
+              | `UNICORN -> failwith "I can fly!"
             in
             rigid_com dir abs1 cap sys
           in
@@ -1231,10 +1231,10 @@ struct
           in
           List.map face fcom.sys
         in
-        let diag = AbsFace.rigid I.idn fcom.dir @@ fun phi ->
+        let diag = AbsFace.make_from_star I.idn fcom.dir @@ fun phi ->
           Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Val.act phi fcom.cap)
         in
-        diag :: (ri_faces @ si_faces)
+        Option.filter_map force_abs_face [diag] @ (ri_faces @ si_faces)
       in
       let boundary = Face.map @@ fun si s'i abs ->
         let phi = I.equate si s'i in
@@ -1271,7 +1271,7 @@ struct
             let yi, el = Abs.unleash absi in
             Abs.bind yi @@ rigid_vproj x ~ty0:(Val.act phi0 ty0) ~ty1:(Val.act phi ty1) ~equiv:(Val.act phi0 equiv) ~el
           in
-          [face0; face1] @ List.map face sys
+          Option.filter_map force_abs_face [face0; face1] @ List.map face sys
         in
         rigid_hcom dir ty1 el1_cap el1_sys
       in
@@ -1286,15 +1286,7 @@ struct
      * in `Up _`? Please move `Up _` to the second
      * list if this does not work out. *)
     | (Pi _ | Sg _ | Up _) ->
-      let rec drop_false sys =
-        match sys with
-        (* This is assuming false equations are made
-         * of constants. Needs to revisit this when
-         * we consider more cofibrations. *)
-        | Face.False _ :: sys -> drop_false sys
-        | _ -> sys
-      in
-      make @@ GHCom {dir; ty; cap; sys = drop_false sys}
+      make @@ GHCom {dir; ty; cap; sys}
 
     (* `Ext _`: the expansion will stop after a valid
      * correction system, so it is not so bad. *)
@@ -1302,7 +1294,6 @@ struct
       let rec aux sys =
         match sys with
         | [] -> cap
-        | Face.False _ :: sys -> aux sys
         | Face.Indet (eqi, absi) :: rest ->
           let ri, r'i = IStar.unleash eqi in
           let r, r' = IStar.unleash dir in
@@ -1670,7 +1661,7 @@ struct
   and eval_rigid_bnd_sys rho sys  =
     try
       let sys =
-        List.map
+        Option.filter_map
           (fun x -> force_abs_face @@ eval_bnd_face rho x)
           sys
       in `Ok sys
@@ -1705,7 +1696,7 @@ struct
   and eval_rigid_tm_sys rho sys  =
     try
       let sys =
-        List.map
+        Option.filter_map
           (fun x -> force_val_face @@ eval_tm_face rho x)
           sys
       in `Ok sys
