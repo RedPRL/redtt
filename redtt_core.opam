@@ -1,8 +1,8 @@
 opam-version: "1.2.2"
-name: "redbasis"
+name: "redtt_core"
 version: "0.0"
 maintainer: "Jonathan Sterling"
-authors: "Jonathan Sterling"
+authors: ["Jon Sterling" "Favonia (Kuen-Bang Hou)"]
 homepage: "https://github.com/jonsterling/redtt"
 bug-reports: "https://github.com/jonsterlign/redtt/issues"
 license: "MIT"

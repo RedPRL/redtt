@@ -1,3 +1,5 @@
+open RedTT_Core
+
 type t
 val init : unit -> t
 val bind : string -> t -> t

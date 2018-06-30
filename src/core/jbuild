@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(library
+ ((name RedTT_Core)
+  (public_name redtt_core)
+  (libraries (redbasis uuseg uuseg.string uutf))))

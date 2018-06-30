@@ -27,7 +27,7 @@ let get_cond : type x. (x, 'a) face -> I.t * I.t =
 let forall : type x. I.atom -> (x, 'a) face -> [`Delete | `Keep] =
   fun x face ->
     let r, r' = get_cond face in
-    if I.absent x r & I.absent x r' then `Keep else `Delete
+    if I.absent x r && I.absent x r' then `Keep else `Delete
 
 module M (X : Sort.S with type 'a m = 'a) :
 sig

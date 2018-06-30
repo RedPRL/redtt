@@ -948,7 +948,7 @@ struct
         make_gcom (IStar.act phi dir) (Abs.act phi cap_abs) (origin phi (I.act (I.cmp phi subst_r) s)) @@
         force_abs_sys @@
         let diag =
-          if I.absent x s & I.absent x s'
+          if I.absent x s && I.absent x s'
           then [
             AbsFace.make phi (I.act phi s) (I.act phi s') @@ fun phi ->
             Abs.bind1 x @@ make_coe (IStar.make (I.act phi r) (`Atom x)) (Abs.act phi cap_abs) (Val.act phi el)
