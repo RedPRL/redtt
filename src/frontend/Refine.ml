@@ -1,7 +1,7 @@
 (* Experimental code *)
 open RedTT_Core
 open RedBasis
-open Bwd open BwdNotation open Dev
+open Bwd open BwdNotation
 
 module type Import =
 sig
@@ -76,6 +76,95 @@ struct
     | Some x -> C.ret x
     | None -> n
 
+
+  exception ChkMatch
+
+  let guess_restricted ty sys tm =
+    let rty = Tm.make @@ Tm.Rst {ty; sys} in
+    M.lift @@ C.check ~ty:rty tm >>= fun b ->
+    if b then M.ret tm else
+      let rec go =
+        function
+        | [] ->
+          M.ret ()
+        | (r, r', Some tm') :: sys ->
+          begin
+            M.under_restriction r r' @@
+            M.lift @@ C.active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
+          end >>
+          go sys
+        | _ :: sys ->
+          go sys
+      in
+      go sys >>
+      M.lift C.ask >>= fun psi ->
+      M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
+
+  (* For negative types, we can do beter than this!! *)
+  let rec tac_rst tac ty =
+    let rec go sys ty =
+      match Tm.unleash ty with
+      | Tm.Rst rst ->
+        go (rst.sys @ sys) rst.ty
+      | _ ->
+        tac ty >>=
+        guess_restricted ty sys
+    in go [] ty
+
+
+  let tac_wrap tac ty =
+    try tac_rst tac ty
+    with
+    | ChkMatch ->
+      normalize_ty ty >>= tac
+
+  let rec tac_lambda names tac ty =
+    match Tm.unleash ty with
+    | Tm.Pi (dom, cod) ->
+      begin
+        match names with
+        | [] -> tac ty
+        | name :: names ->
+          let x = Name.named @@ Some name in
+          let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+          M.in_scope x (`P dom) begin
+            tac_wrap (tac_lambda names tac) codx
+          end >>= fun bdyx ->
+          M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
+      end
+
+    | Tm.Ext (Tm.NB (nms, _) as ebnd) ->
+      begin
+        match names with
+        | [] -> tac ty
+        | _ ->
+          let rec bite nms lnames rnames =
+            match nms, rnames with
+            | [], _ -> lnames, tac_wrap (tac_lambda rnames tac)
+            | _ :: nms, name :: rnames ->
+              let x = Name.named @@ Some name in
+              bite nms (lnames #< x) rnames
+            | _ -> failwith "Elab: incorrect number of binders when refining extension type"
+          in
+          let xs, tac' = bite nms Emp names in
+          let ty, sys = Tm.unbind_ext_with (Bwd.to_list xs) ebnd in
+          let rty = Tm.make @@ Tm.Rst {ty; sys} in
+          let ps = List.map (fun x -> (x, `I)) @@ Bwd.to_list xs in
+          M.in_scopes ps begin
+            tac' rty
+          end >>= fun bdyxs ->
+          M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs)
+      end
+
+    | _ ->
+      begin
+        match names with
+        | [] -> tac ty
+        | _ ->
+          raise ChkMatch
+      end
+
+
   let rec elab_sig env =
     function
     | [] ->
@@ -136,26 +225,6 @@ struct
     in
     go Emp cells
 
-  and guess_restricted ty sys tm =
-    let rty = Tm.make @@ Tm.Rst {ty; sys} in
-    M.lift @@ C.check ~ty:rty tm >>= fun b ->
-    if b then M.ret tm else
-      let rec go =
-        function
-        | [] ->
-          M.ret ()
-        | (r, r', Some tm') :: sys ->
-          begin
-            M.under_restriction r r' @@
-            M.lift @@ C.active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
-          end >>
-          go sys
-        | _ :: sys ->
-          go sys
-      in
-      go sys >>
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
 
   and elab_chk env ty e : tm M.m =
     normalize_ty ty >>= fun ty ->
@@ -200,6 +269,10 @@ struct
       elab_chk env info.ty e >>=
       guess_restricted info.ty info.sys
 
+    | _, E.Lam (names, e) ->
+      let tac ty = elab_chk env ty e in
+      tac_wrap (tac_lambda names tac) ty
+
     | _, E.Quo tmfam ->
       get_resolver env >>= fun renv ->
       let tm = tmfam renv in
@@ -211,9 +284,6 @@ struct
           M.ret @@ tmfam renv
       end
 
-
-    | _, E.Lam ([], e) ->
-      elab_chk env ty e
 
     | _, E.If (omot, escrut, etcase, efcase) ->
       let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
@@ -332,14 +402,6 @@ struct
       M.ret @@ Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
 
 
-    | Tm.Pi (dom, cod), E.Lam (name :: names, e) ->
-      let x = Name.named @@ Some name in
-      let codx = Tm.unbind_with x (fun _ -> `Only) cod in
-      M.in_scope x (`P dom) begin
-        elab_chk env codx @@
-        E.Lam (names, e)
-      end >>= fun bdyx ->
-      M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
 
     | Tm.Univ _, E.Sg ([], e) ->
       elab_chk env ty e
@@ -352,24 +414,6 @@ struct
       end >>= fun codx ->
       M.ret @@ Tm.make @@ Tm.Sg (dom, Tm.bind x codx)
 
-    | Tm.Ext ((Tm.NB (nms, _)) as ebnd), E.Lam (names, e) ->
-      let rec bite nms lnames rnames =
-        match nms, rnames with
-        | [], _ -> lnames, E.Lam (rnames, e)
-        | _ :: nms, name :: rnames ->
-          let x = Name.named @@ Some name in
-          bite nms (lnames #< x) rnames
-        | _ -> failwith "Elab: incorrect number of binders when refining extension type"
-      in
-      let xs, e' = bite nms Emp names in
-      let ty, sys = Tm.unbind_ext_with (Bwd.to_list xs) ebnd in
-      let rty = Tm.make @@ Tm.Rst {ty; sys} in
-      let ps = List.map (fun x -> (x, `I)) @@ Bwd.to_list xs in
-      M.in_scopes ps begin
-        elab_chk env rty e'
-      end >>= fun bdyxs ->
-      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs)
-
 
     | _, Tuple [] ->
       failwith "empty tuple"
@@ -378,9 +422,8 @@ struct
     | Tm.Sg (dom, cod), Tuple (e :: es) ->
       elab_chk env dom e >>= fun tm0 ->
       M.lift C.typechecker >>= fun (module T) ->
-      let module HS = HSubst (T) in
-      let vdom = T.Cx.eval T.Cx.emp dom in
-      let cod' = HS.inst_ty_bnd cod (vdom, tm0) in
+      let cmd0 = Tm.Down {ty = dom; tm = tm0}, Emp in
+      let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
       elab_chk env cod' (Tuple es) >>= fun tm1 ->
       M.ret @@ Tm.cons tm0 tm1
 
