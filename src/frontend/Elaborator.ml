@@ -126,6 +126,9 @@ struct
     go Emp cells
 
 
+
+  (* TODO: we will be disentangling all the elaboration of concrete expressions from tactics which produce redtt proofs.
+     As an example, see what we have done with tac_lambda, tac_if, etc. *)
   and elab_chk env ty e : tm M.m =
     normalize_ty ty >>= fun ty ->
     match Tm.unleash ty, e with
