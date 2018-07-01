@@ -91,9 +91,9 @@ let define gm alpha opacity ~ty tm =
       if opacity = `Transparent then push_update alpha else ret ()
     end >>
     typechecker >>= fun (module T) ->
-    let vty' = T.Cx.eval T.Cx.emp ty' in
-    let vtm' = T.Cx.eval T.Cx.emp tm' in
-    let _ = T.Cx.quote T.Cx.emp ~ty:vty' vtm' in
+    (* let vty' = T.Cx.eval T.Cx.emp ty' in
+       let vtm' = T.Cx.eval T.Cx.emp tm' in
+       let _ = T.Cx.quote T.Cx.emp ~ty:vty' vtm' in *)
     (* Format.eprintf "Defined %a : %a = %a@.@." Name.pp alpha T.Cx.Eval.pp_value vty' T.Cx.Eval.pp_value vtm'; *)
     pushr @@ E (alpha, ty', Defn (opacity, tm'))
 

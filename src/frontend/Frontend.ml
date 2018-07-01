@@ -33,9 +33,9 @@ let load_file file_name =
         `Cached
   end
   in
-  let module Refine = Refine.Make (I) in
+  let module Elaborator = Elaborator.Make (I) in
   let open Lwt.Infix in
   read_file file_name >>= fun esig ->
-  let _ = Refine.M.run @@ Refine.M.report @@ Refine.elab_sig Refine.T.empty esig in
+  let _ = ElabMonad.run @@ ElabMonad.report @@ Elaborator.elab_sig Elaborator.T.empty esig in
   Diagnostics.terminated ();
   Lwt.return_unit

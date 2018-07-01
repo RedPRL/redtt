@@ -1,0 +1,12 @@
+language: c
+sudo: required
+before_install:
+  # Install OPAM and OCaml
+  - travis_retry wget https://raw.github.com/ocaml/opam/master/shell/opam_installer.sh -O - | sh -s "${HOME}/bin"
+  - opam init --yes --comp '4.06.1'
+  - eval $(opam config env)
+install:
+  - opam pin add -y redtt .
+script:
+  - make build
+  - make examples

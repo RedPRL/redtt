@@ -19,9 +19,9 @@ help:
 	@${DUNE} exec -- redtt help
 
 examples:
-	@${DUNE} exec -- redtt load-file test.red
-	@${DUNE} exec -- redtt load-file invariance.red
-	@${DUNE} exec -- redtt load-file univalence.red
+	${DUNE} exec -- redtt load-file test.red
+	${DUNE} exec -- redtt load-file invariance.red
+	${DUNE} exec -- redtt load-file univalence.red
 
 test:
 	@${DUNE} build @runtest

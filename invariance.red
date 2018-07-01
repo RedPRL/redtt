@@ -74,6 +74,6 @@ let swap-fun (A : type) : (bool → A) → bool → A =
 ;     in
 ;     (elt : fun-eq-pair A i)
 ;     → Path (fun-eq-pair A i)
-;         (swapcoe i (swapcoe i elt))
+;         (swapcoe (swapcoe elt))
 ;         elt
 ;

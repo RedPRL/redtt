@@ -1,7 +1,7 @@
 (* Experimental code *)
 open RedTT_Core
 open RedBasis
-open Bwd open BwdNotation open Dev
+open Bwd open BwdNotation
 
 module type Import =
 sig
@@ -14,107 +14,16 @@ struct
   module C = Contextual
   module U = Unify
 
-  module M :
-  sig
-    include Monad.S
-
-    val lift : 'a C.m -> 'a m
-    val in_scope : Name.t -> ty param -> 'a m -> 'a m
-    val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m
-    val under_restriction : tm -> tm -> 'a m -> 'a option m
-    val local : (params -> params) -> 'a m -> 'a m
-
-    val isolate : 'a m -> 'a m
-    val unify : unit m
-
-    type diagnostic =
-      | UserHole of {name : string option; tele : U.telescope; ty : Tm.tm; tm : Tm.tm}
-
-    val emit : diagnostic -> unit m
-    val report : 'a m -> 'a m
-
-    val run : 'a m -> 'a
-  end =
-  struct
-    type diagnostic =
-      | UserHole of {name : string option; tele : U.telescope; ty : Tm.tm; tm : Tm.tm}
-
-    type 'a m = ('a * diagnostic bwd) C.m
-
-
-    let ret a =
-      C.ret (a, Emp)
-
-    let bind m k =
-      C.bind m @@ fun (a, w) ->
-      C.bind (k a) @@ fun (b, w') ->
-      C.ret (b, w <.> w')
-
-    let lift m =
-      C.bind m ret
-
-    let emit d =
-      C.ret ((), Emp #< d)
-
-    let print_diagnostic =
-      function
-      | UserHole {name; tele; ty; tm} ->
-        C.local (fun _ -> tele) @@
-        begin
-          C.bind C.typechecker @@ fun (module T) ->
-          let vty = T.Cx.eval T.Cx.emp ty in
-          let ty = T.Cx.quote_ty T.Cx.emp vty in
-          Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@,%a %a@]@.@."
-            (match name with Some name -> name | None -> "Hole")
-            Dev.pp_params tele
-            Uuseg_string.pp_utf_8 "⊢"
-            Tm.pp0 ty
-            Uuseg_string.pp_utf_8 "⟿"
-            Tm.pp0 tm;
-          C.ret ()
-        end
-
-    let rec print_diagnostics =
-      function
-      | Emp ->
-        C.ret ()
-      | Snoc (w, d) ->
-        C.bind (print_diagnostics w) @@ fun _ ->
-        print_diagnostic d
-
-    let report (m : 'a m) : 'a m =
-      C.bind m @@ fun (a, w) ->
-      C.bind (C.dump_state Format.err_formatter "Unsolved:" `Unsolved) @@ fun _ ->
-      C.bind (print_diagnostics w) @@ fun _ ->
-      ret a
-
-
-    let under_restriction r r' (m : 'a m) : 'a option m =
-      C.bind (C.under_restriction r r' m) @@ function
-      | None ->
-        ret None
-      | Some (x, ds) ->
-        C.ret (Some x, ds)
-
-    let in_scopes = C.in_scopes
-    let in_scope = C.in_scope
-    let isolate = C.isolate
-    let unify = lift @@ C.bind C.go_to_top @@ fun _ -> C.local (fun _ -> Emp) U.ambulando
-    let local = C.local
-
-
-    let run m =
-      fst @@ C.run m
-  end
-
-
-
   open Dev open Unify
+
+  module M = ElabMonad
   module Notation = Monad.Notation (M)
   open Notation
 
   module E = ESig
   module T = Map.Make (String)
+
+  open Refiner
 
   type _ mode =
     | Chk : ty -> tm mode
@@ -147,27 +56,14 @@ struct
     let renv = go_globals (ResEnv.init ()) @@ T.bindings env in
     M.ret @@ go_locals renv psi
 
-
-  let normalization_clock = ref 0.
-
-  let _ =
-    Diagnostics.on_termination @@ fun _ ->
-    Format.eprintf "Refine spent %fs in normalizing types@." !normalization_clock
-
-  let normalize_ty ty =
-    let now0 = Unix.gettimeofday () in
-    M.lift C.typechecker >>= fun (module T) ->
-    let vty = T.Cx.eval T.Cx.emp ty in
-    let ty = T.Cx.quote_ty T.Cx.emp vty in
-    let now1 = Unix.gettimeofday () in
-    normalization_clock := !normalization_clock +. (now1 -. now0);
-    M.ret ty
-
   let (<+>) m n =
     C.bind (C.optional m) @@
     function
     | Some x -> C.ret x
     | None -> n
+
+
+
 
   let rec elab_sig env =
     function
@@ -229,27 +125,10 @@ struct
     in
     go Emp cells
 
-  and guess_restricted ty sys tm =
-    let rty = Tm.make @@ Tm.Rst {ty; sys} in
-    M.lift @@ C.check ~ty:rty tm >>= fun b ->
-    if b then M.ret tm else
-      let rec go =
-        function
-        | [] ->
-          M.ret ()
-        | (r, r', Some tm') :: sys ->
-          begin
-            M.under_restriction r r' @@
-            M.lift @@ C.active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
-          end >>
-          go sys
-        | _ :: sys ->
-          go sys
-      in
-      go sys >>
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
 
+
+  (* TODO: we will be disentangling all the elaboration of concrete expressions from tactics which produce redtt proofs.
+     As an example, see what we have done with tac_lambda, tac_if, etc. *)
   and elab_chk env ty e : tm M.m =
     normalize_ty ty >>= fun ty ->
     match Tm.unleash ty, e with
@@ -266,32 +145,25 @@ struct
 
 
     | _, E.Let info ->
-      begin
+      let itac =
         match info.ty with
         | None ->
           elab_inf env info.tm >>= fun (let_ty, let_tm) ->
           M.ret (let_ty, Tm.up let_tm)
         | Some ety ->
           elab_chk env univ ety >>= fun let_ty ->
-          normalize_ty let_ty >>= fun let_ty ->
           elab_chk env let_ty info.tm >>= fun let_tm ->
           M.ret (let_ty, let_tm)
-      end >>= fun (let_ty, let_tm) ->
-      let singleton_ty =
-        let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some let_tm in
-        Tm.make @@ Tm.Rst {ty = let_ty; sys = [face]}
       in
-      let x = Name.named @@ Some info.name in
-      M.in_scope x (`P singleton_ty)
-        begin
-          elab_chk env ty info.body
-        end >>= fun bdyx ->
-      let inf = Tm.Down {ty = let_ty; tm = let_tm}, Emp in
-      M.ret @@ Tm.make @@ Tm.Let (inf, Tm.bind x bdyx)
+      let ctac ty = elab_chk env ty info.body in
+      tac_let info.name itac ctac ty
 
-    | Tm.Rst info, _ ->
-      elab_chk env info.ty e >>=
-      guess_restricted info.ty info.sys
+    | Tm.Rst _, _ ->
+      tac_rst (fun ty -> elab_chk env ty e) ty
+
+    | _, E.Lam (names, e) ->
+      let tac ty = elab_chk env ty e in
+      tac_wrap_nf (tac_lambda names tac) ty
 
     | _, E.Quo tmfam ->
       get_resolver env >>= fun renv ->
@@ -305,51 +177,12 @@ struct
       end
 
 
-    | _, E.Lam ([], e) ->
-      elab_chk env ty e
-
     | _, E.If (omot, escrut, etcase, efcase) ->
-      let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-      let bool = Tm.make @@ Tm.Bool in
-      elab_chk env bool escrut >>= fun scrut ->
-
-
-      begin
-        match omot with
-        | None ->
-          let is_dependent =
-            match Tm.unleash scrut with
-            | Tm.Up (Tm.Ref {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
-            | _ -> false
-          in
-          if is_dependent then
-            M.lift @@ push_hole `Flex Emp (Tm.pi None bool univ) >>= fun (mothd, motsp) ->
-            let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
-            M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
-            M.unify >>
-
-            normalize_ty (mot @@ Tm.make Tm.Tt) >>= fun mot_tt ->
-            normalize_ty (mot @@ Tm.make Tm.Ff) >>= fun mot_ff ->
-            M.ret (mot, mot_tt, mot_ff)
-          else
-            M.ret ((fun _ -> ty), ty, ty)
-        | Some emot ->
-          let mot_ty = Tm.pi None bool univ in
-          elab_chk env (Tm.pi None bool univ) emot >>= fun mot ->
-          let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-          normalize_ty @@ fmot @@ Tm.make Tm.Tt >>= fun mot_tt ->
-          normalize_ty @@ fmot @@ Tm.make Tm.Ff >>= fun mot_ff ->
-          M.ret (fmot, mot_tt, mot_ff)
-      end >>= fun (mot, mot_tt, mot_ff) ->
-      elab_chk env mot_tt etcase >>= fun tcase ->
-      elab_chk env mot_ff efcase >>= fun fcase ->
-      let hd = Tm.Down {ty = bool; tm = scrut} in
-      let bmot =
-        let x = Name.fresh () in
-        Tm.bind x @@ mot @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)
-      in
-      let frm = Tm.If {mot = bmot; tcase; fcase} in
-      M.ret @@ Tm.up (hd, Emp #< frm)
+      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
+      let tac_scrut ty = elab_chk env ty escrut in
+      let tac_tcase ty = elab_chk env ty etcase in
+      let tac_fcase ty = elab_chk env ty efcase in
+      tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase ty
 
     | Tm.Univ _, E.Bool ->
       M.ret @@ Tm.make Tm.Bool
@@ -425,14 +258,6 @@ struct
       M.ret @@ Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
 
 
-    | Tm.Pi (dom, cod), E.Lam (name :: names, e) ->
-      let x = Name.named @@ Some name in
-      let codx = Tm.unbind_with x (fun _ -> `Only) cod in
-      M.in_scope x (`P dom) begin
-        elab_chk env codx @@
-        E.Lam (names, e)
-      end >>= fun bdyx ->
-      M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
 
     | Tm.Univ _, E.Sg ([], e) ->
       elab_chk env ty e
@@ -445,24 +270,6 @@ struct
       end >>= fun codx ->
       M.ret @@ Tm.make @@ Tm.Sg (dom, Tm.bind x codx)
 
-    | Tm.Ext ((Tm.NB (nms, _)) as ebnd), E.Lam (names, e) ->
-      let rec bite nms lnames rnames =
-        match nms, rnames with
-        | [], _ -> lnames, E.Lam (rnames, e)
-        | _ :: nms, name :: rnames ->
-          let x = Name.named @@ Some name in
-          bite nms (lnames #< x) rnames
-        | _ -> failwith "Elab: incorrect number of binders when refining extension type"
-      in
-      let xs, e' = bite nms Emp names in
-      let ty, sys = Tm.unbind_ext_with (Bwd.to_list xs) ebnd in
-      let rty = Tm.make @@ Tm.Rst {ty; sys} in
-      let ps = List.map (fun x -> (x, `I)) @@ Bwd.to_list xs in
-      M.in_scopes ps begin
-        elab_chk env rty e'
-      end >>= fun bdyxs ->
-      M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs)
-
 
     | _, Tuple [] ->
       failwith "empty tuple"
@@ -471,9 +278,8 @@ struct
     | Tm.Sg (dom, cod), Tuple (e :: es) ->
       elab_chk env dom e >>= fun tm0 ->
       M.lift C.typechecker >>= fun (module T) ->
-      let module HS = HSubst (T) in
-      let vdom = T.Cx.eval T.Cx.emp dom in
-      let cod' = HS.inst_ty_bnd cod (vdom, tm0) in
+      let cmd0 = Tm.Down {ty = dom; tm = tm0}, Emp in
+      let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
       elab_chk env cod' (Tuple es) >>= fun tm1 ->
       M.ret @@ Tm.cons tm0 tm1
 
