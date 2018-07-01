@@ -38,6 +38,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("cons", CONS);
       ("hcom", HCOM);
       ("comp", COMP);
+      ("vproj", VPROJ);
       ("restrict", RESTRICT);
       ("if", IF);
       ("nat-rec", NAT_REC);

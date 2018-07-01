@@ -16,7 +16,7 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN WITH END
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V
+%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ
 %token THEN ELSE
 %token IMPORT OPAQUE
 %token TYPE PRE KAN
@@ -390,3 +390,8 @@ cut:
     { fun env ->
       let hd, fs = scrut env in
       hd, fs #< (Tm.If {mot = mot env; tcase = tcase env; fcase = fcase env}) }
+
+  | LPR; VPROJ; r = tm; e = cut; ty0 = tm; ty1 = tm; equiv = tm; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, fs #< (Tm.VProj {r = r env; ty0 = ty0 env; ty1 = ty1 env; equiv = equiv env})}
