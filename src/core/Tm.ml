@@ -815,7 +815,7 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<hv1>(%s %a@ %a)@]" "@" (go `ExtApp) sp (pp_terms env) ts
       | If {mot = B (nm, mot); tcase; fcase} ->
         let x, env' = Pretty.Env.bind nm env in
-        Format.fprintf fmt "@[<hv1>(if@ [%a] %a@ %a %a %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot (go `If) sp (pp env) tcase (pp env) fcase
+        Format.fprintf fmt "@[<hv1>(if@ [%a] %a@ %a@ %a@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot (go `If) sp (pp env) tcase (pp env) fcase
       | S1Rec {mot = B (nm_mot, mot); bcase; lcase = B (nm_lcase, lcase)} ->
         let x_mot, env_mot = Pretty.Env.bind nm_mot env in
         let x_lcase, env_lcase = Pretty.Env.bind nm_lcase env in

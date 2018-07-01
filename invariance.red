@@ -42,7 +42,7 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
       coe 1 0
         (λ i →
           < λ b → if b then fib.cdr i .car else fib.cdr i .cdr
-          , λ j → connection/or (A × A) (fun-to-pair A (fib.car)) pair (fib.cdr) i j
+          , λ j → connection/or _ (fun-to-pair A (fib.car)) pair (fib.cdr) i j
           >)
       in λ j →
         [i] (f : bool → A) × Path (A × A) <f tt, f ff> pair with
@@ -65,15 +65,13 @@ let swap-fun (A : type) : (bool → A) → bool → A =
   coe 1 0 (swap-pair A) in λ i →
     (fun-eq-pair A i) → fun-eq-pair A i
 
-;; A bug (?) prevents the following example:
-; let swap-fun-eqn (A : type) : (f : bool → A) → Path (bool → A) (swap-fun A f) f =
-;   coe 1 0 (λ pair _ → pair) in λ i →
-;     let swapcoe =
-;       coe 1 i (swap-pair A) in λ j →
-;         (fun-eq-pair A j) → fun-eq-pair A j
-;     in
-;     (elt : fun-eq-pair A i)
-;     → Path (fun-eq-pair A i)
-;         (swapcoe (swapcoe elt))
-;         elt
-;
+let swap-fun-eqn (A : type) : (f : bool → A) → Path (bool → A) (swap-fun A (swap-fun A f)) f =
+  coe 1 0 (λ pair _ → pair) in λ i →
+    let swapcoe =
+      coe 1 i (swap-pair A) in λ j →
+        (fun-eq-pair A j) → fun-eq-pair A j
+    in
+    (f : fun-eq-pair A i)
+    → Path (fun-eq-pair A i)
+        (swapcoe (swapcoe f))
+        f

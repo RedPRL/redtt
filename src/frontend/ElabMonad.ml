@@ -24,17 +24,44 @@ let lift m =
 let emit d =
   C.ret ((), Emp #< d)
 
+let normalize_param p =
+  let module Notation = Monad.Notation (C) in
+  let open Notation in
+
+  C.typechecker >>= fun (module T) ->
+  let normalize_ty ty =
+    let vty = T.Cx.eval T.Cx.emp ty in
+    T.Cx.quote_ty T.Cx.emp vty
+  in
+  match p with
+  | `P ty -> C.ret @@ `P (normalize_ty ty)
+  | `Tw (ty0, ty1) -> C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
+  | `I -> C.ret `I
+  | `R (r0, r1) ->
+    C.ret @@ `R (r0, r1)
+
+let rec normalize_tele =
+  let module Notation = Monad.Notation (C) in
+  let open Notation in
+  function
+  | [] -> C.ret []
+  | (x, p) :: tele ->
+    normalize_param p >>= fun p ->
+    C.in_scope x p (normalize_tele tele) >>= fun psi ->
+    C.ret @@ (x,p) :: psi
+
 let print_diagnostic =
   function
   | UserHole {name; tele; ty; tm} ->
     C.local (fun _ -> tele) @@
     begin
       C.bind C.typechecker @@ fun (module T) ->
+      C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
       let vty = T.Cx.eval T.Cx.emp ty in
       let ty = T.Cx.quote_ty T.Cx.emp vty in
       Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@,%a %a@]@.@."
         (match name with Some name -> name | None -> "Hole")
-        Dev.pp_params tele
+        Dev.pp_params (Bwd.from_list tele)
         Uuseg_string.pp_utf_8 "⊢"
         Tm.pp0 ty
         Uuseg_string.pp_utf_8 "⟿"
