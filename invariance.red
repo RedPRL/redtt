@@ -66,12 +66,12 @@ let swap-fun (A : type) : (bool → A) → bool → A =
     (fun-eq-pair A i) → fun-eq-pair A i
 
 let swap-fun-eqn (A : type) : (f : bool → A) → Path (bool → A) (swap-fun A (swap-fun A f)) f =
-    coe 1 0 (λ pair _ → pair) in λ i →
-      let swapcoe =
-        coe 1 i (swap-pair A) in λ j →
-          (fun-eq-pair A j) → fun-eq-pair A j
-      in
-      (elt : fun-eq-pair A i)
-      → Path (fun-eq-pair A i)
-          (swapcoe (swapcoe elt))
-          elt
+  coe 1 0 (λ pair _ → pair) in λ i →
+    let swapcoe =
+      coe 1 i (swap-pair A) in λ j →
+        (fun-eq-pair A j) → fun-eq-pair A j
+    in
+    (f : fun-eq-pair A i)
+    → Path (fun-eq-pair A i)
+        (swapcoe (swapcoe f))
+        f
