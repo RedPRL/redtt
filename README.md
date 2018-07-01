@@ -70,3 +70,9 @@ $ make top
 ```
 $ make test
 ```
+
+
+
+### Acknowledgments
+
+This research was sponsored by the Air Force Office of Scientific Research under grant number FA9550-15-1-0053 and the National Science Foundation under grant number DMS-1638352. We also thank the Logic and Semantics Group at Aarhus University for their hospitality in during the summer of 2018, during which part of this work was undertaken. The views and conclusions contained here are those of the authors and should not be interpreted as representing the official policies, either expressed or implied, of any sponsoring institution, government or any other entity.
