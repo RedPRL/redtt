@@ -175,46 +175,11 @@ struct
 
 
     | _, E.If (omot, escrut, etcase, efcase) ->
-      let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-      let bool = Tm.make @@ Tm.Bool in
-      elab_chk env bool escrut >>= fun scrut ->
-
-
-      begin
-        match omot with
-        | None ->
-          let is_dependent =
-            match Tm.unleash scrut with
-            | Tm.Up (Tm.Ref {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
-            | _ -> false
-          in
-          if is_dependent then
-            M.lift @@ push_hole `Flex Emp (Tm.pi None bool univ) >>= fun (mothd, motsp) ->
-            let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
-            M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
-            M.unify >>
-            let mot_tt = mot @@ Tm.make Tm.Tt in
-            let mot_ff = mot @@ Tm.make Tm.Ff in
-            M.ret (mot, mot_tt, mot_ff)
-          else
-            M.ret ((fun _ -> ty), ty, ty)
-        | Some emot ->
-          let mot_ty = Tm.pi None bool univ in
-          elab_chk env (Tm.pi None bool univ) emot >>= fun mot ->
-          let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-          let mot_tt = fmot @@ Tm.make Tm.Tt in
-          let mot_ff = fmot @@ Tm.make Tm.Ff in
-          M.ret (fmot, mot_tt, mot_ff)
-      end >>= fun (mot, mot_tt, mot_ff) ->
-      elab_chk env mot_tt etcase >>= fun tcase ->
-      elab_chk env mot_ff efcase >>= fun fcase ->
-      let hd = Tm.Down {ty = bool; tm = scrut} in
-      let bmot =
-        let x = Name.fresh () in
-        Tm.bind x @@ mot @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)
-      in
-      let frm = Tm.If {mot = bmot; tcase; fcase} in
-      M.ret @@ Tm.up (hd, Emp #< frm)
+      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
+      let tac_scrut ty = elab_chk env ty escrut in
+      let tac_tcase ty = elab_chk env ty etcase in
+      let tac_fcase ty = elab_chk env ty efcase in
+      tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase ty
 
     | Tm.Univ _, E.Bool ->
       M.ret @@ Tm.make Tm.Bool
