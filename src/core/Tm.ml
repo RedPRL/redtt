@@ -1008,6 +1008,9 @@ struct
     | V info ->
       go fl info.r @@ go fl info.ty0 @@
       go fl info.ty1 @@ go fl info.equiv acc
+    | VIn info ->
+      go fl info.r @@ go fl info.tm0 @@
+      go fl info.tm1 acc
     | FCom info ->
       go fl info.r @@ go fl info.r' @@ go fl info.cap @@
       go_comp_sys fl info.sys @@ acc
