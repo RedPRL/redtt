@@ -203,9 +203,8 @@ struct
             let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
             M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
             M.unify >>
-
-            normalize_ty (mot @@ Tm.make Tm.Tt) >>= fun mot_tt ->
-            normalize_ty (mot @@ Tm.make Tm.Ff) >>= fun mot_ff ->
+            let mot_tt = mot @@ Tm.make Tm.Tt in
+            let mot_ff = mot @@ Tm.make Tm.Ff in
             M.ret (mot, mot_tt, mot_ff)
           else
             M.ret ((fun _ -> ty), ty, ty)
@@ -213,8 +212,8 @@ struct
           let mot_ty = Tm.pi None bool univ in
           elab_chk env (Tm.pi None bool univ) emot >>= fun mot ->
           let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-          normalize_ty @@ fmot @@ Tm.make Tm.Tt >>= fun mot_tt ->
-          normalize_ty @@ fmot @@ Tm.make Tm.Ff >>= fun mot_ff ->
+          let mot_tt = fmot @@ Tm.make Tm.Tt in
+          let mot_ff = fmot @@ Tm.make Tm.Ff in
           M.ret (fmot, mot_tt, mot_ff)
       end >>= fun (mot, mot_tt, mot_ff) ->
       elab_chk env mot_tt etcase >>= fun tcase ->
