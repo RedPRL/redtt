@@ -9,6 +9,7 @@ module Notation = Monad.Notation (M)
 open Notation
 
 type chk_tac = ty -> tm M.m
+type inf_tac = (ty * tm) M.m
 
 let normalization_clock = ref 0.
 
@@ -122,6 +123,22 @@ let tac_wrap_nf tac ty =
   with
   | ChkMatch ->
     normalize_ty ty >>= tac_rst tac
+
+
+
+let tac_let name itac ctac =
+  fun ty ->
+    itac >>= fun (let_ty, let_tm) ->
+    let singleton_ty =
+      let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some let_tm in
+      Tm.make @@ Tm.Rst {ty = let_ty; sys = [face]}
+    in
+    let x = Name.named @@ Some name in
+    M.in_scope x (`P singleton_ty) (ctac ty) >>= fun bdyx ->
+    let inf = Tm.Down {ty = let_ty; tm = let_tm}, Emp in
+    M.ret @@ Tm.make @@ Tm.Let (inf, Tm.bind x bdyx)
+
+
 
 let rec tac_lambda names tac ty =
   match Tm.unleash ty with

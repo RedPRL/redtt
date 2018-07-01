@@ -2,6 +2,7 @@ open Dev
 open ElabMonad
 
 type chk_tac = ty -> tm m
+type inf_tac = (ty * tm) m
 
 exception ChkMatch
 
@@ -11,6 +12,9 @@ val tac_wrap_nf : chk_tac -> chk_tac
 
 (** Multi-introduction tactic *)
 val tac_lambda : string list -> chk_tac -> chk_tac
+
+
+val tac_let : string -> inf_tac -> chk_tac -> chk_tac
 
 
 (** A tactical which adds support for restriction *)

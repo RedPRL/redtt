@@ -142,28 +142,18 @@ struct
 
 
     | _, E.Let info ->
-      begin
+      let itac =
         match info.ty with
         | None ->
           elab_inf env info.tm >>= fun (let_ty, let_tm) ->
           M.ret (let_ty, Tm.up let_tm)
         | Some ety ->
           elab_chk env univ ety >>= fun let_ty ->
-          normalize_ty let_ty >>= fun let_ty ->
           elab_chk env let_ty info.tm >>= fun let_tm ->
           M.ret (let_ty, let_tm)
-      end >>= fun (let_ty, let_tm) ->
-      let singleton_ty =
-        let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some let_tm in
-        Tm.make @@ Tm.Rst {ty = let_ty; sys = [face]}
       in
-      let x = Name.named @@ Some info.name in
-      M.in_scope x (`P singleton_ty)
-        begin
-          elab_chk env ty info.body
-        end >>= fun bdyx ->
-      let inf = Tm.Down {ty = let_ty; tm = let_tm}, Emp in
-      M.ret @@ Tm.make @@ Tm.Let (inf, Tm.bind x bdyx)
+      let ctac ty = elab_chk env ty info.body in
+      tac_let info.name itac ctac ty
 
     | Tm.Rst _, _ ->
       tac_rst (fun ty -> elab_chk env ty e) ty
