@@ -42,7 +42,7 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
       coe 1 0
         (λ i →
           < λ b → if b then fib.cdr i .car else fib.cdr i .cdr
-          , λ j → connection/or (A × A) (fun-to-pair A (fib.car)) pair (fib.cdr) i j
+          , λ j → connection/or _ (fun-to-pair A (fib.car)) pair (fib.cdr) i j
           >)
       in λ j →
         [i] (f : bool → A) × Path (A × A) <f tt, f ff> pair with
