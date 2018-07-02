@@ -11,7 +11,7 @@
 %token <int> NUMERAL
 %token <string> ATOM
 %token <string option> HOLE_NAME
-%token LSQ RSQ LPR RPR LGL RGL
+%token LSQ RSQ LPR RPR LGL RGL LBR RBR
 %token COLON COLON_ANGLE COMMA DOT PIPE CARET
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
@@ -49,6 +49,8 @@ atomic_eterm:
     { E.Quo t }
   | a = HOLE_NAME;
     { E.Hole a }
+  | a = HOLE_NAME; LBR; e = eterm; RBR
+    { E.Guess e }
   | TYPE
     { E.Type }
   | LGL; es = separated_list(COMMA, eterm); RGL

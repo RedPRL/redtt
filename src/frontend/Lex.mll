@@ -95,6 +95,10 @@ rule token = parse
     { Lwt.return LSQ }
   | ']'
     { Lwt.return RSQ }
+  | '{'
+    { Lwt.return LBR }
+  | '}'
+    { Lwt.return RBR }
   | '#'
     { Lwt.return HASH }
   | '@'

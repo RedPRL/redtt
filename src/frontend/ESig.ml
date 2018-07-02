@@ -10,6 +10,8 @@ and ecell = string * eterm
 and etele = ecell list
 
 and eterm =
+  | Guess of eterm
+
   | Hole of string option
   | Hope
   | Lam of string list * eterm

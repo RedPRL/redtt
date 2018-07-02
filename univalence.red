@@ -47,18 +47,18 @@ let RetIsContr
 let IdEquiv (A : type) : Equiv A A =
   < λ a → a
   , λ a →
-    < <_, λ _ → a>
+    < <a, λ _ → a>
     , λ p i →
       let aux : Line A =
         λ j →
         comp 1 j a with
-        | i=0 ⇒ p.cdr
+        | i=0 ⇒ λ k → p.cdr k
         | i=1 ⇒ λ _ → a
         end
-      in <aux 0, λ j → aux j>
+      in
+      <aux 0, λ j → aux j>
     >
   >
-
 
 let PathToEquiv
   (A : type) (B : type) (P : Path^1 type A B)
@@ -88,7 +88,7 @@ let PropPi
   : IsProp ((a : A) → B a)
   =
   λ f g i a →
-    B/prop _ (f a) (g a) i
+    B/prop a (f a) (g a) i
 
 let PropSet
   (A : type) (A/prop : IsProp A)
@@ -111,7 +111,9 @@ let LemSig
   : Path ((a : A) × B a) u v
   =
   λ i →
-    <P i, LemPropF _ _ B/prop P (u.cdr) (v.cdr) i>
+    <P i,
+    ; bug in elaborator
+    `(@ (LemPropF A B B/prop P (cdr u) (cdr v)) i)>
 
 
 let PropSig

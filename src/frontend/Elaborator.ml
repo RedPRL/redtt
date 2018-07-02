@@ -73,7 +73,7 @@ struct
       elab_decl env (E.Debug f) >>= fun env' ->
       elab_sig env' esig
     | dcl :: esig ->
-      M.isolate (elab_decl env dcl) >>= fun env' ->
+      elab_decl env dcl >>= fun env' ->
       elab_sig env' esig
 
 
@@ -132,6 +132,11 @@ struct
   and elab_chk env ty e : tm M.m =
     normalize_ty ty >>= fun ty ->
     match Tm.unleash ty, e with
+    | Tm.Rst rst, E.Guess e ->
+      elab_chk env rst.ty e >>= fun tm ->
+      M.lift C.ask >>= fun psi ->
+      M.lift @@ U.push_guess psi ~ty0:ty ~ty1:rst.ty tm
+
     | _, E.Hole name ->
       M.lift C.ask >>= fun psi ->
       M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
@@ -419,12 +424,11 @@ struct
     elab_inf env inf >>= fun (ty', cmd) ->
     M.lift (C.check_subtype ty' ty) >>= fun b ->
     if b then M.ret @@ Tm.up cmd else
-      (* TODO: I really don't like this; it leads to confusing, RedPRL-style proof states where you don't know if you're wrong.
-         We should be more conservative, and try to immediately solve the problem with unification, and if that fails, throw an error. *)
       begin
         M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-        M.lift C.ask >>= fun psi ->
-        M.lift @@ U.push_guess psi ~ty0:ty ~ty1:ty' (Tm.up cmd)
+        M.unify >>
+        M.lift (C.check_subtype ty' ty) >>= fun b ->
+        if b then M.ret (Tm.up cmd) else failwith "type error"
       end
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
@@ -529,9 +533,9 @@ struct
                 if b then M.ret (Tm.up (hd, sp)) else
                   let tm = Tm.up (hd, sp) in
                   M.lift @@ C.active @@ Dev.Subtype {ty0 = hty; ty1 = ty} >>
-                  M.lift C.ask >>= fun psi ->
-                  M.lift @@ U.push_guess psi ~ty0:ty ~ty1:hty tm >>= fun tm ->
-                  M.ret tm
+                  M.unify >>
+                  M.lift (C.check_subtype hty ty) >>= fun b ->
+                  if b then M.ret tm else failwith "elab_cut: type error"
 
               | Inf ->
                 M.ret (hty, (hd, sp))
