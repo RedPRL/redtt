@@ -181,6 +181,11 @@ struct
 
   let check_subtype cx ty0 ty1 =
     try
+      (* The following must be masking a bug!! *)
+      let tty0 = quote_ty cx ty0 in
+      let tty1 = quote_ty cx ty1 in
+      let ty0 = eval cx tty0 in
+      let ty1 = eval cx tty1 in
       Q.subtype cx.qenv ty0 ty1
     with
     | exn ->
