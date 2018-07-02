@@ -142,7 +142,14 @@ struct
     let r = I.act phi r in
     let r' = I.act phi r' in
     let rel, phi = Restriction.equate r r' cx.rel in
-    {cx with rel; env = V.Env.act phi cx.env}, phi
+    let act_ty =
+      function
+      | `Ty ty -> `Ty (V.Val.act phi ty)
+      | `Dim -> `Dim
+    in
+    let tys = List.map act_ty cx.tys in
+    let env = V.Env.act phi cx.env in
+    {cx with rel; tys; env}, phi
 
 
   let quote cx ~ty el =
