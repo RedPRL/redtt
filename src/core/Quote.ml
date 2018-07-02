@@ -147,8 +147,6 @@ struct
       let tm1 = equate env info.ty1 vproj0 vproj1 in
       Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
 
-    (* TODO: V type, in order to get eta law *)
-
     | _ ->
       match unleash el0, unleash el1 with
       | Univ info0, Univ info1 ->
@@ -209,16 +207,6 @@ struct
         let equiv_ty = V.Macro.equiv info0.ty0 info1.ty1 in
         let equiv = equate env equiv_ty info0.equiv info1.equiv in
         Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
-
-      | VIn info0, VIn info1 ->
-        (* Format.eprintf "Quoting VIn: %a = %a@." pp_value el0 pp_value el1; *)
-        let x, ty0, ty1, _ = unleash_v ty in
-        let r = `Atom x in
-        let tr = quote_dim env r in
-        let ty0r0 = Val.act (I.equate r `Dim0) ty0 in
-        let tm0 = equate env ty0r0 info0.el0 info1.el0 in
-        let tm1 = equate env ty1 info0.el1 info1.el1 in
-        Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
 
       | Box info0, Box info1 ->
         let dir, ty_cap, ty_sys = unleash_fcom ty in
