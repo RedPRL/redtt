@@ -1,4 +1,5 @@
 import path
+import connection
 
 ; the code in this file is adapted from yacctt and redprl
 
@@ -241,5 +242,49 @@ let univalence (A : type) : IsContr^1 ((B : type) × Equiv A B) =
     (SigPathToEquiv A)
     (UA/retract/sig A)
     (IsContrPath A)
+
+let IdEquiv/connection (B : type) : Equiv B B =
+  < λ b → b
+  , λ b →
+    < <b, λ _ → b>
+    , λ v i → <v.cdr i, λ j → connection/or B (v.car) b (v.cdr) i j>
+    >
+  >
+
+let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
+  < <B, IdEquiv/connection B>
+  , λ w i →
+       let VB : type = `(V i (car w) B (cdr w)) in
+       let proj/B : VB → B = λ g → `(vproj i g (car w) B (cdr w)) in
+       < VB
+       , proj/B
+       , λ b →
+            let ctr/B : Line B =
+              λ j →
+                comp 1 j b with
+                | i=0 ⇒ λ k → w .cdr .cdr b .car .cdr k
+                | i=1 ⇒ λ _ → b
+                end
+            in
+            let ctr : Fiber VB B proj/B b =
+              < `(vin i (car (car ((cdr (cdr w)) b))) (@ ctr/B 0)), λ l → ctr/B l >
+            in
+            < ctr
+            , λ v j →
+                let filler : Line B =
+                  λ l →
+                    comp 1 l b with
+                    | i=0 ⇒ λ k → w .cdr .cdr b .cdr v j .cdr k
+                    | i=1 ⇒ λ k → connection/or B (v .car) b (v .cdr) j k
+                    | j=0 ⇒ λ k → v .cdr k
+                    | j=1 ⇒ λ k → ctr/B k
+                    end
+                in
+                < `(vin i (car (@ ((cdr ((cdr (cdr w)) b)) v) j)) (@ filler 0))
+                , λ j → filler j
+                >
+            >
+       >
+  >
 
 debug
