@@ -138,6 +138,15 @@ struct
       let qcall = equate env ty call0 call1 in
       Tm.make @@ Tm.LblRet qcall
 
+    | V info ->
+      let tr = quote_dim env @@ `Atom info.x in
+      let phi_r0 = I.subst `Dim0 info.x in
+      let tm0 = equate env (Val.act phi_r0 info.ty0) (Val.act phi_r0 el0) (Val.act phi_r0 el1) in
+      let vproj0 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~equiv:info.equiv ~el:el0 in
+      let vproj1 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~equiv:info.equiv ~el:el1 in
+      let tm1 = equate env info.ty1 vproj0 vproj1 in
+      Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
+
     (* TODO: V type, in order to get eta law *)
 
     | _ ->

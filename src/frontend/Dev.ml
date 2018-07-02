@@ -270,7 +270,7 @@ let pp_entry fmt =
       Tm.pp0 ty
 
   | E (x, ty, Guess {tm; ty = ty'}) ->
-    Format.fprintf fmt "?%a@ :@ %a =? %a : %a"
+    Format.fprintf fmt "@[<hv1>?%a@ :@ %a =?@ %a@ :@ %a@]"
       Name.pp x
       Tm.pp0 ty
       Tm.pp0 tm

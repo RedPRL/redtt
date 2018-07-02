@@ -16,7 +16,7 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
 %token AST TIMES HASH AT BACKTICK IN WITH END
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ
+%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN
 %token THEN ELSE
 %token IMPORT OPAQUE
 %token TYPE PRE KAN
@@ -279,6 +279,12 @@ tm:
     { fun env ->
       make_node $startpos $endpos @@
       Tm.V {r = r env; ty0 = ty0 env; ty1 = ty1 env; equiv = equiv env} }
+
+  | LPR; VIN; r = tm; tm0 = tm; tm1 = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.VIn {r = r env; tm0 = tm0 env; tm1 = tm1 env} }
+
 
   | LPR; RIGHT_ARROW; tele = tele; RPR
     { fun env ->
