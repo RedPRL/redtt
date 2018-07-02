@@ -305,8 +305,9 @@ struct
       let r, r' = IStar.unleash p in
       try
         let cx', phi = Cx.restrict cx r r' in
-        Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) el @@
-        Cx.eval cx' tm
+        Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) (Eval.Val.act phi el) @@
+        (* TODO: it is strange that I need this. Seems to uncover either a bug of a conceptual misunderstanding on my part. - Jon *)
+        Eval.Val.act phi @@ Cx.eval cx' tm
       with
       | I.Inconsistent ->
         ()
