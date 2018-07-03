@@ -44,8 +44,8 @@ package by Darin Morrison.
 ### Installing Dependencies
 
 ```
-$ git clone https://github.com/jonsterling/cubical-experiment
-$ cd tt
+$ git clone https://github.com/RedPRL/redtt
+$ cd redtt
 $ opam update
 $ opam pin add -y redtt . # the first time you build
 $ opam upgrade            # after packages change
