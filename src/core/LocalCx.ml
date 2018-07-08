@@ -19,6 +19,7 @@ sig
   type value = Val.value
 
   val emp : t
+  val clear_locals : t -> t
 
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
@@ -63,6 +64,9 @@ struct
      tys = [];
      ppenv = Pretty.Env.emp;
      rel = V.base_restriction}
+
+  let clear_locals cx =
+    {emp with rel = cx.rel; env = Eval.Env.clear_locals cx.env}
 
   let ext {env; qenv; tys; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in
@@ -142,7 +146,14 @@ struct
     let r = I.act phi r in
     let r' = I.act phi r' in
     let rel, phi = Restriction.equate r r' cx.rel in
-    {cx with rel; env = V.Env.act phi cx.env}, phi
+    let act_ty =
+      function
+      | `Ty ty -> `Ty (V.Val.act phi ty)
+      | `Dim -> `Dim
+    in
+    let tys = List.map act_ty cx.tys in
+    let env = V.Env.act phi cx.env in
+    {cx with rel; tys; env}, phi
 
 
   let quote cx ~ty el =

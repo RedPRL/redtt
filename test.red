@@ -19,7 +19,7 @@ let not∘not/id/pt (x : bool) : Path _ (not∘not x) x =
   if x then λ _ → tt else λ _ → ff
 
 
-let not∘not/id : Path (_ → _) _ _ =
+let not∘not/id : Path (bool → bool) not∘not (id _) =
   λ i x →
     not∘not/id/pt x i
 
@@ -52,7 +52,7 @@ let hset/pi
   : hset ((x : A) → B x)
   =
   λ f g α β i j x →
-    hset/B _ _ _ (λ k → α k x) (λ k → β k x) i j
+    hset/B _ (f x) (g x) (λ k → α k x) (λ k → β k x) i j
 
 
 ; this is an example that doesn't work so well in redprl-style sequent calculus

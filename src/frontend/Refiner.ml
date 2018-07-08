@@ -45,8 +45,13 @@ let guess_restricted ty sys tm =
         go sys
     in
     go sys >>
-    M.lift C.ask >>= fun psi ->
-    M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
+    M.unify >>
+    M.lift @@ C.check ~ty:rty tm >>= fun b ->
+    if b then M.ret tm else
+      begin
+        M.lift @@ C.dump_state Format.err_formatter "damn" `All >>= fun _ ->
+        failwith "guess_restricted: type error"
+      end
 
 exception ChkMatch
 

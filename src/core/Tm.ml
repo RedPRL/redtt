@@ -659,7 +659,7 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<hv1>(V %a@ %a@ %a@ %a)@]" (pp env) info.r (pp env) info.ty0 (pp env) info.ty1 (pp env) info.equiv
 
     | VIn info ->
-      Format.fprintf fmt "@[<hv1>(Vin %a@ %a@ %a)!]" (pp env) info.r (pp env) info.tm0 (pp env) info.tm1
+      Format.fprintf fmt "@[<hv1>(Vin %a@ %a@ %a)@]" (pp env) info.r (pp env) info.tm0 (pp env) info.tm1
 
     | Lam (B (nm, tm)) ->
       let x, env' = Pretty.Env.bind nm env in
@@ -820,9 +820,8 @@ and pp_cmd env fmt (hd, sp) =
         let x_mot, env_mot = Pretty.Env.bind nm_mot env in
         let x_lcase, env_lcase = Pretty.Env.bind nm_lcase env in
         Format.fprintf fmt "@[<hv1>(S1rec@ [%a] %a@ %a %a [%a] %a)@]" Uuseg_string.pp_utf_8 x_mot (pp env_mot) mot (go `S1Rec) sp (pp env) bcase Uuseg_string.pp_utf_8 x_lcase (pp env_lcase) lcase
-      | VProj {r; _} ->
-        (* TODO *)
-        Format.fprintf fmt "@[<hv1>(vproj %a@ %a)@]" (pp env) r (go `VProj) sp
+      | VProj {r; ty0; ty1; equiv} ->
+        Format.fprintf fmt "@[<hv1>(vproj %a@ %a@ %a@ %a@ %a)@]" (pp env) r (go `VProj) sp (pp env) ty0 (pp env) ty1 (pp env) equiv
       | Cap _ ->
         (* FIXME *)
         Format.fprintf fmt "@<cap>"
@@ -831,7 +830,6 @@ and pp_cmd env fmt (hd, sp) =
       | CoRForce ->
         Format.fprintf fmt "@[<hv1>(force@ %a)@]" (go `Force) sp
   in
-  (* TODO: backwards ??? *)
   go `Start fmt sp
 
 and pp_spine env fmt sp =

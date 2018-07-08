@@ -1,4 +1,5 @@
 import path
+import connection
 
 ; the code in this file is adapted from yacctt and redprl
 
@@ -47,18 +48,18 @@ let RetIsContr
 let IdEquiv (A : type) : Equiv A A =
   < λ a → a
   , λ a →
-    < <_, λ _ → a>
+    < <a, λ _ → a>
     , λ p i →
       let aux : Line A =
         λ j →
         comp 1 j a with
-        | i=0 ⇒ p.cdr
+        | i=0 ⇒ λ k → p.cdr k
         | i=1 ⇒ λ _ → a
         end
-      in <aux 0, λ j → aux j>
+      in
+      <aux 0, λ j → aux j>
     >
   >
-
 
 let PathToEquiv
   (A : type) (B : type) (P : Path^1 type A B)
@@ -88,7 +89,7 @@ let PropPi
   : IsProp ((a : A) → B a)
   =
   λ f g i a →
-    B/prop _ (f a) (g a) i
+    B/prop a (f a) (g a) i
 
 let PropSet
   (A : type) (A/prop : IsProp A)
@@ -111,7 +112,8 @@ let LemSig
   : Path ((a : A) × B a) u v
   =
   λ i →
-    <P i, LemPropF _ _ B/prop P (u.cdr) (v.cdr) i>
+    <P i,
+     LemPropF _ _ B/prop P (u.cdr) (v.cdr) i>
 
 
 let PropSig
@@ -239,5 +241,49 @@ let univalence (A : type) : IsContr^1 ((B : type) × Equiv A B) =
     (SigPathToEquiv A)
     (UA/retract/sig A)
     (IsContrPath A)
+
+let IdEquiv/connection (B : type) : Equiv B B =
+  < λ b → b
+  , λ b →
+    < <b, λ _ → b>
+    , λ v i → <v.cdr i, λ j → connection/or B (v.car) b (v.cdr) i j>
+    >
+  >
+
+let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
+  < <B, IdEquiv/connection B>
+  , λ w i →
+       let VB : type = `(V i (car w) B (cdr w)) in
+       let proj/B : VB → B = λ g → `(vproj i g (car w) B (cdr w)) in
+       < VB
+       , proj/B
+       , λ b →
+            let ctr/B : Line B =
+              λ j →
+                comp 1 j b with
+                | i=0 ⇒ λ k → w .cdr .cdr b .car .cdr k
+                | i=1 ⇒ λ _ → b
+                end
+            in
+            let ctr : Fiber VB B proj/B b =
+              < `(vin i (car (car ((cdr (cdr w)) b))) (@ ctr/B 0)), λ l → ctr/B l >
+            in
+            < ctr
+            , λ v j →
+                let filler : Line B =
+                  λ l →
+                    comp 1 l b with
+                    | i=0 ⇒ λ k → w .cdr .cdr b .cdr v j .cdr k
+                    | i=1 ⇒ λ k → connection/or B (v .car) b (v .cdr) j k
+                    | j=0 ⇒ λ k → v .cdr k
+                    | j=1 ⇒ λ k → ctr/B k
+                    end
+                in
+                < `(vin i (car (@ ((cdr ((cdr (cdr w)) b)) v) j)) (@ filler 0))
+                , λ j → filler j
+                >
+            >
+       >
+  >
 
 debug

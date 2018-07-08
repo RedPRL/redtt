@@ -31,6 +31,7 @@ let swap a b = Swap (a, b)
 let subst r a = Subst (r, a)
 let cmp phi1 phi0 = Cmp (phi1, phi0)
 
+
 exception Inconsistent
 
 let equate r0 r1 =
@@ -107,3 +108,15 @@ let pp fmt =
     Format.fprintf fmt "1"
   | `Atom x ->
     Name.pp fmt x
+
+
+let rec pp_action fmt =
+  function
+  | Idn ->
+    Format.fprintf fmt "idn"
+  | Swap (a, b) ->
+    Format.fprintf fmt "%a <-> %a" Name.pp a Name.pp b
+  | Subst (r, x) ->
+    Format.fprintf fmt "[%a/%a]" pp r Name.pp x
+  | Cmp (phi1, phi0) ->
+    Format.fprintf fmt "%a o %a" pp_action phi1 pp_action phi0

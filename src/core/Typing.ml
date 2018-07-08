@@ -237,6 +237,19 @@ struct
     | V.Bool, (T.Tt | T.Ff) ->
       ()
 
+    | V.V vty, T.VIn vin ->
+      let r = check_eval_dim cx vin.r in
+      begin
+        match I.compare (`Atom vty.x) r with
+        | `Same ->
+          let cx', phi = Cx.restrict cx (`Atom vty.x) `Dim0 in
+          let el0 = check_eval cx' vty.ty0 vin.tm0 in
+          let el1 = check_eval cx vty.ty1 vin.tm1 in
+          Cx.check_eq cx' ~ty:(Eval.Val.act phi vty.ty1) (Eval.apply (Eval.car vty.equiv) el0) @@ Eval.Val.act phi el1
+        | _ ->
+          failwith "v/vin dimension mismatch"
+      end
+
     | _, T.Up tm ->
       let ty' = infer cx tm in
       Cx.check_subtype cx ty' ty
@@ -520,7 +533,7 @@ struct
     function
     | T.Ref {name; twin; ushift} ->
       let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name twin in
-      Cx.eval Cx.emp ty
+      Cx.eval (Cx.clear_locals cx) ty
 
     | T.Ix (ix, _) ->
       begin
@@ -531,7 +544,7 @@ struct
 
     | T.Meta {name; ushift} ->
       let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name `Only in
-      Cx.eval Cx.emp ty
+      Cx.eval (Cx.clear_locals cx) ty
 
     | T.Coe info ->
       let r = check_eval_dim cx info.r in

@@ -39,6 +39,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("hcom", HCOM);
       ("comp", COMP);
       ("vproj", VPROJ);
+      ("vin", VIN);
       ("restrict", RESTRICT);
       ("if", IF);
       ("nat-rec", NAT_REC);
@@ -94,6 +95,10 @@ rule token = parse
     { Lwt.return LSQ }
   | ']'
     { Lwt.return RSQ }
+  | '{'
+    { Lwt.return LBR }
+  | '}'
+    { Lwt.return RBR }
   | '#'
     { Lwt.return HASH }
   | '@'
@@ -142,8 +147,12 @@ rule token = parse
     { Lwt.return EOF }
   | "?" atom_initial atom_subsequent*
     {
-      let input = lexeme lexbuf in
-      Lwt.return (Grammar.HOLE_NAME (Some input))
+      match String.split_on_char '?' @@ lexeme lexbuf with
+      | [] ->
+        Lwt.return @@ Grammar.HOLE_NAME None
+      | _ :: input ->
+        let name = String.concat "" input in
+        Lwt.return (Grammar.HOLE_NAME (Some name))
     }
   | "?"
     { Lwt.return (Grammar.HOLE_NAME None) }
