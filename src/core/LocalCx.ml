@@ -181,10 +181,6 @@ struct
 
   let check_subtype cx ty0 ty1 =
     try
-      (* The following masks a bug !!!! *)
-      let phi = Restriction.as_action cx.rel in
-      let ty0 = V.Val.act phi ty0 in
-      let ty1 = V.Val.act phi ty1 in
       Q.subtype cx.qenv ty0 ty1
     with
     | exn ->
