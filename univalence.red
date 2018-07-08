@@ -67,22 +67,6 @@ let PathToEquiv
   =
   coe 0 1 (IdEquiv A) in λ i → Equiv A (P i)
 
-let LemPropF
-  (A : type) (B : A → type)
-  (B/prop : (a : A) → IsProp (B a))
-  (P : Line A)
-  (b0 : B (P 0))
-  (b1 : B (P 1))
-  : [i] B (P i) with
-    | i=0 ⇒ b0
-    | i=1 ⇒ b1
-    end
-  =
-  λ i →
-    let coe0 = coe 0 i b0 in λ j → B (P j) in
-    let coe1 = coe 1 i b1 in λ j → B (P j) in
-    B/prop (P i) coe0 coe1 i
-
 let PropPi
   (A : type) (B : A → type)
   (B/prop : (a : A) → IsProp (B a))
@@ -112,8 +96,11 @@ let LemSig
   : Path ((a : A) × B a) u v
   =
   λ i →
-    <P i,
-     LemPropF _ _ B/prop P (u.cdr) (v.cdr) i>
+    < P i
+    , let coe0 = coe 0 i (u.cdr) in λ j → B (P j) in
+      let coe1 = coe 1 i (v.cdr) in λ j → B (P j) in
+      B/prop (P i) coe0 coe1 i
+     >
 
 
 let PropSig
@@ -286,4 +273,3 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
        >
   >
 
-debug
