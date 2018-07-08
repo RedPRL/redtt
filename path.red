@@ -35,7 +35,7 @@ let funext
   (f : (x : A) → B x)
   (g : (x : A) → B x)
   (p : (x : A) → Path (B x) (f x) (g x))
-  : Path ((x : A) -> B x) f g
+  : Path ((x : A) → B x) f g
   =
   λ i x →
     p x i
@@ -57,7 +57,7 @@ let symm
   : Path A (p 1) (p 0)
   =
   λ i →
-    symm/filler A p 1 i
+    symm/filler _ p 1 i
 
 let symm/unit
   (A : type)
@@ -65,7 +65,7 @@ let symm/unit
   : (Path (Path A a a) (λ _ → a) (symm A (λ _ → a)))
   =
   λ i j →
-    symm/filler A (λ _ → a) i j
+    symm/filler _ (λ _ → a) i j
 
 let trans/filler
   (A : type)
@@ -84,16 +84,16 @@ let trans
   (A : type)
   (x : A)
   (p : Line A)
-  (q : Path A (p 1) x)
-  : Path A (p 0) (q 1)
+  (q : Path _ (p 1) x)
+  : Path _ (p 0) (q 1)
   =
   λ i →
-    trans/filler A x p q 1 i
+    trans/filler _ _ p q 1 i
 
 let trans/unit/r
   (A : type)
   (p : Line A)
-  : Path (Path A (p 0) (p 1)) (λ i → p i) (trans A (p 1) p (λ _ → p 1))
+  : Path (Path _ (p 0) (p 1)) (λ i → p i) (trans _ (p 1) p (λ _ → p 1))
   =
   λ i j →
     trans/filler A (p 1) p (λ _ → p 1) i j
@@ -102,7 +102,7 @@ let trans/unit/r
 let trans/sym/r
   (A : type)
   (p : Line A)
-  : Path (Path A (p 0) (p 0)) (λ _ → p 0) (trans A (p 0) p (symm A p))
+  : Path (Path _ (p 0) (p 0)) (λ _ → p 0) (trans _ _ p (symm _ p))
   =
   λ k i →
     comp 0 1 (p i) with
@@ -117,13 +117,13 @@ let trans/sym/r
 let symmd
   (A : Line^1 type)
   (p : [i] A i with end)
-  : [i] (symm^1 type A) i with
+  : [i] symm^1 _ A i with
     | i=0 ⇒ p 1
     | i=1 ⇒ p 0
     end
   =
   λ i →
-    comp 0 1 (p 0) in (λ j → symm/filler^1 type A j i) with
+    comp 0 1 (p 0) in (λ j → symm/filler^1 _ A j i) with
     | i=0 ⇒ λ j → p j
     | i=1 ⇒ λ _ → p 0
     end
