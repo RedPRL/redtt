@@ -534,10 +534,7 @@ struct
     function
     | T.Ref {name; twin; ushift} ->
       let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name twin in
-      (* The following appears to mask a bug!! *)
-      let ty = Cx.eval Cx.emp ty in
-      let ty = Cx.quote_ty cx ty in
-      Cx.eval cx ty
+      Cx.eval (Cx.clear cx) ty
 
     | T.Ix (ix, _) ->
       begin

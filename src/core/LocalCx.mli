@@ -10,6 +10,7 @@ sig
   type value = Val.value
 
   val emp : t
+  val clear : t -> t
 
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
