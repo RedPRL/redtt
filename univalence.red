@@ -113,7 +113,7 @@ let LemSig
   =
   λ i →
     <P i,
-     LemPropF A B B/prop P (u.cdr) (v.cdr) i>
+     LemPropF _ _ B/prop P (u.cdr) (v.cdr) i>
 
 
 let PropSig
