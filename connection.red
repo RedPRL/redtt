@@ -18,7 +18,7 @@ let connection/or
    end
  =
  λ i j →
-  ; this is an example of something that is much nicer here than in redprl and yacctt.
+  ; this is an example of something that is much nicer here than in redprl.
   ; we can define using line types all the faces of the composition at once.
   ; definitional equivalence kicks in to make this work.
   let face : Line (Line A) =
