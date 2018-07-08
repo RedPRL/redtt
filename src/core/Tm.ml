@@ -639,7 +639,7 @@ let rec pp env fmt =
         | [] ->
           Format.fprintf fmt "@[<hv1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
         | _ ->
-          Format.fprintf fmt "@[<hv1>(# @[<hv1><%a>@ %a@ @[%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
+          Format.fprintf fmt "@[<hv1>(# @[<hv1><%a>@ %a@ @[<hv>%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
       end
 
 
@@ -649,7 +649,7 @@ let rec pp env fmt =
         | [] ->
           Format.fprintf fmt "%a" (pp env) ty
         | _ ->
-          Format.fprintf fmt "@[<hv1>(%a@ @[%a@])@]" (pp env) ty (pp_sys env) sys
+          Format.fprintf fmt "@[<hv1>(%a@ @[<hv>%a@])@]" (pp env) ty (pp_sys env) sys
       end
 
     | CoR face ->
@@ -748,7 +748,7 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<hv1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
 
     | Box {r; r'; cap; sys} ->
-      Format.fprintf fmt "@[<hv1>(box %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
+      Format.fprintf fmt "@[<hv1>(box %a %a@ %a@ @[<hv>%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
 
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
