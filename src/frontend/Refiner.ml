@@ -69,7 +69,7 @@ let push_restriction sys ty =
   | Tm.Pi (dom, cod) ->
     let x, codx = Tm.unbind cod in
     let app_tm tm =
-      let var = Tm.up (Tm.Ref {name = x; ushift = 0; twin = `Only}, Emp) in
+      let var = Tm.up @@ Tm.var x in
       let hd = Tm.Down {ty; tm} in
       Tm.up (hd, Emp #< (Tm.FunApp var))
     in
@@ -81,7 +81,7 @@ let push_restriction sys ty =
   | Tm.Ext ebnd ->
     let xs, tyxs, sysxs = Tm.unbind_ext ebnd in
     let app_tm tm =
-      let vars = Bwd.to_list @@ Bwd.map (fun x -> Tm.up (Tm.Ref {name = x; ushift = 0; twin = `Only}, Emp)) xs in
+      let vars = Bwd.to_list @@ Bwd.map (fun x -> Tm.up @@ Tm.var x) xs in
       let hd = Tm.Down {ty; tm} in
       Tm.up (hd , Emp #< (Tm.ExtApp vars))
     in
@@ -179,7 +179,7 @@ let tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase =
     let hd = Tm.Down {ty = bool; tm = scrut} in
     let bmot =
       let x = Name.fresh () in
-      Tm.bind x @@ mot @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)
+      Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
     in
     let frm = Tm.If {mot = bmot; tcase; fcase} in
     M.ret @@ Tm.up (hd, Emp #< frm)
@@ -193,7 +193,7 @@ let rec tac_lambda names tac ty =
       | [] -> tac ty
       | name :: names ->
         let x = Name.named @@ Some name in
-        let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+        let codx = Tm.unbind_with x cod in
         M.in_scope x (`P dom) begin
           tac_wrap_nf (tac_lambda names tac) codx
         end >>= fun bdyx ->

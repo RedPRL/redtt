@@ -1077,7 +1077,7 @@ struct
            * (r'=0). It is using the evaluator to generate the
            * type in the semantic domain. *)
           let fiber0_ty phi b =
-            let var i = Tm.up @@ Tm.var i `Only in
+            let var i = Tm.up @@ Tm.ix i in
             eval (Env.push_many [Val (Val.act phi ty00); Val (Val.act phi ty10); Val (car (Val.act phi equiv0)); Val b] Env.emp) @@
             Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
           in
@@ -2493,8 +2493,8 @@ struct
       let rho = Env.push_many [Val ty0; Val ty1] Env.emp in
       eval rho @@
       Tm.Macro.equiv
-        (Tm.up @@ Tm.var 0 `Only)
-        (Tm.up @@ Tm.var 1 `Only)
+        (Tm.up @@ Tm.ix 0)
+        (Tm.up @@ Tm.ix 1)
 
   end
 

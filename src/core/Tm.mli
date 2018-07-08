@@ -100,8 +100,8 @@ type 'a subst =
 val make : tm tmf -> tm
 val unleash : tm -> tm tmf
 
-val close_var : Name.t -> (twin -> twin) -> int -> tm -> tm
-val open_var : int -> Name.t -> (twin -> twin) -> tm -> tm
+val close_var : Name.t -> ?twin:(twin -> twin) -> int -> tm -> tm
+val open_var : int -> Name.t -> ?twin:(twin -> twin) -> tm -> tm
 
 val bind : Name.t -> tm -> tm bnd
 val bindn : Name.t bwd -> tm -> tm nbnd
@@ -111,7 +111,7 @@ val unbind_ext : (tm * (tm, tm) system) nbnd -> Name.t bwd * tm * (tm, tm) syste
 val unbind_ext_with : Name.t list -> (tm * (tm, tm) system) nbnd -> tm * (tm, tm) system
 val bind_ext : Name.t bwd -> tm -> (tm, tm) system -> (tm * (tm, tm) system) nbnd
 
-val unbind_with : Name.t -> (twin -> twin) -> tm bnd -> tm
+val unbind_with : Name.t -> ?twin:(twin -> twin) -> tm bnd -> tm
 
 val subst : tm cmd subst -> tm -> tm
 
@@ -123,7 +123,9 @@ val eta_contract : tm -> tm
 
 
 val up : tm cmd -> tm
-val var : int -> twin -> tm cmd
+val ix : ?twin:twin -> int -> tm cmd
+val var : ?twin:twin -> Name.t -> tm cmd
+
 val lam : string option -> tm -> tm
 val ext_lam : string option list -> tm -> tm
 val pi : string option -> tm -> tm -> tm

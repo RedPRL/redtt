@@ -483,10 +483,10 @@ struct
     | `Atom x ->
       try
         let ix = Env.ix_of_atom x env in
-        Tm.up @@ Tm.var ix `Only
+        Tm.up @@ Tm.ix ix
       with
       | _ ->
-        Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)
+        Tm.up @@ Tm.var x
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1
