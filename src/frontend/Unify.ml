@@ -115,7 +115,7 @@ let rec opt_traverse f xs =
 
 let to_var t =
   match Tm.unleash @@ Tm.eta_contract t with
-  | Tm.Up (Tm.Ref {name; _}, Emp) ->
+  | Tm.Up (Tm.Var {name; _}, Emp) ->
     Some name
   | _ ->
     (* Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t; *)
@@ -410,13 +410,13 @@ let push_guess gm ~ty0 ~ty1 tm  =
 *)
 let is_orthogonal q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
-  | Tm.Up (Tm.Ref _, _), Tm.Up (Tm.Ref _, _) -> false
-  | Tm.Up (Tm.Ref _, _), Tm.Up (Tm.Meta _, _) -> false
-  | Tm.Up (Tm.Ref _, _), _ -> true
+  | Tm.Up (Tm.Var _, _), Tm.Up (Tm.Var _, _) -> false
+  | Tm.Up (Tm.Var _, _), Tm.Up (Tm.Meta _, _) -> false
+  | Tm.Up (Tm.Var _, _), _ -> true
 
-  | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Ref _, _) -> false
+  | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Var _, _) -> false
   | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) -> false
-  | _, Tm.Up (Tm.Ref _, _) -> true
+  | _, Tm.Up (Tm.Var _, _) -> true
 
   | Tm.Pi _, Tm.Univ _ -> true
   | Tm.Pi _, Tm.Sg _ -> true
@@ -517,8 +517,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let module HSubst = HSubst (T) in
       let _, cod0 = T.Cx.Eval.unleash_sg ~debug:["match_spine/cdr"] ty0 in
       let _, cod1 = T.Cx.Eval.unleash_sg ~debug:["match-spine/cdr"] ty1 in
-      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
-      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
+      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
+      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
       ret (cod0, cod1)
 
     | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
@@ -547,8 +547,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let mot1_ff = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Ff) in
       active @@ Problem.eqn ~ty0:mot0_tt ~tm0:info0.tcase ~ty1:mot1_tt ~tm1:info1.tcase >>
       active @@ Problem.eqn ~ty0:mot0_ff ~tm0:info0.fcase ~ty1:mot1_ff ~tm1:info1.fcase >>
-      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up (Tm.Ref {name = x0; twin = tw0; ushift = 0}, sp0)) in
-      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up (Tm.Ref {name = x1; twin = tw1; ushift = 0}, sp1)) in
+      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0)) in
+      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1)) in
       ret (ty0, ty1)
 
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
@@ -673,7 +673,7 @@ let rigid_rigid q =
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
-  | Tm.Up (Tm.Ref info0, sp0), Tm.Up (Tm.Ref info1, sp1) when info0.ushift = 0 && info1.ushift = 0 ->
+  | Tm.Up (Tm.Var info0, sp0), Tm.Up (Tm.Var info1, sp1) when info0.ushift = 0 && info1.ushift = 0 ->
     match_spine info0.name info0.twin sp0 info1.name info1.twin sp1 >>
     ret ()
 
@@ -770,8 +770,8 @@ let rec split_sigma tele x ty =
     let z = Name.fresh () in
     let sp_tele = telescope_to_spine tele in
 
-    let ytm = Tm.Ref {name = y; twin = `Only; ushift = 0}, sp_tele in
-    let ztm = Tm.Ref {name = z; twin = `Only; ushift = 0}, sp_tele in
+    let ytm = Tm.Var {name = y; twin = `Only; ushift = 0}, sp_tele in
+    let ztm = Tm.Var {name = z; twin = `Only; ushift = 0}, sp_tele in
     let cody = Tm.subst (Tm.Dot (ytm, Tm.Shift 0)) cod in
 
     Some
@@ -780,8 +780,8 @@ let rec split_sigma tele x ty =
       , z
       , abstract_ty tele cody
       , abstract_tm tele @@ Tm.cons (Tm.up ytm) (Tm.up ztm)
-      , ( abstract_tm tele @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Car)
-        , abstract_tm tele @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Cdr)
+      , ( abstract_tm tele @@ Tm.up (Tm.Var {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Car)
+        , abstract_tm tele @@ Tm.up (Tm.Var {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Cdr)
         )
       )
 

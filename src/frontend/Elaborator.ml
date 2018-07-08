@@ -437,10 +437,10 @@ struct
       get_resolver env >>= fun renv ->
       begin
         match ResEnv.get name renv with
-        | `Ref a ->
+        | `Var a ->
           M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) >>= fun ty ->
           let ty = Tm.shift_univ ushift ty in
-          let cmd = Tm.Ref {name = a; twin = `Only; ushift}, Emp in
+          let cmd = Tm.Var {name = a; twin = `Only; ushift}, Emp in
           M.ret (ty, cmd)
         | `Ix _ ->
           failwith "elab_inf: expected locally closed"
@@ -508,7 +508,7 @@ struct
       get_resolver env >>= fun renv ->
       begin
         match ResEnv.get name renv with
-        | `Ref a ->
+        | `Var a ->
           M.ret @@ Tm.up @@ Tm.var a
         | `Ix _ ->
           failwith "elab_dim: expected locally closed"

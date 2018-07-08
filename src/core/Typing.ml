@@ -47,7 +47,7 @@ struct
             | `Dim -> ()
             | _ -> failwith "check_dim_cmd: expected dimension"
           end
-        | Tm.Ref _ ->
+        | Tm.Var _ ->
           (* TODO: lookup in global context, make sure it is a dimension *)
           ()
         | _ -> failwith ""
@@ -531,7 +531,7 @@ struct
 
   and infer_head cx =
     function
-    | T.Ref {name; twin; ushift} ->
+    | T.Var {name; twin; ushift} ->
       let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name twin in
       Cx.eval (Cx.clear_locals cx) ty
 

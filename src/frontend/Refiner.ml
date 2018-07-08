@@ -153,7 +153,7 @@ let tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase =
       | None ->
         let is_dependent =
           match Tm.unleash scrut with
-          | Tm.Up (Tm.Ref {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
+          | Tm.Up (Tm.Var {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
           | _ -> false
         in
         if is_dependent then

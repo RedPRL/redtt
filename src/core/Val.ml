@@ -55,7 +55,7 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Ref : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
+  | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
   | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
@@ -395,7 +395,7 @@ struct
               failwith "eval_dim: expected atom in environment"
           end
 
-        | Tm.Ref info ->
+        | Tm.Var info ->
           I.act rho.global @@ Sig.global_dim info.name
         | Tm.Meta meta ->
           I.act rho.global @@ Sig.global_dim meta.name
@@ -704,7 +704,7 @@ struct
     | Lvl _ ->
       ret con
 
-    | Ref _ ->
+    | Var _ ->
       ret con
 
     | Meta _ ->
@@ -1624,12 +1624,12 @@ struct
           failwith "Expected value in environment"
       end
 
-    | Tm.Ref info ->
+    | Tm.Var info ->
       let tty, tsys = Sig.lookup info.name info.twin in
       let rho' = Env.clear_locals rho in
       let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
       let vty = eval rho' @@ Tm.shift_univ info.ushift tty in
-      reflect vty (Ref {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
+      reflect vty (Var {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
 
     | Tm.Meta {name; ushift} ->
       let tty, tsys = Sig.lookup name `Only in
@@ -2441,7 +2441,7 @@ struct
     | Cdr neu ->
       Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
 
-    | Ref {name; _} ->
+    | Var {name; _} ->
       Name.pp fmt name
 
     | Meta {name; _} ->
