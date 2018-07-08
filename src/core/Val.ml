@@ -228,6 +228,9 @@ struct
 
     let emp = {cells = []; global = I.idn}
 
+    let clear rho =
+      {rho with cells = []}
+
     let push el {cells; global} =
       {cells = el :: cells; global}
 
@@ -1622,14 +1625,16 @@ struct
 
     | Tm.Ref info ->
       let tty, tsys = Sig.lookup info.name info.twin in
-      let vsys = eval_tm_sys Env.emp @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
-      let vty = eval Env.emp @@ Tm.shift_univ info.ushift tty in
+      let rho' = Env.clear rho in
+      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
+      let vty = eval rho' @@ Tm.shift_univ info.ushift tty in
       reflect vty (Ref {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
 
     | Tm.Meta {name; ushift} ->
       let tty, tsys = Sig.lookup name `Only in
-      let vsys = eval_tm_sys Env.emp @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
-      let vty = eval Env.emp @@ Tm.shift_univ ushift tty in
+      let rho' = Env.clear rho in
+      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
+      let vty = eval rho' @@ Tm.shift_univ ushift tty in
       reflect vty (Meta {name; ushift}) vsys
 
   and reflect ty neu sys =
