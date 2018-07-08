@@ -123,8 +123,7 @@ let symmd
     end
   =
   λ i →
-    ?todo
-    ;comp 0 1 (p 0) in (λ j → symm/filler^1 type A j i) with
-    ;| i=0 ⇒ λ j → p j
-    ;| i=1 ⇒ λ _ → p 0
-    ;end
+    comp 0 1 (p 0) in (λ j → symm/filler^1 type A j i) with
+    | i=0 ⇒ λ j → p j
+    | i=1 ⇒ λ _ → p 0
+    end
