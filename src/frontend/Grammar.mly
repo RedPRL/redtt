@@ -49,7 +49,7 @@ atomic_eterm:
     { E.Quo t }
   | a = HOLE_NAME;
     { E.Hole a }
-  | a = HOLE_NAME; LBR; e = eterm; RBR
+  | HOLE_NAME; LBR; e = eterm; RBR
     { E.Guess e }
   | TYPE
     { E.Type }
