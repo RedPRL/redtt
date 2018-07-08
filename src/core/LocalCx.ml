@@ -19,7 +19,7 @@ sig
   type value = Val.value
 
   val emp : t
-  val clear : t -> t
+  val clear_locals : t -> t
 
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
@@ -65,8 +65,8 @@ struct
      ppenv = Pretty.Env.emp;
      rel = V.base_restriction}
 
-  let clear cx =
-    {emp with rel = cx.rel; env = Eval.Env.clear cx.env}
+  let clear_locals cx =
+    {emp with rel = cx.rel; env = Eval.Env.clear_locals cx.env}
 
   let ext {env; qenv; tys; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in

@@ -533,7 +533,7 @@ struct
     function
     | T.Ref {name; twin; ushift} ->
       let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name twin in
-      Cx.eval (Cx.clear cx) ty
+      Cx.eval (Cx.clear_locals cx) ty
 
     | T.Ix (ix, _) ->
       begin
@@ -544,7 +544,7 @@ struct
 
     | T.Meta {name; ushift} ->
       let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name `Only in
-      Cx.eval Cx.emp ty
+      Cx.eval (Cx.clear_locals cx) ty
 
     | T.Coe info ->
       let r = check_eval_dim cx info.r in

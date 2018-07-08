@@ -148,7 +148,7 @@ sig
       with type t = env
       with type 'a m = 'a
     val emp : env
-    val clear : env -> env
+    val clear_locals : env -> env
     val push : env_el -> env -> env
   end
 
