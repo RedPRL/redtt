@@ -113,8 +113,7 @@ let LemSig
   =
   λ i →
     <P i,
-    ; bug in elaborator
-    `(@ (LemPropF A B B/prop P (cdr u) (cdr v)) i)>
+     LemPropF A B B/prop P (u.cdr) (v.cdr) i>
 
 
 let PropSig

@@ -562,7 +562,14 @@ struct
                 failwith "elab_cut: problem biting extension type"
             in
             bite Emp xs efs >>= fun (rs, efs) ->
-            go ext_ty (hd, sp #< (Tm.ExtApp rs)) efs mode
+            (* TODO: this is ugly *)
+            let restriction =
+              List.map2 (fun x r -> let t = Tm.up (Tm.Ref {name = x; ushift = 0; twin = `Only}, Emp) in (Name.fresh (), `R (t, r))) (Bwd.to_list xs) rs
+            in
+            M.in_scopes restriction begin
+              normalize_ty ext_ty >>= fun ext_ty ->
+              go ext_ty (hd, sp #< (Tm.ExtApp rs)) efs mode
+            end
 
           | Tm.Sg (dom, _), E.Car :: efs ->
             go dom (hd, sp #< Tm.Car) efs mode
