@@ -59,7 +59,7 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Ref : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
+  | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
   | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu

@@ -283,9 +283,9 @@ struct
         Tm.Ix (Env.ix_of_lvl l0 env, `Only), Bwd.from_list stk
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
-    | Ref info0, Ref info1 ->
+    | Var info0, Var info1 ->
       if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
-        Tm.Ref {name = info0.name; twin = info0.twin; ushift = info0.ushift}, Bwd.from_list stk
+        Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift}, Bwd.from_list stk
       else
         failwith "global variable name mismatch"
     | Meta meta0, Meta meta1 ->
@@ -483,10 +483,10 @@ struct
     | `Atom x ->
       try
         let ix = Env.ix_of_atom x env in
-        Tm.up @@ Tm.var ix `Only
+        Tm.up @@ Tm.ix ix
       with
       | _ ->
-        Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)
+        Tm.up @@ Tm.var x
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1

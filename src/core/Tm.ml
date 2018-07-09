@@ -60,7 +60,7 @@ type 'a tmf =
 
 and 'a head =
   | Meta of {name: Name.t; ushift : int}
-  | Ref of {name : Name.t; twin : twin; ushift : int}
+  | Var of {name : Name.t; twin : twin; ushift : int}
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
@@ -91,6 +91,13 @@ type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
 
+let ix ?twin:(tw = `Only) i =
+  Ix (i, tw), Emp
+
+let var ?twin:(tw = `Only) a =
+  Var {name = a; twin = tw; ushift = 0}, Emp
+
+
 let rec cmp_subst sub0 sub1 =
   match sub0, sub1 with
   | s, Shift 0 -> s
@@ -98,11 +105,8 @@ let rec cmp_subst sub0 sub1 =
   | Shift m, Shift n -> Shift (m + n)
   | sub0, Dot (e, sub1) -> Dot (subst_cmd sub0 e, cmp_subst sub0 sub1)
 
-and var i tw =
-  Ix (i, tw), Emp
-
 and lift sub =
-  Dot (var 0 `Only, cmp_subst (Shift 1) sub)
+  Dot (ix 0, cmp_subst (Shift 1) sub)
 
 and liftn n sub =
   match n with
@@ -250,8 +254,8 @@ and subst_head sub head =
       | Dot (_, sub), _ -> subst_head sub @@ Ix (i - 1, tw)
     end
 
-  | Ref info ->
-    Ref info, Emp
+  | Var info ->
+    Var info, Emp
 
   | Meta a ->
     Meta a, Emp
@@ -341,7 +345,7 @@ let make con =
 
 let unleash (Tm con) = con
 
-let traverse ~f ~var ~ref =
+let traverse ~f ~go_ix ~go_var =
   let rec go k =
     function
     | Univ info -> Univ info
@@ -422,9 +426,9 @@ let traverse ~f ~var ~ref =
   and go_hd k =
     function
     | Ix (i, tw) ->
-      var k i tw
-    | Ref info ->
-      ref k (info.name, info.twin, info.ushift)
+      go_ix k i tw
+    | Var info ->
+      go_var k (info.name, info.twin, info.ushift)
     | Meta a ->
       Meta a, Emp
     | Down info ->
@@ -526,29 +530,34 @@ let traverse ~f ~var ~ref =
 
   in go
 
-let fix_traverse ~var ~ref  =
+let fix_traverse ~go_ix ~go_var  =
   let rec go k (Tm tm) =
-    Tm (traverse ~f:go ~var ~ref k tm)
+    Tm (traverse ~f:go ~go_ix ~go_var k tm)
   in
   go 0
 
-let close_var a f k =
-  let var _ i tw = Ix (i, tw), Emp in
-  let ref n (b, tw, ush) = if b = a then Ix (n + k, f tw), Emp else Ref {name = b; twin = tw; ushift = ush}, Emp in
-  fix_traverse ~var ~ref
+let close_var a ?twin:(twin = fun _ -> `Only) k =
+  let go_ix _ i tw = Ix (i, tw), Emp in
+  let go_var n (b, tw, ush) =
+    if b = a then
+      ix ~twin:(twin tw) (n + k)
+    else
+      Var {name = b; twin = tw; ushift = ush}, Emp
+  in
+  fix_traverse ~go_ix ~go_var
 
 (* TODO: check that this isn't catastrophically wrong *)
-let open_var k a f =
-  let var k' i tw = if i = (k + k') then Ref {name = a; twin = f tw; ushift = 0}, Emp else Ix (i, tw), Emp in
-  let ref _n (b, tw, ush) = Ref {name = b; twin = tw; ushift = ush}, Emp in
-  fix_traverse ~var ~ref
+let open_var k a ?twin:(twin = fun _ -> `Only) =
+  let go_ix k' i tw = if i = (k + k') then var ~twin:(twin tw) a else Ix (i, tw), Emp in
+  let go_var _n (b, tw, ush) = Var {name = b; twin = tw; ushift = ush}, Emp in
+  fix_traverse ~go_ix ~go_var
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
-  x, open_var 0 x (fun _ -> `Only) t
+  x, open_var 0 x t
 
-let unbind_with x tw (B (_, t)) =
-  open_var 0 x tw t
+let unbind_with x ?twin:(twin = fun _ -> `Only) (B (_, t)) =
+  open_var 0 x ~twin t
 
 let unbindn (NB (nms, t)) =
   let rec go k nms xs t =
@@ -556,7 +565,7 @@ let unbindn (NB (nms, t)) =
     | [] -> xs, t
     | nm :: nms ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) @@ open_var k x (fun _ -> `Only) t
+      go (k + 1) nms (xs #< x) @@ open_var k x t
   in
   go 0 nms Emp t
 
@@ -572,7 +581,7 @@ let unbind_ext (NB (nms, (ty, sys))) =
     | [] -> xs, ty, sys
     | nm :: nms ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) (open_var k x (fun _ -> `Only) ty) (map_tm_sys (open_var k x (fun _ -> `Only)) sys)
+      go (k + 1) nms (xs #< x) (open_var k x ty) (map_tm_sys (open_var k x) sys)
   in
   go 0 nms Emp ty sys
 
@@ -581,7 +590,7 @@ let unbind_ext_with xs (NB (nms, (ty, sys))) =
     match xs with
     | [] -> ty, sys
     | x :: xs ->
-      go (k + 1) xs (open_var k x (fun _ -> `Only) ty) (map_tm_sys (open_var k x (fun _ -> `Only)) sys)
+      go (k + 1) xs (open_var k x ty) (map_tm_sys (open_var k x) sys)
   in
   if List.length nms = List.length xs then
     go 0 xs ty sys
@@ -590,7 +599,7 @@ let unbind_ext_with xs (NB (nms, (ty, sys))) =
 
 
 let bind x tx =
-  B (Name.name x, close_var x (fun _ -> `Only) 0 tx)
+  B (Name.name x, close_var x 0 tx)
 
 let rec bindn xs txs =
   let xs_l = Bwd.to_list xs in
@@ -599,7 +608,7 @@ let rec bindn xs txs =
     match xs with
     | Emp -> txs
     | Snoc (xs, x) ->
-      go (k + 1) xs @@ close_var x (fun _ -> `Only) (n - k) txs
+      go (k + 1) xs @@ close_var x (n - k) txs
   in
   NB (List.map Name.name xs_l, go 0 xs txs)
 
@@ -610,7 +619,7 @@ let rec bind_ext xs tyxs sysxs =
     match xs with
     | Emp -> tyxs, sysxs
     | Snoc (xs, x) ->
-      go (k + 1) xs (close_var x (fun _ -> `Only) (n - k) tyxs) (map_tm_sys (close_var x (fun _ -> `Only) (n - k)) sysxs)
+      go (k + 1) xs (close_var x (n - k) tyxs) (map_tm_sys (close_var x (n - k)) sysxs)
   in
   NB (List.map Name.name xs_l, go 0 xs tyxs sysxs)
 
@@ -784,7 +793,7 @@ and pp_head env fmt =
     Uuseg_string.pp_utf_8 fmt @@
     Pretty.Env.var ix env
 
-  | Ref {name; ushift} ->
+  | Var {name; ushift} ->
     Name.pp fmt name;
     if ushift > 0 then Format.fprintf fmt "^%i" ushift else ()
 
@@ -939,8 +948,8 @@ struct
 
   let path ty tm0 tm1 =
     let ty' = subst (Shift 1) ty in
-    let face0 = up (var 0 `Only), make Dim0, Some (subst (Shift 1) tm0) in
-    let face1 = up (var 0 `Only), make Dim1, Some (subst (Shift 1) tm1) in
+    let face0 = up (ix 0), make Dim0, Some (subst (Shift 1) tm0) in
+    let face1 = up (ix 0), make Dim1, Some (subst (Shift 1) tm1) in
     let sys = [face0; face1] in
     make @@ Ext (NB ([None], (ty', sys)))
 
@@ -948,7 +957,7 @@ struct
     sg (Some "ix") ty0 @@
     let app =
       Down {tm = subst (Shift 1) f; ty = arr ty0 ty1},
-      (Emp #< (FunApp (up (var 0 `Only))))
+      (Emp #< (FunApp (up (ix 0))))
     in
     path
       (subst (Shift 1) ty1)
@@ -962,8 +971,8 @@ struct
     pi (Some "other") (subst (Shift 1) ty) @@
     path
       (subst proj2 ty)
-      (up @@ var 0 `Only)
-      (up @@ var 1 `Only)
+      (up @@ ix 0)
+      (up @@ ix 1)
 
   let equiv ty0 ty1 =
     sg (Some "fun") (arr ty0 ty1) @@
@@ -972,8 +981,8 @@ struct
     fiber
       ~ty0:(subst proj2 ty0)
       ~ty1:(subst proj2 ty1)
-      ~f:(up @@ var 1 `Only)
-      ~x:(up @@ var 0 `Only)
+      ~f:(up @@ ix 1)
+      ~x:(up @@ ix 0)
 end
 
 module OccursAux =
@@ -1020,7 +1029,7 @@ struct
 
   and go_cmd fl (hd, sp) acc =
     match fl, hd with
-    | `RigVars, Ref {name; _} ->
+    | `RigVars, Var {name; _} ->
       go_spine fl sp @@
       Occurs.Set.add name acc
     | `RigVars, Meta _ ->
@@ -1036,9 +1045,9 @@ struct
     | `RigVars, Meta _ -> acc
     | `Metas, Meta {name; _} ->
       Occurs.Set.add name acc
-    | (`Vars | `RigVars), Ref {name; _} ->
+    | (`Vars | `RigVars), Var {name; _} ->
       Occurs.Set.add name acc
-    | `Metas, Ref _ -> acc
+    | `Metas, Var _ -> acc
     | _, Down {ty; tm} ->
       go fl tm @@ go fl ty acc
     | _, Coe info ->
@@ -1160,7 +1169,7 @@ let map_comp_sys f =
 
 let map_head f =
   function
-  | Ref info -> Ref info
+  | Var info -> Var info
   | Meta a -> Meta a
   | Ix (i, tw) -> Ix (i, tw)
   | Down info ->
@@ -1244,10 +1253,10 @@ let rec map_ext_bnd f nbnd =
     NB ([], (f ty, map_tm_sys f sys))
   | NB (nm :: nms, (ty, sys)) ->
     let x = Name.named nm in
-    let tyx = open_var 0 x (fun _ -> `Only) ty in
-    let sysx = map_tm_sys (open_var 0 x (fun _ -> `Only)) sys in
+    let tyx = open_var 0 x ty in
+    let sysx = map_tm_sys (open_var 0 x) sys in
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
-    NB (nm :: nms, (close_var x (fun _ -> `Only) 0 tyx', map_tm_sys (close_var x (fun _ -> `Only) 0) sysx'))
+    NB (nm :: nms, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
 
 let map_cmd f (hd, sp) =
   map_head f hd, map_spine f sp
@@ -1325,7 +1334,7 @@ let rec opt_traverse f xs =
 
 let as_plain_var t =
   match unleash t with
-  | Up (Ref {name; _}, Emp) ->
+  | Up (Var {name; _}, Emp) ->
     Some name
   | _ ->
     None
@@ -1397,8 +1406,8 @@ let rec shift_univ k tm =
   match unleash tm with
   | Univ {lvl; kind} ->
     make @@ Univ {lvl = Lvl.shift k lvl; kind}
-  | Up (Ref info, sp) ->
-    let hd' = Ref {info with ushift = info.ushift + k} in
+  | Up (Var info, sp) ->
+    let hd' = Var {info with ushift = info.ushift + k} in
     let sp' = map_spine (shift_univ k) sp in
     make @@ Up (hd', sp')
   | Up (Meta {name; ushift}, sp) ->

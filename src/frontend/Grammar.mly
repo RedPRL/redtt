@@ -88,6 +88,11 @@ eframe:
     { E.Car }
   | DOT CDR
     { E.Cdr }
+  | DOT; n = NUMERAL
+    { match n with
+      | 0 -> E.Car
+      | 1 -> E.Cdr
+      | _ -> failwith "Parser: invalid projection" }
 
 eterm:
   | e = atomic_eterm
@@ -334,13 +339,13 @@ head:
     { fun env ->
       match R.get a env with
       | `Ix _ -> failwith "Cannot shift bound variable"
-      | `Ref r -> Tm.Ref {name = r; twin = `Only; ushift = k} }
+      | `Var r -> Tm.Var {name = r; twin = `Only; ushift = k} }
 
   | a = ATOM
     { fun env ->
       match R.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
-      | `Ref r -> Tm.Ref {name = r; twin = `Only; ushift = 0} }
+      | `Var r -> Tm.Var {name = r; twin = `Only; ushift = 0} }
 
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->

@@ -29,7 +29,7 @@ let rec get x (env, tbl) =
   with
   | _ ->
     match T.find x tbl with
-    | Some r -> `Ref r
+    | Some r -> `Var r
     | None -> failwith @@ "Could not resolve variable: " ^ x
 
 

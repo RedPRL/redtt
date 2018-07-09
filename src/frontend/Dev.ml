@@ -48,10 +48,10 @@ let eqn_open_var k x tw q =
     | `P -> `Only, `Only
     | `Tw -> `TwinL, `TwinR
   in
-  let ty0 = Tm.open_var k x (fun _ -> twl) q.ty0 in
-  let ty1 = Tm.open_var k x (fun _ -> twr) q.ty1 in
-  let tm0 = Tm.open_var k x (fun _ -> twl) q.tm0 in
-  let tm1 = Tm.open_var k x (fun _ -> twr) q.tm1 in
+  let ty0 = Tm.open_var k x ~twin:(fun _ -> twl) q.ty0 in
+  let ty1 = Tm.open_var k x ~twin:(fun _ -> twr) q.ty1 in
+  let tm0 = Tm.open_var k x ~twin:(fun _ -> twl) q.tm0 in
+  let tm1 = Tm.open_var k x ~twin:(fun _ -> twr) q.tm1 in
   {ty0; ty1; tm0; tm1}
 
 let rec eqn_close_var x tw k q =
@@ -60,10 +60,10 @@ let rec eqn_close_var x tw k q =
     | `P -> `Only, `Only
     | `Tw -> `TwinL, `TwinR
   in
-  let ty0 = Tm.close_var x (fun _ -> twl) k q.ty0 in
-  let ty1 = Tm.close_var x (fun _ -> twr) k q.ty1 in
-  let tm0 = Tm.close_var x (fun _ -> twl) k q.tm0 in
-  let tm1 = Tm.close_var x (fun _ -> twr) k q.tm1 in
+  let ty0 = Tm.close_var x ~twin:(fun _ -> twl) k q.ty0 in
+  let ty1 = Tm.close_var x ~twin:(fun _ -> twr) k q.ty1 in
+  let tm0 = Tm.close_var x ~twin:(fun _ -> twl) k q.tm0 in
+  let tm1 = Tm.close_var x ~twin:(fun _ -> twr) k q.tm1 in
   {ty0; ty1; tm0; tm1}
 
 let param_open_var k x =
@@ -71,11 +71,11 @@ let param_open_var k x =
   | `I ->
     `I
   | `P ty ->
-    `P (Tm.open_var k x (fun tw -> tw) ty)
+    `P (Tm.open_var k x ~twin:(fun tw -> tw) ty)
   | `Tw (ty0, ty1) ->
-    `Tw (Tm.open_var k x (fun tw -> tw) ty0, Tm.open_var k x (fun tw -> tw) ty1)
+    `Tw (Tm.open_var k x ~twin:(fun tw -> tw) ty0, Tm.open_var k x ~twin:(fun tw -> tw) ty1)
   | `R (r0, r1) ->
-    `R (Tm.open_var k x (fun tw -> tw) r0, Tm.open_var k x (fun tw -> tw) r1)
+    `R (Tm.open_var k x ~twin:(fun tw -> tw) r0, Tm.open_var k x ~twin:(fun tw -> tw) r1)
 
 
 let param_close_var x k =
@@ -83,19 +83,19 @@ let param_close_var x k =
   | `I ->
     `I
   | `P ty ->
-    `P (Tm.close_var x (fun tw -> tw) k ty)
+    `P (Tm.close_var x ~twin:(fun tw -> tw) k ty)
   | `Tw (ty0, ty1) ->
-    `Tw (Tm.close_var x (fun tw -> tw) k ty0, Tm.close_var x (fun tw -> tw) k ty1)
+    `Tw (Tm.close_var x ~twin:(fun tw -> tw) k ty0, Tm.close_var x ~twin:(fun tw -> tw) k ty1)
   | `R (r0, r1) ->
-    `R (Tm.close_var x (fun tw -> tw) k r0, Tm.close_var x (fun tw -> tw) k r1)
+    `R (Tm.close_var x ~twin:(fun tw -> tw) k r0, Tm.close_var x ~twin:(fun tw -> tw) k r1)
 
 let rec prob_open_var k x tw =
   function
   | Unify q ->
     Unify (eqn_open_var k x tw q)
   | Subtype q ->
-    let ty0 = Tm.open_var k x (fun tw -> tw) q.ty0 in
-    let ty1 = Tm.open_var k x (fun tw -> tw) q.ty1 in
+    let ty0 = Tm.open_var k x ~twin:(fun tw -> tw) q.ty0 in
+    let ty1 = Tm.open_var k x ~twin:(fun tw -> tw) q.ty1 in
     Subtype {ty0; ty1}
   | All (p, B (nm, prob)) ->
     All (param_open_var k x p, B (nm, prob_open_var (k + 1) x tw prob))
@@ -105,8 +105,8 @@ let rec prob_close_var x tw k =
   | Unify q ->
     Unify (eqn_close_var x tw k q)
   | Subtype q ->
-    let ty0 = Tm.close_var x (fun tw -> tw) k q.ty0 in
-    let ty1 = Tm.close_var x (fun tw -> tw) k q.ty1 in
+    let ty0 = Tm.close_var x ~twin:(fun tw -> tw) k q.ty0 in
+    let ty1 = Tm.close_var x ~twin:(fun tw -> tw) k q.ty1 in
     Subtype {ty0; ty1}
   | All (p, B (nm, prob)) ->
     All (param_close_var x k p, B (nm, prob_close_var x tw (k + 1) prob))

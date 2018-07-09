@@ -55,7 +55,7 @@ type con =
 
 and neu =
   | Lvl : string option * int -> neu
-  | Ref : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
+  | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
   | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
@@ -395,7 +395,7 @@ struct
               failwith "eval_dim: expected atom in environment"
           end
 
-        | Tm.Ref info ->
+        | Tm.Var info ->
           I.act rho.global @@ Sig.global_dim info.name
         | Tm.Meta meta ->
           I.act rho.global @@ Sig.global_dim meta.name
@@ -704,7 +704,7 @@ struct
     | Lvl _ ->
       ret con
 
-    | Ref _ ->
+    | Var _ ->
       ret con
 
     | Meta _ ->
@@ -1077,7 +1077,7 @@ struct
            * (r'=0). It is using the evaluator to generate the
            * type in the semantic domain. *)
           let fiber0_ty phi b =
-            let var i = Tm.up @@ Tm.var i `Only in
+            let var i = Tm.up @@ Tm.ix i in
             eval (Env.push_many [Val (Val.act phi ty00); Val (Val.act phi ty10); Val (car (Val.act phi equiv0)); Val b] Env.emp) @@
             Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
           in
@@ -1624,12 +1624,12 @@ struct
           failwith "Expected value in environment"
       end
 
-    | Tm.Ref info ->
+    | Tm.Var info ->
       let tty, tsys = Sig.lookup info.name info.twin in
       let rho' = Env.clear_locals rho in
       let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
       let vty = eval rho' @@ Tm.shift_univ info.ushift tty in
-      reflect vty (Ref {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
+      reflect vty (Var {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
 
     | Tm.Meta {name; ushift} ->
       let tty, tsys = Sig.lookup name `Only in
@@ -2441,7 +2441,7 @@ struct
     | Cdr neu ->
       Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
 
-    | Ref {name; _} ->
+    | Var {name; _} ->
       Name.pp fmt name
 
     | Meta {name; _} ->
@@ -2493,8 +2493,8 @@ struct
       let rho = Env.push_many [Val ty0; Val ty1] Env.emp in
       eval rho @@
       Tm.Macro.equiv
-        (Tm.up @@ Tm.var 0 `Only)
-        (Tm.up @@ Tm.var 1 `Only)
+        (Tm.up @@ Tm.ix 0)
+        (Tm.up @@ Tm.ix 1)
 
   end
 

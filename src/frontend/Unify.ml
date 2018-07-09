@@ -30,7 +30,7 @@ let rec abstract_tm xs tm =
   | Snoc (xs, (x, `P _)) ->
     abstract_tm xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
   | Snoc (xs, (x, `I)) ->
-    let bnd = Tm.NB ([None], Tm.close_var x (fun _ -> `Only) 0 tm) in
+    let bnd = Tm.NB ([None], Tm.close_var x 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
   | Snoc (xs, (_, `R (r, r'))) ->
     abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
@@ -45,7 +45,7 @@ let rec abstract_ty (gm : telescope) cod =
   | Snoc (gm, (_, `R (r, r'))) ->
     abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
   | Snoc (gm, (x, `I)) ->
-    let cod' = Tm.close_var x (fun tw -> tw) 0 cod in
+    let cod' = Tm.close_var x ~twin:(fun tw -> tw) 0 cod in
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB ([Name.name x], (cod', [])))
   | _ ->
     failwith "abstract_ty"
@@ -55,9 +55,9 @@ let telescope_to_spine : telescope -> tm Tm.spine =
   Bwd.map @@ fun (x, param) ->
   match param with
   | `I ->
-    Tm.ExtApp [Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp)]
+    Tm.ExtApp [Tm.up @@ Tm.var x]
   | `P _ ->
-    Tm.FunApp (Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp))
+    Tm.FunApp (Tm.up @@ Tm.var x)
   | `R _ ->
     Tm.CoRForce
   | _ ->
@@ -115,7 +115,7 @@ let rec opt_traverse f xs =
 
 let to_var t =
   match Tm.unleash @@ Tm.eta_contract t with
-  | Tm.Up (Tm.Ref {name; _}, Emp) ->
+  | Tm.Up (Tm.Var {name; _}, Emp) ->
     Some name
   | _ ->
     (* Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t; *)
@@ -410,13 +410,13 @@ let push_guess gm ~ty0 ~ty1 tm  =
 *)
 let is_orthogonal q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
-  | Tm.Up (Tm.Ref _, _), Tm.Up (Tm.Ref _, _) -> false
-  | Tm.Up (Tm.Ref _, _), Tm.Up (Tm.Meta _, _) -> false
-  | Tm.Up (Tm.Ref _, _), _ -> true
+  | Tm.Up (Tm.Var _, _), Tm.Up (Tm.Var _, _) -> false
+  | Tm.Up (Tm.Var _, _), Tm.Up (Tm.Meta _, _) -> false
+  | Tm.Up (Tm.Var _, _), _ -> true
 
-  | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Ref _, _) -> false
+  | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Var _, _) -> false
   | Tm.Up (Tm.Meta _, _), Tm.Up (Tm.Meta _, _) -> false
-  | _, Tm.Up (Tm.Ref _, _) -> true
+  | _, Tm.Up (Tm.Var _, _) -> true
 
   | Tm.Pi _, Tm.Univ _ -> true
   | Tm.Pi _, Tm.Sg _ -> true
@@ -517,8 +517,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let module HSubst = HSubst (T) in
       let _, cod0 = T.Cx.Eval.unleash_sg ~debug:["match_spine/cdr"] ty0 in
       let _, cod1 = T.Cx.Eval.unleash_sg ~debug:["match-spine/cdr"] ty1 in
-      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
-      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Ref {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
+      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
+      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
       ret (cod0, cod1)
 
     | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
@@ -534,8 +534,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       typechecker >>= fun (module T) ->
       let module HSubst = HSubst (T) in
       let y = Name.fresh () in
-      let mot0y = Tm.unbind_with y (fun _ -> `TwinL) info0.mot in
-      let mot1y = Tm.unbind_with y (fun _ -> `TwinR) info1.mot in
+      let mot0y = Tm.unbind_with y ~twin:(fun _ -> `TwinL) info0.mot in
+      let mot1y = Tm.unbind_with y ~twin:(fun _ -> `TwinR) info1.mot in
       let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
       active @@ Problem.all y (Tm.make Tm.Bool) @@
       Problem.eqn ~ty0:univ ~ty1:univ ~tm0:mot0y ~tm1:mot1y
@@ -547,8 +547,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let mot1_ff = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Ff) in
       active @@ Problem.eqn ~ty0:mot0_tt ~tm0:info0.tcase ~ty1:mot1_tt ~tm1:info1.tcase >>
       active @@ Problem.eqn ~ty0:mot0_ff ~tm0:info0.fcase ~ty1:mot1_ff ~tm1:info1.fcase >>
-      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up (Tm.Ref {name = x0; twin = tw0; ushift = 0}, sp0)) in
-      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up (Tm.Ref {name = x1; twin = tw1; ushift = 0}, sp1)) in
+      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0)) in
+      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1)) in
       ret (ty0, ty1)
 
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
@@ -580,15 +580,15 @@ let rec subtype ty0 ty1 =
     match Tm.unleash ty0, Tm.unleash ty1 with
     | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
       let x = Name.fresh () in
-      let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
-      let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+      let cod0x = Tm.unbind_with x ~twin:(fun _ -> `TwinL) cod0 in
+      let cod1x = Tm.unbind_with x ~twin:(fun _ -> `TwinR) cod1 in
       active @@ Subtype {ty0 = dom1; ty1 = dom0} >>
       active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
 
     | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
       let x = Name.fresh () in
-      let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
-      let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+      let cod0x = Tm.unbind_with x ~twin:(fun _ -> `TwinL) cod0 in
+      let cod1x = Tm.unbind_with x ~twin:(fun _ -> `TwinR) cod1 in
       active @@ Subtype {ty0 = dom0; ty1 = dom1} >>
       active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
 
@@ -659,21 +659,21 @@ let rigid_rigid q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-pi" in
-    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
-    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+    let cod0x = Tm.unbind_with x ~twin:(fun _ -> `TwinL) cod0 in
+    let cod1x = Tm.unbind_with x ~twin:(fun _ -> `TwinR) cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
   | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-sg" in
-    let cod0x = Tm.unbind_with x (fun _ -> `TwinL) cod0 in
-    let cod1x = Tm.unbind_with x (fun _ -> `TwinR) cod1 in
+    let cod0x = Tm.unbind_with x ~twin:(fun _ -> `TwinL) cod0 in
+    let cod1x = Tm.unbind_with x ~twin:(fun _ -> `TwinR) cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
-  | Tm.Up (Tm.Ref info0, sp0), Tm.Up (Tm.Ref info1, sp1) when info0.ushift = 0 && info1.ushift = 0 ->
+  | Tm.Up (Tm.Var info0, sp0), Tm.Up (Tm.Var info1, sp1) when info0.ushift = 0 && info1.ushift = 0 ->
     match_spine info0.name info0.twin sp0 info1.name info1.twin sp1 >>
     ret ()
 
@@ -697,8 +697,8 @@ let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
   | Tm.Pi (dom0, Tm.B (nm, _)), Tm.Pi (dom1, _) ->
     let x = Name.named nm in
-    let x_l = Tm.up (Tm.Ref {name = x; twin = `TwinL; ushift = 0}, Emp) in
-    let x_r = Tm.up (Tm.Ref {name = x; twin = `TwinR; ushift = 0}, Emp) in
+    let x_l = Tm.up @@ Tm.var ~twin:`TwinL x in
+    let x_r = Tm.up @@ Tm.var ~twin:`TwinR x in
 
     in_scope x (`Tw (dom0, dom1))
       begin
@@ -721,7 +721,7 @@ let unify q =
 
   | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
     let xs = List.map Name.named nms0 in
-    let vars = List.map (fun x -> Tm.up (Tm.Ref {name = x; twin =  `Only; ushift = 0}, Emp)) xs in
+    let vars = List.map (fun x -> Tm.up @@ Tm.var x) xs in
     let psi = List.map (fun x -> (x, `I)) xs in
 
     in_scopes psi
@@ -770,8 +770,8 @@ let rec split_sigma tele x ty =
     let z = Name.fresh () in
     let sp_tele = telescope_to_spine tele in
 
-    let ytm = Tm.Ref {name = y; twin = `Only; ushift = 0}, sp_tele in
-    let ztm = Tm.Ref {name = z; twin = `Only; ushift = 0}, sp_tele in
+    let ytm = Tm.Var {name = y; twin = `Only; ushift = 0}, sp_tele in
+    let ztm = Tm.Var {name = z; twin = `Only; ushift = 0}, sp_tele in
     let cody = Tm.subst (Tm.Dot (ytm, Tm.Shift 0)) cod in
 
     Some
@@ -780,8 +780,8 @@ let rec split_sigma tele x ty =
       , z
       , abstract_ty tele cody
       , abstract_tm tele @@ Tm.cons (Tm.up ytm) (Tm.up ztm)
-      , ( abstract_tm tele @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Car)
-        , abstract_tm tele @@ Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Cdr)
+      , ( abstract_tm tele @@ Tm.up (Tm.Var {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Car)
+        , abstract_tm tele @@ Tm.up (Tm.Var {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Cdr)
         )
       )
 
@@ -817,7 +817,7 @@ let rec lower tele alpha ty =
     begin
       match split_sigma Emp x dom with
       | None ->
-        let codx = Tm.unbind_with x (fun _ -> `Only) cod in
+        let codx = Tm.unbind_with x cod in
         lower (tele #< (x, `P dom)) alpha codx
 
       | Some (y, ty0, z, ty1, s, (u, v)) ->
@@ -892,8 +892,8 @@ let rec solver prob =
               (*  This weird crap is needed to avoid creating a cycle in the environment.
                   What we should really do is kill 'twin variables' altogether and switch to
                   a representation based on having two contexts. *)
-              let var_y = Tm.up (Tm.Ref {name = y; twin = `Only; ushift = 0}, Emp) in
-              let var_x = Tm.up (Tm.Ref {name = x; twin = `Only; ushift = 0}, Emp) in
+              let var_y = Tm.up @@ Tm.var y in
+              let var_x = Tm.up @@ Tm.var x in
               let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
               let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
               solver @@ Problem.all x ty0 @@
