@@ -30,8 +30,8 @@ let _ (M : singleton bool tt) : bool = M
 
 
 let foo (x : bool × bool) : _ × _ =
-  let z0 = x.car in
-  let z1 = x.cdr in
+  let z0 = x.0 in
+  let z1 = x.1 in
   < z0, z1 >
 
 
@@ -62,6 +62,6 @@ let theorem-of-choice
   (p : (x : A) → (y : B) × R x y)
   : (f : A → B) × (x : A) → R x (f x)
   =
-  < λ x → p x .car
-  , λ x → p x .cdr
+  < λ x → p x .0
+  , λ x → p x .1
   >

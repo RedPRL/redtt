@@ -20,7 +20,7 @@ let fun-to-pair (A : type) (f : bool → A) : A × A =
   <f tt , f ff>
 
 let pair-to-fun (A : type) (p : A × A) : bool → A =
-  λ b → if b then p.car else p.cdr
+  λ b → if b then p.0 else p.1
 
 
 ; Dedicated to Bob ;-)
@@ -41,12 +41,12 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
     , λ fib →
       coe 1 0
         (λ i →
-          < λ b → if b then fib.cdr i .car else fib.cdr i .cdr
-          , λ j → connection/or _ (fun-to-pair A (fib.car)) pair (fib.cdr) i j
+          < λ b → if b then fib.1 i .0 else fib.1 i .1
+          , λ j → connection/or _ (fun-to-pair A (fib.0)) pair (fib.1) i j
           >)
       in λ j →
         [i] (f : bool → A) × Path (A × A) <f tt, f ff> pair with
-        | i=0 ⇒ < shannon/path A (fib.car) j, fib.cdr >
+        | i=0 ⇒ < shannon/path A (fib.0) j, fib.1 >
         | i=1 ⇒ < pair-to-fun A pair, λ _ → pair >
         end
     >
@@ -59,13 +59,13 @@ let fun-eq-pair (A : type) : Path^1 type (bool → A) (A × A) =
     `(V i (→ bool A) (× A A) (fun-to-pair-equiv A))
 
 let swap-pair (A : type) (p : A × A) : A × A =
-  <p.cdr, p.car>
+  <p.1, p.0>
 
 let swap-fun (A : type) : (bool → A) → bool → A =
   coe 1 0 (swap-pair A) in λ i →
     (fun-eq-pair A i) → fun-eq-pair A i
 
-let swap-fun-eqn (A : type) : (f : bool → A) → Path (bool → A) (swap-fun A (swap-fun A f)) f =
+let swap-fun-eqn (A : type) : (f : bool → A) → Path _ (swap-fun A (swap-fun A f)) f =
   coe 1 0 (λ pair _ → pair) in λ i →
     let swapcoe =
       coe 1 i (swap-pair A) in λ j →

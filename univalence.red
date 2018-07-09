@@ -37,11 +37,11 @@ let RetIsContr
   (c : IsContr B)
   : IsContr A
   =
-  < g (c.car),
+  < g (c.0),
     λ a i →
-      comp 0 1 (g (c.cdr (f a) i)) with
+      comp 0 1 (g (c.1 (f a) i)) with
       | i=0 ⇒ h a
-      | i=1 ⇒ λ _ → g (c.car)
+      | i=1 ⇒ λ _ → g (c.0)
       end
   >
 
@@ -53,7 +53,7 @@ let IdEquiv (A : type) : Equiv A A =
       let aux : Line A =
         λ j →
         comp 1 j a with
-        | i=0 ⇒ λ k → p.cdr k
+        | i=0 ⇒ λ k → p.1 k
         | i=1 ⇒ λ _ → a
         end
       in
@@ -92,13 +92,13 @@ let LemSig
   (B/prop : (a : A) → IsProp (B a))
   (u : (a : A) × B a)
   (v : (a : A) × B a)
-  (P : Path A (u.car) (v.car))
+  (P : Path A (u.0) (v.0))
   : Path ((a : A) × B a) u v
   =
   λ i →
     < P i
-    , let coe0 = coe 0 i (u.cdr) in λ j → B (P j) in
-      let coe1 = coe 1 i (v.cdr) in λ j → B (P j) in
+    , let coe0 = coe 0 i (u.1) in λ j → B (P j) in
+      let coe1 = coe 1 i (v.1) in λ j → B (P j) in
       B/prop (P i) coe0 coe1 i
      >
 
@@ -110,7 +110,7 @@ let PropSig
   : IsProp ((a : A) × B a)
   =
   λ u v →
-    LemSig _ _ B/prop _ _ (A/prop (u.car) (v.car))
+    LemSig _ _ B/prop _ _ (A/prop (u.0) (v.0))
 
 
 opaque
@@ -118,9 +118,9 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
   λ contr →
     let A/prop : IsProp A =
       λ a b i →
-        comp 1 0 (contr.cdr a i) with
+        comp 1 0 (contr.1 a i) with
         | i=0 ⇒ λ _ → a
-        | i=1 ⇒ λ j → contr.cdr b j
+        | i=1 ⇒ λ j → contr.1 b j
         end
     in
 
@@ -138,7 +138,7 @@ let PropIsEquiv (A : type) (B : type) (f : A → B) : IsProp (IsEquiv A B f) =
 opaque
 let EquivLemma
   (A : type) (B : type) (E0 : Equiv A B) (E1 : Equiv A B)
-  (P : Path (A → B) (E0.car) (E1.car))
+  (P : Path (A → B) (E0.0) (E1.0))
   : Path (Equiv A B) E0 E1
   =
   LemSig (A → B) (IsEquiv A B) (PropIsEquiv A B) E0 E1 P
@@ -153,18 +153,18 @@ let UA (A : type) (B : type) (E : Equiv A B) : Path^1 type A B =
 
 let UA/beta
   (A : type) (B : type) (E : Equiv A B) (a : A)
-  : Path _ (coe 0 1 a in UA _ _ E) (E.car a)
+  : Path _ (coe 0 1 a in UA _ _ E) (E.0 a)
   =
   λ i →
-    coe i 1 (E.car a) in λ _ → B
+    coe i 1 (E.0 a) in λ _ → B
 
 let SigEquivToPath
   (A : type)
   (X : (B : type) × Equiv A B)
   : (B : type) × Path^1 type A B
   =
-  < X.car
-  , UA A (X.car) (X.cdr)
+  < X.0
+  , UA _ (X.0) (X.1)
   >
 
 let SigPathToEquiv
@@ -172,8 +172,8 @@ let SigPathToEquiv
   (X : (B : type) × Path^1 type A B)
   : (B : type) × (Equiv A B)
   =
-  < X.car
-  , PathToEquiv A (X.car) (X.cdr)
+  < X.0
+  , PathToEquiv _ (X.0) (X.1)
   >
 
 opaque
@@ -182,34 +182,29 @@ let UA/retract
   : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
   =
   λ E →
-    EquivLemma A B (PathToEquiv A B (UA A B E)) E
+    EquivLemma _ _ (PathToEquiv _ _ (UA A B E)) E
       (λ i a → UA/beta A B E (coe 1 i a in λ _ → A) i)
 
-opaque
 let UA/retract/sig
   (A : type)
-  : Retract^3
-      ((B : type) × Equiv A B)
-      ((B : type) × Path^1 type A B)
-      (SigEquivToPath A)
-      (SigPathToEquiv A)
+  : Retract^3 _ _ (SigEquivToPath A) (SigPathToEquiv A)
   =
   λ singl i →
-    < singl.car
-    , UA/retract A (singl.car) (singl.cdr) i
+    < singl.0
+    , UA/retract A (singl.0) (singl.1) i
     >
 
 opaque
-let IsContrPath (A : type) : IsContr^1 ((B : type) × Path^1 type A B) =
+let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
   < <_, λ _ → A>
   , λ X i →
     < comp 0 1 A with
-      | i=0 ⇒ X.cdr
+      | i=0 ⇒ X.1
       | i=1 ⇒ λ _ → A
       end
     , λ j →
       comp 0 j A with
-      | i=0 ⇒ X.cdr
+      | i=0 ⇒ X.1
       | i=1 ⇒ λ _ → A
       end
     >
@@ -222,8 +217,8 @@ let IsContrPath (A : type) : IsContr^1 ((B : type) × Path^1 type A B) =
 
 let univalence (A : type) : IsContr^1 ((B : type) × Equiv A B) =
   RetIsContr^1
-    ((B : type) × Equiv A B)
-    ((B : type) × Path^1 type A B)
+    _
+    _
     (SigEquivToPath A)
     (SigPathToEquiv A)
     (UA/retract/sig A)
@@ -233,7 +228,7 @@ let IdEquiv/connection (B : type) : Equiv B B =
   < λ b → b
   , λ b →
     < <b, λ _ → b>
-    , λ v i → <v.cdr i, λ j → connection/or B (v.car) b (v.cdr) i j>
+    , λ v i → <v.1 i, λ j → connection/or B (v.0) b (v.1) i j>
     >
   >
 
@@ -248,7 +243,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
             let ctr/B : Line B =
               λ j →
                 comp 1 j b with
-                | i=0 ⇒ λ k → w .cdr .cdr b .car .cdr k
+                | i=0 ⇒ λ k → w .1 .1 b .0 .1 k
                 | i=1 ⇒ λ _ → b
                 end
             in
@@ -260,9 +255,9 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
                 let filler : Line B =
                   λ l →
                     comp 1 l b with
-                    | i=0 ⇒ λ k → w .cdr .cdr b .cdr v j .cdr k
-                    | i=1 ⇒ λ k → connection/or B (v .car) b (v .cdr) j k
-                    | j=0 ⇒ λ k → v .cdr k
+                    | i=0 ⇒ λ k → w .1 .1 b .1 v j .1 k
+                    | i=1 ⇒ λ k → connection/or B (v .0) b (v .1) j k
+                    | j=0 ⇒ λ k → v .1 k
                     | j=1 ⇒ λ k → ctr/B k
                     end
                 in
