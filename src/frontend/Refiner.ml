@@ -157,7 +157,8 @@ let tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase =
           | _ -> false
         in
         if is_dependent then
-          M.lift @@ U.push_hole `Flex Emp (Tm.pi None bool univ) >>= fun (mothd, motsp) ->
+          let mot_ty = Tm.pi None bool univ in
+          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
           let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
           M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
           M.unify >>
@@ -168,7 +169,7 @@ let tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase =
           M.ret ((fun _ -> ty), ty, ty)
       | Some tac_mot ->
         let mot_ty = Tm.pi None bool univ in
-        tac_mot (Tm.pi None bool univ) >>= fun mot ->
+        tac_mot mot_ty >>= fun mot ->
         let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
         let mot_tt = fmot @@ Tm.make Tm.Tt in
         let mot_ff = fmot @@ Tm.make Tm.Ff in
