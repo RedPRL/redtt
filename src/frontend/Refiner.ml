@@ -149,6 +149,7 @@ let tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase =
     let bool = Tm.make @@ Tm.Bool in
     tac_scrut bool >>= fun scrut ->
     begin
+      let mot_ty = Tm.pi None bool univ in
       match tac_mot with
       | None ->
         let is_dependent =
@@ -157,24 +158,20 @@ let tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase =
           | _ -> false
         in
         if is_dependent then
-          let mot_ty = Tm.pi None bool univ in
           M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
           let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
           M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
           M.unify >>
-          let mot_tt = mot @@ Tm.make Tm.Tt in
-          let mot_ff = mot @@ Tm.make Tm.Ff in
-          M.ret (mot, mot_tt, mot_ff)
+          M.ret mot
         else
-          M.ret ((fun _ -> ty), ty, ty)
+          M.ret (fun _ -> ty)
       | Some tac_mot ->
-        let mot_ty = Tm.pi None bool univ in
         tac_mot mot_ty >>= fun mot ->
         let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-        let mot_tt = fmot @@ Tm.make Tm.Tt in
-        let mot_ff = fmot @@ Tm.make Tm.Ff in
-        M.ret (fmot, mot_tt, mot_ff)
-    end >>= fun (mot, mot_tt, mot_ff) ->
+        M.ret fmot
+    end >>= fun mot ->
+    let mot_tt = mot @@ Tm.make Tm.Tt in
+    let mot_ff = mot @@ Tm.make Tm.Ff in
     tac_tcase mot_tt >>= fun tcase ->
     tac_fcase mot_ff >>= fun fcase ->
     let hd = Tm.Down {ty = bool; tm = scrut} in
