@@ -147,9 +147,9 @@ let tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase =
   fun ty ->
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
     let bool = Tm.make @@ Tm.Bool in
+    let mot_ty = Tm.pi None bool univ in
     tac_scrut bool >>= fun scrut ->
     begin
-      let mot_ty = Tm.pi None bool univ in
       match tac_mot with
       | None ->
         let is_dependent =
