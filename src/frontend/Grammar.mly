@@ -116,7 +116,7 @@ eterm:
     { E.Suc n }
 
   | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; WITH; n_rec = ATOM; RRIGHT_ARROW; es = eterm; END
-    { E.NatRec (e0, ez, (n, n_rec, es)) }
+    { E.NatRec (None, e0, ez, (n, n_rec, es)) }
 
   | POS; n = eterm
     { E.Pos n }

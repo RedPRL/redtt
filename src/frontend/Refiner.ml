@@ -229,16 +229,13 @@ let rec tac_lambda names tac ty =
         raise ChkMatch
     end
 
-let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~nms_scase ~tac_scase =
+let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scase, tac_scase) =
   fun ty ->
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-    let nat = Tm.make @@ Tm.Int in
+    let nat = Tm.make @@ Tm.Nat in
     let mot_ty = Tm.pi None nat univ in
-    let x_scase, x_rec_scase =
-      match List.map (fun nm -> Name.named @@ Some nm) nms_scase with
-      | [x_scase; x_rec_scase] -> x_scase, x_rec_scase
-      | _ -> failwith "Elab: incorrect number of binders when refining the suc case"
-    in
+    let x_scase = Name.named @@ Some nm_scase in
+    let x_rec_scase = Name.named @@ Some nm_rec_scase in
     tac_scrut nat >>= fun scrut ->
     begin
       match tac_mot with

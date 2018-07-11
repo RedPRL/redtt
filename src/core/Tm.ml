@@ -1023,8 +1023,10 @@ struct
       go_cmd fl cmd acc
     | ExtLam nbnd ->
       go_nbnd fl nbnd acc
-    | (Bool | Tt | Ff | Dim0 | Dim1 | Univ _) ->
+    | (Bool | Tt | Ff | Nat | Zero | Dim0 | Dim1 | Univ _) ->
       acc
+    | Suc n ->
+      go fl n acc
     | Cons (t0, t1) ->
       go fl t1 @@ go fl t0 acc
     | Let (cmd, bnd) ->
