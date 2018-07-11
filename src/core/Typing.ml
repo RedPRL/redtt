@@ -165,6 +165,9 @@ struct
     | V.Univ _, T.Bool ->
       ()
 
+    | V.Univ _, T.Nat ->
+      ()
+
 
     | V.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
       let cxx, x = Cx.ext_ty cx ~nm dom in
@@ -236,6 +239,12 @@ struct
 
     | V.Bool, (T.Tt | T.Ff) ->
       ()
+
+    | V.Nat, T.Zero ->
+      ()
+
+    | V.Nat, T.Suc n ->
+      check cx (Eval.make V.Nat) n
 
     | V.V vty, T.VIn vin ->
       let r = check_eval_dim cx vin.r in
