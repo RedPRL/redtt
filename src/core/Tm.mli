@@ -74,6 +74,7 @@ and 'a frame =
   | FunApp of 'a
   | ExtApp of 'a list
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
+  | NatRec of {mot : 'a bnd; zcase : 'a; scase : 'a nbnd}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}

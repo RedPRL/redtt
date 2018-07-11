@@ -31,6 +31,8 @@ module Make (R : SOURCE) : LEXER = struct
       ("with", WITH);
       ("end", END);
       ("bool", BOOL);
+      ("nat", NAT);
+      ("ℕ", NAT);
       ("S1", S1);
       ("car", CAR);
       ("cdr", CDR);

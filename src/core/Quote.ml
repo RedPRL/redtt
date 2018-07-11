@@ -164,6 +164,16 @@ struct
       | Ff, Ff ->
         Tm.make Tm.Ff
 
+      | Nat, Nat ->
+        Tm.make Tm.Nat
+
+      | Zero, Zero ->
+        Tm.make Tm.Zero
+
+      | Suc n0, Suc n1 ->
+        let n = equate env ty n0 n1 in
+        Tm.make @@ Tm.Suc n
+
       | Pi pi0, Pi pi1 ->
         let dom = equate env ty pi0.dom pi1.dom in
         let var = generic env pi0.dom in

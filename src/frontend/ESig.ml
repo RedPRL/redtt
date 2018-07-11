@@ -25,7 +25,7 @@ and eterm =
   | Bool | Tt | Ff
 
   | Nat | Zero | Suc of eterm
-  | NatRec of eterm * eterm * (string * string * eterm)
+  | NatRec of eterm option * eterm * eterm * (string * string option * eterm)
 
   | Int | Pos of eterm | NegSuc of eterm
   | IntRec of eterm * (string * eterm) * (string * eterm)

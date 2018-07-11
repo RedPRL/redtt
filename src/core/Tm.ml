@@ -76,6 +76,7 @@ and 'a frame =
   | FunApp of 'a
   | ExtApp of 'a list
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
+  | NatRec of {mot : 'a bnd; zcase : 'a; scase : 'a nbnd}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
@@ -226,6 +227,11 @@ and subst_frame sub frame =
     let tcase = subst sub info.tcase in
     let fcase = subst sub info.fcase in
     If {mot; tcase; fcase}
+  | NatRec info ->
+    let mot = subst_bnd sub info.mot in
+    let zcase = subst sub info.zcase in
+    let scase = subst_nbnd sub info.scase in
+    NatRec {mot; zcase; scase}
   | S1Rec info ->
     let mot = subst_bnd sub info.mot in
     let bcase = subst sub info.bcase in
@@ -485,6 +491,11 @@ let traverse ~f ~go_ix ~go_var =
       let tcase = f k info.tcase in
       let fcase = f k info.fcase in
       If {mot; tcase; fcase}
+    | NatRec info ->
+      let mot = go_bnd k info.mot in
+      let zcase = f k info.zcase in
+      let scase = go_nbnd k info.scase in
+      NatRec {mot; zcase; scase}
     | S1Rec info ->
       let mot = go_bnd k info.mot in
       let bcase = f k info.bcase in
@@ -825,6 +836,10 @@ and pp_cmd env fmt (hd, sp) =
       | If {mot = B (nm, mot); tcase; fcase} ->
         let x, env' = Pretty.Env.bind nm env in
         Format.fprintf fmt "@[<hv1>(if@ [%a] %a@ %a@ %a@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot (go `If) sp (pp env) tcase (pp env) fcase
+      | NatRec {mot = B (nm, mot); zcase; scase = NB (nms_scase, scase)} ->
+        let x_mot, env'_mot = Pretty.Env.bind nm env in
+        let xs_scase, env'_scase = Pretty.Env.bindn nms_scase env in
+        Format.fprintf fmt "@[<hv1>(nat-rec@ [%a] %a@ %a@ %a@ [%a] %a)@]" Uuseg_string.pp_utf_8 x_mot (pp env'_mot) mot (go `NatRec) sp (pp env) zcase pp_strings xs_scase (pp env'_scase) scase
       | S1Rec {mot = B (nm_mot, mot); bcase; lcase = B (nm_lcase, lcase)} ->
         let x_mot, env_mot = Pretty.Env.bind nm_mot env in
         let x_lcase, env_lcase = Pretty.Env.bind nm_lcase env in
@@ -862,6 +877,8 @@ and pp_frame env fmt =
     Format.fprintf fmt "cdr"
   | If _ ->
     Format.fprintf fmt "<if>"
+  | NatRec _ ->
+    Format.fprintf fmt "<nat-rec>"
   | _ ->
     Format.fprintf fmt "<frame>"
 
@@ -1006,8 +1023,10 @@ struct
       go_cmd fl cmd acc
     | ExtLam nbnd ->
       go_nbnd fl nbnd acc
-    | (Bool | Tt | Ff | Dim0 | Dim1 | Univ _) ->
+    | (Bool | Tt | Ff | Nat | Zero | Dim0 | Dim1 | Univ _) ->
       acc
+    | Suc n ->
+      go fl n acc
     | Cons (t0, t1) ->
       go fl t1 @@ go fl t0 acc
     | Let (cmd, bnd) ->
@@ -1094,6 +1113,10 @@ struct
       go_bnd fl info.mot @@
       go fl info.tcase @@
       go fl info.fcase acc
+    | NatRec info ->
+      go_bnd fl info.mot @@
+      go fl info.zcase @@
+      go_nbnd fl info.scase acc
     | S1Rec info ->
       go_bnd fl info.mot @@
       go fl info.bcase @@
@@ -1224,6 +1247,11 @@ let map_frame f =
     let tcase = f info.tcase in
     let fcase = f info.fcase in
     If {mot; tcase; fcase}
+  | NatRec info ->
+    let mot = map_bnd f info.mot in
+    let zcase = f info.zcase in
+    let scase = map_nbnd f info.scase in
+    NatRec {mot; zcase; scase}
   | S1Rec info ->
     let mot = map_bnd f info.mot in
     let bcase = f info.bcase in
