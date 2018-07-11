@@ -617,22 +617,22 @@ let rec bindn xs txs =
   let n = List.length xs_l - 1 in
   let rec go k xs txs =
     match xs with
-    | Emp -> txs
-    | Snoc (xs, x) ->
+    | [] -> txs
+    | x :: xs ->
       go (k + 1) xs @@ close_var x (n - k) txs
   in
-  NB (List.map Name.name xs_l, go 0 xs txs)
+  NB (List.map Name.name xs_l, go 0 xs_l txs)
 
 let rec bind_ext xs tyxs sysxs =
   let xs_l = Bwd.to_list xs in
   let n = List.length xs_l - 1 in
   let rec go k xs tyxs sysxs =
     match xs with
-    | Emp -> tyxs, sysxs
-    | Snoc (xs, x) ->
+    | [] -> tyxs, sysxs
+    | x :: xs ->
       go (k + 1) xs (close_var x (n - k) tyxs) (map_tm_sys (close_var x (n - k)) sysxs)
   in
-  NB (List.map Name.name xs_l, go 0 xs tyxs sysxs)
+  NB (List.map Name.name xs_l, go 0 xs_l tyxs sysxs)
 
 let rec pp env fmt =
 
