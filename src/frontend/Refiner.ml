@@ -260,12 +260,10 @@ let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scas
     end >>= fun mot ->
     tac_zcase (mot (Tm.make Tm.Zero)) >>= fun zcase ->
     let mot_suc_x = mot (Tm.make (Tm.Suc (Tm.up (Tm.var x_scase)))) in
-    M.in_scope x_scase (`P nat) begin
-       M.in_scope x_rec_scase (`P (mot @@ Tm.up @@ Tm.var x_scase)) begin
-         tac_scase mot_suc_x
-       end
+    M.in_scopes [x_scase, `P nat; x_rec_scase, `P (mot @@ Tm.up @@ Tm.var x_scase)] begin
+      tac_scase mot_suc_x >>= fun tm ->
+      M.ret @@ Tm.bindn (Emp #< x_scase #< x_rec_scase) tm
     end >>= fun scase ->
-    let scase = Tm.bindn (Bwd.from_list [x_scase; x_rec_scase]) scase in
     let hd = Tm.Down {ty = nat; tm = scrut} in
     let bmot =
       let x = Name.fresh () in
