@@ -581,7 +581,7 @@ struct
 
       | Face.False _ ->
         (* This one is vacuous *)
-        false
+        true
 
       | Face.Indet (p, v) ->
         (* In this case, we check that the semantic indeterminate will become equal to the face under the
