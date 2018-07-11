@@ -115,7 +115,7 @@ eterm:
   | SUC; n = atomic_eterm
     { E.Suc n }
 
-  | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; WITH; n_rec = ATOM; RRIGHT_ARROW; es = eterm; END
+  | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; LPR; n = ATOM; RRIGHT_ARROW; n_rec = ATOM; RPR; RRIGHT_ARROW; es = eterm; END
     { E.NatRec (None, e0, ez, (n, Some n_rec, es)) }
 
   | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; RRIGHT_ARROW; es = eterm; END
