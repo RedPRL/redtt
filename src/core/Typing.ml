@@ -6,6 +6,7 @@ type value = V.value
 
 type cx = LocalCx.t
 
+open RedBasis
 open RedBasis.Bwd
 
 
@@ -497,9 +498,9 @@ struct
     | T.NatRec info ->
       let T.B (nm, mot) = info.mot in
       let nat = Eval.make V.Nat in
-      let cx_x, x, mot_x =
-        let cx_x, x = Cx.ext_ty cx ~nm nat in
-        cx_x, x, check_eval_ty cx_x mot
+      let _ =
+        let cx_x, _ = Cx.ext_ty cx ~nm nat in
+        check_ty cx_x mot
       in
 
       let mot_clo = Cx.make_closure cx info.mot in
@@ -521,9 +522,10 @@ struct
           | [nm_scase; nm_rec_scase] -> nm_scase, nm_rec_scase
           | _ -> failwith "incorrect number of binders when type-checking the suc case"
         in
+        let cx_x, x = Cx.ext_ty cx nm_scase nat in
+        let mot_x = Eval.inst_clo mot_clo x in
         let cx_x_ih, ih = Cx.ext_ty cx_x nm_rec_scase mot_x in
         let mot_suc = Eval.inst_clo mot_clo @@ Eval.make @@ V.Suc x in
-        Format.eprintf "Will check: %a : %a@." Eval.pp_value mot_suc (Tm.pp (Cx.ppenv cx_x_ih)) scase;
         check cx_x_ih mot_suc scase
       in
 
