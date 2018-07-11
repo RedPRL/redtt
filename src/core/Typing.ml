@@ -485,6 +485,47 @@ struct
       let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:hd in
       Cx.eval cx_scrut mot
 
+    | T.NatRec info ->
+      let T.B (nm, mot) = info.mot in
+      let nat = Eval.make V.Nat in
+      let _ =
+        let cx, _= Cx.ext_ty cx ~nm nat in
+        check_ty cx mot
+      in
+
+      (* result type *)
+      Cx.check_eq_ty cx ty nat;
+
+      (* zero *)
+      let _ =
+        let cx = Cx.def cx ~nm ~ty:nat ~el:(Eval.make V.Zero) in
+        let mot_zero = Cx.eval cx mot in
+        check cx mot_zero info.zcase
+      in
+
+      (* suc *)
+      let T.NB (nms_scase, scase) = info.scase in
+      let _ =
+        let nm_scase, nm_rec_scase =
+          match nms_scase with
+          | [nm_scase; nm_rec_scase] -> nm_scase, nm_rec_scase
+          | _ -> failwith "incorrect number of binders when type-checking the suc case"
+        in
+        let cx, x_scase = Cx.ext_ty cx nm_scase nat in
+        let mot_x =
+          let cx = Cx.def cx ~nm ~ty:nat ~el:x_scase in
+          Cx.eval cx mot
+        in
+        let cx, x_rec_scase = Cx.ext_ty cx nm_rec_scase mot_x in
+        let cx = Cx.def cx ~nm ~ty:nat ~el:(Eval.make (V.Suc x_scase)) in
+        let mot_suc = Cx.eval cx mot in
+        check cx mot_suc scase
+      in
+
+      (* scrut *)
+      let cx_scrut = Cx.def cx ~nm ~ty:nat ~el:hd in
+      Cx.eval cx_scrut mot
+
     | T.S1Rec info ->
       let T.B (nm, mot) = info.mot in
       let s1 = Eval.make V.S1 in

@@ -228,3 +228,51 @@ let rec tac_lambda names tac ty =
       | _ ->
         raise ChkMatch
     end
+
+let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~nms_scase ~tac_scase =
+  fun ty ->
+    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    let nat = Tm.make @@ Tm.Int in
+    let mot_ty = Tm.pi None nat univ in
+    let x_scase, x_rec_scase =
+      match List.map (fun nm -> Name.named @@ Some nm) nms_scase with
+      | [x_scase; x_rec_scase] -> x_scase, x_rec_scase
+      | _ -> failwith "Elab: incorrect number of binders when refining the suc case"
+    in
+    tac_scrut nat >>= fun scrut ->
+    begin
+      match tac_mot with
+      | None ->
+        let is_dependent =
+          match Tm.unleash scrut with
+          | Tm.Up (Tm.Var {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
+          | _ -> false
+        in
+        if is_dependent then
+          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
+          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
+          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
+          M.unify >>
+          M.ret mot
+        else
+          M.ret (fun _ -> ty)
+      | Some tac_mot ->
+        tac_mot mot_ty >>= fun mot ->
+        let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
+        M.ret fmot
+    end >>= fun mot ->
+    tac_zcase (mot (Tm.make Tm.Zero)) >>= fun zcase ->
+    let mot_suc_x = mot (Tm.make (Tm.Suc (Tm.up (Tm.var x_scase)))) in
+    M.in_scope x_scase (`P nat) begin
+       M.in_scope x_rec_scase (`P (mot @@ Tm.up @@ Tm.var x_scase)) begin
+         tac_scase mot_suc_x
+       end
+    end >>= fun scase ->
+    let scase = Tm.bindn (Bwd.from_list [x_scase; x_rec_scase]) scase in
+    let hd = Tm.Down {ty = nat; tm = scrut} in
+    let bmot =
+      let x = Name.fresh () in
+      Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
+    in
+    let frm = Tm.NatRec {mot = bmot; zcase; scase} in
+    M.ret @@ Tm.up (hd, Emp #< frm)

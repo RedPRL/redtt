@@ -86,7 +86,7 @@ and clo =
   | Clo of {bnd : Tm.tm Tm.bnd; rho : env}
 
 and nclo =
-  | NClo of {bnd : Tm.tm Tm.nbnd; rho : env}
+  | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
 
 and env_el = Val of value | Atom of I.t
 and env = {cells : env_el list; global : I.action}
@@ -1381,6 +1381,9 @@ struct
   and clo bnd rho =
     Clo {bnd; rho}
 
+  and nclo nbnd rho =
+    NClo {nbnd; rho}
+
   and eval (rho : env) tm =
     match Tm.unleash tm with
     | Tm.Pi (dom, cod) ->
@@ -1552,6 +1555,11 @@ struct
       let tcase = eval rho info.tcase in
       let fcase = eval rho info.fcase in
       if_ mot vhd tcase fcase
+    | Tm.NatRec info ->
+      let mot = clo info.mot rho in
+      let zcase = eval rho info.zcase in
+      let scase = nclo info.scase rho in
+      nat_rec mot vhd zcase scase
     | Tm.S1Rec info ->
       let mot = clo info.mot rho in
       let bcase = eval rho info.bcase in
@@ -2277,7 +2285,7 @@ struct
   and inst_nclo nclo vargs =
     match nclo with
     | NClo info ->
-      let Tm.NB (_, tm) = info.bnd in
+      let Tm.NB (_, tm) = info.nbnd in
       eval (Env.push_many (List.map (fun v -> Val v) vargs) info.rho) tm
 
   and pp_env_cell fmt =
@@ -2455,13 +2463,13 @@ struct
         pp_value fcase
 
     | NatRec _ ->
-      Format.fprintf fmt "<natrec>"
+      Format.fprintf fmt "<nat-rec>"
 
     | IntRec _ ->
-      Format.fprintf fmt "<intrec>"
+      Format.fprintf fmt "<int-rec>"
 
     | S1Rec _ ->
-      Format.fprintf fmt "<S1rec>"
+      Format.fprintf fmt "<S1-rec>"
 
     | Cap _ ->
       Format.fprintf fmt "<cap>"
