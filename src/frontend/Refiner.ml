@@ -235,7 +235,7 @@ let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scas
     let nat = Tm.make @@ Tm.Nat in
     let mot_ty = Tm.pi None nat univ in
     let x_scase = Name.named @@ Some nm_scase in
-    let x_rec_scase = Name.named @@ Some nm_rec_scase in
+    let x_rec_scase = Name.named nm_rec_scase in
     tac_scrut nat >>= fun scrut ->
     begin
       match tac_mot with
