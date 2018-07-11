@@ -38,6 +38,7 @@ sig
   val eval_frame : t -> value -> Tm.tm Tm.frame -> value
   val eval_dim : t -> Tm.tm -> I.t
   val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
+  val make_closure : t -> Tm.tm Tm.bnd -> Val.clo
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
@@ -104,6 +105,10 @@ struct
 
   let ppenv cx =
     cx.ppenv
+
+  let make_closure cx bnd =
+    V.make_closure cx.env bnd
+
 
   let eval {env; ppenv; _} tm =
     try

@@ -497,18 +497,19 @@ struct
     | T.NatRec info ->
       let T.B (nm, mot) = info.mot in
       let nat = Eval.make V.Nat in
-      let _ =
-        let cx, _= Cx.ext_ty cx ~nm nat in
-        check_ty cx mot
+      let cx_x, x, mot_x =
+        let cx_x, x = Cx.ext_ty cx ~nm nat in
+        cx_x, x, check_eval_ty cx_x mot
       in
+
+      let mot_clo = Cx.make_closure cx info.mot in
 
       (* result type *)
       Cx.check_eq_ty cx ty nat;
 
       (* zero *)
       let _ =
-        let cx = Cx.def cx ~nm ~ty:nat ~el:(Eval.make V.Zero) in
-        let mot_zero = Cx.eval cx mot in
+        let mot_zero = Cx.Eval.inst_clo mot_clo @@ Eval.make V.Zero in
         check cx mot_zero info.zcase
       in
 
@@ -520,20 +521,13 @@ struct
           | [nm_scase; nm_rec_scase] -> nm_scase, nm_rec_scase
           | _ -> failwith "incorrect number of binders when type-checking the suc case"
         in
-        let cx, x_scase = Cx.ext_ty cx nm_scase nat in
-        let mot_x =
-          let cx = Cx.def cx ~nm ~ty:nat ~el:x_scase in
-          Cx.eval cx mot
-        in
-        let cx, x_rec_scase = Cx.ext_ty cx nm_rec_scase mot_x in
-        let cx = Cx.def cx ~nm ~ty:nat ~el:(Eval.make (V.Suc x_scase)) in
-        let mot_suc = Cx.eval cx mot in
-        check cx mot_suc scase
+        let cx_x_ih, ih = Cx.ext_ty cx_x nm_rec_scase mot_x in
+        let mot_suc = Eval.inst_clo mot_clo @@ Eval.make @@ V.Suc x in
+        Format.eprintf "Will check: %a : %a@." Eval.pp_value mot_suc (Tm.pp (Cx.ppenv cx_x_ih)) scase;
+        check cx_x_ih mot_suc scase
       in
 
-      (* scrut *)
-      let cx_scrut = Cx.def cx ~nm ~ty:nat ~el:hd in
-      Cx.eval cx_scrut mot
+      Eval.inst_clo mot_clo hd
 
     | T.S1Rec info ->
       let T.B (nm, mot) = info.mot in

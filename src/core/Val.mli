@@ -114,6 +114,7 @@ sig
   val eval_frame : env -> value -> Tm.tm Tm.frame -> value
   val eval_dim : env -> Tm.tm -> I.t
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
+  val make_closure : env -> Tm.tm Tm.bnd -> clo
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
