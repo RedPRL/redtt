@@ -4,6 +4,7 @@ type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
   | Debug of [ `All | `Constraints | `Unsolved ]
   | Import of string
+  | Quit
 
 and escheme = etele * eterm
 and ecell = string * eterm

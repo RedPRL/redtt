@@ -18,7 +18,7 @@
 %token AST TIMES HASH AT BACKTICK IN WITH END
 %token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN
 %token THEN ELSE
-%token IMPORT OPAQUE
+%token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
 %token EOF
 
@@ -35,6 +35,8 @@ edecl:
     { E.Debug f }
   | IMPORT; a = ATOM
     { E.Import a }
+  | QUIT
+    { E.Quit }
 
 debug_filter:
   | { `All }

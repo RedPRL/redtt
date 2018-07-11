@@ -72,6 +72,8 @@ struct
     | E.Debug f :: esig ->
       elab_decl env (E.Debug f) >>= fun env' ->
       elab_sig env' esig
+    | E.Quit :: _ ->
+      M.ret env
     | dcl :: esig ->
       elab_decl env dcl >>= fun env' ->
       elab_sig env' esig
@@ -110,6 +112,9 @@ struct
         | `Elab esig ->
           elab_sig env esig
       end
+
+    | E.Quit ->
+      M.ret env
 
   and elab_scheme env (cells, ecod) kont =
     let rec go gm =
