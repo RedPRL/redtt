@@ -29,6 +29,12 @@ module Bwd =
 struct
   open BwdNotation
 
+  let rec length =
+    function
+    | Emp -> 0
+    | Snoc (xs, _) ->
+      1 + length xs
+
   let rec map f =
     function
     | Emp -> Emp
