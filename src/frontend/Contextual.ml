@@ -280,7 +280,7 @@ let check ~ty tm =
     T.check lcx vty tm;
     ret true
   with
-  | _exn ->
+  | exn ->
     (* Format.eprintf "type error: %s@." @@ Printexc.to_string exn; *)
     ret false
 

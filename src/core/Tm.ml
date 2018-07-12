@@ -74,7 +74,7 @@ and 'a frame =
   | Car
   | Cdr
   | FunApp of 'a
-  | ExtApp of 'a list
+  | ExtApp of 'a bwd
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | NatRec of {mot : 'a bnd; zcase : 'a; scase : 'a nbnd}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
@@ -221,7 +221,7 @@ and subst_frame sub frame =
   | FunApp t ->
     FunApp (subst sub t)
   | ExtApp ts ->
-    ExtApp (List.map (subst sub) ts)
+    ExtApp (Bwd.map (subst sub) ts)
   | If info ->
     let mot = subst_bnd sub info.mot in
     let tcase = subst sub info.tcase in
@@ -485,7 +485,7 @@ let traverse ~f ~go_ix ~go_var =
     | FunApp t ->
       FunApp (f k t)
     | ExtApp ts ->
-      ExtApp (List.map (f k) ts)
+      ExtApp (Bwd.map (f k) ts)
     | If info ->
       let mot = go_bnd k info.mot in
       let tcase = f k info.tcase in
@@ -573,12 +573,12 @@ let unbind_with x ?twin:(twin = fun _ -> `Only) (B (_, t)) =
 let unbindn (NB (nms, t)) =
   let rec go k nms xs t =
     match nms with
-    | Emp -> Bwd.from_list xs, t
+    | Emp -> Bwd.rev xs, t
     | Snoc (nms, nm) ->
       let x = Name.named nm in
-      go (k + 1) nms (x :: xs) @@ open_var k x t
+      go (k + 1) nms (xs #< x) @@ open_var k x t
   in
-  go 0 nms [] t
+  go 0 nms Emp t
 
 let map_tm_face f (r, r', otm) =
   f r, f r', Option.map f otm
@@ -589,12 +589,12 @@ let map_tm_sys f =
 let unbind_ext (NB (nms, (ty, sys))) =
   let rec go k nms xs ty sys =
     match nms with
-    | Emp -> Bwd.from_list xs, ty, sys
+    | Emp -> Bwd.rev xs, ty, sys
     | Snoc (nms, nm)  ->
       let x = Name.named nm in
-      go (k + 1) nms (x :: xs) (open_var k x ty) (map_tm_sys (open_var k x) sys)
+      go (k + 1) nms (xs #< x) (open_var k x ty) (map_tm_sys (open_var k x) sys)
   in
-  go 0 nms [] ty sys
+  go 0 nms Emp ty sys
 
 let unbind_ext_with xs (NB (nms, (ty, sys))) =
   let rec go k xs ty sys =
@@ -613,22 +613,20 @@ let bind x tx =
   B (Name.name x, close_var x 0 tx)
 
 let rec bindn xs txs =
-  let n = Bwd.length xs - 1 in
   let rec go k xs txs =
     match xs with
     | Emp -> txs
     | Snoc (xs, x) ->
-      go (k + 1) xs @@ close_var x (n - k) txs
+      go (k + 1) xs @@ close_var x k txs
   in
   NB (Bwd.map Name.name xs, go 0 xs txs)
 
 let rec bind_ext xs tyxs sysxs =
-  let n = Bwd.length xs - 1 in
   let rec go k xs tyxs sysxs =
     match xs with
     | Emp -> tyxs, sysxs
     | Snoc (xs, x) ->
-      go (k + 1) xs (close_var x (n - k) tyxs) (map_tm_sys (close_var x (n - k)) sysxs)
+      go (k + 1) xs (close_var x k tyxs) (map_tm_sys (close_var x k) sysxs)
   in
   NB (Bwd.map Name.name xs, go 0 xs tyxs sysxs)
 
@@ -887,7 +885,7 @@ and pp_lbl_args env fmt args =
 
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt "@ " in
-  Format.pp_print_list ~pp_sep (pp env) fmt ts
+  Format.pp_print_list ~pp_sep (pp env) fmt (Bwd.to_list ts)
 
 and pp_strings fmt (xs : string list) : unit =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -1106,7 +1104,7 @@ struct
     | FunApp t ->
       go fl t acc
     | ExtApp ts ->
-      List.fold_right (go fl) ts acc
+      List.fold_right (go fl) (Bwd.to_list ts) acc
     | If info ->
       go_bnd fl info.mot @@
       go fl info.tcase @@
@@ -1239,7 +1237,7 @@ let map_frame f =
   | FunApp t ->
     FunApp (f t)
   | ExtApp ts ->
-    ExtApp (List.map f ts)
+    ExtApp (Bwd.map f ts)
   | If info ->
     let mot = map_bnd f info.mot in
     let tcase = f info.tcase in
@@ -1396,7 +1394,7 @@ let rec eta_contract t =
       match unleash tm'ys with
       | Up (hd, Snoc (sp, ExtApp args)) ->
         begin
-          match opt_traverse as_plain_var args with
+          match opt_traverse as_plain_var @@ Bwd.to_list args with
           | Some y's
             when Bwd.to_list ys = y's
             (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)

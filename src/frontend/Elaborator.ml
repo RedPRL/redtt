@@ -258,7 +258,8 @@ struct
           M.ret (ty, sys)
         end >>= fun (tyxs, sysxs) ->
       let ebnd = Tm.bind_ext (Bwd.from_list xs) tyxs sysxs in
-      M.ret @@ Tm.make @@ Tm.Ext ebnd
+      let ext_ty = Tm.make @@ Tm.Ext ebnd in
+      M.ret ext_ty
 
     | Tm.Univ _, E.Rst (ety, esys) ->
       let univ = ty in
@@ -386,7 +387,7 @@ struct
             elab_chk env ext_ty e >>= fun line ->
             M.lift C.typechecker >>= fun (module T) ->
             let module HS = HSubst (T) in
-            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
+            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp (Emp #< varx)) in
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
@@ -423,7 +424,7 @@ struct
             elab_chk env ext_ty e >>= fun line ->
             M.lift C.typechecker >>= fun (module T) ->
             let module HS = HSubst (T) in
-            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
+            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp (Emp #< varx)) in
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
@@ -484,11 +485,11 @@ struct
       elab_chk env univ_fam info.fam >>= fun fam ->
       M.in_scope x `I @@ M.lift C.typechecker >>= fun (module T) ->
       let module HS = HSubst (T) in
-      let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
+      let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp (Emp #< tr)) in
       elab_chk env fam_r info.tm >>= fun tm ->
-      let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
+      let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp (Emp #< tr')) in
       let varx = Tm.up @@ Tm.var x in
-      let tyx = Tm.up (Tm.Down {ty = univ_fam; tm = fam}, Emp #< (Tm.ExtApp [varx])) in
+      let tyx = Tm.up (Tm.Down {ty = univ_fam; tm = fam}, Emp #< (Tm.ExtApp (Emp #< varx))) in
       let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
       M.ret (fam_r', (coe, Emp))
 
@@ -501,11 +502,11 @@ struct
       elab_chk env univ_fam info.fam >>= fun fam ->
       M.lift C.typechecker >>= fun (module T) ->
       let module HS = HSubst (T) in
-      let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
+      let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp (Emp #< tr)) in
       elab_chk env fam_r info.cap >>= fun cap ->
-      let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
+      let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp (Emp #< tr')) in
       let varx = Tm.up @@ Tm.var x in
-      let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
+      let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp (Emp #< varx)) in
       let tybnd = Tm.bind x tyx in
       elab_com_sys env tr tybnd cap info.sys >>= fun sys ->
       let com = Tm.Com {r = tr; r' = tr'; ty = tybnd; cap; sys} in
@@ -566,7 +567,7 @@ struct
             let rec bite rs xs efs =
               match xs, efs with
               | Emp, _ ->
-                M.ret (Bwd.to_list rs, efs)
+                M.ret (rs, efs)
               | Snoc (xs, _), E.App e :: efs ->
                 elab_dim env e >>= fun r ->
                 bite (rs #< r) xs efs
@@ -574,7 +575,7 @@ struct
                 failwith "elab_cut: problem biting extension type"
             in
             bite Emp xs efs >>= fun (rs, efs) ->
-            let restriction = List.map2 (fun x r -> Name.fresh (), `R (Tm.up @@ Tm.var x, r)) (Bwd.to_list xs) rs in
+            let restriction = List.map2 (fun x r -> Name.fresh (), `R (Tm.up @@ Tm.var x, r)) (Bwd.to_list xs) (Bwd.to_list rs) in
             M.in_scopes restriction begin
               normalize_ty ext_ty >>= fun ext_ty ->
               go ext_ty (hd, sp #< (Tm.ExtApp rs)) efs mode

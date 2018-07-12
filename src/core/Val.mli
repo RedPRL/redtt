@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 type atom = I.atom
 type star = IStar.t
 type dim = I.t
@@ -62,7 +64,7 @@ and neu =
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
   | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
-  | ExtApp : neu * dim list -> neu
+  | ExtApp : neu * dim bwd -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
@@ -117,7 +119,7 @@ sig
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
   val apply : value -> value -> value
-  val ext_apply : value -> dim list -> value
+  val ext_apply : value -> dim bwd -> value
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -126,13 +128,13 @@ sig
   val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
-  val inst_nclo : nclo -> value list -> value
+  val inst_nclo : nclo -> value bwd -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : ?debug:string list -> value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_fcom : value -> star * value * comp_sys
-  val unleash_ext : value -> dim list -> value * val_sys
+  val unleash_ext : value -> dim bwd -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 

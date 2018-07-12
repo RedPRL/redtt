@@ -72,7 +72,7 @@ and 'a frame =
   | Car
   | Cdr
   | FunApp of 'a
-  | ExtApp of 'a list
+  | ExtApp of 'a bwd
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | NatRec of {mot : 'a bnd; zcase : 'a; scase : 'a nbnd}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}

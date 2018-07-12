@@ -81,7 +81,7 @@ let push_restriction sys ty =
   | Tm.Ext ebnd ->
     let xs, tyxs, sysxs = Tm.unbind_ext ebnd in
     let app_tm tm =
-      let vars = Bwd.to_list @@ Bwd.map (fun x -> Tm.up @@ Tm.var x) xs in
+      let vars = Bwd.map (fun x -> Tm.up @@ Tm.var x) xs in
       let hd = Tm.Down {ty; tm} in
       Tm.up (hd , Emp #< (Tm.ExtApp vars))
     in
@@ -218,7 +218,8 @@ let rec tac_lambda names tac ty =
         M.in_scopes ps begin
           tac' rty
         end >>= fun bdyxs ->
-        M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs)
+        let lam = Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs) in
+        M.ret lam
     end
 
   | _ ->

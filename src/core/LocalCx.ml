@@ -1,3 +1,6 @@
+open RedBasis.Bwd
+open BwdNotation
+
 type hyp = [`Ty of Val.value | `Dim]
 
 let check_eq_clock = ref 0.
@@ -90,7 +93,7 @@ struct
     let x = Name.named nm in
     {env = Eval.Env.push (Val.Atom (`Atom x)) env;
      tys = `Dim :: tys;
-     qenv = Quote.Env.abs qenv [x];
+     qenv = Quote.Env.abs qenv @@ Emp #< x;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}, x
 

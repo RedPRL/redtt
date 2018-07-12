@@ -182,7 +182,7 @@ struct
 
     | V.Ext ext_abs, T.ExtLam (T.NB (nms, tm)) ->
       let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
-      let codx, sysx = Eval.ExtAbs.inst ext_abs @@ List.map (fun x -> `Atom x) xs in
+      let codx, sysx = Eval.ExtAbs.inst ext_abs @@ Bwd.map (fun x -> `Atom x) @@ Bwd.from_list xs in
       check_boundary cxx codx sysx tm
 
     | V.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
@@ -465,7 +465,7 @@ struct
       Eval.inst_clo cod v
 
     | T.ExtApp ts ->
-      let rs = List.map (check_eval_dim cx) ts in
+      let rs = Bwd.map (check_eval_dim cx) ts in
       let ty, _ = Eval.unleash_ext ty rs in
       ty
 

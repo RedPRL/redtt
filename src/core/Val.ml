@@ -1,5 +1,6 @@
 open RedBasis
 open Bwd
+open BwdNotation
 
 type atom = Name.t
 type dim = I.t
@@ -58,7 +59,7 @@ and neu =
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
   | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
-  | ExtApp : neu * dim list -> neu
+  | ExtApp : neu * dim bwd -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
 
@@ -124,7 +125,7 @@ sig
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
   val apply : value -> value -> value
-  val ext_apply : value -> dim list -> value
+  val ext_apply : value -> dim bwd -> value
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -134,13 +135,13 @@ sig
   val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
-  val inst_nclo : nclo -> value list -> value
+  val inst_nclo : nclo -> value bwd -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : ?debug:string list -> value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_fcom : value -> star * value * comp_sys
-  val unleash_ext : value -> dim list -> value * val_sys
+  val unleash_ext : value -> dim bwd -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 
@@ -238,7 +239,7 @@ struct
       {cells = el :: cells; global}
 
     let push_many els {cells; global} =
-      {cells = els @ cells; global}
+      {cells = els <>> cells; global}
 
     let act phi {cells; global} =
       {cells = List.map (act_env_cell phi) cells;
@@ -613,7 +614,7 @@ struct
       end
 
     | ExtApp (neu, rs) ->
-      let rs = List.map (I.act phi) rs in
+      let rs = Bwd.map (I.act phi) rs in
       begin
         match act_neu phi neu with
         | Ret neu ->
@@ -1052,7 +1053,7 @@ struct
           (* This gives a path from the fiber `fib` to `fiber0 b`
            * where `b` is calculated from `fib` as
            * `ext_apply (cdr fib) [`Dim1]` directly. *)
-          let contr0 phi fib = apply (cdr @@ apply (cdr (Val.act phi equiv0)) (ext_apply (cdr fib) [`Dim1])) fib in
+          let contr0 phi fib = apply (cdr @@ apply (cdr (Val.act phi equiv0)) (ext_apply (cdr fib) @@ Emp #< `Dim1)) fib in
           (* The diagonal face for r=r'. *)
           let face_diag = AbsFace.make I.idn r r' @@ fun phi ->
             Abs.make1 @@ fun _ -> base phi (I.act phi r) (I.act phi r')
@@ -1069,7 +1070,7 @@ struct
             let cap = base1 phi (I.act phi r') in
             let msys = force_abs_sys @@
               let face0 = AbsFace.make phi (I.act phi r') `Dim0 @@ fun phi ->
-                Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 phi cap)) [`Atom z]
+                Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 phi cap)) @@ Emp #< (`Atom z)
               in
               let face1 = AbsFace.make phi (I.act phi r') `Dim1 @@ fun phi ->
                 Abs.make1 @@ fun _ -> Val.act phi el in
@@ -1083,7 +1084,7 @@ struct
            * type in the semantic domain. *)
           let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.ix i in
-            eval (Env.push_many [Val (Val.act phi ty00); Val (Val.act phi ty10); Val (car (Val.act phi equiv0)); Val b] Env.emp) @@
+            eval (Env.push_many (Emp #< (Val (Val.act phi ty00)) #< (Val (Val.act phi ty10)) #< (Val (car (Val.act phi equiv0))) #< (Val b)) Env.emp) @@
             Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
           in
           (* This is to generate the element in `ty0` and also
@@ -1111,7 +1112,7 @@ struct
                     (* the fiber *)
                     make_cons (Val.act (I.cmp phi (I.subst `Dim0 r_atom)) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
                   in
-                  ext_apply path_in_fiber0_ty [r]
+                  ext_apply path_in_fiber0_ty @@ Emp #< r
               end
             (* The implementation used in [Y]. *)
             | `UNIFORM_HCOM ->
@@ -1119,7 +1120,7 @@ struct
               make_hcom (IStar.make `Dim1 `Dim0) (fiber0_ty phi (base phi (I.act phi r) `Dim0)) (fiber0 phi (base phi (I.act phi r) `Dim0)) @@
               force_abs_sys @@
               let face0 = AbsFace.make phi (I.act phi r) `Dim0 @@ fun phi ->
-                Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) [`Atom w]
+                Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) @@ Emp #< (`Atom w)
               in
               let face1 = AbsFace.make phi (I.act phi r) `Dim1 @@ fun phi ->
                 Abs.make1 @@ fun _ -> fiber0 phi (base1 phi `Dim0)
@@ -1139,7 +1140,7 @@ struct
           in
           let face_front =
             AbsFace.make I.idn r' `Dim0 @@ fun phi ->
-            Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) [`Atom w]
+            Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) @@ Emp #< (`Atom w)
           in
           let el1 = make_hcom (IStar.make `Dim1 `Dim0) info.ty1 (base I.idn r r') @@
             force_abs_sys [face0; face1; face_diag; face_front]
@@ -1543,7 +1544,7 @@ struct
       let v = eval rho t in
       apply vhd v
     | Tm.ExtApp ts ->
-      let rs = List.map (eval_dim rho) ts in
+      let rs = Bwd.map (eval_dim rho) ts in
       ext_apply vhd rs
     | Tm.Car ->
       car vhd
@@ -1731,14 +1732,14 @@ struct
 
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
-    let xs = Bwd.to_list @@ Bwd.map Name.named nms in
-    let rho = Env.push_many (List.map (fun x -> Atom (`Atom x)) xs) rho in
+    let xs = Bwd.map Name.named nms in
+    let rho = Env.push_many (Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
     Abs.bind xs @@ eval rho tm
 
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
-    let xs = Bwd.to_list @@ Bwd.map Name.named nms in
-    let rho = Env.push_many (List.map (fun x -> Atom (`Atom x)) xs) rho in
+    let xs = Bwd.map Name.named nms in
+    let rho = Env.push_many (Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
 
   and unleash_pi ?debug:(debug = []) v =
@@ -1929,7 +1930,7 @@ struct
       Format.eprintf "Tried to apply: %a@." pp_value vfun;
       failwith "apply"
 
-  and ext_apply vext ss =
+  and ext_apply vext (ss : I.t bwd) =
     match unleash vext with
     | ExtLam abs ->
       Abs.inst abs ss
@@ -1942,7 +1943,7 @@ struct
           let app = ExtApp (info.neu, ss) in
           let app_face =
             Face.map @@ fun r r' a ->
-            ext_apply a @@ List.map (I.act (I.equate r r')) ss
+            ext_apply a @@ Bwd.map (I.act (I.equate r r')) ss
           in
           let app_sys = List.map app_face info.sys in
           make @@ Up {ty = tyr; neu = app; sys = sysr @ app_sys}
@@ -1985,7 +1986,7 @@ struct
             let face =
               Face.map @@ fun r r' abs ->
               let phi_rr' = I.equate r r' in
-              let ss_rr' = List.map (I.act phi_rr') ss in
+              let ss_rr' = Bwd.map (I.act phi_rr') ss in
               let x, v = Abs.unleash1 abs in
               Abs.bind1 x @@ ext_apply v ss_rr'
             in
@@ -2052,7 +2053,7 @@ struct
       zcase
     | Suc n ->
       let n_rec = nat_rec mot n zcase scase in
-      inst_nclo scase [n; n_rec]
+      inst_nclo scase @@ Emp #< n#< n_rec
     | Up up ->
       let neu = NatRec {mot; neu = up.neu; zcase; scase} in
       let mot' = inst_clo mot scrut in
@@ -2291,7 +2292,7 @@ struct
     match nclo with
     | NClo info ->
       let Tm.NB (_, tm) = info.nbnd in
-      eval (Env.push_many (List.map (fun v -> Val v) vargs) info.rho) tm
+      eval (Env.push_many (Bwd.map (fun v -> Val v) vargs) info.rho) tm
 
   and pp_env_cell fmt =
     function
@@ -2390,7 +2391,7 @@ struct
 
   and pp_names fmt xs =
     let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep Name.pp fmt xs
+    Format.pp_print_list ~pp_sep Name.pp fmt (Bwd.to_list xs)
 
   and pp_ext_abs fmt abs =
     let x, (tyx, sysx) = ExtAbs.unleash1 abs in
@@ -2506,12 +2507,12 @@ struct
 
   and pp_dims fmt rs =
     let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep I.pp fmt rs
+    Format.pp_print_list ~pp_sep I.pp fmt (Bwd.to_list rs)
 
   module Macro =
   struct
     let equiv ty0 ty1 : value =
-      let rho = Env.push_many [Val ty0; Val ty1] Env.emp in
+      let rho = Env.push_many (Emp #< (Val ty0) #< (Val ty1)) Env.emp in
       eval rho @@
       Tm.Macro.equiv
         (Tm.up @@ Tm.ix 0)

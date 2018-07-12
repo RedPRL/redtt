@@ -55,7 +55,7 @@ let telescope_to_spine : telescope -> tm Tm.spine =
   Bwd.map @@ fun (x, param) ->
   match param with
   | `I ->
-    Tm.ExtApp [Tm.up @@ Tm.var x]
+    Tm.ExtApp (Emp #< (Tm.up @@ Tm.var x))
   | `P _ ->
     Tm.FunApp (Tm.up @@ Tm.var x)
   | `R _ ->
@@ -133,7 +133,7 @@ let rec spine_to_tele sp =
     end
   | Snoc (sp, Tm.ExtApp ts) ->
     begin
-      match opt_traverse to_var ts with
+      match opt_traverse to_var @@ Bwd.to_list ts with
       | Some xs -> Option.map (fun ys -> ys <>< List.map (fun x -> (x, `I)) xs) @@ spine_to_tele sp
       | None -> None
     end
@@ -367,7 +367,7 @@ struct
       let dom, cod = T.Cx.Eval.unleash_pi ty in
       inst_bnd (cod, bnd) (dom, arg)
     | Tm.ExtLam _, Tm.ExtApp args ->
-      let vargs = List.map (T.Cx.eval_dim T.Cx.emp) args in
+      let vargs = Bwd.map (T.Cx.eval_dim T.Cx.emp) args in
       let ty, _ = T.Cx.Eval.unleash_ext ty vargs in
       let vlam = T.Cx.eval T.Cx.emp tm in
       let vapp = T.Cx.Eval.ext_apply vlam vargs in
@@ -494,8 +494,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       go sp0 sp1 >>= fun (ty0, ty1) ->
       typechecker >>= fun (module T) ->
       let module HSubst = HSubst (T) in
-      let rs0 = List.map (fun t -> T.Cx.eval_dim T.Cx.emp t) ts0 in
-      let rs1 = List.map (fun t -> T.Cx.eval_dim T.Cx.emp t) ts1 in
+      let rs0 = Bwd.map (fun t -> T.Cx.eval_dim T.Cx.emp t) ts0 in
+      let rs1 = Bwd.map (fun t -> T.Cx.eval_dim T.Cx.emp t) ts1 in
       (* TODO: unify the dimension spines ts0, ts1 *)
       let ty'0, sys0 = T.Cx.Eval.unleash_ext ty0 rs0 in
       let ty'1, sys1 = T.Cx.Eval.unleash_ext ty1 rs1 in
@@ -720,15 +720,16 @@ let unify q =
     active @@ prob
 
   | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
-    let xs = Bwd.to_list @@ Bwd.map Name.named nms0 in
-    let vars = List.map (fun x -> Tm.up @@ Tm.var x) xs in
-    let psi = List.map (fun x -> (x, `I)) xs in
+    let xs = Bwd.map Name.named nms0 in
+    let xs_lst = Bwd.to_list xs in
+    let vars = Bwd.map (fun x -> Tm.up @@ Tm.var x) xs in
+    let psi = List.map (fun x -> (x, `I)) @@ xs_lst in
 
     in_scopes psi
       begin
         (q.ty0, q.tm0) %% Tm.ExtApp vars >>= fun (ty0, tm0) ->
         (q.ty1, q.tm1) %% Tm.ExtApp vars >>= fun (ty1, tm1) ->
-        ret @@ Problem.all_dims xs @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
+        ret @@ Problem.all_dims xs_lst @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
       end >>= fun prob ->
     active prob
 

@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 type 'a abs
 
 type atom = Name.t
@@ -8,9 +10,9 @@ sig
 
   include Sort.S with type 'a m = 'a with type t = el abs
 
-  val bind : atom list -> el -> t
-  val unleash : t -> atom list * el
-  val inst : t -> I.t list -> el
+  val bind : atom bwd -> el -> t
+  val unleash : t -> atom bwd * el
+  val inst : t -> I.t bwd -> el
 
   val bind1 : atom -> el -> t
   val unleash1 : t -> atom * el
