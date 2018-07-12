@@ -29,6 +29,7 @@ module Bwd =
 struct
   open BwdNotation
 
+
   let rec length =
     function
     | Emp -> 0
@@ -52,4 +53,6 @@ struct
 
   let from_list xs =
     Emp <>< xs
+
+  let rev xs = from_list @@ List.rev @@ to_list xs
 end
