@@ -6,7 +6,7 @@ let pred (x : nat) : nat =
   | suc n ⇒ n
   end
 
-let pred/succ/zero (x : nat) : Path nat x (pred (suc x)) =
+let pred/succ (x : nat) : Path nat x (pred (suc x)) =
   nat-rec x with
   | zero ⇒ λ i → zero
   | suc n ⇒ λ _ → suc n
