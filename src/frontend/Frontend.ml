@@ -36,6 +36,14 @@ let load_file file_name =
   let module Elaborator = Elaborator.Make (I) in
   let open Lwt.Infix in
   read_file file_name >>= fun esig ->
-  let _ = ElabMonad.run @@ ElabMonad.report @@ Elaborator.elab_sig Elaborator.T.empty esig in
-  Diagnostics.terminated ();
-  Lwt.return_unit
+  begin
+    try
+      ignore @@ ElabMonad.run @@ ElabMonad.report @@ Elaborator.elab_sig Elaborator.T.empty esig;
+      Diagnostics.terminated ();
+      Lwt.return_unit
+    with
+    | exn ->
+      Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
+      Diagnostics.terminated ();
+      exit 1
+  end

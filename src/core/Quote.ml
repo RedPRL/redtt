@@ -86,7 +86,7 @@ struct
 
 
   type error =
-    | ErrEquate of {ty : value; el0 : value; el1 : value}
+    | ErrEquate of {env : QEnv.t; ty : value; el0 : value; el1 : value}
 
   exception E of error
 
@@ -294,7 +294,7 @@ struct
         end
 
       | _ ->
-        let err = ErrEquate {ty; el0; el1} in
+        let err = ErrEquate {env; ty; el0; el1} in
         raise @@ E err
 
   and equate_neu_ env neu0 neu1 stk =
@@ -645,8 +645,11 @@ struct
 
   let pp_error fmt =
     function
-    | ErrEquate {ty; el0; el1} ->
-      Format.fprintf fmt "%a /= %a : %a" pp_value el0 pp_value el1 pp_value ty
+    | ErrEquate {env; ty; el0; el1} ->
+      let tty = quote_ty env ty in
+      let tm0 = quote_nf env {ty; el = el0} in
+      let tm1 = quote_nf env {ty; el = el1} in
+      Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Tm.pp0 tm0 Uuseg_string.pp_utf_8 "≠" Tm.pp0 tm1 Tm.pp0 tty
 
 
   module Error =
