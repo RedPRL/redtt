@@ -135,7 +135,7 @@ sig
   val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
-  val inst_nclo : nclo -> value bwd -> value
+  val inst_nclo : nclo -> value list -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : ?debug:string list -> value -> value * clo
@@ -2053,7 +2053,7 @@ struct
       zcase
     | Suc n ->
       let n_rec = nat_rec mot n zcase scase in
-      inst_nclo scase @@ Emp #< n#< n_rec
+      inst_nclo scase @@ [n; n_rec]
     | Up up ->
       let neu = NatRec {mot; neu = up.neu; zcase; scase} in
       let mot' = inst_clo mot scrut in
@@ -2292,8 +2292,8 @@ struct
     match nclo with
     | NClo info ->
       let Tm.NB (_, tm) = info.nbnd in
-      (* WEIRD ? *)
-      eval (Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun v -> Val v) vargs) info.rho) tm
+      (* Reversing makes sense here because: the left-most element of the environment is the innermost variable *)
+      eval (Env.push_many (List.rev_map (fun v -> Val v) vargs) info.rho) tm
 
   and pp_env_cell fmt =
     function

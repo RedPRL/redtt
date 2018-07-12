@@ -335,8 +335,8 @@ struct
       let zcase = equate env vmot_ze rec0.zcase rec1.zcase in
       let ih = generic env' @@ vmot0 in
       let vmot_su = inst_clo rec0.mot @@ make @@ Suc var in
-      let scase0 = inst_nclo rec0.scase @@ Emp #< var #< ih in
-      let scase1 = inst_nclo rec1.scase @@ Emp #< var #< ih in
+      let scase0 = inst_nclo rec0.scase [var; ih] in
+      let scase1 = inst_nclo rec1.scase [var; ih] in
       let scase = equate (Env.succ env') vmot_su scase0 scase1 in
       let frame = Tm.NatRec {mot = Tm.B (clo_name rec0.mot, mot); zcase; scase = Tm.NB (Emp #< None #< None, scase)} in
       equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
