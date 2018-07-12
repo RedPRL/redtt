@@ -3,13 +3,11 @@ import path
 let pred (x : nat) : nat =
   nat-rec x with
   | zero ⇒ zero
-  | suc (n ⇒ ih) ⇒ n
+  | suc n ⇒ n
   end
 
-; broken
-let nat/refl (x : nat) : Path nat x x =
+let pred/succ/zero (x : nat) : Path nat x (pred (suc x)) =
   nat-rec x with
-  | zero ⇒ λ _ → zero
+  | zero ⇒ λ i → zero
   | suc n ⇒ λ _ → suc n
   end
-

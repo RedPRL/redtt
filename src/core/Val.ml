@@ -239,7 +239,7 @@ struct
       {cells = el :: cells; global}
 
     let push_many els {cells; global} =
-      {cells = els <>> cells; global}
+      {cells = els @ cells; global}
 
     let act phi {cells; global} =
       {cells = List.map (act_env_cell phi) cells;
@@ -1084,7 +1084,7 @@ struct
            * type in the semantic domain. *)
           let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.ix i in
-            eval (Env.push_many (Emp #< (Val (Val.act phi ty00)) #< (Val (Val.act phi ty10)) #< (Val (car (Val.act phi equiv0))) #< (Val b)) Env.emp) @@
+            eval (Env.push_many [Val (Val.act phi ty00); Val (Val.act phi ty10); Val (car (Val.act phi equiv0)); Val b] Env.emp) @@
             Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
           in
           (* This is to generate the element in `ty0` and also
@@ -1733,13 +1733,13 @@ struct
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = Bwd.map Name.named nms in
-    let rho = Env.push_many (Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
+    let rho = Env.push_many (Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
     Abs.bind xs @@ eval rho tm
 
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = Bwd.map Name.named nms in
-    let rho = Env.push_many (Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
+    let rho = Env.push_many (Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
 
   and unleash_pi ?debug:(debug = []) v =
@@ -2292,7 +2292,8 @@ struct
     match nclo with
     | NClo info ->
       let Tm.NB (_, tm) = info.nbnd in
-      eval (Env.push_many (Bwd.map (fun v -> Val v) vargs) info.rho) tm
+      (* WEIRD ? *)
+      eval (Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun v -> Val v) vargs) info.rho) tm
 
   and pp_env_cell fmt =
     function
@@ -2512,7 +2513,7 @@ struct
   module Macro =
   struct
     let equiv ty0 ty1 : value =
-      let rho = Env.push_many (Emp #< (Val ty0) #< (Val ty1)) Env.emp in
+      let rho = Env.push_many [Val ty0; Val ty1] Env.emp in
       eval rho @@
       Tm.Macro.equiv
         (Tm.up @@ Tm.ix 0)
