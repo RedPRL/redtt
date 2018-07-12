@@ -1488,13 +1488,11 @@ struct
         "Tried to unbind extension type binder with incorrect number of variables."
 
   let _ =
-    Printexc.register_printer @@ fun exn ->
-    match exn with
+    PpExn.install_printer @@ fun fmt ->
+    function
     | E err ->
-      pp Format.str_formatter err;
-      let str = Format.flush_str_formatter () in
-      Some str
+      pp fmt err
     | _ ->
-      None
+      raise PpExn.Unrecognized
 
 end

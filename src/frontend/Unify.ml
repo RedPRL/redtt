@@ -79,14 +79,13 @@ let hole tag gm ty f =
 let define gm alpha opacity ~ty tm =
   let ty' = abstract_ty gm ty in
   let tm' = abstract_tm gm tm in
-  check ~ty:ty' tm' >>= fun b ->
-  if not b then
+  check ~ty:ty' tm' >>= function
+  | `Exn exn ->
     dump_state Format.err_formatter "Type error" `All >>= fun _ ->
     begin
-      Format.eprintf "error checking: @[<hv>%a@ : %a@]@." Tm.pp0 tm' Tm.pp0 ty';
-      failwith "define: type error"
+      raise exn
     end
-  else
+  | `Ok ->
     begin
       if opacity = `Transparent then push_update alpha else ret ()
     end >>
@@ -164,15 +163,15 @@ let invert alpha ty sp t =
   else (* alpha does not occur in t *)
     match spine_to_tele sp with
     | Some xs when linear_on t xs ->
-      let lam_tm = abstract_tm xs t in
-      local (fun _ -> Emp) begin
-        check ~ty lam_tm
-      end >>= fun b ->
-      ret @@ if b then Some lam_tm else None
+      begin
+        let lam_tm = abstract_tm xs t in
+        local (fun _ -> Emp) begin
+          check ~ty lam_tm
+        end >>= function
+        | `Ok -> ret @@ Some lam_tm
+        | _ -> ret None
+      end
     | _ ->
-      (* Format.eprintf "Invert: nope %a @.@."
-         (Tm.pp_spine Pretty.Env.emp) sp
-         ; *)
       ret None
 
 let try_invert q ty =
@@ -839,9 +838,13 @@ let rec lower tele alpha ty =
 let is_reflexive q =
   let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
   check_eq ~ty:univ q.ty0 q.ty1 >>= function
-  | true ->
-    check_eq ~ty:q.ty0 q.tm0 q.tm1
-  | false ->
+  | `Ok ->
+    begin
+      check_eq ~ty:q.ty0 q.tm0 q.tm1 >>= function
+      | `Ok -> ret true
+      | _ -> ret false
+    end
+  | `Exn _ ->
     ret false
 
 
@@ -857,8 +860,13 @@ let rec solver prob =
     unify q
 
   | Subtype {ty0; ty1} ->
-    check_subtype ty0 ty1 <||
-    subtype ty0 ty1
+    begin
+      check_subtype ty0 ty1 >>= function
+      | `Ok ->
+        ret ()
+      | _ ->
+        subtype ty0 ty1
+    end
 
   | All (param, prob) ->
     let x, probx = unbind param prob in
@@ -887,7 +895,7 @@ let rec solver prob =
           let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
           begin
             check_eq ~ty:univ ty0 ty1 >>= function
-            | true ->
+            | `Ok ->
               get_global_env >>= fun sub ->
               let y = Name.named (Name.name x) in
               (*  This weird crap is needed to avoid creating a cycle in the environment.
@@ -899,7 +907,7 @@ let rec solver prob =
               let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
               solver @@ Problem.all x ty0 @@
               Problem.subst sub_x @@ Problem.subst sub_y probx
-            | false ->
+            | _ ->
               in_scope x (`Tw (ty0, ty1)) @@
               solver probx
           end
@@ -937,12 +945,12 @@ let ambulando =
     | E (alpha, ty, Guess info) ->
       begin
         check ~ty info.tm >>= function
-        | true ->
+        | `Ok ->
           (* Format.eprintf "solved guess %a??@." Name.pp alpha; *)
           pushl @@ E (alpha, ty, Defn (`Transparent, info.tm)) >>
           push_update alpha >>
           loop
-        | false ->
+        | _ ->
           (* dump_state Format.err_formatter "failed to solve guess" `All >>= fun _ -> *)
           (* Format.eprintf "Failed to solve guess %a@." Name.pp alpha; *)
           pushl e >>
