@@ -30,7 +30,7 @@ let shannon (A : type) (f : bool → A) : bool → A =
 let shannon/path (A : type) (f : bool → A) : Path _ f (shannon A f) =
   funext _ _ _ _
     (λ b →
-      if b with λ x →
+      if b in λ x →
         Path _ (f x) (shannon _ f x)
       then λ _ → f tt
       else λ _ → f ff)

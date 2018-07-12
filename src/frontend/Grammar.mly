@@ -111,7 +111,7 @@ eterm:
   | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
     { E.If (None, e0, e1, e2) }
 
-  | IF; e0 = eterm; WITH mot = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
+  | IF; e0 = eterm; IN mot = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
     { E.If (Some mot, e0, e1, e2) }
 
   | SUC; n = atomic_eterm
@@ -122,6 +122,13 @@ eterm:
 
   | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; RRIGHT_ARROW; es = eterm; END
     { E.NatRec (None, e0, ez, (n, None, es)) }
+
+  | NAT_REC; e0 = eterm; IN; mot = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; LPR; n = ATOM; RRIGHT_ARROW; n_rec = ATOM; RPR; RRIGHT_ARROW; es = eterm; END
+    { E.NatRec (Some mot, e0, ez, (n, Some n_rec, es)) }
+
+  | NAT_REC; e0 = eterm; IN; mot = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; RRIGHT_ARROW; es = eterm; END
+    { E.NatRec (Some mot, e0, ez, (n, None, es)) }
+
 
   | POS; n = eterm
     { E.Pos n }
@@ -402,7 +409,7 @@ cut:
   | LPR; AT; e = cut; args = elist(tm); RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< (Tm.ExtApp (args env)) }
+      hd, fs #< (Tm.ExtApp (Bwd.from_list @@ args env)) }
 
   | LPR; IF; mot = bind(tm); scrut = cut; tcase = tm; fcase = tm; RPR
     { fun env ->

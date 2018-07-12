@@ -81,7 +81,7 @@ let push_restriction sys ty =
   | Tm.Ext ebnd ->
     let xs, tyxs, sysxs = Tm.unbind_ext ebnd in
     let app_tm tm =
-      let vars = Bwd.to_list @@ Bwd.map (fun x -> Tm.up @@ Tm.var x) xs in
+      let vars = Bwd.map (fun x -> Tm.up @@ Tm.var x) xs in
       let hd = Tm.Down {ty; tm} in
       Tm.up (hd , Emp #< (Tm.ExtApp vars))
     in
@@ -205,8 +205,8 @@ let rec tac_lambda names tac ty =
       | _ ->
         let rec bite nms lnames rnames =
           match nms, rnames with
-          | [], _ -> lnames, tac_wrap_nf (tac_lambda rnames tac)
-          | _ :: nms, name :: rnames ->
+          | Emp, _ -> lnames, tac_wrap_nf (tac_lambda rnames tac)
+          | Snoc (nms, _), name :: rnames ->
             let x = Name.named @@ Some name in
             bite nms (lnames #< x) rnames
           | _ -> failwith "Elab: incorrect number of binders when refining extension type"
@@ -218,7 +218,8 @@ let rec tac_lambda names tac ty =
         M.in_scopes ps begin
           tac' rty
         end >>= fun bdyxs ->
-        M.ret @@ Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs)
+        let lam = Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs) in
+        M.ret lam
     end
 
   | _ ->
@@ -260,12 +261,10 @@ let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scas
     end >>= fun mot ->
     tac_zcase (mot (Tm.make Tm.Zero)) >>= fun zcase ->
     let mot_suc_x = mot (Tm.make (Tm.Suc (Tm.up (Tm.var x_scase)))) in
-    M.in_scope x_scase (`P nat) begin
-       M.in_scope x_rec_scase (`P (mot @@ Tm.up @@ Tm.var x_scase)) begin
-         tac_scase mot_suc_x
-       end
+      M.in_scopes [x_scase, `P nat; x_rec_scase, `P (mot @@ Tm.up @@ Tm.var x_scase)] begin
+        tac_scase mot_suc_x >>= fun tm ->
+        M.ret @@ Tm.bindn (Emp #< x_scase #< x_rec_scase) tm
     end >>= fun scase ->
-    let scase = Tm.bindn (Bwd.from_list [x_scase; x_rec_scase]) scase in
     let hd = Tm.Down {ty = nat; tm = scrut} in
     let bmot =
       let x = Name.fresh () in

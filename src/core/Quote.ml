@@ -1,5 +1,6 @@
 open Val
 open RedBasis.Bwd
+open BwdNotation
 
 
 module Env :
@@ -11,7 +12,7 @@ sig
   val emp : t
   val make : int -> t
   val succ : t -> t
-  val abs : t -> Name.t list -> t
+  val abs : t -> Name.t bwd -> t
 
   val ix_of_lvl : int -> t -> int
   val ix_of_atom : Name.t -> t -> int
@@ -39,8 +40,8 @@ struct
   (* I might be doing this backwards ;-) *)
   let rec abs env xs =
     match xs with
-    | [] -> env
-    | x::xs -> abs (abs1 env x) xs
+    | Emp -> env
+    | Snoc (xs, x) -> abs (abs1 env x) xs
 
   let ix_of_lvl l env =
     env.n - (l + 1)
@@ -95,10 +96,10 @@ struct
       Tm.cons q0 q1
     | Ext abs ->
       let xs, (tyx, _) = ExtAbs.unleash abs in
-      let rs = List.map (fun x -> `Atom x) xs in
+      let rs = Bwd.map (fun x -> `Atom x) xs in
       let app0 = ext_apply el0 rs in
       let app1 = ext_apply el1 rs in
-      Tm.ext_lam (List.map Name.name xs) @@
+      Tm.ext_lam (Bwd.map Name.name xs) @@
       equate (Env.abs env xs) tyx app0 app1
 
     | Rst {ty; _} ->
@@ -192,11 +193,11 @@ struct
 
       | Ext abs0, Ext abs1 ->
         let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
-        let ty1x, sys1x = ExtAbs.inst abs1 @@ List.map (fun x -> `Atom x) xs in
+        let ty1x, sys1x = ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
         let envx = Env.abs env xs in
         let tyx = equate envx ty ty0x ty1x in
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
-        Tm.make @@ Tm.Ext (Tm.NB (List.map Name.name xs, (tyx, sysx)))
+        Tm.make @@ Tm.Ext (Tm.NB (Bwd.map Name.name xs, (tyx, sysx)))
 
       | Rst info0, Rst info1 ->
         let ty = equate env ty info0.ty info1.ty in
@@ -324,6 +325,27 @@ struct
       let fcase = equate env vmot_ff if0.fcase if1.fcase in
       let frame = Tm.If {mot = Tm.B (clo_name if0.mot, mot); tcase; fcase} in
       equate_neu_ env if0.neu if1.neu @@ frame :: stk
+    | NatRec rec0, NatRec rec1 ->
+      let var = generic env @@ make Nat in
+      let env' = Env.succ env in
+      let vmot0 = inst_clo rec0.mot var in
+      let mot =
+        let vmot1 = inst_clo rec1.mot var in
+        equate_ty env' vmot0 vmot1
+      in
+      let zcase =
+        let vmot_ze = inst_clo rec0.mot @@ make Zero in
+        equate env vmot_ze rec0.zcase rec1.zcase
+      in
+      let scase =
+        let ih = generic env' vmot0 in
+        let vmot_su = inst_clo rec0.mot @@ make @@ Suc var in
+        let scase0 = inst_nclo rec0.scase [var; ih] in
+        let scase1 = inst_nclo rec1.scase [var; ih] in
+        equate (Env.succ env') vmot_su scase0 scase1
+      in
+      let frame = Tm.NatRec {mot = Tm.B (clo_name rec0.mot, mot); zcase; scase = Tm.NB (nclo_names rec0.scase, scase)} in
+      equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
     | VProj vproj0, VProj vproj1 ->
       let x0 = vproj0.x in
       let x1 = vproj1.x in
@@ -427,7 +449,7 @@ struct
     let x, v0x = Abs.unleash1 abs0 in
     let v1x = Abs.inst1 abs1 @@ `Atom x in
     try
-      let envx = Env.abs env [x] in
+      let envx = Env.abs env @@ Emp #< x in
       let tm = equate envx ty v0x v1x in
       Tm.B (Name.name x, tm)
     with
@@ -478,11 +500,11 @@ struct
 
   and equate_dims env rs rs' =
     match rs, rs' with
-    | [], [] ->
-      []
-    | r :: rs, r' :: rs' ->
+    | Emp, Emp ->
+      Emp
+    | Snoc (rs, r), Snoc (rs', r') ->
       let r'' = equate_dim env r r' in
-      r'' :: equate_dims env rs rs'
+      (equate_dims env rs rs') #< r''
     | _ ->
       failwith "equate_dims: length mismatch"
 
@@ -531,7 +553,7 @@ struct
 
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
-      let ty1x, sys1x = ExtAbs.inst abs1 @@ List.map (fun x -> `Atom x) xs in
+      let ty1x, sys1x = ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
       let envx = Env.abs env xs in
       subtype envx ty0x ty1x;
       approx_restriction envx ty0x ty1x sys0x sys1x
@@ -581,7 +603,7 @@ struct
 
       | Face.False _ ->
         (* This one is vacuous *)
-        false
+        true
 
       | Face.Indet (p, v) ->
         (* In this case, we check that the semantic indeterminate will become equal to the face under the

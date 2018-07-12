@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 let make_node _start _stop con =
   Tm.make con
 
@@ -31,16 +33,16 @@ let rec lam_from_multibind info mb =
     Tm.lam nm @@
     lam_from_multibind info mb
   | MBConsDims (nms, mb) ->
-    Tm.ext_lam nms @@
+    Tm.ext_lam (Bwd.from_list nms) @@
     lam_from_multibind info mb
 
 let rec ext_from_multibind start stop mb =
   match mb with
   | MBConsDims (nms, MBEnd (ty, sys)) ->
-    Tm.make @@ Tm.Ext (Tm.NB (nms, (ty, sys)))
+    Tm.make @@ Tm.Ext (Tm.NB (Bwd.from_list nms, (ty, sys)))
 
   | MBConsDims (nms, mb) ->
-    Tm.make @@ Tm.Ext (Tm.NB (nms, (ext_from_multibind start stop mb, [])))
+    Tm.make @@ Tm.Ext (Tm.NB (Bwd.from_list nms, (ext_from_multibind start stop mb, [])))
 
   | _ ->
     failwith "ext_from_multibind"

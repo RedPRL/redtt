@@ -5,7 +5,7 @@ open BwdNotation
 type twin = [`Only | `TwinL | `TwinR]
 
 type 'a bnd = B of string option * 'a
-type 'a nbnd = NB of string option list * 'a
+type 'a nbnd = NB of string option bwd * 'a
 
 type info = Lexing.position * Lexing.position
 
@@ -74,7 +74,7 @@ and 'a frame =
   | Car
   | Cdr
   | FunApp of 'a
-  | ExtApp of 'a list
+  | ExtApp of 'a bwd
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | NatRec of {mot : 'a bnd; zcase : 'a; scase : 'a nbnd}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
@@ -221,7 +221,7 @@ and subst_frame sub frame =
   | FunApp t ->
     FunApp (subst sub t)
   | ExtApp ts ->
-    ExtApp (List.map (subst sub) ts)
+    ExtApp (Bwd.map (subst sub) ts)
   | If info ->
     let mot = subst_bnd sub info.mot in
     let tcase = subst sub info.tcase in
@@ -316,11 +316,11 @@ and subst_bnd sub bnd =
 
 and subst_nbnd sub bnd =
   let NB (nms, t) = bnd in
-  NB (nms, subst (liftn (List.length nms) sub) t)
+  NB (nms, subst (liftn (Bwd.length nms) sub) t)
 
 and subst_ext_bnd sub ebnd =
   let NB (nms, (ty, sys)) = ebnd in
-  let sub' = liftn (List.length nms) sub in
+  let sub' = liftn (Bwd.length nms) sub in
   let ty' = subst sub' ty in
   let sys' = subst_tm_sys sub' sys in
   NB (nms, (ty', sys'))
@@ -485,7 +485,7 @@ let traverse ~f ~go_ix ~go_var =
     | FunApp t ->
       FunApp (f k t)
     | ExtApp ts ->
-      ExtApp (List.map (f k) ts)
+      ExtApp (Bwd.map (f k) ts)
     | If info ->
       let mot = go_bnd k info.mot in
       let tcase = f k info.tcase in
@@ -522,11 +522,11 @@ let traverse ~f ~go_ix ~go_var =
     f k r, f k r', Option.map (go_bnd k) obnd
 
   and go_ext_bnd k (NB (nms, (ty, sys))) =
-    let k' = k + List.length nms in
+    let k' = k + Bwd.length nms in
     NB (nms, (f k' ty, go_tm_sys k' sys))
 
   and go_nbnd k (NB (nms, t)) =
-    let k' = k + List.length nms in
+    let k' = k + Bwd.length nms in
     NB (nms, f k' t)
 
   and go_tm_sys k sys =
@@ -573,8 +573,8 @@ let unbind_with x ?twin:(twin = fun _ -> `Only) (B (_, t)) =
 let unbindn (NB (nms, t)) =
   let rec go k nms xs t =
     match nms with
-    | [] -> xs, t
-    | nm :: nms ->
+    | Emp -> Bwd.rev xs, t
+    | Snoc (nms, nm) ->
       let x = Name.named nm in
       go (k + 1) nms (xs #< x) @@ open_var k x t
   in
@@ -589,8 +589,8 @@ let map_tm_sys f =
 let unbind_ext (NB (nms, (ty, sys))) =
   let rec go k nms xs ty sys =
     match nms with
-    | [] -> xs, ty, sys
-    | nm :: nms ->
+    | Emp -> Bwd.rev xs, ty, sys
+    | Snoc (nms, nm)  ->
       let x = Name.named nm in
       go (k + 1) nms (xs #< x) (open_var k x ty) (map_tm_sys (open_var k x) sys)
   in
@@ -603,7 +603,7 @@ let unbind_ext_with xs (NB (nms, (ty, sys))) =
     | x :: xs ->
       go (k + 1) xs (open_var k x ty) (map_tm_sys (open_var k x) sys)
   in
-  if List.length nms = List.length xs then
+  if Bwd.length nms = List.length xs then
     go 0 xs ty sys
   else
     failwith "unbind_ext_with: length mismatch"
@@ -613,26 +613,22 @@ let bind x tx =
   B (Name.name x, close_var x 0 tx)
 
 let rec bindn xs txs =
-  let xs_l = Bwd.to_list xs in
-  let n = List.length xs_l - 1 in
   let rec go k xs txs =
     match xs with
     | Emp -> txs
     | Snoc (xs, x) ->
-      go (k + 1) xs @@ close_var x (n - k) txs
+      go (k + 1) xs @@ close_var x k txs
   in
-  NB (List.map Name.name xs_l, go 0 xs txs)
+  NB (Bwd.map Name.name xs, go 0 xs txs)
 
 let rec bind_ext xs tyxs sysxs =
-  let xs_l = Bwd.to_list xs in
-  let n = List.length xs_l - 1 in
   let rec go k xs tyxs sysxs =
     match xs with
     | Emp -> tyxs, sysxs
     | Snoc (xs, x) ->
-      go (k + 1) xs (close_var x (n - k) tyxs) (map_tm_sys (close_var x (n - k)) sysxs)
+      go (k + 1) xs (close_var x k tyxs) (map_tm_sys (close_var x k) sysxs)
   in
-  NB (List.map Name.name xs_l, go 0 xs tyxs sysxs)
+  NB (Bwd.map Name.name xs, go 0 xs tyxs sysxs)
 
 let rec pp env fmt =
 
@@ -653,7 +649,7 @@ let rec pp env fmt =
         Format.fprintf fmt "@[<hv1>(%a @[<hv>[%a : %a]@ %a@])@]" Uuseg_string.pp_utf_8 "×" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Sg) cod
 
     | Ext (NB (nms, (cod, sys))) ->
-      let xs, env' = Pretty.Env.bindn nms env in
+      let xs, env' = Pretty.Env.bindn (Bwd.to_list nms) env in
       begin
         match sys with
         | [] ->
@@ -689,7 +685,7 @@ let rec pp env fmt =
         Format.fprintf fmt "@[<1>(λ [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (go env' `Lam) tm
 
     | ExtLam (NB (nms, tm)) ->
-      let xs, env' = Pretty.Env.bindn nms env in
+      let xs, env' = Pretty.Env.bindn (Bwd.to_list nms) env in
       if mode = `Lam then
         Format.fprintf fmt "<%a>@ %a" pp_strings xs (go env' `Lam) tm
       else
@@ -838,7 +834,7 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<hv1>(if@ [%a] %a@ %a@ %a@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') mot (go `If) sp (pp env) tcase (pp env) fcase
       | NatRec {mot = B (nm, mot); zcase; scase = NB (nms_scase, scase)} ->
         let x_mot, env'_mot = Pretty.Env.bind nm env in
-        let xs_scase, env'_scase = Pretty.Env.bindn nms_scase env in
+        let xs_scase, env'_scase = Pretty.Env.bindn (Bwd.to_list nms_scase) env in
         Format.fprintf fmt "@[<hv1>(nat-rec@ [%a] %a@ %a@ %a@ [%a] %a)@]" Uuseg_string.pp_utf_8 x_mot (pp env'_mot) mot (go `NatRec) sp (pp env) zcase pp_strings xs_scase (pp env'_scase) scase
       | S1Rec {mot = B (nm_mot, mot); bcase; lcase = B (nm_lcase, lcase)} ->
         let x_mot, env_mot = Pretty.Env.bind nm_mot env in
@@ -889,7 +885,7 @@ and pp_lbl_args env fmt args =
 
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt "@ " in
-  Format.pp_print_list ~pp_sep (pp env) fmt ts
+  Format.pp_print_list ~pp_sep (pp env) fmt (Bwd.to_list ts)
 
 and pp_strings fmt (xs : string list) : unit =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -968,7 +964,7 @@ struct
     let face0 = up (ix 0), make Dim0, Some (subst (Shift 1) tm0) in
     let face1 = up (ix 0), make Dim1, Some (subst (Shift 1) tm1) in
     let sys = [face0; face1] in
-    make @@ Ext (NB ([None], (ty', sys)))
+    make @@ Ext (NB (Emp #< None, (ty', sys)))
 
   let fiber ~ty0 ~ty1 ~f ~x =
     sg (Some "ix") ty0 @@
@@ -1108,7 +1104,7 @@ struct
     | FunApp t ->
       go fl t acc
     | ExtApp ts ->
-      List.fold_right (go fl) ts acc
+      List.fold_right (go fl) (Bwd.to_list ts) acc
     | If info ->
       go_bnd fl info.mot @@
       go fl info.tcase @@
@@ -1241,7 +1237,7 @@ let map_frame f =
   | FunApp t ->
     FunApp (f t)
   | ExtApp ts ->
-    ExtApp (List.map f ts)
+    ExtApp (Bwd.map f ts)
   | If info ->
     let mot = map_bnd f info.mot in
     let tcase = f info.tcase in
@@ -1277,14 +1273,14 @@ let map_spine f =
 (* TODO: clean up: this is catastrophically bad *)
 let rec map_ext_bnd f nbnd =
   match nbnd with
-  | NB ([], (ty, sys)) ->
-    NB ([], (f ty, map_tm_sys f sys))
-  | NB (nm :: nms, (ty, sys)) ->
+  | NB (Emp, (ty, sys)) ->
+    NB (Emp, (f ty, map_tm_sys f sys))
+  | NB (Snoc (nms, nm), (ty, sys)) ->
     let x = Name.named nm in
     let tyx = open_var 0 x ty in
     let sysx = map_tm_sys (open_var 0 x) sys in
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
-    NB (nm :: nms, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
+    NB (nms #< nm, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
 
 let map_cmd f (hd, sp) =
   map_head f hd, map_spine f sp
@@ -1398,7 +1394,7 @@ let rec eta_contract t =
       match unleash tm'ys with
       | Up (hd, Snoc (sp, ExtApp args)) ->
         begin
-          match opt_traverse as_plain_var args with
+          match opt_traverse as_plain_var @@ Bwd.to_list args with
           | Some y's
             when Bwd.to_list ys = y's
             (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)

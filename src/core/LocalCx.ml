@@ -1,3 +1,6 @@
+open RedBasis.Bwd
+open BwdNotation
+
 type hyp = [`Ty of Val.value | `Dim]
 
 let check_eq_clock = ref 0.
@@ -38,6 +41,7 @@ sig
   val eval_frame : t -> value -> Tm.tm Tm.frame -> value
   val eval_dim : t -> Tm.tm -> I.t
   val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
+  val make_closure : t -> Tm.tm Tm.bnd -> Val.clo
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
@@ -89,7 +93,7 @@ struct
     let x = Name.named nm in
     {env = Eval.Env.push (Val.Atom (`Atom x)) env;
      tys = `Dim :: tys;
-     qenv = Quote.Env.abs qenv [x];
+     qenv = Quote.Env.abs qenv @@ Emp #< x;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}, x
 
@@ -104,6 +108,10 @@ struct
 
   let ppenv cx =
     cx.ppenv
+
+  let make_closure cx bnd =
+    V.make_closure cx.env bnd
+
 
   let eval {env; ppenv; _} tm =
     try
