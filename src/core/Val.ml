@@ -140,8 +140,8 @@ sig
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> value list -> value
 
-  val unleash_pi : ?debug:string list -> value -> value * clo
-  val unleash_sg : ?debug:string list -> value -> value * clo
+  val unleash_pi : value -> value * clo
+  val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_fcom : value -> star * value * comp_sys
   val unleash_ext : value -> dim bwd -> value * val_sys
@@ -180,6 +180,13 @@ sig
 
   module Macro : sig
     val equiv : value -> value -> value
+  end
+
+  module Error :
+  sig
+    type t
+    val pp : t Pretty.t0
+    exception E of t
   end
 
   val base_restriction : Restriction.t
@@ -385,6 +392,29 @@ struct
   exception ProjAbs of abs
   exception ProjVal of value
 
+
+  type error =
+    | ExpectedValueInEnvironment of I.t
+    | ExpectedAtomInEnvironment of value
+    | ExpectedDimensionTerm of Tm.tm
+    | InternalMortalityError
+    | RigidCoeUnexpectedArgument of abs
+    | RigidHComUnexpectedArgument of value
+    | RigidGHComUnexpectedArgument of value
+    | LblCallUnexpectedArgument of value
+    | UnexpectedDimensionTerm of Tm.tm
+    | UnleashPiError of value
+    | UnleashSgError of value
+    | UnleashExtError of value
+    | UnleashVError of value
+    | UnleashCoRError of value
+    | UnleashLblTyError of value
+    | UnleashFComError of value
+    | ForcedUntrueCorestriction of val_face
+
+
+  exception E of error
+
   let make_closure rho bnd =
     Clo {bnd; rho}
 
@@ -401,18 +431,24 @@ struct
           begin
             match List.nth rho.cells i with
             | Atom x -> x
-            | _ ->
-              failwith "eval_dim: expected atom in environment"
+            | Val v ->
+              let err = ExpectedAtomInEnvironment v in
+              raise @@ E err
           end
 
         | Tm.Var info ->
           I.act rho.global @@ Sig.global_dim info.name
+
         | Tm.Meta meta ->
           I.act rho.global @@ Sig.global_dim meta.name
 
-        | _ -> failwith "eval_dim"
+        | _ ->
+          let err = ExpectedDimensionTerm tm in
+          raise @@ E err
       end
-    | _ -> failwith "eval_dim"
+    | _ ->
+      let err = ExpectedDimensionTerm tm in
+      raise @@ E err
 
 
 
@@ -1132,7 +1168,7 @@ struct
               [face0; face1]
             (* Something magical under development. *)
             | `UNICORN ->
-              failwith "too immortal; not suitable for mortal beings"
+              raise @@ E InternalMortalityError
           in
           let el0 phi0 =
             try
@@ -1179,7 +1215,7 @@ struct
               match mode with
               | `OLD_SCHOOL -> Option.filter_map force_abs_face [face0; face1]
               | `INCONSISTENCY_REMOVAL -> Option.filter_map force_abs_face [face0]
-              | `UNICORN -> failwith "I can fly!"
+              | `UNICORN -> raise @@ E InternalMortalityError
             in
             rigid_com dir abs1 cap sys
           in
@@ -1187,7 +1223,8 @@ struct
       end
 
     | _ ->
-      failwith "TODO: rigid_coe"
+      let err = RigidCoeUnexpectedArgument abs in
+      raise @@ E err
 
   and rigid_hcom dir ty cap sys : value =
     match unleash ty with
@@ -1292,7 +1329,8 @@ struct
       rigid_vin x el0 el1
 
     | _ ->
-      failwith "TODO: rigid_hcom"
+      let err = RigidHComUnexpectedArgument ty in
+      raise @@ E err
 
   and rigid_ghcom dir ty cap sys : value =
     match unleash ty with
@@ -1347,7 +1385,8 @@ struct
       aux sys
 
     | _ ->
-      failwith "TODO: rigid_ghcom"
+      let err = RigidGHComUnexpectedArgument ty in
+      raise @@ E err
 
   and rigid_com dir abs cap (sys : comp_sys) : value =
     let _, r' = IStar.unleash dir in
@@ -1506,11 +1545,8 @@ struct
       let sys = eval_rigid_tm_sys rho info.sys in
       make_box dir cap sys
 
-    | Tm.Dim0 ->
-      failwith "0 is a dimension"
-
-    | Tm.Dim1 ->
-      failwith "1 is a dimension"
+    | (Tm.Dim0 | Tm.Dim1) ->
+      raise @@ E (UnexpectedDimensionTerm tm)
 
     | Tm.Up cmd ->
       eval_cmd rho cmd
@@ -1638,8 +1674,8 @@ struct
         match List.nth rho.cells i with
         | Val v -> v
         | Atom r ->
-          Format.eprintf "Expected value in environment for %i, but found dim %a@." i I.pp r;
-          failwith "Expected value in environment"
+          let err = ExpectedValueInEnvironment r in
+          raise @@ E err
       end
 
     | Tm.Var info ->
@@ -1746,28 +1782,19 @@ struct
     let rho = Env.push_many (Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
 
-  and unleash_pi ?debug:(debug = []) v =
+  and unleash_pi v =
     match unleash v with
     | Pi {dom; cod} -> dom, cod
-    | Rst rst -> unleash_pi ~debug rst.ty
+    | Rst rst -> unleash_pi rst.ty
     | _ ->
-      Format.eprintf "%a: tried to unleash %a as pi type@."
-        pp_trace debug
-        pp_value v;
-      failwith "unleash_pi"
+      raise @@ E (UnleashPiError v)
 
-  and unleash_sg ?debug:(debug = []) v =
+  and unleash_sg v =
     match unleash v with
     | Sg {dom; cod} -> dom, cod
     | Rst rst -> unleash_sg rst.ty
     | _ ->
-
-      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-      Format.eprintf "@.";
-      Format.eprintf "%a: tried to unleash %a as sigma type@."
-        pp_trace debug
-        pp_value v;
-      failwith "unleash_sg"
+      raise @@ E (UnleashSgError v)
 
   and unleash_ext v rs =
     match unleash v with
@@ -1776,8 +1803,7 @@ struct
     | Rst rst ->
       unleash_ext rst.ty rs
     | _ ->
-      Format.printf "unleash_ext: %a@." pp_value v;
-      failwith "unleash_ext"
+      raise @@ E (UnleashExtError v)
 
   and unleash_v v =
     match unleash v with
@@ -1786,17 +1812,14 @@ struct
     | Rst rst ->
       unleash_v rst.ty
     | _ ->
-      Format.eprintf "Failed to unleash V type: %a@." pp_value v;
-      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-      Format.eprintf "@.";
-      failwith "unleash_v"
+      raise @@ E (UnleashVError v)
 
   and unleash_fcom v =
     match unleash v with
     | FCom info -> info.dir, info.cap, info.sys
     | Rst rst -> unleash_fcom rst.ty
     | _ ->
-      failwith "unleash_fcom"
+      raise @@ E (UnleashFComError v)
 
   and unleash_lbl_ty v =
     match unleash v with
@@ -1805,7 +1828,7 @@ struct
     | Rst rst ->
       unleash_lbl_ty rst.ty
     | _ ->
-      failwith "unleash_lbl_ty"
+      raise @@ E (UnleashLblTyError v)
 
   and unleash_corestriction_ty v =
     match unleash v with
@@ -1814,13 +1837,7 @@ struct
     | Rst rst ->
       unleash_corestriction_ty rst.ty
     | _ ->
-      failwith "unleash_corestriction_ty"
-
-  and pp_trace fmt trace =
-    Format.fprintf fmt "@[[%a]@]"
-      (Format.pp_print_list Format.pp_print_string)
-      trace
-
+      raise @@ E (UnleashCoRError v)
 
   and lbl_call v =
     match unleash v with
@@ -1835,7 +1852,7 @@ struct
       let call_sys = List.map call_face info.sys in
       make @@ Up {ty; neu = call; sys = call_sys}
     | _ ->
-      failwith "lbl_call"
+      raise @@ E (LblCallUnexpectedArgument v)
 
   and corestriction_force v =
     match unleash v with
@@ -1843,7 +1860,8 @@ struct
       begin
         match face with
         | Face.True (_, _, v) -> v
-        | _ -> failwith "Cannot force corestriction when it doesn't hold"
+        | _ ->
+          raise @@ E (ForcedUntrueCorestriction face)
       end
 
     | Up info ->
@@ -1857,15 +1875,10 @@ struct
           in
           let force_sys = List.map force_face info.sys in
           make @@ Up {ty; neu = force; sys = force_sys}
-        | Face.False _ ->
-          failwith "Cannot force false corestriction"
-        | Face.Indet (p, _) ->
-          let r, r' = IStar.unleash p in
-          Format.eprintf "corestriction: %a =? %a@." I.pp r I.pp r';
-          Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-          Format.eprintf "@.";
-          failwith "Cannot force indeterminate corestriction"
+        | _ as face ->
+          raise @@ E (ForcedUntrueCorestriction face)
       end
+
     | _ ->
       failwith "corestriction_force"
 
@@ -1875,7 +1888,7 @@ struct
       inst_clo clo varg
 
     | Up info ->
-      let dom, cod = unleash_pi ~debug:["apply"; "up"] info.ty in
+      let dom, cod = unleash_pi info.ty in
       let cod' = inst_clo cod varg in
       let app = FunApp (info.neu, {ty = dom; el = varg}) in
       let app_face =
@@ -1888,7 +1901,7 @@ struct
     | Coe info ->
       let r, r' = IStar.unleash info.dir in
       let x, tyx = Abs.unleash1 info.abs in
-      let domx, codx = unleash_pi ~debug:["apply"; "coe"] tyx in
+      let domx, codx = unleash_pi tyx in
       let dom = Abs.bind1 x domx in
       let coe_r'_x = make_coe (IStar.make r' (`Atom x)) dom varg in
       let cod_coe = inst_clo codx coe_r'_x in
@@ -1905,7 +1918,7 @@ struct
       res
 
     | HCom info ->
-      let _, cod = unleash_pi ~debug:["apply"; "hcom"] info.ty in
+      let _, cod = unleash_pi info.ty in
       let ty = inst_clo cod varg in
       let cap = apply info.cap varg in
       let app_face =
@@ -1917,7 +1930,7 @@ struct
       rigid_hcom info.dir ty cap sys
 
     | GHCom info ->
-      let _, cod = unleash_pi ~debug:["apply"; "ghcom"] info.ty in
+      let _, cod = unleash_pi info.ty in
       let ty = inst_clo cod varg in
       let cap = apply info.cap varg in
       let app_face =
@@ -2125,7 +2138,7 @@ struct
       v0
 
     | Up info ->
-      let dom, _ = unleash_sg ~debug:["Val.car"] info.ty in
+      let dom, _ = unleash_sg info.ty in
       let car_sys = List.map (Face.map (fun _ _ a -> car a)) info.sys in
       make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
 
@@ -2258,7 +2271,8 @@ struct
       in
       rigid_gcom info.dir abs cap sys
 
-    | _ -> failwith "TODO: cdr"
+    | _ ->
+      failwith "cdr"
 
   and make_cap mdir ty msys el : value =
     match mdir with
@@ -2282,7 +2296,6 @@ struct
           make_cap (IStar.act phi dir) (Val.act phi ty) (CompSys.act phi sys) a)) info.sys in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
     | _ ->
-      Format.eprintf "Tried to get rigid-cap of %a@." pp_value el;
       failwith "rigid_cap"
 
 
@@ -2514,6 +2527,7 @@ struct
     let pp_sep fmt () = Format.fprintf fmt " " in
     Format.pp_print_list ~pp_sep I.pp fmt (Bwd.to_list rs)
 
+
   module Macro =
   struct
     let equiv ty0 ty1 : value =
@@ -2523,6 +2537,95 @@ struct
         (Tm.up @@ Tm.ix 0)
         (Tm.up @@ Tm.ix 1)
 
+  end
+
+  module Error =
+  struct
+    type t = error
+
+    let pp fmt =
+      function
+      | InternalMortalityError ->
+        Format.fprintf fmt "Too mortal, taste it!"
+      | RigidCoeUnexpectedArgument abs ->
+        Format.fprintf fmt
+          "Unexpected type argument in rigid coercion: %a."
+          pp_abs abs
+      | RigidHComUnexpectedArgument v ->
+        Format.fprintf fmt
+          "Unexpected type argument in rigid homogeneous copmosition: %a."
+          pp_value v
+      | RigidGHComUnexpectedArgument v ->
+        Format.fprintf fmt
+          "Unexpected type argument in rigid generalized homogeneous copmosition: %a."
+          pp_value v
+      | LblCallUnexpectedArgument v ->
+        Format.fprintf fmt
+          "Unexpected argument to labeled type projection: %a"
+          pp_value v
+      | ExpectedAtomInEnvironment v ->
+        Format.fprintf fmt
+          "Expected to find atom in environment, but found value %a."
+          pp_value v
+      | ExpectedValueInEnvironment r ->
+        Format.fprintf fmt
+          "Expected to find value in environment, but found dimension %a."
+          I.pp r
+      | ExpectedDimensionTerm t ->
+        Format.fprintf fmt
+          "Tried to evaluate non-dimension term %a as dimension."
+          Tm.pp0 t
+      | UnexpectedDimensionTerm t ->
+        Format.fprintf fmt
+          "Tried to evaluate dimension term %a as expression."
+          Tm.pp0 t
+      | UnleashPiError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as pi type."
+          pp_value v
+      | UnleashSgError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as sigma type."
+          pp_value v
+      | UnleashVError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as V type."
+          pp_value v
+      | UnleashExtError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as extension type."
+          pp_value v
+      | UnleashCoRError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as co-restriction type."
+          pp_value v
+      | UnleashFComError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as formal homogeneous composition."
+          pp_value v
+      | UnleashLblTyError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as labeled type."
+          pp_value v
+      | ForcedUntrueCorestriction face ->
+        Format.fprintf fmt
+          "Cannot force untrue co-restriction: %a"
+          pp_val_face face
+
+
+
+
+    exception E = E
+
+    let _ =
+      Printexc.register_printer @@ fun exn ->
+      match exn with
+      | E err ->
+        pp Format.str_formatter err;
+        let str = Format.flush_str_formatter () in
+        Some str
+      | _ ->
+        None
   end
 
 end

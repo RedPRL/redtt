@@ -452,7 +452,7 @@ struct
   and infer_frame cx ~ty ~hd =
     function
     | T.Car ->
-      let dom, _ = Eval.unleash_sg ~debug:["infer-frame/car"] ty in
+      let dom, _ = Eval.unleash_sg ty in
       dom
 
     | T.Cdr ->
@@ -460,7 +460,7 @@ struct
       Eval.inst_clo cod @@ Eval.car hd
 
     | T.FunApp t ->
-      let dom, cod = Eval.unleash_pi ~debug:["infer_frame"] ty in
+      let dom, cod = Eval.unleash_pi ty in
       let v = check_eval cx dom t in
       Eval.inst_clo cod v
 

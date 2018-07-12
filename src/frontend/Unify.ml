@@ -507,16 +507,16 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       go sp0 sp1 >>= fun (ty0, ty1) ->
       typechecker >>= fun (module T) ->
       let module HSubst = HSubst (T) in
-      let dom0, _ = T.Cx.Eval.unleash_sg ~debug:["match-spine/car"] ty0 in
-      let dom1, _ = T.Cx.Eval.unleash_sg ~debug:["match-spine/car"] ty1 in
+      let dom0, _ = T.Cx.Eval.unleash_sg ty0 in
+      let dom1, _ = T.Cx.Eval.unleash_sg ty1 in
       ret (dom0, dom1)
 
     | Snoc (sp0, Tm.Cdr), Snoc (sp1, Tm.Cdr) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
       typechecker >>= fun (module T) ->
       let module HSubst = HSubst (T) in
-      let _, cod0 = T.Cx.Eval.unleash_sg ~debug:["match_spine/cdr"] ty0 in
-      let _, cod1 = T.Cx.Eval.unleash_sg ~debug:["match-spine/cdr"] ty1 in
+      let _, cod0 = T.Cx.Eval.unleash_sg ty0 in
+      let _, cod1 = T.Cx.Eval.unleash_sg ty1 in
       let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
       let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
       ret (cod0, cod1)
