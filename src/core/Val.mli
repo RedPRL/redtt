@@ -102,6 +102,7 @@ and env_el = Val of value | Atom of I.t
 and env
 
 val clo_name : clo -> string option
+val nclo_names : nclo -> string option bwd
 
 module type S =
 sig

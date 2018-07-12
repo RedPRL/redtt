@@ -109,6 +109,9 @@ and value = node ref
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
   nm
 
+let nclo_names (NClo {nbnd = Tm.NB (nms, _); _}) =
+  nms
+
 module type S =
 sig
   val make : con -> value
