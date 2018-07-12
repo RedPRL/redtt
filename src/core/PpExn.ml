@@ -15,7 +15,7 @@ let install_printer printer =
     None
 
 let pp fmt exn =
-  let exception Break  in
+  let exception Break in
   let go printer =
     try
       printer fmt exn;
@@ -24,6 +24,7 @@ let pp fmt exn =
     | Unrecognized -> ()
   in
   try
-    Stack.iter go printers
+    Stack.iter go printers;
+    Format.fprintf fmt "%s" @@ Printexc.to_string exn
   with
   | Break -> ()
