@@ -150,6 +150,7 @@ sig
 
   val pp_abs : Format.formatter -> abs -> unit
   val pp_value : Format.formatter -> value -> unit
+  val pp_dims : Format.formatter -> I.t bwd -> unit
   val pp_neu : Format.formatter -> neu -> unit
   val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
   val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
@@ -522,17 +523,17 @@ struct
     | Zero ->
       make con
 
-    | Suc _ ->
-      make con
+    | Suc n ->
+      make @@ Suc (Val.act phi n)
 
     | Int ->
       make con
 
-    | Pos _ ->
-      make con
+    | Pos n ->
+      make @@ Pos (Val.act phi n)
 
-    | NegSuc _ ->
-      make con
+    | NegSuc n ->
+      make @@ NegSuc (Val.act phi n)
 
     | S1 ->
       make con
