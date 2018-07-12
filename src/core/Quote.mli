@@ -26,6 +26,12 @@ sig
   val equiv : env -> ty:Val.value -> Val.value -> Val.value -> unit
   val equiv_ty : env -> Val.value -> Val.value -> unit
   val subtype : env -> Val.value -> Val.value -> unit
+
+  module Error : sig
+    type t
+    val pp : t Pretty.t0
+    exception E of t
+  end
 end
 
 module M (V : Val.S) : S
