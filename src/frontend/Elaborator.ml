@@ -472,6 +472,15 @@ struct
           failwith "Cannot elaborate `term"
       end
 
+    | E.Suc n ->
+      let nat = Tm.make Tm.Nat in
+      elab_chk env nat n >>= fun n ->
+      M.ret (nat, (Tm.Down {ty = nat; tm = Tm.make (Tm.Suc n)}, Emp))
+
+    | E.Zero ->
+      let nat = Tm.make Tm.Nat in
+      M.ret (nat, (Tm.Down {ty = nat; tm = Tm.make Tm.Zero}, Emp))
+
     | E.Cut (e, fs) ->
       elab_inf env e >>= fun (ty, cmd) ->
       normalize_ty ty >>= fun ty ->

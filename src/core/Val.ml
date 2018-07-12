@@ -2527,7 +2527,6 @@ struct
     let pp_sep fmt () = Format.fprintf fmt " " in
     Format.pp_print_list ~pp_sep I.pp fmt (Bwd.to_list rs)
 
-
   module Macro =
   struct
     let equiv ty0 ty1 : value =
