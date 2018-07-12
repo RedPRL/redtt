@@ -142,6 +142,7 @@ sig
 
   val pp_abs : Format.formatter -> abs -> unit
   val pp_value : Format.formatter -> value -> unit
+  val pp_dims : Format.formatter -> I.t bwd -> unit
   val pp_neu : Format.formatter -> neu -> unit
   val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
   val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
