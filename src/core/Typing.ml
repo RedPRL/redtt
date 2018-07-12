@@ -129,7 +129,7 @@ struct
       check cxx ty cod
 
     | V.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
-      let cxx, xs = Cx.ext_dims cx ~nms in
+      let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
       let vcod = check_eval cxx ty cod in
       if Kind.lte univ.kind Kind.Kan then
         check_extension_cofibration xs @@ cofibration_of_sys cxx sys
@@ -181,7 +181,7 @@ struct
       check cx vcod t1
 
     | V.Ext ext_abs, T.ExtLam (T.NB (nms, tm)) ->
-      let cxx, xs = Cx.ext_dims cx ~nms in
+      let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
       let codx, sysx = Eval.ExtAbs.inst ext_abs @@ List.map (fun x -> `Atom x) xs in
       check_boundary cxx codx sysx tm
 
@@ -519,7 +519,7 @@ struct
       let _ =
         let nm_scase, nm_rec_scase =
           match nms_scase with
-          | [nm_scase; nm_rec_scase] -> nm_scase, nm_rec_scase
+          | Snoc (Snoc (Emp, nm_scase), nm_rec_scase) -> nm_scase, nm_rec_scase
           | _ -> failwith "incorrect number of binders when type-checking the suc case"
         in
         let cx_x, x = Cx.ext_ty cx nm_scase nat in

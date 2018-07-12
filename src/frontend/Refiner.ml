@@ -205,8 +205,8 @@ let rec tac_lambda names tac ty =
       | _ ->
         let rec bite nms lnames rnames =
           match nms, rnames with
-          | [], _ -> lnames, tac_wrap_nf (tac_lambda rnames tac)
-          | _ :: nms, name :: rnames ->
+          | Emp, _ -> lnames, tac_wrap_nf (tac_lambda rnames tac)
+          | Snoc (nms, _), name :: rnames ->
             let x = Name.named @@ Some name in
             bite nms (lnames #< x) rnames
           | _ -> failwith "Elab: incorrect number of binders when refining extension type"

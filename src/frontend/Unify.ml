@@ -30,7 +30,7 @@ let rec abstract_tm xs tm =
   | Snoc (xs, (x, `P _)) ->
     abstract_tm xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
   | Snoc (xs, (x, `I)) ->
-    let bnd = Tm.NB ([None], Tm.close_var x 0 tm) in
+    let bnd = Tm.NB (Emp #< None, Tm.close_var x 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
   | Snoc (xs, (_, `R (r, r'))) ->
     abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
@@ -46,7 +46,7 @@ let rec abstract_ty (gm : telescope) cod =
     abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
   | Snoc (gm, (x, `I)) ->
     let cod' = Tm.close_var x ~twin:(fun tw -> tw) 0 cod in
-    abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB ([Name.name x], (cod', [])))
+    abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB (Emp #< (Name.name x), (cod', [])))
   | _ ->
     failwith "abstract_ty"
 
@@ -720,7 +720,7 @@ let unify q =
     active @@ prob
 
   | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
-    let xs = List.map Name.named nms0 in
+    let xs = Bwd.to_list @@ Bwd.map Name.named nms0 in
     let vars = List.map (fun x -> Tm.up @@ Tm.var x) xs in
     let psi = List.map (fun x -> (x, `I)) xs in
 

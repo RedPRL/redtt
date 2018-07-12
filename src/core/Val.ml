@@ -134,6 +134,7 @@ sig
   val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
+  val inst_nclo : nclo -> value list -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : ?debug:string list -> value -> value * clo
@@ -1730,13 +1731,13 @@ struct
 
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
-    let xs = List.map Name.named nms in
+    let xs = Bwd.to_list @@ Bwd.map Name.named nms in
     let rho = Env.push_many (List.map (fun x -> Atom (`Atom x)) xs) rho in
     Abs.bind xs @@ eval rho tm
 
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
-    let xs = List.map Name.named nms in
+    let xs = Bwd.to_list @@ Bwd.map Name.named nms in
     let rho = Env.push_many (List.map (fun x -> Atom (`Atom x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
 
@@ -2433,6 +2434,10 @@ struct
     let Tm.B (_, tm) = clo.bnd in
     Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
 
+  and pp_nclo fmt (NClo clo) =
+    let Tm.NB (_, tm) = clo.nbnd in
+    Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
+
   and pp_neu fmt neu =
     match neu with
     | Lvl (None, i) ->
@@ -2466,8 +2471,12 @@ struct
         pp_value tcase
         pp_value fcase
 
-    | NatRec _ ->
-      Format.fprintf fmt "<nat-rec>"
+    | NatRec {mot; neu; zcase; scase} ->
+      Format.fprintf fmt "@[<1>(nat-rec %a@ %a@ %a@ %a)@]"
+        pp_clo mot
+        pp_neu neu
+        pp_value zcase
+        pp_nclo scase
 
     | IntRec _ ->
       Format.fprintf fmt "<int-rec>"

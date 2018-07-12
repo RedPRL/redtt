@@ -3,7 +3,7 @@ open RedBasis.Bwd
 type twin = [`Only | `TwinL | `TwinR]
 
 type 'a bnd = B of string option * 'a
-type 'a nbnd = NB of string option list * 'a
+type 'a nbnd = NB of string option bwd * 'a
 
 type info = Lexing.position * Lexing.position
 
@@ -128,7 +128,7 @@ val ix : ?twin:twin -> int -> tm cmd
 val var : ?twin:twin -> Name.t -> tm cmd
 
 val lam : string option -> tm -> tm
-val ext_lam : string option list -> tm -> tm
+val ext_lam : string option bwd -> tm -> tm
 val pi : string option -> tm -> tm -> tm
 val sg : string option -> tm -> tm -> tm
 val cons : tm -> tm -> tm

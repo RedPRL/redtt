@@ -126,6 +126,7 @@ sig
   val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
+  val inst_nclo : nclo -> value list -> value
 
   val unleash_pi : ?debug:string list -> value -> value * clo
   val unleash_sg : ?debug:string list -> value -> value * clo
