@@ -86,7 +86,8 @@ struct
 
 
   type error =
-    | ErrEquate of {env : QEnv.t; ty : value; el0 : value; el1 : value}
+    | ErrEquateNf of {env : QEnv.t; ty : value; el0 : value; el1 : value}
+    | ErrEquateNeu of {env : QEnv.t; neu0 : neu; neu1 : neu}
 
   exception E of error
 
@@ -294,7 +295,7 @@ struct
         end
 
       | _ ->
-        let err = ErrEquate {env; ty; el0; el1} in
+        let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
 
   and equate_neu_ env neu0 neu1 stk =
@@ -380,8 +381,8 @@ struct
     | CoRForce neu0, CoRForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
     | _ ->
-      (* Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1; *)
-      failwith "equate_neu"
+      let err = ErrEquateNeu {env; neu0; neu1} in
+      raise @@ E err
 
   and equate_neu env neu0 neu1 =
     equate_neu_ env neu0 neu1 []
@@ -645,11 +646,16 @@ struct
 
   let pp_error fmt =
     function
-    | ErrEquate {env; ty; el0; el1} ->
+    | ErrEquateNf {env; ty; el0; el1} ->
       let tty = quote_ty env ty in
       let tm0 = quote_nf env {ty; el = el0} in
       let tm1 = quote_nf env {ty; el = el1} in
       Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Tm.pp0 tm0 Uuseg_string.pp_utf_8 "≠" Tm.pp0 tm1 Tm.pp0 tty
+
+    | ErrEquateNeu {env; neu0; neu1} ->
+      let tm0 = quote_neu env neu0 in
+      let tm1 = quote_neu env neu1 in
+      Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" (Tm.pp_cmd Pretty.Env.emp) tm0 Uuseg_string.pp_utf_8 "≠" (Tm.pp_cmd Pretty.Env.emp) tm1
 
 
   module Error =
