@@ -325,6 +325,21 @@ struct
       let fcase = equate env vmot_ff if0.fcase if1.fcase in
       let frame = Tm.If {mot = Tm.B (clo_name if0.mot, mot); tcase; fcase} in
       equate_neu_ env if0.neu if1.neu @@ frame :: stk
+    | NatRec rec0, NatRec rec1 ->
+      let var = generic env @@ make Nat in
+      let vmot0 = inst_clo rec0.mot var in
+      let vmot1 = inst_clo rec1.mot var in
+      let env' = Env.succ env in
+      let mot = equate_ty env' vmot0 vmot1 in
+      let vmot_ze = inst_clo rec0.mot @@ make Zero in
+      let zcase = equate env vmot_ze rec0.zcase rec1.zcase in
+      let ih = generic env' @@ vmot0 in
+      let vmot_su = inst_clo rec0.mot @@ make @@ Suc var in
+      let scase0 = inst_nclo rec0.scase [var; ih] in
+      let scase1 = inst_nclo rec1.scase [var; ih] in
+      let scase = equate (Env.succ env') vmot_su scase0 scase1 in
+      let frame = Tm.NatRec {mot = Tm.B (clo_name rec0.mot, mot); zcase; scase = Tm.NB (Emp #< None #< None, scase)} in
+      equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
     | VProj vproj0, VProj vproj1 ->
       let x0 = vproj0.x in
       let x1 = vproj1.x in
