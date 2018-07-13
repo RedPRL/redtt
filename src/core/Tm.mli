@@ -86,6 +86,14 @@ and 'a cmd = 'a head * 'a spine
 
 type tm
 
+
+module Error :
+sig
+  type t
+  val pp : t Pretty.t0
+  exception E of t
+end
+
 val map_head : (tm -> tm) -> tm head -> tm head
 val map_frame : (tm -> tm) -> tm frame -> tm frame
 val map_spine : (tm -> tm) -> tm spine -> tm spine

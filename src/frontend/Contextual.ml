@@ -278,14 +278,13 @@ let check ~ty tm =
   let vty = T.Cx.eval lcx ty in
   try
     T.check lcx vty tm;
-    ret true
+    ret `Ok
   with
-  | _exn ->
-    (* Format.eprintf "type error: %s@." @@ Printexc.to_string exn; *)
-    ret false
+  | exn ->
+    ret @@ `Exn exn
 
 let check_eq ~ty tm0 tm1 =
-  if tm0 = tm1 then ret true else
+  if tm0 = tm1 then ret `Ok else
     typechecker >>= fun (module T) ->
     let lcx = T.Cx.emp in
     let vty = T.Cx.eval lcx ty in
@@ -293,10 +292,10 @@ let check_eq ~ty tm0 tm1 =
     let el1 = T.Cx.eval lcx tm1 in
     try
       T.Cx.check_eq lcx ~ty:vty el0 el1;
-      ret true
+      ret `Ok
     with
-    | _ ->
-      ret false
+    | exn ->
+      ret @@ `Exn exn
 
 let check_subtype ty0 ty1 =
   typechecker >>= fun (module T) ->
@@ -305,10 +304,10 @@ let check_subtype ty0 ty1 =
   let vty1 = T.Cx.eval lcx ty1 in
   try
     T.Cx.check_subtype lcx vty0 vty1;
-    ret true
+    ret `Ok
   with
-  | _ ->
-    ret false
+  | exn ->
+    ret @@ `Exn exn
 
 let compare_dim tr0 tr1 =
   typechecker >>= fun (module T) ->

@@ -14,11 +14,10 @@ let Path
 
 let Square
   (A : type)
-  (a0 : A) (a1 : A) (b0 : A) (b1 : A)
-  (M : Path A a0 a1)
-  (N : Path A b0 b1)
-  (O : Path A a0 b0)
-  (P : Path A a1 b1)
+  (M : Line A)
+  (N : Line A)
+  (O : Path A (M 0) (N 0))
+  (P : Path A (M 1) (N 1))
   : type
   =
   [i j] A with
@@ -27,7 +26,6 @@ let Square
   | i=0 ⇒ O j
   | i=1 ⇒ P j
   end
-
 
 let funext
   (A : type)
