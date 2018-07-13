@@ -64,6 +64,12 @@ sig
   val equiv : env -> ty:Val.value -> Val.value -> Val.value -> unit
   val equiv_ty : env -> Val.value -> Val.value -> unit
   val subtype : env -> Val.value -> Val.value -> unit
+
+  module Error : sig
+    type t
+    val pp : t Pretty.t0
+    exception E of t
+  end
 end
 
 module M (V : Val.S) : S =
@@ -78,6 +84,12 @@ struct
   let generic env ty =
     generic_constrained env ty []
 
+
+  type error =
+    | ErrEquateNf of {env : QEnv.t; ty : value; el0 : value; el1 : value}
+    | ErrEquateNeu of {env : QEnv.t; neu0 : neu; neu1 : neu}
+
+  exception E of error
 
   let rec equate env ty el0 el1 =
     match unleash ty with
@@ -283,8 +295,8 @@ struct
         end
 
       | _ ->
-        (* Format.eprintf "Failed to equate@; @[<1>%a = %a ∈ %a@] @." pp_value el0 pp_value el1 pp_value ty; *)
-        failwith "equate"
+        let err = ErrEquateNf {env; ty; el0; el1} in
+        raise @@ E err
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
@@ -369,8 +381,8 @@ struct
     | CoRForce neu0, CoRForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
     | _ ->
-      (* Format.printf "Tried to equate %a with %a@." pp_neu neu0 pp_neu neu1; *)
-      failwith "equate_neu"
+      let err = ErrEquateNeu {env; neu0; neu1} in
+      raise @@ E err
 
   and equate_neu env neu0 neu1 =
     equate_neu_ env neu0 neu1 []
@@ -629,5 +641,36 @@ struct
         Format.eprintf "Unexpected error in subtyping: %s@." (Printexc.to_string exn);
         raise exn
     end
+
+
+
+  let pp_error fmt =
+    function
+    | ErrEquateNf {env; ty; el0; el1} ->
+      let tty = quote_ty env ty in
+      let tm0 = quote_nf env {ty; el = el0} in
+      let tm1 = quote_nf env {ty; el = el1} in
+      Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Tm.pp0 tm0 Uuseg_string.pp_utf_8 "≠" Tm.pp0 tm1 Tm.pp0 tty
+
+    | ErrEquateNeu {env; neu0; neu1} ->
+      let tm0 = quote_neu env neu0 in
+      let tm1 = quote_neu env neu1 in
+      Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" (Tm.pp_cmd Pretty.Env.emp) tm0 Uuseg_string.pp_utf_8 "≠" (Tm.pp_cmd Pretty.Env.emp) tm1
+
+
+  module Error =
+  struct
+    type t = error
+    let pp = pp_error
+    exception E = E
+  end
+
+  let _ =
+    PpExn.install_printer @@ fun fmt ->
+    function
+    | E err ->
+      Format.fprintf fmt "@[<1>%a@]" pp_error err
+    | _ ->
+      raise PpExn.Unrecognized
 
 end

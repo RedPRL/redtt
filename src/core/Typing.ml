@@ -13,6 +13,13 @@ open RedBasis.Bwd
 module type S =
 sig
   module Cx : LocalCx.S
+  module Error :
+  sig
+    type t
+    exception E of t
+    val pp : t Pretty.t0
+  end
+
   val check : cx -> Val.value -> Tm.tm -> unit
   val infer : cx -> Tm.tm Tm.cmd -> value
   val infer_frame : cx -> ty:value -> hd:value -> Tm.tm Tm.frame -> value
@@ -26,6 +33,25 @@ struct
   module Eval = Val.M (GlobalEnv.M (Sig))
   module Cx = LocalCx.M (Eval)
 
+  type error =
+    | ExpectedDimension of cx * Tm.tm
+
+  exception E of error
+
+  module Error =
+  struct
+    type t = error
+    exception E = E
+
+    let pp fmt =
+      function
+      | ExpectedDimension (cx, tm) ->
+        Format.fprintf fmt
+          "Expected dimension, but got %a."
+          (Tm.pp (Cx.ppenv cx)) tm
+
+  end
+
   let rec check_dim cx tr =
     match T.unleash tr with
     | T.Dim0 ->
@@ -35,7 +61,7 @@ struct
     | T.Up cmd ->
       check_dim_cmd cx cmd
     | _ ->
-      failwith "check_dim: expected dimension"
+      raise @@ E (ExpectedDimension (cx, tr))
 
   and check_dim_cmd cx =
     function
@@ -452,7 +478,7 @@ struct
   and infer_frame cx ~ty ~hd =
     function
     | T.Car ->
-      let dom, _ = Eval.unleash_sg ~debug:["infer-frame/car"] ty in
+      let dom, _ = Eval.unleash_sg ty in
       dom
 
     | T.Cdr ->
@@ -460,7 +486,7 @@ struct
       Eval.inst_clo cod @@ Eval.car hd
 
     | T.FunApp t ->
-      let dom, cod = Eval.unleash_pi ~debug:["infer_frame"] ty in
+      let dom, cod = Eval.unleash_pi ty in
       let v = check_eval cx dom t in
       Eval.inst_clo cod v
 

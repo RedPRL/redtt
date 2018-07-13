@@ -131,8 +131,8 @@ sig
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> value list -> value
 
-  val unleash_pi : ?debug:string list -> value -> value * clo
-  val unleash_sg : ?debug:string list -> value -> value * clo
+  val unleash_pi : value -> value * clo
+  val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_fcom : value -> star * value * comp_sys
   val unleash_ext : value -> dim bwd -> value * val_sys
@@ -171,6 +171,13 @@ sig
 
   module Macro : sig
     val equiv : value -> value -> value
+  end
+
+  module Error :
+  sig
+    type t
+    val pp : t Pretty.t0
+    exception E of t
   end
 
   val base_restriction : Restriction.t
