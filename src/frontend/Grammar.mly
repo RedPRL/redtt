@@ -137,7 +137,7 @@ eterm:
     { E.NegSuc n }
 
   | INT_REC; e0 = eterm; WITH; option(PIPE); POS; np = ATOM; RRIGHT_ARROW; ep = eterm; PIPE; NEGSUC; nn = ATOM; RRIGHT_ARROW; en = eterm; END
-    { E.IntRec (e0, (np, ep), (nn, en)) }
+    { E.IntRec (None, e0, (np, ep), (nn, en)) }
 
   | LOOP; r = eterm
     { E.Loop r }

@@ -28,7 +28,7 @@ and eterm =
   | NatRec of eterm option * eterm * eterm * (string * string option * eterm)
 
   | Int | Pos of eterm | NegSuc of eterm
-  | IntRec of eterm * (string * eterm) * (string * eterm)
+  | IntRec of eterm option * eterm * (string * eterm) * (string * eterm)
 
   | S1Rec of eterm * eterm * (string * eterm)
   | S1 | Base | Loop of eterm
@@ -62,7 +62,7 @@ type esig =
 
 
 (* Please fill this in. I'm just using it for debugging. *)
-let pp fmt =
+let rec pp fmt =
   function
   | Hole _ ->
     Format.fprintf fmt "<hole>"
@@ -72,5 +72,15 @@ let pp fmt =
     Format.fprintf fmt "<lam>"
   | Var (s, _) ->
     Format.fprintf fmt "%s" s
+  | Zero ->
+    Format.fprintf fmt "zero"
+  | Suc n ->
+    Format.fprintf fmt "(suc %a)" pp n
+  | Int ->
+    Format.fprintf fmt "int"
+  | Pos n ->
+    Format.fprintf fmt "(pos %a)" pp n
+  | IntRec _ ->
+    Format.fprintf fmt "<int-rec>"
   | _ ->
     Format.fprintf fmt "<eterm>"

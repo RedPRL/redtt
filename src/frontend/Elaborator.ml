@@ -204,6 +204,13 @@ struct
       let tac_scase ty = elab_chk env ty escase in
       tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(name_scase, name_rec_scase, tac_scase) ty
 
+    | _, E.IntRec (omot, escrut, (name_pcase, epcase), (name_ncase, encase)) ->
+      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
+      let tac_scrut ty = elab_chk env ty escrut in
+      let tac_pcase ty = elab_chk env ty epcase in
+      let tac_ncase ty = elab_chk env ty encase in
+      tac_int_rec ~tac_mot ~tac_scrut ~tac_pcase:(name_pcase, tac_pcase) ~tac_ncase:(name_ncase, tac_ncase) ty
+
     | Tm.Univ _, E.Bool ->
       M.ret @@ Tm.make Tm.Bool
 

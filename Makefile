@@ -19,7 +19,8 @@ help:
 	@${DUNE} exec -- redtt help
 
 examples:
-	${DUNE} exec -- redtt load-file nat.red
+	${DUNE} exec -- redtt load-file natural.red
+	${DUNE} exec -- redtt load-file integer.red
 	${DUNE} exec -- redtt load-file test.red
 	${DUNE} exec -- redtt load-file invariance.red
 	${DUNE} exec -- redtt load-file univalence.red
