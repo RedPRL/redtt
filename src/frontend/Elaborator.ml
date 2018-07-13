@@ -334,14 +334,14 @@ struct
       let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kan in
       begin
         M.lift @@ C.check ~ty:kan_univ ty >>= function
-        | true ->
+        | `Ok ->
           elab_chk env ty info.cap >>= fun cap ->
           elab_hcom_sys env r ty cap info.sys >>= fun sys ->
           let hcom = Tm.HCom {r; r'; ty; cap; sys} in
           M.ret @@ Tm.up (hcom, Emp)
 
-        | false ->
-          failwith "Cannot compose in a type that isn't Kan"
+        | `Exn exn ->
+          raise exn
       end
 
     | _, e ->
@@ -442,14 +442,15 @@ struct
 
   and elab_up env ty inf =
     elab_inf env inf >>= fun (ty', cmd) ->
-    M.lift (C.check_subtype ty' ty) >>= fun b ->
-    if b then M.ret @@ Tm.up cmd else
-      begin
-        M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-        M.unify >>
-        M.lift (C.check_subtype ty' ty) >>= fun b ->
-        if b then M.ret (Tm.up cmd) else failwith "type error"
-      end
+    M.lift (C.check_subtype ty' ty) >>= function
+    | `Ok -> M.ret @@ Tm.up cmd
+    | _ ->
+      M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+      M.unify >>
+      M.lift (C.check_subtype ty' ty) >>= function
+      | `Ok -> M.ret @@ Tm.up cmd
+      | `Exn exn ->
+        raise exn
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
     match e with
@@ -559,13 +560,18 @@ struct
             begin
               match mode with
               | Chk ty ->
-                M.lift (C.check_subtype hty ty) >>= fun b ->
-                if b then M.ret (Tm.up (hd, sp)) else
-                  let tm = Tm.up (hd, sp) in
-                  M.lift @@ C.active @@ Dev.Subtype {ty0 = hty; ty1 = ty} >>
-                  M.unify >>
-                  M.lift (C.check_subtype hty ty) >>= fun b ->
-                  if b then M.ret tm else failwith "elab_cut: type error"
+                begin
+                  M.lift (C.check_subtype hty ty) >>= function
+                  | `Ok -> M.ret @@ Tm.up (hd, sp)
+                  | _ ->
+                    let tm = Tm.up (hd, sp) in
+                    M.lift @@ C.active @@ Dev.Subtype {ty0 = hty; ty1 = ty} >>
+                    M.unify >>
+                    M.lift (C.check_subtype hty ty) >>= function
+                    | `Ok -> M.ret tm
+                    | `Exn exn ->
+                      raise exn
+                end
 
               | Inf ->
                 M.ret (hty, (hd, sp))

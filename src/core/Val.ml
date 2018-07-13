@@ -4,7 +4,7 @@ open BwdNotation
 
 type atom = Name.t
 type dim = I.t
-type star = IStar.t
+type dir = Dir.t
 
 (* Notes: I have defined the semantic domain and evaluator in a fairly naive way, in order to avoid
    some confusing questions. It may not be that efficient! But it should be easier at this point to
@@ -18,11 +18,11 @@ type con =
   | CoR : val_face -> con
   | Ext : ext_abs -> con
 
-  | Coe : {dir : star; abs : abs; el : value} -> con
-  | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
-  | GHCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
-  | FCom : {dir : star; cap : value; sys : comp_sys} -> con
-  | Box : {dir : star; cap : value; sys : box_sys} -> con
+  | Coe : {dir : dir; abs : abs; el : value} -> con
+  | HCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
+  | GHCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
+  | FCom : {dir : dir; cap : value; sys : comp_sys} -> con
+  | Box : {dir : dir; cap : value; sys : box_sys} -> con
 
   | Univ : {kind : Kind.t; lvl : Lvl.t} -> con
   | V : {x : atom; ty0 : value; ty1 : value; equiv : value} -> con
@@ -74,7 +74,7 @@ and neu =
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : atom; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
-  | Cap : {dir : star; ty : value; sys : comp_sys; neu : neu} -> neu
+  | Cap : {dir : dir; ty : value; sys : comp_sys; neu : neu} -> neu
 
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
@@ -140,10 +140,10 @@ sig
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> value list -> value
 
-  val unleash_pi : ?debug:string list -> value -> value * clo
-  val unleash_sg : ?debug:string list -> value -> value * clo
+  val unleash_pi : value -> value * clo
+  val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
-  val unleash_fcom : value -> star * value * comp_sys
+  val unleash_fcom : value -> dir * value * comp_sys
   val unleash_ext : value -> dim bwd -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
@@ -180,6 +180,13 @@ sig
 
   module Macro : sig
     val equiv : value -> value -> value
+  end
+
+  module Error :
+  sig
+    type t
+    val pp : t Pretty.t0
+    exception E of t
   end
 
   val base_restriction : Restriction.t
@@ -385,6 +392,29 @@ struct
   exception ProjAbs of abs
   exception ProjVal of value
 
+
+  type error =
+    | ExpectedValueInEnvironment of I.t
+    | ExpectedAtomInEnvironment of value
+    | ExpectedDimensionTerm of Tm.tm
+    | InternalMortalityError
+    | RigidCoeUnexpectedArgument of abs
+    | RigidHComUnexpectedArgument of value
+    | RigidGHComUnexpectedArgument of value
+    | LblCallUnexpectedArgument of value
+    | UnexpectedDimensionTerm of Tm.tm
+    | UnleashPiError of value
+    | UnleashSgError of value
+    | UnleashExtError of value
+    | UnleashVError of value
+    | UnleashCoRError of value
+    | UnleashLblTyError of value
+    | UnleashFComError of value
+    | ForcedUntrueCorestriction of val_face
+
+
+  exception E of error
+
   let make_closure rho bnd =
     Clo {bnd; rho}
 
@@ -401,18 +431,24 @@ struct
           begin
             match List.nth rho.cells i with
             | Atom x -> x
-            | _ ->
-              failwith "eval_dim: expected atom in environment"
+            | Val v ->
+              let err = ExpectedAtomInEnvironment v in
+              raise @@ E err
           end
 
         | Tm.Var info ->
           I.act rho.global @@ Sig.global_dim info.name
+
         | Tm.Meta meta ->
           I.act rho.global @@ Sig.global_dim meta.name
 
-        | _ -> failwith "eval_dim"
+        | _ ->
+          let err = ExpectedDimensionTerm tm in
+          raise @@ E err
       end
-    | _ -> failwith "eval_dim"
+    | _ ->
+      let err = ExpectedDimensionTerm tm in
+      raise @@ E err
 
 
 
@@ -462,33 +498,33 @@ struct
 
     | Coe info ->
       make_coe
-        (IStar.act phi info.dir)
+        (Dir.act phi info.dir)
         (Abs.act phi info.abs)
         (Val.act phi info.el)
 
     | HCom info ->
       make_hcom
-        (IStar.act phi info.dir)
+        (Dir.act phi info.dir)
         (Val.act phi info.ty)
         (Val.act phi info.cap)
         (CompSys.act phi info.sys)
 
     | GHCom info ->
       make_ghcom
-        (IStar.act phi info.dir)
+        (Dir.act phi info.dir)
         (Val.act phi info.ty)
         (Val.act phi info.cap)
         (CompSys.act phi info.sys)
 
     | FCom info ->
       make_fcom
-        (IStar.act phi info.dir)
+        (Dir.act phi info.dir)
         (Val.act phi info.cap)
         (CompSys.act phi info.sys)
 
     | Box info ->
       make_box
-        (IStar.act phi info.dir)
+        (Dir.act phi info.dir)
         (Val.act phi info.cap)
         (BoxSys.act phi info.sys)
 
@@ -594,7 +630,7 @@ struct
       end
 
     | Cap info ->
-      let mdir = IStar.act phi info.dir in
+      let mdir = Dir.act phi info.dir in
       let msys = CompSys.act phi info.sys in
       begin
         match act_neu phi info.neu with
@@ -815,7 +851,7 @@ struct
         | `Ok sys ->
           rigid_hcom dir ty cap sys
         | `Proj abs ->
-          let _, r' = IStar.unleash dir in
+          let _, r' = Dir.unleash dir in
           Abs.inst1 abs r'
       end
     | `Same _ ->
@@ -829,7 +865,7 @@ struct
         | `Ok sys ->
           rigid_ghcom dir ty cap sys
         | `Proj abs ->
-          let _, r' = IStar.unleash dir in
+          let _, r' = Dir.unleash dir in
           Abs.inst1 abs r'
       end
     | `Same _ ->
@@ -838,7 +874,7 @@ struct
   and make_com mdir abs cap msys : value =
     match mdir with
     | `Ok dir ->
-      let _, r' = IStar.unleash dir in
+      let _, r' = Dir.unleash dir in
       begin
         match msys with
         | `Ok sys ->
@@ -852,7 +888,7 @@ struct
   and make_gcom mdir abs cap msys : value =
     match mdir with
     | `Ok dir ->
-      let _, r' = IStar.unleash dir in
+      let _, r' = Dir.unleash dir in
       begin
         match msys with
         | `Ok sys ->
@@ -871,7 +907,7 @@ struct
         | `Ok sys ->
           rigid_fcom dir cap sys
         | `Proj abs ->
-          let _, r' = IStar.unleash dir in
+          let _, r' = Dir.unleash dir in
           Abs.inst1 abs r'
       end
     | `Same _ ->
@@ -912,8 +948,8 @@ struct
        * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
 
       (* Some helper functions to reduce typos. *)
-      let r, r' = IStar.unleash dir in
-      let s, s' = IStar.unleash fcom.dir in
+      let r, r' = Dir.unleash dir in
+      let s, s' = Dir.unleash fcom.dir in
       let cap_abs = Abs.bind1 x fcom.cap in
       let subst_r = I.subst r x in
       let subst_r' = I.subst r' x in
@@ -927,15 +963,15 @@ struct
           Face.map @@ fun sj s'j absj ->
           let phi = I.cmp (I.equate sj s'j) phi in
           Abs.make1 @@ fun y ->
-          make_coe (IStar.make (`Atom y) (I.act (I.cmp phi subst_r) s)) absj @@
-          make_coe (IStar.make (I.act (I.cmp phi subst_r) s') (`Atom y)) absj @@
+          make_coe (Dir.make (`Atom y) (I.act (I.cmp phi subst_r) s)) absj @@
+          make_coe (Dir.make (I.act (I.cmp phi subst_r) s') (`Atom y)) absj @@
           (Val.act phi el)
         in
         make_hcom
-          (IStar.make (I.act (I.cmp phi subst_r) s') z_dest)
+          (Dir.make (I.act (I.cmp phi subst_r) s') z_dest)
           (Val.act (I.cmp phi subst_r) fcom.cap)
           (make_cap
-             (IStar.act (I.cmp phi subst_r) fcom.dir)
+             (Dir.act (I.cmp phi subst_r) fcom.dir)
              (Val.act (I.cmp phi subst_r) fcom.cap)
              (CompSys.act (I.cmp phi subst_r) fcom.sys)
              (Val.act phi el))
@@ -951,21 +987,21 @@ struct
        * safer to do substitution every time. *)
       let recovery_apart phi abs x_dest z_dest =
         let subst_x = I.subst x_dest x in
-        make_coe (IStar.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) abs @@
-        make_coe (IStar.make (I.act phi r) x_dest) (Abs.bind1 x @@ Abs.inst1 abs (I.act phi s')) @@
+        make_coe (Dir.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) abs @@
+        make_coe (Dir.make (I.act phi r) x_dest) (Abs.bind1 x @@ Abs.inst1 abs (I.act phi s')) @@
         Val.act phi el
       in
       (* This is P in [F, SVO], the naive coercion of the cap part of the box within `fcom.cap`.
        * The problem is that we do not have the boundaries of the box, and even if we have,
        * this naive cap will not be the image of the boundaries. *)
       let naively_coerced_cap phi =
-        make_gcom (IStar.act phi dir) (Abs.act phi cap_abs) (origin phi (I.act (I.cmp phi subst_r) s)) @@
+        make_gcom (Dir.act phi dir) (Abs.act phi cap_abs) (origin phi (I.act (I.cmp phi subst_r) s)) @@
         force_abs_sys @@
         let diag =
           if I.absent x s && I.absent x s'
           then [
             AbsFace.make phi (I.act phi s) (I.act phi s') @@ fun phi ->
-            Abs.bind1 x @@ make_coe (IStar.make (I.act phi r) (`Atom x)) (Abs.act phi cap_abs) (Val.act phi el)
+            Abs.bind1 x @@ make_coe (Dir.make (I.act phi r) (`Atom x)) (Abs.act phi cap_abs) (Val.act phi el)
           ]
           else []
         in
@@ -983,7 +1019,7 @@ struct
        * For equations apart from `x`, the recovery_general will coincide with recovery_apart.
        * This optimization is automatic thanks to the semantic simplification in redtt. *)
       let recovery_general phi abs z_dest =
-        make_gcom (IStar.make (I.act (I.cmp phi subst_r') s) z_dest) abs (naively_coerced_cap phi) @@
+        make_gcom (Dir.make (I.act (I.cmp phi subst_r') s) z_dest) abs (naively_coerced_cap phi) @@
         force_abs_sys @@
         let diag = AbsFace.make phi (I.act phi r) (I.act phi r') @@ fun phi ->
           Abs.make1 @@ fun y -> recovery_apart phi (Abs.act phi abs) (I.act phi r) (`Atom y) in
@@ -998,19 +1034,19 @@ struct
        *
        * Using Q, the preimages, this is to calculate the final cap based on the naive cap. *)
       let coerced_cap =
-        make_hcom (IStar.act subst_r' fcom.dir) (Val.act subst_r' fcom.cap) (naively_coerced_cap I.idn) @@
+        make_hcom (Dir.act subst_r' fcom.dir) (Val.act subst_r' fcom.cap) (naively_coerced_cap I.idn) @@
         force_abs_sys @@
-        let diag = AbsFace.make I.idn r r' @@ fun phi ->
+        let diag = AbsFace.make_from_dir I.idn dir @@ fun phi ->
           Abs.make1 @@ fun w -> origin phi (`Atom w) in
         let face = Face.map @@ fun sj s'j absj ->
           let phi = I.equate sj s'j in
           Abs.make1 @@ fun w ->
-          make_coe (IStar.make (`Atom w) (I.act phi (I.act subst_r' s))) absj @@
+          make_coe (Dir.make (`Atom w) (I.act phi (I.act subst_r' s))) absj @@
           recovery_general phi absj (`Atom w)
         in
         diag :: List.map (fun b -> face (AbsFace.act subst_r' b)) fcom.sys
       in
-      make_box (IStar.act subst_r' fcom.dir) coerced_cap @@
+      make_box (Dir.act subst_r' fcom.dir) coerced_cap @@
       force_val_sys @@
       let face = Face.map @@ fun sj s'j absj ->
         let phi = I.equate sj s'j in
@@ -1025,7 +1061,7 @@ struct
        * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
 
       (* Some helper functions to reduce typos. *)
-      let r, r' = IStar.unleash dir in
+      let r, r' = Dir.unleash dir in
       let abs0 = Abs.bind1 x info.ty0 in
       let abs1 = Abs.bind1 x info.ty1 in
       let subst_0 = Val.act (I.subst `Dim0 x) in
@@ -1041,7 +1077,7 @@ struct
            * `vproj`, `make_coe` and `make_hcom`,
            * redtt can afford less efficient generating code. *)
           let base phi src dest =
-            make_coe (IStar.make src dest) (Abs.act phi abs1) @@
+            make_coe (Dir.make src dest) (Abs.act phi abs1) @@
             let subst_src = Val.act (I.subst src x) in
             vproj phi
               (I.act phi src)
@@ -1059,7 +1095,7 @@ struct
            * `ext_apply (cdr fib) [`Dim1]` directly. *)
           let contr0 phi fib = apply (cdr @@ apply (cdr (Val.act phi equiv0)) (ext_apply (cdr fib) @@ Emp #< `Dim1)) fib in
           (* The diagonal face for r=r'. *)
-          let face_diag = AbsFace.make I.idn r r' @@ fun phi ->
+          let face_diag = AbsFace.make_from_dir I.idn dir @@ fun phi ->
             Abs.make1 @@ fun _ -> base phi (I.act phi r) (I.act phi r')
           in
           (* The face for r=0. *)
@@ -1080,7 +1116,7 @@ struct
                 Abs.make1 @@ fun _ -> Val.act phi el in
               [face0; face1]
             in
-            make_hcom (IStar.make `Dim1 (`Atom y)) ty cap msys
+            make_hcom (Dir.make `Dim1 (`Atom y)) ty cap msys
           in
           (* This is the type of the fiber, and is used for
            * simplifying the generating code for the front face
@@ -1112,7 +1148,7 @@ struct
                   (* coercion to the diagonal *)
                   let path_in_fiber0_ty =
                     contr0 phi @@
-                    make_coe (IStar.make `Dim0 (I.act phi r)) (Abs.bind1 r_atom (fiber0_ty phi (base phi (I.act phi r) `Dim0))) @@
+                    make_coe (Dir.make `Dim0 (I.act phi r)) (Abs.bind1 r_atom (fiber0_ty phi (base phi (I.act phi r) `Dim0))) @@
                     (* the fiber *)
                     make_cons (Val.act (I.cmp phi (I.subst `Dim0 r_atom)) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
                   in
@@ -1121,7 +1157,7 @@ struct
             (* The implementation used in [Y]. *)
             | `UNIFORM_HCOM ->
               (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
-              make_hcom (IStar.make `Dim1 `Dim0) (fiber0_ty phi (base phi (I.act phi r) `Dim0)) (fiber0 phi (base phi (I.act phi r) `Dim0)) @@
+              make_hcom (Dir.make `Dim1 `Dim0) (fiber0_ty phi (base phi (I.act phi r) `Dim0)) (fiber0 phi (base phi (I.act phi r) `Dim0)) @@
               force_abs_sys @@
               let face0 = AbsFace.make phi (I.act phi r) `Dim0 @@ fun phi ->
                 Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) @@ Emp #< (`Atom w)
@@ -1132,7 +1168,7 @@ struct
               [face0; face1]
             (* Something magical under development. *)
             | `UNICORN ->
-              failwith "too immortal; not suitable for mortal beings"
+              raise @@ E InternalMortalityError
           in
           let el0 phi0 =
             try
@@ -1146,7 +1182,7 @@ struct
             AbsFace.make I.idn r' `Dim0 @@ fun phi ->
             Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) @@ Emp #< (`Atom w)
           in
-          let el1 = make_hcom (IStar.make `Dim1 `Dim0) info.ty1 (base I.idn r r') @@
+          let el1 = make_hcom (Dir.make `Dim1 `Dim0) info.ty1 (base I.idn r r') @@
             force_abs_sys [face0; face1; face_diag; face_front]
           in
           make_vin I.idn r' el0 el1
@@ -1154,7 +1190,7 @@ struct
         | false ->
           let el0 =
             let phi0 = I.equate (`Atom info.x) `Dim0 in
-            make_coe (IStar.act phi0 dir) (Abs.act phi0 abs0) (Val.act phi0 el)
+            make_coe (Dir.act phi0 dir) (Abs.act phi0 abs0) (Val.act phi0 el)
           in
           let el1 =
             let cap =
@@ -1169,17 +1205,17 @@ struct
               let face0 =
                 AbsFace.gen_const I.idn info.x `Dim0 @@ fun phi ->
                 Abs.bind1 x @@ apply (car info.equiv) @@
-                make_coe (IStar.make (I.act phi r) (`Atom x)) (Abs.act phi abs0) (Val.act phi el)
+                make_coe (Dir.make (I.act phi r) (`Atom x)) (Abs.act phi abs0) (Val.act phi el)
               in
               let face1 =
                 AbsFace.gen_const I.idn info.x `Dim1 @@ fun phi ->
                 Abs.bind1 x @@
-                make_coe (IStar.make (I.act phi r) (`Atom x)) (Abs.act phi abs1) (Val.act phi el)
+                make_coe (Dir.make (I.act phi r) (`Atom x)) (Abs.act phi abs1) (Val.act phi el)
               in
               match mode with
               | `OLD_SCHOOL -> Option.filter_map force_abs_face [face0; face1]
               | `INCONSISTENCY_REMOVAL -> Option.filter_map force_abs_face [face0]
-              | `UNICORN -> failwith "I can fly!"
+              | `UNICORN -> raise @@ E InternalMortalityError
             in
             rigid_com dir abs1 cap sys
           in
@@ -1187,7 +1223,8 @@ struct
       end
 
     | _ ->
-      failwith "TODO: rigid_coe"
+      let err = RigidCoeUnexpectedArgument abs in
+      raise @@ E err
 
   and rigid_hcom dir ty cap sys : value =
     match unleash ty with
@@ -1212,18 +1249,18 @@ struct
       (* The algorithm is based on the Anders' alternative hcom in [F]. *)
 
       (* Helper functions. *)
-      let r, r' = IStar.unleash dir in
-      let _, s' = IStar.unleash fcom.dir in
+      let r, r' = Dir.unleash dir in
+      let _, s' = Dir.unleash fcom.dir in
 
       (* This is C_M in [F], with an extra parameter `phi` to get along with NbE. *)
       let cap_aux phi el = make_cap
-          (IStar.act phi fcom.dir) (Val.act phi fcom.cap) (CompSys.act phi fcom.sys) el
+          (Dir.act phi fcom.dir) (Val.act phi fcom.cap) (CompSys.act phi fcom.sys) el
       in
 
       (* This serves as `O` and the diagonal face in [F]
        * for the coherence conditions in `fcom.sys` and `s=s'`. *)
       let hcom_template phi y_dest ty = make_hcom
-          (IStar.make (I.act phi r) y_dest) ty
+          (Dir.make (I.act phi r) y_dest) ty
           (Val.act phi fcom.cap) (CompSys.act phi fcom.sys)
       in
 
@@ -1245,7 +1282,7 @@ struct
           in
           List.map face fcom.sys
         in
-        let diag = AbsFace.make_from_star I.idn fcom.dir @@ fun phi ->
+        let diag = AbsFace.make_from_dir I.idn fcom.dir @@ fun phi ->
           Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Val.act phi fcom.cap)
         in
         Option.filter_map force_abs_face [diag] @ (ri_faces @ si_faces)
@@ -1258,13 +1295,13 @@ struct
         (List.map boundary fcom.sys)
 
     | V {x; ty0; ty1; equiv} ->
-      let r, _ = IStar.unleash dir in
+      let r, _ = Dir.unleash dir in
       let el0 =
         let phi0 = I.equate (`Atom x) `Dim0 in
-        make_hcom (IStar.act phi0 dir) ty0 (Val.act phi0 cap) (CompSys.act phi0 sys)
+        make_hcom (Dir.act phi0 dir) ty0 (Val.act phi0 cap) (CompSys.act phi0 sys)
       in
       let el1 =
-        let hcom phi x_dest ty = make_hcom (IStar.make (I.act phi r) x_dest) ty (Val.act phi cap) (CompSys.act phi sys) in
+        let hcom phi x_dest ty = make_hcom (Dir.make (I.act phi r) x_dest) ty (Val.act phi cap) (CompSys.act phi sys) in
         let face0 =
           AbsFace.gen_const I.idn x `Dim0 @@ fun phi ->
           Abs.make1 @@ fun y ->
@@ -1292,7 +1329,8 @@ struct
       rigid_vin x el0 el1
 
     | _ ->
-      failwith "TODO: rigid_hcom"
+      let err = RigidHComUnexpectedArgument ty in
+      raise @@ E err
 
   and rigid_ghcom dir ty cap sys : value =
     match unleash ty with
@@ -1309,8 +1347,8 @@ struct
         match sys with
         | [] -> cap
         | Face.Indet (eqi, absi) :: rest ->
-          let ri, r'i = IStar.unleash eqi in
-          let r, r' = IStar.unleash dir in
+          let ri, r'i = Eq.unleash eqi in
+          let r, r' = Dir.unleash dir in
           let face (dim0, dim1) =
             AbsFace.make I.idn ri dim0 @@ fun phi ->
             (* XXX this would stop the expansion early, but is
@@ -1327,7 +1365,7 @@ struct
                 (* TODO this can be optimized further by expanding
                  * `make_ghcom` because `ty` is not changed and
                  * in degenerate cases there is redundant renaming. *)
-                make_ghcom (IStar.make (I.act phi r) (`Atom y)) (Val.act phi ty) (Val.act phi cap) @@
+                make_ghcom (Dir.make (I.act phi r) (`Atom y)) (Val.act phi ty) (Val.act phi cap) @@
                 (* XXX this would stop the expansion early, but is
                  * unfortunately duplicate under `AbsFace.make` *)
                 CompSys.act phi rest0
@@ -1336,7 +1374,7 @@ struct
               | `Proj abs -> abs
               | `Ok faces ->
                 Abs.make1 @@ fun y ->
-                make_hcom (IStar.make (I.act phi r) (`Atom y)) (Val.act phi ty) (Val.act phi cap) (`Ok (faces @ rest))
+                make_hcom (Dir.make (I.act phi r) (`Atom y)) (Val.act phi ty) (Val.act phi cap) (`Ok (faces @ rest))
           in
           let face0 = face (`Dim0, `Dim1) in
           let face1 = face (`Dim1, `Dim0) in
@@ -1347,10 +1385,11 @@ struct
       aux sys
 
     | _ ->
-      failwith "TODO: rigid_ghcom"
+      let err = RigidGHComUnexpectedArgument ty in
+      raise @@ E err
 
   and rigid_com dir abs cap (sys : comp_sys) : value =
-    let _, r' = IStar.unleash dir in
+    let _, r' = Dir.unleash dir in
     let ty = Abs.inst1 abs r' in
     let capcoe = rigid_coe dir abs cap in
     let syscoe : comp_sys =
@@ -1358,7 +1397,7 @@ struct
         Face.map @@ fun ri r'i absi ->
         let phi = I.equate ri r'i in
         let yi, vi = Abs.unleash1 absi in
-        let y2r' = IStar.make (`Atom yi) (I.act phi r') in
+        let y2r' = Dir.make (`Atom yi) (I.act phi r') in
         Abs.bind1 yi @@ make_coe y2r' (Abs.act phi abs) vi
       in
       List.map face sys
@@ -1366,7 +1405,7 @@ struct
     rigid_hcom dir ty capcoe syscoe
 
   and rigid_gcom dir abs cap (sys : comp_sys) : value =
-    let _, r' = IStar.unleash dir in
+    let _, r' = Dir.unleash dir in
     let ty = Abs.inst1 abs r' in
     let capcoe = rigid_coe dir abs cap in
     let syscoe : comp_sys =
@@ -1374,7 +1413,7 @@ struct
         Face.map @@ fun ri r'i absi ->
         let phi = I.equate ri r'i in
         let yi, vi = Abs.unleash1 absi in
-        let y2r' = IStar.make (`Atom yi) (I.act phi r') in
+        let y2r' = Dir.make (`Atom yi) (I.act phi r') in
         Abs.bind1 yi @@ make_coe y2r' (Abs.act phi abs) vi
       in
       List.map face sys
@@ -1451,7 +1490,7 @@ struct
     | Tm.FCom info ->
       let r = eval_dim rho info.r  in
       let r' = eval_dim rho info.r' in
-      let dir = IStar.make r r' in
+      let dir = Dir.make r r' in
       let cap = eval rho info.cap in
       let sys = eval_rigid_bnd_sys rho info.sys in
       make_fcom dir cap sys
@@ -1501,16 +1540,13 @@ struct
     | Tm.Box info ->
       let r = eval_dim rho info.r  in
       let r' = eval_dim rho info.r' in
-      let dir = IStar.make r r' in
+      let dir = Dir.make r r' in
       let cap = eval rho info.cap in
       let sys = eval_rigid_tm_sys rho info.sys in
       make_box dir cap sys
 
-    | Tm.Dim0 ->
-      failwith "0 is a dimension"
-
-    | Tm.Dim1 ->
-      failwith "1 is a dimension"
+    | (Tm.Dim0 | Tm.Dim1) ->
+      raise @@ E (UnexpectedDimensionTerm tm)
 
     | Tm.Up cmd ->
       eval_cmd rho cmd
@@ -1583,7 +1619,7 @@ struct
     | Tm.Cap info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
-      let dir = IStar.make r r' in
+      let dir = Dir.make r r' in
       let ty = eval rho info.ty in
       let sys = eval_rigid_bnd_sys rho info.sys in
       make_cap dir ty sys vhd
@@ -1597,7 +1633,7 @@ struct
     | Tm.Coe info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
-      let dir = IStar.make r r' in
+      let dir = Dir.make r r' in
       let abs = eval_bnd rho info.ty  in
       let el = eval rho info.tm in
       make_coe dir abs el
@@ -1605,7 +1641,7 @@ struct
     | Tm.HCom info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
-      let dir = IStar.make r r' in
+      let dir = Dir.make r r' in
       let ty = eval rho info.ty in
       let cap = eval rho info.cap in
       let sys = eval_rigid_bnd_sys rho info.sys in
@@ -1614,7 +1650,7 @@ struct
     | Tm.Com info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
-      let dir = IStar.make r r' in
+      let dir = Dir.make r r' in
       let abs = eval_bnd rho info.ty in
       let cap = eval rho info.cap in
       let sys = eval_rigid_bnd_sys rho info.sys in
@@ -1623,7 +1659,7 @@ struct
     | Tm.GHCom info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
-      let dir = IStar.make r r' in
+      let dir = Dir.make r r' in
       let ty = eval rho info.ty in
       let cap = eval rho info.cap in
       let sys = eval_rigid_bnd_sys rho info.sys in
@@ -1632,7 +1668,7 @@ struct
     | Tm.GCom info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
-      let dir = IStar.make r r' in
+      let dir = Dir.make r r' in
       let abs = eval_bnd rho info.ty in
       let cap = eval rho info.cap in
       let sys = eval_rigid_bnd_sys rho info.sys in
@@ -1643,8 +1679,8 @@ struct
         match List.nth rho.cells i with
         | Val v -> v
         | Atom r ->
-          Format.eprintf "Expected value in environment for %i, but found dim %a@." i I.pp r;
-          failwith "Expected value in environment"
+          let err = ExpectedValueInEnvironment r in
+          raise @@ E err
       end
 
     | Tm.Var info ->
@@ -1670,18 +1706,14 @@ struct
   and eval_bnd_face rho (tr, tr', obnd) =
     let sr = eval_dim rho tr in
     let sr' = eval_dim rho tr' in
-    match IStar.make sr sr' with
+    match Eq.make sr sr' with
     | `Ok xi ->
-      begin
-        match I.compare sr sr' with
-        | `Apart ->
-          Face.False xi
-        | _ ->
-          let bnd = Option.get_exn obnd in
-          let rho' = Env.act (I.equate sr sr') rho in
-          let abs = eval_bnd rho' bnd in
-          Face.Indet (xi, abs)
-      end
+      let bnd = Option.get_exn obnd in
+      let rho' = Env.act (I.equate sr sr') rho in
+      let abs = eval_bnd rho' bnd in
+      Face.Indet (xi, abs)
+    | `Apart _ ->
+      Face.False (sr, sr')
     | `Same _ ->
       let bnd = Option.get_exn obnd in
       let abs = eval_bnd rho bnd in
@@ -1701,19 +1733,15 @@ struct
   and eval_tm_face rho (tr, tr', otm) : val_face =
     let r = eval_dim rho tr in
     let r' = eval_dim rho tr' in
-    match IStar.make r r' with
+    match Eq.make r r' with
     | `Ok xi ->
-      begin
-        match I.compare r r' with
-        | `Apart ->
-          Face.False xi
-        | _ ->
-          let tm = Option.get_exn otm in
-          let rho' = Env.act (I.equate r r') rho in
-          (* The problem here is that the this is not affecting GLOBALS! *)
-          let el = eval rho' tm in
-          Face.Indet (xi, el)
-      end
+      let tm = Option.get_exn otm in
+      let rho' = Env.act (I.equate r r') rho in
+      (* The problem here is that the this is not affecting GLOBALS! *)
+      let el = eval rho' tm in
+      Face.Indet (xi, el)
+    | `Apart _ ->
+      Face.False (r, r')
     | `Same _ ->
       let tm = Option.get_exn otm in
       let el = eval rho tm in
@@ -1751,28 +1779,19 @@ struct
     let rho = Env.push_many (Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
 
-  and unleash_pi ?debug:(debug = []) v =
+  and unleash_pi v =
     match unleash v with
     | Pi {dom; cod} -> dom, cod
-    | Rst rst -> unleash_pi ~debug rst.ty
+    | Rst rst -> unleash_pi rst.ty
     | _ ->
-      Format.eprintf "%a: tried to unleash %a as pi type@."
-        pp_trace debug
-        pp_value v;
-      failwith "unleash_pi"
+      raise @@ E (UnleashPiError v)
 
-  and unleash_sg ?debug:(debug = []) v =
+  and unleash_sg v =
     match unleash v with
     | Sg {dom; cod} -> dom, cod
     | Rst rst -> unleash_sg rst.ty
     | _ ->
-
-      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-      Format.eprintf "@.";
-      Format.eprintf "%a: tried to unleash %a as sigma type@."
-        pp_trace debug
-        pp_value v;
-      failwith "unleash_sg"
+      raise @@ E (UnleashSgError v)
 
   and unleash_ext v rs =
     match unleash v with
@@ -1781,8 +1800,7 @@ struct
     | Rst rst ->
       unleash_ext rst.ty rs
     | _ ->
-      Format.printf "unleash_ext: %a@." pp_value v;
-      failwith "unleash_ext"
+      raise @@ E (UnleashExtError v)
 
   and unleash_v v =
     match unleash v with
@@ -1791,17 +1809,14 @@ struct
     | Rst rst ->
       unleash_v rst.ty
     | _ ->
-      Format.eprintf "Failed to unleash V type: %a@." pp_value v;
-      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-      Format.eprintf "@.";
-      failwith "unleash_v"
+      raise @@ E (UnleashVError v)
 
   and unleash_fcom v =
     match unleash v with
     | FCom info -> info.dir, info.cap, info.sys
     | Rst rst -> unleash_fcom rst.ty
     | _ ->
-      failwith "unleash_fcom"
+      raise @@ E (UnleashFComError v)
 
   and unleash_lbl_ty v =
     match unleash v with
@@ -1810,7 +1825,7 @@ struct
     | Rst rst ->
       unleash_lbl_ty rst.ty
     | _ ->
-      failwith "unleash_lbl_ty"
+      raise @@ E (UnleashLblTyError v)
 
   and unleash_corestriction_ty v =
     match unleash v with
@@ -1819,13 +1834,7 @@ struct
     | Rst rst ->
       unleash_corestriction_ty rst.ty
     | _ ->
-      failwith "unleash_corestriction_ty"
-
-  and pp_trace fmt trace =
-    Format.fprintf fmt "@[[%a]@]"
-      (Format.pp_print_list Format.pp_print_string)
-      trace
-
+      raise @@ E (UnleashCoRError v)
 
   and lbl_call v =
     match unleash v with
@@ -1840,7 +1849,7 @@ struct
       let call_sys = List.map call_face info.sys in
       make @@ Up {ty; neu = call; sys = call_sys}
     | _ ->
-      failwith "lbl_call"
+      raise @@ E (LblCallUnexpectedArgument v)
 
   and corestriction_force v =
     match unleash v with
@@ -1848,7 +1857,8 @@ struct
       begin
         match face with
         | Face.True (_, _, v) -> v
-        | _ -> failwith "Cannot force corestriction when it doesn't hold"
+        | _ ->
+          raise @@ E (ForcedUntrueCorestriction face)
       end
 
     | Up info ->
@@ -1862,15 +1872,10 @@ struct
           in
           let force_sys = List.map force_face info.sys in
           make @@ Up {ty; neu = force; sys = force_sys}
-        | Face.False _ ->
-          failwith "Cannot force false corestriction"
-        | Face.Indet (p, _) ->
-          let r, r' = IStar.unleash p in
-          Format.eprintf "corestriction: %a =? %a@." I.pp r I.pp r';
-          Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-          Format.eprintf "@.";
-          failwith "Cannot force indeterminate corestriction"
+        | _ as face ->
+          raise @@ E (ForcedUntrueCorestriction face)
       end
+
     | _ ->
       failwith "corestriction_force"
 
@@ -1880,7 +1885,7 @@ struct
       inst_clo clo varg
 
     | Up info ->
-      let dom, cod = unleash_pi ~debug:["apply"; "up"] info.ty in
+      let dom, cod = unleash_pi info.ty in
       let cod' = inst_clo cod varg in
       let app = FunApp (info.neu, {ty = dom; el = varg}) in
       let app_face =
@@ -1891,17 +1896,17 @@ struct
       make @@ Up {ty = cod'; neu = app; sys = app_sys}
 
     | Coe info ->
-      let r, r' = IStar.unleash info.dir in
+      let r, r' = Dir.unleash info.dir in
       let x, tyx = Abs.unleash1 info.abs in
-      let domx, codx = unleash_pi ~debug:["apply"; "coe"] tyx in
+      let domx, codx = unleash_pi tyx in
       let dom = Abs.bind1 x domx in
-      let coe_r'_x = make_coe (IStar.make r' (`Atom x)) dom varg in
+      let coe_r'_x = make_coe (Dir.make r' (`Atom x)) dom varg in
       let cod_coe = inst_clo codx coe_r'_x in
       let abs = Abs.bind1 x cod_coe in
       let el =
         apply info.el @@
         make_coe
-          (IStar.make r' r)
+          (Dir.make r' r)
           dom
           varg
       in
@@ -1910,7 +1915,7 @@ struct
       res
 
     | HCom info ->
-      let _, cod = unleash_pi ~debug:["apply"; "hcom"] info.ty in
+      let _, cod = unleash_pi info.ty in
       let ty = inst_clo cod varg in
       let cap = apply info.cap varg in
       let app_face =
@@ -1922,7 +1927,7 @@ struct
       rigid_hcom info.dir ty cap sys
 
     | GHCom info ->
-      let _, cod = unleash_pi ~debug:["apply"; "ghcom"] info.ty in
+      let _, cod = unleash_pi info.ty in
       let ty = inst_clo cod varg in
       let cap = apply info.cap varg in
       let app_face =
@@ -2101,10 +2106,10 @@ struct
       Abs.inst1 lcase @@ `Atom x
     | FCom info ->
       let apply_rec tm = s1_rec mot tm bcase lcase in
-      let r, _ = IStar.unleash info.dir in
+      let r, _ = Dir.unleash info.dir in
       let ty = Abs.make1 @@ fun y ->
         inst_clo mot @@
-        make_fcom (IStar.make r (`Atom y)) info.cap (`Ok info.sys)
+        make_fcom (Dir.make r (`Atom y)) info.cap (`Ok info.sys)
       in
       let face = Face.map @@ fun ri r'i absi ->
         let y, el = Abs.unleash1 absi in
@@ -2130,7 +2135,7 @@ struct
       v0
 
     | Up info ->
-      let dom, _ = unleash_sg ~debug:["Val.car"] info.ty in
+      let dom, _ = unleash_sg info.ty in
       let car_sys = List.map (Face.map (fun _ _ a -> car a)) info.sys in
       make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
 
@@ -2185,10 +2190,10 @@ struct
       let abs =
         let x, tyx = Abs.unleash1 info.abs in
         let domx, codx = unleash_sg tyx in
-        let r, _ = IStar.unleash info.dir in
+        let r, _ = Dir.unleash info.dir in
         let coerx =
           make_coe
-            (IStar.make r (`Atom x))
+            (Dir.make r (`Atom x))
             (Abs.bind1 x domx)
             (car info.el)
         in
@@ -2199,7 +2204,7 @@ struct
 
     | HCom info ->
       let abs =
-        let r, _ = IStar.unleash info.dir in
+        let r, _ = Dir.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
         let z = Name.fresh () in
         let msys =
@@ -2212,7 +2217,7 @@ struct
         in
         let hcom =
           make_hcom
-            (IStar.make r (`Atom z))
+            (Dir.make r (`Atom z))
             dom
             (car info.cap)
             msys
@@ -2232,7 +2237,7 @@ struct
 
     | GHCom info ->
       let abs =
-        let r, _ = IStar.unleash info.dir in
+        let r, _ = Dir.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
         let z = Name.fresh () in
         let msys =
@@ -2245,7 +2250,7 @@ struct
         in
         let hcom =
           make_ghcom
-            (IStar.make r (`Atom z))
+            (Dir.make r (`Atom z))
             dom
             (car info.cap)
             msys
@@ -2263,7 +2268,8 @@ struct
       in
       rigid_gcom info.dir abs cap sys
 
-    | _ -> failwith "TODO: cdr"
+    | _ ->
+      failwith "cdr"
 
   and make_cap mdir ty msys el : value =
     match mdir with
@@ -2273,7 +2279,7 @@ struct
         | `Ok sys ->
           rigid_cap dir ty sys el
         | `Proj abs ->
-          rigid_coe (IStar.swap dir) abs el
+          rigid_coe (Dir.swap dir) abs el
       end
     | `Same _ ->
       el
@@ -2284,10 +2290,9 @@ struct
     | Up info ->
       let cap_sys = List.map (Face.map (fun ri r'i a ->
           let phi = I.equate ri r'i in
-          make_cap (IStar.act phi dir) (Val.act phi ty) (CompSys.act phi sys) a)) info.sys in
+          make_cap (Dir.act phi dir) (Val.act phi ty) (CompSys.act phi sys) a)) info.sys in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
     | _ ->
-      Format.eprintf "Tried to get rigid-cap of %a@." pp_value el;
       failwith "rigid_cap"
 
 
@@ -2368,10 +2373,10 @@ struct
     | VIn info ->
       Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)]" Name.pp info.x pp_value info.el0 pp_value info.el1
     | Coe info ->
-      let r, r' = IStar.unleash info.dir in
+      let r, r' = Dir.unleash info.dir in
       Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
     | HCom info ->
-      let r, r' = IStar.unleash info.dir in
+      let r, r' = Dir.unleash info.dir in
       Format.fprintf fmt "@[<1>(hcom %a %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
     | GHCom _ ->
       Format.fprintf fmt "<ghcom>"
@@ -2417,11 +2422,10 @@ struct
       function
       | Face.True (r0, r1, v) ->
         Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_value v
-      | Face.False p ->
-        let r0, r1 = IStar.unleash p in
+      | Face.False (r0, r1) ->
         Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
       | Face.Indet (p, v) ->
-        let r0, r1 = IStar.unleash p in
+        let r0, r1 = Eq.unleash p in
         Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_value v
 
   and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
@@ -2434,11 +2438,10 @@ struct
       function
       | Face.True (r0, r1, v) ->
         Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_abs v
-      | Face.False p ->
-        let r0, r1 = IStar.unleash p in
+      | Face.False (r0, r1) ->
         Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
       | Face.Indet (p, v) ->
-        let r0, r1 = IStar.unleash p in
+        let r0, r1 = Eq.unleash p in
         Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs v
 
   and pp_clo fmt (Clo clo) =
@@ -2527,6 +2530,94 @@ struct
       Tm.Macro.equiv
         (Tm.up @@ Tm.ix 0)
         (Tm.up @@ Tm.ix 1)
+
+  end
+
+  module Error =
+  struct
+    type t = error
+
+    let pp fmt =
+      function
+      | InternalMortalityError ->
+        Format.fprintf fmt "Too mortal, taste it!"
+      | RigidCoeUnexpectedArgument abs ->
+        Format.fprintf fmt
+          "Unexpected type argument in rigid coercion: %a."
+          pp_abs abs
+      | RigidHComUnexpectedArgument v ->
+        Format.fprintf fmt
+          "Unexpected type argument in rigid homogeneous copmosition: %a."
+          pp_value v
+      | RigidGHComUnexpectedArgument v ->
+        Format.fprintf fmt
+          "Unexpected type argument in rigid generalized homogeneous copmosition: %a."
+          pp_value v
+      | LblCallUnexpectedArgument v ->
+        Format.fprintf fmt
+          "Unexpected argument to labeled type projection: %a"
+          pp_value v
+      | ExpectedAtomInEnvironment v ->
+        Format.fprintf fmt
+          "Expected to find atom in environment, but found value %a."
+          pp_value v
+      | ExpectedValueInEnvironment r ->
+        Format.fprintf fmt
+          "Expected to find value in environment, but found dimension %a."
+          I.pp r
+      | ExpectedDimensionTerm t ->
+        Format.fprintf fmt
+          "Tried to evaluate non-dimension term %a as dimension."
+          Tm.pp0 t
+      | UnexpectedDimensionTerm t ->
+        Format.fprintf fmt
+          "Tried to evaluate dimension term %a as expression."
+          Tm.pp0 t
+      | UnleashPiError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as pi type."
+          pp_value v
+      | UnleashSgError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as sigma type."
+          pp_value v
+      | UnleashVError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as V type."
+          pp_value v
+      | UnleashExtError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as extension type."
+          pp_value v
+      | UnleashCoRError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as co-restriction type."
+          pp_value v
+      | UnleashFComError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as formal homogeneous composition."
+          pp_value v
+      | UnleashLblTyError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as labeled type."
+          pp_value v
+      | ForcedUntrueCorestriction face ->
+        Format.fprintf fmt
+          "Cannot force untrue co-restriction: %a"
+          pp_val_face face
+
+
+
+
+    exception E = E
+
+    let _ =
+      PpExn.install_printer @@ fun fmt ->
+      function
+      | E err ->
+        pp fmt err
+      | _ ->
+        raise PpExn.Unrecognized
 
   end
 

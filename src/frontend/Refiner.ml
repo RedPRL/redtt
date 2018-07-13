@@ -29,8 +29,9 @@ let normalize_ty ty =
 
 let guess_restricted ty sys tm =
   let rty = Tm.make @@ Tm.Rst {ty; sys} in
-  M.lift @@ C.check ~ty:rty tm >>= fun b ->
-  if b then M.ret tm else
+  M.lift @@ C.check ~ty:rty tm >>= function
+  | `Ok -> M.ret tm
+  | _ ->
     let rec go =
       function
       | [] ->
@@ -46,12 +47,10 @@ let guess_restricted ty sys tm =
     in
     go sys >>
     M.unify >>
-    M.lift @@ C.check ~ty:rty tm >>= fun b ->
-    if b then M.ret tm else
-      begin
-        M.lift @@ C.dump_state Format.err_formatter "damn" `All >>= fun _ ->
-        failwith "guess_restricted: type error"
-      end
+    M.lift @@ C.check ~ty:rty tm >>= function
+    | `Ok -> M.ret tm
+    | `Exn exn ->
+      raise exn
 
 exception ChkMatch
 

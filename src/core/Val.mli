@@ -1,7 +1,7 @@
 open RedBasis.Bwd
 
 type atom = I.atom
-type star = IStar.t
+type dir = Dir.t
 type dim = I.t
 
 type value
@@ -23,11 +23,11 @@ type con =
   | CoR : val_face -> con
   | Ext : ext_abs -> con
 
-  | Coe : {dir : star; abs : abs; el : value} -> con
-  | HCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
-  | GHCom : {dir : star; ty : value; cap : value; sys : comp_sys} -> con
-  | FCom : {dir : star; cap : value; sys : comp_sys} -> con
-  | Box : {dir : star; cap : value; sys : box_sys} -> con
+  | Coe : {dir : dir; abs : abs; el : value} -> con
+  | HCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
+  | GHCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
+  | FCom : {dir : dir; cap : value; sys : comp_sys} -> con
+  | Box : {dir : dir; cap : value; sys : box_sys} -> con
 
   | Univ : {kind : Kind.t; lvl : Lvl.t} -> con
   | V : {x : atom; ty0 : value; ty1 : value; equiv : value} -> con
@@ -79,7 +79,7 @@ and neu =
   *)
   | VProj : {x : atom; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
-  | Cap : {dir : star; ty : value; sys : comp_sys; neu : neu} -> neu
+  | Cap : {dir : dir; ty : value; sys : comp_sys; neu : neu} -> neu
 
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
@@ -131,10 +131,10 @@ sig
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> value list -> value
 
-  val unleash_pi : ?debug:string list -> value -> value * clo
-  val unleash_sg : ?debug:string list -> value -> value * clo
+  val unleash_pi : value -> value * clo
+  val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
-  val unleash_fcom : value -> star * value * comp_sys
+  val unleash_fcom : value -> dir * value * comp_sys
   val unleash_ext : value -> dim bwd -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
@@ -171,6 +171,13 @@ sig
 
   module Macro : sig
     val equiv : value -> value -> value
+  end
+
+  module Error :
+  sig
+    type t
+    val pp : t Pretty.t0
+    exception E of t
   end
 
   val base_restriction : Restriction.t

@@ -93,6 +93,12 @@ type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
 
+type error =
+  | InvalidDeBruijnIndex of int
+  | UnbindExtLengthMismatch of Name.t list * (tm * (tm, tm) system) nbnd
+
+exception E of error
+
 let ix ?twin:(tw = `Only) i =
   Ix (i, tw), Emp
 
@@ -350,9 +356,12 @@ and subst_comp_face sub (r, r', obnd) =
 and subst_comp_sys sub sys =
   List.map (subst_comp_face sub) sys
 
+
+
 let make con =
   match con with
-  | Up (Ix (ix, _), _) when ix < 0 -> failwith "make: Ix with negative index, wtf!!"
+  | Up (Ix (ix, _), _) when ix < 0 ->
+    raise @@ E (InvalidDeBruijnIndex ix)
   | _ -> Tm con
 
 let unleash (Tm con) = con
@@ -607,7 +616,8 @@ let unbind_ext (NB (nms, (ty, sys))) =
   in
   go 0 nms Emp ty sys
 
-let unbind_ext_with xs (NB (nms, (ty, sys))) =
+let unbind_ext_with xs ebnd =
+  let NB (nms, (ty, sys)) = ebnd in
   let rec go k xs ty sys =
     match xs with
     | [] -> ty, sys
@@ -617,7 +627,8 @@ let unbind_ext_with xs (NB (nms, (ty, sys))) =
   if Bwd.length nms = List.length xs then
     go 0 xs ty sys
   else
-    failwith "unbind_ext_with: length mismatch"
+    let err = UnbindExtLengthMismatch (xs, ebnd) in
+    raise @@ E err
 
 
 let bind x tx =
@@ -1037,7 +1048,7 @@ struct
       go_cmd fl cmd acc
     | ExtLam nbnd ->
       go_nbnd fl nbnd acc
-    | (Bool | Tt | Ff | Nat | Zero | Int | Dim0 | Dim1 | Univ _) ->
+    | (Bool | Tt | Ff | Nat | Zero | Int | S1 | Base | Dim0 | Dim1 | Univ _) ->
       acc
     | Suc n ->
       go fl n acc
@@ -1060,9 +1071,28 @@ struct
       go_comp_sys fl info.sys @@ acc
     | CoRThunk face ->
       go_tm_face fl face acc
-    | _ ->
-      Format.eprintf "Tried to get free variables, but we didn't implement the case for: %a@." (pp Pretty.Env.emp) tm;
-      failwith "TODO"
+    | Pos t ->
+      go fl t acc
+    | NegSuc t ->
+      go fl t acc
+    | LblRet t ->
+      go fl t acc
+    | Loop t ->
+      go fl t acc
+    | LblTy info ->
+      go fl info.ty @@
+      go_lbl_args fl info.args acc
+    | CoR face ->
+      go_tm_face fl face acc
+    | Box info ->
+      go fl info.r @@
+      go fl info.r' @@
+      go fl info.cap @@
+      go_tm_sys fl info.sys acc
+
+  and go_lbl_args fl args =
+    let go_arg acc (t0, t1) acc = go fl t0 @@ go fl t1 acc in
+    List.fold_right (go_arg fl) args
 
   and go_cmd fl (hd, sp) acc =
     match fl, hd with
@@ -1473,3 +1503,27 @@ let rec shift_univ k tm =
     Tm (map_tmf (shift_univ k) tmf)
 
 let pp0 fmt tm = pp Pretty.Env.emp fmt @@ eta_contract tm
+
+module Error =
+struct
+  type t = error
+  exception E = E
+
+  let pp fmt =
+    function
+    | InvalidDeBruijnIndex i ->
+      Format.fprintf fmt
+        "Tried to construct term with negative de bruijn index %i." i
+    | UnbindExtLengthMismatch (xs, ebnd) ->
+      Format.fprintf fmt
+        "Tried to unbind extension type binder with incorrect number of variables."
+
+  let _ =
+    PpExn.install_printer @@ fun fmt ->
+    function
+    | E err ->
+      pp fmt err
+    | _ ->
+      raise PpExn.Unrecognized
+
+end

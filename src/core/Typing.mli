@@ -4,6 +4,13 @@ type cx = LocalCx.t
 module type S =
 sig
   module Cx : LocalCx.S
+  module Error :
+  sig
+    type t
+    exception E of t
+    val pp : t Pretty.t0
+  end
+
   val check : cx -> value -> Tm.tm -> unit
   val infer : cx -> Tm.tm Tm.cmd -> value
   val infer_frame : cx -> ty:value -> hd:value -> Tm.tm Tm.frame -> value
