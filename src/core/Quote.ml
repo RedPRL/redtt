@@ -120,8 +120,7 @@ struct
     | CoR face ->
       begin
         match face with
-        | Face.False p ->
-          let r, r' = IStar.unleash p in
+        | Face.False (r, r') ->
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
           Tm.make @@ Tm.CoRThunk (tr, tr', None)
@@ -135,7 +134,7 @@ struct
           Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
 
         | Face.Indet (p, ty) ->
-          let r, r' = IStar.unleash p in
+          let r, r' = Eq.unleash p in
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
           let phi = I.equate r r' in
@@ -233,8 +232,8 @@ struct
 
       | Box info0, Box info1 ->
         let dir, ty_cap, ty_sys = unleash_fcom ty in
-        let _, s' = IStar.unleash dir in
-        let tr, tr' = equate_star3 env dir info0.dir info1.dir in
+        let _, s' = Dir.unleash dir in
+        let tr, tr' = equate_dir3 env dir info0.dir info1.dir in
         let tcap = equate env ty_cap info0.cap info1.cap in
         let tsys = equate_box_sys env s' ty_sys info0.sys info1.sys in
         Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
@@ -254,7 +253,7 @@ struct
         Tm.up @@ equate_neu env up0.neu up1.neu
 
       | FCom fcom0, FCom fcom1 ->
-        let tr, tr' = equate_star env fcom0.dir fcom1.dir in
+        let tr, tr' = equate_dir env fcom0.dir fcom1.dir in
         let cap = equate env ty fcom0.cap fcom1.cap in
         let sys = equate_comp_sys env ty fcom0.sys fcom1.sys in
         Tm.make @@ Tm.FCom {r = tr; r' = tr'; cap; sys}
@@ -262,7 +261,7 @@ struct
       | HCom hcom0, HCom hcom1 ->
         begin
           try
-            let tr, tr' = equate_star env hcom0.dir hcom1.dir in
+            let tr, tr' = equate_dir env hcom0.dir hcom1.dir in
             let ty = equate_ty env hcom0.ty hcom1.ty in
             let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
             let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
@@ -272,11 +271,11 @@ struct
         end
 
       | Coe coe0, Coe coe1 ->
-        let tr, tr' = equate_star env coe0.dir coe1.dir in
+        let tr, tr' = equate_dir env coe0.dir coe1.dir in
         let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
         let bnd = equate_val_abs env univ coe0.abs coe1.abs in
         let tyr =
-          let r, _ = IStar.unleash coe0.dir in
+          let r, _ = Dir.unleash coe0.dir in
           Abs.inst1 coe0.abs r
         in
         let tm = equate env tyr coe0.el coe1.el in
@@ -285,7 +284,7 @@ struct
       | GHCom ghcom0, GHCom ghcom1 ->
         begin
           try
-            let tr, tr' = equate_star env ghcom0.dir ghcom1.dir in
+            let tr, tr' = equate_dir env ghcom0.dir ghcom1.dir in
             let ty = equate_ty env ghcom0.ty ghcom1.ty in
             let cap = equate env ghcom0.ty ghcom0.cap ghcom1.cap in
             let sys = equate_comp_sys env ghcom0.ty ghcom0.sys ghcom1.sys in
@@ -370,7 +369,7 @@ struct
       let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
     | Cap cap0, Cap cap1 ->
-      let tr, tr' = equate_star env cap0.dir cap1.dir in
+      let tr, tr' = equate_dir env cap0.dir cap1.dir in
       let ty = equate_ty env cap0.ty cap1.ty in
       let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
       let sys = equate_comp_sys env univ cap0.sys cap1.sys in
@@ -428,14 +427,15 @@ struct
       let t = equate env ty v0 v1 in
       tr, tr', Some t
 
-    | Face.False p0, Face.False p1 ->
-      let tr, tr' = equate_star env p0 p1 in
+    | Face.False (r0, r'0), Face.False (r1, r'1) ->
+      let tr = equate_dim env r0 r1 in
+      let tr' = equate_dim env r'0 r'1 in
       tr, tr', None
 
     | Face.Indet (p0, v0), Face.Indet (p1, v1) ->
-      let r, r' = IStar.unleash p0 in
+      let r, r' = Eq.unleash p0 in
       let phi = I.equate r r' in
-      let tr, tr' = equate_star env p0 p1 in
+      let tr, tr' = equate_eq env p0 p1 in
       let v = equate env (Val.act phi ty) v0 v1 in
       tr, tr', Some v
 
@@ -444,16 +444,16 @@ struct
   and equate_comp_face env ty face0 face1 =
     match face0, face1 with
     | Face.Indet (p0, abs0), Face.Indet (p1, abs1) ->
-      let r, r' = IStar.unleash p0 in
+      let r, r' = Eq.unleash p0 in
       let phi = I.equate r r' in
-      let tr, tr' = equate_star env p0 p1 in
+      let tr, tr' = equate_eq env p0 p1 in
       let bnd = equate_val_abs env (Val.act phi ty) abs0 abs1 in
       tr, tr', Some bnd
 
   and equate_box_boundary env s' ty bdry0 bdry1 =
     match ty, bdry0, bdry1 with
     | Face.Indet (p_ty, abs), Face.Indet (p0, b0), Face.Indet (p1, b1) ->
-      let tr, tr' = equate_star3 env p_ty p0 p1 in
+      let tr, tr' = equate_eq3 env p_ty p0 p1 in
       let b = equate env (Abs.inst1 abs s') b0 b1 in
       tr, tr', Some b
 
@@ -469,17 +469,32 @@ struct
       (* Format.eprintf "Failed to equate abs: @[<v>%a@,= %a@]@." pp_abs abs0 pp_abs abs1; *)
       raise exn
 
-  and equate_star env p0 p1 =
-    let r0, r'0 = IStar.unleash p0 in
-    let r1, r'1 = IStar.unleash p1 in
+  and equate_eq env p0 p1 =
+    let r0, r'0 = Eq.unleash p0 in
+    let r1, r'1 = Eq.unleash p1 in
     let tr = equate_dim env r0 r1 in
     let tr' = equate_dim env r'0 r'1 in
     tr, tr'
 
-  and equate_star3 env p0 p1 p2 =
-    let r0, r'0 = IStar.unleash p0 in
-    let r1, r'1 = IStar.unleash p1 in
-    let r2, r'2 = IStar.unleash p2 in
+  and equate_eq3 env p0 p1 p2 =
+    let r0, r'0 = Eq.unleash p0 in
+    let r1, r'1 = Eq.unleash p1 in
+    let r2, r'2 = Eq.unleash p2 in
+    let tr = equate_dim3 env r0 r1 r2 in
+    let tr' = equate_dim3 env r'0 r'1 r'2 in
+    tr, tr'
+
+  and equate_dir env p0 p1 =
+    let r0, r'0 = Dir.unleash p0 in
+    let r1, r'1 = Dir.unleash p1 in
+    let tr = equate_dim env r0 r1 in
+    let tr' = equate_dim env r'0 r'1 in
+    tr, tr'
+
+  and equate_dir3 env p0 p1 p2 =
+    let r0, r'0 = Dir.unleash p0 in
+    let r1, r'1 = Dir.unleash p1 in
+    let r2, r'2 = Dir.unleash p2 in
     let tr = equate_dim3 env r0 r1 r2 in
     let tr' = equate_dim3 env r'0 r'1 r'2 in
     tr, tr'
@@ -620,7 +635,7 @@ struct
       | Face.Indet (p, v) ->
         (* In this case, we check that the semantic indeterminate will become equal to the face under the
            stipulated restriction. *)
-        let r, r' = IStar.unleash p in
+        let r, r' = Eq.unleash p in
         let gen_rr' = Val.act (I.equate r r') gen in
         let ty_rr' = Val.act (I.equate r r') ty1 in
         begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end

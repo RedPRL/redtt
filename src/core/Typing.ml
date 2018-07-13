@@ -227,7 +227,7 @@ struct
               failwith "co-restriction mismatch"
           end
         | Face.Indet (p, ty), Some tm ->
-          let r0, r1 = IStar.unleash p in
+          let r0, r1 = Eq.unleash p in
           begin
             match I.compare r'0 r0, I.compare r'1 r1 with
             | `Same, `Same ->
@@ -338,7 +338,7 @@ struct
       ()
 
     | Face.Indet (p, el) ->
-      let r, r' = IStar.unleash p in
+      let r, r' = Eq.unleash p in
       try
         let cx', phi = Cx.restrict cx r r' in
         Cx.check_eq cx' ~ty:(Eval.Val.act phi ty) el @@
