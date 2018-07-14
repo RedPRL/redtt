@@ -528,31 +528,6 @@ let subst sub tm =
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 let make con =
   match con with
   | Up (Ix (ix, _), _) when ix < 0 ->
@@ -561,216 +536,46 @@ let make con =
 
 let unleash (Tm con) = con
 
-let traverse ~f ~go_ix ~go_var =
-  let rec go k =
-    function
-    | Univ info -> Univ info
-    | Bool -> Bool
-    | Tt -> Tt
-    | Ff -> Ff
-    | Nat -> Nat
-    | Zero -> Zero
-    | Suc n -> Suc (f k n)
-    | Int -> Int
-    | Pos n -> Pos (f k n)
-    | NegSuc n -> NegSuc (f k n)
-    | S1 -> S1
-    | Base -> Base
-    | Loop r -> Loop (f k r)
-    | Dim0 -> Dim0
-    | Dim1 -> Dim1
-    | Lam bnd ->
-      Lam (go_bnd k bnd)
-    | Pi (dom, cod) ->
-      Pi (f k dom, go_bnd k cod)
-    | Sg (dom, cod) ->
-      Sg (f k dom, go_bnd k cod)
-    | Ext ebnd ->
-      Ext (go_ext_bnd k ebnd)
-    | Rst info ->
-      let ty = f k info.ty in
-      let sys = go_tm_sys k info.sys in
-      Rst {ty; sys}
-    | CoR face ->
-      CoR (go_tm_face k face)
-    | FCom info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      FCom {r; r'; cap; sys}
-    | V info ->
-      let r = f k info.r in
-      let ty0 = f k info.ty0 in
-      let ty1 = f k info.ty1 in
-      let equiv = f k info.equiv in
-      V {r; ty0; ty1; equiv}
-    | VIn info ->
-      let r = f k info.r in
-      let tm0 = f k info.tm0 in
-      let tm1 = f k info.tm1 in
-      VIn {r; tm0; tm1}
-    | ExtLam nbnd ->
-      ExtLam (go_nbnd k nbnd)
-    | CoRThunk face ->
-      CoRThunk (go_tm_face k face)
-    | Cons (t0, t1) ->
-      Cons (f k t0, f k t1)
-    | Box info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let cap = f k info.cap in
-      let sys = go_tm_sys k info.sys in
-      Box {r; r'; cap; sys}
-    | LblTy info ->
-      let args = List.map (fun (t0, t1) -> f k t0, f k t1) info.args in
-      let ty = f k info.ty in
-      LblTy {info with args; ty}
-    | LblRet t ->
-      LblRet (f k t)
-    | Up cmd ->
-      Up (go_cmd k cmd)
-    | Let (cmd, bnd) ->
-      Let (go_cmd k cmd, go_bnd k bnd)
+module CloseVarAlg :
+sig
+  include Alg
+  val run : twin:(twin -> twin) -> name:Name.t -> ix:int -> 'a M.m -> 'a
+end =
+struct
+  type state = {twin : twin -> twin; name : Name.t; ix : int}
+  module M = ReaderMonad.M (struct type t = state end)
+  module Notation = Monad.Notation (M)
+  open Notation
 
-  (* TODO: not sure if this is backwards !!!! *)
-  and go_cmd k (hd, sp) =
-    let hd', sp' = go_hd k hd in
-    let sp'' = go_spine k sp in
-    hd', sp' <.> sp''
+  let run ~twin ~name ~ix =
+    M.run {twin; name; ix}
 
-  and go_hd k =
-    function
-    | Ix (i, tw) ->
-      go_ix k i tw
-    | Var info ->
-      go_var k (info.name, info.twin, info.ushift)
-    | Meta a ->
-      Meta a, Emp
-    | Down info ->
-      let ty = f k info.ty in
-      let tm = f k info.tm in
-      Down {ty; tm}, Emp
-    | Coe info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = go_bnd k info.ty in
-      let tm = f k info.tm in
-      Coe {r; r'; ty; tm}, Emp
-    | HCom info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = f k info.ty in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      HCom {r; r'; ty; cap; sys}, Emp
-    | Com info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = go_bnd k info.ty in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      Com {r; r'; ty; cap; sys}, Emp
-    | GHCom info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = f k info.ty in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      GHCom {r; r'; ty; cap; sys}, Emp
-    | GCom info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = go_bnd k info.ty in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      GCom {r; r'; ty; cap; sys}, Emp
+  let under_meta m = m
 
-  and go_spine k =
-    Bwd.map (go_frm k)
+  let push_bindings n =
+    M.local @@ fun st ->
+    {st with ix = n + st.ix}
 
-  and go_frm k =
-    function
-    | (Car | Cdr | LblCall | CoRForce) as frm -> frm
-    | FunApp t ->
-      FunApp (f k t)
-    | ExtApp ts ->
-      ExtApp (Bwd.map (f k) ts)
-    | If info ->
-      let mot = go_bnd k info.mot in
-      let tcase = f k info.tcase in
-      let fcase = f k info.fcase in
-      If {mot; tcase; fcase}
-    | NatRec info ->
-      let mot = go_bnd k info.mot in
-      let zcase = f k info.zcase in
-      let scase = go_nbnd k info.scase in
-      NatRec {mot; zcase; scase}
-    | IntRec info ->
-      let mot = go_bnd k info.mot in
-      let pcase = go_bnd k info.pcase in
-      let ncase = go_bnd k info.ncase in
-      IntRec {mot; pcase; ncase}
-    | S1Rec info ->
-      let mot = go_bnd k info.mot in
-      let bcase = f k info.bcase in
-      let lcase = go_bnd k info.lcase in
-      S1Rec {mot; bcase; lcase}
-    | VProj info ->
-      let r = f k info.r in
-      let ty0 = f k info.ty0 in
-      let ty1 = f k info.ty1 in
-      let equiv = f k info.equiv in
-      VProj {r; ty0; ty1; equiv}
-    | Cap info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = f k info.ty in
-      let sys = go_comp_sys k info.sys in
-      Cap {r; r'; ty; sys}
+  let bvar ~ih ~ix ~twin =
+    M.ret (Ix (ix, twin), Emp)
 
-
-  and go_comp_sys k sys =
-    List.map (go_comp_face k) sys
-
-  and go_comp_face k (r, r', obnd) =
-    f k r, f k r', Option.map (go_bnd k) obnd
-
-  and go_ext_bnd k (NB (nms, (ty, sys))) =
-    let k' = k + Bwd.length nms in
-    NB (nms, (f k' ty, go_tm_sys k' sys))
-
-  and go_nbnd k (NB (nms, t)) =
-    let k' = k + Bwd.length nms in
-    NB (nms, f k' t)
-
-  and go_tm_sys k sys =
-    List.map (go_tm_face k) sys
-
-  and go_tm_face k (r, r', otm) =
-    f k r, f k r', Option.map (f k) otm
-
-  and go_bnd k : 'a bnd -> 'b bnd =
-    function B (nm, t) ->
-      B (nm, f (k + 1) t)
-
-  in go
-
-let fix_traverse ~go_ix ~go_var  =
-  let rec go k (Tm tm) =
-    Tm (traverse ~f:go ~go_ix ~go_var k tm)
-  in
-  go 0
-
-let close_var a ?twin:(twin = fun _ -> `Only) k =
-  let go_ix _ i tw = Ix (i, tw), Emp in
-  let go_var n (b, tw, ush) =
-    if b = a then
-      ix ~twin:(twin tw) (n + k)
+  let fvar ~name ~twin ~ushift =
+    M.get >>= fun st ->
+    M.ret @@
+    if name = st.name then
+      Ix (st.ix, st.twin twin), Emp
     else
-      Var {name = b; twin = tw; ushift = ush}, Emp
-  in
-  fix_traverse ~go_ix ~go_var
+      Var {name; twin; ushift}, Emp
+
+
+  let meta ~name ~ushift =
+    M.ret (Meta {name; ushift}, Emp)
+end
+
+let close_var a ?twin:(twin = fun _ -> `Only) k tm =
+  let module T = Traverse (CloseVarAlg) in
+  CloseVarAlg.run ~twin ~name:a ~ix:k @@ T.traverse_tm tm
+
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
