@@ -533,8 +533,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       typechecker >>= fun (module T) ->
       let module HSubst = HSubst (T) in
       let y = Name.fresh () in
-      let mot0y = Tm.unbind_with y ~twin:(fun _ -> `TwinL) info0.mot in
-      let mot1y = Tm.unbind_with y ~twin:(fun _ -> `TwinR) info1.mot in
+      let mot0y = Tm.unbind_with (Tm.var y ~twin:`TwinL) info0.mot in
+      let mot1y = Tm.unbind_with (Tm.var y ~twin:`TwinR) info1.mot in
       let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
       active @@ Problem.all y (Tm.make Tm.Bool) @@
       Problem.eqn ~ty0:univ ~ty1:univ ~tm0:mot0y ~tm1:mot1y
@@ -579,15 +579,15 @@ let rec subtype ty0 ty1 =
     match Tm.unleash ty0, Tm.unleash ty1 with
     | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
       let x = Name.fresh () in
-      let cod0x = Tm.unbind_with x ~twin:(fun _ -> `TwinL) cod0 in
-      let cod1x = Tm.unbind_with x ~twin:(fun _ -> `TwinR) cod1 in
+      let cod0x = Tm.unbind_with (Tm.var x ~twin:`TwinL) cod0 in
+      let cod1x = Tm.unbind_with (Tm.var x ~twin:`TwinR) cod1 in
       active @@ Subtype {ty0 = dom1; ty1 = dom0} >>
       active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
 
     | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
       let x = Name.fresh () in
-      let cod0x = Tm.unbind_with x ~twin:(fun _ -> `TwinL) cod0 in
-      let cod1x = Tm.unbind_with x ~twin:(fun _ -> `TwinR) cod1 in
+      let cod0x = Tm.unbind_with (Tm.var x ~twin:`TwinL) cod0 in
+      let cod1x = Tm.unbind_with (Tm.var x ~twin:`TwinR) cod1 in
       active @@ Subtype {ty0 = dom0; ty1 = dom1} >>
       active @@ Problem.all_twins x dom0 dom1 @@ Subtype {ty0 = cod0x; ty1 = cod1x}
 
@@ -658,16 +658,16 @@ let rigid_rigid q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-pi" in
-    let cod0x = Tm.unbind_with x ~twin:(fun _ -> `TwinL) cod0 in
-    let cod1x = Tm.unbind_with x ~twin:(fun _ -> `TwinR) cod1 in
+    let cod0x = Tm.unbind_with (Tm.var x ~twin:`TwinL) cod0 in
+    let cod1x = Tm.unbind_with (Tm.var x ~twin:`TwinR) cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
 
   | Tm.Sg (dom0, cod0), Tm.Sg (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-sg" in
-    let cod0x = Tm.unbind_with x ~twin:(fun _ -> `TwinL) cod0 in
-    let cod1x = Tm.unbind_with x ~twin:(fun _ -> `TwinR) cod1 in
+    let cod0x = Tm.unbind_with (Tm.var x ~twin:`TwinL) cod0 in
+    let cod1x = Tm.unbind_with (Tm.var x ~twin:`TwinR) cod1 in
     active @@ Problem.eqn ~ty0:q.ty0 ~tm0:dom0 ~ty1:q.ty1 ~tm1:dom1 >>
     active @@ Problem.all_twins x dom0 dom1 @@
     Problem.eqn ~ty0:q.ty0 ~tm0:cod0x ~ty1:q.ty1 ~tm1:cod1x
@@ -817,7 +817,7 @@ let rec lower tele alpha ty =
     begin
       match split_sigma Emp x dom with
       | None ->
-        let codx = Tm.unbind_with x cod in
+        let codx = Tm.unbind_with (Tm.var x) cod in
         lower (tele #< (x, `P dom)) alpha codx
 
       | Some (y, ty0, z, ty1, s, (u, v)) ->

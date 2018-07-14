@@ -380,7 +380,7 @@ struct
           let face_cap = varx, s, Some cap in
           let face_adj (r, r', obnd) =
             let bnd = Option.get_exn obnd in
-            let tmx = Tm.unbind_with x ~twin:(fun tw -> tw) bnd in
+            let tmx = Tm.unbind_with (Tm.var x) bnd in
             r, r', Some tmx
           in
           let faces_adj = List.map face_adj @@ Bwd.to_list acc in
@@ -412,12 +412,12 @@ struct
       | (e_r, e_r', e) :: esys ->
         let x = Name.fresh () in
         let varx = Tm.up @@ Tm.var x in
-        let tyx = Tm.unbind_with x ~twin:(fun tw -> tw) ty_bnd in
+        let tyx = Tm.unbind_with (Tm.var x) ty_bnd in
         let ext_ty =
           let face_cap = varx, s, Some cap in
           let face_adj (r, r', obnd) =
             let bnd = Option.get_exn obnd in
-            let tmx = Tm.unbind_with x ~twin:(fun tw -> tw) bnd in
+            let tmx = Tm.unbind_with (Tm.var x) bnd in
             r, r', Some tmx
           in
           let faces_adj = List.map face_adj @@ Bwd.to_list acc in

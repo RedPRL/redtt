@@ -89,7 +89,7 @@ and 'a cmd = 'a head * 'a spine
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
-  | Lift of int * 'a subst
+  | Lift of 'a subst
 
 type tm = Tm of tm tmf
 
@@ -423,10 +423,10 @@ end
 module OpenVarAlg :
 sig
   include Alg
-  val run : int -> tm cmd -> 'a M.m -> 'a
+  val run : int -> (twin -> tm cmd) -> 'a M.m -> 'a
 end =
 struct
-  type state = { cmd : tm cmd; depth: int}
+  type state = { cmd : twin -> tm cmd; depth: int}
 
   module M = ReaderMonad.M (struct type t = state end)
   module Notation = Monad.Notation (M)
@@ -442,7 +442,7 @@ struct
   let bvar ~ih ~ix ~twin =
     M.get >>= fun st ->
     if ix = st.depth then
-      M.ret @@ st.cmd
+      M.ret @@ st.cmd twin
     else
       M.ret (Ix (ix, twin), Emp)
 
@@ -467,9 +467,12 @@ struct
 
   let run = M.run
 
+  let rec liftn k sub =
+    if k = 0 then sub else Lift (liftn (k - 1) sub)
+
   let push_bindings k =
     M.local @@ fun sub ->
-    Lift (k, sub)
+    liftn k sub
 
   let rec bvar ~ih ~ix ~twin =
     M.get >>= fun sub ->
@@ -481,13 +484,15 @@ struct
     | Dot (_, sub), _ ->
       M.local (fun _ -> sub) @@
       bvar ~ih ~ix:(ix - 1) ~twin
-    | Lift (n, sub), _ ->
-      if ix < n then
-        M.ret (Ix (ix, twin), Emp)
-      else
-        bvar ~ih ~ix:(ix - n) ~twin >>= fun cmd ->
+    | Lift sub, 0 ->
+      M.ret (Ix (ix, twin), Emp)
+    | Lift sub, _ ->
+      begin
         M.local (fun _ -> sub) @@
-        ih cmd
+        bvar ~ih ~ix:(ix - 1) ~twin
+      end >>= fun cmd ->
+      M.local (fun _ -> Shift 1) @@
+      ih cmd
 
   let fvar ~name ~twin ~ushift =
     M.ret (Var {name; twin; ushift}, Emp)
@@ -751,18 +756,12 @@ let close_var a ?twin:(twin = fun _ -> `Only) k =
   in
   fix_traverse ~go_ix ~go_var
 
-(* TODO: check that this isn't catastrophically wrong *)
-let open_var k a ?twin:(twin = fun _ -> `Only) =
-  let go_ix k' i tw = if i = (k + k') then var ~twin:(twin tw) a else Ix (i, tw), Emp in
-  let go_var _n (b, tw, ush) = Var {name = b; twin = tw; ushift = ush}, Emp in
-  fix_traverse ~go_ix ~go_var
-
 let unbind (B (nm, t)) =
   let x = Name.named nm in
-  x, open_var 0 x t
+  x, open_var 0 (fun _ -> var x) t
 
-let unbind_with x ?twin:(twin = fun _ -> `Only) (B (_, t)) =
-  open_var 0 x ~twin t
+let unbind_with cmd (B (_, t)) =
+  open_var 0 (fun _ -> cmd) t
 
 let unbindn (NB (nms, t)) =
   let rec go k nms xs t =
@@ -770,7 +769,7 @@ let unbindn (NB (nms, t)) =
     | Emp -> Bwd.rev xs, t
     | Snoc (nms, nm) ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) @@ open_var k x t
+      go (k + 1) nms (xs #< x) @@ open_var k (fun _ -> var x) t
   in
   go 0 nms Emp t
 
@@ -786,7 +785,7 @@ let unbind_ext (NB (nms, (ty, sys))) =
     | Emp -> Bwd.rev xs, ty, sys
     | Snoc (nms, nm)  ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) (open_var k x ty) (map_tm_sys (open_var k x) sys)
+      go (k + 1) nms (xs #< x) (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
   in
   go 0 nms Emp ty sys
 
@@ -796,7 +795,7 @@ let unbind_ext_with xs ebnd =
     match xs with
     | [] -> ty, sys
     | x :: xs ->
-      go (k + 1) xs (open_var k x ty) (map_tm_sys (open_var k x) sys)
+      go (k + 1) xs (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
   in
   if Bwd.length nms = List.length xs then
     go 0 xs ty sys
@@ -1508,8 +1507,8 @@ let rec map_ext_bnd f nbnd =
     NB (Emp, (f ty, map_tm_sys f sys))
   | NB (Snoc (nms, nm), (ty, sys)) ->
     let x = Name.named nm in
-    let tyx = open_var 0 x ty in
-    let sysx = map_tm_sys (open_var 0 x) sys in
+    let tyx = open_var 0 (fun _ -> var x) ty in
+    let sysx = map_tm_sys (open_var 0 (fun _ -> var x)) sys in
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
     NB (nms #< nm, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
 
