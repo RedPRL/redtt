@@ -106,150 +106,150 @@ let var ?twin:(tw = `Only) a =
   Var {name = a; twin = tw; ushift = 0}, Emp
 
 
-
-module type Alg =
+(* "algebras" for generic traversals of terms; the interface is imperative, because
+   the monadic / functional version had prohibitively bad performance.
+   Consider refactoring these into OCaml's object system (who know one could ever
+   find a use for that!). *)
+module type IAlg =
 sig
-  module M : Monad.S
-  val push_bindings : int -> 'a M.m -> 'a M.m
-  val under_meta : 'a M.m -> 'a M.m
+  val with_bindings : int -> (unit -> 'a) -> 'a
+  val under_meta : (unit -> 'a) -> 'a
 
-  val bvar : ih:(tm cmd -> tm cmd M.m) -> ix:int -> twin:twin -> tm cmd M.m
-  val fvar : name:Name.t -> twin:twin -> ushift:int -> tm cmd M.m
-  val meta : name:Name.t -> ushift:int -> tm cmd M.m
+  val bvar : ih:(tm cmd -> tm cmd) -> ix:int -> twin:twin -> tm cmd
+  val fvar : name:Name.t -> twin:twin -> ushift:int -> tm cmd
+  val meta : name:Name.t -> ushift:int -> tm cmd
 end
 
-module Traverse (A : Alg) : sig
-  val traverse_tm : tm -> tm A.M.m
-  val traverse_spine : tm spine -> tm spine A.M.m
+
+module ITraverse (A : IAlg) : sig
+  val traverse_tm : tm -> tm
+  val traverse_spine : tm spine -> tm spine
 end =
 struct
-  module M = A.M
-  module Notation = Monad.Notation (M)
-  open Notation
-
   let rec traverse_tm (Tm con) =
-    traverse_con con >>= fun con' ->
-    M.ret @@ Tm con'
+    let con' = traverse_con con in
+    Tm con'
 
   and traverse_con =
     function
     | (Univ _ | Tt | Ff | Bool | S1 | Nat | Int | Dim0 | Dim1 | Base | Zero as con) ->
-      M.ret con
+      con
 
     | FCom info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.r' >>= fun r' ->
-      traverse_tm info.cap >>= fun cap ->
-      traverse_list traverse_bface info.sys >>= fun sys ->
-      M.ret @@ FCom {r; r'; cap; sys}
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
+      FCom {r; r'; cap; sys}
 
     | Pi (dom, cod) ->
-      traverse_tm dom >>= fun dom' ->
-      traverse_bnd traverse_tm cod >>= fun cod' ->
-      M.ret @@ Pi (dom', cod')
+      let dom' = traverse_tm dom in
+      let cod' = traverse_bnd traverse_tm cod in
+      Pi (dom', cod')
 
     | Sg (dom, cod) ->
-      traverse_tm dom >>= fun dom' ->
-      traverse_bnd traverse_tm cod >>= fun cod' ->
-      M.ret @@ Sg (dom', cod')
+      let dom' = traverse_tm dom in
+      let cod' = traverse_bnd traverse_tm cod in
+      Sg (dom', cod')
 
     | Ext ebnd ->
-      traverse_nbnd
-        (traverse_pair traverse_tm (traverse_list traverse_face))
-        ebnd
-      >>= fun ebnd' ->
-      M.ret @@ Ext ebnd'
+      let ebnd' =
+        traverse_nbnd
+          (traverse_pair traverse_tm (traverse_list traverse_face))
+          ebnd
+      in
+      Ext ebnd'
 
     | Rst info ->
-      traverse_tm info.ty >>= fun ty ->
-      traverse_list traverse_face info.sys >>= fun sys ->
-      M.ret @@ Rst {ty; sys}
+      let ty = traverse_tm info.ty in
+      let sys = traverse_list traverse_face info.sys in
+      Rst {ty; sys}
 
     | CoR face ->
-      traverse_face face >>= fun face' ->
-      M.ret @@ CoR face'
+      let face' = traverse_face face in
+      CoR face'
 
     | Cons (t0, t1) ->
-      traverse_tm t0 >>= fun t0' ->
-      traverse_tm t1 >>= fun t1' ->
-      M.ret @@ Cons (t0', t1')
+      let t0' = traverse_tm t0 in
+      let t1' = traverse_tm t1 in
+      Cons (t0', t1')
 
     | V info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.ty0 >>= fun ty0 ->
-      traverse_tm info.ty1 >>= fun ty1 ->
-      traverse_tm info.equiv >>= fun equiv ->
-      M.ret @@ V {r; ty0; ty1; equiv}
+      let r = traverse_tm info.r in
+      let ty0 = traverse_tm info.ty0 in
+      let ty1 = traverse_tm info.ty1 in
+      let equiv = traverse_tm info.equiv in
+      V {r; ty0; ty1; equiv}
 
     | VIn info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.tm0 >>= fun tm0 ->
-      traverse_tm info.tm1 >>= fun tm1 ->
-      M.ret @@ VIn {r; tm0; tm1}
+      let r = traverse_tm info.r in
+      let tm0 = traverse_tm info.tm0 in
+      let tm1 = traverse_tm info.tm1 in
+      VIn {r; tm0; tm1}
 
     | Suc t ->
-      traverse_tm t >>= fun t' ->
-      M.ret @@ Suc t'
+      let t' = traverse_tm t in
+      Suc t'
 
     | NegSuc t ->
-      traverse_tm t >>= fun t' ->
-      M.ret @@ NegSuc t'
+      let t' = traverse_tm t in
+      NegSuc t'
 
     | Pos t ->
-      traverse_tm t >>= fun t' ->
-      M.ret @@ Pos t'
+      let t' = traverse_tm t in
+      Pos t'
 
     | Loop r ->
-      traverse_tm r >>= fun r' ->
-      M.ret @@ Loop r'
+      let r' = traverse_tm r in
+      Loop r'
 
     | Lam bnd ->
-      traverse_bnd traverse_tm bnd >>= fun bnd' ->
-      M.ret @@ Lam bnd'
+      let bnd' = traverse_bnd traverse_tm bnd in
+      Lam bnd'
 
     | ExtLam nbnd ->
-      traverse_nbnd traverse_tm nbnd >>= fun nbnd' ->
-      M.ret @@ ExtLam nbnd'
+      let nbnd' = traverse_nbnd traverse_tm nbnd in
+      ExtLam nbnd'
 
     | CoRThunk face ->
-      traverse_face face >>= fun face' ->
-      M.ret @@ CoRThunk face'
+      let face' = traverse_face face in
+      CoRThunk face'
 
     | Box info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.r' >>= fun r' ->
-      traverse_tm info.cap >>= fun cap ->
-      traverse_list traverse_face info.sys >>= fun sys ->
-      M.ret @@ Box {r; r'; cap; sys}
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_face info.sys in
+      Box {r; r'; cap; sys}
 
     | LblTy info ->
-      traverse_list (traverse_pair traverse_tm traverse_tm) info.args >>= fun args ->
-      traverse_tm info.ty >>= fun ty ->
-      M.ret @@ LblTy {info with args; ty}
+      let args = traverse_list (traverse_pair traverse_tm traverse_tm) info.args in
+      let ty = traverse_tm info.ty in
+      LblTy {info with args; ty}
 
     | LblRet t ->
-      traverse_tm t >>= fun t' ->
-      M.ret @@ LblRet t'
+      let t' = traverse_tm t in
+      LblRet t'
 
     | Let (cmd, bnd) ->
-      traverse_cmd cmd >>= fun cmd' ->
-      traverse_bnd traverse_tm bnd >>= fun bnd' ->
-      M.ret @@ Let (cmd', bnd')
+      let cmd' = traverse_cmd cmd in
+      let bnd' = traverse_bnd traverse_tm bnd in
+      Let (cmd', bnd')
 
     | Up cmd ->
-      traverse_cmd cmd >>= fun cmd' ->
-      M.ret @@ Up cmd'
+      let cmd' = traverse_cmd cmd in
+      Up cmd'
 
   and traverse_cmd (hd, sp) =
-    traverse_head hd >>= fun (hd', sp') ->
-    begin
+    let hd', sp' = traverse_head hd in
+    let sp'' =
       match hd' with
       | Meta _ ->
-        A.under_meta @@ traverse_spine sp
+        A.under_meta @@ fun _ -> traverse_spine sp
       | _ ->
         traverse_spine sp
-    end >>= fun sp'' ->
-    M.ret (hd', sp' <.> sp'')
+    in
+    hd', sp' <.> sp''
 
   and traverse_spine sp =
     traverse_bwd traverse_frame sp
@@ -260,289 +260,258 @@ struct
       A.bvar ~ih:traverse_cmd ~ix ~twin
 
     | Var {name; twin; ushift} ->
-      (* TODO *)
       A.fvar ~name ~twin ~ushift
 
     | Meta {name; ushift} ->
       A.meta ~name ~ushift
 
     | Down info ->
-      traverse_tm info.ty >>= fun ty ->
-      traverse_tm info.tm >>= fun tm ->
-      M.ret (Down {ty; tm}, Emp)
+      let ty = traverse_tm info.ty in
+      let tm = traverse_tm info.tm in
+      Down {ty; tm}, Emp
 
     | Coe info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.r' >>= fun r' ->
-      traverse_bnd traverse_tm info.ty >>= fun ty ->
-      traverse_tm info.tm >>= fun tm ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_bnd traverse_tm info.ty in
+      let tm = traverse_tm info.tm in
       let coe = Coe {r; r'; ty; tm} in
-      M.ret (coe, Emp)
+      coe, Emp
 
     | HCom info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.r' >>= fun r' ->
-      traverse_tm info.ty >>= fun ty ->
-      traverse_tm info.cap >>= fun cap ->
-      traverse_list traverse_bface info.sys >>= fun sys ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_tm info.ty in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
       let hcom = HCom {r; r'; ty; cap; sys} in
-      M.ret (hcom, Emp)
+      hcom, Emp
 
     | GHCom info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.r' >>= fun r' ->
-      traverse_tm info.ty >>= fun ty ->
-      traverse_tm info.cap >>= fun cap ->
-      traverse_list traverse_bface info.sys >>= fun sys ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_tm info.ty in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
       let hcom = GHCom {r; r'; ty; cap; sys} in
-      M.ret (hcom, Emp)
+      hcom, Emp
 
     | Com info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.r' >>= fun r' ->
-      traverse_bnd traverse_tm info.ty >>= fun ty ->
-      traverse_tm info.cap >>= fun cap ->
-      traverse_list traverse_bface info.sys >>= fun sys ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_bnd traverse_tm info.ty in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
       let com = Com {r; r'; ty; cap; sys} in
-      M.ret (com, Emp)
+      com, Emp
 
     | GCom info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.r' >>= fun r' ->
-      traverse_bnd traverse_tm info.ty >>= fun ty ->
-      traverse_tm info.cap >>= fun cap ->
-      traverse_list traverse_bface info.sys >>= fun sys ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_bnd traverse_tm info.ty in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
       let com = GCom {r; r'; ty; cap; sys} in
-      M.ret (com, Emp)
+      com, Emp
 
-  and traverse_bnd : 'a. ('a -> 'b M.m) -> 'a bnd -> 'b bnd M.m =
+  and traverse_bnd : 'a. ('a -> 'b) -> 'a bnd -> 'b bnd =
     fun f (B (nm, tm)) ->
-      A.push_bindings 1
-        begin
-          f tm
-        end >>= fun tm' ->
-      M.ret @@ B (nm, tm')
+      let tm' = A.with_bindings 1 (fun _ -> f tm) in
+      B (nm, tm')
 
-  and traverse_nbnd : 'a 'b. ('a -> 'b M.m) -> 'a nbnd -> 'b nbnd M.m =
+  and traverse_nbnd : 'a 'b. ('a -> 'b) -> 'a nbnd -> 'b nbnd =
     fun f (NB (nms, tm)) ->
-      A.push_bindings (Bwd.length nms)
-        begin
-          f tm
-        end >>= fun tm' ->
-      M.ret @@ NB (nms, tm')
+      let tm' = A.with_bindings (Bwd.length nms) (fun _ -> f tm) in
+      NB (nms, tm')
 
   and traverse_bface (r, r', obnd) =
-    traverse_tm r >>= fun s ->
-    traverse_tm r' >>= fun s' ->
-    traverse_opt (traverse_bnd traverse_tm) obnd >>= fun obnd' ->
-    M.ret (s, s', obnd')
+    let s = traverse_tm r in
+    let s' = traverse_tm r' in
+    let obnd' = traverse_opt (traverse_bnd traverse_tm) obnd in
+    s, s', obnd'
 
   and traverse_face (r, r', otm) =
-    traverse_tm r >>= fun s ->
-    traverse_tm r' >>= fun s' ->
-    traverse_opt traverse_tm otm >>= fun otm' ->
-    M.ret (s, s', otm')
+    let s = traverse_tm r in
+    let s' = traverse_tm r' in
+    let otm' = traverse_opt traverse_tm otm in
+    s, s', otm'
 
-  and traverse_pair : 'a 'b 'c 'd. ('a -> 'c M.m) -> ('b -> 'd M.m) -> 'a * 'b -> ('c * 'd) M.m =
+  and traverse_pair : 'a 'b 'c 'd. ('a -> 'c) -> ('b -> 'd) -> 'a * 'b -> ('c * 'd) =
     fun f g (a, b) ->
-      f a >>= fun c ->
-      g b >>= fun d ->
-      M.ret (c, d)
+      let c = f a in
+      let d = g b in
+      c, d
 
-  and traverse_opt : 'a 'b. ('a -> 'b M.m) -> 'a option -> 'b option M.m =
+  and traverse_opt : 'a 'b. ('a -> 'b) -> 'a option -> 'b option =
     fun f ->
       function
       | None ->
-        M.ret None
+        None
       | Some a ->
-        f a >>= fun a' ->
-        M.ret @@ Some a'
+        let a' = f a in
+        Some a'
 
-  and traverse_list : 'a 'b. ('a -> 'b M.m) -> 'a list -> 'b list M.m =
+  and traverse_list : 'a 'b. ('a -> 'b) -> 'a list -> 'b list =
     fun f ->
       function
-      | [] -> M.ret []
+      | [] -> []
       | x :: xs ->
-        f x >>= fun x' ->
-        traverse_list f xs >>= fun xs' ->
-        M.ret @@ x' :: xs'
+        let x' = f x in
+        let xs' = traverse_list f xs in
+        x' :: xs'
 
-  and traverse_bwd : 'a 'b. ('a -> 'b M.m) -> 'a bwd -> 'b bwd M.m =
+  and traverse_bwd : 'a 'b. ('a -> 'b) -> 'a bwd -> 'b bwd =
     fun f ->
       function
-      | Emp -> M.ret Emp
+      | Emp -> Emp
       | Snoc (xs, x) ->
-        traverse_bwd f xs >>= fun xs' ->
-        f x >>= fun x' ->
-        M.ret @@ Snoc (xs', x')
+        let xs' = traverse_bwd f xs in
+        let x' = f x in
+        Snoc (xs', x')
 
 
   and traverse_frame =
     function
     | (Car | Cdr | LblCall | CoRForce as frm) ->
-      M.ret frm
+      frm
 
     | FunApp t ->
-      traverse_tm t >>= fun t' ->
-      M.ret @@ FunApp t'
+      let t' = traverse_tm t in
+      FunApp t'
 
     | ExtApp ts ->
-      traverse_bwd traverse_tm ts >>= fun ts' ->
-      M.ret @@ ExtApp ts'
+      let ts' = traverse_bwd traverse_tm ts in
+      ExtApp ts'
 
     | If info ->
-      traverse_bnd traverse_tm info.mot >>= fun mot ->
-      traverse_tm info.tcase >>= fun tcase ->
-      traverse_tm info.fcase >>= fun fcase ->
-      M.ret @@ If {mot; tcase; fcase}
+      let mot = traverse_bnd traverse_tm info.mot in
+      let tcase = traverse_tm info.tcase in
+      let fcase = traverse_tm info.fcase in
+      If {mot; tcase; fcase}
 
     | NatRec info ->
-      traverse_bnd traverse_tm info.mot >>= fun mot ->
-      traverse_tm info.zcase >>= fun zcase ->
-      traverse_nbnd traverse_tm info.scase >>= fun scase ->
-      M.ret @@ NatRec {mot; zcase; scase}
+      let mot = traverse_bnd traverse_tm info.mot in
+      let zcase = traverse_tm info.zcase in
+      let scase = traverse_nbnd traverse_tm info.scase in
+      NatRec {mot; zcase; scase}
 
     | IntRec info ->
-      traverse_bnd traverse_tm info.mot >>= fun mot ->
-      traverse_bnd traverse_tm info.pcase >>= fun pcase ->
-      traverse_bnd traverse_tm info.ncase >>= fun ncase ->
-      M.ret @@ IntRec {mot; pcase; ncase}
+      let mot = traverse_bnd traverse_tm info.mot in
+      let pcase = traverse_bnd traverse_tm info.pcase in
+      let ncase = traverse_bnd traverse_tm info.ncase in
+      IntRec {mot; pcase; ncase}
 
     | S1Rec info ->
-      traverse_bnd traverse_tm info.mot >>= fun mot ->
-      traverse_tm info.bcase >>= fun bcase ->
-      traverse_bnd traverse_tm info.lcase >>= fun lcase ->
-      M.ret @@ S1Rec {mot; bcase; lcase}
+      let mot = traverse_bnd traverse_tm info.mot in
+      let bcase = traverse_tm info.bcase in
+      let lcase = traverse_bnd traverse_tm info.lcase in
+      S1Rec {mot; bcase; lcase}
 
     | VProj info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.ty0 >>= fun ty0 ->
-      traverse_tm info.ty1 >>= fun ty1 ->
-      traverse_tm info.equiv >>= fun equiv ->
-      M.ret @@ VProj {r; ty0; ty1; equiv}
+      let r = traverse_tm info.r in
+      let ty0 = traverse_tm info.ty0 in
+      let ty1 = traverse_tm info.ty1 in
+      let equiv = traverse_tm info.equiv in
+      VProj {r; ty0; ty1; equiv}
 
     | Cap info ->
-      traverse_tm info.r >>= fun r ->
-      traverse_tm info.r' >>= fun r' ->
-      traverse_tm info.ty >>= fun ty ->
-      traverse_list traverse_bface info.sys >>= fun sys ->
-      M.ret @@ Cap {r; r'; ty; sys}
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_tm info.ty in
+      let sys = traverse_list traverse_bface info.sys in
+      Cap {r; r'; ty; sys}
 end
 
 
 
 
-module OpenVarAlg :
+
+
+
+
+
+
+
+
+
+
+module ISubstAlg (Init : sig val subst : tm cmd subst end) :
 sig
-  include Alg
-  val run : int -> (twin -> tm cmd) -> 'a M.m -> 'a
+  include IAlg
 end =
 struct
-  type state = { cmd : twin -> tm cmd; depth: int}
-
-  module M = ReaderMonad.M (struct type t = state end)
-  module Notation = Monad.Notation (M)
-  open Notation
-
-  let run k cmd =
-    M.run {cmd; depth = k}
-
-  let push_bindings n =
-    M.local @@ fun st ->
-    {st with depth = st.depth + n}
-
-  let under_meta m = m
-
-  let bvar ~ih ~ix ~twin =
-    M.get >>= fun st ->
-    if ix = st.depth then
-      M.ret @@ st.cmd twin
-    else
-      M.ret (Ix (ix, twin), Emp)
-
-  let fvar ~name ~twin ~ushift =
-    M.ret (Var {name; twin; ushift}, Emp)
-
-  let meta ~name ~ushift =
-    M.ret (Meta {name; ushift}, Emp)
-end
-
-module SubstAlg :
-sig
-  include Alg
-  val run : tm cmd subst -> 'a M.m -> 'a
-end =
-struct
-  type state = tm cmd subst
-
-  module M = ReaderMonad.M (struct type t = state end)
-  module Notation = Monad.Notation (M)
-  open Notation
-
-  let run = M.run
-
+  let subst = ref Init.subst
 
   let rec lift sub =
     Dot (ix 0, Cmp (Shift 1, sub))
 
-  and liftn n sub =
+  and liftn n (sub : tm cmd subst) : tm cmd subst  =
     match n with
     | 0 -> sub
     | _ -> liftn (n - 1) @@ lift sub
 
-  let push_bindings k =
-    M.local @@ liftn k
+  let under_meta f = f ()
 
-  let under_meta m = m
+  let with_bindings n f =
+    let old = !subst in
+    subst := liftn n old;
+    let r = f () in
+    subst := old;
+    r
 
   let rec bvar ~ih ~ix ~twin =
-    M.get >>= fun sub ->
-    match sub, ix with
+    match !subst, ix with
     | Shift n, _ ->
-      M.ret (Ix (ix + n, twin), Emp)
+      Ix (ix + n, twin), Emp
+
     | Dot (cmd, _), 0 ->
-      M.ret cmd
+      cmd
+
     | Dot (_, sub), _ ->
-      M.local (fun _ -> sub) @@
-      bvar ~ih ~ix:(ix - 1) ~twin
+      let old = !subst in
+      subst := sub;
+      let r = bvar ~ih ~ix:(ix - 1) ~twin in
+      subst := old;
+      r
+
     | Cmp (sub1, sub0), _ ->
-      cmp_subst ih sub1 sub0 >>= fun sub ->
-      M.local (fun _ -> sub) @@
+      subst := cmp_subst ih sub1 sub0;
       bvar ~ih ~ix ~twin
+
 
   and cmp_subst ih sub0 sub1 =
     match sub0, sub1 with
-    | s, Shift 0 -> M.ret s
-    | Dot (_, sub0), Shift m -> cmp_subst ih sub0 (Shift (m - 1))
-    | Shift m, Shift n -> M.ret @@ Shift (m + n)
+    | s, Shift 0 ->
+      s
+    | Dot (_, sub0), Shift m ->
+      cmp_subst ih sub0 (Shift (m - 1))
+    | Shift m, Shift n ->
+      Shift (m + n)
     | sub0, Dot (e, sub1) ->
-      M.local (fun _ -> sub0) (ih e) >>= fun e' ->
-      cmp_subst ih sub0 sub1 >>= fun sub' ->
-      M.ret @@ Dot (e', sub')
+      let old = !subst in
+      subst := sub0;
+      let e' = ih e in
+      subst := old;
+      let sub' = cmp_subst ih sub0 sub1 in
+      Dot (e', sub')
+    (* Dot (subst_cmd sub0 e, cmp_subst sub0 sub1) *)
     | Cmp (sub0, sub1), sub ->
-      cmp_subst ih sub0 sub1 >>= fun sub' ->
+      let sub' = cmp_subst ih sub0 sub1 in
       cmp_subst ih sub' sub
     | sub, Cmp (sub0, sub1) ->
-      cmp_subst ih sub0 sub1 >>= fun sub' ->
+      let sub' = cmp_subst ih sub0 sub1 in
       cmp_subst ih sub sub'
 
-
   let fvar ~name ~twin ~ushift =
-    M.ret (Var {name; twin; ushift}, Emp)
-
+    Var {name; twin; ushift}, Emp
   let meta ~name ~ushift =
-    M.ret (Meta {name; ushift}, Emp)
+    Meta {name; ushift}, Emp
 end
 
-
-let open_var k cmd tm =
-  let module T = Traverse (OpenVarAlg) in
-  OpenVarAlg.run k cmd @@ T.traverse_tm tm
-
 let subst sub tm =
-  let module T = Traverse (SubstAlg) in
-  SubstAlg.run sub @@ T.traverse_tm  tm
-
+  let module Init = struct let subst = sub end in
+  let module T = ITraverse (ISubstAlg (Init)) in
+  T.traverse_tm tm
 
 
 let make con =
@@ -553,46 +522,98 @@ let make con =
 
 let unleash (Tm con) = con
 
-module CloseVarAlg :
-sig
-  include Alg
-  val run : twin:(twin -> twin) -> name:Name.t -> ix:int -> 'a M.m -> 'a
-end =
+module IOpenVarAlg (Init : sig val cmd : twin -> tm cmd val ix : int end) : IAlg =
 struct
-  type state = {twin : twin -> twin; name : Name.t; ix : int}
-  module M = ReaderMonad.M (struct type t = state end)
-  module Notation = Monad.Notation (M)
-  open Notation
+  let state = ref Init.ix
 
-  let run ~twin ~name ~ix =
-    M.run {twin; name; ix}
+  let with_bindings n f =
+    let old = !state in
+    state := old + n;
+    let r = f () in
+    state := old;
+    r
 
-  let under_meta m = m
-
-  let push_bindings n =
-    M.local @@ fun st ->
-    {st with ix = n + st.ix}
+  let under_meta f =
+    f ()
 
   let bvar ~ih ~ix ~twin =
-    M.ret (Ix (ix, twin), Emp)
+    if ix = !state then
+      Init.cmd twin
+    else
+      Ix (ix, twin), Emp
 
   let fvar ~name ~twin ~ushift =
-    M.get >>= fun st ->
-    M.ret @@
-    if name = st.name then
-      Ix (st.ix, st.twin twin), Emp
+    Var {name; twin; ushift}, Emp
+
+  let meta ~name ~ushift =
+    Meta {name; ushift}, Emp
+end
+
+module ICloseVarAlg (Init : sig val twin : twin -> twin val name : Name.t val ix : int end) : IAlg =
+struct
+  let state = ref Init.ix
+
+  let under_meta f = f ()
+
+  let with_bindings k f =
+    let old = !state in
+    state := old + k;
+    let r = f () in
+    state := old;
+    r
+
+  let bvar ~ih ~ix ~twin =
+    Ix (ix, twin), Emp
+
+  let fvar ~name ~twin ~ushift =
+    if name = Init.name then
+      Ix (!state, Init.twin twin), Emp
     else
       Var {name; twin; ushift}, Emp
 
 
   let meta ~name ~ushift =
-    M.ret (Meta {name; ushift}, Emp)
+    Meta {name; ushift}, Emp
 end
 
-let close_var a ?twin:(twin = fun _ -> `Only) k tm =
-  let module T = Traverse (CloseVarAlg) in
-  CloseVarAlg.run ~twin ~name:a ~ix:k @@ T.traverse_tm tm
 
+let close_var_clock = ref 0.
+let open_var_clock = ref 0.
+
+let _ =
+  Diagnostics.on_termination @@ fun _ ->
+  Format.eprintf "Tm spent %fs in close_var@." !close_var_clock;
+  Format.eprintf "Tm spent %fs in open_var@." !open_var_clock
+
+let open_var k cmd tm =
+  let now0 = Unix.gettimeofday () in
+  let module Init =
+  struct
+    let cmd = cmd
+    let ix = k
+  end
+  in
+  let module T = ITraverse (IOpenVarAlg (Init)) in
+  let res = T.traverse_tm tm in
+  let now1 = Unix.gettimeofday () in
+  open_var_clock := !open_var_clock +. (now1 -. now0);
+  res
+
+
+let close_var a ?twin:(twin = fun _ -> `Only) k tm =
+  let now0 = Unix.gettimeofday () in
+  let module Init =
+  struct
+    let twin = twin
+    let name = a
+    let ix = k
+  end
+  in
+  let module T = ITraverse (ICloseVarAlg (Init)) in
+  let res = T.traverse_tm tm in
+  let now1 = Unix.gettimeofday () in
+  close_var_clock := !close_var_clock +. (now1 -. now0);
+  res
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
@@ -1039,79 +1060,79 @@ struct
 end
 
 
-module OccursAlg :
+module IOccursAlg (Init : sig val fl : Occurs.flavor end) :
 sig
-  include Alg
-  val run : Occurs.flavor -> 'a M.m -> 'a * Occurs.Set.t
+  include IAlg
+  val get : unit -> Occurs.Set.t
 end =
 struct
   type set = Occurs.Set.t
-  type state = {fl : Occurs.flavor; vars : set; srigid: bool}
 
-  module M = StateMonad.M (struct type t = state end)
-  module Notation = Monad.Notation (M)
-  open Notation
+  let state = ref Occurs.Set.empty
+  let srigid = ref true
+  let get () = !state
 
-  let run fl m =
-    let init = {fl; vars = Occurs.Set.empty; srigid = true} in
-    let a, st = M.run init m in
-    a, st.vars
+  open Init
 
   let insert x =
-    M.get >>= fun st ->
-    M.set @@ {st with vars = Occurs.Set.add x st.vars}
+    state := Occurs.Set.add x !state
 
-  let push_bindings _ m =
-    m
+  let with_bindings _ f =
+    f ()
 
-  let under_meta m =
-    M.get >>= fun st0 ->
-    M.set {st0 with srigid = false} >>
-    m >>= fun a ->
-    M.get >>= fun st1 ->
-    M.set {st1 with srigid = st0.srigid} >>
-    M.ret a
+
+  let under_meta f =
+    let old = !srigid in
+    srigid := false;
+    let r = f () in
+    srigid := old;
+    r
+
 
   let bvar ~ih ~ix ~twin =
-    M.ret (Ix (ix, twin), Emp)
+    Ix (ix, twin), Emp
 
   let fvar ~name ~twin ~ushift =
-    M.get >>= fun st ->
     begin
-      if st.fl = `Vars || (st.fl = `RigVars && st.srigid) then
+      if fl = `Vars || (fl = `RigVars && !srigid) then
         insert name
       else
-        M.ret ()
-    end >>
-    M.ret (Var {name; twin; ushift}, Emp)
+        ()
+    end;
+    Var {name; twin; ushift}, Emp
 
   let meta ~name ~ushift =
-    M.get >>= fun st ->
     begin
-      if st.fl = `Metas then
+      if fl = `Metas then
         insert name
       else
-        M.ret ()
-    end >>
-    M.ret (Meta {name; ushift}, Emp)
+        ()
+    end;
+    Meta {name; ushift}, Emp
 end
 
 
 
 
 let free fl tm =
-  let module T = Traverse (OccursAlg) in
-  let _, xs = OccursAlg.run fl @@ T.traverse_tm tm in
-  xs
+  let module Init = struct let fl = fl end in
+  let module A = IOccursAlg (Init) in
+  let module T = ITraverse (A) in
+  let _ = T.traverse_tm tm in
+  A.get ()
+
 
 module Sp =
 struct
   type t = tm spine
   let free fl sp =
-    let module T = Traverse (OccursAlg) in
-    let _, xs = OccursAlg.run fl @@ T.traverse_spine sp in
-    xs
+    let module Init = struct let fl = fl end in
+    let module A = IOccursAlg (Init) in
+    let module T = ITraverse (A) in
+    let _ = T.traverse_spine sp in
+    A.get ()
 end
+
 
 let map_bnd (f : tm -> tm) (bnd : tm bnd) : tm bnd =
   let x, tx = unbind bnd in
