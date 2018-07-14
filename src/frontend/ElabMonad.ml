@@ -52,20 +52,18 @@ let rec normalize_tele =
 
 let print_diagnostic =
   function
-  | UserHole {name; tele; ty; tm} ->
+  | UserHole {name; tele; ty; _} ->
     C.local (fun _ -> tele) @@
     begin
       C.bind C.typechecker @@ fun (module T) ->
       C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
       let vty = T.Cx.eval T.Cx.emp ty in
       let ty = T.Cx.quote_ty T.Cx.emp vty in
-      Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@,%a %a@]@.@."
+      Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@]@.@."
         (match name with Some name -> name | None -> "Hole")
         Dev.pp_params (Bwd.from_list tele)
         Uuseg_string.pp_utf_8 "⊢"
-        Tm.pp0 ty
-        Uuseg_string.pp_utf_8 "⟿"
-        Tm.pp0 tm;
+        Tm.pp0 ty;
       C.ret ()
     end
 
