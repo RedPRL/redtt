@@ -89,7 +89,7 @@ and 'a cmd = 'a head * 'a spine
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
-  | Lift of int * 'a subst
+  | Cmp of 'a subst * 'a subst
 
 type tm = Tm of tm tmf
 
@@ -481,9 +481,17 @@ struct
 
   let run = M.run
 
+
+  let rec lift sub =
+    Dot (ix 0, Cmp (Shift 1, sub))
+
+  and liftn n sub =
+    match n with
+    | 0 -> sub
+    | _ -> liftn (n - 1) @@ lift sub
+
   let push_bindings k =
-    M.local @@ fun sub ->
-    Lift (k, sub)
+    M.local @@ liftn k
 
   let under_meta m = m
 
@@ -497,20 +505,27 @@ struct
     | Dot (_, sub), _ ->
       M.local (fun _ -> sub) @@
       bvar ~ih ~ix:(ix - 1) ~twin
-    | Lift (0, sub), _ ->
+    | Cmp (sub1, sub0), _ ->
+      cmp_subst ih sub1 sub0 >>= fun sub ->
       M.local (fun _ -> sub) @@
-      bvar ~ih ~ix:ix ~twin
+      bvar ~ih ~ix ~twin
 
-    | Lift (n, sub), 0 ->
-      M.ret (Ix (ix, twin), Emp)
+  and cmp_subst ih sub0 sub1 =
+    match sub0, sub1 with
+    | s, Shift 0 -> M.ret s
+    | Dot (_, sub0), Shift m -> cmp_subst ih sub0 (Shift (m - 1))
+    | Shift m, Shift n -> M.ret @@ Shift (m + n)
+    | sub0, Dot (e, sub1) ->
+      M.local (fun _ -> sub0) (ih e) >>= fun e' ->
+      cmp_subst ih sub0 sub1 >>= fun sub' ->
+      M.ret @@ Dot (e', sub')
+    | Cmp (sub0, sub1), sub ->
+      cmp_subst ih sub0 sub1 >>= fun sub' ->
+      cmp_subst ih sub' sub
+    | sub, Cmp (sub0, sub1) ->
+      cmp_subst ih sub0 sub1 >>= fun sub' ->
+      cmp_subst ih sub sub'
 
-    | Lift (n, sub), _ ->
-      begin
-        M.local (fun _ -> sub) @@
-        bvar ~ih ~ix:(ix - n) ~twin
-      end >>= fun cmd ->
-      M.local (fun _ -> Shift n) @@
-      ih cmd
 
   let fvar ~name ~twin ~ushift =
     M.ret (Var {name; twin; ushift}, Emp)
