@@ -75,6 +75,7 @@ and 'a frame =
   | ExtApp of 'a bwd
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | NatRec of {mot : 'a bnd; zcase : 'a; scase : 'a nbnd}
+  | IntRec of {mot : 'a bnd; pcase : 'a bnd; ncase : 'a bnd}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}

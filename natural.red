@@ -1,12 +1,12 @@
 import path
 
-let pred (x : nat) : nat =
+let nat-pred (x : nat) : nat =
   nat-rec x with
   | zero ⇒ zero
   | suc n ⇒ n
   end
 
-let pred/succ (x : nat) : Path nat x (pred (suc x)) =
+let nat-pred/succ (x : nat) : Path nat x (nat-pred (suc x)) =
   nat-rec x with
   | zero ⇒ λ i → zero
   | suc n ⇒ λ _ → suc n

@@ -186,6 +186,19 @@ struct
         let n = equate env ty n0 n1 in
         Tm.make @@ Tm.Suc n
 
+      | Int, Int ->
+        Tm.make Tm.Int
+
+      | Pos n0, Pos n1 ->
+        let nat = make Nat in
+        let n = equate env nat n0 n1 in
+        Tm.make @@ Tm.Pos n
+
+      | NegSuc n0, NegSuc n1 ->
+        let nat = make Nat in
+        let n = equate env nat n0 n1 in
+        Tm.make @@ Tm.NegSuc n
+
       | Pi pi0, Pi pi1 ->
         let dom = equate env ty pi0.dom pi1.dom in
         let var = generic env pi0.dom in
@@ -337,10 +350,10 @@ struct
       let frame = Tm.If {mot = Tm.B (clo_name if0.mot, mot); tcase; fcase} in
       equate_neu_ env if0.neu if1.neu @@ frame :: stk
     | NatRec rec0, NatRec rec1 ->
-      let var = generic env @@ make Nat in
-      let env' = Env.succ env in
-      let vmot0 = inst_clo rec0.mot var in
       let mot =
+        let var = generic env @@ make Nat in
+        let env' = Env.succ env in
+        let vmot0 = inst_clo rec0.mot var in
         let vmot1 = inst_clo rec1.mot var in
         equate_ty env' vmot0 vmot1
       in
@@ -349,6 +362,9 @@ struct
         equate env vmot_ze rec0.zcase rec1.zcase
       in
       let scase =
+        let var = generic env @@ make Nat in
+        let env' = Env.succ env in
+        let vmot0 = inst_clo rec0.mot var in
         let ih = generic env' vmot0 in
         let vmot_su = inst_clo rec0.mot @@ make @@ Suc var in
         let scase0 = inst_nclo rec0.scase [var; ih] in
@@ -356,6 +372,32 @@ struct
         equate (Env.succ env') vmot_su scase0 scase1
       in
       let frame = Tm.NatRec {mot = Tm.B (clo_name rec0.mot, mot); zcase; scase = Tm.NB (nclo_names rec0.scase, scase)} in
+      equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
+    | IntRec rec0, IntRec rec1 ->
+      let mot =
+        let var = generic env @@ make Int in
+        let env' = Env.succ env in
+        let vmot0 = inst_clo rec0.mot var in
+        let vmot1 = inst_clo rec1.mot var in
+        equate_ty env' vmot0 vmot1
+      in
+      let pcase =
+        let var = generic env @@ make Nat in
+        let vmot_pos = inst_clo rec0.mot @@ make @@ Pos var in
+        let pcase0 = inst_clo rec0.pcase var in
+        let pcase1 = inst_clo rec1.pcase var in
+        let env' = Env.succ env in
+        equate env' vmot_pos pcase0 pcase1
+      in
+      let ncase =
+        let var = generic env @@ make Nat in
+        let vmot_pos = inst_clo rec0.mot @@ make @@ NegSuc var in
+        let ncase0 = inst_clo rec0.ncase var in
+        let ncase1 = inst_clo rec1.ncase var in
+        let env' = Env.succ env in
+        equate env' vmot_pos ncase0 ncase1
+      in
+      let frame = Tm.IntRec {mot = Tm.B (clo_name rec0.mot, mot); pcase = Tm.B (clo_name rec0.pcase, pcase); ncase = Tm.B (clo_name rec0.ncase, ncase)} in
       equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
     | VProj vproj0, VProj vproj1 ->
       let x0 = vproj0.x in

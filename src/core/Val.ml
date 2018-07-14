@@ -1606,6 +1606,11 @@ struct
       let zcase = eval rho info.zcase in
       let scase = nclo info.scase rho in
       nat_rec mot vhd zcase scase
+    | Tm.IntRec info ->
+      let mot = clo info.mot rho in
+      let pcase = clo info.pcase rho in
+      let ncase = clo info.ncase rho in
+      int_rec mot vhd pcase ncase
     | Tm.S1Rec info ->
       let mot = clo info.mot rho in
       let bcase = eval rho info.bcase in
@@ -2079,7 +2084,7 @@ struct
   and int_rec mot scrut pcase ncase =
     match unleash scrut with
     | Pos n -> inst_clo pcase n
-    | Suc n -> inst_clo ncase n
+    | NegSuc n -> inst_clo ncase n
     | Up up ->
       let neu = IntRec {mot; neu = up.neu; pcase; ncase} in
       let mot' = inst_clo mot scrut in
@@ -2340,7 +2345,7 @@ struct
     | Int ->
       Format.fprintf fmt "int"
     | Pos n ->
-      Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
+      Format.fprintf fmt "@[<1>(pos@ %a)@]" pp_value n
     | NegSuc n ->
       Format.fprintf fmt "@[<1>(negsuc@ %a)@]" pp_value n
     | S1 ->

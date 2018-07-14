@@ -229,6 +229,8 @@ let rec tac_lambda names tac ty =
         raise ChkMatch
     end
 
+(* TODO factor out the motive inference algorithm *)
+
 let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scase, tac_scase) =
   fun ty ->
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
@@ -270,4 +272,52 @@ let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scas
       Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
     in
     let frm = Tm.NatRec {mot = bmot; zcase; scase} in
+    M.ret @@ Tm.up (hd, Emp #< frm)
+
+let tac_int_rec ~tac_mot ~tac_scrut ~tac_pcase:(nm_pcase, tac_pcase) ~tac_ncase:(nm_ncase, tac_ncase) =
+  fun ty ->
+    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    (* let nat = Tm.make @@ Tm.Nat in *)
+    let int = Tm.make @@ Tm.Int in
+    let mot_ty = Tm.pi None int univ in
+    let x_pcase = Name.named @@ Some nm_pcase in
+    let x_ncase = Name.named @@ Some nm_ncase in
+    tac_scrut int >>= fun scrut ->
+    begin
+      match tac_mot with
+      | None ->
+        let is_dependent =
+          match Tm.unleash scrut with
+          | Tm.Up (Tm.Var {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
+          | _ -> false
+        in
+        if is_dependent then
+          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
+          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
+          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
+          M.unify >>
+          M.ret mot
+        else
+          M.ret (fun _ -> ty)
+      | Some tac_mot ->
+        tac_mot mot_ty >>= fun mot ->
+        let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
+        M.ret fmot
+    end >>= fun mot ->
+    let mot_pos_x = mot (Tm.make (Tm.Pos (Tm.up (Tm.var x_pcase)))) in
+    M.in_scope x_pcase (`P (Tm.make @@ Tm.Nat)) begin
+      tac_pcase mot_pos_x >>= fun tm ->
+      M.ret @@ Tm.bind x_pcase tm
+    end >>= fun pcase ->
+    let mot_negsuc_x = mot (Tm.make (Tm.NegSuc (Tm.up (Tm.var x_ncase)))) in
+    M.in_scope x_ncase (`P (Tm.make @@ Tm.Nat)) begin
+      tac_ncase mot_negsuc_x >>= fun tm ->
+      M.ret @@ Tm.bind x_ncase tm
+    end >>= fun ncase ->
+    let hd = Tm.Down {ty = int; tm = scrut} in
+    let bmot =
+      let x = Name.fresh () in
+      Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
+    in
+    let frm = Tm.IntRec {mot = bmot; pcase; ncase} in
     M.ret @@ Tm.up (hd, Emp #< frm)

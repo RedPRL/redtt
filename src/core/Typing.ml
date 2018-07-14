@@ -189,10 +189,7 @@ struct
       let ty1 = check_eval cx ty info.ty1 in
       check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-    | V.Univ _, T.Bool ->
-      ()
-
-    | V.Univ _, T.Nat ->
+    | V.Univ _, (T.Bool | T.Nat | T.Int) ->
       ()
 
 
@@ -271,6 +268,12 @@ struct
       ()
 
     | V.Nat, T.Suc n ->
+      check cx (Eval.make V.Nat) n
+
+    | V.Int, T.Pos n ->
+      check cx (Eval.make V.Nat) n
+
+    | V.Int, T.NegSuc n ->
       check cx (Eval.make V.Nat) n
 
     | V.V vty, T.VIn vin ->
@@ -531,7 +534,7 @@ struct
 
       let mot_clo = Cx.make_closure cx info.mot in
 
-      (* result type *)
+      (* head *)
       Cx.check_eq_ty cx ty nat;
 
       (* zero *)
@@ -553,6 +556,39 @@ struct
         let cx_x_ih, ih = Cx.ext_ty cx_x nm_rec_scase mot_x in
         let mot_suc = Eval.inst_clo mot_clo @@ Eval.make @@ V.Suc x in
         check cx_x_ih mot_suc scase
+      in
+
+      Eval.inst_clo mot_clo hd
+
+    | T.IntRec info ->
+      let T.B (nm, mot) = info.mot in
+      let int = Eval.make V.Int in
+      let _ =
+        let cx_x, _ = Cx.ext_ty cx ~nm int in
+        check_ty cx_x mot
+      in
+
+      let mot_clo = Cx.make_closure cx info.mot in
+
+      (* head *)
+      Cx.check_eq_ty cx ty int;
+
+      (* pos *)
+      let _ =
+        let T.B (nm_pcase, pcase) = info.pcase in
+        let nat = Eval.make V.Nat in
+        let cx_n, n = Cx.ext_ty cx ~nm:nm_pcase nat in
+        let mot_pos = Cx.Eval.inst_clo mot_clo @@ Eval.make (V.Pos n) in
+        check cx_n mot_pos pcase
+      in
+
+      (* negsucc *)
+      let _ =
+        let T.B (nm_ncase, ncase) = info.ncase in
+        let nat = Eval.make V.Nat in
+        let cx_n, n = Cx.ext_ty cx ~nm:nm_ncase nat in
+        let mot_negsuc = Cx.Eval.inst_clo mot_clo @@ Eval.make (V.NegSuc n) in
+        check cx_n mot_negsuc ncase
       in
 
       Eval.inst_clo mot_clo hd

@@ -77,6 +77,7 @@ and 'a frame =
   | ExtApp of 'a bwd
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | NatRec of {mot : 'a bnd; zcase : 'a; scase : 'a nbnd}
+  | IntRec of {mot : 'a bnd; pcase : 'a bnd; ncase : 'a bnd}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
@@ -238,6 +239,11 @@ and subst_frame sub frame =
     let zcase = subst sub info.zcase in
     let scase = subst_nbnd sub info.scase in
     NatRec {mot; zcase; scase}
+  | IntRec info ->
+    let mot = subst_bnd sub info.mot in
+    let pcase = subst_bnd sub info.pcase in
+    let ncase = subst_bnd sub info.ncase in
+    IntRec {mot; pcase; ncase}
   | S1Rec info ->
     let mot = subst_bnd sub info.mot in
     let bcase = subst sub info.bcase in
@@ -505,6 +511,11 @@ let traverse ~f ~go_ix ~go_var =
       let zcase = f k info.zcase in
       let scase = go_nbnd k info.scase in
       NatRec {mot; zcase; scase}
+    | IntRec info ->
+      let mot = go_bnd k info.mot in
+      let pcase = go_bnd k info.pcase in
+      let ncase = go_bnd k info.ncase in
+      IntRec {mot; pcase; ncase}
     | S1Rec info ->
       let mot = go_bnd k info.mot in
       let bcase = f k info.bcase in
@@ -730,7 +741,7 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<hv1> (pos %a)@]" (go env `Pos) n
 
     | NegSuc n ->
-      Format.fprintf fmt "@[<hv1> (neg-suc %a)@]" (go env `NegSuc) n
+      Format.fprintf fmt "@[<hv1> (negsuc %a)@]" (go env `NegSuc) n
 
     | Dim0 ->
       Format.fprintf fmt "0"
@@ -847,6 +858,11 @@ and pp_cmd env fmt (hd, sp) =
         let x_mot, env'_mot = Pretty.Env.bind nm env in
         let xs_scase, env'_scase = Pretty.Env.bindn (Bwd.to_list nms_scase) env in
         Format.fprintf fmt "@[<hv1>(nat-rec@ [%a] %a@ %a@ %a@ [%a] %a)@]" Uuseg_string.pp_utf_8 x_mot (pp env'_mot) mot (go `NatRec) sp (pp env) zcase pp_strings xs_scase (pp env'_scase) scase
+      | IntRec {mot = B (nm, mot); pcase = B (nm_pcase, pcase); ncase = B (nm_ncase, ncase)} ->
+        let x_mot, env'_mot = Pretty.Env.bind nm env in
+        let x_pcase, env'_pcase = Pretty.Env.bind nm_pcase env in
+        let x_ncase, env'_ncase = Pretty.Env.bind nm_ncase env in
+        Format.fprintf fmt "@[<hv1>(int-rec@ [%a] %a@ %a@ [%a] %a@ [%a] %a)@]" Uuseg_string.pp_utf_8 x_mot (pp env'_mot) mot (go `IntRec) sp Uuseg_string.pp_utf_8 x_pcase (pp env'_pcase) pcase Uuseg_string.pp_utf_8 x_ncase (pp env'_ncase) ncase
       | S1Rec {mot = B (nm_mot, mot); bcase; lcase = B (nm_lcase, lcase)} ->
         let x_mot, env_mot = Pretty.Env.bind nm_mot env in
         let x_lcase, env_lcase = Pretty.Env.bind nm_lcase env in
@@ -886,6 +902,8 @@ and pp_frame env fmt =
     Format.fprintf fmt "<if>"
   | NatRec _ ->
     Format.fprintf fmt "<nat-rec>"
+  | IntRec _ ->
+    Format.fprintf fmt "<int-rec>"
   | _ ->
     Format.fprintf fmt "<frame>"
 
@@ -1030,9 +1048,13 @@ struct
       go_cmd fl cmd acc
     | ExtLam nbnd ->
       go_nbnd fl nbnd acc
-    | (Bool | Tt | Ff | Int | S1 | Base | Nat | Zero | Dim0 | Dim1 | Univ _) ->
+    | (Bool | Tt | Ff | Nat | Zero | Int | S1 | Base | Dim0 | Dim1 | Univ _) ->
       acc
     | Suc n ->
+      go fl n acc
+    | Pos n ->
+      go fl n acc
+    | NegSuc n ->
       go fl n acc
     | Cons (t0, t1) ->
       go fl t1 @@ go fl t0 acc
@@ -1143,6 +1165,10 @@ struct
       go_bnd fl info.mot @@
       go fl info.zcase @@
       go_nbnd fl info.scase acc
+    | IntRec info ->
+      go_bnd fl info.mot @@
+      go_bnd fl info.pcase @@
+      go_bnd fl info.ncase acc
     | S1Rec info ->
       go_bnd fl info.mot @@
       go fl info.bcase @@
@@ -1278,6 +1304,11 @@ let map_frame f =
     let zcase = f info.zcase in
     let scase = map_nbnd f info.scase in
     NatRec {mot; zcase; scase}
+  | IntRec info ->
+    let mot = map_bnd f info.mot in
+    let pcase = map_bnd f info.pcase in
+    let ncase = map_bnd f info.ncase in
+    IntRec {mot; pcase; ncase}
   | S1Rec info ->
     let mot = map_bnd f info.mot in
     let bcase = f info.bcase in
