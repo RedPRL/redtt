@@ -7,8 +7,6 @@ type twin = [`Only | `TwinL | `TwinR]
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option bwd * 'a
 
-type info = Lexing.position * Lexing.position
-
 type ('r, 'a) face = 'r * 'r * 'a option
 type ('r, 'a) system = ('r, 'a) face list
 
@@ -87,11 +85,13 @@ and 'a frame =
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
 
-type tm = Tm of tm tmf
 
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
+  | Cmp of 'a subst * 'a subst
+
+type tm = Tm of tm tmf
 
 type error =
   | InvalidDeBruijnIndex of int
@@ -106,256 +106,412 @@ let var ?twin:(tw = `Only) a =
   Var {name = a; twin = tw; ushift = 0}, Emp
 
 
-let rec cmp_subst sub0 sub1 =
-  match sub0, sub1 with
-  | s, Shift 0 -> s
-  | Dot (_, sub0), Shift m -> cmp_subst sub0 (Shift (m - 1))
-  | Shift m, Shift n -> Shift (m + n)
-  | sub0, Dot (e, sub1) -> Dot (subst_cmd sub0 e, cmp_subst sub0 sub1)
+(* "algebras" for generic traversals of terms; the interface is imperative, because
+   the monadic / functional version had prohibitively bad performance.
+   Consider refactoring these into OCaml's object system (who know one could ever
+   find a use for that!). *)
+module type Alg =
+sig
+  val with_bindings : int -> (unit -> 'a) -> 'a
+  val under_meta : (unit -> 'a) -> 'a
 
-and lift sub =
-  Dot (ix 0, cmp_subst (Shift 1) sub)
-
-and liftn n sub =
-  match n with
-  | 0 -> sub
-  | _ -> liftn (n - 1) @@ lift sub
-
-and subst (sub : tm cmd subst) (Tm con) =
-  Tm (subst_f sub con)
-
-and subst_f (sub : tm cmd subst) =
-  function
-  | (Dim0 | Dim1 | Univ _ | Bool | Tt | Ff | Nat | Zero | Int | S1 | Base) as con ->
-    con
-
-  | Suc n -> Suc (subst sub n)
-
-  | Pos n -> Pos (subst sub n)
-  | NegSuc n -> NegSuc (subst sub n)
-
-  | Loop r -> Loop (subst sub r)
-
-  | FCom info ->
-    let r = subst sub info.r in
-    let r' = subst sub info.r' in
-    let cap = subst sub info.cap in
-    let sys = subst_comp_sys sub info.sys in
-    FCom {r; r'; cap; sys}
-
-  | Up cmd ->
-    Up (subst_cmd sub cmd)
-
-  | Pi (dom, cod) ->
-    Pi (subst sub dom, subst_bnd sub cod)
-
-  | Sg (dom, cod) ->
-    Sg (subst sub dom, subst_bnd sub cod)
-
-  | Ext ebnd ->
-    Ext (subst_ext_bnd sub ebnd)
-
-  | Rst info ->
-    let ty = subst sub info.ty in
-    let sys = subst_tm_sys sub info.sys in
-    Rst {ty; sys}
-
-  | CoR face ->
-    CoR (subst_tm_face sub face)
-
-  | V info ->
-    let r = subst sub info.r in
-    let ty0 = subst sub info.ty0 in
-    let ty1 = subst sub info.ty1 in
-    let equiv = subst sub info.equiv in
-    V {r; ty0; ty1; equiv}
-
-  | VIn info ->
-    let r = subst sub info.r in
-    let tm0 = subst sub info.tm0 in
-    let tm1 = subst sub info.tm1 in
-    VIn {r; tm0; tm1}
-
-  | Lam bnd ->
-    Lam (subst_bnd sub bnd)
-
-  | ExtLam nbnd ->
-    ExtLam (subst_nbnd sub nbnd)
-
-  | CoRThunk face ->
-    CoRThunk (subst_tm_face sub face)
-
-  | Cons (t0, t1) ->
-    Cons (subst sub t0, subst sub t1)
-
-  | Box info ->
-    let r = subst sub info.r in
-    let r' = subst sub info.r' in
-    let cap = subst sub info.cap in
-    let sys = subst_tm_sys sub info.sys in
-    Box {r; r'; cap; sys}
-
-  | LblTy info ->
-    let args = List.map (fun (ty, tm) -> subst sub ty, subst sub tm) info.args in
-    let ty = subst sub info.ty in
-    LblTy {info with args; ty}
-
-  | LblRet t ->
-    LblRet (subst sub t)
-
-  | Let (cmd, bnd) ->
-    Let (subst_cmd sub cmd, subst_bnd sub bnd)
-
-and subst_tm_sys sub  =
-  List.map (subst_tm_face sub)
-
-and subst_tm_face sub (r, r', otm) =
-  subst sub r, subst sub r', Option.map (subst sub) otm
+  val bvar : ih:(tm cmd -> tm cmd) -> ix:int -> twin:twin -> tm cmd
+  val fvar : name:Name.t -> twin:twin -> ushift:int -> tm cmd
+  val meta : name:Name.t -> ushift:int -> tm cmd
+end
 
 
-and subst_cmd sub (head, spine) =
-  let head', spine' = subst_head sub head in
-  let spine'' = subst_spine sub spine in
-  head', spine' <.> spine''
+module Traverse (A : Alg) : sig
+  val traverse_tm : tm -> tm
+  val traverse_spine : tm spine -> tm spine
+end =
+struct
+  let rec traverse_tm (Tm con) =
+    let con' = traverse_con con in
+    Tm con'
 
-and subst_spine sub spine =
-  Bwd.map (subst_frame sub) spine
+  and traverse_con =
+    function
+    | (Univ _ | Tt | Ff | Bool | S1 | Nat | Int | Dim0 | Dim1 | Base | Zero as con) ->
+      con
 
-and subst_frame sub frame =
-  match frame with
-  | (Car | Cdr | LblCall | CoRForce) ->
-    frame
-  | FunApp t ->
-    FunApp (subst sub t)
-  | ExtApp ts ->
-    ExtApp (Bwd.map (subst sub) ts)
-  | If info ->
-    let mot = subst_bnd sub info.mot in
-    let tcase = subst sub info.tcase in
-    let fcase = subst sub info.fcase in
-    If {mot; tcase; fcase}
-  | NatRec info ->
-    let mot = subst_bnd sub info.mot in
-    let zcase = subst sub info.zcase in
-    let scase = subst_nbnd sub info.scase in
-    NatRec {mot; zcase; scase}
-  | IntRec info ->
-    let mot = subst_bnd sub info.mot in
-    let pcase = subst_bnd sub info.pcase in
-    let ncase = subst_bnd sub info.ncase in
-    IntRec {mot; pcase; ncase}
-  | S1Rec info ->
-    let mot = subst_bnd sub info.mot in
-    let bcase = subst sub info.bcase in
-    let lcase = subst_bnd sub info.lcase in
-    S1Rec {mot; bcase; lcase}
-  | VProj info ->
-    let r = subst sub info.r in
-    let ty0 = subst sub info.ty0 in
-    let ty1 = subst sub info.ty1 in
-    let equiv = subst sub info.equiv in
-    VProj {r; ty0; ty1; equiv}
-  | Cap info ->
-    let r = subst sub info.r in
-    let r' = subst sub info.r' in
-    let ty = subst sub info.ty in
-    let sys = subst_comp_sys sub info.sys in
-    Cap {r; r'; ty; sys}
+    | FCom info ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
+      FCom {r; r'; cap; sys}
 
-and subst_head sub head =
-  match head with
-  | Ix (i, tw) ->
-    begin
-      match sub, i with
-      | Shift n, _ -> Ix (i + n, tw), Emp
-      | Dot (e, _), 0 -> e
-      | Dot (_, sub), _ -> subst_head sub @@ Ix (i - 1, tw)
-    end
+    | Pi (dom, cod) ->
+      let dom' = traverse_tm dom in
+      let cod' = traverse_bnd traverse_tm cod in
+      Pi (dom', cod')
 
-  | Var info ->
-    Var info, Emp
+    | Sg (dom, cod) ->
+      let dom' = traverse_tm dom in
+      let cod' = traverse_bnd traverse_tm cod in
+      Sg (dom', cod')
 
-  | Meta a ->
-    Meta a, Emp
+    | Ext ebnd ->
+      let ebnd' =
+        traverse_nbnd
+          (traverse_pair traverse_tm (traverse_list traverse_face))
+          ebnd
+      in
+      Ext ebnd'
 
-  | Down info ->
-    let ty = subst sub info.ty in
-    let tm = subst sub info.tm in
-    Down {ty; tm}, Emp
+    | Rst info ->
+      let ty = traverse_tm info.ty in
+      let sys = traverse_list traverse_face info.sys in
+      Rst {ty; sys}
 
-  | HCom info ->
-    let r = subst sub info.r in
-    let r' = subst sub info.r' in
-    let ty = subst sub info.ty in
-    let cap = subst sub info.cap in
-    let sys = subst_comp_sys sub info.sys in
-    HCom {r; r'; ty; cap; sys}, Emp
+    | CoR face ->
+      let face' = traverse_face face in
+      CoR face'
 
-  | Coe info ->
-    let r = subst sub info.r in
-    let r' = subst sub info.r' in
-    let ty = subst_bnd sub info.ty in
-    let tm = subst sub info.tm in
-    Coe {r; r'; ty; tm}, Emp
+    | Cons (t0, t1) ->
+      let t0' = traverse_tm t0 in
+      let t1' = traverse_tm t1 in
+      Cons (t0', t1')
 
-  | Com info ->
-    let r = subst sub info.r in
-    let r' = subst sub info.r' in
-    let ty = subst_bnd sub info.ty in
-    let cap = subst sub info.cap in
-    let sys = subst_comp_sys sub info.sys in
-    Com {r; r'; ty; cap; sys}, Emp
+    | V info ->
+      let r = traverse_tm info.r in
+      let ty0 = traverse_tm info.ty0 in
+      let ty1 = traverse_tm info.ty1 in
+      let equiv = traverse_tm info.equiv in
+      V {r; ty0; ty1; equiv}
 
-  | GHCom info ->
-    let r = subst sub info.r in
-    let r' = subst sub info.r' in
-    let ty = subst sub info.ty in
-    let cap = subst sub info.cap in
-    let sys = subst_comp_sys sub info.sys in
-    GHCom {r; r'; ty; cap; sys}, Emp
+    | VIn info ->
+      let r = traverse_tm info.r in
+      let tm0 = traverse_tm info.tm0 in
+      let tm1 = traverse_tm info.tm1 in
+      VIn {r; tm0; tm1}
 
-  | GCom info ->
-    let r = subst sub info.r in
-    let r' = subst sub info.r' in
-    let ty = subst_bnd sub info.ty in
-    let cap = subst sub info.cap in
-    let sys = subst_comp_sys sub info.sys in
-    GCom {r; r'; ty; cap; sys}, Emp
+    | Suc t ->
+      let t' = traverse_tm t in
+      Suc t'
 
-and subst_bnd sub bnd =
-  let B (nm, t) = bnd in
-  B (nm, subst (lift sub) t)
+    | NegSuc t ->
+      let t' = traverse_tm t in
+      NegSuc t'
 
-and subst_nbnd sub bnd =
-  let NB (nms, t) = bnd in
-  NB (nms, subst (liftn (Bwd.length nms) sub) t)
+    | Pos t ->
+      let t' = traverse_tm t in
+      Pos t'
 
-and subst_ext_bnd sub ebnd =
-  let NB (nms, (ty, sys)) = ebnd in
-  let sub' = liftn (Bwd.length nms) sub in
-  let ty' = subst sub' ty in
-  let sys' = subst_tm_sys sub' sys in
-  NB (nms, (ty', sys'))
+    | Loop r ->
+      let r' = traverse_tm r in
+      Loop r'
+
+    | Lam bnd ->
+      let bnd' = traverse_bnd traverse_tm bnd in
+      Lam bnd'
+
+    | ExtLam nbnd ->
+      let nbnd' = traverse_nbnd traverse_tm nbnd in
+      ExtLam nbnd'
+
+    | CoRThunk face ->
+      let face' = traverse_face face in
+      CoRThunk face'
+
+    | Box info ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_face info.sys in
+      Box {r; r'; cap; sys}
+
+    | LblTy info ->
+      let args = traverse_list (traverse_pair traverse_tm traverse_tm) info.args in
+      let ty = traverse_tm info.ty in
+      LblTy {info with args; ty}
+
+    | LblRet t ->
+      let t' = traverse_tm t in
+      LblRet t'
+
+    | Let (cmd, bnd) ->
+      let cmd' = traverse_cmd cmd in
+      let bnd' = traverse_bnd traverse_tm bnd in
+      Let (cmd', bnd')
+
+    | Up cmd ->
+      let cmd' = traverse_cmd cmd in
+      Up cmd'
+
+  and traverse_cmd (hd, sp) =
+    let hd', sp' = traverse_head hd in
+    let sp'' =
+      match hd' with
+      | Meta _ ->
+        A.under_meta @@ fun _ -> traverse_spine sp
+      | _ ->
+        traverse_spine sp
+    in
+    hd', sp' <.> sp''
+
+  and traverse_spine sp =
+    traverse_bwd traverse_frame sp
+
+  and traverse_head =
+    function
+    | Ix (ix, twin) ->
+      A.bvar ~ih:traverse_cmd ~ix ~twin
+
+    | Var {name; twin; ushift} ->
+      A.fvar ~name ~twin ~ushift
+
+    | Meta {name; ushift} ->
+      A.meta ~name ~ushift
+
+    | Down info ->
+      let ty = traverse_tm info.ty in
+      let tm = traverse_tm info.tm in
+      Down {ty; tm}, Emp
+
+    | Coe info ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_bnd traverse_tm info.ty in
+      let tm = traverse_tm info.tm in
+      let coe = Coe {r; r'; ty; tm} in
+      coe, Emp
+
+    | HCom info ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_tm info.ty in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
+      let hcom = HCom {r; r'; ty; cap; sys} in
+      hcom, Emp
+
+    | GHCom info ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_tm info.ty in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
+      let hcom = GHCom {r; r'; ty; cap; sys} in
+      hcom, Emp
+
+    | Com info ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_bnd traverse_tm info.ty in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
+      let com = Com {r; r'; ty; cap; sys} in
+      com, Emp
+
+    | GCom info ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_bnd traverse_tm info.ty in
+      let cap = traverse_tm info.cap in
+      let sys = traverse_list traverse_bface info.sys in
+      let com = GCom {r; r'; ty; cap; sys} in
+      com, Emp
+
+  and traverse_bnd : 'a. ('a -> 'b) -> 'a bnd -> 'b bnd =
+    fun f (B (nm, tm)) ->
+      let tm' = A.with_bindings 1 (fun _ -> f tm) in
+      B (nm, tm')
+
+  and traverse_nbnd : 'a 'b. ('a -> 'b) -> 'a nbnd -> 'b nbnd =
+    fun f (NB (nms, tm)) ->
+      let tm' = A.with_bindings (Bwd.length nms) (fun _ -> f tm) in
+      NB (nms, tm')
+
+  and traverse_bface (r, r', obnd) =
+    let s = traverse_tm r in
+    let s' = traverse_tm r' in
+    let obnd' = traverse_opt (traverse_bnd traverse_tm) obnd in
+    s, s', obnd'
+
+  and traverse_face (r, r', otm) =
+    let s = traverse_tm r in
+    let s' = traverse_tm r' in
+    let otm' = traverse_opt traverse_tm otm in
+    s, s', otm'
+
+  and traverse_pair : 'a 'b 'c 'd. ('a -> 'c) -> ('b -> 'd) -> 'a * 'b -> ('c * 'd) =
+    fun f g (a, b) ->
+      let c = f a in
+      let d = g b in
+      c, d
+
+  and traverse_opt : 'a 'b. ('a -> 'b) -> 'a option -> 'b option =
+    fun f ->
+      function
+      | None ->
+        None
+      | Some a ->
+        let a' = f a in
+        Some a'
+
+  and traverse_list : 'a 'b. ('a -> 'b) -> 'a list -> 'b list =
+    fun f ->
+      function
+      | [] -> []
+      | x :: xs ->
+        let x' = f x in
+        let xs' = traverse_list f xs in
+        x' :: xs'
+
+  and traverse_bwd : 'a 'b. ('a -> 'b) -> 'a bwd -> 'b bwd =
+    fun f ->
+      function
+      | Emp -> Emp
+      | Snoc (xs, x) ->
+        let xs' = traverse_bwd f xs in
+        let x' = f x in
+        Snoc (xs', x')
 
 
-and subst_ext_sys sub sys =
-  List.map (subst_ext_face sub) sys
+  and traverse_frame =
+    function
+    | (Car | Cdr | LblCall | CoRForce as frm) ->
+      frm
 
-and subst_ext_face sub (r, r', otm) =
-  let r = subst sub r in
-  let r' = subst sub r' in
-  let otm = Option.map (subst sub) otm in
-  r, r', otm
+    | FunApp t ->
+      let t' = traverse_tm t in
+      FunApp t'
 
-and subst_comp_face sub (r, r', obnd) =
-  let r = subst sub r in
-  let r' = subst sub r' in
-  let obnd = Option.map (subst_bnd sub) obnd in
-  r, r', obnd
+    | ExtApp ts ->
+      let ts' = traverse_bwd traverse_tm ts in
+      ExtApp ts'
 
-and subst_comp_sys sub sys =
-  List.map (subst_comp_face sub) sys
+    | If info ->
+      let mot = traverse_bnd traverse_tm info.mot in
+      let tcase = traverse_tm info.tcase in
+      let fcase = traverse_tm info.fcase in
+      If {mot; tcase; fcase}
 
+    | NatRec info ->
+      let mot = traverse_bnd traverse_tm info.mot in
+      let zcase = traverse_tm info.zcase in
+      let scase = traverse_nbnd traverse_tm info.scase in
+      NatRec {mot; zcase; scase}
+
+    | IntRec info ->
+      let mot = traverse_bnd traverse_tm info.mot in
+      let pcase = traverse_bnd traverse_tm info.pcase in
+      let ncase = traverse_bnd traverse_tm info.ncase in
+      IntRec {mot; pcase; ncase}
+
+    | S1Rec info ->
+      let mot = traverse_bnd traverse_tm info.mot in
+      let bcase = traverse_tm info.bcase in
+      let lcase = traverse_bnd traverse_tm info.lcase in
+      S1Rec {mot; bcase; lcase}
+
+    | VProj info ->
+      let r = traverse_tm info.r in
+      let ty0 = traverse_tm info.ty0 in
+      let ty1 = traverse_tm info.ty1 in
+      let equiv = traverse_tm info.equiv in
+      VProj {r; ty0; ty1; equiv}
+
+    | Cap info ->
+      let r = traverse_tm info.r in
+      let r' = traverse_tm info.r' in
+      let ty = traverse_tm info.ty in
+      let sys = traverse_list traverse_bface info.sys in
+      Cap {r; r'; ty; sys}
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+module SubstAlg (Init : sig val subst : tm cmd subst end) :
+sig
+  include Alg
+end =
+struct
+  let subst = ref Init.subst
+
+  let rec lift sub =
+    Dot (ix 0, Cmp (Shift 1, sub))
+
+  and liftn n (sub : tm cmd subst) : tm cmd subst  =
+    match n with
+    | 0 -> sub
+    | _ -> liftn (n - 1) @@ lift sub
+
+  let under_meta f = f ()
+
+  let with_bindings n f =
+    let old = !subst in
+    subst := liftn n old;
+    let r = f () in
+    subst := old;
+    r
+
+  let rec bvar ~ih ~ix ~twin =
+    match !subst, ix with
+    | Shift n, _ ->
+      Ix (ix + n, twin), Emp
+
+    | Dot (cmd, _), 0 ->
+      cmd
+
+    | Dot (_, sub), _ ->
+      let old = !subst in
+      subst := sub;
+      let r = bvar ~ih ~ix:(ix - 1) ~twin in
+      subst := old;
+      r
+
+    | Cmp (sub1, sub0), _ ->
+      subst := cmp_subst ih sub1 sub0;
+      bvar ~ih ~ix ~twin
+
+
+  and cmp_subst ih sub0 sub1 =
+    match sub0, sub1 with
+    | s, Shift 0 ->
+      s
+    | Dot (_, sub0), Shift m ->
+      cmp_subst ih sub0 (Shift (m - 1))
+    | Shift m, Shift n ->
+      Shift (m + n)
+    | sub0, Dot (e, sub1) ->
+      let old = !subst in
+      subst := sub0;
+      let e' = ih e in
+      subst := old;
+      let sub' = cmp_subst ih sub0 sub1 in
+      Dot (e', sub')
+    (* Dot (subst_cmd sub0 e, cmp_subst sub0 sub1) *)
+    | Cmp (sub0, sub1), sub ->
+      let sub' = cmp_subst ih sub0 sub1 in
+      cmp_subst ih sub' sub
+    | sub, Cmp (sub0, sub1) ->
+      let sub' = cmp_subst ih sub0 sub1 in
+      cmp_subst ih sub sub'
+
+  let fvar ~name ~twin ~ushift =
+    Var {name; twin; ushift}, Emp
+  let meta ~name ~ushift =
+    Meta {name; ushift}, Emp
+end
+
+let subst sub tm =
+  let module Init = struct let subst = sub end in
+  let module T = Traverse (SubstAlg (Init)) in
+  T.traverse_tm tm
 
 
 let make con =
@@ -366,229 +522,105 @@ let make con =
 
 let unleash (Tm con) = con
 
-let traverse ~f ~go_ix ~go_var =
-  let rec go k =
-    function
-    | Univ info -> Univ info
-    | Bool -> Bool
-    | Tt -> Tt
-    | Ff -> Ff
-    | Nat -> Nat
-    | Zero -> Zero
-    | Suc n -> Suc (f k n)
-    | Int -> Int
-    | Pos n -> Pos (f k n)
-    | NegSuc n -> NegSuc (f k n)
-    | S1 -> S1
-    | Base -> Base
-    | Loop r -> Loop (f k r)
-    | Dim0 -> Dim0
-    | Dim1 -> Dim1
-    | Lam bnd ->
-      Lam (go_bnd k bnd)
-    | Pi (dom, cod) ->
-      Pi (f k dom, go_bnd k cod)
-    | Sg (dom, cod) ->
-      Sg (f k dom, go_bnd k cod)
-    | Ext ebnd ->
-      Ext (go_ext_bnd k ebnd)
-    | Rst info ->
-      let ty = f k info.ty in
-      let sys = go_tm_sys k info.sys in
-      Rst {ty; sys}
-    | CoR face ->
-      CoR (go_tm_face k face)
-    | FCom info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      FCom {r; r'; cap; sys}
-    | V info ->
-      let r = f k info.r in
-      let ty0 = f k info.ty0 in
-      let ty1 = f k info.ty1 in
-      let equiv = f k info.equiv in
-      V {r; ty0; ty1; equiv}
-    | VIn info ->
-      let r = f k info.r in
-      let tm0 = f k info.tm0 in
-      let tm1 = f k info.tm1 in
-      VIn {r; tm0; tm1}
-    | ExtLam nbnd ->
-      ExtLam (go_nbnd k nbnd)
-    | CoRThunk face ->
-      CoRThunk (go_tm_face k face)
-    | Cons (t0, t1) ->
-      Cons (f k t0, f k t1)
-    | Box info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let cap = f k info.cap in
-      let sys = go_tm_sys k info.sys in
-      Box {r; r'; cap; sys}
-    | LblTy info ->
-      let args = List.map (fun (t0, t1) -> f k t0, f k t1) info.args in
-      let ty = f k info.ty in
-      LblTy {info with args; ty}
-    | LblRet t ->
-      LblRet (f k t)
-    | Up cmd ->
-      Up (go_cmd k cmd)
-    | Let (cmd, bnd) ->
-      Let (go_cmd k cmd, go_bnd k bnd)
+module OpenVarAlg (Init : sig val cmd : twin -> tm cmd val ix : int end) : Alg =
+struct
+  let state = ref Init.ix
 
-  (* TODO: not sure if this is backwards !!!! *)
-  and go_cmd k (hd, sp) =
-    let hd', sp' = go_hd k hd in
-    let sp'' = go_spine k sp in
-    hd', sp' <.> sp''
+  let with_bindings n f =
+    let old = !state in
+    state := old + n;
+    let r = f () in
+    state := old;
+    r
 
-  and go_hd k =
-    function
-    | Ix (i, tw) ->
-      go_ix k i tw
-    | Var info ->
-      go_var k (info.name, info.twin, info.ushift)
-    | Meta a ->
-      Meta a, Emp
-    | Down info ->
-      let ty = f k info.ty in
-      let tm = f k info.tm in
-      Down {ty; tm}, Emp
-    | Coe info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = go_bnd k info.ty in
-      let tm = f k info.tm in
-      Coe {r; r'; ty; tm}, Emp
-    | HCom info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = f k info.ty in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      HCom {r; r'; ty; cap; sys}, Emp
-    | Com info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = go_bnd k info.ty in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      Com {r; r'; ty; cap; sys}, Emp
-    | GHCom info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = f k info.ty in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      GHCom {r; r'; ty; cap; sys}, Emp
-    | GCom info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = go_bnd k info.ty in
-      let cap = f k info.cap in
-      let sys = go_comp_sys k info.sys in
-      GCom {r; r'; ty; cap; sys}, Emp
+  let under_meta f =
+    f ()
 
-  and go_spine k =
-    Bwd.map (go_frm k)
-
-  and go_frm k =
-    function
-    | (Car | Cdr | LblCall | CoRForce) as frm -> frm
-    | FunApp t ->
-      FunApp (f k t)
-    | ExtApp ts ->
-      ExtApp (Bwd.map (f k) ts)
-    | If info ->
-      let mot = go_bnd k info.mot in
-      let tcase = f k info.tcase in
-      let fcase = f k info.fcase in
-      If {mot; tcase; fcase}
-    | NatRec info ->
-      let mot = go_bnd k info.mot in
-      let zcase = f k info.zcase in
-      let scase = go_nbnd k info.scase in
-      NatRec {mot; zcase; scase}
-    | IntRec info ->
-      let mot = go_bnd k info.mot in
-      let pcase = go_bnd k info.pcase in
-      let ncase = go_bnd k info.ncase in
-      IntRec {mot; pcase; ncase}
-    | S1Rec info ->
-      let mot = go_bnd k info.mot in
-      let bcase = f k info.bcase in
-      let lcase = go_bnd k info.lcase in
-      S1Rec {mot; bcase; lcase}
-    | VProj info ->
-      let r = f k info.r in
-      let ty0 = f k info.ty0 in
-      let ty1 = f k info.ty1 in
-      let equiv = f k info.equiv in
-      VProj {r; ty0; ty1; equiv}
-    | Cap info ->
-      let r = f k info.r in
-      let r' = f k info.r' in
-      let ty = f k info.ty in
-      let sys = go_comp_sys k info.sys in
-      Cap {r; r'; ty; sys}
-
-
-  and go_comp_sys k sys =
-    List.map (go_comp_face k) sys
-
-  and go_comp_face k (r, r', obnd) =
-    f k r, f k r', Option.map (go_bnd k) obnd
-
-  and go_ext_bnd k (NB (nms, (ty, sys))) =
-    let k' = k + Bwd.length nms in
-    NB (nms, (f k' ty, go_tm_sys k' sys))
-
-  and go_nbnd k (NB (nms, t)) =
-    let k' = k + Bwd.length nms in
-    NB (nms, f k' t)
-
-  and go_tm_sys k sys =
-    List.map (go_tm_face k) sys
-
-  and go_tm_face k (r, r', otm) =
-    f k r, f k r', Option.map (f k) otm
-
-  and go_bnd k : 'a bnd -> 'b bnd =
-    function B (nm, t) ->
-      B (nm, f (k + 1) t)
-
-  in go
-
-let fix_traverse ~go_ix ~go_var  =
-  let rec go k (Tm tm) =
-    Tm (traverse ~f:go ~go_ix ~go_var k tm)
-  in
-  go 0
-
-let close_var a ?twin:(twin = fun _ -> `Only) k =
-  let go_ix _ i tw = Ix (i, tw), Emp in
-  let go_var n (b, tw, ush) =
-    if b = a then
-      ix ~twin:(twin tw) (n + k)
+  let bvar ~ih ~ix ~twin =
+    if ix = !state then
+      Init.cmd twin
     else
-      Var {name = b; twin = tw; ushift = ush}, Emp
-  in
-  fix_traverse ~go_ix ~go_var
+      Ix (ix, twin), Emp
 
-(* TODO: check that this isn't catastrophically wrong *)
-let open_var k a ?twin:(twin = fun _ -> `Only) =
-  let go_ix k' i tw = if i = (k + k') then var ~twin:(twin tw) a else Ix (i, tw), Emp in
-  let go_var _n (b, tw, ush) = Var {name = b; twin = tw; ushift = ush}, Emp in
-  fix_traverse ~go_ix ~go_var
+  let fvar ~name ~twin ~ushift =
+    Var {name; twin; ushift}, Emp
+
+  let meta ~name ~ushift =
+    Meta {name; ushift}, Emp
+end
+
+module CloseVarAlg (Init : sig val twin : twin -> twin val name : Name.t val ix : int end) : Alg =
+struct
+  let state = ref Init.ix
+
+  let under_meta f = f ()
+
+  let with_bindings k f =
+    let old = !state in
+    state := old + k;
+    let r = f () in
+    state := old;
+    r
+
+  let bvar ~ih ~ix ~twin =
+    Ix (ix, twin), Emp
+
+  let fvar ~name ~twin ~ushift =
+    if name = Init.name then
+      Ix (!state, Init.twin twin), Emp
+    else
+      Var {name; twin; ushift}, Emp
+
+
+  let meta ~name ~ushift =
+    Meta {name; ushift}, Emp
+end
+
+
+let close_var_clock = ref 0.
+let open_var_clock = ref 0.
+
+let _ =
+  Diagnostics.on_termination @@ fun _ ->
+  Format.eprintf "Tm spent %fs in close_var@." !close_var_clock;
+  Format.eprintf "Tm spent %fs in open_var@." !open_var_clock
+
+let open_var k cmd tm =
+  let now0 = Unix.gettimeofday () in
+  let module Init =
+  struct
+    let cmd = cmd
+    let ix = k
+  end
+  in
+  let module T = Traverse (OpenVarAlg (Init)) in
+  let res = T.traverse_tm tm in
+  let now1 = Unix.gettimeofday () in
+  open_var_clock := !open_var_clock +. (now1 -. now0);
+  res
+
+
+let close_var a ?twin:(twin = fun _ -> `Only) k tm =
+  let now0 = Unix.gettimeofday () in
+  let module Init =
+  struct
+    let twin = twin
+    let name = a
+    let ix = k
+  end
+  in
+  let module T = Traverse (CloseVarAlg (Init)) in
+  let res = T.traverse_tm tm in
+  let now1 = Unix.gettimeofday () in
+  close_var_clock := !close_var_clock +. (now1 -. now0);
+  res
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
-  x, open_var 0 x t
+  x, open_var 0 (fun _ -> var x) t
 
-let unbind_with x ?twin:(twin = fun _ -> `Only) (B (_, t)) =
-  open_var 0 x ~twin t
+let unbind_with cmd (B (_, t)) =
+  open_var 0 (fun _ -> cmd) t
 
 let unbindn (NB (nms, t)) =
   let rec go k nms xs t =
@@ -596,7 +628,7 @@ let unbindn (NB (nms, t)) =
     | Emp -> Bwd.rev xs, t
     | Snoc (nms, nm) ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) @@ open_var k x t
+      go (k + 1) nms (xs #< x) @@ open_var k (fun _ -> var x) t
   in
   go 0 nms Emp t
 
@@ -612,7 +644,7 @@ let unbind_ext (NB (nms, (ty, sys))) =
     | Emp -> Bwd.rev xs, ty, sys
     | Snoc (nms, nm)  ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) (open_var k x ty) (map_tm_sys (open_var k x) sys)
+      go (k + 1) nms (xs #< x) (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
   in
   go 0 nms Emp ty sys
 
@@ -622,7 +654,7 @@ let unbind_ext_with xs ebnd =
     match xs with
     | [] -> ty, sys
     | x :: xs ->
-      go (k + 1) xs (open_var k x ty) (map_tm_sys (open_var k x) sys)
+      go (k + 1) xs (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
   in
   if Bwd.length nms = List.length xs then
     go 0 xs ty sys
@@ -1027,200 +1059,80 @@ struct
       ~x:(up @@ ix 0)
 end
 
-module OccursAux =
+
+module OccursAlg (Init : sig val fl : Occurs.flavor end) :
+sig
+  include Alg
+  val get : unit -> Occurs.Set.t
+end =
 struct
-  let rec go fl tm acc =
-    match unleash tm with
-    | Lam bnd ->
-      go_bnd fl bnd acc
-    | Pi (dom, cod) ->
-      go_bnd fl cod @@
-      go fl dom acc
-    | Sg (dom, cod) ->
-      go_bnd fl cod @@
-      go fl dom acc
-    | Ext ebnd ->
-      go_ext_bnd fl ebnd acc
-    | Rst info ->
-      go fl info.ty @@
-      go_tm_sys fl info.sys acc
-    | Up cmd ->
-      go_cmd fl cmd acc
-    | ExtLam nbnd ->
-      go_nbnd fl nbnd acc
-    | (Bool | Tt | Ff | Nat | Zero | Int | S1 | Base | Dim0 | Dim1 | Univ _) ->
-      acc
-    | Suc n ->
-      go fl n acc
-    | Pos n ->
-      go fl n acc
-    | NegSuc n ->
-      go fl n acc
-    | Cons (t0, t1) ->
-      go fl t1 @@ go fl t0 acc
-    | Let (cmd, bnd) ->
-      go_bnd fl bnd @@ go_cmd fl cmd acc
-    | V info ->
-      go fl info.r @@ go fl info.ty0 @@
-      go fl info.ty1 @@ go fl info.equiv acc
-    | VIn info ->
-      go fl info.r @@ go fl info.tm0 @@
-      go fl info.tm1 acc
-    | FCom info ->
-      go fl info.r @@ go fl info.r' @@ go fl info.cap @@
-      go_comp_sys fl info.sys @@ acc
-    | CoRThunk face ->
-      go_tm_face fl face acc
-    | LblRet t ->
-      go fl t acc
-    | Loop t ->
-      go fl t acc
-    | LblTy info ->
-      go fl info.ty @@
-      go_lbl_args fl info.args acc
-    | CoR face ->
-      go_tm_face fl face acc
-    | Box info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go fl info.cap @@
-      go_tm_sys fl info.sys acc
+  type set = Occurs.Set.t
 
-  and go_lbl_args fl args =
-    let go_arg acc (t0, t1) acc = go fl t0 @@ go fl t1 acc in
-    List.fold_right (go_arg fl) args
+  let state = ref Occurs.Set.empty
+  let srigid = ref true
+  let get () = !state
 
-  and go_cmd fl (hd, sp) acc =
-    match fl, hd with
-    | `RigVars, Var {name; _} ->
-      go_spine fl sp @@
-      Occurs.Set.add name acc
-    | `RigVars, Meta _ ->
-      acc
-    | _ ->
-      go_spine fl sp @@
-      go_head fl hd acc
+  open Init
 
-  and go_head fl hd acc =
-    match fl, hd with
-    | _, Ix _ -> acc
-    | `Vars, Meta _ -> acc
-    | `RigVars, Meta _ -> acc
-    | `Metas, Meta {name; _} ->
-      Occurs.Set.add name acc
-    | (`Vars | `RigVars), Var {name; _} ->
-      Occurs.Set.add name acc
-    | `Metas, Var _ -> acc
-    | _, Down {ty; tm} ->
-      go fl tm @@ go fl ty acc
-    | _, Coe info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go_bnd fl info.ty @@
-      go fl info.tm acc
-    | _, HCom info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go fl info.ty @@
-      go fl info.cap @@
-      go_comp_sys fl info.sys acc
-    | _, Com info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go_bnd fl info.ty @@
-      go fl info.cap @@
-      go_comp_sys fl info.sys acc
-    | _, GHCom info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go fl info.ty @@
-      go fl info.cap @@
-      go_comp_sys fl info.sys acc
-    | _, GCom info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go_bnd fl info.ty @@
-      go fl info.cap @@
-      go_comp_sys fl info.sys acc
+  let insert x =
+    state := Occurs.Set.add x !state
 
-  and go_spine fl sp =
-    List.fold_right (go_frame fl) @@ Bwd.to_list sp
-
-  and go_frame fl frm acc =
-    match frm with
-    | (Car | Cdr | LblCall | CoRForce) -> acc
-    | FunApp t ->
-      go fl t acc
-    | ExtApp ts ->
-      List.fold_right (go fl) (Bwd.to_list ts) acc
-    | If info ->
-      go_bnd fl info.mot @@
-      go fl info.tcase @@
-      go fl info.fcase acc
-    | NatRec info ->
-      go_bnd fl info.mot @@
-      go fl info.zcase @@
-      go_nbnd fl info.scase acc
-    | IntRec info ->
-      go_bnd fl info.mot @@
-      go_bnd fl info.pcase @@
-      go_bnd fl info.ncase acc
-    | S1Rec info ->
-      go_bnd fl info.mot @@
-      go fl info.bcase @@
-      go_bnd fl info.lcase acc
-    | VProj info ->
-      go fl info.r @@
-      go fl info.ty0 @@
-      go fl info.ty1 @@
-      go fl info.equiv acc
-    | Cap info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go_comp_sys fl info.sys acc
-
-  and go_ext_bnd fl bnd acc =
-    let NB (_, (ty, sys)) = bnd in
-    go fl ty @@ go_tm_sys fl sys acc
+  let with_bindings _ f =
+    f ()
 
 
-  and go_nbnd fl bnd acc =
-    let NB (_, tm) = bnd in
-    go fl tm acc
+  let under_meta f =
+    let old = !srigid in
+    srigid := false;
+    let r = f () in
+    srigid := old;
+    r
 
-  and go_bnd fl bnd acc =
-    let B (_, tm) = bnd in
-    go fl tm acc
 
-  and go_tm_sys fl =
-    List.fold_right @@ go_tm_face fl
+  let bvar ~ih ~ix ~twin =
+    Ix (ix, twin), Emp
 
-  and go_comp_sys fl =
-    List.fold_right @@ go_comp_face fl
+  let fvar ~name ~twin ~ushift =
+    begin
+      if fl = `Vars || (fl = `RigVars && !srigid) then
+        insert name
+      else
+        ()
+    end;
+    Var {name; twin; ushift}, Emp
 
-  and go_tm_face fl (r, r', otm) acc =
-    go fl r @@ go fl r' @@
-    match otm with
-    | None -> acc
-    | Some tm -> go fl tm acc
-
-  and go_comp_face fl (r, r', obnd) acc =
-    go fl r @@ go fl r' @@
-    match obnd with
-    | None -> acc
-    | Some bnd -> go_bnd fl bnd acc
+  let meta ~name ~ushift =
+    begin
+      if fl = `Metas then
+        insert name
+      else
+        ()
+    end;
+    Meta {name; ushift}, Emp
 end
 
+
+
+
 let free fl tm =
-  (* Format.eprintf "Free: %a@." (pp Pretty.Env.emp) tm; *)
-  OccursAux.go fl tm Occurs.Set.empty
+  let module Init = struct let fl = fl end in
+  let module A = OccursAlg (Init) in
+  let module T = Traverse (A) in
+  let _ = T.traverse_tm tm in
+  A.get ()
+
 
 module Sp =
 struct
   type t = tm spine
   let free fl sp =
-    OccursAux.go_spine fl sp Occurs.Set.empty
+    let module Init = struct let fl = fl end in
+    let module A = OccursAlg (Init) in
+    let module T = Traverse (A) in
+    let _ = T.traverse_spine sp in
+    A.get ()
 end
+
 
 let map_bnd (f : tm -> tm) (bnd : tm bnd) : tm bnd =
   let x, tx = unbind bnd in
@@ -1334,8 +1246,8 @@ let rec map_ext_bnd f nbnd =
     NB (Emp, (f ty, map_tm_sys f sys))
   | NB (Snoc (nms, nm), (ty, sys)) ->
     let x = Name.named nm in
-    let tyx = open_var 0 x ty in
-    let sysx = map_tm_sys (open_var 0 x) sys in
+    let tyx = open_var 0 (fun _ -> var x) ty in
+    let sysx = map_tm_sys (open_var 0 (fun _ -> var x)) sys in
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
     NB (nms #< nm, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
 

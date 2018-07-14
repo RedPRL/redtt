@@ -5,8 +5,6 @@ type twin = [`Only | `TwinL | `TwinR]
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option bwd * 'a
 
-type info = Lexing.position * Lexing.position
-
 type ('r, 'a) face = 'r * 'r * 'a option
 type ('r, 'a) system = ('r, 'a) face list
 
@@ -105,13 +103,14 @@ val map_tm_sys : (tm -> tm) -> (tm, tm) system -> (tm, tm) system
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
+  | Cmp of 'a subst * 'a subst
 
 
 val make : tm tmf -> tm
 val unleash : tm -> tm tmf
 
 val close_var : Name.t -> ?twin:(twin -> twin) -> int -> tm -> tm
-val open_var : int -> Name.t -> ?twin:(twin -> twin) -> tm -> tm
+val open_var : int -> (twin -> tm cmd) -> tm -> tm
 
 val bind : Name.t -> tm -> tm bnd
 val bindn : Name.t bwd -> tm -> tm nbnd
@@ -121,7 +120,7 @@ val unbind_ext : (tm * (tm, tm) system) nbnd -> Name.t bwd * tm * (tm, tm) syste
 val unbind_ext_with : Name.t list -> (tm * (tm, tm) system) nbnd -> tm * (tm, tm) system
 val bind_ext : Name.t bwd -> tm -> (tm, tm) system -> (tm * (tm, tm) system) nbnd
 
-val unbind_with : Name.t -> ?twin:(twin -> twin) -> tm bnd -> tm
+val unbind_with : tm cmd -> tm bnd -> tm
 
 val subst : tm cmd subst -> tm -> tm
 

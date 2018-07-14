@@ -190,7 +190,7 @@ let rec tac_lambda names tac ty =
       | [] -> tac ty
       | name :: names ->
         let x = Name.named @@ Some name in
-        let codx = Tm.unbind_with x cod in
+        let codx = Tm.unbind_with (Tm.var x) cod in
         M.in_scope x (`P dom) begin
           tac_wrap_nf (tac_lambda names tac) codx
         end >>= fun bdyx ->
