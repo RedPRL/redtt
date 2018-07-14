@@ -110,7 +110,7 @@ let var ?twin:(tw = `Only) a =
    the monadic / functional version had prohibitively bad performance.
    Consider refactoring these into OCaml's object system (who know one could ever
    find a use for that!). *)
-module type IAlg =
+module type Alg =
 sig
   val with_bindings : int -> (unit -> 'a) -> 'a
   val under_meta : (unit -> 'a) -> 'a
@@ -121,7 +121,7 @@ sig
 end
 
 
-module ITraverse (A : IAlg) : sig
+module Traverse (A : Alg) : sig
   val traverse_tm : tm -> tm
   val traverse_spine : tm spine -> tm spine
 end =
@@ -435,9 +435,9 @@ end
 
 
 
-module ISubstAlg (Init : sig val subst : tm cmd subst end) :
+module SubstAlg (Init : sig val subst : tm cmd subst end) :
 sig
-  include IAlg
+  include Alg
 end =
 struct
   let subst = ref Init.subst
@@ -510,7 +510,7 @@ end
 
 let subst sub tm =
   let module Init = struct let subst = sub end in
-  let module T = ITraverse (ISubstAlg (Init)) in
+  let module T = Traverse (SubstAlg (Init)) in
   T.traverse_tm tm
 
 
@@ -522,7 +522,7 @@ let make con =
 
 let unleash (Tm con) = con
 
-module IOpenVarAlg (Init : sig val cmd : twin -> tm cmd val ix : int end) : IAlg =
+module OpenVarAlg (Init : sig val cmd : twin -> tm cmd val ix : int end) : Alg =
 struct
   let state = ref Init.ix
 
@@ -549,7 +549,7 @@ struct
     Meta {name; ushift}, Emp
 end
 
-module ICloseVarAlg (Init : sig val twin : twin -> twin val name : Name.t val ix : int end) : IAlg =
+module CloseVarAlg (Init : sig val twin : twin -> twin val name : Name.t val ix : int end) : Alg =
 struct
   let state = ref Init.ix
 
@@ -593,7 +593,7 @@ let open_var k cmd tm =
     let ix = k
   end
   in
-  let module T = ITraverse (IOpenVarAlg (Init)) in
+  let module T = Traverse (OpenVarAlg (Init)) in
   let res = T.traverse_tm tm in
   let now1 = Unix.gettimeofday () in
   open_var_clock := !open_var_clock +. (now1 -. now0);
@@ -609,7 +609,7 @@ let close_var a ?twin:(twin = fun _ -> `Only) k tm =
     let ix = k
   end
   in
-  let module T = ITraverse (ICloseVarAlg (Init)) in
+  let module T = Traverse (CloseVarAlg (Init)) in
   let res = T.traverse_tm tm in
   let now1 = Unix.gettimeofday () in
   close_var_clock := !close_var_clock +. (now1 -. now0);
@@ -1060,9 +1060,9 @@ struct
 end
 
 
-module IOccursAlg (Init : sig val fl : Occurs.flavor end) :
+module OccursAlg (Init : sig val fl : Occurs.flavor end) :
 sig
-  include IAlg
+  include Alg
   val get : unit -> Occurs.Set.t
 end =
 struct
@@ -1116,8 +1116,8 @@ end
 
 let free fl tm =
   let module Init = struct let fl = fl end in
-  let module A = IOccursAlg (Init) in
-  let module T = ITraverse (A) in
+  let module A = OccursAlg (Init) in
+  let module T = Traverse (A) in
   let _ = T.traverse_tm tm in
   A.get ()
 
@@ -1127,8 +1127,8 @@ struct
   type t = tm spine
   let free fl sp =
     let module Init = struct let fl = fl end in
-    let module A = IOccursAlg (Init) in
-    let module T = ITraverse (A) in
+    let module A = OccursAlg (Init) in
+    let module T = Traverse (A) in
     let _ = T.traverse_spine sp in
     A.get ()
 end
