@@ -7,8 +7,6 @@ type twin = [`Only | `TwinL | `TwinR]
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option bwd * 'a
 
-type info = Lexing.position * Lexing.position
-
 type ('r, 'a) face = 'r * 'r * 'a option
 type ('r, 'a) system = ('r, 'a) face list
 
@@ -87,11 +85,13 @@ and 'a frame =
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
 
-type tm = Tm of tm tmf
 
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
+  | Lift of int * 'a subst
+
+type tm = Tm of tm tmf | Sub of tm cmd subst * tm
 
 type error =
   | InvalidDeBruijnIndex of int
@@ -106,8 +106,219 @@ let var ?twin:(tw = `Only) a =
   Var {name = a; twin = tw; ushift = 0}, Emp
 
 
+
+module type Alg =
+sig
+  module M : Monad.S
+  val push_bindings : int -> 'a M.m -> 'a M.m
+
+  val bvar : ih:(tm cmd -> tm cmd M.m) -> ix:int -> twin:twin -> tm cmd M.m
+  val fvar : name:Name.t -> twin:twin -> ushift:int -> tm cmd M.m
+end
+
+module Traverse (A : Alg) : sig
+  val traverse_tm : tm -> tm A.M.m
+end =
+struct
+  module M = A.M
+  module Notation = Monad.Notation (M)
+  open Notation
+
+  let rec traverse_tm (Tm con) =
+    traverse_con con >>= fun con' ->
+    M.ret @@ Tm con'
+
+  and traverse_con =
+    function
+    | Univ info ->
+      M.ret @@ Univ info
+    | Tt ->
+      M.ret Tt
+    | Ff ->
+      M.ret Ff
+    | Up cmd ->
+      traverse_cmd cmd >>= fun cmd' ->
+      M.ret @@ Up cmd'
+    | _ -> failwith ""
+
+  and traverse_cmd (hd, sp) =
+    traverse_head hd >>= fun (hd', sp') ->
+    traverse_spine sp >>= fun sp'' ->
+    M.ret (hd', sp' <.> sp'')
+
+  and traverse_head =
+    function
+    | Ix (ix, twin) ->
+      A.bvar ~ih:traverse_cmd ~ix ~twin
+    | Var {name; twin; ushift} ->
+      A.fvar ~name ~twin ~ushift
+    | _ -> failwith ""
+
+  and traverse_spine =
+    function
+    | Emp ->
+      M.ret Emp
+    | Snoc (sp, frm) ->
+      traverse_spine sp >>= fun sp' ->
+      traverse_frame frm >>= fun frm' ->
+      M.ret (sp' #< frm')
+
+  and traverse_frame =
+    function
+    | Car ->
+      M.ret Car
+    | Cdr ->
+      M.ret Cdr
+    | FunApp t ->
+      traverse_tm t >>= fun t' ->
+      M.ret @@ FunApp t'
+    | _ -> failwith ""
+
+  (* let rec traverse_con ~bvar ~fvar ~con =
+     function
+     | Univ info ->
+      M.ret @@ Univ info
+     | Tt ->
+      M.ret Tt
+     | Ff ->
+      M.ret Ff
+     | Up cmd ->
+      traverse_cmd ~bvar ~fvar ~con cmd >>= fun cmd' ->
+      M.ret @@ Up cmd'
+     | _ -> failwith ""
+
+     and traverse_cmd ~bvar ~fvar ~con (hd, sp) =
+     traverse_head ~bvar ~fvar ~con hd >>= fun (hd', sp') ->
+     traverse_spine ~bvar ~fvar ~con sp >>= fun sp'' ->
+     M.ret (hd', sp' <.> sp'')
+
+     and traverse_head ~bvar ~fvar ~con =
+     function
+     | Ix (ix, tw) ->
+      bvar ~ix ~twin:tw
+     | Var info ->
+      fvar ~name:info.name ~twin:info.twin ~ushift:info.ushift
+     | Down info ->
+      failwith ""
+     | _ -> failwith ""
+
+     and traverse_spine ~bvar ~con hd = failwith "" *)
+end
+
+
+
+
+module OpenVarAlg :
+sig
+  include Alg
+  val run : int -> tm cmd -> 'a M.m -> 'a
+end =
+struct
+  type state = { cmd : tm cmd; depth: int}
+
+  module M = ReaderMonad.M (struct type t = state end)
+  module Notation = Monad.Notation (M)
+  open Notation
+
+  let run k cmd =
+    M.run {cmd; depth = k}
+
+  let push_bindings n =
+    M.local @@ fun st ->
+    {st with depth = st.depth + n}
+
+  let bvar ~ih ~ix ~twin =
+    M.get >>= fun st ->
+    if ix = st.depth then
+      M.ret @@ st.cmd
+    else
+      M.ret (Ix (ix, twin), Emp)
+
+  let fvar ~name ~twin ~ushift =
+    M.ret (Var {name; twin; ushift}, Emp)
+end
+
+module SubstAlg :
+sig
+  include Alg
+  val run : tm cmd subst -> 'a M.m -> 'a
+end =
+struct
+  type state = tm cmd subst
+
+  module M = ReaderMonad.M (struct type t = state end)
+  module Notation = Monad.Notation (M)
+  open Notation
+
+  let run = M.run
+
+  let push_bindings k =
+    M.local @@ fun sub ->
+    Lift (k, sub)
+
+  let rec bvar ~ih ~ix ~twin =
+    M.get >>= fun sub ->
+    match sub, ix with
+    | Shift n, _ ->
+      M.ret (Ix (ix + n, twin), Emp)
+    | Dot (cmd, _), 0 ->
+      M.ret cmd
+    | Dot (_, sub), _ ->
+      M.local (fun _ -> sub) @@
+      bvar ~ih ~ix:(ix - 1) ~twin
+    | Lift (n, sub), _ ->
+      if ix < n then
+        M.ret (Ix (ix, twin), Emp)
+      else
+        bvar ~ih ~ix:(ix - n) ~twin >>= fun cmd ->
+        M.local (fun _ -> sub) @@
+        ih cmd
+
+  let fvar ~name ~twin ~ushift =
+    M.ret (Var {name; twin; ushift}, Emp)
+end
+
+
+let open_var k cmd tm =
+  let module T = Traverse (OpenVarAlg) in
+  OpenVarAlg.run k cmd @@ T.traverse_tm tm
+
+let subst sub tm =
+  let module T = Traverse (SubstAlg) in
+  SubstAlg.run sub @@ T.traverse_tm tm
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 let rec cmp_subst sub0 sub1 =
   match sub0, sub1 with
+  | Lift (k, sub0), _ ->
+    cmp_subst (liftn k sub0) sub1
+  | _, Lift (k, sub1) ->
+    cmp_subst sub0 (liftn k sub1)
   | s, Shift 0 -> s
   | Dot (_, sub0), Shift m -> cmp_subst sub0 (Shift (m - 1))
   | Shift m, Shift n -> Shift (m + n)
@@ -270,6 +481,7 @@ and subst_head sub head =
       | Shift n, _ -> Ix (i + n, tw), Emp
       | Dot (e, _), 0 -> e
       | Dot (_, sub), _ -> subst_head sub @@ Ix (i - 1, tw)
+      | Lift (n, sub), _ -> subst_head (liftn n sub) head
     end
 
   | Var info ->

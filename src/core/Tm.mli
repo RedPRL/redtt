@@ -5,8 +5,6 @@ type twin = [`Only | `TwinL | `TwinR]
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option bwd * 'a
 
-type info = Lexing.position * Lexing.position
-
 type ('r, 'a) face = 'r * 'r * 'a option
 type ('r, 'a) system = ('r, 'a) face list
 
@@ -105,6 +103,7 @@ val map_tm_sys : (tm -> tm) -> (tm, tm) system -> (tm, tm) system
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
+  | Lift of int * 'a subst
 
 
 val make : tm tmf -> tm
