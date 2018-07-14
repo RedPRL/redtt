@@ -91,6 +91,10 @@ type 'a subst =
   | Dot of 'a * 'a subst
   | Cmp of 'a subst * 'a subst
 
+let shift i = Shift i
+let dot a sb = Dot (a, sb)
+
+
 type tm = Tm of tm tmf
 
 type error =

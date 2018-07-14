@@ -100,10 +100,12 @@ val map_tmf : (tm -> tm) -> tm tmf -> tm tmf
 val map_tm_sys : (tm -> tm) -> (tm, tm) system -> (tm, tm) system
 
 
-type 'a subst =
-  | Shift of int
-  | Dot of 'a * 'a subst
-  | Cmp of 'a subst * 'a subst
+type 'a subst
+
+val shift : int -> 'a subst
+val dot : 'a -> 'a subst -> 'a subst
+
+
 
 
 val make : tm tmf -> tm

@@ -772,7 +772,7 @@ let rec split_sigma tele x ty =
 
     let ytm = Tm.Var {name = y; twin = `Only; ushift = 0}, sp_tele in
     let ztm = Tm.Var {name = z; twin = `Only; ushift = 0}, sp_tele in
-    let cody = Tm.subst (Tm.Dot (ytm, Tm.Shift 0)) cod in
+    let cody = Tm.subst (Tm.dot ytm (Tm.shift 0)) cod in
 
     Some
       ( y
