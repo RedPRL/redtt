@@ -494,7 +494,6 @@ struct
       subst := old;
       let sub' = cmp_subst ih sub0 sub1 in
       Dot (e', sub')
-    (* Dot (subst_cmd sub0 e, cmp_subst sub0 sub1) *)
     | Cmp (sub0, sub1), sub ->
       let sub' = cmp_subst ih sub0 sub1 in
       cmp_subst ih sub' sub
