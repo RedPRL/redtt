@@ -6,6 +6,41 @@ Epigram, and [Idris](https://www.idris-lang.org/).
 Related work: [yacctt](https://github.com/mortberg/yacctt/), [RedPRL](https://www.redprl.org)
 and [cubicaltt](https://github.com/mortberg/cubicaltt).
 
+## Feature Summary
+
+`redtt` is not yet documented; we have the following interesting features:
+
+- path types definable in terms of more general extension types, which specify
+  the boundary of an `n`-cube all at once
+
+- source language with implicit arguments based on a cubical version of
+  higher-order unification
+
+- predicative hierarchy of cumulative universes
+
+- level "polymorphic" definitions achieved using McBride's "Crude But Effective
+  Stratification" (in which each thing is defined at the lowest level possible,
+  and then hoisted upward when needed)
+
+- two-level type theory in the style of RedPRL: currently we have only pretypes
+  and (kan) types. Once we design a suitable account of exact equality types in
+  the cubical setting, we will add these, and they will live side-by-side with
+  path types as they did in RedPRL.
+
+- some built-in inductive types: natural numbers, integers, booleans, the circle
+
+
+Features we intend to add in the near future:
+
+- general higher inductive types, based on the [work of Evan Cavallo and Bob
+  Harper](https://arxiv.org/abs/1801.01568)
+
+- user-extensible tactic language
+
+- namespacing
+
+
+
 ## Contributing Guidelines
 
 Help is welcome and desired! Please see the [open
