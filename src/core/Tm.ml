@@ -111,6 +111,7 @@ module type Alg =
 sig
   module M : Monad.S
   val push_bindings : int -> 'a M.m -> 'a M.m
+  val under_meta : 'a M.m -> 'a M.m
 
   val bvar : ih:(tm cmd -> tm cmd M.m) -> ix:int -> twin:twin -> tm cmd M.m
   val fvar : name:Name.t -> twin:twin -> ushift:int -> tm cmd M.m
@@ -119,6 +120,7 @@ end
 
 module Traverse (A : Alg) : sig
   val traverse_tm : tm -> tm A.M.m
+  val traverse_spine : tm spine -> tm spine A.M.m
 end =
 struct
   module M = A.M
@@ -240,8 +242,17 @@ struct
 
   and traverse_cmd (hd, sp) =
     traverse_head hd >>= fun (hd', sp') ->
-    traverse_bwd traverse_frame sp >>= fun sp'' ->
+    begin
+      match hd' with
+      | Meta _ ->
+        A.under_meta @@ traverse_spine sp
+      | _ ->
+        traverse_spine sp
+    end >>= fun sp'' ->
     M.ret (hd', sp' <.> sp'')
+
+  and traverse_spine sp =
+    traverse_bwd traverse_frame sp
 
   and traverse_head =
     function
@@ -249,6 +260,7 @@ struct
       A.bvar ~ih:traverse_cmd ~ix ~twin
 
     | Var {name; twin; ushift} ->
+      (* TODO *)
       A.fvar ~name ~twin ~ushift
 
     | Meta {name; ushift} ->
@@ -439,6 +451,8 @@ struct
     M.local @@ fun st ->
     {st with depth = st.depth + n}
 
+  let under_meta m = m
+
   let bvar ~ih ~ix ~twin =
     M.get >>= fun st ->
     if ix = st.depth then
@@ -473,6 +487,8 @@ struct
   let push_bindings k =
     M.local @@ fun sub ->
     liftn k sub
+
+  let under_meta m = m
 
   let rec bvar ~ih ~ix ~twin =
     M.get >>= fun sub ->
@@ -1200,199 +1216,79 @@ struct
       ~x:(up @@ ix 0)
 end
 
-module OccursAux =
+
+module OccursAlg :
+sig
+  include Alg
+  val run : Occurs.flavor -> 'a M.m -> 'a * Occurs.Set.t
+end =
 struct
-  let rec go fl tm acc =
-    match unleash tm with
-    | Lam bnd ->
-      go_bnd fl bnd acc
-    | Pi (dom, cod) ->
-      go_bnd fl cod @@
-      go fl dom acc
-    | Sg (dom, cod) ->
-      go_bnd fl cod @@
-      go fl dom acc
-    | Ext ebnd ->
-      go_ext_bnd fl ebnd acc
-    | Rst info ->
-      go fl info.ty @@
-      go_tm_sys fl info.sys acc
-    | Up cmd ->
-      go_cmd fl cmd acc
-    | ExtLam nbnd ->
-      go_nbnd fl nbnd acc
-    | (Bool | Tt | Ff | Nat | Zero | Int | S1 | Base | Dim0 | Dim1 | Univ _) ->
-      acc
-    | Suc n ->
-      go fl n acc
-    | Pos n ->
-      go fl n acc
-    | NegSuc n ->
-      go fl n acc
-    | Cons (t0, t1) ->
-      go fl t1 @@ go fl t0 acc
-    | Let (cmd, bnd) ->
-      go_bnd fl bnd @@ go_cmd fl cmd acc
-    | V info ->
-      go fl info.r @@ go fl info.ty0 @@
-      go fl info.ty1 @@ go fl info.equiv acc
-    | VIn info ->
-      go fl info.r @@ go fl info.tm0 @@
-      go fl info.tm1 acc
-    | FCom info ->
-      go fl info.r @@ go fl info.r' @@ go fl info.cap @@
-      go_comp_sys fl info.sys @@ acc
-    | CoRThunk face ->
-      go_tm_face fl face acc
-    | LblRet t ->
-      go fl t acc
-    | Loop t ->
-      go fl t acc
-    | LblTy info ->
-      go fl info.ty @@
-      go_lbl_args fl info.args acc
-    | CoR face ->
-      go_tm_face fl face acc
-    | Box info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go fl info.cap @@
-      go_tm_sys fl info.sys acc
+  type set = Occurs.Set.t
+  type state = {fl : Occurs.flavor; vars : set; srigid: bool}
 
-  and go_lbl_args fl args =
-    let go_arg acc (t0, t1) acc = go fl t0 @@ go fl t1 acc in
-    List.fold_right (go_arg fl) args
+  module M = StateMonad.M (struct type t = state end)
+  module Notation = Monad.Notation (M)
+  open Notation
 
-  and go_cmd fl (hd, sp) acc =
-    match fl, hd with
-    | `RigVars, Var {name; _} ->
-      go_spine fl sp @@
-      Occurs.Set.add name acc
-    | `RigVars, Meta _ ->
-      acc
-    | _ ->
-      go_spine fl sp @@
-      go_head fl hd acc
+  let run fl m =
+    let init = {fl; vars = Occurs.Set.empty; srigid = true} in
+    let a, st = M.run init m in
+    a, st.vars
 
-  and go_head fl hd acc =
-    match fl, hd with
-    | _, Ix _ -> acc
-    | `Vars, Meta _ -> acc
-    | `RigVars, Meta _ -> acc
-    | `Metas, Meta {name; _} ->
-      Occurs.Set.add name acc
-    | (`Vars | `RigVars), Var {name; _} ->
-      Occurs.Set.add name acc
-    | `Metas, Var _ -> acc
-    | _, Down {ty; tm} ->
-      go fl tm @@ go fl ty acc
-    | _, Coe info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go_bnd fl info.ty @@
-      go fl info.tm acc
-    | _, HCom info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go fl info.ty @@
-      go fl info.cap @@
-      go_comp_sys fl info.sys acc
-    | _, Com info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go_bnd fl info.ty @@
-      go fl info.cap @@
-      go_comp_sys fl info.sys acc
-    | _, GHCom info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go fl info.ty @@
-      go fl info.cap @@
-      go_comp_sys fl info.sys acc
-    | _, GCom info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go_bnd fl info.ty @@
-      go fl info.cap @@
-      go_comp_sys fl info.sys acc
+  let insert x =
+    M.get >>= fun st ->
+    M.set @@ {st with vars = Occurs.Set.add x st.vars}
 
-  and go_spine fl sp =
-    List.fold_right (go_frame fl) @@ Bwd.to_list sp
+  let push_bindings _ m =
+    m
 
-  and go_frame fl frm acc =
-    match frm with
-    | (Car | Cdr | LblCall | CoRForce) -> acc
-    | FunApp t ->
-      go fl t acc
-    | ExtApp ts ->
-      List.fold_right (go fl) (Bwd.to_list ts) acc
-    | If info ->
-      go_bnd fl info.mot @@
-      go fl info.tcase @@
-      go fl info.fcase acc
-    | NatRec info ->
-      go_bnd fl info.mot @@
-      go fl info.zcase @@
-      go_nbnd fl info.scase acc
-    | IntRec info ->
-      go_bnd fl info.mot @@
-      go_bnd fl info.pcase @@
-      go_bnd fl info.ncase acc
-    | S1Rec info ->
-      go_bnd fl info.mot @@
-      go fl info.bcase @@
-      go_bnd fl info.lcase acc
-    | VProj info ->
-      go fl info.r @@
-      go fl info.ty0 @@
-      go fl info.ty1 @@
-      go fl info.equiv acc
-    | Cap info ->
-      go fl info.r @@
-      go fl info.r' @@
-      go_comp_sys fl info.sys acc
+  let under_meta m =
+    M.get >>= fun st0 ->
+    M.set {st0 with srigid = false} >>
+    m >>= fun a ->
+    M.get >>= fun st1 ->
+    M.set {st1 with srigid = st0.srigid} >>
+    M.ret a
 
-  and go_ext_bnd fl bnd acc =
-    let NB (_, (ty, sys)) = bnd in
-    go fl ty @@ go_tm_sys fl sys acc
+  let bvar ~ih ~ix ~twin =
+    M.ret (Ix (ix, twin), Emp)
 
+  let fvar ~name ~twin ~ushift =
+    M.get >>= fun st ->
+    begin
+      if st.fl = `Vars || (st.fl = `RigVars && st.srigid) then
+        insert name
+      else
+        M.ret ()
+    end >>
+    M.ret (Var {name; twin; ushift}, Emp)
 
-  and go_nbnd fl bnd acc =
-    let NB (_, tm) = bnd in
-    go fl tm acc
-
-  and go_bnd fl bnd acc =
-    let B (_, tm) = bnd in
-    go fl tm acc
-
-  and go_tm_sys fl =
-    List.fold_right @@ go_tm_face fl
-
-  and go_comp_sys fl =
-    List.fold_right @@ go_comp_face fl
-
-  and go_tm_face fl (r, r', otm) acc =
-    go fl r @@ go fl r' @@
-    match otm with
-    | None -> acc
-    | Some tm -> go fl tm acc
-
-  and go_comp_face fl (r, r', obnd) acc =
-    go fl r @@ go fl r' @@
-    match obnd with
-    | None -> acc
-    | Some bnd -> go_bnd fl bnd acc
+  let meta ~name ~ushift =
+    M.get >>= fun st ->
+    begin
+      if st.fl = `Metas then
+        insert name
+      else
+        M.ret ()
+    end >>
+    M.ret (Meta {name; ushift}, Emp)
 end
 
+
+
+
 let free fl tm =
-  (* Format.eprintf "Free: %a@." (pp Pretty.Env.emp) tm; *)
-  OccursAux.go fl tm Occurs.Set.empty
+  let module T = Traverse (OccursAlg) in
+  let _, xs = OccursAlg.run fl @@ T.traverse_tm tm in
+  xs
 
 module Sp =
 struct
   type t = tm spine
   let free fl sp =
-    OccursAux.go_spine fl sp Occurs.Set.empty
+    let module T = Traverse (OccursAlg) in
+    let _, xs = OccursAlg.run fl @@ T.traverse_spine sp in
+    xs
 end
 
 let map_bnd (f : tm -> tm) (bnd : tm bnd) : tm bnd =
