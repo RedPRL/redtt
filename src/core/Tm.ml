@@ -1071,10 +1071,6 @@ struct
       go_comp_sys fl info.sys @@ acc
     | CoRThunk face ->
       go_tm_face fl face acc
-    | Pos t ->
-      go fl t acc
-    | NegSuc t ->
-      go fl t acc
     | LblRet t ->
       go fl t acc
     | Loop t ->
