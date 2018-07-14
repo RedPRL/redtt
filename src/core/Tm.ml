@@ -89,7 +89,7 @@ and 'a cmd = 'a head * 'a spine
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
-  | Lift of 'a subst
+  | Lift of int * 'a subst
 
 type tm = Tm of tm tmf
 
@@ -481,12 +481,9 @@ struct
 
   let run = M.run
 
-  let rec liftn k sub =
-    if k = 0 then sub else Lift (liftn (k - 1) sub)
-
   let push_bindings k =
     M.local @@ fun sub ->
-    liftn k sub
+    Lift (k, sub)
 
   let under_meta m = m
 
@@ -500,14 +497,19 @@ struct
     | Dot (_, sub), _ ->
       M.local (fun _ -> sub) @@
       bvar ~ih ~ix:(ix - 1) ~twin
-    | Lift sub, 0 ->
+    | Lift (0, sub), _ ->
+      M.local (fun _ -> sub) @@
+      bvar ~ih ~ix:ix ~twin
+
+    | Lift (n, sub), 0 ->
       M.ret (Ix (ix, twin), Emp)
-    | Lift sub, _ ->
+
+    | Lift (n, sub), _ ->
       begin
         M.local (fun _ -> sub) @@
-        bvar ~ih ~ix:(ix - 1) ~twin
+        bvar ~ih ~ix:(ix - n) ~twin
       end >>= fun cmd ->
-      M.local (fun _ -> Shift 1) @@
+      M.local (fun _ -> Shift n) @@
       ih cmd
 
   let fvar ~name ~twin ~ushift =

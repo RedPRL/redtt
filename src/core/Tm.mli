@@ -103,7 +103,7 @@ val map_tm_sys : (tm -> tm) -> (tm, tm) system -> (tm, tm) system
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
-  | Lift of 'a subst
+  | Lift of int * 'a subst
 
 
 val make : tm tmf -> tm
