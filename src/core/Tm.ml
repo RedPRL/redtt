@@ -628,12 +628,12 @@ let unbind_with cmd (B (_, t)) =
 let unbindn (NB (nms, t)) =
   let rec go k nms xs t =
     match nms with
-    | Emp -> Bwd.rev xs, t
+    | Emp -> Bwd.from_list xs, t
     | Snoc (nms, nm) ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) @@ open_var k (fun _ -> var x) t
+      go (k + 1) nms (x :: xs) @@ open_var k (fun _ -> var x) t
   in
-  go 0 nms Emp t
+  go 0 nms [] t
 
 let map_tm_face f (r, r', otm) =
   f r, f r', Option.map f otm
@@ -644,12 +644,12 @@ let map_tm_sys f =
 let unbind_ext (NB (nms, (ty, sys))) =
   let rec go k nms xs ty sys =
     match nms with
-    | Emp -> Bwd.rev xs, ty, sys
+    | Emp -> Bwd.from_list xs, ty, sys
     | Snoc (nms, nm)  ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
+      go (k + 1) nms (x :: xs) (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
   in
-  go 0 nms Emp ty sys
+  go 0 nms [] ty sys
 
 let unbind_ext_with xs ebnd =
   let NB (nms, (ty, sys)) = ebnd in
