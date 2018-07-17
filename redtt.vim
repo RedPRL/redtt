@@ -26,7 +26,7 @@ syn keyword redttKeyw V in with end bool nat ℕ int ℤ S1 car cdr coe com cons
 syn keyword redttKeyw restrict if nat-rec int-rec S1-rec lam call tt ff zero suc
 syn keyword redttKeyw pos negsuc base loop pre kan U type then else
 
-syn keyword redttDecl opaque let debug import
+syn keyword redttDecl opaque let debug import quit
 
 syn match   redttSymb '[#@`|^*×:,.▷=⇒→<>λ]\|->'
 
