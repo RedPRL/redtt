@@ -15,7 +15,7 @@
 %token COLON COLON_ANGLE COMMA DOT PIPE CARET
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW
-%token AST TIMES HASH AT BACKTICK IN WITH END
+%token TIMES HASH AT BACKTICK IN WITH END
 %token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
@@ -308,10 +308,6 @@ tm:
   | LPR; RIGHT_ARROW; tele = tele; RPR
     { fun env ->
       pi_from_tele (Some ($startpos, $endpos)) @@ tele env }
-
-  | LPR; AST; tele = tele; RPR
-    { fun env ->
-      sg_from_tele (Some ($startpos, $endpos)) @@ tele env }
 
   | LPR; TIMES; tele = tele; RPR
     { fun env ->
