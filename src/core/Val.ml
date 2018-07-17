@@ -2409,8 +2409,8 @@ struct
     Format.pp_print_list ~pp_sep Name.pp fmt (Bwd.to_list xs)
 
   and pp_ext_abs fmt abs =
-    let x, (tyx, sysx) = ExtAbs.unleash1 abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" Name.pp x pp_value tyx pp_val_sys sysx
+    let xs, (tyx, sysx) = ExtAbs.unleash abs in
+    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" pp_names xs pp_value tyx pp_val_sys sysx
 
   and pp_val_sys : type x. Format.formatter -> (x, value) face list -> unit =
     fun fmt ->
