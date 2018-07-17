@@ -108,7 +108,7 @@ struct
       Tm.cons q0 q1
     | Ext abs ->
       let xs, (tyx, _) = ExtAbs.unleash abs in
-      let rs = Bwd.map (fun x -> `Atom x) xs in
+      let rs = List.map (fun x -> `Atom x) @@ Bwd.to_list xs in
       let app0 = ext_apply el0 rs in
       let app1 = ext_apply el1 rs in
       Tm.ext_lam (Bwd.map Name.name xs) @@
@@ -569,11 +569,11 @@ struct
 
   and equate_dims env rs rs' =
     match rs, rs' with
-    | Emp, Emp ->
-      Emp
-    | Snoc (rs, r), Snoc (rs', r') ->
+    | [], [] ->
+      []
+    | r :: rs, r' :: rs' ->
       let r'' = equate_dim env r r' in
-      (equate_dims env rs rs') #< r''
+      r'' :: equate_dims env rs rs'
     | _ ->
       failwith "equate_dims: length mismatch"
 

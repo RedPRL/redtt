@@ -409,7 +409,7 @@ cut:
   | LPR; AT; e = cut; args = elist(tm); RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< (Tm.ExtApp (Bwd.from_list @@ args env)) }
+      hd, fs #< (Tm.ExtApp (args env)) }
 
   | LPR; IF; mot = bind(tm); scrut = cut; tcase = tm; fcase = tm; RPR
     { fun env ->

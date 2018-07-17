@@ -72,7 +72,7 @@ and 'a frame =
   | Car
   | Cdr
   | FunApp of 'a
-  | ExtApp of 'a bwd
+  | ExtApp of 'a list
   | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
   | NatRec of {mot : 'a bnd; zcase : 'a; scase : 'a nbnd}
   | IntRec of {mot : 'a bnd; pcase : 'a bnd; ncase : 'a bnd}
@@ -384,7 +384,7 @@ struct
       FunApp t'
 
     | ExtApp ts ->
-      let ts' = traverse_bwd traverse_tm ts in
+      let ts' = traverse_list traverse_tm ts in
       ExtApp ts'
 
     | If info ->
@@ -628,12 +628,12 @@ let unbind_with cmd (B (_, t)) =
 let unbindn (NB (nms, t)) =
   let rec go k nms xs t =
     match nms with
-    | Emp -> Bwd.rev xs, t
+    | Emp -> Bwd.from_list xs, t
     | Snoc (nms, nm) ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) @@ open_var k (fun _ -> var x) t
+      go (k + 1) nms (x :: xs) @@ open_var k (fun _ -> var x) t
   in
-  go 0 nms Emp t
+  go 0 nms [] t
 
 let map_tm_face f (r, r', otm) =
   f r, f r', Option.map f otm
@@ -644,12 +644,12 @@ let map_tm_sys f =
 let unbind_ext (NB (nms, (ty, sys))) =
   let rec go k nms xs ty sys =
     match nms with
-    | Emp -> Bwd.rev xs, ty, sys
+    | Emp -> Bwd.from_list xs, ty, sys
     | Snoc (nms, nm)  ->
       let x = Name.named nm in
-      go (k + 1) nms (xs #< x) (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
+      go (k + 1) nms (x :: xs) (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
   in
-  go 0 nms Emp ty sys
+  go 0 nms [] ty sys
 
 let unbind_ext_with xs ebnd =
   let NB (nms, (ty, sys)) = ebnd in
@@ -854,6 +854,7 @@ and pp_head env fmt =
     Format.fprintf fmt "@[<hv1>(gcom %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
 
   | Ix (ix, _tw) ->
+    (* Format.fprintf fmt "#%i/" ix; *)
     Uuseg_string.pp_utf_8 fmt @@
     Pretty.Env.var ix env
 
@@ -949,7 +950,7 @@ and pp_lbl_args env fmt args =
 
 and pp_terms env fmt ts =
   let pp_sep fmt () = Format.fprintf fmt "@ " in
-  Format.pp_print_list ~pp_sep (pp env) fmt (Bwd.to_list ts)
+  Format.pp_print_list ~pp_sep (pp env) fmt ts
 
 and pp_strings fmt (xs : string list) : unit =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -1204,7 +1205,7 @@ let map_frame f =
   | FunApp t ->
     FunApp (f t)
   | ExtApp ts ->
-    ExtApp (Bwd.map f ts)
+    ExtApp (List.map f ts)
   | If info ->
     let mot = map_bnd f info.mot in
     let tcase = f info.tcase in
@@ -1366,7 +1367,7 @@ let rec eta_contract t =
       match unleash tm'ys with
       | Up (hd, Snoc (sp, ExtApp args)) ->
         begin
-          match opt_traverse as_plain_var @@ Bwd.to_list args with
+          match opt_traverse as_plain_var args with
           | Some y's
             when Bwd.to_list ys = y's
             (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)

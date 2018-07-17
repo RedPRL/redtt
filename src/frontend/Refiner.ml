@@ -80,7 +80,7 @@ let push_restriction sys ty =
   | Tm.Ext ebnd ->
     let xs, tyxs, sysxs = Tm.unbind_ext ebnd in
     let app_tm tm =
-      let vars = Bwd.map (fun x -> Tm.up @@ Tm.var x) xs in
+      let vars = List.map (fun x -> Tm.up @@ Tm.var x) @@ Bwd.to_list xs in
       let hd = Tm.Down {ty; tm} in
       Tm.up (hd , Emp #< (Tm.ExtApp vars))
     in

@@ -27,17 +27,8 @@ struct
   type 'a m = 'a
   type t = X.t abs
 
-  let rec freshen_atoms xs acc phi =
-    match xs with
-    | Emp -> Bwd.rev acc, phi
-    | Snoc (xs, x) ->
-      let y = Name.named @@ Name.name x in
-      freshen_atoms xs (Snoc (acc, y)) @@
-      I.cmp (I.swap y x) phi
-
   let unleash abs =
-    let xs, phi = freshen_atoms abs.atoms Emp I.idn in
-    xs, X.act phi abs.node
+    abs.atoms, abs.node
 
   let rec inst_atoms xs rs phi =
     match xs, rs with
@@ -51,11 +42,16 @@ struct
     let phi = inst_atoms abs.atoms rs I.idn in
     X.act phi abs.node
 
-  (* FYI: It may not be necessary to freshen here, depending on how substitution is implemented. *)
-  let bind atoms node =
-    {atoms; node}
-  (* let xs, phi = freshen_atoms atoms [] D.idn in
-     {atoms = xs; node = X.act phi node} *)
+  let rec bind atoms node =
+    let rec go ys atoms phi =
+      match atoms with
+      | Emp ->
+        {atoms = Bwd.from_list ys; node = X.act phi node}
+      | Snoc (atoms, x) ->
+        let y = Name.named @@ Name.name x in
+        go (y :: ys) atoms @@ I.cmp (I.swap x y) phi
+    in
+    go [] atoms I.idn
 
   let bind1 x el =
     bind (Emp #< x) el
