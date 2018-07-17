@@ -854,9 +854,9 @@ and pp_head env fmt =
     Format.fprintf fmt "@[<hv1>(gcom %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
 
   | Ix (ix, _tw) ->
-    Format.fprintf fmt "#%i" ix
-  (* Uuseg_string.pp_utf_8 fmt @@
-     Pretty.Env.var ix env *)
+    (* Format.fprintf fmt "#%i/" ix; *)
+    Uuseg_string.pp_utf_8 fmt @@
+    Pretty.Env.var ix env
 
   | Var {name; ushift} ->
     Name.pp fmt name;

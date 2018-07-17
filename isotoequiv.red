@@ -20,23 +20,21 @@ let Iso/fiber-is-prop
   let α = I.1.1.0 in
   let β = I.1.1.1 in
 
-  let sq : (Fiber _ _ (I.0) b) → Line (Line A) =
+  let sq : (Fiber _ _ (I.0) b) → [i j] A with end =
     λ fib i j →
       comp 0 j (g (fib.1 i)) with
       | i=0 ⇒ λ k → β (fib.0) k
       | i=1 ⇒ λ _ → g b
       end
   in
-
   λ fib0 fib1 →
-    let sq2 : Line (Line A) =
+    let sq2 : [i j] A with end =
       λ i j →
         comp 1 j (g b) with
         | i=0 ⇒ λ k → sq fib0 k 1
         | i=1 ⇒ λ k → sq fib1 k 1
         end
     in
-
     λ i →
      < sq2 i 0
      , λ j →
@@ -54,7 +52,8 @@ let Iso/fiber-is-prop
         | j=0 ⇒ λ k → α (f (sq2 i 0)) k
         | j=1 ⇒ λ k → α b k
         end
-    >
+     >
+
 
 let Iso/Equiv (A : type) (B : type) (I : Iso A B) : Equiv A B =
   < I.0

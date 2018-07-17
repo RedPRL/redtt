@@ -1771,13 +1771,13 @@ struct
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = Bwd.map Name.named nms in
-    let rho = Env.push_many (Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
+    let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
     Abs.bind xs @@ eval rho tm
 
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = Bwd.map Name.named nms in
-    let rho = Env.push_many (Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
+    let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
 
   and unleash_pi v =
