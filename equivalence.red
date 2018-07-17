@@ -1,5 +1,10 @@
 import path
 
+let IsProp (C : type) : type =
+  (c : _)
+  → (c' : _)
+  → Path C c' c
+
 let IsContr (C : type) : type =
   (c : _) × (c' : _) →
     Path C c' c
