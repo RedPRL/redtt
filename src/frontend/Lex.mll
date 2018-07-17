@@ -115,7 +115,7 @@ rule token = parse
   | '^'
     { Lwt.return CARET }
   | '*'
-    { Lwt.return AST }
+    { Lwt.return TIMES }
   | "×"
     { Lwt.return TIMES }
   | ':'
