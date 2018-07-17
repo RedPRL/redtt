@@ -64,7 +64,7 @@ and neu =
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
   | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
-  | ExtApp : neu * dim bwd -> neu
+  | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
   | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
@@ -120,7 +120,7 @@ sig
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
   val apply : value -> value -> value
-  val ext_apply : value -> dim bwd -> value
+  val ext_apply : value -> dim list -> value
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -135,14 +135,14 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_fcom : value -> dir * value * comp_sys
-  val unleash_ext : value -> dim bwd -> value * val_sys
+  val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 
 
   val pp_abs : Format.formatter -> abs -> unit
   val pp_value : Format.formatter -> value -> unit
-  val pp_dims : Format.formatter -> I.t bwd -> unit
+  val pp_dims : Format.formatter -> I.t list -> unit
   val pp_neu : Format.formatter -> neu -> unit
   val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
   val pp_val_sys : Format.formatter -> ('x, value) face list -> unit

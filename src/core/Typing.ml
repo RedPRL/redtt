@@ -494,7 +494,7 @@ struct
       Eval.inst_clo cod v
 
     | T.ExtApp ts ->
-      let rs = Bwd.map (check_eval_dim cx) ts in
+      let rs = List.map (check_eval_dim cx) ts in
       let ty, _ = Eval.unleash_ext ty rs in
       ty
 

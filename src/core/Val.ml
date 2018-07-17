@@ -59,7 +59,7 @@ and neu =
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
   | Meta : {name : Name.t; ushift : int} -> neu
   | FunApp : neu * nf -> neu
-  | ExtApp : neu * dim bwd -> neu
+  | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
 
@@ -128,7 +128,7 @@ sig
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
   val apply : value -> value -> value
-  val ext_apply : value -> dim bwd -> value
+  val ext_apply : value -> dim list -> value
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -144,13 +144,13 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_fcom : value -> dir * value * comp_sys
-  val unleash_ext : value -> dim bwd -> value * val_sys
+  val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 
   val pp_abs : Format.formatter -> abs -> unit
   val pp_value : Format.formatter -> value -> unit
-  val pp_dims : Format.formatter -> I.t bwd -> unit
+  val pp_dims : Format.formatter -> I.t list -> unit
   val pp_neu : Format.formatter -> neu -> unit
   val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
   val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
@@ -654,7 +654,7 @@ struct
       end
 
     | ExtApp (neu, rs) ->
-      let rs = Bwd.map (I.act phi) rs in
+      let rs = List.map (I.act phi) rs in
       begin
         match act_neu phi neu with
         | Ret neu ->
@@ -1093,7 +1093,7 @@ struct
           (* This gives a path from the fiber `fib` to `fiber0 b`
            * where `b` is calculated from `fib` as
            * `ext_apply (cdr fib) [`Dim1]` directly. *)
-          let contr0 phi fib = apply (cdr @@ apply (cdr (Val.act phi equiv0)) (ext_apply (cdr fib) @@ Emp #< `Dim1)) fib in
+          let contr0 phi fib = apply (cdr @@ apply (cdr (Val.act phi equiv0)) (ext_apply (cdr fib) [`Dim1])) fib in
           (* The diagonal face for r=r'. *)
           let face_diag = AbsFace.make_from_dir I.idn dir @@ fun phi ->
             Abs.make1 @@ fun _ -> base phi (I.act phi r) (I.act phi r')
@@ -1110,7 +1110,7 @@ struct
             let cap = base1 phi (I.act phi r') in
             let msys = force_abs_sys @@
               let face0 = AbsFace.make phi (I.act phi r') `Dim0 @@ fun phi ->
-                Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 phi cap)) @@ Emp #< (`Atom z)
+                Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 phi cap)) [`Atom z]
               in
               let face1 = AbsFace.make phi (I.act phi r') `Dim1 @@ fun phi ->
                 Abs.make1 @@ fun _ -> Val.act phi el in
@@ -1152,7 +1152,7 @@ struct
                     (* the fiber *)
                     make_cons (Val.act (I.cmp phi (I.subst `Dim0 r_atom)) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
                   in
-                  ext_apply path_in_fiber0_ty @@ Emp #< r
+                  ext_apply path_in_fiber0_ty [r]
               end
             (* The implementation used in [Y]. *)
             | `UNIFORM_HCOM ->
@@ -1160,7 +1160,7 @@ struct
               make_hcom (Dir.make `Dim1 `Dim0) (fiber0_ty phi (base phi (I.act phi r) `Dim0)) (fiber0 phi (base phi (I.act phi r) `Dim0)) @@
               force_abs_sys @@
               let face0 = AbsFace.make phi (I.act phi r) `Dim0 @@ fun phi ->
-                Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) @@ Emp #< (`Atom w)
+                Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) [`Atom w]
               in
               let face1 = AbsFace.make phi (I.act phi r) `Dim1 @@ fun phi ->
                 Abs.make1 @@ fun _ -> fiber0 phi (base1 phi `Dim0)
@@ -1180,7 +1180,7 @@ struct
           in
           let face_front =
             AbsFace.make I.idn r' `Dim0 @@ fun phi ->
-            Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) @@ Emp #< (`Atom w)
+            Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) [`Atom w]
           in
           let el1 = make_hcom (Dir.make `Dim1 `Dim0) info.ty1 (base I.idn r r') @@
             force_abs_sys [face0; face1; face_diag; face_front]
@@ -1584,7 +1584,7 @@ struct
       let v = eval rho t in
       apply vhd v
     | Tm.ExtApp ts ->
-      let rs = Bwd.map (eval_dim rho) ts in
+      let rs = List.map (eval_dim rho) ts in
       ext_apply vhd rs
     | Tm.Car ->
       car vhd
@@ -1796,7 +1796,7 @@ struct
   and unleash_ext v rs =
     match unleash v with
     | Ext abs ->
-      ExtAbs.inst abs rs
+      ExtAbs.inst abs (Bwd.from_list rs)
     | Rst rst ->
       unleash_ext rst.ty rs
     | _ ->
@@ -1944,10 +1944,10 @@ struct
       Format.eprintf "Tried to apply: %a@." pp_value vfun;
       failwith "apply"
 
-  and ext_apply vext (ss : I.t bwd) =
+  and ext_apply vext (ss : I.t list) =
     match unleash vext with
     | ExtLam abs ->
-      Abs.inst abs ss
+      Abs.inst abs (Bwd.from_list ss)
 
     | Up info ->
       let tyr, sysr = unleash_ext info.ty ss in
@@ -1957,7 +1957,7 @@ struct
           let app = ExtApp (info.neu, ss) in
           let app_face =
             Face.map @@ fun r r' a ->
-            ext_apply a @@ Bwd.map (I.act (I.equate r r')) ss
+            ext_apply a @@ List.map (I.act (I.equate r r')) ss
           in
           let app_sys = List.map app_face info.sys in
           make @@ Up {ty = tyr; neu = app; sys = sysr @ app_sys}
@@ -2000,7 +2000,7 @@ struct
             let face =
               Face.map @@ fun r r' abs ->
               let phi_rr' = I.equate r r' in
-              let ss_rr' = Bwd.map (I.act phi_rr') ss in
+              let ss_rr' = List.map (I.act phi_rr') ss in
               let x, v = Abs.unleash1 abs in
               Abs.bind1 x @@ ext_apply v ss_rr'
             in
@@ -2520,7 +2520,7 @@ struct
 
   and pp_dims fmt rs =
     let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep I.pp fmt (Bwd.to_list rs)
+    Format.pp_print_list ~pp_sep I.pp fmt rs
 
   module Macro =
   struct
