@@ -1,6 +1,7 @@
 import path
 import natural
 import equivalence
+import isotoequiv
 
 let pred (x : int) : int =
   int-rec x with
@@ -41,3 +42,6 @@ let succ-pred (n : int) : Path int (succ (pred n)) n =
     end
   | negsuc n => lam _ -> negsuc n
   end
+
+let succ-equiv : Equiv int int =
+  Iso/Equiv int int < succ, < pred, < succ-pred, pred-succ > > >
