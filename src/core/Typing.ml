@@ -28,7 +28,7 @@ end
 
 type cofibration = (I.t * I.t) list
 
-module M (Sig : sig val globals : GlobalEnv.t end) =
+module M (Sig : sig val globals : GlobalEnv.t end) : S =
 struct
   module Eval = Val.M (GlobalEnv.M (Sig))
   module Cx = LocalCx.M (Eval)
