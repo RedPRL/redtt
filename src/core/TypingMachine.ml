@@ -64,6 +64,7 @@ end
 
 type error =
   | PredicativityViolation
+  | ExpectedDimension of cx * Tm.tm
 
 exception E of error
 
@@ -139,6 +140,47 @@ let cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration m =
     in
     ret @@ List.map face sys
 
+
+let chk_dim_cmd cx =
+  function
+  | hd, Emp ->
+    begin
+      match hd with
+      | Tm.Ix (ix, _) ->
+        begin
+          get_cx >>= fun (module Cx) ->
+          match Cx.lookup ix cx with
+          | `Dim ->
+            ret ()
+          | _ ->
+            raise @@ E (ExpectedDimension (cx, T.up (hd, Emp)))
+        end
+      | Tm.Var _ ->
+        (* TODO: lookup in global context, make sure it is a dimension *)
+        ret ()
+      | _ ->
+        raise @@ E (ExpectedDimension (cx, T.up (hd, Emp)))
+    end
+  | _ ->
+    failwith "check_dim_cmd"
+
+let rec chk_dim cx tr =
+  match T.unleash tr with
+  | T.Dim0 ->
+    ret ()
+  | T.Dim1 ->
+    ret ()
+  | T.Up cmd ->
+    chk_dim_cmd cx cmd
+  | _ ->
+    raise @@ E (ExpectedDimension (cx, tr))
+
+let chk_eval_dim cx tr =
+  chk_dim cx tr >>
+  get_cx >>= fun (module Cx) ->
+  ret @@ Cx.eval_dim cx tr
+
+
 let rec chk cx ty tm =
   get_cx >>= fun (module Cx) ->
   match Cx.Eval.unleash ty, T.unleash tm with
@@ -173,7 +215,55 @@ let rec chk cx ty tm =
 
 
 and chk_ext_sys cx ty sys =
-  failwith "TODO"
+  let rec go sys acc =
+    match sys with
+    | [] ->
+      ret ()
+    | (tr0, tr1, otm) :: sys ->
+      chk_eval_dim cx tr0 >>= fun r0 ->
+      chk_eval_dim cx tr1 >>= fun r1 ->
+      begin
+        match I.compare r0 r1, otm with
+        | `Apart, _ ->
+          go sys acc
+
+        | (`Same | `Indet), Some tm ->
+          begin
+            get_cx >>= fun (module Cx) ->
+            try
+              let cx', phi = Cx.restrict cx r0 r1 in
+              chk cx' (Cx.Eval.Val.act phi ty) tm >>
+              go_adj cx' acc (r0, r1, tm)
+            with
+            | I.Inconsistent ->
+              ret ()
+          end
+
+        | _, None ->
+          failwith "check_ext_sys"
+      end
+
+  and go_adj cx faces face =
+    match faces with
+    | [] ->
+      ret ()
+    | (r'0, r'1, tm') :: faces ->
+      let r0, r1, tm = face in
+      begin
+        get_cx >>= fun (module Cx) ->
+        try
+          let cx', phi = Cx.restrict cx r'0 r'1 in
+          let v = Cx.eval cx' tm in
+          let v' = Cx.eval cx' tm' in
+          let phi = I.cmp phi (I.equate r0 r1) in
+          chk_eq cx' ~ty:(Cx.Eval.Val.act phi ty) v v'
+        with
+        | I.Inconsistent ->
+          ret ()
+      end >>
+      go_adj cx faces face
+  in
+  go sys []
 
 
 and chk_eval cx ty tm =
@@ -181,8 +271,12 @@ and chk_eval cx ty tm =
   get_cx >>= fun (module Cx) ->
   ret @@ Cx.eval cx tm
 
-and constrain (module Cx : LocalCx.S) ctr =
+and chk_eq cx ~ty el0 el1 =
+  constrain @@ ChkEq (cx, ty, (el0, el1))
+
+and constrain ctr =
   callcc @@ fun kont ->
+  get_cx >>= fun (module Cx) ->
   match ctr with
   | ChkEq (cx, ty, (el0, el1)) ->
     callcc @@ fun kont ->
