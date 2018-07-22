@@ -277,7 +277,7 @@ let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scas
 let tac_int_rec ~tac_mot ~tac_scrut ~tac_pcase:(nm_pcase, tac_pcase) ~tac_ncase:(nm_ncase, tac_ncase) =
   fun ty ->
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-    (* let nat = Tm.make @@ Tm.Nat in *)
+    let nat = Tm.make @@ Tm.Nat in
     let int = Tm.make @@ Tm.Int in
     let mot_ty = Tm.pi None int univ in
     let x_pcase = Name.named @@ Some nm_pcase in
@@ -305,12 +305,12 @@ let tac_int_rec ~tac_mot ~tac_scrut ~tac_pcase:(nm_pcase, tac_pcase) ~tac_ncase:
         M.ret fmot
     end >>= fun mot ->
     let mot_pos_x = mot (Tm.make (Tm.Pos (Tm.up (Tm.var x_pcase)))) in
-    M.in_scope x_pcase (`P (Tm.make @@ Tm.Nat)) begin
+    M.in_scope x_pcase (`P nat) begin
       tac_pcase mot_pos_x >>= fun tm ->
       M.ret @@ Tm.bind x_pcase tm
     end >>= fun pcase ->
     let mot_negsuc_x = mot (Tm.make (Tm.NegSuc (Tm.up (Tm.var x_ncase)))) in
-    M.in_scope x_ncase (`P (Tm.make @@ Tm.Nat)) begin
+    M.in_scope x_ncase (`P nat) begin
       tac_ncase mot_negsuc_x >>= fun tm ->
       M.ret @@ Tm.bind x_ncase tm
     end >>= fun ncase ->
