@@ -189,7 +189,7 @@ struct
       let ty1 = check_eval cx ty info.ty1 in
       check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-    | V.Univ _, (T.Bool | T.Nat | T.Int) ->
+    | V.Univ _, (T.Bool | T.Nat | T.Int | T.S1) ->
       ()
 
 
@@ -275,6 +275,12 @@ struct
 
     | V.Int, T.NegSuc n ->
       check cx (Eval.make V.Nat) n
+
+    | V.S1, T.Base ->
+      ()
+
+    | V.S1, T.Loop x ->
+      check_dim cx x
 
     | V.V vty, T.VIn vin ->
       let r = check_eval_dim cx vin.r in
@@ -609,7 +615,7 @@ struct
       let cxx, x = Cx.ext_dim cx ~nm:nm_loop in
       let cxx_loop = Cx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ V.Loop x) in
       let mot_loop = Cx.eval cxx_loop mot in
-      let val_loopx = check_eval cx mot_loop lcase in
+      let val_loopx = check_eval cxx mot_loop lcase in
       let val_loop0 = Eval.Val.act (I.subst `Dim0 x) val_loopx in
       let val_loop1 = Eval.Val.act (I.subst `Dim1 x) val_loopx in
       Cx.check_eq cx mot_base val_loop0 val_base;
