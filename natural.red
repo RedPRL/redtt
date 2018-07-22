@@ -43,6 +43,6 @@ let plus/suc/r (n : nat) : (m : nat) → Path nat (plus n (suc m)) (suc (plus n 
 let plus/comm (m : nat) : (n : nat) → Path nat (plus n m) (plus m n) =
   nat-rec m with
   | zero ⇒ plus/unit/r
-  | suc (m ⇒ plus/comm/m) ⇒ λ n → trans _ (suc (plus m n)) (plus/suc/r n m) (λ i → suc (plus/comm/m n i))
+  | suc (m ⇒ plus/comm/m) ⇒ λ n → trans _ (plus/suc/r n m) (λ i → suc (plus/comm/m n i))
   end
 
