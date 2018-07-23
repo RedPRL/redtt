@@ -44,7 +44,7 @@ struct
           raise Fatal
       end
 
-  let rec get k t =
+  let get k t =
     match !t with
     | Tbl a ->
       Hashtbl.find a k
@@ -75,16 +75,6 @@ struct
       res
     | _ ->
       raise Fatal
-
-  let set_without_replacing k v t =
-    match find k t with
-    | None ->
-      set k v t
-    | Some v' ->
-      if v = v' then
-        set k v t
-      else
-        failwith "table merge error"
 
   let merge t0 t1 =
     reroot t0;

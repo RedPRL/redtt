@@ -1,6 +1,5 @@
 open RedBasis
 open Bwd
-open BwdNotation
 
 type atom = Name.t
 type dim = I.t
@@ -317,6 +316,7 @@ struct
      * the dimension. *)
     let forall x sys =
       List.filter (fun f -> Face.forall x f = `Keep) sys
+
     let forallm x msys =
       match msys with
       | `Ok sys -> `Ok (forall x sys)
@@ -419,7 +419,7 @@ struct
   let make_closure rho bnd =
     Clo {bnd; rho}
 
-  let rec eval_dim rho tm =
+  let eval_dim rho tm =
     match Tm.unleash tm with
     | Tm.Dim0 ->
       `Dim0
@@ -1082,10 +1082,10 @@ struct
             let subst_src = Val.act (I.subst src x) in
             vproj phi
               (I.act phi src)
-              (fun phi0 -> Val.act phi0 @@ subst_src info.ty0)
-              (Val.act phi @@ subst_src info.ty1)
-              (fun phi0 -> Val.act phi0 @@ subst_src info.equiv)
-              (Val.act phi el)
+              ~ty0:(fun phi0 -> Val.act phi0 @@ subst_src info.ty0)
+              ~ty1:(Val.act phi @@ subst_src info.ty1)
+              ~equiv:(fun phi0 -> Val.act phi0 @@ subst_src info.equiv)
+              ~el:(Val.act phi el)
           in
           (* Some helper functions to reduce typos. *)
           let base0 phi dest = base phi `Dim0 dest in
@@ -1126,7 +1126,7 @@ struct
           let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.ix i in
             eval (Env.push_many [Val (Val.act phi ty00); Val (Val.act phi ty10); Val (car (Val.act phi equiv0)); Val b] Env.emp) @@
-            Tm.Macro.fiber (var 0) (var 1) (var 2) (var 3)
+            Tm.Macro.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
           in
           (* This is to generate the element in `ty0` and also
            * the face for r'=0. This is `O` in [F]. *)
@@ -1344,7 +1344,7 @@ struct
     (* `Ext _`: the expansion will stop after a valid
      * correction system, so it is not so bad. *)
     | (Ext _ | Bool | Univ _ | FCom _ | V _) ->
-      let rec aux sys =
+      let aux sys =
         match sys with
         | [] -> cap
         | Face.Indet (eqi, absi) :: rest ->
