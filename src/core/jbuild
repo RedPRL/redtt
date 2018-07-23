@@ -1,8 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name RedTT_Core)
-  (flags
-   (:standard -w -32))
-  (public_name redtt_core)
-  (libraries (redbasis uuseg uuseg.string uutf))))
