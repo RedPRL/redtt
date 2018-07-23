@@ -1,11 +1,10 @@
 import path
 import integer
-import univalence
 
 let S1-univ-cover (x : S1) : type =
   S1-rec x with
   | base => int
-  | loop i => UA int int succ-equiv i
+  | loop i => `(V i int int succ-equiv)
   end
 
 let loopn (n : int) : Path S1 base base =

@@ -277,6 +277,10 @@ tm:
     { fun _env ->
       make_node $startpos $endpos @@ Tm.Bool }
 
+  | INT
+    { fun _env ->
+      make_node $startpos $endpos @@ Tm.Int }
+
   | TT
     { fun _env ->
       make_node $startpos $endpos @@ Tm.Tt }
