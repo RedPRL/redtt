@@ -402,6 +402,7 @@ struct
     | RigidCoeUnexpectedArgument of abs
     | RigidHComUnexpectedArgument of value
     | RigidGHComUnexpectedArgument of value
+    | RigidVProjUnexpectedArgument of value
     | LblCallUnexpectedArgument of value
     | UnexpectedDimensionTerm of Tm.tm
     | UnleashPiError of value
@@ -2044,7 +2045,8 @@ struct
       let vproj_sys = List.map vproj_face up.sys in
       make @@ Up {ty = ty1; neu; sys = vproj_sys}
     | _ ->
-      failwith "rigid_vproj"
+      let err = RigidVProjUnexpectedArgument el in
+      raise @@ E err
 
   and if_ mot scrut tcase fcase =
     match unleash scrut with
@@ -2560,6 +2562,10 @@ struct
       | LblCallUnexpectedArgument v ->
         Format.fprintf fmt
           "Unexpected argument to labeled type projection: %a"
+          pp_value v
+      | RigidVProjUnexpectedArgument v ->
+        Format.fprintf fmt
+          "Unexpected argument to rigid vproj: %a"
           pp_value v
       | ExpectedAtomInEnvironment v ->
         Format.fprintf fmt
