@@ -9,12 +9,11 @@ dev-repo: "https://github.com/jonsterling/tt.git"
 license: "Apache-2.0"
 depends: [
   "cmdliner" {= "1.0.2"}
-  "uuseg" {= "10.0.0"}
+  "uuseg" {= "11.0.0"}
   "uutf" {= "1.0.1"}
-  "jbuilder" {build & = "1.0+beta20"}
-  "lwt" {= "3.2.1"}
-  "menhir" {>= "20171013"}
-  "topkg" {= "0.9.1"}
+  "dune" {build & = "1.0.0"}
+  "lwt" {= "4.1.0"}
+  "menhir" {>= "20180703"}
 ]
 build: [
   ["make"]

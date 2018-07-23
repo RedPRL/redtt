@@ -1,0 +1,3 @@
+(library
+ (name RedBasis)
+ (public_name redbasis))

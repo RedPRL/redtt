@@ -1,0 +1,9 @@
+(executables
+ (names main)
+ (ocamlopt_flags (:standard -p))
+ (libraries cmdliner lwt.unix redtt))
+
+(install
+ (section bin)
+ (package redtt)
+ (files (main.exe as redtt)))

@@ -664,7 +664,7 @@ struct
         subtype env info0.ty info1.ty;
       let go_arg (nf0, nf1) =
         equiv_ty env nf0.ty nf1.ty;
-        equiv env nf0.ty nf0.el nf1.el
+        equiv env ~ty:nf0.ty nf0.el nf1.el
       in
       ignore @@ List.map go_arg @@ List.combine info0.args info1.args
 
