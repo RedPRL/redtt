@@ -136,6 +136,9 @@ val eta_contract : tm -> tm
 val up : tm cmd -> tm
 val ix : ?twin:twin -> int -> tm cmd
 val var : ?twin:twin -> Name.t -> tm cmd
+val car : tm cmd -> tm cmd
+val cdr : tm cmd -> tm cmd
+val let_ : string option -> tm cmd -> tm -> tm
 
 val lam : string option -> tm -> tm
 val ext_lam : string option bwd -> tm -> tm
