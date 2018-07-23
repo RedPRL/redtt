@@ -25,7 +25,10 @@ let loopn (n : int) : Path S1 base base =
 let winding (l : Path S1 base base) : int =
   coe 0 1 (pos zero) in lam i -> S1-univ-cover (l i)
 
-let three : int = pos (suc (suc (suc zero)))
+let two : int = pos (suc (suc zero))
 
-let winding-loop-testing : Path int three (winding (loopn three)) =
-  lam _ -> three
+let winding-loop-testing : Path int two (winding (trans S1 (lam i -> loop i) (lam i -> loop i))) =
+  lam _ -> two
+
+let winding-loop-testing : Path int two (winding (loopn two)) =
+  lam _ -> two
