@@ -14,7 +14,6 @@ depends: [
   "dune" {build & = "1.0.0"}
   "lwt" {= "4.1.0"}
   "menhir" {>= "20180703"}
-  "topkg" {= "0.9.1"}
 ]
 build: [
   ["make"]
