@@ -12,12 +12,6 @@ type t =
    chronicle : eqn list;
    size : int}
 
-let rec eval_chronicle dl uf =
-  match dl with
-  | [] -> uf
-  | (r, r') :: dl ->
-    UF.union r r' @@ eval_chronicle dl uf
-
 let pp_eqn fmt (r, r') =
   Format.fprintf fmt "%a=%a" I.pp r I.pp r'
 
@@ -30,7 +24,7 @@ let pp fmt rst =
 
 
 let emp () =
-  {classes = UF.init 100;
+  {classes = UF.init ~size:100;
    chronicle = [];
    size = 0}
 
@@ -87,8 +81,8 @@ let as_action t =
   in
   go t.chronicle
 
-
-let test =
+(* poor man's tests *)
+let _  =
   try
     let x = `Atom (Name.named (Some "i")) in
     let rst, _ = equate x `Dim1 @@ emp () in
@@ -98,7 +92,7 @@ let test =
   with
   | Inconsistent -> ()
 
-let test2 =
+let _ =
   let x = `Atom (Name.named (Some "i")) in
   let rst, _ = equate x `Dim0 @@ emp () in
   assert (canonize x rst = `Dim0)

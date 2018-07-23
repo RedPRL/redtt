@@ -42,7 +42,7 @@ struct
     let phi = inst_atoms abs.atoms rs I.idn in
     X.act phi abs.node
 
-  let rec bind atoms node =
+  let bind atoms node =
     let rec go ys atoms phi =
       match atoms with
       | Emp ->

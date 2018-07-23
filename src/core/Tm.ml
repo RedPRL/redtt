@@ -539,7 +539,7 @@ struct
   let under_meta f =
     f ()
 
-  let bvar ~ih ~ix ~twin =
+  let bvar ~ih:_ ~ix ~twin =
     if ix = !state then
       Init.cmd twin
     else
@@ -565,7 +565,7 @@ struct
     state := old;
     r
 
-  let bvar ~ih ~ix ~twin =
+  let bvar ~ih:_ ~ix ~twin =
     Ix (ix, twin), Emp
 
   let fvar ~name ~twin ~ushift =
@@ -669,7 +669,7 @@ let unbind_ext_with xs ebnd =
 let bind x tx =
   B (Name.name x, close_var x 0 tx)
 
-let rec bindn xs txs =
+let bindn xs txs =
   let rec go k xs txs =
     match xs with
     | Emp -> txs
@@ -678,7 +678,7 @@ let rec bindn xs txs =
   in
   NB (Bwd.map Name.name xs, go 0 xs txs)
 
-let rec bind_ext xs tyxs sysxs =
+let bind_ext xs tyxs sysxs =
   let rec go k xs tyxs sysxs =
     match xs with
     | Emp -> tyxs, sysxs
@@ -858,9 +858,9 @@ and pp_head env fmt =
     Uuseg_string.pp_utf_8 fmt @@
     Pretty.Env.var ix env
 
-  | Var {name; ushift} ->
-    Name.pp fmt name;
-    if ushift > 0 then Format.fprintf fmt "^%i" ushift else ()
+  | Var info ->
+    Name.pp fmt info.name;
+    if info.ushift > 0 then Format.fprintf fmt "^%i" info.ushift else ()
 
   | Meta {name; ushift} ->
     Format.fprintf fmt "?%a^%i"
@@ -1070,8 +1070,6 @@ sig
   val get : unit -> Occurs.Set.t
 end =
 struct
-  type set = Occurs.Set.t
-
   let state = ref Occurs.Set.empty
   let srigid = ref true
   let get () = !state
@@ -1093,7 +1091,7 @@ struct
     r
 
 
-  let bvar ~ih ~ix ~twin =
+  let bvar ~ih:_ ~ix ~twin =
     Ix (ix, twin), Emp
 
   let fvar ~name ~twin ~ushift =
@@ -1426,7 +1424,7 @@ struct
     | InvalidDeBruijnIndex i ->
       Format.fprintf fmt
         "Tried to construct term with negative de bruijn index %i." i
-    | UnbindExtLengthMismatch (xs, ebnd) ->
+    | UnbindExtLengthMismatch (_xs, _ebnd) ->
       Format.fprintf fmt
         "Tried to unbind extension type binder with incorrect number of variables."
 
