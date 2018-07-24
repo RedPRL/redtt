@@ -1,6 +1,3 @@
-open RedBasis
-open Bwd
-
 type cx = LocalCx.t
 type value = Val.value
 type cofibration = (I.t * I.t) list
@@ -35,7 +32,7 @@ let continue k = Intermediate {env = (); kont = k}
 let (@>) jdg state =
   Wait (jdg, state)
 
-let rec step : type rho x. (module LocalCx.S) -> rho -> rho state -> unit checkpoint =
+let step : type rho. (module LocalCx.S) -> rho -> rho state -> unit checkpoint =
   fun (module Cx) env ->
     function
     | Wait (Jdg (chi, jdg), kont) ->
@@ -83,7 +80,7 @@ let refresh_ty : (module LocalCx.S) -> cx -> value -> value =
 let refresh_cx : (module LocalCx.S) -> cx -> cx =
   failwith "TODO"
 
-let refresh_inputs : type rho0 rho1 x. (module LocalCx.S) -> (rho0, rho1) jdg -> rho0 -> rho0 =
+let refresh_inputs : type rho0 rho1. (module LocalCx.S) -> (rho0, rho1) jdg -> rho0 -> rho0 =
   fun ((module Cx) as cxmod) jdg env ->
     match jdg with
     | Chk ->
@@ -102,7 +99,7 @@ let refresh_inputs : type rho0 rho1 x. (module LocalCx.S) -> (rho0, rho1) jdg ->
       let dom' = refresh_ty cxmod cx' dom in
       cx', univ', dom', fam
 
-let rec refresh : type rho x. (module LocalCx.S) -> rho state -> rho state =
+let refresh : type rho. (module LocalCx.S) -> rho state -> rho state =
   fun cx kont ->
     match kont with
     | Wait (Jdg (chi, jdg), kont) ->
@@ -111,7 +108,7 @@ let rec refresh : type rho x. (module LocalCx.S) -> rho state -> rho state =
     | Done ->
       Done
 
-let rec driver : type rho x. (module LocalCx.S) -> rho -> rho state -> unit =
+let rec driver : type rho. (module LocalCx.S) -> rho -> rho state -> unit =
   fun cx env kont ->
     match step cx env kont with
     | Error ->
