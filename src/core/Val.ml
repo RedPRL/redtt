@@ -86,6 +86,8 @@ and neu =
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
 
+  | DFix : nf -> neu
+
 and nf = {ty : value; el : value}
 
 and ('x, 'a) face = ('x, 'a) Face.face
@@ -787,6 +789,10 @@ struct
 
     | Meta _ ->
       ret con
+
+    | DFix nf ->
+      let nf' = act_nf phi nf in
+      ret @@ DFix nf'
 
   and act_nf phi (nf : nf) =
     match nf with
@@ -2556,6 +2562,9 @@ struct
 
     | CoRForce neu ->
       Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
+
+    | DFix _ ->
+      Format.fprintf fmt "<dfix>"
 
 
   and pp_nf fmt nf =

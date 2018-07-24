@@ -93,6 +93,8 @@ and neu =
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
 
+  | DFix : nf -> neu
+
 and nf = {ty : value; el : value}
 
 and abs = value IAbs.abs
