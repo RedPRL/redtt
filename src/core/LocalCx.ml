@@ -3,7 +3,9 @@ open BwdNotation
 
 type hyp =
   {classifier : [`Ty of Val.value | `Dim | `Tick];
-   locks : int}
+   killed : bool; (* for modal calculus *)
+   locks : int (* for modal calculus *)
+  }
 
 let check_eq_clock = ref 0.
 
@@ -28,6 +30,7 @@ sig
 
   val ext_lock : t -> t
   val clear_locks : t -> t
+  val kill_from_tick : t -> int -> t
 
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
@@ -87,11 +90,20 @@ struct
   let clear_locks cx =
     {cx with hyps = List.map (hyp_map_lock (fun _ -> 0)) cx.hyps}
 
+  let kill_from_tick cx i =
+    let go j hyp =
+      if j <= i then
+        {hyp with killed = true}
+      else
+        hyp
+    in
+    {cx with hyps = List.mapi go cx.hyps}
+
   let ext {env; qenv; hyps; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in
     let var = V.reflect ty (Val.Lvl (nm, n)) sys in
     {env = Eval.Env.push (Val.Val var) env;
-     hyps = {classifier = `Ty ty; locks = 0} :: hyps;
+     hyps = {classifier = `Ty ty; locks = 0; killed = false} :: hyps;
      qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel},
@@ -107,7 +119,7 @@ struct
   let ext_dim {env; qenv; hyps; ppenv; rel} ~nm =
     let x = Name.named nm in
     {env = Eval.Env.push (Val.Atom (`Atom x)) env;
-     hyps = {classifier = `Dim; locks = 0} :: hyps;
+     hyps = {classifier = `Dim; locks = 0; killed = false} :: hyps;
      qenv = Quote.Env.abs qenv @@ Emp #< x;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}, x
@@ -162,9 +174,9 @@ struct
     V.eval_tm_sys env sys
 
   let lookup i {hyps; _} =
-    let {classifier; locks} = List.nth hyps i in
-    if locks > 0 then
-      failwith "Cannot view hypothesis under lock and key ;-)"
+    let {classifier; locks; killed} = List.nth hyps i in
+    if (killed || locks > 0) && classifier != `Dim then
+      failwith "Hypothesis is inaccessible (modal, taste it!)"
     else
       classifier
 
@@ -173,11 +185,11 @@ struct
     let r = I.act phi r in
     let r' = I.act phi r' in
     let rel, phi = Restriction.equate r r' cx.rel in
-    let act_ty {classifier; locks} =
+    let act_ty {classifier; locks; killed} =
       match classifier with
-      | `Ty ty -> {classifier = `Ty (V.Val.act phi ty); locks}
-      | `Dim -> {classifier = `Dim; locks}
-      | `Tick -> {classifier = `Tick; locks}
+      | `Ty ty -> {classifier = `Ty (V.Val.act phi ty); locks; killed}
+      | `Dim -> {classifier = `Dim; locks; killed}
+      | `Tick -> {classifier = `Tick; locks; killed}
     in
     let hyps = List.map act_ty cx.hyps in
     let env = V.Env.act phi cx.env in
