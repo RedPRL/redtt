@@ -99,6 +99,7 @@ struct
       let app0 = apply el0 var in
       let app1 = apply el1 var in
       Tm.lam (clo_name cod) @@ equate (Env.succ env) vcod app0 app1
+
     | Sg {dom; cod} ->
       let el00 = car el0 in
       let el10 = car el1 in
@@ -106,6 +107,7 @@ struct
       let vcod = inst_clo cod el00 in
       let q1 = equate env vcod (cdr el0) (cdr el1) in
       Tm.cons q0 q1
+
     | Ext abs ->
       let xs, (tyx, _) = ExtAbs.unleash abs in
       let rs = List.map (fun x -> `Atom x) @@ Bwd.to_list xs in
@@ -113,6 +115,14 @@ struct
       let app1 = ext_apply el1 rs in
       Tm.ext_lam (Bwd.map Name.name xs) @@
       equate (Env.abs env xs) tyx app0 app1
+
+    | Later ltr ->
+      let tick = TickGen (`Lvl (None, Env.len env)) in
+      let prev0 = prev tick el0 in
+      let prev1 = prev tick el1 in
+      let ty = inst_tick_clo ltr tick in
+      let bdy = equate (Env.succ env) ty prev0 prev1 in
+      Tm.make @@ Tm.Next (Tm.B (None, bdy))
 
     | Rst {ty; _} ->
       equate env ty el0 el1
@@ -206,6 +216,14 @@ struct
         let vcod1 = inst_clo pi1.cod var in
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi (clo_name pi0.cod) dom cod
+
+      | Later ltr0, Later ltr1 ->
+        let tick = TickGen (`Lvl (None, Env.len env)) in
+        let vcod0 = inst_tick_clo ltr0 tick in
+        let vcod1 = inst_tick_clo ltr1 tick in
+        let cod = equate (Env.succ env) ty vcod0 vcod1 in
+        Tm.make @@ Tm.Later (Tm.B (None, cod))
+
 
       | Sg sg0, Sg sg1 ->
         let dom = equate env ty sg0.dom sg1.dom in
@@ -305,6 +323,15 @@ struct
           with
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
+
+      | DFix dfix0, DFix dfix1 ->
+        let ty = equate_ty env dfix0.ty dfix1.ty in
+        let ltr_ty = make_later dfix0.ty in
+        let var = generic env ltr_ty in
+        let bdy0 = inst_clo dfix0.clo var in
+        let bdy1 = inst_clo dfix1.clo var in
+        let bdy = Tm.B (None, equate (Env.succ env) dfix0.ty bdy0 bdy1) in
+        Tm.up (Tm.DFix {ty; bdy}, Emp)
 
       | _ ->
         let err = ErrEquateNf {env; ty; el0; el1} in
@@ -421,6 +448,11 @@ struct
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
     | CoRForce neu0, CoRForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
+
+    | Fix (_tgen0, ty0, _clo0), Fix (_tgen1, ty1, _clo1) ->
+      let _ty = equate_ty env ty0 ty1 in
+      failwith "Damn it!! Wrong direction again!!!"
+
     | _ ->
       let err = ErrEquateNeu {env; neu0; neu1} in
       raise @@ E err
