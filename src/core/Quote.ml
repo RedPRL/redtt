@@ -541,6 +541,12 @@ struct
     let tr' = equate_dim3 env r'0 r'1 r'2 in
     tr, tr'
 
+  and equate_tick env tick0 tick1 =
+    if tick0 = tick1 then
+      quote_tick env tick0
+    else
+      failwith "equate_tick: ticks did not match"
+
   and equate_dim env (r : I.t) (r' : I.t) =
     match I.compare r r' with
     | `Same ->
@@ -550,6 +556,7 @@ struct
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
       failwith "equate_dim: dimensions did not match"
+
 
   and equate_dim3 env (r : I.t) (r' : I.t) (r'' : I.t) =
     match I.compare r r', I.compare r r'' with
@@ -588,6 +595,16 @@ struct
       with
       | _ ->
         Tm.up @@ Tm.var x
+
+  and quote_tick env tck =
+    match tck with
+    | TickConst ->
+      Tm.make Tm.TickConst
+    | TickGen (`Lvl (_, lvl)) ->
+      let ix = Env.ix_of_lvl lvl env in
+      Tm.up @@ Tm.ix ix
+    | TickGen (`Global alpha) ->
+      Tm.up @@ Tm.var alpha
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1
