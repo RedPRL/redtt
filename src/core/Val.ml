@@ -58,6 +58,7 @@ type con =
   | LblRet : value -> con
 
   | Later : tick_clo -> con
+  | Next : tick_clo -> con
 
 
 and neu =
@@ -639,6 +640,9 @@ struct
 
     | Later clo ->
       make @@ Later (TickClo.act phi clo)
+
+    | Next clo ->
+      make @@ Next (TickClo.act phi clo)
 
   and act_neu phi con =
     match con with
@@ -2440,6 +2444,8 @@ struct
       Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
     | Later _clo ->
       Format.fprintf fmt "<later>"
+    | Next _clo ->
+      Format.fprintf fmt "<next>"
 
   and pp_abs fmt abs =
     let xs, v = Abs.unleash abs in

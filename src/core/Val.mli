@@ -66,6 +66,7 @@ type con =
   | LblRet : value -> con
 
   | Later : tick_clo -> con
+  | Next : tick_clo -> con
 
 and neu =
   | Lvl : string option * int -> neu
