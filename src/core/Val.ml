@@ -96,7 +96,7 @@ and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
 
 and tick_clo =
-  | TickClo of {bnd : Tm.tm Tm.nbnd; rho : env}
+  | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}
 
 and env_el = Val of value | Atom of I.t | Tick of tick
 and env = {cells : env_el list; global : I.action}
@@ -148,6 +148,7 @@ sig
 
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> value list -> value
+  val inst_tick_clo : tick_clo -> tick -> value
 
   val unleash_pi : value -> value * clo
   val unleash_sg : value -> value * clo
@@ -2338,6 +2339,12 @@ struct
       let Tm.NB (_, tm) = info.nbnd in
       (* Reversing makes sense here because: the left-most element of the environment is the innermost variable *)
       eval (Env.push_many (List.rev_map (fun v -> Val v) vargs) info.rho) tm
+
+  and inst_tick_clo clo tick =
+    match clo with
+    | TickClo info ->
+      let Tm.B (_, tm) = info.bnd in
+      eval (Env.push (Tick tick) info.rho) tm
 
   and pp_env_cell fmt =
     function

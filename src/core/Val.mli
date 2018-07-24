@@ -139,6 +139,7 @@ sig
 
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> value list -> value
+  val inst_tick_clo : tick_clo -> tick -> value
 
   val unleash_pi : value -> value * clo
   val unleash_sg : value -> value * clo
