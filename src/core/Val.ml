@@ -5,9 +5,12 @@ type atom = Name.t
 type dim = I.t
 type dir = Dir.t
 
+type tick_gen =
+  [`Lvl of string option * int | `Global of Name.t ]
+
 type tick =
   | TickConst
-  | TickLvl of string option * int
+  | TickGen of tick_gen
 
 
 (* Notes: I have defined the semantic domain and evaluator in a fairly naive way, in order to avoid
@@ -88,7 +91,7 @@ and neu =
   | CoRForce : neu -> neu
 
   | Prev : tick * neu -> neu
-  | Fix : string option * int * value * clo -> neu
+  | Fix : tick_gen * value * clo -> neu
 
 and nf = {ty : value; el : value}
 
@@ -141,6 +144,7 @@ sig
   val eval_head : env -> Tm.tm Tm.head -> value
   val eval_frame : env -> value -> Tm.tm Tm.frame -> value
   val eval_dim : env -> Tm.tm -> I.t
+  val eval_tick : env -> Tm.tm -> tick
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
@@ -433,6 +437,7 @@ struct
   type error =
     | UnexpectedEnvCell of env_el
     | ExpectedDimensionTerm of Tm.tm
+    | ExpectedTickTerm of Tm.tm
     | InternalMortalityError
     | RigidCoeUnexpectedArgument of abs
     | RigidHComUnexpectedArgument of value
@@ -486,6 +491,31 @@ struct
       end
     | _ ->
       let err = ExpectedDimensionTerm tm in
+      raise @@ E err
+
+  let eval_tick rho tm =
+    match Tm.unleash tm with
+    | Tm.TickConst ->
+      TickConst
+    | Tm.Up (hd, Emp) ->
+      begin
+        match hd with
+        | Tm.Ix (i, _) ->
+          begin
+            match List.nth rho.cells i with
+            | Tick tck -> tck
+            | cell ->
+              let err = UnexpectedEnvCell cell in
+              raise @@ E err
+          end
+        | Tm.Var info ->
+          TickGen (`Global info.name)
+        | _ ->
+          let err = ExpectedTickTerm tm in
+          raise @@ E err
+      end
+    | _ ->
+      let err = ExpectedTickTerm tm in
       raise @@ E err
 
 
@@ -818,8 +848,8 @@ struct
           step @@ prev tick v
       end
 
-    | Fix (nm, lvl, ty, clo) ->
-      ret @@ Fix (nm, lvl, Val.act phi ty, Clo.act phi clo)
+    | Fix (tick, ty, clo) ->
+      ret @@ Fix (tick, Val.act phi ty, Clo.act phi clo)
 
   and act_nf phi (nf : nf) =
     match nf with
@@ -1691,6 +1721,10 @@ struct
       let ty = eval rho info.ty in
       let sys = eval_rigid_bnd_sys rho info.sys in
       make_cap dir ty sys vhd
+    | Tm.Prev tick ->
+      let vtick = eval_tick rho tick in
+      prev vtick vhd
+
 
 
   and eval_head rho =
@@ -2100,8 +2134,8 @@ struct
         match tick with
         | TickConst ->
           inst_clo dfix.clo el
-        | TickLvl (nm, lvl) ->
-          let neu = Fix (nm, lvl, dfix.ty, dfix.clo) in
+        | TickGen gen ->
+          let neu = Fix (gen, dfix.ty, dfix.clo) in
           make @@ Up {ty = dfix.ty; neu; sys = []}
       end
 
@@ -2726,6 +2760,10 @@ struct
       | ExpectedDimensionTerm t ->
         Format.fprintf fmt
           "Tried to evaluate non-dimension term %a as dimension."
+          Tm.pp0 t
+      | ExpectedTickTerm t ->
+        Format.fprintf fmt
+          "Tried to evaluate non-tick term %a as dimension."
           Tm.pp0 t
       | UnexpectedDimensionTerm t ->
         Format.fprintf fmt

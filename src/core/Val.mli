@@ -11,9 +11,12 @@ type nclo
 
 type ('x, 'a) face = ('x, 'a) Face.face
 
+type tick_gen =
+  [`Lvl of string option * int | `Global of Name.t ]
+
 type tick =
   | TickConst
-  | TickLvl of string option * int
+  | TickGen of tick_gen
 
 
 (* TODO: now it may be possible to semantic domain to use the fancy restriction data structure,
@@ -95,7 +98,7 @@ and neu =
   | CoRForce : neu -> neu
 
   | Prev : tick * neu -> neu
-  | Fix : string option * int * value * clo -> neu
+  | Fix : tick_gen * value * clo -> neu
 
 and nf = {ty : value; el : value}
 
@@ -132,6 +135,7 @@ sig
   val eval_head : env -> Tm.tm Tm.head -> value
   val eval_frame : env -> value -> Tm.tm Tm.frame -> value
   val eval_dim : env -> Tm.tm -> I.t
+  val eval_tick : env -> Tm.tm -> tick
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 

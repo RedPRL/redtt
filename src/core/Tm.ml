@@ -84,6 +84,7 @@ and 'a frame =
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | LblCall
   | CoRForce
+  | Prev of 'a
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
@@ -432,6 +433,10 @@ struct
       let ty = traverse_tm info.ty in
       let sys = traverse_list traverse_bface info.sys in
       Cap {r; r'; ty; sys}
+
+    | Prev tick ->
+      let tick = traverse_tm tick in
+      Prev tick
 end
 
 
@@ -927,6 +932,8 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<hv1>(call@ %a)@]" (go `Call) sp
       | CoRForce ->
         Format.fprintf fmt "@[<hv1>(force@ %a)@]" (go `Force) sp
+      | Prev tick ->
+        Format.fprintf fmt "@[<hv1>(prev %a %a)@]" (pp env) tick (go `Prev) sp
   in
   go `Start fmt sp
 
@@ -1255,6 +1262,9 @@ let map_frame f =
     let ty = f info.ty in
     let sys = map_comp_sys f info.sys in
     Cap {r; r'; ty; sys}
+  | Prev tick ->
+    let tick = f tick in
+    Prev tick
 
 let map_spine f =
   Bwd.map @@ map_frame f

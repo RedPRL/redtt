@@ -636,6 +636,9 @@ struct
         | _ -> failwith "Cannot force co-restriction when it is not true!"
       end
 
+    | T.Prev _tick ->
+      failwith "TODO"
+
   and infer_head cx =
     function
     | T.Var {name; twin; ushift} ->

@@ -83,6 +83,7 @@ and 'a frame =
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | LblCall
   | CoRForce
+  | Prev of 'a
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
