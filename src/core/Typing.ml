@@ -186,6 +186,10 @@ struct
       let cxx, _ = Cx.ext_ty cx ~nm vdom in
       check cxx ty cod
 
+    | V.Univ _, T.Later (B (nm, cod)) ->
+      let cxx, _ = Cx.ext_tick cx ~nm in
+      check cxx ty cod
+
     | V.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
       let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
       let vcod = check_eval cxx ty cod in
@@ -229,6 +233,11 @@ struct
       let cxx, x = Cx.ext_ty cx ~nm dom in
       let vcod = Eval.inst_clo cod x in
       check cxx vcod tm
+
+    | V.Later tclo, T.Next (T.B (nm, tm)) ->
+      let cxx, tck = Cx.ext_tick cx ~nm in
+      let vty = Eval.inst_tick_clo tclo tck in
+      check cxx vty tm
 
     | V.Sg {dom; cod}, T.Cons (t0, t1) ->
       let v = check_eval cx dom t0 in

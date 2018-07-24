@@ -35,6 +35,7 @@ sig
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
   val ext_dims : t -> nms:string option list -> t * I.atom list
+  val ext_tick : t -> nm:string option -> t * Val.tick
 
   val restrict : t -> I.t -> I.t -> t * I.action
 
@@ -114,6 +115,16 @@ struct
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel},
     var
+
+  let ext_tick {env; qenv; hyps; ppenv; rel} ~nm =
+    let n = Quote.Env.len qenv in
+    let tick = Val.TickGen (`Lvl (nm, n)) in
+    {env = Eval.Env.push (Val.Tick tick) env;
+     hyps = {classifier = `Tick; locks = 0; killed = false} :: hyps;
+     qenv = Quote.Env.succ qenv;
+     ppenv = snd @@ Pretty.Env.bind nm ppenv;
+     rel},
+    tick
 
   let ext_ty cx ~nm ty =
     ext cx ~nm ty []

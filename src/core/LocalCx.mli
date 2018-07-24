@@ -21,6 +21,7 @@ sig
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
   val ext_dims : t -> nms:string option list -> t * I.atom list
+  val ext_tick : t -> nm:string option -> t * Val.tick
 
   (** Might raise I.Inconsistent *)
   val restrict : t -> I.t -> I.t -> t * I.action
