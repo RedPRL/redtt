@@ -5,6 +5,8 @@ type atom = Name.t
 type dim = I.t
 type dir = Dir.t
 
+type timestamp = float
+
 (* Notes: I have defined the semantic domain and evaluator in a fairly naive way, in order to avoid
    some confusing questions. It may not be that efficient! But it should be easier at this point to
    transform it make something efficient, since the code is currently simple-minded enough to
@@ -56,7 +58,7 @@ type con =
 and neu =
   | Lvl : string option * int -> neu
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
-  | Meta : {name : Name.t; ushift : int} -> neu
+  | Meta : {name : Name.t; ushift : int; timestamp : timestamp} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
@@ -194,6 +196,7 @@ end
 
 module type Sig =
 sig
+  val timestamp : timestamp
   val restriction : Restriction.t
   val global_dim : I.atom -> I.t
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
@@ -201,6 +204,7 @@ end
 
 module M (Sig : Sig) : S =
 struct
+
   let base_restriction = Sig.restriction
 
   type step =
@@ -754,8 +758,11 @@ struct
     | Var _ ->
       ret con
 
-    | Meta _ ->
-      ret con
+    | Meta {timestamp; name; ushift} ->
+      if timestamp > Sig.timestamp then
+        step @@ eval Env.emp @@ Tm.up (Tm.Meta {name; ushift}, Emp)
+      else
+        ret con
 
   and act_nf phi (nf : nf) =
     match nf with
@@ -794,10 +801,30 @@ struct
     | ProjAbs abs ->
       `Proj abs
 
+  and needs_refresh con =
+    match con with
+    | Up {neu; _} ->
+      neu_needs_refresh neu
+    | _ ->
+      false
+
+  and neu_needs_refresh =
+    function
+    | (Car neu | Cdr neu
+      | FunApp (neu, _) | ExtApp (neu, _)
+      | If {neu; _} | NatRec {neu; _} | IntRec {neu ; _} | S1Rec {neu; _}
+      | VProj {neu; _} | Cap {neu; _}
+      | LblCall neu | CoRForce neu) ->
+      neu_needs_refresh neu
+    | Meta {timestamp; _} ->
+      timestamp > Sig.timestamp
+    | (Lvl _ | Var _)->
+      false
+
   and unleash : value -> con =
     fun node ->
       let Node info = !node in
-      match info.action = I.idn with
+      match not (needs_refresh info.con) && info.action = I.idn with
       | true ->
         info.con
       | false ->
@@ -1696,7 +1723,7 @@ struct
       let rho' = Env.clear_locals rho in
       let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
       let vty = eval rho' @@ Tm.shift_univ ushift tty in
-      reflect vty (Meta {name; ushift}) vsys
+      reflect vty (Meta {name; ushift; timestamp = Sig.timestamp}) vsys
 
   and reflect ty neu sys =
     match force_val_sys sys with

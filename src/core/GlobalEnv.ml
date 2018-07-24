@@ -75,6 +75,8 @@ let pp_twin fmt =
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
 
+  let timestamp = Unix.gettimeofday ()
+
   let restriction = Sig.globals.rel
 
   let global_dim x =

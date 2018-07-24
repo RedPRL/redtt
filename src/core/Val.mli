@@ -4,6 +4,8 @@ type atom = I.atom
 type dir = Dir.t
 type dim = I.t
 
+type timestamp = float
+
 type value
 type clo
 type nclo
@@ -62,7 +64,7 @@ type con =
 and neu =
   | Lvl : string option * int -> neu
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
-  | Meta : {name : Name.t; ushift : int} -> neu
+  | Meta : {name : Name.t; ushift : int; timestamp : timestamp} -> neu
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
@@ -184,8 +186,11 @@ sig
   val base_restriction : Restriction.t
 end
 
+
+
 module type Sig =
 sig
+  val timestamp : timestamp
   val restriction : Restriction.t
 
   val global_dim : I.atom -> I.t
