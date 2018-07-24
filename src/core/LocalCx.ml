@@ -30,7 +30,7 @@ sig
 
   val ext_lock : t -> t
   val clear_locks : t -> t
-  val kill_from_tick : t -> int -> t
+  val kill_from_tick : t -> Val.tick_gen -> t
 
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
@@ -91,14 +91,19 @@ struct
   let clear_locks cx =
     {cx with hyps = List.map (hyp_map_lock (fun _ -> 0)) cx.hyps}
 
-  let kill_from_tick cx i =
-    let go j hyp =
-      if j <= i then
-        {hyp with killed = true}
-      else
-        hyp
-    in
-    {cx with hyps = List.mapi go cx.hyps}
+  let kill_from_tick cx tgen =
+    match tgen with
+    | `Lvl (_, lvl) ->
+      let i = Quote.Env.len cx.qenv - lvl - 1 in
+      let go j hyp =
+        if j <= i then
+          {hyp with killed = true}
+        else
+          hyp
+      in
+      {cx with hyps = List.mapi go cx.hyps}
+    | `Global _ ->
+      failwith "TODO: implement kill_from_tick for global tick"
 
   let ext {env; qenv; hyps; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in

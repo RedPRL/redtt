@@ -682,20 +682,22 @@ struct
           | _ -> failwith "Cannot force co-restriction when it is not true!"
         end
 
-      (*
-
-    | T.Prev tick ->
-      check_tick cx tick;
-      (* The problem is that I don't have the ability to fiddle with the context.
-         Looks like Prev is not compatible with the spine-style typechecker. *)
-      failwith "TODO: need to rework typechecking algorithm to support ticks"
-
-
-
-         *)
-
-      | _ ->
-        failwith ""
+      | T.Prev tick ->
+        check_tick cx tick;
+        let vtick = Cx.eval_tick cx tick in
+        begin
+          match vtick with
+          | Val.TickConst ->
+            let cx' = Cx.ext_lock cx in
+            let ih = infer_spine cx' hd sp in
+            let tclo = Eval.unleash_later ih.ty in
+            Val.{el = Eval.prev vtick ih.el; ty = Eval.inst_tick_clo tclo vtick}
+          | Val.TickGen tgen ->
+            let cx' = Cx.kill_from_tick cx tgen in
+            let ih = infer_spine cx' hd sp in
+            let tclo = Eval.unleash_later ih.ty in
+            Val.{el = Eval.prev vtick ih.el; ty = Eval.inst_tick_clo tclo vtick}
+        end
 
 
   and infer_head cx =
