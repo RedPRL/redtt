@@ -59,6 +59,9 @@ type con =
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
   | LblRet : value -> con
 
+  | TickPseudoTy : con
+  | TickConst : con
+
 and neu =
   | Lvl : string option * int -> neu
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu

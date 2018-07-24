@@ -49,9 +49,11 @@ type con =
   | Loop : atom -> con
 
   | Up : {ty : value; neu : neu; sys : rigid_val_sys} -> con
-
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
   | LblRet : value -> con
+
+  | TickPseudoTy : con
+  | TickConst : con
 
 and neu =
   | Lvl : string option * int -> neu
@@ -612,6 +614,12 @@ struct
           | Step v ->
             v
       end
+
+    | TickConst ->
+      make con
+
+    | TickPseudoTy ->
+      make con
 
   and act_neu phi con =
     match con with
@@ -1549,6 +1557,9 @@ struct
     | (Tm.Dim0 | Tm.Dim1) ->
       raise @@ E (UnexpectedDimensionTerm tm)
 
+    | Tm.TickConst ->
+      make TickConst
+
     | Tm.Up cmd ->
       eval_cmd rho cmd
 
@@ -2400,6 +2411,10 @@ struct
       end
     | LblRet v ->
       Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
+    | TickConst ->
+      Format.fprintf fmt "<>"
+    | TickPseudoTy ->
+      Format.fprintf fmt "tick"
 
   and pp_abs fmt abs =
     let xs, v = Abs.unleash abs in

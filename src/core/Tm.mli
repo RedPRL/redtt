@@ -42,8 +42,10 @@ type 'a tmf =
   | CoRThunk of ('a, 'a) face
 
   | Cons of 'a * 'a
+
   | Dim0
   | Dim1
+  | TickConst
 
   | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
 
@@ -53,6 +55,7 @@ type 'a tmf =
 
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
+
 
 and 'a head =
   | Meta of {name: Name.t; ushift : int}

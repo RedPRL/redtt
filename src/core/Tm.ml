@@ -44,8 +44,10 @@ type 'a tmf =
   | CoRThunk of ('a, 'a) face
 
   | Cons of 'a * 'a
+
   | Dim0
   | Dim1
+  | TickConst
 
   | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
 
@@ -136,7 +138,7 @@ struct
 
   and traverse_con =
     function
-    | (Univ _ | Tt | Ff | Bool | S1 | Nat | Int | Dim0 | Dim1 | Base | Zero as con) ->
+    | (Univ _ | Tt | Ff | Bool | S1 | Nat | Int | Dim0 | Dim1 | TickConst | Base | Zero as con) ->
       con
 
     | FCom info ->
@@ -784,6 +786,9 @@ let rec pp env fmt =
     | Dim1 ->
       Format.fprintf fmt "1"
 
+    | TickConst ->
+      Format.fprintf fmt "<>"
+
     | S1 ->
       Format.fprintf fmt "S1"
 
@@ -1258,7 +1263,7 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Bool | Tt | Ff | Nat | Zero | Int | Dim0 | Dim1 | S1 | Base) as con ->
+  | (Univ _ | Bool | Tt | Ff | Nat | Zero | Int | Dim0 | Dim1 | TickConst | S1 | Base) as con ->
     con
   | Suc n -> Suc (f n)
   | Pos n -> Pos (f n)
