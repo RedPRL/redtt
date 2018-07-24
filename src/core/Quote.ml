@@ -324,15 +324,6 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
-      | DFix dfix0, DFix dfix1 ->
-        let ty = equate_ty env dfix0.ty dfix1.ty in
-        let ltr_ty = make_later dfix0.ty in
-        let var = generic env ltr_ty in
-        let bdy0 = inst_clo dfix0.clo var in
-        let bdy1 = inst_clo dfix1.clo var in
-        let bdy = Tm.B (None, equate (Env.succ env) dfix0.ty bdy0 bdy1) in
-        Tm.up (Tm.DFix {ty; bdy}, Emp)
-
       | _ ->
         let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
