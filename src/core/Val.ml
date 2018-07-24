@@ -59,6 +59,7 @@ type con =
 
   | Later : tick_clo -> con
   | Next : tick_clo -> con
+  | DFix : nf -> con
 
 
 and neu =
@@ -86,7 +87,8 @@ and neu =
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
 
-  | DFix : nf -> neu
+  | Prev : tick * neu -> neu
+  | Fix : string option * int * nf -> neu
 
 and nf = {ty : value; el : value}
 
@@ -141,6 +143,7 @@ sig
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
+  val prev : tick -> value -> value
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -156,6 +159,7 @@ sig
   val unleash_pi : value -> value * clo
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
+  val unleash_later : value -> tick_clo
   val unleash_fcom : value -> dir * value * comp_sys
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
@@ -435,6 +439,7 @@ struct
     | UnleashSgError of value
     | UnleashExtError of value
     | UnleashVError of value
+    | UnleashLaterError of value
     | UnleashCoRError of value
     | UnleashLblTyError of value
     | UnleashFComError of value
@@ -646,6 +651,9 @@ struct
     | Next clo ->
       make @@ Next (TickClo.act phi clo)
 
+    | DFix nf ->
+      make @@ DFix (act_nf phi nf)
+
   and act_neu phi con =
     match con with
     | VProj info ->
@@ -790,9 +798,17 @@ struct
     | Meta _ ->
       ret con
 
-    | DFix nf ->
-      let nf' = act_nf phi nf in
-      ret @@ DFix nf'
+    | Prev (tick, neu) ->
+      begin
+        match act_neu phi neu with
+        | Ret neu ->
+          ret @@ Prev (tick, neu)
+        | Step v ->
+          step @@ prev tick v
+      end
+
+    | Fix (nm, lvl, nf) ->
+      ret @@ Fix (nm, lvl, act_nf phi nf)
 
   and act_nf phi (nf : nf) =
     match nf with
@@ -1827,6 +1843,14 @@ struct
     | _ ->
       raise @@ E (UnleashPiError v)
 
+
+  and unleash_later v =
+    match unleash v with
+    | Later clo -> clo
+    | Rst rst -> unleash_later rst.ty
+    | _ ->
+      raise @@ E (UnleashLaterError v)
+
   and unleash_sg v =
     match unleash v with
     | Sg {dom; cod} -> dom, cod
@@ -2052,6 +2076,38 @@ struct
 
     | _ ->
       failwith "ext_apply"
+
+  and prev tick el =
+    match unleash el with
+    | Next tclo ->
+      inst_tick_clo tclo tick
+    | DFix nf ->
+      begin
+        match tick with
+        | TickConst ->
+          apply nf.el el
+        | TickLvl (nm, lvl) ->
+          let dom, _ = unleash_pi nf.ty in
+          let tclo = unleash_later dom in
+          let ty = inst_tick_clo tclo tick in
+          let neu = Fix (nm, lvl, nf) in
+          make @@ Up {ty; neu; sys = []}
+      end
+    | Up info ->
+      let tclo = unleash_later info.ty in
+      let ty = inst_tick_clo tclo tick in
+      let prev_face =
+        Face.map @@ fun r r' a ->
+        prev tick a
+      in
+      let prev_sys = List.map prev_face info.sys in
+      make @@ Up {ty; neu = Prev (tick, info.neu); sys = prev_sys}
+    | Coe _info ->
+      failwith "TODO"
+    | HCom _info ->
+      failwith "TODO"
+    | _ ->
+      failwith "prev"
 
 
   (* the equation oracle `phi` is for continuations `ty0` and `equiv`
@@ -2452,6 +2508,8 @@ struct
       Format.fprintf fmt "<later>"
     | Next _clo ->
       Format.fprintf fmt "<next>"
+    | DFix _ ->
+      Format.fprintf fmt "<dfix>"
 
   and pp_abs fmt abs =
     let xs, v = Abs.unleash abs in
@@ -2563,8 +2621,11 @@ struct
     | CoRForce neu ->
       Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
 
-    | DFix _ ->
-      Format.fprintf fmt "<dfix>"
+    | Prev _ ->
+      Format.fprintf fmt "<prev>"
+
+    | Fix _ ->
+      Format.fprintf fmt "<fix>"
 
 
   and pp_nf fmt nf =
@@ -2639,6 +2700,10 @@ struct
       | UnleashVError v ->
         Format.fprintf fmt
           "Tried to unleash %a as V type."
+          pp_value v
+      | UnleashLaterError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as later modality."
           pp_value v
       | UnleashExtError v ->
         Format.fprintf fmt

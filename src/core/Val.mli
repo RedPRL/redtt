@@ -67,6 +67,7 @@ type con =
 
   | Later : tick_clo -> con
   | Next : tick_clo -> con
+  | DFix : nf -> con
 
 and neu =
   | Lvl : string option * int -> neu
@@ -93,7 +94,8 @@ and neu =
   | LblCall : neu -> neu
   | CoRForce : neu -> neu
 
-  | DFix : nf -> neu
+  | Prev : tick * neu -> neu
+  | Fix : string option * int * nf -> neu
 
 and nf = {ty : value; el : value}
 
@@ -133,6 +135,7 @@ sig
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
+  val prev : tick -> value -> value
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -147,6 +150,7 @@ sig
   val unleash_pi : value -> value * clo
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
+  val unleash_later : value -> tick_clo
   val unleash_fcom : value -> dir * value * comp_sys
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
