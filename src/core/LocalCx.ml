@@ -1,7 +1,9 @@
 open RedBasis.Bwd
 open BwdNotation
 
-type hyp = [`Ty of Val.value | `Dim]
+type hyp =
+  {classifier : [`Ty of Val.value | `Dim];
+   locks : int}
 
 let check_eq_clock = ref 0.
 
@@ -11,7 +13,7 @@ let _ =
 
 (* The way that we model dimensions is now incompatible with the union-find version of things.
    We need to find a new way. *)
-type cx = {tys : hyp list; env : Val.env; qenv : Quote.env; ppenv : Pretty.env; rel : Restriction.t}
+type cx = {hyps : hyp list; env : Val.env; qenv : Quote.env; ppenv : Pretty.env; rel : Restriction.t}
 type t = cx
 
 module type S =
@@ -23,6 +25,9 @@ sig
 
   val emp : t
   val clear_locals : t -> t
+
+  val ext_lock : t -> t
+  val clear_locks : t -> t
 
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
@@ -65,18 +70,28 @@ struct
   let emp : cx =
     {env = Eval.Env.emp;
      qenv = Quote.Env.emp;
-     tys = [];
+     hyps = [];
      ppenv = Pretty.Env.emp;
      rel = V.base_restriction}
 
   let clear_locals cx =
     {emp with rel = cx.rel; env = Eval.Env.clear_locals cx.env}
 
-  let ext {env; qenv; tys; ppenv; rel} ~nm ty sys =
+  let hyp_map_lock f hyp =
+    {hyp with locks = f hyp.locks}
+
+
+  let ext_lock cx =
+    {cx with hyps = List.map (hyp_map_lock (fun n -> n + 1)) cx.hyps}
+
+  let clear_locks cx =
+    {cx with hyps = List.map (hyp_map_lock (fun _ -> 0)) cx.hyps}
+
+  let ext {env; qenv; hyps; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in
     let var = V.reflect ty (Val.Lvl (nm, n)) sys in
     {env = Eval.Env.push (Val.Val var) env;
-     tys = `Ty ty :: tys;
+     hyps = {classifier = `Ty ty; locks = 0} :: hyps;
      qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel},
@@ -89,10 +104,10 @@ struct
     let face = Face.True (`Dim0, `Dim1, el) in
     fst @@ ext cx ~nm ty [face]
 
-  let ext_dim {env; qenv; tys; ppenv; rel} ~nm =
+  let ext_dim {env; qenv; hyps; ppenv; rel} ~nm =
     let x = Name.named nm in
     {env = Eval.Env.push (Val.Atom (`Atom x)) env;
-     tys = `Dim :: tys;
+     hyps = {classifier = `Dim; locks = 0} :: hyps;
      qenv = Quote.Env.abs qenv @@ Emp #< x;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}, x
@@ -146,22 +161,26 @@ struct
   let eval_tm_sys {env; _} sys =
     V.eval_tm_sys env sys
 
-  let lookup i {tys; _} =
-    List.nth tys i
+  let lookup i {hyps; _} =
+    let {classifier; locks} = List.nth hyps i in
+    if locks > 0 then
+      failwith "Cannot view hypothesis under lock and key ;-)"
+    else
+      classifier
 
   let restrict cx r r' =
     let phi = Restriction.as_action cx.rel in
     let r = I.act phi r in
     let r' = I.act phi r' in
     let rel, phi = Restriction.equate r r' cx.rel in
-    let act_ty =
-      function
-      | `Ty ty -> `Ty (V.Val.act phi ty)
-      | `Dim -> `Dim
+    let act_ty {classifier; locks} =
+      match classifier with
+      | `Ty ty -> {classifier = `Ty (V.Val.act phi ty); locks}
+      | `Dim -> {classifier = `Dim; locks}
     in
-    let tys = List.map act_ty cx.tys in
+    let hyps = List.map act_ty cx.hyps in
     let env = V.Env.act phi cx.env in
-    {cx with rel; tys; env}, phi
+    {cx with rel; hyps; env}, phi
 
 
   let quote cx ~ty el =

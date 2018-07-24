@@ -12,6 +12,10 @@ sig
   val emp : t
   val clear_locals : t -> t
 
+  (* Modal left adjoints *)
+  val ext_lock : t -> t
+  val clear_locks : t -> t
+
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
   val ext_dims : t -> nms:string option list -> t * I.atom list
