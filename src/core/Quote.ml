@@ -355,6 +355,17 @@ struct
         Tm.Meta {name = meta0.name; ushift = meta0.ushift}, Bwd.from_list stk
       else
         failwith "global variable name mismatch"
+
+    | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
+      let ty = equate_ty env ty0 ty1 in
+      let ltr_ty = make_later ty0 in
+      let var = generic env ltr_ty in
+      let el0 = inst_clo clo0 var in
+      let el1 = inst_clo clo1 var in
+      let bdy = equate (Env.succ env) ty0 el0 el1 in
+      let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
+      Tm.DFix {ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
+
     | Car neu0, Car neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Car :: stk
     | Cdr neu0, Cdr neu1 ->
@@ -448,10 +459,6 @@ struct
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
     | CoRForce neu0, CoRForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
-
-    | Fix (_tgen0, ty0, _clo0), Fix (_tgen1, ty1, _clo1) ->
-      let _ty = equate_ty env ty0 ty1 in
-      failwith "Damn it!! Wrong direction again!!!"
 
     | _ ->
       let err = ErrEquateNeu {env; neu0; neu1} in
