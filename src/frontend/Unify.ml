@@ -382,7 +382,7 @@ struct
   let (%%) (ty, tm) frame =
     let vty = T.Cx.eval T.Cx.emp ty in
     let tm' = plug (vty, tm) frame in
-    let vty' = T.infer_frame T.Cx.emp ~ty:vty ~hd:(T.Cx.eval T.Cx.emp tm) frame in
+    let vty' = T.infer T.Cx.emp (Tm.Down {ty; tm}, Emp #< frame) in
     let ty' = T.Cx.quote_ty T.Cx.emp vty' in
     ty', tm'
 end

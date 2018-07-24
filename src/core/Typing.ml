@@ -21,7 +21,6 @@ sig
 
   val check : cx -> Val.value -> Tm.tm -> unit
   val infer : cx -> Tm.tm Tm.cmd -> value
-  val infer_frame : cx -> ty:value -> hd:value -> Tm.tm Tm.frame -> value
   val check_boundary : cx -> Val.value -> Val.val_sys -> Tm.tm -> unit
 end
 
@@ -498,183 +497,206 @@ struct
     in go sys []
 
   and infer cx (hd, sp) =
-    let ty_hd = infer_head cx hd in
-    let vhd = Cx.eval_head cx hd in
-    infer_stack cx ~ty:ty_hd ~hd:vhd @@ Bwd.to_list sp
-  (* TODO: should just write inference directly for spines ! *)
+    let Val.{ty; _} = infer_spine cx hd sp in
+    ty
 
-  and infer_stack cx ~ty ~hd =
+  and infer_spine cx hd =
     function
-    | [] -> ty
-    | frm :: stk ->
-      let ty = infer_frame cx ~ty ~hd frm in
-      let hd = Cx.eval_frame cx hd frm in
-      infer_stack cx ~ty ~hd stk
+    | Emp ->
+      Val.{el = Cx.eval_head cx hd; ty = infer_head cx hd}
 
-  and infer_frame cx ~ty ~hd =
-    function
-    | T.Car ->
-      let dom, _ = Eval.unleash_sg ty in
-      dom
+    | Snoc (sp, frm) ->
+      match frm with
+      | T.Car ->
+        let ih = infer_spine cx hd sp in
+        let dom, _ = Eval.unleash_sg ih.ty in
+        Val.{el = Eval.car ih.el; ty = dom}
 
-    | T.Cdr ->
-      let _, cod = Eval.unleash_sg ty in
-      Eval.inst_clo cod @@ Eval.car hd
+      | T.Cdr ->
+        let ih = infer_spine cx hd sp in
+        let _, cod = Eval.unleash_sg ih.ty in
+        let car = Eval.car ih.el in
+        Val.{el = Eval.cdr ih.el; ty = Eval.inst_clo cod car}
 
-    | T.FunApp t ->
-      let dom, cod = Eval.unleash_pi ty in
-      let v = check_eval cx dom t in
-      Eval.inst_clo cod v
+      | T.FunApp t ->
+        let ih = infer_spine cx hd sp in
+        let dom, cod = Eval.unleash_pi ih.ty in
+        let v = check_eval cx dom t in
+        Val.{el = Eval.apply ih.el v; ty = Eval.inst_clo cod v}
 
-    | T.ExtApp ts ->
-      let rs = List.map (check_eval_dim cx) ts in
-      let ty, _ = Eval.unleash_ext ty rs in
-      ty
+      | T.ExtApp ts ->
+        let ih = infer_spine cx hd sp in
+        let rs = List.map (check_eval_dim cx) ts in
+        let ty, _ = Eval.unleash_ext ih.ty rs in
+        Val.{el = Eval.ext_apply ih.el rs; ty}
 
-    | T.VProj info ->
-      let v_ty =
-        check_eval_ty cx @@
-        T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
-      in
-      Cx.check_eq_ty cx v_ty ty;
-      Cx.eval cx info.ty1
-
-    | T.If info ->
-      let T.B (nm, mot) = info.mot in
-      let bool = Eval.make V.Bool in
-      let cxx, _= Cx.ext_ty cx ~nm bool in
-      check_ty cxx mot;
-
-      Cx.check_eq_ty cx ty bool;
-
-      let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Tt) in
-      let cx_ff = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Ff) in
-      let mot_tt = Cx.eval cx_tt mot in
-      let mot_ff = Cx.eval cx_ff mot in
-      check cx mot_tt info.tcase;
-      check cx mot_ff info.fcase;
-
-      let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:hd in
-      Cx.eval cx_scrut mot
-
-    | T.NatRec info ->
-      let T.B (nm, mot) = info.mot in
-      let nat = Eval.make V.Nat in
-      let _ =
-        let cx_x, _ = Cx.ext_ty cx ~nm nat in
-        check_ty cx_x mot
-      in
-
-      let mot_clo = Cx.make_closure cx info.mot in
-
-      (* head *)
-      Cx.check_eq_ty cx ty nat;
-
-      (* zero *)
-      let _ =
-        let mot_zero = Cx.Eval.inst_clo mot_clo @@ Eval.make V.Zero in
-        check cx mot_zero info.zcase
-      in
-
-      (* suc *)
-      let T.NB (nms_scase, scase) = info.scase in
-      let _ =
-        let nm_scase, nm_rec_scase =
-          match nms_scase with
-          | Snoc (Snoc (Emp, nm_scase), nm_rec_scase) -> nm_scase, nm_rec_scase
-          | _ -> failwith "incorrect number of binders when type-checking the suc case"
+      | T.VProj info ->
+        let ih = infer_spine cx hd sp in
+        let v_ty =
+          check_eval_ty cx @@
+          T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
         in
-        let cx_x, x = Cx.ext_ty cx ~nm:nm_scase nat in
-        let mot_x = Eval.inst_clo mot_clo x in
-        let cx_x_ih, _ih = Cx.ext_ty cx_x ~nm:nm_rec_scase mot_x in
-        let mot_suc = Eval.inst_clo mot_clo @@ Eval.make @@ V.Suc x in
-        check cx_x_ih mot_suc scase
-      in
+        Cx.check_eq_ty cx v_ty ih.ty;
+        Val.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty1}
 
-      Eval.inst_clo mot_clo hd
+      | T.If info ->
+        let T.B (nm, mot) = info.mot in
+        let bool = Eval.make V.Bool in
+        let cxx, _= Cx.ext_ty cx ~nm bool in
+        check_ty cxx mot;
 
-    | T.IntRec info ->
-      let T.B (nm, mot) = info.mot in
-      let int = Eval.make V.Int in
-      let _ =
-        let cx_x, _ = Cx.ext_ty cx ~nm int in
-        check_ty cx_x mot
-      in
+        let ih = infer_spine cx hd sp in
+        Cx.check_eq_ty cx ih.ty bool;
 
-      let mot_clo = Cx.make_closure cx info.mot in
+        let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Tt) in
+        let cx_ff = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Ff) in
+        let mot_tt = Cx.eval cx_tt mot in
+        let mot_ff = Cx.eval cx_ff mot in
+        check cx mot_tt info.tcase;
+        check cx mot_ff info.fcase;
 
-      (* head *)
-      Cx.check_eq_ty cx ty int;
+        let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:ih.el in
+        Val.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx_scrut mot}
 
-      (* pos *)
-      let _ =
-        let T.B (nm_pcase, pcase) = info.pcase in
+      | T.NatRec info ->
+        let T.B (nm, mot) = info.mot in
         let nat = Eval.make V.Nat in
-        let cx_n, n = Cx.ext_ty cx ~nm:nm_pcase nat in
-        let mot_pos = Cx.Eval.inst_clo mot_clo @@ Eval.make (V.Pos n) in
-        check cx_n mot_pos pcase
-      in
+        let _ =
+          let cx_x, _ = Cx.ext_ty cx ~nm nat in
+          check_ty cx_x mot
+        in
 
-      (* negsucc *)
-      let _ =
-        let T.B (nm_ncase, ncase) = info.ncase in
-        let nat = Eval.make V.Nat in
-        let cx_n, n = Cx.ext_ty cx ~nm:nm_ncase nat in
-        let mot_negsuc = Cx.Eval.inst_clo mot_clo @@ Eval.make (V.NegSuc n) in
-        check cx_n mot_negsuc ncase
-      in
+        let mot_clo = Cx.make_closure cx info.mot in
 
-      Eval.inst_clo mot_clo hd
+        let ih = infer_spine cx hd sp in
 
-    | T.S1Rec info ->
-      let T.B (nm, mot) = info.mot in
-      let s1 = Eval.make V.S1 in
-      let cxx, _= Cx.ext_ty cx ~nm s1 in
-      check_ty cxx mot;
+        (* head *)
+        Cx.check_eq_ty cx ih.ty nat;
 
-      Cx.check_eq_ty cx ty s1;
+        (* zero *)
+        let _ =
+          let mot_zero = Cx.Eval.inst_clo mot_clo @@ Eval.make V.Zero in
+          check cx mot_zero info.zcase
+        in
 
-      let cx_base = Cx.def cx ~nm ~ty:s1 ~el:(Eval.make V.Base) in
-      let mot_base = Cx.eval cx_base mot in
-      let val_base = check_eval cx mot_base info.bcase in
+        (* suc *)
+        let T.NB (nms_scase, scase) = info.scase in
+        let _ =
+          let nm_scase, nm_rec_scase =
+            match nms_scase with
+            | Snoc (Snoc (Emp, nm_scase), nm_rec_scase) -> nm_scase, nm_rec_scase
+            | _ -> failwith "incorrect number of binders when type-checking the suc case"
+          in
+          let cx_x, x = Cx.ext_ty cx ~nm:nm_scase nat in
+          let mot_x = Eval.inst_clo mot_clo x in
+          let cx_x_ih, _ih = Cx.ext_ty cx_x ~nm:nm_rec_scase mot_x in
+          let mot_suc = Eval.inst_clo mot_clo @@ Eval.make @@ V.Suc x in
+          check cx_x_ih mot_suc scase
+        in
 
-      let T.B (nm_loop, lcase) = info.lcase in
-      let cxx, x = Cx.ext_dim cx ~nm:nm_loop in
-      let cxx_loop = Cx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ V.Loop x) in
-      let mot_loop = Cx.eval cxx_loop mot in
-      let val_loopx = check_eval cx mot_loop lcase in
-      let val_loop0 = Eval.Val.act (I.subst `Dim0 x) val_loopx in
-      let val_loop1 = Eval.Val.act (I.subst `Dim1 x) val_loopx in
-      Cx.check_eq cx ~ty:mot_base val_loop0 val_base;
-      Cx.check_eq cx ~ty:mot_base val_loop1 val_base;
+        Val.{el = Cx.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el }
 
-      let cx_scrut = Cx.def cx ~nm ~ty:s1 ~el:hd in
-      Cx.eval cx_scrut mot
+      | T.IntRec info ->
+        let T.B (nm, mot) = info.mot in
+        let int = Eval.make V.Int in
+        let _ =
+          let cx_x, _ = Cx.ext_ty cx ~nm int in
+          check_ty cx_x mot
+        in
 
-    | T.Cap info ->
-      let fcom_ty =
-        check_eval_ty cx @@
-        T.make @@ T.FCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
-      in
-      Cx.check_eq_ty cx fcom_ty ty;
-      Cx.eval cx info.ty
+        let mot_clo = Cx.make_closure cx info.mot in
 
-    | T.LblCall ->
-      let _, _, ty = Eval.unleash_lbl_ty ty in
-      ty
+        let ih = infer_spine cx hd sp in
 
-    | Tm.CoRForce ->
-      begin
-        match Eval.unleash_corestriction_ty ty with
-        | Face.True (_, _, ty) -> ty
-        | _ -> failwith "Cannot force co-restriction when it is not true!"
-      end
+        (* head *)
+        Cx.check_eq_ty cx ih.ty int;
+
+        (* pos *)
+        let _ =
+          let T.B (nm_pcase, pcase) = info.pcase in
+          let nat = Eval.make V.Nat in
+          let cx_n, n = Cx.ext_ty cx ~nm:nm_pcase nat in
+          let mot_pos = Cx.Eval.inst_clo mot_clo @@ Eval.make (V.Pos n) in
+          check cx_n mot_pos pcase
+        in
+
+        (* negsucc *)
+        let _ =
+          let T.B (nm_ncase, ncase) = info.ncase in
+          let nat = Eval.make V.Nat in
+          let cx_n, n = Cx.ext_ty cx ~nm:nm_ncase nat in
+          let mot_negsuc = Cx.Eval.inst_clo mot_clo @@ Eval.make (V.NegSuc n) in
+          check cx_n mot_negsuc ncase
+        in
+
+        Val.{el = Cx.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el}
+
+      | T.S1Rec info ->
+        let T.B (nm, mot) = info.mot in
+        let s1 = Eval.make V.S1 in
+        let cxx, _= Cx.ext_ty cx ~nm s1 in
+        check_ty cxx mot;
+
+        let ih = infer_spine cx hd sp in
+
+        Cx.check_eq_ty cx ih.ty s1;
+
+        let cx_base = Cx.def cx ~nm ~ty:s1 ~el:(Eval.make V.Base) in
+        let mot_base = Cx.eval cx_base mot in
+        let val_base = check_eval cx mot_base info.bcase in
+
+        let T.B (nm_loop, lcase) = info.lcase in
+        let cxx, x = Cx.ext_dim cx ~nm:nm_loop in
+        let cxx_loop = Cx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ V.Loop x) in
+        let mot_loop = Cx.eval cxx_loop mot in
+        let val_loopx = check_eval cx mot_loop lcase in
+        let val_loop0 = Eval.Val.act (I.subst `Dim0 x) val_loopx in
+        let val_loop1 = Eval.Val.act (I.subst `Dim1 x) val_loopx in
+        Cx.check_eq cx ~ty:mot_base val_loop0 val_base;
+        Cx.check_eq cx ~ty:mot_base val_loop1 val_base;
+
+        let cx_scrut = Cx.def cx ~nm ~ty:s1 ~el:ih.el in
+        Val.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx_scrut mot}
+
+      | T.Cap info ->
+        let fcom_ty =
+          check_eval_ty cx @@
+          T.make @@ T.FCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
+        in
+        let ih = infer_spine cx hd sp in
+        Cx.check_eq_ty cx fcom_ty ih.ty;
+        Val.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty}
+
+
+      | T.LblCall ->
+        let ih = infer_spine cx hd sp in
+        let _, _, ty = Eval.unleash_lbl_ty ih.ty in
+        Val.{el = Cx.eval_frame cx ih.el frm; ty}
+
+      | Tm.CoRForce ->
+        let ih = infer_spine cx hd sp in
+        begin
+          match Eval.unleash_corestriction_ty ih.ty with
+          | Face.True (_, _, ty) ->
+            Val.{el = Cx.eval_frame cx ih.el frm; ty}
+          | _ -> failwith "Cannot force co-restriction when it is not true!"
+        end
+
+      (*
 
     | T.Prev tick ->
       check_tick cx tick;
       (* The problem is that I don't have the ability to fiddle with the context.
          Looks like Prev is not compatible with the spine-style typechecker. *)
       failwith "TODO: need to rework typechecking algorithm to support ticks"
+
+
+
+         *)
+
+      | _ ->
+        failwith ""
+
 
   and infer_head cx =
     function
