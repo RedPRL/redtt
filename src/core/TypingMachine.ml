@@ -5,287 +5,122 @@ type cx = LocalCx.t
 type value = Val.value
 type cofibration = (I.t * I.t) list
 
-type constraint_ =
-  | ChkEq of cx * value * (value * value)
+type tm = Tm.tm
+type chk = cx * value * tm
+type chk_fam = cx * value * value * tm Tm.bnd
+type eval = cx * tm
 
-type _ judgment =
-  | Chk : cx * value * Tm.tm -> unit judgment
-  | Constrain : constraint_ -> unit judgment
-  | Eval : cx * Tm.tm -> value judgment
+type (_, _) jdg =
+  | Eval : (eval, value) jdg
+  | Chk : (chk, unit) jdg
+  | ChkFam : (chk_fam, unit) jdg
 
-module type Cont =
-sig
-  include Monad.S
-  type ('a, 'b) cont = (module LocalCx.S) -> 'a -> 'b m
+type (_, _) cmd =
+  | Jdg : ('rho -> 'rho0) * ('rho0, 'rho1) jdg -> ('rho, 'rho1) cmd
 
-  val get_cx : (module LocalCx.S) m
-  val callcc : (('a, 'b) cont -> 'a m) -> 'a m
-  val run : (module LocalCx.S) -> 'a m -> [`Ok | `Interrupt of constraint_ * (unit, unit) cont]
+type _ state =
+  | Wait : ('rho0, 'rho1) cmd * 'rho1 state -> 'rho0 state
+  | Done : 'rho state
 
-  val interrupt : constraint_ -> (unit, unit) cont -> 'a m
-end
+type 'a checkpoint =
+  | Result of 'a
+  | Error
+  | Intermediate :
+      { env : 'rho;
+        kont : 'rho state
+      } -> unit checkpoint
 
-module Cont : Cont =
-struct
-  type 'a m = (module LocalCx.S) -> ((module LocalCx.S) -> 'a -> unit) -> unit
-  type ('a, 'b) cont = (module LocalCx.S) -> 'a -> 'b m
+let continue k = Intermediate {env = (); kont = k}
 
-  let ret x cx k =
-    k cx x
+let (@>) jdg state =
+  Wait (jdg, state)
 
-  let get_cx : (module LocalCx.S) m =
-    fun cx k ->
-      k cx cx
-
-  let bind (m : 'a m) (f : 'a -> 'b m) : 'b m =
-    fun cx cont ->
-      m cx @@ fun cx x ->
-      f x cx cont
-
-  let callcc (k : ('a, 'b) cont -> 'a m) : 'a m =
-    fun cx cont ->
-      (* TODO: make sure I'm passing the right cx' *)
-      k (fun cx' x _ _ -> cont cx' x) cx cont
-
-  exception Interrupt of constraint_ * (unit, unit) cont
-
-  let run (module Cx : LocalCx.S) (m : 'a m) =
-    try
-      m (module Cx) (fun _ _ -> ());
-      `Ok
-    with
-    | Interrupt (ctr, kont) ->
-      `Interrupt (ctr, kont)
-  let interrupt ctr k =
-    raise @@ Interrupt (ctr, k)
-
-end
-
-
-type error =
-  | PredicativityViolation
-  | ExpectedDimension of cx * Tm.tm
-
-exception E of error
-
-
-module T = Tm
-module V = Val
-
-
-module Notation = Monad.Notation (Cont)
-open Cont open Notation
-
-let check_dim_scope oxs r =
-  match oxs with
-  | None -> ()
-  | Some xs ->
-    match r with
-    | `Atom x ->
-      if List.exists (fun y -> x = y) xs then () else failwith "Bad dimension scope"
-    | _ -> ()
-
-let check_valid_cofibration ?xs:(xs = None) cofib =
-  let zeros = Hashtbl.create 20 in
-  let ones = Hashtbl.create 20 in
-  let rec go eqns =
-    match eqns with
-    | [] -> false
-    | (r, r') :: eqns ->
-      check_dim_scope xs r;
-      check_dim_scope xs r';
+let rec step : type rho x. (module LocalCx.S) -> rho -> rho state -> unit checkpoint =
+  fun (module Cx) env ->
+    function
+    | Wait (Jdg (chi, jdg), kont) ->
       begin
-        match I.compare r r' with
-        | `Same -> true
-        | `Apart -> go eqns
-        | `Indet ->
-          match r, r' with
-          | `Dim0, `Dim1 -> go eqns
-          | `Dim1, `Dim0 -> go eqns
-          | `Dim0, `Dim0 -> true
-          | `Dim1, `Dim1 -> true
-          | `Atom x, `Dim0 ->
-            if Hashtbl.mem ones x then true else
-              begin
-                Hashtbl.add zeros x ();
-                go eqns
-              end
-          | `Atom x, `Dim1 ->
-            if Hashtbl.mem zeros x then true else
-              begin
-                Hashtbl.add ones x ();
-                go eqns
-              end
-          | `Atom x, `Atom y ->
-            x = y || go eqns
-          | _, _ ->
-            go @@ (r', r) :: eqns
-      end
-  in
-  if go cofib then () else failwith "check_valid_cofibration"
+        match jdg with
+        | Eval ->
+          let cx, tm = chi env in
+          Intermediate {env = Cx.eval cx tm; kont}
 
-let check_extension_cofibration xs cofib =
-  match cofib with
-  | [] -> ()
-  | _ ->
-    check_valid_cofibration ~xs:(Some xs) cofib
-
-let cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration m =
-  fun cx sys ->
-    get_cx >>= fun (module Cx) ->
-    let face (tr, tr', _) =
-      let r = Cx.eval_dim cx tr in
-      let r' = Cx.eval_dim cx tr' in
-      (r, r')
-    in
-    ret @@ List.map face sys
-
-
-let chk_dim_cmd cx =
-  function
-  | hd, Emp ->
-    begin
-      match hd with
-      | Tm.Ix (ix, _) ->
-        begin
-          get_cx >>= fun (module Cx) ->
-          match Cx.lookup ix cx with
-          | `Dim ->
-            ret ()
-          | _ ->
-            raise @@ E (ExpectedDimension (cx, T.up (hd, Emp)))
-        end
-      | Tm.Var _ ->
-        (* TODO: lookup in global context, make sure it is a dimension *)
-        ret ()
-      | _ ->
-        raise @@ E (ExpectedDimension (cx, T.up (hd, Emp)))
-    end
-  | _ ->
-    failwith "check_dim_cmd"
-
-let rec chk_dim cx tr =
-  match T.unleash tr with
-  | T.Dim0 ->
-    ret ()
-  | T.Dim1 ->
-    ret ()
-  | T.Up cmd ->
-    chk_dim_cmd cx cmd
-  | _ ->
-    raise @@ E (ExpectedDimension (cx, tr))
-
-let chk_eval_dim cx tr =
-  chk_dim cx tr >>
-  get_cx >>= fun (module Cx) ->
-  ret @@ Cx.eval_dim cx tr
-
-
-let rec chk cx ty tm =
-  get_cx >>= fun (module Cx) ->
-  match Cx.Eval.unleash ty, T.unleash tm with
-  | V.Univ info0, T.Univ info1 ->
-    if Lvl.greater info0.lvl info1.lvl then ret () else
-      raise @@ E PredicativityViolation
-
-  | V.Univ _, T.Pi (dom, B (nm, cod)) ->
-    chk_eval cx ty dom >>= fun vdom ->
-    let cxx, _ = Cx.ext_ty cx ~nm vdom in
-    chk cxx ty cod
-
-  | V.Univ _, T.Sg (dom, B (nm, cod)) ->
-    chk_eval cx ty dom >>= fun vdom ->
-    let cxx, _ = Cx.ext_ty cx ~nm vdom in
-    chk cxx ty cod
-
-  | V.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
-    let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
-    chk_eval cxx ty cod >>= fun vcod ->
-    begin
-      if Kind.lte univ.kind Kind.Kan then
-        cofibration_of_sys cxx sys >>= fun cofib ->
-        ret @@ check_extension_cofibration xs cofib
-      else
-        ret ()
-    end >>
-    chk_ext_sys cxx vcod sys
-
-  | _ ->
-    failwith "TODO"
-
-
-and chk_ext_sys cx ty sys =
-  let rec go sys acc =
-    match sys with
-    | [] ->
-      ret ()
-    | (tr0, tr1, otm) :: sys ->
-      chk_eval_dim cx tr0 >>= fun r0 ->
-      chk_eval_dim cx tr1 >>= fun r1 ->
-      begin
-        match I.compare r0 r1, otm with
-        | `Apart, _ ->
-          go sys acc
-
-        | (`Same | `Indet), Some tm ->
+        | Chk ->
+          let cx, ty, tm = chi env in
           begin
-            get_cx >>= fun (module Cx) ->
-            try
-              let cx', phi = Cx.restrict cx r0 r1 in
-              chk cx' (Cx.Eval.Val.act phi ty) tm >>
-              go_adj cx' acc (r0, r1, tm)
-            with
-            | I.Inconsistent ->
-              ret ()
+            match Cx.Eval.unleash ty, Tm.unleash tm with
+            | Val.Univ _, Tm.Pi (dom, cod) ->
+              continue @@
+              Jdg ((fun _ -> cx, ty, dom), Chk) @>
+              Jdg ((fun _ -> cx, dom), Eval) @>
+              Jdg ((fun vdom -> cx, ty, vdom, cod), ChkFam) @>
+              kont
+            | _ -> failwith ""
           end
 
-        | _, None ->
-          failwith "check_ext_sys"
+        | ChkFam ->
+          let cx, univ, dom, fam = chi env in
+          let Tm.B (nm, bdy) = fam in
+          let cxx, _ = Cx.ext_ty cx ~nm dom in
+          continue @@
+          Jdg ((fun _ -> cxx, univ, bdy), Chk) @> kont
+
       end
 
-  and go_adj cx faces face =
-    match faces with
-    | [] ->
-      ret ()
-    | (r'0, r'1, tm') :: faces ->
-      let r0, r1, tm = face in
-      begin
-        get_cx >>= fun (module Cx) ->
-        try
-          let cx', phi = Cx.restrict cx r'0 r'1 in
-          let v = Cx.eval cx' tm in
-          let v' = Cx.eval cx' tm' in
-          let phi = I.cmp phi (I.equate r0 r1) in
-          chk_eq cx' ~ty:(Cx.Eval.Val.act phi ty) v v'
-        with
-        | I.Inconsistent ->
-          ret ()
-      end >>
-      go_adj cx faces face
-  in
-  go sys []
+    | Done ->
+      Result ()
 
+let refresh_val : (module LocalCx.S) -> cx -> value -> value -> value =
+  fun (module Cx) cx ty el ->
+    let tm = Cx.quote cx ~ty el in
+    Cx.eval cx tm
 
-and chk_eval cx ty tm =
-  chk cx ty tm >>= fun _ ->
-  get_cx >>= fun (module Cx) ->
-  ret @@ Cx.eval cx tm
+let refresh_ty : (module LocalCx.S) -> cx -> value -> value =
+  fun ((module Cx) as cxmod) cx ty ->
+    let univ = Cx.Eval.make @@ Val.Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
+    refresh_val cxmod cx univ ty
 
-and chk_eq cx ~ty el0 el1 =
-  constrain @@ ChkEq (cx, ty, (el0, el1))
+let refresh_cx : (module LocalCx.S) -> cx -> cx =
+  failwith "TODO"
 
-and constrain ctr =
-  callcc @@ fun kont ->
-  get_cx >>= fun (module Cx) ->
-  match ctr with
-  | ChkEq (cx, ty, (el0, el1)) ->
-    callcc @@ fun kont ->
-    try
-      Cx.check_eq cx ~ty el0 el1;
-      ret ()
-    with
-    | _  ->
-      interrupt ctr kont
+let refresh_inputs : type rho0 rho1 x. (module LocalCx.S) -> (rho0, rho1) jdg -> rho0 -> rho0 =
+  fun ((module Cx) as cxmod) jdg env ->
+    match jdg with
+    | Chk ->
+      let cx, ty, tm = env in
+      let cx' = refresh_cx cxmod cx in
+      let ty' = refresh_ty cxmod cx' ty in
+      cx', ty', tm
+    | Eval ->
+      let cx, tm = env in
+      let cx' = refresh_cx cxmod cx in
+      cx', tm
+    | ChkFam ->
+      let cx, univ, dom, fam = env in
+      let cx' = refresh_cx cxmod cx in
+      let univ' = refresh_ty cxmod cx' univ in
+      let dom' = refresh_ty cxmod cx' dom in
+      cx', univ', dom', fam
 
+let rec refresh : type rho x. (module LocalCx.S) -> rho state -> rho state =
+  fun cx kont ->
+    match kont with
+    | Wait (Jdg (chi, jdg), kont) ->
+      let chi' x = refresh_inputs cx jdg @@ chi x in
+      Wait (Jdg (chi', jdg), kont)
+    | Done ->
+      Done
 
+let rec driver : type rho x. (module LocalCx.S) -> rho -> rho state -> unit =
+  fun cx env kont ->
+    match step cx env kont with
+    | Error ->
+      (* TODO: try to update global environment *)
+      let cx' = cx in
+      driver cx' env @@ refresh cx' kont
 
+    | Intermediate {env; kont} ->
+      driver cx env kont
+
+    | Result () ->
+      ()
