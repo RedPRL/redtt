@@ -5,6 +5,11 @@ type atom = Name.t
 type dim = I.t
 type dir = Dir.t
 
+type tick =
+  | TickConst
+  | TickLvl of string option * int
+
+
 (* Notes: I have defined the semantic domain and evaluator in a fairly naive way, in order to avoid
    some confusing questions. It may not be that efficient! But it should be easier at this point to
    transform it make something efficient, since the code is currently simple-minded enough to
@@ -52,8 +57,8 @@ type con =
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
   | LblRet : value -> con
 
-  | TickPseudoTy : con
-  | TickConst : con
+  | Later : tick_clo -> con
+
 
 and neu =
   | Lvl : string option * int -> neu
@@ -90,7 +95,10 @@ and clo =
 and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
 
-and env_el = Val of value | Atom of I.t
+and tick_clo =
+  | TickClo of {bnd : Tm.tm Tm.nbnd; rho : env}
+
+and env_el = Val of value | Atom of I.t | Tick of tick
 and env = {cells : env_el list; global : I.action}
 
 and abs = value IAbs.abs
@@ -237,6 +245,8 @@ struct
       Val (Val.act phi v)
     | Atom x ->
       Atom (I.act phi x)
+    | Tick tck ->
+      Tick tck
 
   module Env =
   struct
@@ -268,6 +278,17 @@ struct
       match clo with
       | Clo info ->
         Clo {info with rho = Env.act phi info.rho}
+  end
+
+  module TickClo : Sort with type t = tick_clo with type 'a m = 'a =
+  struct
+    type t = tick_clo
+    type 'a m = 'a
+
+    let act phi clo =
+      match clo with
+      | TickClo info ->
+        TickClo {info with rho = Env.act phi info.rho}
   end
 
   module NClo : Sort with type t = nclo with type 'a m = 'a =
@@ -397,8 +418,7 @@ struct
 
 
   type error =
-    | ExpectedValueInEnvironment of I.t
-    | ExpectedAtomInEnvironment of value
+    | UnexpectedEnvCell of env_el
     | ExpectedDimensionTerm of Tm.tm
     | InternalMortalityError
     | RigidCoeUnexpectedArgument of abs
@@ -406,6 +426,7 @@ struct
     | RigidGHComUnexpectedArgument of value
     | LblCallUnexpectedArgument of value
     | UnexpectedDimensionTerm of Tm.tm
+    | UnexpectedTickTerm of Tm.tm
     | UnleashPiError of value
     | UnleashSgError of value
     | UnleashExtError of value
@@ -434,8 +455,8 @@ struct
           begin
             match List.nth rho.cells i with
             | Atom x -> x
-            | Val v ->
-              let err = ExpectedAtomInEnvironment v in
+            | cell ->
+              let err = UnexpectedEnvCell cell in
               raise @@ E err
           end
 
@@ -615,11 +636,8 @@ struct
             v
       end
 
-    | TickConst ->
-      make con
-
-    | TickPseudoTy ->
-      make con
+    | Later clo ->
+      make @@ Later (TickClo.act phi clo)
 
   and act_neu phi con =
     match con with
@@ -1558,7 +1576,7 @@ struct
       raise @@ E (UnexpectedDimensionTerm tm)
 
     | Tm.TickConst ->
-      make TickConst
+      raise @@ E (UnexpectedTickTerm tm)
 
     | Tm.Up cmd ->
       eval_cmd rho cmd
@@ -1690,8 +1708,8 @@ struct
       begin
         match List.nth rho.cells i with
         | Val v -> v
-        | Atom r ->
-          let err = ExpectedValueInEnvironment r in
+        | cell ->
+          let err = UnexpectedEnvCell cell in
           raise @@ E err
       end
 
@@ -2327,6 +2345,8 @@ struct
       pp_value fmt v
     | Atom r ->
       I.pp fmt r
+    | Tick _ ->
+      Format.fprintf fmt "<tick>"
 
   and pp_env fmt =
     let pp_sep fmt () = Format.fprintf fmt ", " in
@@ -2411,10 +2431,8 @@ struct
       end
     | LblRet v ->
       Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
-    | TickConst ->
-      Format.fprintf fmt "<>"
-    | TickPseudoTy ->
-      Format.fprintf fmt "tick"
+    | Later _clo ->
+      Format.fprintf fmt "<later>"
 
   and pp_abs fmt abs =
     let xs, v = Abs.unleash abs in
@@ -2573,14 +2591,9 @@ struct
         Format.fprintf fmt
           "Unexpected argument to labeled type projection: %a"
           pp_value v
-      | ExpectedAtomInEnvironment v ->
+      | UnexpectedEnvCell _ ->
         Format.fprintf fmt
-          "Expected to find atom in environment, but found value %a."
-          pp_value v
-      | ExpectedValueInEnvironment r ->
-        Format.fprintf fmt
-          "Expected to find value in environment, but found dimension %a."
-          I.pp r
+          "Did not find what was expected in the environment"
       | ExpectedDimensionTerm t ->
         Format.fprintf fmt
           "Tried to evaluate non-dimension term %a as dimension."
@@ -2588,6 +2601,10 @@ struct
       | UnexpectedDimensionTerm t ->
         Format.fprintf fmt
           "Tried to evaluate dimension term %a as expression."
+          Tm.pp0 t
+      | UnexpectedTickTerm t ->
+        Format.fprintf fmt
+          "Tried to evaluate tick term %a as expression."
           Tm.pp0 t
       | UnleashPiError v ->
         Format.fprintf fmt

@@ -6,9 +6,15 @@ type dim = I.t
 
 type value
 type clo
+type tick_clo
 type nclo
 
 type ('x, 'a) face = ('x, 'a) Face.face
+
+type tick =
+  | TickConst
+  | TickLvl of string option * int
+
 
 (* TODO: now it may be possible to semantic domain to use the fancy restriction data structure,
    instead of inventing a new dimension and doing a diagonal. Needs further investigation.
@@ -59,8 +65,7 @@ type con =
   | LblTy : {lbl : string; args : nf list; ty : value} -> con
   | LblRet : value -> con
 
-  | TickPseudoTy : con
-  | TickConst : con
+  | Later : tick_clo -> con
 
 and neu =
   | Lvl : string option * int -> neu
@@ -101,7 +106,8 @@ and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
 and ext_abs = (value * val_sys) IAbs.abs
 
-and env_el = Val of value | Atom of I.t
+and env_el = Val of value | Atom of I.t | Tick of tick
+
 and env
 
 val clo_name : clo -> string option
