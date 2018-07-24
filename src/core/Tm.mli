@@ -53,6 +53,9 @@ type 'a tmf =
   | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
   | LblRet of 'a
 
+  | Later of 'a bnd
+  | Next of 'a bnd
+
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 

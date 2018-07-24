@@ -1661,6 +1661,14 @@ struct
     | Tm.LblRet t ->
       make @@ LblRet (eval rho t)
 
+    | Tm.Later bnd ->
+      let tclo = TickClo {bnd; rho} in
+      make @@ Later tclo
+
+    | Tm.Next bnd ->
+      let tclo = TickClo {bnd; rho} in
+      make @@ Next tclo
+
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
     eval_stack rho vhd @@ Bwd.to_list sp

@@ -55,6 +55,9 @@ type 'a tmf =
   | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
   | LblRet of 'a
 
+  | Later of 'a bnd
+  | Next of 'a bnd
+
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
@@ -238,6 +241,14 @@ struct
     | LblRet t ->
       let t' = traverse_tm t in
       LblRet t'
+
+    | Later bnd ->
+      let bnd' = traverse_bnd traverse_tm bnd in
+      Later bnd'
+
+    | Next bnd ->
+      let bnd' = traverse_bnd traverse_tm bnd in
+      Next bnd'
 
     | Let (cmd, bnd) ->
       let cmd' = traverse_cmd cmd in
@@ -839,6 +850,14 @@ let rec pp env fmt =
     | Box {r; r'; cap; sys} ->
       Format.fprintf fmt "@[<hv1>(box %a %a@ %a@ @[<hv>%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
 
+    | Later (B (nm, t)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<hv1>(|> [%a %a])@]" Uuseg_string.pp_utf_8 x (pp env') t
+
+    | Next (B (nm, t)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<hv1>(next [%a %a])@]" Uuseg_string.pp_utf_8 x (pp env') t
+
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<hv1>(let@ @[<hv1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
@@ -1340,6 +1359,12 @@ let map_tmf f =
     let ty = f info.ty in
     let args = List.map (fun (t0, t1) -> f t0, f t1) info.args in
     LblTy {info with ty; args}
+  | Later bnd ->
+    let bnd = map_bnd f bnd in
+    Later bnd
+  | Next bnd ->
+    let bnd = map_bnd f bnd in
+    Next bnd
   | Up cmd ->
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
