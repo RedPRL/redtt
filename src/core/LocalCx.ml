@@ -48,6 +48,7 @@ sig
   val eval_head : t -> Tm.tm Tm.head -> value
   val eval_frame : t -> value -> Tm.tm Tm.frame -> value
   val eval_dim : t -> Tm.tm -> I.t
+  val eval_tick : t -> Tm.tm -> Val.tick
   val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
   val make_closure : t -> Tm.tm Tm.bnd -> Val.clo
 
@@ -169,6 +170,9 @@ struct
 
   let eval_dim {env; _} tm =
     V.eval_dim env tm
+
+  let eval_tick {env; _} tm =
+    V.eval_tick env tm
 
   let eval_tm_sys {env; _} sys =
     V.eval_tm_sys env sys

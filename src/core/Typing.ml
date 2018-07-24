@@ -34,6 +34,7 @@ struct
 
   type error =
     | ExpectedDimension of cx * Tm.tm
+    | ExpectedTick of cx * Tm.tm
 
   exception E of error
 
@@ -47,6 +48,10 @@ struct
       | ExpectedDimension (cx, tm) ->
         Format.fprintf fmt
           "Expected dimension, but got %a."
+          (Tm.pp (Cx.ppenv cx)) tm
+      | ExpectedTick (cx, tm) ->
+        Format.fprintf fmt
+          "Expected tick, but got %a."
           (Tm.pp (Cx.ppenv cx)) tm
 
   end
@@ -77,6 +82,35 @@ struct
           (* TODO: lookup in global context, make sure it is a dimension *)
           ()
         | _ -> failwith ""
+      end
+    | _ ->
+      failwith "check_dim_cmd"
+
+  let rec check_tick cx tr =
+    match T.unleash tr with
+    | T.TickConst ->
+      ()
+    | T.Up cmd ->
+      check_tick_cmd cx cmd
+    | _ ->
+      raise @@ E (ExpectedTick (cx, tr))
+
+  and check_tick_cmd cx =
+    function
+    | hd, Emp ->
+      begin
+        match hd with
+        | Tm.Ix (ix, _) ->
+          begin
+            match Cx.lookup ix cx with
+            | `Tick -> ()
+            | _ -> failwith "check_tick_cmd: expected dimension"
+          end
+        | Tm.Var _ ->
+          (* TODO: lookup in global context, make sure it is a dimension *)
+          ()
+        | _ ->
+          failwith ""
       end
     | _ ->
       failwith "check_dim_cmd"
@@ -636,8 +670,11 @@ struct
         | _ -> failwith "Cannot force co-restriction when it is not true!"
       end
 
-    | T.Prev _tick ->
-      failwith "TODO"
+    | T.Prev tick ->
+      check_tick cx tick;
+      (* The problem is that I don't have the ability to fiddle with the context.
+         Looks like Prev is not compatible with the spine-style typechecker. *)
+      failwith "TODO: need to rework typechecking algorithm to support ticks"
 
   and infer_head cx =
     function
