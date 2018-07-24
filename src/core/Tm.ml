@@ -63,6 +63,7 @@ and 'a head =
   | Var of {name : Name.t; twin : twin; ushift : int}
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
+  | DFix of {ty : 'a; bdy : 'a bnd}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
   | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
@@ -275,6 +276,11 @@ struct
       let ty = traverse_tm info.ty in
       let tm = traverse_tm info.tm in
       Down {ty; tm}, Emp
+
+    | DFix info ->
+      let ty = traverse_tm info.ty in
+      let bdy = traverse_bnd traverse_tm info.bdy in
+      DFix {ty; bdy}, Emp
 
     | Coe info ->
       let r = traverse_tm info.r in
@@ -875,6 +881,10 @@ and pp_head env fmt =
   | Down {ty; tm} ->
     Format.fprintf fmt "@[<hv1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
 
+  | DFix {ty; bdy = B (nm, bdy)} ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<hv1>(dfix %a@ [%a] %a)@]" (pp env) ty Uuseg_string.pp_utf_8 x (pp env') bdy
+
 and pp_cmd env fmt (hd, sp) =
   let rec go mode fmt sp =
     match sp with
@@ -1166,6 +1176,10 @@ let map_head f =
     let ty = f info.ty in
     let tm = f info.tm in
     Down {ty; tm}
+  | DFix info ->
+    let ty = f info.ty in
+    let bdy = map_bnd f info.bdy in
+    DFix {ty; bdy}
   | Coe info ->
     let r = f info.r in
     let r' = f info.r' in

@@ -59,7 +59,7 @@ type con =
 
   | Later : tick_clo -> con
   | Next : tick_clo -> con
-  | DFix : nf -> con
+  | DFix : {ty : value; clo : clo} -> con
 
 
 and neu =
@@ -88,7 +88,7 @@ and neu =
   | CoRForce : neu -> neu
 
   | Prev : tick * neu -> neu
-  | Fix : string option * int * nf -> neu
+  | Fix : string option * int * value * clo -> neu
 
 and nf = {ty : value; el : value}
 
@@ -102,6 +102,7 @@ and nclo =
 
 and tick_clo =
   | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}
+  | TickCloConst of value
 
 and env_el = Val of value | Atom of I.t | Tick of tick
 and env = {cells : env_el list; global : I.action}
@@ -130,6 +131,8 @@ module type S =
 sig
   val make : con -> value
   val unleash : value -> con
+
+  val make_later : value -> value
 
   val reflect : value -> neu -> val_sys -> value
 
@@ -297,6 +300,8 @@ struct
       match clo with
       | TickClo info ->
         TickClo {info with rho = Env.act phi info.rho}
+      | TickCloConst v ->
+        TickCloConst (Val.act phi v)
   end
 
   module NClo : Sort with type t = nclo with type 'a m = 'a =
@@ -504,6 +509,10 @@ struct
       | _ ->
         ref @@ Node {con; action = I.idn}
 
+  and make_later ty =
+    let tclo = TickCloConst ty in
+    make @@ Later tclo
+
   and act_can phi con =
     match con with
     | Pi info ->
@@ -651,8 +660,10 @@ struct
     | Next clo ->
       make @@ Next (TickClo.act phi clo)
 
-    | DFix nf ->
-      make @@ DFix (act_nf phi nf)
+    | DFix info ->
+      let ty = Val.act phi info.ty in
+      let clo = Clo.act phi info.clo in
+      make @@ DFix {ty; clo}
 
   and act_neu phi con =
     match con with
@@ -807,8 +818,8 @@ struct
           step @@ prev tick v
       end
 
-    | Fix (nm, lvl, nf) ->
-      ret @@ Fix (nm, lvl, act_nf phi nf)
+    | Fix (nm, lvl, ty, clo) ->
+      ret @@ Fix (nm, lvl, Val.act phi ty, Clo.act phi clo)
 
   and act_nf phi (nf : nf) =
     match nf with
@@ -1687,6 +1698,11 @@ struct
     | Tm.Down info ->
       eval rho info.tm
 
+    | Tm.DFix info ->
+      let ty = eval rho info.ty in
+      let clo = clo info.bdy rho in
+      make @@ DFix {ty; clo}
+
     | Tm.Coe info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
@@ -2079,17 +2095,14 @@ struct
     match unleash el with
     | Next tclo ->
       inst_tick_clo tclo tick
-    | DFix nf ->
+    | DFix dfix ->
       begin
         match tick with
         | TickConst ->
-          apply nf.el el
+          inst_clo dfix.clo el
         | TickLvl (nm, lvl) ->
-          let dom, _ = unleash_pi nf.ty in
-          let tclo = unleash_later dom in
-          let ty = inst_tick_clo tclo tick in
-          let neu = Fix (nm, lvl, nf) in
-          make @@ Up {ty; neu; sys = []}
+          let neu = Fix (nm, lvl, dfix.ty, dfix.clo) in
+          make @@ Up {ty = dfix.ty; neu; sys = []}
       end
 
     | Up info ->
@@ -2442,6 +2455,8 @@ struct
     | TickClo info ->
       let Tm.B (_, tm) = info.bnd in
       eval (Env.push (Tick tick) info.rho) tm
+    | TickCloConst v ->
+      v
 
   and pp_env_cell fmt =
     function

@@ -67,7 +67,7 @@ type con =
 
   | Later : tick_clo -> con
   | Next : tick_clo -> con
-  | DFix : nf -> con
+  | DFix : {ty : value; clo : clo} -> con
 
 and neu =
   | Lvl : string option * int -> neu
@@ -95,7 +95,7 @@ and neu =
   | CoRForce : neu -> neu
 
   | Prev : tick * neu -> neu
-  | Fix : string option * int * nf -> neu
+  | Fix : string option * int * value * clo -> neu
 
 and nf = {ty : value; el : value}
 
@@ -122,6 +122,8 @@ module type S =
 sig
   val make : con -> value
   val unleash : value -> con
+
+  val make_later : value -> value
 
   val reflect : value -> neu -> val_sys -> value
 

@@ -710,6 +710,14 @@ struct
       check cx ty info.tm;
       ty
 
+    | T.DFix info ->
+      let Tm.B (nm, bdy) = info.bdy in
+      let ty = check_eval_ty cx info.ty in
+      let ltr_ty = Eval.make_later ty in
+      let cxx, _ = Cx.ext_ty cx ~nm ltr_ty in
+      check cxx ty bdy;
+      ltr_ty
+
 
   and check_eval cx ty tm =
     check cx ty tm;
