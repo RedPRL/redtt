@@ -459,6 +459,9 @@ struct
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
     | CoRForce neu0, CoRForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
+    | Prev (tick0, neu0), Prev (tick1, neu1) ->
+      let tick = equate_tick env tick0 tick1 in
+      equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
 
     | _ ->
       let err = ErrEquateNeu {env; neu0; neu1} in
