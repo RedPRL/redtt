@@ -1975,9 +1975,7 @@ struct
           dom
           varg
       in
-      let res = rigid_coe info.dir abs el in
-      (* Format.eprintf "apply: @[%a $ %a@ ==> %a, %a, %a, %a]@." pp_value vfun pp_value varg Name.pp x pp_value coe_r'_x pp_value cod_coe pp_abs abs; *)
-      res
+      rigid_coe info.dir abs el
 
     | HCom info ->
       let _, cod = unleash_pi info.ty in
@@ -2093,19 +2091,52 @@ struct
           let neu = Fix (nm, lvl, nf) in
           make @@ Up {ty; neu; sys = []}
       end
+
     | Up info ->
       let tclo = unleash_later info.ty in
       let ty = inst_tick_clo tclo tick in
       let prev_face =
-        Face.map @@ fun r r' a ->
+        Face.map @@ fun _ _ a ->
         prev tick a
       in
       let prev_sys = List.map prev_face info.sys in
       make @@ Up {ty; neu = Prev (tick, info.neu); sys = prev_sys}
-    | Coe _info ->
-      failwith "TODO"
-    | HCom _info ->
-      failwith "TODO"
+
+    | Coe info ->
+      (* EXPERIMENTAL !!! *)
+      let x, tyx = Abs.unleash1 info.abs in
+      let tclox = unleash_later tyx in
+      let cod_tick = inst_tick_clo tclox tick in
+      let abs = Abs.bind1 x cod_tick in
+      let el = prev tick info.el in
+      rigid_coe info.dir abs el
+
+    | HCom info ->
+      (* EXPERIMENTAL !!! *)
+      let tclo = unleash_later info.ty in
+      let ty = inst_tick_clo tclo tick in
+      let cap = prev tick info.cap in
+      let prev_face =
+        Face.map @@ fun _ _ abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ prev tick v
+      in
+      let sys = List.map prev_face info.sys in
+      rigid_hcom info.dir ty cap sys
+
+    | GHCom info ->
+      (* EXPERIMENTAL !!! *)
+      let tclo = unleash_later info.ty in
+      let ty = inst_tick_clo tclo tick in
+      let cap = prev tick info.cap in
+      let prev_face =
+        Face.map @@ fun _ _ abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ prev tick v
+      in
+      let sys = List.map prev_face info.sys in
+      rigid_ghcom info.dir ty cap sys
+
     | _ ->
       failwith "prev"
 
