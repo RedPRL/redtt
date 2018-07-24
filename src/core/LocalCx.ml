@@ -2,7 +2,7 @@ open RedBasis.Bwd
 open BwdNotation
 
 type hyp =
-  {classifier : [`Ty of Val.value | `Dim];
+  {classifier : [`Ty of Val.value | `Dim | `Tick];
    locks : int}
 
 let check_eq_clock = ref 0.
@@ -38,7 +38,7 @@ sig
   val def : t -> nm:string option -> ty:value -> el:value -> t
 
   val ppenv : t -> Pretty.env
-  val lookup : int -> t -> [`Ty of value | `Dim]
+  val lookup : int -> t -> [`Ty of value | `Dim | `Tick]
 
   val eval : t -> Tm.tm -> value
   val eval_cmd : t -> Tm.tm Tm.cmd -> value
@@ -177,6 +177,7 @@ struct
       match classifier with
       | `Ty ty -> {classifier = `Ty (V.Val.act phi ty); locks}
       | `Dim -> {classifier = `Dim; locks}
+      | `Tick -> {classifier = `Tick; locks}
     in
     let hyps = List.map act_ty cx.hyps in
     let env = V.Env.act phi cx.env in

@@ -646,7 +646,7 @@ struct
       begin
         match Cx.lookup ix cx with
         | `Ty ty -> ty
-        | `Dim -> failwith "infer: expected type hypothesis"
+        | (`Dim | `Tick) -> failwith "infer: expected type hypothesis"
       end
 
     | T.Meta {name; ushift} ->
