@@ -71,6 +71,7 @@ type con =
   | Later : tick_clo -> con
   | Next : tick_clo -> con
   | DFix : {ty : value; clo : clo} -> con
+  | DFixLine : {x : atom; ty : value; clo : clo} -> con
 
 and neu =
   | Lvl : string option * int -> neu
@@ -99,6 +100,7 @@ and neu =
 
   | Prev : tick * neu -> neu
   | Fix : tick_gen * value * clo -> neu
+  | FixLine : atom * tick_gen * value * clo -> neu
 
 and nf = {ty : value; el : value}
 

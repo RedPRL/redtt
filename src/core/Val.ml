@@ -63,6 +63,7 @@ type con =
   | Later : tick_clo -> con
   | Next : tick_clo -> con
   | DFix : {ty : value; clo : clo} -> con
+  | DFixLine : {x : atom; ty : value; clo : clo} -> con
 
 
 and neu =
@@ -92,6 +93,7 @@ and neu =
 
   | Prev : tick * neu -> neu
   | Fix : tick_gen * value * clo -> neu
+  | FixLine : atom * tick_gen * value * clo -> neu
 
 and nf = {ty : value; el : value}
 
@@ -695,6 +697,12 @@ struct
       let clo = Clo.act phi info.clo in
       make @@ DFix {ty; clo}
 
+    | DFixLine info ->
+      let r = I.act phi @@ `Atom info.x in
+      let ty = Val.act phi info.ty in
+      let clo = Clo.act phi info.clo in
+      make_dfix_line r ty clo
+
   and act_neu phi con =
     match con with
     | VProj info ->
@@ -851,6 +859,20 @@ struct
     | Fix (tick, ty, clo) ->
       ret @@ Fix (tick, Val.act phi ty, Clo.act phi clo)
 
+    | FixLine (x, tick, ty, clo) ->
+      let ty' = Val.act phi ty in
+      let clo' = Clo.act phi clo in
+      begin
+        match I.act phi @@ `Atom x with
+        | `Atom y ->
+          ret @@ FixLine (y, tick, ty', clo')
+        | `Dim0 ->
+          ret @@ Fix (tick, ty', clo')
+        | `Dim1 ->
+          (* TODO: check that this is right *)
+          step @@ inst_clo clo' @@ make @@ DFix {ty = ty'; clo = clo'}
+      end
+
   and act_nf phi (nf : nf) =
     match nf with
     | info ->
@@ -904,10 +926,21 @@ struct
 
   and make_extlam abs = make @@ ExtLam abs
 
-  and make_v phi mgen ty0 ty1 equiv : value =
-    match mgen with
+  and make_dfix_line r ty clo =
+    match r with
     | `Atom x ->
-      let phi0 = I.cmp (I.equate mgen `Dim0) phi in
+      make @@ DFixLine {x; ty; clo}
+    | `Dim0 ->
+      make @@ DFix {ty; clo}
+    | `Dim1 ->
+      let bdy = inst_clo clo @@ make @@ DFix {ty; clo} in
+      let tclo = TickCloConst bdy in
+      make @@ Next tclo
+
+  and make_v phi r ty0 ty1 equiv : value =
+    match r with
+    | `Atom x ->
+      let phi0 = I.cmp (I.equate r `Dim0) phi in
       make @@ V {x; ty0 = ty0 phi0; ty1; equiv = equiv phi0}
     | `Dim0 ->
       ty0 phi
@@ -2146,6 +2179,15 @@ struct
           let neu = Fix (gen, dfix.ty, dfix.clo) in
           make @@ Up {ty = dfix.ty; neu; sys = []}
       end
+    | DFixLine dfix ->
+      begin
+        match tick with
+        | TickConst ->
+          inst_clo dfix.clo el
+        | TickGen gen ->
+          let neu = FixLine (dfix.x, gen, dfix.ty, dfix.clo) in
+          make @@ Up {ty = dfix.ty; neu; sys = []}
+      end
 
     | Up info ->
       let tclo = unleash_later info.ty in
@@ -2598,7 +2640,8 @@ struct
       Format.fprintf fmt "<next>"
     | DFix _ ->
       Format.fprintf fmt "<dfix>"
-
+    | DFixLine _ ->
+      Format.fprintf fmt "<dfix-line>"
   and pp_abs fmt abs =
     let xs, v = Abs.unleash abs in
     Format.fprintf fmt "@[<1><%a>@ %a@]" pp_names xs pp_value v
@@ -2714,6 +2757,9 @@ struct
 
     | Fix _ ->
       Format.fprintf fmt "<fix>"
+
+    | FixLine _ ->
+      Format.fprintf fmt "<fix-line>"
 
 
   and pp_nf fmt nf =
