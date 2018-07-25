@@ -1774,9 +1774,10 @@ struct
       eval rho info.tm
 
     | Tm.DFix info ->
+      let r = eval_dim rho info.r in
       let ty = eval rho info.ty in
       let clo = clo info.bdy rho in
-      make @@ DFix {ty; clo}
+      make_dfix_line r ty clo
 
     | Tm.Coe info ->
       let r = eval_dim rho info.r in
