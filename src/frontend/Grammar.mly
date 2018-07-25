@@ -381,9 +381,9 @@ head:
     { fun env ->
       Tm.Coe {r = r0 env; r' = r1 env; ty = ty env; tm = tm env} }
 
-  | LPR; DFIX; ty = tm; bdy = bind(tm); RPR
+  | LPR; DFIX; r = tm; ty = tm; bdy = bind(tm); RPR
     { fun env ->
-      Tm.DFix {ty = ty env; bdy = bdy env} }
+      Tm.DFix {r = r env; ty = ty env; bdy = bdy env} }
 
   | LPR; COLON; ty = tm; tm = tm; RPR
     { fun env ->

@@ -784,6 +784,7 @@ struct
       ty
 
     | T.DFix info ->
+      check_dim cx info.r;
       let Tm.B (nm, bdy) = info.bdy in
       let ty = check_eval_ty cx info.ty in
       let ltr_ty = Eval.make_later ty in

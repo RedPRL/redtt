@@ -355,7 +355,18 @@ struct
       let el1 = inst_clo clo1 var in
       let bdy = equate (Env.succ env) ty0 el0 el1 in
       let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
-      Tm.DFix {ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
+      Tm.DFix {r = Tm.make Tm.Dim0; ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
+
+    | FixLine (x0, tgen0, ty0, clo0), FixLine (x1, tgen1, ty1, clo1) ->
+      let r = equate_atom env x0 x1 in
+      let ty = equate_ty env ty0 ty1 in
+      let ltr_ty = make_later ty0 in
+      let var = generic env ltr_ty in
+      let el0 = inst_clo clo0 var in
+      let el1 = inst_clo clo1 var in
+      let bdy = equate (Env.succ env) ty0 el0 el1 in
+      let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
+      Tm.DFix {r; ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
 
     | Car neu0, Car neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Car :: stk

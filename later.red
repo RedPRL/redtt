@@ -4,7 +4,7 @@ import path
 
 let stream : type =
   `(prev ∙
-    (dfix (U 0) [A]
+    (dfix 0 (U 0) [A]
      (× bool (▷ [α] (prev α A)))))
 
 debug
