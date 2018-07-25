@@ -1063,7 +1063,7 @@ struct
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
-    | (Pi _ | Sg _ | Ext _ | Up _) ->
+    | (Pi _ | Sg _ | Ext _ | Up _ | Later _) ->
       make @@ Coe {dir; abs; el}
 
     | (Bool | Univ _) ->
