@@ -1,6 +1,6 @@
 import path
 
-; Currently, the soure language doesn't have constructs for guarded recursion,
+; Currently, the source language doesn't have constructs for guarded recursion,
 ; so you must program it using the *redtt core language*. This language is accessed
 ; using a backtick `expr.
 
