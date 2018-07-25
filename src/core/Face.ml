@@ -29,15 +29,25 @@ let forall : type x. I.atom -> (x, 'a) face -> [`Delete | `Keep] =
     let r, r' = get_cond face in
     if I.absent x r && I.absent x r' then `Keep else `Delete
 
-module M (X : Sort.S with type 'a m = 'a) :
+module type S =
 sig
-  type 'x t = ('x, X.t) face
+  type body
+  type 'x t = ('x, body) face
+
+  val rigid : I.action -> Eq.t -> (I.action -> body) -> 'x t
+
+  val make_from_dir : I.action -> Dir.t -> (I.action -> body) -> [`Any] t
+
+  val make : I.action -> I.t -> I.t -> (I.action -> body) -> [`Any] t
+
+  (* convenience function for generating faces x = ε *)
+  val gen_const : I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> body) -> [`Any] t
+
   val act : I.action -> 'x t -> [`Any] t
-  val rigid : I.action -> Eq.t -> (I.action -> X.t) -> 'x t
-  val make_from_dir : I.action -> Dir.t -> (I.action -> X.t) -> [`Any] t
-  val gen_const : I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> X.t) -> 'x t
-  val make : I.action -> I.t -> I.t -> (I.action -> X.t) -> [`Any] t
-end =
+end
+
+
+module M (X : Sort.S with type 'a m = 'a) : S with type body := X.t =
 struct
   type 'x t = ('x, X.t) face
 

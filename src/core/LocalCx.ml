@@ -68,19 +68,18 @@ struct
   type t = cx
 
   module Eval = V
-  module Q = Quote.M (V)
 
   type value = Domain.value
 
   let emp : cx =
-    {env = Eval.Env.emp;
+    {env = Domain.Env.emp;
      qenv = Quote.Env.emp;
      hyps = [];
      ppenv = Pretty.Env.emp;
      rel = V.base_restriction}
 
   let clear_locals cx =
-    {emp with rel = cx.rel; env = Eval.Env.clear_locals cx.env}
+    {emp with rel = cx.rel; env = Domain.Env.clear_locals cx.env}
 
   let hyp_map_lock f hyp =
     {hyp with locks = f hyp.locks}
@@ -109,7 +108,7 @@ struct
   let ext {env; qenv; hyps; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in
     let var = V.reflect ty (Domain.Lvl (nm, n)) sys in
-    {env = Eval.Env.push (Domain.Val var) env;
+    {env = Domain.Env.push (Domain.Val var) env;
      hyps = {classifier = `Ty ty; locks = 0; killed = false} :: hyps;
      qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -119,7 +118,7 @@ struct
   let ext_tick {env; qenv; hyps; ppenv; rel} ~nm =
     let n = Quote.Env.len qenv in
     let tick = Domain.TickGen (`Lvl (nm, n)) in
-    {env = Eval.Env.push (Domain.Tick tick) env;
+    {env = Domain.Env.push (Domain.Tick tick) env;
      hyps = {classifier = `Tick; locks = 0; killed = false} :: hyps;
      qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -135,7 +134,7 @@ struct
 
   let ext_dim {env; qenv; hyps; ppenv; rel} ~nm =
     let x = Name.named nm in
-    {env = Eval.Env.push (Domain.Atom (`Atom x)) env;
+    {env = Domain.Env.push (Domain.Atom (`Atom x)) env;
      hyps = {classifier = `I; locks = 0; killed = false} :: hyps;
      qenv = Quote.Env.abs qenv @@ Emp #< x;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -154,7 +153,7 @@ struct
     cx.ppenv
 
   let make_closure cx bnd =
-    V.make_closure cx.env bnd
+    Domain.Clo {rho = cx.env; bnd}
 
 
   let eval {env; ppenv; _} tm =
@@ -207,14 +206,16 @@ struct
     let rel, phi = Restriction.equate r r' cx.rel in
     let act_ty {classifier; locks; killed} =
       match classifier with
-      | `Ty ty -> {classifier = `Ty (V.Val.act phi ty); locks; killed}
+      | `Ty ty -> {classifier = `Ty (Domain.Value.act phi ty); locks; killed}
       | `I -> {classifier = `I; locks; killed}
       | `Tick -> {classifier = `Tick; locks; killed}
     in
     let hyps = List.map act_ty cx.hyps in
-    let env = V.Env.act phi cx.env in
+    let env = Domain.Env.act phi cx.env in
     {cx with rel; hyps; env}, phi
 
+
+  module Q = Quote.M (V)
 
   let quote cx ~ty el =
     Q.quote_nf cx.qenv @@ {ty; el}
@@ -225,7 +226,6 @@ struct
 
   let check_eq cx ~ty el0 el1 =
     let now0 = Unix.gettimeofday () in
-    (* Format.eprintf "check_eq: %a = %a@." Eval.pp_value el0 Eval.pp_value el1 ; *)
     try
       Q.equiv cx.qenv ~ty el0 el1;
       let now1 = Unix.gettimeofday () in

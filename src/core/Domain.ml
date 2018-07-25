@@ -365,3 +365,197 @@ and pp_nfs fmt nfs =
 and pp_dims fmt rs =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep I.pp fmt rs
+
+module type Sort = Sort.S
+
+module Value : Sort with type t = value with type 'a m = 'a =
+struct
+
+  type 'a m = 'a
+  type t = value
+
+  let act : I.action -> value -> value =
+    fun phi (Node node) ->
+      Node {node with action = I.cmp phi node.action}
+end
+
+
+module Abs = IAbs.M (Value)
+module ValFace = Face.M (Value)
+module AbsFace = Face.M (Abs)
+
+let act_env_cell phi =
+  function
+  | Val v ->
+    Val (Value.act phi v)
+  | Atom x ->
+    Atom (I.act phi x)
+  | Tick tck ->
+    Tick tck
+
+module Env =
+struct
+  type t = env
+  type 'a m = 'a
+
+  let emp = {cells = []; global = I.idn}
+
+  let clear_locals rho =
+    {rho with cells = []}
+
+  let push el {cells; global} =
+    {cells = el :: cells; global}
+
+  let push_many els {cells; global} =
+    {cells = els @ cells; global}
+
+  let act phi {cells; global} =
+    {cells = List.map (act_env_cell phi) cells;
+     global = I.cmp phi global}
+end
+
+module Clo : Sort with type t = clo with type 'a m = 'a =
+struct
+  type t = clo
+  type 'a m = 'a
+
+  let act phi clo =
+    match clo with
+    | Clo info ->
+      Clo {info with rho = Env.act phi info.rho}
+end
+
+module TickClo : Sort with type t = tick_clo with type 'a m = 'a =
+struct
+  type t = tick_clo
+  type 'a m = 'a
+
+  let act phi clo =
+    match clo with
+    | TickClo info ->
+      TickClo {info with rho = Env.act phi info.rho}
+    | TickCloConst v ->
+      TickCloConst (Value.act phi v)
+end
+
+module NClo : Sort with type t = nclo with type 'a m = 'a =
+struct
+  type t = nclo
+  type 'a m = 'a
+
+  let act phi clo =
+    match clo with
+    | NClo info ->
+      NClo {info with rho = Env.act phi info.rho}
+end
+
+module CompSys :
+sig
+  include Sort
+    with type t = comp_sys
+    with type 'a m = [`Ok of comp_sys | `Proj of abs]
+  val forall : I.atom -> t -> t
+  val forallm : I.atom -> t m -> t m
+end =
+struct
+  type t = comp_sys
+  type 'a m = [`Ok of comp_sys | `Proj of abs]
+
+  exception Proj of abs
+
+  let rec act_aux phi (sys : t) =
+    match sys with
+    | [] -> []
+    | face :: sys ->
+      match AbsFace.act phi face with
+      | Face.True (_, _, abs) ->
+        raise @@ Proj abs
+      | Face.False _ ->
+        act_aux phi sys
+      | Face.Indet (p, t) ->
+        Face.Indet (p, t) :: act_aux phi sys
+
+  let act phi sys =
+    try `Ok (act_aux phi sys)
+    with
+    | Proj abs ->
+      `Proj abs
+
+  (* note that these functions do not commute with `make`
+   * if there is a face with equation `x=x` where `x` is
+   * the dimension. *)
+  let forall x sys =
+    List.filter (fun f -> Face.forall x f = `Keep) sys
+
+  let forallm x msys =
+    match msys with
+    | `Ok sys -> `Ok (forall x sys)
+    | `Proj abs -> `Proj abs
+
+end
+
+(* TODO merge this with CompSys *)
+module BoxSys :
+sig
+  include Sort
+    with type t = box_sys
+    with type 'a m = [`Ok of box_sys | `Proj of value]
+end =
+struct
+  type t = box_sys
+  type 'a m = [`Ok of box_sys | `Proj of value]
+
+  exception Proj of value
+
+  let rec act_aux phi (sys : t) =
+    match sys with
+    | [] -> []
+    | face :: sys ->
+      match ValFace.act phi face with
+      | Face.True (_, _, value) ->
+        raise @@ Proj value
+      | Face.False _ ->
+        act_aux phi sys
+      | Face.Indet (p, t) ->
+        Face.Indet (p, t) :: act_aux phi sys
+
+  let act phi sys =
+    try `Ok (act_aux phi sys)
+    with
+    | Proj value ->
+      `Proj value
+end
+
+module ValSys :
+sig
+  include Sort
+    with type t = val_sys
+    with type 'a m = 'a
+
+  val from_rigid : rigid_val_sys -> t
+  val forall : I.atom -> t -> t
+end =
+struct
+  type t = val_sys
+  type 'a m = 'a
+
+  let act phi =
+    List.map (ValFace.act phi)
+
+  let from_rigid sys =
+    let face : rigid_val_face -> val_face =
+      function
+      | Face.Indet (p, a) ->
+        Face.Indet (p, a)
+    in
+    List.map face sys
+
+  (* note that these functions do not commute with `make`
+   * if there is a face with equation `x=x` where `x` is
+   * the dimension. *)
+  let forall x sys =
+    List.filter (fun f -> Face.forall x f = `Keep) sys
+end
+
+module ExtAbs : IAbs.S with type el = value * val_sys =
+  IAbs.M (Sort.Prod (Value) (ValSys))

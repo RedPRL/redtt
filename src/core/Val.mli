@@ -40,28 +40,7 @@ sig
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
-
-
-  module Env :
-  sig
-    include Sort.S
-      with type t = env
-      with type 'a m = 'a
-    val emp : env
-    val clear_locals : env -> env
-    val push : env_el -> env -> env
-  end
-
-  module Val : Sort.S
-    with type t = value
-    with type 'a m = 'a
-
-
-  module ExtAbs : IAbs.S
-    with type el = value * val_sys
-
-  module Abs : IAbs.S
-    with type el = value
+  val base_restriction : Restriction.t
 
   module Macro : sig
     val equiv : value -> value -> value
@@ -73,8 +52,6 @@ sig
     val pp : t Pretty.t0
     exception E of t
   end
-
-  val base_restriction : Restriction.t
 end
 
 module type Sig =

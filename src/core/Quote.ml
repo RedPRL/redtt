@@ -1,5 +1,6 @@
 open Domain
 open RedBasis.Bwd
+
 open BwdNotation
 
 
@@ -50,7 +51,7 @@ struct
     try
       let lvl = M.find x env.atoms in
       ix_of_lvl lvl env
-    with _ -> failwith "FUCK!!:"
+    with _ -> failwith "ix_of_atom"
 end
 
 type env = Env.t
@@ -109,7 +110,7 @@ struct
       Tm.cons q0 q1
 
     | Ext abs ->
-      let xs, (tyx, _) = ExtAbs.unleash abs in
+      let xs, (tyx, _) = Domain.ExtAbs.unleash abs in
       let rs = List.map (fun x -> `Atom x) @@ Bwd.to_list xs in
       let app0 = ext_apply el0 rs in
       let app1 = ext_apply el1 rs in
@@ -148,8 +149,8 @@ struct
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
           let phi = I.equate r r' in
-          let force0 = corestriction_force @@ Val.act phi el0 in
-          let force1 = corestriction_force @@ Val.act phi el1 in
+          let force0 = corestriction_force @@ Domain.Value.act phi el0 in
+          let force1 = corestriction_force @@ Domain.Value.act phi el1 in
           let tm = equate env ty force0 force1 in
           Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
       end
@@ -163,7 +164,7 @@ struct
     | V info ->
       let tr = quote_dim env @@ `Atom info.x in
       let phi_r0 = I.subst `Dim0 info.x in
-      let tm0 = equate env (Val.act phi_r0 info.ty0) (Val.act phi_r0 el0) (Val.act phi_r0 el1) in
+      let tm0 = equate env (Domain.Value.act phi_r0 info.ty0) (Domain.Value.act phi_r0 el0) (Domain.Value.act phi_r0 el1) in
       let vproj0 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~equiv:info.equiv ~el:el0 in
       let vproj1 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~equiv:info.equiv ~el:el1 in
       let tm1 = equate env info.ty1 vproj0 vproj1 in
@@ -234,8 +235,8 @@ struct
         Tm.sg (clo_name sg0.cod) dom cod
 
       | Ext abs0, Ext abs1 ->
-        let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
-        let ty1x, sys1x = ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
+        let xs, (ty0x, sys0x) = Domain.ExtAbs.unleash abs0 in
+        let ty1x, sys1x = Domain.ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
         let envx = Env.abs env xs in
         let tyx = equate envx ty ty0x ty1x in
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
@@ -447,7 +448,7 @@ struct
       let ty1 = equate_ty env vproj0.ty1 vproj1.ty1 in
       let equiv_ty = V.Macro.equiv vproj0.ty0 vproj0.ty1 in
       let phi = I.subst `Dim0 x0 in
-      let equiv = equate env (Val.act phi equiv_ty) vproj0.equiv vproj1.equiv in
+      let equiv = equate env (Value.act phi equiv_ty) vproj0.equiv vproj1.equiv in
       let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
     | Cap cap0, Cap cap1 ->
@@ -522,7 +523,7 @@ struct
       let r, r' = Eq.unleash p0 in
       let phi = I.equate r r' in
       let tr, tr' = equate_eq env p0 p1 in
-      let v = equate env (Val.act phi ty) v0 v1 in
+      let v = equate env (Value.act phi ty) v0 v1 in
       tr, tr', Some v
 
     | _ -> failwith "equate_val_face"
@@ -533,7 +534,7 @@ struct
       let r, r' = Eq.unleash p0 in
       let phi = I.equate r r' in
       let tr, tr' = equate_eq env p0 p1 in
-      let bnd = equate_val_abs env (Val.act phi ty) abs0 abs1 in
+      let bnd = equate_val_abs env (Value.act phi ty) abs0 abs1 in
       tr, tr', Some bnd
 
   and equate_box_boundary env s' ty bdry0 bdry1 =
@@ -739,8 +740,8 @@ struct
         (* In this case, we check that the semantic indeterminate will become equal to the face under the
            stipulated restriction. *)
         let r, r' = Eq.unleash p in
-        let gen_rr' = Val.act (I.equate r r') gen in
-        let ty_rr' = Val.act (I.equate r r') ty1 in
+        let gen_rr' = Value.act (I.equate r r') gen in
+        let ty_rr' = Value.act (I.equate r r') ty1 in
         begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end
     in
 
