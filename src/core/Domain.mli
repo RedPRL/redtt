@@ -78,8 +78,6 @@ and neu =
 
   | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
 
-  (* Invariant: neu \in vty, vty is a V type
-  *)
   | VProj : {x : atom; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
   | Cap : {dir : dir; ty : value; sys : comp_sys; neu : neu} -> neu
