@@ -1,8 +1,9 @@
 module V = Val
 module Q = Quote
 module T = Tm
+module D = Domain
 
-type value = V.value
+type value = D.value
 
 type cx = LocalCx.t
 
@@ -19,9 +20,9 @@ sig
     val pp : t Pretty.t0
   end
 
-  val check : cx -> Val.value -> Tm.tm -> unit
+  val check : cx -> D.value -> Tm.tm -> unit
   val infer : cx -> Tm.tm Tm.cmd -> value
-  val check_boundary : cx -> Val.value -> Val.val_sys -> Tm.tm -> unit
+  val check_boundary : cx -> D.value -> D.val_sys -> Tm.tm -> unit
 end
 
 type cofibration = (I.t * I.t) list
@@ -170,27 +171,27 @@ struct
 
   let rec check cx ty tm =
     match Eval.unleash ty, T.unleash tm with
-    | V.Univ info0, T.Univ info1 ->
+    | D.Univ info0, T.Univ info1 ->
       (* TODO: what about kinds? I think it's fine, since we learned from Andy Pitts how to make
          the pretype universe Kan. But I may need to add those "ecom" thingies, LOL. *)
       if Lvl.greater info0.lvl info1.lvl then () else
         failwith "Predicativity violation"
 
-    | V.Univ _, T.Pi (dom, B (nm, cod)) ->
+    | D.Univ _, T.Pi (dom, B (nm, cod)) ->
       let vdom = check_eval cx ty dom in
       let cxx', _ = Cx.ext_ty cx ~nm vdom in
       check cxx' ty cod
 
-    | V.Univ _, T.Sg (dom, B (nm, cod)) ->
+    | D.Univ _, T.Sg (dom, B (nm, cod)) ->
       let vdom = check_eval cx ty dom in
       let cxx, _ = Cx.ext_ty cx ~nm vdom in
       check cxx ty cod
 
-    | V.Univ _, T.Later (B (nm, cod)) ->
+    | D.Univ _, T.Later (B (nm, cod)) ->
       let cxx, _ = Cx.ext_tick cx ~nm in
       check cxx ty cod
 
-    | V.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
+    | D.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
       let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
       let vcod = check_eval cxx ty cod in
       if Kind.lte univ.kind Kind.Kan then
@@ -199,12 +200,12 @@ struct
         ();
       check_ext_sys cxx vcod sys
 
-    | V.Univ univ, T.Rst info ->
+    | D.Univ univ, T.Rst info ->
       if univ.kind = Kind.Pre then () else failwith "Restriction type is not Kan";
       let ty = check_eval cx ty info.ty in
       check_ext_sys cx ty info.sys
 
-    | V.Univ univ, T.CoR (tr, tr', oty) ->
+    | D.Univ univ, T.CoR (tr, tr', oty) ->
       if univ.kind = Kind.Pre then () else failwith "Co-restriction type is not known to be Kan";
       let r = check_eval_dim cx tr in
       let r' = check_eval_dim cx tr' in
@@ -219,37 +220,37 @@ struct
           failwith "co-restriction type malformed"
       end
 
-    | V.Univ _, T.V info ->
+    | D.Univ _, T.V info ->
       check_dim cx info.r;
       let ty0 = check_eval cx ty info.ty0 in
       let ty1 = check_eval cx ty info.ty1 in
       check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-    | V.Univ _, (T.Bool | T.Nat | T.Int) ->
+    | D.Univ _, (T.Bool | T.Nat | T.Int) ->
       ()
 
 
-    | V.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
+    | D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
       let cxx, x = Cx.ext_ty cx ~nm dom in
       let vcod = Eval.inst_clo cod x in
       check cxx vcod tm
 
-    | V.Later tclo, T.Next (T.B (nm, tm)) ->
+    | D.Later tclo, T.Next (T.B (nm, tm)) ->
       let cxx, tck = Cx.ext_tick cx ~nm in
       let vty = Eval.inst_tick_clo tclo tck in
       check cxx vty tm
 
-    | V.Sg {dom; cod}, T.Cons (t0, t1) ->
+    | D.Sg {dom; cod}, T.Cons (t0, t1) ->
       let v = check_eval cx dom t0 in
       let vcod = Eval.inst_clo cod v in
       check cx vcod t1
 
-    | V.Ext ext_abs, T.ExtLam (T.NB (nms, tm)) ->
+    | D.Ext ext_abs, T.ExtLam (T.NB (nms, tm)) ->
       let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
       let codx, sysx = Eval.ExtAbs.inst ext_abs @@ Bwd.map (fun x -> `Atom x) @@ Bwd.from_list xs in
       check_boundary cxx codx sysx tm
 
-    | V.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
+    | D.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
       let r'0 = check_eval_dim cx tr0 in
       let r'1 = check_eval_dim cx tr1 in
       begin
@@ -284,14 +285,14 @@ struct
           failwith "Malformed element of co-restriction type"
       end
 
-    | V.Rst {ty; sys}, _ ->
+    | D.Rst {ty; sys}, _ ->
       check cx ty tm;
       check_boundary cx ty sys tm
 
-    | V.Univ _, T.FCom info ->
+    | D.Univ _, T.FCom info ->
       check_fcom cx ty info.r info.r' info.cap info.sys
 
-    | V.Univ _, T.LblTy info ->
+    | D.Univ _, T.LblTy info ->
       check cx ty info.ty;
       let go_arg (ty, tm) =
         let vty = check_eval_ty cx ty in
@@ -299,25 +300,25 @@ struct
       in
       ignore @@ List.map go_arg info.args
 
-    | V.LblTy info, T.LblRet t ->
+    | D.LblTy info, T.LblRet t ->
       check cx info.ty t
 
-    | V.Bool, (T.Tt | T.Ff) ->
+    | D.Bool, (T.Tt | T.Ff) ->
       ()
 
-    | V.Nat, T.Zero ->
+    | D.Nat, T.Zero ->
       ()
 
-    | V.Nat, T.Suc n ->
-      check cx (Eval.make V.Nat) n
+    | D.Nat, T.Suc n ->
+      check cx (Eval.make D.Nat) n
 
-    | V.Int, T.Pos n ->
-      check cx (Eval.make V.Nat) n
+    | D.Int, T.Pos n ->
+      check cx (Eval.make D.Nat) n
 
-    | V.Int, T.NegSuc n ->
-      check cx (Eval.make V.Nat) n
+    | D.Int, T.NegSuc n ->
+      check cx (Eval.make D.Nat) n
 
-    | V.V vty, T.VIn vin ->
+    | D.V vty, T.VIn vin ->
       let r = check_eval_dim cx vin.r in
       begin
         match I.compare (`Atom vty.x) r with
@@ -506,38 +507,38 @@ struct
     in go sys []
 
   and infer cx (hd, sp) =
-    let Val.{ty; _} = infer_spine cx hd sp in
+    let D.{ty; _} = infer_spine cx hd sp in
     ty
 
   and infer_spine cx hd =
     function
     | Emp ->
-      Val.{el = Cx.eval_head cx hd; ty = infer_head cx hd}
+      D.{el = Cx.eval_head cx hd; ty = infer_head cx hd}
 
     | Snoc (sp, frm) ->
       match frm with
       | T.Car ->
         let ih = infer_spine cx hd sp in
         let dom, _ = Eval.unleash_sg ih.ty in
-        Val.{el = Eval.car ih.el; ty = dom}
+        D.{el = Eval.car ih.el; ty = dom}
 
       | T.Cdr ->
         let ih = infer_spine cx hd sp in
         let _, cod = Eval.unleash_sg ih.ty in
         let car = Eval.car ih.el in
-        Val.{el = Eval.cdr ih.el; ty = Eval.inst_clo cod car}
+        D.{el = Eval.cdr ih.el; ty = Eval.inst_clo cod car}
 
       | T.FunApp t ->
         let ih = infer_spine cx hd sp in
         let dom, cod = Eval.unleash_pi ih.ty in
         let v = check_eval cx dom t in
-        Val.{el = Eval.apply ih.el v; ty = Eval.inst_clo cod v}
+        D.{el = Eval.apply ih.el v; ty = Eval.inst_clo cod v}
 
       | T.ExtApp ts ->
         let ih = infer_spine cx hd sp in
         let rs = List.map (check_eval_dim cx) ts in
         let ty, _ = Eval.unleash_ext ih.ty rs in
-        Val.{el = Eval.ext_apply ih.el rs; ty}
+        D.{el = Eval.ext_apply ih.el rs; ty}
 
       | T.VProj info ->
         let ih = infer_spine cx hd sp in
@@ -546,30 +547,30 @@ struct
           T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
         in
         Cx.check_eq_ty cx v_ty ih.ty;
-        Val.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty1}
+        D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty1}
 
       | T.If info ->
         let T.B (nm, mot) = info.mot in
-        let bool = Eval.make V.Bool in
+        let bool = Eval.make D.Bool in
         let cxx, _= Cx.ext_ty cx ~nm bool in
         check_ty cxx mot;
 
         let ih = infer_spine cx hd sp in
         Cx.check_eq_ty cx ih.ty bool;
 
-        let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Tt) in
-        let cx_ff = Cx.def cx ~nm ~ty:bool ~el:(Eval.make V.Ff) in
+        let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(Eval.make D.Tt) in
+        let cx_ff = Cx.def cx ~nm ~ty:bool ~el:(Eval.make D.Ff) in
         let mot_tt = Cx.eval cx_tt mot in
         let mot_ff = Cx.eval cx_ff mot in
         check cx mot_tt info.tcase;
         check cx mot_ff info.fcase;
 
         let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:ih.el in
-        Val.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx_scrut mot}
+        D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx_scrut mot}
 
       | T.NatRec info ->
         let T.B (nm, mot) = info.mot in
-        let nat = Eval.make V.Nat in
+        let nat = Eval.make D.Nat in
         let _ =
           let cx_x, _ = Cx.ext_ty cx ~nm nat in
           check_ty cx_x mot
@@ -584,7 +585,7 @@ struct
 
         (* zero *)
         let _ =
-          let mot_zero = Cx.Eval.inst_clo mot_clo @@ Eval.make V.Zero in
+          let mot_zero = Cx.Eval.inst_clo mot_clo @@ Eval.make D.Zero in
           check cx mot_zero info.zcase
         in
 
@@ -599,15 +600,15 @@ struct
           let cx_x, x = Cx.ext_ty cx ~nm:nm_scase nat in
           let mot_x = Eval.inst_clo mot_clo x in
           let cx_x_ih, _ih = Cx.ext_ty cx_x ~nm:nm_rec_scase mot_x in
-          let mot_suc = Eval.inst_clo mot_clo @@ Eval.make @@ V.Suc x in
+          let mot_suc = Eval.inst_clo mot_clo @@ Eval.make @@ D.Suc x in
           check cx_x_ih mot_suc scase
         in
 
-        Val.{el = Cx.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el }
+        D.{el = Cx.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el }
 
       | T.IntRec info ->
         let T.B (nm, mot) = info.mot in
-        let int = Eval.make V.Int in
+        let int = Eval.make D.Int in
         let _ =
           let cx_x, _ = Cx.ext_ty cx ~nm int in
           check_ty cx_x mot
@@ -623,26 +624,26 @@ struct
         (* pos *)
         let _ =
           let T.B (nm_pcase, pcase) = info.pcase in
-          let nat = Eval.make V.Nat in
+          let nat = Eval.make D.Nat in
           let cx_n, n = Cx.ext_ty cx ~nm:nm_pcase nat in
-          let mot_pos = Cx.Eval.inst_clo mot_clo @@ Eval.make (V.Pos n) in
+          let mot_pos = Cx.Eval.inst_clo mot_clo @@ Eval.make (D.Pos n) in
           check cx_n mot_pos pcase
         in
 
         (* negsucc *)
         let _ =
           let T.B (nm_ncase, ncase) = info.ncase in
-          let nat = Eval.make V.Nat in
+          let nat = Eval.make D.Nat in
           let cx_n, n = Cx.ext_ty cx ~nm:nm_ncase nat in
-          let mot_negsuc = Cx.Eval.inst_clo mot_clo @@ Eval.make (V.NegSuc n) in
+          let mot_negsuc = Cx.Eval.inst_clo mot_clo @@ Eval.make (D.NegSuc n) in
           check cx_n mot_negsuc ncase
         in
 
-        Val.{el = Cx.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el}
+        D.{el = Cx.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el}
 
       | T.S1Rec info ->
         let T.B (nm, mot) = info.mot in
-        let s1 = Eval.make V.S1 in
+        let s1 = Eval.make D.S1 in
         let cxx, _= Cx.ext_ty cx ~nm s1 in
         check_ty cxx mot;
 
@@ -650,13 +651,13 @@ struct
 
         Cx.check_eq_ty cx ih.ty s1;
 
-        let cx_base = Cx.def cx ~nm ~ty:s1 ~el:(Eval.make V.Base) in
+        let cx_base = Cx.def cx ~nm ~ty:s1 ~el:(Eval.make D.Base) in
         let mot_base = Cx.eval cx_base mot in
         let val_base = check_eval cx mot_base info.bcase in
 
         let T.B (nm_loop, lcase) = info.lcase in
         let cxx, x = Cx.ext_dim cx ~nm:nm_loop in
-        let cxx_loop = Cx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ V.Loop x) in
+        let cxx_loop = Cx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ D.Loop x) in
         let mot_loop = Cx.eval cxx_loop mot in
         let val_loopx = check_eval cx mot_loop lcase in
         let val_loop0 = Eval.Val.act (I.subst `Dim0 x) val_loopx in
@@ -665,7 +666,7 @@ struct
         Cx.check_eq cx ~ty:mot_base val_loop1 val_base;
 
         let cx_scrut = Cx.def cx ~nm ~ty:s1 ~el:ih.el in
-        Val.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx_scrut mot}
+        D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx_scrut mot}
 
       | T.Cap info ->
         let fcom_ty =
@@ -674,20 +675,20 @@ struct
         in
         let ih = infer_spine cx hd sp in
         Cx.check_eq_ty cx fcom_ty ih.ty;
-        Val.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty}
+        D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty}
 
 
       | T.LblCall ->
         let ih = infer_spine cx hd sp in
         let _, _, ty = Eval.unleash_lbl_ty ih.ty in
-        Val.{el = Cx.eval_frame cx ih.el frm; ty}
+        D.{el = Cx.eval_frame cx ih.el frm; ty}
 
       | Tm.CoRForce ->
         let ih = infer_spine cx hd sp in
         begin
           match Eval.unleash_corestriction_ty ih.ty with
           | Face.True (_, _, ty) ->
-            Val.{el = Cx.eval_frame cx ih.el frm; ty}
+            D.{el = Cx.eval_frame cx ih.el frm; ty}
           | _ -> failwith "Cannot force co-restriction when it is not true!"
         end
 
@@ -696,16 +697,16 @@ struct
         let vtick = Cx.eval_tick cx tick in
         begin
           match vtick with
-          | Val.TickConst ->
+          | D.TickConst ->
             let cx' = Cx.ext_lock cx in
             let ih = infer_spine cx' hd sp in
             let tclo = Eval.unleash_later ih.ty in
-            Val.{el = Eval.prev vtick ih.el; ty = Eval.inst_tick_clo tclo vtick}
-          | Val.TickGen tgen ->
+            D.{el = Eval.prev vtick ih.el; ty = Eval.inst_tick_clo tclo vtick}
+          | D.TickGen tgen ->
             let cx' = Cx.kill_from_tick cx tgen in
             let ih = infer_spine cx' hd sp in
             let tclo = Eval.unleash_later ih.ty in
-            Val.{el = Eval.prev vtick ih.el; ty = Eval.inst_tick_clo tclo vtick}
+            D.{el = Eval.prev vtick ih.el; ty = Eval.inst_tick_clo tclo vtick}
         end
 
 
@@ -798,7 +799,7 @@ struct
     Cx.eval cx tm
 
   and check_ty cx ty =
-    let univ = Eval.make @@ V.Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+    let univ = Eval.make @@ D.Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
     check cx univ ty
 
   and check_eval_dim cx tr =

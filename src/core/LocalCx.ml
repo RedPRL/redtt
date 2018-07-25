@@ -2,7 +2,7 @@ open RedBasis.Bwd
 open BwdNotation
 
 type hyp =
-  {classifier : [`Ty of Val.value | `Dim | `Tick];
+  {classifier : [`Ty of Domain.value | `Dim | `Tick];
    killed : bool; (* for modal calculus *)
    locks : int (* for modal calculus *)
   }
@@ -15,7 +15,7 @@ let _ =
 
 (* The way that we model dimensions is now incompatible with the union-find version of things.
    We need to find a new way. *)
-type cx = {hyps : hyp list; env : Val.env; qenv : Quote.env; ppenv : Pretty.env; rel : Restriction.t}
+type cx = {hyps : hyp list; env : Domain.env; qenv : Quote.env; ppenv : Pretty.env; rel : Restriction.t}
 type t = cx
 
 module type S =
@@ -23,19 +23,19 @@ sig
   type t = cx
   module Eval : Val.S
 
-  type value = Val.value
+  type value = Domain.value
 
   val emp : t
   val clear_locals : t -> t
 
   val ext_lock : t -> t
   val clear_locks : t -> t
-  val kill_from_tick : t -> Val.tick_gen -> t
+  val kill_from_tick : t -> Domain.tick_gen -> t
 
   val ext_ty : t -> nm:string option -> value -> t * value
   val ext_dim : t -> nm:string option -> t * I.atom
   val ext_dims : t -> nms:string option list -> t * I.atom list
-  val ext_tick : t -> nm:string option -> t * Val.tick
+  val ext_tick : t -> nm:string option -> t * Domain.tick
 
   val restrict : t -> I.t -> I.t -> t * I.action
 
@@ -49,9 +49,9 @@ sig
   val eval_head : t -> Tm.tm Tm.head -> value
   val eval_frame : t -> value -> Tm.tm Tm.frame -> value
   val eval_dim : t -> Tm.tm -> I.t
-  val eval_tick : t -> Tm.tm -> Val.tick
-  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Val.val_sys
-  val make_closure : t -> Tm.tm Tm.bnd -> Val.clo
+  val eval_tick : t -> Tm.tm -> Domain.tick
+  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Domain.val_sys
+  val make_closure : t -> Tm.tm Tm.bnd -> Domain.clo
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
@@ -70,7 +70,7 @@ struct
   module Eval = V
   module Q = Quote.M (V)
 
-  type value = Val.value
+  type value = Domain.value
 
   let emp : cx =
     {env = Eval.Env.emp;
@@ -108,8 +108,8 @@ struct
 
   let ext {env; qenv; hyps; ppenv; rel} ~nm ty sys =
     let n = Quote.Env.len qenv in
-    let var = V.reflect ty (Val.Lvl (nm, n)) sys in
-    {env = Eval.Env.push (Val.Val var) env;
+    let var = V.reflect ty (Domain.Lvl (nm, n)) sys in
+    {env = Eval.Env.push (Domain.Val var) env;
      hyps = {classifier = `Ty ty; locks = 0; killed = false} :: hyps;
      qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -118,8 +118,8 @@ struct
 
   let ext_tick {env; qenv; hyps; ppenv; rel} ~nm =
     let n = Quote.Env.len qenv in
-    let tick = Val.TickGen (`Lvl (nm, n)) in
-    {env = Eval.Env.push (Val.Tick tick) env;
+    let tick = Domain.TickGen (`Lvl (nm, n)) in
+    {env = Eval.Env.push (Domain.Tick tick) env;
      hyps = {classifier = `Tick; locks = 0; killed = false} :: hyps;
      qenv = Quote.Env.succ qenv;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
@@ -135,7 +135,7 @@ struct
 
   let ext_dim {env; qenv; hyps; ppenv; rel} ~nm =
     let x = Name.named nm in
-    {env = Eval.Env.push (Val.Atom (`Atom x)) env;
+    {env = Eval.Env.push (Domain.Atom (`Atom x)) env;
      hyps = {classifier = `Dim; locks = 0; killed = false} :: hyps;
      qenv = Quote.Env.abs qenv @@ Emp #< x;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
