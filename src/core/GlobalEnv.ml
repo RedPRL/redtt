@@ -3,10 +3,10 @@ type 'a param =
   | `Tw of 'a * 'a
   ]
 
-
 type ty = Tm.tm
 type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
-type t = {env : (Name.t * entry param) list; rel : Restriction.t}
+type lock_info = {locks : int; killed : bool}
+type t = {env : (Name.t * entry param * lock_info) list; rel : Restriction.t}
 
 
 let emp () =
@@ -14,24 +14,27 @@ let emp () =
    rel = Restriction.emp ()}
 
 let ext (sg : t) nm param : t =
-  {sg with env = (nm, param) :: sg.env}
+  {sg with env = (nm, param, {locks = 0; killed = false}) :: sg.env}
 
 let define (sg : t) nm ~ty ~tm =
   let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm in
   let sys = [face] in
-  {sg with env = (nm, `P {ty; sys}) :: sg.env}
+  {sg with env = (nm, `P {ty; sys}, {locks = 0; killed = false}) :: sg.env}
 
 let lookup_entry env nm tw =
   let rec go =
     function
     | [] -> failwith "GlobalEnv.lookup_entry"
-    | (nm', prm) :: env ->
+    | (nm', prm, linfo) :: env ->
       if nm' = nm then
-        match prm, tw with
-        | `P a, _ -> a
-        | `Tw (a, _), `TwinL -> a
-        | `Tw (_, a), `TwinR -> a
-        | _ -> failwith "GlobalEnv.lookup_entry"
+        if linfo.locks > 0 || linfo.killed then
+          failwith "GlobalEnv.lookup_entry: not accessible (modal!!)"
+        else
+          match prm, tw with
+          | `P a, _ -> a
+          | `Tw (a, _), `TwinL -> a
+          | `Tw (_, a), `TwinR -> a
+          | _ -> failwith "GlobalEnv.lookup_entry"
       else
         go env
   in go env
@@ -56,7 +59,7 @@ let restrict tr0 tr1 sg =
 
 let pp fmt sg =
   let pp_sep fmt () = Format.fprintf fmt "; " in
-  let go fmt (nm, p) =
+  let go fmt (nm, p, _) =
     match p with
     | `P _ ->
       Format.fprintf fmt "%a"
@@ -88,14 +91,16 @@ struct
     r
 
   let lookup nm tw =
-    try
-      let {ty; sys} = lookup_entry Sig.globals.env nm tw
-      in ty, sys
-    with
-    | exn ->
-      Format.eprintf "Internal error: %a[%a] not found in {@[<1>%a@]}@."
-        Name.pp nm
-        pp_twin tw
-        pp Sig.globals;
-      raise exn
+    let entry =
+      try
+        lookup_entry Sig.globals.env nm tw
+      with
+      | exn ->
+        Format.eprintf "Internal error: %a[%a] not found in {@[<1>%a@]}@."
+          Name.pp nm
+          pp_twin tw
+          pp Sig.globals;
+        raise exn
+    in
+    entry.ty, entry.sys
 end
