@@ -123,8 +123,7 @@ and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
 
-and node = Node of {con : con; action : I.action}
-and value = node ref
+and value = Node of {con : con; action : I.action}
 
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
   nm
@@ -246,9 +245,8 @@ struct
     type t = value
 
     let act : I.action -> value -> value =
-      fun phi thunk ->
-        let Node node = !thunk in
-        ref @@ Node {node with action = I.cmp phi node.action}
+      fun phi (Node node) ->
+        Node {node with action = I.cmp phi node.action}
   end
 
 
@@ -536,10 +534,10 @@ struct
                 make @@ Up {ty = rst.ty; neu = up.neu; sys}
             end
           | _ ->
-            ref @@ Node {con; action = I.idn}
+            Node {con; action = I.idn}
         end
       | _ ->
-        ref @@ Node {con; action = I.idn}
+        Node {con; action = I.idn}
 
   and make_later ty =
     let tclo = TickCloConst ty in
@@ -911,15 +909,13 @@ struct
       `Proj abs
 
   and unleash : value -> con =
-    fun node ->
-      let Node info = !node in
+    fun (Node info) ->
       match info.action = I.idn with
       | true ->
         info.con
       | false ->
         let node' = act_can info.action info.con in
         let con = unleash node' in
-        node := Node {con = con; action = I.idn};
         con
 
   and make_cons (a, b) = make @@ Cons (a, b)
