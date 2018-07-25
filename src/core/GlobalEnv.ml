@@ -17,6 +17,37 @@ let emp () =
 let ext (sg : t) nm param : t =
   {sg with env = (nm, param, {locks = 0; killed = false}) :: sg.env}
 
+let ext_tick (sg : t) nm : t =
+  {sg with env = (nm, `Tick, {locks = 0; killed = false}) :: sg.env}
+
+let ext_lock (sg : t) : t =
+  let go (nm, entry, linfo) =
+    nm, entry, {linfo with locks = linfo.locks + 1}
+  in
+  {sg with env = List.map go sg.env}
+
+
+let rec index_of pred xs =
+  match xs with
+  | [] -> failwith "index_of"
+  | x :: xs ->
+    if pred x then 0 else 1 + index_of pred xs
+
+let kill_from_tick (sg : t) nm : t =
+  try
+    let pred (nm', _, _) = nm = nm' in
+    let ix = index_of pred sg.env in
+    let go ix' (nm, entry, linfo) =
+      if ix' <= ix then
+        nm, entry, {linfo with killed = true}
+      else
+        nm, entry, linfo
+    in
+    let env = List.mapi go sg.env in
+    {sg with env}
+  with
+  | _ -> sg
+
 let define (sg : t) nm ~ty ~tm =
   let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm in
   let sys = [face] in
