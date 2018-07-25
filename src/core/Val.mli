@@ -3,9 +3,8 @@ open Domain
 module type S =
 sig
   val make : con -> value
-  val unleash : value -> con
-
   val make_later : value -> value
+  val unleash : value -> con
 
   val reflect : value -> neu -> val_sys -> value
 

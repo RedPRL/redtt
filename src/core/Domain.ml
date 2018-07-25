@@ -116,7 +116,12 @@ and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
 
-and value = Node of {con : con; action : I.action}
+and dfcon =
+  | Con of con
+  | Reflect of {ty : value; neu : neu; sys : val_sys}
+
+and value =
+  | Node of {con : dfcon; action : I.action}
 
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
   nm
@@ -137,15 +142,7 @@ and pp_env fmt =
   let pp_sep fmt () = Format.fprintf fmt ", " in
   Format.pp_print_list ~pp_sep pp_env_cell fmt
 
-and pp_value fmt value =
-  let Node node = value in
-  if node.action = I.idn then
-    pp_con fmt node.con
-  else
-    Format.fprintf fmt "@[<hv1>@[<hv1>(%a)@]<%a>@]"
-      pp_con node.con I.pp_action node.action
-
-and pp_con fmt =
+and pp_con fmt : con -> unit =
   function
   | Up up ->
     Format.fprintf fmt "%a" pp_neu up.neu
@@ -232,6 +229,22 @@ and pp_con fmt =
     Format.fprintf fmt "<dfix>"
   | DFixLine _ ->
     Format.fprintf fmt "<dfix-line>"
+
+and pp_value fmt value =
+  let Node node = value in
+  if node.action = I.idn then
+    pp_dfcon fmt node.con
+  else
+    Format.fprintf fmt "@[<hv1>@[<hv1>(%a)@]<%a>@]"
+      pp_dfcon node.con I.pp_action node.action
+
+and pp_dfcon fmt =
+  function
+  | Con con ->
+    pp_con fmt con
+  | Reflect _ ->
+    Format.fprintf fmt "<reflect>"
+
 
 and pp_abs fmt =
   IAbs.pp pp_value fmt

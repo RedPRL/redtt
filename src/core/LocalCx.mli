@@ -1,5 +1,31 @@
 type cx
 type t = cx
+type value = Domain.value
+
+val clear_locals : t -> t
+
+(* Modal left adjoints *)
+val ext_lock : t -> t
+val clear_locks : t -> t
+
+val kill_from_tick : t -> Domain.tick_gen -> t
+
+val ext_ty : t -> nm:string option -> value -> t * value
+val ext_dim : t -> nm:string option -> t * I.atom
+val ext_dims : t -> nms:string option list -> t * I.atom list
+val ext_tick : t -> nm:string option -> t * Domain.tick
+
+(** Might raise I.Inconsistent *)
+val restrict : t -> I.t -> I.t -> t * I.action
+
+val def : t -> nm:string option -> ty:value -> el:value -> t
+
+val ppenv : t -> Pretty.env
+val lookup : int -> t -> [`Ty of value | `I | `Tick]
+
+val make_closure : t -> Tm.tm Tm.bnd -> Domain.clo
+
+
 
 module type S =
 sig
@@ -7,29 +33,7 @@ sig
 
   module Eval : Val.S
 
-  type value = Domain.value
-
   val emp : t
-  val clear_locals : t -> t
-
-  (* Modal left adjoints *)
-  val ext_lock : t -> t
-  val clear_locks : t -> t
-
-  val kill_from_tick : t -> Domain.tick_gen -> t
-
-  val ext_ty : t -> nm:string option -> value -> t * value
-  val ext_dim : t -> nm:string option -> t * I.atom
-  val ext_dims : t -> nms:string option list -> t * I.atom list
-  val ext_tick : t -> nm:string option -> t * Domain.tick
-
-  (** Might raise I.Inconsistent *)
-  val restrict : t -> I.t -> I.t -> t * I.action
-
-  val def : t -> nm:string option -> ty:value -> el:value -> t
-
-  val ppenv : t -> Pretty.env
-  val lookup : int -> t -> [`Ty of value | `I | `Tick]
 
   val eval : t -> Tm.tm -> value
   val eval_cmd : t -> Tm.tm Tm.cmd -> value
@@ -38,7 +42,6 @@ sig
   val eval_dim : t -> Tm.tm -> I.t
   val eval_tick : t -> Tm.tm -> Domain.tick
   val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Domain.val_sys
-  val make_closure : t -> Tm.tm Tm.bnd -> Domain.clo
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit

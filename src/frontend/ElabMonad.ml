@@ -30,8 +30,8 @@ let normalize_param p =
 
   C.typechecker >>= fun (module T) ->
   let normalize_ty ty =
-    let vty = T.Cx.eval T.Cx.emp ty in
-    T.Cx.quote_ty T.Cx.emp vty
+    let vty = T.CxUtil.eval T.CxUtil.emp ty in
+    T.CxUtil.quote_ty T.CxUtil.emp vty
   in
   match p with
   | `P ty -> C.ret @@ `P (normalize_ty ty)
@@ -57,8 +57,8 @@ let print_diagnostic =
     begin
       C.bind C.typechecker @@ fun (module T) ->
       C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
-      let vty = T.Cx.eval T.Cx.emp ty in
-      let ty = T.Cx.quote_ty T.Cx.emp vty in
+      let vty = T.CxUtil.eval T.CxUtil.emp ty in
+      let ty = T.CxUtil.quote_ty T.CxUtil.emp vty in
       Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@]@.@."
         (match name with Some name -> name | None -> "Hole")
         Dev.pp_params (Bwd.from_list tele)

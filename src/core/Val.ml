@@ -13,9 +13,9 @@ let step v = Step v
 module type S =
 sig
   val make : con -> value
-  val unleash : value -> con
-
   val make_later : value -> value
+
+  val unleash : value -> con
 
   val reflect : value -> neu -> val_sys -> value
 
@@ -170,7 +170,7 @@ struct
 
   let rec make : con -> value =
     fun con ->
-      Node {con; action = I.idn}
+      Node {con = Con con; action = I.idn}
 
   and make_later ty =
     let tclo = TickCloConst ty in
@@ -551,9 +551,9 @@ struct
       let con =
         match info.action = I.idn with
         | true ->
-          info.con
+          run_dfcon info.con
         | false ->
-          let node' = act_can info.action info.con in
+          let node' = act_can info.action @@ run_dfcon info.con in
           let con = unleash node' in
           con
       in
@@ -574,6 +574,13 @@ struct
         end
       | _ ->
         con
+
+  and run_dfcon =
+    function
+    | Con con ->
+      con
+    | Reflect info ->
+      unleash @@ reflect info.ty info.neu info.sys
 
   and make_cons (a, b) = make @@ Cons (a, b)
 

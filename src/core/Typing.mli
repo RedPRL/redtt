@@ -3,7 +3,7 @@ type cx = LocalCx.t
 
 module type S =
 sig
-  module Cx : LocalCx.S
+  module CxUtil : LocalCx.S
   module Error :
   sig
     type t
