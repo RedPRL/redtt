@@ -29,7 +29,7 @@ sig
   val def : t -> nm:string option -> ty:value -> el:value -> t
 
   val ppenv : t -> Pretty.env
-  val lookup : int -> t -> [`Ty of value | `Dim | `Tick]
+  val lookup : int -> t -> [`Ty of value | `I | `Tick]
 
   val eval : t -> Tm.tm -> value
   val eval_cmd : t -> Tm.tm Tm.cmd -> value

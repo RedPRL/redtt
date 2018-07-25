@@ -2,7 +2,7 @@ open RedBasis.Bwd
 open BwdNotation
 
 type hyp =
-  {classifier : [`Ty of Domain.value | `Dim | `Tick];
+  {classifier : [`Ty of Domain.value | `I | `Tick];
    killed : bool; (* for modal calculus *)
    locks : int (* for modal calculus *)
   }
@@ -42,7 +42,7 @@ sig
   val def : t -> nm:string option -> ty:value -> el:value -> t
 
   val ppenv : t -> Pretty.env
-  val lookup : int -> t -> [`Ty of value | `Dim | `Tick]
+  val lookup : int -> t -> [`Ty of value | `I | `Tick]
 
   val eval : t -> Tm.tm -> value
   val eval_cmd : t -> Tm.tm Tm.cmd -> value
@@ -136,7 +136,7 @@ struct
   let ext_dim {env; qenv; hyps; ppenv; rel} ~nm =
     let x = Name.named nm in
     {env = Eval.Env.push (Domain.Atom (`Atom x)) env;
-     hyps = {classifier = `Dim; locks = 0; killed = false} :: hyps;
+     hyps = {classifier = `I; locks = 0; killed = false} :: hyps;
      qenv = Quote.Env.abs qenv @@ Emp #< x;
      ppenv = snd @@ Pretty.Env.bind nm ppenv;
      rel}, x
@@ -195,7 +195,7 @@ struct
 
   let lookup i {hyps; _} =
     let {classifier; locks; killed} = List.nth hyps i in
-    if (killed || locks > 0) && classifier != `Dim then
+    if (killed || locks > 0) && classifier != `I then
       failwith "Hypothesis is inaccessible (modal, taste it!)"
     else
       classifier
@@ -208,7 +208,7 @@ struct
     let act_ty {classifier; locks; killed} =
       match classifier with
       | `Ty ty -> {classifier = `Ty (V.Val.act phi ty); locks; killed}
-      | `Dim -> {classifier = `Dim; locks; killed}
+      | `I -> {classifier = `I; locks; killed}
       | `Tick -> {classifier = `Tick; locks; killed}
     in
     let hyps = List.map act_ty cx.hyps in

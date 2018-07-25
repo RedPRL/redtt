@@ -75,7 +75,7 @@ struct
         | Tm.Ix (ix, _) ->
           begin
             match Cx.lookup ix cx with
-            | `Dim -> ()
+            | `I -> ()
             | _ -> failwith "check_dim_cmd: expected dimension"
           end
         | Tm.Var _ ->
@@ -720,7 +720,7 @@ struct
       begin
         match Cx.lookup ix cx with
         | `Ty ty -> ty
-        | (`Dim | `Tick) -> failwith "infer: expected type hypothesis"
+        | (`I | `Tick) -> failwith "infer: expected type hypothesis"
       end
 
     | T.Meta {name; ushift} ->
