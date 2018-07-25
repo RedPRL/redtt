@@ -385,28 +385,18 @@ struct
 
   let rec make : con -> value =
     fun con ->
-      match con with
-      | Up up ->
-        begin
-          match unleash up.ty with
-          | Rst rst ->
-            begin
-              match force_val_sys rst.sys with
-              | `Proj el -> el
-              | `Ok sys ->
-                make @@ Up {ty = rst.ty; neu = up.neu; sys}
-            end
-          | _ ->
-            Node {con; action = I.idn}
-        end
-      | _ ->
-        Node {con; action = I.idn}
+      Node {con; action = I.idn}
 
   and make_later ty =
     let tclo = TickCloConst ty in
     make @@ Later tclo
 
-  and act_can phi con =
+
+
+
+
+
+  let rec act_can phi con =
     match con with
     | Pi info ->
       let dom = Val.act phi info.dom in
@@ -773,12 +763,31 @@ struct
 
   and unleash : value -> con =
     fun (Node info) ->
-      match info.action = I.idn with
-      | true ->
-        info.con
-      | false ->
-        let node' = act_can info.action info.con in
-        let con = unleash node' in
+      let con =
+        match info.action = I.idn with
+        | true ->
+          info.con
+        | false ->
+          let node' = act_can info.action info.con in
+          let con = unleash node' in
+          con
+      in
+      match con with
+      | Up up ->
+        begin
+          match unleash up.ty with
+          | Rst rst ->
+            begin
+              match force_val_sys rst.sys with
+              | `Proj el ->
+                unleash el
+              | `Ok sys ->
+                Up {ty = rst.ty; neu = up.neu; sys}
+            end
+          | _ ->
+            con
+        end
+      | _ ->
         con
 
   and make_cons (a, b) = make @@ Cons (a, b)
