@@ -326,7 +326,7 @@ struct
           let cx', phi = LocalCx.restrict cx (`Atom vty.x) `Dim0 in
           let el0 = check_eval cx' vty.ty0 vin.tm0 in
           let el1 = check_eval cx vty.ty1 vin.tm1 in
-          CxUtil.check_eq cx' ~ty:(Domain.Value.act phi vty.ty1) (Eval.apply (Eval.car vty.equiv) el0) @@ Domain.Value.act phi el1
+          CxUtil.check_eq cx' ~ty:(D.Value.act phi vty.ty1) (Eval.apply (Eval.car vty.equiv) el0) @@ D.Value.act phi el1
         | _ ->
           failwith "v/vin dimension mismatch"
       end
@@ -386,7 +386,7 @@ struct
       let r, r' = Eq.unleash p in
       try
         let cx', phi = LocalCx.restrict cx r r' in
-        CxUtil.check_eq cx' ~ty:(Domain.Value.act phi ty) el @@
+        CxUtil.check_eq cx' ~ty:(D.Value.act phi ty) el @@
         CxUtil.eval cx' tm
       with
       | I.Inconsistent ->
@@ -410,7 +410,7 @@ struct
             begin
               try
                 let cx', phi = LocalCx.restrict cx r0 r1 in
-                check cx' (Domain.Value.act phi ty) tm;
+                check cx' (D.Value.act phi ty) tm;
 
                 (* Check face-face adjacency conditions *)
                 go_adj cx' acc (r0, r1, tm)
@@ -435,7 +435,7 @@ struct
             let v = CxUtil.eval cx' tm in
             let v' = CxUtil.eval cx' tm' in
             let phi = I.cmp phi (I.equate r0 r1) in
-            CxUtil.check_eq cx' ~ty:(Domain.Value.act phi ty) v v'
+            CxUtil.check_eq cx' ~ty:(D.Value.act phi ty) v v'
           with
           | I.Inconsistent -> ()
         end;
@@ -462,15 +462,15 @@ struct
                 (* check that bnd is a section of tyx under r0=r1 *)
                 let cxxr0r1, phir0r1= LocalCx.restrict cxx r0 r1 in
                 let T.B (_, tm) = bnd in
-                check cxxr0r1 (Domain.Value.act phir0r1 tyx) tm;
+                check cxxr0r1 (D.Value.act phir0r1 tyx) tm;
 
                 (* check that tm<r/x> = cap under r0=r1 *)
                 let cxr0r1, _ = LocalCx.restrict cx r0 r1 in
                 let phirx = I.cmp phir0r1 @@ I.subst r x in
                 CxUtil.check_eq cxr0r1
-                  ~ty:(Domain.Value.act phirx tyx)
-                  (Domain.Value.act phir0r1 cap)
-                  (Domain.Value.act phirx cap);
+                  ~ty:(D.Value.act phirx tyx)
+                  (D.Value.act phir0r1 cap)
+                  (D.Value.act phirx cap);
 
                 (* Check face-face adjacency conditions *)
                 go_adj cxxr0r1 acc (r0, r1, bnd)
@@ -498,7 +498,7 @@ struct
             let v = CxUtil.eval cxx' tm in
             let v' = CxUtil.eval cxx' tm' in
             let phi = I.cmp phir'0r'1 (I.equate r0 r1) in
-            CxUtil.check_eq cxx' ~ty:(Domain.Value.act phi tyx) v v'
+            CxUtil.check_eq cxx' ~ty:(D.Value.act phi tyx) v v'
           with
           | I.Inconsistent -> ()
         end;
@@ -660,8 +660,8 @@ struct
         let cxx_loop = LocalCx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ D.Loop x) in
         let mot_loop = CxUtil.eval cxx_loop mot in
         let val_loopx = check_eval cx mot_loop lcase in
-        let val_loop0 = Domain.Value.act (I.subst `Dim0 x) val_loopx in
-        let val_loop1 = Domain.Value.act (I.subst `Dim1 x) val_loopx in
+        let val_loop0 = D.Value.act (I.subst `Dim0 x) val_loopx in
+        let val_loop1 = D.Value.act (I.subst `Dim1 x) val_loopx in
         CxUtil.check_eq cx ~ty:mot_base val_loop0 val_base;
         CxUtil.check_eq cx ~ty:mot_base val_loop1 val_base;
 
@@ -733,9 +733,9 @@ struct
       let T.B (nm, ty) = info.ty in
       let cxx, x = LocalCx.ext_dim cx ~nm in
       let vtyx = check_eval_ty cxx ty in
-      let vtyr = Domain.Value.act (I.subst r x) vtyx in
+      let vtyr = D.Value.act (I.subst r x) vtyx in
       check cx vtyr info.tm;
-      Domain.Value.act (I.subst r' x) vtyx
+      D.Value.act (I.subst r' x) vtyx
 
     | T.Com info ->
       let r = check_eval_dim cx info.r in
@@ -743,11 +743,11 @@ struct
       let T.B (nm, ty) = info.ty in
       let cxx, x = LocalCx.ext_dim cx ~nm in
       let vtyx = check_eval_ty cxx ty in
-      let vtyr = Domain.Value.act (I.subst r x) vtyx in
+      let vtyr = D.Value.act (I.subst r x) vtyx in
       let cap = check_eval cx vtyr info.cap in
       check_valid_cofibration @@ cofibration_of_sys cx info.sys;
       check_comp_sys cx r (cxx, x, vtyx) cap info.sys;
-      Domain.Value.act (I.subst r' x) vtyx
+      D.Value.act (I.subst r' x) vtyx
 
     | T.HCom info ->
       let r = check_eval_dim cx info.r in
@@ -765,10 +765,10 @@ struct
       let T.B (nm, ty) = info.ty in
       let cxx, x = LocalCx.ext_dim cx ~nm in
       let vtyx = check_eval_ty cxx ty in
-      let vtyr = Domain.Value.act (I.subst r x) vtyx in
+      let vtyr = D.Value.act (I.subst r x) vtyx in
       let cap = check_eval cx vtyr info.cap in
       check_comp_sys cx r (cxx, x, vtyx) cap info.sys;
-      Domain.Value.act (I.subst r' x) vtyx
+      D.Value.act (I.subst r' x) vtyx
 
     | T.GHCom info ->
       let r = check_eval_dim cx info.r in
