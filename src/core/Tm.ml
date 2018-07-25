@@ -852,11 +852,11 @@ let rec pp env fmt =
 
     | Later (B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<hv1>(|> [%a %a])@]" Uuseg_string.pp_utf_8 x (pp env') t
+      Format.fprintf fmt "@[<hv1>(%a [%a] %a)@]" Uuseg_string.pp_utf_8 "▷" Uuseg_string.pp_utf_8 x (pp env') t
 
     | Next (B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
-      Format.fprintf fmt "@[<hv1>(next [%a %a])@]" Uuseg_string.pp_utf_8 x (pp env') t
+      Format.fprintf fmt "@[<hv1>(next [%a] %a)@]" Uuseg_string.pp_utf_8 x (pp env') t
 
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
