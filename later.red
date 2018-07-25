@@ -7,15 +7,15 @@ import path
 let Ltr (A : type) : type =
   `(▷ [_] A)
 
-let Fix (F : (Ltr^1 type) → type) : Line^1 type =
+let Fix (A : type) (f : (Ltr A) → A) : Line A =
   λ i →
-    F `(dfix i (U 0) [A] (F A))
+    f `(dfix i A [x] (f x))
 
 let stream/F (A : `(▷ [_] (U 0))) : type =
   bool × `(▷ [α] (prev α A))
 
 let stream/L : Line^1 type =
-  Fix stream/F
+  Fix^1 _ stream/F
 
 let stream : type = stream/L 0
 
@@ -36,5 +36,7 @@ let stream/tl (xs : stream) : Ltr stream =
       (prev α
        (dfix i (U 0) [A] (stream/F A))))
 
+let tts : stream =
+  Fix stream (stream/cons tt) 0
 
 debug
