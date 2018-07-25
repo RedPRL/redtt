@@ -11,12 +11,6 @@ type tick =
   | TickConst
   | TickGen of tick_gen
 
-
-(* Notes: I have defined the semantic domain and evaluator in a fairly naive way, in order to avoid
-   some confusing questions. It may not be that efficient! But it should be easier at this point to
-   transform it make something efficient, since the code is currently simple-minded enough to
-   think about. *)
-
 type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con

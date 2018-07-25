@@ -14,12 +14,6 @@ type tick =
   | TickGen of tick_gen
 
 
-(* TODO: now it may be possible to semantic domain to use the fancy restriction data structure,
-   instead of inventing a new dimension and doing a diagonal. Needs further investigation.
-
-   It was already necessary to *evaluate* with respect to a restriction, based on the needs of the
-   typechecker; but the further question is how things should work in the internal semantic operations. *)
-
 type con =
   | Pi : {dom : value; cod : clo} -> con
   | Sg : {dom : value; cod : clo} -> con
