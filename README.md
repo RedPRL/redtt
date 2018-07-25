@@ -29,6 +29,8 @@ and [cubicaltt](https://github.com/mortberg/cubicaltt).
 
 - some built-in inductive types: natural numbers, integers, booleans, the circle
 
+- experimental support for Fitch-style modal guarded recursion
+
 
 Features we intend to add in the near future:
 

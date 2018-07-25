@@ -44,14 +44,19 @@ type 'a tmf =
   | CoRThunk of ('a, 'a) face
 
   | Cons of 'a * 'a
+
   | Dim0
   | Dim1
+  | TickConst
 
   | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
 
   (* Labelled types from Epigram *)
   | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
   | LblRet of 'a
+
+  | Later of 'a bnd
+  | Next of 'a bnd
 
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
@@ -61,6 +66,7 @@ and 'a head =
   | Var of {name : Name.t; twin : twin; ushift : int}
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
+  | DFix of {r : 'a; ty : 'a; bdy : 'a bnd}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
   | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
@@ -81,6 +87,7 @@ and 'a frame =
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | LblCall
   | CoRForce
+  | Prev of 'a
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
@@ -136,7 +143,7 @@ struct
 
   and traverse_con =
     function
-    | (Univ _ | Tt | Ff | Bool | S1 | Nat | Int | Dim0 | Dim1 | Base | Zero as con) ->
+    | (Univ _ | Tt | Ff | Bool | S1 | Nat | Int | Dim0 | Dim1 | TickConst | Base | Zero as con) ->
       con
 
     | FCom info ->
@@ -235,6 +242,14 @@ struct
       let t' = traverse_tm t in
       LblRet t'
 
+    | Later bnd ->
+      let bnd' = traverse_bnd traverse_tm bnd in
+      Later bnd'
+
+    | Next bnd ->
+      let bnd' = traverse_bnd traverse_tm bnd in
+      Next bnd'
+
     | Let (cmd, bnd) ->
       let cmd' = traverse_cmd cmd in
       let bnd' = traverse_bnd traverse_tm bnd in
@@ -273,6 +288,12 @@ struct
       let ty = traverse_tm info.ty in
       let tm = traverse_tm info.tm in
       Down {ty; tm}, Emp
+
+    | DFix info ->
+      let r = traverse_tm info.r in
+      let ty = traverse_tm info.ty in
+      let bdy = traverse_bnd traverse_tm info.bdy in
+      DFix {r; ty; bdy}, Emp
 
     | Coe info ->
       let r = traverse_tm info.r in
@@ -424,6 +445,10 @@ struct
       let ty = traverse_tm info.ty in
       let sys = traverse_list traverse_bface info.sys in
       Cap {r; r'; ty; sys}
+
+    | Prev tick ->
+      let tick = traverse_tm tick in
+      Prev tick
 end
 
 
@@ -784,6 +809,9 @@ let rec pp env fmt =
     | Dim1 ->
       Format.fprintf fmt "1"
 
+    | TickConst ->
+      Uuseg_string.pp_utf_8 fmt "∙"
+
     | S1 ->
       Format.fprintf fmt "S1"
 
@@ -822,6 +850,14 @@ let rec pp env fmt =
 
     | Box {r; r'; cap; sys} ->
       Format.fprintf fmt "@[<hv1>(box %a %a@ %a@ @[<hv>%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
+
+    | Later (B (nm, t)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<hv1>(%a [%a] %a)@]" Uuseg_string.pp_utf_8 "▷" Uuseg_string.pp_utf_8 x (pp env') t
+
+    | Next (B (nm, t)) ->
+      let x, env' = Pretty.Env.bind nm env in
+      Format.fprintf fmt "@[<hv1>(next [%a] %a)@]" Uuseg_string.pp_utf_8 x (pp env') t
 
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
@@ -868,7 +904,11 @@ and pp_head env fmt =
       ushift
 
   | Down {ty; tm} ->
-    Format.fprintf fmt "@[<hv1>(%a@ %a@ %a)@]" Uuseg_string.pp_utf_8 "▷" (pp env) ty (pp env) tm
+    Format.fprintf fmt "@[<hv1>(:@ %a@ %a)@]" (pp env) ty (pp env) tm
+
+  | DFix {r; ty; bdy = B (nm, bdy)} ->
+    let x, env' = Pretty.Env.bind nm env in
+    Format.fprintf fmt "@[<hv1>(dfix %a %a@ [%a] %a)@]" (pp env) r (pp env) ty Uuseg_string.pp_utf_8 x (pp env') bdy
 
 and pp_cmd env fmt (hd, sp) =
   let rec go mode fmt sp =
@@ -912,6 +952,8 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<hv1>(call@ %a)@]" (go `Call) sp
       | CoRForce ->
         Format.fprintf fmt "@[<hv1>(force@ %a)@]" (go `Force) sp
+      | Prev tick ->
+        Format.fprintf fmt "@[<hv1>(prev %a %a)@]" (pp env) tick (go `Prev) sp
   in
   go `Start fmt sp
 
@@ -1161,6 +1203,11 @@ let map_head f =
     let ty = f info.ty in
     let tm = f info.tm in
     Down {ty; tm}
+  | DFix info ->
+    let r = f info.r in
+    let ty = f info.ty in
+    let bdy = map_bnd f info.bdy in
+    DFix {r; ty; bdy}
   | Coe info ->
     let r = f info.r in
     let r' = f info.r' in
@@ -1236,6 +1283,9 @@ let map_frame f =
     let ty = f info.ty in
     let sys = map_comp_sys f info.sys in
     Cap {r; r'; ty; sys}
+  | Prev tick ->
+    let tick = f tick in
+    Prev tick
 
 let map_spine f =
   Bwd.map @@ map_frame f
@@ -1258,7 +1308,7 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Bool | Tt | Ff | Nat | Zero | Int | Dim0 | Dim1 | S1 | Base) as con ->
+  | (Univ _ | Bool | Tt | Ff | Nat | Zero | Int | Dim0 | Dim1 | TickConst | S1 | Base) as con ->
     con
   | Suc n -> Suc (f n)
   | Pos n -> Pos (f n)
@@ -1311,6 +1361,12 @@ let map_tmf f =
     let ty = f info.ty in
     let args = List.map (fun (t0, t1) -> f t0, f t1) info.args in
     LblTy {info with ty; args}
+  | Later bnd ->
+    let bnd = map_bnd f bnd in
+    Later bnd
+  | Next bnd ->
+    let bnd = map_bnd f bnd in
+    Next bnd
   | Up cmd ->
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->

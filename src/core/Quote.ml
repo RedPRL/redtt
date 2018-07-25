@@ -1,4 +1,4 @@
-open Val
+open Domain
 open RedBasis.Bwd
 open BwdNotation
 
@@ -57,13 +57,13 @@ type env = Env.t
 
 module type S =
 sig
-  val quote_nf : env -> Val.nf -> Tm.tm
-  val quote_neu : env -> Val.neu -> Tm.tm Tm.cmd
-  val quote_ty : env -> Val.value -> Tm.tm
+  val quote_nf : env -> nf -> Tm.tm
+  val quote_neu : env -> neu -> Tm.tm Tm.cmd
+  val quote_ty : env -> value -> Tm.tm
 
-  val equiv : env -> ty:Val.value -> Val.value -> Val.value -> unit
-  val equiv_ty : env -> Val.value -> Val.value -> unit
-  val subtype : env -> Val.value -> Val.value -> unit
+  val equiv : env -> ty:value -> value -> value -> unit
+  val equiv_ty : env -> value -> value -> unit
+  val subtype : env -> value -> value -> unit
 
   module Error : sig
     type t
@@ -99,6 +99,7 @@ struct
       let app0 = apply el0 var in
       let app1 = apply el1 var in
       Tm.lam (clo_name cod) @@ equate (Env.succ env) vcod app0 app1
+
     | Sg {dom; cod} ->
       let el00 = car el0 in
       let el10 = car el1 in
@@ -106,6 +107,7 @@ struct
       let vcod = inst_clo cod el00 in
       let q1 = equate env vcod (cdr el0) (cdr el1) in
       Tm.cons q0 q1
+
     | Ext abs ->
       let xs, (tyx, _) = ExtAbs.unleash abs in
       let rs = List.map (fun x -> `Atom x) @@ Bwd.to_list xs in
@@ -113,6 +115,14 @@ struct
       let app1 = ext_apply el1 rs in
       Tm.ext_lam (Bwd.map Name.name xs) @@
       equate (Env.abs env xs) tyx app0 app1
+
+    | Later ltr ->
+      let tick = TickGen (`Lvl (None, Env.len env)) in
+      let prev0 = prev tick el0 in
+      let prev1 = prev tick el1 in
+      let ty = inst_tick_clo ltr tick in
+      let bdy = equate (Env.succ env) ty prev0 prev1 in
+      Tm.make @@ Tm.Next (Tm.B (None, bdy))
 
     | Rst {ty; _} ->
       equate env ty el0 el1
@@ -206,6 +216,14 @@ struct
         let vcod1 = inst_clo pi1.cod var in
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi (clo_name pi0.cod) dom cod
+
+      | Later ltr0, Later ltr1 ->
+        let tick = TickGen (`Lvl (None, Env.len env)) in
+        let vcod0 = inst_tick_clo ltr0 tick in
+        let vcod1 = inst_tick_clo ltr1 tick in
+        let cod = equate (Env.succ env) ty vcod0 vcod1 in
+        Tm.make @@ Tm.Later (Tm.B (None, cod))
+
 
       | Sg sg0, Sg sg1 ->
         let dom = equate env ty sg0.dom sg1.dom in
@@ -328,6 +346,28 @@ struct
         Tm.Meta {name = meta0.name; ushift = meta0.ushift}, Bwd.from_list stk
       else
         failwith "global variable name mismatch"
+
+    | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
+      let ty = equate_ty env ty0 ty1 in
+      let ltr_ty = make_later ty0 in
+      let var = generic env ltr_ty in
+      let el0 = inst_clo clo0 var in
+      let el1 = inst_clo clo1 var in
+      let bdy = equate (Env.succ env) ty0 el0 el1 in
+      let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
+      Tm.DFix {r = Tm.make Tm.Dim0; ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
+
+    | FixLine (x0, tgen0, ty0, clo0), FixLine (x1, tgen1, ty1, clo1) ->
+      let r = equate_atom env x0 x1 in
+      let ty = equate_ty env ty0 ty1 in
+      let ltr_ty = make_later ty0 in
+      let var = generic env ltr_ty in
+      let el0 = inst_clo clo0 var in
+      let el1 = inst_clo clo1 var in
+      let bdy = equate (Env.succ env) ty0 el0 el1 in
+      let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
+      Tm.DFix {r; ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
+
     | Car neu0, Car neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Car :: stk
     | Cdr neu0, Cdr neu1 ->
@@ -421,6 +461,10 @@ struct
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
     | CoRForce neu0, CoRForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
+    | Prev (tick0, neu0), Prev (tick1, neu1) ->
+      let tick = equate_tick env tick0 tick1 in
+      equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
+
     | _ ->
       let err = ErrEquateNeu {env; neu0; neu1} in
       raise @@ E err
@@ -541,6 +585,12 @@ struct
     let tr' = equate_dim3 env r'0 r'1 r'2 in
     tr, tr'
 
+  and equate_tick env tick0 tick1 =
+    if tick0 = tick1 then
+      quote_tick env tick0
+    else
+      failwith "equate_tick: ticks did not match"
+
   and equate_dim env (r : I.t) (r' : I.t) =
     match I.compare r r' with
     | `Same ->
@@ -550,6 +600,7 @@ struct
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
       failwith "equate_dim: dimensions did not match"
+
 
   and equate_dim3 env (r : I.t) (r' : I.t) (r'' : I.t) =
     match I.compare r r', I.compare r r'' with
@@ -588,6 +639,16 @@ struct
       with
       | _ ->
         Tm.up @@ Tm.var x
+
+  and quote_tick env tck =
+    match tck with
+    | TickConst ->
+      Tm.make Tm.TickConst
+    | TickGen (`Lvl (_, lvl)) ->
+      let ix = Env.ix_of_lvl lvl env in
+      Tm.up @@ Tm.ix ix
+    | TickGen (`Global alpha) ->
+      Tm.up @@ Tm.var alpha
 
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1

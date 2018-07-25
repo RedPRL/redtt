@@ -1,120 +1,14 @@
 open RedBasis
 open Bwd
+open Domain
 
-type atom = Name.t
-type dim = I.t
-type dir = Dir.t
-
-(* Notes: I have defined the semantic domain and evaluator in a fairly naive way, in order to avoid
-   some confusing questions. It may not be that efficient! But it should be easier at this point to
-   transform it make something efficient, since the code is currently simple-minded enough to
-   think about. *)
-
-type con =
-  | Pi : {dom : value; cod : clo} -> con
-  | Sg : {dom : value; cod : clo} -> con
-  | Rst : {ty : value; sys : val_sys} -> con
-  | CoR : val_face -> con
-  | Ext : ext_abs -> con
-
-  | Coe : {dir : dir; abs : abs; el : value} -> con
-  | HCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
-  | GHCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
-  | FCom : {dir : dir; cap : value; sys : comp_sys} -> con
-  | Box : {dir : dir; cap : value; sys : box_sys} -> con
-
-  | Univ : {kind : Kind.t; lvl : Lvl.t} -> con
-  | V : {x : atom; ty0 : value; ty1 : value; equiv : value} -> con
-  | VIn : {x : atom; el0 : value; el1 : value} -> con
-
-  | Lam : clo -> con
-  | ExtLam : abs -> con
-  | CoRThunk : val_face -> con
-
-  | Cons : value * value -> con
-  | Bool : con
-  | Tt : con
-  | Ff : con
-
-  | Nat : con
-  | Zero : con
-  | Suc : value -> con
-
-  | Int : con
-  | Pos : value -> con
-  | NegSuc : value -> con
-
-  | S1 : con
-  | Base : con
-  | Loop : atom -> con
-
-  | Up : {ty : value; neu : neu; sys : rigid_val_sys} -> con
-
-  | LblTy : {lbl : string; args : nf list; ty : value} -> con
-  | LblRet : value -> con
-
-and neu =
-  | Lvl : string option * int -> neu
-  | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
-  | Meta : {name : Name.t; ushift : int} -> neu
-  | FunApp : neu * nf -> neu
-  | ExtApp : neu * dim list -> neu
-  | Car : neu -> neu
-  | Cdr : neu -> neu
-
-  | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
-
-  | NatRec : {mot : clo; neu : neu; zcase : value; scase : nclo} -> neu
-
-  | IntRec : {mot : clo; neu : neu; pcase : clo; ncase : clo} -> neu
-
-  | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
-
-  (* Invariant: neu \in vty, vty is a V type *)
-  | VProj : {x : atom; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
-
-  | Cap : {dir : dir; ty : value; sys : comp_sys; neu : neu} -> neu
-
-  | LblCall : neu -> neu
-  | CoRForce : neu -> neu
-
-and nf = {ty : value; el : value}
-
-and ('x, 'a) face = ('x, 'a) Face.face
-
-and clo =
-  | Clo of {bnd : Tm.tm Tm.bnd; rho : env}
-
-and nclo =
-  | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
-
-and env_el = Val of value | Atom of I.t
-and env = {cells : env_el list; global : I.action}
-
-and abs = value IAbs.abs
-and ext_abs = (value * val_sys) IAbs.abs
-and rigid_abs_face = ([`Rigid], abs) face
-and val_face = ([`Any], value) face
-and rigid_val_face = ([`Rigid], value) face
-
-and comp_sys = rigid_abs_face list
-and val_sys = val_face list
-and rigid_val_sys = rigid_val_face list
-and box_sys = rigid_val_sys
-
-and node = Node of {con : con; action : I.action}
-and value = node ref
-
-let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
-  nm
-
-let nclo_names (NClo {nbnd = Tm.NB (nms, _); _}) =
-  nms
 
 module type S =
 sig
   val make : con -> value
   val unleash : value -> con
+
+  val make_later : value -> value
 
   val reflect : value -> neu -> val_sys -> value
 
@@ -123,11 +17,13 @@ sig
   val eval_head : env -> Tm.tm Tm.head -> value
   val eval_frame : env -> value -> Tm.tm Tm.frame -> value
   val eval_dim : env -> Tm.tm -> I.t
+  val eval_tick : env -> Tm.tm -> tick
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
+  val prev : tick -> value -> value
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -138,23 +34,16 @@ sig
 
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> value list -> value
+  val inst_tick_clo : tick_clo -> tick -> value
 
   val unleash_pi : value -> value * clo
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
+  val unleash_later : value -> tick_clo
   val unleash_fcom : value -> dir * value * comp_sys
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
-
-  val pp_abs : Format.formatter -> abs -> unit
-  val pp_value : Format.formatter -> value -> unit
-  val pp_dims : Format.formatter -> I.t list -> unit
-  val pp_neu : Format.formatter -> neu -> unit
-  val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
-  val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
-  val pp_comp_sys : Format.formatter -> comp_sys -> unit
-  val pp_names : Format.formatter -> Name.t bwd -> unit
 
   module Env :
   sig
@@ -219,9 +108,8 @@ struct
     type t = value
 
     let act : I.action -> value -> value =
-      fun phi thunk ->
-        let Node node = !thunk in
-        ref @@ Node {node with action = I.cmp phi node.action}
+      fun phi (Node node) ->
+        Node {node with action = I.cmp phi node.action}
   end
 
 
@@ -235,6 +123,8 @@ struct
       Val (Val.act phi v)
     | Atom x ->
       Atom (I.act phi x)
+    | Tick tck ->
+      Tick tck
 
   module Env =
   struct
@@ -266,6 +156,19 @@ struct
       match clo with
       | Clo info ->
         Clo {info with rho = Env.act phi info.rho}
+  end
+
+  module TickClo : Sort with type t = tick_clo with type 'a m = 'a =
+  struct
+    type t = tick_clo
+    type 'a m = 'a
+
+    let act phi clo =
+      match clo with
+      | TickClo info ->
+        TickClo {info with rho = Env.act phi info.rho}
+      | TickCloConst v ->
+        TickCloConst (Val.act phi v)
   end
 
   module NClo : Sort with type t = nclo with type 'a m = 'a =
@@ -395,19 +298,21 @@ struct
 
 
   type error =
-    | ExpectedValueInEnvironment of I.t
-    | ExpectedAtomInEnvironment of value
+    | UnexpectedEnvCell of env_el
     | ExpectedDimensionTerm of Tm.tm
+    | ExpectedTickTerm of Tm.tm
     | InternalMortalityError
     | RigidCoeUnexpectedArgument of abs
     | RigidHComUnexpectedArgument of value
     | RigidGHComUnexpectedArgument of value
     | LblCallUnexpectedArgument of value
     | UnexpectedDimensionTerm of Tm.tm
+    | UnexpectedTickTerm of Tm.tm
     | UnleashPiError of value
     | UnleashSgError of value
     | UnleashExtError of value
     | UnleashVError of value
+    | UnleashLaterError of value
     | UnleashCoRError of value
     | UnleashLblTyError of value
     | UnleashFComError of value
@@ -432,8 +337,8 @@ struct
           begin
             match List.nth rho.cells i with
             | Atom x -> x
-            | Val v ->
-              let err = ExpectedAtomInEnvironment v in
+            | cell ->
+              let err = UnexpectedEnvCell cell in
               raise @@ E err
           end
 
@@ -449,6 +354,31 @@ struct
       end
     | _ ->
       let err = ExpectedDimensionTerm tm in
+      raise @@ E err
+
+  let eval_tick rho tm =
+    match Tm.unleash tm with
+    | Tm.TickConst ->
+      TickConst
+    | Tm.Up (hd, Emp) ->
+      begin
+        match hd with
+        | Tm.Ix (i, _) ->
+          begin
+            match List.nth rho.cells i with
+            | Tick tck -> tck
+            | cell ->
+              let err = UnexpectedEnvCell cell in
+              raise @@ E err
+          end
+        | Tm.Var info ->
+          TickGen (`Global info.name)
+        | _ ->
+          let err = ExpectedTickTerm tm in
+          raise @@ E err
+      end
+    | _ ->
+      let err = ExpectedTickTerm tm in
       raise @@ E err
 
 
@@ -467,10 +397,14 @@ struct
                 make @@ Up {ty = rst.ty; neu = up.neu; sys}
             end
           | _ ->
-            ref @@ Node {con; action = I.idn}
+            Node {con; action = I.idn}
         end
       | _ ->
-        ref @@ Node {con; action = I.idn}
+        Node {con; action = I.idn}
+
+  and make_later ty =
+    let tclo = TickCloConst ty in
+    make @@ Later tclo
 
   and act_can phi con =
     match con with
@@ -612,6 +546,23 @@ struct
           | Step v ->
             v
       end
+
+    | Later clo ->
+      make @@ Later (TickClo.act phi clo)
+
+    | Next clo ->
+      make @@ Next (TickClo.act phi clo)
+
+    | DFix info ->
+      let ty = Val.act phi info.ty in
+      let clo = Clo.act phi info.clo in
+      make @@ DFix {ty; clo}
+
+    | DFixLine info ->
+      let r = I.act phi @@ `Atom info.x in
+      let ty = Val.act phi info.ty in
+      let clo = Clo.act phi info.clo in
+      make_dfix_line r ty clo
 
   and act_neu phi con =
     match con with
@@ -757,6 +708,32 @@ struct
     | Meta _ ->
       ret con
 
+    | Prev (tick, neu) ->
+      begin
+        match act_neu phi neu with
+        | Ret neu ->
+          ret @@ Prev (tick, neu)
+        | Step v ->
+          step @@ prev tick v
+      end
+
+    | Fix (tick, ty, clo) ->
+      ret @@ Fix (tick, Val.act phi ty, Clo.act phi clo)
+
+    | FixLine (x, tick, ty, clo) ->
+      let ty' = Val.act phi ty in
+      let clo' = Clo.act phi clo in
+      begin
+        match I.act phi @@ `Atom x with
+        | `Atom y ->
+          ret @@ FixLine (y, tick, ty', clo')
+        | `Dim0 ->
+          ret @@ Fix (tick, ty', clo')
+        | `Dim1 ->
+          (* TODO: check that this is right *)
+          step @@ inst_clo clo' @@ make @@ DFix {ty = ty'; clo = clo'}
+      end
+
   and act_nf phi (nf : nf) =
     match nf with
     | info ->
@@ -795,25 +772,34 @@ struct
       `Proj abs
 
   and unleash : value -> con =
-    fun node ->
-      let Node info = !node in
+    fun (Node info) ->
       match info.action = I.idn with
       | true ->
         info.con
       | false ->
         let node' = act_can info.action info.con in
         let con = unleash node' in
-        node := Node {con = con; action = I.idn};
         con
 
   and make_cons (a, b) = make @@ Cons (a, b)
 
   and make_extlam abs = make @@ ExtLam abs
 
-  and make_v phi mgen ty0 ty1 equiv : value =
-    match mgen with
+  and make_dfix_line r ty clo =
+    match r with
     | `Atom x ->
-      let phi0 = I.cmp (I.equate mgen `Dim0) phi in
+      make @@ DFixLine {x; ty; clo}
+    | `Dim0 ->
+      make @@ DFix {ty; clo}
+    | `Dim1 ->
+      let bdy = inst_clo clo @@ make @@ DFix {ty; clo} in
+      let tclo = TickCloConst bdy in
+      make @@ Next tclo
+
+  and make_v phi r ty0 ty1 equiv : value =
+    match r with
+    | `Atom x ->
+      let phi0 = I.cmp (I.equate r `Dim0) phi in
       make @@ V {x; ty0 = ty0 phi0; ty1; equiv = equiv phi0}
     | `Dim0 ->
       ty0 phi
@@ -936,7 +922,7 @@ struct
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
-    | (Pi _ | Sg _ | Ext _ | Up _) ->
+    | (Pi _ | Sg _ | Ext _ | Up _ | Later _) ->
       make @@ Coe {dir; abs; el}
 
     | (Bool | Univ _) ->
@@ -1176,7 +1162,7 @@ struct
               car (fixer_fiber phi0)
             with
             | exn ->
-              Format.eprintf "Not immortal enough: %a@." pp_value (fixer_fiber phi0);
+              (* Format.eprintf "Not immortal enough: %a@." pp_value (fixer_fiber phi0); *)
               raise exn
           in
           let face_front =
@@ -1549,6 +1535,9 @@ struct
     | (Tm.Dim0 | Tm.Dim1) ->
       raise @@ E (UnexpectedDimensionTerm tm)
 
+    | Tm.TickConst ->
+      raise @@ E (UnexpectedTickTerm tm)
+
     | Tm.Up cmd ->
       eval_cmd rho cmd
 
@@ -1563,6 +1552,14 @@ struct
 
     | Tm.LblRet t ->
       make @@ LblRet (eval rho t)
+
+    | Tm.Later bnd ->
+      let tclo = TickClo {bnd; rho} in
+      make @@ Later tclo
+
+    | Tm.Next bnd ->
+      let tclo = TickClo {bnd; rho} in
+      make @@ Next tclo
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
@@ -1624,12 +1621,22 @@ struct
       let ty = eval rho info.ty in
       let sys = eval_rigid_bnd_sys rho info.sys in
       make_cap dir ty sys vhd
+    | Tm.Prev tick ->
+      let vtick = eval_tick rho tick in
+      prev vtick vhd
+
 
 
   and eval_head rho =
     function
     | Tm.Down info ->
       eval rho info.tm
+
+    | Tm.DFix info ->
+      let r = eval_dim rho info.r in
+      let ty = eval rho info.ty in
+      let clo = clo info.bdy rho in
+      make_dfix_line r ty clo
 
     | Tm.Coe info ->
       let r = eval_dim rho info.r in
@@ -1679,8 +1686,8 @@ struct
       begin
         match List.nth rho.cells i with
         | Val v -> v
-        | Atom r ->
-          let err = ExpectedValueInEnvironment r in
+        | cell ->
+          let err = UnexpectedEnvCell cell in
           raise @@ E err
       end
 
@@ -1786,6 +1793,14 @@ struct
     | Rst rst -> unleash_pi rst.ty
     | _ ->
       raise @@ E (UnleashPiError v)
+
+
+  and unleash_later v =
+    match unleash v with
+    | Later clo -> clo
+    | Rst rst -> unleash_later rst.ty
+    | _ ->
+      raise @@ E (UnleashLaterError v)
 
   and unleash_sg v =
     match unleash v with
@@ -1911,9 +1926,7 @@ struct
           dom
           varg
       in
-      let res = rigid_coe info.dir abs el in
-      (* Format.eprintf "apply: @[%a $ %a@ ==> %a, %a, %a, %a]@." pp_value vfun pp_value varg Name.pp x pp_value coe_r'_x pp_value cod_coe pp_abs abs; *)
-      res
+      rigid_coe info.dir abs el
 
     | HCom info ->
       let _, cod = unleash_pi info.ty in
@@ -1940,9 +1953,6 @@ struct
       rigid_ghcom info.dir ty cap sys
 
     | _ ->
-      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-      Format.eprintf "@.";
-      Format.eprintf "Tried to apply: %a@." pp_value vfun;
       failwith "apply"
 
   and ext_apply vext (ss : I.t list) =
@@ -2012,6 +2022,77 @@ struct
 
     | _ ->
       failwith "ext_apply"
+
+  and prev tick el =
+    match unleash el with
+    | Next tclo ->
+      inst_tick_clo tclo tick
+    | DFix dfix ->
+      begin
+        match tick with
+        | TickConst ->
+          inst_clo dfix.clo el
+        | TickGen gen ->
+          let neu = Fix (gen, dfix.ty, dfix.clo) in
+          make @@ Up {ty = dfix.ty; neu; sys = []}
+      end
+    | DFixLine dfix ->
+      begin
+        match tick with
+        | TickConst ->
+          inst_clo dfix.clo el
+        | TickGen gen ->
+          let neu = FixLine (dfix.x, gen, dfix.ty, dfix.clo) in
+          make @@ Up {ty = dfix.ty; neu; sys = []}
+      end
+
+    | Up info ->
+      let tclo = unleash_later info.ty in
+      let ty = inst_tick_clo tclo tick in
+      let prev_face =
+        Face.map @@ fun _ _ a ->
+        prev tick a
+      in
+      let prev_sys = List.map prev_face info.sys in
+      make @@ Up {ty; neu = Prev (tick, info.neu); sys = prev_sys}
+
+    | Coe info ->
+      (* EXPERIMENTAL !!! *)
+      let x, tyx = Abs.unleash1 info.abs in
+      let tclox = unleash_later tyx in
+      let cod_tick = inst_tick_clo tclox tick in
+      let abs = Abs.bind1 x cod_tick in
+      let el = prev tick info.el in
+      rigid_coe info.dir abs el
+
+    | HCom info ->
+      (* EXPERIMENTAL !!! *)
+      let tclo = unleash_later info.ty in
+      let ty = inst_tick_clo tclo tick in
+      let cap = prev tick info.cap in
+      let prev_face =
+        Face.map @@ fun _ _ abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ prev tick v
+      in
+      let sys = List.map prev_face info.sys in
+      rigid_hcom info.dir ty cap sys
+
+    | GHCom info ->
+      (* EXPERIMENTAL !!! *)
+      let tclo = unleash_later info.ty in
+      let ty = inst_tick_clo tclo tick in
+      let cap = prev tick info.cap in
+      let prev_face =
+        Face.map @@ fun _ _ abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ prev tick v
+      in
+      let sys = List.map prev_face info.sys in
+      rigid_ghcom info.dir ty cap sys
+
+    | _ ->
+      failwith "prev"
 
 
   (* the equation oracle `phi` is for continuations `ty0` and `equiv`
@@ -2153,11 +2234,7 @@ struct
       let face =
         Face.map @@ fun _ _ abs ->
         let y, v = Abs.unleash1 abs in
-        try
-          Abs.bind1 y @@ car v
-        with exn ->
-          Format.eprintf "Tried to take car of:@ @[<v>%a@]@.@." pp_value v;
-          raise exn
+        Abs.bind1 y @@ car v
       in
       let sys = List.map face info.sys in
       rigid_hcom info.dir dom cap sys
@@ -2310,218 +2387,14 @@ struct
       (* Reversing makes sense here because: the left-most element of the environment is the innermost variable *)
       eval (Env.push_many (List.rev_map (fun v -> Val v) vargs) info.rho) tm
 
-  and pp_env_cell fmt =
-    function
-    | Val v ->
-      pp_value fmt v
-    | Atom r ->
-      I.pp fmt r
+  and inst_tick_clo clo tick =
+    match clo with
+    | TickClo info ->
+      let Tm.B (_, tm) = info.bnd in
+      eval (Env.push (Tick tick) info.rho) tm
+    | TickCloConst v ->
+      v
 
-  and pp_env fmt =
-    let pp_sep fmt () = Format.fprintf fmt ", " in
-    Format.pp_print_list ~pp_sep pp_env_cell fmt
-
-  and pp_value fmt value =
-    match unleash value with
-    | Up up ->
-      Format.fprintf fmt "%a" pp_neu up.neu
-    | Lam clo ->
-      Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
-    | ExtLam abs ->
-      Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
-    | CoRThunk face ->
-      Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
-    | Bool ->
-      Format.fprintf fmt "bool"
-    | Tt ->
-      Format.fprintf fmt "tt"
-    | Ff ->
-      Format.fprintf fmt "ff"
-    | Nat ->
-      Format.fprintf fmt "nat"
-    | Zero ->
-      Format.fprintf fmt "zero"
-    | Suc n ->
-      Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
-    | Int ->
-      Format.fprintf fmt "int"
-    | Pos n ->
-      Format.fprintf fmt "@[<1>(pos@ %a)@]" pp_value n
-    | NegSuc n ->
-      Format.fprintf fmt "@[<1>(negsuc@ %a)@]" pp_value n
-    | S1 ->
-      Format.fprintf fmt "S1"
-    | Base ->
-      Format.fprintf fmt "base"
-    | Loop _x ->
-      Format.fprintf fmt "<loop>"
-    | Pi {dom; cod} ->
-      Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
-    | Sg {dom; cod} ->
-      Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
-    | Ext abs ->
-      Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
-    | Rst {ty; sys} ->
-      Format.fprintf fmt "@[<1>(restrict@ %a@ %a)@]" pp_value ty pp_val_sys sys
-    | CoR face ->
-      Format.fprintf fmt "@[<1>(corestrict@ %a)@]" pp_val_face face
-    | Univ {kind; lvl} ->
-      Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
-    | Cons (v0, v1) ->
-      Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
-    | V info ->
-      Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
-    | VIn info ->
-      Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)]" Name.pp info.x pp_value info.el0 pp_value info.el1
-    | Coe info ->
-      let r, r' = Dir.unleash info.dir in
-      Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
-    | HCom info ->
-      let r, r' = Dir.unleash info.dir in
-      Format.fprintf fmt "@[<1>(hcom %a %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
-    | GHCom _ ->
-      Format.fprintf fmt "<ghcom>"
-    | FCom _ ->
-      Format.fprintf fmt "<fcom>"
-    | Box _ ->
-      Format.fprintf fmt "<box>" (* �� *)
-    | LblTy {lbl; args; ty} ->
-      begin
-        match args with
-        | [] ->
-          Format.fprintf fmt "{%a : %a}"
-            Uuseg_string.pp_utf_8 lbl
-            pp_value ty
-        | _ ->
-          Format.fprintf fmt "{%a %a : %a}"
-            Uuseg_string.pp_utf_8 lbl
-            pp_nfs args
-            pp_value ty
-      end
-    | LblRet v ->
-      Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
-
-  and pp_abs fmt abs =
-    let xs, v = Abs.unleash abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@]" pp_names xs pp_value v
-
-  and pp_names fmt xs =
-    let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep Name.pp fmt (Bwd.to_list xs)
-
-  and pp_ext_abs fmt abs =
-    let xs, (tyx, sysx) = ExtAbs.unleash abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" pp_names xs pp_value tyx pp_val_sys sysx
-
-  and pp_val_sys : type x. Format.formatter -> (x, value) face list -> unit =
-    fun fmt ->
-      let pp_sep fmt () = Format.fprintf fmt "@ " in
-      Format.pp_print_list ~pp_sep pp_val_face fmt
-
-  and pp_val_face : type x. _ -> (x, value) face -> unit =
-    fun fmt ->
-      function
-      | Face.True (r0, r1, v) ->
-        Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_value v
-      | Face.False (r0, r1) ->
-        Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
-      | Face.Indet (p, v) ->
-        let r0, r1 = Eq.unleash p in
-        Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_value v
-
-  and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
-    fun fmt ->
-      let pp_sep fmt () = Format.fprintf fmt "@ " in
-      Format.pp_print_list ~pp_sep pp_comp_face fmt
-
-  and pp_comp_face : type x. _ -> (x, abs) face -> unit =
-    fun fmt ->
-      function
-      | Face.True (r0, r1, v) ->
-        Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_abs v
-      | Face.False (r0, r1) ->
-        Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
-      | Face.Indet (p, v) ->
-        let r0, r1 = Eq.unleash p in
-        Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs v
-
-  and pp_clo fmt (Clo clo) =
-    let Tm.B (_, tm) = clo.bnd in
-    Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
-
-  and pp_nclo fmt (NClo clo) =
-    let Tm.NB (_, tm) = clo.nbnd in
-    Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
-
-  and pp_neu fmt neu =
-    match neu with
-    | Lvl (None, i) ->
-      Format.fprintf fmt "#%i" i
-
-    | Lvl (Some x, _) ->
-      Uuseg_string.pp_utf_8 fmt x
-
-    | FunApp (neu, arg) ->
-      Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
-
-    | ExtApp (neu, args) ->
-      Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
-
-    | Car neu ->
-      Format.fprintf fmt "@[<1>(car %a)@]" pp_neu neu
-
-    | Cdr neu ->
-      Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
-
-    | Var {name; _} ->
-      Name.pp fmt name
-
-    | Meta {name; _} ->
-      Name.pp fmt name
-
-    | If {mot; neu; tcase; fcase} ->
-      Format.fprintf fmt "@[<1>(if %a@ %a@ %a@ %a)@]"
-        pp_clo mot
-        pp_neu neu
-        pp_value tcase
-        pp_value fcase
-
-    | NatRec {mot; neu; zcase; scase} ->
-      Format.fprintf fmt "@[<1>(nat-rec %a@ %a@ %a@ %a)@]"
-        pp_clo mot
-        pp_neu neu
-        pp_value zcase
-        pp_nclo scase
-
-    | IntRec _ ->
-      Format.fprintf fmt "<int-rec>"
-
-    | S1Rec _ ->
-      Format.fprintf fmt "<S1-rec>"
-
-    | Cap _ ->
-      Format.fprintf fmt "<cap>"
-
-    | VProj _ ->
-      Format.fprintf fmt "<vproj>"
-
-    | LblCall neu ->
-      Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
-
-    | CoRForce neu ->
-      Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
-
-
-  and pp_nf fmt nf =
-    pp_value fmt nf.el
-
-  and pp_nfs fmt nfs =
-    let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep pp_nf fmt nfs
-
-  and pp_dims fmt rs =
-    let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep I.pp fmt rs
 
   module Macro =
   struct
@@ -2558,21 +2431,24 @@ struct
         Format.fprintf fmt
           "Unexpected argument to labeled type projection: %a"
           pp_value v
-      | ExpectedAtomInEnvironment v ->
+      | UnexpectedEnvCell _ ->
         Format.fprintf fmt
-          "Expected to find atom in environment, but found value %a."
-          pp_value v
-      | ExpectedValueInEnvironment r ->
-        Format.fprintf fmt
-          "Expected to find value in environment, but found dimension %a."
-          I.pp r
+          "Did not find what was expected in the environment"
       | ExpectedDimensionTerm t ->
         Format.fprintf fmt
           "Tried to evaluate non-dimension term %a as dimension."
           Tm.pp0 t
+      | ExpectedTickTerm t ->
+        Format.fprintf fmt
+          "Tried to evaluate non-tick term %a as dimension."
+          Tm.pp0 t
       | UnexpectedDimensionTerm t ->
         Format.fprintf fmt
           "Tried to evaluate dimension term %a as expression."
+          Tm.pp0 t
+      | UnexpectedTickTerm t ->
+        Format.fprintf fmt
+          "Tried to evaluate tick term %a as expression."
           Tm.pp0 t
       | UnleashPiError v ->
         Format.fprintf fmt
@@ -2585,6 +2461,10 @@ struct
       | UnleashVError v ->
         Format.fprintf fmt
           "Tried to unleash %a as V type."
+          pp_value v
+      | UnleashLaterError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as later modality."
           pp_value v
       | UnleashExtError v ->
         Format.fprintf fmt
