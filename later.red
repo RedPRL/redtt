@@ -23,4 +23,14 @@ let stream/cons (x : bool) (xs : Ltr stream) : stream =
          (dfix i (U 0) [A] (stream/F A))))
   >
 
+let stream/hd (xs : stream) : bool =
+  xs.0
+
+let stream/tl (xs : stream) : Ltr stream =
+  coe 0 1 (xs.1) in λ i →
+    `(▷ [α]
+      (prev α
+       (dfix i (U 0) [A] (stream/F A))))
+
+
 debug
