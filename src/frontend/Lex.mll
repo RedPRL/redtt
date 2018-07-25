@@ -142,7 +142,9 @@ rule token = parse
   | "→"
     { Lwt.return RIGHT_ARROW }
   | "<>"
-    { Lwt.return DIAMOND}
+    { Lwt.return BULLET}
+  | "∙"
+    { Lwt.return BULLET }
   | "<"
     { Lwt.return LGL }
   | ">"

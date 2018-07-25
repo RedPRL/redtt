@@ -809,7 +809,7 @@ let rec pp env fmt =
       Format.fprintf fmt "1"
 
     | TickConst ->
-      Format.fprintf fmt "<>"
+      Uuseg_string.pp_utf_8 fmt "∙"
 
     | S1 ->
       Format.fprintf fmt "S1"
