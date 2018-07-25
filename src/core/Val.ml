@@ -131,6 +131,248 @@ let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
 let nclo_names (NClo {nbnd = Tm.NB (nms, _); _}) =
   nms
 
+let rec pp_env_cell fmt =
+  function
+  | Val v ->
+    pp_value fmt v
+  | Atom r ->
+    I.pp fmt r
+  | Tick _ ->
+    Format.fprintf fmt "<tick>"
+
+and pp_env fmt =
+  let pp_sep fmt () = Format.fprintf fmt ", " in
+  Format.pp_print_list ~pp_sep pp_env_cell fmt
+
+and pp_value fmt value =
+  let Node node = value in
+  if node.action = I.idn then
+    pp_con fmt node.con
+  else
+    Format.fprintf fmt "@[<hv1>@[<hv1>(%a)@]<%a>@]"
+      pp_con node.con I.pp_action node.action
+
+and pp_con fmt =
+  function
+  | Up up ->
+    Format.fprintf fmt "%a" pp_neu up.neu
+  | Lam clo ->
+    Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
+  | ExtLam abs ->
+    Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
+  | CoRThunk face ->
+    Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
+  | Bool ->
+    Format.fprintf fmt "bool"
+  | Tt ->
+    Format.fprintf fmt "tt"
+  | Ff ->
+    Format.fprintf fmt "ff"
+  | Nat ->
+    Format.fprintf fmt "nat"
+  | Zero ->
+    Format.fprintf fmt "zero"
+  | Suc n ->
+    Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
+  | Int ->
+    Format.fprintf fmt "int"
+  | Pos n ->
+    Format.fprintf fmt "@[<1>(pos@ %a)@]" pp_value n
+  | NegSuc n ->
+    Format.fprintf fmt "@[<1>(negsuc@ %a)@]" pp_value n
+  | S1 ->
+    Format.fprintf fmt "S1"
+  | Base ->
+    Format.fprintf fmt "base"
+  | Loop _x ->
+    Format.fprintf fmt "<loop>"
+  | Pi {dom; cod} ->
+    Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
+  | Sg {dom; cod} ->
+    Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
+  | Ext abs ->
+    Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
+  | Rst {ty; sys} ->
+    Format.fprintf fmt "@[<1>(restrict@ %a@ %a)@]" pp_value ty pp_val_sys sys
+  | CoR face ->
+    Format.fprintf fmt "@[<1>(corestrict@ %a)@]" pp_val_face face
+  | Univ {kind; lvl} ->
+    Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
+  | Cons (v0, v1) ->
+    Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
+  | V info ->
+    Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
+  | VIn info ->
+    Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)]" Name.pp info.x pp_value info.el0 pp_value info.el1
+  | Coe info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
+  | HCom info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(hcom %a %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
+  | GHCom _ ->
+    Format.fprintf fmt "<ghcom>"
+  | FCom _ ->
+    Format.fprintf fmt "<fcom>"
+  | Box _ ->
+    Format.fprintf fmt "<box>" (* �� *)
+  | LblTy {lbl; args; ty} ->
+    begin
+      match args with
+      | [] ->
+        Format.fprintf fmt "{%a : %a}"
+          Uuseg_string.pp_utf_8 lbl
+          pp_value ty
+      | _ ->
+        Format.fprintf fmt "{%a %a : %a}"
+          Uuseg_string.pp_utf_8 lbl
+          pp_nfs args
+          pp_value ty
+    end
+  | LblRet v ->
+    Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
+  | Later _clo ->
+    Format.fprintf fmt "<later>"
+  | Next _clo ->
+    Format.fprintf fmt "<next>"
+  | DFix _ ->
+    Format.fprintf fmt "<dfix>"
+  | DFixLine _ ->
+    Format.fprintf fmt "<dfix-line>"
+
+and pp_abs fmt =
+  IAbs.pp pp_value fmt
+
+and pp_names fmt xs =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep Name.pp fmt (Bwd.to_list xs)
+
+and pp_ext_abs fmt =
+  let pp_ext_body fmt (ty, sys) =
+    Format.fprintf fmt "%a@ %a"
+      pp_value ty pp_val_sys sys
+  in
+  IAbs.pp pp_ext_body fmt
+
+and pp_val_sys : type x. Format.formatter -> (x, value) face list -> unit =
+  fun fmt ->
+    let pp_sep fmt () = Format.fprintf fmt "@ " in
+    Format.pp_print_list ~pp_sep pp_val_face fmt
+
+and pp_val_face : type x. _ -> (x, value) face -> unit =
+  fun fmt ->
+    function
+    | Face.True (r0, r1, v) ->
+      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_value v
+    | Face.False (r0, r1) ->
+      Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
+    | Face.Indet (p, v) ->
+      let r0, r1 = Eq.unleash p in
+      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_value v
+
+and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
+  fun fmt ->
+    let pp_sep fmt () = Format.fprintf fmt "@ " in
+    Format.pp_print_list ~pp_sep pp_comp_face fmt
+
+and pp_comp_face : type x. _ -> (x, abs) face -> unit =
+  fun fmt ->
+    function
+    | Face.True (r0, r1, v) ->
+      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_abs v
+    | Face.False (r0, r1) ->
+      Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
+    | Face.Indet (p, v) ->
+      let r0, r1 = Eq.unleash p in
+      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs v
+
+and pp_clo fmt (Clo clo) =
+  let Tm.B (_, tm) = clo.bnd in
+  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
+
+and pp_nclo fmt (NClo clo) =
+  let Tm.NB (_, tm) = clo.nbnd in
+  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
+
+and pp_neu fmt neu =
+  match neu with
+  | Lvl (None, i) ->
+    Format.fprintf fmt "#%i" i
+
+  | Lvl (Some x, _) ->
+    Uuseg_string.pp_utf_8 fmt x
+
+  | FunApp (neu, arg) ->
+    Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
+
+  | ExtApp (neu, args) ->
+    Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
+
+  | Car neu ->
+    Format.fprintf fmt "@[<1>(car %a)@]" pp_neu neu
+
+  | Cdr neu ->
+    Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
+
+  | Var {name; _} ->
+    Name.pp fmt name
+
+  | Meta {name; _} ->
+    Name.pp fmt name
+
+  | If {mot; neu; tcase; fcase} ->
+    Format.fprintf fmt "@[<1>(if %a@ %a@ %a@ %a)@]"
+      pp_clo mot
+      pp_neu neu
+      pp_value tcase
+      pp_value fcase
+
+  | NatRec {mot; neu; zcase; scase} ->
+    Format.fprintf fmt "@[<1>(nat-rec %a@ %a@ %a@ %a)@]"
+      pp_clo mot
+      pp_neu neu
+      pp_value zcase
+      pp_nclo scase
+
+  | IntRec _ ->
+    Format.fprintf fmt "<int-rec>"
+
+  | S1Rec _ ->
+    Format.fprintf fmt "<S1-rec>"
+
+  | Cap _ ->
+    Format.fprintf fmt "<cap>"
+
+  | VProj _ ->
+    Format.fprintf fmt "<vproj>"
+
+  | LblCall neu ->
+    Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
+
+  | CoRForce neu ->
+    Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
+
+  | Prev _ ->
+    Format.fprintf fmt "<prev>"
+
+  | Fix _ ->
+    Format.fprintf fmt "<fix>"
+
+  | FixLine _ ->
+    Format.fprintf fmt "<fix-line>"
+
+
+and pp_nf fmt nf =
+  pp_value fmt nf.el
+
+and pp_nfs fmt nfs =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep pp_nf fmt nfs
+
+and pp_dims fmt rs =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep I.pp fmt rs
+
 module type S =
 sig
   val make : con -> value
@@ -172,15 +414,6 @@ sig
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
-
-  val pp_abs : Format.formatter -> abs -> unit
-  val pp_value : Format.formatter -> value -> unit
-  val pp_dims : Format.formatter -> I.t list -> unit
-  val pp_neu : Format.formatter -> neu -> unit
-  val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
-  val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
-  val pp_comp_sys : Format.formatter -> comp_sys -> unit
-  val pp_names : Format.formatter -> Name.t bwd -> unit
 
   module Env :
   sig
@@ -1299,7 +1532,7 @@ struct
               car (fixer_fiber phi0)
             with
             | exn ->
-              Format.eprintf "Not immortal enough: %a@." pp_value (fixer_fiber phi0);
+              (* Format.eprintf "Not immortal enough: %a@." pp_value (fixer_fiber phi0); *)
               raise exn
           in
           let face_front =
@@ -1583,7 +1816,7 @@ struct
       make @@ CoR face
 
     | Tm.V info ->
-      let r = eval_dim rho info.r in
+      let r = eval_dim rho info.r in      Format.eprintf "@.";
       let ty0 phi0 = eval (Env.act phi0 rho) info.ty0 in
       let ty1 = eval rho info.ty1 in
       let equiv phi0 = eval (Env.act phi0 rho) info.equiv in
@@ -2090,9 +2323,6 @@ struct
       rigid_ghcom info.dir ty cap sys
 
     | _ ->
-      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-      Format.eprintf "@.";
-      Format.eprintf "Tried to apply: %a@." pp_value vfun;
       failwith "apply"
 
   and ext_apply vext (ss : I.t list) =
@@ -2374,11 +2604,7 @@ struct
       let face =
         Face.map @@ fun _ _ abs ->
         let y, v = Abs.unleash1 abs in
-        try
-          Abs.bind1 y @@ car v
-        with exn ->
-          Format.eprintf "Tried to take car of:@ @[<v>%a@]@.@." pp_value v;
-          raise exn
+        Abs.bind1 y @@ car v
       in
       let sys = List.map face info.sys in
       rigid_hcom info.dir dom cap sys
@@ -2539,236 +2765,6 @@ struct
     | TickCloConst v ->
       v
 
-  and pp_env_cell fmt =
-    function
-    | Val v ->
-      pp_value fmt v
-    | Atom r ->
-      I.pp fmt r
-    | Tick _ ->
-      Format.fprintf fmt "<tick>"
-
-  and pp_env fmt =
-    let pp_sep fmt () = Format.fprintf fmt ", " in
-    Format.pp_print_list ~pp_sep pp_env_cell fmt
-
-  and pp_value fmt value =
-    match unleash value with
-    | Up up ->
-      Format.fprintf fmt "%a" pp_neu up.neu
-    | Lam clo ->
-      Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
-    | ExtLam abs ->
-      Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
-    | CoRThunk face ->
-      Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
-    | Bool ->
-      Format.fprintf fmt "bool"
-    | Tt ->
-      Format.fprintf fmt "tt"
-    | Ff ->
-      Format.fprintf fmt "ff"
-    | Nat ->
-      Format.fprintf fmt "nat"
-    | Zero ->
-      Format.fprintf fmt "zero"
-    | Suc n ->
-      Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
-    | Int ->
-      Format.fprintf fmt "int"
-    | Pos n ->
-      Format.fprintf fmt "@[<1>(pos@ %a)@]" pp_value n
-    | NegSuc n ->
-      Format.fprintf fmt "@[<1>(negsuc@ %a)@]" pp_value n
-    | S1 ->
-      Format.fprintf fmt "S1"
-    | Base ->
-      Format.fprintf fmt "base"
-    | Loop _x ->
-      Format.fprintf fmt "<loop>"
-    | Pi {dom; cod} ->
-      Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
-    | Sg {dom; cod} ->
-      Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
-    | Ext abs ->
-      Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
-    | Rst {ty; sys} ->
-      Format.fprintf fmt "@[<1>(restrict@ %a@ %a)@]" pp_value ty pp_val_sys sys
-    | CoR face ->
-      Format.fprintf fmt "@[<1>(corestrict@ %a)@]" pp_val_face face
-    | Univ {kind; lvl} ->
-      Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
-    | Cons (v0, v1) ->
-      Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
-    | V info ->
-      Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
-    | VIn info ->
-      Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)]" Name.pp info.x pp_value info.el0 pp_value info.el1
-    | Coe info ->
-      let r, r' = Dir.unleash info.dir in
-      Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
-    | HCom info ->
-      let r, r' = Dir.unleash info.dir in
-      Format.fprintf fmt "@[<1>(hcom %a %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
-    | GHCom _ ->
-      Format.fprintf fmt "<ghcom>"
-    | FCom _ ->
-      Format.fprintf fmt "<fcom>"
-    | Box _ ->
-      Format.fprintf fmt "<box>" (* �� *)
-    | LblTy {lbl; args; ty} ->
-      begin
-        match args with
-        | [] ->
-          Format.fprintf fmt "{%a : %a}"
-            Uuseg_string.pp_utf_8 lbl
-            pp_value ty
-        | _ ->
-          Format.fprintf fmt "{%a %a : %a}"
-            Uuseg_string.pp_utf_8 lbl
-            pp_nfs args
-            pp_value ty
-      end
-    | LblRet v ->
-      Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
-    | Later _clo ->
-      Format.fprintf fmt "<later>"
-    | Next _clo ->
-      Format.fprintf fmt "<next>"
-    | DFix _ ->
-      Format.fprintf fmt "<dfix>"
-    | DFixLine _ ->
-      Format.fprintf fmt "<dfix-line>"
-  and pp_abs fmt abs =
-    let xs, v = Abs.unleash abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@]" pp_names xs pp_value v
-
-  and pp_names fmt xs =
-    let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep Name.pp fmt (Bwd.to_list xs)
-
-  and pp_ext_abs fmt abs =
-    let xs, (tyx, sysx) = ExtAbs.unleash abs in
-    Format.fprintf fmt "@[<1><%a>@ %a@ %a@]" pp_names xs pp_value tyx pp_val_sys sysx
-
-  and pp_val_sys : type x. Format.formatter -> (x, value) face list -> unit =
-    fun fmt ->
-      let pp_sep fmt () = Format.fprintf fmt "@ " in
-      Format.pp_print_list ~pp_sep pp_val_face fmt
-
-  and pp_val_face : type x. _ -> (x, value) face -> unit =
-    fun fmt ->
-      function
-      | Face.True (r0, r1, v) ->
-        Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_value v
-      | Face.False (r0, r1) ->
-        Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
-      | Face.Indet (p, v) ->
-        let r0, r1 = Eq.unleash p in
-        Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_value v
-
-  and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
-    fun fmt ->
-      let pp_sep fmt () = Format.fprintf fmt "@ " in
-      Format.pp_print_list ~pp_sep pp_comp_face fmt
-
-  and pp_comp_face : type x. _ -> (x, abs) face -> unit =
-    fun fmt ->
-      function
-      | Face.True (r0, r1, v) ->
-        Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_abs v
-      | Face.False (r0, r1) ->
-        Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
-      | Face.Indet (p, v) ->
-        let r0, r1 = Eq.unleash p in
-        Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs v
-
-  and pp_clo fmt (Clo clo) =
-    let Tm.B (_, tm) = clo.bnd in
-    Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
-
-  and pp_nclo fmt (NClo clo) =
-    let Tm.NB (_, tm) = clo.nbnd in
-    Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
-
-  and pp_neu fmt neu =
-    match neu with
-    | Lvl (None, i) ->
-      Format.fprintf fmt "#%i" i
-
-    | Lvl (Some x, _) ->
-      Uuseg_string.pp_utf_8 fmt x
-
-    | FunApp (neu, arg) ->
-      Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
-
-    | ExtApp (neu, args) ->
-      Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
-
-    | Car neu ->
-      Format.fprintf fmt "@[<1>(car %a)@]" pp_neu neu
-
-    | Cdr neu ->
-      Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
-
-    | Var {name; _} ->
-      Name.pp fmt name
-
-    | Meta {name; _} ->
-      Name.pp fmt name
-
-    | If {mot; neu; tcase; fcase} ->
-      Format.fprintf fmt "@[<1>(if %a@ %a@ %a@ %a)@]"
-        pp_clo mot
-        pp_neu neu
-        pp_value tcase
-        pp_value fcase
-
-    | NatRec {mot; neu; zcase; scase} ->
-      Format.fprintf fmt "@[<1>(nat-rec %a@ %a@ %a@ %a)@]"
-        pp_clo mot
-        pp_neu neu
-        pp_value zcase
-        pp_nclo scase
-
-    | IntRec _ ->
-      Format.fprintf fmt "<int-rec>"
-
-    | S1Rec _ ->
-      Format.fprintf fmt "<S1-rec>"
-
-    | Cap _ ->
-      Format.fprintf fmt "<cap>"
-
-    | VProj _ ->
-      Format.fprintf fmt "<vproj>"
-
-    | LblCall neu ->
-      Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
-
-    | CoRForce neu ->
-      Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
-
-    | Prev _ ->
-      Format.fprintf fmt "<prev>"
-
-    | Fix _ ->
-      Format.fprintf fmt "<fix>"
-
-    | FixLine _ ->
-      Format.fprintf fmt "<fix-line>"
-
-
-  and pp_nf fmt nf =
-    pp_value fmt nf.el
-
-  and pp_nfs fmt nfs =
-    let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep pp_nf fmt nfs
-
-  and pp_dims fmt rs =
-    let pp_sep fmt () = Format.fprintf fmt " " in
-    Format.pp_print_list ~pp_sep I.pp fmt rs
 
   module Macro =
   struct

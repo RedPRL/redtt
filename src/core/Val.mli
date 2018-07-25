@@ -123,6 +123,16 @@ and env
 val clo_name : clo -> string option
 val nclo_names : nclo -> string option bwd
 
+val pp_abs : Format.formatter -> abs -> unit
+val pp_value : Format.formatter -> value -> unit
+val pp_dims : Format.formatter -> I.t list -> unit
+val pp_neu : Format.formatter -> neu -> unit
+val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
+val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
+val pp_comp_sys : Format.formatter -> comp_sys -> unit
+val pp_names : Format.formatter -> Name.t bwd -> unit
+
+
 module type S =
 sig
   val make : con -> value
@@ -164,15 +174,6 @@ sig
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 
-
-  val pp_abs : Format.formatter -> abs -> unit
-  val pp_value : Format.formatter -> value -> unit
-  val pp_dims : Format.formatter -> I.t list -> unit
-  val pp_neu : Format.formatter -> neu -> unit
-  val pp_comp_face : Format.formatter -> rigid_abs_face -> unit
-  val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
-  val pp_comp_sys : Format.formatter -> comp_sys -> unit
-  val pp_names : Format.formatter -> Name.t bwd -> unit
 
   module Env :
   sig
