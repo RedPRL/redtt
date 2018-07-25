@@ -1,6 +1,7 @@
 type 'a param =
   [ `P of 'a
   | `Tw of 'a * 'a
+  | `Tick
   ]
 
 type ty = Tm.tm
@@ -66,6 +67,9 @@ let pp fmt sg =
         Name.pp nm
     | `Tw _ ->
       Format.fprintf fmt "%a[twin]"
+        Name.pp nm
+    | `Tick ->
+      Format.fprintf fmt "%a"
         Name.pp nm
   in
   Format.pp_print_list ~pp_sep go fmt @@ List.rev sg.env

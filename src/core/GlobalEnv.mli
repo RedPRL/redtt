@@ -3,6 +3,7 @@ type t
 type 'a param =
   [ `P of 'a
   | `Tw of 'a * 'a
+  | `Tick
   ]
 
 type entry = {ty : Tm.tm; sys : (Tm.tm, Tm.tm) Tm.system}
