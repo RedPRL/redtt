@@ -16,7 +16,7 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW DIAMOND
 %token TIMES HASH AT BACKTICK IN WITH END
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV
+%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV DFIX
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
@@ -380,6 +380,10 @@ head:
   | LPR; COE; r0 = tm; r1 = tm; ty = dimbind(tm); tm = tm; RPR
     { fun env ->
       Tm.Coe {r = r0 env; r' = r1 env; ty = ty env; tm = tm env} }
+
+  | LPR; DFIX; ty = tm; bdy = bind(tm); RPR
+    { fun env ->
+      Tm.DFix {ty = ty env; bdy = bdy env} }
 
   | LPR; COLON; ty = tm; tm = tm; RPR
     { fun env ->
