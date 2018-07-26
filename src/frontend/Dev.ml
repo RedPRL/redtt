@@ -292,10 +292,10 @@ sig
 end
 
 let subst_tm sub ~ty tm =
-  let module T = Typing.M (struct let globals = sub end) in
-  let vty = T.Cx.eval T.Cx.emp ty in
-  let el = T.Cx.eval T.Cx.emp tm in
-  T.Cx.quote T.Cx.emp ~ty:vty el
+  let cx = Cx.init sub in
+  let vty = Cx.eval cx ty in
+  let el = Cx.eval cx tm in
+  Cx.quote cx ~ty:vty el
 
 let subst_decl sub ~ty =
   function

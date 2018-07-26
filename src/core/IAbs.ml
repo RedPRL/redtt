@@ -4,6 +4,15 @@ open BwdNotation
 type atom = Name.t
 type 'a abs = {atoms : atom bwd; node : 'a}
 
+let pp ih fmt {atoms; node} =
+  let pp_atoms fmt atoms =
+    let pp_sep fmt () = Format.fprintf fmt " " in
+    Format.pp_print_list ~pp_sep Name.pp fmt (Bwd.to_list atoms)
+  in
+  Format.fprintf fmt "<%a> %a"
+    pp_atoms atoms
+    ih node
+
 module type S =
 sig
   type el

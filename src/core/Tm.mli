@@ -42,8 +42,10 @@ type 'a tmf =
   | CoRThunk of ('a, 'a) face
 
   | Cons of 'a * 'a
+
   | Dim0
   | Dim1
+  | TickConst
 
   | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
 
@@ -51,14 +53,19 @@ type 'a tmf =
   | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
   | LblRet of 'a
 
+  | Later of 'a bnd
+  | Next of 'a bnd
+
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
+
 
 and 'a head =
   | Meta of {name: Name.t; ushift : int}
   | Var of {name : Name.t; twin : twin; ushift : int}
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
+  | DFix of {r : 'a; ty : 'a; bdy : 'a bnd}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
   | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
@@ -79,6 +86,7 @@ and 'a frame =
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | LblCall
   | CoRForce
+  | Prev of 'a
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine

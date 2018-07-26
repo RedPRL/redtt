@@ -19,9 +19,9 @@ let _ =
 
 let normalize_ty ty =
   let now0 = Unix.gettimeofday () in
-  M.lift C.typechecker >>= fun (module T) ->
-  let vty = T.Cx.eval T.Cx.emp ty in
-  let ty = T.Cx.quote_ty T.Cx.emp vty in
+  M.lift C.base_cx >>= fun cx ->
+  let vty = Cx.eval cx ty in
+  let ty = Cx.quote_ty cx vty in
   let now1 = Unix.gettimeofday () in
   normalization_clock := !normalization_clock +. (now1 -. now0);
   M.ret ty

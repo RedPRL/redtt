@@ -4,6 +4,8 @@ open Bwd open BwdNotation
 open Contextual
 open Dev
 
+module D = Domain
+
 module Notation = Monad.Notation (Contextual)
 open Notation
 
@@ -89,11 +91,6 @@ let define gm alpha opacity ~ty tm =
     begin
       if opacity = `Transparent then push_update alpha else ret ()
     end >>
-    typechecker >>= fun (module T) ->
-    (* let vty' = T.Cx.eval T.Cx.emp ty' in
-       let vtm' = T.Cx.eval T.Cx.emp tm' in
-       let _ = T.Cx.quote T.Cx.emp ~ty:vty' vtm' in *)
-    (* Format.eprintf "Defined %a : %a = %a@.@." Name.pp alpha T.Cx.Eval.pp_value vty' T.Cx.Eval.pp_value vtm'; *)
     pushr @@ E (alpha, ty', Defn (opacity, tm'))
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
@@ -339,53 +336,65 @@ let try_prune _q =
    unification would be better served by a purely syntactic approach based on hereditary
    substitution. *)
 
+let evaluator =
+  base_cx >>= fun cx ->
+  ret (cx, Cx.evaluator cx)
 
-module HSubst (T : Typing.S) =
-struct
-  let inst_ty_bnd bnd (arg_ty, arg) =
-    let Tm.B (nm, tm) = bnd in
-    let varg = T.Cx.eval T.Cx.emp arg in
-    let lcx = T.Cx.def T.Cx.emp ~nm ~ty:arg_ty ~el:varg in
-    let el = T.Cx.eval lcx tm in
-    T.Cx.quote_ty T.Cx.emp el
+let inst_ty_bnd bnd (arg_ty, arg) =
+  base_cx >>= fun cx ->
+  let Tm.B (nm, tm) = bnd in
+  let varg = Cx.eval cx arg in
+  let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
+  let el = Cx.eval lcx tm in
+  ret @@ Cx.quote_ty cx el
 
-  let inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
-    let Tm.B (nm, tm) = tm_bnd in
-    let varg = T.Cx.eval T.Cx.emp arg in
-    let lcx = T.Cx.def T.Cx.emp ~nm ~ty:arg_ty ~el:varg in
-    let el = T.Cx.eval lcx tm in
-    let vty = T.Cx.Eval.inst_clo ty_clo varg in
-    T.Cx.quote T.Cx.emp ~ty:vty el
+let eval tm =
+  base_cx >>= fun cx ->
+  ret @@ Cx.eval cx tm
 
 
-  let plug (ty, tm) frame =
-    match Tm.unleash tm, frame with
-    | Tm.Up (hd, sp), _ ->
-      Tm.up (hd, sp #< frame)
-    | Tm.Lam bnd, Tm.FunApp arg ->
-      let dom, cod = T.Cx.Eval.unleash_pi ty in
-      inst_bnd (cod, bnd) (dom, arg)
-    | Tm.ExtLam _, Tm.ExtApp args ->
-      let vargs = List.map (T.Cx.eval_dim T.Cx.emp) args in
-      let ty, _ = T.Cx.Eval.unleash_ext ty vargs in
-      let vlam = T.Cx.eval T.Cx.emp tm in
-      let vapp = T.Cx.Eval.ext_apply vlam vargs in
-      T.Cx.quote T.Cx.emp ~ty vapp
-    | Tm.Cons (t0, _), Tm.Car -> t0
-    | Tm.Cons (_, t1), Tm.Cdr -> t1
-    | Tm.LblRet t, Tm.LblCall -> t
-    | Tm.Tt, Tm.If info -> info.tcase
-    | Tm.Ff, Tm.If info -> info.fcase
-    | _ -> failwith "TODO: plug"
+let inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
+  base_cx >>= fun cx ->
+  let (module V) = Cx.evaluator cx in
+  let Tm.B (nm, tm) = tm_bnd in
+  let varg = Cx.eval cx arg in
+  let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
+  let el = Cx.eval lcx tm in
+  let vty = V.inst_clo ty_clo varg in
+  ret @@ Cx.quote cx ~ty:vty el
 
-  (* TODO: this sorry attempt results in things getting repeatedly evaluated *)
-  let (%%) (ty, tm) frame =
-    let vty = T.Cx.eval T.Cx.emp ty in
-    let tm' = plug (vty, tm) frame in
-    let vty' = T.infer_frame T.Cx.emp ~ty:vty ~hd:(T.Cx.eval T.Cx.emp tm) frame in
-    let ty' = T.Cx.quote_ty T.Cx.emp vty' in
-    ty', tm'
-end
+let plug (ty, tm) frame =
+  base_cx >>= fun cx ->
+  let (module V) = Cx.evaluator cx in
+
+  match Tm.unleash tm, frame with
+  | Tm.Up (hd, sp), _ ->
+    ret @@ Tm.up (hd, sp #< frame)
+  | Tm.Lam bnd, Tm.FunApp arg ->
+    let dom, cod = V.unleash_pi ty in
+    inst_bnd (cod, bnd) (dom, arg)
+  | Tm.ExtLam _, Tm.ExtApp args ->
+    let vargs = List.map (Cx.eval_dim cx) args in
+    let ty, _ = V.unleash_ext ty vargs in
+    let vlam = Cx.eval cx tm in
+    let vapp = V.ext_apply vlam vargs in
+    ret @@ Cx.quote cx ~ty vapp
+  | Tm.Cons (t0, _), Tm.Car -> ret t0
+  | Tm.Cons (_, t1), Tm.Cdr -> ret t1
+  | Tm.LblRet t, Tm.LblCall -> ret t
+  | Tm.Tt, Tm.If info -> ret info.tcase
+  | Tm.Ff, Tm.If info -> ret info.fcase
+  | _ -> failwith "TODO: plug"
+
+(* TODO: this sorry attempt results in things getting repeatedly evaluated *)
+let (%%) (ty, tm) frame =
+  base_cx >>= fun cx ->
+  let vty = Cx.eval cx ty in
+  plug (vty, tm) frame >>= fun tm' ->
+  let vty' = Typing.infer cx (Tm.Down {ty; tm}, Emp #< frame) in
+  let ty' = Cx.quote_ty cx vty' in
+  ret (ty', tm')
+
 
 let push_guess gm ~ty0 ~ty1 tm  =
   let alpha = Name.fresh () in
@@ -462,13 +471,11 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
   let rec go sp0 sp1 =
     match sp0, sp1 with
     | Emp, Emp ->
-      typechecker >>= fun (module T) ->
-      let module HSubst = HSubst (T) in
       if x0 = x1 then
         lookup_var x0 tw0 >>= fun ty0 ->
         lookup_var x1 tw1 >>= fun ty1 ->
-        let vty0 = T.Cx.eval T.Cx.emp ty0 in
-        let vty1 = T.Cx.eval T.Cx.emp ty1 in
+        eval ty0 >>= fun vty0 ->
+        eval ty1 >>= fun vty1 ->
         ret (vty0, vty1)
       else
         begin
@@ -478,60 +485,53 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 
     | Snoc (sp0, Tm.FunApp t0), Snoc (sp1, Tm.FunApp t1) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
-      typechecker >>= fun (module T) ->
-      let module HSubst = HSubst (T) in
-      let dom0, cod0 = T.Cx.Eval.unleash_pi ty0 in
-      let dom1, cod1 = T.Cx.Eval.unleash_pi ty1 in
-      let tdom0 = T.Cx.quote_ty T.Cx.emp dom0 in
-      let tdom1 = T.Cx.quote_ty T.Cx.emp dom1 in
+      evaluator >>= fun (cx, (module V)) ->
+      let dom0, cod0 = V.unleash_pi ty0 in
+      let dom1, cod1 = V.unleash_pi ty1 in
+      let tdom0 = Cx.quote_ty cx dom0 in
+      let tdom1 = Cx.quote_ty cx dom1 in
       active @@ Problem.eqn ~ty0:tdom0 ~ty1:tdom1 ~tm0:t0 ~tm1:t1 >>
-      let cod0t0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval T.Cx.emp t0 in
-      let cod0t1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval T.Cx.emp t1 in
+      let cod0t0 = V.inst_clo cod0 @@ Cx.eval cx t0 in
+      let cod0t1 = V.inst_clo cod1 @@ Cx.eval cx t1 in
       ret (cod0t0, cod0t1)
 
     | Snoc (sp0, Tm.ExtApp ts0), Snoc (sp1, Tm.ExtApp ts1) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
-      typechecker >>= fun (module T) ->
-      let module HSubst = HSubst (T) in
-      let rs0 = List.map (fun t -> T.Cx.eval_dim T.Cx.emp t) ts0 in
-      let rs1 = List.map (fun t -> T.Cx.eval_dim T.Cx.emp t) ts1 in
+      evaluator >>= fun (cx, (module V)) ->
+      let rs0 = List.map (Cx.eval_dim cx) ts0 in
+      let rs1 = List.map (Cx.eval_dim cx) ts1 in
       (* TODO: unify the dimension spines ts0, ts1 *)
-      let ty'0, sys0 = T.Cx.Eval.unleash_ext ty0 rs0 in
-      let ty'1, sys1 = T.Cx.Eval.unleash_ext ty1 rs1 in
-      let rst0 = T.Cx.Eval.make @@ Val.Rst {ty = ty'0; sys = sys0} in
-      let rst1 = T.Cx.Eval.make @@ Val.Rst {ty = ty'1; sys = sys1} in
+      let ty'0, sys0 = V.unleash_ext ty0 rs0 in
+      let ty'1, sys1 = V.unleash_ext ty1 rs1 in
+      let rst0 = D.make @@ D.Rst {ty = ty'0; sys = sys0} in
+      let rst1 = D.make @@ D.Rst {ty = ty'1; sys = sys1} in
       ret (rst0, rst1)
 
     | Snoc (sp0, Tm.Car), Snoc (sp1, Tm.Car) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
-      typechecker >>= fun (module T) ->
-      let module HSubst = HSubst (T) in
-      let dom0, _ = T.Cx.Eval.unleash_sg ty0 in
-      let dom1, _ = T.Cx.Eval.unleash_sg ty1 in
+      evaluator >>= fun (_, (module V)) ->
+      let dom0, _ = V.unleash_sg ty0 in
+      let dom1, _ = V.unleash_sg ty1 in
       ret (dom0, dom1)
 
     | Snoc (sp0, Tm.Cdr), Snoc (sp1, Tm.Cdr) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
-      typechecker >>= fun (module T) ->
-      let module HSubst = HSubst (T) in
-      let _, cod0 = T.Cx.Eval.unleash_sg ty0 in
-      let _, cod1 = T.Cx.Eval.unleash_sg ty1 in
-      let cod0 = T.Cx.Eval.inst_clo cod0 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
-      let cod1 = T.Cx.Eval.inst_clo cod1 @@ T.Cx.eval_cmd T.Cx.emp (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
+      evaluator >>= fun (cx, (module V)) ->
+      let _, cod0 = V.unleash_sg ty0 in
+      let _, cod1 = V.unleash_sg ty1 in
+      let cod0 = V.inst_clo cod0 @@ Cx.eval_cmd cx (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
+      let cod1 = V.inst_clo cod1 @@ Cx.eval_cmd cx (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
       ret (cod0, cod1)
 
     | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
-      typechecker >>= fun (module T) ->
-      let module HSubst = HSubst (T) in
-      let _, _, ty0 = T.Cx.Eval.unleash_lbl_ty ty0 in
-      let _, _, ty1 = T.Cx.Eval.unleash_lbl_ty ty1 in
+      evaluator >>= fun (_, (module V)) ->
+      let _, _, ty0 = V.unleash_lbl_ty ty0 in
+      let _, _, ty1 = V.unleash_lbl_ty ty1 in
       ret (ty0, ty1)
 
     | Snoc (sp0, Tm.If info0), Snoc (sp1, Tm.If info1) ->
       go sp0 sp1 >>= fun (_ty0, _ty1) ->
-      typechecker >>= fun (module T) ->
-      let module HSubst = HSubst (T) in
       let y = Name.fresh () in
       let mot0y = Tm.unbind_with (Tm.var y ~twin:`TwinL) info0.mot in
       let mot1y = Tm.unbind_with (Tm.var y ~twin:`TwinR) info1.mot in
@@ -539,15 +539,15 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       active @@ Problem.all y (Tm.make Tm.Bool) @@
       Problem.eqn ~ty0:univ ~ty1:univ ~tm0:mot0y ~tm1:mot1y
       >>
-      let bool = T.Cx.Eval.make Val.Bool in
-      let mot0_tt = HSubst.inst_ty_bnd info0.mot (bool, Tm.make Tm.Tt) in
-      let mot0_ff = HSubst.inst_ty_bnd info0.mot (bool, Tm.make Tm.Ff) in
-      let mot1_tt = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Tt) in
-      let mot1_ff = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Ff) in
+      let bool = D.make D.Bool in
+      inst_ty_bnd info0.mot (bool, Tm.make Tm.Tt) >>= fun mot0_tt ->
+      inst_ty_bnd info0.mot (bool, Tm.make Tm.Ff) >>= fun mot0_ff ->
+      inst_ty_bnd info1.mot (bool, Tm.make Tm.Tt) >>= fun mot1_tt ->
+      inst_ty_bnd info1.mot (bool, Tm.make Tm.Ff) >>= fun mot1_ff ->
       active @@ Problem.eqn ~ty0:mot0_tt ~tm0:info0.tcase ~ty1:mot1_tt ~tm1:info1.tcase >>
       active @@ Problem.eqn ~ty0:mot0_ff ~tm0:info0.fcase ~ty1:mot1_ff ~tm1:info1.fcase >>
-      let ty0 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info0.mot (bool, Tm.up (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0)) in
-      let ty1 = T.Cx.eval T.Cx.emp @@ HSubst.inst_ty_bnd info1.mot (bool, Tm.up (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1)) in
+      (inst_ty_bnd info0.mot (bool, Tm.up (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0)) >>= eval) >>= fun ty0 ->
+      (inst_ty_bnd info1.mot (bool, Tm.up (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1)) >>= eval) >>= fun ty1 ->
       ret (ty0, ty1)
 
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
@@ -641,15 +641,15 @@ let rec subtype ty0 ty1 =
 
 
 let normalize_eqn q =
-  typechecker >>= fun (module T) ->
-  let vty0 = T.Cx.eval T.Cx.emp q.ty0 in
-  let vty1 = T.Cx.eval T.Cx.emp q.ty1 in
-  let el0 = T.Cx.eval T.Cx.emp q.tm0 in
-  let el1 = T.Cx.eval T.Cx.emp q.tm1 in
-  let tm0 = T.Cx.quote T.Cx.emp vty0 el0 in
-  let tm1 = T.Cx.quote T.Cx.emp vty1 el1 in
-  let ty0 = T.Cx.quote_ty T.Cx.emp vty0 in
-  let ty1 = T.Cx.quote_ty T.Cx.emp vty1 in
+  base_cx >>= fun cx ->
+  let vty0 = Cx.eval cx q.ty0 in
+  let vty1 = Cx.eval cx q.ty1 in
+  let el0 = Cx.eval cx q.tm0 in
+  let el1 = Cx.eval cx q.tm1 in
+  let tm0 = Cx.quote cx vty0 el0 in
+  let tm1 = Cx.quote cx vty1 el1 in
+  let ty0 = Cx.quote_ty cx vty0 in
+  let ty1 = Cx.quote_ty cx vty1 in
   ret {ty0; ty1; tm0; tm1}
 
 (* invariant: will not be called on equations which are already reflexive *)
@@ -684,13 +684,6 @@ let rigid_rigid q =
       end
     else
       block @@ Unify q
-
-let (%%) (ty, tm) frame =
-  typechecker >>= fun (module T) ->
-  let module HSubst = HSubst (T) in
-  let open HSubst in
-  ret @@ (ty, tm) %% frame
-
 
 let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
@@ -803,10 +796,10 @@ let rec lower tele alpha ty =
 
   | Tm.Sg (dom, cod) ->
     hole `Flex tele dom @@ fun t0 ->
-    (in_scopes (Bwd.to_list tele) typechecker) >>= fun (module T) ->
-    let module HS = HSubst (T) in
-    let vdom = T.Cx.eval T.Cx.emp dom in
-    let cod' = HS.inst_ty_bnd cod (vdom, Tm.up t0) in
+    in_scopes (Bwd.to_list tele) begin
+      eval dom >>= fun vdom ->
+      inst_ty_bnd cod (vdom, Tm.up t0)
+    end >>= fun cod' ->
     hole `Flex tele cod' @@ fun t1 ->
     define tele alpha `Transparent ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
@@ -822,10 +815,13 @@ let rec lower tele alpha ty =
 
       | Some (y, ty0, z, ty1, s, (u, v)) ->
         let tele' = tele #< (y, `P ty0) #< (z, `P ty1) in
-        (in_scopes (Bwd.to_list tele') typechecker) >>= fun (module T) ->
-        let module HS = HSubst (T) in
-        let vty = T.Cx.eval T.Cx.emp @@ abstract_ty tele dom in
-        let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) @@ HS.inst_ty_bnd cod (vty, s) in
+        in_scopes (Bwd.to_list tele') begin
+          eval @@ abstract_ty tele dom >>= fun vty ->
+          begin
+            inst_ty_bnd cod (vty, s) >>= fun cod' ->
+            ret @@ abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod'
+          end
+        end >>= fun pi_ty ->
         hole `Flex tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
         define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>

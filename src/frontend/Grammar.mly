@@ -12,11 +12,11 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON COLON_ANGLE COMMA DOT PIPE CARET
+%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET
 %token EQUALS
-%token RIGHT_ARROW RRIGHT_ARROW
+%token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH END
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN
+%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV DFIX
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
@@ -275,15 +275,19 @@ kind:
 tm:
   | BOOL
     { fun _env ->
-      make_node $startpos $endpos @@ Tm.Bool }
+      make_node $startpos $endpos Tm.Bool }
 
   | TT
     { fun _env ->
-      make_node $startpos $endpos @@ Tm.Tt }
+      make_node $startpos $endpos Tm.Tt }
 
   | FF
     { fun _env ->
-      make_node $startpos $endpos @@ Tm.Ff }
+      make_node $startpos $endpos Tm.Ff }
+
+  | BULLET
+    { fun _env ->
+      make_node $startpos $endpos Tm.TickConst }
 
   | i = NUMERAL
     { fun _env ->
@@ -317,15 +321,25 @@ tm:
     { fun env ->
       ext_from_multibind $startpos $endpos @@ mb env }
 
+  | LPR; TRIANGLE_RIGHT; ty = bind(tm); RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Later (ty env) }
+
   | LPR; rst = constrained; RPR
     { fun env ->
       let ty, sys = rst env in
       make_node $startpos $endpos @@
-      Tm.Rst {ty; sys}}
+      Tm.Rst {ty; sys} }
 
   | LPR; LAM; mb = multibind(tm); RPR
     { fun env ->
       lam_from_multibind (Some ($startpos, $endpos)) @@ mb env }
+
+  | LPR; NEXT; bnd = bind(tm); RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Next (bnd env) }
 
   | LPR; CONS; e0 = tm; e1 = tm; RPR
     { fun env ->
@@ -367,7 +381,11 @@ head:
     { fun env ->
       Tm.Coe {r = r0 env; r' = r1 env; ty = ty env; tm = tm env} }
 
-  | LPR; COLON_ANGLE; ty = tm; tm = tm; RPR
+  | LPR; DFIX; r = tm; ty = tm; bdy = bind(tm); RPR
+    { fun env ->
+      Tm.DFix {r = r env; ty = ty env; bdy = bdy env} }
+
+  | LPR; COLON; ty = tm; tm = tm; RPR
     { fun env ->
       Tm.Down {ty = ty env; tm = tm env} }
 
@@ -395,6 +413,11 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.LblCall }
+
+  | LPR; PREV; t = tm; e = cut; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, fs #< (Tm.Prev (t env)) }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->

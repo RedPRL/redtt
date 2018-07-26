@@ -1,20 +1,13 @@
-type value = Val.value
-type cx = LocalCx.t
+type value = Domain.value
+type cx = Cx.t
 
-module type S =
+module Error :
 sig
-  module Cx : LocalCx.S
-  module Error :
-  sig
-    type t
-    exception E of t
-    val pp : t Pretty.t0
-  end
-
-  val check : cx -> value -> Tm.tm -> unit
-  val infer : cx -> Tm.tm Tm.cmd -> value
-  val infer_frame : cx -> ty:value -> hd:value -> Tm.tm Tm.frame -> value
-  val check_boundary : cx -> value -> Val.val_sys -> Tm.tm -> unit
+  type t
+  exception E of t
+  val pp : t Pretty.t0
 end
 
-module M (Sig : sig val globals : GlobalEnv.t end) : S
+val check : cx -> value -> Tm.tm -> unit
+val infer : cx -> Tm.tm Tm.cmd -> value
+val check_boundary : cx -> value -> Domain.val_sys -> Tm.tm -> unit
