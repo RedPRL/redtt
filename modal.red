@@ -39,4 +39,13 @@ let stream/tl (xs : stream) : Ltr stream =
 let tts : stream =
   Fix stream (stream/cons tt) 0
 
+
+
+
+let box/example (x : bool) : (b : `(□ bool)) × Path bool x `(open b) =
+  if x then
+    < `(shut tt), λ _ → tt >
+  else
+    < `(shut ff), λ _ → ff >
+
 debug
