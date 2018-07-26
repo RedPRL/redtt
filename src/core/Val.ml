@@ -46,6 +46,7 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_later : value -> tick_clo
+  val unleash_box_modality : value -> value
   val unleash_fcom : value -> dir * value * comp_sys
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
@@ -97,6 +98,7 @@ struct
     | UnleashExtError of value
     | UnleashVError of value
     | UnleashLaterError of value
+    | UnleashBoxModalityError of value
     | UnleashCoRError of value
     | UnleashLblTyError of value
     | UnleashFComError of value
@@ -1606,6 +1608,13 @@ struct
     | _ ->
       raise @@ E (UnleashLaterError v)
 
+  and unleash_box_modality v =
+    match unleash v with
+    | BoxModality ty -> ty
+    | Rst rst -> unleash_box_modality rst.ty
+    | _ ->
+      raise @@ E (UnleashBoxModalityError v)
+
   and unleash_sg v =
     match unleash v with
     | Sg {dom; cod} -> dom, cod
@@ -1899,8 +1908,51 @@ struct
       failwith "prev"
 
 
-  and modal_open _el =
-    failwith "TODO: modal_open"
+  and modal_open el =
+    match unleash el with
+    | Shut el ->
+      el
+
+    | Up info ->
+      let ty = unleash_box_modality info.ty in
+      let open_face = Face.map @@ fun _ _ a -> modal_open a in
+      let open_sys = List.map open_face info.sys in
+      make @@ Up {ty; neu = Open info.neu; sys = open_sys}
+
+    | Coe info ->
+      (* EXPERIMENTAL !!! *)
+      let x, boxtyx = Abs.unleash1 info.abs in
+      let tyx = unleash_box_modality boxtyx in
+      let abs = Abs.bind1 x tyx in
+      let el = modal_open info.el in
+      rigid_coe info.dir abs el
+
+    | HCom info ->
+      (* EXPERIMENTAL !!! *)
+      let ty = unleash_box_modality info.ty in
+      let cap = modal_open info.cap in
+      let open_face =
+        Face.map @@ fun _ _ abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ modal_open v
+      in
+      let sys = List.map open_face info.sys in
+      rigid_hcom info.dir ty cap sys
+
+    | GHCom info ->
+      (* EXPERIMENTAL !!! *)
+      let ty = unleash_box_modality info.ty in
+      let cap = modal_open info.cap in
+      let open_face =
+        Face.map @@ fun _ _ abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ modal_open v
+      in
+      let sys = List.map open_face info.sys in
+      rigid_ghcom info.dir ty cap sys
+
+    | _ ->
+      failwith "modal_open"
 
 
   (* the equation oracle `phi` is for continuations `ty0` and `equiv`
@@ -2273,6 +2325,10 @@ struct
       | UnleashLaterError v ->
         Format.fprintf fmt
           "Tried to unleash %a as later modality."
+          pp_value v
+      | UnleashBoxModalityError v ->
+        Format.fprintf fmt
+          "Tried to unleash %a as box modality."
           pp_value v
       | UnleashExtError v ->
         Format.fprintf fmt

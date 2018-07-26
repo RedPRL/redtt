@@ -35,6 +35,7 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_later : value -> tick_clo
+  val unleash_box_modality : value -> value
   val unleash_fcom : value -> dir * value * comp_sys
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
