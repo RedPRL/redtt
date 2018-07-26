@@ -42,4 +42,6 @@ let box/example (x : bool) : (b : □ bool) × Path bool x `(open b) =
   else
     < shut ff, λ _ → ff >
 
+let sequence : type = □ (stream/L 0)
+
 debug

@@ -125,10 +125,8 @@ let lookup i {hyps; _} =
     classifier
 
 let lookup_constant nm tw cx =
-  if cx.all_locks > 0 then
-    failwith "Hypothesis is inaccessible (modal, taste it!)"
-  else
-    GlobalEnv.lookup_ty cx.sign nm tw
+  (* For constants, the only locks that are relevant are the global ones. Ignore the local locks. *)
+  GlobalEnv.lookup_ty cx.sign nm tw
 
 let restrict cx r r' =
   let phi = Restriction.as_action cx.rel in

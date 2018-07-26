@@ -7,7 +7,7 @@ type 'a param =
 
 type ty = Tm.tm
 type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
-type lock_info = {locks : int; killed : bool}
+type lock_info = {locks : int; killed : bool; constant : bool}
 type t = {env : (Name.t * entry param * lock_info) list; rel : Restriction.t}
 
 
@@ -16,13 +16,13 @@ let emp () =
    rel = Restriction.emp ()}
 
 let ext (sg : t) nm param : t =
-  {sg with env = (nm, param, {locks = 0; killed = false}) :: sg.env}
+  {sg with env = (nm, param, {locks = 0; killed = false; constant = false}) :: sg.env}
 
 let ext_tick (sg : t) nm : t =
-  {sg with env = (nm, `Tick, {locks = 0; killed = false}) :: sg.env}
+  {sg with env = (nm, `Tick, {locks = 0; killed = false; constant = false}) :: sg.env}
 
 let ext_dim (sg : t) nm : t =
-  {sg with env = (nm, `I, {locks = 0; killed = false}) :: sg.env}
+  {sg with env = (nm, `I, {locks = 0; killed = false; constant = false}) :: sg.env}
 
 let ext_lock (sg : t) : t =
   let go (nm, entry, linfo) =
@@ -61,7 +61,7 @@ let kill_from_tick (sg : t) nm : t =
 let define (sg : t) nm ~ty ~tm =
   let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm in
   let sys = [face] in
-  {sg with env = (nm, `P {ty; sys}, {locks = 0; killed = false}) :: sg.env}
+  {sg with env = (nm, `P {ty; sys}, {locks = 0; killed = false; constant = true}) :: sg.env}
 
 let lookup_entry env nm tw =
   let rec go =
@@ -69,7 +69,7 @@ let lookup_entry env nm tw =
     | [] -> failwith "GlobalEnv.lookup_entry"
     | (nm', prm, linfo) :: env ->
       if nm' = nm then
-        if linfo.locks > 0 || linfo.killed then
+        if not linfo.constant && (linfo.locks > 0 || linfo.killed) then
           failwith "GlobalEnv.lookup_entry: not accessible (modal!!)"
         else
           match prm, tw with
