@@ -39,6 +39,8 @@ let rec abstract_tm xs tm =
   | Emp -> tm
   | Snoc (xs, (x, `P _)) ->
     abstract_tm xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+  | Snoc (xs, (x, `Tick)) ->
+    abstract_tm xs @@ Tm.make @@ Tm.Next (Tm.bind x tm)
   | Snoc (xs, (x, `I)) ->
     let bnd = Tm.NB (Emp #< None, Tm.close_var x 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
@@ -59,6 +61,8 @@ let rec abstract_ty (gm : telescope) cod =
   | Snoc (gm, (x, `I)) ->
     let cod' = Tm.close_var x ~twin:(fun tw -> tw) 0 cod in
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB (Emp #< (Name.name x), (cod', [])))
+  | Snoc (gm, (x, `Tick)) ->
+    abstract_ty gm @@ Tm.make @@ Tm.Later (Tm.bind x cod)
   | Snoc (gm, (_, `Lock)) ->
     abstract_ty gm @@ Tm.make @@ Tm.BoxModality cod
   | _ ->
@@ -74,6 +78,10 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     Tm.FunApp (Tm.up @@ Tm.var x)
   | `R _ ->
     Tm.CoRForce
+  | `Tick ->
+    Tm.Prev (Tm.up @@ Tm.var x)
+  | `Lock ->
+    Tm.Open
   | _ ->
     failwith "TODO: telescope_to_spine"
 

@@ -16,6 +16,7 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH END
+%token DIM TICK LOCK
 %token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV DFIX BOX_MODALITY OPEN SHUT
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
@@ -167,10 +168,17 @@ eterm:
     { E.Rst (ty, sys)}
 
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
-    { E.Pi (["_", dom], cod) }
+    { E.Pi ([`Ty ("_", dom)], cod) }
 
   | dom = atomic_eterm; TIMES; cod = eterm
-    { E.Sg (["_", dom], cod) }
+    { E.Sg ([`Ty ("_", dom)], cod) }
+
+  | BOX_MODALITY; ty = eterm
+    { E.Pi ([`Lock], ty)}
+
+  | SHUT; tm = eterm
+    { E.Shut tm }
+
 
 eface:
   | r0 = atomic_eterm; EQUALS; r1 = atomic_eterm; RRIGHT_ARROW; e = eterm
@@ -178,16 +186,22 @@ eface:
 
 
 escheme:
-  | tele = list(escheme_cell); COLON; cod = eterm
+  | tele = list(etele_cell); COLON; cod = eterm
     { (tele, cod) }
-
-escheme_cell:
-  | LPR; a = ATOM; COLON; ty = eterm; RPR
-    { (a, ty) }
 
 etele_cell:
   | LPR; a = ATOM; COLON; ty = eterm; RPR
-    { (a, ty) }
+    { `Ty (a, ty) }
+  | LPR; a = ATOM; COLON; TICK; RPR
+    { `Tick a }
+  | LPR; a = ATOM; COLON; DIM; RPR
+    { `I a }
+  | DIM
+    { `I "_" }
+  | TICK
+    { `Tick "_" }
+  | LOCK
+    { `Lock }
 
 esig:
   | d = edecl; esig = esig

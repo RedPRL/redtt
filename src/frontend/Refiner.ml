@@ -197,6 +197,19 @@ let rec tac_lambda names tac ty =
         M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
     end
 
+  | Tm.Later cod ->
+    begin
+      match names with
+      | [] -> tac ty
+      | name :: names ->
+        let x = Name.named @@ Some name in
+        let codx = Tm.unbind_with (Tm.var x) cod in
+        M.in_scope x `Tick begin
+          tac_wrap_nf (tac_lambda names tac) codx
+        end >>= fun bdyx ->
+        M.ret @@ Tm.make @@ Tm.Next (Tm.bind x bdyx)
+    end
+
   | Tm.Ext (Tm.NB (nms, _) as ebnd) ->
     begin
       match names with
