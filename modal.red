@@ -50,4 +50,11 @@ let sequence/cons (x : bool) (xs : sequence) : sequence =
       `(open (car (bool/constant x)))
       (λ α → `(open xs))
 
+let sequence/hd (xs : sequence) : bool =
+  stream/hd `(open xs)
+
+let sequence/tl (xs : sequence) : sequence =
+  shut
+    `(prev ∙ (stream/tl (open xs)))
+
 debug
