@@ -1,5 +1,5 @@
 type value = Domain.value
-type cx = LocalCx.t
+type cx = Cx.t
 
 module Error :
 sig

@@ -470,7 +470,7 @@ struct
         | Tm.Up cmd ->
           M.lift C.base_cx >>= fun cx ->
           let vty = Typing.infer cx cmd in
-          M.ret (LocalCx.quote_ty cx vty, cmd)
+          M.ret (Cx.quote_ty cx vty, cmd)
         | _ ->
           failwith "Cannot elaborate `term"
       end

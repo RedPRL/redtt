@@ -13,7 +13,7 @@ let check_eq_clock = ref 0.
 
 let _ =
   Diagnostics.on_termination @@ fun _ ->
-  Format.eprintf "[diagnostic]: LocalCx spent %fs in checking equality@." !check_eq_clock
+  Format.eprintf "[diagnostic]: Cx spent %fs in checking equality@." !check_eq_clock
 
 (* The way that we model dimensions is now incompatible with the union-find version of things.
    We need to find a new way. *)

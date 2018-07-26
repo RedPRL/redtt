@@ -20,8 +20,8 @@ let _ =
 let normalize_ty ty =
   let now0 = Unix.gettimeofday () in
   M.lift C.base_cx >>= fun cx ->
-  let vty = LocalCx.eval cx ty in
-  let ty = LocalCx.quote_ty cx vty in
+  let vty = Cx.eval cx ty in
+  let ty = Cx.quote_ty cx vty in
   let now1 = Unix.gettimeofday () in
   normalization_clock := !normalization_clock +. (now1 -. now0);
   M.ret ty

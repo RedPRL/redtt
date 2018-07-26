@@ -30,8 +30,8 @@ let normalize_param p =
 
   C.base_cx >>= fun cx ->
   let normalize_ty ty =
-    let vty = LocalCx.eval cx ty in
-    LocalCx.quote_ty cx vty
+    let vty = Cx.eval cx ty in
+    Cx.quote_ty cx vty
   in
   match p with
   | `P ty -> C.ret @@ `P (normalize_ty ty)
@@ -57,8 +57,8 @@ let print_diagnostic =
     begin
       C.bind C.base_cx @@ fun cx ->
       C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
-      let vty = LocalCx.eval cx ty in
-      let ty = LocalCx.quote_ty cx vty in
+      let vty = Cx.eval cx ty in
+      let ty = Cx.quote_ty cx vty in
       Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@]@.@."
         (match name with Some name -> name | None -> "Hole")
         Dev.pp_params (Bwd.from_list tele)

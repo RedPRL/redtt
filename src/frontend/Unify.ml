@@ -338,34 +338,34 @@ let try_prune _q =
 
 let evaluator =
   base_cx >>= fun cx ->
-  ret (cx, LocalCx.evaluator cx)
+  ret (cx, Cx.evaluator cx)
 
 let inst_ty_bnd bnd (arg_ty, arg) =
   base_cx >>= fun cx ->
   let Tm.B (nm, tm) = bnd in
-  let varg = LocalCx.eval cx arg in
-  let lcx = LocalCx.def cx ~nm ~ty:arg_ty ~el:varg in
-  let el = LocalCx.eval lcx tm in
-  ret @@ LocalCx.quote_ty cx el
+  let varg = Cx.eval cx arg in
+  let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
+  let el = Cx.eval lcx tm in
+  ret @@ Cx.quote_ty cx el
 
 let eval tm =
   base_cx >>= fun cx ->
-  ret @@ LocalCx.eval cx tm
+  ret @@ Cx.eval cx tm
 
 
 let inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
   base_cx >>= fun cx ->
-  let (module V) = LocalCx.evaluator cx in
+  let (module V) = Cx.evaluator cx in
   let Tm.B (nm, tm) = tm_bnd in
-  let varg = LocalCx.eval cx arg in
-  let lcx = LocalCx.def cx ~nm ~ty:arg_ty ~el:varg in
-  let el = LocalCx.eval lcx tm in
+  let varg = Cx.eval cx arg in
+  let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
+  let el = Cx.eval lcx tm in
   let vty = V.inst_clo ty_clo varg in
-  ret @@ LocalCx.quote cx ~ty:vty el
+  ret @@ Cx.quote cx ~ty:vty el
 
 let plug (ty, tm) frame =
   base_cx >>= fun cx ->
-  let (module V) = LocalCx.evaluator cx in
+  let (module V) = Cx.evaluator cx in
 
   match Tm.unleash tm, frame with
   | Tm.Up (hd, sp), _ ->
@@ -374,11 +374,11 @@ let plug (ty, tm) frame =
     let dom, cod = V.unleash_pi ty in
     inst_bnd (cod, bnd) (dom, arg)
   | Tm.ExtLam _, Tm.ExtApp args ->
-    let vargs = List.map (LocalCx.eval_dim cx) args in
+    let vargs = List.map (Cx.eval_dim cx) args in
     let ty, _ = V.unleash_ext ty vargs in
-    let vlam = LocalCx.eval cx tm in
+    let vlam = Cx.eval cx tm in
     let vapp = V.ext_apply vlam vargs in
-    ret @@ LocalCx.quote cx ~ty vapp
+    ret @@ Cx.quote cx ~ty vapp
   | Tm.Cons (t0, _), Tm.Car -> ret t0
   | Tm.Cons (_, t1), Tm.Cdr -> ret t1
   | Tm.LblRet t, Tm.LblCall -> ret t
@@ -389,10 +389,10 @@ let plug (ty, tm) frame =
 (* TODO: this sorry attempt results in things getting repeatedly evaluated *)
 let (%%) (ty, tm) frame =
   base_cx >>= fun cx ->
-  let vty = LocalCx.eval cx ty in
+  let vty = Cx.eval cx ty in
   plug (vty, tm) frame >>= fun tm' ->
   let vty' = Typing.infer cx (Tm.Down {ty; tm}, Emp #< frame) in
-  let ty' = LocalCx.quote_ty cx vty' in
+  let ty' = Cx.quote_ty cx vty' in
   ret (ty', tm')
 
 
@@ -488,18 +488,18 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       evaluator >>= fun (cx, (module V)) ->
       let dom0, cod0 = V.unleash_pi ty0 in
       let dom1, cod1 = V.unleash_pi ty1 in
-      let tdom0 = LocalCx.quote_ty cx dom0 in
-      let tdom1 = LocalCx.quote_ty cx dom1 in
+      let tdom0 = Cx.quote_ty cx dom0 in
+      let tdom1 = Cx.quote_ty cx dom1 in
       active @@ Problem.eqn ~ty0:tdom0 ~ty1:tdom1 ~tm0:t0 ~tm1:t1 >>
-      let cod0t0 = V.inst_clo cod0 @@ LocalCx.eval cx t0 in
-      let cod0t1 = V.inst_clo cod1 @@ LocalCx.eval cx t1 in
+      let cod0t0 = V.inst_clo cod0 @@ Cx.eval cx t0 in
+      let cod0t1 = V.inst_clo cod1 @@ Cx.eval cx t1 in
       ret (cod0t0, cod0t1)
 
     | Snoc (sp0, Tm.ExtApp ts0), Snoc (sp1, Tm.ExtApp ts1) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
       evaluator >>= fun (cx, (module V)) ->
-      let rs0 = List.map (LocalCx.eval_dim cx) ts0 in
-      let rs1 = List.map (LocalCx.eval_dim cx) ts1 in
+      let rs0 = List.map (Cx.eval_dim cx) ts0 in
+      let rs1 = List.map (Cx.eval_dim cx) ts1 in
       (* TODO: unify the dimension spines ts0, ts1 *)
       let ty'0, sys0 = V.unleash_ext ty0 rs0 in
       let ty'1, sys1 = V.unleash_ext ty1 rs1 in
@@ -519,8 +519,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       evaluator >>= fun (cx, (module V)) ->
       let _, cod0 = V.unleash_sg ty0 in
       let _, cod1 = V.unleash_sg ty1 in
-      let cod0 = V.inst_clo cod0 @@ LocalCx.eval_cmd cx (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
-      let cod1 = V.inst_clo cod1 @@ LocalCx.eval_cmd cx (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
+      let cod0 = V.inst_clo cod0 @@ Cx.eval_cmd cx (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Car) in
+      let cod1 = V.inst_clo cod1 @@ Cx.eval_cmd cx (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Car) in
       ret (cod0, cod1)
 
     | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
@@ -642,14 +642,14 @@ let rec subtype ty0 ty1 =
 
 let normalize_eqn q =
   base_cx >>= fun cx ->
-  let vty0 = LocalCx.eval cx q.ty0 in
-  let vty1 = LocalCx.eval cx q.ty1 in
-  let el0 = LocalCx.eval cx q.tm0 in
-  let el1 = LocalCx.eval cx q.tm1 in
-  let tm0 = LocalCx.quote cx vty0 el0 in
-  let tm1 = LocalCx.quote cx vty1 el1 in
-  let ty0 = LocalCx.quote_ty cx vty0 in
-  let ty1 = LocalCx.quote_ty cx vty1 in
+  let vty0 = Cx.eval cx q.ty0 in
+  let vty1 = Cx.eval cx q.ty1 in
+  let el0 = Cx.eval cx q.tm0 in
+  let el1 = Cx.eval cx q.tm1 in
+  let tm0 = Cx.quote cx vty0 el0 in
+  let tm1 = Cx.quote cx vty1 el1 in
+  let ty0 = Cx.quote_ty cx vty0 in
+  let ty1 = Cx.quote_ty cx vty1 in
   ret {ty0; ty1; tm0; tm1}
 
 (* invariant: will not be called on equations which are already reflexive *)

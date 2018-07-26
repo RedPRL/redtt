@@ -292,10 +292,10 @@ sig
 end
 
 let subst_tm sub ~ty tm =
-  let cx = LocalCx.init sub in
-  let vty = LocalCx.eval cx ty in
-  let el = LocalCx.eval cx tm in
-  LocalCx.quote cx ~ty:vty el
+  let cx = Cx.init sub in
+  let vty = Cx.eval cx ty in
+  let el = Cx.eval cx tm in
+  Cx.quote cx ~ty:vty el
 
 let subst_decl sub ~ty =
   function
