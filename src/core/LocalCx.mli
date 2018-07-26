@@ -2,6 +2,8 @@ type cx
 type t = cx
 type value = Domain.value
 
+val init : GlobalEnv.t -> t
+
 val clear_locals : t -> t
 
 (* Modal left adjoints *)
@@ -46,15 +48,3 @@ val check_subtype : t -> value -> value -> unit
 val quote : t -> ty:value -> value -> Tm.tm
 val quote_ty : t -> value -> Tm.tm
 val check_eq_ty : t -> value -> value -> unit
-
-
-module type S =
-sig
-  type t = cx
-
-  module Eval : Val.S
-
-  val emp : t
-end
-
-module M (Sig : sig val globals : GlobalEnv.t end) : S

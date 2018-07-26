@@ -3,7 +3,6 @@ type cx = LocalCx.t
 
 module type S =
 sig
-  module CxUtil : LocalCx.S
   module Error :
   sig
     type t
@@ -14,6 +13,12 @@ sig
   val check : cx -> value -> Tm.tm -> unit
   val infer : cx -> Tm.tm Tm.cmd -> value
   val check_boundary : cx -> value -> Domain.val_sys -> Tm.tm -> unit
+
+  (* Basic local context, empty except for global constants and restrictions. *)
+  val base_cx : cx
+
+  (* Basic evaluator, set up with global constants and restrictions *)
+  module Eval : Val.S
 end
 
 module M (Sig : sig val globals : GlobalEnv.t end) : S

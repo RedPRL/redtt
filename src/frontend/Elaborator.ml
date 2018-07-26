@@ -474,8 +474,8 @@ struct
         match Tm.unleash tm with
         | Tm.Up cmd ->
           M.lift C.typechecker >>= fun (module T) ->
-          let vty = T.infer T.CxUtil.emp cmd in
-          M.ret (LocalCx.quote_ty T.CxUtil.emp vty, cmd)
+          let vty = T.infer T.base_cx cmd in
+          M.ret (LocalCx.quote_ty T.base_cx vty, cmd)
         | _ ->
           failwith "Cannot elaborate `term"
       end
@@ -581,7 +581,7 @@ struct
             elab_chk env dom e >>= fun t ->
             M.lift C.typechecker >>= fun (module T) ->
             let module HS = HSubst (T) in
-            let vdom = LocalCx.eval T.CxUtil.emp dom in
+            let vdom = LocalCx.eval T.base_cx dom in
             let cod' = HS.inst_ty_bnd cod (vdom, t) in
             go cod' (hd, sp #< (Tm.FunApp t)) efs mode
 

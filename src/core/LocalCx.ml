@@ -239,29 +239,11 @@ let check_subtype cx ty0 ty1 =
     raise exn
 
 
-
-
-module type S =
-sig
-  type t = cx
-  module Eval : Val.S
-  val emp : t
-end
-
-
-module M (Sig : sig val globals : GlobalEnv.t end) : S =
-struct
-  type t = cx
-
-  module Eval = Val.M (GlobalEnv.M (Sig))
-
-  let emp : cx =
-    {sign = Sig.globals;
-     env = Domain.Env.emp;
-     qenv = Quote.Env.emp;
-     hyps = [];
-     ppenv = Pretty.Env.emp;
-     rel = Eval.base_restriction;
-     all_locks = 0}
-end
-
+let init globals =
+  {sign = globals;
+   env = Domain.Env.emp;
+   qenv = Quote.Env.emp;
+   hyps = [];
+   ppenv = Pretty.Env.emp;
+   rel = GlobalEnv.restriction globals;
+   all_locks = 0}

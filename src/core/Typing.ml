@@ -12,7 +12,6 @@ open RedBasis.Bwd
 
 module type S =
 sig
-  module CxUtil : LocalCx.S
   module Error :
   sig
     type t
@@ -23,14 +22,19 @@ sig
   val check : cx -> D.value -> Tm.tm -> unit
   val infer : cx -> Tm.tm Tm.cmd -> value
   val check_boundary : cx -> D.value -> D.val_sys -> Tm.tm -> unit
+
+  (* Basic local context, empty except for global constants and restrictions. *)
+  val base_cx : cx
+
+  (* Basic evaluator, set up with global constants and restrictions *)
+  module Eval : Val.S
 end
 
 type cofibration = (I.t * I.t) list
 
 module M (Sig : sig val globals : GlobalEnv.t end) =
 struct
-  module CxUtil = LocalCx.M (Sig)
-  module Eval = CxUtil.Eval
+  module Eval = Val.M (GlobalEnv.M (Sig))
 
   type error =
     | ExpectedDimension of cx * Tm.tm
@@ -585,7 +589,7 @@ struct
 
         (* zero *)
         let _ =
-          let mot_zero = CxUtil.Eval.inst_clo mot_clo @@ D.make D.Zero in
+          let mot_zero = Eval.inst_clo mot_clo @@ D.make D.Zero in
           check cx mot_zero info.zcase
         in
 
@@ -626,7 +630,7 @@ struct
           let T.B (nm_pcase, pcase) = info.pcase in
           let nat = D.make D.Nat in
           let cx_n, n = LocalCx.ext_ty cx ~nm:nm_pcase nat in
-          let mot_pos = CxUtil.Eval.inst_clo mot_clo @@ D.make (D.Pos n) in
+          let mot_pos = Eval.inst_clo mot_clo @@ D.make (D.Pos n) in
           check cx_n mot_pos pcase
         in
 
@@ -635,7 +639,7 @@ struct
           let T.B (nm_ncase, ncase) = info.ncase in
           let nat = D.make D.Nat in
           let cx_n, n = LocalCx.ext_ty cx ~nm:nm_ncase nat in
-          let mot_negsuc = CxUtil.Eval.inst_clo mot_clo @@ D.make (D.NegSuc n) in
+          let mot_negsuc = Eval.inst_clo mot_clo @@ D.make (D.NegSuc n) in
           check cx_n mot_negsuc ncase
         in
 
@@ -813,5 +817,7 @@ struct
   and check_is_equivalence cx ~ty0 ~ty1 ~equiv =
     let type_of_equiv = Eval.Macro.equiv ty0 ty1 in
     check cx type_of_equiv equiv
+
+  let base_cx = LocalCx.init Sig.globals
 end
 
