@@ -82,7 +82,24 @@ let lookup_entry env nm tw =
           | _ -> failwith "GlobalEnv.lookup_entry"
       else
         go env
-  in go env
+  in
+  go env
+
+let unsafe_lookup_entry env nm tw =
+  let rec go =
+    function
+    | [] -> failwith "GlobalEnv.lookup_entry"
+    | (nm', prm, _) :: env ->
+      if nm' = nm then
+        match prm, tw with
+        | `P a, _ -> a
+        | `Tw (a, _), `TwinL -> a
+        | `Tw (_, a), `TwinR -> a
+        | _ -> failwith "GlobalEnv.lookup_entry"
+      else
+        go env
+  in
+  go env
 
 let lookup_ty sg nm (tw : Tm.twin) =
   let {ty; _} = lookup_entry sg.env nm tw in
@@ -138,7 +155,7 @@ struct
   let lookup nm tw =
     let entry =
       try
-        lookup_entry (clear_locks Sig.globals).env nm tw
+        unsafe_lookup_entry Sig.globals.env nm tw
       with
       | exn ->
         Format.eprintf "Internal error: %a[%a] not found in {@[<1>%a@]}@."
