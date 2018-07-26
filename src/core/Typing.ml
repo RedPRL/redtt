@@ -326,14 +326,14 @@ struct
           let cx', phi = LocalCx.restrict cx (`Atom vty.x) `Dim0 in
           let el0 = check_eval cx' vty.ty0 vin.tm0 in
           let el1 = check_eval cx vty.ty1 vin.tm1 in
-          CxUtil.check_eq cx' ~ty:(D.Value.act phi vty.ty1) (Eval.apply (Eval.car vty.equiv) el0) @@ D.Value.act phi el1
+          LocalCx.check_eq cx' ~ty:(D.Value.act phi vty.ty1) (Eval.apply (Eval.car vty.equiv) el0) @@ D.Value.act phi el1
         | _ ->
           failwith "v/vin dimension mismatch"
       end
 
     | _, T.Up tm ->
       let ty' = infer cx tm in
-      CxUtil.check_subtype cx ty' ty
+      LocalCx.check_subtype cx ty' ty
 
     | _, T.Let (cmd, T.B (nm, t1)) ->
       let ty' = infer cx cmd in
@@ -376,7 +376,7 @@ struct
   and check_boundary_face cx ty face tm =
     match face with
     | Face.True (_, _, el) ->
-      CxUtil.check_eq cx ~ty el @@
+      LocalCx.check_eq cx ~ty el @@
       LocalCx.eval cx tm
 
     | Face.False _ ->
@@ -386,7 +386,7 @@ struct
       let r, r' = Eq.unleash p in
       try
         let cx', phi = LocalCx.restrict cx r r' in
-        CxUtil.check_eq cx' ~ty:(D.Value.act phi ty) el @@
+        LocalCx.check_eq cx' ~ty:(D.Value.act phi ty) el @@
         LocalCx.eval cx' tm
       with
       | I.Inconsistent ->
@@ -435,7 +435,7 @@ struct
             let v = LocalCx.eval cx' tm in
             let v' = LocalCx.eval cx' tm' in
             let phi = I.cmp phi (I.equate r0 r1) in
-            CxUtil.check_eq cx' ~ty:(D.Value.act phi ty) v v'
+            LocalCx.check_eq cx' ~ty:(D.Value.act phi ty) v v'
           with
           | I.Inconsistent -> ()
         end;
@@ -467,7 +467,7 @@ struct
                 (* check that tm<r/x> = cap under r0=r1 *)
                 let cxr0r1, _ = LocalCx.restrict cx r0 r1 in
                 let phirx = I.cmp phir0r1 @@ I.subst r x in
-                CxUtil.check_eq cxr0r1
+                LocalCx.check_eq cxr0r1
                   ~ty:(D.Value.act phirx tyx)
                   (D.Value.act phir0r1 cap)
                   (D.Value.act phirx cap);
@@ -498,7 +498,7 @@ struct
             let v = LocalCx.eval cxx' tm in
             let v' = LocalCx.eval cxx' tm' in
             let phi = I.cmp phir'0r'1 (I.equate r0 r1) in
-            CxUtil.check_eq cxx' ~ty:(D.Value.act phi tyx) v v'
+            LocalCx.check_eq cxx' ~ty:(D.Value.act phi tyx) v v'
           with
           | I.Inconsistent -> ()
         end;
@@ -546,7 +546,7 @@ struct
           check_eval_ty cx @@
           T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
         in
-        CxUtil.check_eq_ty cx v_ty ih.ty;
+        LocalCx.check_eq_ty cx v_ty ih.ty;
         D.{el = LocalCx.eval_frame cx ih.el frm; ty = LocalCx.eval cx info.ty1}
 
       | T.If info ->
@@ -556,7 +556,7 @@ struct
         check_ty cxx mot;
 
         let ih = infer_spine cx hd sp in
-        CxUtil.check_eq_ty cx ih.ty bool;
+        LocalCx.check_eq_ty cx ih.ty bool;
 
         let cx_tt = LocalCx.def cx ~nm ~ty:bool ~el:(D.make D.Tt) in
         let cx_ff = LocalCx.def cx ~nm ~ty:bool ~el:(D.make D.Ff) in
@@ -581,7 +581,7 @@ struct
         let ih = infer_spine cx hd sp in
 
         (* head *)
-        CxUtil.check_eq_ty cx ih.ty nat;
+        LocalCx.check_eq_ty cx ih.ty nat;
 
         (* zero *)
         let _ =
@@ -619,7 +619,7 @@ struct
         let ih = infer_spine cx hd sp in
 
         (* head *)
-        CxUtil.check_eq_ty cx ih.ty int;
+        LocalCx.check_eq_ty cx ih.ty int;
 
         (* pos *)
         let _ =
@@ -649,7 +649,7 @@ struct
 
         let ih = infer_spine cx hd sp in
 
-        CxUtil.check_eq_ty cx ih.ty s1;
+        LocalCx.check_eq_ty cx ih.ty s1;
 
         let cx_base = LocalCx.def cx ~nm ~ty:s1 ~el:(D.make D.Base) in
         let mot_base = LocalCx.eval cx_base mot in
@@ -662,8 +662,8 @@ struct
         let val_loopx = check_eval cx mot_loop lcase in
         let val_loop0 = D.Value.act (I.subst `Dim0 x) val_loopx in
         let val_loop1 = D.Value.act (I.subst `Dim1 x) val_loopx in
-        CxUtil.check_eq cx ~ty:mot_base val_loop0 val_base;
-        CxUtil.check_eq cx ~ty:mot_base val_loop1 val_base;
+        LocalCx.check_eq cx ~ty:mot_base val_loop0 val_base;
+        LocalCx.check_eq cx ~ty:mot_base val_loop1 val_base;
 
         let cx_scrut = LocalCx.def cx ~nm ~ty:s1 ~el:ih.el in
         D.{el = LocalCx.eval_frame cx ih.el frm; ty = LocalCx.eval cx_scrut mot}
@@ -674,7 +674,7 @@ struct
           T.make @@ T.FCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
         in
         let ih = infer_spine cx hd sp in
-        CxUtil.check_eq_ty cx fcom_ty ih.ty;
+        LocalCx.check_eq_ty cx fcom_ty ih.ty;
         D.{el = LocalCx.eval_frame cx ih.el frm; ty = LocalCx.eval cx info.ty}
 
 

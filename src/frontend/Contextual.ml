@@ -291,7 +291,7 @@ let check_eq ~ty tm0 tm1 =
     let el0 = LocalCx.eval lcx tm0 in
     let el1 = LocalCx.eval lcx tm1 in
     try
-      T.CxUtil.check_eq lcx ~ty:vty el0 el1;
+      LocalCx.check_eq lcx ~ty:vty el0 el1;
       ret `Ok
     with
     | exn ->
@@ -303,7 +303,7 @@ let check_subtype ty0 ty1 =
   let vty0 = LocalCx.eval lcx ty0 in
   let vty1 = LocalCx.eval lcx ty1 in
   try
-    T.CxUtil.check_subtype lcx vty0 vty1;
+    LocalCx.check_subtype lcx vty0 vty1;
     ret `Ok
   with
   | exn ->

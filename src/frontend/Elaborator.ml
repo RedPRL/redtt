@@ -475,7 +475,7 @@ struct
         | Tm.Up cmd ->
           M.lift C.typechecker >>= fun (module T) ->
           let vty = T.infer T.CxUtil.emp cmd in
-          M.ret (T.CxUtil.quote_ty T.CxUtil.emp vty, cmd)
+          M.ret (LocalCx.quote_ty T.CxUtil.emp vty, cmd)
         | _ ->
           failwith "Cannot elaborate `term"
       end

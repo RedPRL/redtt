@@ -151,6 +151,11 @@ let evaluator cx : (module Val.S) =
   let module V = Val.M (GlobalEnv.M (Sig)) in
   (module V)
 
+let quoter cx : (module Quote.S) =
+  let (module V) = evaluator cx in
+  let module Q = Quote.M (V) in
+  (module Q)
+
 let eval cx tm =
   let (module V) = evaluator cx in
   try
@@ -194,6 +199,45 @@ let eval_tm_sys cx sys =
   let (module V) = evaluator cx in
   V.eval_tm_sys cx.env sys
 
+let quote cx ~ty el =
+  let (module Q) = quoter cx in
+  Q.quote_nf cx.qenv @@ {ty; el}
+
+let quote_ty cx ty =
+  let (module Q) = quoter cx in
+  Q.quote_ty cx.qenv ty
+
+
+let check_eq cx ~ty el0 el1 =
+  let (module Q) = quoter cx in
+  let now0 = Unix.gettimeofday () in
+  try
+    Q.equiv cx.qenv ~ty el0 el1;
+    let now1 = Unix.gettimeofday () in
+    check_eq_clock := !check_eq_clock +. (now1 -. now0)
+  with
+  | exn ->
+    (* Format.eprintf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1; *)
+    raise exn
+
+let check_eq_ty cx el0 el1 =
+  let (module Q) = quoter cx in
+  try
+    Q.equiv_ty cx.qenv el0 el1
+  with
+  | exn ->
+    (* Format.eprintf "check_eq_ty: %a /= %a@." V.pp_value el0 V.pp_value el1; *)
+    raise exn
+
+let check_subtype cx ty0 ty1 =
+  let (module Q) = quoter cx in
+  try
+    Q.subtype cx.qenv ty0 ty1
+  with
+  | exn ->
+    (* Format.eprintf "subtype: %a /<= %a@." V.pp_value ty0 V.pp_value ty1; *)
+    raise exn
+
 
 
 
@@ -201,16 +245,7 @@ module type S =
 sig
   type t = cx
   module Eval : Val.S
-
   val emp : t
-
-  val check_eq : t -> ty:value -> value -> value -> unit
-  val check_subtype : t -> value -> value -> unit
-
-  val quote : t -> ty:value -> value -> Tm.tm
-  val quote_ty : t -> value -> Tm.tm
-
-  val check_eq_ty : t -> value -> value -> unit
 end
 
 
@@ -228,42 +263,5 @@ struct
      ppenv = Pretty.Env.emp;
      rel = Eval.base_restriction;
      all_locks = 0}
-
-  module Q = Quote.M (Eval)
-
-  let quote cx ~ty el =
-    Q.quote_nf cx.qenv @@ {ty; el}
-
-  let quote_ty cx ty =
-    Q.quote_ty cx.qenv ty
-
-
-  let check_eq cx ~ty el0 el1 =
-    let now0 = Unix.gettimeofday () in
-    try
-      Q.equiv cx.qenv ~ty el0 el1;
-      let now1 = Unix.gettimeofday () in
-      check_eq_clock := !check_eq_clock +. (now1 -. now0)
-    with
-    | exn ->
-      (* Format.eprintf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1; *)
-      raise exn
-
-  let check_eq_ty cx el0 el1 =
-    try
-      Q.equiv_ty cx.qenv el0 el1
-    with
-    | exn ->
-      (* Format.eprintf "check_eq_ty: %a /= %a@." V.pp_value el0 V.pp_value el1; *)
-      raise exn
-
-  let check_subtype cx ty0 ty1 =
-    try
-      Q.subtype cx.qenv ty0 ty1
-    with
-    | exn ->
-      (* Format.eprintf "subtype: %a /<= %a@." V.pp_value ty0 V.pp_value ty1; *)
-      raise exn
-
 end
 

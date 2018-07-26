@@ -41,6 +41,11 @@ val eval_tick : t -> Tm.tm -> Domain.tick
 val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Domain.val_sys
 
 
+val check_eq : t -> ty:value -> value -> value -> unit
+val check_subtype : t -> value -> value -> unit
+val quote : t -> ty:value -> value -> Tm.tm
+val quote_ty : t -> value -> Tm.tm
+val check_eq_ty : t -> value -> value -> unit
 
 
 module type S =
@@ -50,15 +55,6 @@ sig
   module Eval : Val.S
 
   val emp : t
-
-
-  val check_eq : t -> ty:value -> value -> value -> unit
-  val check_subtype : t -> value -> value -> unit
-
-  val quote : t -> ty:value -> value -> Tm.tm
-  val quote_ty : t -> value -> Tm.tm
-
-  val check_eq_ty : t -> value -> value -> unit
 end
 
 module M (Sig : sig val globals : GlobalEnv.t end) : S

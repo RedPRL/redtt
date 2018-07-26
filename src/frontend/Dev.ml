@@ -295,7 +295,7 @@ let subst_tm sub ~ty tm =
   let module T = Typing.M (struct let globals = sub end) in
   let vty = LocalCx.eval T.CxUtil.emp ty in
   let el = LocalCx.eval T.CxUtil.emp tm in
-  T.CxUtil.quote T.CxUtil.emp ~ty:vty el
+  LocalCx.quote T.CxUtil.emp ~ty:vty el
 
 let subst_decl sub ~ty =
   function

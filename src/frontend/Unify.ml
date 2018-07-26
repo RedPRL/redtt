@@ -345,7 +345,7 @@ struct
     let varg = LocalCx.eval T.CxUtil.emp arg in
     let lcx = LocalCx.def T.CxUtil.emp ~nm ~ty:arg_ty ~el:varg in
     let el = LocalCx.eval lcx tm in
-    T.CxUtil.quote_ty T.CxUtil.emp el
+    LocalCx.quote_ty T.CxUtil.emp el
 
   let inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
     let Tm.B (nm, tm) = tm_bnd in
@@ -353,7 +353,7 @@ struct
     let lcx = LocalCx.def T.CxUtil.emp ~nm ~ty:arg_ty ~el:varg in
     let el = LocalCx.eval lcx tm in
     let vty = T.CxUtil.Eval.inst_clo ty_clo varg in
-    T.CxUtil.quote T.CxUtil.emp ~ty:vty el
+    LocalCx.quote T.CxUtil.emp ~ty:vty el
 
 
   let plug (ty, tm) frame =
@@ -368,7 +368,7 @@ struct
       let ty, _ = T.CxUtil.Eval.unleash_ext ty vargs in
       let vlam = LocalCx.eval T.CxUtil.emp tm in
       let vapp = T.CxUtil.Eval.ext_apply vlam vargs in
-      T.CxUtil.quote T.CxUtil.emp ~ty vapp
+      LocalCx.quote T.CxUtil.emp ~ty vapp
     | Tm.Cons (t0, _), Tm.Car -> t0
     | Tm.Cons (_, t1), Tm.Cdr -> t1
     | Tm.LblRet t, Tm.LblCall -> t
@@ -381,7 +381,7 @@ struct
     let vty = LocalCx.eval T.CxUtil.emp ty in
     let tm' = plug (vty, tm) frame in
     let vty' = T.infer T.CxUtil.emp (Tm.Down {ty; tm}, Emp #< frame) in
-    let ty' = T.CxUtil.quote_ty T.CxUtil.emp vty' in
+    let ty' = LocalCx.quote_ty T.CxUtil.emp vty' in
     ty', tm'
 end
 
@@ -480,8 +480,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let module HSubst = HSubst (T) in
       let dom0, cod0 = T.CxUtil.Eval.unleash_pi ty0 in
       let dom1, cod1 = T.CxUtil.Eval.unleash_pi ty1 in
-      let tdom0 = T.CxUtil.quote_ty T.CxUtil.emp dom0 in
-      let tdom1 = T.CxUtil.quote_ty T.CxUtil.emp dom1 in
+      let tdom0 = LocalCx.quote_ty T.CxUtil.emp dom0 in
+      let tdom1 = LocalCx.quote_ty T.CxUtil.emp dom1 in
       active @@ Problem.eqn ~ty0:tdom0 ~ty1:tdom1 ~tm0:t0 ~tm1:t1 >>
       let cod0t0 = T.CxUtil.Eval.inst_clo cod0 @@ LocalCx.eval T.CxUtil.emp t0 in
       let cod0t1 = T.CxUtil.Eval.inst_clo cod1 @@ LocalCx.eval T.CxUtil.emp t1 in
@@ -644,10 +644,10 @@ let normalize_eqn q =
   let vty1 = LocalCx.eval T.CxUtil.emp q.ty1 in
   let el0 = LocalCx.eval T.CxUtil.emp q.tm0 in
   let el1 = LocalCx.eval T.CxUtil.emp q.tm1 in
-  let tm0 = T.CxUtil.quote T.CxUtil.emp vty0 el0 in
-  let tm1 = T.CxUtil.quote T.CxUtil.emp vty1 el1 in
-  let ty0 = T.CxUtil.quote_ty T.CxUtil.emp vty0 in
-  let ty1 = T.CxUtil.quote_ty T.CxUtil.emp vty1 in
+  let tm0 = LocalCx.quote T.CxUtil.emp vty0 el0 in
+  let tm1 = LocalCx.quote T.CxUtil.emp vty1 el1 in
+  let ty0 = LocalCx.quote_ty T.CxUtil.emp vty0 in
+  let ty1 = LocalCx.quote_ty T.CxUtil.emp vty1 in
   ret {ty0; ty1; tm0; tm1}
 
 (* invariant: will not be called on equations which are already reflexive *)
