@@ -63,8 +63,8 @@ let kill_from_tick cx tgen =
         hyp
     in
     {cx with hyps = List.mapi go cx.hyps}
-  | `Global _ ->
-    failwith "TODO: implement kill_from_tick for global tick"
+  | `Global alpha ->
+    {cx with sign = GlobalEnv.kill_from_tick cx.sign alpha}
 
 let ext cx ~nm ty sys =
   let n = Quote.Env.len cx.qenv in
