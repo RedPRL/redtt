@@ -28,10 +28,10 @@ let normalize_param p =
   let module Notation = Monad.Notation (C) in
   let open Notation in
 
-  C.typechecker >>= fun (module T) ->
+  C.base_cx >>= fun cx ->
   let normalize_ty ty =
-    let vty = LocalCx.eval T.base_cx ty in
-    LocalCx.quote_ty T.base_cx vty
+    let vty = LocalCx.eval cx ty in
+    LocalCx.quote_ty cx vty
   in
   match p with
   | `P ty -> C.ret @@ `P (normalize_ty ty)
@@ -55,10 +55,10 @@ let print_diagnostic =
   | UserHole {name; tele; ty; _} ->
     C.local (fun _ -> tele) @@
     begin
-      C.bind C.typechecker @@ fun (module T) ->
+      C.bind C.base_cx @@ fun cx ->
       C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
-      let vty = LocalCx.eval T.base_cx ty in
-      let ty = LocalCx.quote_ty T.base_cx vty in
+      let vty = LocalCx.eval cx ty in
+      let ty = LocalCx.quote_ty cx vty in
       Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@]@.@."
         (match name with Some name -> name | None -> "Hole")
         Dev.pp_params (Bwd.from_list tele)

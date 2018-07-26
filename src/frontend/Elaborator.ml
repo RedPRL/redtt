@@ -305,7 +305,6 @@ struct
       elab_chk env ty e
     | Tm.Sg (dom, cod), Tuple (e :: es) ->
       elab_chk env dom e >>= fun tm0 ->
-      M.lift C.typechecker >>= fun (module T) ->
       let cmd0 = Tm.Down {ty = dom; tm = tm0}, Emp in
       let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
       elab_chk env cod' (Tuple es) >>= fun tm1 ->
@@ -469,9 +468,9 @@ struct
       begin
         match Tm.unleash tm with
         | Tm.Up cmd ->
-          M.lift C.typechecker >>= fun (module T) ->
-          let vty = T.infer T.base_cx cmd in
-          M.ret (LocalCx.quote_ty T.base_cx vty, cmd)
+          M.lift C.base_cx >>= fun cx ->
+          let vty = Typing.infer cx cmd in
+          M.ret (LocalCx.quote_ty cx vty, cmd)
         | _ ->
           failwith "Cannot elaborate `term"
       end

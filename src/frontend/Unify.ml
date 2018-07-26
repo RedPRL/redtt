@@ -336,10 +336,6 @@ let try_prune _q =
    unification would be better served by a purely syntactic approach based on hereditary
    substitution. *)
 
-let base_cx =
-  typechecker >>= fun (module T) ->
-  ret T.base_cx
-
 let evaluator =
   base_cx >>= fun cx ->
   ret (cx, LocalCx.evaluator cx)
@@ -392,11 +388,11 @@ let plug (ty, tm) frame =
 
 (* TODO: this sorry attempt results in things getting repeatedly evaluated *)
 let (%%) (ty, tm) frame =
-  typechecker >>= fun (module T) ->
-  let vty = LocalCx.eval T.base_cx ty in
+  base_cx >>= fun cx ->
+  let vty = LocalCx.eval cx ty in
   plug (vty, tm) frame >>= fun tm' ->
-  let vty' = T.infer T.base_cx (Tm.Down {ty; tm}, Emp #< frame) in
-  let ty' = LocalCx.quote_ty T.base_cx vty' in
+  let vty' = Typing.infer cx (Tm.Down {ty; tm}, Emp #< frame) in
+  let ty' = LocalCx.quote_ty cx vty' in
   ret (ty', tm')
 
 

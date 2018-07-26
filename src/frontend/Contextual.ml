@@ -266,18 +266,16 @@ let active = postpone Active
 let block = postpone Blocked
 
 
-let typechecker : (module Typing.S) m =
+let base_cx =
   get_global_env >>= fun env ->
-  let module G = struct let globals = env end in
-  let module T = Typing.M (G) in
-  ret @@ (module T : Typing.S)
+  ret @@ LocalCx.init env
+
 
 let check ~ty tm =
-  typechecker >>= fun (module T) ->
-  let lcx = T.base_cx in
+  base_cx >>= fun lcx ->
   let vty = LocalCx.eval lcx ty in
   try
-    T.check lcx vty tm;
+    Typing.check lcx vty tm;
     ret `Ok
   with
   | exn ->
@@ -285,8 +283,7 @@ let check ~ty tm =
 
 let check_eq ~ty tm0 tm1 =
   if tm0 = tm1 then ret `Ok else
-    typechecker >>= fun (module T) ->
-    let lcx = T.base_cx in
+    base_cx >>= fun lcx ->
     let vty = LocalCx.eval lcx ty in
     let el0 = LocalCx.eval lcx tm0 in
     let el1 = LocalCx.eval lcx tm1 in
@@ -298,8 +295,7 @@ let check_eq ~ty tm0 tm1 =
       ret @@ `Exn exn
 
 let check_subtype ty0 ty1 =
-  typechecker >>= fun (module T) ->
-  let lcx = T.base_cx in
+  base_cx >>= fun lcx ->
   let vty0 = LocalCx.eval lcx ty0 in
   let vty1 = LocalCx.eval lcx ty1 in
   try
@@ -310,15 +306,15 @@ let check_subtype ty0 ty1 =
     ret @@ `Exn exn
 
 let compare_dim tr0 tr1 =
-  typechecker >>= fun (module T) ->
-  let r0 = LocalCx.eval_dim T.base_cx tr0 in
-  let r1 = LocalCx.eval_dim T.base_cx tr1 in
+  base_cx >>= fun cx ->
+  let r0 = LocalCx.eval_dim cx tr0 in
+  let r1 = LocalCx.eval_dim cx tr1 in
   ret @@ I.compare r0 r1
 
 let check_eq_dim tr0 tr1 =
-  typechecker >>= fun (module T) ->
-  let r0 = LocalCx.eval_dim T.base_cx tr0 in
-  let r1 = LocalCx.eval_dim T.base_cx tr1 in
+  base_cx >>= fun cx ->
+  let r0 = LocalCx.eval_dim cx tr0 in
+  let r1 = LocalCx.eval_dim cx tr1 in
   match I.compare r0 r1 with
   | `Same ->
     ret true

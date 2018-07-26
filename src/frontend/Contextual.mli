@@ -44,7 +44,7 @@ val check_eq_dim : tm -> tm -> bool m
 
 
 val get_global_env : Subst.t m
-val typechecker : (module Typing.S) m
+val base_cx : LocalCx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 
