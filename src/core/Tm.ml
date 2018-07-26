@@ -1446,6 +1446,37 @@ let rec eta_contract t =
         make @@ Lam (bind y tm'y)
     end
 
+  | Next bnd ->
+    let y, tmy = unbind bnd in
+    let tm'y = eta_contract tmy in
+    begin
+      match unleash tm'y with
+      | Up (hd, Snoc (sp, Prev arg)) ->
+        begin
+          match as_plain_var arg with
+          | Some y'
+            when
+              y = y'
+              && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
+            ->
+            up (hd, sp)
+          | _ ->
+            make @@ Next (bind y tm'y)
+        end
+      | _ ->
+        make @@ Next (bind y tm'y)
+    end
+
+  | Shut tm ->
+    let tm' = eta_contract tm in
+    begin
+      match unleash tm' with
+      | Up (hd, Snoc (sp, Open)) ->
+        up (hd, sp)
+      | _ ->
+        make @@ Shut tm'
+    end
+
   | ExtLam nbnd ->
     let ys, tmys = unbindn nbnd in
     let tm'ys = eta_contract tmys in

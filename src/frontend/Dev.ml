@@ -25,6 +25,7 @@ type ('a, 'b) equation =
 type 'a param =
   [ `I
   | `Tick
+  | `Lock
   | `P of 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
@@ -71,10 +72,7 @@ let rec eqn_close_var x tw k q =
 
 let param_open_var k x =
   function
-  | `I ->
-    `I
-  | `Tick ->
-    `Tick
+  | (`I | `Tick | `Lock) as p -> p
   | `P ty ->
     `P (Tm.open_var k (fun twin -> Tm.var x ~twin) ty)
   | `Tw (ty0, ty1) ->
@@ -85,10 +83,7 @@ let param_open_var k x =
 
 let param_close_var x k =
   function
-  | `I ->
-    `I
-  | `Tick ->
-    `Tick
+  | (`I | `Tick | `Lock) as p -> p
   | `P ty ->
     `P (Tm.close_var x ~twin:(fun tw -> tw) k ty)
   | `Tw (ty0, ty1) ->
@@ -171,6 +166,8 @@ let pp_param fmt =
     Format.fprintf fmt "dim"
   | `Tick ->
     Format.fprintf fmt "tick"
+  | `Lock ->
+    Format.fprintf fmt "lock"
   | `P ty ->
     Tm.pp0 fmt ty
   | `Tw (ty0, ty1) ->
@@ -204,6 +201,10 @@ let pp_param_cell fmt (x, param) =
 
   | `Tick ->
     Format.fprintf fmt "@[<1>%a : tick@]"
+      Name.pp x
+
+  | `Lock ->
+    Format.fprintf fmt "@[<1>%a : lock@]"
       Name.pp x
 
   | `R (r0, r1) ->
@@ -330,10 +331,8 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
   function
-  | `I ->
-    `I, sub
-  | `Tick ->
-    `Tick, sub
+  | (`I | `Tick | `Lock) as p ->
+    p, sub
   | `P ty ->
     `P (subst_tm sub ~ty:univ ty), sub
   | `Tw (ty0, ty1) ->
@@ -366,11 +365,7 @@ let rec subst_problem sub =
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
-      | `I ->
-        let probx' = subst_problem sub' probx in
-        let prob' = bind x param' probx' in
-        All (param', prob')
-      | `Tick ->
+      | (`I | `Tick | `Lock) ->
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
@@ -398,8 +393,7 @@ struct
 
   let free fl =
     function
-    | `I -> Occurs.Set.empty
-    | `Tick -> Occurs.Set.empty
+    | (`I | `Tick | `Lock) -> Occurs.Set.empty
     | `P ty -> Tm.free fl ty
     | `Tw (ty0, ty1) ->
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)
