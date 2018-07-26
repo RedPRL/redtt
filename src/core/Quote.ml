@@ -66,13 +66,39 @@ sig
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
-
-  module Error : sig
-    type t
-    val pp : t Pretty.t0
-    exception E of t
-  end
 end
+
+
+
+type error =
+  | ErrEquateNf of {env : Env.t; ty : value; el0 : value; el1 : value}
+  | ErrEquateNeu of {env : Env.t; neu0 : neu; neu1 : neu}
+
+let pp_error fmt =
+  function
+  | ErrEquateNf {ty; el0; el1; _} ->
+    Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Domain.pp_value el0 Uuseg_string.pp_utf_8 "≠" Domain.pp_value el1 Domain.pp_value ty
+
+  | ErrEquateNeu {neu0; neu1; _} ->
+    Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" Domain.pp_neu neu0 Uuseg_string.pp_utf_8 "≠" Domain.pp_neu neu1
+
+exception E of error
+
+module Error =
+struct
+  type t = error
+  let pp = pp_error
+  exception E = E
+end
+
+let _ =
+  PpExn.install_printer @@ fun fmt ->
+  function
+  | E err ->
+    Format.fprintf fmt "@[<1>%a@]" pp_error err
+  | _ ->
+    raise PpExn.Unrecognized
+
 
 module M (V : Val.S) : S =
 struct
@@ -85,13 +111,6 @@ struct
 
   let generic env ty =
     generic_constrained env ty []
-
-
-  type error =
-    | ErrEquateNf of {env : QEnv.t; ty : value; el0 : value; el1 : value}
-    | ErrEquateNeu of {env : QEnv.t; neu0 : neu; neu1 : neu}
-
-  exception E of error
 
   let rec equate env ty el0 el1 =
     match unleash ty with
@@ -784,34 +803,5 @@ struct
     end
 
 
-
-  let pp_error fmt =
-    function
-    | ErrEquateNf {env; ty; el0; el1} ->
-      let tty = quote_ty env ty in
-      let tm0 = quote_nf env {ty; el = el0} in
-      let tm1 = quote_nf env {ty; el = el1} in
-      Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Tm.pp0 tm0 Uuseg_string.pp_utf_8 "≠" Tm.pp0 tm1 Tm.pp0 tty
-
-    | ErrEquateNeu {env; neu0; neu1} ->
-      let tm0 = quote_neu env neu0 in
-      let tm1 = quote_neu env neu1 in
-      Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" (Tm.pp_cmd Pretty.Env.emp) tm0 Uuseg_string.pp_utf_8 "≠" (Tm.pp_cmd Pretty.Env.emp) tm1
-
-
-  module Error =
-  struct
-    type t = error
-    let pp = pp_error
-    exception E = E
-  end
-
-  let _ =
-    PpExn.install_printer @@ fun fmt ->
-    function
-    | E err ->
-      Format.fprintf fmt "@[<1>%a@]" pp_error err
-    | _ ->
-      raise PpExn.Unrecognized
 
 end

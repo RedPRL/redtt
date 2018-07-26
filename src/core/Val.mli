@@ -1,5 +1,12 @@
 open Domain
 
+module Error :
+sig
+  type t
+  val pp : t Pretty.t0
+  exception E of t
+end
+
 module type S =
 sig
   val unleash : value -> con
@@ -44,13 +51,6 @@ sig
 
   module Macro : sig
     val equiv : value -> value -> value
-  end
-
-  module Error :
-  sig
-    type t
-    val pp : t Pretty.t0
-    exception E of t
   end
 end
 

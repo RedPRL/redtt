@@ -18,6 +18,12 @@ end
 
 type env = Env.t
 
+module Error : sig
+  type t
+  val pp : t Pretty.t0
+  exception E of t
+end
+
 module type S =
 sig
   val quote_nf : env -> nf -> Tm.tm
@@ -28,11 +34,6 @@ sig
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
 
-  module Error : sig
-    type t
-    val pp : t Pretty.t0
-    exception E of t
-  end
 end
 
 module M (V : Val.S) : S
