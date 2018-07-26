@@ -18,6 +18,9 @@ let emp () =
 let ext (sg : t) nm param : t =
   {sg with env = (nm, param, {locks = 0; killed = false; constant = false}) :: sg.env}
 
+let ext_meta (sg : t) nm param : t =
+  {sg with env = (nm, param, {locks = 0; killed = false; constant = true}) :: sg.env}
+
 let ext_tick (sg : t) nm : t =
   {sg with env = (nm, `Tick, {locks = 0; killed = false; constant = false}) :: sg.env}
 
@@ -135,13 +138,15 @@ struct
   let lookup nm tw =
     let entry =
       try
-        lookup_entry Sig.globals.env nm tw
+        lookup_entry (clear_locks Sig.globals).env nm tw
       with
       | exn ->
         Format.eprintf "Internal error: %a[%a] not found in {@[<1>%a@]}@."
           Name.pp nm
           pp_twin tw
           pp Sig.globals;
+        Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+        Format.eprintf "@.";
         raise exn
     in
     entry.ty, entry.sys

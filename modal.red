@@ -36,12 +36,18 @@ let stream/tl (xs : stream) (α : ✓) : stream =
 let tts : stream =
   Fix _ (stream/cons tt) 0
 
-let box/example (x : bool) : (b : □ bool) × Path bool x `(open b) =
+let bool/constant (x : bool) : (b : □ bool) × Path bool x `(open b) =
   if x then
     < shut tt, λ _ → tt >
   else
     < shut ff, λ _ → ff >
 
 let sequence : type = □ (stream/L 0)
+
+let sequence/cons (x : bool) (xs : sequence) : sequence =
+  shut
+    stream/cons
+      `(open (car (bool/constant x)))
+      (λ α → `(open xs))
 
 debug

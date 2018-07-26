@@ -115,13 +115,13 @@ let update_env e =
   modify @@ fun st ->
   match e with
   | E (nm, ty, Hole info) ->
-    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm info st.info}
+    {st with env = GlobalEnv.ext_meta st.env nm @@ `P {ty; sys = []}; info = Map.add nm info st.info}
   | E (nm, ty, Guess _) ->
-    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
+    {st with env = GlobalEnv.ext_meta st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
   | E (nm, ty, Defn (`Transparent, t)) ->
     {st with env = GlobalEnv.define st.env nm ty t; info = Map.add nm `Rigid st.info}
   | E (nm, ty, Defn (`Opaque, _)) ->
-    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
+    {st with env = GlobalEnv.ext_meta st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
   | _ ->
     st
 
@@ -172,7 +172,8 @@ let get_global_env =
     | Snoc (psi, (x, `Tick)) ->
       GlobalEnv.ext_tick (go_params psi) x
     | Snoc (psi, (_, `Lock)) ->
-      GlobalEnv.ext_lock @@ go_params psi
+      GlobalEnv.ext_lock @@
+      go_params psi
     | Snoc (psi, (x, `P ty)) ->
       GlobalEnv.ext (go_params psi) x @@ `P {ty; sys = []}
     | Snoc (psi, (x, `Tw (ty0, ty1))) ->
