@@ -18,6 +18,8 @@ sig
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
   val prev : tick -> value -> value
+  val modal_open : value -> value
+
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value

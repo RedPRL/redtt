@@ -28,6 +28,8 @@ sig
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
   val prev : tick -> value -> value
+  val modal_open : value -> value
+
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -324,6 +326,12 @@ struct
       let clo = Clo.act phi info.clo in
       make_dfix_line r ty clo
 
+    | BoxModality v ->
+      make @@ BoxModality (Value.act phi v)
+
+    | Shut v ->
+      make @@ Shut (Value.act phi v)
+
   and act_neu phi con =
     match con with
     | VProj info ->
@@ -476,6 +484,16 @@ struct
         | Step v ->
           step @@ prev tick v
       end
+
+    | Open neu ->
+      begin
+        match act_neu phi neu with
+        | Ret neu ->
+          ret @@ Open neu
+        | Step v ->
+          step @@ modal_open v
+      end
+
 
     | Fix (tick, ty, clo) ->
       ret @@ Fix (tick, Value.act phi ty, Clo.act phi clo)
@@ -1879,6 +1897,10 @@ struct
 
     | _ ->
       failwith "prev"
+
+
+  and modal_open _el =
+    failwith "TODO: modal_open"
 
 
   (* the equation oracle `phi` is for continuations `ty0` and `equiv`
