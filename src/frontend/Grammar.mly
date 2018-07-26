@@ -16,7 +16,7 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH END
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV DFIX
+%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV DFIX BOX_MODALITY OPEN SHUT
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
@@ -326,6 +326,11 @@ tm:
       make_node $startpos $endpos @@
       Tm.Later (ty env) }
 
+  | LPR; BOX_MODALITY; ty = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.BoxModality (ty env) }
+
   | LPR; rst = constrained; RPR
     { fun env ->
       let ty, sys = rst env in
@@ -340,6 +345,11 @@ tm:
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Next (bnd env) }
+
+  | LPR; SHUT; tm = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Shut (tm env) }
 
   | LPR; CONS; e0 = tm; e1 = tm; RPR
     { fun env ->
@@ -418,6 +428,11 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< (Tm.Prev (t env)) }
+
+  | LPR; OPEN; e = cut; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, fs #< Tm.Open }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->
