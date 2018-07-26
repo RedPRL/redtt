@@ -199,3 +199,7 @@ sig
   val from_rigid : rigid_val_sys -> t
   val forall : I.atom -> t -> t
 end
+
+
+val make : con -> value
+val make_later : value -> value

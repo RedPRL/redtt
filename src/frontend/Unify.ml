@@ -500,8 +500,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       (* TODO: unify the dimension spines ts0, ts1 *)
       let ty'0, sys0 = T.CxUtil.Eval.unleash_ext ty0 rs0 in
       let ty'1, sys1 = T.CxUtil.Eval.unleash_ext ty1 rs1 in
-      let rst0 = T.CxUtil.Eval.make @@ D.Rst {ty = ty'0; sys = sys0} in
-      let rst1 = T.CxUtil.Eval.make @@ D.Rst {ty = ty'1; sys = sys1} in
+      let rst0 = D.make @@ D.Rst {ty = ty'0; sys = sys0} in
+      let rst1 = D.make @@ D.Rst {ty = ty'1; sys = sys1} in
       ret (rst0, rst1)
 
     | Snoc (sp0, Tm.Car), Snoc (sp1, Tm.Car) ->
@@ -541,7 +541,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       active @@ Problem.all y (Tm.make Tm.Bool) @@
       Problem.eqn ~ty0:univ ~ty1:univ ~tm0:mot0y ~tm1:mot1y
       >>
-      let bool = T.CxUtil.Eval.make D.Bool in
+      let bool = D.make D.Bool in
       let mot0_tt = HSubst.inst_ty_bnd info0.mot (bool, Tm.make Tm.Tt) in
       let mot0_ff = HSubst.inst_ty_bnd info0.mot (bool, Tm.make Tm.Ff) in
       let mot1_tt = HSubst.inst_ty_bnd info1.mot (bool, Tm.make Tm.Tt) in

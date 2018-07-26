@@ -1,7 +1,8 @@
 open Domain
 open RedBasis.Bwd
-
 open BwdNotation
+
+module D = Domain
 
 
 module Env :
@@ -248,7 +249,7 @@ struct
         Tm.make @@ Tm.Rst {ty; sys}
 
       | CoR face0, CoR face1 ->
-        let univ = V.make @@ Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
+        let univ = D.make @@ Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
         let face = equate_val_face env univ face0 face1 in
         Tm.make @@ Tm.CoR face
 

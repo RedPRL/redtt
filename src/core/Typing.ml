@@ -310,13 +310,13 @@ struct
       ()
 
     | D.Nat, T.Suc n ->
-      check cx (Eval.make D.Nat) n
+      check cx (D.make D.Nat) n
 
     | D.Int, T.Pos n ->
-      check cx (Eval.make D.Nat) n
+      check cx (D.make D.Nat) n
 
     | D.Int, T.NegSuc n ->
-      check cx (Eval.make D.Nat) n
+      check cx (D.make D.Nat) n
 
     | D.V vty, T.VIn vin ->
       let r = check_eval_dim cx vin.r in
@@ -551,15 +551,15 @@ struct
 
       | T.If info ->
         let T.B (nm, mot) = info.mot in
-        let bool = Eval.make D.Bool in
+        let bool = D.make D.Bool in
         let cxx, _= LocalCx.ext_ty cx ~nm bool in
         check_ty cxx mot;
 
         let ih = infer_spine cx hd sp in
         CxUtil.check_eq_ty cx ih.ty bool;
 
-        let cx_tt = LocalCx.def cx ~nm ~ty:bool ~el:(Eval.make D.Tt) in
-        let cx_ff = LocalCx.def cx ~nm ~ty:bool ~el:(Eval.make D.Ff) in
+        let cx_tt = LocalCx.def cx ~nm ~ty:bool ~el:(D.make D.Tt) in
+        let cx_ff = LocalCx.def cx ~nm ~ty:bool ~el:(D.make D.Ff) in
         let mot_tt = CxUtil.eval cx_tt mot in
         let mot_ff = CxUtil.eval cx_ff mot in
         check cx mot_tt info.tcase;
@@ -570,7 +570,7 @@ struct
 
       | T.NatRec info ->
         let T.B (nm, mot) = info.mot in
-        let nat = Eval.make D.Nat in
+        let nat = D.make D.Nat in
         let _ =
           let cx_x, _ = LocalCx.ext_ty cx ~nm nat in
           check_ty cx_x mot
@@ -585,7 +585,7 @@ struct
 
         (* zero *)
         let _ =
-          let mot_zero = CxUtil.Eval.inst_clo mot_clo @@ Eval.make D.Zero in
+          let mot_zero = CxUtil.Eval.inst_clo mot_clo @@ D.make D.Zero in
           check cx mot_zero info.zcase
         in
 
@@ -600,7 +600,7 @@ struct
           let cx_x, x = LocalCx.ext_ty cx ~nm:nm_scase nat in
           let mot_x = Eval.inst_clo mot_clo x in
           let cx_x_ih, _ih = LocalCx.ext_ty cx_x ~nm:nm_rec_scase mot_x in
-          let mot_suc = Eval.inst_clo mot_clo @@ Eval.make @@ D.Suc x in
+          let mot_suc = Eval.inst_clo mot_clo @@ D.make @@ D.Suc x in
           check cx_x_ih mot_suc scase
         in
 
@@ -608,7 +608,7 @@ struct
 
       | T.IntRec info ->
         let T.B (nm, mot) = info.mot in
-        let int = Eval.make D.Int in
+        let int = D.make D.Int in
         let _ =
           let cx_x, _ = LocalCx.ext_ty cx ~nm int in
           check_ty cx_x mot
@@ -624,18 +624,18 @@ struct
         (* pos *)
         let _ =
           let T.B (nm_pcase, pcase) = info.pcase in
-          let nat = Eval.make D.Nat in
+          let nat = D.make D.Nat in
           let cx_n, n = LocalCx.ext_ty cx ~nm:nm_pcase nat in
-          let mot_pos = CxUtil.Eval.inst_clo mot_clo @@ Eval.make (D.Pos n) in
+          let mot_pos = CxUtil.Eval.inst_clo mot_clo @@ D.make (D.Pos n) in
           check cx_n mot_pos pcase
         in
 
         (* negsucc *)
         let _ =
           let T.B (nm_ncase, ncase) = info.ncase in
-          let nat = Eval.make D.Nat in
+          let nat = D.make D.Nat in
           let cx_n, n = LocalCx.ext_ty cx ~nm:nm_ncase nat in
-          let mot_negsuc = CxUtil.Eval.inst_clo mot_clo @@ Eval.make (D.NegSuc n) in
+          let mot_negsuc = CxUtil.Eval.inst_clo mot_clo @@ D.make (D.NegSuc n) in
           check cx_n mot_negsuc ncase
         in
 
@@ -643,7 +643,7 @@ struct
 
       | T.S1Rec info ->
         let T.B (nm, mot) = info.mot in
-        let s1 = Eval.make D.S1 in
+        let s1 = D.make D.S1 in
         let cxx, _= LocalCx.ext_ty cx ~nm s1 in
         check_ty cxx mot;
 
@@ -651,13 +651,13 @@ struct
 
         CxUtil.check_eq_ty cx ih.ty s1;
 
-        let cx_base = LocalCx.def cx ~nm ~ty:s1 ~el:(Eval.make D.Base) in
+        let cx_base = LocalCx.def cx ~nm ~ty:s1 ~el:(D.make D.Base) in
         let mot_base = CxUtil.eval cx_base mot in
         let val_base = check_eval cx mot_base info.bcase in
 
         let T.B (nm_loop, lcase) = info.lcase in
         let cxx, x = LocalCx.ext_dim cx ~nm:nm_loop in
-        let cxx_loop = LocalCx.def cxx ~nm ~ty:s1 ~el:(Eval.make @@ D.Loop x) in
+        let cxx_loop = LocalCx.def cxx ~nm ~ty:s1 ~el:(D.make @@ D.Loop x) in
         let mot_loop = CxUtil.eval cxx_loop mot in
         let val_loopx = check_eval cx mot_loop lcase in
         let val_loop0 = D.Value.act (I.subst `Dim0 x) val_loopx in
@@ -788,7 +788,7 @@ struct
       check_dim cx info.r;
       let Tm.B (nm, bdy) = info.bdy in
       let ty = check_eval_ty cx info.ty in
-      let ltr_ty = Eval.make_later ty in
+      let ltr_ty = D.make_later ty in
       let cxx, _ = LocalCx.ext_ty cx ~nm ltr_ty in
       check cxx ty bdy;
       ltr_ty
@@ -799,7 +799,7 @@ struct
     CxUtil.eval cx tm
 
   and check_ty cx ty =
-    let univ = Eval.make @@ D.Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+    let univ = D.make @@ D.Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
     check cx univ ty
 
   and check_eval_dim cx tr =

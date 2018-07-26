@@ -572,3 +572,15 @@ end
 
 module ExtAbs : IAbs.S with type el = value * val_sys =
   IAbs.M (Sort.Prod (Value) (ValSys))
+
+let rec make : con -> value =
+  fun con ->
+    Node {con = Con con; action = I.idn}
+
+and make_later ty =
+  let tclo = TickCloConst ty in
+  make @@ Later tclo
+
+
+
+

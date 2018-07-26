@@ -12,9 +12,6 @@ let step v = Step v
 
 module type S =
 sig
-  val make : con -> value
-  val make_later : value -> value
-
   val unleash : value -> con
 
   val reflect : value -> neu -> val_sys -> value
@@ -165,18 +162,6 @@ struct
     | _ ->
       let err = ExpectedTickTerm tm in
       raise @@ E err
-
-
-
-  let rec make : con -> value =
-    fun con ->
-      Node {con = Con con; action = I.idn}
-
-  and make_later ty =
-    let tclo = TickCloConst ty in
-    make @@ Later tclo
-
-
 
 
 
