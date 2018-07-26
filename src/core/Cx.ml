@@ -158,21 +158,11 @@ let quoter cx : (module Quote.S) =
 
 let eval cx tm =
   let (module V) = evaluator cx in
-  try
-    V.eval cx.env tm
-  with
-  | exn ->
-    Format.eprintf "Failed to evaluate: %a because of %s@." (Tm.pp cx.ppenv) tm (Printexc.to_string exn);
-    raise exn
+  V.eval cx.env tm
 
 let eval_cmd cx cmd =
   let (module V) = evaluator cx in
-  try
-    V.eval_cmd cx.env cmd
-  with
-  | exn ->
-    Format.eprintf "Failed to evaluate: %a@." (Tm.pp_cmd cx.ppenv) cmd;
-    raise exn
+  V.eval_cmd cx.env cmd
 
 let eval_frame cx frm hd =
   let (module V) = evaluator cx in
@@ -180,12 +170,7 @@ let eval_frame cx frm hd =
 
 let eval_head cx hd =
   let (module V) = evaluator cx in
-  try
-    V.eval_head cx.env hd
-  with
-  | exn ->
-    Format.eprintf "Failed to evaluate: %a@." (Tm.pp_head cx.ppenv) hd;
-    raise exn
+  V.eval_head cx.env hd
 
 let eval_dim cx tm =
   let (module V) = evaluator cx in
@@ -211,32 +196,17 @@ let quote_ty cx ty =
 let check_eq cx ~ty el0 el1 =
   let (module Q) = quoter cx in
   let now0 = Unix.gettimeofday () in
-  try
-    Q.equiv cx.qenv ~ty el0 el1;
-    let now1 = Unix.gettimeofday () in
-    check_eq_clock := !check_eq_clock +. (now1 -. now0)
-  with
-  | exn ->
-    (* Format.eprintf "check_eq: %a /= %a@." V.pp_value el0 V.pp_value el1; *)
-    raise exn
+  Q.equiv cx.qenv ~ty el0 el1;
+  let now1 = Unix.gettimeofday () in
+  check_eq_clock := !check_eq_clock +. (now1 -. now0)
 
 let check_eq_ty cx el0 el1 =
   let (module Q) = quoter cx in
-  try
-    Q.equiv_ty cx.qenv el0 el1
-  with
-  | exn ->
-    (* Format.eprintf "check_eq_ty: %a /= %a@." V.pp_value el0 V.pp_value el1; *)
-    raise exn
+  Q.equiv_ty cx.qenv el0 el1
 
 let check_subtype cx ty0 ty1 =
   let (module Q) = quoter cx in
-  try
-    Q.subtype cx.qenv ty0 ty1
-  with
-  | exn ->
-    (* Format.eprintf "subtype: %a /<= %a@." V.pp_value ty0 V.pp_value ty1; *)
-    raise exn
+  Q.subtype cx.qenv ty0 ty1
 
 
 let init globals =
