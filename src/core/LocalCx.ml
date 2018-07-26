@@ -17,7 +17,15 @@ let _ =
 
 (* The way that we model dimensions is now incompatible with the union-find version of things.
    We need to find a new way. *)
-type cx = {hyps : hyp list; env : Domain.env; qenv : Quote.env; ppenv : Pretty.env; rel : Restriction.t}
+type cx =
+  {sign : GlobalEnv.t;
+   hyps : hyp list;
+   env : Domain.env;
+   qenv : Quote.env;
+   ppenv : Pretty.env;
+   rel : Restriction.t;
+   all_locks : int}
+
 type t = cx
 
 let clear_locals cx =
@@ -25,17 +33,24 @@ let clear_locals cx =
    qenv = Quote.Env.emp;
    hyps = [];
    ppenv = Pretty.Env.emp;
-   env = Domain.Env.clear_locals cx.env}
+   env = Domain.Env.clear_locals cx.env;
+   all_locks = 0}
 
 let hyp_map_lock f hyp =
   {hyp with locks = f hyp.locks}
 
 
 let ext_lock cx =
-  {cx with hyps = List.map (hyp_map_lock (fun n -> n + 1)) cx.hyps}
+  {cx with
+   sign = GlobalEnv.ext_lock cx.sign;
+   hyps = List.map (hyp_map_lock (fun n -> n + 1)) cx.hyps;
+   all_locks = cx.all_locks + 1}
 
 let clear_locks cx =
-  {cx with hyps = List.map (hyp_map_lock (fun _ -> 0)) cx.hyps}
+  {cx with
+   sign = GlobalEnv.clear_locks cx.sign;
+   hyps = List.map (hyp_map_lock (fun _ -> 0)) cx.hyps;
+   all_locks = 0}
 
 let kill_from_tick cx tgen =
   match tgen with
@@ -51,24 +66,24 @@ let kill_from_tick cx tgen =
   | `Global _ ->
     failwith "TODO: implement kill_from_tick for global tick"
 
-let ext {env; qenv; hyps; ppenv; rel} ~nm ty sys =
-  let n = Quote.Env.len qenv in
+let ext cx ~nm ty sys =
+  let n = Quote.Env.len cx.qenv in
   let var = Domain.Node {con = Domain.Reflect {ty; neu = Domain.Lvl (nm, n); sys}; action = I.idn} in
-  {env = Domain.Env.push (Domain.Val var) env;
-   hyps = {classifier = `Ty ty; locks = 0; killed = false} :: hyps;
-   qenv = Quote.Env.succ qenv;
-   ppenv = snd @@ Pretty.Env.bind nm ppenv;
-   rel},
+  {cx with
+   env = Domain.Env.push (Domain.Val var) cx.env;
+   hyps = {classifier = `Ty ty; locks = 0; killed = false} :: cx.hyps;
+   qenv = Quote.Env.succ cx.qenv;
+   ppenv = snd @@ Pretty.Env.bind nm cx.ppenv},
   var
 
-let ext_tick {env; qenv; hyps; ppenv; rel} ~nm =
-  let n = Quote.Env.len qenv in
+let ext_tick cx ~nm =
+  let n = Quote.Env.len cx.qenv in
   let tick = Domain.TickGen (`Lvl (nm, n)) in
-  {env = Domain.Env.push (Domain.Tick tick) env;
-   hyps = {classifier = `Tick; locks = 0; killed = false} :: hyps;
-   qenv = Quote.Env.succ qenv;
-   ppenv = snd @@ Pretty.Env.bind nm ppenv;
-   rel},
+  {cx with
+   env = Domain.Env.push (Domain.Tick tick) cx.env;
+   hyps = {classifier = `Tick; locks = 0; killed = false} :: cx.hyps;
+   qenv = Quote.Env.succ cx.qenv;
+   ppenv = snd @@ Pretty.Env.bind nm cx.ppenv},
   tick
 
 let ext_ty cx ~nm ty =
@@ -78,13 +93,14 @@ let def cx ~nm ~ty ~el =
   let face = Face.True (`Dim0, `Dim1, el) in
   fst @@ ext cx ~nm ty [face]
 
-let ext_dim {env; qenv; hyps; ppenv; rel} ~nm =
+let ext_dim cx ~nm =
   let x = Name.named nm in
-  {env = Domain.Env.push (Domain.Atom (`Atom x)) env;
-   hyps = {classifier = `I; locks = 0; killed = false} :: hyps;
-   qenv = Quote.Env.abs qenv @@ Emp #< x;
-   ppenv = snd @@ Pretty.Env.bind nm ppenv;
-   rel}, x
+  {cx with
+   env = Domain.Env.push (Domain.Atom (`Atom x)) cx.env;
+   hyps = {classifier = `I; locks = 0; killed = false} :: cx.hyps;
+   qenv = Quote.Env.abs cx.qenv @@ Emp #< x;
+   ppenv = snd @@ Pretty.Env.bind nm cx.ppenv},
+  x
 
 let rec ext_dims cx ~nms =
   match nms with
@@ -107,6 +123,12 @@ let lookup i {hyps; _} =
     failwith "Hypothesis is inaccessible (modal, taste it!)"
   else
     classifier
+
+let lookup_constant nm tw cx =
+  if cx.all_locks > 0 then
+    failwith "Hypothesis is inaccessible (modal, taste it!)"
+  else
+    GlobalEnv.lookup_ty cx.sign nm tw
 
 let restrict cx r r' =
   let phi = Restriction.as_action cx.rel in
@@ -150,22 +172,24 @@ sig
 end
 
 
-module M (V : Val.S) : S =
+module M (Sig : sig val globals : GlobalEnv.t end) : S =
 struct
   type t = cx
 
-  module Eval = V
+  module Eval = Val.M (GlobalEnv.M (Sig))
 
   let emp : cx =
-    {env = Domain.Env.emp;
+    {sign = Sig.globals;
+     env = Domain.Env.emp;
      qenv = Quote.Env.emp;
      hyps = [];
      ppenv = Pretty.Env.emp;
-     rel = V.base_restriction}
+     rel = Eval.base_restriction;
+     all_locks = 0}
 
   let eval {env; ppenv; _} tm =
     try
-      V.eval env tm
+      Eval.eval env tm
     with
     | exn ->
       Format.eprintf "Failed to evaluate: %a because of %s@." (Tm.pp ppenv) tm (Printexc.to_string exn);
@@ -173,34 +197,34 @@ struct
 
   let eval_cmd {env; ppenv; _} cmd =
     try
-      V.eval_cmd env cmd
+      Eval.eval_cmd env cmd
     with
     | exn ->
       Format.eprintf "Failed to evaluate: %a@." (Tm.pp_cmd ppenv) cmd;
       raise exn
 
   let eval_frame {env; _} frm hd =
-    V.eval_frame env frm hd
+    Eval.eval_frame env frm hd
 
   let eval_head {env; ppenv; _} hd =
     try
-      V.eval_head env hd
+      Eval.eval_head env hd
     with
     | exn ->
       Format.eprintf "Failed to evaluate: %a@." (Tm.pp_head ppenv) hd;
       raise exn
 
   let eval_dim {env; _} tm =
-    V.eval_dim env tm
+    Eval.eval_dim env tm
 
   let eval_tick {env; _} tm =
-    V.eval_tick env tm
+    Eval.eval_tick env tm
 
   let eval_tm_sys {env; _} sys =
-    V.eval_tm_sys env sys
+    Eval.eval_tm_sys env sys
 
 
-  module Q = Quote.M (V)
+  module Q = Quote.M (Eval)
 
   let quote cx ~ty el =
     Q.quote_nf cx.qenv @@ {ty; el}

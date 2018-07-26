@@ -29,8 +29,8 @@ type cofibration = (I.t * I.t) list
 
 module M (Sig : sig val globals : GlobalEnv.t end) =
 struct
-  module Eval = Val.M (GlobalEnv.M (Sig))
-  module CxUtil = LocalCx.M (Eval)
+  module CxUtil = LocalCx.M (Sig)
+  module Eval = CxUtil.Eval
 
   type error =
     | ExpectedDimension of cx * Tm.tm
@@ -713,7 +713,7 @@ struct
   and infer_head cx =
     function
     | T.Var {name; twin; ushift} ->
-      let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name twin in
+      let ty = Tm.shift_univ ushift @@ LocalCx.lookup_constant name twin cx in
       CxUtil.eval (LocalCx.clear_locals cx) ty
 
     | T.Ix (ix, _) ->
@@ -724,7 +724,7 @@ struct
       end
 
     | T.Meta {name; ushift} ->
-      let ty = Tm.shift_univ ushift @@ GlobalEnv.lookup_ty Sig.globals name `Only in
+      let ty = Tm.shift_univ ushift @@ LocalCx.lookup_constant name `Only cx in
       CxUtil.eval (LocalCx.clear_locals cx) ty
 
     | T.Coe info ->

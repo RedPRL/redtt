@@ -21,7 +21,13 @@ val restrict : t -> I.t -> I.t -> t * I.action
 val def : t -> nm:string option -> ty:value -> el:value -> t
 
 val ppenv : t -> Pretty.env
+
+
+(** Look up the classifier (either type, interval or tick) of a local variable. *)
 val lookup : int -> t -> [`Ty of value | `I | `Tick]
+
+(** Look up the type of a named constant. *)
+val lookup_constant : Name.t -> Tm.twin -> t -> Tm.tm
 
 val make_closure : t -> Tm.tm Tm.bnd -> Domain.clo
 
@@ -52,4 +58,4 @@ sig
   val check_eq_ty : t -> value -> value -> unit
 end
 
-module M (V : Val.S) : S with type t = t
+module M (Sig : sig val globals : GlobalEnv.t end) : S

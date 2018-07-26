@@ -26,6 +26,12 @@ let ext_lock (sg : t) : t =
   in
   {sg with env = List.map go sg.env}
 
+let clear_locks (sg : t) : t =
+  let go (nm, entry, linfo) =
+    nm, entry, {linfo with locks = 0}
+  in
+  {sg with env = List.map go sg.env}
+
 
 let rec index_of pred xs =
   match xs with

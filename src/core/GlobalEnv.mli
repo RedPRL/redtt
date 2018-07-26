@@ -13,8 +13,8 @@ val define : t -> Name.t -> ty:Tm.tm -> tm:Tm.tm -> t
 val ext : t -> Name.t -> entry param -> t
 val ext_tick : t -> Name.t -> t
 val ext_lock : t -> t
+val clear_locks : t -> t
 val kill_from_tick : t -> Name.t -> t
-
 
 val lookup_ty : t -> Name.t -> Tm.twin -> Tm.tm
 
