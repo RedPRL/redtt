@@ -2,6 +2,7 @@ type 'a param =
   [ `P of 'a
   | `Tw of 'a * 'a
   | `Tick
+  | `I
   ]
 
 type ty = Tm.tm
@@ -19,6 +20,9 @@ let ext (sg : t) nm param : t =
 
 let ext_tick (sg : t) nm : t =
   {sg with env = (nm, `Tick, {locks = 0; killed = false}) :: sg.env}
+
+let ext_dim (sg : t) nm : t =
+  {sg with env = (nm, `I, {locks = 0; killed = false}) :: sg.env}
 
 let ext_lock (sg : t) : t =
   let go (nm, entry, linfo) =
@@ -99,13 +103,10 @@ let pp fmt sg =
   let pp_sep fmt () = Format.fprintf fmt "; " in
   let go fmt (nm, p, _) =
     match p with
-    | `P _ ->
-      Format.fprintf fmt "%a"
-        Name.pp nm
     | `Tw _ ->
       Format.fprintf fmt "%a[twin]"
         Name.pp nm
-    | `Tick ->
+    | (`Tick | `I | `P _) ->
       Format.fprintf fmt "%a"
         Name.pp nm
   in

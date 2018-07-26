@@ -37,6 +37,7 @@ let normalize_param p =
   | `P ty -> C.ret @@ `P (normalize_ty ty)
   | `Tw (ty0, ty1) -> C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
   | `I -> C.ret `I
+  | `Tick -> C.ret `Tick
   | `R (r0, r1) ->
     C.ret @@ `R (r0, r1)
 

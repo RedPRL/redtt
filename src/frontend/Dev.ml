@@ -24,6 +24,7 @@ type ('a, 'b) equation =
 
 type 'a param =
   [ `I
+  | `Tick
   | `P of 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
@@ -72,6 +73,8 @@ let param_open_var k x =
   function
   | `I ->
     `I
+  | `Tick ->
+    `Tick
   | `P ty ->
     `P (Tm.open_var k (fun twin -> Tm.var x ~twin) ty)
   | `Tw (ty0, ty1) ->
@@ -84,6 +87,8 @@ let param_close_var x k =
   function
   | `I ->
     `I
+  | `Tick ->
+    `Tick
   | `P ty ->
     `P (Tm.close_var x ~twin:(fun tw -> tw) k ty)
   | `Tw (ty0, ty1) ->
@@ -164,6 +169,8 @@ let pp_param fmt =
   function
   | `I ->
     Format.fprintf fmt "dim"
+  | `Tick ->
+    Format.fprintf fmt "tick"
   | `P ty ->
     Tm.pp0 fmt ty
   | `Tw (ty0, ty1) ->
@@ -193,6 +200,10 @@ let pp_param_cell fmt (x, param) =
 
   | `I ->
     Format.fprintf fmt "@[<1>%a : dim@]"
+      Name.pp x
+
+  | `Tick ->
+    Format.fprintf fmt "@[<1>%a : tick@]"
       Name.pp x
 
   | `R (r0, r1) ->
@@ -321,6 +332,8 @@ let subst_param sub =
   function
   | `I ->
     `I, sub
+  | `Tick ->
+    `Tick, sub
   | `P ty ->
     `P (subst_tm sub ~ty:univ ty), sub
   | `Tw (ty0, ty1) ->
@@ -357,6 +370,10 @@ let rec subst_problem sub =
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
+      | `Tick ->
+        let probx' = subst_problem sub' probx in
+        let prob' = bind x param' probx' in
+        All (param', prob')
       | `R (_, _) ->
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
@@ -382,6 +399,7 @@ struct
   let free fl =
     function
     | `I -> Occurs.Set.empty
+    | `Tick -> Occurs.Set.empty
     | `P ty -> Tm.free fl ty
     | `Tw (ty0, ty1) ->
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)

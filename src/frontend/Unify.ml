@@ -875,6 +875,10 @@ let rec solver prob =
           in_scope x `I @@
           solver probx
 
+        | `Tick ->
+          in_scope x `Tick @@
+          solver probx
+
         | `P ty ->
           begin
             match split_sigma Emp x ty with

@@ -167,8 +167,10 @@ let get_global_env =
   let rec go_params =
     function
     | Emp -> st.env
-    | Snoc (psi, (_, `I)) ->
-      go_params psi
+    | Snoc (psi, (x, `I)) ->
+      GlobalEnv.ext_dim (go_params psi) x
+    | Snoc (psi, (x, `Tick)) ->
+      GlobalEnv.ext_tick (go_params psi) x
     | Snoc (psi, (x, `P ty)) ->
       GlobalEnv.ext (go_params psi) x @@ `P {ty; sys = []}
     | Snoc (psi, (x, `Tw (ty0, ty1))) ->
