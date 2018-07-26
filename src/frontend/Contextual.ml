@@ -275,7 +275,7 @@ let typechecker : (module Typing.S) m =
 let check ~ty tm =
   typechecker >>= fun (module T) ->
   let lcx = T.CxUtil.emp in
-  let vty = T.CxUtil.eval lcx ty in
+  let vty = LocalCx.eval lcx ty in
   try
     T.check lcx vty tm;
     ret `Ok
@@ -287,9 +287,9 @@ let check_eq ~ty tm0 tm1 =
   if tm0 = tm1 then ret `Ok else
     typechecker >>= fun (module T) ->
     let lcx = T.CxUtil.emp in
-    let vty = T.CxUtil.eval lcx ty in
-    let el0 = T.CxUtil.eval lcx tm0 in
-    let el1 = T.CxUtil.eval lcx tm1 in
+    let vty = LocalCx.eval lcx ty in
+    let el0 = LocalCx.eval lcx tm0 in
+    let el1 = LocalCx.eval lcx tm1 in
     try
       T.CxUtil.check_eq lcx ~ty:vty el0 el1;
       ret `Ok
@@ -300,8 +300,8 @@ let check_eq ~ty tm0 tm1 =
 let check_subtype ty0 ty1 =
   typechecker >>= fun (module T) ->
   let lcx = T.CxUtil.emp in
-  let vty0 = T.CxUtil.eval lcx ty0 in
-  let vty1 = T.CxUtil.eval lcx ty1 in
+  let vty0 = LocalCx.eval lcx ty0 in
+  let vty1 = LocalCx.eval lcx ty1 in
   try
     T.CxUtil.check_subtype lcx vty0 vty1;
     ret `Ok
@@ -311,14 +311,14 @@ let check_subtype ty0 ty1 =
 
 let compare_dim tr0 tr1 =
   typechecker >>= fun (module T) ->
-  let r0 = T.CxUtil.eval_dim T.CxUtil.emp tr0 in
-  let r1 = T.CxUtil.eval_dim T.CxUtil.emp tr1 in
+  let r0 = LocalCx.eval_dim T.CxUtil.emp tr0 in
+  let r1 = LocalCx.eval_dim T.CxUtil.emp tr1 in
   ret @@ I.compare r0 r1
 
 let check_eq_dim tr0 tr1 =
   typechecker >>= fun (module T) ->
-  let r0 = T.CxUtil.eval_dim T.CxUtil.emp tr0 in
-  let r1 = T.CxUtil.eval_dim T.CxUtil.emp tr1 in
+  let r0 = LocalCx.eval_dim T.CxUtil.emp tr0 in
+  let r1 = LocalCx.eval_dim T.CxUtil.emp tr1 in
   match I.compare r0 r1 with
   | `Same ->
     ret true

@@ -32,6 +32,16 @@ val lookup_constant : Name.t -> Tm.twin -> t -> Tm.tm
 val make_closure : t -> Tm.tm Tm.bnd -> Domain.clo
 
 
+val eval : t -> Tm.tm -> value
+val eval_cmd : t -> Tm.tm Tm.cmd -> value
+val eval_head : t -> Tm.tm Tm.head -> value
+val eval_frame : t -> value -> Tm.tm Tm.frame -> value
+val eval_dim : t -> Tm.tm -> I.t
+val eval_tick : t -> Tm.tm -> Domain.tick
+val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Domain.val_sys
+
+
+
 
 module type S =
 sig
@@ -41,13 +51,6 @@ sig
 
   val emp : t
 
-  val eval : t -> Tm.tm -> value
-  val eval_cmd : t -> Tm.tm Tm.cmd -> value
-  val eval_head : t -> Tm.tm Tm.head -> value
-  val eval_frame : t -> value -> Tm.tm Tm.frame -> value
-  val eval_dim : t -> Tm.tm -> I.t
-  val eval_tick : t -> Tm.tm -> Domain.tick
-  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Domain.val_sys
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit

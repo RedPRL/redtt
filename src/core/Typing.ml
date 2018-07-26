@@ -337,7 +337,7 @@ struct
 
     | _, T.Let (cmd, T.B (nm, t1)) ->
       let ty' = infer cx cmd in
-      let el = CxUtil.eval_cmd cx cmd in
+      let el = LocalCx.eval_cmd cx cmd in
       let cx' = LocalCx.def cx ~nm ~ty:ty' ~el in
       check cx' ty t1
 
@@ -348,8 +348,8 @@ struct
   and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
     fun cx sys ->
       let face (tr, tr', _) =
-        let r = CxUtil.eval_dim cx tr in
-        let r' = CxUtil.eval_dim cx tr' in
+        let r = LocalCx.eval_dim cx tr in
+        let r' = LocalCx.eval_dim cx tr' in
         (r, r')
       in
       List.map face sys
@@ -377,7 +377,7 @@ struct
     match face with
     | Face.True (_, _, el) ->
       CxUtil.check_eq cx ~ty el @@
-      CxUtil.eval cx tm
+      LocalCx.eval cx tm
 
     | Face.False _ ->
       ()
@@ -387,7 +387,7 @@ struct
       try
         let cx', phi = LocalCx.restrict cx r r' in
         CxUtil.check_eq cx' ~ty:(D.Value.act phi ty) el @@
-        CxUtil.eval cx' tm
+        LocalCx.eval cx' tm
       with
       | I.Inconsistent ->
         ()
@@ -432,8 +432,8 @@ struct
         begin
           try
             let cx', phi = LocalCx.restrict cx r'0 r'1 in
-            let v = CxUtil.eval cx' tm in
-            let v' = CxUtil.eval cx' tm' in
+            let v = LocalCx.eval cx' tm in
+            let v' = LocalCx.eval cx' tm' in
             let phi = I.cmp phi (I.equate r0 r1) in
             CxUtil.check_eq cx' ~ty:(D.Value.act phi ty) v v'
           with
@@ -495,8 +495,8 @@ struct
         begin
           try
             let cxx', phir'0r'1 = LocalCx.restrict cxx r'0 r'1 in
-            let v = CxUtil.eval cxx' tm in
-            let v' = CxUtil.eval cxx' tm' in
+            let v = LocalCx.eval cxx' tm in
+            let v' = LocalCx.eval cxx' tm' in
             let phi = I.cmp phir'0r'1 (I.equate r0 r1) in
             CxUtil.check_eq cxx' ~ty:(D.Value.act phi tyx) v v'
           with
@@ -513,7 +513,7 @@ struct
   and infer_spine cx hd =
     function
     | Emp ->
-      D.{el = CxUtil.eval_head cx hd; ty = infer_head cx hd}
+      D.{el = LocalCx.eval_head cx hd; ty = infer_head cx hd}
 
     | Snoc (sp, frm) ->
       match frm with
@@ -547,7 +547,7 @@ struct
           T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
         in
         CxUtil.check_eq_ty cx v_ty ih.ty;
-        D.{el = CxUtil.eval_frame cx ih.el frm; ty = CxUtil.eval cx info.ty1}
+        D.{el = LocalCx.eval_frame cx ih.el frm; ty = LocalCx.eval cx info.ty1}
 
       | T.If info ->
         let T.B (nm, mot) = info.mot in
@@ -560,13 +560,13 @@ struct
 
         let cx_tt = LocalCx.def cx ~nm ~ty:bool ~el:(D.make D.Tt) in
         let cx_ff = LocalCx.def cx ~nm ~ty:bool ~el:(D.make D.Ff) in
-        let mot_tt = CxUtil.eval cx_tt mot in
-        let mot_ff = CxUtil.eval cx_ff mot in
+        let mot_tt = LocalCx.eval cx_tt mot in
+        let mot_ff = LocalCx.eval cx_ff mot in
         check cx mot_tt info.tcase;
         check cx mot_ff info.fcase;
 
         let cx_scrut = LocalCx.def cx ~nm ~ty:bool ~el:ih.el in
-        D.{el = CxUtil.eval_frame cx ih.el frm; ty = CxUtil.eval cx_scrut mot}
+        D.{el = LocalCx.eval_frame cx ih.el frm; ty = LocalCx.eval cx_scrut mot}
 
       | T.NatRec info ->
         let T.B (nm, mot) = info.mot in
@@ -604,7 +604,7 @@ struct
           check cx_x_ih mot_suc scase
         in
 
-        D.{el = CxUtil.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el }
+        D.{el = LocalCx.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el }
 
       | T.IntRec info ->
         let T.B (nm, mot) = info.mot in
@@ -639,7 +639,7 @@ struct
           check cx_n mot_negsuc ncase
         in
 
-        D.{el = CxUtil.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el}
+        D.{el = LocalCx.eval_frame cx ih.el frm; ty = Eval.inst_clo mot_clo ih.el}
 
       | T.S1Rec info ->
         let T.B (nm, mot) = info.mot in
@@ -652,13 +652,13 @@ struct
         CxUtil.check_eq_ty cx ih.ty s1;
 
         let cx_base = LocalCx.def cx ~nm ~ty:s1 ~el:(D.make D.Base) in
-        let mot_base = CxUtil.eval cx_base mot in
+        let mot_base = LocalCx.eval cx_base mot in
         let val_base = check_eval cx mot_base info.bcase in
 
         let T.B (nm_loop, lcase) = info.lcase in
         let cxx, x = LocalCx.ext_dim cx ~nm:nm_loop in
         let cxx_loop = LocalCx.def cxx ~nm ~ty:s1 ~el:(D.make @@ D.Loop x) in
-        let mot_loop = CxUtil.eval cxx_loop mot in
+        let mot_loop = LocalCx.eval cxx_loop mot in
         let val_loopx = check_eval cx mot_loop lcase in
         let val_loop0 = D.Value.act (I.subst `Dim0 x) val_loopx in
         let val_loop1 = D.Value.act (I.subst `Dim1 x) val_loopx in
@@ -666,7 +666,7 @@ struct
         CxUtil.check_eq cx ~ty:mot_base val_loop1 val_base;
 
         let cx_scrut = LocalCx.def cx ~nm ~ty:s1 ~el:ih.el in
-        D.{el = CxUtil.eval_frame cx ih.el frm; ty = CxUtil.eval cx_scrut mot}
+        D.{el = LocalCx.eval_frame cx ih.el frm; ty = LocalCx.eval cx_scrut mot}
 
       | T.Cap info ->
         let fcom_ty =
@@ -675,26 +675,26 @@ struct
         in
         let ih = infer_spine cx hd sp in
         CxUtil.check_eq_ty cx fcom_ty ih.ty;
-        D.{el = CxUtil.eval_frame cx ih.el frm; ty = CxUtil.eval cx info.ty}
+        D.{el = LocalCx.eval_frame cx ih.el frm; ty = LocalCx.eval cx info.ty}
 
 
       | T.LblCall ->
         let ih = infer_spine cx hd sp in
         let _, _, ty = Eval.unleash_lbl_ty ih.ty in
-        D.{el = CxUtil.eval_frame cx ih.el frm; ty}
+        D.{el = LocalCx.eval_frame cx ih.el frm; ty}
 
       | Tm.CoRForce ->
         let ih = infer_spine cx hd sp in
         begin
           match Eval.unleash_corestriction_ty ih.ty with
           | Face.True (_, _, ty) ->
-            D.{el = CxUtil.eval_frame cx ih.el frm; ty}
+            D.{el = LocalCx.eval_frame cx ih.el frm; ty}
           | _ -> failwith "Cannot force co-restriction when it is not true!"
         end
 
       | T.Prev tick ->
         check_tick cx tick;
-        let vtick = CxUtil.eval_tick cx tick in
+        let vtick = LocalCx.eval_tick cx tick in
         begin
           match vtick with
           | D.TickConst ->
@@ -714,7 +714,7 @@ struct
     function
     | T.Var {name; twin; ushift} ->
       let ty = Tm.shift_univ ushift @@ LocalCx.lookup_constant name twin cx in
-      CxUtil.eval (LocalCx.clear_locals cx) ty
+      LocalCx.eval (LocalCx.clear_locals cx) ty
 
     | T.Ix (ix, _) ->
       begin
@@ -725,7 +725,7 @@ struct
 
     | T.Meta {name; ushift} ->
       let ty = Tm.shift_univ ushift @@ LocalCx.lookup_constant name `Only cx in
-      CxUtil.eval (LocalCx.clear_locals cx) ty
+      LocalCx.eval (LocalCx.clear_locals cx) ty
 
     | T.Coe info ->
       let r = check_eval_dim cx info.r in
@@ -796,7 +796,7 @@ struct
 
   and check_eval cx ty tm =
     check cx ty tm;
-    CxUtil.eval cx tm
+    LocalCx.eval cx tm
 
   and check_ty cx ty =
     let univ = D.make @@ D.Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
@@ -804,11 +804,11 @@ struct
 
   and check_eval_dim cx tr =
     check_dim cx tr;
-    CxUtil.eval_dim cx tr
+    LocalCx.eval_dim cx tr
 
   and check_eval_ty cx ty =
     check_ty cx ty;
-    CxUtil.eval cx ty
+    LocalCx.eval cx ty
 
   and check_is_equivalence cx ~ty0 ~ty1 ~equiv =
     let type_of_equiv = Eval.Macro.equiv ty0 ty1 in

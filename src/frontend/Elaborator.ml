@@ -581,7 +581,7 @@ struct
             elab_chk env dom e >>= fun t ->
             M.lift C.typechecker >>= fun (module T) ->
             let module HS = HSubst (T) in
-            let vdom = T.CxUtil.eval T.CxUtil.emp dom in
+            let vdom = LocalCx.eval T.CxUtil.emp dom in
             let cod' = HS.inst_ty_bnd cod (vdom, t) in
             go cod' (hd, sp #< (Tm.FunApp t)) efs mode
 

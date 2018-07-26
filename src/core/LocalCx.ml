@@ -146,6 +146,56 @@ let restrict cx r r' =
   {cx with rel; hyps; env}, phi
 
 
+let evaluator cx : (module Val.S) =
+  let module Sig = struct let globals = cx.sign end in
+  let module V = Val.M (GlobalEnv.M (Sig)) in
+  (module V)
+
+let eval cx tm =
+  let (module V) = evaluator cx in
+  try
+    V.eval cx.env tm
+  with
+  | exn ->
+    Format.eprintf "Failed to evaluate: %a because of %s@." (Tm.pp cx.ppenv) tm (Printexc.to_string exn);
+    raise exn
+
+let eval_cmd cx cmd =
+  let (module V) = evaluator cx in
+  try
+    V.eval_cmd cx.env cmd
+  with
+  | exn ->
+    Format.eprintf "Failed to evaluate: %a@." (Tm.pp_cmd cx.ppenv) cmd;
+    raise exn
+
+let eval_frame cx frm hd =
+  let (module V) = evaluator cx in
+  V.eval_frame cx.env frm hd
+
+let eval_head cx hd =
+  let (module V) = evaluator cx in
+  try
+    V.eval_head cx.env hd
+  with
+  | exn ->
+    Format.eprintf "Failed to evaluate: %a@." (Tm.pp_head cx.ppenv) hd;
+    raise exn
+
+let eval_dim cx tm =
+  let (module V) = evaluator cx in
+  V.eval_dim cx.env tm
+
+let eval_tick cx tm =
+  let (module V) = evaluator cx in
+  V.eval_tick cx.env tm
+
+let eval_tm_sys cx sys =
+  let (module V) = evaluator cx in
+  V.eval_tm_sys cx.env sys
+
+
+
 
 module type S =
 sig
@@ -153,14 +203,6 @@ sig
   module Eval : Val.S
 
   val emp : t
-
-  val eval : t -> Tm.tm -> value
-  val eval_cmd : t -> Tm.tm Tm.cmd -> value
-  val eval_head : t -> Tm.tm Tm.head -> value
-  val eval_frame : t -> value -> Tm.tm Tm.frame -> value
-  val eval_dim : t -> Tm.tm -> I.t
-  val eval_tick : t -> Tm.tm -> Domain.tick
-  val eval_tm_sys : t -> (Tm.tm, Tm.tm) Tm.system -> Domain.val_sys
 
   val check_eq : t -> ty:value -> value -> value -> unit
   val check_subtype : t -> value -> value -> unit
@@ -186,43 +228,6 @@ struct
      ppenv = Pretty.Env.emp;
      rel = Eval.base_restriction;
      all_locks = 0}
-
-  let eval {env; ppenv; _} tm =
-    try
-      Eval.eval env tm
-    with
-    | exn ->
-      Format.eprintf "Failed to evaluate: %a because of %s@." (Tm.pp ppenv) tm (Printexc.to_string exn);
-      raise exn
-
-  let eval_cmd {env; ppenv; _} cmd =
-    try
-      Eval.eval_cmd env cmd
-    with
-    | exn ->
-      Format.eprintf "Failed to evaluate: %a@." (Tm.pp_cmd ppenv) cmd;
-      raise exn
-
-  let eval_frame {env; _} frm hd =
-    Eval.eval_frame env frm hd
-
-  let eval_head {env; ppenv; _} hd =
-    try
-      Eval.eval_head env hd
-    with
-    | exn ->
-      Format.eprintf "Failed to evaluate: %a@." (Tm.pp_head ppenv) hd;
-      raise exn
-
-  let eval_dim {env; _} tm =
-    Eval.eval_dim env tm
-
-  let eval_tick {env; _} tm =
-    Eval.eval_tick env tm
-
-  let eval_tm_sys {env; _} sys =
-    Eval.eval_tm_sys env sys
-
 
   module Q = Quote.M (Eval)
 
