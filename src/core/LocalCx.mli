@@ -48,3 +48,5 @@ val check_subtype : t -> value -> value -> unit
 val quote : t -> ty:value -> value -> Tm.tm
 val quote_ty : t -> value -> Tm.tm
 val check_eq_ty : t -> value -> value -> unit
+
+val evaluator : t -> (module Val.S)
