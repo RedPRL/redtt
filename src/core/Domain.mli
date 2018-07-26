@@ -62,6 +62,10 @@ type con =
   | DFix : {ty : value; clo : clo} -> con
   | DFixLine : {x : atom; ty : value; clo : clo} -> con
 
+  (* Too bad 'Box' is already taken. Any other ideas? *)
+  | BoxModality : value -> con
+  | Shut : value -> con
+
 and neu =
   | Lvl : string option * int -> neu
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
@@ -88,6 +92,8 @@ and neu =
   | Prev : tick * neu -> neu
   | Fix : tick_gen * value * clo -> neu
   | FixLine : atom * tick_gen * value * clo -> neu
+
+  | Open : neu -> neu
 
 and nf = {ty : value; el : value}
 

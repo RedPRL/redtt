@@ -66,13 +66,39 @@ sig
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
-
-  module Error : sig
-    type t
-    val pp : t Pretty.t0
-    exception E of t
-  end
 end
+
+
+
+type error =
+  | ErrEquateNf of {env : Env.t; ty : value; el0 : value; el1 : value}
+  | ErrEquateNeu of {env : Env.t; neu0 : neu; neu1 : neu}
+
+let pp_error fmt =
+  function
+  | ErrEquateNf {ty; el0; el1; _} ->
+    Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Domain.pp_value el0 Uuseg_string.pp_utf_8 "≠" Domain.pp_value el1 Domain.pp_value ty
+
+  | ErrEquateNeu {neu0; neu1; _} ->
+    Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" Domain.pp_neu neu0 Uuseg_string.pp_utf_8 "≠" Domain.pp_neu neu1
+
+exception E of error
+
+module Error =
+struct
+  type t = error
+  let pp = pp_error
+  exception E = E
+end
+
+let _ =
+  PpExn.install_printer @@ fun fmt ->
+  function
+  | E err ->
+    Format.fprintf fmt "@[<1>%a@]" pp_error err
+  | _ ->
+    raise PpExn.Unrecognized
+
 
 module M (V : Val.S) : S =
 struct
@@ -85,13 +111,6 @@ struct
 
   let generic env ty =
     generic_constrained env ty []
-
-
-  type error =
-    | ErrEquateNf of {env : QEnv.t; ty : value; el0 : value; el1 : value}
-    | ErrEquateNeu of {env : QEnv.t; neu0 : neu; neu1 : neu}
-
-  exception E of error
 
   let rec equate env ty el0 el1 =
     match unleash ty with
@@ -125,6 +144,12 @@ struct
       let ty = inst_tick_clo ltr tick in
       let bdy = equate (Env.succ env) ty prev0 prev1 in
       Tm.make @@ Tm.Next (Tm.B (None, bdy))
+
+    | BoxModality ty ->
+      let open0 = modal_open el0 in
+      let open1 = modal_open el1 in
+      let t = equate env ty open0 open1 in
+      Tm.make @@ Tm.Shut t
 
     | Rst {ty; _} ->
       equate env ty el0 el1
@@ -226,6 +251,9 @@ struct
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.make @@ Tm.Later (Tm.B (None, cod))
 
+      | BoxModality ty0, BoxModality ty1 ->
+        let ty = equate env ty ty0 ty1 in
+        Tm.make @@ Tm.BoxModality ty
 
       | Sg sg0, Sg sg1 ->
         let dom = equate env ty sg0.dom sg1.dom in
@@ -467,6 +495,9 @@ struct
       let tick = equate_tick env tick0 tick1 in
       equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
 
+    | Open neu0, Open neu1 ->
+      equate_neu_ env neu0 neu1 @@ Tm.Open :: stk
+
     | _ ->
       let err = ErrEquateNeu {env; neu0; neu1} in
       raise @@ E err
@@ -683,6 +714,15 @@ struct
       let vcod1 = inst_clo sg1.cod var in
       subtype (Env.succ env) vcod0 vcod1
 
+    | Later ltr0, Later ltr1 ->
+      let tick = TickGen (`Lvl (None, Env.len env)) in
+      let vcod0 = inst_tick_clo ltr0 tick in
+      let vcod1 = inst_tick_clo ltr1 tick in
+      subtype (Env.succ env) vcod0 vcod1
+
+    | BoxModality ty0, BoxModality ty1 ->
+      subtype env ty0 ty1
+
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
       let ty1x, sys1x = ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
@@ -763,34 +803,5 @@ struct
     end
 
 
-
-  let pp_error fmt =
-    function
-    | ErrEquateNf {env; ty; el0; el1} ->
-      let tty = quote_ty env ty in
-      let tm0 = quote_nf env {ty; el = el0} in
-      let tm1 = quote_nf env {ty; el = el1} in
-      Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Tm.pp0 tm0 Uuseg_string.pp_utf_8 "≠" Tm.pp0 tm1 Tm.pp0 tty
-
-    | ErrEquateNeu {env; neu0; neu1} ->
-      let tm0 = quote_neu env neu0 in
-      let tm1 = quote_neu env neu1 in
-      Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" (Tm.pp_cmd Pretty.Env.emp) tm0 Uuseg_string.pp_utf_8 "≠" (Tm.pp_cmd Pretty.Env.emp) tm1
-
-
-  module Error =
-  struct
-    type t = error
-    let pp = pp_error
-    exception E = E
-  end
-
-  let _ =
-    PpExn.install_printer @@ fun fmt ->
-    function
-    | E err ->
-      Format.fprintf fmt "@[<1>%a@]" pp_error err
-    | _ ->
-      raise PpExn.Unrecognized
 
 end

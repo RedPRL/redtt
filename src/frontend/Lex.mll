@@ -31,6 +31,14 @@ module Make (R : SOURCE) : LEXER = struct
       ("with", WITH);
       ("end", END);
       ("bool", BOOL);
+      ("[]", BOX_MODALITY);
+      ("□", BOX_MODALITY);
+      ("tick", TICK);
+      ("✓", TICK);
+      ("dim", DIM);
+      ("𝕀", DIM);
+      ("lock", LOCK);
+      ("🔓", LOCK);
       ("nat", NAT);
       ("ℕ", NAT);
       ("int", INT);
@@ -55,6 +63,8 @@ module Make (R : SOURCE) : LEXER = struct
       ("next", NEXT);
       ("prev", PREV);
       ("dfix", DFIX);
+      ("open", OPEN);
+      ("shut", SHUT);
       ("call", CALL);
       ("tt", TT);
       ("ff", FF);

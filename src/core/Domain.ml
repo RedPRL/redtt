@@ -58,6 +58,8 @@ type con =
   | DFix : {ty : value; clo : clo} -> con
   | DFixLine : {x : atom; ty : value; clo : clo} -> con
 
+  | BoxModality : value -> con
+  | Shut : value -> con
 
 and neu =
   | Lvl : string option * int -> neu
@@ -87,6 +89,8 @@ and neu =
   | Prev : tick * neu -> neu
   | Fix : tick_gen * value * clo -> neu
   | FixLine : atom * tick_gen * value * clo -> neu
+
+  | Open : neu -> neu
 
 and nf = {ty : value; el : value}
 
@@ -229,6 +233,11 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<dfix>"
   | DFixLine _ ->
     Format.fprintf fmt "<dfix-line>"
+  | BoxModality _ ->
+    Format.fprintf fmt "<box-modality>"
+  | Shut _ ->
+    Format.fprintf fmt "<shut>"
+
 
 and pp_value fmt value =
   let Node node = value in
@@ -366,6 +375,9 @@ and pp_neu fmt neu =
 
   | FixLine _ ->
     Format.fprintf fmt "<fix-line>"
+
+  | Open _ ->
+    Format.fprintf fmt "<open>"
 
 
 and pp_nf fmt nf =

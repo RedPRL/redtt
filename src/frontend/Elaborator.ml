@@ -117,18 +117,31 @@ struct
       M.ret env
 
   and elab_scheme env (cells, ecod) kont =
-    let rec go gm =
+    let rec go =
       function
       | [] ->
         elab_chk env univ ecod >>=
         kont
-      | (name, edom) :: cells ->
+      | `Ty (name, edom) :: cells ->
         elab_chk env univ edom >>= normalize_ty >>= fun dom ->
         let x = Name.named @@ Some name in
         M.in_scope x (`P dom) @@
-        go (gm #< (x, dom)) cells
+        go cells
+      | `Tick name :: cells ->
+        let x = Name.named @@ Some name in
+        M.in_scope x `Tick @@
+        go cells
+      | `I name :: cells ->
+        let x = Name.named @@ Some name in
+        M.in_scope x `I @@
+        go cells
+      | `Lock :: cells ->
+        let x = Name.fresh () in
+        M.in_scope x `Lock @@
+        go cells
+      | _ -> failwith "TODO: elab_scheme"
     in
-    go Emp cells
+    go cells
 
 
 
@@ -141,6 +154,12 @@ struct
       elab_chk env rst.ty e >>= fun tm ->
       M.lift C.ask >>= fun psi ->
       M.lift @@ U.push_guess psi ~ty0:ty ~ty1:rst.ty tm
+
+    | Tm.BoxModality ty, E.Shut e ->
+      M.in_scope (Name.fresh ()) `Lock begin
+        elab_chk env ty e
+      end >>= fun tm ->
+      M.ret @@ Tm.make @@ Tm.Shut tm
 
     | _, E.Hole name ->
       M.lift C.ask >>= fun psi ->
@@ -277,7 +296,7 @@ struct
     | Tm.Univ _, E.Pi ([], e) ->
       elab_chk env ty e
 
-    | Tm.Univ _, E.Pi ((name, edom) :: etele, ecod) ->
+    | Tm.Univ _, E.Pi (`Ty (name, edom) :: etele, ecod) ->
       elab_chk env ty edom >>= fun dom ->
       let x = Name.named @@ Some name in
       M.in_scope x (`P dom) begin
@@ -285,12 +304,33 @@ struct
       end >>= fun codx ->
       M.ret @@ Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
 
+    | Tm.Univ _, E.Pi (`I name :: etele, ecod) ->
+      let x = Name.named @@ Some name in
+      M.in_scope x `I begin
+        elab_chk env ty @@ E.Pi (etele, ecod)
+      end >>= fun codx ->
+      let ebnd = Tm.bind_ext (Emp #< x) codx [] in
+      M.ret @@ Tm.make @@ Tm.Ext ebnd
 
+    | Tm.Univ _, E.Pi (`Tick name :: etele, ecod) ->
+      let x = Name.named @@ Some name in
+      M.in_scope x `Tick begin
+        elab_chk env ty @@ E.Pi (etele, ecod)
+      end >>= fun codx ->
+      let bnd = Tm.bind x codx in
+      M.ret @@ Tm.make @@ Tm.Later bnd
+
+    | Tm.Univ _, E.Pi (`Lock :: etele, ecod) ->
+      let x = Name.fresh () in
+      M.in_scope x `Lock begin
+        elab_chk env ty @@ E.Pi (etele, ecod)
+      end >>= fun ty ->
+      M.ret @@ Tm.make @@ Tm.BoxModality ty
 
     | Tm.Univ _, E.Sg ([], e) ->
       elab_chk env ty e
 
-    | Tm.Univ _, E.Sg ((name, edom) :: etele, ecod) ->
+    | Tm.Univ _, E.Sg (`Ty (name, edom) :: etele, ecod) ->
       elab_chk env ty edom >>= fun dom ->
       let x = Name.named @@ Some name in
       M.in_scope x (`P dom) begin

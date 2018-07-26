@@ -17,12 +17,20 @@ let rec telescope ty : telescope * ty =
   match Tm.unleash ty with
   | Tm.Pi (dom, cod) ->
     let x, codx = Tm.unbind cod in
-    let (tel, ty) = telescope codx in
+    let tel, ty = telescope codx in
     (Emp #< (x, `P dom)) <.> tel, ty
   | Tm.CoR (r, r', Some ty) ->
     let x = Name.fresh () in
-    let (tel, ty) = telescope ty in
+    let tel, ty = telescope ty in
     (Emp #< (x, `R (r, r'))) <.> tel, ty
+  | Tm.Later cod ->
+    let x, codx = Tm.unbind cod in
+    let tel, ty = telescope codx in
+    (Emp #< (x, `Tick)) <.> tel, ty
+  | Tm.BoxModality ty ->
+    let x = Name.fresh () in
+    let tel, ty = telescope ty in
+    (Emp #< (x, `Lock)) <.> tel, ty
   | _ ->
     Emp, ty
 
@@ -31,9 +39,13 @@ let rec abstract_tm xs tm =
   | Emp -> tm
   | Snoc (xs, (x, `P _)) ->
     abstract_tm xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+  | Snoc (xs, (x, `Tick)) ->
+    abstract_tm xs @@ Tm.make @@ Tm.Next (Tm.bind x tm)
   | Snoc (xs, (x, `I)) ->
     let bnd = Tm.NB (Emp #< None, Tm.close_var x 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
+  | Snoc (xs, (_, `Lock)) ->
+    abstract_tm xs @@ Tm.make @@ Tm.Shut tm
   | Snoc (xs, (_, `R (r, r'))) ->
     abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
   | _ ->
@@ -49,6 +61,10 @@ let rec abstract_ty (gm : telescope) cod =
   | Snoc (gm, (x, `I)) ->
     let cod' = Tm.close_var x ~twin:(fun tw -> tw) 0 cod in
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB (Emp #< (Name.name x), (cod', [])))
+  | Snoc (gm, (x, `Tick)) ->
+    abstract_ty gm @@ Tm.make @@ Tm.Later (Tm.bind x cod)
+  | Snoc (gm, (_, `Lock)) ->
+    abstract_ty gm @@ Tm.make @@ Tm.BoxModality cod
   | _ ->
     failwith "abstract_ty"
 
@@ -62,6 +78,10 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     Tm.FunApp (Tm.up @@ Tm.var x)
   | `R _ ->
     Tm.CoRForce
+  | `Tick ->
+    Tm.Prev (Tm.up @@ Tm.var x)
+  | `Lock ->
+    Tm.Open
   | _ ->
     failwith "TODO: telescope_to_spine"
 
@@ -871,8 +891,8 @@ let rec solver prob =
     else
       begin
         match param with
-        | `I ->
-          in_scope x `I @@
+        | (`I | `Tick | `Lock) as p ->
+          in_scope x p @@
           solver probx
 
         | `P ty ->

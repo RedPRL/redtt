@@ -9,6 +9,132 @@ type step =
 let ret v = Ret v
 let step v = Step v
 
+exception ProjAbs of abs
+exception ProjVal of value
+
+
+type error =
+  | UnexpectedEnvCell of env_el
+  | ExpectedDimensionTerm of Tm.tm
+  | ExpectedTickTerm of Tm.tm
+  | InternalMortalityError
+  | RigidCoeUnexpectedArgument of abs
+  | RigidHComUnexpectedArgument of value
+  | RigidGHComUnexpectedArgument of value
+  | LblCallUnexpectedArgument of value
+  | UnexpectedDimensionTerm of Tm.tm
+  | UnexpectedTickTerm of Tm.tm
+  | UnleashPiError of value
+  | UnleashSgError of value
+  | UnleashExtError of value
+  | UnleashVError of value
+  | UnleashLaterError of value
+  | UnleashBoxModalityError of value
+  | UnleashCoRError of value
+  | UnleashLblTyError of value
+  | UnleashFComError of value
+  | ForcedUntrueCorestriction of val_face
+
+
+exception E of error
+
+module Error =
+struct
+  type t = error
+
+  let pp fmt =
+    function
+    | InternalMortalityError ->
+      Format.fprintf fmt "Too mortal, taste it!"
+    | RigidCoeUnexpectedArgument abs ->
+      Format.fprintf fmt
+        "Unexpected type argument in rigid coercion: %a."
+        pp_abs abs
+    | RigidHComUnexpectedArgument v ->
+      Format.fprintf fmt
+        "Unexpected type argument in rigid homogeneous copmosition: %a."
+        pp_value v
+    | RigidGHComUnexpectedArgument v ->
+      Format.fprintf fmt
+        "Unexpected type argument in rigid generalized homogeneous copmosition: %a."
+        pp_value v
+    | LblCallUnexpectedArgument v ->
+      Format.fprintf fmt
+        "Unexpected argument to labeled type projection: %a"
+        pp_value v
+    | UnexpectedEnvCell _ ->
+      Format.fprintf fmt
+        "Did not find what was expected in the environment"
+    | ExpectedDimensionTerm t ->
+      Format.fprintf fmt
+        "Tried to evaluate non-dimension term %a as dimension."
+        Tm.pp0 t
+    | ExpectedTickTerm t ->
+      Format.fprintf fmt
+        "Tried to evaluate non-tick term %a as dimension."
+        Tm.pp0 t
+    | UnexpectedDimensionTerm t ->
+      Format.fprintf fmt
+        "Tried to evaluate dimension term %a as expression."
+        Tm.pp0 t
+    | UnexpectedTickTerm t ->
+      Format.fprintf fmt
+        "Tried to evaluate tick term %a as expression."
+        Tm.pp0 t
+    | UnleashPiError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as pi type."
+        pp_value v
+    | UnleashSgError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as sigma type."
+        pp_value v
+    | UnleashVError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as V type."
+        pp_value v
+    | UnleashLaterError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as later modality."
+        pp_value v
+    | UnleashBoxModalityError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as box modality."
+        pp_value v
+    | UnleashExtError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as extension type."
+        pp_value v
+    | UnleashCoRError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as co-restriction type."
+        pp_value v
+    | UnleashFComError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as formal homogeneous composition."
+        pp_value v
+    | UnleashLblTyError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as labeled type."
+        pp_value v
+    | ForcedUntrueCorestriction face ->
+      Format.fprintf fmt
+        "Cannot force untrue co-restriction: %a"
+        pp_val_face face
+
+
+  exception E = E
+
+  let _ =
+    PpExn.install_printer @@ fun fmt ->
+    function
+    | E err ->
+      pp fmt err
+    | _ ->
+      raise PpExn.Unrecognized
+end
+
+
 
 module type S =
 sig
@@ -28,6 +154,8 @@ sig
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
   val prev : tick -> value -> value
+  val modal_open : value -> value
+
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -44,6 +172,7 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_later : value -> tick_clo
+  val unleash_box_modality : value -> value
   val unleash_fcom : value -> dir * value * comp_sys
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
@@ -53,13 +182,6 @@ sig
 
   module Macro : sig
     val equiv : value -> value -> value
-  end
-
-  module Error :
-  sig
-    type t
-    val pp : t Pretty.t0
-    exception E of t
   end
 end
 
@@ -74,34 +196,6 @@ module M (Sig : Sig) : S =
 struct
   let base_restriction = Sig.restriction
 
-
-  exception ProjAbs of abs
-  exception ProjVal of value
-
-
-  type error =
-    | UnexpectedEnvCell of env_el
-    | ExpectedDimensionTerm of Tm.tm
-    | ExpectedTickTerm of Tm.tm
-    | InternalMortalityError
-    | RigidCoeUnexpectedArgument of abs
-    | RigidHComUnexpectedArgument of value
-    | RigidGHComUnexpectedArgument of value
-    | LblCallUnexpectedArgument of value
-    | UnexpectedDimensionTerm of Tm.tm
-    | UnexpectedTickTerm of Tm.tm
-    | UnleashPiError of value
-    | UnleashSgError of value
-    | UnleashExtError of value
-    | UnleashVError of value
-    | UnleashLaterError of value
-    | UnleashCoRError of value
-    | UnleashLblTyError of value
-    | UnleashFComError of value
-    | ForcedUntrueCorestriction of val_face
-
-
-  exception E of error
 
   let make_closure rho bnd =
     Clo {bnd; rho}
@@ -324,6 +418,12 @@ struct
       let clo = Clo.act phi info.clo in
       make_dfix_line r ty clo
 
+    | BoxModality v ->
+      make @@ BoxModality (Value.act phi v)
+
+    | Shut v ->
+      make @@ Shut (Value.act phi v)
+
   and act_neu phi con =
     match con with
     | VProj info ->
@@ -476,6 +576,16 @@ struct
         | Step v ->
           step @@ prev tick v
       end
+
+    | Open neu ->
+      begin
+        match act_neu phi neu with
+        | Ret neu ->
+          ret @@ Open neu
+        | Step v ->
+          step @@ modal_open v
+      end
+
 
     | Fix (tick, ty, clo) ->
       ret @@ Fix (tick, Value.act phi ty, Clo.act phi clo)
@@ -708,7 +818,7 @@ struct
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
-    | (Pi _ | Sg _ | Ext _ | Up _ | Later _) ->
+    | (Pi _ | Sg _ | Ext _ | Up _ | Later _ | BoxModality _) ->
       make @@ Coe {dir; abs; el}
 
     | (Bool | Univ _) ->
@@ -1347,6 +1457,14 @@ struct
       let tclo = TickClo {bnd; rho} in
       make @@ Next tclo
 
+    | Tm.BoxModality ty ->
+      let vty = eval rho ty in
+      make @@ BoxModality vty
+
+    | Tm.Shut t ->
+      let v = eval rho t in
+      make @@ Shut v
+
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
     eval_stack rho vhd @@ Bwd.to_list sp
@@ -1410,7 +1528,8 @@ struct
     | Tm.Prev tick ->
       let vtick = eval_tick rho tick in
       prev vtick vhd
-
+    | Tm.Open ->
+      modal_open vhd
 
 
   and eval_head rho =
@@ -1587,6 +1706,13 @@ struct
     | Rst rst -> unleash_later rst.ty
     | _ ->
       raise @@ E (UnleashLaterError v)
+
+  and unleash_box_modality v =
+    match unleash v with
+    | BoxModality ty -> ty
+    | Rst rst -> unleash_box_modality rst.ty
+    | _ ->
+      raise @@ E (UnleashBoxModalityError v)
 
   and unleash_sg v =
     match unleash v with
@@ -1879,6 +2005,53 @@ struct
 
     | _ ->
       failwith "prev"
+
+
+  and modal_open el =
+    match unleash el with
+    | Shut el ->
+      el
+
+    | Up info ->
+      let ty = unleash_box_modality info.ty in
+      let open_face = Face.map @@ fun _ _ a -> modal_open a in
+      let open_sys = List.map open_face info.sys in
+      make @@ Up {ty; neu = Open info.neu; sys = open_sys}
+
+    | Coe info ->
+      (* EXPERIMENTAL !!! *)
+      let x, boxtyx = Abs.unleash1 info.abs in
+      let tyx = unleash_box_modality boxtyx in
+      let abs = Abs.bind1 x tyx in
+      let el = modal_open info.el in
+      rigid_coe info.dir abs el
+
+    | HCom info ->
+      (* EXPERIMENTAL !!! *)
+      let ty = unleash_box_modality info.ty in
+      let cap = modal_open info.cap in
+      let open_face =
+        Face.map @@ fun _ _ abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ modal_open v
+      in
+      let sys = List.map open_face info.sys in
+      rigid_hcom info.dir ty cap sys
+
+    | GHCom info ->
+      (* EXPERIMENTAL !!! *)
+      let ty = unleash_box_modality info.ty in
+      let cap = modal_open info.cap in
+      let open_face =
+        Face.map @@ fun _ _ abs ->
+        let x, v = Abs.unleash1 abs in
+        Abs.bind1 x @@ modal_open v
+      in
+      let sys = List.map open_face info.sys in
+      rigid_ghcom info.dir ty cap sys
+
+    | _ ->
+      failwith "modal_open"
 
 
   (* the equation oracle `phi` is for continuations `ty0` and `equiv`
@@ -2192,100 +2365,5 @@ struct
 
   end
 
-
-  module Error =
-  struct
-    type t = error
-
-    let pp fmt =
-      function
-      | InternalMortalityError ->
-        Format.fprintf fmt "Too mortal, taste it!"
-      | RigidCoeUnexpectedArgument abs ->
-        Format.fprintf fmt
-          "Unexpected type argument in rigid coercion: %a."
-          pp_abs abs
-      | RigidHComUnexpectedArgument v ->
-        Format.fprintf fmt
-          "Unexpected type argument in rigid homogeneous copmosition: %a."
-          pp_value v
-      | RigidGHComUnexpectedArgument v ->
-        Format.fprintf fmt
-          "Unexpected type argument in rigid generalized homogeneous copmosition: %a."
-          pp_value v
-      | LblCallUnexpectedArgument v ->
-        Format.fprintf fmt
-          "Unexpected argument to labeled type projection: %a"
-          pp_value v
-      | UnexpectedEnvCell _ ->
-        Format.fprintf fmt
-          "Did not find what was expected in the environment"
-      | ExpectedDimensionTerm t ->
-        Format.fprintf fmt
-          "Tried to evaluate non-dimension term %a as dimension."
-          Tm.pp0 t
-      | ExpectedTickTerm t ->
-        Format.fprintf fmt
-          "Tried to evaluate non-tick term %a as dimension."
-          Tm.pp0 t
-      | UnexpectedDimensionTerm t ->
-        Format.fprintf fmt
-          "Tried to evaluate dimension term %a as expression."
-          Tm.pp0 t
-      | UnexpectedTickTerm t ->
-        Format.fprintf fmt
-          "Tried to evaluate tick term %a as expression."
-          Tm.pp0 t
-      | UnleashPiError v ->
-        Format.fprintf fmt
-          "Tried to unleash %a as pi type."
-          pp_value v
-      | UnleashSgError v ->
-        Format.fprintf fmt
-          "Tried to unleash %a as sigma type."
-          pp_value v
-      | UnleashVError v ->
-        Format.fprintf fmt
-          "Tried to unleash %a as V type."
-          pp_value v
-      | UnleashLaterError v ->
-        Format.fprintf fmt
-          "Tried to unleash %a as later modality."
-          pp_value v
-      | UnleashExtError v ->
-        Format.fprintf fmt
-          "Tried to unleash %a as extension type."
-          pp_value v
-      | UnleashCoRError v ->
-        Format.fprintf fmt
-          "Tried to unleash %a as co-restriction type."
-          pp_value v
-      | UnleashFComError v ->
-        Format.fprintf fmt
-          "Tried to unleash %a as formal homogeneous composition."
-          pp_value v
-      | UnleashLblTyError v ->
-        Format.fprintf fmt
-          "Tried to unleash %a as labeled type."
-          pp_value v
-      | ForcedUntrueCorestriction face ->
-        Format.fprintf fmt
-          "Cannot force untrue co-restriction: %a"
-          pp_val_face face
-
-
-
-
-    exception E = E
-
-    let _ =
-      PpExn.install_printer @@ fun fmt ->
-      function
-      | E err ->
-        pp fmt err
-      | _ ->
-        raise PpExn.Unrecognized
-
-  end
 
 end

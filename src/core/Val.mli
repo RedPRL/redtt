@@ -1,5 +1,12 @@
 open Domain
 
+module Error :
+sig
+  type t
+  val pp : t Pretty.t0
+  exception E of t
+end
+
 module type S =
 sig
   val unleash : value -> con
@@ -18,6 +25,8 @@ sig
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
   val prev : tick -> value -> value
+  val modal_open : value -> value
+
   val car : value -> value
   val cdr : value -> value
   val lbl_call : value -> value
@@ -33,6 +42,7 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_later : value -> tick_clo
+  val unleash_box_modality : value -> value
   val unleash_fcom : value -> dir * value * comp_sys
   val unleash_ext : value -> dim list -> value * val_sys
   val unleash_lbl_ty : value -> string * nf list * value
@@ -41,13 +51,6 @@ sig
 
   module Macro : sig
     val equiv : value -> value -> value
-  end
-
-  module Error :
-  sig
-    type t
-    val pp : t Pretty.t0
-    exception E of t
   end
 end
 

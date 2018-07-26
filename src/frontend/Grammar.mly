@@ -16,7 +16,8 @@
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH END
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV DFIX
+%token DIM TICK LOCK
+%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV DFIX BOX_MODALITY OPEN SHUT
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
@@ -155,10 +156,10 @@ eterm:
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = eterm
-    { E.Pi (tele, cod) }
+    { E.Pi (List.flatten tele, cod) }
 
   | tele = nonempty_list(etele_cell); TIMES; cod = eterm
-    { E.Sg (tele, cod) }
+    { E.Sg (List.flatten tele, cod) }
 
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
     { E.Ext (dims, ty, sys)}
@@ -167,10 +168,17 @@ eterm:
     { E.Rst (ty, sys)}
 
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
-    { E.Pi (["_", dom], cod) }
+    { E.Pi ([`Ty ("_", dom)], cod) }
 
   | dom = atomic_eterm; TIMES; cod = eterm
-    { E.Sg (["_", dom], cod) }
+    { E.Sg ([`Ty ("_", dom)], cod) }
+
+  | BOX_MODALITY; ty = eterm
+    { E.Pi ([`Lock], ty)}
+
+  | SHUT; tm = eterm
+    { E.Shut tm }
+
 
 eface:
   | r0 = atomic_eterm; EQUALS; r1 = atomic_eterm; RRIGHT_ARROW; e = eterm
@@ -178,16 +186,22 @@ eface:
 
 
 escheme:
-  | tele = list(escheme_cell); COLON; cod = eterm
-    { (tele, cod) }
-
-escheme_cell:
-  | LPR; a = ATOM; COLON; ty = eterm; RPR
-    { (a, ty) }
+  | tele = list(etele_cell); COLON; cod = eterm
+    { (List.flatten tele, cod) }
 
 etele_cell:
-  | LPR; a = ATOM; COLON; ty = eterm; RPR
-    { (a, ty) }
+  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; ty = eterm; RPR
+    { List.map (fun x -> `Ty (x, ty)) xs }
+  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; TICK; RPR
+    { List.map (fun x -> `Tick x) xs }
+  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; DIM; RPR
+    { List.map (fun x -> `I x) xs }
+  | DIM
+    { [`I "_"] }
+  | TICK
+    { [`Tick "_"] }
+  | LOCK
+    { [`Lock] }
 
 esig:
   | d = edecl; esig = esig
@@ -326,6 +340,11 @@ tm:
       make_node $startpos $endpos @@
       Tm.Later (ty env) }
 
+  | LPR; BOX_MODALITY; ty = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.BoxModality (ty env) }
+
   | LPR; rst = constrained; RPR
     { fun env ->
       let ty, sys = rst env in
@@ -340,6 +359,11 @@ tm:
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Next (bnd env) }
+
+  | LPR; SHUT; tm = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Shut (tm env) }
 
   | LPR; CONS; e0 = tm; e1 = tm; RPR
     { fun env ->
@@ -418,6 +442,11 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< (Tm.Prev (t env)) }
+
+  | LPR; OPEN; e = cut; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, fs #< Tm.Open }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->
