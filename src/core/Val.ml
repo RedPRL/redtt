@@ -728,7 +728,7 @@ struct
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
-    | (Pi _ | Sg _ | Ext _ | Up _ | Later _) ->
+    | (Pi _ | Sg _ | Ext _ | Up _ | Later _ | BoxModality _) ->
       make @@ Coe {dir; abs; el}
 
     | (Bool | Univ _) ->
@@ -1367,6 +1367,14 @@ struct
       let tclo = TickClo {bnd; rho} in
       make @@ Next tclo
 
+    | Tm.BoxModality ty ->
+      let vty = eval rho ty in
+      make @@ BoxModality vty
+
+    | Tm.Shut t ->
+      let v = eval rho t in
+      make @@ Shut v
+
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
     eval_stack rho vhd @@ Bwd.to_list sp
@@ -1430,7 +1438,8 @@ struct
     | Tm.Prev tick ->
       let vtick = eval_tick rho tick in
       prev vtick vhd
-
+    | Tm.Open ->
+      modal_open vhd
 
 
   and eval_head rho =

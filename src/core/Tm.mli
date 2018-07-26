@@ -56,6 +56,9 @@ type 'a tmf =
   | Later of 'a bnd
   | Next of 'a bnd
 
+  | BoxModality of 'a
+  | Shut of 'a
+
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
@@ -87,6 +90,7 @@ and 'a frame =
   | LblCall
   | CoRForce
   | Prev of 'a
+  | Open
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine

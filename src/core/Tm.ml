@@ -58,6 +58,9 @@ type 'a tmf =
   | Later of 'a bnd
   | Next of 'a bnd
 
+  | BoxModality of 'a
+  | Shut of 'a
+
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
@@ -88,6 +91,7 @@ and 'a frame =
   | LblCall
   | CoRForce
   | Prev of 'a
+  | Open
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
@@ -249,6 +253,14 @@ struct
     | Next bnd ->
       let bnd' = traverse_bnd traverse_tm bnd in
       Next bnd'
+
+    | BoxModality t ->
+      let t' = traverse_tm t in
+      BoxModality t'
+
+    | Shut t ->
+      let t' = traverse_tm t in
+      Shut t'
 
     | Let (cmd, bnd) ->
       let cmd' = traverse_cmd cmd in
@@ -449,6 +461,10 @@ struct
     | Prev tick ->
       let tick = traverse_tm tick in
       Prev tick
+
+    | Open ->
+      Open
+
 end
 
 
@@ -859,6 +875,12 @@ let rec pp env fmt =
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<hv1>(next [%a] %a)@]" Uuseg_string.pp_utf_8 x (pp env') t
 
+    | BoxModality t ->
+      Format.fprintf fmt "@[<hv1>(%a@ %a)@]" Uuseg_string.pp_utf_8 "□" (pp env) t
+
+    | Shut t ->
+      Format.fprintf fmt "@[<hv1>(%a@ %a)@]" Uuseg_string.pp_utf_8 "shut" (pp env) t
+
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
       Format.fprintf fmt "@[<hv1>(let@ @[<hv1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
@@ -953,7 +975,9 @@ and pp_cmd env fmt (hd, sp) =
       | CoRForce ->
         Format.fprintf fmt "@[<hv1>(force@ %a)@]" (go `Force) sp
       | Prev tick ->
-        Format.fprintf fmt "@[<hv1>(prev %a %a)@]" (pp env) tick (go `Prev) sp
+        Format.fprintf fmt "@[<hv1>(prev %a@ %a)@]" (pp env) tick (go `Prev) sp
+      | Open ->
+        Format.fprintf fmt "@[<hv1>(shut@ %a)@]" (go `Open) sp
   in
   go `Start fmt sp
 
@@ -1286,6 +1310,8 @@ let map_frame f =
   | Prev tick ->
     let tick = f tick in
     Prev tick
+  | Open ->
+    Open
 
 let map_spine f =
   Bwd.map @@ map_frame f
@@ -1367,6 +1393,12 @@ let map_tmf f =
   | Next bnd ->
     let bnd = map_bnd f bnd in
     Next bnd
+  | BoxModality t ->
+    let t = f t in
+    BoxModality t
+  | Shut t ->
+    let t = f t in
+    Shut t
   | Up cmd ->
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
