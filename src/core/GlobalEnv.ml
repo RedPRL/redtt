@@ -5,39 +5,61 @@ type 'a param =
   | `I
   ]
 
+module T = Map.Make (Name)
+
 type ty = Tm.tm
 type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
-type lock_info = {locks : int; killed : bool; constant : bool}
-type t = {env : (Name.t * entry param * lock_info) list; rel : Restriction.t}
+type lock_info = {constant : bool; birth : int}
+type t =
+  {rel : Restriction.t;
+   table : (entry param * lock_info) T.t;
+   lock : int -> int;
+   killed : int -> bool;
+   len : int}
 
 
 let emp () =
-  {env = [];
-   rel = Restriction.emp ()}
+  {table = T.empty;
+   rel = Restriction.emp ();
+   lock = (fun _ -> 0);
+   killed = (fun _ -> false);
+   len = 0}
 
-let ext (sg : t) nm param : t =
-  {sg with env = (nm, param, {locks = 0; killed = false; constant = false}) :: sg.env}
+let ext_ (sg : t) ~constant nm param : t =
+  let linfo = {constant; birth = sg.len} in
+  {sg with
+   table = T.add nm (param, linfo) sg.table;
+   len = sg.len + 1}
 
-let ext_meta (sg : t) nm param : t =
-  {sg with env = (nm, param, {locks = 0; killed = false; constant = true}) :: sg.env}
+
+let define (sg : t) nm ~ty ~tm =
+  let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm in
+  let sys = [face] in
+  let linfo = {constant = true; birth = sg.len} in
+  {sg with
+   table = T.add nm (`P {ty; sys}, linfo) sg.table;
+   len = sg.len + 1}
+
+let ext (sg : t) =
+  ext_ sg ~constant:false
+
+let ext_meta (sg : t) =
+  ext_ sg ~constant:true
 
 let ext_tick (sg : t) nm : t =
-  {sg with env = (nm, `Tick, {locks = 0; killed = false; constant = false}) :: sg.env}
+  ext_ sg ~constant:false nm `Tick
 
 let ext_dim (sg : t) nm : t =
-  {sg with env = (nm, `I, {locks = 0; killed = false; constant = false}) :: sg.env}
+  ext_ sg ~constant:false nm `I
+
 
 let ext_lock (sg : t) : t =
-  let go (nm, entry, linfo) =
-    nm, entry, {linfo with locks = linfo.locks + 1}
-  in
-  {sg with env = List.map go sg.env}
+  {sg with
+   lock = fun i -> if i < sg.len then sg.lock i + 1 else sg.lock i}
 
 let clear_locks (sg : t) : t =
-  let go (nm, entry, linfo) =
-    nm, entry, {linfo with locks = 0}
-  in
-  {sg with env = List.map go sg.env}
+  {sg with
+   lock = (fun _ -> 0)}
 
 
 let rec index_of pred xs =
@@ -48,61 +70,26 @@ let rec index_of pred xs =
 
 let kill_from_tick (sg : t) nm : t =
   try
-    let pred (nm', _, _) = nm = nm' in
-    let ix = index_of pred sg.env in
-    let go ix' (nm, entry, linfo) =
-      if ix' <= ix then
-        nm, entry, {linfo with killed = true}
-      else
-        nm, entry, linfo
-    in
-    let env = List.mapi go sg.env in
-    {sg with env}
+    let _, tick_linfo = T.find nm sg.table in
+    {sg with killed = fun i -> if i < sg.len && i >= tick_linfo.birth then true else sg.killed i}
   with
   | _ -> sg
 
-let define (sg : t) nm ~ty ~tm =
-  let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm in
-  let sys = [face] in
-  {sg with env = (nm, `P {ty; sys}, {locks = 0; killed = false; constant = true}) :: sg.env}
-
-let lookup_entry env nm tw =
-  let rec go =
-    function
-    | [] -> failwith "GlobalEnv.lookup_entry"
-    | (nm', prm, linfo) :: env ->
-      if nm' = nm then
-        if not linfo.constant && (linfo.locks > 0 || linfo.killed) then
-          failwith "GlobalEnv.lookup_entry: not accessible (modal!!)"
-        else
-          match prm, tw with
-          | `P a, _ -> a
-          | `Tw (a, _), `TwinL -> a
-          | `Tw (_, a), `TwinR -> a
-          | _ -> failwith "GlobalEnv.lookup_entry"
-      else
-        go env
-  in
-  go env
-
-let unsafe_lookup_entry env nm tw =
-  let rec go =
-    function
-    | [] -> failwith "GlobalEnv.lookup_entry"
-    | (nm', prm, _) :: env ->
-      if nm' = nm then
-        match prm, tw with
-        | `P a, _ -> a
-        | `Tw (a, _), `TwinL -> a
-        | `Tw (_, a), `TwinR -> a
-        | _ -> failwith "GlobalEnv.lookup_entry"
-      else
-        go env
-  in
-  go env
+let lookup_entry sg nm tw =
+  let prm, linfo = T.find nm sg.table in
+  let locks = sg.lock linfo.birth in
+  let killed = sg.killed linfo.birth in
+  if not linfo.constant && (locks > 0 || killed) then
+    failwith "GlobalEnv.lookup_entry: not accessible (modal!!)"
+  else
+    match prm, tw with
+    | `P a, _ -> a
+    | `Tw (a, _), `TwinL -> a
+    | `Tw (_, a), `TwinR -> a
+    | _ -> failwith "GlobalEnv.lookup_entry"
 
 let lookup_ty sg nm (tw : Tm.twin) =
-  let {ty; _} = lookup_entry sg.env nm tw in
+  let {ty; _} = lookup_entry sg nm tw in
   ty
 
 let restriction sg =
@@ -121,7 +108,7 @@ let restrict tr0 tr1 sg =
 
 let pp fmt sg =
   let pp_sep fmt () = Format.fprintf fmt "; " in
-  let go fmt (nm, p, _) =
+  let go fmt (nm, (p, _)) =
     match p with
     | `Tw _ ->
       Format.fprintf fmt "%a[twin]"
@@ -130,7 +117,7 @@ let pp fmt sg =
       Format.fprintf fmt "%a"
         Name.pp nm
   in
-  Format.pp_print_list ~pp_sep go fmt @@ List.rev sg.env
+  Format.pp_print_list ~pp_sep go fmt @@ T.bindings sg.table
 
 let pp_twin fmt =
   function
@@ -153,18 +140,20 @@ struct
     r
 
   let lookup nm tw =
-    let entry =
+    let param, _ =
       try
-        unsafe_lookup_entry Sig.globals.env nm tw
+        T.find nm Sig.globals.table
       with
-      | exn ->
-        Format.eprintf "Internal error: %a[%a] not found in {@[<1>%a@]}@."
-          Name.pp nm
-          pp_twin tw
-          pp Sig.globals;
-        Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-        Format.eprintf "@.";
-        raise exn
+      | _ ->
+        failwith "GlobalEnv.M.lookup: not found"
     in
-    entry.ty, entry.sys
+    match param, tw with
+    | `P entry, _ ->
+      entry.ty, entry.sys
+    | `Tw (entry, _), `TwinL ->
+      entry.ty, entry.sys
+    | `Tw (_, entry), `TwinR ->
+      entry.ty, entry.sys
+    | _ ->
+      failwith "GlobalEnv.M.lookup: twin mismatch"
 end
