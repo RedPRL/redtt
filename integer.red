@@ -44,4 +44,4 @@ let succ-pred (n : int) : Path int (succ (pred n)) n =
   end
 
 let succ-equiv : Equiv int int =
-  Iso/Equiv int int < succ, < pred, < succ-pred, pred-succ > > >
+  Iso/Equiv _ _ < succ, < pred, < succ-pred, pred-succ > > >

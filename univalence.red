@@ -5,20 +5,20 @@ import connection
 ; the code in this file is adapted from yacctt and redprl
 
 let IsProp (C : type) : type =
-  (c : _) (c' : _) →
+  (c, c' : _) →
     Path C c c'
 
 let IsSet (C : type) : type =
-  (c : _) (c' : _) →
+  (c, c' : _) →
     IsProp (Path C c c')
 
 
-let Retract (A : type) (B : type) (f : A → B) (g : B → A) : type =
+let Retract (A,B : type) (f : A → B) (g : B → A) : type =
   (a : A) →
     Path A (g (f a)) a
 
 let RetIsContr
-  (A : type) (B : type)
+  (A,B : type)
   (f : A → B)
   (g : B → A)
   (h : Retract A B f g)
@@ -50,7 +50,7 @@ let IdEquiv (A : type) : Equiv A A =
   >
 
 let PathToEquiv
-  (A : type) (B : type) (P : Path^1 type A B)
+  (A,B : type) (P : Path^1 type A B)
   : Equiv A B
   =
   coe 0 1 (IdEquiv A) in λ i → Equiv A (P i)
@@ -78,8 +78,7 @@ let PropSet
 let LemSig
   (A : type) (B : A → type)
   (B/prop : (a : A) → IsProp (B a))
-  (u : (a : A) × B a)
-  (v : (a : A) × B a)
+  (u,v : (a : A) × B a)
   (P : Path A (u.0) (v.0))
   : Path ((a : A) × B a) u v
   =
@@ -120,12 +119,12 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
     contr/A/prop contr
 
 opaque
-let PropIsEquiv (A : type) (B : type) (f : A → B) : IsProp (IsEquiv A B f) =
+let PropIsEquiv (A,B : type) (f : A → B) : IsProp (IsEquiv A B f) =
   λ e0 e1 i b → PropIsContr (Fiber A B f b) (e0 b) (e1 b) i
 
 opaque
 let EquivLemma
-  (A : type) (B : type) (E0 : Equiv A B) (E1 : Equiv A B)
+  (A,B : type) (E0, E1 : Equiv A B)
   (P : Path (A → B) (E0.0) (E1.0))
   : Path (Equiv A B) E0 E1
   =
@@ -135,12 +134,12 @@ let EquivLemma
 ; per Dan Licata, UA and UABeta suffice for full univalence:
 ; https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
 
-let UA (A : type) (B : type) (E : Equiv A B) : Path^1 type A B =
+let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
   λ i →
     `(V i A B E)
 
 let UA/beta
-  (A : type) (B : type) (E : Equiv A B) (a : A)
+  (A,B : type) (E : Equiv A B) (a : A)
   : Path _ (coe 0 1 a in UA _ _ E) (E.0 a)
   =
   λ i →
@@ -166,7 +165,7 @@ let SigPathToEquiv
 
 opaque
 let UA/retract
-  (A : type) (B : type)
+  (A,B : type)
   : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
   =
   λ E →

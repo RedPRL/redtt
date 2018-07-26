@@ -156,10 +156,10 @@ eterm:
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = eterm
-    { E.Pi (tele, cod) }
+    { E.Pi (List.flatten tele, cod) }
 
   | tele = nonempty_list(etele_cell); TIMES; cod = eterm
-    { E.Sg (tele, cod) }
+    { E.Sg (List.flatten tele, cod) }
 
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
     { E.Ext (dims, ty, sys)}
@@ -187,21 +187,21 @@ eface:
 
 escheme:
   | tele = list(etele_cell); COLON; cod = eterm
-    { (tele, cod) }
+    { (List.flatten tele, cod) }
 
 etele_cell:
-  | LPR; a = ATOM; COLON; ty = eterm; RPR
-    { `Ty (a, ty) }
-  | LPR; a = ATOM; COLON; TICK; RPR
-    { `Tick a }
-  | LPR; a = ATOM; COLON; DIM; RPR
-    { `I a }
+  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; ty = eterm; RPR
+    { List.map (fun x -> `Ty (x, ty)) xs }
+  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; TICK; RPR
+    { List.map (fun x -> `Tick x) xs }
+  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; DIM; RPR
+    { List.map (fun x -> `I x) xs }
   | DIM
-    { `I "_" }
+    { [`I "_"] }
   | TICK
-    { `Tick "_" }
+    { [`Tick "_"] }
   | LOCK
-    { `Lock }
+    { [`Lock] }
 
 esig:
   | d = edecl; esig = esig

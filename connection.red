@@ -7,8 +7,7 @@ let singleton (A : type) (M : A) : `(U pre 0) =
 
 let connection/or
  (A : type)
- (a : A)
- (b : A)
+ (a, b : A)
  (p : Path A a b)
  : [i j] A with
    | j=0 ⇒ p i
@@ -39,8 +38,7 @@ let connection/or
 ; an example of using the singleton type to establish an exact equality
 let connection/or/diagonal
  (A : type)
- (a : A)
- (b : A)
+ (a, b : A)
  (p : Path A a b)
  : singleton (Path A a b) p
  =
@@ -49,8 +47,7 @@ let connection/or/diagonal
 
 let connection/and
  (A : type)
- (a : A)
- (b : A)
+ (a,b : A)
  (p : Path A a b)
  : [i j] A with
    | j=0 ⇒ a
