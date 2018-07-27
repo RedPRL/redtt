@@ -31,5 +31,5 @@ let winding-loop-testing : Path int two (winding (trans S1 (lam i -> loop i) (la
 
 ; TODO: a bug prevents the following from working
 
-; let winding-loop-testing : Path int two (winding (loopn two)) =
-;   lam _ -> two
+let winding-loop-testing : Path int two (winding (loopn two)) =
+  lam _ -> two
