@@ -126,7 +126,7 @@ let make_closure cx bnd =
 let lookup i {hyps; _} =
   let {classifier; locks; killed} = List.nth hyps i in
   if (killed || locks > 0) && classifier != `I then
-    failwith "Hypothesis is inaccessible (modal, taste it!)"
+    failwith "Hypothesis is inaccessible"
   else
     classifier
 

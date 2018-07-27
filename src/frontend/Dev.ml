@@ -171,9 +171,9 @@ let pp_param fmt =
   | `I ->
     Format.fprintf fmt "dim"
   | `Tick ->
-    Format.fprintf fmt "tick"
+    Uuseg_string.pp_utf_8 fmt "✓"
   | `Lock ->
-    Format.fprintf fmt "lock"
+    Uuseg_string.pp_utf_8 fmt "🔓"
   | `ClearLocks ->
     Format.fprintf fmt "<clear-locks>"
   | `KillFromTick _ ->
@@ -210,12 +210,13 @@ let pp_param_cell fmt (x, param) =
       Name.pp x
 
   | `Tick ->
-    Format.fprintf fmt "@[<1>%a : tick@]"
+    Format.fprintf fmt "@[<1>%a : %a@]"
       Name.pp x
+      Uuseg_string.pp_utf_8
+      "✓"
 
   | `Lock ->
-    Format.fprintf fmt "@[<1>%a : lock@]"
-      Name.pp x
+    Uuseg_string.pp_utf_8 fmt "🔓"
 
   | `ClearLocks ->
     Format.fprintf fmt "<clear-locks>"

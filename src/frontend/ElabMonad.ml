@@ -59,7 +59,7 @@ let print_diagnostic =
       C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
       let vty = Cx.eval cx ty in
       let ty = Cx.quote_ty cx vty in
-      Format.printf "?%s:@,  @[<v>@[<v>%a@]@,%a %a@]@.@."
+      Format.printf "@.?%s:@,  @[<v>@[<v>%a@]@,%a %a@]@.@."
         (match name with Some name -> name | None -> "Hole")
         Dev.pp_params (Bwd.from_list tele)
         Uuseg_string.pp_utf_8 "⊢"
@@ -77,7 +77,7 @@ let rec print_diagnostics =
 
 let report (m : 'a m) : 'a m =
   C.bind m @@ fun (a, w) ->
-  C.bind (C.dump_state Format.err_formatter "Unsolved:" `Unsolved) @@ fun _ ->
+  (* C.bind (C.dump_state Format.err_formatter "Unsolved:" `Unsolved) @@ fun _ -> *)
   C.bind (print_diagnostics w) @@ fun _ ->
   ret a
 
