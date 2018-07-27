@@ -12,7 +12,7 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET
+%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BANG
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH END
@@ -66,6 +66,8 @@ atomic_eterm:
     { if a = "_" then E.Hope else E.Var (a, 0) }
   | n = NUMERAL;
     { E.Num n }
+  | BULLET
+    { E.TickConst }
   | BOOL
     { E.Bool }
   | TT
@@ -87,6 +89,8 @@ atomic_eterm:
 eframe:
   | e = atomic_eterm
     { E.App e }
+  | BANG
+    { E.Open }
   | DOT CAR
     { E.Car }
   | DOT CDR
@@ -101,7 +105,7 @@ eterm:
   | e = atomic_eterm
     { e }
   | e = atomic_eterm; fs = nonempty_list(eframe)
-    { E.Cut (e, fs) }
+    { E.Cut (e, Bwd.from_list fs) }
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = eterm
     { E.Lam (xs, e)   }
   | LET; name = ATOM; COLON; ty = eterm; EQUALS; tm = eterm; IN; body = eterm

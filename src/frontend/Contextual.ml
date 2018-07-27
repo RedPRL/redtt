@@ -172,8 +172,17 @@ let get_global_env =
     | Snoc (psi, (x, `Tick)) ->
       GlobalEnv.ext_tick (go_params psi) x
     | Snoc (psi, (_, `Lock)) ->
-      GlobalEnv.ext_lock @@
-      go_params psi
+      GlobalEnv.ext_lock @@ go_params psi
+    | Snoc (psi, (_, `ClearLocks)) ->
+      GlobalEnv.clear_locks @@ go_params psi
+    | Snoc (psi, (_, `KillFromTick tck)) ->
+      begin
+        match Tm.unleash tck with
+        | Tm.Up (Tm.Var info, Emp) ->
+          GlobalEnv.kill_from_tick (go_params psi) info.name
+        | _ ->
+          go_params psi
+      end
     | Snoc (psi, (x, `P ty)) ->
       GlobalEnv.ext (go_params psi) x @@ `P {ty; sys = []}
     | Snoc (psi, (x, `Tw (ty0, ty1))) ->

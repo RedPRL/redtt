@@ -26,6 +26,8 @@ type 'a param =
   [ `I
   | `Tick
   | `Lock
+  | `ClearLocks
+  | `KillFromTick of 'a
   | `P of 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
@@ -72,7 +74,9 @@ let rec eqn_close_var x tw k q =
 
 let param_open_var k x =
   function
-  | (`I | `Tick | `Lock) as p -> p
+  | (`I | `Tick | `Lock | `ClearLocks) as p -> p
+  | `KillFromTick tck ->
+    `KillFromTick (Tm.open_var k (fun twin -> Tm.var x ~twin) tck)
   | `P ty ->
     `P (Tm.open_var k (fun twin -> Tm.var x ~twin) ty)
   | `Tw (ty0, ty1) ->
@@ -83,7 +87,9 @@ let param_open_var k x =
 
 let param_close_var x k =
   function
-  | (`I | `Tick | `Lock) as p -> p
+  | (`I | `Tick | `Lock | `ClearLocks) as p -> p
+  | `KillFromTick tck ->
+    `KillFromTick (Tm.close_var x ~twin:(fun tw -> tw) k tck)
   | `P ty ->
     `P (Tm.close_var x ~twin:(fun tw -> tw) k ty)
   | `Tw (ty0, ty1) ->
@@ -168,6 +174,10 @@ let pp_param fmt =
     Format.fprintf fmt "tick"
   | `Lock ->
     Format.fprintf fmt "lock"
+  | `ClearLocks ->
+    Format.fprintf fmt "<clear-locks>"
+  | `KillFromTick _ ->
+    Format.fprintf fmt "<kill-after-tick>"
   | `P ty ->
     Tm.pp0 fmt ty
   | `Tw (ty0, ty1) ->
@@ -206,6 +216,13 @@ let pp_param_cell fmt (x, param) =
   | `Lock ->
     Format.fprintf fmt "@[<1>%a : lock@]"
       Name.pp x
+
+  | `ClearLocks ->
+    Format.fprintf fmt "<clear-locks>"
+
+  | `KillFromTick tck ->
+    Format.fprintf fmt "<clear-after-tick: %a>"
+      Tm.pp0 tck
 
   | `R (r0, r1) ->
     Format.fprintf fmt "@[<1>%a = %a@]"
@@ -331,8 +348,10 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
   function
-  | (`I | `Tick | `Lock) as p ->
+  | (`I | `Tick | `Lock | `ClearLocks) as p ->
     p, sub
+  | `KillFromTick tck ->
+    `KillFromTick (subst_tm sub ~ty:univ tck), sub
   | `P ty ->
     `P (subst_tm sub ~ty:univ ty), sub
   | `Tw (ty0, ty1) ->
@@ -365,7 +384,7 @@ let rec subst_problem sub =
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
-      | (`I | `Tick | `Lock) ->
+      | (`I | `Tick | `Lock | `ClearLocks | `KillFromTick _) ->
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
@@ -393,7 +412,8 @@ struct
 
   let free fl =
     function
-    | (`I | `Tick | `Lock) -> Occurs.Set.empty
+    | (`I | `Tick | `Lock | `ClearLocks) -> Occurs.Set.empty
+    | `KillFromTick tck -> Tm.free fl tck
     | `P ty -> Tm.free fl ty
     | `Tw (ty0, ty1) ->
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)

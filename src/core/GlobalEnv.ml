@@ -88,6 +88,15 @@ let lookup_entry sg nm tw =
     | `Tw (_, a), `TwinR -> a
     | _ -> failwith "GlobalEnv.lookup_entry"
 
+let lookup_kind sg nm =
+  let prm, _ = T.find nm sg.table in
+  match prm with
+  | `P _ -> `P ()
+  | `Tw _ -> `Tw ((), ())
+  | `I -> `I
+  | `Tick -> `Tick
+
+
 let lookup_ty sg nm (tw : Tm.twin) =
   let {ty; _} = lookup_entry sg nm tw in
   ty
@@ -145,6 +154,9 @@ struct
         T.find nm Sig.globals.table
       with
       | _ ->
+        Format.eprintf "Failed to find: %a@." Name.pp nm;
+        Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+        Format.eprintf "@.";
         failwith "GlobalEnv.M.lookup: not found"
     in
     match param, tw with

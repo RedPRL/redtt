@@ -1,4 +1,5 @@
 open RedTT_Core
+open RedBasis.Bwd
 
 type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
@@ -44,7 +45,9 @@ and eterm =
 
   | Shut of eterm
 
-  | Cut of eterm * frame list
+  | TickConst
+
+  | Cut of eterm * frame bwd
 
   | Var of string * int
   | Num of int
@@ -57,6 +60,7 @@ and frame =
   | App of eterm
   | Car
   | Cdr
+  | Open
 
 (* e-sigarette ;-) *)
 type esig =

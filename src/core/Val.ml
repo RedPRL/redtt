@@ -179,7 +179,8 @@ sig
   val unleash_later : value -> tick_clo
   val unleash_box_modality : value -> value
   val unleash_fcom : value -> dir * value * comp_sys
-  val unleash_ext : value -> dim list -> value * val_sys
+  val unleash_ext_with : value -> dim list -> value * val_sys
+  val unleash_ext : value -> ext_abs
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 
@@ -567,11 +568,19 @@ struct
     | Lvl _ ->
       ret con
 
-    | Var _ ->
-      ret con
+    | Var {name; ushift; twin} ->
+      let tty, tsys = Sig.lookup name twin in
+      let rho' = {Env.emp with global = phi} in
+      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
+      let vty = eval rho' @@ Tm.shift_univ ushift tty in
+      step @@ reflect vty (Var {name; ushift; twin}) vsys
 
-    | Meta _ ->
-      ret con
+    | Meta {name; ushift} ->
+      let tty, tsys = Sig.lookup name `Only in
+      let rho' = {Env.emp with global = phi} in
+      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
+      let vty = eval rho' @@ Tm.shift_univ ushift tty in
+      step @@ reflect vty (Meta {name; ushift}) vsys
 
     | Prev (tick, neu) ->
       begin
@@ -1721,12 +1730,21 @@ struct
     | _ ->
       raise @@ E (UnleashSgError v)
 
-  and unleash_ext v rs =
+  and unleash_ext_with v rs =
     match unleash v with
     | Ext abs ->
       ExtAbs.inst abs (Bwd.from_list rs)
     | Rst rst ->
-      unleash_ext rst.ty rs
+      unleash_ext_with rst.ty rs
+    | _ ->
+      raise @@ E (UnleashExtError v)
+
+  and unleash_ext v =
+    match unleash v with
+    | Ext abs ->
+      abs
+    | Rst rst ->
+      unleash_ext rst.ty
     | _ ->
       raise @@ E (UnleashExtError v)
 
@@ -1873,7 +1891,7 @@ struct
       Abs.inst abs (Bwd.from_list ss)
 
     | Up info ->
-      let tyr, sysr = unleash_ext info.ty ss in
+      let tyr, sysr = unleash_ext_with info.ty ss in
       begin
         match force_val_sys sysr with
         | `Ok sysr ->
@@ -1890,7 +1908,7 @@ struct
 
     | Coe info ->
       let y, ext_y = Abs.unleash1 info.abs in
-      let ty_s, sys_s = unleash_ext ext_y ss in
+      let ty_s, sys_s = unleash_ext_with ext_y ss in
       let forall_y_sys_s = ValSys.forall y sys_s in
       begin
         match force_val_sys forall_y_sys_s with
@@ -1908,7 +1926,7 @@ struct
       end
 
     | HCom info ->
-      let ty_s, sys_s = unleash_ext info.ty ss in
+      let ty_s, sys_s = unleash_ext_with info.ty ss in
       begin
         match force_val_sys sys_s with
         | `Proj v ->

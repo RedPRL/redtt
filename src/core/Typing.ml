@@ -531,7 +531,7 @@ and infer_spine cx hd =
     | T.ExtApp ts ->
       let ih = infer_spine cx hd sp in
       let rs = List.map (check_eval_dim cx) ts in
-      let ty, _ = V.unleash_ext ih.ty rs in
+      let ty, _ = V.unleash_ext_with ih.ty rs in
       D.{el = V.ext_apply ih.el rs; ty}
 
     | T.VProj info ->

@@ -879,7 +879,7 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<hv1>(%a@ %a)@]" Uuseg_string.pp_utf_8 "□" (pp env) t
 
     | Shut t ->
-      Format.fprintf fmt "@[<hv1>(%a@ %a)@]" Uuseg_string.pp_utf_8 "shut" (pp env) t
+      Format.fprintf fmt "@[<hv1>(shut@ %a)@]" (pp env) t
 
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pretty.Env.bind nm env in
@@ -926,7 +926,7 @@ and pp_head env fmt =
       ushift
 
   | Down {ty; tm} ->
-    Format.fprintf fmt "@[<hv1>(:@ %a@ %a)@]" (pp env) ty (pp env) tm
+    Format.fprintf fmt "@[<hv1>(: @[<hov>%a@ %a@])@]" (pp env) ty (pp env) tm
 
   | DFix {r; ty; bdy = B (nm, bdy)} ->
     let x, env' = Pretty.Env.bind nm env in
@@ -977,7 +977,7 @@ and pp_cmd env fmt (hd, sp) =
       | Prev tick ->
         Format.fprintf fmt "@[<hv1>(prev %a@ %a)@]" (pp env) tick (go `Prev) sp
       | Open ->
-        Format.fprintf fmt "@[<hv1>(shut@ %a)@]" (go `Open) sp
+        Format.fprintf fmt "@[<hv1>(open@ %a)@]" (go `Open) sp
   in
   go `Start fmt sp
 

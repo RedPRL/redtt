@@ -44,7 +44,8 @@ sig
   val unleash_later : value -> tick_clo
   val unleash_box_modality : value -> value
   val unleash_fcom : value -> dir * value * comp_sys
-  val unleash_ext : value -> dim list -> value * val_sys
+  val unleash_ext_with : value -> dim list -> value * val_sys
+  val unleash_ext : value -> ext_abs
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
   val base_restriction : Restriction.t
