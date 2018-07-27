@@ -1599,15 +1599,15 @@ struct
     | Tm.Var info ->
       let tty, tsys = Sig.lookup info.name info.twin in
       let rho' = Env.clear_locals rho in
-      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
-      let vty = eval rho' @@ Tm.shift_univ info.ushift tty in
+      let vsys = eval_tm_sys rho' @@ if info.ushift = 0 then tsys else Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
+      let vty = eval rho' @@ if info.ushift = 0 then tty else Tm.shift_univ info.ushift tty in
       reflect vty (Var {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
 
     | Tm.Meta {name; ushift} ->
       let tty, tsys = Sig.lookup name `Only in
       let rho' = Env.clear_locals rho in
-      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
-      let vty = eval rho' @@ Tm.shift_univ ushift tty in
+      let vsys = eval_tm_sys rho' @@ if ushift = 0 then tsys else Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
+      let vty = eval rho' @@ if ushift = 0 then tty else Tm.shift_univ ushift tty in
       reflect vty (Meta {name; ushift}) vsys
 
   and reflect ty neu sys =
