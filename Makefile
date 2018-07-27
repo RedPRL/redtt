@@ -21,6 +21,7 @@ help:
 examples:
 	${DUNE} exec -- redtt load-file natural.red
 	${DUNE} exec -- redtt load-file integer.red
+	${DUNE} exec -- redtt load-file omega1s1.red
 	${DUNE} exec -- redtt load-file modal.red
 	${DUNE} exec -- redtt load-file test.red
 	${DUNE} exec -- redtt load-file isotoequiv.red
