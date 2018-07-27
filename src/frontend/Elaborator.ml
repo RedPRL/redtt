@@ -25,9 +25,9 @@ struct
 
   open Refiner
 
-  type _ mode =
-    | Chk : ty -> tm mode
-    | Inf : (ty * tm Tm.cmd) mode
+  type mode =
+    | Chk of ty
+    | Inf
 
   let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre
 
@@ -372,7 +372,8 @@ struct
     | _, E.Cut (e, fs) ->
       elab_inf env e >>= fun (hty, hd) ->
       normalize_ty hty >>= fun hty ->
-      elab_cut env (hty, hd) fs (Chk ty)
+      elab_cut env (hty, hd) fs (Chk ty) >>= fun (_, tm) ->
+      M.ret @@ Tm.up tm
 
     | _, E.HCom info ->
       elab_dim env info.r >>= fun r ->
@@ -594,10 +595,10 @@ struct
     | _ ->
       failwith "TODO: elab_dim"
 
-  and elab_cut : type x. _ -> (ty * tm Tm.cmd) -> E.frame list -> x mode -> x M.m =
-    fun (type x) env ->
-      let rec go : ty -> _ -> _ -> x mode -> x M.m =
-        fun (hty : ty) (hd, sp) efs mode : x M.m ->
+  and elab_cut : _ -> (ty * tm Tm.cmd) -> E.frame list -> mode -> (ty * tm Tm.cmd) M.m =
+    fun env ->
+      let rec go : ty -> _ -> _ -> mode -> _ M.m =
+        fun (hty : ty) (hd, sp) efs mode : _ M.m ->
           match Tm.unleash hty, efs with
           | _, [] ->
             begin
@@ -605,13 +606,14 @@ struct
               | Chk ty ->
                 begin
                   M.lift (C.check_subtype hty ty) >>= function
-                  | `Ok -> M.ret @@ Tm.up (hd, sp)
+                  | `Ok ->
+                    M.ret (ty, (hd, sp))
                   | _ ->
-                    let tm = Tm.up (hd, sp) in
                     M.lift @@ C.active @@ Dev.Subtype {ty0 = hty; ty1 = ty} >>
                     M.unify >>
                     M.lift (C.check_subtype hty ty) >>= function
-                    | `Ok -> M.ret tm
+                    | `Ok ->
+                      M.ret (ty, (hd, sp))
                     | `Exn exn ->
                       raise exn
                 end
