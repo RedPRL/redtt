@@ -293,6 +293,12 @@ let rec check cx ty tm =
   | D.Bool, (T.Tt | T.Ff) ->
     ()
 
+  | D.S1, T.Base ->
+    ()
+
+  | D.S1, T.Loop x ->
+    check_dim cx x
+
   | D.Nat, T.Zero ->
     ()
 
