@@ -39,7 +39,7 @@ let bool/constant (x : bool) : (b : □ bool) × Path bool x (b !) =
   else
     < shut ff, λ _ → ff >
 
-let sequence : type = □ (stream/L 0)
+let sequence : type = □ stream
 
 let sequence/cons (x : bool) (xs : sequence) : sequence =
   shut
@@ -54,3 +54,4 @@ let sequence/tl (xs : sequence) : sequence =
   shut
     stream/tl (xs !) ∙
 
+debug
