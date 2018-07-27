@@ -29,7 +29,5 @@ let two : int = pos (suc (suc zero))
 let winding-loop-testing : Path int two (winding (trans S1 (lam i -> loop i) (lam i -> loop i))) =
   lam _ -> two
 
-; TODO: a bug prevents the following from working
-
 let winding-loop-testing : Path int two (winding (loopn two)) =
   lam _ -> two
