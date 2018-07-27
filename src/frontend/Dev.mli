@@ -24,6 +24,7 @@ type 'a param =
   | `Tick
   | `Lock
   | `ClearLocks
+  | `KillFromTick of 'a
   | `P of 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a

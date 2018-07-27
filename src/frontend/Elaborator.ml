@@ -524,20 +524,25 @@ struct
       | `Exn exn ->
         raise exn
 
+  and elab_var env name ushift =
+    get_resolver env >>= fun renv ->
+    begin
+      match ResEnv.get name renv with
+      | `Var a ->
+        let cmd = Tm.Var {name = a; twin = `Only; ushift}, Emp in
+        M.ret (a, cmd)
+      | _ ->
+        failwith "elab_var: expected locally closed"
+    end
+
+
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
     match e with
     | E.Var (name, ushift) ->
-      get_resolver env >>= fun renv ->
-      begin
-        match ResEnv.get name renv with
-        | `Var a ->
-          M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) >>= fun ty ->
-          let ty = Tm.shift_univ ushift ty in
-          let cmd = Tm.Var {name = a; twin = `Only; ushift}, Emp in
-          M.ret (ty, cmd)
-        | `Ix _ ->
-          failwith "elab_inf: expected locally closed"
-      end
+      elab_var env name ushift >>= fun (a, cmd) ->
+      M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) >>= fun ty ->
+      let ty = Tm.shift_univ ushift ty in
+      M.ret (ty, cmd)
 
     | E.Quo tmfam ->
       get_resolver env >>= fun renv ->
@@ -743,8 +748,16 @@ struct
       let vty' = V.inst_tick_clo tclo @@ Domain.TickConst in
       M.ret (vty', (hd, sp #< (Tm.Prev tick)))
 
-    | _, `Prev (E.Var _) ->
-      failwith "TODO"
+    | spine, `Prev (E.Var (name, _)) ->
+      elab_var env name 0 >>= fun (_, tick) ->
+      M.in_scope (Name.fresh ()) (`KillFromTick (Tm.up tick)) begin
+        elab_cut env exp spine
+      end >>= fun (vty, (hd, sp)) ->
+      evaluator >>= fun (cx, (module V)) ->
+      let tclo = V.unleash_later vty in
+      let vtck = Cx.eval_tick cx (Tm.up tick) in
+      let vty' = V.inst_tick_clo tclo vtck in
+      M.ret (vty', (hd, sp #< (Tm.Prev (Tm.up tick))))
 
     | spine, `Open ->
       M.in_scope (Name.fresh ()) `ClearLocks begin
