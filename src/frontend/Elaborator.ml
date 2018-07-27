@@ -399,11 +399,8 @@ struct
       end
 
     | _, E.Cut (e, fs) ->
-      elab_inf env e >>= fun (hty, hd) ->
-      normalize_ty hty >>= fun hty ->
-
-      elab_cut env (hty, hd) fs (Chk ty) >>= fun (_, tm) ->
-      M.ret @@ Tm.up tm
+      elab_chk_cut env e (Bwd.from_list fs) ty >>= fun (_, cmd) ->
+      M.ret @@ Tm.up cmd
 
     | _, E.HCom info ->
       elab_dim env info.r >>= fun r ->
@@ -563,7 +560,7 @@ struct
       M.ret (nat, (Tm.Down {ty = nat; tm = Tm.make Tm.Zero}, Emp))
 
     | E.Cut (e, fs) ->
-      fancy_elab_cut env e (Bwd.from_list fs) >>= fun (vty, cmd) ->
+      elab_cut env e (Bwd.from_list fs) >>= fun (vty, cmd) ->
       M.lift C.base_cx >>= fun cx ->
       let ty = Cx.quote_ty cx vty in
       M.ret (ty, cmd)
@@ -672,7 +669,20 @@ struct
       traverse f xs >>= fun ys ->
       M.ret (y :: ys)
 
-  and fancy_elab_cut env exp frms =
+  and elab_chk_cut env exp frms ty =
+    elab_cut env exp frms >>= fun (vty, cmd) ->
+    M.lift C.base_cx >>= fun cx ->
+    let ty' = Cx.quote_ty cx vty in
+    M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+    M.unify >>
+    M.lift (C.check_subtype ty' ty) >>= function
+    | `Ok ->
+      M.ret (ty, cmd)
+    | `Exn exn ->
+      raise exn
+
+
+  and elab_cut env exp frms =
     bite_from_spine env frms >>= function
     | _, `Done ->
       elab_inf env exp >>= fun (ty, cmd) ->
@@ -680,13 +690,12 @@ struct
       M.ret (vty, cmd)
 
     | spine, `ExtApp dims ->
-      evaluator >>= fun (cx, (module V)) ->
-
       let rec go dims (vty, (hd, sp)) =
         match dims with
         | [] ->
           M.ret (vty, (hd, sp))
         | _ ->
+          evaluator >>= fun (cx, (module V)) ->
           let n = Domain.ExtAbs.len @@ V.unleash_ext vty in
           let dims0, dims1 = ListUtil.split n dims in
           traverse (elab_dim env) dims0 >>= fun trs0 ->
@@ -695,25 +704,26 @@ struct
           go dims1 (ty, (hd, sp #< (Tm.ExtApp trs0)))
       in
 
-      fancy_elab_cut env exp spine >>= go dims
+      elab_cut env exp spine >>= go dims
 
     | spine, `FunApp e ->
-      fancy_elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
+      elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
       evaluator >>= fun (cx, (module V)) ->
       let dom, cod = V.unleash_pi vty in
       let tdom = Cx.quote_ty cx dom in
       elab_chk env tdom e >>= fun arg ->
+      evaluator >>= fun (cx, (module V)) ->
       let varg = Cx.eval cx arg in
       M.ret (V.inst_clo cod varg, (hd, sp #< (Tm.FunApp arg)))
 
     | spine, `Car ->
-      fancy_elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
+      elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
       evaluator >>= fun (_, (module V)) ->
       let dom, _ = V.unleash_sg vty in
       M.ret (dom, (hd, sp #< Tm.Car))
 
     | spine, `Cdr ->
-      fancy_elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
+      elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
       evaluator >>= fun (cx, (module V)) ->
       let _, cod = V.unleash_sg vty in
       let cod' = V.inst_clo cod @@ Cx.eval_cmd cx (hd, sp #< Tm.Car) in
@@ -722,76 +732,6 @@ struct
     | _, `Prev _ ->
       failwith ""
 
-
-  and elab_cut : _ -> (ty * tm Tm.cmd) -> E.frame list -> mode -> (ty * tm Tm.cmd) M.m =
-    fun env ->
-      let rec go : ty -> _ -> _ -> mode -> _ M.m =
-        fun (hty : ty) (hd, sp) efs mode : _ M.m ->
-          match Tm.unleash hty, efs with
-          | _, [] ->
-            begin
-              match mode with
-              | Chk ty ->
-                begin
-                  M.lift (C.check_subtype hty ty) >>= function
-                  | `Ok ->
-                    M.ret (ty, (hd, sp))
-                  | _ ->
-                    M.lift @@ C.active @@ Dev.Subtype {ty0 = hty; ty1 = ty} >>
-                    M.unify >>
-                    M.lift (C.check_subtype hty ty) >>= function
-                    | `Ok ->
-                      M.ret (ty, (hd, sp))
-                    | `Exn exn ->
-                      raise exn
-                end
-
-              | Inf ->
-                M.ret (hty, (hd, sp))
-            end
-
-          | Tm.Pi (dom, cod), E.App e :: efs ->
-            elab_chk env dom e >>= fun t ->
-            M.lift @@ Unify.eval dom >>= fun vdom ->
-            M.lift @@ Unify.inst_ty_bnd cod (vdom, t) >>= fun cod' ->
-            go cod' (hd, sp #< (Tm.FunApp t)) efs mode
-
-          | Tm.Ext ebnd, efs ->
-            let xs, ext_ty, _ = Tm.unbind_ext ebnd in
-            let rec bite rs xs efs =
-              match xs, efs with
-              | Emp, _ ->
-                M.ret (rs, efs)
-              | Snoc (xs, _), E.App e :: efs ->
-                elab_dim env e >>= fun r ->
-                bite (rs #< r) xs efs
-              | _ ->
-                failwith "elab_cut: problem biting extension type"
-            in
-            bite Emp xs efs >>= fun (rs, efs) ->
-            let rs = Bwd.to_list rs in
-            let restriction = List.map2 (fun x r -> Name.fresh (), `R (Tm.up @@ Tm.var x, r)) (Bwd.to_list xs) rs in
-            M.in_scopes restriction begin
-              normalize_ty ext_ty >>= fun ext_ty ->
-              go ext_ty (hd, sp #< (Tm.ExtApp rs)) efs mode
-            end
-
-          | Tm.Sg (dom, _), E.Car :: efs ->
-            go dom (hd, sp #< Tm.Car) efs mode
-
-          | Tm.Sg (_, Tm.B (_, cod)), E.Cdr :: efs ->
-            let cod' = Tm.subst (Tm.dot (hd, sp #< Tm.Car) (Tm.shift 0)) cod in
-            go cod' (hd, sp #< Tm.Cdr) efs mode
-
-          | Tm.Rst rst, efs ->
-            go rst.ty (hd, sp) efs mode
-
-          | _ ->
-            Format.eprintf "damn: %a@." Tm.pp0 hty;
-            failwith "elab_cut: unexpected case"
-      in
-      fun (hty, cmd) ->
-        go hty cmd
 
 end
 

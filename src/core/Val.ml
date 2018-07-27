@@ -568,11 +568,19 @@ struct
     | Lvl _ ->
       ret con
 
-    | Var _ ->
-      ret con
+    | Var {name; ushift; twin} ->
+      let tty, tsys = Sig.lookup name twin in
+      let rho' = {Env.emp with global = phi} in
+      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
+      let vty = eval rho' @@ Tm.shift_univ ushift tty in
+      step @@ reflect vty (Var {name; ushift; twin}) vsys
 
-    | Meta _ ->
-      ret con
+    | Meta {name; ushift} ->
+      let tty, tsys = Sig.lookup name `Only in
+      let rho' = {Env.emp with global = phi} in
+      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
+      let vty = eval rho' @@ Tm.shift_univ ushift tty in
+      step @@ reflect vty (Meta {name; ushift}) vsys
 
     | Prev (tick, neu) ->
       begin
