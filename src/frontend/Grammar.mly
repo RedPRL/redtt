@@ -66,6 +66,8 @@ atomic_eterm:
     { if a = "_" then E.Hope else E.Var (a, 0) }
   | n = NUMERAL;
     { E.Num n }
+  | BULLET
+    { E.TickConst }
   | BOOL
     { E.Bool }
   | TT

@@ -55,6 +55,5 @@ let sequence/hd (xs : sequence) : bool =
 
 let sequence/tl (xs : sequence) : sequence =
   shut
-    `(prev ∙ (stream/tl (open xs)))
+    stream/tl `(open xs) ∙
 
-debug

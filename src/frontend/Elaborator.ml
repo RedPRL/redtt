@@ -729,8 +729,21 @@ struct
       let cod' = V.inst_clo cod @@ Cx.eval_cmd cx (hd, sp #< Tm.Car) in
       M.ret (cod', (hd, sp #< Tm.Cdr))
 
-    | _, `Prev _ ->
-      failwith ""
+    | spine, `Prev E.TickConst ->
+      M.in_scope (Name.fresh ()) `Lock begin
+        elab_cut env exp spine
+      end >>= fun (vty, (hd, sp)) ->
+      evaluator >>= fun (_, (module V)) ->
+      let tclo = V.unleash_later vty in
+      let tick = Tm.make Tm.TickConst in
+      let vty' = V.inst_tick_clo tclo @@ Domain.TickConst in
+      M.ret (vty', (hd, sp #< (Tm.Prev tick)))
+
+    | _, `Prev (E.Var _) ->
+      failwith "TODO"
+
+    | _ ->
+      failwith "elab_cut"
 
 
 end
