@@ -44,6 +44,8 @@ and eterm =
 
   | Shut of eterm
 
+  | TickConst
+
   | Cut of eterm * frame list
 
   | Var of string * int

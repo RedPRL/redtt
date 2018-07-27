@@ -63,6 +63,29 @@ struct
     | None -> n
 
 
+  let kind_of_frame env =
+    function
+    | E.App E.TickConst ->
+      M.ret @@ `Prev E.TickConst
+    | E.App (E.Num (0 | 1) as e) ->
+      M.ret @@ `ExtApp e
+    | E.App (E.Var (nm, _) as e) ->
+      let alpha = T.find nm env in
+      M.lift C.get_global_env >>= fun env ->
+      begin
+        match GlobalEnv.lookup_kind env alpha with
+        | `P _ -> M.ret @@ `FunApp e
+        | `Tw _ -> M.ret @@ `FunApp e
+        | `I -> M.ret @@ `ExtApp e
+        | `Tick -> M.ret @@ `Prev e
+      end
+    | E.App e ->
+      M.ret @@ `FunApp e
+    | E.Car ->
+      M.ret `Car
+    | E.Cdr ->
+      M.ret `Cdr
+
 
 
   let rec elab_sig env =
@@ -594,6 +617,64 @@ struct
       M.ret @@ Tm.make Tm.Dim1
     | _ ->
       failwith "TODO: elab_dim"
+
+  and bite_from_spine env spine =
+    match spine with
+    | Emp ->
+      M.ret (spine, `Done)
+    | Snoc (spine, frm) ->
+      kind_of_frame env frm >>= function
+      | `FunApp e ->
+        M.ret (spine, `FunApp e)
+      | `ExtApp dim ->
+        bite_dims_from_spine env spine >>= fun (spine, dims) ->
+        M.ret (spine, `ExtApp (Bwd.to_list @@ dims #< dim))
+      | `Prev e ->
+        M.ret (spine, `Prev e)
+      | `Car ->
+        M.ret (spine, `Car)
+      | `Cdr ->
+        M.ret (spine, `Cdr)
+
+  and bite_dims_from_spine env spine =
+    let rec go spine dims =
+      match spine with
+      | Emp ->
+        M.ret (Emp, Bwd.from_list dims)
+      | Snoc (spine, frm) ->
+        kind_of_frame env frm >>= function
+        | `ExtApp dim ->
+          go spine (dim :: dims)
+        | _ ->
+          M.ret (spine #< frm, Bwd.from_list dims)
+    in
+    go spine []
+
+
+
+  and fancy_elab_cut env exp frms =
+    bite_from_spine env frms >>= function
+    | _, `Done ->
+      elab_inf env exp
+    | spine, `ExtApp _ ->
+      fancy_elab_cut env exp spine >>= fun _ ->
+      failwith ""
+
+    | spine, `FunApp _ ->
+      fancy_elab_cut env exp spine >>= fun _ ->
+      failwith ""
+
+    | spine, `Car ->
+      fancy_elab_cut env exp spine >>= fun _ ->
+      failwith ""
+
+    | spine, `Cdr ->
+      fancy_elab_cut env exp spine >>= fun _ ->
+      failwith ""
+
+    | _, `Prev _ ->
+      failwith ""
+
 
   and elab_cut : _ -> (ty * tm Tm.cmd) -> E.frame list -> mode -> (ty * tm Tm.cmd) M.m =
     fun env ->

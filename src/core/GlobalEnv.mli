@@ -20,6 +20,7 @@ val clear_locks : t -> t
 val kill_from_tick : t -> Name.t -> t
 
 val lookup_ty : t -> Name.t -> Tm.twin -> Tm.tm
+val lookup_kind : t -> Name.t -> unit param
 
 val restrict : Tm.tm -> Tm.tm -> t -> t
 
