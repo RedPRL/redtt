@@ -16,6 +16,8 @@ sig
   val unleash : t -> atom bwd * el
   val inst : t -> I.t bwd -> el
 
+  val len : t -> int
+
   val bind1 : atom -> el -> t
   val unleash1 : t -> atom * el
   val inst1 : t -> I.t -> el

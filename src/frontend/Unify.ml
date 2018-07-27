@@ -392,7 +392,7 @@ let plug (ty, tm) frame =
     inst_bnd (cod, bnd) (dom, arg)
   | Tm.ExtLam _, Tm.ExtApp args ->
     let vargs = List.map (Cx.eval_dim cx) args in
-    let ty, _ = V.unleash_ext ty vargs in
+    let ty, _ = V.unleash_ext_with ty vargs in
     let vlam = Cx.eval cx tm in
     let vapp = V.ext_apply vlam vargs in
     ret @@ Cx.quote cx ~ty vapp
@@ -518,8 +518,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let rs0 = List.map (Cx.eval_dim cx) ts0 in
       let rs1 = List.map (Cx.eval_dim cx) ts1 in
       (* TODO: unify the dimension spines ts0, ts1 *)
-      let ty'0, sys0 = V.unleash_ext ty0 rs0 in
-      let ty'1, sys1 = V.unleash_ext ty1 rs1 in
+      let ty'0, sys0 = V.unleash_ext_with ty0 rs0 in
+      let ty'1, sys1 = V.unleash_ext_with ty1 rs1 in
       let rst0 = D.make @@ D.Rst {ty = ty'0; sys = sys0} in
       let rst1 = D.make @@ D.Rst {ty = ty'1; sys = sys1} in
       ret (rst0, rst1)

@@ -70,14 +70,20 @@ struct
     | E.App (E.Num (0 | 1) as e) ->
       M.ret @@ `ExtApp e
     | E.App (E.Var (nm, _) as e) ->
-      let alpha = T.find nm env in
-      M.lift C.get_global_env >>= fun env ->
+      get_resolver env >>= fun renv ->
       begin
-        match GlobalEnv.lookup_kind env alpha with
-        | `P _ -> M.ret @@ `FunApp e
-        | `Tw _ -> M.ret @@ `FunApp e
-        | `I -> M.ret @@ `ExtApp e
-        | `Tick -> M.ret @@ `Prev e
+        match ResEnv.get nm renv with
+        | `Var alpha ->
+          M.lift C.get_global_env >>= fun env ->
+          begin
+            match GlobalEnv.lookup_kind env alpha with
+            | `P _ -> M.ret @@ `FunApp e
+            | `Tw _ -> M.ret @@ `FunApp e
+            | `I -> M.ret @@ `ExtApp e
+            | `Tick -> M.ret @@ `Prev e
+          end
+        | _ ->
+          failwith "kind_of_frame"
       end
     | E.App e ->
       M.ret @@ `FunApp e
@@ -395,6 +401,7 @@ struct
     | _, E.Cut (e, fs) ->
       elab_inf env e >>= fun (hty, hd) ->
       normalize_ty hty >>= fun hty ->
+
       elab_cut env (hty, hd) fs (Chk ty) >>= fun (_, tm) ->
       M.ret @@ Tm.up tm
 
@@ -462,7 +469,7 @@ struct
         begin
           M.under_restriction r r' begin
             elab_chk env ext_ty e >>= fun line ->
-            M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx] >>= fun (_, tmx) ->
+            M.in_scope x `I (M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx]) >>= fun (_, tmx) ->
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
@@ -497,7 +504,7 @@ struct
         begin
           M.under_restriction r r' begin
             elab_chk env ext_ty e >>= fun line ->
-            M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx] >>= fun (_, tmx) ->
+            M.in_scope x `I (M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx]) >>= fun (_, tmx) ->
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
@@ -556,9 +563,10 @@ struct
       M.ret (nat, (Tm.Down {ty = nat; tm = Tm.make Tm.Zero}, Emp))
 
     | E.Cut (e, fs) ->
-      elab_inf env e >>= fun (ty, cmd) ->
-      normalize_ty ty >>= fun ty ->
-      elab_cut env (ty, cmd) fs Inf
+      fancy_elab_cut env e (Bwd.from_list fs) >>= fun (vty, cmd) ->
+      M.lift C.base_cx >>= fun cx ->
+      let ty = Cx.quote_ty cx vty in
+      M.ret (ty, cmd)
 
     | E.Coe info ->
       elab_dim env info.r >>= fun tr ->
@@ -651,26 +659,65 @@ struct
     go spine []
 
 
+  and evaluator =
+    M.lift C.base_cx >>= fun cx ->
+    M.ret (cx, Cx.evaluator cx)
+
+  and traverse f xs =
+    match xs with
+    | [] ->
+      M.ret []
+    | x :: xs ->
+      f x >>= fun y ->
+      traverse f xs >>= fun ys ->
+      M.ret (y :: ys)
 
   and fancy_elab_cut env exp frms =
     bite_from_spine env frms >>= function
     | _, `Done ->
-      elab_inf env exp
-    | spine, `ExtApp _ ->
-      fancy_elab_cut env exp spine >>= fun _ ->
-      failwith ""
+      elab_inf env exp >>= fun (ty, cmd) ->
+      M.lift @@ Unify.eval ty >>= fun vty ->
+      M.ret (vty, cmd)
 
-    | spine, `FunApp _ ->
-      fancy_elab_cut env exp spine >>= fun _ ->
-      failwith ""
+    | spine, `ExtApp dims ->
+      evaluator >>= fun (cx, (module V)) ->
+
+      let rec go dims (vty, (hd, sp)) =
+        match dims with
+        | [] ->
+          M.ret (vty, (hd, sp))
+        | _ ->
+          let n = Domain.ExtAbs.len @@ V.unleash_ext vty in
+          let dims0, dims1 = ListUtil.split n dims in
+          traverse (elab_dim env) dims0 >>= fun trs0 ->
+          let rs0 = List.map (Cx.eval_dim cx) trs0 in
+          let ty, _ = V.unleash_ext_with vty rs0 in
+          go dims1 (ty, (hd, sp #< (Tm.ExtApp trs0)))
+      in
+
+      fancy_elab_cut env exp spine >>= go dims
+
+    | spine, `FunApp e ->
+      fancy_elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
+      evaluator >>= fun (cx, (module V)) ->
+      let dom, cod = V.unleash_pi vty in
+      let tdom = Cx.quote_ty cx dom in
+      elab_chk env tdom e >>= fun arg ->
+      let varg = Cx.eval cx arg in
+      M.ret (V.inst_clo cod varg, (hd, sp #< (Tm.FunApp arg)))
 
     | spine, `Car ->
-      fancy_elab_cut env exp spine >>= fun _ ->
-      failwith ""
+      fancy_elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
+      evaluator >>= fun (_, (module V)) ->
+      let dom, _ = V.unleash_sg vty in
+      M.ret (dom, (hd, sp #< Tm.Car))
 
     | spine, `Cdr ->
-      fancy_elab_cut env exp spine >>= fun _ ->
-      failwith ""
+      fancy_elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
+      evaluator >>= fun (cx, (module V)) ->
+      let _, cod = V.unleash_sg vty in
+      let cod' = V.inst_clo cod @@ Cx.eval_cmd cx (hd, sp #< Tm.Car) in
+      M.ret (cod', (hd, sp #< Tm.Cdr))
 
     | _, `Prev _ ->
       failwith ""
