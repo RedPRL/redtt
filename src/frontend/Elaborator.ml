@@ -91,6 +91,8 @@ struct
       M.ret `Car
     | E.Cdr ->
       M.ret `Cdr
+    | E.Open ->
+      M.ret `Open
 
 
 
@@ -640,6 +642,8 @@ struct
         M.ret (spine, `Car)
       | `Cdr ->
         M.ret (spine, `Cdr)
+      | `Open ->
+        M.ret (spine, `Open)
 
   and bite_dims_from_spine env spine =
     let rec go spine dims =
@@ -741,6 +745,14 @@ struct
 
     | _, `Prev (E.Var _) ->
       failwith "TODO"
+
+    | spine, `Open ->
+      M.in_scope (Name.fresh ()) `ClearLocks begin
+        elab_cut env exp spine
+      end >>= fun (vty, (hd, sp)) ->
+      evaluator >>= fun (_, (module V)) ->
+      let vty' = V.unleash_box_modality vty in
+      M.ret (vty', (hd, sp #< Tm.Open))
 
     | _ ->
       failwith "elab_cut"

@@ -888,7 +888,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | (`I | `Tick | `Lock) as p ->
+        | (`I | `Tick | `Lock | `ClearLocks) as p ->
           in_scope x p @@
           solver probx
 

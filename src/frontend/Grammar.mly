@@ -12,7 +12,7 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET
+%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BANG
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH END
@@ -89,6 +89,8 @@ atomic_eterm:
 eframe:
   | e = atomic_eterm
     { E.App e }
+  | BANG
+    { E.Open }
   | DOT CAR
     { E.Car }
   | DOT CDR

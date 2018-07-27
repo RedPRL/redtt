@@ -23,6 +23,7 @@ type 'a param =
   [ `I
   | `Tick
   | `Lock
+  | `ClearLocks
   | `P of 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a

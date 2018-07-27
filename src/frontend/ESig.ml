@@ -60,6 +60,7 @@ and frame =
   | App of eterm
   | Car
   | Cdr
+  | Open
 
 (* e-sigarette ;-) *)
 type esig =

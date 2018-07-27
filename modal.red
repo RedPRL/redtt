@@ -36,7 +36,7 @@ let stream/tl (xs : stream) (α : ✓) : stream =
 let tts : stream =
   Fix _ (stream/cons tt) 0
 
-let bool/constant (x : bool) : (b : □ bool) × Path bool x `(open b) =
+let bool/constant (x : bool) : (b : □ bool) × Path bool x (b !) =
   if x then
     < shut tt, λ _ → tt >
   else
@@ -47,13 +47,13 @@ let sequence : type = □ (stream/L 0)
 let sequence/cons (x : bool) (xs : sequence) : sequence =
   shut
     stream/cons
-      `(open (car (bool/constant x)))
-      (λ _ → `(open xs))
+      (bool/constant x .0 !)
+      (λ _ → xs !)
 
 let sequence/hd (xs : sequence) : bool =
-  stream/hd `(open xs)
+  stream/hd (xs !)
 
 let sequence/tl (xs : sequence) : sequence =
   shut
-    stream/tl `(open xs) ∙
+    stream/tl (xs !) ∙
 
