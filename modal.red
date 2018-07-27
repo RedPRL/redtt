@@ -9,10 +9,10 @@ let Fix (A : type) (f : (✓ → A) → A) : Line A =
 let stream/F (A : ✓ → type) : type =
   bool × (α : ✓) → A α
 
-let stream/L : Line^1 type =
+let stream/L : Line^1 _ =
   Fix^1 _ stream/F
 
-let stream : type = stream/L 0
+let stream : _ = stream/L 0
 
 let stream/cons (x : bool) (xs : ✓ → stream) : stream =
   < x,
@@ -22,18 +22,18 @@ let stream/cons (x : bool) (xs : ✓ → stream) : stream =
   >
 
 
-let stream/hd (xs : stream) : bool =
+let stream/hd (xs : stream) : _ =
   xs.0
 
 let stream/tl (xs : stream) (α : ✓) : stream =
   coe 0 1 (xs.1 α) in λ i →
     `(dfix i (U 0) [A] (stream/F A)) α
 
-let tts : stream =
+let tts : _ =
   Fix _ (stream/cons tt) 0
 
 ; To eliminate a box, write 'b !'; this elaborates to the core term `(open b).
-let bool/constant (x : bool) : (b : □ bool) × Path bool x (b !) =
+let bool/constant (x : bool) : (b : □ bool) × Path _ x (b !) =
   if x then
     < shut tt, λ _ → tt >
   else

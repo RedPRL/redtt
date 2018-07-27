@@ -77,7 +77,7 @@ let rec print_diagnostics =
 
 let report (m : 'a m) : 'a m =
   C.bind m @@ fun (a, w) ->
-  (* C.bind (C.dump_state Format.err_formatter "Unsolved:" `Unsolved) @@ fun _ -> *)
+  C.bind (C.dump_state Format.err_formatter "Unsolved:" `Unsolved) @@ fun _ ->
   C.bind (print_diagnostics w) @@ fun _ ->
   ret a
 
