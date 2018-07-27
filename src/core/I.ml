@@ -60,6 +60,12 @@ let equate r0 r1 =
   | `Atom _, `Atom _ ->
     Idn
 
+let act_clock = ref 0.
+
+let _ =
+  Diagnostics.on_termination @@ fun _ ->
+  Format.eprintf "[diagnostic]: spent %fs acting on dimensions@." !act_clock
+
 let rec act phi =
   function
   | (`Dim0 | `Dim1) as r -> r
@@ -71,6 +77,13 @@ let rec act phi =
     | Subst (s, b) when a = b -> s
     | Cmp (psi1, psi0) -> act psi1 @@ act psi0 r
     | _ -> r
+
+let act phi r =
+  let now0 = Unix.gettimeofday () in
+  let r' = act phi r in
+  let now1 = Unix.gettimeofday () in
+  act_clock := !act_clock +. (now1 -. now0);
+  r'
 
 
 

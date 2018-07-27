@@ -626,8 +626,8 @@ let open_var_clock = ref 0.
 
 let _ =
   Diagnostics.on_termination @@ fun _ ->
-  Format.eprintf "Tm spent %fs in close_var@." !close_var_clock;
-  Format.eprintf "Tm spent %fs in open_var@." !open_var_clock
+  Format.eprintf "[diagnostic]: Tm spent %fs in close_var@." !close_var_clock;
+  Format.eprintf "[diagnostic]: Tm spent %fs in open_var@." !open_var_clock
 
 let open_var k cmd tm =
   let now0 = Unix.gettimeofday () in
