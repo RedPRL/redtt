@@ -101,7 +101,7 @@ eterm:
   | e = atomic_eterm
     { e }
   | e = atomic_eterm; fs = nonempty_list(eframe)
-    { E.Cut (e, fs) }
+    { E.Cut (e, Bwd.from_list fs) }
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = eterm
     { E.Lam (xs, e)   }
   | LET; name = ATOM; COLON; ty = eterm; EQUALS; tm = eterm; IN; body = eterm

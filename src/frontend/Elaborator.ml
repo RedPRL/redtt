@@ -399,7 +399,7 @@ struct
       end
 
     | _, E.Cut (e, fs) ->
-      elab_chk_cut env e (Bwd.from_list fs) ty >>= fun (_, cmd) ->
+      elab_chk_cut env e fs ty >>= fun (_, cmd) ->
       M.ret @@ Tm.up cmd
 
     | _, E.HCom info ->
@@ -560,7 +560,7 @@ struct
       M.ret (nat, (Tm.Down {ty = nat; tm = Tm.make Tm.Zero}, Emp))
 
     | E.Cut (e, fs) ->
-      elab_cut env e (Bwd.from_list fs) >>= fun (vty, cmd) ->
+      elab_cut env e fs >>= fun (vty, cmd) ->
       M.lift C.base_cx >>= fun cx ->
       let ty = Cx.quote_ty cx vty in
       M.ret (ty, cmd)

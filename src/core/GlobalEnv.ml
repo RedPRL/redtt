@@ -154,6 +154,9 @@ struct
         T.find nm Sig.globals.table
       with
       | _ ->
+        Format.eprintf "Failed to find: %a@." Name.pp nm;
+        Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+        Format.eprintf "@.";
         failwith "GlobalEnv.M.lookup: not found"
     in
     match param, tw with
