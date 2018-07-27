@@ -48,7 +48,7 @@ let sequence/cons (x : bool) (xs : sequence) : sequence =
   shut
     stream/cons
       `(open (car (bool/constant x)))
-      (λ α → `(open xs))
+      (λ _ → `(open xs))
 
 let sequence/hd (xs : sequence) : bool =
   stream/hd `(open xs)

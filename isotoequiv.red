@@ -11,7 +11,7 @@ let Iso (A, B : type) : type =
   × (a : _) → Path _ (g (f a)) a
 
 let Iso/fiber-is-prop
-  (A : type) (B : type)
+  (A, B : type)
   (I : Iso A B) (b : B)
   : IsProp (Fiber _ _ (I.0) b)
   =
