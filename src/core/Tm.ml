@@ -926,7 +926,7 @@ and pp_head env fmt =
       ushift
 
   | Down {ty; tm} ->
-    Format.fprintf fmt "@[<hv1>(:@ %a@ %a)@]" (pp env) ty (pp env) tm
+    Format.fprintf fmt "@[<hv1>(: @[<hov>%a@ %a@])@]" (pp env) ty (pp env) tm
 
   | DFix {r; ty; bdy = B (nm, bdy)} ->
     let x, env' = Pretty.Env.bind nm env in
