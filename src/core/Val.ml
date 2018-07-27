@@ -1201,6 +1201,9 @@ struct
             let phi = I.equate ri r'i in
             let phi0 = I.cmp (I.equate (`Atom x) `Dim0) phi in
             let yi, el = Abs.unleash absi in
+
+            (* If it helps, this right here is the source of the error that appears in omega1s1. - JMS *)
+            (* Format.eprintf "Here's a bad argument to rigid_vproj: %a@.@." pp_value el; *)
             Abs.bind yi @@ rigid_vproj x ~ty0:(Value.act phi0 ty0) ~ty1:(Value.act phi ty1) ~equiv:(Value.act phi0 equiv) ~el
           in
           Option.filter_map force_abs_face [face0; face1] @ List.map face sys
