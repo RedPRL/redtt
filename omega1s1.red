@@ -1,10 +1,14 @@
 import path
 import integer
 
+let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
+  λ i →
+    `(V i A B E)
+
 let S1-univ-cover (x : S1) : type =
   S1-rec x with
   | base => int
-  | loop i => `(V i int int succ-equiv)
+  | loop i => UA _ _ succ-equiv i
   end
 
 let loopn (n : int) : Path S1 base base =

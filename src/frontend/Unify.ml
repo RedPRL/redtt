@@ -671,7 +671,7 @@ let normalize_eqn q =
 
 (* invariant: will not be called on equations which are already reflexive *)
 let rigid_rigid q =
-  (* normalize_eqn q >>= fun q -> *)
+  normalize_eqn q >>= fun q ->
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
     let x = Name.named @@ Some "rigidrigid-pi" in
