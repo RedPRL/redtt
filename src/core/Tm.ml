@@ -808,16 +808,16 @@ let rec pp env fmt =
       Format.fprintf fmt "zero"
 
     | Suc n ->
-      Format.fprintf fmt "@[<hv1> (suc %a)@]" (go env `Suc) n
+      Format.fprintf fmt "@[<hv1>(suc %a)@]" (go env `Suc) n
 
     | Int ->
       Format.fprintf fmt "int"
 
     | Pos n ->
-      Format.fprintf fmt "@[<hv1> (pos %a)@]" (go env `Pos) n
+      Format.fprintf fmt "@[<hv1>(pos %a)@]" (go env `Pos) n
 
     | NegSuc n ->
-      Format.fprintf fmt "@[<hv1> (negsuc %a)@]" (go env `NegSuc) n
+      Format.fprintf fmt "@[<hv1>(negsuc %a)@]" (go env `NegSuc) n
 
     | Dim0 ->
       Format.fprintf fmt "0"
