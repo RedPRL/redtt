@@ -7,7 +7,7 @@ type edecl =
   | Quit
 
 and escheme = etele * eterm
-and ecell = string * eterm
+and ecell = [`Ty of string * eterm | `Tick of string | `I of string | `Lock ]
 and etele = ecell list
 
 and eterm =
@@ -41,6 +41,8 @@ and eterm =
   | Coe of {r : eterm; r' : eterm; fam : eterm; tm : eterm}
   | HCom of {r : eterm; r' : eterm; cap : eterm; sys : esys}
   | Com of {r : eterm; r' : eterm; fam : eterm; cap : eterm; sys : esys}
+
+  | Shut of eterm
 
   | Cut of eterm * frame list
 

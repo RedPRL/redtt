@@ -1,6 +1,8 @@
-open Val
+open Domain
 open RedBasis.Bwd
 open BwdNotation
+
+module D = Domain
 
 
 module Env :
@@ -50,27 +52,53 @@ struct
     try
       let lvl = M.find x env.atoms in
       ix_of_lvl lvl env
-    with _ -> failwith "FUCK!!:"
+    with _ -> failwith "ix_of_atom"
 end
 
 type env = Env.t
 
 module type S =
 sig
-  val quote_nf : env -> Val.nf -> Tm.tm
-  val quote_neu : env -> Val.neu -> Tm.tm Tm.cmd
-  val quote_ty : env -> Val.value -> Tm.tm
+  val quote_nf : env -> nf -> Tm.tm
+  val quote_neu : env -> neu -> Tm.tm Tm.cmd
+  val quote_ty : env -> value -> Tm.tm
 
-  val equiv : env -> ty:Val.value -> Val.value -> Val.value -> unit
-  val equiv_ty : env -> Val.value -> Val.value -> unit
-  val subtype : env -> Val.value -> Val.value -> unit
-
-  module Error : sig
-    type t
-    val pp : t Pretty.t0
-    exception E of t
-  end
+  val equiv : env -> ty:value -> value -> value -> unit
+  val equiv_ty : env -> value -> value -> unit
+  val subtype : env -> value -> value -> unit
 end
+
+
+
+type error =
+  | ErrEquateNf of {env : Env.t; ty : value; el0 : value; el1 : value}
+  | ErrEquateNeu of {env : Env.t; neu0 : neu; neu1 : neu}
+
+let pp_error fmt =
+  function
+  | ErrEquateNf {ty; el0; el1; _} ->
+    Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Domain.pp_value el0 Uuseg_string.pp_utf_8 "≠" Domain.pp_value el1 Domain.pp_value ty
+
+  | ErrEquateNeu {neu0; neu1; _} ->
+    Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" Domain.pp_neu neu0 Uuseg_string.pp_utf_8 "≠" Domain.pp_neu neu1
+
+exception E of error
+
+module Error =
+struct
+  type t = error
+  let pp = pp_error
+  exception E = E
+end
+
+let _ =
+  PpExn.install_printer @@ fun fmt ->
+  function
+  | E err ->
+    Format.fprintf fmt "@[<1>%a@]" pp_error err
+  | _ ->
+    raise PpExn.Unrecognized
+
 
 module M (V : Val.S) : S =
 struct
@@ -84,13 +112,6 @@ struct
   let generic env ty =
     generic_constrained env ty []
 
-
-  type error =
-    | ErrEquateNf of {env : QEnv.t; ty : value; el0 : value; el1 : value}
-    | ErrEquateNeu of {env : QEnv.t; neu0 : neu; neu1 : neu}
-
-  exception E of error
-
   let rec equate env ty el0 el1 =
     match unleash ty with
     | Pi {dom; cod} ->
@@ -99,6 +120,7 @@ struct
       let app0 = apply el0 var in
       let app1 = apply el1 var in
       Tm.lam (clo_name cod) @@ equate (Env.succ env) vcod app0 app1
+
     | Sg {dom; cod} ->
       let el00 = car el0 in
       let el10 = car el1 in
@@ -106,13 +128,28 @@ struct
       let vcod = inst_clo cod el00 in
       let q1 = equate env vcod (cdr el0) (cdr el1) in
       Tm.cons q0 q1
+
     | Ext abs ->
-      let xs, (tyx, _) = ExtAbs.unleash abs in
+      let xs, (tyx, _) = Domain.ExtAbs.unleash abs in
       let rs = List.map (fun x -> `Atom x) @@ Bwd.to_list xs in
       let app0 = ext_apply el0 rs in
       let app1 = ext_apply el1 rs in
       Tm.ext_lam (Bwd.map Name.name xs) @@
       equate (Env.abs env xs) tyx app0 app1
+
+    | Later ltr ->
+      let tick = TickGen (`Lvl (None, Env.len env)) in
+      let prev0 = prev tick el0 in
+      let prev1 = prev tick el1 in
+      let ty = inst_tick_clo ltr tick in
+      let bdy = equate (Env.succ env) ty prev0 prev1 in
+      Tm.make @@ Tm.Next (Tm.B (None, bdy))
+
+    | BoxModality ty ->
+      let open0 = modal_open el0 in
+      let open1 = modal_open el1 in
+      let t = equate env ty open0 open1 in
+      Tm.make @@ Tm.Shut t
 
     | Rst {ty; _} ->
       equate env ty el0 el1
@@ -138,8 +175,8 @@ struct
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
           let phi = I.equate r r' in
-          let force0 = corestriction_force @@ Val.act phi el0 in
-          let force1 = corestriction_force @@ Val.act phi el1 in
+          let force0 = corestriction_force @@ Domain.Value.act phi el0 in
+          let force1 = corestriction_force @@ Domain.Value.act phi el1 in
           let tm = equate env ty force0 force1 in
           Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
       end
@@ -153,7 +190,7 @@ struct
     | V info ->
       let tr = quote_dim env @@ `Atom info.x in
       let phi_r0 = I.subst `Dim0 info.x in
-      let tm0 = equate env (Val.act phi_r0 info.ty0) (Val.act phi_r0 el0) (Val.act phi_r0 el1) in
+      let tm0 = equate env (Domain.Value.act phi_r0 info.ty0) (Domain.Value.act phi_r0 el0) (Domain.Value.act phi_r0 el1) in
       let vproj0 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~equiv:info.equiv ~el:el0 in
       let vproj1 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~equiv:info.equiv ~el:el1 in
       let tm1 = equate env info.ty1 vproj0 vproj1 in
@@ -218,6 +255,17 @@ struct
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi (clo_name pi0.cod) dom cod
 
+      | Later ltr0, Later ltr1 ->
+        let tick = TickGen (`Lvl (None, Env.len env)) in
+        let vcod0 = inst_tick_clo ltr0 tick in
+        let vcod1 = inst_tick_clo ltr1 tick in
+        let cod = equate (Env.succ env) ty vcod0 vcod1 in
+        Tm.make @@ Tm.Later (Tm.B (None, cod))
+
+      | BoxModality ty0, BoxModality ty1 ->
+        let ty = equate env ty ty0 ty1 in
+        Tm.make @@ Tm.BoxModality ty
+
       | Sg sg0, Sg sg1 ->
         let dom = equate env ty sg0.dom sg1.dom in
         let var = generic env sg0.dom in
@@ -227,8 +275,8 @@ struct
         Tm.sg (clo_name sg0.cod) dom cod
 
       | Ext abs0, Ext abs1 ->
-        let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
-        let ty1x, sys1x = ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
+        let xs, (ty0x, sys0x) = Domain.ExtAbs.unleash abs0 in
+        let ty1x, sys1x = Domain.ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
         let envx = Env.abs env xs in
         let tyx = equate envx ty ty0x ty1x in
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
@@ -240,7 +288,7 @@ struct
         Tm.make @@ Tm.Rst {ty; sys}
 
       | CoR face0, CoR face1 ->
-        let univ = V.make @@ Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
+        let univ = D.make @@ Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
         let face = equate_val_face env univ face0 face1 in
         Tm.make @@ Tm.CoR face
 
@@ -339,6 +387,28 @@ struct
         Tm.Meta {name = meta0.name; ushift = meta0.ushift}, Bwd.from_list stk
       else
         failwith "global variable name mismatch"
+
+    | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
+      let ty = equate_ty env ty0 ty1 in
+      let ltr_ty = make_later ty0 in
+      let var = generic env ltr_ty in
+      let el0 = inst_clo clo0 var in
+      let el1 = inst_clo clo1 var in
+      let bdy = equate (Env.succ env) ty0 el0 el1 in
+      let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
+      Tm.DFix {r = Tm.make Tm.Dim0; ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
+
+    | FixLine (x0, tgen0, ty0, clo0), FixLine (x1, tgen1, ty1, clo1) ->
+      let r = equate_atom env x0 x1 in
+      let ty = equate_ty env ty0 ty1 in
+      let ltr_ty = make_later ty0 in
+      let var = generic env ltr_ty in
+      let el0 = inst_clo clo0 var in
+      let el1 = inst_clo clo1 var in
+      let bdy = equate (Env.succ env) ty0 el0 el1 in
+      let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
+      Tm.DFix {r; ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
+
     | Car neu0, Car neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Car :: stk
     | Cdr neu0, Cdr neu1 ->
@@ -439,7 +509,7 @@ struct
       let ty1 = equate_ty env vproj0.ty1 vproj1.ty1 in
       let equiv_ty = V.Macro.equiv vproj0.ty0 vproj0.ty1 in
       let phi = I.subst `Dim0 x0 in
-      let equiv = equate env (Val.act phi equiv_ty) vproj0.equiv vproj1.equiv in
+      let equiv = equate env (Value.act phi equiv_ty) vproj0.equiv vproj1.equiv in
       let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
     | Cap cap0, Cap cap1 ->
@@ -453,6 +523,13 @@ struct
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
     | CoRForce neu0, CoRForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
+    | Prev (tick0, neu0), Prev (tick1, neu1) ->
+      let tick = equate_tick env tick0 tick1 in
+      equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
+
+    | Open neu0, Open neu1 ->
+      equate_neu_ env neu0 neu1 @@ Tm.Open :: stk
+
     | _ ->
       let err = ErrEquateNeu {env; neu0; neu1} in
       raise @@ E err
@@ -510,7 +587,7 @@ struct
       let r, r' = Eq.unleash p0 in
       let phi = I.equate r r' in
       let tr, tr' = equate_eq env p0 p1 in
-      let v = equate env (Val.act phi ty) v0 v1 in
+      let v = equate env (Value.act phi ty) v0 v1 in
       tr, tr', Some v
 
     | _ -> failwith "equate_val_face"
@@ -521,7 +598,7 @@ struct
       let r, r' = Eq.unleash p0 in
       let phi = I.equate r r' in
       let tr, tr' = equate_eq env p0 p1 in
-      let bnd = equate_val_abs env (Val.act phi ty) abs0 abs1 in
+      let bnd = equate_val_abs env (Value.act phi ty) abs0 abs1 in
       tr, tr', Some bnd
 
   and equate_box_boundary env s' ty bdry0 bdry1 =
@@ -573,6 +650,12 @@ struct
     let tr' = equate_dim3 env r'0 r'1 r'2 in
     tr, tr'
 
+  and equate_tick env tick0 tick1 =
+    if tick0 = tick1 then
+      quote_tick env tick0
+    else
+      failwith "equate_tick: ticks did not match"
+
   and equate_dim env (r : I.t) (r' : I.t) =
     match I.compare r r' with
     | `Same ->
@@ -582,6 +665,7 @@ struct
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
       failwith "equate_dim: dimensions did not match"
+
 
   and equate_dim3 env (r : I.t) (r' : I.t) (r'' : I.t) =
     match I.compare r r', I.compare r r'' with
@@ -621,6 +705,16 @@ struct
       | _ ->
         Tm.up @@ Tm.var x
 
+  and quote_tick env tck =
+    match tck with
+    | TickConst ->
+      Tm.make Tm.TickConst
+    | TickGen (`Lvl (_, lvl)) ->
+      let ix = Env.ix_of_lvl lvl env in
+      Tm.up @@ Tm.ix ix
+    | TickGen (`Global alpha) ->
+      Tm.up @@ Tm.var alpha
+
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1
 
@@ -651,6 +745,15 @@ struct
       let vcod0 = inst_clo sg0.cod var in
       let vcod1 = inst_clo sg1.cod var in
       subtype (Env.succ env) vcod0 vcod1
+
+    | Later ltr0, Later ltr1 ->
+      let tick = TickGen (`Lvl (None, Env.len env)) in
+      let vcod0 = inst_tick_clo ltr0 tick in
+      let vcod1 = inst_tick_clo ltr1 tick in
+      subtype (Env.succ env) vcod0 vcod1
+
+    | BoxModality ty0, BoxModality ty1 ->
+      subtype env ty0 ty1
 
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
@@ -710,8 +813,8 @@ struct
         (* In this case, we check that the semantic indeterminate will become equal to the face under the
            stipulated restriction. *)
         let r, r' = Eq.unleash p in
-        let gen_rr' = Val.act (I.equate r r') gen in
-        let ty_rr' = Val.act (I.equate r r') ty1 in
+        let gen_rr' = Value.act (I.equate r r') gen in
+        let ty_rr' = Value.act (I.equate r r') ty1 in
         begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end
     in
 
@@ -732,34 +835,5 @@ struct
     end
 
 
-
-  let pp_error fmt =
-    function
-    | ErrEquateNf {env; ty; el0; el1} ->
-      let tty = quote_ty env ty in
-      let tm0 = quote_nf env {ty; el = el0} in
-      let tm1 = quote_nf env {ty; el = el1} in
-      Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Tm.pp0 tm0 Uuseg_string.pp_utf_8 "≠" Tm.pp0 tm1 Tm.pp0 tty
-
-    | ErrEquateNeu {env; neu0; neu1} ->
-      let tm0 = quote_neu env neu0 in
-      let tm1 = quote_neu env neu1 in
-      Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" (Tm.pp_cmd Pretty.Env.emp) tm0 Uuseg_string.pp_utf_8 "≠" (Tm.pp_cmd Pretty.Env.emp) tm1
-
-
-  module Error =
-  struct
-    type t = error
-    let pp = pp_error
-    exception E = E
-  end
-
-  let _ =
-    PpExn.install_printer @@ fun fmt ->
-    function
-    | E err ->
-      Format.fprintf fmt "@[<1>%a@]" pp_error err
-    | _ ->
-      raise PpExn.Unrecognized
 
 end

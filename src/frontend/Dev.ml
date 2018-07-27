@@ -24,6 +24,8 @@ type ('a, 'b) equation =
 
 type 'a param =
   [ `I
+  | `Tick
+  | `Lock
   | `P of 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
@@ -70,8 +72,7 @@ let rec eqn_close_var x tw k q =
 
 let param_open_var k x =
   function
-  | `I ->
-    `I
+  | (`I | `Tick | `Lock) as p -> p
   | `P ty ->
     `P (Tm.open_var k (fun twin -> Tm.var x ~twin) ty)
   | `Tw (ty0, ty1) ->
@@ -82,8 +83,7 @@ let param_open_var k x =
 
 let param_close_var x k =
   function
-  | `I ->
-    `I
+  | (`I | `Tick | `Lock) as p -> p
   | `P ty ->
     `P (Tm.close_var x ~twin:(fun tw -> tw) k ty)
   | `Tw (ty0, ty1) ->
@@ -164,6 +164,10 @@ let pp_param fmt =
   function
   | `I ->
     Format.fprintf fmt "dim"
+  | `Tick ->
+    Format.fprintf fmt "tick"
+  | `Lock ->
+    Format.fprintf fmt "lock"
   | `P ty ->
     Tm.pp0 fmt ty
   | `Tw (ty0, ty1) ->
@@ -193,6 +197,14 @@ let pp_param_cell fmt (x, param) =
 
   | `I ->
     Format.fprintf fmt "@[<1>%a : dim@]"
+      Name.pp x
+
+  | `Tick ->
+    Format.fprintf fmt "@[<1>%a : tick@]"
+      Name.pp x
+
+  | `Lock ->
+    Format.fprintf fmt "@[<1>%a : lock@]"
       Name.pp x
 
   | `R (r0, r1) ->
@@ -292,10 +304,10 @@ sig
 end
 
 let subst_tm sub ~ty tm =
-  let module T = Typing.M (struct let globals = sub end) in
-  let vty = T.Cx.eval T.Cx.emp ty in
-  let el = T.Cx.eval T.Cx.emp tm in
-  T.Cx.quote T.Cx.emp ~ty:vty el
+  let cx = Cx.init sub in
+  let vty = Cx.eval cx ty in
+  let el = Cx.eval cx tm in
+  Cx.quote cx ~ty:vty el
 
 let subst_decl sub ~ty =
   function
@@ -319,8 +331,8 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
   function
-  | `I ->
-    `I, sub
+  | (`I | `Tick | `Lock) as p ->
+    p, sub
   | `P ty ->
     `P (subst_tm sub ~ty:univ ty), sub
   | `Tw (ty0, ty1) ->
@@ -353,7 +365,7 @@ let rec subst_problem sub =
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
-      | `I ->
+      | (`I | `Tick | `Lock) ->
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
@@ -381,7 +393,7 @@ struct
 
   let free fl =
     function
-    | `I -> Occurs.Set.empty
+    | (`I | `Tick | `Lock) -> Occurs.Set.empty
     | `P ty -> Tm.free fl ty
     | `Tw (ty0, ty1) ->
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)

@@ -39,10 +39,8 @@ let testing (x : restrict bool with 1=1 ⇒ tt end) : singleton bool tt =
   x
 
 let hset (A : _) : type =
-  (x : A)
-  (y : A)
-  (p : Path A x y)
-  (q : Path A x y)
+  (x, y : A)
+  (p, q : Path A x y)
   → Path _ p q
 
 let hset/pi
@@ -57,7 +55,7 @@ let hset/pi
 
 ; this is an example that doesn't work so well in redprl-style sequent calculus
 let theorem-of-choice
-  (A : type) (B : type)
+  (A, B : type)
   (R : A → B → type)
   (p : (x : A) → (y : B) × R x y)
   : (f : A → B) × (x : A) → R x (f x)

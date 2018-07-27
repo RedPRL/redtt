@@ -1,12 +1,7 @@
 let Line (A : type) : type =
-  [_] A with end
+  (_ : dim) → A
 
-let Path
-  (A : type)
-  (M : A)
-  (N : A)
-  : type
-  =
+let Path (A : type) (M,N : A) : type =
   [i] A with
   | i=0 ⇒ M
   | i=1 ⇒ N
@@ -14,8 +9,7 @@ let Path
 
 let Square
   (A : type)
-  (M : Line A)
-  (N : Line A)
+  (M,N : Line A)
   (O : Path A (M 0) (N 0))
   (P : Path A (M 1) (N 1))
   : type
@@ -30,8 +24,7 @@ let Square
 let funext
   (A : type)
   (B : A → type)
-  (f : (x : A) → B x)
-  (g : (x : A) → B x)
+  (f,g : (x : A) → B x)
   (p : (x : A) → Path (B x) (f x) (g x))
   : Path ((x : A) → B x) f g
   =
@@ -112,7 +105,7 @@ let trans/sym/r
 ; Perhaps we could parallelize this proof? ;)
 let symmd
   (A : Line^1 type)
-  (p : [i] A i with end)
+  (p : (i : dim) → A i)
   : [i] symm^1 _ A i with
     | i=0 ⇒ p 1
     | i=1 ⇒ p 0

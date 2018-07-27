@@ -28,7 +28,7 @@ let plus/unit/r (n : nat) : Path nat (plus n zero) n =
   | suc (n ⇒ path/n) ⇒ λ i → suc (path/n i)
   end
 
-let plus/assoc (n : nat) : (m : nat) → (o : nat) → Path nat (plus n (plus m o)) (plus (plus n m) o) =
+let plus/assoc (n : nat) : (m, o : nat) → Path nat (plus n (plus m o)) (plus (plus n m) o) =
   nat-rec n with
   | zero ⇒ λ m o i → plus m o
   | suc (n ⇒ plus/assoc/n) ⇒ λ m o i → suc (plus/assoc/n m o i)

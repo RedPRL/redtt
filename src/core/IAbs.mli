@@ -4,6 +4,8 @@ type 'a abs
 
 type atom = Name.t
 
+val pp : 'a Pretty.t0 -> 'a abs Pretty.t0
+
 module type S =
 sig
   type el

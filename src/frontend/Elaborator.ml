@@ -117,18 +117,31 @@ struct
       M.ret env
 
   and elab_scheme env (cells, ecod) kont =
-    let rec go gm =
+    let rec go =
       function
       | [] ->
         elab_chk env univ ecod >>=
         kont
-      | (name, edom) :: cells ->
+      | `Ty (name, edom) :: cells ->
         elab_chk env univ edom >>= normalize_ty >>= fun dom ->
         let x = Name.named @@ Some name in
         M.in_scope x (`P dom) @@
-        go (gm #< (x, dom)) cells
+        go cells
+      | `Tick name :: cells ->
+        let x = Name.named @@ Some name in
+        M.in_scope x `Tick @@
+        go cells
+      | `I name :: cells ->
+        let x = Name.named @@ Some name in
+        M.in_scope x `I @@
+        go cells
+      | `Lock :: cells ->
+        let x = Name.fresh () in
+        M.in_scope x `Lock @@
+        go cells
+      | _ -> failwith "TODO: elab_scheme"
     in
-    go Emp cells
+    go cells
 
 
 
@@ -141,6 +154,12 @@ struct
       elab_chk env rst.ty e >>= fun tm ->
       M.lift C.ask >>= fun psi ->
       M.lift @@ U.push_guess psi ~ty0:ty ~ty1:rst.ty tm
+
+    | Tm.BoxModality ty, E.Shut e ->
+      M.in_scope (Name.fresh ()) `Lock begin
+        elab_chk env ty e
+      end >>= fun tm ->
+      M.ret @@ Tm.make @@ Tm.Shut tm
 
     | _, E.Hole name ->
       M.lift C.ask >>= fun psi ->
@@ -284,7 +303,7 @@ struct
     | Tm.Univ _, E.Pi ([], e) ->
       elab_chk env ty e
 
-    | Tm.Univ _, E.Pi ((name, edom) :: etele, ecod) ->
+    | Tm.Univ _, E.Pi (`Ty (name, edom) :: etele, ecod) ->
       elab_chk env ty edom >>= fun dom ->
       let x = Name.named @@ Some name in
       M.in_scope x (`P dom) begin
@@ -292,12 +311,33 @@ struct
       end >>= fun codx ->
       M.ret @@ Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
 
+    | Tm.Univ _, E.Pi (`I name :: etele, ecod) ->
+      let x = Name.named @@ Some name in
+      M.in_scope x `I begin
+        elab_chk env ty @@ E.Pi (etele, ecod)
+      end >>= fun codx ->
+      let ebnd = Tm.bind_ext (Emp #< x) codx [] in
+      M.ret @@ Tm.make @@ Tm.Ext ebnd
 
+    | Tm.Univ _, E.Pi (`Tick name :: etele, ecod) ->
+      let x = Name.named @@ Some name in
+      M.in_scope x `Tick begin
+        elab_chk env ty @@ E.Pi (etele, ecod)
+      end >>= fun codx ->
+      let bnd = Tm.bind x codx in
+      M.ret @@ Tm.make @@ Tm.Later bnd
+
+    | Tm.Univ _, E.Pi (`Lock :: etele, ecod) ->
+      let x = Name.fresh () in
+      M.in_scope x `Lock begin
+        elab_chk env ty @@ E.Pi (etele, ecod)
+      end >>= fun ty ->
+      M.ret @@ Tm.make @@ Tm.BoxModality ty
 
     | Tm.Univ _, E.Sg ([], e) ->
       elab_chk env ty e
 
-    | Tm.Univ _, E.Sg ((name, edom) :: etele, ecod) ->
+    | Tm.Univ _, E.Sg (`Ty (name, edom) :: etele, ecod) ->
       elab_chk env ty edom >>= fun dom ->
       let x = Name.named @@ Some name in
       M.in_scope x (`P dom) begin
@@ -312,7 +352,6 @@ struct
       elab_chk env ty e
     | Tm.Sg (dom, cod), Tuple (e :: es) ->
       elab_chk env dom e >>= fun tm0 ->
-      M.lift C.typechecker >>= fun (module T) ->
       let cmd0 = Tm.Down {ty = dom; tm = tm0}, Emp in
       let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
       elab_chk env cod' (Tuple es) >>= fun tm1 ->
@@ -399,9 +438,7 @@ struct
         begin
           M.under_restriction r r' begin
             elab_chk env ext_ty e >>= fun line ->
-            M.lift C.typechecker >>= fun (module T) ->
-            let module HS = HSubst (T) in
-            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
+            M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx] >>= fun (_, tmx) ->
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
@@ -436,9 +473,7 @@ struct
         begin
           M.under_restriction r r' begin
             elab_chk env ext_ty e >>= fun line ->
-            M.lift C.typechecker >>= fun (module T) ->
-            let module HS = HSubst (T) in
-            let _, tmx = HS.((ext_ty, line) %% Tm.ExtApp [varx]) in
+            M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx] >>= fun (_, tmx) ->
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
@@ -480,9 +515,9 @@ struct
       begin
         match Tm.unleash tm with
         | Tm.Up cmd ->
-          M.lift C.typechecker >>= fun (module T) ->
-          let vty = T.infer T.Cx.emp cmd in
-          M.ret (T.Cx.quote_ty T.Cx.emp vty, cmd)
+          M.lift C.base_cx >>= fun cx ->
+          let vty = Typing.infer cx cmd in
+          M.ret (Cx.quote_ty cx vty, cmd)
         | _ ->
           failwith "Cannot elaborate `term"
       end
@@ -508,11 +543,12 @@ struct
       let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
       elab_chk env univ_fam info.fam >>= fun fam ->
-      M.in_scope x `I @@ M.lift C.typechecker >>= fun (module T) ->
-      let module HS = HSubst (T) in
-      let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
+      M.in_scope x `I begin
+        M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr] >>= fun (_, fam_r) ->
+        M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr'] >>= fun (_, fam_r') ->
+        M.ret (fam_r, fam_r')
+      end >>= fun (fam_r, fam_r') ->
       elab_chk env fam_r info.tm >>= fun tm ->
-      let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
       let varx = Tm.up @@ Tm.var x in
       let tyx = Tm.up (Tm.Down {ty = univ_fam; tm = fam}, Emp #< (Tm.ExtApp [varx])) in
       let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
@@ -525,14 +561,14 @@ struct
       let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
       elab_chk env univ_fam info.fam >>= fun fam ->
-      M.lift C.typechecker >>= fun (module T) ->
-      let module HS = HSubst (T) in
-      let _, fam_r = HS.((univ_fam, fam) %% Tm.ExtApp [tr]) in
+      M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr] >>= fun (_, fam_r) ->
+      M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr'] >>= fun (_, fam_r') ->
       elab_chk env fam_r info.cap >>= fun cap ->
-      let _, fam_r' = HS.((univ_fam, fam) %% Tm.ExtApp [tr']) in
       let varx = Tm.up @@ Tm.var x in
-      let _, tyx = HS.((univ_fam, fam) %% Tm.ExtApp [varx]) in
-      let tybnd = Tm.bind x tyx in
+      M.in_scope x `I begin
+        M.lift @@ (univ_fam, fam) %% Tm.ExtApp [varx]
+      end >>= fun (_, fam_x) ->
+      let tybnd = Tm.bind x fam_x in
       elab_com_sys env tr tybnd cap info.sys >>= fun sys ->
       let com = Tm.Com {r = tr; r' = tr'; ty = tybnd; cap; sys} in
       M.ret (fam_r', (com, Emp))
@@ -586,10 +622,8 @@ struct
 
           | Tm.Pi (dom, cod), E.App e :: efs ->
             elab_chk env dom e >>= fun t ->
-            M.lift C.typechecker >>= fun (module T) ->
-            let module HS = HSubst (T) in
-            let vdom = T.Cx.eval T.Cx.emp dom in
-            let cod' = HS.inst_ty_bnd cod (vdom, t) in
+            M.lift @@ Unify.eval dom >>= fun vdom ->
+            M.lift @@ Unify.inst_ty_bnd cod (vdom, t) >>= fun cod' ->
             go cod' (hd, sp #< (Tm.FunApp t)) efs mode
 
           | Tm.Ext ebnd, efs ->

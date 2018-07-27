@@ -19,9 +19,9 @@ let _ =
 
 let normalize_ty ty =
   let now0 = Unix.gettimeofday () in
-  M.lift C.typechecker >>= fun (module T) ->
-  let vty = T.Cx.eval T.Cx.emp ty in
-  let ty = T.Cx.quote_ty T.Cx.emp vty in
+  M.lift C.base_cx >>= fun cx ->
+  let vty = Cx.eval cx ty in
+  let ty = Cx.quote_ty cx vty in
   let now1 = Unix.gettimeofday () in
   normalization_clock := !normalization_clock +. (now1 -. now0);
   M.ret ty
@@ -195,6 +195,19 @@ let rec tac_lambda names tac ty =
           tac_wrap_nf (tac_lambda names tac) codx
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
+    end
+
+  | Tm.Later cod ->
+    begin
+      match names with
+      | [] -> tac ty
+      | name :: names ->
+        let x = Name.named @@ Some name in
+        let codx = Tm.unbind_with (Tm.var x) cod in
+        M.in_scope x `Tick begin
+          tac_wrap_nf (tac_lambda names tac) codx
+        end >>= fun bdyx ->
+        M.ret @@ Tm.make @@ Tm.Next (Tm.bind x bdyx)
     end
 
   | Tm.Ext (Tm.NB (nms, _) as ebnd) ->

@@ -12,11 +12,12 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON COLON_ANGLE COMMA DOT PIPE CARET
+%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET
 %token EQUALS
-%token RIGHT_ARROW RRIGHT_ARROW
+%token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH END
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN
+%token DIM TICK LOCK
+%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV DFIX BOX_MODALITY OPEN SHUT
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
@@ -155,10 +156,10 @@ eterm:
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = eterm
-    { E.Pi (tele, cod) }
+    { E.Pi (List.flatten tele, cod) }
 
   | tele = nonempty_list(etele_cell); TIMES; cod = eterm
-    { E.Sg (tele, cod) }
+    { E.Sg (List.flatten tele, cod) }
 
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
     { E.Ext (dims, ty, sys)}
@@ -167,10 +168,17 @@ eterm:
     { E.Rst (ty, sys)}
 
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
-    { E.Pi (["_", dom], cod) }
+    { E.Pi ([`Ty ("_", dom)], cod) }
 
   | dom = atomic_eterm; TIMES; cod = eterm
-    { E.Sg (["_", dom], cod) }
+    { E.Sg ([`Ty ("_", dom)], cod) }
+
+  | BOX_MODALITY; ty = eterm
+    { E.Pi ([`Lock], ty)}
+
+  | SHUT; tm = eterm
+    { E.Shut tm }
+
 
 eface:
   | r0 = atomic_eterm; EQUALS; r1 = atomic_eterm; RRIGHT_ARROW; e = eterm
@@ -178,16 +186,22 @@ eface:
 
 
 escheme:
-  | tele = list(escheme_cell); COLON; cod = eterm
-    { (tele, cod) }
-
-escheme_cell:
-  | LPR; a = ATOM; COLON; ty = eterm; RPR
-    { (a, ty) }
+  | tele = list(etele_cell); COLON; cod = eterm
+    { (List.flatten tele, cod) }
 
 etele_cell:
-  | LPR; a = ATOM; COLON; ty = eterm; RPR
-    { (a, ty) }
+  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; ty = eterm; RPR
+    { List.map (fun x -> `Ty (x, ty)) xs }
+  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; TICK; RPR
+    { List.map (fun x -> `Tick x) xs }
+  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; DIM; RPR
+    { List.map (fun x -> `I x) xs }
+  | DIM
+    { [`I "_"] }
+  | TICK
+    { [`Tick "_"] }
+  | LOCK
+    { [`Lock] }
 
 esig:
   | d = edecl; esig = esig
@@ -275,19 +289,23 @@ kind:
 tm:
   | BOOL
     { fun _env ->
-      make_node $startpos $endpos @@ Tm.Bool }
+      make_node $startpos $endpos Tm.Bool }
 
   | INT
     { fun _env ->
-      make_node $startpos $endpos @@ Tm.Int }
+      make_node $startpos $endpos Tm.Int }
 
   | TT
     { fun _env ->
-      make_node $startpos $endpos @@ Tm.Tt }
+      make_node $startpos $endpos Tm.Tt }
 
   | FF
     { fun _env ->
-      make_node $startpos $endpos @@ Tm.Ff }
+      make_node $startpos $endpos Tm.Ff }
+
+  | BULLET
+    { fun _env ->
+      make_node $startpos $endpos Tm.TickConst }
 
   | i = NUMERAL
     { fun _env ->
@@ -321,15 +339,35 @@ tm:
     { fun env ->
       ext_from_multibind $startpos $endpos @@ mb env }
 
+  | LPR; TRIANGLE_RIGHT; ty = bind(tm); RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Later (ty env) }
+
+  | LPR; BOX_MODALITY; ty = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.BoxModality (ty env) }
+
   | LPR; rst = constrained; RPR
     { fun env ->
       let ty, sys = rst env in
       make_node $startpos $endpos @@
-      Tm.Rst {ty; sys}}
+      Tm.Rst {ty; sys} }
 
   | LPR; LAM; mb = multibind(tm); RPR
     { fun env ->
       lam_from_multibind (Some ($startpos, $endpos)) @@ mb env }
+
+  | LPR; NEXT; bnd = bind(tm); RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Next (bnd env) }
+
+  | LPR; SHUT; tm = tm; RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Shut (tm env) }
 
   | LPR; CONS; e0 = tm; e1 = tm; RPR
     { fun env ->
@@ -371,7 +409,11 @@ head:
     { fun env ->
       Tm.Coe {r = r0 env; r' = r1 env; ty = ty env; tm = tm env} }
 
-  | LPR; COLON_ANGLE; ty = tm; tm = tm; RPR
+  | LPR; DFIX; r = tm; ty = tm; bdy = bind(tm); RPR
+    { fun env ->
+      Tm.DFix {r = r env; ty = ty env; bdy = bdy env} }
+
+  | LPR; COLON; ty = tm; tm = tm; RPR
     { fun env ->
       Tm.Down {ty = ty env; tm = tm env} }
 
@@ -399,6 +441,16 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.LblCall }
+
+  | LPR; PREV; t = tm; e = cut; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, fs #< (Tm.Prev (t env)) }
+
+  | LPR; OPEN; e = cut; RPR
+    { fun env ->
+      let hd, fs = e env in
+      hd, fs #< Tm.Open }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->

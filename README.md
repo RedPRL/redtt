@@ -16,7 +16,7 @@ and [cubicaltt](https://github.com/mortberg/cubicaltt).
 - source language with implicit arguments based on a cubical version of
   higher-order unification
 
-- predicative hierarchy of cumulative universes
+- predicative hierarchy of cumulative, univalent universes
 
 - level "polymorphic" definitions achieved using McBride's "Crude But Effective
   Stratification" (in which each thing is defined at the lowest level possible,
@@ -28,6 +28,8 @@ and [cubicaltt](https://github.com/mortberg/cubicaltt).
   path types as they did in RedPRL.
 
 - some built-in inductive types: natural numbers, integers, booleans, the circle
+
+- experimental support for Fitch-style modal guarded recursion: □, ▷
 
 
 Features we intend to add in the near future:

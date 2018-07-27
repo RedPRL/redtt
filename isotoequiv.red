@@ -4,7 +4,7 @@ import equivalence
 ; RedPRL: https://github.com/RedPRL/sml-redprl/blob/bd73932409ddc3479c8ded5ac32ae0d93d31874a/example/isotoequiv.prl
 ; cubicaltt: https://github.com/mortberg/cubicaltt/blob/a331f1d355c5d2fc608a59c1cbbf016ea09d6deb/experiments/isoToEquiv.ctt
 
-let Iso (A : type) (B : type) : type =
+let Iso (A, B : type) : type =
   (f : A → B)
   × (g : B → A)
   × (α : (b : _) → Path _ (f (g b)) b)
@@ -20,7 +20,7 @@ let Iso/fiber-is-prop
   let α = I.1.1.0 in
   let β = I.1.1.1 in
 
-  let sq : (Fiber _ _ (I.0) b) → [i j] A with end =
+  let sq : (_ : Fiber _ _ (I.0) b) (i, j : dim) → A =
     λ fib i j →
       comp 0 j (g (fib.1 i)) with
       | i=0 ⇒ λ k → β (fib.0) k
@@ -28,7 +28,7 @@ let Iso/fiber-is-prop
       end
   in
   λ fib0 fib1 →
-    let sq2 : [i j] A with end =
+    let sq2 : (i, j : dim) → A =
       λ i j →
         comp 1 j (g b) with
         | i=0 ⇒ λ k → sq fib0 k 1
@@ -55,7 +55,7 @@ let Iso/fiber-is-prop
      >
 
 
-let Iso/Equiv (A : type) (B : type) (I : Iso A B) : Equiv A B =
+let Iso/Equiv (A, B : type) (I : Iso A B) : Equiv A B =
   < I.0
   , λ b →
     < <I.1.0 b, I.1.1.0 b>

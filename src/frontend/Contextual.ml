@@ -115,13 +115,13 @@ let update_env e =
   modify @@ fun st ->
   match e with
   | E (nm, ty, Hole info) ->
-    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm info st.info}
+    {st with env = GlobalEnv.ext_meta st.env nm @@ `P {ty; sys = []}; info = Map.add nm info st.info}
   | E (nm, ty, Guess _) ->
-    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
+    {st with env = GlobalEnv.ext_meta st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
   | E (nm, ty, Defn (`Transparent, t)) ->
     {st with env = GlobalEnv.define st.env nm ty t; info = Map.add nm `Rigid st.info}
   | E (nm, ty, Defn (`Opaque, _)) ->
-    {st with env = GlobalEnv.ext st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
+    {st with env = GlobalEnv.ext_meta st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
   | _ ->
     st
 
@@ -167,7 +167,12 @@ let get_global_env =
   let rec go_params =
     function
     | Emp -> st.env
-    | Snoc (psi, (_, `I)) ->
+    | Snoc (psi, (x, `I)) ->
+      GlobalEnv.ext_dim (go_params psi) x
+    | Snoc (psi, (x, `Tick)) ->
+      GlobalEnv.ext_tick (go_params psi) x
+    | Snoc (psi, (_, `Lock)) ->
+      GlobalEnv.ext_lock @@
       go_params psi
     | Snoc (psi, (x, `P ty)) ->
       GlobalEnv.ext (go_params psi) x @@ `P {ty; sys = []}
@@ -266,18 +271,16 @@ let active = postpone Active
 let block = postpone Blocked
 
 
-let typechecker : (module Typing.S) m =
+let base_cx =
   get_global_env >>= fun env ->
-  let module G = struct let globals = env end in
-  let module T = Typing.M (G) in
-  ret @@ (module T : Typing.S)
+  ret @@ Cx.init env
+
 
 let check ~ty tm =
-  typechecker >>= fun (module T) ->
-  let lcx = T.Cx.emp in
-  let vty = T.Cx.eval lcx ty in
+  base_cx >>= fun lcx ->
+  let vty = Cx.eval lcx ty in
   try
-    T.check lcx vty tm;
+    Typing.check lcx vty tm;
     ret `Ok
   with
   | exn ->
@@ -285,40 +288,38 @@ let check ~ty tm =
 
 let check_eq ~ty tm0 tm1 =
   if tm0 = tm1 then ret `Ok else
-    typechecker >>= fun (module T) ->
-    let lcx = T.Cx.emp in
-    let vty = T.Cx.eval lcx ty in
-    let el0 = T.Cx.eval lcx tm0 in
-    let el1 = T.Cx.eval lcx tm1 in
+    base_cx >>= fun lcx ->
+    let vty = Cx.eval lcx ty in
+    let el0 = Cx.eval lcx tm0 in
+    let el1 = Cx.eval lcx tm1 in
     try
-      T.Cx.check_eq lcx ~ty:vty el0 el1;
+      Cx.check_eq lcx ~ty:vty el0 el1;
       ret `Ok
     with
     | exn ->
       ret @@ `Exn exn
 
 let check_subtype ty0 ty1 =
-  typechecker >>= fun (module T) ->
-  let lcx = T.Cx.emp in
-  let vty0 = T.Cx.eval lcx ty0 in
-  let vty1 = T.Cx.eval lcx ty1 in
+  base_cx >>= fun lcx ->
+  let vty0 = Cx.eval lcx ty0 in
+  let vty1 = Cx.eval lcx ty1 in
   try
-    T.Cx.check_subtype lcx vty0 vty1;
+    Cx.check_subtype lcx vty0 vty1;
     ret `Ok
   with
   | exn ->
     ret @@ `Exn exn
 
 let compare_dim tr0 tr1 =
-  typechecker >>= fun (module T) ->
-  let r0 = T.Cx.eval_dim T.Cx.emp tr0 in
-  let r1 = T.Cx.eval_dim T.Cx.emp tr1 in
+  base_cx >>= fun cx ->
+  let r0 = Cx.eval_dim cx tr0 in
+  let r1 = Cx.eval_dim cx tr1 in
   ret @@ I.compare r0 r1
 
 let check_eq_dim tr0 tr1 =
-  typechecker >>= fun (module T) ->
-  let r0 = T.Cx.eval_dim T.Cx.emp tr0 in
-  let r1 = T.Cx.eval_dim T.Cx.emp tr1 in
+  base_cx >>= fun cx ->
+  let r0 = Cx.eval_dim cx tr0 in
+  let r1 = Cx.eval_dim cx tr1 in
   match I.compare r0 r1 with
   | `Same ->
     ret true
