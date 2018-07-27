@@ -48,6 +48,10 @@ let rec abstract_tm xs tm =
     abstract_tm xs @@ Tm.make @@ Tm.Shut tm
   | Snoc (xs, (_, `R (r, r'))) ->
     abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
+  | Snoc (xs, (_, `ClearLocks)) ->
+    abstract_tm xs tm
+  | Snoc (xs, (_, `KillFromTick _)) ->
+    abstract_tm xs tm
   | _ ->
     failwith "abstract_tm"
 
@@ -65,25 +69,32 @@ let rec abstract_ty (gm : telescope) cod =
     abstract_ty gm @@ Tm.make @@ Tm.Later (Tm.bind x cod)
   | Snoc (gm, (_, `Lock)) ->
     abstract_ty gm @@ Tm.make @@ Tm.BoxModality cod
+  | Snoc (gm, (_, `ClearLocks)) ->
+    abstract_ty gm cod
+  | Snoc (gm, (_, `KillFromTick _)) ->
+    abstract_ty gm cod
   | _ ->
     failwith "abstract_ty"
 
 let telescope_to_spine : telescope -> tm Tm.spine =
-  (* TODO: might be backwards *)
-  Bwd.map @@ fun (x, param) ->
+  Bwd.flat_map @@ fun (x, param) ->
   match param with
   | `I ->
-    Tm.ExtApp [Tm.up @@ Tm.var x]
+    [Tm.ExtApp [Tm.up @@ Tm.var x]]
   | `P _ ->
-    Tm.FunApp (Tm.up @@ Tm.var x)
+    [Tm.FunApp (Tm.up @@ Tm.var x)]
+  | `Tw _ ->
+    [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `R _ ->
-    Tm.CoRForce
+    [Tm.CoRForce]
   | `Tick ->
-    Tm.Prev (Tm.up @@ Tm.var x)
+    [Tm.Prev (Tm.up @@ Tm.var x)]
   | `Lock ->
-    Tm.Open
-  | _ ->
-    failwith "TODO: telescope_to_spine"
+    [Tm.Open]
+  | `ClearLocks ->
+    []
+  | `KillFromTick _ ->
+    []
 
 let push_hole tag gm ty =
   let alpha = Name.fresh () in

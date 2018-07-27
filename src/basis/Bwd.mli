@@ -18,6 +18,7 @@ sig
   val rev : 'a bwd -> 'a bwd
   val length : 'a bwd -> int
   val map : ('a -> 'b) -> 'a bwd -> 'b bwd
+  val flat_map : ('a -> 'b list) -> 'a bwd -> 'b bwd
   val filter : ('a -> bool) -> 'a bwd -> 'a bwd
   val to_list : 'a bwd -> 'a list
   val from_list : 'a list -> 'a bwd

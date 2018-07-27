@@ -57,5 +57,3 @@ let sequence/tl (xs : sequence) : sequence =
 
 let s4/law (A,B : type) (f : □ (A → B)) (x : □ A) : □ B =
   shut f ! (x !)
-
-debug

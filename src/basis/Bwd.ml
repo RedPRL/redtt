@@ -41,6 +41,11 @@ struct
     | Emp -> Emp
     | Snoc (xs, x) -> Snoc (map f xs, f x)
 
+  let rec flat_map f =
+    function
+    | Emp -> Emp
+    | Snoc (xs, x) -> flat_map f xs <>< f x
+
   let rec filter f =
     function
     | Emp -> Emp
