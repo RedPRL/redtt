@@ -66,9 +66,15 @@ let kill_from_tick cx tgen =
   | `Global alpha ->
     {cx with sign = GlobalEnv.kill_from_tick cx.sign alpha}
 
+let evaluator cx : (module Val.S) =
+  let module Sig = struct let globals = cx.sign end in
+  let module V = Val.M (GlobalEnv.M (Sig)) in
+  (module V)
+
 let ext cx ~nm ty sys =
   let n = Quote.Env.len cx.qenv in
-  let var = Domain.Node {con = Domain.Reflect {ty; neu = Domain.Lvl (nm, n); sys}; action = I.idn} in
+  let (module V) = evaluator cx in
+  let var = V.reflect ty (Domain.Lvl (nm, n)) sys in
   {cx with
    env = Domain.Env.push (Domain.Val var) cx.env;
    hyps = {classifier = `Ty ty; locks = 0; killed = false} :: cx.hyps;
@@ -144,10 +150,6 @@ let restrict cx r r' =
   {cx with rel; hyps; env}, phi
 
 
-let evaluator cx : (module Val.S) =
-  let module Sig = struct let globals = cx.sign end in
-  let module V = Val.M (GlobalEnv.M (Sig)) in
-  (module V)
 
 let quoter cx : (module Quote.S) =
   let (module V) = evaluator cx in

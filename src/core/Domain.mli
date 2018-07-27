@@ -119,13 +119,7 @@ and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
 and ext_abs = (value * val_sys) IAbs.abs
 
-(* defunctionalized action *)
-and dfcon =
-  | Con of con
-  | Reflect of {ty : value; neu : neu; sys : val_sys}
-
-and value =
-  | Node of {con : dfcon; action : I.action}
+and value = Node of {con : con; action : I.action}
 
 and env_el = Val of value | Atom of I.t | Tick of tick
 and env = {cells : env_el list; global : I.action}

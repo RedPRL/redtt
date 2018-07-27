@@ -364,13 +364,18 @@ let tac_s1_rec ~tac_mot ~tac_scrut ~tac_bcase ~tac_lcase:(nm_lcase, tac_lcase) =
         let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
         M.ret fmot
     end >>= fun mot ->
-    let mot_base = mot (Tm.make Tm.Base) in
+
+    let mot_base = mot @@ Tm.make Tm.Base in
+
     tac_bcase mot_base >>= fun bcase ->
-    let mot_loop = mot (Tm.make (Tm.Loop (Tm.up (Tm.var x_lcase)))) in
+
+    let mot_loop = mot @@ Tm.make @@ Tm.Loop (Tm.up (Tm.var x_lcase)) in
+
     M.in_scope x_lcase `I begin
       tac_lcase mot_loop >>= fun tm ->
       M.ret @@ Tm.bind x_lcase tm
     end >>= fun lcase ->
+
     let hd = Tm.Down {ty = s1; tm = scrut} in
     let bmot =
       let x = Name.fresh () in

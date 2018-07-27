@@ -103,10 +103,7 @@ let define gm alpha opacity ~ty tm =
   let tm' = abstract_tm gm tm in
   check ~ty:ty' tm' >>= function
   | `Exn exn ->
-    dump_state Format.err_formatter "Type error" `All >>= fun _ ->
-    begin
-      raise exn
-    end
+    raise exn
   | `Ok ->
     begin
       if opacity = `Transparent then push_update alpha else ret ()

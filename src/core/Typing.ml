@@ -209,7 +209,7 @@ let rec check cx ty tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-  | D.Univ _, (T.Bool | T.Nat | T.Int) ->
+  | D.Univ _, (T.Bool | T.Nat | T.Int | T.S1) ->
     ()
 
 
@@ -292,6 +292,12 @@ let rec check cx ty tm =
 
   | D.Bool, (T.Tt | T.Ff) ->
     ()
+
+  | D.S1, T.Base ->
+    ()
+
+  | D.S1, T.Loop x ->
+    check_dim cx x
 
   | D.Nat, T.Zero ->
     ()
@@ -632,29 +638,33 @@ and infer_spine cx hd =
     | T.S1Rec info ->
       let T.B (nm, mot) = info.mot in
       let s1 = D.make D.S1 in
-      let cxx, _= Cx.ext_ty cx ~nm s1 in
-      check_ty cxx mot;
+
+      begin
+        let cxx, _= Cx.ext_ty cx ~nm s1 in
+        check_ty cxx mot
+      end;
+
+      let mot_clo = Cx.make_closure cx info.mot in
 
       let ih = infer_spine cx hd sp in
 
       Cx.check_eq_ty cx ih.ty s1;
 
-      let cx_base = Cx.def cx ~nm ~ty:s1 ~el:(D.make D.Base) in
-      let mot_base = Cx.eval cx_base mot in
+      let mot_base = V.inst_clo mot_clo @@ D.make D.Base in
       let val_base = check_eval cx mot_base info.bcase in
 
       let T.B (nm_loop, lcase) = info.lcase in
       let cxx, x = Cx.ext_dim cx ~nm:nm_loop in
-      let cxx_loop = Cx.def cxx ~nm ~ty:s1 ~el:(D.make @@ D.Loop x) in
-      let mot_loop = Cx.eval cxx_loop mot in
-      let val_loopx = check_eval cx mot_loop lcase in
+
+      let mot_loop = V.inst_clo mot_clo @@ D.make (D.Loop x) in
+
+      let val_loopx = check_eval cxx mot_loop lcase in
       let val_loop0 = D.Value.act (I.subst `Dim0 x) val_loopx in
       let val_loop1 = D.Value.act (I.subst `Dim1 x) val_loopx in
       Cx.check_eq cx ~ty:mot_base val_loop0 val_base;
       Cx.check_eq cx ~ty:mot_base val_loop1 val_base;
 
-      let cx_scrut = Cx.def cx ~nm ~ty:s1 ~el:ih.el in
-      D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx_scrut mot}
+      D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
 
     | T.Cap info ->
       let fcom_ty =

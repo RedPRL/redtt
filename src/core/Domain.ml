@@ -120,12 +120,7 @@ and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
 
-and dfcon =
-  | Con of con
-  | Reflect of {ty : value; neu : neu; sys : val_sys}
-
-and value =
-  | Node of {con : dfcon; action : I.action}
+and value = Node of {con : con; action : I.action}
 
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
   nm
@@ -242,17 +237,10 @@ and pp_con fmt : con -> unit =
 and pp_value fmt value =
   let Node node = value in
   if node.action = I.idn then
-    pp_dfcon fmt node.con
+    pp_con fmt node.con
   else
     Format.fprintf fmt "@[<hv1>@[<hv1>(%a)@]<%a>@]"
-      pp_dfcon node.con I.pp_action node.action
-
-and pp_dfcon fmt =
-  function
-  | Con con ->
-    pp_con fmt con
-  | Reflect _ ->
-    Format.fprintf fmt "<reflect>"
+      pp_con node.con I.pp_action node.action
 
 
 and pp_abs fmt =
@@ -587,7 +575,7 @@ module ExtAbs : IAbs.S with type el = value * val_sys =
 
 let rec make : con -> value =
   fun con ->
-    Node {con = Con con; action = I.idn}
+    Node {con; action = I.idn}
 
 and make_later ty =
   let tclo = TickCloConst ty in
