@@ -651,9 +651,9 @@ struct
       let con =
         match info.action = I.idn with
         | true ->
-          run_dfcon info.con
+          info.con
         | false ->
-          let node' = act_can info.action @@ run_dfcon info.con in
+          let node' = act_can info.action info.con in
           let con = unleash node' in
           con
       in
@@ -674,13 +674,6 @@ struct
         end
       | _ ->
         con
-
-  and run_dfcon =
-    function
-    | Con con ->
-      con
-    | Reflect info ->
-      unleash @@ reflect info.ty info.neu info.sys
 
   and make_cons (a, b) = make @@ Cons (a, b)
 
