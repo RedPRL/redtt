@@ -26,8 +26,10 @@ let winding (l : Path S1 base base) : int =
 
 let two : int = pos (suc (suc zero))
 
-let winding-loop-testing : Path int two (winding (trans S1 (lam i -> loop i) (lam i -> loop i))) =
+let winding-loop-testing0 : Path int two (winding (loopn two)) =
   lam _ -> two
 
-let winding-loop-testing : Path int two (winding (loopn two)) =
-  lam _ -> two
+let five : int = pos (suc (suc (suc (suc zero))))
+
+let winding-loop-testing1 : Path int five (winding (loopn five)) =
+  lam _ -> five
