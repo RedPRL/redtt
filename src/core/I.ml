@@ -21,7 +21,7 @@ let bind m k =
 type t = atom f
 
 type action =
-  | Subst of t *atom
+  | Subst of t * atom
   | Swap of atom * atom
   | Idn
   | Cmp of action * action
@@ -29,7 +29,12 @@ type action =
 let idn = Idn
 let swap a b = Swap (a, b)
 let subst r a = Subst (r, a)
-let cmp phi1 phi0 = Cmp (phi1, phi0)
+
+let cmp phi1 phi0 =
+  match phi1, phi0 with
+  | Idn, _ -> phi0
+  | _, Idn -> phi1
+  | _ -> Cmp (phi1, phi0)
 
 
 exception Inconsistent
