@@ -21,6 +21,8 @@ type error =
   | RigidCoeUnexpectedArgument of abs
   | RigidHComUnexpectedArgument of value
   | RigidGHComUnexpectedArgument of value
+  | UnexpectedFunction of value
+  | RecursorUnexpectedArgument of string * value
   | RigidVProjUnexpectedArgument of value
   | LblCallUnexpectedArgument of value
   | UnexpectedDimensionTerm of Tm.tm
@@ -53,23 +55,31 @@ struct
         pp_abs abs
     | RigidHComUnexpectedArgument v ->
       Format.fprintf fmt
-        "Unexpected type argument in rigid homogeneous copmosition: %a."
+        "Unexpected type argument in rigid homogeneous copmosition:@ %a."
         pp_value v
     | RigidGHComUnexpectedArgument v ->
       Format.fprintf fmt
-        "Unexpected type argument in rigid generalized homogeneous copmosition: %a."
+        "Unexpected type argument in rigid generalized homogeneous copmosition:@ %a."
         pp_value v
+    | UnexpectedFunction v ->
+      Format.fprintf fmt
+        "Unexpected function:@ %a."
+        pp_value v
+    | RecursorUnexpectedArgument (ty, v) ->
+      Format.fprintf fmt
+        "Unexpected argument to the recursor of %s:@ %a."
+        ty pp_value v
     | RigidVProjUnexpectedArgument v ->
       Format.fprintf fmt
-        "Unexpected argument to rigid vproj: %a"
+        "Unexpected argument to rigid vproj:@ %a."
         pp_value v
     | LblCallUnexpectedArgument v ->
       Format.fprintf fmt
-        "Unexpected argument to labeled type projection: %a"
+        "Unexpected argument to labeled type projection:@ %a."
         pp_value v
     | UnexpectedEnvCell _ ->
       Format.fprintf fmt
-        "Did not find what was expected in the environment"
+        "Did not find what was expected in the environment."
     | ExpectedDimensionTerm t ->
       Format.fprintf fmt
         "Tried to evaluate non-dimension term %a as dimension."
@@ -1118,7 +1128,7 @@ struct
 
   and rigid_hcom dir ty cap sys : value =
     match unleash ty with
-    | (Pi _ | Sg _ | Ext _ | Up _) ->
+    | Pi _ | Sg _ | Ext _ | Up _ ->
       make @@ HCom {dir; ty; cap; sys}
 
     | Bool | Nat | Int ->
@@ -1226,7 +1236,7 @@ struct
     (* Who knows whether we can delay the expansion
      * in `Up _`? Please move `Up _` to the second
      * list if this does not work out. *)
-    | (Pi _ | Sg _ | Up _) ->
+    | Pi _ | Sg _ | Up _ ->
       make @@ GHCom {dir; ty; cap; sys}
 
     | Bool | Nat | Int ->
@@ -1234,7 +1244,7 @@ struct
 
     (* `Ext _`: the expansion will stop after a valid
      * correction system, so it is not so bad. *)
-    | (Ext _ | S1 | Univ _ | FCom _ | V _) ->
+    | Ext _ | S1 | Univ _ | FCom _ | V _ ->
       let aux sys =
         match sys with
         | [] -> cap
@@ -1883,7 +1893,7 @@ struct
       rigid_ghcom info.dir ty cap sys
 
     | _ ->
-      failwith "apply"
+      raise @@ E (UnexpectedFunction vfun)
 
   and ext_apply vext (ss : I.t list) =
     match unleash vext with
@@ -2139,7 +2149,7 @@ struct
       let nat_rec_sys = List.map nat_rec_face up.sys in
       make @@ Up {ty = mot'; neu; sys = nat_rec_sys}
     | _ ->
-      failwith "nat_rec"
+      raise @@ E (RecursorUnexpectedArgument ("natural numbers", scrut))
 
   and int_rec mot scrut pcase ncase =
     match unleash scrut with
@@ -2156,7 +2166,7 @@ struct
       let int_rec_sys = List.map int_rec_face up.sys in
       make @@ Up {ty = mot'; neu; sys = int_rec_sys}
     | _ ->
-      failwith "int_rec"
+      raise @@ E (RecursorUnexpectedArgument ("integers", scrut))
 
   and s1_rec mot scrut bcase lcase =
     match unleash scrut with
