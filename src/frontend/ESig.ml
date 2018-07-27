@@ -30,7 +30,7 @@ and eterm =
   | Int | Pos of eterm | NegSuc of eterm
   | IntRec of eterm option * eterm * (string * eterm) * (string * eterm)
 
-  | S1Rec of eterm * eterm * (string * eterm)
+  | S1Rec of eterm option * eterm * eterm * (string * eterm)
   | S1 | Base | Loop of eterm
 
   | Pi of etele * eterm

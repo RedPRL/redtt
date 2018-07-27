@@ -21,6 +21,7 @@ type error =
   | RigidCoeUnexpectedArgument of abs
   | RigidHComUnexpectedArgument of value
   | RigidGHComUnexpectedArgument of value
+  | RigidVProjUnexpectedArgument of value
   | LblCallUnexpectedArgument of value
   | UnexpectedDimensionTerm of Tm.tm
   | UnexpectedTickTerm of Tm.tm
@@ -57,6 +58,10 @@ struct
     | RigidGHComUnexpectedArgument v ->
       Format.fprintf fmt
         "Unexpected type argument in rigid generalized homogeneous copmosition: %a."
+        pp_value v
+    | RigidVProjUnexpectedArgument v ->
+      Format.fprintf fmt
+        "Unexpected argument to rigid vproj: %a"
         pp_value v
     | LblCallUnexpectedArgument v ->
       Format.fprintf fmt
@@ -821,7 +826,7 @@ struct
     | (Pi _ | Sg _ | Ext _ | Up _ | Later _ | BoxModality _) ->
       make @@ Coe {dir; abs; el}
 
-    | (Bool | Univ _) ->
+    | (Bool | Nat | Int | S1 | Univ _) ->
       el
 
     | FCom fcom ->
@@ -1223,9 +1228,12 @@ struct
     | (Pi _ | Sg _ | Up _) ->
       make @@ GHCom {dir; ty; cap; sys}
 
+    | Bool | Nat | Int ->
+      cap
+
     (* `Ext _`: the expansion will stop after a valid
      * correction system, so it is not so bad. *)
-    | (Ext _ | Bool | Univ _ | FCom _ | V _) ->
+    | (Ext _ | S1 | Univ _ | FCom _ | V _) ->
       let aux sys =
         match sys with
         | [] -> cap
@@ -2081,7 +2089,8 @@ struct
       let vproj_sys = List.map vproj_face up.sys in
       make @@ Up {ty = ty1; neu; sys = vproj_sys}
     | _ ->
-      failwith "rigid_vproj"
+      let err = RigidVProjUnexpectedArgument el in
+      raise @@ E err
 
   and if_ mot scrut tcase fcase =
     match unleash scrut with

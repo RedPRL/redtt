@@ -60,9 +60,8 @@ let symm/unit
 
 let trans/filler
   (A : type)
-  (x : A)
   (p : Line A)
-  (q : Path A (p 1) x)
+  (q : [i] A with i=0 ⇒ p 1 end)
   : Line (Line A)
   =
   λ j i →
@@ -73,34 +72,33 @@ let trans/filler
 
 let trans
   (A : type)
-  (x : A)
   (p : Line A)
-  (q : Path _ (p 1) x)
+  (q : [i] A with i=0 ⇒ p 1 end)
   : Path _ (p 0) (q 1)
   =
   λ i →
-    trans/filler _ _ p q 1 i
+    trans/filler _ p q 1 i
 
 let trans/unit/r
   (A : type)
   (p : Line A)
-  : Path (Path _ (p 0) (p 1)) (λ i → p i) (trans _ (p 1) p (λ _ → p 1))
+  : Path (Path _ (p 0) (p 1)) (λ i → p i) (trans _ p (λ _ → p 1))
   =
   λ i j →
-    trans/filler A (p 1) p (λ _ → p 1) i j
+    trans/filler A p (λ _ → p 1) i j
 
 ; This proof gets simpler when dead tubes are deleted!
 let trans/sym/r
   (A : type)
   (p : Line A)
-  : Path (Path _ (p 0) (p 0)) (λ _ → p 0) (trans _ _ p (symm _ p))
+  : Path (Path _ (p 0) (p 0)) (λ _ → p 0) (trans _ p (symm _ p))
   =
   λ k i →
     comp 0 1 (p i) with
     | i=0 ⇒ λ _ → p 0
     | i=1 ⇒ λ j → symm A p j
     | k=0 ⇒ λ j → symm/filler A p i j
-    ;| k=1 ⇒ λ j → trans/filler A (p 0) p (symm A p) j i
+    ;| k=1 ⇒ λ j → trans/filler A p (symm A p) j i
     end
 
 ; Define LineD and PathD?

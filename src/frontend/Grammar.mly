@@ -144,7 +144,7 @@ eterm:
     { E.Loop r }
 
   | S1_REC; e0 = eterm; WITH; option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm; END
-    { E.S1Rec (e0, eb, (x, el)) }
+    { E.S1Rec (None, e0, eb, (x, el)) }
 
   | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm= atomic_eterm; IN; fam = eterm
     { E.Coe {r = r0; r' = r1; fam; tm} }
@@ -290,6 +290,10 @@ tm:
   | BOOL
     { fun _env ->
       make_node $startpos $endpos Tm.Bool }
+
+  | INT
+    { fun _env ->
+      make_node $startpos $endpos Tm.Int }
 
   | TT
     { fun _env ->

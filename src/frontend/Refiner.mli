@@ -18,6 +18,7 @@ val tac_let : string -> inf_tac -> chk_tac -> chk_tac
 val tac_if : tac_mot:chk_tac option -> tac_scrut:chk_tac -> tac_tcase:chk_tac -> tac_fcase:chk_tac -> chk_tac
 val tac_nat_rec : tac_mot:chk_tac option -> tac_scrut:chk_tac -> tac_zcase:chk_tac -> tac_scase:(string * string option * chk_tac) -> chk_tac
 val tac_int_rec : tac_mot:chk_tac option -> tac_scrut:chk_tac -> tac_pcase:(string * chk_tac) -> tac_ncase:(string * chk_tac) -> chk_tac
+val tac_s1_rec : tac_mot:chk_tac option -> tac_scrut:chk_tac -> tac_bcase:chk_tac -> tac_lcase:(string * chk_tac) -> chk_tac
 
 
 (** A tactical which adds support for restriction *)
