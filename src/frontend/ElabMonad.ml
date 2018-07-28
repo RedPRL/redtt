@@ -5,7 +5,11 @@ module C = Contextual
 module U = Unify
 
 type diagnostic =
-  | UserHole of {name : string option; tele : U.telescope; ty : Tm.tm; tm : Tm.tm}
+  | UserHole of
+      {name : string option;
+       tele : U.telescope;
+       ty : Tm.tm;
+       tm : Tm.tm}
 
 type 'a m = ('a * diagnostic bwd) C.m
 
@@ -34,9 +38,12 @@ let normalize_param p =
     Cx.quote_ty cx vty
   in
   match p with
-  | `P ty -> C.ret @@ `P (normalize_ty ty)
-  | `Tw (ty0, ty1) -> C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
-  | (`I | `Tick | `Lock | `ClearLocks | `KillFromTick _) as p -> C.ret p
+  | `P ty ->
+    C.ret @@ `P (normalize_ty ty)
+  | `Tw (ty0, ty1) ->
+    C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
+  | (`I | `Tick | `Lock | `ClearLocks | `KillFromTick _) as p ->
+    C.ret p
   | `R (r0, r1) ->
     C.ret @@ `R (r0, r1)
 

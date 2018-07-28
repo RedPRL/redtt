@@ -98,7 +98,7 @@ let telescope_to_spine : telescope -> tm Tm.spine =
 
 let push_hole tag gm ty =
   let alpha = Name.fresh () in
-  pushl (E (alpha, abstract_ty gm ty, Hole tag)) >>
+  pushl @@ E (alpha, abstract_ty gm ty, Hole tag) >>
   let hd = Tm.Meta {name = alpha; ushift = 0} in
   let sp = telescope_to_spine gm in
   ret (hd, sp)
@@ -217,7 +217,7 @@ let try_invert q ty =
 let rec flex_term ~deps q =
   match Tm.unleash q.tm0 with
   | Tm.Up (Meta {name = alpha; ushift = 0}, _) ->
-    Bwd.map snd <@> ask >>= fun gm ->
+    ask <<@> Bwd.map snd >>= fun gm ->
     begin
       popl >>= function
       | E (beta, _, Hole `Rigid) as e when alpha = beta ->
@@ -263,16 +263,16 @@ let rec flex_term ~deps q =
 let rec flex_flex_diff ~deps q =
   match Tm.unleash q.tm0, Tm.unleash q.tm1 with
   | Tm.Up (Tm.Meta {name = alpha0; ushift = 0}, _), Tm.Up (Tm.Meta {name = alpha1; ushift = 0}, _) ->
-    Bwd.map snd <@> ask >>= fun gm ->
+    ask <<@> Bwd.map snd >>= fun gm ->
     begin
       popl >>= function
       | E (gamma, _, Hole `Rigid) as e when (alpha0 = gamma || alpha1 = gamma) ->
-        pushls (e :: deps) >>
-        block (Unify q)
+        pushls @@ e :: deps >>
+        block @@ Unify q
 
       | E (gamma, _, Guess _) as e when (alpha0 = gamma || alpha1 = gamma) ->
-        pushls (e :: deps) >>
-        block (Unify q)
+        pushls @@ e :: deps >>
+        block @@ Unify q
 
       | E (gamma, _, Hole `Flex) as e
         when
@@ -280,8 +280,8 @@ let rec flex_flex_diff ~deps q =
           && Occurs.Set.mem gamma @@ Entries.free `Metas deps
         ->
         (* Format.eprintf "flex_flex_diff / popl / 1: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
-        pushls (e :: deps) >>
-        block (Unify q)
+        pushls @@ e :: deps >>
+        block @@ Unify q
 
       | (E (gamma, ty, Hole _) | E (gamma, ty, Guess _)) as e when gamma = alpha0 ->
         (* Format.eprintf "flex_flex_diff / popl / 2: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
@@ -373,8 +373,7 @@ let inst_ty_bnd bnd (arg_ty, arg) =
   let Tm.B (nm, tm) = bnd in
   let varg = Cx.eval cx arg in
   let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
-  let el = Cx.eval lcx tm in
-  ret @@ Cx.quote_ty cx el
+  ret @@ Cx.quote_ty cx @@ Cx.eval lcx tm
 
 let eval tm =
   base_cx >>= fun cx ->
@@ -382,14 +381,12 @@ let eval tm =
 
 
 let inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
-  base_cx >>= fun cx ->
-  let (module V) = Cx.evaluator cx in
+  evaluator >>= fun (cx, (module V)) ->
   let Tm.B (nm, tm) = tm_bnd in
   let varg = Cx.eval cx arg in
   let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
-  let el = Cx.eval lcx tm in
   let vty = V.inst_clo ty_clo varg in
-  ret @@ Cx.quote cx ~ty:vty el
+  ret @@ Cx.quote cx ~ty:vty @@ Cx.eval lcx tm
 
 let plug (ty, tm) frame =
   base_cx >>= fun cx ->
@@ -405,13 +402,17 @@ let plug (ty, tm) frame =
     let vargs = List.map (Cx.eval_dim cx) args in
     let ty, _ = V.unleash_ext_with ty vargs in
     let vlam = Cx.eval cx tm in
-    let vapp = V.ext_apply vlam vargs in
-    ret @@ Cx.quote cx ~ty vapp
-  | Tm.Cons (t0, _), Tm.Car -> ret t0
-  | Tm.Cons (_, t1), Tm.Cdr -> ret t1
-  | Tm.LblRet t, Tm.LblCall -> ret t
-  | Tm.Tt, Tm.If info -> ret info.tcase
-  | Tm.Ff, Tm.If info -> ret info.fcase
+    ret @@ Cx.quote cx ~ty @@ V.ext_apply vlam vargs
+  | Tm.Cons (t0, _), Tm.Car ->
+    ret t0
+  | Tm.Cons (_, t1), Tm.Cdr ->
+    ret t1
+  | Tm.LblRet t, Tm.LblCall ->
+    ret t
+  | Tm.Tt, Tm.If info ->
+    ret info.tcase
+  | Tm.Ff, Tm.If info ->
+    ret info.fcase
   | _ -> failwith "TODO: plug"
 
 (* TODO: this sorry attempt results in things getting repeatedly evaluated *)
@@ -899,7 +900,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | (`I | `Tick | `Lock | `ClearLocks | `KillFromTick _) as p ->
+        | `I | `Tick | `Lock | `ClearLocks | `KillFromTick _ as p ->
           in_scope x p @@
           solver probx
 
