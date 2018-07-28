@@ -28,6 +28,9 @@ examples:
 	${DUNE} exec -- redtt load-file invariance.red
 	${DUNE} exec -- redtt load-file univalence.red
 
+install:
+	${OPAM} reinstall redtt
+
 test:
 	@${DUNE} build @runtest
 
