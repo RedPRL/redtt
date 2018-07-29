@@ -599,14 +599,43 @@ struct
       M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr] >>= fun (_, fam_r) ->
       M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr'] >>= fun (_, fam_r') ->
       elab_chk env fam_r info.cap >>= fun cap ->
-      let varx = Tm.up @@ Tm.var x in
       M.in_scope x `I begin
+        let varx = Tm.up @@ Tm.var x in
         M.lift @@ (univ_fam, fam) %% Tm.ExtApp [varx]
       end >>= fun (_, fam_x) ->
       let tybnd = Tm.bind x fam_x in
       elab_com_sys env tr tybnd cap info.sys <<@> fun sys ->
         let com = Tm.Com {r = tr; r' = tr'; ty = tybnd; cap; sys} in
         fam_r', (com, Emp)
+
+    | E.DFixLine info ->
+      elab_chk env univ info.ty >>= fun ty ->
+      elab_dim env info.r >>= fun r ->
+      let wk_ty = Tm.subst (Tm.shift 1) ty in
+      let ltr_ty = Tm.make @@ Tm.Later (Tm.B (None, wk_ty)) in
+      let x = Name.named @@ Some info.name in
+      M.in_scope x (`P ltr_ty) begin
+        elab_chk env ty info.bdy
+        <<@> Tm.bind x
+        <<@> fun bdy ->
+          ltr_ty, (Tm.DFix {r; ty; bdy}, Emp)
+      end
+
+    | E.FixLine info ->
+      elab_chk env univ info.ty >>= fun ty ->
+      elab_dim env info.r >>= fun r ->
+      let wk_ty = Tm.subst (Tm.shift 1) ty in
+      let ltr_ty = Tm.make @@ Tm.Later (Tm.B (None, wk_ty)) in
+      let x = Name.named @@ Some info.name in
+      M.in_scope x (`P ltr_ty) begin
+        elab_chk env ty info.bdy
+        <<@> Tm.bind x
+        <<@> fun bdy ->
+          let dfix = Tm.DFix {r; ty; bdy}, Emp in
+          let Tm.B (_, bdy') = bdy in
+          let fix = Tm.subst (Tm.dot dfix @@ Tm.shift 0) bdy' in
+          ty, (Tm.Down {tm = fix; ty}, Emp)
+      end
 
     | _ ->
       failwith "Can't infer"

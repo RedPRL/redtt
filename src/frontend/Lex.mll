@@ -63,6 +63,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("next", NEXT);
       ("prev", PREV);
       ("dfix", DFIX);
+      ("fix", FIX);
       ("open", OPEN);
       ("shut", SHUT);
       ("call", CALL);

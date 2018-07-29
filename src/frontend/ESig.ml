@@ -46,6 +46,8 @@ and eterm =
   | Shut of eterm
 
   | TickConst
+  | DFixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
+  | FixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
 
   | Cut of eterm * frame bwd
 
