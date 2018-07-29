@@ -55,5 +55,5 @@ let sequence/tl (xs : sequence) : sequence =
     stream/tl (xs !) ∙
 
 
-let s4/law (A,B : type) (f : □ (A → B)) (x : □ A) : □ B =
+let law/k (A,B : type) (f : □ (A → B)) (x : □ A) : □ B =
   shut f ! (x !)
