@@ -1,36 +1,35 @@
 import path
 
-let Fix (A : type) (f : (✓ → A) → A) : Line A =
-  λ i →
-    f `(dfix i A [x] (f x))
-
 ; the core constructor (prev α M) is written using application notation in
 ; the surface language
 let stream/F (A : ✓ → type) : type =
   bool × (α : ✓) → A α
 
-let stream/L : Line^1 _ =
-  Fix^1 _ stream/F
+let stream/L (i : dim) : type =
+  fix[i] A : type in stream/F A
 
 let stream : _ = stream/L 0
+
+let later (A : ✓ → type) : type =
+  (α : ✓) → A α
 
 let stream/cons (x : bool) (xs : ✓ → stream) : stream =
   < x,
     coe 1 0 xs in λ i →
-      (α : ✓) →
-        `(dfix i (U 0) [A] (stream/F A)) α
+      later (dfix[i] A : type in stream/F A)
   >
-
 
 let stream/hd (xs : stream) : _ =
   xs.0
 
-let stream/tl (xs : stream) (α : ✓) : stream =
-  coe 0 1 (xs.1 α) in λ i →
-    `(dfix i (U 0) [A] (stream/F A)) α
+let stream/tl (xs : stream) : ✓ → stream =
+  coe 0 1 (xs.1) in λ i →
+    later (dfix[i] A : type in stream/F A)
 
 let tts : _ =
-  Fix _ (stream/cons tt) 0
+  fix xs : stream in
+    stream/cons tt xs
+
 
 ; To eliminate a box, write 'b !'; this elaborates to the core term `(open b).
 let bool/constant (x : bool) : (b : □ bool) × Path _ x (b !) =

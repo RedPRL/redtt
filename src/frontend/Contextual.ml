@@ -104,8 +104,8 @@ let get _ cx = cx, cx
 
 let modify f _ cx = f cx, ()
 
-let getl = (fun x -> x.lcx) <@> get
-let getr = (fun x -> x.rcx) <@> get
+let getl = get <<@> fun x -> x.lcx
+let getr = get <<@> fun x -> x.rcx
 let modifyl f = modify @@ fun st -> {st with lcx = f st.lcx}
 let modifyr f = modify @@ fun st -> {st with rcx = f st.rcx}
 let setl l = modifyl @@ fun _ -> l

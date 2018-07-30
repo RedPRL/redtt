@@ -11,7 +11,10 @@ sig
 
   val (>>=) : 'a m -> ('a -> 'b m) -> 'b m
   val (>>) : 'a m -> 'b m -> 'b m
-  val (<@>) : ('a -> 'b) -> 'a m -> 'b m
+  val (<@>>) : ('a -> 'b) -> 'a m -> 'b m
+  val (<<@>) : 'a m -> ('a -> 'b) -> 'b m
+  val (<*>) : ('a -> 'b) m -> 'a m -> 'b m
+  val (<&>) : 'a m -> 'b m -> ('a * 'b) m
   val (<||) : bool m -> unit m -> unit m
 end
 

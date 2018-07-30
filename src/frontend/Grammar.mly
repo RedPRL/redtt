@@ -17,7 +17,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH END
 %token DIM TICK LOCK
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV DFIX BOX_MODALITY OPEN SHUT
+%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
@@ -149,6 +149,18 @@ eterm:
 
   | S1_REC; e0 = eterm; WITH; option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm; END
     { E.S1Rec (None, e0, eb, (x, el)) }
+
+  | DFIX; LSQ; r = eterm; RSQ; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
+    { E.DFixLine {r; name; ty; bdy} }
+
+  | DFIX; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
+    { E.DFixLine {r = E.Num 0; name; ty; bdy} }
+
+  | FIX; LSQ; r = eterm; RSQ; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
+    { E.FixLine {r; name; ty; bdy} }
+
+  | FIX; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
+    { E.FixLine {r = E.Num 0; name; ty; bdy} }
 
   | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm= atomic_eterm; IN; fam = eterm
     { E.Coe {r = r0; r' = r1; fam; tm} }
