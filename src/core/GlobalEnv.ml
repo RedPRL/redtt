@@ -15,6 +15,7 @@ type t =
    table : (entry param * lock_info) T.t;
    lock : int -> bool;
    killed : int -> bool;
+   under_tick : int -> bool;
    len : int}
 
 
@@ -23,6 +24,7 @@ let emp () =
    rel = Restriction.emp ();
    lock = (fun _ -> false);
    killed = (fun _ -> false);
+   under_tick = (fun _ -> false);
    len = 0}
 
 let ext_ (sg : t) ~constant nm param : t =
@@ -47,7 +49,10 @@ let ext_meta (sg : t) =
   ext_ sg ~constant:true
 
 let ext_tick (sg : t) nm : t =
-  ext_ sg ~constant:false nm `Tick
+  let sg' = ext_ sg ~constant:false nm `Tick in
+  { sg' with
+    under_tick = fun i -> if i <= sg.len then true else sg'.under_tick i
+  }
 
 let ext_dim (sg : t) nm : t =
   ext_ sg ~constant:false nm `I
@@ -57,10 +62,9 @@ let ext_lock (sg : t) : t =
   {sg with
    lock = fun i -> if i < sg.len then true else sg.lock i}
 
-(* TODO: need to not go past a tick!!!! *)
 let clear_locks (sg : t) : t =
   {sg with
-   lock = (fun _ -> false)}
+   lock = (fun i -> if sg.under_tick i then sg.lock i else false)}
 
 
 let rec index_of pred xs =
