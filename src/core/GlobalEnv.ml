@@ -13,7 +13,7 @@ type lock_info = {constant : bool; birth : int}
 type t =
   {rel : Restriction.t;
    table : (entry param * lock_info) T.t;
-   lock : int -> int;
+   lock : int -> bool;
    killed : int -> bool;
    len : int}
 
@@ -21,7 +21,7 @@ type t =
 let emp () =
   {table = T.empty;
    rel = Restriction.emp ();
-   lock = (fun _ -> 0);
+   lock = (fun _ -> false);
    killed = (fun _ -> false);
    len = 0}
 
@@ -55,11 +55,12 @@ let ext_dim (sg : t) nm : t =
 
 let ext_lock (sg : t) : t =
   {sg with
-   lock = fun i -> if i < sg.len then sg.lock i + 1 else sg.lock i}
+   lock = fun i -> if i < sg.len then true else sg.lock i}
 
+(* TODO: need to not go past a tick!!!! *)
 let clear_locks (sg : t) : t =
   {sg with
-   lock = (fun _ -> 0)}
+   lock = (fun _ -> false)}
 
 
 let rec index_of pred xs =
@@ -77,9 +78,9 @@ let kill_from_tick (sg : t) nm : t =
 
 let lookup_entry sg nm tw =
   let prm, linfo = T.find nm sg.table in
-  let locks = sg.lock linfo.birth in
+  let locked = sg.lock linfo.birth in
   let killed = sg.killed linfo.birth in
-  if not linfo.constant && (locks > 0 || killed) then
+  if not linfo.constant && (locked || killed) then
     failwith "GlobalEnv.lookup_entry: not accessible (modal!!)"
   else
     match prm, tw with
