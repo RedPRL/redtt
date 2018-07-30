@@ -41,11 +41,19 @@ let bool/constant (x : bool) : (b : □ bool) × Path _ x (b !) =
 
 let sequence : type = □ stream
 
+
+let Next (A : type) (x : A) ✓ : A =
+  x
+
 let sequence/cons (x : bool) (xs : sequence) : sequence =
   shut
     stream/cons
       (bool/constant x .0 !)
-      (λ _ → xs !)
+      (Next stream (xs !))
+      ; this is suspicious: we use this Next in order to essentially
+      ; weaken away the tick that we will not use, in order to get the right number
+      ; of locks deleted. But this is proof-theoretically very strange.
+
 
 let sequence/hd (xs : sequence) : bool =
   stream/hd (xs !)
