@@ -64,6 +64,13 @@ let sequence/cons (x : bool) (xs : sequence) : sequence =
 ; would *delete* the tick β from the context (thinking backward), which is
 ; a tick weakening. the example would typecheck because there is no need for
 ; β in xs.
+;
+; For reference, the core-language term would look like the following:
+;
+;    (shut [α]
+;     (stream/cons
+;      (open α (car (bool/constant x)))
+;      (next [β] (open α xs))))
 
 
 
