@@ -40,11 +40,38 @@ let bool/constant (x : bool) : (b : □ bool) × Path _ x (b !) =
 
 let sequence : type = □ stream
 
+
+let Next (A : type) (x : A) ✓ : A =
+  x
+
 let sequence/cons (x : bool) (xs : sequence) : sequence =
   shut
     stream/cons
       (bool/constant x .0 !)
-      (λ _ → xs !)
+      (Next stream (xs !))
+      ; this is suspicious: we use this Next in order to essentially
+      ; weaken away the tick that we will not use, in order to get the right number
+      ; of locks deleted. But this is proof-theoretically very strange.
+
+; The proper solution to the problem above is to bind lock names in the syntax and in the context,
+; analogous to tick names. This will make the calculus more baroque, but it will enable a
+; deterministic version of the 'open' rule. The source term for the above would then be:
+;
+;     λ α → stream/cons (bool/constant x .0 α) (λ β → xs α)
+;
+; Above, α is a lock name and β is a tick name; opening with the lock α
+; would *delete* the tick β from the context (thinking backward), which is
+; a tick weakening. the example would typecheck because there is no need for
+; β in xs.
+;
+; For reference, the core-language term would look like the following:
+;
+;    (shut [α]
+;     (stream/cons
+;      (open α (car (bool/constant x)))
+;      (next [β] (open α xs))))
+
+
 
 let sequence/hd (xs : sequence) : bool =
   stream/hd (xs !)

@@ -6,7 +6,7 @@ type value = Domain.value
 type hyp =
   {classifier : [`Ty of value | `I | `Tick];
    killed : bool; (* for modal calculus *)
-   locks : int (* for modal calculus *)
+   locked : bool (* for modal calculus *)
   }
 
 let check_eq_clock = ref 0.
@@ -35,21 +35,28 @@ let clear_locals cx =
    ppenv = Pretty.Env.emp;
    env = Domain.Env.clear_locals cx.env;
    all_locks = 0}
-
-let hyp_map_lock f hyp =
-  {hyp with locks = f hyp.locks}
-
-
 let ext_lock cx =
   {cx with
    sign = GlobalEnv.ext_lock cx.sign;
-   hyps = List.map (hyp_map_lock (fun n -> n + 1)) cx.hyps;
+   hyps = List.map (fun hyp -> {hyp with locked = true}) cx.hyps;
    all_locks = cx.all_locks + 1}
+
+let hyps_clear_locks hyps =
+  let rec go hyps =
+    match hyps with
+    | [] -> []
+    | hyp :: hyps ->
+      match hyp.classifier with
+      | `Tick -> hyp :: hyps (* Maybe not quite right *)
+      | _ ->
+        {hyp with locked = false} :: go hyps
+  in
+  go hyps
 
 let clear_locks cx =
   {cx with
    sign = GlobalEnv.clear_locks cx.sign;
-   hyps = List.map (hyp_map_lock (fun _ -> 0)) cx.hyps;
+   hyps = hyps_clear_locks cx.hyps;
    all_locks = 0}
 
 let kill_from_tick cx tgen =
@@ -77,7 +84,7 @@ let ext cx ~nm ty sys =
   let var = V.reflect ty (Domain.Lvl (nm, n)) sys in
   {cx with
    env = Domain.Env.push (Domain.Val var) cx.env;
-   hyps = {classifier = `Ty ty; locks = 0; killed = false} :: cx.hyps;
+   hyps = {classifier = `Ty ty; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.succ cx.qenv;
    ppenv = snd @@ Pretty.Env.bind nm cx.ppenv},
   var
@@ -87,7 +94,7 @@ let ext_tick cx ~nm =
   let tick = Domain.TickGen (`Lvl (nm, n)) in
   {cx with
    env = Domain.Env.push (Domain.Tick tick) cx.env;
-   hyps = {classifier = `Tick; locks = 0; killed = false} :: cx.hyps;
+   hyps = {classifier = `Tick; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.succ cx.qenv;
    ppenv = snd @@ Pretty.Env.bind nm cx.ppenv},
   tick
@@ -103,7 +110,7 @@ let ext_dim cx ~nm =
   let x = Name.named nm in
   {cx with
    env = Domain.Env.push (Domain.Atom (`Atom x)) cx.env;
-   hyps = {classifier = `I; locks = 0; killed = false} :: cx.hyps;
+   hyps = {classifier = `I; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.abs cx.qenv @@ Emp #< x;
    ppenv = snd @@ Pretty.Env.bind nm cx.ppenv},
   x
@@ -124,11 +131,11 @@ let make_closure cx bnd =
   Domain.Clo {rho = cx.env; bnd}
 
 let lookup i {hyps; _} =
-  let {classifier; locks; killed} = List.nth hyps i in
-  if (killed || locks > 0) && classifier != `I then
+  let hyp = List.nth hyps i in
+  if (hyp.killed || hyp.locked) && hyp.classifier != `I then
     failwith "Hypothesis is inaccessible"
   else
-    classifier
+    hyp.classifier
 
 let lookup_constant nm tw cx =
   (* For constants, the only locks that are relevant are the global ones. Ignore the local locks. *)
@@ -139,11 +146,11 @@ let restrict cx r r' =
   let r = I.act phi r in
   let r' = I.act phi r' in
   let rel, phi = Restriction.equate r r' cx.rel in
-  let act_ty {classifier; locks; killed} =
-    match classifier with
-    | `Ty ty -> {classifier = `Ty (Domain.Value.act phi ty); locks; killed}
-    | `I -> {classifier = `I; locks; killed}
-    | `Tick -> {classifier = `Tick; locks; killed}
+  let act_ty hyp =
+    match hyp.classifier with
+    | `Ty ty -> {hyp with classifier = `Ty (Domain.Value.act phi ty)}
+    | `I -> hyp
+    | `Tick -> hyp
   in
   let hyps = List.map act_ty cx.hyps in
   let env = Domain.Env.act phi cx.env in
