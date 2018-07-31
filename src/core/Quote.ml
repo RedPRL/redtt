@@ -388,6 +388,13 @@ struct
       else
         failwith "global variable name mismatch"
 
+    | NHCom info0, NHCom info1 ->
+      let tr, tr' = equate_dir env info0.dir info1.dir in
+      let ty = equate_ty env info0.ty info1.ty in
+      let cap = equate_neu env info0.cap info1.cap in
+      let sys = equate_comp_sys env info0.ty info0.sys info1.sys in
+      Tm.HCom {r = tr; r' = tr'; ty; cap = Tm.up cap; sys}, Bwd.from_list stk
+
     | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
       let ty = equate_ty env ty0 ty1 in
       let ltr_ty = make_later ty0 in

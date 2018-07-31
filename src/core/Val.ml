@@ -462,6 +462,18 @@ struct
 
   and act_neu phi con =
     match con with
+    | NHCom info ->
+      let dir = Dir.act phi info.dir in
+      let ty = Value.act phi info.ty in
+      let sys = CompSys.act phi info.sys in
+      let cap =
+        match act_neu phi info.cap with
+        | Ret neu ->
+          reflect ty neu []
+        | Step cap -> cap
+      in
+      step @@ make_hcom dir ty cap sys
+
     | VProj info ->
       let mx = I.act phi @@ `Atom info.x in
       let ty0 phi0 = Value.act phi0 info.ty0 in
@@ -1146,13 +1158,95 @@ struct
       let err = RigidCoeUnexpectedArgument abs in
       raise @@ E err
 
+  and rigid_hcom_bool dir cap sys =
+    match unleash cap with
+    | Tt ->
+      make Tt
+    | Ff ->
+      make Ff
+    | Up info ->
+      rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
+    | _ ->
+      raise @@ E (RigidHComUnexpectedArgument cap)
+
+  and rigid_hcom_nat dir cap sys =
+    match unleash cap with
+    | Zero ->
+      make Zero
+
+    | Suc pcap ->
+      let unsuc el =
+        match unleash el with
+        | Suc el' -> el'
+        | _ -> failwith "unsuc"
+      in
+      let nat = make Nat in
+      let psys = List.map (Face.map (fun _ _ abs -> let x, elx = Abs.unleash1 abs in Abs.bind1 x @@ unsuc elx)) sys in
+      let phcom = rigid_hcom dir nat pcap psys in
+      make @@ Suc phcom
+
+    | Up info ->
+      rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
+
+    | _ ->
+      raise @@ E (RigidHComUnexpectedArgument cap)
+
+  and rigid_hcom_int dir cap sys =
+    match unleash cap with
+    | Pos cap ->
+      let strip el =
+        match unleash el with
+        | Pos el' -> el'
+        | _ -> failwith "unsuc"
+      in
+      let nat = make Nat in
+      let sys = List.map (Face.map (fun _ _ abs -> let x, elx = Abs.unleash1 abs in Abs.bind1 x @@ strip elx)) sys in
+      let hcom = rigid_hcom dir nat cap sys in
+      make @@ Pos hcom
+
+    | NegSuc cap ->
+      let strip el =
+        match unleash el with
+        | NegSuc el' -> el'
+        | _ -> failwith "unsuc"
+      in
+      let nat = make Nat in
+      let sys = List.map (Face.map (fun _ _ abs -> let x, elx = Abs.unleash1 abs in Abs.bind1 x @@ strip elx)) sys in
+      let hcom = rigid_hcom dir nat cap sys in
+      make @@ NegSuc hcom
+
+    | Up info ->
+      rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
+
+    | _ ->
+      raise @@ E (RigidHComUnexpectedArgument cap)
+
+
+  and rigid_nhcom_up dir ty cap ~comp_sys ~rst_sys =
+    let neu = NHCom {dir; ty; cap; sys = comp_sys} in
+    let hcom_face r r' el =
+      let phi = I.equate r r' in
+      let dir_phi = Dir.act phi dir in
+      let ty_phi = Value.act phi ty in
+      let sys_phi = CompSys.act phi comp_sys in
+      make_hcom dir_phi ty_phi el sys_phi
+    in
+    let rst_sys = List.map (Face.map hcom_face) rst_sys in
+    make @@ Up { ty; neu; sys = rst_sys}
+
   and rigid_hcom dir ty cap sys : value =
     match unleash ty with
     | Pi _ | Sg _ | Ext _ | Up _ ->
       make @@ HCom {dir; ty; cap; sys}
 
-    | Bool | Nat | Int ->
-      cap
+    | Bool ->
+      rigid_hcom_bool dir cap sys
+
+    | Nat ->
+      rigid_hcom_nat dir cap sys
+
+    | Int ->
+      rigid_hcom_int dir cap sys
 
     | S1 ->
       make @@ FCom {dir; cap; sys}
@@ -1173,9 +1267,7 @@ struct
       let _, s' = Dir.unleash fcom.dir in
 
       (* This is C_M in [F], with an extra parameter `phi` to get along with NbE. *)
-      let cap_aux phi el = make_cap
-          (Dir.act phi fcom.dir) (Value.act phi fcom.cap) (CompSys.act phi fcom.sys) el
-      in
+      let cap_aux phi el = make_cap (Dir.act phi fcom.dir) (Value.act phi fcom.cap) (CompSys.act phi fcom.sys) el in
 
       (* This serves as `O` and the diagonal face in [F]
        * for the coherence conditions in `fcom.sys` and `s=s'`. *)
