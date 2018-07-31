@@ -113,6 +113,7 @@ struct
   and elab_decl env =
     function
     | E.Define (name, opacity, scheme, e) ->
+      let now0 = Unix.gettimeofday () in
       elab_scheme env scheme @@ fun cod ->
       M.unify >>
       elab_chk env cod e >>= fun tm ->
@@ -122,7 +123,8 @@ struct
       M.lift @@ U.define psi alpha opacity cod tm >>= fun _ ->
       M.lift C.go_to_top >>
       M.unify <<@> fun _ ->
-        Format.printf "Defined %s.@." name;
+        let now1 = Unix.gettimeofday () in
+        Format.printf "Defined %s (%fs).@." name (now1 -. now0);
         T.add name alpha env
 
     | E.Debug filter ->
