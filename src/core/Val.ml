@@ -1351,12 +1351,9 @@ struct
     | Pi _ | Sg _ | Up _ ->
       make @@ GHCom {dir; ty; cap; sys}
 
-    | Bool | Nat | Int ->
-      cap
-
     (* `Ext _`: the expansion will stop after a valid
      * correction system, so it is not so bad. *)
-    | Ext _ | S1 | Univ _ | FCom _ | V _ ->
+    | Ext _ | Univ _ | FCom _ | V _ | S1 | Bool | Nat | Int ->
       let aux sys =
         match sys with
         | [] -> cap
