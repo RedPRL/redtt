@@ -65,6 +65,9 @@ and neu =
   | Lvl : string option * int -> neu
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
   | Meta : {name : Name.t; ushift : int} -> neu
+
+  | NHCom : {dir : dir; ty : value; cap : neu; sys : comp_sys} -> neu
+
   | FunApp : neu * nf -> neu
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
@@ -304,6 +307,10 @@ and pp_neu fmt neu =
 
   | Lvl (Some x, _) ->
     Uuseg_string.pp_utf_8 fmt x
+
+  | NHCom info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_neu info.cap pp_comp_sys info.sys
 
   | FunApp (neu, arg) ->
     Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
