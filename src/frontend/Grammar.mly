@@ -15,9 +15,10 @@
 %token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BANG
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
-%token TIMES HASH AT BACKTICK IN WITH END
+%token TIMES HASH AT BACKTICK IN WITH WHERE END DATA
 %token DIM TICK LOCK
 %token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
+%token OF
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
@@ -34,6 +35,9 @@ edecl:
     { E.Define (a, `Opaque, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
+  | DATA; dlbl = ATOM; WHERE; option(PIPE); constrs = separated_list(PIPE, desc_constr)
+    { let _constrs = List.map (fun constr -> constr dlbl) constrs in
+      failwith "parsing data declaration!!" }
   | IMPORT; a = ATOM
     { E.Import a }
   | QUIT
@@ -218,6 +222,39 @@ etele_cell:
     { [`Tick "_"] }
   | LOCK
     { [`Lock] }
+
+
+
+
+desc_constr:
+| clbl = ATOM
+  { fun _dlbl ->
+    clbl, Desc.{params = []; args = []} }
+
+| clbl = ATOM; OF; params = nonempty_list(desc_param); TIMES; args = separated_nonempty_list(TIMES, desc_arg)
+  { fun dlbl ->
+    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args} }
+
+| clbl = ATOM; OF; params = nonempty_list(desc_param)
+  { fun _dlbl ->
+    clbl, Desc.{params; args = []} }
+
+| clbl = ATOM; OF; args = separated_nonempty_list(TIMES, desc_arg)
+  { fun dlbl ->
+    clbl, Desc.{params = []; args = List.map (fun arg -> arg dlbl) args} }
+
+%inline
+desc_arg:
+| self = ATOM
+  { fun name ->
+      if name = self then Desc.Self else failwith ("Expected " ^ name ^ " but got " ^ self)}
+
+%inline
+desc_param:
+| LPR; x = ATOM; COLON; ty = eterm; RPR
+  { x, ty }
+
+
 
 esig:
   | d = edecl; esig = esig

@@ -29,6 +29,8 @@ module Make (R : SOURCE) : LEXER = struct
       ("quit", QUIT);
       ("in", IN);
       ("with", WITH);
+      ("where", WHERE);
+      ("data", DATA);
       ("end", END);
       ("bool", BOOL);
       ("[]", BOX_MODALITY);
@@ -83,6 +85,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("import", IMPORT);
       ("then", THEN);
       ("else", ELSE);
+      ("of", OF)
     ]
 }
 

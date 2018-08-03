@@ -22,7 +22,8 @@ syn region  redttEncl transparent start="\[" end="\]" contains=ALLBUT,redttBrack
 
 syn match   redttHole '?\k*'
 
-syn keyword redttKeyw V in with end bool nat ℕ int ℤ S1 car cdr coe com cons hcom comp vproj
+syn keyword redttKeyw data where of in with end
+syn keyword redttKeyw V bool nat ℕ int ℤ S1 car cdr coe com cons hcom comp vproj
 syn keyword redttKeyw restrict if nat-rec int-rec S1-rec lam call tt ff zero suc
 syn keyword redttKeyw pos negsuc base loop pre kan U type then else
 syn keyword redttKeyw open shut tick dim prev next dfix fix
