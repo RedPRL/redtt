@@ -7,27 +7,26 @@ let singleton (A : type) (M : A) : `(U pre 0) =
 
 let connection/or
  (A : type)
- (a, b : A)
- (p : Path A a b)
+ (p : dim → A)
  : [i j] A with
    | j=0 ⇒ p i
    | i=0 ⇒ p j
-   | j=1 ⇒ b
-   | i=1 ⇒ b
+   | j=1 ⇒ p 1
+   | i=1 ⇒ p 1
    end
  =
  λ i j →
   ; this is an example of something that is much nicer here than in redprl.
   ; we can define using line types all the faces of the composition at once.
   ; definitional equivalence kicks in to make this work.
-  let face : Line (Line A) =
+  let face : dim → dim → A =
     λ l k →
       comp 0 l (p k) with
-      | k=1 ⇒ λ _ → b
+      | k=1 ⇒ λ _ → p 1
       | k=0 ⇒ λ m → p m
       end
   in
-  comp 1 0 b with
+  comp 1 0 (p 1) with
   | i=0 ⇒ λ k → face j k
   | i=1 ⇒ λ k → face 1 k
   | j=0 ⇒ λ k → face i k
@@ -38,33 +37,31 @@ let connection/or
 ; an example of using the singleton type to establish an exact equality
 let connection/or/diagonal
  (A : type)
- (a, b : A)
- (p : Path A a b)
- : singleton (Path A a b) p
+ (p : dim → A)
+ : singleton _ p
  =
  λ i →
-   connection/or _ a b p i i
+   connection/or _ p i i
 
 let connection/and
  (A : type)
- (a,b : A)
- (p : Path A a b)
+ (p : dim → A)
  : [i j] A with
-   | j=0 ⇒ a
-   | i=0 ⇒ a
+   | j=0 ⇒ p 0
+   | i=0 ⇒ p 0
    | j=1 ⇒ p i
    | i=1 ⇒ p j
    end
  =
  λ i j →
-   let face : Line (Line A) =
+   let face : dim → dim → A =
      λ l k →
        comp 1 l (p k) with
-       | k=0 ⇒ λ _ → a
+       | k=0 ⇒ λ _ → p 0
        | k=1 ⇒ λ m → p m
        end
    in
-   comp 0 1 a with
+   comp 0 1 (p 0) with
    | i=0 ⇒ λ k → face 0 k
    | i=1 ⇒ λ k → face j k
    | j=0 ⇒ λ k → face 0 k

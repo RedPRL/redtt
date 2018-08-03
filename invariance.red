@@ -30,7 +30,7 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
       coe 1 0
         (λ i →
           < λ b → if b then fib.1 i .0 else fib.1 i .1
-          , λ j → connection/or _ (fun-to-pair A (fib.0)) pair (fib.1) i j
+          , λ j → connection/or _ (fib.1) i j
           >)
       in λ j →
         [i] (f : bool → A) × Path (A × A) <f tt, f ff> pair with

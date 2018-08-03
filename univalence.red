@@ -38,7 +38,7 @@ let IdEquiv (A : type) : Equiv A A =
   , λ a →
     < <a, λ _ → a>
     , λ p i →
-      let aux : Line A =
+      let aux : dim → A =
         λ j →
         comp 1 j a with
         | i=0 ⇒ λ k → p.1 k
@@ -215,7 +215,7 @@ let IdEquiv/connection (B : type) : Equiv B B =
   < λ b → b
   , λ b →
     < <b, λ _ → b>
-    , λ v i → <v.1 i, λ j → connection/or B (v.0) b (v.1) i j>
+    , λ v i → <v.1 i, λ j → connection/or B (v.1) i j>
     >
   >
 
@@ -227,7 +227,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
        < VB
        , proj/B
        , λ b →
-            let ctr/B : Line B =
+            let ctr/B : dim → B =
               λ j →
                 comp 1 j b with
                 | i=0 ⇒ λ k → w .1 .1 b .0 .1 k
@@ -239,11 +239,11 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
             in
             < ctr
             , λ v j →
-                let filler : Line B =
+                let filler : dim → B =
                   λ l →
                     comp 1 l b with
                     | i=0 ⇒ λ k → w .1 .1 b .1 v j .1 k
-                    | i=1 ⇒ λ k → connection/or B (v .0) b (v .1) j k
+                    | i=1 ⇒ λ k → connection/or B (v .1) j k
                     | j=0 ⇒ λ k → v .1 k
                     | j=1 ⇒ λ k → ctr/B k
                     end
@@ -255,3 +255,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
        >
   >
 
+
+let ice/cube (A : type) (i : dim) : Path^1 _ A `(V i A A (IdEquiv A)) =
+  λ j →
+    connection/and^1 _ (λ k → `(V k A A (IdEquiv A))) i j
