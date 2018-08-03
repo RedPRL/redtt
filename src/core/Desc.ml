@@ -4,7 +4,7 @@ type 'a arg_ty =
 type 'a tele = 'a list
 
 type 'a constr =
-  {params : 'a tele;
+  {params : (string * 'a) tele;
    args : 'a arg_ty list}
 
 type data_label = string
@@ -33,13 +33,13 @@ let pp_constr pp fmt constr =
 
   let rec go_params env fmt =
     function
-    | [p] ->
-      let nm, env' = Pretty.Env.bind_fresh env in
+    | [nm, p] ->
+      let nm, env' = Pretty.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
         (go_args env') constr.args
-    | p :: ps ->
-      let nm, env' = Pretty.Env.bind_fresh env in
+    | (nm, p) :: ps ->
+      let nm, env' = Pretty.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
         (go_params env') ps

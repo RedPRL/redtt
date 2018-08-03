@@ -9,7 +9,7 @@ type 'a tele = 'a list
     When we generalized to indexed inductive types, the parameters will become *bound* in the arguments. Finally, to support HITs,
     we will ultimately add dimension arguments and boundary constraints. *)
 type 'a constr =
-  {params : 'a tele;
+  {params : (string * 'a) tele;
    args : 'a arg_ty list}
 
 
