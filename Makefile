@@ -35,4 +35,4 @@ test:
 	@${DUNE} build @runtest
 
 top:
-	@${DUNE} utop src/lib
+	@${DUNE} utop src/core
