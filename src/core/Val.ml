@@ -38,7 +38,7 @@ type error =
   | UnleashBoxModalityError of value
   | UnleashCoRError of value
   | UnleashLblTyError of value
-  | UnleashFComError of value
+  | UnleashFHComError of value
   | ForcedUntrueCorestriction of val_face
   | ForcedUnexpectedCorestriction of value
 
@@ -140,7 +140,7 @@ struct
       Format.fprintf fmt
         "Tried to unleash %a as co-restriction type."
         pp_value v
-    | UnleashFComError v ->
+    | UnleashFHComError v ->
       Format.fprintf fmt
         "Tried to unleash %a as formal homogeneous composition."
         pp_value v
@@ -208,7 +208,7 @@ sig
   val unleash_v : value -> atom * value * value * value
   val unleash_later : value -> tick_clo
   val unleash_box_modality : value -> value
-  val unleash_fcom : value -> dir * value * comp_sys
+  val unleash_fhcom : value -> dir * value * comp_sys
   val unleash_ext_with : value -> dim list -> value * val_sys
   val unleash_ext : value -> ext_abs
   val unleash_lbl_ty : value -> string * nf list * value
@@ -341,8 +341,8 @@ struct
         (Value.act phi info.cap)
         (CompSys.act phi info.sys)
 
-    | FCom info ->
-      make_fcom
+    | FHCom info ->
+      make_fhcom
         (Dir.act phi info.dir)
         (Value.act phi info.cap)
         (CompSys.act phi info.sys)
@@ -831,13 +831,13 @@ struct
     | `Same _ ->
       cap
 
-  and make_fcom mdir cap msys : value =
+  and make_fhcom mdir cap msys : value =
     match mdir with
     | `Ok dir ->
       begin
         match msys with
         | `Ok sys ->
-          rigid_fcom dir cap sys
+          rigid_fhcom dir cap sys
         | `Proj abs ->
           let _, r' = Dir.unleash dir in
           Abs.inst1 abs r'
@@ -873,7 +873,7 @@ struct
     | (Bool | Nat | Int | S1 | Univ _) ->
       el
 
-    | FCom fcom ->
+    | FHCom fhcom ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
        * [SVO]: Part III (airport).
        * [R1]: RedPRL I ddcc4ce72b1880671d842ede6b50adbee94935b5.
@@ -881,8 +881,8 @@ struct
 
       (* Some helper functions to reduce typos. *)
       let r, r' = Dir.unleash dir in
-      let s, s' = Dir.unleash fcom.dir in
-      let cap_abs = Abs.bind1 x fcom.cap in
+      let s, s' = Dir.unleash fhcom.dir in
+      let cap_abs = Abs.bind1 x fhcom.cap in
       let subst_r = I.subst r x in
       let subst_r' = I.subst r' x in
 
@@ -901,15 +901,15 @@ struct
         in
         make_hcom
           (Dir.make (I.act (I.cmp phi subst_r) s') z_dest)
-          (Value.act (I.cmp phi subst_r) fcom.cap)
+          (Value.act (I.cmp phi subst_r) fhcom.cap)
           (make_cap
-             (Dir.act (I.cmp phi subst_r) fcom.dir)
-             (Value.act (I.cmp phi subst_r) fcom.cap)
-             (CompSys.act (I.cmp phi subst_r) fcom.sys)
+             (Dir.act (I.cmp phi subst_r) fhcom.dir)
+             (Value.act (I.cmp phi subst_r) fhcom.cap)
+             (CompSys.act (I.cmp phi subst_r) fhcom.sys)
              (Value.act phi el))
-          (force_abs_sys @@ List.map (fun b -> face (AbsFace.act (I.cmp phi subst_r) b)) fcom.sys)
+          (force_abs_sys @@ List.map (fun b -> face (AbsFace.act (I.cmp phi subst_r) b)) fhcom.sys)
       in
-      (* This is N in [F, SVO], representing the coherence conditions enforced by `fcom.sys`.
+      (* This is N in [F, SVO], representing the coherence conditions enforced by `fhcom.sys`.
        * The coercion must be equal to the coercion within the system under the restriction.
        *
        * Precondition: `x` is apart from `phi` (thus `subst_x` commutes with `phi`),
@@ -923,7 +923,7 @@ struct
         make_coe (Dir.make (I.act phi r) x_dest) (Abs.bind1 x @@ Abs.inst1 abs (I.act phi s')) @@
         Value.act phi el
       in
-      (* This is P in [F, SVO], the naive coercion of the cap part of the box within `fcom.cap`.
+      (* This is P in [F, SVO], the naive coercion of the cap part of the box within `fhcom.cap`.
        * The problem is that we do not have the boundaries of the box, and even if we have,
        * this naive cap will not be the image of the boundaries. *)
       let naively_coerced_cap phi =
@@ -943,7 +943,7 @@ struct
           let phi = I.cmp (I.equate sj s'j) phi in
           Abs.bind1 x @@ recovery_apart phi absj (`Atom x) (I.act phi s)
         in
-        diag @ List.map (fun b -> face (AbsFace.act phi b)) (CompSys.forall x fcom.sys)
+        diag @ List.map (fun b -> face (AbsFace.act phi b)) (CompSys.forall x fhcom.sys)
       in
       (* This is Q in [F, SVO]. This is used to calculate the preimage of the naively coerced cap
        * for the boundaries and the fixed cap.
@@ -960,13 +960,13 @@ struct
           let phi = I.cmp (I.equate sj s'j) phi in
           Abs.make1 @@ fun y -> recovery_apart phi absj (I.act phi r') (`Atom y)
         in
-        diag :: List.map (fun b -> face (AbsFace.act phi b)) (CompSys.forall x fcom.sys)
+        diag :: List.map (fun b -> face (AbsFace.act phi b)) (CompSys.forall x fhcom.sys)
       in
       (* This is the "cap" part of the final request in [F, SVO].
        *
        * Using Q, the preimages, this is to calculate the final cap based on the naive cap. *)
       let coerced_cap =
-        make_hcom (Dir.act subst_r' fcom.dir) (Value.act subst_r' fcom.cap) (naively_coerced_cap I.idn) @@
+        make_hcom (Dir.act subst_r' fhcom.dir) (Value.act subst_r' fhcom.cap) (naively_coerced_cap I.idn) @@
         force_abs_sys @@
         let diag = AbsFace.make_from_dir I.idn dir @@ fun phi ->
           Abs.make1 @@ fun w -> origin phi (`Atom w) in
@@ -976,14 +976,14 @@ struct
           make_coe (Dir.make (`Atom w) (I.act phi (I.act subst_r' s))) absj @@
           recovery_general phi absj (`Atom w)
         in
-        diag :: List.map (fun b -> face (AbsFace.act subst_r' b)) fcom.sys
+        diag :: List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
       in
-      make_box (Dir.act subst_r' fcom.dir) coerced_cap @@
+      make_box (Dir.act subst_r' fhcom.dir) coerced_cap @@
       force_val_sys @@
       let face = Face.map @@ fun sj s'j absj ->
         let phi = I.equate sj s'j in
         recovery_general phi absj (I.act (I.cmp phi subst_r') s')
-      in List.map (fun b -> face (AbsFace.act subst_r' b)) fcom.sys
+      in List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
 
 
     | V info ->
@@ -1249,12 +1249,12 @@ struct
       rigid_hcom_int dir cap sys
 
     | S1 ->
-      make @@ FCom {dir; cap; sys}
+      make @@ FHCom {dir; cap; sys}
 
     | Univ _ ->
-      rigid_fcom dir cap sys
+      rigid_fhcom dir cap sys
 
-    | FCom fcom ->
+    | FHCom fhcom ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
        * [SVO]: Part III (airport).
        * [R1]: RedPRL I ddcc4ce72b1880671d842ede6b50adbee94935b5.
@@ -1264,20 +1264,20 @@ struct
 
       (* Helper functions. *)
       let r, r' = Dir.unleash dir in
-      let _, s' = Dir.unleash fcom.dir in
+      let _, s' = Dir.unleash fhcom.dir in
 
       (* This is C_M in [F], with an extra parameter `phi` to get along with NbE. *)
-      let cap_aux phi el = make_cap (Dir.act phi fcom.dir) (Value.act phi fcom.cap) (CompSys.act phi fcom.sys) el in
+      let cap_aux phi el = make_cap (Dir.act phi fhcom.dir) (Value.act phi fhcom.cap) (CompSys.act phi fhcom.sys) el in
 
       (* This serves as `O` and the diagonal face in [F]
-       * for the coherence conditions in `fcom.sys` and `s=s'`. *)
+       * for the coherence conditions in `fhcom.sys` and `s=s'`. *)
       let hcom_template phi y_dest ty = make_hcom
           (Dir.make (I.act phi r) y_dest) ty
-          (Value.act phi fcom.cap) (CompSys.act phi fcom.sys)
+          (Value.act phi fhcom.cap) (CompSys.act phi fhcom.sys)
       in
 
       (* This is `P` in [F]. *)
-      let new_cap = rigid_hcom dir fcom.cap (cap_aux I.idn cap) @@
+      let new_cap = rigid_hcom dir fhcom.cap (cap_aux I.idn cap) @@
         let ri_faces =
           let face = Face.map @@ fun ri r'i abs ->
             let y, el = Abs.unleash1 abs in
@@ -1292,10 +1292,10 @@ struct
             (* this is not the most efficient code, but maybe we can afford this? *)
             cap_aux phi (hcom_template phi (`Atom y) (Value.act phi (Abs.inst1 abs s')))
           in
-          List.map face fcom.sys
+          List.map face fhcom.sys
         in
-        let diag = AbsFace.make_from_dir I.idn fcom.dir @@ fun phi ->
-          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Value.act phi fcom.cap)
+        let diag = AbsFace.make_from_dir I.idn fhcom.dir @@ fun phi ->
+          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Value.act phi fhcom.cap)
         in
         Option.filter_map force_abs_face [diag] @ (ri_faces @ si_faces)
       in
@@ -1303,8 +1303,8 @@ struct
         let phi = I.equate si s'i in
         hcom_template phi (I.act phi r') (Value.act phi (Abs.inst1 abs s'))
       in
-      rigid_box fcom.dir new_cap
-        (List.map boundary fcom.sys)
+      rigid_box fhcom.dir new_cap
+        (List.map boundary fhcom.sys)
 
     | V {x; ty0; ty1; equiv} ->
       let r, _ = Dir.unleash dir in
@@ -1353,7 +1353,7 @@ struct
 
     (* `Ext _`: the expansion will stop after a valid
      * correction system, so it is not so bad. *)
-    | Ext _ | Univ _ | FCom _ | V _ | S1 | Bool | Nat | Int ->
+    | Ext _ | Univ _ | FHCom _ | V _ | S1 | Bool | Nat | Int ->
       let aux sys =
         match sys with
         | [] -> cap
@@ -1431,8 +1431,8 @@ struct
     in
     rigid_ghcom dir ty capcoe syscoe
 
-  and rigid_fcom dir cap sys : value =
-    make @@ FCom {dir; cap; sys}
+  and rigid_fhcom dir cap sys : value =
+    make @@ FHCom {dir; cap; sys}
 
   and rigid_box dir cap sys : value =
     make @@ Box {dir; cap; sys}
@@ -1498,13 +1498,13 @@ struct
       let v1 = eval rho t1 in
       make @@ Cons (v0, v1)
 
-    | Tm.FCom info ->
+    | Tm.FHCom info ->
       let r = eval_dim rho info.r  in
       let r' = eval_dim rho info.r' in
       let dir = Dir.make r r' in
       let cap = eval rho info.cap in
       let sys = eval_rigid_bnd_sys rho info.sys in
-      make_fcom dir cap sys
+      make_fhcom dir cap sys
 
     | Tm.Univ {kind; lvl} ->
       make @@ Univ {kind; lvl}
@@ -1876,12 +1876,12 @@ struct
     | _ ->
       raise @@ E (UnleashVError v)
 
-  and unleash_fcom v =
+  and unleash_fhcom v =
     match unleash v with
-    | FCom info -> info.dir, info.cap, info.sys
-    | Rst rst -> unleash_fcom rst.ty
+    | FHCom info -> info.dir, info.cap, info.sys
+    | Rst rst -> unleash_fhcom rst.ty
     | _ ->
-      raise @@ E (UnleashFComError v)
+      raise @@ E (UnleashFHComError v)
 
   and unleash_lbl_ty v =
     match unleash v with
@@ -2283,12 +2283,12 @@ struct
       bcase
     | Loop x ->
       Abs.inst1 lcase @@ `Atom x
-    | FCom info ->
+    | FHCom info ->
       let apply_rec tm = s1_rec mot tm bcase lcase in
       let r, _ = Dir.unleash info.dir in
       let ty = Abs.make1 @@ fun y ->
         inst_clo mot @@
-        make_fcom (Dir.make r (`Atom y)) info.cap (`Ok info.sys)
+        make_fhcom (Dir.make r (`Atom y)) info.cap (`Ok info.sys)
       in
       let face = Face.map @@ fun ri r'i absi ->
         let y, el = Abs.unleash1 absi in

@@ -24,7 +24,7 @@ type con =
   | Coe : {dir : dir; abs : abs; el : value} -> con
   | HCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
   | GHCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
-  | FCom : {dir : dir; cap : value; sys : comp_sys} -> con
+  | FHCom : {dir : dir; cap : value; sys : comp_sys} -> con
   | Box : {dir : dir; cap : value; sys : box_sys} -> con
 
   | Univ : {kind : Kind.t; lvl : Lvl.t} -> con

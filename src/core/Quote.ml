@@ -303,7 +303,7 @@ struct
         Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
 
       | Box info0, Box info1 ->
-        let dir, ty_cap, ty_sys = unleash_fcom ty in
+        let dir, ty_cap, ty_sys = unleash_fhcom ty in
         let _, s' = Dir.unleash dir in
         let tr, tr' = equate_dir3 env dir info0.dir info1.dir in
         let tcap = equate env ty_cap info0.cap info1.cap in
@@ -324,11 +324,11 @@ struct
       | Up up0, Up up1 ->
         Tm.up @@ equate_neu env up0.neu up1.neu
 
-      | FCom fcom0, FCom fcom1 ->
-        let tr, tr' = equate_dir env fcom0.dir fcom1.dir in
-        let cap = equate env ty fcom0.cap fcom1.cap in
-        let sys = equate_comp_sys env ty fcom0.sys fcom1.sys in
-        Tm.make @@ Tm.FCom {r = tr; r' = tr'; cap; sys}
+      | FHCom fhcom0, FHCom fhcom1 ->
+        let tr, tr' = equate_dir env fhcom0.dir fhcom1.dir in
+        let cap = equate env ty fhcom0.cap fhcom1.cap in
+        let sys = equate_comp_sys env ty fhcom0.sys fhcom1.sys in
+        Tm.make @@ Tm.FHCom {r = tr; r' = tr'; cap; sys}
 
       | HCom hcom0, HCom hcom1 ->
         begin

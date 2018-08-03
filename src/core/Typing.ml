@@ -276,8 +276,8 @@ let rec check cx ty tm =
     check cx ty tm;
     check_boundary cx ty sys tm
 
-  | D.Univ _, T.FCom info ->
-    check_fcom cx ty info.r info.r' info.cap info.sys
+  | D.Univ _, T.FHCom info ->
+    check_fhcom cx ty info.r info.r' info.cap info.sys
 
   | D.Univ _, T.LblTy info ->
     check cx ty info.ty;
@@ -347,7 +347,7 @@ and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
     in
     List.map face sys
 
-and check_fcom cx ty tr tr' tcap tsys =
+and check_fhcom cx ty tr tr' tcap tsys =
   let r = check_eval_dim cx tr in
   check_dim cx tr';
   let cxx, x = Cx.ext_dim cx ~nm:None in
@@ -667,12 +667,12 @@ and infer_spine cx hd =
       D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
 
     | T.Cap info ->
-      let fcom_ty =
+      let fhcom_ty =
         check_eval_ty cx @@
-        T.make @@ T.FCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
+        T.make @@ T.FHCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
       in
       let ih = infer_spine cx hd sp in
-      Cx.check_eq_ty cx fcom_ty ih.ty;
+      Cx.check_eq_ty cx fhcom_ty ih.ty;
       D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty}
 
 
