@@ -255,3 +255,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
        >
   >
 
+
+let anders/mortberg (A : type) (i : dim) : Path^1 _ A `(V i A A (IdEquiv A)) =
+  λ j →
+    connection/and^1 _ (λ k → `(V k A A (IdEquiv A))) i j
