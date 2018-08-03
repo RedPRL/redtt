@@ -12,19 +12,21 @@ type 'a constr =
   {params : 'a tele;
    args : 'a arg_ty list}
 
-type label = string
+
+type data_label
+type con_label
+
 
 (** A datatype description is just a list of named constructors. *)
-type 'a desc = (label * 'a constr) list
-
+type 'a desc = (con_label * 'a constr) list
 
 (** Returns 'yes' if the description specifies strictly higher dimensional structure, like the strict natural numbers.
     Currently, this is always true but will change as we extend to support higher inductive types. *)
 val is_strict_set : 'a desc -> bool
 
 
+val pp_data_label : data_label Pretty.t0
+val pp_con_label : con_label Pretty.t0
+
 val pp_desc : 'a Pretty.t -> 'a desc Pretty.t0
 val pp_constr : 'a Pretty.t -> 'a constr Pretty.t0
-
-
-val test : unit -> unit

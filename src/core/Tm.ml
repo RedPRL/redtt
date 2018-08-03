@@ -64,6 +64,13 @@ type 'a tmf =
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
+
+  | Data of Desc.data_label
+  | Intro of Desc.data_label * Desc.con_label * 'a list
+
+
+
+
 and 'a head =
   | Meta of {name: Name.t; ushift : int}
   | Var of {name : Name.t; twin : twin; ushift : int}
@@ -270,6 +277,14 @@ struct
     | Up cmd ->
       let cmd' = traverse_cmd cmd in
       Up cmd'
+
+    | Data lbl ->
+      Data lbl
+
+    | Intro (dlbl, clbl, args) ->
+      let args' = traverse_list traverse_tm args in
+      Intro (dlbl, clbl, args')
+
 
   and traverse_cmd (hd, sp) =
     let hd', sp' = traverse_head hd in
@@ -888,6 +903,23 @@ let rec pp env fmt =
     | Up cmd ->
       pp_cmd env fmt cmd
 
+    | Data lbl ->
+      Desc.pp_data_label fmt lbl
+
+    | Intro (dlbl, clbl, args) ->
+      begin
+        match args with
+        | [] ->
+          Format.fprintf fmt "%a.%a"
+            Desc.pp_data_label dlbl
+            Desc.pp_con_label clbl
+        | _ ->
+          Format.fprintf fmt "@[<hv1>(%a.%a@ %a)@]"
+            Desc.pp_data_label dlbl
+            Desc.pp_con_label clbl
+            (pp_terms env) args
+      end
+
   in
   go env `Start fmt
 
@@ -1403,6 +1435,10 @@ let map_tmf f =
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
     Let (map_cmd f cmd, map_bnd f bnd)
+  | Data lbl ->
+    Data lbl
+  | Intro (dlbl, clbl, args) ->
+    Intro (dlbl, clbl, List.map f args)
 
 
 

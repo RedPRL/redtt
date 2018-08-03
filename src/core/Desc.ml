@@ -7,12 +7,16 @@ type 'a constr =
   {params : 'a tele;
    args : 'a arg_ty list}
 
-type label = string
+type data_label = string
+type con_label = string
 
-type 'a desc = (label * 'a constr) list
+type 'a desc = (con_label * 'a constr) list
 
 
 let is_strict_set _ = true
+
+let pp_data_label = Uuseg_string.pp_utf_8
+let pp_con_label = Uuseg_string.pp_utf_8
 
 
 let pp_arg_ty fmt =
@@ -68,9 +72,6 @@ let pp_desc pp fmt constrs =
     (pp_constrs pp) constrs
 
 
-let nats : 'a desc =
-  ["ze", {params = []; args = []};
-   "su", {params = []; args = [Self]}]
-
-let test () =
-  Format.printf "%a@." (pp_desc Tm.pp) nats
+(* let nats : 'a desc =
+   ["ze", {params = []; args = []};
+   "su", {params = []; args = [Self]}] *)

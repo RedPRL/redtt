@@ -63,6 +63,9 @@ type 'a tmf =
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
+  | Data of Desc.data_label
+  | Intro of Desc.data_label * Desc.con_label * 'a list
+
 
 and 'a head =
   | Meta of {name: Name.t; ushift : int}

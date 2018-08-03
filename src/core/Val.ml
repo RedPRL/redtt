@@ -460,6 +460,13 @@ struct
     | Shut v ->
       make @@ Shut (Value.act phi v)
 
+    | Data lbl ->
+      make @@ Data lbl
+
+    | Intro (dlbl, clbl, args) ->
+      let args' = List.map (Value.act phi) args in
+      make @@ Intro (dlbl, clbl, args')
+
   and act_neu phi con =
     match con with
     | NHCom info ->
@@ -1592,6 +1599,13 @@ struct
     | Tm.Shut t ->
       let v = eval rho t in
       make @@ Shut v
+
+    | Tm.Data lbl ->
+      make @@ Data lbl
+
+    | Tm.Intro (dlbl, clbl, args) ->
+      let vargs = List.map (eval rho) args in
+      make @@ Intro (dlbl, clbl, vargs)
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in

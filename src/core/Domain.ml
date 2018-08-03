@@ -61,6 +61,10 @@ type con =
   | BoxModality : value -> con
   | Shut : value -> con
 
+
+  | Data of Desc.data_label
+  | Intro of Desc.data_label * Desc.con_label * value list
+
 and neu =
   | Lvl : string option * int -> neu
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
@@ -235,6 +239,10 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<box-modality>"
   | Shut _ ->
     Format.fprintf fmt "<shut>"
+  | Data _ ->
+    Format.fprintf fmt "<data>"
+  | Intro _ ->
+    Format.fprintf fmt "<intro>"
 
 
 and pp_value fmt value =
