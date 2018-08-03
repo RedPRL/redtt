@@ -127,6 +127,9 @@ struct
         Format.printf "Defined %s (%fs).@." name (now1 -. now0);
         T.add name alpha env
 
+    | E.Data (_dlbl, _edesc) ->
+      failwith "Elaborating data declaration"
+
     | E.Debug filter ->
       let title =
         match filter with

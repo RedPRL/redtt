@@ -36,8 +36,8 @@ edecl:
   | DEBUG; f = debug_filter
     { E.Debug f }
   | DATA; dlbl = ATOM; WHERE; option(PIPE); constrs = separated_list(PIPE, desc_constr)
-    { let _constrs = List.map (fun constr -> constr dlbl) constrs in
-      failwith "parsing data declaration!!" }
+    { let desc = List.map (fun constr -> constr dlbl) constrs in
+      E.Data (dlbl, desc) }
   | IMPORT; a = ATOM
     { E.Import a }
   | QUIT
