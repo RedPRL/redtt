@@ -6,8 +6,8 @@ let J
   (x : A) (p : Path _ a x)
   : C x p
   =
-  let ty : Line^1 type = λ i →
-    let h : Line A = λ j →
+  let ty : dim → type = λ i →
+    let h : dim → A = λ j →
       comp 0 j a with
       | i=0 ⇒ λ _ → a
       | i=1 ⇒ λ k → p k
@@ -22,7 +22,7 @@ let J/eq
   (C : (x : A) (p : Path A a x) → type) (d : C a (λ _ → a))
   : Path (C a _) (J _ _ C d _ (λ _ → a)) d
   =
-  let square : Line (Line A) =
+  let square : dim → dim → A =
     λ i j →
       comp 0 j a with
       | i=0 ⇒ λ _ → a
@@ -31,7 +31,7 @@ let J/eq
   in
   λ k →
     comp 0 1 d in λ i →
-      let aux : Line A =
+      let aux : dim → A =
         λ j →
           comp 0 j a with
           | k=0 ⇒ λ l → square i l
