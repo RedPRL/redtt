@@ -50,7 +50,7 @@ let symm
 let symm/unit
   (A : type)
   (a : A)
-  : (Path (Path A a a) (λ _ → a) (symm A (λ _ → a)))
+  : (Path (Path _ a a) (λ _ → a) (symm _ (λ _ → a)))
   =
   λ i j →
     symm/filler _ (λ _ → a) i j
@@ -82,7 +82,7 @@ let trans/unit/r
   : Path (Path _ (p 0) (p 1)) (λ i → p i) (trans _ p (λ _ → p 1))
   =
   λ i j →
-    trans/filler A p (λ _ → p 1) i j
+    trans/filler _ p (λ _ → p 1) i j
 
 ; This proof gets simpler when dead tubes are deleted!
 let trans/sym/r

@@ -38,7 +38,7 @@ let connection/or
 let connection/or/diagonal
  (A : type)
  (p : dim → A)
- : singleton (dim → A) p
+ : singleton _ p
  =
  λ i →
    connection/or _ p i i
