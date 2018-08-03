@@ -12,9 +12,9 @@ type 'a constr =
   {params : (string * 'a) tele;
    args : 'a arg_ty list}
 
-
-type data_label
-type con_label
+(* TODO: abstract *)
+type data_label = string
+type con_label = string
 
 
 (** A datatype description is just a list of named constructors. *)
