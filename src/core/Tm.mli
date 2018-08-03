@@ -9,7 +9,7 @@ type ('r, 'a) face = 'r * 'r * 'a option
 type ('r, 'a) system = ('r, 'a) face list
 
 type 'a tmf =
-  | FCom of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a bnd) system}
+  | FHCom of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a bnd) system}
 
   | Univ of {kind : Kind.t; lvl : Lvl.t}
   | Pi of 'a * 'a bnd

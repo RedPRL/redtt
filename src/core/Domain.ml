@@ -21,7 +21,7 @@ type con =
   | Coe : {dir : dir; abs : abs; el : value} -> con
   | HCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
   | GHCom : {dir : dir; ty : value; cap : value; sys : comp_sys} -> con
-  | FCom : {dir : dir; cap : value; sys : comp_sys} -> con
+  | FHCom : {dir : dir; cap : value; sys : comp_sys} -> con
   | Box : {dir : dir; cap : value; sys : box_sys} -> con
 
   | Univ : {kind : Kind.t; lvl : Lvl.t} -> con
@@ -204,8 +204,8 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(hcom %a %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
   | GHCom _ ->
     Format.fprintf fmt "<ghcom>"
-  | FCom _ ->
-    Format.fprintf fmt "<fcom>"
+  | FHCom _ ->
+    Format.fprintf fmt "<fhcom>"
   | Box _ ->
     Format.fprintf fmt "<box>" (* �� *)
   | LblTy {lbl; args; ty} ->

@@ -11,7 +11,7 @@ type ('r, 'a) face = 'r * 'r * 'a option
 type ('r, 'a) system = ('r, 'a) face list
 
 type 'a tmf =
-  | FCom of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a bnd) system}
+  | FHCom of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a bnd) system}
 
   | Univ of {kind : Kind.t; lvl : Lvl.t}
   | Pi of 'a * 'a bnd
@@ -150,12 +150,12 @@ struct
     | (Univ _ | Tt | Ff | Bool | S1 | Nat | Int | Dim0 | Dim1 | TickConst | Base | Zero as con) ->
       con
 
-    | FCom info ->
+    | FHCom info ->
       let r = traverse_tm info.r in
       let r' = traverse_tm info.r' in
       let cap = traverse_tm info.cap in
       let sys = traverse_list traverse_bface info.sys in
-      FCom {r; r'; cap; sys}
+      FHCom {r; r'; cap; sys}
 
     | Pi (dom, cod) ->
       let dom' = traverse_tm dom in
@@ -840,8 +840,8 @@ let rec pp env fmt =
     | Univ {kind; lvl} ->
       Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
 
-    | FCom {r; r'; cap; sys} ->
-      Format.fprintf fmt "@[<hv1>(fcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_bsys env) sys
+    | FHCom {r; r'; cap; sys} ->
+      Format.fprintf fmt "@[<hv1>(fhcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_bsys env) sys
 
     | LblTy {lbl; args; ty} ->
       begin
@@ -1344,12 +1344,12 @@ let map_tmf f =
     Cons (f t0, f t1)
   | LblRet t ->
     LblRet (f t)
-  | FCom info ->
+  | FHCom info ->
     let r = f info.r in
     let r' = f info.r' in
     let cap = f info.cap in
     let sys = map_comp_sys f info.sys in
-    FCom {r; r'; cap; sys}
+    FHCom {r; r'; cap; sys}
   | Pi (dom, cod) ->
     Pi (f dom, map_bnd f cod)
   | Sg (dom, cod) ->
