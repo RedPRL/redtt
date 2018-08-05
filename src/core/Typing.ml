@@ -695,8 +695,32 @@ and infer_spine cx hd =
 
       D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
 
-    | T.Elim _info ->
-      failwith "TODO: infer_spine Tm.Elim"
+    | T.Elim info ->
+      let T.B (nm, mot) = info.mot in
+      let ih = infer_spine cx hd sp in
+      let mot_clo =
+        let cxx, _= Cx.ext_ty cx ~nm ih.ty in
+        check_ty cxx mot;
+        Cx.make_closure cx info.mot
+      in
+
+      let check_clause lbl constr clauses =
+        let _, Tm.NB (_nms, _bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
+        (* Need to extend the context once for each constr.params, and then twice for
+           each constr.args (twice, because of i.h.). *)
+        failwith "TODO: check_clauses"
+      in
+
+      begin
+        match V.unleash ih.ty with
+        | D.Data dlbl ->
+          let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+          List.iter (fun (lbl, constr) -> check_clause lbl constr info.clauses) desc;
+          D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
+
+        | _ ->
+          failwith "eliminator expected datatype"
+      end
 
     | T.Cap info ->
       let fhcom_ty =
