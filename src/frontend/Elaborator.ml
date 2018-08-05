@@ -167,11 +167,19 @@ struct
     let open Desc in
     let elab_arg_ty Self = M.ret Self in
 
+    let rec abstract_tele xs (ps : _ list) =
+      match ps with
+      | [] -> []
+      | (lbl, x, p) :: ps ->
+        let Tm.NB (_, p') = Tm.bindn xs p in
+        (lbl, p') :: abstract_tele (xs #< x) ps
+    in
+
     let rec go acc =
       function
       | [] ->
         traverse elab_arg_ty constr.args <<@> fun args ->
-          clbl, {params = Bwd.to_list acc; args}
+          clbl, {params = abstract_tele Emp @@ Bwd.to_list acc; args}
 
       | (lbl, ety) :: prms ->
         (* TODO: support higher universes *)
@@ -179,7 +187,7 @@ struct
         elab_chk env univ0 ety >>= fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
-        go (acc #< (lbl, pty)) prms
+        go (acc #< (lbl, x, pty)) prms
     in
 
     go Emp constr.params
