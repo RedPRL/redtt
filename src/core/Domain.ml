@@ -84,6 +84,7 @@ and neu =
   | IntRec : {mot : clo; neu : neu; pcase : clo; ncase : clo} -> neu
 
   | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
+  | Elim : {mot : clo; neu : neu; clauses : (Desc.con_label * nclo) list} -> neu
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : atom; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
@@ -357,6 +358,9 @@ and pp_neu fmt neu =
 
   | S1Rec _ ->
     Format.fprintf fmt "<S1-rec>"
+
+  | Elim _ ->
+    Format.fprintf fmt "<elim>"
 
   | Cap _ ->
     Format.fprintf fmt "<cap>"

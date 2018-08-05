@@ -597,6 +597,19 @@ struct
           step @@ s1_rec mot v bcase lcase
       end
 
+    | Elim info ->
+      let mot = Clo.act phi info.mot in
+      let go (lbl, nclo) = lbl, NClo.act phi nclo in
+      let clauses = List.map go info.clauses in
+      begin
+        match act_neu phi info.neu with
+        | Ret neu ->
+          ret @@ Elim {mot; neu; clauses}
+        | Step _v ->
+          failwith "TODO: Val.act of Elim"
+      end
+
+
     | LblCall neu ->
       begin
         match act_neu phi neu with
