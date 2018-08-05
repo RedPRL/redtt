@@ -604,9 +604,9 @@ struct
       begin
         match act_neu phi info.neu with
         | Ret neu ->
-          ret @@ Elim {mot; neu; clauses}
+          ret @@ Elim {info with mot; neu; clauses}
         | Step v ->
-          step @@ elim_data mot v clauses
+          step @@ elim_data info.dlbl mot v clauses
       end
 
 
@@ -1689,7 +1689,7 @@ struct
     | Tm.Elim info ->
       let mot = clo info.mot rho in
       let clauses = List.map (fun (lbl, nbnd) -> lbl, nclo nbnd rho) info.clauses in
-      elim_data mot vhd clauses
+      elim_data info.dlbl mot vhd clauses
 
 
   and eval_head rho =
@@ -2292,7 +2292,7 @@ struct
     | _ ->
       raise @@ E (RecursorUnexpectedArgument ("natural numbers", scrut))
 
-  and elim_data mot scrut clauses =
+  and elim_data dlbl mot scrut clauses =
     match unleash scrut with
     | Intro (clbl, vs) ->
       let _, nclo = List.find (fun (clbl', _) -> clbl = clbl') clauses in
@@ -2300,13 +2300,13 @@ struct
       inst_nclo nclo vs
 
     | Up up ->
-      let neu = Elim {mot; neu = up.neu; clauses} in
+      let neu = Elim {dlbl; mot; neu = up.neu; clauses} in
       let mot' = inst_clo mot scrut in
       let elim_face =
         Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
-        elim_data (Clo.act phi mot) a clauses'
+        elim_data dlbl (Clo.act phi mot) a clauses'
       in
       let elim_sys = List.map elim_face up.sys in
       make @@ Up {ty = mot'; neu; sys = elim_sys}

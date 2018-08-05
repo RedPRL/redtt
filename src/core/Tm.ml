@@ -100,7 +100,7 @@ and 'a frame =
   | Prev of 'a
   | Open
 
-  | Elim of {mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
+  | Elim of {dlbl : Desc.data_label; mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
@@ -464,7 +464,7 @@ struct
     | Elim info ->
       let mot = traverse_bnd traverse_tm info.mot in
       let clauses = List.map (fun (lbl, bnd) -> lbl, traverse_nbnd traverse_tm bnd) info.clauses in
-      Elim {mot; clauses}
+      Elim {info with mot; clauses}
 
     | VProj info ->
       let r = traverse_tm info.r in
@@ -1333,7 +1333,7 @@ let map_frame f =
   | Elim info ->
     let mot = map_bnd f info.mot in
     let clauses = List.map (fun (lbl, bnd) -> lbl, map_nbnd f bnd) info.clauses in
-    Elim {mot; clauses}
+    Elim {info with mot; clauses}
   | VProj info ->
     let r = f info.r in
     let ty0 = f info.ty0 in
