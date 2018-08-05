@@ -509,6 +509,19 @@ struct
       let frame = Tm.NatRec {mot = Tm.B (clo_name rec0.mot, mot); zcase; scase = Tm.NB (nclo_names rec0.scase, scase)} in
       equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
 
+    | Elim elim0, Elim elim1 ->
+      let _mot =
+        (* damn: in order to even implement this, I need some annotation of the datatype
+           this is coming from here *)
+        let data_ty = failwith "shoot" in
+        let var = generic env data_ty in
+        let env' = Env.succ env in
+        let vmot0 = inst_clo elim0.mot var in
+        let vmot1 = inst_clo elim1.mot var in
+        equate_ty env' vmot0 vmot1
+      in
+      failwith ""
+
     | IntRec rec0, IntRec rec1 ->
       let mot =
         let var = generic env @@ make Int in
