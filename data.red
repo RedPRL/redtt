@@ -21,8 +21,8 @@ debug
 ; Once the eliminators are being elaborated,
 ; we can do something like this:
 
-; let nat-pred (x : nat) : nat =
-;   elim x with
-;   | ze ⇒ zero
-;   | su n ⇒ n
-;   end
+let nat-pred (x : nat) : nat =
+  elim x with
+  | ze ⇒ zero
+  | su n ⇒ n
+  end

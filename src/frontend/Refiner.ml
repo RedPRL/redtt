@@ -244,6 +244,35 @@ let rec tac_lambda names tac ty =
 
 (* TODO factor out the motive inference algorithm *)
 
+let tac_elim ~tac_mot ~tac_scrut ~clauses:_ =
+  fun ty ->
+    tac_scrut >>= fun (data_ty, scrut) ->
+    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    let mot_ty = Tm.pi None data_ty univ in
+    begin
+      match tac_mot with
+      | None ->
+        let is_dependent =
+          match Tm.unleash scrut with
+          | Tm.Up (Tm.Var {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
+          | _ -> false
+        in
+        if is_dependent then
+          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
+          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
+          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
+          M.unify >>
+          M.ret mot
+        else
+          M.ret (fun _ -> ty)
+      | Some tac_mot ->
+        tac_mot mot_ty >>= fun mot ->
+        let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
+        M.ret fmot
+    end >>= fun _mot ->
+
+    failwith "TODO: tac_elim"
+
 let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scase, tac_scase) =
   fun ty ->
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in

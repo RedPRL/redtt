@@ -286,6 +286,12 @@ struct
       end
 
 
+    | _, E.Elim {mot; scrut; clauses} ->
+      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) mot in
+      let tac_scrut = elab_inf env scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
+      let clauses = List.map (fun (lbl, pbinds, bdy) -> lbl, pbinds, fun ty -> elab_chk env ty bdy) clauses in
+      tac_elim ~tac_mot ~tac_scrut ~clauses ty
+
     | _, E.If (omot, escrut, etcase, efcase) ->
       let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
       let tac_scrut ty = elab_chk env ty escrut in
