@@ -7,6 +7,7 @@ type value = D.value
 type cx = Cx.t
 
 open RedBasis.Bwd
+open BwdNotation
 
 type cofibration = (I.t * I.t) list
 
@@ -707,10 +708,24 @@ and infer_spine cx hd =
       let check_clause lbl constr clauses =
         let open Desc in
         let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
-        let rec build_cx params args = failwith "TODO" in
+        let rec build_cx cx vs params args =
+          match params, args with
+          | (plbl, pty) :: ps, _ ->
+            let env_els = List.map (fun v -> D.Val v) @@ Bwd.to_list vs in
+            let env = D.Env.push_many env_els D.Env.emp in
+            let vty = V.eval env pty in
+            let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
+            build_cx cx' (vs #< v) ps args
+          | [], Self :: args ->
+            let cx_x, v_x = Cx.ext_ty cx ~nm:None ih.ty in
+            let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
+            build_cx cx_ih (vs #< v_x #< v_ih) [] args
+          | [], [] ->
+            cx
+        in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx' = build_cx constr.params constr.args in
+        let cx' = build_cx cx Emp constr.params constr.args in
         let intro = D.make @@ D.Intro (lbl, failwith "TODO") in
         let ty = V.inst_clo mot_clo intro in
         check cx' ty bdy
