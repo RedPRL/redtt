@@ -18,9 +18,14 @@ data boolean where
 
 data void where
 
-let abort (A : type) (x : void) : A =
+let not (x : boolean) : boolean =
   elim x with
+  | true ⇒ false
+  | false ⇒ true
   end
+
+let foo : Path _ (not true) false =
+  λ _ → false
 
 debug
 

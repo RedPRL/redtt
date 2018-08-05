@@ -78,18 +78,22 @@ struct
     | E.App (E.Var (nm, _) as e) ->
       get_resolver env >>= fun renv ->
       begin
-        match ResEnv.get nm renv with
-        | `Var alpha ->
-          M.lift C.get_global_env >>= fun env ->
+        try
           begin
-            match GlobalEnv.lookup_kind env alpha with
-            | `P _ -> M.ret @@ `FunApp e
-            | `Tw _ -> M.ret @@ `FunApp e
-            | `I -> M.ret @@ `ExtApp e
-            | `Tick -> M.ret @@ `Prev e
+            match ResEnv.get nm renv with
+            | `Var alpha ->
+              M.lift C.get_global_env >>= fun env ->
+              begin
+                match GlobalEnv.lookup_kind env alpha with
+                | `P _ -> M.ret @@ `FunApp e
+                | `Tw _ -> M.ret @@ `FunApp e
+                | `I -> M.ret @@ `ExtApp e
+                | `Tick -> M.ret @@ `Prev e
+              end
+            | _ ->
+              failwith "kind_of_frame"
           end
-        | _ ->
-          failwith "kind_of_frame"
+        with _ -> M.ret @@ `FunApp e
       end
     | E.App e ->
       M.ret @@ `FunApp e

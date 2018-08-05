@@ -254,7 +254,7 @@ let unleash_data ty =
 module MonadUtil = Monad.Util (ElabMonad)
 open MonadUtil
 
-let tac_elim ~tac_mot ~tac_scrut ~clauses =
+let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
@@ -288,31 +288,33 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses =
         let sign = Cx.globals cx in
         let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl sign in
         desc
-    end >>= fun _desc ->
+    end >>= fun desc ->
 
-    let refine_clause (lbl, _pbinds, (clause_tac : chk_tac)) =
+    let refine_clause (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
-      let rec _go pbinds ps args =
+      let _, constr = List.find (fun (clbl', _) -> clbl = clbl') desc in
+      let rec go xs tms pbinds ps args =
         match pbinds, ps, args with
-        | ESig.PVar _, (_plbl, _pty) :: _ps, _ ->
-          failwith ""
+        | ESig.PVar _ :: _pbinds, (_plbl, _pty) :: _ps, _ ->
+          failwith "foo"
 
-        | ESig.PVar _, [], Self :: _args ->
-          failwith ""
+        | ESig.PVar _ :: _pbinds, [], Self :: _args ->
+          failwith "bar"
 
-        | ESig.PIndVar _, [], Self :: _args ->
-          failwith ""
+        | ESig.PIndVar _ :: _pbinds, [], Self :: _args ->
+          failwith "baz"
 
         | _, [], [] ->
-          failwith ""
+          xs, Bwd.to_list tms
 
         | _ ->
           failwith "refine_clause"
       in
-      let clause_ty = failwith "" in
+      let xs, tms = go Emp Emp pbinds constr.params constr.args in
+      let intro = Tm.make @@ Tm.Intro (dlbl, tms) in
+      let clause_ty = mot intro in
       clause_tac clause_ty >>= fun bdy ->
-      let xs = failwith "" in
-      M.ret (lbl, Tm.bindn xs bdy)
+      M.ret (clbl, Tm.bindn xs bdy)
     in
 
     traverse (fun x -> x) @@ List.map refine_clause clauses >>= fun tclauses ->
