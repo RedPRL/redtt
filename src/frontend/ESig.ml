@@ -32,8 +32,10 @@ and eterm =
   | Int | Pos of eterm | NegSuc of eterm
   | IntRec of eterm option * eterm * (string * eterm) * (string * eterm)
 
-  | S1Rec of eterm option * eterm * eterm * (string * eterm)
   | S1 | Base | Loop of eterm
+  | S1Rec of eterm option * eterm * eterm * (string * eterm)
+
+  | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
 
   | Pi of etele * eterm
   | Sg of etele * eterm
@@ -54,6 +56,10 @@ and eterm =
 
   | Var of string * int
   | Num of int
+
+and eclause = epat * eterm
+and epat = Desc.con_label * epatbind list
+and epatbind = PVar of string | PIndVar of string * string
 
 and esys = eface list
 
