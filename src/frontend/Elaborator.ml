@@ -127,8 +127,10 @@ struct
         Format.printf "Defined %s (%fs).@." name (now1 -. now0);
         T.add name alpha env
 
-    | E.Data (_dlbl, _edesc) ->
-      failwith "Elaborating data declaration"
+    | E.Data (dlbl, edesc) ->
+      elab_datatype edesc >>= fun desc ->
+      M.lift @@ C.global (GlobalEnv.declare_datatype dlbl desc) >>
+      M.ret env
 
     | E.Debug filter ->
       let title =
@@ -151,6 +153,9 @@ struct
 
     | E.Quit ->
       M.ret env
+
+  and elab_datatype _edesc =
+    failwith "elaborating datatype"
 
   and elab_scheme env (cells, ecod) kont =
     let rec go =
