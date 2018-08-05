@@ -708,25 +708,26 @@ and infer_spine cx hd =
       let check_clause lbl constr clauses =
         let open Desc in
         let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
-        let rec build_cx cx vs params args =
+
+        (* 'cx' is local context extended with hyps;
+           'env' is the environment for evaluating the types that comprise
+           the constructor, and should therefore begin with the *empty* environment. *)
+        let rec build_cx cx env vs params args =
           match params, args with
           | (plbl, pty) :: ps, _ ->
-            (* Hope this stuff isn't backwards, LOL *)
-            let env_els = List.map (fun v -> D.Val v) @@ Bwd.to_list vs in
-            let env = D.Env.push_many env_els D.Env.emp in
             let vty = V.eval env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (vs #< v) ps args
+            build_cx cx' (D.Env.push (D.Val v) env) (vs #< v) ps args
           | [], Self :: args ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:None ih.ty in
             let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih (vs #< v_x #< v_ih) [] args
+            build_cx cx_ih (D.Env.push_many [D.Val v_x; D.Val v_ih] env) (vs #< v_x #< v_ih) [] args
           | [], [] ->
             cx, Bwd.to_list vs
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', vs = build_cx cx Emp constr.params constr.args in
+        let cx', vs = build_cx cx D.Env.emp Emp constr.params constr.args in
         let intro = D.make @@ D.Intro (lbl, vs) in
         let ty = V.inst_clo mot_clo intro in
         check cx' ty bdy
