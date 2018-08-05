@@ -28,6 +28,9 @@ type cx =
 
 type t = cx
 
+let globals cx =
+  cx.sign
+
 let clear_locals cx =
   {cx with
    qenv = Quote.Env.emp;

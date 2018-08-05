@@ -3,6 +3,7 @@ type t = cx
 type value = Domain.value
 
 val init : GlobalEnv.t -> t
+val globals : t -> GlobalEnv.t
 
 val clear_locals : t -> t
 

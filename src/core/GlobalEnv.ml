@@ -169,6 +169,10 @@ struct
     (* Format.eprintf "[%a] != %a ==> %a@." Restriction.pp restriction Name.pp x I.pp r; *)
     r
 
+  let lookup_datatype lbl =
+    let Desc desc = lookup_datatype lbl Sig.globals in
+    desc
+
   let lookup nm tw =
     let param, _ =
       try

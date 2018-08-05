@@ -171,6 +171,15 @@ end
 
 
 
+
+module type Sig =
+sig
+  val restriction : Restriction.t
+  val global_dim : I.atom -> I.t
+  val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
+  val lookup_datatype : Desc.data_label -> Tm.tm Desc.desc
+end
+
 module type S =
 sig
   val unleash : value -> con
@@ -214,24 +223,16 @@ sig
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 
-  val base_restriction : Restriction.t
+  module Sig : Sig
 
   module Macro : sig
     val equiv : value -> value -> value
   end
 end
 
-module type Sig =
-sig
-  val restriction : Restriction.t
-  val global_dim : I.atom -> I.t
-  val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
-end
-
-module M (Sig : Sig) : S =
+module M (Sig : Sig) : S with module Sig = Sig =
 struct
-  let base_restriction = Sig.restriction
-
+  module Sig = Sig
 
   let make_closure rho bnd =
     Clo {bnd; rho}
