@@ -63,7 +63,7 @@ type con =
 
 
   | Data of Desc.data_label
-  | Intro of Desc.data_label * Desc.con_label * env_el bwd
+  | Intro of Desc.data_label * Desc.con_label * value list
 
 and neu =
   | Lvl : string option * int -> neu
@@ -412,19 +412,14 @@ module Abs = IAbs.M (Value)
 module ValFace = Face.M (Value)
 module AbsFace = Face.M (Abs)
 
-module EnvEl : Sort.S with type t = env_el with type 'a m = 'a =
-struct
-  type t = env_el
-  type 'a m = 'a
-  let act phi =
-    function
-    | Val v ->
-      Val (Value.act phi v)
-    | Atom x ->
-      Atom (I.act phi x)
-    | Tick tck ->
-      Tick tck
-end
+let act_env_cell phi =
+  function
+  | Val v ->
+    Val (Value.act phi v)
+  | Atom x ->
+    Atom (I.act phi x)
+  | Tick tck ->
+    Tick tck
 
 module Env =
 struct
@@ -443,7 +438,7 @@ struct
     {cells = els @ cells; global}
 
   let act phi {cells; global} =
-    {cells = List.map (EnvEl.act phi) cells;
+    {cells = List.map (act_env_cell phi) cells;
      global = I.cmp phi global}
 end
 

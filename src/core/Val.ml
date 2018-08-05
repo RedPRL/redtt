@@ -1,5 +1,5 @@
 open RedBasis
-open Bwd open BwdNotation
+open Bwd
 open Domain
 
 type step =
@@ -465,7 +465,7 @@ struct
       make @@ Data lbl
 
     | Intro (dlbl, clbl, args) ->
-      let args' = Bwd.map (EnvEl.act phi) args in
+      let args' = List.map (Value.act phi) args in
       make @@ Intro (dlbl, clbl, args')
 
   and act_neu phi con =
@@ -1750,7 +1750,7 @@ struct
       make @@ Data lbl
 
     | Tm.Intro (dlbl, clbl) ->
-      make @@ Intro (dlbl, clbl, Emp)
+      make @@ Intro (dlbl, clbl, failwith "TODO: eval Tm.Intro")
 
 
   and reflect ty neu sys =
@@ -1964,9 +1964,6 @@ struct
     | Lam clo ->
       inst_clo clo varg
 
-    | Intro (dlbl, clbl, args) ->
-      make @@ Intro (dlbl, clbl, args #< (Val varg))
-
     | Up info ->
       let dom, cod = unleash_pi info.ty in
       let cod' = inst_clo cod varg in
@@ -2026,9 +2023,6 @@ struct
     match unleash vext with
     | ExtLam abs ->
       Abs.inst abs (Bwd.from_list ss)
-
-    | Intro (dlbl, clbl, args) ->
-      make @@ Intro (dlbl, clbl, args <>< List.map (fun s -> Atom s) ss)
 
     | Up info ->
       let tyr, sysr = unleash_ext_with info.ty ss in
