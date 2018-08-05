@@ -2,7 +2,7 @@ import path
 
 data tree where
 | nil
-| fork of (lbl : nat) (foo : Path nat lbl lbl) × tree × tree
+| fork of (lbl : nat) (foo : Path _ lbl lbl) × tree × tree
 
 ; an example that exercises definitional equivalence for constructors
 let test (t : tree)

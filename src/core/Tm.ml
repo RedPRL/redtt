@@ -100,6 +100,8 @@ and 'a frame =
   | Prev of 'a
   | Open
 
+  | Elim of {mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
+
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine
 
@@ -458,6 +460,11 @@ struct
       let bcase = traverse_tm info.bcase in
       let lcase = traverse_bnd traverse_tm info.lcase in
       S1Rec {mot; bcase; lcase}
+
+    | Elim info ->
+      let mot = traverse_bnd traverse_tm info.mot in
+      let clauses = List.map (fun (lbl, bnd) -> lbl, traverse_nbnd traverse_tm bnd) info.clauses in
+      Elim {mot; clauses}
 
     | VProj info ->
       let r = traverse_tm info.r in
@@ -947,7 +954,7 @@ and pp_head env fmt =
 
   | Var info ->
     Name.pp fmt info.name;
-    if info.ushift > 0 then Format.fprintf fmt "^%i" info.ushift else ()
+    if info.ushift > 0 then Format.fprintf fmt "^%i" info.ushift
 
   | Meta {name; ushift} ->
     Format.fprintf fmt "?%a^%i"
@@ -994,6 +1001,9 @@ and pp_cmd env fmt (hd, sp) =
         let x_mot, env_mot = Pretty.Env.bind nm_mot env in
         let x_lcase, env_lcase = Pretty.Env.bind nm_lcase env in
         Format.fprintf fmt "@[<hv1>(S1rec@ [%a] %a@ %a %a [%a] %a)@]" Uuseg_string.pp_utf_8 x_mot (pp env_mot) mot (go `S1Rec) sp (pp env) bcase Uuseg_string.pp_utf_8 x_lcase (pp env_lcase) lcase
+      | Elim _ ->
+        (* TODO *)
+        Format.fprintf fmt "<elim>"
       | VProj {r; ty0; ty1; equiv} ->
         Format.fprintf fmt "@[<hv1>(vproj %a@ %a@ %a@ %a@ %a)@]" (pp env) r (go `VProj) sp (pp env) ty0 (pp env) ty1 (pp env) equiv
       | Cap _ ->
@@ -1193,8 +1203,6 @@ struct
     begin
       if fl = `Vars || (fl = `RigVars && !srigid) then
         insert name
-      else
-        ()
     end;
     Var {name; twin; ushift}, Emp
 
@@ -1202,8 +1210,6 @@ struct
     begin
       if fl = `Metas then
         insert name
-      else
-        ()
     end;
     Meta {name; ushift}, Emp
 end
@@ -1324,6 +1330,10 @@ let map_frame f =
     let bcase = f info.bcase in
     let lcase = map_bnd f info.lcase in
     S1Rec {mot; bcase; lcase}
+  | Elim info ->
+    let mot = map_bnd f info.mot in
+    let clauses = List.map (fun (lbl, bnd) -> lbl, map_nbnd f bnd) info.clauses in
+    Elim {mot; clauses}
   | VProj info ->
     let r = f info.r in
     let ty0 = f info.ty0 in

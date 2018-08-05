@@ -695,6 +695,9 @@ and infer_spine cx hd =
 
       D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
 
+    | T.Elim _info ->
+      failwith "TODO: infer_spine Tm.Elim"
+
     | T.Cap info ->
       let fhcom_ty =
         check_eval_ty cx @@

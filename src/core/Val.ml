@@ -1673,6 +1673,8 @@ struct
       prev vtick vhd
     | Tm.Open ->
       modal_open vhd
+    | Tm.Elim _ ->
+      failwith "TODO: eval Tm.Elim"
 
 
   and eval_head rho =
