@@ -294,7 +294,7 @@ let rec check cx ty tm =
       let vty = check_eval_ty cx ty in
       check cx vty tm
     in
-    ignore @@ List.map go_arg info.args
+    List.iter go_arg info.args
 
   | D.LblTy info, T.LblRet t ->
     check cx info.ty t
@@ -362,7 +362,7 @@ and check_constr cx dlbl constr args =
   let check_args _cx' arg_tys args =
     (* TODO: eventually the _cx' here will matter below *)
     let vdataty = D.make @@ D.Data dlbl in
-    ignore @@ List.map2 (fun Desc.Self arg -> check cx vdataty arg) arg_tys args
+    List.iter2 (fun Desc.Self arg -> check cx vdataty arg) arg_tys args
   in
   let cx', args = check_params cx constr.params args in
   check_args cx' constr.args args
@@ -704,7 +704,7 @@ and infer_spine cx hd =
         Cx.make_closure cx info.mot
       in
 
-      let check_clause lbl constr clauses =
+      let check_clause lbl _constr clauses =
         let _, Tm.NB (_nms, _bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)

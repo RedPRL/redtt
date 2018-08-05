@@ -818,7 +818,7 @@ struct
         equiv_ty env nf0.ty nf1.ty;
         equiv env ~ty:nf0.ty nf0.el nf1.el
       in
-      ignore @@ List.map go_arg @@ List.combine info0.args info1.args
+      List.iter go_arg @@ List.combine info0.args info1.args
 
     | Univ info0, Univ info1 ->
       if Kind.lte info0.kind info1.kind && Lvl.lte info0.lvl info1.lvl then
