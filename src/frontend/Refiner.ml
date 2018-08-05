@@ -251,6 +251,9 @@ let unleash_data ty =
     Format.eprintf "Shit: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
 
+module MonadUtil = Monad.Util (ElabMonad)
+open MonadUtil
+
 let tac_elim ~tac_mot ~tac_scrut ~clauses =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
@@ -278,14 +281,48 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses =
         M.ret fmot
     end >>= fun mot ->
 
-    let tclauses = failwith "TODO: refine pattern clauses" in
+    let dlbl = unleash_data data_ty in
+
+    begin
+      M.lift C.base_cx <<@> fun cx ->
+        let sign = Cx.globals cx in
+        let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl sign in
+        desc
+    end >>= fun _desc ->
+
+    let refine_clause (lbl, _pbinds, (clause_tac : chk_tac)) =
+      let open Desc in
+      let rec _go pbinds ps args =
+        match pbinds, ps, args with
+        | ESig.PVar _, (_plbl, _pty) :: _ps, _ ->
+          failwith ""
+
+        | ESig.PVar _, [], Self :: _args ->
+          failwith ""
+
+        | ESig.PIndVar _, [], Self :: _args ->
+          failwith ""
+
+        | _, [], [] ->
+          failwith ""
+
+        | _ ->
+          failwith "refine_clause"
+      in
+      let clause_ty = failwith "" in
+      clause_tac clause_ty >>= fun bdy ->
+      let xs = failwith "" in
+      M.ret (lbl, Tm.bindn xs bdy)
+    in
+
+    traverse (fun x -> x) @@ List.map refine_clause clauses >>= fun tclauses ->
 
     let hd = Tm.Down {ty = data_ty; tm = scrut} in
     let bmot =
       let x = Name.fresh () in
       Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
     in
-    let frm = Tm.Elim {dlbl = unleash_data data_ty; mot = bmot; clauses = tclauses} in
+    let frm = Tm.Elim {dlbl; mot = bmot; clauses = tclauses} in
     M.ret @@ Tm.up (hd, Emp #< frm)
 
 let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scase, tac_scase) =
