@@ -585,8 +585,7 @@ struct
           let sign = Cx.globals cx in
           let GlobalEnv.Desc _ = GlobalEnv.lookup_datatype name sign in
           let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
-          let hd = Tm.Down {ty = univ0; tm = Tm.make @@ Tm.Data name} in
-          let cmd = hd, Emp in
+          let cmd = Tm.Data name, Emp in
           univ0, cmd
       end
 
