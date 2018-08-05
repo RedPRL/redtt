@@ -178,6 +178,8 @@ struct
     let rec go acc =
       function
       | [] ->
+        (* TODO: when self args are more complex, we'll need to abstract them over
+           the parameters too. *)
         traverse elab_arg_ty constr.args <<@> fun args ->
           clbl, {params = abstract_tele Emp @@ Bwd.to_list acc; args}
 
