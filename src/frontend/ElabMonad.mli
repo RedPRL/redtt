@@ -4,6 +4,8 @@ open Dev
 
 include Monad.S
 
+val optional : 'a m -> 'a option m
+
 val lift : 'a Contextual.m -> 'a m
 val in_scope : Name.t -> ty param -> 'a m -> 'a m
 val in_scopes : (Name.t * ty param) list -> 'a m -> 'a m

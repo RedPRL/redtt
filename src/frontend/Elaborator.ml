@@ -64,9 +64,8 @@ struct
       go_locals renv psi
 
   let (<+>) m n =
-    C.bind (C.optional m) @@
-    function
-    | Some x -> C.ret x
+    M.optional m >>= function
+    | Some x -> M.ret x
     | None -> n
 
 
@@ -576,9 +575,20 @@ struct
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
     match e with
     | E.Var (name, ushift) ->
-      elab_var env name ushift >>= fun (a, cmd) ->
-      M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) <<@> fun ty ->
-        Tm.shift_univ ushift ty, cmd
+      begin
+        elab_var env name ushift >>= fun (a, cmd) ->
+        M.lift (C.lookup_var a `Only) <+> (M.lift (C.lookup_meta a) <<@> fst) <<@> fun ty ->
+          Tm.shift_univ ushift ty, cmd
+      end <+>
+      begin
+        M.lift C.base_cx <<@> fun cx ->
+          let sign = Cx.globals cx in
+          let GlobalEnv.Desc _ = GlobalEnv.lookup_datatype name sign in
+          let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
+          let hd = Tm.Down {ty = univ0; tm = Tm.make @@ Tm.Data name} in
+          let cmd = hd, Emp in
+          univ0, cmd
+      end
 
     | E.Quo tmfam ->
       get_resolver env >>= fun renv ->

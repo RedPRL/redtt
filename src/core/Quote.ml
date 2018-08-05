@@ -73,14 +73,27 @@ end
 type error =
   | ErrEquateNf of {env : Env.t; ty : value; el0 : value; el1 : value}
   | ErrEquateNeu of {env : Env.t; neu0 : neu; neu1 : neu}
+  | ErrEquateLbl of string * string
 
 let pp_error fmt =
   function
   | ErrEquateNf {ty; el0; el1; _} ->
-    Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Domain.pp_value el0 Uuseg_string.pp_utf_8 "≠" Domain.pp_value el1 Domain.pp_value ty
+    Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]"
+      Domain.pp_value el0
+      Uuseg_string.pp_utf_8 "≠"
+      Domain.pp_value el1 Domain.pp_value ty
 
   | ErrEquateNeu {neu0; neu1; _} ->
-    Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" Domain.pp_neu neu0 Uuseg_string.pp_utf_8 "≠" Domain.pp_neu neu1
+    Format.fprintf fmt "@[<hv>%a@ %a@ %a@]"
+      Domain.pp_neu neu0
+      Uuseg_string.pp_utf_8 "≠"
+      Domain.pp_neu neu1
+
+  | ErrEquateLbl (lbl0, lbl1) ->
+    Format.fprintf fmt "@[<hv>%a@ %a@ %a@]"
+      Uuseg_string.pp_utf_8 lbl0
+      Uuseg_string.pp_utf_8 "≠"
+      Uuseg_string.pp_utf_8 lbl1
 
 exception E of error
 
@@ -254,6 +267,12 @@ struct
         let vcod1 = inst_clo pi1.cod var in
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi (clo_name pi0.cod) dom cod
+
+      | Data lbl0, Data lbl1 ->
+        if lbl0 = lbl1 then
+          Tm.make @@ Tm.Data lbl0
+        else
+          raise @@ E (ErrEquateLbl (lbl0, lbl1))
 
       | Later ltr0, Later ltr1 ->
         let tick = TickGen (`Lvl (None, Env.len env)) in

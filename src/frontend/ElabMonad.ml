@@ -13,6 +13,10 @@ type diagnostic =
 
 type 'a m = ('a * diagnostic bwd) C.m
 
+let optional (m : 'a m) : 'a option m =
+  C.bind (C.optional m) @@ function
+  | None -> C.ret (None, Emp)
+  | Some (a, ds) -> C.ret (Some a, ds)
 
 let ret a =
   C.ret (a, Emp)
