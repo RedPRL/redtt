@@ -20,6 +20,13 @@ struct
   module Notation = Monad.Notation (M)
   open Notation
 
+  let rec traverse f xs =
+    match xs with
+    | [] ->
+      M.ret []
+    | x :: xs ->
+      (fun y ys -> y :: ys) <@>> f x <*> traverse f xs
+
   module E = ESig
   module T = Map.Make (String)
 
@@ -128,7 +135,7 @@ struct
         T.add name alpha env
 
     | E.Data (dlbl, edesc) ->
-      elab_datatype edesc >>= fun desc ->
+      elab_datatype env edesc >>= fun desc ->
       M.lift @@ C.global (GlobalEnv.declare_datatype dlbl desc) >>
       M.ret env
 
@@ -154,8 +161,27 @@ struct
     | E.Quit ->
       M.ret env
 
-  and elab_datatype _edesc =
-    failwith "elaborating datatype"
+  and elab_datatype env edesc =
+    traverse (elab_constr env) edesc
+
+  and elab_constr env (clbl, constr) =
+    let open Desc in
+    let elab_arg_ty Self = M.ret Self in
+
+    let rec go acc =
+      function
+      | [] ->
+        traverse elab_arg_ty constr.args <<@> fun args ->
+          clbl, {params = Bwd.to_list acc; args}
+
+      | (lbl, ety) :: prms ->
+        elab_chk env univ ety >>= fun pty ->
+        let x = Name.named @@ Some lbl in
+        M.in_scope x (`P pty) @@
+        go (acc #< (lbl, pty)) prms
+    in
+
+    go Emp constr.params
 
   and elab_scheme env (cells, ecod) kont =
     let rec go =
@@ -707,12 +733,6 @@ struct
     M.lift C.base_cx <<@> fun cx ->
       cx, Cx.evaluator cx
 
-  and traverse f xs =
-    match xs with
-    | [] ->
-      M.ret []
-    | x :: xs ->
-      (fun y ys -> y :: ys) <@>> f x <*> traverse f xs
 
   and elab_chk_cut env exp frms ty =
     elab_cut env exp frms >>= fun (vty, cmd) ->
