@@ -216,6 +216,11 @@ let rec check cx ty tm =
     let _ = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     ()
 
+  | D.Data dlbl, T.Intro (clbl, args) ->
+    let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+    let _, constr = List.find (fun (clbl', _) -> clbl = clbl') desc in
+    check_constr cx dlbl constr args
+
 
   | D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
     let cxx, x = Cx.ext_ty cx ~nm dom in
@@ -341,6 +346,26 @@ let rec check cx ty tm =
   | _ ->
     (* Format.eprintf "Failed to check term %a@." (Tm.pp (CxUtil.ppenv cx)) tm; *)
     failwith "Type error"
+
+and check_constr cx dlbl constr args =
+  let rec check_params cx' ps args =
+    match ps, args with
+    | [], _ ->
+      cx', args
+    | (plbl, pty) :: ps, targ :: args ->
+      let vpty = Cx.eval cx' pty in
+      let varg = check_eval cx vpty targ in
+      let cx' = Cx.def cx ~nm:(Some plbl) ~ty:vpty ~el:varg in
+      check_params cx' ps args
+    | _ -> failwith "constructor arguments malformed"
+  in
+  let check_args _cx' arg_tys args =
+    (* TODO: eventually the _cx' here will matter below *)
+    let vdataty = D.make @@ D.Data dlbl in
+    ignore @@ List.map2 (fun Desc.Self arg -> check cx vdataty arg) arg_tys args
+  in
+  let cx', args = check_params cx constr.params args in
+  check_args cx' constr.args args
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->

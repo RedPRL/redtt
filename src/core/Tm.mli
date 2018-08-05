@@ -64,7 +64,7 @@ type 'a tmf =
   | Let of 'a cmd * 'a bnd
 
   | Data of Desc.data_label
-  | Intro of Desc.data_label * Desc.con_label * 'a list
+  | Intro of Desc.con_label * 'a list
 
 
 and 'a head =

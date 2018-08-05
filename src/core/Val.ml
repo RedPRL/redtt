@@ -464,9 +464,9 @@ struct
     | Data lbl ->
       make @@ Data lbl
 
-    | Intro (dlbl, clbl, args) ->
+    | Intro (clbl, args) ->
       let args' = List.map (Value.act phi) args in
-      make @@ Intro (dlbl, clbl, args')
+      make @@ Intro (clbl, args')
 
   and act_neu phi con =
     match con with
@@ -1604,9 +1604,9 @@ struct
     | Tm.Data lbl ->
       make @@ Data lbl
 
-    | Tm.Intro (dlbl, clbl, args) ->
+    | Tm.Intro (clbl, args) ->
       let vargs = List.map (eval rho) args in
-      make @@ Intro (dlbl, clbl, vargs)
+      make @@ Intro (clbl, vargs)
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
