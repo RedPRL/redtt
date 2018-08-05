@@ -457,6 +457,11 @@ struct
           raise exn
       end
 
+    | _, E.Var _ ->
+      elab_chk_cut env e Emp ty
+      <<@> snd
+      <<@> Tm.up
+
     | _, e ->
       elab_up env ty e
 
@@ -747,6 +752,28 @@ struct
 
 
   and elab_chk_cut env exp frms ty =
+    match Tm.unleash ty with
+    | Tm.Data dlbl ->
+      begin
+        match exp with
+        | E.Var (clbl, _) ->
+          M.lift C.base_cx <<@> fun cx ->
+            let sign = Cx.globals cx in
+            let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl sign in
+            let _, constr = List.find (fun (clbl', _) -> clbl = clbl') desc in
+            elab_intro env dlbl clbl constr frms
+
+        | _ ->
+          elab_mode_switch_cut env exp frms ty
+      end
+
+    | _ ->
+      elab_mode_switch_cut env exp frms ty
+
+  and elab_intro _env _dlbl _clbl _constr _frms =
+    failwith "TODO: elab_intro"
+
+  and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (vty, cmd) ->
     M.lift C.base_cx >>= fun cx ->
     let ty' = Cx.quote_ty cx vty in
