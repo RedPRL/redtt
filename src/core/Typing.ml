@@ -212,6 +212,10 @@ let rec check cx ty tm =
   | D.Univ _, (T.Bool | T.Nat | T.Int | T.S1) ->
     ()
 
+  | D.Univ _, T.Data dlbl ->
+    let _ = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+    ()
+
 
   | D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
     let cxx, x = Cx.ext_ty cx ~nm dom in

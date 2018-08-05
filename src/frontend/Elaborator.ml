@@ -175,7 +175,9 @@ struct
           clbl, {params = Bwd.to_list acc; args}
 
       | (lbl, ety) :: prms ->
-        elab_chk env univ ety >>= fun pty ->
+        (* TODO: support higher universes *)
+        let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
+        elab_chk env univ0 ety >>= fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
         go (acc #< (lbl, pty)) prms
