@@ -4,6 +4,8 @@ open Dev
 
 include Monad.S
 
+val global : (GlobalEnv.t -> GlobalEnv.t) -> unit m
+
 val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m

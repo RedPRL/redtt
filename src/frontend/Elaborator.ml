@@ -101,7 +101,7 @@ struct
     | [] ->
       M.ret env
     | E.Debug f :: esig ->
-      elab_decl env (E.Debug f) >>= fun env' ->
+      elab_decl env @@ E.Debug f >>= fun env' ->
       elab_sig env' esig
     | E.Quit :: _ ->
       M.ret env

@@ -162,6 +162,10 @@ let popl =
     dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
 
+let global f =
+  modify @@ fun cx ->
+  {cx with env = f cx.env}
+
 let get_global_env =
   get >>= fun st ->
   let rec go_params =
