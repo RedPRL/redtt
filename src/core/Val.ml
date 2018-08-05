@@ -605,8 +605,8 @@ struct
         match act_neu phi info.neu with
         | Ret neu ->
           ret @@ Elim {mot; neu; clauses}
-        | Step _v ->
-          failwith "TODO: Val.act of Elim"
+        | Step v ->
+          step @@ elim_data mot v clauses
       end
 
 
@@ -1686,8 +1686,10 @@ struct
       prev vtick vhd
     | Tm.Open ->
       modal_open vhd
-    | Tm.Elim _ ->
-      failwith "TODO: eval Tm.Elim"
+    | Tm.Elim info ->
+      let mot = clo info.mot rho in
+      let clauses = List.map (fun (lbl, nbnd) -> lbl, nclo nbnd rho) info.clauses in
+      elim_data mot vhd clauses
 
 
   and eval_head rho =
@@ -2289,6 +2291,28 @@ struct
       make @@ Up {ty = mot'; neu; sys = nat_rec_sys}
     | _ ->
       raise @@ E (RecursorUnexpectedArgument ("natural numbers", scrut))
+
+  and elim_data mot scrut clauses =
+    match unleash scrut with
+    | Intro (clbl, vs) ->
+      let _, nclo = List.find (fun (clbl', _) -> clbl = clbl') clauses in
+      (* Wonder if this is backwards ??? *)
+      inst_nclo nclo vs
+
+    | Up up ->
+      let neu = Elim {mot; neu = up.neu; clauses} in
+      let mot' = inst_clo mot scrut in
+      let elim_face =
+        Face.map @@ fun r r' a ->
+        let phi = I.equate r r' in
+        let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
+        elim_data (Clo.act phi mot) a clauses'
+      in
+      let elim_sys = List.map elim_face up.sys in
+      make @@ Up {ty = mot'; neu; sys = elim_sys}
+
+    | _ ->
+      raise @@ E (RecursorUnexpectedArgument ("data type", scrut))
 
   and int_rec mot scrut pcase ncase =
     match unleash scrut with
