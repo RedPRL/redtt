@@ -711,6 +711,7 @@ and infer_spine cx hd =
         let rec build_cx cx vs params args =
           match params, args with
           | (plbl, pty) :: ps, _ ->
+            (* Hope this stuff isn't backwards, LOL *)
             let env_els = List.map (fun v -> D.Val v) @@ Bwd.to_list vs in
             let env = D.Env.push_many env_els D.Env.emp in
             let vty = V.eval env pty in
