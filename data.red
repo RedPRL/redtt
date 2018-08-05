@@ -1,5 +1,9 @@
 import path
 
+data natural where
+| ze
+| su of natural
+
 data tree where
 | nil
 | fork of (lbl : nat) (foo : Path _ lbl lbl) × tree × tree
@@ -13,3 +17,12 @@ let test (t : tree)
   fork _ (λ _ → zero) t nil
 
 debug
+
+; Once the eliminators are being elaborated,
+; we can do something like this:
+
+; let nat-pred (x : nat) : nat =
+;   elim x with
+;   | ze ⇒ zero
+;   | su n ⇒ n
+;   end
