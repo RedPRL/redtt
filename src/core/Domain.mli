@@ -68,7 +68,7 @@ type con =
 
 
   | Data of Desc.data_label
-  | Intro of Desc.data_label * Desc.con_label * value list
+  | Intro of Desc.data_label * Desc.con_label * env_el bwd
 
 
 and neu =
@@ -146,6 +146,7 @@ val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
 val pp_comp_sys : Format.formatter -> comp_sys -> unit
 val pp_names : Format.formatter -> Name.t bwd -> unit
 
+module EnvEl : Sort.S with type t = env_el with type 'a m = 'a
 
 module Env :
 sig
