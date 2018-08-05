@@ -2278,7 +2278,7 @@ struct
       zcase
     | Suc n ->
       let n_rec = nat_rec mot n zcase scase in
-      inst_nclo scase @@ [n; n_rec]
+      inst_nclo scase [n; n_rec]
     | Up up ->
       let neu = NatRec {mot; neu = up.neu; zcase; scase} in
       let mot' = inst_clo mot scrut in

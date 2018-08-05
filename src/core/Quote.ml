@@ -460,14 +460,18 @@ struct
 
     | Car neu0, Car neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Car :: stk
+
     | Cdr neu0, Cdr neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Cdr :: stk
+
     | FunApp (neu0, nf0), FunApp (neu1, nf1) ->
       let t = equate env nf0.ty nf0.el nf1.el in
       equate_neu_ env neu0 neu1 @@ Tm.FunApp t :: stk
+
     | ExtApp (neu0, rs0), ExtApp (neu1, rs1) ->
       let ts = equate_dims env rs0 rs1 in
       equate_neu_ env neu0 neu1 @@ Tm.ExtApp ts :: stk
+
     | If if0, If if1 ->
       let var = generic env @@ make Bool in
       let vmot0 = inst_clo if0.mot var in
@@ -479,6 +483,7 @@ struct
       let fcase = equate env vmot_ff if0.fcase if1.fcase in
       let frame = Tm.If {mot = Tm.B (clo_name if0.mot, mot); tcase; fcase} in
       equate_neu_ env if0.neu if1.neu @@ frame :: stk
+
     | NatRec rec0, NatRec rec1 ->
       let mot =
         let var = generic env @@ make Nat in
@@ -503,6 +508,7 @@ struct
       in
       let frame = Tm.NatRec {mot = Tm.B (clo_name rec0.mot, mot); zcase; scase = Tm.NB (nclo_names rec0.scase, scase)} in
       equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
+
     | IntRec rec0, IntRec rec1 ->
       let mot =
         let var = generic env @@ make Int in
@@ -529,6 +535,7 @@ struct
       in
       let frame = Tm.IntRec {mot = Tm.B (clo_name rec0.mot, mot); pcase = Tm.B (clo_name rec0.pcase, pcase); ncase = Tm.B (clo_name rec0.ncase, ncase)} in
       equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
+
     | S1Rec rec0, S1Rec rec1 ->
       let mot =
         let var = generic env @@ make S1 in
@@ -550,6 +557,7 @@ struct
       in
       let frame = Tm.S1Rec {mot = Tm.B (clo_name rec0.mot, mot); bcase = bcase; lcase = Tm.B (Name.name x_lcase, lcase)} in
       equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
+
     | VProj vproj0, VProj vproj1 ->
       let x0 = vproj0.x in
       let x1 = vproj1.x in
@@ -561,6 +569,7 @@ struct
       let equiv = equate env (Value.act phi equiv_ty) vproj0.equiv vproj1.equiv in
       let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
+
     | Cap cap0, Cap cap1 ->
       let tr, tr' = equate_dir env cap0.dir cap1.dir in
       let ty = equate_ty env cap0.ty cap1.ty in
@@ -568,10 +577,13 @@ struct
       let sys = equate_comp_sys env univ cap0.sys cap1.sys in
       let frame = Tm.Cap {r = tr; r' = tr'; ty; sys} in
       equate_neu_ env cap0.neu cap1.neu @@ frame :: stk
+
     | LblCall neu0, LblCall neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
+
     | CoRForce neu0, CoRForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
+
     | Prev (tick0, neu0), Prev (tick1, neu1) ->
       let tick = equate_tick env tick0 tick1 in
       equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
