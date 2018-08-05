@@ -763,11 +763,14 @@ struct
       begin
         match exp with
         | E.Var (clbl, _) ->
-          M.lift C.base_cx >>= fun cx ->
-          let sign = Cx.globals cx in
-          let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl sign in
-          let _, constr = List.find (fun (clbl', _) -> clbl = clbl') desc in
-          elab_intro env dlbl clbl constr frms
+          begin
+            M.lift C.base_cx >>= fun cx ->
+            let sign = Cx.globals cx in
+            let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl sign in
+            let _, constr = List.find (fun (clbl', _) -> clbl = clbl') desc in
+            elab_intro env dlbl clbl constr frms
+          end
+          <+> elab_mode_switch_cut env exp frms ty
 
         | _ ->
           elab_mode_switch_cut env exp frms ty
