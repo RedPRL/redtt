@@ -722,12 +722,12 @@ and infer_spine cx hd =
             let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
             build_cx cx_ih (vs #< v_x #< v_ih) [] args
           | [], [] ->
-            cx
+            cx, Bwd.to_list vs
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx' = build_cx cx Emp constr.params constr.args in
-        let intro = D.make @@ D.Intro (lbl, failwith "TODO") in
+        let cx', vs = build_cx cx Emp constr.params constr.args in
+        let intro = D.make @@ D.Intro (lbl, vs) in
         let ty = V.inst_clo mot_clo intro in
         check cx' ty bdy
       in
