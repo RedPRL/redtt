@@ -14,6 +14,7 @@ sig
   val emp : t
   val make : int -> t
   val succ : t -> t
+  val succn : int -> t -> t
   val abs : t -> Name.t bwd -> t
 
   val ix_of_lvl : int -> t -> int
@@ -33,6 +34,9 @@ struct
 
   let succ env =
     {env with n = env.n + 1}
+
+  let succn n env =
+    {env with n = env.n + n}
 
   let abs1 env x =
     {n = env.n + 1;
@@ -511,15 +515,35 @@ struct
 
     | Elim elim0, Elim elim1 ->
       if elim0.dlbl = elim1.dlbl then
-        let _mot =
-          let data_ty = D.make @@ D.Data elim0.dlbl in
+        let dlbl = elim0.dlbl in
+        let mot =
+          let data_ty = D.make @@ D.Data dlbl in
           let var = generic env data_ty in
           let env' = Env.succ env in
           let vmot0 = inst_clo elim0.mot var in
           let vmot1 = inst_clo elim1.mot var in
-          equate_ty env' vmot0 vmot1
+          let bdy = equate_ty env' vmot0 vmot1 in
+          Tm.B (clo_name elim0.mot, bdy)
         in
-        failwith ""
+        let desc = V.Sig.lookup_datatype dlbl in
+
+        let quote_clause (clbl, constr) =
+          let n = Desc.(List.length constr.params + 2 * List.length constr.args) in
+          let _, clause0 = List.find (fun (clbl', _) -> clbl = clbl') elim0.clauses in
+          let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
+          let env' = Env.succn n env in
+          let vs = failwith "TODO!!" in
+          let bdy0 = inst_nclo clause0 vs in
+          let bdy1 = inst_nclo clause1 vs in
+          let intro = D.make @@ D.Intro (clbl, vs) in
+          let mot_intro = inst_clo elim0.mot intro in
+          let tbdy = equate env' mot_intro bdy0 bdy1 in
+          clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)
+        in
+
+        let clauses = List.map quote_clause desc in
+        let frame = Tm.Elim {dlbl; mot; clauses} in
+        equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
         failwith "Datatype mismatch"
 
