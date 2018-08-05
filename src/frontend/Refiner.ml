@@ -244,7 +244,14 @@ let rec tac_lambda names tac ty =
 
 (* TODO factor out the motive inference algorithm *)
 
-let tac_elim ~tac_mot ~tac_scrut ~clauses:_ =
+let unleash_data ty =
+  match Tm.unleash ty with
+  | Tm.Data dlbl -> dlbl
+  | _ ->
+    Format.eprintf "Shit: %a@." Tm.pp0 ty;
+    failwith "Expected datatype"
+
+let tac_elim ~tac_mot ~tac_scrut ~clauses =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
@@ -269,9 +276,17 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses:_ =
         tac_mot mot_ty >>= fun mot ->
         let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
         M.ret fmot
-    end >>= fun _mot ->
+    end >>= fun mot ->
 
-    failwith "TODO: tac_elim"
+    let tclauses = failwith "TODO: refine pattern clauses" in
+
+    let hd = Tm.Down {ty = data_ty; tm = scrut} in
+    let bmot =
+      let x = Name.fresh () in
+      Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
+    in
+    let frm = Tm.Elim {dlbl = unleash_data data_ty; mot = bmot; clauses = tclauses} in
+    M.ret @@ Tm.up (hd, Emp #< frm)
 
 let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scase, tac_scase) =
   fun ty ->
