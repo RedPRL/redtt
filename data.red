@@ -3,5 +3,7 @@ data tree where
 | fork of (lbl : nat) × tree × tree
 
 let test (t : tree) : tree =
-  t
+  fork zero nil nil
+
+debug
 

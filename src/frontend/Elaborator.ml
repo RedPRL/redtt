@@ -438,8 +438,6 @@ struct
 
     | _, E.Cut (e, fs) ->
       elab_chk_cut env e fs ty
-      <<@> snd
-      <<@> Tm.up
 
     | _, E.HCom info ->
       elab_dim env info.r >>= fun r ->
@@ -459,8 +457,6 @@ struct
 
     | _, E.Var _ ->
       elab_chk_cut env e Emp ty
-      <<@> snd
-      <<@> Tm.up
 
     | _, e ->
       elab_up env ty e
@@ -757,11 +753,11 @@ struct
       begin
         match exp with
         | E.Var (clbl, _) ->
-          M.lift C.base_cx <<@> fun cx ->
-            let sign = Cx.globals cx in
-            let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl sign in
-            let _, constr = List.find (fun (clbl', _) -> clbl = clbl') desc in
-            elab_intro env dlbl clbl constr frms
+          M.lift C.base_cx >>= fun cx ->
+          let sign = Cx.globals cx in
+          let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl sign in
+          let _, constr = List.find (fun (clbl', _) -> clbl = clbl') desc in
+          elab_intro env dlbl clbl constr frms
 
         | _ ->
           elab_mode_switch_cut env exp frms ty
@@ -770,8 +766,33 @@ struct
     | _ ->
       elab_mode_switch_cut env exp frms ty
 
-  and elab_intro _env _dlbl _clbl _constr _frms =
-    failwith "TODO: elab_intro"
+  and elab_intro env dlbl clbl constr frms =
+    let rec go_params acc ps frms =
+      match ps, frms with
+      | [], _ ->
+        M.ret (List.rev_map snd acc, frms)
+      | (_, pty) :: ps, E.App e :: frms ->
+        (* TODO: might be backwards *)
+        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.Down {ty; tm}, Emp) sub) acc @@ Tm.shift 0 in
+        let pty' = Tm.subst sub pty in
+        elab_chk env pty' e >>= fun t ->
+        go_params ((pty', t) :: acc) ps frms
+      | _ ->
+        failwith "elab_intro: malformed parameters"
+    in
+    let rec go_args arg_tys frms =
+      match arg_tys, frms with
+      | [], [] ->
+        M.ret []
+      | Desc.Self :: arg_tys, E.App e :: frms ->
+        let self_ty = Tm.make @@ Tm.Data dlbl in
+        (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_args arg_tys frms
+      | _ ->
+        failwith "todo: go_args"
+    in
+    go_params [] constr.params @@ Bwd.to_list frms >>= fun (tps, frms) ->
+    go_args constr.args frms >>= fun targs ->
+    M.ret @@ Tm.make @@ Tm.Intro (clbl, tps @ targs)
 
   and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (vty, cmd) ->
@@ -781,7 +802,7 @@ struct
     M.unify >>
     M.lift (C.check_subtype ty' ty) >>= function
     | `Ok ->
-      M.ret (ty, cmd)
+      M.ret @@ Tm.up cmd
     | `Exn exn ->
       raise exn
 
