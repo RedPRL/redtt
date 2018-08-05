@@ -43,6 +43,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("🔓", LOCK);
       ("nat", NAT);
       ("ℕ", NAT);
+      ("elim", ELIM);
       ("int", INT);
       ("ℤ", INT);
       ("S1", S1);

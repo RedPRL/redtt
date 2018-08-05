@@ -57,8 +57,7 @@ and eterm =
   | Var of string * int
   | Num of int
 
-and eclause = epat * eterm
-and epat = Desc.con_label * epatbind list
+and eclause = Desc.con_label * epatbind list * eterm
 and epatbind = PVar of string | PIndVar of string * string
 
 and esys = eface list

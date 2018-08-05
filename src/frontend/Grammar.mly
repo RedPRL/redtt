@@ -17,7 +17,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA
 %token DIM TICK LOCK
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
+%token S1 S1_REC NAT_REC ELIM LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
 %token OF
 %token THEN ELSE
 %token IMPORT OPAQUE QUIT
@@ -126,6 +126,12 @@ eterm:
   | SUC; n = atomic_eterm
     { E.Suc n }
 
+  | ELIM; scrut = eterm; IN; mot = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
+    { E.Elim {mot = Some mot; scrut; clauses} }
+
+  | ELIM; scrut = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
+    { E.Elim {mot = None; scrut; clauses} }
+
   | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; LPR; n = ATOM; RRIGHT_ARROW; n_rec = ATOM; RPR; RRIGHT_ARROW; es = eterm; END
     { E.NatRec (None, e0, ez, (n, Some n_rec, es)) }
 
@@ -199,6 +205,13 @@ eterm:
   | SHUT; tm = eterm
     { E.Shut tm }
 
+eclause:
+  | lbl = ATOM; pbinds = list(epatbind); RRIGHT_ARROW; bdy = eterm
+    { lbl, pbinds, bdy }
+
+epatbind:
+  | x = ATOM
+    { E.PVar x }
 
 eface:
   | r0 = atomic_eterm; EQUALS; r1 = atomic_eterm; RRIGHT_ARROW; e = eterm
