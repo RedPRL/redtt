@@ -516,8 +516,8 @@ struct
     | Elim elim0, Elim elim1 ->
       if elim0.dlbl = elim1.dlbl then
         let dlbl = elim0.dlbl in
+        let data_ty = D.make @@ D.Data dlbl in
         let mot =
-          let data_ty = D.make @@ D.Data dlbl in
           let var = generic env data_ty in
           let env' = Env.succ env in
           let vmot0 = inst_clo elim0.mot var in
@@ -528,11 +528,28 @@ struct
         let desc = V.Sig.lookup_datatype dlbl in
 
         let quote_clause (clbl, constr) =
-          let n = Desc.(List.length constr.params + 2 * List.length constr.args) in
           let _, clause0 = List.find (fun (clbl', _) -> clbl = clbl') elim0.clauses in
           let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
-          let env' = Env.succn n env in
-          let vs = failwith "TODO!!" in
+          let env', vs =
+            let open Desc in
+            let rec build_cx qenv env vs ps args =
+              match ps, args with
+              | (_, pty) :: ps, _ ->
+                let vty = V.eval env pty in
+                let v = generic qenv vty in
+                let env' = D.Env.push (D.Val v) env in
+                build_cx (Env.succ qenv) env' (vs #< v) ps args
+              | [], Self :: args ->
+                let vx = generic qenv data_ty in
+                let qenv' = Env.succ qenv in
+                let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
+                let env' = D.Env.push_many [D.Val vx; D.Val vih] env in
+                build_cx (Env.succ qenv') env' (vs #< vx #< vih) [] args
+              | [], [] ->
+                qenv, Bwd.to_list vs
+            in
+            build_cx env D.Env.emp Emp constr.params constr.args
+          in
           let bdy0 = inst_nclo clause0 vs in
           let bdy1 = inst_nclo clause1 vs in
           let intro = D.make @@ D.Intro (clbl, vs) in
