@@ -704,11 +704,16 @@ and infer_spine cx hd =
         Cx.make_closure cx info.mot
       in
 
-      let check_clause lbl _constr clauses =
-        let _, Tm.NB (_nms, _bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
+      let check_clause lbl constr clauses =
+        let open Desc in
+        let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
+        let rec build_cx params args = failwith "TODO" in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        failwith "TODO: check_clauses"
+        let cx' = build_cx constr.params constr.args in
+        let intro = D.make @@ D.Intro (lbl, failwith "TODO") in
+        let ty = V.inst_clo mot_clo intro in
+        check cx' ty bdy
       in
 
       begin
