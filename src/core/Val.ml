@@ -1601,6 +1601,13 @@ struct
       let v = eval rho t in
       make @@ Shut v
 
+    | Tm.Data lbl ->
+      make @@ Data lbl
+
+    | Tm.Intro (dlbl, clbl, args) ->
+      let vargs = List.map (eval rho) args in
+      make @@ Intro (dlbl, clbl, vargs)
+
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
     eval_stack rho vhd @@ Bwd.to_list sp
@@ -1745,13 +1752,6 @@ struct
       let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
       let vty = eval rho' @@ Tm.shift_univ ushift tty in
       reflect vty (Meta {name; ushift}) vsys
-
-    | Tm.Data lbl ->
-      make @@ Data lbl
-
-    | Tm.Intro (dlbl, clbl) ->
-      make @@ Intro (dlbl, clbl, failwith "TODO: eval Tm.Intro")
-
 
   and reflect ty neu sys =
     match force_val_sys sys with

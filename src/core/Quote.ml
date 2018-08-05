@@ -270,7 +270,7 @@ struct
 
       | Data lbl0, Data lbl1 ->
         if lbl0 = lbl1 then
-          Tm.up (Tm.Data lbl0, Emp)
+          Tm.make @@ Tm.Data lbl0
         else
           raise @@ E (ErrEquateLbl (lbl0, lbl1))
 

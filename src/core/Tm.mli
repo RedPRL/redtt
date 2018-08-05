@@ -63,6 +63,9 @@ type 'a tmf =
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
+  | Data of Desc.data_label
+  | Intro of Desc.data_label * Desc.con_label * 'a list
+
 
 and 'a head =
   | Meta of {name: Name.t; ushift : int}
@@ -75,9 +78,6 @@ and 'a head =
   | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
   | GHCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
   | GCom of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
-
-  | Data of Desc.data_label
-  | Intro of Desc.data_label * Desc.con_label
 
 
 and 'a frame =

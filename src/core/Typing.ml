@@ -212,6 +212,11 @@ let rec check cx ty tm =
   | D.Univ _, (T.Bool | T.Nat | T.Int | T.S1) ->
     ()
 
+  | D.Univ _, T.Data dlbl ->
+    let _ = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+    ()
+
+
   | D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
     let cxx, x = Cx.ext_ty cx ~nm dom in
     let vcod = V.inst_clo cod x in
@@ -795,16 +800,6 @@ and infer_head cx =
     let cxx, _ = Cx.ext_ty cx ~nm ltr_ty in
     check cxx ty bdy;
     ltr_ty
-
-  | T.Data dlbl ->
-    let _ = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
-    D.make @@ D.Univ {kind = Kind.Kan; lvl = Lvl.Const 0}
-
-  | T.Intro _ ->
-    failwith "TODO: typecheck intro"
-
-
-
 
 
 and check_eval cx ty tm =
