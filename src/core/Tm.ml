@@ -916,10 +916,24 @@ and pp_cmd env fmt (hd, sp) =
       | S1Rec {mot = B (nm_mot, mot); bcase; lcase = B (nm_lcase, lcase)} ->
         let x_mot, env_mot = Pretty.Env.bind nm_mot env in
         let x_lcase, env_lcase = Pretty.Env.bind nm_lcase env in
-        Format.fprintf fmt "@[<hv1>(S1rec@ [%a] %a@ %a %a [%a] %a)@]" Uuseg_string.pp_utf_8 x_mot (pp env_mot) mot (go `S1Rec) sp (pp env) bcase Uuseg_string.pp_utf_8 x_lcase (pp env_lcase) lcase
-      | Elim _ ->
+        Format.fprintf fmt "@[<hv1>(S1rec@ [%a] %a@ %a %a [%a] %a)@]"
+          Uuseg_string.pp_utf_8 x_mot
+          (pp env_mot) mot
+          (go `S1Rec) sp
+          (pp env) bcase
+          Uuseg_string.pp_utf_8 x_lcase
+          (pp env_lcase) lcase
+      | Elim info ->
+        let B (nm_mot, mot) = info.mot in
+        let x_mot, env_mot = Pretty.Env.bind nm_mot env in
         (* TODO *)
-        Format.fprintf fmt "<elim>"
+        Format.fprintf fmt "@[<hv1>(%a.elim@ [%a] %a@ %a@ %a)@]"
+          Desc.pp_data_label info.dlbl
+          Uuseg_string.pp_utf_8 x_mot
+          (pp env_mot) mot
+          (go `Elim) sp
+          (pp_elim_clauses env) info.clauses
+
       | VProj {r; ty0; ty1; equiv} ->
         Format.fprintf fmt "@[<hv1>(vproj %a@ %a@ %a@ %a@ %a)@]" (pp env) r (go `VProj) sp (pp env) ty0 (pp env) ty1 (pp env) equiv
       | Cap _ ->
@@ -935,6 +949,24 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<hv1>(open@ %a)@]" (go `Open) sp
   in
   go `Start fmt sp
+
+and pp_elim_clauses env fmt clauses =
+  let pp_sep fmt () = Format.fprintf fmt "@ " in
+  Format.pp_print_list ~pp_sep (pp_elim_clause env) fmt clauses
+
+and pp_elim_clause env fmt (clbl, nbnd) =
+  Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
+    Desc.pp_con_label clbl
+    (pp_nbnd env) nbnd
+
+and pp_nbnd env fmt nbnd =
+  let NB (nms, tm) = nbnd in
+  match nms with
+  | Emp ->
+    pp env fmt tm
+  | _ ->
+    let xs, env' = Pretty.Env.bindn (Bwd.to_list nms) env in
+    Format.fprintf fmt "@[<hv1>[%a]@ %a@]" pp_strings xs (pp env') tm
 
 and pp_spine env fmt sp =
   match sp with
