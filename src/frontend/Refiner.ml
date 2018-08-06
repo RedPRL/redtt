@@ -251,6 +251,27 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
         GlobalEnv.lookup_datatype dlbl sign
     end >>= fun desc ->
 
+    (* Add holes for any missing clauses *)
+    let clauses =
+      let find_clause lbl =
+        try
+          List.find (fun (lbl', _, _) -> lbl = lbl') clauses
+        with
+        | _ ->
+          let constr = Desc.lookup_constr lbl desc in
+          let pbinds =
+            List.map (fun (plbl, _) -> ESig.PVar plbl) constr.params
+            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.args
+          in
+          lbl, pbinds, fun ty ->
+            M.lift C.ask >>= fun psi ->
+            M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
+            M.emit @@ M.UserHole {name = Some lbl; ty; tele = psi; tm = Tm.up tm} >>
+            M.ret @@ Tm.up tm
+      in
+      List.map (fun (lbl, _) -> find_clause lbl) desc
+    in
+
     begin
       M.lift C.base_cx <<@> fun cx ->
         Cx.evaluator cx, Cx.quoter cx
