@@ -60,3 +60,10 @@ let plus/su/r (n : natural) : (m : natural) → Path natural (plus n (su m)) (su
   | su (n ⇒ plus/n/su/r) ⇒ λ m i → su (plus/n/su/r m i)
   end
 
+
+let plus/comm (m : natural) : (n : natural) → Path natural (plus n m) (plus m n) =
+  elim m with
+  | ze ⇒ plus/unit/r
+  | su (m ⇒ plus/comm/m) ⇒ λ n → trans _ (plus/su/r n m) (λ i → su (plus/comm/m n i))
+  end
+
