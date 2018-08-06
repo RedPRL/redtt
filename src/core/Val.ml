@@ -2296,8 +2296,23 @@ struct
     match unleash scrut with
     | Intro (clbl, vs) ->
       let _, nclo = List.find (fun (clbl', _) -> clbl = clbl') clauses in
-      (* Wonder if this is backwards ??? *)
-      inst_nclo nclo vs
+      let desc = Sig.lookup_datatype dlbl in
+      let constr = Desc.lookup_constr clbl desc in
+
+      let rec go vs ps args =
+        match vs, ps, args with
+        | v :: vs, (_, _) :: ps, _ ->
+          v :: go vs ps args
+        | v :: vs, [], Desc.Self :: args ->
+          let v_ih = elim_data dlbl mot v clauses in
+          v :: v_ih :: go vs [] args
+        | [], [], [] ->
+          []
+        | _ ->
+          failwith "elim_data/intro"
+      in
+
+      inst_nclo nclo @@ go vs constr.params constr.args
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in

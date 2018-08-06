@@ -17,6 +17,17 @@ data void where
 let abort (A : type) (t : void) : A =
   elim t with end
 
-debug
+
+data natural where
+| ze
+| su of natural
+
+let nat-pred (x : natural) : natural =
+  elim x with
+  | ze ⇒ ze
+  | su n ⇒ n
+  end
 
 
+let nat-pred/succ (x : natural) : Path natural x (nat-pred (su x)) =
+  λ _ → x

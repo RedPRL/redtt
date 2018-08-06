@@ -212,6 +212,8 @@ eclause:
 epatbind:
   | x = ATOM
     { E.PVar x }
+  | LPR; x = ATOM; RRIGHT_ARROW; ih = ATOM; RPR
+    { E.PIndVar (x, ih) }
 
 eface:
   | r0 = atomic_eterm; EQUALS; r1 = atomic_eterm; RRIGHT_ARROW; e = eterm

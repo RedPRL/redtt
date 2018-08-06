@@ -212,7 +212,7 @@ and pp_con fmt : con -> unit =
   | FHCom _ ->
     Format.fprintf fmt "<fhcom>"
   | Box _ ->
-    Format.fprintf fmt "<box>" (* �� *)
+    Format.fprintf fmt "<box>"
   | LblTy {lbl; args; ty} ->
     begin
       match args with
@@ -242,8 +242,10 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<shut>"
   | Data _ ->
     Format.fprintf fmt "<data>"
-  | Intro _ ->
-    Format.fprintf fmt "<intro>"
+  | Intro (lbl, args) ->
+    Format.fprintf fmt "@[<hv1>(%a %a)]"
+      Uuseg_string.pp_utf_8 lbl
+      pp_values args
 
 
 and pp_value fmt value =
@@ -393,6 +395,10 @@ and pp_nf fmt nf =
 and pp_nfs fmt nfs =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep pp_nf fmt nfs
+
+and pp_values fmt els =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep pp_value fmt els
 
 and pp_dims fmt rs =
   let pp_sep fmt () = Format.fprintf fmt " " in

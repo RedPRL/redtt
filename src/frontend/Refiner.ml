@@ -2,6 +2,7 @@ open RedBasis
 open RedTT_Core
 open Dev open Bwd open BwdNotation
 
+module D = Domain
 module M = ElabMonad
 module C = Contextual
 module U = Unify
@@ -289,31 +290,53 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
         GlobalEnv.lookup_datatype dlbl sign
     end >>= fun desc ->
 
+    begin
+      M.lift C.base_cx <<@> fun cx ->
+        Cx.evaluator cx, Cx.quoter cx
+    end >>= fun ((module V), (module Q)) ->
+
     let refine_clause (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
       let constr = lookup_constr clbl desc in
-      let rec go xs tms pbinds ps args =
+      let rec go psi env tms pbinds ps args =
         match pbinds, ps, args with
-        | ESig.PVar _ :: _pbinds, (_plbl, _pty) :: _ps, _ ->
-          failwith "foo"
+        | ESig.PVar nm :: pbinds, (_plbl, pty) :: ps, _ ->
+          let x = Name.named @@ Some nm in
+          let vty = V.eval env pty in
+          let tty = Q.quote_ty Quote.Env.emp vty in
+          let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
+          let x_tm = Tm.up @@ Tm.var x in
+          let env' = D.Env.push (D.Val x_el) env in
+          go (psi #< (x, `P tty)) env' (tms #< x_tm) pbinds ps args
 
-        | ESig.PVar _ :: _pbinds, [], Self :: _args ->
-          failwith "bar"
+        | ESig.PVar nm :: pbinds, [], Self :: args ->
+          let x = Name.named @@ Some nm in
+          let x_ih = Name.fresh () in
+          let x_tm = Tm.up @@ Tm.var x in
+          let ih_ty = mot x_tm in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args
 
-        | ESig.PIndVar _ :: _pbinds, [], Self :: _args ->
-          failwith "baz"
+        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], Self :: args ->
+          let x = Name.named @@ Some nm in
+          let x_ih = Name.named @@ Some nm_ih in
+          let x_tm = Tm.up @@ Tm.var x in
+          let ih_ty = mot x_tm in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args
 
         | _, [], [] ->
-          xs, Bwd.to_list tms
+          psi, Bwd.to_list tms
 
         | _ ->
           failwith "refine_clause"
       in
-      let xs, tms = go Emp Emp pbinds constr.params constr.args in
+      let psi, tms = go Emp D.Env.emp Emp pbinds constr.params constr.args in
       let intro = Tm.make @@ Tm.Intro (clbl, tms) in
       let clause_ty = mot intro in
-      clause_tac clause_ty >>= fun bdy ->
-      M.ret (clbl, Tm.bindn xs bdy)
+      begin
+        M.in_scopes (Bwd.to_list psi) @@
+        clause_tac clause_ty <<@> Tm.bindn (Bwd.map fst psi)
+      end >>= fun bdy ->
+      M.ret (clbl, bdy)
     in
 
     traverse (fun x -> x) @@ List.map refine_clause clauses >>= fun tclauses ->

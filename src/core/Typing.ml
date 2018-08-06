@@ -721,8 +721,8 @@ and infer_spine cx hd =
             build_cx cx' (D.Env.push (D.Val v) env) (vs #< v) ps args
           | [], Self :: args ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:None ih.ty in
-            let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih env (vs #< v_x #< v_ih) [] args
+            let cx_ih, _ = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
+            build_cx cx_ih env (vs #< v_x) [] args
           | [], [] ->
             cx, Bwd.to_list vs
         in
