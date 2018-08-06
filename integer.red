@@ -3,45 +3,50 @@ import natural
 import equivalence
 import isotoequiv
 
-let pred (x : int) : int =
-  int-rec x with
-  | pos n ⇒
-    nat-rec n with
-    | zero ⇒ negsuc zero
-    | suc n ⇒ pos n
+data integer where
+| ipos of (n : natural)
+| inegsu of (n : natural)
+
+let pred (x : integer) : integer =
+  elim x with
+  | ipos n ⇒
+    elim n with
+    | ze ⇒ inegsu ze
+    | su n ⇒ ipos n
     end
-  | negsuc n ⇒ negsuc (suc n)
+  | inegsu n ⇒ inegsu (su n)
   end
 
-let succ (x : int) : int =
-  int-rec x with
-  | pos n ⇒ pos (suc n)
-  | negsuc n ⇒
-    nat-rec n with
-    | zero ⇒ pos zero
-    | suc n ⇒ negsuc n
-    end
-  end
-
-let pred-succ (n : int) : Path int (pred (succ n)) n =
-  int-rec n with
-  | pos n => lam _ -> pos n
-  | negsuc n =>
-    nat-rec n with
-    | zero => lam _ -> negsuc zero
-    | suc n => lam _ -> negsuc (suc n)
+let isu (x : integer) : integer =
+  elim x with
+  | ipos n ⇒ ipos (su n)
+  | inegsu n ⇒
+    elim n with
+    | ze ⇒ ipos ze
+    | su n ⇒ inegsu n
     end
   end
 
-let succ-pred (n : int) : Path int (succ (pred n)) n =
-  int-rec n with
-  | pos n =>
-    nat-rec n with
-    | zero => lam _ -> pos zero
-    | suc n => lam _ -> pos (suc n)
+
+let pred-isu (n : integer) : Path integer (pred (isu n)) n =
+  elim n with
+  | ipos n => lam _ -> ipos n
+  | inegsu n =>
+    elim n with
+    | ze => lam _ -> inegsu ze
+    | su n => lam _ -> inegsu (su n)
     end
-  | negsuc n => lam _ -> negsuc n
   end
 
-let succ-equiv : Equiv int int =
-  Iso/Equiv _ _ < succ, < pred, < succ-pred, pred-succ > > >
+let isu-pred (n : integer) : Path integer (isu (pred n)) n =
+  elim n with
+  | ipos n =>
+    elim n with
+    | ze => lam _ -> ipos ze
+    | su n => lam _ -> ipos (su n)
+    end
+  | inegsu n => lam _ -> inegsu n
+  end
+
+let isu-equiv : Equiv integer integer =
+  Iso/Equiv _ _ < isu, < pred, < isu-pred, pred-isu > > >
