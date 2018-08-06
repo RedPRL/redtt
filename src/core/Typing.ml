@@ -708,10 +708,7 @@ and infer_spine cx hd =
       let check_clause lbl constr clauses =
         let open Desc in
 
-        let _, Tm.NB (_, bdy) =
-          try List.find (fun (lbl', _) -> lbl = lbl') clauses
-          with _ -> failwith "DAMN!"
-        in
+        let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
 
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
@@ -725,7 +722,7 @@ and infer_spine cx hd =
           | [], Self :: args ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:None ih.ty in
             let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih (D.Env.push_many [D.Val v_x; D.Val v_ih] env) (vs #< v_x #< v_ih) [] args
+            build_cx cx_ih env (vs #< v_x #< v_ih) [] args
           | [], [] ->
             cx, Bwd.to_list vs
         in

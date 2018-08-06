@@ -13,9 +13,10 @@ let not (x : boolean) : boolean =
 let not∘not (x : boolean) : _ =
   not (not x)
 
-let not∘not/id/pt (x : boolean) : Path boolean (not∘not x) x =
+let not∘not/id/pt (x : boolean) : Path _ (not∘not x) x =
   elim x with
   | true ⇒ λ _ → true
   | false ⇒ λ _ → false
   end
 
+debug

@@ -544,8 +544,7 @@ struct
                 let vx = generic qenv data_ty in
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
-                let env' = D.Env.push_many [D.Val vx; D.Val vih] env in
-                build_cx (Env.succ qenv') env' (vs #< vx #< vih) [] args
+                build_cx (Env.succ qenv') env (vs #< vx #< vih) [] args
               | [], [] ->
                 qenv, Bwd.to_list vs
             in

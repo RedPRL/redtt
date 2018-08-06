@@ -11,16 +11,11 @@ let test (t : tree)
     end
   =
   fork _ (λ _ → zero) t nil
+
 data void where
 
-let not (x : boolean) : boolean =
-  elim x with
-  | true ⇒ false
-  | false ⇒ true
-  end
-
-let foo : Path _ (not true) false =
-  λ _ → false
+let abort (A : type) (t : void) : A =
+  elim t with end
 
 debug
 
