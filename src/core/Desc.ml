@@ -5,7 +5,8 @@ type 'a tele = 'a list
 
 type 'a constr =
   {params : (string * 'a) tele;
-   args : 'a arg_ty list}
+   args : 'a arg_ty list;
+   dims : string list}
 
 type data_label = string
 type con_label = string
@@ -22,7 +23,13 @@ let lookup_constr lbl desc =
   | _ ->
     raise @@ ConstructorNotFound lbl
 
-let is_strict_set _ = true
+let is_strict_set desc =
+  let constr_is_point constr =
+    match constr.dims with
+    | [] -> true
+    | _ -> false
+  in
+  List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc true
 
 let pp_data_label = Uuseg_string.pp_utf_8
 let pp_con_label = Uuseg_string.pp_utf_8
@@ -40,32 +47,26 @@ let pp_constr pp fmt constr =
       (pp env) ty
   in
 
-  let rec go_params env fmt =
-    function
-    | [nm, p] ->
+  let rec go env fmt (ps, args) =
+    match ps, args with
+    | [nm, p], _ ->
       let nm, env' = Pretty.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
-        (go_args env') constr.args
-    | (nm, p) :: ps ->
+        (go env') ([], args)
+    | (nm, p) :: ps, _ ->
       let nm, env' = Pretty.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
-        (go_params env') ps
-    | [] ->
-      go_args env fmt constr.args
-
-  and go_args _ fmt =
-    function
-    | [] ->
+        (go env') (ps, args)
+    | [], [] ->
       ()
-    | args ->
+    | [], args ->
       let pp_sep fmt () = Format.fprintf fmt " " in
       Format.fprintf fmt "of ";
       Format.pp_print_list ~pp_sep pp_arg_ty fmt args
-
   in
-  go_params Pretty.Env.emp fmt constr.params
+  go Pretty.Env.emp fmt (constr.params, constr.args)
 
 let pp_labeled_constr pp fmt (lbl, constr) =
   Format.fprintf fmt "| %a @[<hv1>%a@]"
@@ -79,8 +80,3 @@ let pp_constrs pp fmt =
 let pp_desc pp fmt constrs =
   Format.fprintf fmt "@[<v>data where@ %a@ end@]"
     (pp_constrs pp) constrs
-
-
-(* let nats : 'a desc =
-   ["ze", {params = []; args = []};
-   "su", {params = []; args = [Self]}] *)

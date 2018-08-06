@@ -10,7 +10,8 @@ type 'a tele = 'a list
     we will ultimately add dimension arguments and boundary constraints. *)
 type 'a constr =
   {params : (string * 'a) tele;
-   args : 'a arg_ty list}
+   args : 'a arg_ty list;
+   dims : string list}
 
 (* TODO: abstract *)
 type data_label = string

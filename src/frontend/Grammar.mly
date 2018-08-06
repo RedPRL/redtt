@@ -200,19 +200,19 @@ etele_cell:
 desc_constr:
 | clbl = ATOM
   { fun _dlbl ->
-    clbl, Desc.{params = []; args = []} }
+    clbl, Desc.{params = []; args = []; dims = []} }
 
 | clbl = ATOM; OF; params = nonempty_list(desc_param); TIMES; args = separated_nonempty_list(TIMES, desc_arg)
   { fun dlbl ->
-    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args} }
+    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims = []} }
 
 | clbl = ATOM; OF; params = nonempty_list(desc_param)
   { fun _dlbl ->
-    clbl, Desc.{params; args = []} }
+    clbl, Desc.{params; args = []; dims = []} }
 
 | clbl = ATOM; OF; args = separated_nonempty_list(TIMES, desc_arg)
   { fun dlbl ->
-    clbl, Desc.{params = []; args = List.map (fun arg -> arg dlbl) args} }
+    clbl, Desc.{params = []; args = List.map (fun arg -> arg dlbl) args; dims = []} }
 
 %inline
 desc_arg:
