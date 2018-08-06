@@ -442,6 +442,11 @@ tm:
       make_node $startpos $endpos @@
       Tm.Cons (e0 env, e1 env) }
 
+  | LPR; DATA; dlbl = ATOM; RPR
+    { fun _ ->
+      make_node $startpos $endpos @@
+      Tm.Data dlbl }
+
   | e = cmd
     { fun env ->
       make_node $startpos $endpos @@

@@ -18,5 +18,3 @@ let not∘not/id/pt (x : boolean) : Path _ (not∘not x) x =
   | true ⇒ λ _ → true
   | false ⇒ λ _ → false
   end
-
-debug
