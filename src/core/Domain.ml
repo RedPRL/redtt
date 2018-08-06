@@ -161,7 +161,7 @@ and pp_con fmt : con -> unit =
   | Univ {kind; lvl} ->
     Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
   | Cons (v0, v1) ->
-    Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
+    Format.fprintf fmt "@[<1>(pair@ %a %a)@]" pp_value v0 pp_value v1
   | V info ->
     Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
   | VIn info ->

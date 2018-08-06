@@ -17,7 +17,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA
 %token DIM TICK LOCK
-%token S1 S1_ELIM ELIM LOOP BASE UNIV LAM CONS CAR CDR COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
+%token S1 S1_ELIM ELIM LOOP BASE UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
 %token OF
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
@@ -82,9 +82,9 @@ eframe:
     { E.App e }
   | BANG
     { E.Open }
-  | DOT CAR
+  | DOT FST
     { E.Car }
-  | DOT CDR
+  | DOT SND
     { E.Cdr }
   | DOT; n = NUMERAL
     { match n with
@@ -377,7 +377,7 @@ tm:
       make_node $startpos $endpos @@
       Tm.Shut (tm env) }
 
-  | LPR; CONS; e0 = tm; e1 = tm; RPR
+  | LPR; PAIR; e0 = tm; e1 = tm; RPR
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Cons (e0 env, e1 env) }
@@ -440,12 +440,12 @@ cut:
     { fun env ->
       hd env, Emp }
 
-  | LPR; CAR; e = cut; RPR
+  | LPR; FST; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.Car }
 
-  | LPR; CDR; e = cut; RPR
+  | LPR; SND; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.Cdr }

@@ -198,7 +198,7 @@ let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
   >
 
 
-; The following is a formulation of univalence proposed by Martin Escardo:
+; The following is a formulation of univalence proposed by Martin Esfstdo:
 ; https://groups.google.com/forum/#!msg/homotopytypetheory/HfCB_b-PNEU/Ibb48LvUMeUJ
 ; See also Theorem 5.8.4 of the HoTT Book.
 
@@ -222,8 +222,8 @@ let IdEquiv/connection (B : type) : Equiv B B =
 let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
   < <B, IdEquiv/connection B>
   , λ w i →
-       let VB : type = `(V i (car w) B (cdr w)) in
-       let proj/B : VB → B = λ g → `(vproj i g (car w) B (cdr w)) in
+       let VB : type = `(V i (fst w) B (snd w)) in
+       let proj/B : VB → B = λ g → `(vproj i g (fst w) B (snd w)) in
        < VB
        , proj/B
        , λ b →
@@ -235,7 +235,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
                 end
             in
             let ctr : Fiber VB B proj/B b =
-              < `(vin i (car (car ((cdr (cdr w)) b))) (@ ctr/B 0)), λ l → ctr/B l >
+              < `(vin i (fst (fst ((snd (snd w)) b))) (@ ctr/B 0)), λ l → ctr/B l >
             in
             < ctr
             , λ v j →
@@ -248,7 +248,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
                     | j=1 ⇒ λ k → ctr/B k
                     end
                 in
-                < `(vin i (car (@ ((cdr ((cdr (cdr w)) b)) v) j)) (@ filler 0))
+                < `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))
                 , λ j → filler j
                 >
             >

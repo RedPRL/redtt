@@ -42,11 +42,11 @@ module Make (R : SOURCE) : LEXER = struct
       ("🔓", LOCK);
       ("elim", ELIM);
       ("S1", S1);
-      ("car", CAR);
-      ("cdr", CDR);
+      ("fst", FST);
+      ("snd", SND);
       ("coe", COE);
       ("com", COM);
-      ("cons", CONS);
+      ("pair", PAIR);
       ("hcom", HCOM);
       ("comp", COMP);
       ("vproj", VPROJ);

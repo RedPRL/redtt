@@ -812,7 +812,7 @@ let rec pp env fmt =
         (pp env) t
 
     | Cons (tm0, tm1) ->
-      Format.fprintf fmt "@[<hv1>(cons@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
+      Format.fprintf fmt "@[<hv1>(pair@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
 
     | Box {r; r'; cap; sys} ->
       Format.fprintf fmt "@[<hv1>(box %a %a@ %a@ @[<hv>%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
