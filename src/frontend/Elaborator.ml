@@ -739,18 +739,20 @@ struct
       | _ ->
         failwith "elab_intro: malformed parameters"
     in
-    let rec go_args arg_tys frms =
-      match arg_tys, frms with
-      | [], [] ->
+    let rec go_args arg_tys dims frms =
+      match arg_tys, dims, frms with
+      | [], [], [] ->
         M.ret []
-      | (_, Desc.Self) :: arg_tys, E.App e :: frms ->
+      | [], _ :: dims, E.App r :: frms ->
+        (fun x xs -> x :: xs) <@>> elab_dim env r <*> go_args arg_tys dims frms
+      | (_, Desc.Self) :: arg_tys, dims, E.App e :: frms ->
         let self_ty = Tm.make @@ Tm.Data dlbl in
-        (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_args arg_tys frms
+        (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_args arg_tys dims frms
       | _ ->
         failwith "todo: go_args"
     in
     go_params [] constr.params @@ Bwd.to_list frms >>= fun (tps, frms) ->
-    go_args constr.args frms >>= fun targs ->
+    go_args constr.args constr.dims frms >>= fun targs ->
     M.ret @@ Tm.make @@ Tm.Intro (clbl, tps @ targs)
 
   and elab_mode_switch_cut env exp frms ty =
