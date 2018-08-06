@@ -1,5 +1,6 @@
 open RedBasis
 open Bwd
+open BwdNotation
 open Domain
 
 type step =
@@ -30,6 +31,7 @@ type error =
   | LblCallUnexpectedArgument of value
   | UnexpectedDimensionTerm of Tm.tm
   | UnexpectedTickTerm of Tm.tm
+  | UnleashDataError of value
   | UnleashPiError of value
   | UnleashSgError of value
   | UnleashExtError of value
@@ -112,6 +114,10 @@ struct
       Format.fprintf fmt
         "Tried to evaluate tick term %a as expression."
         Tm.pp0 t
+    | UnleashDataError v ->
+      Format.fprintf fmt
+        "Tried to unleash %a as datatype."
+        pp_value v
     | UnleashPiError v ->
       Format.fprintf fmt
         "Tried to unleash %a as pi type."
@@ -894,6 +900,11 @@ struct
     | (Bool | Nat | Int | S1 | Univ _) ->
       el
 
+
+    (* TODO: will need to change when indexed types are added *)
+    | Data _ ->
+      el
+
     | FHCom fhcom ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
        * [SVO]: Part III (airport).
@@ -1190,6 +1201,51 @@ struct
     | _ ->
       raise @@ E (RigidHComUnexpectedArgument cap)
 
+  and rigid_hcom_strict_data dir ty cap sys =
+    match unleash ty, unleash cap with
+    | Data dlbl, Intro (clbl, args) ->
+      let peel_arg k el =
+        match unleash el with
+        | Intro (_, args') ->
+          List.nth args' k
+        | _ ->
+          failwith ""
+      in
+
+      let peel_face k =
+        Face.map @@ fun _ _ abs ->
+        let x, elx = Abs.unleash1 abs in
+        Abs.bind1 x @@ peel_arg k elx
+      in
+
+      let peel_sys k sys = List.map (peel_face k) sys in
+
+      let rec make_args i acc args ps atys =
+        match args, ps, atys with
+        | el :: args, _ :: ps, _ ->
+          make_args (i + 1) (acc #< el) args ps atys
+        | el :: args, [], Desc.Self :: atys ->
+          let hcom = rigid_hcom dir ty el (peel_sys i sys) in
+          make_args (i + 1) (acc #< hcom) args ps atys
+        | [], [], [] ->
+          Bwd.to_list acc
+        | _ ->
+          failwith "rigid_hcom_strict_data"
+      in
+
+      let desc = Sig.lookup_datatype dlbl in
+      let constr = Desc.lookup_constr clbl desc in
+
+      let args' = make_args 0 Emp args constr.params constr.args in
+
+      make @@ Intro (clbl, args')
+
+    | _, Up info ->
+      rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
+
+    | _ ->
+      raise @@ E (RigidHComUnexpectedArgument cap)
+
   and rigid_hcom_nat dir cap sys =
     match unleash cap with
     | Zero ->
@@ -1271,6 +1327,13 @@ struct
 
     | S1 ->
       make @@ FHCom {dir; cap; sys}
+
+    | Data dlbl ->
+      let desc = Sig.lookup_datatype dlbl in
+      if Desc.is_strict_set desc then
+        rigid_hcom_strict_data dir ty cap sys
+      else
+        make @@ FHCom {dir; cap; sys}
 
     | Univ _ ->
       rigid_fhcom dir cap sys
@@ -1851,6 +1914,13 @@ struct
     let xs = Bwd.map Name.named nms in
     let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
+
+  and unleash_data v =
+    match unleash v with
+    | Data dlbl -> dlbl
+    | Rst rst -> unleash_data rst.ty
+    | _ ->
+      raise @@ E (UnleashDataError v)
 
   and unleash_pi v =
     match unleash v with
