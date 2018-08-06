@@ -1,5 +1,5 @@
 import path
-import integer
+import int
 
 let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
   λ i →
@@ -8,33 +8,33 @@ let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
 
 let S1-univ-cover (x : S1) : type =
   S1-elim x with
-  | base => integer
-  | loop i => UA _ _ isu-equiv i
+  | base => int
+  | loop i => UA _ _ isuc-equiv i
   end
 
-let loopn (n : integer) : Path S1 base base =
+let loopn (n : int) : Path S1 base base =
   elim n with
-  | ipos n =>
+  | pos n =>
     elim n with
-    | ze => lam _ -> base
-    | su (n => loopn) => trans S1 (lam i -> loop i) loopn
+    | zero => lam _ -> base
+    | suc (n => loopn) => trans S1 (lam i -> loop i) loopn
     end
-  | inegsu n =>
+  | negsuc n =>
     elim n with
-    | ze => symm S1 (lam i -> loop i)
-    | su (n => loopn) => trans S1 (symm S1 (lam i -> loop i)) loopn
+    | zero => symm S1 (lam i -> loop i)
+    | suc (n => loopn) => trans S1 (symm S1 (lam i -> loop i)) loopn
     end
   end
 
-let winding (l : Path S1 base base) : integer =
-  coe 0 1 (ipos ze) in lam i -> S1-univ-cover (l i)
+let winding (l : Path S1 base base) : int =
+  coe 0 1 (pos zero) in lam i -> S1-univ-cover (l i)
 
-let two : integer = ipos (su (su ze))
+let two : int = pos (suc (suc zero))
 
-let winding-loop-testing0 : Path integer two (winding (loopn two)) =
+let winding-loop-testing0 : Path int two (winding (loopn two)) =
   lam _ -> two
 
-let five : integer = ipos (su (su (su (su ze))))
+let five : int = pos (suc (suc (suc (suc zero))))
 
-let winding-loop-testing1 : Path integer five (winding (loopn five)) =
+let winding-loop-testing1 : Path int five (winding (loopn five)) =
   lam _ -> five
