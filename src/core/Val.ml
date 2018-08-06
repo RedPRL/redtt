@@ -61,11 +61,11 @@ struct
         pp_abs abs
     | RigidHComUnexpectedArgument v ->
       Format.fprintf fmt
-        "Unexpected type argument in rigid homogeneous copmosition:@ %a."
+        "Unexpected type argument in rigid homogeneous composition:@ %a."
         pp_value v
     | RigidGHComUnexpectedArgument v ->
       Format.fprintf fmt
-        "Unexpected type argument in rigid generalized homogeneous copmosition:@ %a."
+        "Unexpected type argument in rigid generalized homogeneous composition:@ %a."
         pp_value v
     | ApplyUnexpectedFunction v ->
       Format.fprintf fmt
@@ -1437,7 +1437,7 @@ struct
 
     (* `Ext _`: the expansion will stop after a valid
      * correction system, so it is not so bad. *)
-    | Ext _ | Univ _ | FHCom _ | V _ | S1 | Bool | Nat | Int ->
+    | Ext _ | Univ _ | FHCom _ | V _ | S1 | Bool | Nat | Int | Data _ ->
       let aux sys =
         match sys with
         | [] -> cap
