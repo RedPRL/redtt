@@ -15,7 +15,7 @@
 %token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BANG
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
-%token TIMES HASH AT BACKTICK IN WITH WHERE END DATA
+%token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK LOCK
 %token S1 S1_ELIM ELIM LOOP BASE UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
 %token OF
@@ -386,6 +386,11 @@ tm:
     { fun _ ->
       make_node $startpos $endpos @@
       Tm.Data dlbl }
+
+  | LPR; INTRO; clbl = ATOM; es = elist(tm); RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Intro (clbl, es env) }
 
   | e = cmd
     { fun env ->
