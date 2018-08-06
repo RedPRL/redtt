@@ -481,8 +481,9 @@ struct
             in
             build_cx env D.Env.emp Emp constr.params constr.args
           in
-          let bdy0 = inst_nclo clause0 vs in
-          let bdy1 = inst_nclo clause1 vs in
+          let cells = List.map (fun x -> D.Val x) vs in
+          let bdy0 = inst_nclo clause0 cells in
+          let bdy1 = inst_nclo clause1 cells in
           let intro = D.make @@ D.Intro (dlbl, clbl, vs) in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in

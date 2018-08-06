@@ -48,7 +48,7 @@ sig
   val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
-  val inst_nclo : nclo -> value list -> value
+  val inst_nclo : nclo -> env_el list -> value
   val inst_tick_clo : tick_clo -> tick -> value
 
   val unleash_pi : value -> value * clo

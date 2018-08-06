@@ -215,7 +215,7 @@ sig
   val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
-  val inst_nclo : nclo -> value list -> value
+  val inst_nclo : nclo -> env_el list -> value
   val inst_tick_clo : tick_clo -> tick -> value
 
   val unleash_pi : value -> value * clo
@@ -2153,10 +2153,10 @@ struct
       let rec go vs ps args =
         match vs, ps, args with
         | v :: vs, (_, _) :: ps, _ ->
-          v :: go vs ps args
+          Val v :: go vs ps args
         | v :: vs, [], (_, Desc.Self) :: args ->
           let v_ih = elim_data dlbl mot v clauses in
-          v :: v_ih :: go vs [] args
+          Val v :: Val v_ih :: go vs [] args
         | [], [], [] ->
           []
         | _ ->
@@ -2385,7 +2385,7 @@ struct
     | NClo info ->
       let Tm.NB (_, tm) = info.nbnd in
       (* Reversing makes sense here because: the left-most element of the environment is the innermost variable *)
-      eval (Env.push_many (List.rev_map (fun v -> Val v) vargs) info.rho) tm
+      eval (Env.push_many (List.rev vargs) info.rho) tm
 
   and inst_tick_clo clo tick =
     match clo with
