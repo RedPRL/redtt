@@ -6,7 +6,8 @@ type value = D.value
 
 type cx = Cx.t
 
-open RedBasis.Bwd
+open RedBasis
+open Bwd
 open BwdNotation
 
 type cofibration = (I.t * I.t) list
@@ -333,25 +334,22 @@ let rec check cx ty tm =
     (* Format.eprintf "Failed to check term %a@." (Tm.pp (CxUtil.ppenv cx)) tm; *)
     failwith "Type error"
 
-and check_constr cx dlbl constr args =
-  let rec check_params cx' ps args =
-    match ps, args with
-    | [], _ ->
-      cx', args
-    | (plbl, pty) :: ps, targ :: args ->
+and check_constr cx dlbl constr tms =
+  let vdataty = D.make @@ D.Data dlbl in
+  let rec go cx' ps args dims tms =
+    match ps, args, dims, tms with
+    | [], args, dims, _ ->
+      let tms, trs = ListUtil.split (List.length args) tms in
+      List.iter2 (fun (_, Desc.Self) tm -> check cx vdataty tm) args tms;
+      List.iter2 (fun _ tm -> check_dim cx tm) dims trs;
+    | (plbl, pty) :: ps, args, dims, tm :: tms ->
       let vpty = Cx.eval cx' pty in
-      let varg = check_eval cx vpty targ in
+      let varg = check_eval cx vpty tm in
       let cx' = Cx.def cx ~nm:(Some plbl) ~ty:vpty ~el:varg in
-      check_params cx' ps args
+      go cx' ps args dims tms
     | _ -> failwith "constructor arguments malformed"
   in
-  let check_args _cx' arg_tys args =
-    (* TODO: eventually the _cx' here will matter below *)
-    let vdataty = D.make @@ D.Data dlbl in
-    List.iter2 (fun (_, Desc.Self) arg -> check cx vdataty arg) arg_tys args
-  in
-  let cx', args = check_params cx constr.params args in
-  check_args cx' constr.args args
+  go cx constr.params constr.args constr.dims tms
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
