@@ -49,23 +49,31 @@ let pp_constr pp fmt constr =
   in
 
   let rec go env fmt (ps, args, dims) =
-    match ps, args with
-    | [nm, p], _ ->
+    match ps, args, dims with
+    | [nm, p], _, _ ->
       let nm, env' = Pretty.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
         (go env') ([], args, dims)
-    | (nm, p) :: ps, _ ->
+    | (nm, p) :: ps, _, _ ->
       let nm, env' = Pretty.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
         (go env') (ps, args, dims)
-    | [], [] ->
+    | [], [], [] ->
       ()
-    | [], args ->
+    | [], args, dims ->
+      let nms, _env' = Pretty.Env.bindn (List.map (fun x -> Some (fst x)) args) env in
       let pp_sep fmt () = Format.fprintf fmt " " in
-      Format.fprintf fmt "of ";
-      Format.pp_print_list ~pp_sep pp_arg_ty fmt args
+      begin
+        match dims with
+        | [] ->
+          Format.fprintf fmt "%a <%a>"
+            (Format.pp_print_list ~pp_sep pp_arg_ty) (List.map2 (fun nm (_, aty) -> nm, aty) nms args)
+            (Format.pp_print_list ~pp_sep Uuseg_string.pp_utf_8) dims
+        | _ ->
+          Format.fprintf fmt "<%a>" (Format.pp_print_list ~pp_sep Uuseg_string.pp_utf_8) dims
+      end
   in
   go Pretty.Env.emp fmt (constr.params, constr.args, constr.dims)
 
