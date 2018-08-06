@@ -195,23 +195,14 @@ etele_cell:
 
 
 
-
 desc_constr:
-| clbl = ATOM
-  { fun _dlbl ->
-    clbl, Desc.{params = []; args = []; dims = []} }
-
-| clbl = ATOM; params = nonempty_list(desc_param); args = nonempty_list(desc_arg)
+| clbl = ATOM;
+  params = loption(nonempty_list(desc_param));
+  args = loption(nonempty_list(desc_arg));
+  dims = loption(delimited(LGL, nonempty_list(ATOM), RGL))
   { fun dlbl ->
-    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims = []} }
+    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims} }
 
-| clbl = ATOM; params = nonempty_list(desc_param)
-  { fun _dlbl ->
-    clbl, Desc.{params; args = []; dims = []} }
-
-| clbl = ATOM; args = separated_nonempty_list(TIMES, desc_arg)
-  { fun dlbl ->
-    clbl, Desc.{params = []; args = List.map (fun arg -> arg dlbl) args; dims = []} }
 
 %inline
 desc_arg:
