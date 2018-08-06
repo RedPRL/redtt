@@ -1,25 +1,26 @@
 import path
-import integer
+import int
 
 let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
   λ i →
     `(V i A B E)
 
+
 let S1-univ-cover (x : S1) : type =
-  S1-rec x with
+  S1-elim x with
   | base => int
-  | loop i => UA _ _ succ-equiv i
+  | loop i => UA _ _ isuc-equiv i
   end
 
 let loopn (n : int) : Path S1 base base =
-  int-rec n with
+  elim n with
   | pos n =>
-    nat-rec n with
+    elim n with
     | zero => lam _ -> base
     | suc (n => loopn) => trans S1 (lam i -> loop i) loopn
     end
   | negsuc n =>
-    nat-rec n with
+    elim n with
     | zero => symm S1 (lam i -> loop i)
     | suc (n => loopn) => trans S1 (symm S1 (lam i -> loop i)) loopn
     end

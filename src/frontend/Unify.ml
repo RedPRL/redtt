@@ -409,10 +409,6 @@ let plug (ty, tm) frame =
     ret t1
   | Tm.LblRet t, Tm.LblCall ->
     ret t
-  | Tm.Tt, Tm.If info ->
-    ret info.tcase
-  | Tm.Ff, Tm.If info ->
-    ret info.fcase
   | _ -> failwith "TODO: plug"
 
 (* TODO: this sorry attempt results in things getting repeatedly evaluated *)
@@ -457,42 +453,42 @@ let is_orthogonal q =
 
   | Tm.Pi _, Tm.Univ _ -> true
   | Tm.Pi _, Tm.Sg _ -> true
-  | Tm.Pi _, Tm.Bool -> true
+  | Tm.Pi _, Tm.Data _ -> true
   | Tm.Pi _, Tm.Rst _ -> true
   | Tm.Pi _, Tm.Ext _ -> true
 
   | Tm.Univ _, Tm.Pi _ -> true
   | Tm.Univ _, Tm.Sg _ -> true
-  | Tm.Univ _, Tm.Bool -> true
+  | Tm.Univ _, Tm.Data _ -> true
   | Tm.Univ _, Tm.Rst _ -> true
   | Tm.Univ _, Tm.Ext _ -> true
 
   | Tm.Sg _, Tm.Pi _ -> true
   | Tm.Sg _, Tm.Univ _ -> true
-  | Tm.Sg _, Tm.Bool -> true
+  | Tm.Sg _, Tm.Data _ -> true
   | Tm.Sg _, Tm.Rst _ -> true
   | Tm.Sg _, Tm.Ext _ -> true
 
-  | Tm.Bool, Tm.Univ _ -> true
-  | Tm.Bool, Tm.Sg _ -> true
-  | Tm.Bool, Tm.Ext _ -> true
-  | Tm.Bool, Tm.Pi _ -> true
-  | Tm.Bool, Tm.Rst _ -> true
+  | Tm.Data _, Tm.Univ _ -> true
+  | Tm.Data _, Tm.Sg _ -> true
+  | Tm.Data _, Tm.Ext _ -> true
+  | Tm.Data _, Tm.Pi _ -> true
+  | Tm.Data _, Tm.Rst _ -> true
 
   | Tm.Rst _, Tm.Univ _ -> true
   | Tm.Rst _, Tm.Pi _ -> true
   | Tm.Rst _, Tm.Sg _ -> true
   | Tm.Rst _, Tm.Ext _ -> true
-  | Tm.Rst _, Tm.Bool -> true
+  | Tm.Rst _, Tm.Data _ -> true
 
   | Tm.Ext _, Tm.Pi _ -> true
   | Tm.Ext _, Tm.Sg _ -> true
   | Tm.Ext _, Tm.Univ _ -> true
-  | Tm.Ext _, Tm.Bool -> true
+  | Tm.Ext _, Tm.Data _ -> true
   | Tm.Ext _, Tm.Rst _ -> true
 
-  | Tm.Tt, Tm.Ff -> true
-  | Tm.Ff, Tm.Tt -> true
+  | Tm.Data dlbl0, Tm.Data dlbl1 -> not (dlbl0 = dlbl1)
+  | Tm.Intro (clbl0, _), Tm.Intro (clbl1, _) -> not (clbl0 = clbl1)
 
   | _ -> false
 
@@ -559,25 +555,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let _, _, ty1 = V.unleash_lbl_ty ty1 in
       ret (ty0, ty1)
 
-    | Snoc (sp0, Tm.If info0), Snoc (sp1, Tm.If info1) ->
-      go sp0 sp1 >>= fun (_ty0, _ty1) ->
-      let y = Name.fresh () in
-      let mot0y = Tm.unbind_with (Tm.var y ~twin:`TwinL) info0.mot in
-      let mot1y = Tm.unbind_with (Tm.var y ~twin:`TwinR) info1.mot in
-      let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-      active @@ Problem.all y (Tm.make Tm.Bool) @@
-      Problem.eqn ~ty0:univ ~ty1:univ ~tm0:mot0y ~tm1:mot1y
-      >>
-      let bool = D.make D.Bool in
-      inst_ty_bnd info0.mot (bool, Tm.make Tm.Tt) >>= fun mot0_tt ->
-      inst_ty_bnd info0.mot (bool, Tm.make Tm.Ff) >>= fun mot0_ff ->
-      inst_ty_bnd info1.mot (bool, Tm.make Tm.Tt) >>= fun mot1_tt ->
-      inst_ty_bnd info1.mot (bool, Tm.make Tm.Ff) >>= fun mot1_ff ->
-      active @@ Problem.eqn ~ty0:mot0_tt ~tm0:info0.tcase ~ty1:mot1_tt ~tm1:info1.tcase >>
-      active @@ Problem.eqn ~ty0:mot0_ff ~tm0:info0.fcase ~ty1:mot1_ff ~tm1:info1.fcase >>
-      (inst_ty_bnd info0.mot (bool, Tm.up (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0)) >>= eval) >>= fun ty0 ->
-      (inst_ty_bnd info1.mot (bool, Tm.up (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1)) >>= eval) >>= fun ty1 ->
-      ret (ty0, ty1)
+
+    (* TODO: Elim *)
 
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
       failwith "TODO: match_spine/vproj"

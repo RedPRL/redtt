@@ -6,12 +6,15 @@ type 'a param =
   ]
 
 module T = Map.Make (Name)
+module StringTable = Map.Make (String)
 
 type ty = Tm.tm
 type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
 type lock_info = {constant : bool; birth : int}
+
 type t =
   {rel : Restriction.t;
+   data_decls : Tm.tm Desc.desc StringTable.t;
    table : (entry param * lock_info) T.t;
    lock : int -> bool;
    killed : int -> bool;
@@ -21,11 +24,20 @@ type t =
 
 let emp () =
   {table = T.empty;
+   data_decls = StringTable.empty;
    rel = Restriction.emp ();
    lock = (fun _ -> false);
    killed = (fun _ -> false);
    under_tick = (fun _ -> false);
    len = 0}
+
+
+let declare_datatype dlbl desc (sg : t) : t =
+  {sg with
+   data_decls = StringTable.add dlbl desc sg.data_decls}
+
+let lookup_datatype dlbl sg =
+  StringTable.find dlbl sg.data_decls
 
 let ext_ (sg : t) ~constant nm param : t =
   let linfo = {constant; birth = sg.len} in
@@ -152,6 +164,9 @@ struct
     let r = I.act phi @@ `Atom x in
     (* Format.eprintf "[%a] != %a ==> %a@." Restriction.pp restriction Name.pp x I.pp r; *)
     r
+
+  let lookup_datatype lbl =
+    lookup_datatype lbl Sig.globals
 
   let lookup nm tw =
     let param, _ =

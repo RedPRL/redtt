@@ -15,10 +15,10 @@
 %token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BANG
 %token EQUALS
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
-%token TIMES HASH AT BACKTICK IN WITH END
+%token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK LOCK
-%token S1 S1_REC NAT_REC LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
-%token THEN ELSE
+%token S1 S1_ELIM ELIM LOOP BASE UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
+%token OF
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
 %token EOF
@@ -34,6 +34,9 @@ edecl:
     { E.Define (a, `Opaque, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
+  | DATA; dlbl = ATOM; WHERE; option(PIPE); constrs = separated_list(PIPE, desc_constr)
+    { let desc = List.map (fun constr -> constr dlbl) constrs in
+      E.Data (dlbl, desc) }
   | IMPORT; a = ATOM
     { E.Import a }
   | QUIT
@@ -68,18 +71,6 @@ atomic_eterm:
     { E.Num n }
   | BULLET
     { E.TickConst }
-  | BOOL
-    { E.Bool }
-  | TT
-    { E.Tt }
-  | FF
-    { E.Ff }
-  | NAT
-    { E.Nat }
-  | ZERO
-    { E.Zero }
-  | INT
-    { E.Int }
   | S1
     { E.S1 }
   | BASE
@@ -91,9 +82,9 @@ eframe:
     { E.App e }
   | BANG
     { E.Open }
-  | DOT CAR
+  | DOT FST
     { E.Car }
-  | DOT CDR
+  | DOT SND
     { E.Cdr }
   | DOT; n = NUMERAL
     { match n with
@@ -113,41 +104,16 @@ eterm:
   | LET; name = ATOM; EQUALS; tm = eterm; IN; body = eterm
     { E.Let {name; ty = None; tm; body} }
 
-  | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
-    { E.If (None, e0, e1, e2) }
+  | ELIM; scrut = eterm; IN; mot = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
+    { E.Elim {mot = Some mot; scrut; clauses} }
 
-  | IF; e0 = eterm; IN mot = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
-    { E.If (Some mot, e0, e1, e2) }
-
-  | SUC; n = atomic_eterm
-    { E.Suc n }
-
-  | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; LPR; n = ATOM; RRIGHT_ARROW; n_rec = ATOM; RPR; RRIGHT_ARROW; es = eterm; END
-    { E.NatRec (None, e0, ez, (n, Some n_rec, es)) }
-
-  | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; RRIGHT_ARROW; es = eterm; END
-    { E.NatRec (None, e0, ez, (n, None, es)) }
-
-  | NAT_REC; e0 = eterm; IN; mot = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; LPR; n = ATOM; RRIGHT_ARROW; n_rec = ATOM; RPR; RRIGHT_ARROW; es = eterm; END
-    { E.NatRec (Some mot, e0, ez, (n, Some n_rec, es)) }
-
-  | NAT_REC; e0 = eterm; IN; mot = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; RRIGHT_ARROW; es = eterm; END
-    { E.NatRec (Some mot, e0, ez, (n, None, es)) }
-
-
-  | POS; n = eterm
-    { E.Pos n }
-
-  | NEGSUC; n = eterm
-    { E.NegSuc n }
-
-  | INT_REC; e0 = eterm; WITH; option(PIPE); POS; np = ATOM; RRIGHT_ARROW; ep = eterm; PIPE; NEGSUC; nn = ATOM; RRIGHT_ARROW; en = eterm; END
-    { E.IntRec (None, e0, (np, ep), (nn, en)) }
+  | ELIM; scrut = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
+    { E.Elim {mot = None; scrut; clauses} }
 
   | LOOP; r = eterm
     { E.Loop r }
 
-  | S1_REC; e0 = eterm; WITH; option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm; END
+  | S1_ELIM; e0 = eterm; WITH; option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm; END
     { E.S1Rec (None, e0, eb, (x, el)) }
 
   | DFIX; LSQ; r = eterm; RSQ; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
@@ -195,6 +161,15 @@ eterm:
   | SHUT; tm = eterm
     { E.Shut tm }
 
+eclause:
+  | lbl = ATOM; pbinds = list(epatbind); RRIGHT_ARROW; bdy = eterm
+    { lbl, pbinds, bdy }
+
+epatbind:
+  | x = ATOM
+    { E.PVar x }
+  | LPR; x = ATOM; RRIGHT_ARROW; ih = ATOM; RPR
+    { E.PIndVar (x, ih) }
 
 eface:
   | r0 = atomic_eterm; EQUALS; r1 = atomic_eterm; RRIGHT_ARROW; e = eterm
@@ -218,6 +193,39 @@ etele_cell:
     { [`Tick "_"] }
   | LOCK
     { [`Lock] }
+
+
+
+
+desc_constr:
+| clbl = ATOM
+  { fun _dlbl ->
+    clbl, Desc.{params = []; args = []} }
+
+| clbl = ATOM; OF; params = nonempty_list(desc_param); TIMES; args = separated_nonempty_list(TIMES, desc_arg)
+  { fun dlbl ->
+    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args} }
+
+| clbl = ATOM; OF; params = nonempty_list(desc_param)
+  { fun _dlbl ->
+    clbl, Desc.{params; args = []} }
+
+| clbl = ATOM; OF; args = separated_nonempty_list(TIMES, desc_arg)
+  { fun dlbl ->
+    clbl, Desc.{params = []; args = List.map (fun arg -> arg dlbl) args} }
+
+%inline
+desc_arg:
+| self = ATOM
+  { fun name ->
+      if name = self then Desc.Self else failwith ("Expected " ^ name ^ " but got " ^ self)}
+
+%inline
+desc_param:
+| LPR; x = ATOM; COLON; ty = eterm; RPR
+  { x, ty }
+
+
 
 esig:
   | d = edecl; esig = esig
@@ -303,22 +311,6 @@ kind:
   | { Kind.Kan }
 
 tm:
-  | BOOL
-    { fun _env ->
-      make_node $startpos $endpos Tm.Bool }
-
-  | INT
-    { fun _env ->
-      make_node $startpos $endpos Tm.Int }
-
-  | TT
-    { fun _env ->
-      make_node $startpos $endpos Tm.Tt }
-
-  | FF
-    { fun _env ->
-      make_node $startpos $endpos Tm.Ff }
-
   | BULLET
     { fun _env ->
       make_node $startpos $endpos Tm.TickConst }
@@ -385,10 +377,20 @@ tm:
       make_node $startpos $endpos @@
       Tm.Shut (tm env) }
 
-  | LPR; CONS; e0 = tm; e1 = tm; RPR
+  | LPR; PAIR; e0 = tm; e1 = tm; RPR
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Cons (e0 env, e1 env) }
+
+  | LPR; DATA; dlbl = ATOM; RPR
+    { fun _ ->
+      make_node $startpos $endpos @@
+      Tm.Data dlbl }
+
+  | LPR; INTRO; clbl = ATOM; es = elist(tm); RPR
+    { fun env ->
+      make_node $startpos $endpos @@
+      Tm.Intro (clbl, es env) }
 
   | e = cmd
     { fun env ->
@@ -443,12 +445,12 @@ cut:
     { fun env ->
       hd env, Emp }
 
-  | LPR; CAR; e = cut; RPR
+  | LPR; FST; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.Car }
 
-  | LPR; CDR; e = cut; RPR
+  | LPR; SND; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.Cdr }
@@ -478,11 +480,6 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< (Tm.ExtApp (args env)) }
-
-  | LPR; IF; mot = bind(tm); scrut = cut; tcase = tm; fcase = tm; RPR
-    { fun env ->
-      let hd, fs = scrut env in
-      hd, fs #< (Tm.If {mot = mot env; tcase = tcase env; fcase = fcase env}) }
 
   | LPR; VPROJ; r = tm; e = cut; ty0 = tm; ty1 = tm; equiv = tm; RPR
     { fun env ->

@@ -20,6 +20,13 @@ struct
   module Notation = Monad.Notation (M)
   open Notation
 
+  let rec traverse f xs =
+    match xs with
+    | [] ->
+      M.ret []
+    | x :: xs ->
+      (fun y ys -> y :: ys) <@>> f x <*> traverse f xs
+
   module E = ESig
   module T = Map.Make (String)
 
@@ -57,9 +64,8 @@ struct
       go_locals renv psi
 
   let (<+>) m n =
-    C.bind (C.optional m) @@
-    function
-    | Some x -> C.ret x
+    M.optional m >>= function
+    | Some x -> M.ret x
     | None -> n
 
 
@@ -72,18 +78,22 @@ struct
     | E.App (E.Var (nm, _) as e) ->
       get_resolver env >>= fun renv ->
       begin
-        match ResEnv.get nm renv with
-        | `Var alpha ->
-          M.lift C.get_global_env >>= fun env ->
+        try
           begin
-            match GlobalEnv.lookup_kind env alpha with
-            | `P _ -> M.ret @@ `FunApp e
-            | `Tw _ -> M.ret @@ `FunApp e
-            | `I -> M.ret @@ `ExtApp e
-            | `Tick -> M.ret @@ `Prev e
+            match ResEnv.get nm renv with
+            | `Var alpha ->
+              M.lift C.get_global_env >>= fun env ->
+              begin
+                match GlobalEnv.lookup_kind env alpha with
+                | `P _ -> M.ret @@ `FunApp e
+                | `Tw _ -> M.ret @@ `FunApp e
+                | `I -> M.ret @@ `ExtApp e
+                | `Tick -> M.ret @@ `Prev e
+              end
+            | _ ->
+              failwith "kind_of_frame"
           end
-        | _ ->
-          failwith "kind_of_frame"
+        with _ -> M.ret @@ `FunApp e
       end
     | E.App e ->
       M.ret @@ `FunApp e
@@ -101,7 +111,7 @@ struct
     | [] ->
       M.ret env
     | E.Debug f :: esig ->
-      elab_decl env (E.Debug f) >>= fun env' ->
+      elab_decl env @@ E.Debug f >>= fun env' ->
       elab_sig env' esig
     | E.Quit :: _ ->
       M.ret env
@@ -127,6 +137,11 @@ struct
         Format.printf "Defined %s (%fs).@." name (now1 -. now0);
         T.add name alpha env
 
+    | E.Data (dlbl, edesc) ->
+      elab_datatype env edesc >>= fun desc ->
+      M.lift @@ C.global (GlobalEnv.declare_datatype dlbl desc) >>
+      M.ret env
+
     | E.Debug filter ->
       let title =
         match filter with
@@ -148,6 +163,40 @@ struct
 
     | E.Quit ->
       M.ret env
+
+  and elab_datatype env edesc =
+    traverse (elab_constr env) edesc
+
+  and elab_constr env (clbl, constr) =
+    let open Desc in
+    let elab_arg_ty Self = M.ret Self in
+
+    let rec abstract_tele xs (ps : _ list) =
+      match ps with
+      | [] -> []
+      | (lbl, x, p) :: ps ->
+        let Tm.NB (_, p') = Tm.bindn xs p in
+        (lbl, p') :: abstract_tele (xs #< x) ps
+    in
+
+    let rec go acc =
+      function
+      | [] ->
+        (* TODO: when self args are more complex, we'll need to abstract them over
+           the parameters too. *)
+        traverse elab_arg_ty constr.args <<@> fun args ->
+          clbl, {params = abstract_tele Emp @@ Bwd.to_list acc; args}
+
+      | (lbl, ety) :: prms ->
+        (* TODO: support higher universes *)
+        let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
+        elab_chk env univ0 ety >>= fun pty ->
+        let x = Name.named @@ Some lbl in
+        M.in_scope x (`P pty) @@
+        go (acc #< (lbl, x, pty)) prms
+    in
+
+    go Emp constr.params
 
   and elab_scheme env (cells, ecod) kont =
     let rec go =
@@ -241,66 +290,18 @@ struct
       end
 
 
-    | _, E.If (omot, escrut, etcase, efcase) ->
-      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
-      let tac_scrut ty = elab_chk env ty escrut in
-      let tac_tcase ty = elab_chk env ty etcase in
-      let tac_fcase ty = elab_chk env ty efcase in
-      tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase ty
-
-    | _, E.NatRec (omot, escrut, ezcase, (name_scase, name_rec_scase, escase)) ->
-      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
-      let tac_scrut ty = elab_chk env ty escrut in
-      let tac_zcase ty = elab_chk env ty ezcase in
-      let tac_scase ty = elab_chk env ty escase in
-      tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(name_scase, name_rec_scase, tac_scase) ty
-
-    | _, E.IntRec (omot, escrut, (name_pcase, epcase), (name_ncase, encase)) ->
-      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
-      let tac_scrut ty = elab_chk env ty escrut in
-      let tac_pcase ty = elab_chk env ty epcase in
-      let tac_ncase ty = elab_chk env ty encase in
-      tac_int_rec ~tac_mot ~tac_scrut ~tac_pcase:(name_pcase, tac_pcase) ~tac_ncase:(name_ncase, tac_ncase) ty
+    | _, E.Elim {mot; scrut; clauses} ->
+      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) mot in
+      let tac_scrut = elab_inf env scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
+      let clauses = List.map (fun (lbl, pbinds, bdy) -> lbl, pbinds, fun ty -> elab_chk env ty bdy) clauses in
+      tac_elim ~tac_mot ~tac_scrut ~clauses ty
 
     | _, E.S1Rec (omot, escrut, ebcase, (name_lcase, elcase)) ->
       let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
       let tac_scrut ty = elab_chk env ty escrut in
       let tac_bcase ty = elab_chk env ty ebcase in
       let tac_lcase ty = elab_chk env ty elcase in
-      tac_s1_rec ~tac_mot ~tac_scrut ~tac_bcase ~tac_lcase:(name_lcase, tac_lcase) ty
-
-    | Tm.Univ _, E.Bool ->
-      M.ret @@ Tm.make Tm.Bool
-
-    | Tm.Bool, E.Tt ->
-      M.ret @@ Tm.make Tm.Tt
-
-    | Tm.Bool, E.Ff ->
-      M.ret @@ Tm.make Tm.Ff
-
-    | Tm.Univ _, E.Nat ->
-      M.ret @@ Tm.make Tm.Nat
-
-    | Tm.Nat, E.Zero ->
-      M.ret @@ Tm.make Tm.Zero
-
-    | Tm.Nat, E.Suc n ->
-      let nat = Tm.make @@ Tm.Nat in
-      elab_chk env nat n <<@> fun n ->
-        Tm.make @@ Tm.Suc n
-
-    | Tm.Univ _, E.Int ->
-      M.ret @@ Tm.make Tm.Int
-
-    | Tm.Int, E.Pos n ->
-      let nat = Tm.make @@ Tm.Nat in
-      elab_chk env nat n <<@> fun n ->
-        Tm.make @@ Tm.Pos n
-
-    | Tm.Int, E.NegSuc n ->
-      let nat = Tm.make @@ Tm.Nat in
-      elab_chk env nat n <<@> fun n ->
-        Tm.make @@ Tm.NegSuc n
+      tac_s1_elim ~tac_mot ~tac_scrut ~tac_bcase ~tac_lcase:(name_lcase, tac_lcase) ty
 
     | Tm.Univ _, E.S1 ->
       M.ret @@ Tm.make Tm.S1
@@ -403,8 +404,6 @@ struct
 
     | _, E.Cut (e, fs) ->
       elab_chk_cut env e fs ty
-      <<@> snd
-      <<@> Tm.up
 
     | _, E.HCom info ->
       elab_dim env info.r >>= fun r ->
@@ -421,6 +420,9 @@ struct
         | `Exn exn ->
           raise exn
       end
+
+    | _, E.Var _ ->
+      elab_chk_cut env e Emp ty
 
     | _, e ->
       elab_up env ty e
@@ -540,9 +542,20 @@ struct
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
     match e with
     | E.Var (name, ushift) ->
-      elab_var env name ushift >>= fun (a, cmd) ->
-      M.lift (C.lookup_var a `Only <+> C.bind (C.lookup_meta a) (fun (ty, _) -> C.ret ty)) <<@> fun ty ->
-        Tm.shift_univ ushift ty, cmd
+      begin
+        elab_var env name ushift >>= fun (a, cmd) ->
+        M.lift (C.lookup_var a `Only) <+> (M.lift (C.lookup_meta a) <<@> fst) <<@> fun ty ->
+          Tm.shift_univ ushift ty, cmd
+      end <+>
+      begin
+        M.lift C.base_cx <<@> fun cx ->
+          let sign = Cx.globals cx in
+          let _ = GlobalEnv.lookup_datatype name sign in
+          let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
+          let hd = Tm.Down {ty = univ0; tm = Tm.make @@ Tm.Data name} in
+          let cmd = hd, Emp in
+          univ0, cmd
+      end
 
     | E.Quo tmfam ->
       get_resolver env >>= fun renv ->
@@ -556,16 +569,6 @@ struct
         | _ ->
           failwith "Cannot elaborate `term"
       end
-
-    | E.Suc n ->
-      let nat = Tm.make Tm.Nat in
-      elab_chk env nat n <<@> fun n ->
-        nat, (Tm.Down {ty = nat; tm = Tm.make (Tm.Suc n)}, Emp)
-
-    | E.Zero ->
-      M.ret @@
-      let nat = Tm.make Tm.Nat in
-      nat, (Tm.Down {ty = nat; tm = Tm.make Tm.Zero}, Emp)
 
     | E.Cut (e, fs) ->
       elab_cut env e fs >>= fun (vty, cmd) ->
@@ -699,14 +702,58 @@ struct
     M.lift C.base_cx <<@> fun cx ->
       cx, Cx.evaluator cx
 
-  and traverse f xs =
-    match xs with
-    | [] ->
-      M.ret []
-    | x :: xs ->
-      (fun y ys -> y :: ys) <@>> f x <*> traverse f xs
 
   and elab_chk_cut env exp frms ty =
+    match Tm.unleash ty with
+    | Tm.Data dlbl ->
+      begin
+        match exp with
+        | E.Var (clbl, _) ->
+          begin
+            M.lift C.base_cx >>= fun cx ->
+            let sign = Cx.globals cx in
+            let desc = GlobalEnv.lookup_datatype dlbl sign in
+            let constr = Desc.lookup_constr clbl desc in
+            elab_intro env dlbl clbl constr frms
+          end
+          <+> elab_mode_switch_cut env exp frms ty
+
+        | _ ->
+          elab_mode_switch_cut env exp frms ty
+      end
+
+    | _ ->
+      elab_mode_switch_cut env exp frms ty
+
+  and elab_intro env dlbl clbl constr frms =
+    let rec go_params acc ps frms =
+      match ps, frms with
+      | [], _ ->
+        M.ret (List.rev_map snd acc, frms)
+      | (_, pty) :: ps, E.App e :: frms ->
+        (* TODO: might be backwards *)
+        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.Down {ty; tm}, Emp) sub) acc @@ Tm.shift 0 in
+        let pty' = Tm.subst sub pty in
+        elab_chk env pty' e >>= fun t ->
+        go_params ((pty', t) :: acc) ps frms
+      | _ ->
+        failwith "elab_intro: malformed parameters"
+    in
+    let rec go_args arg_tys frms =
+      match arg_tys, frms with
+      | [], [] ->
+        M.ret []
+      | Desc.Self :: arg_tys, E.App e :: frms ->
+        let self_ty = Tm.make @@ Tm.Data dlbl in
+        (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_args arg_tys frms
+      | _ ->
+        failwith "todo: go_args"
+    in
+    go_params [] constr.params @@ Bwd.to_list frms >>= fun (tps, frms) ->
+    go_args constr.args frms >>= fun targs ->
+    M.ret @@ Tm.make @@ Tm.Intro (clbl, tps @ targs)
+
+  and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (vty, cmd) ->
     M.lift C.base_cx >>= fun cx ->
     let ty' = Cx.quote_ty cx vty in
@@ -714,7 +761,7 @@ struct
     M.unify >>
     M.lift (C.check_subtype ty' ty) >>= function
     | `Ok ->
-      M.ret (ty, cmd)
+      M.ret @@ Tm.up cmd
     | `Exn exn ->
       raise exn
 

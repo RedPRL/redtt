@@ -14,6 +14,7 @@ sig
   val emp : t
   val make : int -> t
   val succ : t -> t
+  val succn : int -> t -> t
   val abs : t -> Name.t bwd -> t
 
   val ix_of_lvl : int -> t -> int
@@ -33,6 +34,9 @@ struct
 
   let succ env =
     {env with n = env.n + 1}
+
+  let succn n env =
+    {env with n = env.n + n}
 
   let abs1 env x =
     {n = env.n + 1;
@@ -73,14 +77,27 @@ end
 type error =
   | ErrEquateNf of {env : Env.t; ty : value; el0 : value; el1 : value}
   | ErrEquateNeu of {env : Env.t; neu0 : neu; neu1 : neu}
+  | ErrEquateLbl of string * string
 
 let pp_error fmt =
   function
   | ErrEquateNf {ty; el0; el1; _} ->
-    Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]" Domain.pp_value el0 Uuseg_string.pp_utf_8 "≠" Domain.pp_value el1 Domain.pp_value ty
+    Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]"
+      Domain.pp_value el0
+      Uuseg_string.pp_utf_8 "≠"
+      Domain.pp_value el1 Domain.pp_value ty
 
   | ErrEquateNeu {neu0; neu1; _} ->
-    Format.fprintf fmt "@[<hv>%a@ %a@ %a@]" Domain.pp_neu neu0 Uuseg_string.pp_utf_8 "≠" Domain.pp_neu neu1
+    Format.fprintf fmt "@[<hv>%a@ %a@ %a@]"
+      Domain.pp_neu neu0
+      Uuseg_string.pp_utf_8 "≠"
+      Domain.pp_neu neu1
+
+  | ErrEquateLbl (lbl0, lbl1) ->
+    Format.fprintf fmt "@[<hv>%a@ %a@ %a@]"
+      Uuseg_string.pp_utf_8 lbl0
+      Uuseg_string.pp_utf_8 "≠"
+      Uuseg_string.pp_utf_8 lbl1
 
 exception E of error
 
@@ -196,58 +213,25 @@ struct
       let tm1 = equate env info.ty1 vproj0 vproj1 in
       Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
 
-    | _ ->
-      match unleash el0, unleash el1 with
-      | Univ info0, Univ info1 ->
+    | tycon ->
+      match tycon, unleash el0, unleash el1 with
+      | _, Univ info0, Univ info1 ->
         if info0.kind = info1.kind && info0.lvl = info1.lvl then
           Tm.univ ~kind:info0.kind ~lvl:info0.lvl
         else
           failwith "Expected equal universe levels"
 
-      | Bool, Bool ->
-        Tm.make Tm.Bool
-
-      | Tt, Tt ->
-        Tm.make Tm.Tt
-
-      | Ff, Ff ->
-        Tm.make Tm.Ff
-
-      | Nat, Nat ->
-        Tm.make Tm.Nat
-
-      | Zero, Zero ->
-        Tm.make Tm.Zero
-
-      | Suc n0, Suc n1 ->
-        let n = equate env ty n0 n1 in
-        Tm.make @@ Tm.Suc n
-
-      | Int, Int ->
-        Tm.make Tm.Int
-
-      | Pos n0, Pos n1 ->
-        let nat = make Nat in
-        let n = equate env nat n0 n1 in
-        Tm.make @@ Tm.Pos n
-
-      | NegSuc n0, NegSuc n1 ->
-        let nat = make Nat in
-        let n = equate env nat n0 n1 in
-        Tm.make @@ Tm.NegSuc n
-
-      | S1, S1 ->
+      | _, S1, S1 ->
         Tm.make Tm.S1
 
-      | Base, Base ->
+      | _, Base, Base ->
         Tm.make Tm.Base
 
-      | Loop x0, Loop x1 ->
-        (* XXX the following line is stupid *)
-        let tx = equate_dim env (`Atom x0) (`Atom x1) in
+      | _, Loop x0, Loop x1 ->
+        let tx = equate_atom env x0 x1 in
         Tm.make @@ Tm.Loop tx
 
-      | Pi pi0, Pi pi1 ->
+      | _, Pi pi0, Pi pi1 ->
         let dom = equate env ty pi0.dom pi1.dom in
         let var = generic env pi0.dom in
         let vcod0 = inst_clo pi0.cod var in
@@ -255,18 +239,24 @@ struct
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi (clo_name pi0.cod) dom cod
 
-      | Later ltr0, Later ltr1 ->
+      | _, Data lbl0, Data lbl1 ->
+        if lbl0 = lbl1 then
+          Tm.make @@ Tm.Data lbl0
+        else
+          raise @@ E (ErrEquateLbl (lbl0, lbl1))
+
+      | _, Later ltr0, Later ltr1 ->
         let tick = TickGen (`Lvl (None, Env.len env)) in
         let vcod0 = inst_tick_clo ltr0 tick in
         let vcod1 = inst_tick_clo ltr1 tick in
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.make @@ Tm.Later (Tm.B (None, cod))
 
-      | BoxModality ty0, BoxModality ty1 ->
+      | _, BoxModality ty0, BoxModality ty1 ->
         let ty = equate env ty ty0 ty1 in
         Tm.make @@ Tm.BoxModality ty
 
-      | Sg sg0, Sg sg1 ->
+      | _, Sg sg0, Sg sg1 ->
         let dom = equate env ty sg0.dom sg1.dom in
         let var = generic env sg0.dom in
         let vcod0 = inst_clo sg0.cod var in
@@ -274,7 +264,7 @@ struct
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.sg (clo_name sg0.cod) dom cod
 
-      | Ext abs0, Ext abs1 ->
+      | _, Ext abs0, Ext abs1 ->
         let xs, (ty0x, sys0x) = Domain.ExtAbs.unleash abs0 in
         let ty1x, sys1x = Domain.ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
         let envx = Env.abs env xs in
@@ -282,17 +272,17 @@ struct
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
         Tm.make @@ Tm.Ext (Tm.NB (Bwd.map Name.name xs, (tyx, sysx)))
 
-      | Rst info0, Rst info1 ->
+      | _, Rst info0, Rst info1 ->
         let ty = equate env ty info0.ty info1.ty in
         let sys = equate_val_sys env info0.ty info0.sys info1.sys in
         Tm.make @@ Tm.Rst {ty; sys}
 
-      | CoR face0, CoR face1 ->
+      | _, CoR face0, CoR face1 ->
         let univ = D.make @@ Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
         let face = equate_val_face env univ face0 face1 in
         Tm.make @@ Tm.CoR face
 
-      | V info0, V info1 ->
+      | _, V info0, V info1 ->
         let x0 = info0.x in
         let x1 = info1.x in
         let tr = equate_atom env x0 x1 in
@@ -302,7 +292,7 @@ struct
         let equiv = equate env equiv_ty info0.equiv info1.equiv in
         Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
 
-      | Box info0, Box info1 ->
+      | _, Box info0, Box info1 ->
         let dir, ty_cap, ty_sys = unleash_fhcom ty in
         let _, s' = Dir.unleash dir in
         let tr, tr' = equate_dir3 env dir info0.dir info1.dir in
@@ -310,7 +300,7 @@ struct
         let tsys = equate_box_sys env s' ty_sys info0.sys info1.sys in
         Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
 
-      | LblTy info0, LblTy info1 ->
+      | _, LblTy info0, LblTy info1 ->
         if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
           let ty = equate env ty info0.ty info1.ty in
           let go_arg (nf0, nf1) =
@@ -321,16 +311,16 @@ struct
           let args = List.map go_arg @@ List.combine info0.args info1.args in
           Tm.make @@ Tm.LblTy {lbl = info0.lbl; ty; args}
 
-      | Up up0, Up up1 ->
+      | _, Up up0, Up up1 ->
         Tm.up @@ equate_neu env up0.neu up1.neu
 
-      | FHCom fhcom0, FHCom fhcom1 ->
+      | _, FHCom fhcom0, FHCom fhcom1 ->
         let tr, tr' = equate_dir env fhcom0.dir fhcom1.dir in
         let cap = equate env ty fhcom0.cap fhcom1.cap in
         let sys = equate_comp_sys env ty fhcom0.sys fhcom1.sys in
         Tm.make @@ Tm.FHCom {r = tr; r' = tr'; cap; sys}
 
-      | HCom hcom0, HCom hcom1 ->
+      | _, HCom hcom0, HCom hcom1 ->
         begin
           try
             let tr, tr' = equate_dir env hcom0.dir hcom1.dir in
@@ -342,7 +332,7 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
-      | Coe coe0, Coe coe1 ->
+      | _, Coe coe0, Coe coe1 ->
         let tr, tr' = equate_dir env coe0.dir coe1.dir in
         let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
         let bnd = equate_val_abs env univ coe0.abs coe1.abs in
@@ -353,7 +343,7 @@ struct
         let tm = equate env tyr coe0.el coe1.el in
         Tm.up (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Emp)
 
-      | GHCom ghcom0, GHCom ghcom1 ->
+      | _, GHCom ghcom0, GHCom ghcom1 ->
         begin
           try
             let tr, tr' = equate_dir env ghcom0.dir ghcom1.dir in
@@ -365,9 +355,33 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
+      | Data dlbl, Intro (clbl0, args0), Intro (clbl1, args1) when clbl0 = clbl1 ->
+        let desc = V.Sig.lookup_datatype dlbl in
+        let constr = Desc.lookup_constr clbl0 desc in
+        let targs = equate_constr_args env dlbl constr args0 args1 in
+        Tm.make @@ Tm.Intro (clbl0, targs)
+
       | _ ->
         let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
+
+  and equate_constr_args env dlbl constr =
+    let rec go_params acc venv ps els0 els1 =
+      match ps, els0, els1 with
+      | [], _, _ ->
+        Bwd.to_list acc, els0, els1
+      | (_, pty) :: ps, el0 :: els0, el1 :: els1 ->
+        let vty = eval venv pty in
+        let tm0 = equate env vty el0 el1 in
+        go_params (acc #< tm0) (D.Env.push (D.Val el0) venv) ps els0 els1
+      | _ ->
+        failwith "equate_constr_args"
+    in
+    fun els0 els1 ->
+      let tps, els0', els1' = go_params Emp D.Env.emp constr.params els0 els1 in
+      let self_ty = D.make @@ D.Data dlbl in
+      let targs = List.map2 (equate env self_ty) els0' els1' in
+      tps @ targs
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
@@ -418,75 +432,69 @@ struct
 
     | Car neu0, Car neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Car :: stk
+
     | Cdr neu0, Cdr neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Cdr :: stk
+
     | FunApp (neu0, nf0), FunApp (neu1, nf1) ->
       let t = equate env nf0.ty nf0.el nf1.el in
       equate_neu_ env neu0 neu1 @@ Tm.FunApp t :: stk
+
     | ExtApp (neu0, rs0), ExtApp (neu1, rs1) ->
       let ts = equate_dims env rs0 rs1 in
       equate_neu_ env neu0 neu1 @@ Tm.ExtApp ts :: stk
-    | If if0, If if1 ->
-      let var = generic env @@ make Bool in
-      let vmot0 = inst_clo if0.mot var in
-      let vmot1 = inst_clo if1.mot var in
-      let mot = equate_ty (Env.succ env) vmot0 vmot1 in
-      let vmot_tt = inst_clo if0.mot @@ make Tt in
-      let vmot_ff = inst_clo if0.mot @@ make Ff in
-      let tcase = equate env vmot_tt if0.tcase if1.tcase in
-      let fcase = equate env vmot_ff if0.fcase if1.fcase in
-      let frame = Tm.If {mot = Tm.B (clo_name if0.mot, mot); tcase; fcase} in
-      equate_neu_ env if0.neu if1.neu @@ frame :: stk
-    | NatRec rec0, NatRec rec1 ->
-      let mot =
-        let var = generic env @@ make Nat in
-        let env' = Env.succ env in
-        let vmot0 = inst_clo rec0.mot var in
-        let vmot1 = inst_clo rec1.mot var in
-        equate_ty env' vmot0 vmot1
-      in
-      let zcase =
-        let vmot_ze = inst_clo rec0.mot @@ make Zero in
-        equate env vmot_ze rec0.zcase rec1.zcase
-      in
-      let scase =
-        let var = generic env @@ make Nat in
-        let env' = Env.succ env in
-        let vmot0 = inst_clo rec0.mot var in
-        let ih = generic env' vmot0 in
-        let vmot_su = inst_clo rec0.mot @@ make @@ Suc var in
-        let scase0 = inst_nclo rec0.scase [var; ih] in
-        let scase1 = inst_nclo rec1.scase [var; ih] in
-        equate (Env.succ env') vmot_su scase0 scase1
-      in
-      let frame = Tm.NatRec {mot = Tm.B (clo_name rec0.mot, mot); zcase; scase = Tm.NB (nclo_names rec0.scase, scase)} in
-      equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
-    | IntRec rec0, IntRec rec1 ->
-      let mot =
-        let var = generic env @@ make Int in
-        let env' = Env.succ env in
-        let vmot0 = inst_clo rec0.mot var in
-        let vmot1 = inst_clo rec1.mot var in
-        equate_ty env' vmot0 vmot1
-      in
-      let pcase =
-        let var = generic env @@ make Nat in
-        let vmot_pos = inst_clo rec0.mot @@ make @@ Pos var in
-        let pcase0 = inst_clo rec0.pcase var in
-        let pcase1 = inst_clo rec1.pcase var in
-        let env' = Env.succ env in
-        equate env' vmot_pos pcase0 pcase1
-      in
-      let ncase =
-        let var = generic env @@ make Nat in
-        let vmot_pos = inst_clo rec0.mot @@ make @@ NegSuc var in
-        let ncase0 = inst_clo rec0.ncase var in
-        let ncase1 = inst_clo rec1.ncase var in
-        let env' = Env.succ env in
-        equate env' vmot_pos ncase0 ncase1
-      in
-      let frame = Tm.IntRec {mot = Tm.B (clo_name rec0.mot, mot); pcase = Tm.B (clo_name rec0.pcase, pcase); ncase = Tm.B (clo_name rec0.ncase, ncase)} in
-      equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
+
+    | Elim elim0, Elim elim1 ->
+      if elim0.dlbl = elim1.dlbl then
+        let dlbl = elim0.dlbl in
+        let data_ty = D.make @@ D.Data dlbl in
+        let mot =
+          let var = generic env data_ty in
+          let env' = Env.succ env in
+          let vmot0 = inst_clo elim0.mot var in
+          let vmot1 = inst_clo elim1.mot var in
+          let bdy = equate_ty env' vmot0 vmot1 in
+          Tm.B (clo_name elim0.mot, bdy)
+        in
+
+        let desc = V.Sig.lookup_datatype dlbl in
+
+        let quote_clause (clbl, constr) =
+          let _, clause0 = List.find (fun (clbl', _) -> clbl = clbl') elim0.clauses in
+          let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
+          let env', vs =
+            let open Desc in
+            let rec build_cx qenv env vs ps args =
+              match ps, args with
+              | (_, pty) :: ps, _ ->
+                let vty = V.eval env pty in
+                let v = generic qenv vty in
+                let env' = D.Env.push (D.Val v) env in
+                build_cx (Env.succ qenv) env' (vs #< v) ps args
+              | [], Self :: args ->
+                let vx = generic qenv data_ty in
+                let qenv' = Env.succ qenv in
+                let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
+                build_cx (Env.succ qenv') env (vs #< vx #< vih) [] args
+              | [], [] ->
+                qenv, Bwd.to_list vs
+            in
+            build_cx env D.Env.emp Emp constr.params constr.args
+          in
+          let bdy0 = inst_nclo clause0 vs in
+          let bdy1 = inst_nclo clause1 vs in
+          let intro = D.make @@ D.Intro (clbl, vs) in
+          let mot_intro = inst_clo elim0.mot intro in
+          let tbdy = equate env' mot_intro bdy0 bdy1 in
+          clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)
+        in
+
+        let clauses = List.map quote_clause desc in
+        let frame = Tm.Elim {dlbl; mot; clauses} in
+        equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
+      else
+        failwith "Datatype mismatch"
+
     | S1Rec rec0, S1Rec rec1 ->
       let mot =
         let var = generic env @@ make S1 in
@@ -508,6 +516,7 @@ struct
       in
       let frame = Tm.S1Rec {mot = Tm.B (clo_name rec0.mot, mot); bcase = bcase; lcase = Tm.B (Name.name x_lcase, lcase)} in
       equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
+
     | VProj vproj0, VProj vproj1 ->
       let x0 = vproj0.x in
       let x1 = vproj1.x in
@@ -519,6 +528,7 @@ struct
       let equiv = equate env (Value.act phi equiv_ty) vproj0.equiv vproj1.equiv in
       let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
+
     | Cap cap0, Cap cap1 ->
       let tr, tr' = equate_dir env cap0.dir cap1.dir in
       let ty = equate_ty env cap0.ty cap1.ty in
@@ -526,10 +536,13 @@ struct
       let sys = equate_comp_sys env univ cap0.sys cap1.sys in
       let frame = Tm.Cap {r = tr; r' = tr'; ty; sys} in
       equate_neu_ env cap0.neu cap1.neu @@ frame :: stk
+
     | LblCall neu0, LblCall neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
+
     | CoRForce neu0, CoRForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
+
     | Prev (tick0, neu0), Prev (tick1, neu1) ->
       let tick = equate_tick env tick0 tick1 in
       equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
@@ -776,7 +789,7 @@ struct
         equiv_ty env nf0.ty nf1.ty;
         equiv env ~ty:nf0.ty nf0.el nf1.el
       in
-      ignore @@ List.map go_arg @@ List.combine info0.args info1.args
+      List.iter go_arg @@ List.combine info0.args info1.args
 
     | Univ info0, Univ info1 ->
       if Kind.lte info0.kind info1.kind && Lvl.lte info0.lvl info1.lvl then

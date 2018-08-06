@@ -3,6 +3,7 @@ open RedBasis.Bwd
 
 type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
+  | Data of string * eterm Desc.desc
   | Debug of [ `All | `Constraints | `Unsolved ]
   | Import of string
   | Quit
@@ -22,17 +23,10 @@ and eterm =
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
 
-  | If of eterm option * eterm * eterm * eterm
-  | Bool | Tt | Ff
-
-  | Nat | Zero | Suc of eterm
-  | NatRec of eterm option * eterm * eterm * (string * string option * eterm)
-
-  | Int | Pos of eterm | NegSuc of eterm
-  | IntRec of eterm option * eterm * (string * eterm) * (string * eterm)
-
-  | S1Rec of eterm option * eterm * eterm * (string * eterm)
   | S1 | Base | Loop of eterm
+  | S1Rec of eterm option * eterm * eterm * (string * eterm)
+
+  | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
 
   | Pi of etele * eterm
   | Sg of etele * eterm
@@ -53,6 +47,9 @@ and eterm =
 
   | Var of string * int
   | Num of int
+
+and eclause = Desc.con_label * epatbind list * eterm
+and epatbind = PVar of string | PIndVar of string * string
 
 and esys = eface list
 
@@ -80,15 +77,5 @@ let rec pp fmt =
     Format.fprintf fmt "<lam>"
   | Var (s, _) ->
     Format.fprintf fmt "%s" s
-  | Zero ->
-    Format.fprintf fmt "zero"
-  | Suc n ->
-    Format.fprintf fmt "(suc %a)" pp n
-  | Int ->
-    Format.fprintf fmt "int"
-  | Pos n ->
-    Format.fprintf fmt "(pos %a)" pp n
-  | IntRec _ ->
-    Format.fprintf fmt "<int-rec>"
   | _ ->
     Format.fprintf fmt "<eterm>"

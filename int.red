@@ -1,47 +1,52 @@
 import path
-import natural
+import nat
 import equivalence
 import isotoequiv
 
+data int where
+| pos of (n : nat)
+| negsuc of (n : nat)
+
 let pred (x : int) : int =
-  int-rec x with
+  elim x with
   | pos n ⇒
-    nat-rec n with
+    elim n with
     | zero ⇒ negsuc zero
     | suc n ⇒ pos n
     end
   | negsuc n ⇒ negsuc (suc n)
   end
 
-let succ (x : int) : int =
-  int-rec x with
+let isuc (x : int) : int =
+  elim x with
   | pos n ⇒ pos (suc n)
   | negsuc n ⇒
-    nat-rec n with
+    elim n with
     | zero ⇒ pos zero
     | suc n ⇒ negsuc n
     end
   end
 
-let pred-succ (n : int) : Path int (pred (succ n)) n =
-  int-rec n with
+
+let pred-isuc (n : int) : Path int (pred (isuc n)) n =
+  elim n with
   | pos n => lam _ -> pos n
   | negsuc n =>
-    nat-rec n with
+    elim n with
     | zero => lam _ -> negsuc zero
     | suc n => lam _ -> negsuc (suc n)
     end
   end
 
-let succ-pred (n : int) : Path int (succ (pred n)) n =
-  int-rec n with
+let isuc-pred (n : int) : Path int (isuc (pred n)) n =
+  elim n with
   | pos n =>
-    nat-rec n with
+    elim n with
     | zero => lam _ -> pos zero
     | suc n => lam _ -> pos (suc n)
     end
   | negsuc n => lam _ -> negsuc n
   end
 
-let succ-equiv : Equiv int int =
-  Iso/Equiv _ _ < succ, < pred, < succ-pred, pred-succ > > >
+let isuc-equiv : Equiv int int =
+  Iso/Equiv _ _ < isuc, < pred, < isuc-pred, pred-isuc > > >

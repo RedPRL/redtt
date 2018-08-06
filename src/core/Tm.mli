@@ -8,6 +8,7 @@ type 'a nbnd = NB of string option bwd * 'a
 type ('r, 'a) face = 'r * 'r * 'a option
 type ('r, 'a) system = ('r, 'a) face list
 
+
 type 'a tmf =
   | FHCom of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a bnd) system}
 
@@ -20,18 +21,6 @@ type 'a tmf =
 
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | VIn of {r : 'a; tm0 : 'a; tm1 : 'a}
-
-  | Bool
-  | Tt
-  | Ff
-
-  | Nat
-  | Zero
-  | Suc of 'a
-
-  | Int
-  | Pos of 'a
-  | NegSuc of 'a
 
   | S1
   | Base
@@ -62,6 +51,9 @@ type 'a tmf =
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
+  | Data of Desc.data_label
+  | Intro of Desc.con_label * 'a list
+
 
 and 'a head =
   | Meta of {name: Name.t; ushift : int}
@@ -81,9 +73,6 @@ and 'a frame =
   | Cdr
   | FunApp of 'a
   | ExtApp of 'a list
-  | If of {mot : 'a bnd; tcase : 'a; fcase : 'a}
-  | NatRec of {mot : 'a bnd; zcase : 'a; scase : 'a nbnd}
-  | IntRec of {mot : 'a bnd; pcase : 'a bnd; ncase : 'a bnd}
   | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
@@ -91,6 +80,8 @@ and 'a frame =
   | CoRForce
   | Prev of 'a
   | Open
+
+  | Elim of {dlbl : Desc.data_label; mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine

@@ -7,6 +7,7 @@ type value = D.value
 type cx = Cx.t
 
 open RedBasis.Bwd
+open BwdNotation
 
 type cofibration = (I.t * I.t) list
 
@@ -209,8 +210,17 @@ let rec check cx ty tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-  | D.Univ _, (T.Bool | T.Nat | T.Int | T.S1) ->
+  | D.Univ _, T.S1 ->
     ()
+
+  | D.Univ _, T.Data dlbl ->
+    let _ = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+    ()
+
+  | D.Data dlbl, T.Intro (clbl, args) ->
+    let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+    let constr = Desc.lookup_constr clbl desc in
+    check_constr cx dlbl constr args
 
 
   | D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
@@ -285,31 +295,16 @@ let rec check cx ty tm =
       let vty = check_eval_ty cx ty in
       check cx vty tm
     in
-    ignore @@ List.map go_arg info.args
+    List.iter go_arg info.args
 
   | D.LblTy info, T.LblRet t ->
     check cx info.ty t
-
-  | D.Bool, (T.Tt | T.Ff) ->
-    ()
 
   | D.S1, T.Base ->
     ()
 
   | D.S1, T.Loop x ->
     check_dim cx x
-
-  | D.Nat, T.Zero ->
-    ()
-
-  | D.Nat, T.Suc n ->
-    check cx (D.make D.Nat) n
-
-  | D.Int, T.Pos n ->
-    check cx (D.make D.Nat) n
-
-  | D.Int, T.NegSuc n ->
-    check cx (D.make D.Nat) n
 
   | D.V vty, T.VIn vin ->
     let r = check_eval_dim cx vin.r in
@@ -337,6 +332,26 @@ let rec check cx ty tm =
   | _ ->
     (* Format.eprintf "Failed to check term %a@." (Tm.pp (CxUtil.ppenv cx)) tm; *)
     failwith "Type error"
+
+and check_constr cx dlbl constr args =
+  let rec check_params cx' ps args =
+    match ps, args with
+    | [], _ ->
+      cx', args
+    | (plbl, pty) :: ps, targ :: args ->
+      let vpty = Cx.eval cx' pty in
+      let varg = check_eval cx vpty targ in
+      let cx' = Cx.def cx ~nm:(Some plbl) ~ty:vpty ~el:varg in
+      check_params cx' ps args
+    | _ -> failwith "constructor arguments malformed"
+  in
+  let check_args _cx' arg_tys args =
+    (* TODO: eventually the _cx' here will matter below *)
+    let vdataty = D.make @@ D.Data dlbl in
+    List.iter2 (fun Desc.Self arg -> check cx vdataty arg) arg_tys args
+  in
+  let cx', args = check_params cx constr.params args in
+  check_args cx' constr.args args
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
@@ -543,98 +558,6 @@ and infer_spine cx hd =
       Cx.check_eq_ty cx v_ty ih.ty;
       D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty1}
 
-    | T.If info ->
-      let T.B (nm, mot) = info.mot in
-      let bool = D.make D.Bool in
-      let cxx, _= Cx.ext_ty cx ~nm bool in
-      check_ty cxx mot;
-
-      let ih = infer_spine cx hd sp in
-      Cx.check_eq_ty cx ih.ty bool;
-
-      let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(D.make D.Tt) in
-      let cx_ff = Cx.def cx ~nm ~ty:bool ~el:(D.make D.Ff) in
-      let mot_tt = Cx.eval cx_tt mot in
-      let mot_ff = Cx.eval cx_ff mot in
-      check cx mot_tt info.tcase;
-      check cx mot_ff info.fcase;
-
-      let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:ih.el in
-      D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx_scrut mot}
-
-    | T.NatRec info ->
-      let T.B (nm, mot) = info.mot in
-      let nat = D.make D.Nat in
-      let _ =
-        let cx_x, _ = Cx.ext_ty cx ~nm nat in
-        check_ty cx_x mot
-      in
-
-      let mot_clo = Cx.make_closure cx info.mot in
-
-      let ih = infer_spine cx hd sp in
-
-      (* head *)
-      Cx.check_eq_ty cx ih.ty nat;
-
-      (* zero *)
-      let _ =
-        let mot_zero = V.inst_clo mot_clo @@ D.make D.Zero in
-        check cx mot_zero info.zcase
-      in
-
-      (* suc *)
-      let T.NB (nms_scase, scase) = info.scase in
-      let _ =
-        let nm_scase, nm_rec_scase =
-          match nms_scase with
-          | Snoc (Snoc (Emp, nm_scase), nm_rec_scase) -> nm_scase, nm_rec_scase
-          | _ -> failwith "incorrect number of binders when type-checking the suc case"
-        in
-        let cx_x, x = Cx.ext_ty cx ~nm:nm_scase nat in
-        let mot_x = V.inst_clo mot_clo x in
-        let cx_x_ih, _ih = Cx.ext_ty cx_x ~nm:nm_rec_scase mot_x in
-        let mot_suc = V.inst_clo mot_clo @@ D.make @@ D.Suc x in
-        check cx_x_ih mot_suc scase
-      in
-
-      D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el }
-
-    | T.IntRec info ->
-      let T.B (nm, mot) = info.mot in
-      let int = D.make D.Int in
-      let _ =
-        let cx_x, _ = Cx.ext_ty cx ~nm int in
-        check_ty cx_x mot
-      in
-
-      let mot_clo = Cx.make_closure cx info.mot in
-
-      let ih = infer_spine cx hd sp in
-
-      (* head *)
-      Cx.check_eq_ty cx ih.ty int;
-
-      (* pos *)
-      let _ =
-        let T.B (nm_pcase, pcase) = info.pcase in
-        let nat = D.make D.Nat in
-        let cx_n, n = Cx.ext_ty cx ~nm:nm_pcase nat in
-        let mot_pos = V.inst_clo mot_clo @@ D.make (D.Pos n) in
-        check cx_n mot_pos pcase
-      in
-
-      (* negsucc *)
-      let _ =
-        let T.B (nm_ncase, ncase) = info.ncase in
-        let nat = D.make D.Nat in
-        let cx_n, n = Cx.ext_ty cx ~nm:nm_ncase nat in
-        let mot_negsuc = V.inst_clo mot_clo @@ D.make (D.NegSuc n) in
-        check cx_n mot_negsuc ncase
-      in
-
-      D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
-
     | T.S1Rec info ->
       let T.B (nm, mot) = info.mot in
       let s1 = D.make D.S1 in
@@ -665,6 +588,55 @@ and infer_spine cx hd =
       Cx.check_eq cx ~ty:mot_base val_loop1 val_base;
 
       D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
+
+    | T.Elim info ->
+      let T.B (nm, mot) = info.mot in
+      let ih = infer_spine cx hd sp in
+      let mot_clo =
+        let cxx, _= Cx.ext_ty cx ~nm ih.ty in
+        check_ty cxx mot;
+        Cx.make_closure cx info.mot
+      in
+
+      let check_clause lbl constr clauses =
+        let open Desc in
+
+        let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
+
+        (* 'cx' is local context extended with hyps;
+           'env' is the environment for evaluating the types that comprise
+           the constructor, and should therefore begin with the *empty* environment. *)
+        let rec build_cx cx env vs params args =
+          match params, args with
+          | (plbl, pty) :: ps, _ ->
+            let vty = V.eval env pty in
+            let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
+            build_cx cx' (D.Env.push (D.Val v) env) (vs #< v) ps args
+          | [], Self :: args ->
+            let cx_x, v_x = Cx.ext_ty cx ~nm:None ih.ty in
+            let cx_ih, _ = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
+            build_cx cx_ih env (vs #< v_x) [] args
+          | [], [] ->
+            cx, Bwd.to_list vs
+        in
+        (* Need to extend the context once for each constr.params, and then twice for
+           each constr.args (twice, because of i.h.). *)
+        let cx', vs = build_cx cx D.Env.emp Emp constr.params constr.args in
+        let intro = D.make @@ D.Intro (lbl, vs) in
+        let ty = V.inst_clo mot_clo intro in
+        check cx' ty bdy
+      in
+
+      begin
+        match V.unleash ih.ty with
+        | D.Data dlbl ->
+          let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+          List.iter (fun (lbl, constr) -> check_clause lbl constr info.clauses) desc;
+          D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
+
+        | _ ->
+          failwith "eliminator expected datatype"
+      end
 
     | T.Cap info ->
       let fhcom_ty =

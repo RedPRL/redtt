@@ -16,13 +16,18 @@ val ext_meta : t -> Name.t -> entry param -> t
 val ext_dim : t -> Name.t -> t
 val ext_tick : t -> Name.t -> t
 val ext_lock : t -> t
+val restrict : Tm.tm -> Tm.tm -> t -> t
 val clear_locks : t -> t
 val kill_from_tick : t -> Name.t -> t
 
+
+val declare_datatype : Desc.data_label -> Tm.tm Desc.desc -> t -> t
+val lookup_datatype : Desc.data_label -> t -> Tm.tm Desc.desc
+
+
+
 val lookup_ty : t -> Name.t -> Tm.twin -> Tm.tm
 val lookup_kind : t -> Name.t -> unit param
-
-val restrict : Tm.tm -> Tm.tm -> t -> t
 
 val restriction : t -> Restriction.t
 

@@ -2,6 +2,7 @@ open RedBasis
 open RedTT_Core
 open Dev open Bwd open BwdNotation
 
+module D = Domain
 module M = ElabMonad
 module C = Contextual
 module U = Unify
@@ -142,45 +143,6 @@ let tac_let name itac ctac =
     let inf = Tm.Down {ty = let_ty; tm = let_tm}, Emp in
     M.ret @@ Tm.make @@ Tm.Let (inf, Tm.bind x bdyx)
 
-let tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase =
-  fun ty ->
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-    let bool = Tm.make @@ Tm.Bool in
-    let mot_ty = Tm.pi None bool univ in
-    tac_scrut bool >>= fun scrut ->
-    begin
-      match tac_mot with
-      | None ->
-        let is_dependent =
-          match Tm.unleash scrut with
-          | Tm.Up (Tm.Var {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
-          | _ -> false
-        in
-        if is_dependent then
-          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
-          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
-          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
-          M.unify >>
-          M.ret mot
-        else
-          M.ret (fun _ -> ty)
-      | Some tac_mot ->
-        tac_mot mot_ty >>= fun mot ->
-        let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-        M.ret fmot
-    end >>= fun mot ->
-    let mot_tt = mot @@ Tm.make Tm.Tt in
-    let mot_ff = mot @@ Tm.make Tm.Ff in
-    tac_tcase mot_tt >>= fun tcase ->
-    tac_fcase mot_ff >>= fun fcase ->
-    let hd = Tm.Down {ty = bool; tm = scrut} in
-    let bmot =
-      let x = Name.fresh () in
-      Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
-    in
-    let frm = Tm.If {mot = bmot; tcase; fcase} in
-    M.ret @@ Tm.up (hd, Emp #< frm)
-
 
 let rec tac_lambda names tac ty =
   match Tm.unleash ty with
@@ -244,14 +206,21 @@ let rec tac_lambda names tac ty =
 
 (* TODO factor out the motive inference algorithm *)
 
-let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scase, tac_scase) =
+let unleash_data ty =
+  match Tm.unleash ty with
+  | Tm.Data dlbl -> dlbl
+  | _ ->
+    Format.eprintf "Shit: %a@." Tm.pp0 ty;
+    failwith "Expected datatype"
+
+module MonadUtil = Monad.Util (ElabMonad)
+open MonadUtil
+
+let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun ty ->
+    tac_scrut >>= fun (data_ty, scrut) ->
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-    let nat = Tm.make @@ Tm.Nat in
-    let mot_ty = Tm.pi None nat univ in
-    let x_scase = Name.named @@ Some nm_scase in
-    let x_rec_scase = Name.named nm_rec_scase in
-    tac_scrut nat >>= fun scrut ->
+    let mot_ty = Tm.pi None data_ty univ in
     begin
       match tac_mot with
       | None ->
@@ -273,69 +242,75 @@ let tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(nm_scase, nm_rec_scas
         let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
         M.ret fmot
     end >>= fun mot ->
-    tac_zcase (mot (Tm.make Tm.Zero)) >>= fun zcase ->
-    let mot_suc_x = mot (Tm.make (Tm.Suc (Tm.up (Tm.var x_scase)))) in
-    M.in_scopes [x_scase, `P nat; x_rec_scase, `P (mot @@ Tm.up @@ Tm.var x_scase)] begin
-      tac_scase mot_suc_x >>= fun tm ->
-      M.ret @@ Tm.bindn (Emp #< x_scase #< x_rec_scase) tm
-    end >>= fun scase ->
-    let hd = Tm.Down {ty = nat; tm = scrut} in
-    let bmot =
-      let x = Name.fresh () in
-      Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
-    in
-    let frm = Tm.NatRec {mot = bmot; zcase; scase} in
-    M.ret @@ Tm.up (hd, Emp #< frm)
 
-let tac_int_rec ~tac_mot ~tac_scrut ~tac_pcase:(nm_pcase, tac_pcase) ~tac_ncase:(nm_ncase, tac_ncase) =
-  fun ty ->
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-    let nat = Tm.make @@ Tm.Nat in
-    let int = Tm.make @@ Tm.Int in
-    let mot_ty = Tm.pi None int univ in
-    let x_pcase = Name.named @@ Some nm_pcase in
-    let x_ncase = Name.named @@ Some nm_ncase in
-    tac_scrut int >>= fun scrut ->
+    let dlbl = unleash_data data_ty in
+
     begin
-      match tac_mot with
-      | None ->
-        let is_dependent =
-          match Tm.unleash scrut with
-          | Tm.Up (Tm.Var {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
-          | _ -> false
-        in
-        if is_dependent then
-          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
-          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
-          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
-          M.unify >>
-          M.ret mot
-        else
-          M.ret (fun _ -> ty)
-      | Some tac_mot ->
-        tac_mot mot_ty >>= fun mot ->
-        let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-        M.ret fmot
-    end >>= fun mot ->
-    let mot_pos_x = mot (Tm.make (Tm.Pos (Tm.up (Tm.var x_pcase)))) in
-    M.in_scope x_pcase (`P nat) begin
-      tac_pcase mot_pos_x >>= fun tm ->
-      M.ret @@ Tm.bind x_pcase tm
-    end >>= fun pcase ->
-    let mot_negsuc_x = mot (Tm.make (Tm.NegSuc (Tm.up (Tm.var x_ncase)))) in
-    M.in_scope x_ncase (`P nat) begin
-      tac_ncase mot_negsuc_x >>= fun tm ->
-      M.ret @@ Tm.bind x_ncase tm
-    end >>= fun ncase ->
-    let hd = Tm.Down {ty = int; tm = scrut} in
+      M.lift C.base_cx <<@> fun cx ->
+        let sign = Cx.globals cx in
+        GlobalEnv.lookup_datatype dlbl sign
+    end >>= fun desc ->
+
+    begin
+      M.lift C.base_cx <<@> fun cx ->
+        Cx.evaluator cx, Cx.quoter cx
+    end >>= fun ((module V), (module Q)) ->
+
+    let refine_clause (clbl, pbinds, (clause_tac : chk_tac)) =
+      let open Desc in
+      let constr = lookup_constr clbl desc in
+      let rec go psi env tms pbinds ps args =
+        match pbinds, ps, args with
+        | ESig.PVar nm :: pbinds, (_plbl, pty) :: ps, _ ->
+          let x = Name.named @@ Some nm in
+          let vty = V.eval env pty in
+          let tty = Q.quote_ty Quote.Env.emp vty in
+          let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
+          let x_tm = Tm.up @@ Tm.var x in
+          let env' = D.Env.push (D.Val x_el) env in
+          go (psi #< (x, `P tty)) env' (tms #< x_tm) pbinds ps args
+
+        | ESig.PVar nm :: pbinds, [], Self :: args ->
+          let x = Name.named @@ Some nm in
+          let x_ih = Name.fresh () in
+          let x_tm = Tm.up @@ Tm.var x in
+          let ih_ty = mot x_tm in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args
+
+        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], Self :: args ->
+          let x = Name.named @@ Some nm in
+          let x_ih = Name.named @@ Some nm_ih in
+          let x_tm = Tm.up @@ Tm.var x in
+          let ih_ty = mot x_tm in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args
+
+        | _, [], [] ->
+          psi, Bwd.to_list tms
+
+        | _ ->
+          failwith "refine_clause"
+      in
+      let psi, tms = go Emp D.Env.emp Emp pbinds constr.params constr.args in
+      let intro = Tm.make @@ Tm.Intro (clbl, tms) in
+      let clause_ty = mot intro in
+      begin
+        M.in_scopes (Bwd.to_list psi) @@
+        clause_tac clause_ty <<@> Tm.bindn (Bwd.map fst psi)
+      end >>= fun bdy ->
+      M.ret (clbl, bdy)
+    in
+
+    traverse (fun x -> x) @@ List.map refine_clause clauses >>= fun tclauses ->
+
+    let hd = Tm.Down {ty = data_ty; tm = scrut} in
     let bmot =
       let x = Name.fresh () in
       Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
     in
-    let frm = Tm.IntRec {mot = bmot; pcase; ncase} in
+    let frm = Tm.Elim {dlbl; mot = bmot; clauses = tclauses} in
     M.ret @@ Tm.up (hd, Emp #< frm)
 
-let tac_s1_rec ~tac_mot ~tac_scrut ~tac_bcase ~tac_lcase:(nm_lcase, tac_lcase) =
+let tac_s1_elim ~tac_mot ~tac_scrut ~tac_bcase ~tac_lcase:(nm_lcase, tac_lcase) =
   fun ty ->
     let pre_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
     let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in

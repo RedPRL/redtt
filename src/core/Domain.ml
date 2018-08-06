@@ -33,17 +33,6 @@ type con =
   | CoRThunk : val_face -> con
 
   | Cons : value * value -> con
-  | Bool : con
-  | Tt : con
-  | Ff : con
-
-  | Nat : con
-  | Zero : con
-  | Suc : value -> con
-
-  | Int : con
-  | Pos : value -> con
-  | NegSuc : value -> con
 
   | S1 : con
   | Base : con
@@ -61,6 +50,10 @@ type con =
   | BoxModality : value -> con
   | Shut : value -> con
 
+
+  | Data of Desc.data_label
+  | Intro of Desc.con_label * value list
+
 and neu =
   | Lvl : string option * int -> neu
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
@@ -73,13 +66,8 @@ and neu =
   | Car : neu -> neu
   | Cdr : neu -> neu
 
-  | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
-
-  | NatRec : {mot : clo; neu : neu; zcase : value; scase : nclo} -> neu
-
-  | IntRec : {mot : clo; neu : neu; pcase : clo; ncase : clo} -> neu
-
   | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
+  | Elim : {dlbl : Desc.data_label; mot : clo; neu : neu; clauses : (Desc.con_label * nclo) list} -> neu
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj : {x : atom; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
@@ -154,24 +142,6 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
   | CoRThunk face ->
     Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
-  | Bool ->
-    Format.fprintf fmt "bool"
-  | Tt ->
-    Format.fprintf fmt "tt"
-  | Ff ->
-    Format.fprintf fmt "ff"
-  | Nat ->
-    Format.fprintf fmt "nat"
-  | Zero ->
-    Format.fprintf fmt "zero"
-  | Suc n ->
-    Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
-  | Int ->
-    Format.fprintf fmt "int"
-  | Pos n ->
-    Format.fprintf fmt "@[<1>(pos@ %a)@]" pp_value n
-  | NegSuc n ->
-    Format.fprintf fmt "@[<1>(negsuc@ %a)@]" pp_value n
   | S1 ->
     Format.fprintf fmt "S1"
   | Base ->
@@ -191,7 +161,7 @@ and pp_con fmt : con -> unit =
   | Univ {kind; lvl} ->
     Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
   | Cons (v0, v1) ->
-    Format.fprintf fmt "@[<1>(cons@ %a %a)@]" pp_value v0 pp_value v1
+    Format.fprintf fmt "@[<1>(pair@ %a %a)@]" pp_value v0 pp_value v1
   | V info ->
     Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
   | VIn info ->
@@ -207,7 +177,7 @@ and pp_con fmt : con -> unit =
   | FHCom _ ->
     Format.fprintf fmt "<fhcom>"
   | Box _ ->
-    Format.fprintf fmt "<box>" (* �� *)
+    Format.fprintf fmt "<box>"
   | LblTy {lbl; args; ty} ->
     begin
       match args with
@@ -235,6 +205,12 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<box-modality>"
   | Shut _ ->
     Format.fprintf fmt "<shut>"
+  | Data _ ->
+    Format.fprintf fmt "<data>"
+  | Intro (lbl, args) ->
+    Format.fprintf fmt "@[<hv1>(%a %a)]"
+      Uuseg_string.pp_utf_8 lbl
+      pp_values args
 
 
 and pp_value fmt value =
@@ -330,25 +306,11 @@ and pp_neu fmt neu =
   | Meta {name; _} ->
     Name.pp fmt name
 
-  | If {mot; neu; tcase; fcase} ->
-    Format.fprintf fmt "@[<1>(if %a@ %a@ %a@ %a)@]"
-      pp_clo mot
-      pp_neu neu
-      pp_value tcase
-      pp_value fcase
-
-  | NatRec {mot; neu; zcase; scase} ->
-    Format.fprintf fmt "@[<1>(nat-rec %a@ %a@ %a@ %a)@]"
-      pp_clo mot
-      pp_neu neu
-      pp_value zcase
-      pp_nclo scase
-
-  | IntRec _ ->
-    Format.fprintf fmt "<int-rec>"
-
   | S1Rec _ ->
     Format.fprintf fmt "<S1-rec>"
+
+  | Elim _ ->
+    Format.fprintf fmt "<elim>"
 
   | Cap _ ->
     Format.fprintf fmt "<cap>"
@@ -381,6 +343,10 @@ and pp_nf fmt nf =
 and pp_nfs fmt nfs =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep pp_nf fmt nfs
+
+and pp_values fmt els =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep pp_value fmt els
 
 and pp_dims fmt rs =
   let pp_sep fmt () = Format.fprintf fmt " " in

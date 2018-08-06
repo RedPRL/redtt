@@ -1,4 +1,5 @@
 import path
+import bool
 
 ; the core constructor (prev α M) is written using application notation in
 ; the surface language
@@ -33,10 +34,12 @@ let tts : _ =
 
 ; To eliminate a box, write 'b !'; this elaborates to the core term `(open b).
 let bool/constant (x : bool) : (b : □ bool) × Path _ x (b !) =
-  if x then
+  elim x with
+  | tt ⇒
     < shut tt, λ _ → tt >
-  else
+  | ff ⇒
     < shut ff, λ _ → ff >
+  end
 
 let sequence : type = □ stream
 

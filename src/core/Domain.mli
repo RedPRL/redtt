@@ -36,17 +36,6 @@ type con =
   | CoRThunk : val_face -> con
 
   | Cons : value * value -> con
-  | Bool : con
-  | Tt : con
-  | Ff : con
-
-  | Nat : con
-  | Zero : con
-  | Suc : value -> con
-
-  | Int : con
-  | Pos : value -> con
-  | NegSuc : value -> con
 
   | S1 : con
   | Base : con
@@ -66,6 +55,11 @@ type con =
   | BoxModality : value -> con
   | Shut : value -> con
 
+
+  | Data of Desc.data_label
+  | Intro of Desc.con_label * value list
+
+
 and neu =
   | Lvl : string option * int -> neu
   | Var : {name : Name.t; twin : Tm.twin; ushift : int} -> neu
@@ -77,13 +71,9 @@ and neu =
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
-  | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
-
-  | NatRec : {mot : clo; neu : neu; zcase : value; scase : nclo} -> neu
-
-  | IntRec : {mot : clo; neu : neu; pcase : clo; ncase : clo} -> neu
 
   | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
+  | Elim : {dlbl : Desc.data_label; mot : clo; neu : neu; clauses : (Desc.con_label * nclo) list} -> neu
 
   | VProj : {x : atom; ty0 : value; ty1 : value; equiv : value; neu : neu} -> neu
 
