@@ -604,23 +604,24 @@ and infer_spine cx hd =
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
            the constructor, and should therefore begin with the *empty* environment. *)
-        let rec build_cx cx env vs params args =
+        let rec build_cx cx env vs params args dims =
           match params, args with
           | (plbl, pty) :: ps, _ ->
             let vty = V.eval env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (D.Env.push (D.Val v) env) (vs #< v) ps args
+            build_cx cx' (D.Env.push (D.Val v) env) (vs #< v) ps args dims
           | [], (nm, Self) :: args ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
             let cx_ih, _ = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih env (vs #< v_x) [] args
+            build_cx cx_ih env (vs #< v_x) [] args dims
           | [], [] ->
-            cx, Bwd.to_list vs
+            let cx', xs = Cx.ext_dims cx ~nms:(List.map (fun x -> Some x) dims) in
+            cx', Bwd.to_list vs, List.map (fun x -> `Atom x) xs
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', vs = build_cx cx D.Env.emp Emp constr.params constr.args in
-        let intro = D.make @@ D.Intro (info.dlbl, lbl, vs) in
+        let cx', vs, rs = build_cx cx D.Env.emp Emp constr.params constr.args constr.dims in
+        let intro = D.make @@ D.Intro (info.dlbl, lbl, vs, rs) in
         let ty = V.inst_clo mot_clo intro in
         check cx' ty bdy
       in

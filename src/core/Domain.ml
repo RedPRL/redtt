@@ -52,7 +52,7 @@ type con =
 
 
   | Data of Desc.data_label
-  | Intro of Desc.data_label * Desc.con_label * value list
+  | Intro of Desc.data_label * Desc.con_label * value list * dim list
 
 and neu =
   | Lvl : string option * int -> neu
@@ -207,10 +207,11 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<shut>"
   | Data _ ->
     Format.fprintf fmt "<data>"
-  | Intro (_, lbl, args) ->
-    Format.fprintf fmt "@[<hv1>(%a %a)]"
+  | Intro (_, lbl, args, rs) ->
+    Format.fprintf fmt "@[<hv1>(%a %a %a)]"
       Uuseg_string.pp_utf_8 lbl
       pp_values args
+      pp_dims rs
 
 
 and pp_value fmt value =

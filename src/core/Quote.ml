@@ -355,11 +355,12 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
-      | Data dlbl, Intro (_, clbl0, args0), Intro (_, clbl1, args1) when clbl0 = clbl1 ->
+      | Data dlbl, Intro (_, clbl0, args0, rs0), Intro (_, clbl1, args1, rs1) when clbl0 = clbl1 ->
         let desc = V.Sig.lookup_datatype dlbl in
         let constr = Desc.lookup_constr clbl0 desc in
         let targs = equate_constr_args env dlbl constr args0 args1 in
-        Tm.make @@ Tm.Intro (dlbl, clbl0, targs)
+        let trs = equate_dims env rs0 rs1 in
+        Tm.make @@ Tm.Intro (dlbl, clbl0, targs @ trs)
 
       | _ ->
         let err = ErrEquateNf {env; ty; el0; el1} in
@@ -462,29 +463,31 @@ struct
         let quote_clause (clbl, constr) =
           let _, clause0 = List.find (fun (clbl', _) -> clbl = clbl') elim0.clauses in
           let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
-          let env', vs =
+          let env', vs, rs =
             let open Desc in
-            let rec build_cx qenv env vs ps args =
-              match ps, args with
-              | (_, pty) :: ps, _ ->
+            let rec build_cx qenv env vs rs ps args dims =
+              match ps, args, dims with
+              | (_, pty) :: ps, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
                 let env' = D.Env.push (D.Val v) env in
-                build_cx (Env.succ qenv) env' (vs #< v) ps args
-              | [], (_, Self) :: args ->
+                build_cx (Env.succ qenv) env' (vs #< v) rs ps args dims
+              | [], (_, Self) :: args, _ ->
                 let vx = generic qenv data_ty in
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
-                build_cx (Env.succ qenv') env (vs #< vx #< vih) [] args
-              | [], [] ->
-                qenv, Bwd.to_list vs
+                build_cx (Env.succ qenv') env (vs #< vx #< vih) rs [] args dims
+              | [], [], dims ->
+                let xs = Bwd.map (fun x -> Name.named @@ Some x) @@ Bwd.from_list dims in
+                let qenv' = Env.abs qenv xs in
+                qenv', Bwd.to_list vs, Bwd.to_list rs
             in
-            build_cx env D.Env.emp Emp constr.params constr.args
+            build_cx env D.Env.emp Emp Emp constr.params constr.args constr.dims
           in
-          let cells = List.map (fun x -> D.Val x) vs in
+          let cells = List.map (fun x -> D.Val x) vs @ List.map (fun x -> Atom x) rs in
           let bdy0 = inst_nclo clause0 cells in
           let bdy1 = inst_nclo clause1 cells in
-          let intro = D.make @@ D.Intro (dlbl, clbl, vs) in
+          let intro = D.make @@ D.Intro (dlbl, clbl, vs, rs) in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)

@@ -443,9 +443,10 @@ struct
     | Data lbl ->
       make @@ Data lbl
 
-    | Intro (dlbl, clbl, args) ->
+    | Intro (dlbl, clbl, args, rs) ->
       let args' = List.map (Value.act phi) args in
-      make @@ Intro (dlbl, clbl, args')
+      let rs' = List.map (I.act phi) rs in
+      make @@ Intro (dlbl, clbl, args', rs')
 
   and act_neu phi con =
     match con with
@@ -1127,12 +1128,13 @@ struct
       let err = RigidCoeUnexpectedArgument abs in
       raise @@ E err
 
+  (* presupposes no dimension arguments *)
   and rigid_hcom_strict_data dir ty cap sys =
     match unleash ty, unleash cap with
-    | Data dlbl, Intro (_, clbl, args) ->
+    | Data dlbl, Intro (_, clbl, args, []) ->
       let peel_arg k el =
         match unleash el with
-        | Intro (_, _, args') ->
+        | Intro (_, _, args', []) ->
           List.nth args' k
         | _ ->
           failwith ""
@@ -1164,7 +1166,7 @@ struct
 
       let args' = make_args 0 Emp args constr.params constr.args in
 
-      make @@ Intro (dlbl, clbl, args')
+      make @@ Intro (dlbl, clbl, args', [])
 
     | _, Up info ->
       rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
@@ -1516,8 +1518,12 @@ struct
       make @@ Data lbl
 
     | Tm.Intro (dlbl, clbl, args) ->
+      let desc = Sig.lookup_datatype dlbl in
+      let constr = Desc.lookup_constr clbl desc in
+      let args, trs = ListUtil.split (List.length constr.params + List.length constr.args) args in
       let vargs = List.map (eval rho) args in
-      make @@ Intro (dlbl, clbl, vargs)
+      let rs = List.map (eval_dim rho) trs in
+      make @@ Intro (dlbl, clbl, vargs, rs)
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
@@ -2145,25 +2151,27 @@ struct
 
   and elim_data dlbl mot scrut clauses =
     match unleash scrut with
-    | Intro (_, clbl, vs) ->
+    | Intro (_, clbl, vs, rs) ->
       let _, nclo = List.find (fun (clbl', _) -> clbl = clbl') clauses in
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr clbl desc in
 
-      let rec go vs ps args =
-        match vs, ps, args with
-        | v :: vs, (_, _) :: ps, _ ->
-          Val v :: go vs ps args
-        | v :: vs, [], (_, Desc.Self) :: args ->
+      let rec go vs rs ps args dims =
+        match vs, rs, ps, args, dims with
+        | v :: vs, _, (_, _) :: ps, _, _ ->
+          Val v :: go vs rs ps args dims
+        | v :: vs, _,  [], (_, Desc.Self) :: args, _ ->
           let v_ih = elim_data dlbl mot v clauses in
-          Val v :: Val v_ih :: go vs [] args
-        | [], [], [] ->
+          Val v :: Val v_ih :: go vs rs [] args dims
+        | [], r :: rs, [], [], _ :: dims ->
+          Atom r :: go [] rs [] [] dims
+        | [], [], [], [], [] ->
           []
         | _ ->
           failwith "elim_data/intro"
       in
 
-      inst_nclo nclo @@ go vs constr.params constr.args
+      inst_nclo nclo @@ go vs rs constr.params constr.args constr.dims
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in
