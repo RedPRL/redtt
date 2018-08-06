@@ -310,7 +310,7 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           failwith "refine_clause"
       in
       let xs, tms = go Emp Emp pbinds constr.params constr.args in
-      let intro = Tm.make @@ Tm.Intro (dlbl, tms) in
+      let intro = Tm.make @@ Tm.Intro (clbl, tms) in
       let clause_ty = mot intro in
       clause_tac clause_ty >>= fun bdy ->
       M.ret (clbl, Tm.bindn xs bdy)
