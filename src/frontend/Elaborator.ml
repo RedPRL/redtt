@@ -296,66 +296,12 @@ struct
       let clauses = List.map (fun (lbl, pbinds, bdy) -> lbl, pbinds, fun ty -> elab_chk env ty bdy) clauses in
       tac_elim ~tac_mot ~tac_scrut ~clauses ty
 
-    | _, E.If (omot, escrut, etcase, efcase) ->
-      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
-      let tac_scrut ty = elab_chk env ty escrut in
-      let tac_tcase ty = elab_chk env ty etcase in
-      let tac_fcase ty = elab_chk env ty efcase in
-      tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase ty
-
-    | _, E.NatRec (omot, escrut, ezcase, (name_scase, name_rec_scase, escase)) ->
-      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
-      let tac_scrut ty = elab_chk env ty escrut in
-      let tac_zcase ty = elab_chk env ty ezcase in
-      let tac_scase ty = elab_chk env ty escase in
-      tac_nat_rec ~tac_mot ~tac_scrut ~tac_zcase ~tac_scase:(name_scase, name_rec_scase, tac_scase) ty
-
-    | _, E.IntRec (omot, escrut, (name_pcase, epcase), (name_ncase, encase)) ->
-      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
-      let tac_scrut ty = elab_chk env ty escrut in
-      let tac_pcase ty = elab_chk env ty epcase in
-      let tac_ncase ty = elab_chk env ty encase in
-      tac_int_rec ~tac_mot ~tac_scrut ~tac_pcase:(name_pcase, tac_pcase) ~tac_ncase:(name_ncase, tac_ncase) ty
-
     | _, E.S1Rec (omot, escrut, ebcase, (name_lcase, elcase)) ->
       let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
       let tac_scrut ty = elab_chk env ty escrut in
       let tac_bcase ty = elab_chk env ty ebcase in
       let tac_lcase ty = elab_chk env ty elcase in
-      tac_s1_rec ~tac_mot ~tac_scrut ~tac_bcase ~tac_lcase:(name_lcase, tac_lcase) ty
-
-    | Tm.Univ _, E.Bool ->
-      M.ret @@ Tm.make Tm.Bool
-
-    | Tm.Bool, E.Tt ->
-      M.ret @@ Tm.make Tm.Tt
-
-    | Tm.Bool, E.Ff ->
-      M.ret @@ Tm.make Tm.Ff
-
-    | Tm.Univ _, E.Nat ->
-      M.ret @@ Tm.make Tm.Nat
-
-    | Tm.Nat, E.Zero ->
-      M.ret @@ Tm.make Tm.Zero
-
-    | Tm.Nat, E.Suc n ->
-      let nat = Tm.make @@ Tm.Nat in
-      elab_chk env nat n <<@> fun n ->
-        Tm.make @@ Tm.Suc n
-
-    | Tm.Univ _, E.Int ->
-      M.ret @@ Tm.make Tm.Int
-
-    | Tm.Int, E.Pos n ->
-      let nat = Tm.make @@ Tm.Nat in
-      elab_chk env nat n <<@> fun n ->
-        Tm.make @@ Tm.Pos n
-
-    | Tm.Int, E.NegSuc n ->
-      let nat = Tm.make @@ Tm.Nat in
-      elab_chk env nat n <<@> fun n ->
-        Tm.make @@ Tm.NegSuc n
+      tac_s1_elim ~tac_mot ~tac_scrut ~tac_bcase ~tac_lcase:(name_lcase, tac_lcase) ty
 
     | Tm.Univ _, E.S1 ->
       M.ret @@ Tm.make Tm.S1
@@ -623,16 +569,6 @@ struct
         | _ ->
           failwith "Cannot elaborate `term"
       end
-
-    | E.Suc n ->
-      let nat = Tm.make Tm.Nat in
-      elab_chk env nat n <<@> fun n ->
-        nat, (Tm.Down {ty = nat; tm = Tm.make (Tm.Suc n)}, Emp)
-
-    | E.Zero ->
-      M.ret @@
-      let nat = Tm.make Tm.Nat in
-      nat, (Tm.Down {ty = nat; tm = Tm.make Tm.Zero}, Emp)
 
     | E.Cut (e, fs) ->
       elab_cut env e fs >>= fun (vty, cmd) ->

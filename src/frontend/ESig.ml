@@ -23,15 +23,6 @@ and eterm =
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
 
-  | If of eterm option * eterm * eterm * eterm
-  | Bool | Tt | Ff
-
-  | Nat | Zero | Suc of eterm
-  | NatRec of eterm option * eterm * eterm * (string * string option * eterm)
-
-  | Int | Pos of eterm | NegSuc of eterm
-  | IntRec of eterm option * eterm * (string * eterm) * (string * eterm)
-
   | S1 | Base | Loop of eterm
   | S1Rec of eterm option * eterm * eterm * (string * eterm)
 
@@ -86,15 +77,5 @@ let rec pp fmt =
     Format.fprintf fmt "<lam>"
   | Var (s, _) ->
     Format.fprintf fmt "%s" s
-  | Zero ->
-    Format.fprintf fmt "zero"
-  | Suc n ->
-    Format.fprintf fmt "(suc %a)" pp n
-  | Int ->
-    Format.fprintf fmt "int"
-  | Pos n ->
-    Format.fprintf fmt "(pos %a)" pp n
-  | IntRec _ ->
-    Format.fprintf fmt "<int-rec>"
   | _ ->
     Format.fprintf fmt "<eterm>"
