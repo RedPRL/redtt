@@ -63,16 +63,18 @@ let pp_constr pp fmt constr =
     | [], [], [] ->
       ()
     | [], args, dims ->
-      let nms, _env' = Pretty.Env.bindn (List.map (fun x -> Some (fst x)) args) env in
+      let nms, env' = Pretty.Env.bindn (List.map (fun x -> Some (fst x)) args) env in
+      let dims', _env'' = Pretty.Env.bindn (List.map (fun x -> Some x) dims) env' in
+      (* TODO: when we add boundaries, we'll use _env''. *)
       let pp_sep fmt () = Format.fprintf fmt " " in
       begin
-        match dims with
+        match dims' with
         | [] ->
           Format.fprintf fmt "%a <%a>"
             (Format.pp_print_list ~pp_sep pp_arg_ty) (List.map2 (fun nm (_, aty) -> nm, aty) nms args)
             (Format.pp_print_list ~pp_sep Uuseg_string.pp_utf_8) dims
         | _ ->
-          Format.fprintf fmt "<%a>" (Format.pp_print_list ~pp_sep Uuseg_string.pp_utf_8) dims
+          Format.fprintf fmt "<%a>" (Format.pp_print_list ~pp_sep Uuseg_string.pp_utf_8) dims'
       end
   in
   go Pretty.Env.emp fmt (constr.params, constr.args, constr.dims)
