@@ -27,7 +27,9 @@ and [cubicaltt](https://github.com/mortberg/cubicaltt).
   the cubical setting, we will add these, and they will live side-by-side with
   path types as they did in RedPRL.
 
-- some built-in inductive types: natural numbers, integers, booleans, the circle
+- user-defined inductive types (parameters, indices, higher constructors not yet supported)
+
+- built-in higher inductive type (the circle)
 
 - experimental support for Fitch-style modal guarded recursion: □, ▷
 
