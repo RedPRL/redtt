@@ -1,8 +1,12 @@
 data foo where
 | p
-| q <i>
+| q (x : foo) <i>
 
 let asdf : foo =
-  q 0
+  q p 0
 
-debug
+let test (x : foo) : foo =
+  elim x with
+  | p ⇒ p
+  | q (z ⇒ ih) j ⇒ q ih j
+  end

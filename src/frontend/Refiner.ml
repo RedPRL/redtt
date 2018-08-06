@@ -262,6 +262,7 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let pbinds =
             List.map (fun (plbl, _) -> ESig.PVar plbl) constr.params
             @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.args
+            @ List.map (fun x -> ESig.PVar x) constr.dims
           in
           lbl, pbinds, fun ty ->
             M.lift C.ask >>= fun psi ->
@@ -280,38 +281,45 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
     let refine_clause (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
       let constr = lookup_constr clbl desc in
-      let rec go psi env tms pbinds ps args =
-        match pbinds, ps, args with
-        | ESig.PVar nm :: pbinds, (_plbl, pty) :: ps, _ ->
+      let rec go psi env tms pbinds ps args dims =
+        match pbinds, ps, args, dims with
+        | ESig.PVar nm :: pbinds, (_plbl, pty) :: ps, _, _->
           let x = Name.named @@ Some nm in
           let vty = V.eval env pty in
           let tty = Q.quote_ty Quote.Env.emp vty in
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let x_tm = Tm.up @@ Tm.var x in
           let env' = D.Env.push (D.Val x_el) env in
-          go (psi #< (x, `P tty)) env' (tms #< x_tm) pbinds ps args
+          go (psi #< (x, `P tty)) env' (tms #< x_tm) pbinds ps args dims
 
-        | ESig.PVar nm :: pbinds, [], (_, Self) :: args ->
+        | ESig.PVar nm :: pbinds, [], (_, Self) :: args, _ ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.fresh () in
           let x_tm = Tm.up @@ Tm.var x in
           let ih_ty = mot x_tm in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args dims
 
-        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: args ->
+        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: args, _ ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.named @@ Some nm_ih in
           let x_tm = Tm.up @@ Tm.var x in
           let ih_ty = mot x_tm in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args dims
 
-        | _, [], [] ->
+        | ESig.PVar nm :: pbinds, [], [], _ :: dims ->
+          let x = Name.named @@ Some nm in
+          let x_tm = Tm.up @@ Tm.var x in
+          let r = `Atom x in
+          let env' = D.Env.push (D.Atom r) env in
+          go (psi #< (x, `I)) env' (tms #< x_tm) pbinds [] [] dims
+
+        | _, [], [], [] ->
           psi, Bwd.to_list tms
 
         | _ ->
           failwith "refine_clause"
       in
-      let psi, tms = go Emp D.Env.emp Emp pbinds constr.params constr.args in
+      let psi, tms = go Emp D.Env.emp Emp pbinds constr.params constr.args constr.dims in
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
       begin
