@@ -389,7 +389,7 @@ struct
 
       | Data dlbl, Intro (clbl0, args0), Intro (clbl1, args1) when clbl0 = clbl1 ->
         let desc = V.Sig.lookup_datatype dlbl in
-        let _, constr = List.find (fun (clbl, _) -> clbl = clbl0) desc in
+        let constr = Desc.lookup_constr clbl0 desc in
         let targs = equate_constr_args env dlbl constr args0 args1 in
         Tm.make @@ Tm.Intro (clbl0, targs)
 
@@ -525,6 +525,7 @@ struct
           let bdy = equate_ty env' vmot0 vmot1 in
           Tm.B (clo_name elim0.mot, bdy)
         in
+
         let desc = V.Sig.lookup_datatype dlbl in
 
         let quote_clause (clbl, constr) =

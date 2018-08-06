@@ -218,8 +218,8 @@ let rec check cx ty tm =
     ()
 
   | D.Data dlbl, T.Intro (clbl, args) ->
-    let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
-    let _, constr = List.find (fun (clbl', _) -> clbl = clbl') desc in
+    let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+    let constr = Desc.lookup_constr clbl desc in
     check_constr cx dlbl constr args
 
 
@@ -707,7 +707,11 @@ and infer_spine cx hd =
 
       let check_clause lbl constr clauses =
         let open Desc in
-        let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
+
+        let _, Tm.NB (_, bdy) =
+          try List.find (fun (lbl', _) -> lbl = lbl') clauses
+          with _ -> failwith "DAMN!"
+        in
 
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
@@ -736,7 +740,7 @@ and infer_spine cx hd =
       begin
         match V.unleash ih.ty with
         | D.Data dlbl ->
-          let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+          let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
           List.iter (fun (lbl, constr) -> check_clause lbl constr info.clauses) desc;
           D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
 

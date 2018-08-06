@@ -12,13 +12,9 @@ type ty = Tm.tm
 type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
 type lock_info = {constant : bool; birth : int}
 
-
-type data_decl =
-  | Desc of Tm.tm Desc.desc
-
 type t =
   {rel : Restriction.t;
-   data_decls : data_decl StringTable.t;
+   data_decls : Tm.tm Desc.desc StringTable.t;
    table : (entry param * lock_info) T.t;
    lock : int -> bool;
    killed : int -> bool;
@@ -38,7 +34,7 @@ let emp () =
 
 let declare_datatype dlbl desc (sg : t) : t =
   {sg with
-   data_decls = StringTable.add dlbl (Desc desc) sg.data_decls}
+   data_decls = StringTable.add dlbl desc sg.data_decls}
 
 let lookup_datatype dlbl sg =
   StringTable.find dlbl sg.data_decls
@@ -170,8 +166,7 @@ struct
     r
 
   let lookup_datatype lbl =
-    let Desc desc = lookup_datatype lbl Sig.globals in
-    desc
+    lookup_datatype lbl Sig.globals
 
   let lookup nm tw =
     let param, _ =

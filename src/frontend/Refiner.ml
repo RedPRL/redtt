@@ -286,13 +286,12 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
     begin
       M.lift C.base_cx <<@> fun cx ->
         let sign = Cx.globals cx in
-        let GlobalEnv.Desc desc = GlobalEnv.lookup_datatype dlbl sign in
-        desc
+        GlobalEnv.lookup_datatype dlbl sign
     end >>= fun desc ->
 
     let refine_clause (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
-      let _, constr = List.find (fun (clbl', _) -> clbl = clbl') desc in
+      let constr = lookup_constr clbl desc in
       let rec go xs tms pbinds ps args =
         match pbinds, ps, args with
         | ESig.PVar _ :: _pbinds, (_plbl, _pty) :: _ps, _ ->

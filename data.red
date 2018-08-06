@@ -11,11 +11,6 @@ let test (t : tree)
     end
   =
   fork _ (λ _ → zero) t nil
-
-data boolean where
-| true
-| false
-
 data void where
 
 let not (x : boolean) : boolean =

@@ -20,6 +20,9 @@ type con_label = string
 (** A datatype description is just a list of named constructors. *)
 type 'a desc = (con_label * 'a constr) list
 
+exception ConstructorNotFound of con_label
+val lookup_constr : con_label -> 'a desc -> 'a constr
+
 (** Returns 'yes' if the description specifies strictly higher dimensional structure, like the strict natural numbers.
     Currently, this is always true but will change as we extend to support higher inductive types. *)
 val is_strict_set : 'a desc -> bool

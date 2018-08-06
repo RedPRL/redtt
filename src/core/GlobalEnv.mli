@@ -9,12 +9,6 @@ type 'a param =
 
 type entry = {ty : Tm.tm; sys : (Tm.tm, Tm.tm) Tm.system}
 
-type data_decl =
-  | Desc of Tm.tm Desc.desc
-
-
-
-
 val emp : unit -> t
 val define : t -> Name.t -> ty:Tm.tm -> tm:Tm.tm -> t
 val ext : t -> Name.t -> entry param -> t
@@ -28,9 +22,7 @@ val kill_from_tick : t -> Name.t -> t
 
 
 val declare_datatype : Desc.data_label -> Tm.tm Desc.desc -> t -> t
-val lookup_datatype : Desc.data_label -> t -> data_decl
-
-
+val lookup_datatype : Desc.data_label -> t -> Tm.tm Desc.desc
 
 
 

@@ -12,6 +12,15 @@ type con_label = string
 
 type 'a desc = (con_label * 'a constr) list
 
+exception ConstructorNotFound of con_label
+
+let lookup_constr lbl desc =
+  try
+    let _, constr = List.find (fun (lbl', _) -> lbl' = lbl) desc in
+    constr
+  with
+  | _ ->
+    raise @@ ConstructorNotFound lbl
 
 let is_strict_set _ = true
 
