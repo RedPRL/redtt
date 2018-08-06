@@ -17,9 +17,8 @@
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA
 %token DIM TICK LOCK
-%token S1 S1_REC NAT_REC ELIM LOOP BASE ZERO SUC POS NEGSUC INT INT_REC NAT BOOL UNIV LAM CONS CAR CDR TT FF IF COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
+%token S1 S1_REC ELIM LOOP BASE UNIV LAM CONS CAR CDR COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
 %token OF
-%token THEN ELSE
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
 %token EOF
@@ -72,18 +71,6 @@ atomic_eterm:
     { E.Num n }
   | BULLET
     { E.TickConst }
-  | BOOL
-    { E.Bool }
-  | TT
-    { E.Tt }
-  | FF
-    { E.Ff }
-  | NAT
-    { E.Nat }
-  | ZERO
-    { E.Zero }
-  | INT
-    { E.Int }
   | S1
     { E.S1 }
   | BASE
@@ -117,42 +104,11 @@ eterm:
   | LET; name = ATOM; EQUALS; tm = eterm; IN; body = eterm
     { E.Let {name; ty = None; tm; body} }
 
-  | IF; e0 = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
-    { E.If (None, e0, e1, e2) }
-
-  | IF; e0 = eterm; IN mot = eterm; THEN; e1 = eterm; ELSE; e2 = eterm
-    { E.If (Some mot, e0, e1, e2) }
-
-  | SUC; n = atomic_eterm
-    { E.Suc n }
-
   | ELIM; scrut = eterm; IN; mot = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
     { E.Elim {mot = Some mot; scrut; clauses} }
 
   | ELIM; scrut = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
     { E.Elim {mot = None; scrut; clauses} }
-
-  | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; LPR; n = ATOM; RRIGHT_ARROW; n_rec = ATOM; RPR; RRIGHT_ARROW; es = eterm; END
-    { E.NatRec (None, e0, ez, (n, Some n_rec, es)) }
-
-  | NAT_REC; e0 = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; RRIGHT_ARROW; es = eterm; END
-    { E.NatRec (None, e0, ez, (n, None, es)) }
-
-  | NAT_REC; e0 = eterm; IN; mot = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; LPR; n = ATOM; RRIGHT_ARROW; n_rec = ATOM; RPR; RRIGHT_ARROW; es = eterm; END
-    { E.NatRec (Some mot, e0, ez, (n, Some n_rec, es)) }
-
-  | NAT_REC; e0 = eterm; IN; mot = eterm; WITH; option(PIPE); ZERO; RRIGHT_ARROW; ez = eterm; PIPE; SUC; n = ATOM; RRIGHT_ARROW; es = eterm; END
-    { E.NatRec (Some mot, e0, ez, (n, None, es)) }
-
-
-  | POS; n = eterm
-    { E.Pos n }
-
-  | NEGSUC; n = eterm
-    { E.NegSuc n }
-
-  | INT_REC; e0 = eterm; WITH; option(PIPE); POS; np = ATOM; RRIGHT_ARROW; ep = eterm; PIPE; NEGSUC; nn = ATOM; RRIGHT_ARROW; en = eterm; END
-    { E.IntRec (None, e0, (np, ep), (nn, en)) }
 
   | LOOP; r = eterm
     { E.Loop r }
@@ -355,22 +311,6 @@ kind:
   | { Kind.Kan }
 
 tm:
-  | BOOL
-    { fun _env ->
-      make_node $startpos $endpos Tm.Bool }
-
-  | INT
-    { fun _env ->
-      make_node $startpos $endpos Tm.Int }
-
-  | TT
-    { fun _env ->
-      make_node $startpos $endpos Tm.Tt }
-
-  | FF
-    { fun _env ->
-      make_node $startpos $endpos Tm.Ff }
-
   | BULLET
     { fun _env ->
       make_node $startpos $endpos Tm.TickConst }
@@ -535,11 +475,6 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< (Tm.ExtApp (args env)) }
-
-  | LPR; IF; mot = bind(tm); scrut = cut; tcase = tm; fcase = tm; RPR
-    { fun env ->
-      let hd, fs = scrut env in
-      hd, fs #< (Tm.If {mot = mot env; tcase = tcase env; fcase = fcase env}) }
 
   | LPR; VPROJ; r = tm; e = cut; ty0 = tm; ty1 = tm; equiv = tm; RPR
     { fun env ->

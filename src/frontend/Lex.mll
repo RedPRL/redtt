@@ -32,7 +32,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("where", WHERE);
       ("data", DATA);
       ("end", END);
-      ("bool", BOOL);
       ("[]", BOX_MODALITY);
       ("□", BOX_MODALITY);
       ("tick", TICK);
@@ -41,11 +40,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("𝕀", DIM);
       ("lock", LOCK);
       ("🔓", LOCK);
-      ("nat", NAT);
-      ("ℕ", NAT);
       ("elim", ELIM);
-      ("int", INT);
-      ("ℤ", INT);
       ("S1", S1);
       ("car", CAR);
       ("cdr", CDR);
@@ -57,9 +52,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("vproj", VPROJ);
       ("vin", VIN);
       ("restrict", RESTRICT);
-      ("if", IF);
-      ("nat-rec", NAT_REC);
-      ("int-rec", INT_REC);
       ("S1-rec", S1_REC);
       ("let", LET);
       ("lam", LAM);
@@ -70,12 +62,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("open", OPEN);
       ("shut", SHUT);
       ("call", CALL);
-      ("tt", TT);
-      ("ff", FF);
-      ("zero", ZERO);
-      ("suc", SUC);
-      ("pos", POS);
-      ("negsuc", NEGSUC);
       ("base", BASE);
       ("loop", LOOP);
       ("pre", PRE);
@@ -84,8 +70,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("debug", DEBUG);
       ("type", TYPE);
       ("import", IMPORT);
-      ("then", THEN);
-      ("else", ELSE);
       ("of", OF)
     ]
 }
