@@ -5,7 +5,7 @@ type 'a tele = 'a list
 
 type 'a constr =
   {params : (string * 'a) tele;
-   args : 'a arg_ty list;
+   args : (string * 'a arg_ty) list;
    dims : string list}
 
 type data_label = string
@@ -37,8 +37,9 @@ let pp_con_label = Uuseg_string.pp_utf_8
 
 let pp_arg_ty fmt =
   function
-  | Self ->
-    Format.fprintf fmt "self"
+  | nm, Self ->
+    Format.fprintf fmt "(%a : self)"
+      Uuseg_string.pp_utf_8 nm
 
 let pp_constr pp fmt constr =
   let pp_param env fmt (nm, ty) =
@@ -47,18 +48,18 @@ let pp_constr pp fmt constr =
       (pp env) ty
   in
 
-  let rec go env fmt (ps, args) =
+  let rec go env fmt (ps, args, dims) =
     match ps, args with
     | [nm, p], _ ->
       let nm, env' = Pretty.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
-        (go env') ([], args)
+        (go env') ([], args, dims)
     | (nm, p) :: ps, _ ->
       let nm, env' = Pretty.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
-        (go env') (ps, args)
+        (go env') (ps, args, dims)
     | [], [] ->
       ()
     | [], args ->
@@ -66,7 +67,7 @@ let pp_constr pp fmt constr =
       Format.fprintf fmt "of ";
       Format.pp_print_list ~pp_sep pp_arg_ty fmt args
   in
-  go Pretty.Env.emp fmt (constr.params, constr.args)
+  go Pretty.Env.emp fmt (constr.params, constr.args, constr.dims)
 
 let pp_labeled_constr pp fmt (lbl, constr) =
   Format.fprintf fmt "| %a @[<hv1>%a@]"

@@ -4,8 +4,8 @@ import equivalence
 import isotoequiv
 
 data int where
-| pos of (n : nat)
-| negsuc of (n : nat)
+| pos [n : nat]
+| negsuc [n : nat]
 
 let pred (x : int) : int =
   elim x with

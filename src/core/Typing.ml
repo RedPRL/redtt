@@ -348,7 +348,7 @@ and check_constr cx dlbl constr args =
   let check_args _cx' arg_tys args =
     (* TODO: eventually the _cx' here will matter below *)
     let vdataty = D.make @@ D.Data dlbl in
-    List.iter2 (fun Desc.Self arg -> check cx vdataty arg) arg_tys args
+    List.iter2 (fun (_, Desc.Self) arg -> check cx vdataty arg) arg_tys args
   in
   let cx', args = check_params cx constr.params args in
   check_args cx' constr.args args
@@ -612,8 +612,8 @@ and infer_spine cx hd =
             let vty = V.eval env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
             build_cx cx' (D.Env.push (D.Val v) env) (vs #< v) ps args
-          | [], Self :: args ->
-            let cx_x, v_x = Cx.ext_ty cx ~nm:None ih.ty in
+          | [], (nm, Self) :: args ->
+            let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
             let cx_ih, _ = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
             build_cx cx_ih env (vs #< v_x) [] args
           | [], [] ->

@@ -18,7 +18,6 @@
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK LOCK
 %token S1 S1_ELIM ELIM LOOP BASE UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
-%token OF
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
 %token EOF
@@ -202,27 +201,27 @@ desc_constr:
   { fun _dlbl ->
     clbl, Desc.{params = []; args = []; dims = []} }
 
-| clbl = ATOM; OF; params = nonempty_list(desc_param); TIMES; args = separated_nonempty_list(TIMES, desc_arg)
+| clbl = ATOM; params = nonempty_list(desc_param); args = nonempty_list(desc_arg)
   { fun dlbl ->
     clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims = []} }
 
-| clbl = ATOM; OF; params = nonempty_list(desc_param)
+| clbl = ATOM; params = nonempty_list(desc_param)
   { fun _dlbl ->
     clbl, Desc.{params; args = []; dims = []} }
 
-| clbl = ATOM; OF; args = separated_nonempty_list(TIMES, desc_arg)
+| clbl = ATOM; args = separated_nonempty_list(TIMES, desc_arg)
   { fun dlbl ->
     clbl, Desc.{params = []; args = List.map (fun arg -> arg dlbl) args; dims = []} }
 
 %inline
 desc_arg:
-| self = ATOM
+| LPR; x = ATOM; COLON; self = ATOM; RPR
   { fun name ->
-      if name = self then Desc.Self else failwith ("Expected " ^ name ^ " but got " ^ self)}
+      if name = self then (x, Desc.Self) else failwith ("Expected " ^ name ^ " but got " ^ self)}
 
 %inline
 desc_param:
-| LPR; x = ATOM; COLON; ty = eterm; RPR
+| LSQ; x = ATOM; COLON; ty = eterm; RSQ
   { x, ty }
 
 

@@ -169,7 +169,7 @@ struct
 
   and elab_constr env (clbl, constr) =
     let open Desc in
-    let elab_arg_ty Self = M.ret Self in
+    let elab_arg_ty (x, Self) = M.ret (x, Self) in
 
     let rec abstract_tele xs (ps : _ list) =
       match ps with
@@ -743,7 +743,7 @@ struct
       match arg_tys, frms with
       | [], [] ->
         M.ret []
-      | Desc.Self :: arg_tys, E.App e :: frms ->
+      | (_, Desc.Self) :: arg_tys, E.App e :: frms ->
         let self_ty = Tm.make @@ Tm.Data dlbl in
         (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_args arg_tys frms
       | _ ->

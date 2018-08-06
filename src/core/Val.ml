@@ -1150,7 +1150,7 @@ struct
         match args, ps, atys with
         | el :: args, _ :: ps, _ ->
           make_args (i + 1) (acc #< el) args ps atys
-        | el :: args, [], Desc.Self :: atys ->
+        | el :: args, [], (_, Desc.Self) :: atys ->
           let hcom = rigid_hcom dir ty el (peel_sys i sys) in
           make_args (i + 1) (acc #< hcom) args ps atys
         | [], [], [] ->
@@ -2154,7 +2154,7 @@ struct
         match vs, ps, args with
         | v :: vs, (_, _) :: ps, _ ->
           v :: go vs ps args
-        | v :: vs, [], Desc.Self :: args ->
+        | v :: vs, [], (_, Desc.Self) :: args ->
           let v_ih = elim_data dlbl mot v clauses in
           v :: v_ih :: go vs [] args
         | [], [], [] ->

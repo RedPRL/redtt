@@ -471,7 +471,7 @@ struct
                 let v = generic qenv vty in
                 let env' = D.Env.push (D.Val v) env in
                 build_cx (Env.succ qenv) env' (vs #< v) ps args
-              | [], Self :: args ->
+              | [], (_, Self) :: args ->
                 let vx = generic qenv data_ty in
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in

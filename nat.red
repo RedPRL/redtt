@@ -3,7 +3,7 @@ import path
 
 data nat where
 | zero
-| suc of nat
+| suc (x : nat)
 
 let nat-pred (x : nat) : nat =
   elim x with

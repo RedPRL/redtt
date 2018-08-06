@@ -291,14 +291,14 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let env' = D.Env.push (D.Val x_el) env in
           go (psi #< (x, `P tty)) env' (tms #< x_tm) pbinds ps args
 
-        | ESig.PVar nm :: pbinds, [], Self :: args ->
+        | ESig.PVar nm :: pbinds, [], (_, Self) :: args ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.fresh () in
           let x_tm = Tm.up @@ Tm.var x in
           let ih_ty = mot x_tm in
           go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args
 
-        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], Self :: args ->
+        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: args ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.named @@ Some nm_ih in
           let x_tm = Tm.up @@ Tm.var x in

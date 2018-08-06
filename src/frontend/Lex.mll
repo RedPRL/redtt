@@ -70,7 +70,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("debug", DEBUG);
       ("type", TYPE);
       ("import", IMPORT);
-      ("of", OF)
     ]
 }
 
