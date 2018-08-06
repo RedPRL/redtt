@@ -33,17 +33,6 @@ type con =
   | CoRThunk : val_face -> con
 
   | Cons : value * value -> con
-  | Bool : con
-  | Tt : con
-  | Ff : con
-
-  | Nat : con
-  | Zero : con
-  | Suc : value -> con
-
-  | Int : con
-  | Pos : value -> con
-  | NegSuc : value -> con
 
   | S1 : con
   | Base : con
@@ -76,12 +65,6 @@ and neu =
   | ExtApp : neu * dim list -> neu
   | Car : neu -> neu
   | Cdr : neu -> neu
-
-  | If : {mot : clo; neu : neu; tcase : value; fcase : value} -> neu
-
-  | NatRec : {mot : clo; neu : neu; zcase : value; scase : nclo} -> neu
-
-  | IntRec : {mot : clo; neu : neu; pcase : clo; ncase : clo} -> neu
 
   | S1Rec : {mot : clo; neu : neu; bcase : value; lcase : abs} -> neu
   | Elim : {dlbl : Desc.data_label; mot : clo; neu : neu; clauses : (Desc.con_label * nclo) list} -> neu
@@ -159,24 +142,6 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
   | CoRThunk face ->
     Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
-  | Bool ->
-    Format.fprintf fmt "bool"
-  | Tt ->
-    Format.fprintf fmt "tt"
-  | Ff ->
-    Format.fprintf fmt "ff"
-  | Nat ->
-    Format.fprintf fmt "nat"
-  | Zero ->
-    Format.fprintf fmt "zero"
-  | Suc n ->
-    Format.fprintf fmt "@[<1>(suc@ %a)@]" pp_value n
-  | Int ->
-    Format.fprintf fmt "int"
-  | Pos n ->
-    Format.fprintf fmt "@[<1>(pos@ %a)@]" pp_value n
-  | NegSuc n ->
-    Format.fprintf fmt "@[<1>(negsuc@ %a)@]" pp_value n
   | S1 ->
     Format.fprintf fmt "S1"
   | Base ->
@@ -340,23 +305,6 @@ and pp_neu fmt neu =
 
   | Meta {name; _} ->
     Name.pp fmt name
-
-  | If {mot; neu; tcase; fcase} ->
-    Format.fprintf fmt "@[<1>(if %a@ %a@ %a@ %a)@]"
-      pp_clo mot
-      pp_neu neu
-      pp_value tcase
-      pp_value fcase
-
-  | NatRec {mot; neu; zcase; scase} ->
-    Format.fprintf fmt "@[<1>(nat-rec %a@ %a@ %a@ %a)@]"
-      pp_clo mot
-      pp_neu neu
-      pp_value zcase
-      pp_nclo scase
-
-  | IntRec _ ->
-    Format.fprintf fmt "<int-rec>"
 
   | S1Rec _ ->
     Format.fprintf fmt "<S1-rec>"

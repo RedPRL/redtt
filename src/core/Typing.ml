@@ -210,7 +210,7 @@ let rec check cx ty tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-  | D.Univ _, (T.Bool | T.Nat | T.Int | T.S1) ->
+  | D.Univ _, T.S1 ->
     ()
 
   | D.Univ _, T.Data dlbl ->
@@ -300,26 +300,11 @@ let rec check cx ty tm =
   | D.LblTy info, T.LblRet t ->
     check cx info.ty t
 
-  | D.Bool, (T.Tt | T.Ff) ->
-    ()
-
   | D.S1, T.Base ->
     ()
 
   | D.S1, T.Loop x ->
     check_dim cx x
-
-  | D.Nat, T.Zero ->
-    ()
-
-  | D.Nat, T.Suc n ->
-    check cx (D.make D.Nat) n
-
-  | D.Int, T.Pos n ->
-    check cx (D.make D.Nat) n
-
-  | D.Int, T.NegSuc n ->
-    check cx (D.make D.Nat) n
 
   | D.V vty, T.VIn vin ->
     let r = check_eval_dim cx vin.r in
@@ -572,98 +557,6 @@ and infer_spine cx hd =
       in
       Cx.check_eq_ty cx v_ty ih.ty;
       D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty1}
-
-    | T.If info ->
-      let T.B (nm, mot) = info.mot in
-      let bool = D.make D.Bool in
-      let cxx, _= Cx.ext_ty cx ~nm bool in
-      check_ty cxx mot;
-
-      let ih = infer_spine cx hd sp in
-      Cx.check_eq_ty cx ih.ty bool;
-
-      let cx_tt = Cx.def cx ~nm ~ty:bool ~el:(D.make D.Tt) in
-      let cx_ff = Cx.def cx ~nm ~ty:bool ~el:(D.make D.Ff) in
-      let mot_tt = Cx.eval cx_tt mot in
-      let mot_ff = Cx.eval cx_ff mot in
-      check cx mot_tt info.tcase;
-      check cx mot_ff info.fcase;
-
-      let cx_scrut = Cx.def cx ~nm ~ty:bool ~el:ih.el in
-      D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx_scrut mot}
-
-    | T.NatRec info ->
-      let T.B (nm, mot) = info.mot in
-      let nat = D.make D.Nat in
-      let _ =
-        let cx_x, _ = Cx.ext_ty cx ~nm nat in
-        check_ty cx_x mot
-      in
-
-      let mot_clo = Cx.make_closure cx info.mot in
-
-      let ih = infer_spine cx hd sp in
-
-      (* head *)
-      Cx.check_eq_ty cx ih.ty nat;
-
-      (* zero *)
-      let _ =
-        let mot_zero = V.inst_clo mot_clo @@ D.make D.Zero in
-        check cx mot_zero info.zcase
-      in
-
-      (* suc *)
-      let T.NB (nms_scase, scase) = info.scase in
-      let _ =
-        let nm_scase, nm_rec_scase =
-          match nms_scase with
-          | Snoc (Snoc (Emp, nm_scase), nm_rec_scase) -> nm_scase, nm_rec_scase
-          | _ -> failwith "incorrect number of binders when type-checking the suc case"
-        in
-        let cx_x, x = Cx.ext_ty cx ~nm:nm_scase nat in
-        let mot_x = V.inst_clo mot_clo x in
-        let cx_x_ih, _ih = Cx.ext_ty cx_x ~nm:nm_rec_scase mot_x in
-        let mot_suc = V.inst_clo mot_clo @@ D.make @@ D.Suc x in
-        check cx_x_ih mot_suc scase
-      in
-
-      D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el }
-
-    | T.IntRec info ->
-      let T.B (nm, mot) = info.mot in
-      let int = D.make D.Int in
-      let _ =
-        let cx_x, _ = Cx.ext_ty cx ~nm int in
-        check_ty cx_x mot
-      in
-
-      let mot_clo = Cx.make_closure cx info.mot in
-
-      let ih = infer_spine cx hd sp in
-
-      (* head *)
-      Cx.check_eq_ty cx ih.ty int;
-
-      (* pos *)
-      let _ =
-        let T.B (nm_pcase, pcase) = info.pcase in
-        let nat = D.make D.Nat in
-        let cx_n, n = Cx.ext_ty cx ~nm:nm_pcase nat in
-        let mot_pos = V.inst_clo mot_clo @@ D.make (D.Pos n) in
-        check cx_n mot_pos pcase
-      in
-
-      (* negsucc *)
-      let _ =
-        let T.B (nm_ncase, ncase) = info.ncase in
-        let nat = D.make D.Nat in
-        let cx_n, n = Cx.ext_ty cx ~nm:nm_ncase nat in
-        let mot_negsuc = V.inst_clo mot_clo @@ D.make (D.NegSuc n) in
-        check cx_n mot_negsuc ncase
-      in
-
-      D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
 
     | T.S1Rec info ->
       let T.B (nm, mot) = info.mot in

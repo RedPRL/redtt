@@ -7,7 +7,7 @@ let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
 
 
 let S1-univ-cover (x : S1) : type =
-  S1-rec x with
+  S1-elim x with
   | base => integer
   | loop i => UA _ _ isu-equiv i
   end

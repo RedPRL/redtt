@@ -376,33 +376,6 @@ struct
     | Univ _ ->
       make con
 
-    | Bool ->
-      make con
-
-    | Tt ->
-      make con
-
-    | Ff ->
-      make con
-
-    | Nat ->
-      make con
-
-    | Zero ->
-      make con
-
-    | Suc n ->
-      make @@ Suc (Value.act phi n)
-
-    | Int ->
-      make con
-
-    | Pos n ->
-      make @@ Pos (Value.act phi n)
-
-    | NegSuc n ->
-      make @@ NegSuc (Value.act phi n)
-
     | S1 ->
       make con
 
@@ -553,42 +526,6 @@ struct
           ret @@ Cdr neu
         | Step v ->
           step @@ cdr v
-      end
-
-    | If info ->
-      let mot = Clo.act phi info.mot in
-      let tcase = Value.act phi info.tcase in
-      let fcase = Value.act phi info.fcase in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          ret @@ If {mot; neu; tcase; fcase}
-        | Step v ->
-          step @@ if_ mot v tcase fcase
-      end
-
-    | NatRec info ->
-      let mot = Clo.act phi info.mot in
-      let zcase = Value.act phi info.zcase in
-      let scase = NClo.act phi info.scase in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          ret @@ NatRec {mot; neu; zcase; scase}
-        | Step v ->
-          step @@ nat_rec mot v zcase scase
-      end
-
-    | IntRec info ->
-      let mot = Clo.act phi info.mot in
-      let pcase = Clo.act phi info.pcase in
-      let ncase = Clo.act phi info.ncase in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          ret @@ IntRec {mot; neu; pcase; ncase}
-        | Step v ->
-          step @@ int_rec mot v pcase ncase
       end
 
     | S1Rec info ->
@@ -894,10 +831,10 @@ struct
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
-    | (Pi _ | Sg _ | Ext _ | Up _ | Later _ | BoxModality _) ->
+    | Pi _ | Sg _ | Ext _ | Up _ | Later _ | BoxModality _ ->
       make @@ Coe {dir; abs; el}
 
-    | (Bool | Nat | Int | S1 | Univ _) ->
+    | S1 | Univ _ ->
       el
 
 
@@ -1190,17 +1127,6 @@ struct
       let err = RigidCoeUnexpectedArgument abs in
       raise @@ E err
 
-  and rigid_hcom_bool dir cap sys =
-    match unleash cap with
-    | Tt ->
-      make Tt
-    | Ff ->
-      make Ff
-    | Up info ->
-      rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
-    | _ ->
-      raise @@ E (RigidHComUnexpectedArgument cap)
-
   and rigid_hcom_strict_data dir ty cap sys =
     match unleash ty, unleash cap with
     | Data dlbl, Intro (clbl, args) ->
@@ -1246,58 +1172,6 @@ struct
     | _ ->
       raise @@ E (RigidHComUnexpectedArgument cap)
 
-  and rigid_hcom_nat dir cap sys =
-    match unleash cap with
-    | Zero ->
-      make Zero
-
-    | Suc pcap ->
-      let unsuc el =
-        match unleash el with
-        | Suc el' -> el'
-        | _ -> failwith "unsuc"
-      in
-      let nat = make Nat in
-      let psys = List.map (Face.map (fun _ _ abs -> let x, elx = Abs.unleash1 abs in Abs.bind1 x @@ unsuc elx)) sys in
-      let phcom = rigid_hcom dir nat pcap psys in
-      make @@ Suc phcom
-
-    | Up info ->
-      rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
-
-    | _ ->
-      raise @@ E (RigidHComUnexpectedArgument cap)
-
-  and rigid_hcom_int dir cap sys =
-    match unleash cap with
-    | Pos cap ->
-      let strip el =
-        match unleash el with
-        | Pos el' -> el'
-        | _ -> failwith "unsuc"
-      in
-      let nat = make Nat in
-      let sys = List.map (Face.map (fun _ _ abs -> let x, elx = Abs.unleash1 abs in Abs.bind1 x @@ strip elx)) sys in
-      let hcom = rigid_hcom dir nat cap sys in
-      make @@ Pos hcom
-
-    | NegSuc cap ->
-      let strip el =
-        match unleash el with
-        | NegSuc el' -> el'
-        | _ -> failwith "unsuc"
-      in
-      let nat = make Nat in
-      let sys = List.map (Face.map (fun _ _ abs -> let x, elx = Abs.unleash1 abs in Abs.bind1 x @@ strip elx)) sys in
-      let hcom = rigid_hcom dir nat cap sys in
-      make @@ NegSuc hcom
-
-    | Up info ->
-      rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
-
-    | _ ->
-      raise @@ E (RigidHComUnexpectedArgument cap)
-
 
   and rigid_nhcom_up dir ty cap ~comp_sys ~rst_sys =
     let neu = NHCom {dir; ty; cap; sys = comp_sys} in
@@ -1315,15 +1189,6 @@ struct
     match unleash ty with
     | Pi _ | Sg _ | Ext _ | Up _ ->
       make @@ HCom {dir; ty; cap; sys}
-
-    | Bool ->
-      rigid_hcom_bool dir cap sys
-
-    | Nat ->
-      rigid_hcom_nat dir cap sys
-
-    | Int ->
-      rigid_hcom_int dir cap sys
 
     | S1 ->
       make @@ FHCom {dir; cap; sys}
@@ -1437,7 +1302,7 @@ struct
 
     (* `Ext _`: the expansion will stop after a valid
      * correction system, so it is not so bad. *)
-    | Ext _ | Univ _ | FHCom _ | V _ | S1 | Bool | Nat | Int | Data _ ->
+    | Ext _ | Univ _ | FHCom _ | V _ | S1 | Data _ ->
       let aux sys =
         match sys with
         | [] -> cap
@@ -1593,36 +1458,6 @@ struct
     | Tm.Univ {kind; lvl} ->
       make @@ Univ {kind; lvl}
 
-    | Tm.Bool ->
-      make Bool
-
-    | Tm.Tt ->
-      make Tt
-
-    | Tm.Ff ->
-      make Ff
-
-    | Tm.Nat ->
-      make Nat
-
-    | Tm.Zero ->
-      make Zero
-
-    | Tm.Suc n ->
-      let n = eval rho n in
-      make @@ Suc n
-
-    | Tm.Int ->
-      make Int
-
-    | Tm.Pos n ->
-      let n = eval rho n in
-      make @@ Pos n
-
-    | Tm.NegSuc n ->
-      let n = eval rho n in
-      make @@ NegSuc n
-
     | Tm.S1 ->
       make S1
 
@@ -1717,21 +1552,6 @@ struct
       let ty1 = eval rho info.ty1 in
       let equiv phi0 = eval (Env.act phi0 rho) info.equiv in
       vproj I.idn r ~ty0 ~ty1 ~equiv ~el:vhd
-    | Tm.If info ->
-      let mot = clo info.mot rho in
-      let tcase = eval rho info.tcase in
-      let fcase = eval rho info.fcase in
-      if_ mot vhd tcase fcase
-    | Tm.NatRec info ->
-      let mot = clo info.mot rho in
-      let zcase = eval rho info.zcase in
-      let scase = nclo info.scase rho in
-      nat_rec mot vhd zcase scase
-    | Tm.IntRec info ->
-      let mot = clo info.mot rho in
-      let pcase = clo info.pcase rho in
-      let ncase = clo info.ncase rho in
-      int_rec mot vhd pcase ncase
     | Tm.S1Rec info ->
       let mot = clo info.mot rho in
       let bcase = eval rho info.bcase in
@@ -2323,45 +2143,6 @@ struct
       let err = RigidVProjUnexpectedArgument el in
       raise @@ E err
 
-  and if_ mot scrut tcase fcase =
-    match unleash scrut with
-    | Tt ->
-      tcase
-    | Ff ->
-      fcase
-    | Up up ->
-      let neu = If {mot; neu = up.neu; tcase; fcase} in
-      let mot' = inst_clo mot scrut in
-      let if_face =
-        Face.map @@ fun r r' a ->
-        let phi = I.equate r r' in
-        if_ (Clo.act phi mot) a (Value.act phi tcase) (Value.act phi fcase)
-      in
-      let if_sys = List.map if_face up.sys in
-      make @@ Up {ty = mot'; neu; sys = if_sys}
-    | _ ->
-      raise @@ E (RecursorUnexpectedArgument ("Booleans", scrut))
-
-  and nat_rec mot scrut zcase scase =
-    match unleash scrut with
-    | Zero ->
-      zcase
-    | Suc n ->
-      let n_rec = nat_rec mot n zcase scase in
-      inst_nclo scase [n; n_rec]
-    | Up up ->
-      let neu = NatRec {mot; neu = up.neu; zcase; scase} in
-      let mot' = inst_clo mot scrut in
-      let nat_rec_face =
-        Face.map @@ fun r r' a ->
-        let phi = I.equate r r' in
-        nat_rec (Clo.act phi mot) a (Value.act phi zcase) (NClo.act phi scase)
-      in
-      let nat_rec_sys = List.map nat_rec_face up.sys in
-      make @@ Up {ty = mot'; neu; sys = nat_rec_sys}
-    | _ ->
-      raise @@ E (RecursorUnexpectedArgument ("natural numbers", scrut))
-
   and elim_data dlbl mot scrut clauses =
     match unleash scrut with
     | Intro (clbl, vs) ->
@@ -2398,23 +2179,6 @@ struct
 
     | _ ->
       raise @@ E (RecursorUnexpectedArgument ("data type", scrut))
-
-  and int_rec mot scrut pcase ncase =
-    match unleash scrut with
-    | Pos n -> inst_clo pcase n
-    | NegSuc n -> inst_clo ncase n
-    | Up up ->
-      let neu = IntRec {mot; neu = up.neu; pcase; ncase} in
-      let mot' = inst_clo mot scrut in
-      let int_rec_face =
-        Face.map @@ fun r r' a ->
-        let phi = I.equate r r' in
-        int_rec (Clo.act phi mot) a (Clo.act phi pcase) (Clo.act phi ncase)
-      in
-      let int_rec_sys = List.map int_rec_face up.sys in
-      make @@ Up {ty = mot'; neu; sys = int_rec_sys}
-    | _ ->
-      raise @@ E (RecursorUnexpectedArgument ("integers", scrut))
 
   and s1_rec mot scrut bcase lcase =
     match unleash scrut with

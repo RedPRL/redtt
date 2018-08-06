@@ -143,45 +143,6 @@ let tac_let name itac ctac =
     let inf = Tm.Down {ty = let_ty; tm = let_tm}, Emp in
     M.ret @@ Tm.make @@ Tm.Let (inf, Tm.bind x bdyx)
 
-let tac_if ~tac_mot ~tac_scrut ~tac_tcase ~tac_fcase =
-  fun ty ->
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-    let bool = Tm.make @@ Tm.Bool in
-    let mot_ty = Tm.pi None bool univ in
-    tac_scrut bool >>= fun scrut ->
-    begin
-      match tac_mot with
-      | None ->
-        let is_dependent =
-          match Tm.unleash scrut with
-          | Tm.Up (Tm.Var {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
-          | _ -> false
-        in
-        if is_dependent then
-          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
-          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
-          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
-          M.unify >>
-          M.ret mot
-        else
-          M.ret (fun _ -> ty)
-      | Some tac_mot ->
-        tac_mot mot_ty >>= fun mot ->
-        let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-        M.ret fmot
-    end >>= fun mot ->
-    let mot_tt = mot @@ Tm.make Tm.Tt in
-    let mot_ff = mot @@ Tm.make Tm.Ff in
-    tac_tcase mot_tt >>= fun tcase ->
-    tac_fcase mot_ff >>= fun fcase ->
-    let hd = Tm.Down {ty = bool; tm = scrut} in
-    let bmot =
-      let x = Name.fresh () in
-      Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
-    in
-    let frm = Tm.If {mot = bmot; tcase; fcase} in
-    M.ret @@ Tm.up (hd, Emp #< frm)
-
 
 let rec tac_lambda names tac ty =
   match Tm.unleash ty with
