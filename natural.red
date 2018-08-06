@@ -1,48 +1,52 @@
 import path
 
-let nat-pred (x : nat) : nat =
-  nat-rec x with
-  | zero ⇒ zero
-  | suc n ⇒ n
+
+data natural where
+| ze
+| su of natural
+
+let nat-pred (x : natural) : natural =
+  elim x with
+  | ze ⇒ ze
+  | su n ⇒ n
   end
 
-let nat-pred/succ (x : nat) : Path nat x (nat-pred (suc x)) =
-  nat-rec x with
-  | zero ⇒ λ i → zero
-  | suc n ⇒ λ _ → suc n
-  end
 
-let plus : nat → nat → nat =
+let nat-pred/su (x : natural) : Path natural x (nat-pred (su x)) =
+  λ _ → x
+
+let plus : natural → natural → natural =
   λ m n →
-    nat-rec m with
-    | zero ⇒ n
-    | suc (m ⇒ plus/m/n) ⇒ suc plus/m/n
+    elim m with
+    | ze ⇒ n
+    | su (m ⇒ plus/m/n) ⇒ su plus/m/n
     end
 
-let plus/unit/l (n : nat) : Path nat (plus zero n) n =
+let plus/unit/l (n : natural) : Path natural (plus ze n) n =
   λ i → n
 
-let plus/unit/r (n : nat) : Path nat (plus n zero) n =
-  nat-rec n with
-  | zero ⇒ λ i → zero
-  | suc (n ⇒ path/n) ⇒ λ i → suc (path/n i)
+let plus/unit/r (n : natural) : Path natural (plus n ze) n =
+  elim n with
+  | ze ⇒ λ _ → ze
+  | su (n ⇒ path/n) ⇒ λ i → su (path/n i)
   end
 
-let plus/assoc (n : nat) : (m, o : nat) → Path nat (plus n (plus m o)) (plus (plus n m) o) =
-  nat-rec n with
-  | zero ⇒ λ m o i → plus m o
-  | suc (n ⇒ plus/assoc/n) ⇒ λ m o i → suc (plus/assoc/n m o i)
+let plus/assoc (n : natural) : (m, o : natural) → Path natural (plus n (plus m o)) (plus (plus n m) o) =
+  elim n with
+  | ze ⇒ λ m o i → plus m o
+  | su (n ⇒ plus/assoc/n) ⇒ λ m o i → su (plus/assoc/n m o i)
   end
 
-let plus/suc/r (n : nat) : (m : nat) → Path nat (plus n (suc m)) (suc (plus n m)) =
-  nat-rec n with
-  | zero ⇒ λ m i → suc m
-  | suc (n ⇒ plus/n/suc/r) ⇒ λ m i → suc (plus/n/suc/r m i)
+let plus/su/r (n : natural) : (m : natural) → Path natural (plus n (su m)) (su (plus n m)) =
+  elim n with
+  | ze ⇒ λ m _ → su m
+  | su (n ⇒ plus/n/su/r) ⇒ λ m i → su (plus/n/su/r m i)
   end
 
-let plus/comm (m : nat) : (n : nat) → Path nat (plus n m) (plus m n) =
-  nat-rec m with
-  | zero ⇒ plus/unit/r
-  | suc (m ⇒ plus/comm/m) ⇒ λ n → trans _ (plus/suc/r n m) (λ i → suc (plus/comm/m n i))
+
+let plus/comm (m : natural) : (n : natural) → Path natural (plus n m) (plus m n) =
+  elim m with
+  | ze ⇒ plus/unit/r
+  | su (m ⇒ plus/comm/m) ⇒ λ n → trans _ (plus/su/r n m) (λ i → su (plus/comm/m n i))
   end
 
