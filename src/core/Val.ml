@@ -443,9 +443,9 @@ struct
     | Data lbl ->
       make @@ Data lbl
 
-    | Intro (clbl, args) ->
+    | Intro (dlbl, clbl, args) ->
       let args' = List.map (Value.act phi) args in
-      make @@ Intro (clbl, args')
+      make @@ Intro (dlbl, clbl, args')
 
   and act_neu phi con =
     match con with
@@ -1129,10 +1129,10 @@ struct
 
   and rigid_hcom_strict_data dir ty cap sys =
     match unleash ty, unleash cap with
-    | Data dlbl, Intro (clbl, args) ->
+    | Data dlbl, Intro (_, clbl, args) ->
       let peel_arg k el =
         match unleash el with
-        | Intro (_, args') ->
+        | Intro (_, _, args') ->
           List.nth args' k
         | _ ->
           failwith ""
@@ -1164,7 +1164,7 @@ struct
 
       let args' = make_args 0 Emp args constr.params constr.args in
 
-      make @@ Intro (clbl, args')
+      make @@ Intro (dlbl, clbl, args')
 
     | _, Up info ->
       rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
@@ -1515,9 +1515,9 @@ struct
     | Tm.Data lbl ->
       make @@ Data lbl
 
-    | Tm.Intro (clbl, args) ->
+    | Tm.Intro (dlbl, clbl, args) ->
       let vargs = List.map (eval rho) args in
-      make @@ Intro (clbl, vargs)
+      make @@ Intro (dlbl, clbl, vargs)
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
@@ -2145,7 +2145,7 @@ struct
 
   and elim_data dlbl mot scrut clauses =
     match unleash scrut with
-    | Intro (clbl, vs) ->
+    | Intro (_, clbl, vs) ->
       let _, nclo = List.find (fun (clbl', _) -> clbl = clbl') clauses in
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr clbl desc in

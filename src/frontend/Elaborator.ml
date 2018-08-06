@@ -753,7 +753,7 @@ struct
     in
     go_params [] constr.params @@ Bwd.to_list frms >>= fun (tps, frms) ->
     go_args constr.args constr.dims frms >>= fun targs ->
-    M.ret @@ Tm.make @@ Tm.Intro (clbl, tps @ targs)
+    M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
 
   and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (vty, cmd) ->

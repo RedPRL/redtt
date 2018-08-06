@@ -355,11 +355,11 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
-      | Data dlbl, Intro (clbl0, args0), Intro (clbl1, args1) when clbl0 = clbl1 ->
+      | Data dlbl, Intro (_, clbl0, args0), Intro (_, clbl1, args1) when clbl0 = clbl1 ->
         let desc = V.Sig.lookup_datatype dlbl in
         let constr = Desc.lookup_constr clbl0 desc in
         let targs = equate_constr_args env dlbl constr args0 args1 in
-        Tm.make @@ Tm.Intro (clbl0, targs)
+        Tm.make @@ Tm.Intro (dlbl, clbl0, targs)
 
       | _ ->
         let err = ErrEquateNf {env; ty; el0; el1} in
@@ -483,7 +483,7 @@ struct
           in
           let bdy0 = inst_nclo clause0 vs in
           let bdy1 = inst_nclo clause1 vs in
-          let intro = D.make @@ D.Intro (clbl, vs) in
+          let intro = D.make @@ D.Intro (dlbl, clbl, vs) in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)

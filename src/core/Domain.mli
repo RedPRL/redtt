@@ -57,7 +57,7 @@ type con =
 
 
   | Data of Desc.data_label
-  | Intro of Desc.con_label * value list
+  | Intro of Desc.data_label * Desc.con_label * value list
 
 
 and neu =

@@ -312,7 +312,7 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           failwith "refine_clause"
       in
       let psi, tms = go Emp D.Env.emp Emp pbinds constr.params constr.args in
-      let intro = Tm.make @@ Tm.Intro (clbl, tms) in
+      let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
       begin
         M.in_scopes (Bwd.to_list psi) @@

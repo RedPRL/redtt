@@ -218,7 +218,7 @@ let rec check cx ty tm =
     let _ = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     ()
 
-  | D.Data dlbl, T.Intro (clbl, args) ->
+  | D.Data dlbl, T.Intro (dlbl', clbl, args) when dlbl = dlbl' ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     let constr = Desc.lookup_constr clbl desc in
     check_constr cx dlbl constr args
@@ -620,7 +620,7 @@ and infer_spine cx hd =
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
         let cx', vs = build_cx cx D.Env.emp Emp constr.params constr.args in
-        let intro = D.make @@ D.Intro (lbl, vs) in
+        let intro = D.make @@ D.Intro (info.dlbl, lbl, vs) in
         let ty = V.inst_clo mot_clo intro in
         check cx' ty bdy
       in

@@ -54,7 +54,7 @@ type 'a tmf =
 
 
   | Data of Desc.data_label
-  | Intro of Desc.con_label * 'a list
+  | Intro of Desc.data_label * Desc.con_label * 'a list
 
 
 
@@ -256,9 +256,9 @@ struct
     | Data lbl ->
       Data lbl
 
-    | Intro (clbl, args) ->
+    | Intro (dlbl, clbl, args) ->
       let args' = traverse_list traverse_tm args in
-      Intro (clbl, args')
+      Intro (dlbl, clbl, args')
 
 
   and traverse_cmd (hd, sp) =
@@ -841,7 +841,7 @@ let rec pp env fmt =
     | Data lbl ->
       Desc.pp_data_label fmt lbl
 
-    | Intro (clbl, args) ->
+    | Intro (_dlbl, clbl, args) ->
       begin
         match args with
         | [] ->
@@ -1366,8 +1366,8 @@ let map_tmf f =
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
     Let (map_cmd f cmd, map_bnd f bnd)
-  | Intro (clbl, args) ->
-    Intro (clbl, List.map f args)
+  | Intro (dlbl, clbl, args) ->
+    Intro (dlbl, clbl, List.map f args)
 
 
 
