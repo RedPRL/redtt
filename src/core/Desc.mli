@@ -1,5 +1,5 @@
 (** Recursive argument types; currently this includes only [Self]; in the future, this will be extended with an indexed
-    version of [Self], as well a formal function types. *)
+    version of [Self], as well a formal function type. *)
 type 'a arg_ty =
   | Self
 
@@ -24,8 +24,7 @@ type 'a desc = (con_label * 'a constr) list
 exception ConstructorNotFound of con_label
 val lookup_constr : con_label -> 'a desc -> 'a constr
 
-(** Returns 'yes' if the description specifies strictly higher dimensional structure, like the strict natural numbers.
-    Currently, this is always true but will change as we extend to support higher inductive types. *)
+(** Returns 'yes' if the description specifies strictly no higher dimensional structure, like the natural numbers. *)
 val is_strict_set : 'a desc -> bool
 
 
