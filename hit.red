@@ -12,7 +12,8 @@ data torus where
   [ i=0 ⇒ p/one j
   | i=1 ⇒ p/one j
   | j=0 ⇒ p/two i
-  | j=1 ⇒ p/two i ]
+  | j=1 ⇒ p/two i
+  ]
 
 let t2c (t : torus) : s1 × s1 =
   elim t [
