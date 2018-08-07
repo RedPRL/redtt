@@ -165,9 +165,13 @@ struct
       M.ret env
 
   and elab_datatype env edesc =
-    traverse (elab_constr env) edesc
+    let used = Hashtbl.create 10 in
+    traverse (elab_constr env used) edesc
 
-  and elab_constr env (clbl, constr) =
+  and elab_constr env used (clbl, constr) =
+    if Hashtbl.mem used clbl then failwith "Duplicate constructor in datatype";
+    Hashtbl.add used clbl ();
+
     let open Desc in
     let elab_arg_ty (x, Self) = M.ret (x, Self) in
 
@@ -298,7 +302,15 @@ struct
     | _, E.Elim {mot; scrut; clauses} ->
       let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) mot in
       let tac_scrut = elab_inf env scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
-      let clauses = List.map (fun (lbl, pbinds, bdy) -> lbl, pbinds, fun ty -> elab_chk env ty bdy) clauses in
+      let used = Hashtbl.create 10 in
+      let elab_clause (lbl, pbinds, bdy) =
+        if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
+          begin
+            Hashtbl.add used lbl ();
+            lbl, pbinds, fun ty -> elab_chk env ty bdy
+          end
+      in
+      let clauses = List.map elab_clause clauses in
       tac_elim ~tac_mot ~tac_scrut ~clauses ty
 
     | _, E.S1Rec (omot, escrut, ebcase, (name_lcase, elcase)) ->

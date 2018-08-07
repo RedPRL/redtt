@@ -596,8 +596,12 @@ and infer_spine cx hd =
         Cx.make_closure cx info.mot
       in
 
+      let used_labels = Hashtbl.create 10 in
+
       let check_clause lbl constr clauses =
         let open Desc in
+        if Hashtbl.mem used_labels lbl then failwith "Duplicate case in eliminator";
+        Hashtbl.add used_labels lbl ();
 
         let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
 
