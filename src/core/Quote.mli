@@ -34,6 +34,7 @@ sig
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
 
+  val equiv_bvalue : (int, Tm.tm, Tm.tm) Desc.desc -> env -> Tm.tm Desc.arg_ty -> bvalue -> bvalue -> unit
 end
 
 module M (V : Val.S) : S

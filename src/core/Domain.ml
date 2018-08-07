@@ -297,6 +297,8 @@ struct
   let rec act phi =
     function
     | BIntro info ->
+      (* TODO: Here, we will ultimately need to know the boundary specification,
+         and appropriately return one of those faces if it becomes true *)
       let const_args = List.map (Value.act phi) info.const_args in
       let rec_args = List.map (act phi) info.rec_args in
       let rs = List.map (I.act phi) info.rs in
