@@ -1,15 +1,24 @@
 type 'a arg_ty =
   | Self
 
-type 'a boundary = ('a * 'a * 'a) list
+
+type data_label = string
+type con_label = string
+
+module Boundary =
+struct
+  type ('var, 'a) term =
+    | Var of 'var
+    | Intro of con_label * 'a list * ('var, 'a) term list
+
+  type ('var, 'a) face = 'a * 'a * ('var, 'a) term
+  type ('var, 'a) sys = ('var, 'a) face list
+end
 
 type 'a constr =
   {params : (string * 'a) list;
    args : (string * 'a arg_ty) list;
    dims : string list}
-
-type data_label = string
-type con_label = string
 
 type 'a desc = (con_label * 'a constr) list
 
