@@ -17,7 +17,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK LOCK
-%token S1 S1_ELIM ELIM LOOP BASE UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
+%token S1 ELIM LOOP BASE UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
 %token EOF
@@ -91,6 +91,19 @@ eframe:
       | 1 -> E.Cdr
       | _ -> failwith "Parser: invalid projection" }
 
+
+block(X):
+  | WITH; x = X; END
+    { x }
+
+pipe_block(X):
+  | x = block(preceded(option(PIPE), separated_list(PIPE, X)))
+    { x }
+
+s1_elim:
+  | option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm
+    { eb, x, el }
+
 eterm:
   | e = atomic_eterm
     { e }
@@ -103,17 +116,18 @@ eterm:
   | LET; name = ATOM; EQUALS; tm = eterm; IN; body = eterm
     { E.Let {name; ty = None; tm; body} }
 
-  | ELIM; scrut = eterm; IN; mot = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
+  | ELIM; scrut = eterm; IN; mot = eterm; clauses = pipe_block(eclause)
     { E.Elim {mot = Some mot; scrut; clauses} }
 
-  | ELIM; scrut = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
+  | ELIM; scrut = eterm; clauses = pipe_block(eclause)
     { E.Elim {mot = None; scrut; clauses} }
 
   | LOOP; r = eterm
     { E.Loop r }
 
-  | S1_ELIM; e0 = eterm; WITH; option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm; END
-    { E.S1Rec (None, e0, eb, (x, el)) }
+  | ELIM; e0 = eterm; s1_elim = block(s1_elim)
+    { let eb, x, el = s1_elim in
+      E.S1Rec (None, e0, eb, (x, el)) }
 
   | DFIX; LSQ; r = eterm; RSQ; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
     { E.DFixLine {r; name; ty; bdy} }
@@ -130,10 +144,10 @@ eterm:
   | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm= atomic_eterm; IN; fam = eterm
     { E.Coe {r = r0; r' = r1; fam; tm} }
 
-  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; sys = pipe_block(eface)
     { E.HCom {r = r0; r' = r1; cap; sys}}
 
-  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; IN; fam = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; IN; fam = eterm; sys = pipe_block(eface)
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = eterm
@@ -142,10 +156,10 @@ eterm:
   | tele = nonempty_list(etele_cell); TIMES; cod = eterm
     { E.Sg (List.flatten tele, cod) }
 
-  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; sys = pipe_block(eface)
     { E.Ext (dims, ty, sys)}
 
-  | RESTRICT; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+  | RESTRICT; ty = eterm; sys = pipe_block(eface)
     { E.Rst (ty, sys)}
 
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
@@ -205,10 +219,7 @@ desc_constr:
     clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims; boundary} }
 
 desc_boundary:
-  | WITH;
-    option(PIPE);
-    faces = separated_nonempty_list(PIPE, eface);
-    END
+  | faces = pipe_block(eface)
   { faces }
 
 

@@ -52,7 +52,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("vproj", VPROJ);
       ("vin", VIN);
       ("restrict", RESTRICT);
-      ("S1-elim", S1_ELIM);
       ("let", LET);
       ("lam", LAM);
       ("next", NEXT);
