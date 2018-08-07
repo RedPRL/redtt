@@ -35,6 +35,9 @@ and pp_bvalue fmt =
     Format.fprintf fmt "%a"
       pp_bneu info.neu
 
+(* | InstBClo _ ->
+   Format.fprintf fmt "<inst-bclo>" *)
+
 and pp_bneu fmt =
   function
   | BLvl lvl ->
@@ -461,13 +464,14 @@ struct
   let rec act phi =
     function
     | BIntro info ->
+      let const_args = List.map (Value.act phi) info.const_args in
+      let rec_args = List.map (act phi) info.rec_args in
+      let rs = List.map (I.act phi) info.rs in
       begin
         match force_bval_sys @@ act_bval_sys phi info.sys with
-        | `Proj bv -> bv
+        | `Proj v ->
+          v
         | `Ok sys ->
-          let const_args = List.map (Value.act phi) info.const_args in
-          let rec_args = List.map (act phi) info.rec_args in
-          let rs = List.map (I.act phi) info.rs in
           BIntro {info with const_args; rec_args; rs; sys}
       end
 
@@ -476,24 +480,37 @@ struct
       let neu = act_neu phi info.neu in
       BUp {ty; neu}
 
+  (* | InstBClo (bclo, env) ->
+     InstBClo (BClo.act phi bclo, List.map (Env.act_env_el phi) env) *)
+
   and act_bval_sys phi =
-    List.map @@ BValueFace.act phi
+    List.map @@ BValFace.act phi
 
 end
-and BValueFace : Face.S with type body := BValue.t = Face.M(BValue)
+and BValFace : Face.S with type body := BValue.t = Face.M(BValue)
+and BCloFace : Face.S with type body := BClo.t = Face.M(BClo)
+and BClo : Sort.S with type t = bclo with type 'a m = 'a =
+struct
+  type t = bclo
+  type 'a m = 'a
 
-let act_env_cell phi =
-  function
-  | `Val v ->
-    `Val (Value.act phi v)
-  | `BVal v ->
-    `BVal (BValue.act phi v)
-  | `Dim x ->
-    `Dim (I.act phi x)
-  | `Tick tck ->
-    `Tick tck
+  let act phi clo =
+    match clo with
+    | BClo info ->
+      BClo {info with rho = Env.act phi info.rho}
+end
 
-module Env =
+and Env :
+sig
+  include Sort.S
+    with type t = env
+    with type 'a m = 'a
+  val emp : env
+  val clear_locals : env -> env
+  val push : env_el -> env -> env
+  val push_many : env_el list -> env -> env
+  val act_env_el : I.action -> env_el -> env_el
+end =
 struct
   type t = env
   type 'a m = 'a
@@ -509,8 +526,19 @@ struct
   let push_many els {cells; global} =
     {cells = els @ cells; global}
 
+  let act_env_el phi =
+    function
+    | `Val v ->
+      `Val (Value.act phi v)
+    | `BVal v ->
+      `BVal (BValue.act phi v)
+    | `Dim x ->
+      `Dim (I.act phi x)
+    | `Tick tck ->
+      `Tick tck
+
   let act phi {cells; global} =
-    {cells = List.map (act_env_cell phi) cells;
+    {cells = List.map (act_env_el phi) cells;
      global = I.cmp phi global}
 end
 

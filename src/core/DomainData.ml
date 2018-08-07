@@ -101,6 +101,9 @@ and clo =
 and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
 
+and bclo =
+  | BClo of {len : int; btm : (int, Tm.tm, Tm.tm) Desc.Boundary.term; rho : env}
+
 and tick_clo =
   | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}
   | TickCloConst of value
@@ -132,6 +135,8 @@ and bvalue =
   | BUp of
       {ty : value Desc.arg_ty;
        neu : bneu}
+
+(* | InstBClo of bclo * env_el list *)
 
 and bneu =
   | BLvl of int

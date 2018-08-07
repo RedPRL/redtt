@@ -1057,7 +1057,7 @@ struct
         | Intro info' ->
           List.nth info'.args k
         | _ ->
-          failwith ""
+          failwith "rigid_hcom_strict_data: peel_arg"
       in
 
       let peel_face k =
@@ -1319,15 +1319,14 @@ struct
     match btm with
     | B.Intro info ->
       let constr = Desc.lookup_constr info.clbl desc in
-      let sys = eval_bterm_boundary desc rho constr.boundary in
+      let const_args = List.map (eval rho) info.const_args in
+      let rec_args = List.map (eval_bterm desc rho) info.rec_args in
+      let rs = List.map (eval_dim rho) info.rs in
+      let sys = eval_bterm_boundary desc rho constr.boundary const_args rec_args rs in
       begin
         match force_bval_sys sys with
         | `Proj bv -> bv
-        | `Ok sys ->
-          let const_args = List.map (eval rho) info.const_args in
-          let rec_args = List.map (eval_bterm desc rho) info.rec_args in
-          let rs = List.map (eval_dim rho) info.rs in
-          BIntro {clbl = info.clbl; const_args; rec_args; rs; sys}
+        | `Ok sys -> BIntro {clbl = info.clbl; const_args; rec_args; rs; sys}
       end
 
     | B.Var ix ->
@@ -1339,20 +1338,29 @@ struct
           raise @@ E err
       end
 
-  and eval_bterm_boundary desc rho sys =
-    List.map (eval_bterm_face desc rho) sys
+  and eval_bterm_boundary desc rho sys const_args rec_args rs =
+    List.map (eval_bterm_face desc rho const_args rec_args rs) sys
 
-  and eval_bterm_face desc rho (tr0, tr1, btm) =
+  and eval_bterm_face desc rho const_args rec_args rs (tr0, tr1, btm) =
     let r0 = eval_dim rho tr0 in
     let r1 = eval_dim rho tr1 in
+    let rho' =
+      Env.push_many
+        begin
+          List.map (fun x -> `Val x) const_args
+          @ List.map (fun x -> `BVal x) rec_args
+          @ List.map (fun x -> `Dim x) rs
+        end
+        rho
+    in
     match Eq.make r0 r1 with
     | `Ok xi ->
-      let bv = BValue.act (I.equate r0 r1) @@ eval_bterm desc rho btm in
+      let bv = BValue.act (I.equate r0 r1) @@ eval_bterm desc rho' btm in
       Face.Indet (xi, bv)
     | `Apart _ ->
       Face.False (r0, r1)
     | `Same _ ->
-      let bv = eval_bterm desc rho btm in
+      let bv = eval_bterm desc rho' btm in
       Face.True (r0, r1, bv)
 
 
@@ -1485,6 +1493,11 @@ struct
       let vargs = List.map (eval rho) args in
       let rs = List.map (eval_dim rho) trs in
       make @@ Intro {dlbl; clbl; args = vargs; rs}
+
+  and execute_bvalue _desc =
+    function
+    | BIntro _ -> failwith ""
+    | BUp _ -> failwith ""
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
