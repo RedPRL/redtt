@@ -12,6 +12,8 @@ let rec pp_env_cell fmt =
   function
   | `Val v ->
     pp_value fmt v
+  | `BVal bv ->
+    pp_bvalue fmt bv
   | `Dim r ->
     I.pp fmt r
   | `Tick _ ->
@@ -20,6 +22,25 @@ let rec pp_env_cell fmt =
 and pp_env fmt =
   let pp_sep fmt () = Format.fprintf fmt ", " in
   Format.pp_print_list ~pp_sep pp_env_cell fmt
+
+and pp_bvalue fmt =
+  function
+  | BIntro info ->
+    Format.fprintf fmt "@[<hv1>(%a %a %a %a)]"
+      Uuseg_string.pp_utf_8 info.clbl
+      pp_values info.const_args
+      pp_bvalues info.rec_args
+      pp_dims info.rs
+
+  | BUp info ->
+    Format.fprintf fmt "%a"
+      pp_bneu info.neu
+
+and pp_bneu fmt =
+  function
+  | BLvl lvl ->
+    Format.fprintf fmt "#%i" lvl
+
 
 and pp_con fmt : con -> unit =
   function
@@ -238,6 +259,10 @@ and pp_values fmt els =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep pp_value fmt els
 
+and pp_bvalues fmt bvs =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep pp_bvalue fmt bvs
+
 and pp_dims fmt rs =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep I.pp fmt rs
@@ -246,13 +271,41 @@ module type Sort = Sort.S
 
 module Value : Sort with type t = value with type 'a m = 'a =
 struct
-
   type 'a m = 'a
   type t = value
 
   let act : I.action -> value -> value =
     fun phi (Node node) ->
       Node {node with action = I.cmp phi node.action}
+end
+
+module BValue : Sort with type t = bvalue with type 'a m = 'a =
+struct
+  type 'a m = 'a
+  type t = bvalue
+
+  let act_self_ty _phi =
+    function
+    | Desc.Self ->
+      Desc.Self
+
+  let act_neu _phi =
+    function
+    | BLvl ix ->
+      BLvl ix
+
+  let rec act phi =
+    function
+    | BIntro info ->
+      let const_args = List.map (Value.act phi) info.const_args in
+      let rec_args = List.map (act phi) info.rec_args in
+      let rs = List.map (I.act phi) info.rs in
+      BIntro {info with const_args; rec_args; rs}
+
+    | BUp info ->
+      let ty = act_self_ty phi info.ty in
+      let neu = act_neu phi info.neu in
+      BUp {ty; neu}
 end
 
 
@@ -264,6 +317,8 @@ let act_env_cell phi =
   function
   | `Val v ->
     `Val (Value.act phi v)
+  | `BVal v ->
+    `BVal (BValue.act phi v)
   | `Dim x ->
     `Dim (I.act phi x)
   | `Tick tck ->
@@ -443,7 +498,3 @@ let rec make : con -> value =
 and make_later ty =
   let tclo = TickCloConst ty in
   make @@ Later tclo
-
-
-
-

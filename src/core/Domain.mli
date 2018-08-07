@@ -30,6 +30,10 @@ module Value : Sort.S
   with type t = value
   with type 'a m = 'a
 
+module BValue : Sort.S
+  with type t = bvalue
+  with type 'a m = 'a
+
 
 module ExtAbs : IAbs.S
   with type el = value * val_sys
