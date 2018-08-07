@@ -11,17 +11,17 @@ module Boundary :
 sig
   (** ['var] is the representation of variables; ['r] is the representation of dimensions;
       ['a] is the representation of ordinary terms. *)
-  type ('var, 'r, 'a) term =
-    | Var of 'var
+  type 'a term =
+    | Var of int
     | Intro of
         { clbl : con_label;
           const_args : 'a list;
-          rec_args : ('var, 'r, 'a) term list;
-          rs : 'r list}
+          rec_args : 'a term list;
+          rs : 'a list}
     (* TODO: fhcom, lam, app *)
 
-  type ('var, 'r, 'a) face = 'r * 'r * ('var, 'r, 'a) term
-  type ('var, 'r, 'a) sys = ('var, 'r, 'a) face list
+  type ('a, 'b) face = 'a * 'a * 'b
+  type ('a, 'b) sys = ('a, 'b) face list
 end
 
 
@@ -30,25 +30,22 @@ end
 
     When we generalized to indexed inductive types, the parameters will become {e bound} in the
     arguments. TODO: rename [params] to [const_args] and [args] to [rec_args]. *)
-type ('var, 'r, 'a) constr =
+type ('a, 'b) constr =
   {params : (string * 'a) list;
    args : (string * 'a arg_ty) list;
    dims : string list;
-   boundary : ('var, 'r, 'a) Boundary.sys}
+   boundary : ('a, 'b) Boundary.sys}
 
 
 (** A datatype description is just a list of named constructors. *)
-type ('var, 'r, 'a) desc = (con_label * ('var, 'r, 'a) constr) list
+type ('a, 'b) desc = (con_label * ('a, 'b) constr) list
 
 exception ConstructorNotFound of con_label
-val lookup_constr : con_label -> ('var, 'r, 'a) desc -> ('var, 'r, 'a) constr
+val lookup_constr : con_label -> ('a, 'b) desc -> ('a, 'b) constr
 
 (** Returns 'yes' if the description specifies strictly no higher dimensional structure, like the natural numbers. *)
-val is_strict_set : ('var, 'r, 'a) desc -> bool
+val is_strict_set : ('a, 'b) desc -> bool
 
 
 val pp_data_label : data_label Pp.t0
 val pp_con_label : con_label Pp.t0
-
-val pp_desc : 'var Pp.t -> 'a Pp.t -> ('var, 'r, 'a) desc Pp.t0
-val pp_constr : 'var Pp.t -> 'a Pp.t -> ('var, 'r, 'a) constr Pp.t0

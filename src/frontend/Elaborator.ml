@@ -213,7 +213,7 @@ struct
 
     go Emp constr.params
 
-  and elab_constr_boundary env constrs sys : (int, tm, tm) Desc.Boundary.sys M.m =
+  and elab_constr_boundary env constrs sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
     traverse (elab_constr_face env constrs) sys
 
   and elab_constr_face env constrs (er0, er1, e) =

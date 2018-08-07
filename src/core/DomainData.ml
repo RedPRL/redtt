@@ -103,7 +103,7 @@ and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
 
 and bclo =
-  | BClo of {len : int; btm : (int, Tm.tm, Tm.tm) Desc.Boundary.term; rho : env}
+  | BClo of {len : int; btm : Tm.tm Desc.Boundary.term; rho : env}
 
 and tick_clo =
   | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}

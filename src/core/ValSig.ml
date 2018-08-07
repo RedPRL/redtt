@@ -9,7 +9,7 @@ sig
   (** Return the type and boundary of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 
-  val lookup_datatype : Desc.data_label -> (int, Tm.tm, Tm.tm) Desc.desc
+  val lookup_datatype : Desc.data_label -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
 end
 
 module type S =

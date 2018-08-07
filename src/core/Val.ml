@@ -1312,7 +1312,7 @@ struct
   and nclo nbnd rho =
     NClo {nbnd; rho}
 
-  and eval_bterm dlbl (desc : (int, Tm.tm, Tm.tm) Desc.desc) (rho : env) btm =
+  and eval_bterm dlbl desc (rho : env) btm =
     match btm with
     | B.Intro info ->
       let constr = Desc.lookup_constr info.clbl desc in

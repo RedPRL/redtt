@@ -14,7 +14,7 @@ type lock_info = {constant : bool; birth : int}
 
 type t =
   {rel : Restriction.t;
-   data_decls : (int, Tm.tm, Tm.tm) Desc.desc StringTable.t;
+   data_decls : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc StringTable.t;
    table : (entry param * lock_info) T.t;
    lock : int -> bool;
    killed : int -> bool;
