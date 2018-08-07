@@ -96,11 +96,11 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<shut>"
   | Data _ ->
     Format.fprintf fmt "<data>"
-  | Intro (_, lbl, args, rs) ->
+  | Intro info ->
     Format.fprintf fmt "@[<hv1>(%a %a %a)]"
-      Uuseg_string.pp_utf_8 lbl
-      pp_values args
-      pp_dims rs
+      Uuseg_string.pp_utf_8 info.clbl
+      pp_values info.args
+      pp_dims info.rs
 
 
 and pp_value fmt value =

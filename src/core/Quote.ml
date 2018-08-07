@@ -355,12 +355,12 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
-      | Data dlbl, Intro (_, clbl0, args0, rs0), Intro (_, clbl1, args1, rs1) when clbl0 = clbl1 ->
+      | Data dlbl, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
         let desc = V.Sig.lookup_datatype dlbl in
-        let constr = Desc.lookup_constr clbl0 desc in
-        let targs = equate_constr_args env dlbl constr args0 args1 in
-        let trs = equate_dims env rs0 rs1 in
-        Tm.make @@ Tm.Intro (dlbl, clbl0, targs @ trs)
+        let constr = Desc.lookup_constr info0.clbl desc in
+        let targs = equate_constr_args env dlbl constr info0.args info1.args in
+        let trs = equate_dims env info0.rs info1.rs in
+        Tm.make @@ Tm.Intro (dlbl, info0.clbl, targs @ trs)
 
       | _ ->
         let err = ErrEquateNf {env; ty; el0; el1} in
@@ -487,7 +487,7 @@ struct
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
           let bdy1 = inst_nclo clause1 cells in
-          let intro = D.make @@ D.Intro (dlbl, clbl, vs, rs) in
+          let intro = D.make @@ D.Intro {dlbl; clbl; args = vs; rs} in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)

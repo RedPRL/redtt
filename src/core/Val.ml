@@ -443,7 +443,7 @@ struct
     | Data lbl ->
       make @@ Data lbl
 
-    | Intro (dlbl, clbl, args, rs) ->
+    | Intro info ->
       (* let desc = Sig.lookup_datatype dlbl in
          let constr = Desc.lookup_constr clbl desc in
          let boundary = failwith "TODO!" in
@@ -452,9 +452,9 @@ struct
          | `Proj el ->
           el
          | _ -> *)
-      let args' = List.map (Value.act phi) args in
-      let rs' = List.map (I.act phi) rs in
-      make @@ Intro (dlbl, clbl, args', rs')
+      let args = List.map (Value.act phi) info.args in
+      let rs = List.map (I.act phi) info.rs in
+      make @@ Intro {info with args; rs}
   (* end *)
 
   and act_neu phi con =
@@ -1140,11 +1140,11 @@ struct
   (* presupposes no dimension arguments *)
   and rigid_hcom_strict_data dir ty cap sys =
     match unleash ty, unleash cap with
-    | Data dlbl, Intro (_, clbl, args, []) ->
+    | Data dlbl, Intro info ->
       let peel_arg k el =
         match unleash el with
-        | Intro (_, _, args', []) ->
-          List.nth args' k
+        | Intro info' ->
+          List.nth info'.args k
         | _ ->
           failwith ""
       in
@@ -1171,11 +1171,11 @@ struct
       in
 
       let desc = Sig.lookup_datatype dlbl in
-      let constr = Desc.lookup_constr clbl desc in
+      let constr = Desc.lookup_constr info.clbl desc in
 
-      let args' = make_args 0 Emp args constr.params constr.args in
+      let args' = make_args 0 Emp info.args constr.params constr.args in
 
-      make @@ Intro (dlbl, clbl, args', [])
+      make @@ Intro {dlbl; clbl = info.clbl; args = args'; rs = []}
 
     | _, Up info ->
       rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
@@ -1532,7 +1532,7 @@ struct
       let args, trs = ListUtil.split (List.length constr.params + List.length constr.args) args in
       let vargs = List.map (eval rho) args in
       let rs = List.map (eval_dim rho) trs in
-      make @@ Intro (dlbl, clbl, vargs, rs)
+      make @@ Intro {dlbl; clbl; args = vargs; rs}
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
@@ -2160,10 +2160,10 @@ struct
 
   and elim_data dlbl mot scrut clauses =
     match unleash scrut with
-    | Intro (_, clbl, vs, rs) ->
-      let _, nclo = List.find (fun (clbl', _) -> clbl = clbl') clauses in
+    | Intro info ->
+      let _, nclo = List.find (fun (clbl', _) -> info.clbl = clbl') clauses in
       let desc = Sig.lookup_datatype dlbl in
-      let constr = Desc.lookup_constr clbl desc in
+      let constr = Desc.lookup_constr info.clbl desc in
 
       let rec go vs rs ps args dims =
         match vs, rs, ps, args, dims with
@@ -2180,7 +2180,7 @@ struct
           failwith "elim_data/intro"
       in
 
-      inst_nclo nclo @@ go vs rs constr.params constr.args constr.dims
+      inst_nclo nclo @@ go info.args info.rs constr.params constr.args constr.dims
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in

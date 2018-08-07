@@ -52,7 +52,11 @@ type con =
   | Shut of value
 
   | Data of Desc.data_label
-  | Intro of Desc.data_label * Desc.con_label * value list * dim list
+  | Intro of
+      {dlbl : Desc.data_label;
+       clbl : Desc.con_label;
+       args : value list;
+       rs : dim list}
 
 and neu =
   | Lvl of string option * int
