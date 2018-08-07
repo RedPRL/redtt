@@ -60,20 +60,20 @@ let pp_constr _pp_var pp fmt constr =
   let rec go env fmt (ps, args, dims) =
     match ps, args, dims with
     | [nm, p], _, _ ->
-      let nm, env' = Pretty.Env.bind (Some nm) env in
+      let nm, env' = Pp.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
         (go env') ([], args, dims)
     | (nm, p) :: ps, _, _ ->
-      let nm, env' = Pretty.Env.bind (Some nm) env in
+      let nm, env' = Pp.Env.bind (Some nm) env in
       Format.fprintf fmt "%a %a"
         (pp_param env) (nm, p)
         (go env') (ps, args, dims)
     | [], [], [] ->
       ()
     | [], args, dims ->
-      let nms, env' = Pretty.Env.bindn (List.map (fun x -> Some (fst x)) args) env in
-      let dims', _env'' = Pretty.Env.bindn (List.map (fun x -> Some x) dims) env' in
+      let nms, env' = Pp.Env.bindn (List.map (fun x -> Some (fst x)) args) env in
+      let dims', _env'' = Pp.Env.bindn (List.map (fun x -> Some x) dims) env' in
       (* TODO: when we add boundaries, we'll use _env''. *)
       let pp_sep fmt () = Format.fprintf fmt " " in
       begin
@@ -86,7 +86,7 @@ let pp_constr _pp_var pp fmt constr =
           Format.fprintf fmt "<%a>" (Format.pp_print_list ~pp_sep Uuseg_string.pp_utf_8) dims'
       end
   in
-  go Pretty.Env.emp fmt (constr.params, constr.args, constr.dims)
+  go Pp.Env.emp fmt (constr.params, constr.args, constr.dims)
 
 let pp_labeled_constr pp_var pp fmt (lbl, constr) =
   Format.fprintf fmt "| %a @[<hv1>%a@]"

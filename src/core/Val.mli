@@ -3,7 +3,7 @@ open Domain
 module Error :
 sig
   type t
-  val pp : t Pretty.t0
+  val pp : t Pp.t0
   exception E of t
 end
 

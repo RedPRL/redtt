@@ -92,7 +92,7 @@ type tm
 module Error :
 sig
   type t
-  val pp : t Pretty.t0
+  val pp : t Pp.t0
   exception E of t
 end
 
@@ -166,13 +166,13 @@ sig
   val equiv : tm -> tm -> tm
 end
 
-val pp : tm Pretty.t
-val pp0 : tm Pretty.t0
-val pp_cmd : tm cmd Pretty.t
-val pp_head : tm head Pretty.t
-val pp_frame : tm frame Pretty.t
-val pp_spine : tm spine Pretty.t
-val pp_sys : (tm, tm) system Pretty.t
+val pp : tm Pp.t
+val pp0 : tm Pp.t0
+val pp_cmd : tm cmd Pp.t
+val pp_head : tm head Pp.t
+val pp_frame : tm frame Pp.t
+val pp_spine : tm spine Pp.t
+val pp_sys : (tm, tm) system Pp.t
 
 
 include Occurs.S with type t := tm

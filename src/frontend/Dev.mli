@@ -49,8 +49,8 @@ val unbind : 'a param -> problem bind -> Name.t * problem
 val inst_with_vars : Name.t list -> problem -> [`Unify of (tm, tm) equation | `Subtype of tm * tm] option
 
 
-val pp_params : params Pretty.t0
-val pp_entry : entry Pretty.t0
+val pp_params : params Pp.t0
+val pp_entry : entry Pp.t0
 
 
 type twin = Tm.twin
@@ -60,7 +60,7 @@ module Subst = GlobalEnv
 module type DevSort =
 sig
   include Occurs.S
-  val pp : t Pretty.t0
+  val pp : t Pp.t0
   val subst : Subst.t -> t -> t
 end
 

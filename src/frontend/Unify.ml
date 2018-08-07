@@ -142,7 +142,7 @@ let to_var t =
   | Tm.Up (Tm.Var {name; _}, Emp) ->
     Some name
   | _ ->
-    (* Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t; *)
+    (* Format.eprintf "to_var: %a@.@." (Tm.pp Pp.Env.emp) t; *)
     None
 
 
@@ -617,7 +617,7 @@ let rec subtype ty0 ty1 =
           end >>
           go sys0 sys1
         | _ ->
-          (* Format.eprintf "shoot??: %a <= %a@ / %a <= %a@." Tm.pp0 ty'0 Tm.pp0 ty'1 (Tm.pp_sys Pretty.Env.emp) sys0 (Tm.pp_sys Pretty.Env.emp) sys1; *)
+          (* Format.eprintf "shoot??: %a <= %a@ / %a <= %a@." Tm.pp0 ty'0 Tm.pp0 ty'1 (Tm.pp_sys Pp.Env.emp) sys0 (Tm.pp_sys Pp.Env.emp) sys1; *)
           failwith "Extension subtype: nope"
       in
       in_scopes ps begin

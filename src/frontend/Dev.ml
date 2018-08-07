@@ -317,7 +317,7 @@ module Subst = GlobalEnv
 module type DevSort =
 sig
   include Occurs.S
-  val pp : t Pretty.t0
+  val pp : t Pp.t0
   val subst : Subst.t -> t -> t
 end
 

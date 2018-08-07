@@ -5,7 +5,7 @@ module Error :
 sig
   type t
   exception E of t
-  val pp : t Pretty.t0
+  val pp : t Pp.t0
 end
 
 val check : cx -> value -> Tm.tm -> unit

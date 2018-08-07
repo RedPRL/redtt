@@ -32,6 +32,6 @@ val lookup_kind : t -> Name.t -> unit param
 val restriction : t -> Restriction.t
 
 
-val pp : t Pretty.t0
+val pp : t Pp.t0
 
 module M (Sig : sig val globals : t end) : Val.Sig

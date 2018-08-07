@@ -39,8 +39,8 @@ val lookup_constr : con_label -> ('var, 'a) desc -> ('var, 'a) constr
 val is_strict_set : ('var, 'a) desc -> bool
 
 
-val pp_data_label : data_label Pretty.t0
-val pp_con_label : con_label Pretty.t0
+val pp_data_label : data_label Pp.t0
+val pp_con_label : con_label Pp.t0
 
-val pp_desc : 'var Pretty.t -> 'a Pretty.t -> ('var, 'a) desc Pretty.t0
-val pp_constr : 'var Pretty.t -> 'a Pretty.t -> ('var, 'a) constr Pretty.t0
+val pp_desc : 'var Pp.t -> 'a Pp.t -> ('var, 'a) desc Pp.t0
+val pp_constr : 'var Pp.t -> 'a Pp.t -> ('var, 'a) constr Pp.t0
