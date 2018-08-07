@@ -15,12 +15,12 @@ struct
   type ('var, 'a) sys = ('var, 'a) face list
 end
 
-type 'a constr =
+type ('var, 'a) constr =
   {params : (string * 'a) list;
    args : (string * 'a arg_ty) list;
    dims : string list}
 
-type 'a desc = (con_label * 'a constr) list
+type ('var, 'a) desc = (con_label * ('var, 'a) constr) list
 
 exception ConstructorNotFound of con_label
 
@@ -50,7 +50,7 @@ let pp_arg_ty fmt =
     Format.fprintf fmt "(%a : self)"
       Uuseg_string.pp_utf_8 nm
 
-let pp_constr pp fmt constr =
+let pp_constr _pp_var pp fmt constr =
   let pp_param env fmt (nm, ty) =
     Format.fprintf fmt "(%a : %a)"
       Uuseg_string.pp_utf_8 nm
@@ -88,15 +88,15 @@ let pp_constr pp fmt constr =
   in
   go Pretty.Env.emp fmt (constr.params, constr.args, constr.dims)
 
-let pp_labeled_constr pp fmt (lbl, constr) =
+let pp_labeled_constr pp_var pp fmt (lbl, constr) =
   Format.fprintf fmt "| %a @[<hv1>%a@]"
     Uuseg_string.pp_utf_8 lbl
-    (pp_constr pp) constr
+    (pp_constr pp_var pp) constr
 
-let pp_constrs pp fmt =
+let pp_constrs pp_var pp fmt =
   let pp_sep fmt () = Format.pp_print_newline fmt () in
-  Format.pp_print_list ~pp_sep (pp_labeled_constr pp) fmt
+  Format.pp_print_list ~pp_sep (pp_labeled_constr pp_var pp) fmt
 
-let pp_desc pp fmt constrs =
+let pp_desc pp_var pp fmt constrs =
   Format.fprintf fmt "@[<v>data where@ %a@ end@]"
-    (pp_constrs pp) constrs
+    (pp_constrs pp_var pp) constrs

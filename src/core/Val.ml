@@ -183,7 +183,7 @@ sig
   val restriction : Restriction.t
   val global_dim : I.atom -> I.t
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
-  val lookup_datatype : Desc.data_label -> Tm.tm Desc.desc
+  val lookup_datatype : Desc.data_label -> (int, Tm.tm) Desc.desc
 end
 
 module type S =

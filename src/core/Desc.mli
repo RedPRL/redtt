@@ -23,24 +23,24 @@ end
 (** A data constructor is a list of parameters (non-recursive arguments) and recursive arguments.
     When we generalized to indexed inductive types, the parameters will become *bound* in the arguments. Finally, to support HITs,
     we will ultimately add dimension arguments and boundary constraints. *)
-type 'a constr =
+type ('var, 'a) constr =
   {params : (string * 'a) list;
    args : (string * 'a arg_ty) list;
    dims : string list}
 
 
 (** A datatype description is just a list of named constructors. *)
-type 'a desc = (con_label * 'a constr) list
+type ('var, 'a) desc = (con_label * ('var, 'a) constr) list
 
 exception ConstructorNotFound of con_label
-val lookup_constr : con_label -> 'a desc -> 'a constr
+val lookup_constr : con_label -> ('var, 'a) desc -> ('var, 'a) constr
 
 (** Returns 'yes' if the description specifies strictly no higher dimensional structure, like the natural numbers. *)
-val is_strict_set : 'a desc -> bool
+val is_strict_set : ('var, 'a) desc -> bool
 
 
 val pp_data_label : data_label Pretty.t0
 val pp_con_label : con_label Pretty.t0
 
-val pp_desc : 'a Pretty.t -> 'a desc Pretty.t0
-val pp_constr : 'a Pretty.t -> 'a constr Pretty.t0
+val pp_desc : 'var Pretty.t -> 'a Pretty.t -> ('var, 'a) desc Pretty.t0
+val pp_constr : 'var Pretty.t -> 'a Pretty.t -> ('var, 'a) constr Pretty.t0
