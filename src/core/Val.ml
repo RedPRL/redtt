@@ -444,9 +444,18 @@ struct
       make @@ Data lbl
 
     | Intro (dlbl, clbl, args, rs) ->
+      (* let desc = Sig.lookup_datatype dlbl in
+         let constr = Desc.lookup_constr clbl desc in
+         let boundary = failwith "TODO!" in
+         begin
+         match force_val_sys @@ ValSys.act phi boundary with
+         | `Proj el ->
+          el
+         | _ -> *)
       let args' = List.map (Value.act phi) args in
       let rs' = List.map (I.act phi) rs in
       make @@ Intro (dlbl, clbl, args', rs')
+  (* end *)
 
   and act_neu phi con =
     match con with
