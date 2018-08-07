@@ -28,6 +28,8 @@ type cx =
 
 type t = cx
 
+let env cx = cx.env
+
 let globals cx =
   cx.sign
 

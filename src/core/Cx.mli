@@ -4,6 +4,7 @@ type value = Domain.value
 
 val init : GlobalEnv.t -> t
 val globals : t -> GlobalEnv.t
+val env : t -> Domain.env
 
 val clear_locals : t -> t
 

@@ -385,18 +385,15 @@ struct
       make @@ Data lbl
 
     | Intro info ->
-      (* let desc = Sig.lookup_datatype dlbl in
-         let constr = Desc.lookup_constr clbl desc in
-         let boundary = failwith "TODO!" in
-         begin
-         match force_val_sys @@ ValSys.act phi boundary with
-         | `Proj el ->
-          el
-         | _ -> *)
-      let args = List.map (Value.act phi) info.args in
-      let rs = List.map (I.act phi) info.rs in
-      make @@ Intro {info with args; rs}
-  (* end *)
+      begin
+        match force_val_sys @@ ValSys.act phi @@ ValSys.from_rigid info.sys with
+        | `Ok sys ->
+          let args = List.map (Value.act phi) info.args in
+          let rs = List.map (I.act phi) info.rs in
+          make @@ Intro {info with args; rs; sys}
+        | `Proj v ->
+          v
+      end
 
   and act_neu phi con =
     match con with
@@ -1494,7 +1491,19 @@ struct
       let args, trs = ListUtil.split (List.length constr.params + List.length constr.args) args in
       let vargs = List.map (eval rho) args in
       let rs = List.map (eval_dim rho) trs in
-      make @@ Intro {dlbl; clbl; args = vargs; rs; sys = failwith "TODO!!!"}
+      make_intro (Env.clear_locals rho) ~dlbl ~clbl ~args:vargs ~rs
+
+
+  and make_intro rho ~dlbl ~clbl ~args ~rs =
+    let desc = Sig.lookup_datatype dlbl in
+    let constr = Desc.lookup_constr clbl desc in
+    let const_args, rec_args = ListUtil.split (List.length constr.params) args in
+    let sys = eval_bterm_boundary dlbl desc rho constr.boundary const_args rec_args rs in
+    match force_val_sys sys with
+    | `Ok sys ->
+      make @@ Intro {dlbl; clbl; args; rs; sys}
+    | `Proj v ->
+      v
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
