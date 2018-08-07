@@ -194,13 +194,22 @@ struct
       | [] ->
         (* TODO: when self args are more complex, we'll need to abstract them over
            the parameters too. *)
-        traverse elab_arg_ty constr.args <<@> fun args ->
-          clbl,
-          {params = abstract_tele Emp @@ Bwd.to_list acc;
-           args;
-           dims = constr.dims;
-           boundary = []}
-      (* TODO: elab boundary *)
+        traverse elab_arg_ty constr.args >>= fun args ->
+
+        let psi =
+          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) args
+          @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dims
+        in
+        M.in_scopes psi @@
+        begin
+          elab_constr_boundary env constrs constr.boundary >>= fun boundary ->
+          M.ret
+            (clbl,
+             {params = abstract_tele Emp @@ Bwd.to_list acc;
+              args;
+              dims = constr.dims;
+              boundary})
+        end
 
       | (lbl, ety) :: prms ->
         (* TODO: support higher universes *)

@@ -200,9 +200,17 @@ desc_constr:
   params = loption(nonempty_list(desc_param));
   args = loption(nonempty_list(desc_arg));
   dims = loption(delimited(LGL, nonempty_list(ATOM), RGL));
-  (* _boundary = loption(delimited(WITH, nonempty_list(eface), END)) *)
+  boundary = loption(desc_boundary)
   { fun dlbl ->
-    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims; boundary = []} }
+    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims; boundary} }
+
+desc_boundary:
+  | WITH;
+    option(PIPE);
+    faces = separated_nonempty_list(PIPE, eface);
+    END
+  { faces }
+
 
 
 %inline

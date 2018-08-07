@@ -46,7 +46,7 @@ let normalize_param p =
     C.ret @@ `P (normalize_ty ty)
   | `Tw (ty0, ty1) ->
     C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
-  | (`I | `Tick | `Lock | `ClearLocks | `KillFromTick _) as p ->
+  | (`I | `Tick | `Lock | `ClearLocks | `KillFromTick _ | `SelfArg Desc.Self) as p ->
     C.ret p
   | `R (r0, r1) ->
     C.ret @@ `R (r0, r1)

@@ -83,6 +83,9 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     [Tm.ExtApp [Tm.up @@ Tm.var x]]
   | `P _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
+  | `SelfArg _ ->
+    (* ??? *)
+    [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `Tw _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `R _ ->
@@ -879,7 +882,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | `I | `Tick | `Lock | `ClearLocks | `KillFromTick _ as p ->
+        | `I | `Tick | `Lock | `ClearLocks | `KillFromTick _ | `SelfArg _ as p ->
           in_scope x p @@
           solver probx
 
