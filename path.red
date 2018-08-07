@@ -1,8 +1,8 @@
 let Path (A : type) (M,N : A) : type =
-  [i] A with
+  [i] A [
   | i=0 ⇒ M
   | i=1 ⇒ N
-  end
+  ]
 
 let Square
   (A : type)
@@ -11,12 +11,12 @@ let Square
   (P : Path A (M 1) (N 1))
   : type
   =
-  [i j] A with
+  [i j] A [
   | j=0 ⇒ M i
   | j=1 ⇒ N i
   | i=0 ⇒ O j
   | i=1 ⇒ P j
-  end
+  ]
 
 let funext
   (A : type)
@@ -34,10 +34,10 @@ let symm/filler
   (j, i : dim)
   : A
   =
-  comp 0 j (p 0) with
+  comp 0 j (p 0) [
   | i=0 ⇒ λ i → p i
   | i=1 ⇒ λ _ → p 0
-  end
+  ]
 
 let symm
   (A : type)
@@ -58,19 +58,19 @@ let symm/unit
 let trans/filler
   (A : type)
   (p : dim → A)
-  (q : [i] A with i=0 ⇒ p 1 end)
+  (q : [i] A [ i=0 ⇒ p 1 ])
   (j, i : dim)
   : A
   =
-  comp 0 j (p i) with
+  comp 0 j (p i) [
   | i=0 ⇒ λ _ → p 0
   | i=1 ⇒ λ i → q i
-  end
+  ]
 
 let trans
   (A : type)
   (p : dim → A)
-  (q : [i] A with i=0 ⇒ p 1 end)
+  (q : [i] A [ i=0 ⇒ p 1 ])
   : Path _ (p 0) (q 1)
   =
   λ i →
@@ -91,24 +91,24 @@ let trans/sym/r
   : Path (Path _ (p 0) (p 0)) (λ _ → p 0) (trans _ p (symm _ p))
   =
   λ k i →
-    comp 0 1 (p i) with
+    comp 0 1 (p i) [
     | i=0 ⇒ λ _ → p 0
     | i=1 ⇒ λ j → symm A p j
     | k=0 ⇒ λ j → symm/filler A p i j
     ;| k=1 ⇒ λ j → trans/filler A p (symm A p) j i
-    end
+    ]
 
 ; Perhaps we could parallelize this proof? ;)
 let symmd
   (A : dim → type)
   (p : (i : dim) → A i)
-  : [i] symm^1 _ A i with
+  : [i] symm^1 _ A i [
     | i=0 ⇒ p 1
     | i=1 ⇒ p 0
-    end
+    ]
   =
   λ i →
-    comp 0 1 (p 0) in (λ j → symm/filler^1 _ A j i) with
+    comp 0 1 (p 0) in (λ j → symm/filler^1 _ A j i) [
     | i=0 ⇒ λ j → p j
     | i=1 ⇒ λ _ → p 0
-    end
+    ]

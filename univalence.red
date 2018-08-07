@@ -27,10 +27,10 @@ let RetIsContr
   =
   < g (c.0),
     λ a i →
-      comp 0 1 (g (c.1 (f a) i)) with
+      comp 0 1 (g (c.1 (f a) i)) [
       | i=0 ⇒ h a
       | i=1 ⇒ λ _ → g (c.0)
-      end
+      ]
   >
 
 let IdEquiv (A : type) : Equiv A A =
@@ -40,10 +40,10 @@ let IdEquiv (A : type) : Equiv A A =
     , λ p i →
       let aux : dim → A =
         λ j →
-        comp 1 j a with
+        comp 1 j a [
         | i=0 ⇒ λ k → p.1 k
         | i=1 ⇒ λ _ → a
-        end
+        ]
       in
       <aux 0, λ j → aux j>
     >
@@ -68,12 +68,12 @@ let PropSet
   : (IsSet A)
   =
   λ a b p q i j →
-    comp 0 1 a with
+    comp 0 1 a [
     | j=0 ⇒ λ k → A/prop a a k
     | j=1 ⇒ λ k → A/prop a b k
     | i=0 ⇒ λ k → A/prop a (p j) k
     | i=1 ⇒ λ k → A/prop a (q j) k
-    end
+    ]
 
 let LemSig
   (A : type) (B : A → type)
@@ -105,10 +105,10 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
   λ contr →
     let A/prop : IsProp A =
       λ a b i →
-        comp 1 0 (contr.1 a i) with
+        comp 1 0 (contr.1 a i) [
         | i=0 ⇒ λ _ → a
         | i=1 ⇒ λ j → contr.1 b j
-        end
+        ]
     in
 
     let contr/A/prop =
@@ -185,15 +185,15 @@ opaque
 let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
   < <_, λ _ → A>
   , λ X i →
-    < comp 0 1 A with
+    < comp 0 1 A [
       | i=0 ⇒ X.1
       | i=1 ⇒ λ _ → A
-      end
+      ]
     , λ j →
-      comp 0 j A with
+      comp 0 j A [
       | i=0 ⇒ X.1
       | i=1 ⇒ λ _ → A
-      end
+      ]
     >
   >
 
@@ -229,10 +229,10 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
        , λ b →
             let ctr/B : dim → B =
               λ j →
-                comp 1 j b with
+                comp 1 j b [
                 | i=0 ⇒ λ k → w .1 .1 b .0 .1 k
                 | i=1 ⇒ λ _ → b
-                end
+                ]
             in
             let ctr : Fiber VB B proj/B b =
               < `(vin i (fst (fst ((snd (snd w)) b))) (@ ctr/B 0)), λ l → ctr/B l >
@@ -241,12 +241,12 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
             , λ v j →
                 let filler : dim → B =
                   λ l →
-                    comp 1 l b with
+                    comp 1 l b [
                     | i=0 ⇒ λ k → w .1 .1 b .1 v j .1 k
                     | i=1 ⇒ λ k → connection/or B (v .1) j k
                     | j=0 ⇒ λ k → v .1 k
                     | j=1 ⇒ λ k → ctr/B k
-                    end
+                    ]
                 in
                 < `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))
                 , λ j → filler j

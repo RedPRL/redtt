@@ -95,6 +95,8 @@ eframe:
 block(X):
   | WITH; x = X; END
     { x }
+  | LSQ; x = X; RSQ
+    { x }
 
 pipe_block(X):
   | x = block(preceded(option(PIPE), separated_list(PIPE, X)))
@@ -213,14 +215,17 @@ desc_constr:
 | clbl = ATOM;
   params = loption(nonempty_list(desc_param));
   args = loption(nonempty_list(desc_arg));
-  dims = loption(preceded(AT, nonempty_list(ATOM)));
-  boundary = loption(desc_boundary)
+  extent = desc_extent
   { fun dlbl ->
+    let dims, boundary = extent in
     clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims; boundary} }
 
-desc_boundary:
-  | faces = pipe_block(eface)
-  { faces }
+desc_extent:
+  | AT;
+    dims = list(ATOM);
+    boundary = pipe_block(eface)
+    { dims, boundary }
+  | { [], [] }
 
 
 

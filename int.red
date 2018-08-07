@@ -8,45 +8,45 @@ data int where
 | negsuc [n : nat]
 
 let pred (x : int) : int =
-  elim x with
+  elim x [
   | pos n ⇒
-    elim n with
+    elim n [
     | zero ⇒ negsuc zero
     | suc n ⇒ pos n
-    end
+    ]
   | negsuc n ⇒ negsuc (suc n)
-  end
+  ]
 
 let isuc (x : int) : int =
-  elim x with
+  elim x [
   | pos n ⇒ pos (suc n)
   | negsuc n ⇒
-    elim n with
+    elim n [
     | zero ⇒ pos zero
     | suc n ⇒ negsuc n
-    end
-  end
+    ]
+  ]
 
 
 let pred-isuc (n : int) : Path int (pred (isuc n)) n =
-  elim n with
+  elim n [
   | pos n ⇒ λ _ → pos n
   | negsuc n ⇒
-    elim n with
+    elim n [
     | zero ⇒ λ _ → negsuc zero
     | suc n ⇒ λ _ → negsuc (suc n)
-    end
-  end
+    ]
+  ]
 
 let isuc-pred (n : int) : Path int (isuc (pred n)) n =
-  elim n with
+  elim n [
   | pos n ⇒
-    elim n with
+    elim n [
     | zero ⇒ λ _ → pos zero
     | suc n' ⇒ λ _ → pos (suc n')
-    end
+    ]
   | negsuc n ⇒ λ _ → negsuc n
-  end
+  ]
 
 let isuc-equiv : Equiv int int =
   Iso/Equiv _ _ < isuc, < pred, < isuc-pred, pred-isuc > > >

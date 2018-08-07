@@ -34,12 +34,10 @@ let tts : _ =
 
 ; To eliminate a box, write 'b !'; this elaborates to the core term `(open b).
 let bool/constant (x : bool) : (b : □ bool) × Path _ x (b !) =
-  elim x with
-  | tt ⇒
-    < shut tt, λ _ → tt >
-  | ff ⇒
-    < shut ff, λ _ → ff >
-  end
+  elim x [
+  | tt ⇒ < shut tt, λ _ → tt >
+  | ff ⇒ < shut ff, λ _ → ff >
+  ]
 
 let sequence : type = □ stream
 

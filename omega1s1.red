@@ -7,24 +7,24 @@ let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
 
 
 let S1-univ-cover (x : S1) : type =
-  elim x with
+  elim x [
   | base => int
   | loop i => UA _ _ isuc-equiv i
-  end
+  ]
 
 let loopn (n : int) : Path S1 base base =
-  elim n with
+  elim n [
   | pos n =>
-    elim n with
+    elim n [
     | zero => lam _ -> base
     | suc (n => loopn) => trans S1 (lam i -> loop i) loopn
-    end
+    ]
   | negsuc n =>
-    elim n with
+    elim n [
     | zero => symm S1 (lam i -> loop i)
     | suc (n => loopn) => trans S1 (symm S1 (lam i -> loop i)) loopn
-    end
-  end
+    ]
+  ]
 
 let winding (l : Path S1 base base) : int =
   coe 0 1 (pos zero) in lam i -> S1-univ-cover (l i)
