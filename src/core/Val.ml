@@ -14,9 +14,6 @@ type step =
 let ret v = Ret v
 let step v = Step v
 
-exception ProjAbs of abs
-exception ProjVal of value
-
 
 type error =
   | UnexpectedEnvCell of env_el
@@ -178,9 +175,6 @@ struct
     | _ ->
       raise PpExn.Unrecognized
 end
-
-
-
 
 
 module M (Sig : Sig) : S with module Sig = Sig =
@@ -587,36 +581,6 @@ struct
       let ty = Value.act phi info.ty in
       let el = Value.act phi info.el in
       {ty; el}
-
-  and force_abs_face face =
-    match face with
-    | Face.True (_, _, abs) ->
-      raise @@ ProjAbs abs
-    | Face.False _ -> None
-    | Face.Indet (xi, abs) ->
-      Some (Face.Indet (xi, abs))
-
-  and force_val_face (face : val_face) =
-    match face with
-    | Face.True (_, _, v) ->
-      raise @@ ProjVal v
-    | Face.False _ -> None
-    | Face.Indet (xi, v) ->
-      Some (Face.Indet (xi, v))
-
-  and force_val_sys sys =
-    try
-      `Ok (Option.filter_map force_val_face sys)
-    with
-    | ProjVal v ->
-      `Proj v
-
-  and force_abs_sys sys =
-    try
-      `Ok (Option.filter_map force_abs_face sys)
-    with
-    | ProjAbs abs ->
-      `Proj abs
 
   and unleash : value -> con =
     fun (Node info) ->
@@ -1357,7 +1321,7 @@ struct
       let const_args = List.map (eval rho) info.const_args in
       let rec_args = List.map (eval_bterm rho) info.rec_args in
       let rs = List.map (eval_dim rho) info.rs in
-      BIntro {clbl = info.clbl; const_args; rec_args; rs}
+      BIntro {clbl = info.clbl; const_args; rec_args; rs; sys = failwith "TODO!!!"}
 
     | B.Var ix ->
       begin

@@ -1,5 +1,4 @@
-open RedBasis.Bwd
-
+open RedBasis open Bwd
 include DomainData
 
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
@@ -279,108 +278,58 @@ struct
       Node {node with action = I.cmp phi node.action}
 end
 
-module BValue : Sort with type t = bvalue with type 'a m = 'a =
-struct
-  type 'a m = 'a
-  type t = bvalue
-
-  let act_self_ty _phi =
-    function
-    | Desc.Self ->
-      Desc.Self
-
-  let act_neu _phi =
-    function
-    | BLvl ix ->
-      BLvl ix
-
-  let rec act phi =
-    function
-    | BIntro info ->
-      (* TODO: Here, we will ultimately need to know the boundary specification,
-         and appropriately return one of those faces if it becomes true *)
-      let const_args = List.map (Value.act phi) info.const_args in
-      let rec_args = List.map (act phi) info.rec_args in
-      let rs = List.map (I.act phi) info.rs in
-      BIntro {info with const_args; rec_args; rs}
-
-    | BUp info ->
-      let ty = act_self_ty phi info.ty in
-      let neu = act_neu phi info.neu in
-      BUp {ty; neu}
-end
-
+exception ProjAbs of abs
+exception ProjVal of value
+exception ProjBVal of bvalue
 
 module Abs = IAbs.M (Value)
 module ValFace = Face.M (Value)
 module AbsFace = Face.M (Abs)
 
-let act_env_cell phi =
-  function
-  | `Val v ->
-    `Val (Value.act phi v)
-  | `BVal v ->
-    `BVal (BValue.act phi v)
-  | `Dim x ->
-    `Dim (I.act phi x)
-  | `Tick tck ->
-    `Tick tck
+let force_abs_face face =
+  match face with
+  | Face.True (_, _, abs) ->
+    raise @@ ProjAbs abs
+  | Face.False _ -> None
+  | Face.Indet (xi, abs) ->
+    Some (Face.Indet (xi, abs))
 
-module Env =
-struct
-  type t = env
-  type 'a m = 'a
+let force_val_face (face : val_face) =
+  match face with
+  | Face.True (_, _, v) ->
+    raise @@ ProjVal v
+  | Face.False _ -> None
+  | Face.Indet (xi, v) ->
+    Some (Face.Indet (xi, v))
 
-  let emp = {cells = []; global = I.idn}
+let force_val_sys sys =
+  try
+    `Ok (Option.filter_map force_val_face sys)
+  with
+  | ProjVal v ->
+    `Proj v
 
-  let clear_locals rho =
-    {rho with cells = []}
+let force_bval_face face =
+  match face with
+  | Face.True (_, _, v) ->
+    raise @@ ProjBVal v
+  | Face.False _ -> None
+  | Face.Indet (xi, v) ->
+    Some (Face.Indet (xi, v))
 
-  let push el {cells; global} =
-    {cells = el :: cells; global}
+let force_bval_sys sys =
+  try
+    `Ok (Option.filter_map force_bval_face sys)
+  with
+  | ProjBVal v ->
+    `Proj v
 
-  let push_many els {cells; global} =
-    {cells = els @ cells; global}
-
-  let act phi {cells; global} =
-    {cells = List.map (act_env_cell phi) cells;
-     global = I.cmp phi global}
-end
-
-module Clo : Sort with type t = clo with type 'a m = 'a =
-struct
-  type t = clo
-  type 'a m = 'a
-
-  let act phi clo =
-    match clo with
-    | Clo info ->
-      Clo {info with rho = Env.act phi info.rho}
-end
-
-module TickClo : Sort with type t = tick_clo with type 'a m = 'a =
-struct
-  type t = tick_clo
-  type 'a m = 'a
-
-  let act phi clo =
-    match clo with
-    | TickClo info ->
-      TickClo {info with rho = Env.act phi info.rho}
-    | TickCloConst v ->
-      TickCloConst (Value.act phi v)
-end
-
-module NClo : Sort with type t = nclo with type 'a m = 'a =
-struct
-  type t = nclo
-  type 'a m = 'a
-
-  let act phi clo =
-    match clo with
-    | NClo info ->
-      NClo {info with rho = Env.act phi info.rho}
-end
+let force_abs_sys sys =
+  try
+    `Ok (Option.filter_map force_abs_face sys)
+  with
+  | ProjAbs abs ->
+    `Proj abs
 
 module CompSys :
 sig
@@ -492,6 +441,113 @@ end
 
 module ExtAbs : IAbs.S with type el = value * val_sys =
   IAbs.M (Sort.Prod (Value) (ValSys))
+
+
+module rec BValue : Sort with type t = bvalue with type 'a m = 'a =
+struct
+  type 'a m = 'a
+  type t = bvalue
+
+  let act_self_ty _phi =
+    function
+    | Desc.Self ->
+      Desc.Self
+
+  let act_neu _phi =
+    function
+    | BLvl ix ->
+      BLvl ix
+
+  let rec act phi =
+    function
+    | BIntro info ->
+      begin
+        match force_bval_sys @@ act_bval_sys phi info.sys with
+        | `Proj bv -> bv
+        | `Ok sys ->
+          let const_args = List.map (Value.act phi) info.const_args in
+          let rec_args = List.map (act phi) info.rec_args in
+          let rs = List.map (I.act phi) info.rs in
+          BIntro {info with const_args; rec_args; rs; sys}
+      end
+
+    | BUp info ->
+      let ty = act_self_ty phi info.ty in
+      let neu = act_neu phi info.neu in
+      BUp {ty; neu}
+
+  and act_bval_sys phi =
+    List.map @@ BValueFace.act phi
+
+end
+and BValueFace : Face.S with type body := BValue.t = Face.M(BValue)
+
+let act_env_cell phi =
+  function
+  | `Val v ->
+    `Val (Value.act phi v)
+  | `BVal v ->
+    `BVal (BValue.act phi v)
+  | `Dim x ->
+    `Dim (I.act phi x)
+  | `Tick tck ->
+    `Tick tck
+
+module Env =
+struct
+  type t = env
+  type 'a m = 'a
+
+  let emp = {cells = []; global = I.idn}
+
+  let clear_locals rho =
+    {rho with cells = []}
+
+  let push el {cells; global} =
+    {cells = el :: cells; global}
+
+  let push_many els {cells; global} =
+    {cells = els @ cells; global}
+
+  let act phi {cells; global} =
+    {cells = List.map (act_env_cell phi) cells;
+     global = I.cmp phi global}
+end
+
+module Clo : Sort with type t = clo with type 'a m = 'a =
+struct
+  type t = clo
+  type 'a m = 'a
+
+  let act phi clo =
+    match clo with
+    | Clo info ->
+      Clo {info with rho = Env.act phi info.rho}
+end
+
+module TickClo : Sort with type t = tick_clo with type 'a m = 'a =
+struct
+  type t = tick_clo
+  type 'a m = 'a
+
+  let act phi clo =
+    match clo with
+    | TickClo info ->
+      TickClo {info with rho = Env.act phi info.rho}
+    | TickCloConst v ->
+      TickCloConst (Value.act phi v)
+end
+
+module NClo : Sort with type t = nclo with type 'a m = 'a =
+struct
+  type t = nclo
+  type 'a m = 'a
+
+  let act phi clo =
+    match clo with
+    | NClo info ->
+      NClo {info with rho = Env.act phi info.rho}
+end
 
 let rec make : con -> value =
   fun con ->

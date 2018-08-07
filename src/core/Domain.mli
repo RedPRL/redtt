@@ -15,6 +15,15 @@ val pp_comp_sys : Format.formatter -> comp_sys -> unit
 val pp_names : Format.formatter -> Name.t bwd -> unit
 
 
+exception ProjAbs of abs
+exception ProjVal of value
+
+val force_val_face : val_face -> ('a, value) face option
+val force_abs_face : ([`Any], abs) face -> ('a, abs) face option
+val force_val_sys : val_face list -> [`Ok of ('a, value) face list | `Proj of value]
+val force_abs_sys : ([`Any], abs) face list -> [`Ok of ('a, abs) face list | `Proj of abs]
+
+
 module Env :
 sig
   include Sort.S
