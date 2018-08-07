@@ -3,13 +3,13 @@
 type 'a arg_ty =
   | Self
 
-type 'a tele = 'a list
+type 'a boundary = ('a * 'a * 'a) list
 
 (** A data constructor is a list of parameters (non-recursive arguments) and recursive arguments.
     When we generalized to indexed inductive types, the parameters will become *bound* in the arguments. Finally, to support HITs,
     we will ultimately add dimension arguments and boundary constraints. *)
 type 'a constr =
-  {params : (string * 'a) tele;
+  {params : (string * 'a) list;
    args : (string * 'a arg_ty) list;
    dims : string list}
 

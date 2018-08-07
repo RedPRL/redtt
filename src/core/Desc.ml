@@ -1,10 +1,10 @@
 type 'a arg_ty =
   | Self
 
-type 'a tele = 'a list
+type 'a boundary = ('a * 'a * 'a) list
 
 type 'a constr =
-  {params : (string * 'a) tele;
+  {params : (string * 'a) list;
    args : (string * 'a arg_ty) list;
    dims : string list}
 

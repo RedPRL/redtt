@@ -210,7 +210,7 @@ let unleash_data ty =
   match Tm.unleash ty with
   | Tm.Data dlbl -> dlbl
   | _ ->
-    Format.eprintf "Shit: %a@." Tm.pp0 ty;
+    Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
 
 module MonadUtil = Monad.Util (ElabMonad)
