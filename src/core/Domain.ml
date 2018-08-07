@@ -10,11 +10,11 @@ let nclo_names (NClo {nbnd = Tm.NB (nms, _); _}) =
 
 let rec pp_env_cell fmt =
   function
-  | Val v ->
+  | `Val v ->
     pp_value fmt v
-  | Atom r ->
+  | `Dim r ->
     I.pp fmt r
-  | Tick _ ->
+  | `Tick _ ->
     Format.fprintf fmt "<tick>"
 
 and pp_env fmt =
@@ -262,12 +262,12 @@ module AbsFace = Face.M (Abs)
 
 let act_env_cell phi =
   function
-  | Val v ->
-    Val (Value.act phi v)
-  | Atom x ->
-    Atom (I.act phi x)
-  | Tick tck ->
-    Tick tck
+  | `Val v ->
+    `Val (Value.act phi v)
+  | `Dim x ->
+    `Dim (I.act phi x)
+  | `Tick tck ->
+    `Tick tck
 
 module Env =
 struct

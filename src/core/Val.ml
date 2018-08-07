@@ -183,7 +183,7 @@ sig
   val restriction : Restriction.t
   val global_dim : I.atom -> I.t
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
-  val lookup_datatype : Desc.data_label -> (int, Tm.tm) Desc.desc
+  val lookup_datatype : Desc.data_label -> (int, Tm.tm, Tm.tm) Desc.desc
 end
 
 module type S =
@@ -255,7 +255,7 @@ struct
         | Tm.Ix (i, _) ->
           begin
             match List.nth rho.cells i with
-            | Atom x -> x
+            | `Dim x -> x
             | cell ->
               let err = UnexpectedEnvCell cell in
               raise @@ E err
@@ -285,7 +285,7 @@ struct
         | Tm.Ix (i, _) ->
           begin
             match List.nth rho.cells i with
-            | Tick tck -> tck
+            | `Tick tck -> tck
             | cell ->
               let err = UnexpectedEnvCell cell in
               raise @@ E err
@@ -1035,7 +1035,7 @@ struct
            * type in the semantic domain. *)
           let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.ix i in
-            eval (Env.push_many [Val (Value.act phi ty00); Val (Value.act phi ty10); Val (car (Value.act phi equiv0)); Val b] Env.emp) @@
+            eval (Env.push_many [`Val (Value.act phi ty00); `Val (Value.act phi ty10); `Val (car (Value.act phi equiv0)); `Val b] Env.emp) @@
             Tm.Macro.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
           in
           (* This is to generate the element in `ty0` and also
@@ -1497,7 +1497,7 @@ struct
 
     | Tm.Let (cmd, Tm.B (_, t)) ->
       let v0 = eval_cmd rho cmd in
-      eval (Env.push (Val v0) rho) t
+      eval (Env.push (`Val v0) rho) t
 
     | Tm.LblTy info ->
       let ty = eval rho info.ty in
@@ -1648,7 +1648,7 @@ struct
     | Tm.Ix (i, _) ->
       begin
         match List.nth rho.cells i with
-        | Val v -> v
+        | `Val v -> v
         | cell ->
           let err = UnexpectedEnvCell cell in
           raise @@ E err
@@ -1735,19 +1735,19 @@ struct
   and eval_bnd rho bnd =
     let Tm.B (_, tm) = bnd in
     let x = Name.fresh () in
-    let rho = Env.push (Atom (`Atom x)) rho in
+    let rho = Env.push (`Dim (`Atom x)) rho in
     Abs.bind1 x @@ eval rho tm
 
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = Bwd.map Name.named nms in
-    let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
+    let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs) rho in
     Abs.bind xs @@ eval rho tm
 
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = Bwd.map Name.named nms in
-    let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> Atom (`Atom x)) xs) rho in
+    let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs) rho in
     ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
 
   and unleash_data v =
@@ -2168,12 +2168,12 @@ struct
       let rec go vs rs ps args dims =
         match vs, rs, ps, args, dims with
         | v :: vs, _, (_, _) :: ps, _, _ ->
-          Val v :: go vs rs ps args dims
+          `Val v :: go vs rs ps args dims
         | v :: vs, _,  [], (_, Desc.Self) :: args, _ ->
           let v_ih = elim_data dlbl mot v clauses in
-          Val v :: Val v_ih :: go vs rs [] args dims
+          `Val v :: `Val v_ih :: go vs rs [] args dims
         | [], r :: rs, [], [], _ :: dims ->
-          Atom r :: go [] rs [] [] dims
+          `Dim r :: go [] rs [] [] dims
         | [], [], [], [], [] ->
           []
         | _ ->
@@ -2395,7 +2395,7 @@ struct
     match clo with
     | Clo info ->
       let Tm.B (_, tm) = info.bnd in
-      eval (Env.push (Val varg) info.rho) tm
+      eval (Env.push (`Val varg) info.rho) tm
 
   and inst_nclo nclo vargs =
     match nclo with
@@ -2408,14 +2408,14 @@ struct
     match clo with
     | TickClo info ->
       let Tm.B (_, tm) = info.bnd in
-      eval (Env.push (Tick tick) info.rho) tm
+      eval (Env.push (`Tick tick) info.rho) tm
     | TickCloConst v ->
       v
 
   module Macro =
   struct
     let equiv ty0 ty1 : value =
-      let rho = Env.push_many [Val ty0; Val ty1] Env.emp in
+      let rho = Env.push_many [`Val ty0; `Val ty1] Env.emp in
       eval rho @@
       Tm.Macro.equiv
         (Tm.up @@ Tm.ix 0)

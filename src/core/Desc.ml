@@ -5,22 +5,29 @@ type 'a arg_ty =
 type data_label = string
 type con_label = string
 
+
 module Boundary =
 struct
-  type ('var, 'a) term =
+  type ('var, 'r, 'a) term =
     | Var of 'var
-    | Intro of con_label * 'a list * ('var, 'a) term list
+    | Intro of
+        { clbl : con_label;
+          const_args : 'a list;
+          rec_args : ('var, 'r, 'a) term list;
+          rs : 'r list}
 
-  type ('var, 'a) face = 'a * 'a * ('var, 'a) term
-  type ('var, 'a) sys = ('var, 'a) face list
+  type ('var, 'r, 'a) face = 'r * 'r * ('var, 'r, 'a) term
+  type ('var, 'r, 'a) sys = ('var, 'r, 'a) face list
 end
 
-type ('var, 'a) constr =
+type ('var, 'r, 'a) constr =
   {params : (string * 'a) list;
    args : (string * 'a arg_ty) list;
    dims : string list}
 
-type ('var, 'a) desc = (con_label * ('var, 'a) constr) list
+
+(** A datatype description is just a list of named constructors. *)
+type ('var, 'r, 'a) desc = (con_label * ('var, 'r, 'a) constr) list
 
 exception ConstructorNotFound of con_label
 

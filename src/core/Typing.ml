@@ -609,7 +609,7 @@ and infer_spine cx hd =
           | (plbl, pty) :: ps, _ ->
             let vty = V.eval env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (D.Env.push (D.Val v) env) (vs #< v) ps args dims
+            build_cx cx' (D.Env.push (`Val v) env) (vs #< v) ps args dims
           | [], (nm, Self) :: args ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
             let cx_ih, _ = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in

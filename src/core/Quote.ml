@@ -374,7 +374,7 @@ struct
       | (_, pty) :: ps, el0 :: els0, el1 :: els1 ->
         let vty = eval venv pty in
         let tm0 = equate env vty el0 el1 in
-        go_params (acc #< tm0) (D.Env.push (D.Val el0) venv) ps els0 els1
+        go_params (acc #< tm0) (D.Env.push (`Val el0) venv) ps els0 els1
       | _ ->
         failwith "equate_constr_args"
     in
@@ -470,7 +470,7 @@ struct
               | (_, pty) :: ps, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
-                let env' = D.Env.push (D.Val v) env in
+                let env' = D.Env.push (`Val v) env in
                 build_cx (Env.succ qenv) env' (vs #< v) rs ps args dims
               | [], (_, Self) :: args, _ ->
                 let vx = generic qenv data_ty in
@@ -484,7 +484,7 @@ struct
             in
             build_cx env D.Env.emp Emp Emp constr.params constr.args constr.dims
           in
-          let cells = List.map (fun x -> D.Val x) vs @ List.map (fun x -> Atom x) rs in
+          let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
           let bdy1 = inst_nclo clause1 cells in
           let intro = D.make @@ D.Intro (dlbl, clbl, vs, rs) in

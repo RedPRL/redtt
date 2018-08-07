@@ -113,6 +113,5 @@ and ext_abs = (value * val_sys) IAbs.abs
 
 and value = Node of {con : con; action : I.action}
 
-and env_el = Val of value | Atom of I.t | Tick of tick
+and env_el = [`Val of value | `Dim of I.t | `Tick of tick]
 and env = {cells : env_el list; global : I.action}
-
