@@ -56,7 +56,8 @@ type con =
       {dlbl : Desc.data_label;
        clbl : Desc.con_label;
        args : value list;
-       rs : dim list}
+       rs : dim list;
+       sys : rigid_val_sys}
 
 and neu =
   | Lvl of string option * int
@@ -120,23 +121,5 @@ and ext_abs = (value * val_sys) IAbs.abs
 
 and value = Node of {con : con; action : I.action}
 
-and env_el = [`Val of value | `BVal of bvalue | `Dim of I.t | `Tick of tick]
+and env_el = [`Val of value | `Dim of I.t | `Tick of tick]
 and env = {cells : env_el list; global : I.action}
-
-and bval_sys = ([`Rigid], bvalue) face list
-
-and bvalue =
-  | BIntro of
-      {clbl : Desc.con_label;
-       const_args : value list;
-       rec_args : bvalue list;
-       rs : I.t list;
-       sys : bval_sys}
-  | BUp of
-      {ty : value Desc.arg_ty;
-       neu : bneu}
-
-(* | InstBClo of bclo * env_el list *)
-
-and bneu =
-  | BLvl of int

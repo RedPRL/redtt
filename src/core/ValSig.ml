@@ -27,9 +27,6 @@ sig
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
-  val eval_bterm : (int, Tm.tm, Tm.tm) Desc.desc -> env -> (int, Tm.tm, Tm.tm) Desc.Boundary.term -> bvalue
-  (* val eval_bterm_boundary : (int, Tm.tm, Tm.tm) Desc.desc -> env -> (int, Tm.tm, Tm.tm) Desc.Boundary.sys -> ([`Any], bvalue) face list *)
-
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
   val prev : tick -> value -> value

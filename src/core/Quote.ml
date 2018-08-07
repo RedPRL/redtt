@@ -70,8 +70,6 @@ sig
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
-
-  val equiv_bvalue : (int, Tm.tm, Tm.tm) Desc.desc -> env -> Tm.tm Desc.arg_ty -> bvalue -> bvalue -> unit
 end
 
 
@@ -489,7 +487,7 @@ struct
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
           let bdy1 = inst_nclo clause1 cells in
-          let intro = D.make @@ D.Intro {dlbl; clbl; args = vs; rs} in
+          let intro = D.make @@ D.Intro {dlbl; clbl; args = vs; rs; sys = failwith "TODO!!!"} in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)
@@ -864,17 +862,17 @@ struct
 
   module B = Desc.Boundary
 
-  let equate_bneu env bneu0 bneu1 =
-    match bneu0, bneu1 with
-    | BLvl lvl0, BLvl lvl1 when lvl0 = lvl1 ->
+  (* let equate_bneu env bneu0 bneu1 =
+     match bneu0, bneu1 with
+     | BLvl lvl0, BLvl lvl1 when lvl0 = lvl1 ->
       let ix = Env.ix_of_lvl lvl0 env in
       B.Var ix
-    | _ ->
+     | _ ->
       failwith "equate_bneu"
 
-  let rec equate_bvalue desc env self_ty bv0 bv1 =
-    match self_ty with
-    | Desc.Self ->
+     let rec equate_bvalue desc env self_ty bv0 bv1 =
+     match self_ty with
+     | Desc.Self ->
       match bv0, bv1 with
       | D.BIntro intro0, D.BIntro intro1 when intro0.clbl = intro1.clbl ->
         let clbl = intro0.clbl in
@@ -890,32 +888,32 @@ struct
       | _ ->
         failwith "equate_bvalue"
 
-  and equate_rec_args desc env specs bvs0 bvs1 =
-    match specs, bvs0, bvs1 with
-    | (_, sty) :: specs, bv0 :: bvs0, bv1 :: bvs1 ->
+     and equate_rec_args desc env specs bvs0 bvs1 =
+     match specs, bvs0, bvs1 with
+     | (_, sty) :: specs, bv0 :: bvs0, bv1 :: bvs1 ->
       let btm = equate_bvalue desc env sty bv0 bv1 in
       btm :: equate_rec_args desc env specs bvs0 bvs1
 
-    | [], [], [] ->
+     | [], [], [] ->
       []
 
-    | _ ->
+     | _ ->
       failwith "equate_rec_args"
 
-  and equate_const_args env rho specs vs0 vs1 =
-    match specs, vs0, vs1 with
-    | (_, ty) :: specs, v0 :: vs0, v1 :: vs1 ->
+     and equate_const_args env rho specs vs0 vs1 =
+     match specs, vs0, vs1 with
+     | (_, ty) :: specs, v0 :: vs0, v1 :: vs1 ->
       let vty = eval rho ty in
       let tm = equate env vty v0 v1 in
       tm :: equate_const_args env (D.Env.push (`Val v0) rho) specs vs0 vs1
 
-    | [], [], [] ->
+     | [], [], [] ->
       []
 
-    | _ ->
+     | _ ->
       failwith "equate_const_args"
 
-  let equiv_bvalue desc env sty bv0 bv1 =
-    ignore @@ equate_bvalue desc env sty bv0 bv1
+     let equiv_bvalue desc env sty bv0 bv1 =
+     ignore @@ equate_bvalue desc env sty bv0 bv1 *)
 
 end

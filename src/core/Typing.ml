@@ -625,7 +625,7 @@ and infer_spine cx hd =
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
         let cx', vs, rs = build_cx cx D.Env.emp Emp constr.params constr.args constr.dims in
-        let intro = D.make @@ D.Intro {dlbl = info.dlbl; clbl = lbl; args = vs; rs = rs} in
+        let intro = D.make @@ D.Intro {dlbl = info.dlbl; clbl = lbl; args = vs; rs = rs; sys = failwith "TODO!!!"} in
         let ty = V.inst_clo mot_clo intro in
         check cx' ty bdy
       in

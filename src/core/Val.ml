@@ -1086,7 +1086,7 @@ struct
 
       let args' = make_args 0 Emp info.args constr.params constr.args in
 
-      make @@ Intro {dlbl; clbl = info.clbl; args = args'; rs = []}
+      make @@ Intro {dlbl; clbl = info.clbl; args = args'; rs = []; sys = []}
 
     | _, Up info ->
       rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
@@ -1315,53 +1315,55 @@ struct
   and nclo nbnd rho =
     NClo {nbnd; rho}
 
-  and eval_bterm (desc : (int, Tm.tm, Tm.tm) Desc.desc) (rho : env) btm =
+  and eval_bterm dlbl (desc : (int, Tm.tm, Tm.tm) Desc.desc) (rho : env) btm =
     match btm with
     | B.Intro info ->
       let constr = Desc.lookup_constr info.clbl desc in
       let const_args = List.map (eval rho) info.const_args in
-      let rec_args = List.map (eval_bterm desc rho) info.rec_args in
+      let rec_args = List.map (eval_bterm dlbl desc rho) info.rec_args in
       let rs = List.map (eval_dim rho) info.rs in
-      let sys = eval_bterm_boundary desc rho constr.boundary const_args rec_args rs in
+      let sys = eval_bterm_boundary dlbl desc rho constr.boundary const_args rec_args rs in
       begin
-        match force_bval_sys sys with
-        | `Proj bv -> bv
-        | `Ok sys -> BIntro {clbl = info.clbl; const_args; rec_args; rs; sys}
+        match force_val_sys sys with
+        | `Proj v ->
+          v
+        | `Ok sys ->
+          make @@ Intro {dlbl; clbl = info.clbl; args = const_args @ rec_args; rs; sys}
       end
 
     | B.Var ix ->
       begin
         match List.nth rho.cells ix with
-        | `BVal bv -> bv
+        | `Val v -> v
         | cell ->
           let err = UnexpectedEnvCell cell in
           raise @@ E err
       end
 
-  and eval_bterm_boundary desc rho sys const_args rec_args rs =
-    List.map (eval_bterm_face desc rho const_args rec_args rs) sys
+  and eval_bterm_boundary dlbl desc rho sys const_args rec_args rs =
+    List.map (eval_bterm_face dlbl desc rho const_args rec_args rs) sys
 
-  and eval_bterm_face desc rho const_args rec_args rs (tr0, tr1, btm) =
+  and eval_bterm_face dlbl desc rho const_args rec_args rs (tr0, tr1, btm) =
     let r0 = eval_dim rho tr0 in
     let r1 = eval_dim rho tr1 in
     let rho' =
       Env.push_many
         begin
           List.map (fun x -> `Val x) const_args
-          @ List.map (fun x -> `BVal x) rec_args
+          @ List.map (fun x -> `Val x) rec_args
           @ List.map (fun x -> `Dim x) rs
         end
         rho
     in
     match Eq.make r0 r1 with
     | `Ok xi ->
-      let bv = BValue.act (I.equate r0 r1) @@ eval_bterm desc rho' btm in
-      Face.Indet (xi, bv)
+      let v = Value.act (I.equate r0 r1) @@ eval_bterm dlbl desc rho' btm in
+      Face.Indet (xi, v)
     | `Apart _ ->
       Face.False (r0, r1)
     | `Same _ ->
-      let bv = eval_bterm desc rho' btm in
-      Face.True (r0, r1, bv)
+      let v = eval_bterm dlbl desc rho' btm in
+      Face.True (r0, r1, v)
 
 
   and eval (rho : env) tm =
@@ -1492,12 +1494,7 @@ struct
       let args, trs = ListUtil.split (List.length constr.params + List.length constr.args) args in
       let vargs = List.map (eval rho) args in
       let rs = List.map (eval_dim rho) trs in
-      make @@ Intro {dlbl; clbl; args = vargs; rs}
-
-  and execute_bvalue _desc =
-    function
-    | BIntro _ -> failwith ""
-    | BUp _ -> failwith ""
+      make @@ Intro {dlbl; clbl; args = vargs; rs; sys = failwith "TODO!!!"}
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in

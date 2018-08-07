@@ -1,6 +1,14 @@
 open RedBasis open Bwd
 include DomainData
 
+let rec make : con -> value =
+  fun con ->
+    Node {con; action = I.idn}
+
+and make_later ty =
+  let tclo = TickCloConst ty in
+  make @@ Later tclo
+
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
   nm
 
@@ -11,8 +19,6 @@ let rec pp_env_cell fmt =
   function
   | `Val v ->
     pp_value fmt v
-  | `BVal bv ->
-    pp_bvalue fmt bv
   | `Dim r ->
     I.pp fmt r
   | `Tick _ ->
@@ -21,27 +27,6 @@ let rec pp_env_cell fmt =
 and pp_env fmt =
   let pp_sep fmt () = Format.fprintf fmt ", " in
   Format.pp_print_list ~pp_sep pp_env_cell fmt
-
-and pp_bvalue fmt =
-  function
-  | BIntro info ->
-    Format.fprintf fmt "@[<hv1>(%a %a %a %a)]"
-      Uuseg_string.pp_utf_8 info.clbl
-      pp_values info.const_args
-      pp_bvalues info.rec_args
-      pp_dims info.rs
-
-  | BUp info ->
-    Format.fprintf fmt "%a"
-      pp_bneu info.neu
-
-(* | InstBClo _ ->
-   Format.fprintf fmt "<inst-bclo>" *)
-
-and pp_bneu fmt =
-  function
-  | BLvl lvl ->
-    Format.fprintf fmt "#%i" lvl
 
 
 and pp_con fmt : con -> unit =
@@ -261,10 +246,6 @@ and pp_values fmt els =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep pp_value fmt els
 
-and pp_bvalues fmt bvs =
-  let pp_sep fmt () = Format.fprintf fmt " " in
-  Format.pp_print_list ~pp_sep pp_bvalue fmt bvs
-
 and pp_dims fmt rs =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep I.pp fmt rs
@@ -283,7 +264,6 @@ end
 
 exception ProjAbs of abs
 exception ProjVal of value
-exception ProjBVal of bvalue
 
 module Abs = IAbs.M (Value)
 module ValFace = Face.M (Value)
@@ -310,21 +290,6 @@ let force_val_sys sys =
     `Ok (Option.filter_map force_val_face sys)
   with
   | ProjVal v ->
-    `Proj v
-
-let force_bval_face face =
-  match face with
-  | Face.True (_, _, v) ->
-    raise @@ ProjBVal v
-  | Face.False _ -> None
-  | Face.Indet (xi, v) ->
-    Some (Face.Indet (xi, v))
-
-let force_bval_sys sys =
-  try
-    `Ok (Option.filter_map force_bval_face sys)
-  with
-  | ProjBVal v ->
     `Proj v
 
 let force_abs_sys sys =
@@ -446,61 +411,7 @@ module ExtAbs : IAbs.S with type el = value * val_sys =
   IAbs.M (Sort.Prod (Value) (ValSys))
 
 
-module rec BValue : Sort with type t = bvalue with type 'a m = 'a =
-struct
-  type 'a m = 'a
-  type t = bvalue
-
-  let act_self_ty _phi =
-    function
-    | Desc.Self ->
-      Desc.Self
-
-  let act_neu _phi =
-    function
-    | BLvl ix ->
-      BLvl ix
-
-  let rec act phi =
-    function
-    | BIntro info ->
-      let const_args = List.map (Value.act phi) info.const_args in
-      let rec_args = List.map (act phi) info.rec_args in
-      let rs = List.map (I.act phi) info.rs in
-      begin
-        match force_bval_sys @@ act_bval_sys phi info.sys with
-        | `Proj v ->
-          v
-        | `Ok sys ->
-          BIntro {info with const_args; rec_args; rs; sys}
-      end
-
-    | BUp info ->
-      let ty = act_self_ty phi info.ty in
-      let neu = act_neu phi info.neu in
-      BUp {ty; neu}
-
-  (* | InstBClo (bclo, env) ->
-     InstBClo (BClo.act phi bclo, List.map (Env.act_env_el phi) env) *)
-
-  and act_bval_sys phi =
-    List.map @@ BValFace.act phi
-
-end
-and BValFace : Face.S with type body := BValue.t = Face.M(BValue)
-and BCloFace : Face.S with type body := BClo.t = Face.M(BClo)
-and BClo : Sort.S with type t = bclo with type 'a m = 'a =
-struct
-  type t = bclo
-  type 'a m = 'a
-
-  let act phi clo =
-    match clo with
-    | BClo info ->
-      BClo {info with rho = Env.act phi info.rho}
-end
-
-and Env :
+module Env :
 sig
   include Sort.S
     with type t = env
@@ -530,8 +441,6 @@ struct
     function
     | `Val v ->
       `Val (Value.act phi v)
-    | `BVal v ->
-      `BVal (BValue.act phi v)
     | `Dim x ->
       `Dim (I.act phi x)
     | `Tick tck ->
@@ -576,11 +485,3 @@ struct
     | NClo info ->
       NClo {info with rho = Env.act phi info.rho}
 end
-
-let rec make : con -> value =
-  fun con ->
-    Node {con; action = I.idn}
-
-and make_later ty =
-  let tclo = TickCloConst ty in
-  make @@ Later tclo
