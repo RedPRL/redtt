@@ -1,14 +1,10 @@
-data foo where
-| p
-| q (x : foo) <i>
+import path
 
-let asdf : foo =
-  q p 0
+data s1 where
+| s1/base
+| s1/loop @ i with i=0 ⇒ s1/base | i=1 ⇒ s1/base end
 
-let test (x : foo) : foo =
-  elim x with
-  | p ⇒ p
-  | q (z ⇒ ih) j ⇒ q ih j
-  end
+let test : Path s1 (s1/loop 0) s1/base =
+  λ _ → s1/base
 
 debug

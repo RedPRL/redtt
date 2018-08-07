@@ -199,7 +199,7 @@ desc_constr:
 | clbl = ATOM;
   params = loption(nonempty_list(desc_param));
   args = loption(nonempty_list(desc_arg));
-  dims = loption(delimited(LGL, nonempty_list(ATOM), RGL));
+  dims = loption(preceded(AT, nonempty_list(ATOM)));
   boundary = loption(desc_boundary)
   { fun dlbl ->
     clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims; boundary} }

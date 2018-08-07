@@ -1341,8 +1341,6 @@ struct
     List.map (eval_bterm_face dlbl desc rho const_args rec_args rs) sys
 
   and eval_bterm_face dlbl desc rho const_args rec_args rs (tr0, tr1, btm) =
-    let r0 = eval_dim rho tr0 in
-    let r1 = eval_dim rho tr1 in
     let rho' =
       Env.push_many
         begin
@@ -1352,6 +1350,8 @@ struct
         end
         rho
     in
+    let r0 = eval_dim rho' tr0 in
+    let r1 = eval_dim rho' tr1 in
     match Eq.make r0 r1 with
     | `Ok xi ->
       let v = Value.act (I.equate r0 r1) @@ eval_bterm dlbl desc rho' btm in
