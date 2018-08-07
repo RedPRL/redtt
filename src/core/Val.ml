@@ -3,6 +3,8 @@ open Bwd
 open BwdNotation
 open Domain
 
+module B = Desc.Boundary
+
 type step =
   | Ret : neu -> step
   | Step : value -> step
@@ -193,6 +195,7 @@ sig
   val reflect : value -> neu -> val_sys -> value
 
   val eval : env -> Tm.tm -> value
+  val eval_bterm : env -> (int, Tm.tm, Tm.tm) B.term -> bvalue
   val eval_cmd : env -> Tm.tm Tm.cmd -> value
   val eval_head : env -> Tm.tm Tm.head -> value
   val eval_frame : env -> value -> Tm.tm Tm.frame -> value
@@ -1404,6 +1407,23 @@ struct
   and nclo nbnd rho =
     NClo {nbnd; rho}
 
+  and eval_bterm (rho : env) btm =
+    match btm with
+    | B.Intro info ->
+      let const_args = List.map (eval rho) info.const_args in
+      let rec_args = List.map (eval_bterm rho) info.rec_args in
+      let rs = List.map (eval_dim rho) info.rs in
+      BIntro {clbl = info.clbl; const_args; rec_args; rs}
+
+    | B.Var ix ->
+      begin
+        match List.nth rho.cells ix with
+        | `BVal bv -> bv
+        | cell ->
+          let err = UnexpectedEnvCell cell in
+          raise @@ E err
+      end
+
   and eval (rho : env) tm =
     match Tm.unleash tm with
     | Tm.Pi (dom, cod) ->
@@ -2422,6 +2442,5 @@ struct
         (Tm.up @@ Tm.ix 1)
 
   end
-
 
 end

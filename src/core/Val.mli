@@ -27,6 +27,7 @@ sig
   val reflect : value -> neu -> val_sys -> value
 
   val eval : env -> Tm.tm -> value
+  val eval_bterm : env -> (int, Tm.tm, Tm.tm) Desc.Boundary.term -> bvalue
   val eval_cmd : env -> Tm.tm Tm.cmd -> value
   val eval_head : env -> Tm.tm Tm.head -> value
   val eval_frame : env -> value -> Tm.tm Tm.frame -> value
