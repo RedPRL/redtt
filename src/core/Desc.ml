@@ -23,7 +23,8 @@ end
 type ('var, 'r, 'a) constr =
   {params : (string * 'a) list;
    args : (string * 'a arg_ty) list;
-   dims : string list}
+   dims : string list;
+   boundary : ('var, 'r, 'a) Boundary.sys}
 
 
 (** A datatype description is just a list of named constructors. *)

@@ -201,7 +201,7 @@ desc_constr:
   args = loption(nonempty_list(desc_arg));
   dims = loption(delimited(LGL, nonempty_list(ATOM), RGL))
   { fun dlbl ->
-    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims} }
+    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args; dims; boundary = []} }
 
 
 %inline

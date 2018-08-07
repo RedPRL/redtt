@@ -10,3 +10,5 @@ let test (x : foo) : foo =
   | p ⇒ p
   | q (z ⇒ ih) j ⇒ q ih j
   end
+
+debug

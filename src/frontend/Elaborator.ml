@@ -185,7 +185,12 @@ struct
         (* TODO: when self args are more complex, we'll need to abstract them over
            the parameters too. *)
         traverse elab_arg_ty constr.args <<@> fun args ->
-          clbl, {params = abstract_tele Emp @@ Bwd.to_list acc; args; dims = constr.dims}
+          clbl,
+          {params = abstract_tele Emp @@ Bwd.to_list acc;
+           args;
+           dims = constr.dims;
+           boundary = []}
+      (* TODO: elab boundary *)
 
       | (lbl, ety) :: prms ->
         (* TODO: support higher universes *)
