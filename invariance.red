@@ -35,8 +35,8 @@ let shannon/path (A : type) (f : bool → A) : Path _ f (shannon A f) =
       end)
 
 let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
-  λ pair →
-    < <pair-to-fun A pair, λ _ → pair>
+  λ p →
+    < <pair-to-fun A p, λ _ → p>
     , λ fib →
       coe 1 0
         (λ i →
@@ -44,9 +44,9 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
           , λ j → connection/or _ (fib.1) i j
           >)
       in λ j →
-        [i] (f : bool → A) × Path (A × A) <f tt, f ff> pair with
+        [i] (f : bool → A) × Path (A × A) <f tt, f ff> p with
         | i=0 ⇒ < shannon/path A (fib.0) j, fib.1 >
-        | i=1 ⇒ < pair-to-fun A pair, λ _ → pair >
+        | i=1 ⇒ < pair-to-fun A p, λ _ → p >
         end
     >
 
@@ -65,7 +65,7 @@ let swap-fun (A : type) : (bool → A) → bool → A =
     (fun-eq-pair A i) → fun-eq-pair A i
 
 let swap-fun-eqn (A : type) : (f : bool → A) → Path _ (swap-fun A (swap-fun A f)) f =
-  coe 1 0 (λ pair _ → pair) in λ i →
+  coe 1 0 (λ p _ → p) in λ i →
     let swapcoe =
       coe 1 i (swap-pair A) in λ j →
         (fun-eq-pair A j) → fun-eq-pair A j
