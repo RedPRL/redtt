@@ -22,6 +22,7 @@ val force_val_face : val_face -> ('a, value) face option
 val force_abs_face : ([`Any], abs) face -> ('a, abs) face option
 val force_val_sys : val_face list -> [`Ok of ('a, value) face list | `Proj of value]
 val force_abs_sys : ([`Any], abs) face list -> [`Ok of ('a, abs) face list | `Proj of abs]
+val force_bval_sys : ([`Any], bvalue) face list -> [`Ok of ('a, bvalue) face list | `Proj of bvalue]
 
 
 module Env :

@@ -19,7 +19,6 @@ sig
   val reflect : value -> neu -> val_sys -> value
 
   val eval : env -> Tm.tm -> value
-  val eval_bterm : env -> (int, Tm.tm, Tm.tm) Desc.Boundary.term -> bvalue
   val eval_cmd : env -> Tm.tm Tm.cmd -> value
   val eval_head : env -> Tm.tm Tm.head -> value
   val eval_frame : env -> value -> Tm.tm Tm.frame -> value
@@ -27,6 +26,8 @@ sig
   val eval_tick : env -> Tm.tm -> tick
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
   val make_closure : env -> Tm.tm Tm.bnd -> clo
+
+  val eval_bterm : (int, Tm.tm, Tm.tm) Desc.desc -> env -> (int, Tm.tm, Tm.tm) Desc.Boundary.term -> bvalue
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value

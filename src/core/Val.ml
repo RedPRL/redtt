@@ -1315,13 +1315,20 @@ struct
   and nclo nbnd rho =
     NClo {nbnd; rho}
 
-  and eval_bterm (rho : env) btm =
+  and eval_bterm (desc : (int, Tm.tm, Tm.tm) Desc.desc) (rho : env) btm =
     match btm with
     | B.Intro info ->
-      let const_args = List.map (eval rho) info.const_args in
-      let rec_args = List.map (eval_bterm rho) info.rec_args in
-      let rs = List.map (eval_dim rho) info.rs in
-      BIntro {clbl = info.clbl; const_args; rec_args; rs; sys = failwith "TODO!!!"}
+      let constr = Desc.lookup_constr info.clbl desc in
+      let sys = eval_bterm_boundary desc rho constr.boundary in
+      begin
+        match force_bval_sys sys with
+        | `Proj bv -> bv
+        | `Ok sys ->
+          let const_args = List.map (eval rho) info.const_args in
+          let rec_args = List.map (eval_bterm desc rho) info.rec_args in
+          let rs = List.map (eval_dim rho) info.rs in
+          BIntro {clbl = info.clbl; const_args; rec_args; rs; sys}
+      end
 
     | B.Var ix ->
       begin
@@ -1331,6 +1338,23 @@ struct
           let err = UnexpectedEnvCell cell in
           raise @@ E err
       end
+
+  and eval_bterm_boundary desc rho sys =
+    List.map (eval_bterm_face desc rho) sys
+
+  and eval_bterm_face desc rho (tr0, tr1, btm) =
+    let r0 = eval_dim rho tr0 in
+    let r1 = eval_dim rho tr1 in
+    match Eq.make r0 r1 with
+    | `Ok xi ->
+      let bv = BValue.act (I.equate r0 r1) @@ eval_bterm desc rho btm in
+      Face.Indet (xi, bv)
+    | `Apart _ ->
+      Face.False (r0, r1)
+    | `Same _ ->
+      let bv = eval_bterm desc rho btm in
+      Face.True (r0, r1, bv)
+
 
   and eval (rho : env) tm =
     match Tm.unleash tm with
