@@ -165,12 +165,18 @@ struct
       M.ret env
 
   and elab_datatype env edesc =
-    let used = Hashtbl.create 10 in
-    traverse (elab_constr env used) edesc
+    let rec go acc =
+      function
+      | [] -> M.ret @@ List.rev acc
+      | econstr :: econstrs ->
+        elab_constr env acc econstr >>= fun constr ->
+        go (constr :: acc) econstrs
+    in
+    go [] edesc
 
-  and elab_constr env used (clbl, constr) =
-    if Hashtbl.mem used clbl then failwith "Duplicate constructor in datatype";
-    Hashtbl.add used clbl ();
+  and elab_constr env constrs (clbl, constr) =
+    if List.exists (fun (lbl, _) -> clbl = lbl) constrs then
+      failwith "Duplicate constructor in datatype";
 
     let open Desc in
     let elab_arg_ty (x, Self) = M.ret (x, Self) in
@@ -206,6 +212,26 @@ struct
     in
 
     go Emp constr.params
+
+  and elab_constr_boundary env constrs sys : (int, tm, tm) Desc.Boundary.sys M.m =
+    traverse (elab_constr_face env constrs) sys
+
+  and elab_constr_face env constrs (er0, er1, e) =
+    elab_dim env er0 >>= fun r0 ->
+    elab_dim env er1 >>= fun r1 ->
+    M.in_scope (Name.fresh ()) (`R (r0, r1)) @@
+    begin
+      elab_boundary_term env constrs e <<@> fun bt ->
+        r0, r1, bt
+    end
+
+  and elab_boundary_term _env _constrs =
+    function
+    | E.Var (_x, _) ->
+      failwith "TODO: elaborate_boundary_term"
+    | _ ->
+      failwith "TODO: elaborate_boundary_term"
+
 
   and elab_scheme env (cells, ecod) kont =
     let rec go =
