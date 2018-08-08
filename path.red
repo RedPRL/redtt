@@ -1,3 +1,9 @@
+let PathD (A : dim → type) (M : A 0) (N : A 1) : type =
+  [i] A i [
+  | i=0 ⇒ M
+  | i=1 ⇒ N
+  ]
+
 let Path (A : type) (M,N : A) : type =
   [i] A [
   | i=0 ⇒ M
@@ -102,10 +108,7 @@ let trans/sym/r
 let symmd
   (A : dim → type)
   (p : (i : dim) → A i)
-  : [i] symm^1 _ A i [
-    | i=0 ⇒ p 1
-    | i=1 ⇒ p 0
-    ]
+  : PathD (symm^1 _ A) (p 1) (p 0)
   =
   λ i →
     comp 0 1 (p 0) in (λ j → symm/filler^1 _ A j i) [
