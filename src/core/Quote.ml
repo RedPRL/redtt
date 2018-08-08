@@ -359,7 +359,8 @@ struct
       | Data dlbl, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
         let desc = V.Sig.lookup_datatype dlbl in
         let constr = Desc.lookup_constr info0.clbl desc in
-        let targs = equate_constr_args env dlbl constr info0.args info1.args in
+        (* TODO: change equate_constr_args to take two sets of arguments *)
+        let targs = equate_constr_args env dlbl constr (info0.const_args @ info0.rec_args) (info1.const_args @ info1.rec_args) in
         let trs = equate_dims env info0.rs info1.rs in
         Tm.make @@ Tm.Intro (dlbl, info0.clbl, targs @ trs)
 
@@ -410,6 +411,13 @@ struct
       let cap = equate_neu env info0.cap info1.cap in
       let sys = equate_comp_sys env info0.ty info0.sys info1.sys in
       Tm.HCom {r = tr; r' = tr'; ty; cap = Tm.up cap; sys}, Bwd.from_list stk
+
+    | NCoe info0, NCoe info1 ->
+      let tr, tr' = equate_dir env info0.dir info1.dir in
+      let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+      let bnd = equate_val_abs env univ info0.abs info1.abs in
+      let tm = equate_neu env info0.neu info1.neu in
+      Tm.Coe {r = tr; r' = tr'; ty = bnd; tm = Tm.up tm}, Bwd.from_list stk
 
     | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
       let ty = equate_ty env ty0 ty1 in
@@ -464,31 +472,32 @@ struct
         let quote_clause (clbl, constr) =
           let _, clause0 = List.find (fun (clbl', _) -> clbl = clbl') elim0.clauses in
           let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
-          let env', vs, rs =
+          let env', cvs, rvs, rs =
             let open Desc in
-            let rec build_cx qenv env vs rs ps args dims =
+            let rec build_cx qenv env (cvs, rvs) rs ps args dims =
               match ps, args, dims with
               | (_, pty) :: ps, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
                 let env' = D.Env.push (`Val v) env in
-                build_cx (Env.succ qenv) env' (vs #< v) rs ps args dims
+                build_cx (Env.succ qenv) env' (cvs #< v, rvs) rs ps args dims
               | [], (_, Self) :: args, _ ->
                 let vx = generic qenv data_ty in
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
-                build_cx (Env.succ qenv') env (vs #< vx #< vih) rs [] args dims
+                build_cx (Env.succ qenv') env (cvs, rvs #< vx #< vih) rs [] args dims
               | [], [], dims ->
                 let xs = Bwd.map (fun x -> Name.named @@ Some x) @@ Bwd.from_list dims in
                 let qenv' = Env.abs qenv xs in
-                qenv', Bwd.to_list vs, Bwd.to_list rs
+                qenv', Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env D.Env.emp Emp Emp constr.params constr.args constr.dims
+            build_cx env D.Env.emp (Emp, Emp) Emp constr.params constr.args constr.dims
           in
+          let vs = cvs @ rvs in
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
           let bdy1 = inst_nclo clause1 cells in
-          let intro = make_intro D.Env.emp ~dlbl ~clbl ~args:vs ~rs in
+          let intro = make_intro D.Env.emp ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)

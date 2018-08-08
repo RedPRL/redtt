@@ -55,7 +55,8 @@ type con =
   | Intro of
       {dlbl : Desc.data_label;
        clbl : Desc.con_label;
-       args : value list;
+       const_args : value list;
+       rec_args : value list;
        rs : dim list;
        sys : rigid_val_sys}
 
@@ -65,6 +66,7 @@ and neu =
   | Meta of {name : Name.t; ushift : int}
 
   | NHCom of {dir : dir; ty : value; cap : neu; sys : comp_sys}
+  | NCoe of {dir : dir; abs : abs; neu : neu}
 
   | FunApp of neu * nf
   | ExtApp of neu * dim list

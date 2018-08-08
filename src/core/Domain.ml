@@ -105,9 +105,10 @@ and pp_con fmt : con -> unit =
   | Data _ ->
     Format.fprintf fmt "<data>"
   | Intro info ->
-    Format.fprintf fmt "@[<hv1>(%a %a %a)@]"
+    Format.fprintf fmt "@[<hv1>(%a %a %a %a)@]"
       Uuseg_string.pp_utf_8 info.clbl
-      pp_values info.args
+      pp_values info.const_args
+      pp_values info.rec_args
       pp_dims info.rs
 
 
@@ -184,7 +185,11 @@ and pp_neu fmt neu =
 
   | NHCom info ->
     let r, r' = Dir.unleash info.dir in
-    Format.fprintf fmt "@[<1>(hcom %a %a@ %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_neu info.cap pp_comp_sys info.sys
+    Format.fprintf fmt "@[<1>(nhcom %a %a@ %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_neu info.cap pp_comp_sys info.sys
+
+  | NCoe info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_neu info.neu
 
   | FunApp (neu, arg) ->
     Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el

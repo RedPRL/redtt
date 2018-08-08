@@ -86,7 +86,7 @@ sig
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_corestriction_ty : value -> val_face
 
-  val make_intro : env -> dlbl:Desc.data_label -> clbl:Desc.con_label -> args:value list -> rs:dim list -> value
+  val make_intro : env -> dlbl:Desc.data_label -> clbl:Desc.con_label -> const_args:value list -> rec_args:value list -> rs:dim list -> value
 
   module Sig : Sig
 

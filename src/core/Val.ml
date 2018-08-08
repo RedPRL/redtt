@@ -386,9 +386,10 @@ struct
       begin
         match force_val_sys @@ ValSys.act phi @@ ValSys.from_rigid info.sys with
         | `Ok sys ->
-          let args = List.map (Value.act phi) info.args in
+          let const_args = List.map (Value.act phi) info.const_args in
+          let rec_args = List.map (Value.act phi) info.rec_args in
           let rs = List.map (I.act phi) info.rs in
-          make @@ Intro {info with args; rs; sys}
+          make @@ Intro {info with const_args; rec_args; rs; sys}
         | `Proj v ->
           v
       end
@@ -406,6 +407,24 @@ struct
         | Step cap -> cap
       in
       step @@ make_hcom dir ty cap sys
+
+    | NCoe info ->
+      let dir = Dir.act phi info.dir in
+      let abs = Abs.act phi info.abs in
+      let el =
+        match act_neu phi info.neu with
+        | Ret neu ->
+          let r =
+            match dir with
+            | `Ok dir -> fst @@ Dir.unleash dir
+            | `Same (r, _) -> r
+          in
+          let tyr = Abs.inst1 abs r in
+          reflect tyr neu []
+        | Step el -> el
+      in
+      step @@ make_coe dir abs el
+
 
     | VProj info ->
       let mx = I.act phi @@ `Atom info.x in
@@ -744,6 +763,53 @@ struct
   and rigid_loop x : value =
     make @@ Loop x
 
+  and rigid_ncoe_up dir abs neu ~rst_sys =
+    let ncoe = NCoe {dir; abs; neu} in
+    let ty =
+      let _, r' = Dir.unleash dir in
+      Abs.inst1 abs r'
+    in
+    let coe_face s s' el =
+      let phi = I.equate s s' in
+      let dir_phi = Dir.act phi dir in
+      let abs_phi = Abs.act phi abs in
+      make_coe dir_phi abs_phi el
+    in
+    let ncoe_sys = List.map (Face.map coe_face) rst_sys in
+    make @@ Up {ty; neu = ncoe; sys = ncoe_sys}
+
+  and rigid_coe_data dir abs el =
+    let _, tyx = Abs.unleash1 abs in
+    match unleash tyx, unleash el with
+    | Data dlbl, Intro info ->
+      (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3 *)
+      let desc = Sig.lookup_datatype dlbl in
+      let constr = Desc.lookup_constr info.clbl desc in
+      begin
+        match constr.boundary with
+        | [] ->
+          let const_args = info.const_args in
+          let coe_arg arg =
+            (* TODO: when we add more recursive argument types, please fix!!! Change this to coerce in the
+               realization of the "formal argument type". *)
+            rigid_coe dir abs arg
+          in
+          let rec_args = List.map coe_arg info.rec_args in
+          let rs = info.rs in
+          make_intro Env.emp ~dlbl ~clbl:info.clbl ~const_args ~rec_args ~rs
+        | _ ->
+          failwith "TODO: coercion for constructor with boundary"
+      end
+
+    | Data _dlbl, Up info ->
+      rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
+
+    | Data _dlbl, FHCom _info ->
+      failwith "TODO: coercion of data at fhcom"
+
+    | _ ->
+      failwith "rigid_coe_data"
+
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
@@ -753,10 +819,8 @@ struct
     | S1 | Univ _ ->
       el
 
-
-    (* TODO: will need to change when indexed types are added *)
     | Data _ ->
-      el
+      rigid_coe_data dir abs el
 
     | FHCom fhcom ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
@@ -1050,7 +1114,7 @@ struct
       let peel_arg k el =
         match unleash el with
         | Intro info' ->
-          List.nth info'.args k
+          List.nth (info'.const_args @ info'.rec_args) k
         | _ ->
           failwith "rigid_hcom_strict_data: peel_arg"
       in
@@ -1079,9 +1143,11 @@ struct
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
 
-      let args' = make_args 0 Emp info.args constr.params constr.args in
+      (* TODO: clean this up! this was written before I split the args into two lists *)
+      let args' = make_args 0 Emp (info.const_args @ info.rec_args) constr.params constr.args in
+      let const_args, rec_args = ListUtil.split (List.length constr.params) args' in
 
-      make @@ Intro {dlbl; clbl = info.clbl; args = args'; rs = []; sys = []}
+      make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
 
     | _, Up info ->
       rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
@@ -1100,7 +1166,7 @@ struct
       make_hcom dir_phi ty_phi el sys_phi
     in
     let rst_sys = List.map (Face.map hcom_face) rst_sys in
-    make @@ Up { ty; neu; sys = rst_sys}
+    make @@ Up {ty; neu; sys = rst_sys}
 
   and rigid_hcom dir ty cap sys : value =
     match unleash ty with
@@ -1323,7 +1389,7 @@ struct
         | `Proj v ->
           v
         | `Ok sys ->
-          make @@ Intro {dlbl; clbl = info.clbl; args = const_args @ rec_args; rs; sys}
+          make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs; sys}
       end
 
     | B.Var ix ->
@@ -1487,20 +1553,22 @@ struct
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr clbl desc in
-      let args, trs = ListUtil.split (List.length constr.params + List.length constr.args) args in
-      let vargs = List.map (eval rho) args in
+      let tconst_args, args = ListUtil.split (List.length constr.params) args in
+      let trec_args, trs = ListUtil.split (List.length constr.args) args in
+      let const_args = List.map (eval rho) tconst_args in
+      let rec_args = List.map (eval rho) trec_args in
       let rs = List.map (eval_dim rho) trs in
-      make_intro (Env.clear_locals rho) ~dlbl ~clbl ~args:vargs ~rs
+      make_intro (Env.clear_locals rho) ~dlbl ~clbl ~const_args ~rec_args ~rs
 
 
-  and make_intro rho ~dlbl ~clbl ~args ~rs =
+  and make_intro rho ~dlbl ~clbl ~const_args ~rec_args ~rs =
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
-    let const_args, rec_args = ListUtil.split (List.length constr.params) args in
     let sys = eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs constr.boundary in
     match force_val_sys sys with
     | `Ok sys ->
-      make @@ Intro {dlbl; clbl; args; rs; sys}
+      (* Did I just fix a bug?? *)
+      make @@ Intro {dlbl; clbl; const_args; rec_args; rs; sys}
     | `Proj v ->
       v
 
@@ -2150,7 +2218,8 @@ struct
           failwith "elim_data/intro"
       in
 
-      inst_nclo nclo @@ go info.args info.rs constr.params constr.args constr.dims
+      (* CLEANUP *)
+      inst_nclo nclo @@ go (info.const_args @ info.rec_args) info.rs constr.params constr.args constr.dims
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in
