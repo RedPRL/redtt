@@ -610,26 +610,25 @@ and infer_spine cx hd =
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
            the constructor, and should therefore begin with the *empty* environment. *)
-        let rec build_cx cx env (nms, cvs, rvs) const_specs rec_specs dim_specs =
-          match const_specs, rec_specs with
-          | (plbl, pty) :: const_specs, _ ->
+        let rec build_cx cx env (nms, cvs, rvs, rs) const_specs rec_specs dim_specs =
+          match const_specs, rec_specs, dim_specs with
+          | (plbl, pty) :: const_specs, _, _ ->
             let vty = V.eval env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some plbl), cvs #< v, rvs) const_specs rec_specs dim_specs
-          | [], (nm, Self) :: rec_specs ->
+            build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some plbl), cvs #< v, rvs, rs) const_specs rec_specs dim_specs
+          | [], (nm, Self) :: rec_specs, _ ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
             let cx_ih, _ = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih env (nms #< (Some nm) #< None, cvs, rvs #< v_x) [] rec_specs dim_specs
-          | [], [] ->
-            let dim_nms = List.map (fun x -> Some x) dim_specs in
-            let cx', xs = Cx.ext_dims cx ~nms:dim_nms in
-            (* Seems weird to reverse those 'xs', but it only works that way.
-               Should we also reverse dim_nms? I find it all extremely confusing. *)
-            cx', nms <>< dim_nms, Bwd.to_list cvs, Bwd.to_list rvs, List.rev @@ List.map (fun x -> `Atom x) xs
+            build_cx cx_ih env (nms #< (Some nm) #< None, cvs, rvs #< v_x, rs) const_specs rec_specs dim_specs
+          | [], [], nm :: dim_specs ->
+            let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
+            build_cx cx' env (nms #< (Some nm), cvs, rvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
+          | [], [], [] ->
+            cx, nms, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', nms, cvs, rvs, rs = build_cx cx D.Env.emp (Emp, Emp, Emp) constr.params constr.args constr.dims in
+        let cx', nms, cvs, rvs, rs = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp) constr.params constr.args constr.dims in
         let vs = cvs @ rvs in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~args:vs ~rs in
         let ty = V.inst_clo mot_clo intro in

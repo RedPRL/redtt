@@ -1342,6 +1342,7 @@ struct
     let rho' =
       Env.push_many
         begin
+          (* This is not backwards, FYI. *)
           List.map (fun x -> `Val x) const_args
           @ List.map (fun x -> `Val x) rec_args
           @ List.map (fun x -> `Dim x) rs

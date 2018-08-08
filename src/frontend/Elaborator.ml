@@ -214,7 +214,7 @@ struct
       | (lbl, ety) :: prms ->
         (* TODO: support higher universes *)
         let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
-        elab_chk env univ0 ety >>= fun pty ->
+        elab_chk env univ0 ety >>= bind_in_scope >>= fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
         go (acc #< (lbl, x, pty)) prms
@@ -281,7 +281,7 @@ struct
           (* TODO: might be backwards *)
           let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.Down {ty; tm}, Emp) sub) acc @@ Tm.shift 0 in
           let pty' = Tm.subst sub pty in
-          elab_chk env pty' e >>= fun t ->
+          elab_chk env pty' e >>= bind_in_scope >>= fun t ->
           go_params ((pty', t) :: acc) ps frms
         | _ ->
           failwith "elab_intro: malformed parameters"
