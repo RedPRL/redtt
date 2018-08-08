@@ -596,51 +596,77 @@ and infer_spine cx hd =
         Cx.make_closure cx info.mot
       in
 
+      let desc = V.Sig.lookup_datatype info.dlbl in
       let used_labels = Hashtbl.create 10 in
 
-      let check_clause lbl constr clauses =
+
+      let check_clause earlier_clauses lbl constr =
         let open Desc in
         if Hashtbl.mem used_labels lbl then failwith "Duplicate case in eliminator";
         Hashtbl.add used_labels lbl ();
 
-        let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') clauses in
+        let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') info.clauses in
 
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
            the constructor, and should therefore begin with the *empty* environment. *)
-        let rec build_cx cx env vs params args dims =
-          match params, args with
-          | (plbl, pty) :: ps, _ ->
+        let rec build_cx cx env (nms, cvs, rvs) const_specs rec_specs dim_specs =
+          match const_specs, rec_specs with
+          | (plbl, pty) :: const_specs, _ ->
             let vty = V.eval env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (D.Env.push (`Val v) env) (vs #< v) ps args dims
-          | [], (nm, Self) :: args ->
+            build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some plbl), cvs #< v, rvs) const_specs rec_specs dim_specs
+          | [], (nm, Self) :: rec_specs ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
             let cx_ih, _ = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih env (vs #< v_x) [] args dims
+            build_cx cx_ih env (nms #< (Some nm) #< None, cvs, rvs #< v_x) [] rec_specs dim_specs
           | [], [] ->
-            let cx', xs = Cx.ext_dims cx ~nms:(List.map (fun x -> Some x) dims) in
-            cx', Bwd.to_list vs, List.map (fun x -> `Atom x) xs
+            let dim_nms = List.map (fun x -> Some x) dim_specs in
+            let cx', xs = Cx.ext_dims cx ~nms:dim_nms in
+            (* Seems weird to reverse those 'xs', but it only works that way.
+               Should we also reverse dim_nms? I find it all extremely confusing. *)
+            cx', nms <>< dim_nms, Bwd.to_list cvs, Bwd.to_list rvs, List.rev @@ List.map (fun x -> `Atom x) xs
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', vs, rs = build_cx cx D.Env.emp Emp constr.params constr.args constr.dims in
+        let cx', nms, cvs, rvs, rs = build_cx cx D.Env.emp (Emp, Emp, Emp) constr.params constr.args constr.dims in
+        let vs = cvs @ rvs in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~args:vs ~rs in
         let ty = V.inst_clo mot_clo intro in
-        (* TODO: impose a boundary restriction here *)
-        check cx' ty bdy
+
+        let image_of_face face =
+          let elim_face r r' scrut =
+            let phi = I.equate r r' in
+            let mot = D.Clo.act phi mot_clo in
+            let clauses = List.map (fun (lbl, nclo) -> lbl, D.NClo.act phi nclo) earlier_clauses in
+            V.elim_data info.dlbl ~mot ~scrut ~clauses
+          in
+          Face.map elim_face @@
+          let env0 = D.Env.clear_locals (Cx.env cx) in
+          V.eval_bterm_face info.dlbl desc env0 face
+            ~const_args:cvs
+            ~rec_args:rvs
+            ~rs:rs
+        in
+        let boundary = List.map image_of_face constr.boundary in
+        check_boundary cx' ty boundary bdy;
+        Tm.NB (nms, bdy)
       in
 
-      begin
-        match V.unleash ih.ty with
-        | D.Data dlbl ->
-          let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
-          List.iter (fun (lbl, constr) -> check_clause lbl constr info.clauses) desc;
-          D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
+      let rec check_clauses acc constrs =
+        match constrs with
+        | [] ->
+          ()
+        | (lbl, constr) :: constrs ->
+          let nbnd = check_clause acc lbl constr in
+          let nclo = D.NClo {nbnd; rho = Cx.env cx} in
+          check_clauses ((lbl, nclo) :: acc) constrs
 
-        | _ ->
-          failwith "eliminator expected datatype"
-      end
+      in
+
+      check_clauses [] desc;
+      D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
+
 
     | T.Cap info ->
       let fhcom_ty =
