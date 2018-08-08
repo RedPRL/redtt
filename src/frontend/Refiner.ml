@@ -213,9 +213,6 @@ let unleash_data ty =
     Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
 
-module MonadUtil = Monad.Util (ElabMonad)
-open MonadUtil
-
 let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
@@ -278,7 +275,9 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
         Cx.evaluator cx, Cx.quoter cx
     end >>= fun ((module V), (module Q)) ->
 
-    let refine_clause (clbl, pbinds, (clause_tac : chk_tac)) =
+
+    (* TODO: factor this out into another tactic. *)
+    let refine_clause _earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
       let constr = lookup_constr clbl desc in
       let rec go psi env tms pbinds ps args dims =
@@ -322,6 +321,7 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
       let psi, tms = go Emp D.Env.emp Emp pbinds constr.params constr.args constr.dims in
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
+      Format.eprintf "clause_ty: %a@." Tm.pp0 clause_ty;
       (* TODO: impose a boundary restriction here *)
       begin
         M.in_scopes (Bwd.to_list psi) @@
@@ -330,7 +330,16 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
       M.ret (clbl, bdy)
     in
 
-    traverse (fun x -> x) @@ List.map refine_clause clauses >>= fun tclauses ->
+    let rec refine_clauses acc =
+      function
+      | [] ->
+        M.ret acc
+      | clause :: clauses ->
+        refine_clause acc clause >>= fun tclause ->
+        refine_clauses (tclause :: acc) clauses
+    in
+
+    refine_clauses [] clauses >>= fun tclauses ->
 
     let hd = Tm.Down {ty = data_ty; tm = scrut} in
     let bmot =
