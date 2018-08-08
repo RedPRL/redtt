@@ -495,7 +495,7 @@ struct
         | Ret neu ->
           ret @@ Elim {info with mot; neu; clauses}
         | Step v ->
-          step @@ elim_data info.dlbl mot v clauses
+          step @@ elim_data info.dlbl ~mot ~scrut:v ~clauses
       end
 
 
@@ -1556,7 +1556,7 @@ struct
     | Tm.Elim info ->
       let mot = clo info.mot rho in
       let clauses = List.map (fun (lbl, nbnd) -> lbl, nclo nbnd rho) info.clauses in
-      elim_data info.dlbl mot vhd clauses
+      elim_data info.dlbl ~mot ~scrut:vhd ~clauses
 
 
   and eval_head rho =
@@ -2127,7 +2127,7 @@ struct
       let err = RigidVProjUnexpectedArgument el in
       raise @@ E err
 
-  and elim_data dlbl mot scrut clauses =
+  and elim_data dlbl ~mot ~scrut ~clauses =
     match unleash scrut with
     | Intro info ->
       let _, nclo = List.find (fun (clbl', _) -> info.clbl = clbl') clauses in
@@ -2139,7 +2139,7 @@ struct
         | v :: vs, _, (_, _) :: ps, _, _ ->
           `Val v :: go vs rs ps args dims
         | v :: vs, _,  [], (_, Desc.Self) :: args, _ ->
-          let v_ih = elim_data dlbl mot v clauses in
+          let v_ih = elim_data dlbl ~mot ~scrut:v ~clauses in
           `Val v :: `Val v_ih :: go vs rs [] args dims
         | [], r :: rs, [], [], _ :: dims ->
           `Dim r :: go [] rs [] [] dims
@@ -2158,7 +2158,7 @@ struct
         Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
-        elim_data dlbl (Clo.act phi mot) a clauses'
+        elim_data dlbl ~mot:(Clo.act phi mot) ~scrut:a ~clauses:clauses'
       in
       let elim_sys = List.map elim_face up.sys in
       make @@ Up {ty = mot'; neu; sys = elim_sys}
