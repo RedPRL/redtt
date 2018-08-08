@@ -854,8 +854,16 @@ struct
     | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
 
-    | Data _dlbl, FHCom _info ->
-      failwith "TODO: coercion of data at fhcom"
+    | Data _, FHCom info ->
+      let cap = rigid_coe dir abs info.cap in
+      let face =
+        Face.map @@ fun r r' abs' ->
+        let y, v = Abs.unleash1 abs' in
+        let phi = I.equate r r' in
+        Abs.bind1 y @@ make_coe (Dir.act phi dir) (Abs.act phi abs) v
+      in
+      let sys = List.map face info.sys in
+      rigid_fhcom info.dir cap sys
 
     | _ ->
       failwith "rigid_coe_data"
