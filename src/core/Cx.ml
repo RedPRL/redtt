@@ -29,6 +29,7 @@ type cx =
 type t = cx
 
 let env cx = cx.env
+let qenv cx = cx.qenv
 
 let globals cx =
   cx.sign

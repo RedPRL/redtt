@@ -5,6 +5,8 @@ type value = Domain.value
 val init : GlobalEnv.t -> t
 val globals : t -> GlobalEnv.t
 val env : t -> Domain.env
+val ppenv : t -> Pp.env
+val qenv : t -> Quote.env
 
 val clear_locals : t -> t
 
@@ -24,7 +26,7 @@ val restrict : t -> I.t -> I.t -> t * I.action
 
 val def : t -> nm:string option -> ty:value -> el:value -> t
 
-val ppenv : t -> Pp.env
+
 
 
 (** Look up the classifier (either type, interval or tick) of a local variable. *)

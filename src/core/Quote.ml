@@ -66,6 +66,7 @@ sig
   val quote_nf : env -> nf -> Tm.tm
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
+  val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
@@ -572,6 +573,9 @@ struct
     with
     | Invalid_argument _ ->
       failwith "equate_val_sys length mismatch"
+
+  and quote_val_sys env ty sys =
+    equate_val_sys env ty sys sys
 
   and equate_comp_sys env ty sys0 sys1 =
     try

@@ -45,7 +45,9 @@ end
 
 module Traverse (A : Alg) : sig
   val traverse_tm : tm -> tm
+  val traverse_head : tm head -> tm cmd
   val traverse_spine : tm spine -> tm spine
+  val traverse_cmd : tm cmd -> tm cmd
 end =
 struct
   let rec traverse_tm (Tm con) =
@@ -446,6 +448,11 @@ let subst sub tm =
   let module Init = struct let subst = sub end in
   let module T = Traverse (SubstAlg (Init)) in
   T.traverse_tm tm
+
+let subst_cmd sub cmd =
+  let module Init = struct let subst = sub end in
+  let module T = Traverse (SubstAlg (Init)) in
+  T.traverse_cmd cmd
 
 
 let make con =

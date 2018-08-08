@@ -216,8 +216,12 @@ let unleash_data ty =
 let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
+
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
     let mot_ty = Tm.pi None data_ty univ in
+
+
+
     begin
       match tac_mot with
       | None ->
@@ -231,21 +235,29 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
           M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
           M.unify >>
-          M.ret mot
+          let wmothd, wmotsp = Tm.subst_cmd (Tm.shift 1) (mothd, motsp) in
+          M.ret @@ Tm.B (None, Tm.up (wmothd, wmotsp #< (Tm.FunApp (Tm.up @@ Tm.ix 0))))
         else
-          M.ret (fun _ -> ty)
+          M.ret @@ Tm.B (None, Tm.subst (Tm.shift 1) ty)
       | Some tac_mot ->
         tac_mot mot_ty >>= fun mot ->
-        let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-        M.ret fmot
-    end >>= fun mot ->
+        let mothd = Tm.Down {ty = Tm.subst (Tm.shift 1) mot_ty; tm = Tm.subst (Tm.shift 1) mot} in
+        let motx = (mothd, Emp #< (Tm.FunApp (Tm.up @@ Tm.ix 0))) in
+        M.ret @@ Tm.B (None, Tm.up @@ motx)
+    end >>= fun bmot ->
+
+    let mot arg =
+      let Tm.B (_, motx) = bmot in
+      let arg' = Tm.Down {ty = data_ty; tm = arg}, Emp in
+      Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
+    in
 
     let dlbl = unleash_data data_ty in
+    let data_vty = D.make @@ D.Data dlbl in
 
     begin
       M.lift C.base_cx <<@> fun cx ->
-        let sign = Cx.globals cx in
-        GlobalEnv.lookup_datatype dlbl sign
+        GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
     end >>= fun desc ->
 
     (* Add holes for any missing clauses *)
@@ -277,10 +289,10 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
 
 
     (* TODO: factor this out into another tactic. *)
-    let refine_clause _earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
+    let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
       let constr = lookup_constr clbl desc in
-      let rec go psi env tms pbinds ps args dims =
+      let rec go psi env (tms, cargs, rargs, rs) pbinds ps args dims =
         match pbinds, ps, args, dims with
         | ESig.PVar nm :: pbinds, (_plbl, pty) :: ps, _, _->
           let x = Name.named @@ Some nm in
@@ -289,45 +301,82 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let x_tm = Tm.up @@ Tm.var x in
           let env' = D.Env.push (`Val x_el) env in
-          go (psi #< (x, `P tty)) env' (tms #< x_tm) pbinds ps args dims
+          go (psi #< (x, `P tty)) env' (tms #< x_tm, cargs #< x_el, rargs, rs) pbinds ps args dims
 
         | ESig.PVar nm :: pbinds, [], (_, Self) :: args, _ ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.fresh () in
           let x_tm = Tm.up @@ Tm.var x in
+          let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let ih_ty = mot x_tm in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args dims
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, rs) pbinds [] args dims
 
         | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: args, _ ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.named @@ Some nm_ih in
           let x_tm = Tm.up @@ Tm.var x in
           let ih_ty = mot x_tm in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args dims
+          let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, rs) pbinds [] args dims
 
         | ESig.PVar nm :: pbinds, [], [], _ :: dims ->
           let x = Name.named @@ Some nm in
           let x_tm = Tm.up @@ Tm.var x in
           let r = `Atom x in
           let env' = D.Env.push (`Dim r) env in
-          go (psi #< (x, `I)) env' (tms #< x_tm) pbinds [] [] dims
+          go (psi #< (x, `I)) env' (tms #< x_tm, cargs, rargs, rs #< r) pbinds [] [] dims
 
         | _, [], [], [] ->
-          psi, Bwd.to_list tms
+          psi, Bwd.to_list tms, Bwd.to_list cargs, Bwd.to_list rargs, Bwd.to_list rs
 
         | _ ->
           failwith "refine_clause"
       in
-      let psi, tms = go Emp D.Env.emp Emp pbinds constr.params constr.args constr.dims in
+      let psi, tms, const_args, rec_args, rs =
+        go Emp D.Env.emp (Emp, Emp, Emp, Emp) pbinds constr.params constr.args constr.dims
+      in
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
-      Format.eprintf "clause_ty: %a@." Tm.pp0 clause_ty;
-      (* TODO: impose a boundary restriction here *)
-      begin
-        M.in_scopes (Bwd.to_list psi) @@
-        clause_tac clause_ty <<@> Tm.bindn (Bwd.map fst psi)
-      end >>= fun bdy ->
-      M.ret (clbl, bdy)
+
+      M.in_scopes (Bwd.to_list psi) begin
+        begin
+          M.lift C.base_cx <<@> fun cx ->
+            cx, Cx.evaluator cx, Cx.quoter cx
+        end >>= fun (cx, (module V), (module Q)) ->
+
+        let image_of_face face =
+          let elim_face r r' scrut =
+            let phi = I.equate r r' in
+            let rho = D.Env.act phi @@ Cx.env cx in
+            let mot = V.make_closure rho bmot in
+            let clauses = List.map (fun (clbl, nbnd) -> clbl, D.NClo {nbnd; rho}) earlier_clauses in
+            V.elim_data dlbl ~mot:mot ~scrut:scrut ~clauses
+          in
+          Face.map elim_face @@
+          let env0 = D.Env.clear_locals @@ Cx.env cx in
+          V.eval_bterm_face dlbl desc env0 face
+            ~const_args
+            ~rec_args
+            ~rs
+        in
+
+        (* What is the image of the boundary in the current fiber of the motive? *)
+        let tsys =
+          let val_sys = List.map image_of_face constr.boundary in
+          let vty = Cx.eval cx clause_ty in
+          Q.quote_val_sys (Cx.qenv cx) vty val_sys
+        in
+
+        (* We run the clause tactic with the goal type restricted by the boundary above *)
+        let clause_rty =
+          match tsys with
+          | [] -> clause_ty
+          | _ -> Tm.make @@ Tm.Rst {ty = clause_ty; sys = tsys}
+        in
+
+        clause_tac clause_rty <<@> fun bdy ->
+          clbl, Tm.bindn (Bwd.map fst psi) bdy
+      end
     in
 
     let rec refine_clauses acc =

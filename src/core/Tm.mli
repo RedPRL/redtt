@@ -42,7 +42,7 @@ val bind_ext : Name.t bwd -> tm -> (tm, tm) system -> (tm * (tm, tm) system) nbn
 val unbind_with : tm cmd -> tm bnd -> tm
 
 val subst : tm cmd subst -> tm -> tm
-
+val subst_cmd : tm cmd subst -> tm cmd -> tm cmd
 
 val shift_univ : int -> tm -> tm
 
@@ -95,5 +95,3 @@ module Sp :
 sig
   include Occurs.S with type t = tm spine
 end
-
-
