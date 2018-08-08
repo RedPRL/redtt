@@ -1,5 +1,7 @@
 open Domain
 
+module B = Desc.Boundary
+
 module type Sig =
 sig
   val restriction : Restriction.t
@@ -9,7 +11,7 @@ sig
   (** Return the type and boundary of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 
-  val lookup_datatype : Desc.data_label -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+  val lookup_datatype : Desc.data_label -> (Tm.tm, Tm.tm B.term) Desc.desc
 end
 
 module type S =
@@ -25,6 +27,34 @@ sig
   val eval_dim : env -> Tm.tm -> I.t
   val eval_tick : env -> Tm.tm -> tick
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
+
+  val eval_bterm
+    : Desc.data_label
+    -> (Tm.tm, Tm.tm B.term) Desc.desc
+    -> env
+    -> Tm.tm B.term
+    -> value
+
+  val eval_bterm_boundary
+    : Desc.data_label
+    -> (Tm.tm, Tm.tm B.term) Desc.desc
+    -> env
+    -> const_args:value list
+    -> rec_args:value list
+    -> rs:I.t list
+    -> (Tm.tm, Tm.tm B.term) B.sys
+    -> val_sys
+
+  val eval_bterm_face
+    : Desc.data_label
+    -> (Tm.tm, Tm.tm B.term) Desc.desc
+    -> env
+    -> const_args:value list
+    -> rec_args:value list
+    -> rs:I.t list
+    -> (Tm.tm, Tm.tm B.term) B.face
+    -> val_face
+
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
   val apply : value -> value -> value

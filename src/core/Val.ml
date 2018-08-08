@@ -5,8 +5,6 @@ open Domain
 
 include ValSig
 
-module B = Desc.Boundary
-
 type step =
   | Ret : neu -> step
   | Step : value -> step
@@ -1319,7 +1317,7 @@ struct
       let const_args = List.map (eval rho) info.const_args in
       let rec_args = List.map (eval_bterm dlbl desc rho) info.rec_args in
       let rs = List.map (eval_dim rho) info.rs in
-      let sys = eval_bterm_boundary dlbl desc rho constr.boundary const_args rec_args rs in
+      let sys = eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs constr.boundary in
       begin
         match force_val_sys sys with
         | `Proj v ->
@@ -1337,10 +1335,10 @@ struct
           raise @@ E err
       end
 
-  and eval_bterm_boundary dlbl desc rho sys const_args rec_args rs =
-    List.map (eval_bterm_face dlbl desc rho const_args rec_args rs) sys
+  and eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs =
+    List.map (eval_bterm_face dlbl desc rho ~const_args ~rec_args ~rs)
 
-  and eval_bterm_face dlbl desc rho const_args rec_args rs (tr0, tr1, btm) =
+  and eval_bterm_face dlbl desc rho ~const_args ~rec_args ~rs (tr0, tr1, btm) =
     let rho' =
       Env.push_many
         begin
@@ -1498,7 +1496,7 @@ struct
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
     let const_args, rec_args = ListUtil.split (List.length constr.params) args in
-    let sys = eval_bterm_boundary dlbl desc rho constr.boundary const_args rec_args rs in
+    let sys = eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs constr.boundary in
     match force_val_sys sys with
     | `Ok sys ->
       make @@ Intro {dlbl; clbl; args; rs; sys}
