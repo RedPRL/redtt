@@ -795,36 +795,56 @@ struct
     | _ ->
       failwith "rigid_multi_coe: length mismatch"
 
+  and multi_coe env mdir (x, const_specs) args =
+    match mdir with
+    | `Ok dir ->
+      rigid_multi_coe env dir (x, const_specs) args
+    | `Same _ ->
+      args
+
   and rigid_coe_data dir abs el =
-    let _, tyx = Abs.unleash1 abs in
+    let x, tyx = Abs.unleash1 abs in
     match unleash tyx, unleash el with
     | Data dlbl, Intro info ->
       (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
+      let r, r' = Dir.unleash dir in
 
-      let const_args =
-        let x, _ = Abs.unleash1 abs in
-        rigid_multi_coe Env.emp dir (x, constr.params) info.const_args
+      let make_const_args dir =
+        multi_coe Env.emp dir (x, constr.params) info.const_args
       in
 
-      let coe_rec_arg _arg_spec arg =
+      let coe_rec_arg dir _arg_spec arg =
         (* TODO: when we add more recursive argument types, please fix!!! Change this to coerce in the
            realization of the "argument spec". *)
-        rigid_coe dir abs arg
+        make_coe dir abs arg
       in
 
-      let rec_args = List.map2 coe_rec_arg constr.args info.rec_args in
+      let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.args info.rec_args in
       let rs = info.rs in
-      let intro = make_intro Env.emp ~dlbl ~clbl:info.clbl ~const_args ~rec_args ~rs in
+      let intro =
+        make_intro Env.emp ~dlbl ~clbl:info.clbl
+          ~const_args:(make_const_args (`Ok dir))
+          ~rec_args:(make_rec_args (`Ok dir))
+          ~rs
+      in
 
       begin
         match constr.boundary with
         | [] ->
           intro
         | _ ->
-          let correction = failwith "TODO: calculate boundary correction in rigid_coe_data" in
-          rigid_fhcom dir intro correction
+          (* My lord, I have no idea if this is right. ouch!! *)
+          let faces =
+            eval_bterm_boundary dlbl desc Env.emp
+              ~const_args:(make_const_args @@ Dir.make (`Atom x) r')
+              ~rec_args:(make_rec_args @@ Dir.make r (`Atom x))
+              ~rs:(failwith "")
+              constr.boundary
+          in
+          let correction = List.map (Face.map @@ fun _ _ -> Abs.bind1 x) faces in
+          make_fhcom (`Ok dir) intro @@ force_abs_sys correction
       end
 
     | Data _, Up info ->
