@@ -778,6 +778,23 @@ struct
     let ncoe_sys = List.map (Face.map coe_face) rst_sys in
     make @@ Up {ty; neu = ncoe; sys = ncoe_sys}
 
+  (* TODO: check that this is right *)
+  and rigid_multi_coe env dir (x, const_specs) args =
+    match const_specs, args with
+    | [], [] ->
+      []
+    | (_, spec) :: const_specs, arg :: args ->
+      let vty = eval env spec in
+      let r, r' = Dir.unleash dir in
+      let coe_hd s = make_coe (Dir.make r s) (Abs.bind1 x vty) arg in
+      let coe_tl =
+        let coe_hd_x = coe_hd @@ `Atom x in
+        rigid_multi_coe (Env.push (`Val coe_hd_x) env) dir (x, const_specs) args
+      in
+      coe_hd r' :: coe_tl
+    | _ ->
+      failwith "rigid_multi_coe: length mismatch"
+
   and rigid_coe_data dir abs el =
     let _, tyx = Abs.unleash1 abs in
     match unleash tyx, unleash el with
@@ -789,8 +806,8 @@ struct
         match constr.boundary with
         | [] ->
           let const_args =
-            (* TODO: need that annoying 'mcoe' thing here *)
-            info.const_args
+            let x, _ = Abs.unleash1 abs in
+            rigid_multi_coe Env.emp dir (x, constr.params) info.const_args
           in
           let coe_arg arg =
             (* TODO: when we add more recursive argument types, please fix!!! Change this to coerce in the
