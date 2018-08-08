@@ -799,30 +799,35 @@ struct
     let _, tyx = Abs.unleash1 abs in
     match unleash tyx, unleash el with
     | Data dlbl, Intro info ->
-      (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3 *)
+      (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
+
+      let const_args =
+        let x, _ = Abs.unleash1 abs in
+        rigid_multi_coe Env.emp dir (x, constr.params) info.const_args
+      in
+
+      let coe_rec_arg _arg_spec arg =
+        (* TODO: when we add more recursive argument types, please fix!!! Change this to coerce in the
+           realization of the "argument spec". *)
+        rigid_coe dir abs arg
+      in
+
+      let rec_args = List.map2 coe_rec_arg constr.args info.rec_args in
+      let rs = info.rs in
+      let intro = make_intro Env.emp ~dlbl ~clbl:info.clbl ~const_args ~rec_args ~rs in
+
       begin
         match constr.boundary with
         | [] ->
-          let const_args =
-            let x, _ = Abs.unleash1 abs in
-            rigid_multi_coe Env.emp dir (x, constr.params) info.const_args
-          in
-          let coe_arg arg =
-            (* TODO: when we add more recursive argument types, please fix!!! Change this to coerce in the
-               realization of the "formal argument type". *)
-            rigid_coe dir abs arg
-          in
-          let rec_args = List.map coe_arg info.rec_args in
-          let rs = info.rs in
-          make_intro Env.emp ~dlbl ~clbl:info.clbl ~const_args ~rec_args ~rs
-
+          intro
         | _ ->
-          failwith "TODO: coercion for constructor with boundary"
+          let correction = failwith "TODO: calculate boundary correction in rigid_coe_data" in
+          rigid_fhcom dir intro correction
       end
 
-    | Data _dlbl, Up info ->
+    | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
 
     | Data _dlbl, FHCom _info ->
@@ -837,6 +842,7 @@ struct
     | Pi _ | Sg _ | Ext _ | Up _ | Later _ | BoxModality _ ->
       make @@ Coe {dir; abs; el}
 
+    (* TODO: what about neutral element of the universe? is this even correct? *)
     | S1 | Univ _ ->
       el
 
