@@ -788,7 +788,10 @@ struct
       begin
         match constr.boundary with
         | [] ->
-          let const_args = info.const_args in
+          let const_args =
+            (* TODO: need that annoying 'mcoe' thing here *)
+            info.const_args
+          in
           let coe_arg arg =
             (* TODO: when we add more recursive argument types, please fix!!! Change this to coerce in the
                realization of the "formal argument type". *)
@@ -797,6 +800,7 @@ struct
           let rec_args = List.map coe_arg info.rec_args in
           let rs = info.rs in
           make_intro Env.emp ~dlbl ~clbl:info.clbl ~const_args ~rec_args ~rs
+
         | _ ->
           failwith "TODO: coercion for constructor with boundary"
       end
