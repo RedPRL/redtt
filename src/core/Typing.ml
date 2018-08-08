@@ -627,6 +627,7 @@ and infer_spine cx hd =
         let cx', vs, rs = build_cx cx D.Env.emp Emp constr.params constr.args constr.dims in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~args:vs ~rs in
         let ty = V.inst_clo mot_clo intro in
+        (* TODO: impose a boundary restriction here *)
         check cx' ty bdy
       in
 

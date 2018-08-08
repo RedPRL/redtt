@@ -322,6 +322,7 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
       let psi, tms = go Emp D.Env.emp Emp pbinds constr.params constr.args constr.dims in
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
+      (* TODO: impose a boundary restriction here *)
       begin
         M.in_scopes (Bwd.to_list psi) @@
         clause_tac clause_ty <<@> Tm.bindn (Bwd.map fst psi)
