@@ -2293,7 +2293,23 @@ struct
       make @@ Up {ty = mot'; neu; sys = elim_sys}
 
     | FHCom info ->
-      failwith "TODO: elim_data of fhcom"
+      let tyabs =
+        let r, _ = Dir.unleash info.dir in
+        Abs.make1 @@ fun y ->
+        inst_clo mot @@
+        make_fhcom (Dir.make r @@ `Atom y) info.cap (`Ok info.sys)
+      in
+      let cap = elim_data dlbl ~mot ~scrut:info.cap ~clauses in
+      let face =
+        Face.map @@ fun r r' abs ->
+        let y, ely = Abs.unleash1 abs in
+        let phi = I.equate r r' in
+        let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
+        Abs.bind1 y @@
+        elim_data dlbl ~mot:(Clo.act phi mot) ~scrut:ely ~clauses:clauses'
+      in
+      let sys = List.map face info.sys in
+      rigid_com info.dir tyabs cap sys
 
     | _ ->
       raise @@ E (RecursorUnexpectedArgument ("data type", scrut))
