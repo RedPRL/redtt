@@ -35,10 +35,6 @@ type con =
 
   | Cons of value * value
 
-  | S1
-  | Base
-  | Loop of atom
-
   | Up of {ty : value; neu : neu; sys : rigid_val_sys}
   | LblTy of {lbl : string; args : nf list; ty : value}
   | LblRet of value
@@ -72,8 +68,6 @@ and neu =
   | ExtApp of neu * dim list
   | Car of neu
   | Cdr of neu
-
-  | S1Rec of {mot : clo; neu : neu; bcase : value; lcase : abs}
 
   | Elim of
       {dlbl : Desc.data_label;

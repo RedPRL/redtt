@@ -211,9 +211,6 @@ let rec check cx ty tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-  | D.Univ _, T.S1 ->
-    ()
-
   | D.Univ _, T.Data dlbl ->
     let _ = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     ()
@@ -300,12 +297,6 @@ let rec check cx ty tm =
 
   | D.LblTy info, T.LblRet t ->
     check cx info.ty t
-
-  | D.S1, T.Base ->
-    ()
-
-  | D.S1, T.Loop x ->
-    check_dim cx x
 
   | D.V vty, T.VIn vin ->
     let r = check_eval_dim cx vin.r in
@@ -555,37 +546,6 @@ and infer_spine cx hd =
       in
       Cx.check_eq_ty cx v_ty ih.ty;
       D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty1}
-
-    | T.S1Rec info ->
-      let T.B (nm, mot) = info.mot in
-      let s1 = D.make D.S1 in
-
-      begin
-        let cxx, _= Cx.ext_ty cx ~nm s1 in
-        check_ty cxx mot
-      end;
-
-      let mot_clo = Cx.make_closure cx info.mot in
-
-      let ih = infer_spine cx hd sp in
-
-      Cx.check_eq_ty cx ih.ty s1;
-
-      let mot_base = V.inst_clo mot_clo @@ D.make D.Base in
-      let val_base = check_eval cx mot_base info.bcase in
-
-      let T.B (nm_loop, lcase) = info.lcase in
-      let cxx, x = Cx.ext_dim cx ~nm:nm_loop in
-
-      let mot_loop = V.inst_clo mot_clo @@ D.make (D.Loop x) in
-
-      let val_loopx = check_eval cxx mot_loop lcase in
-      let val_loop0 = D.Value.act (I.subst `Dim0 x) val_loopx in
-      let val_loop1 = D.Value.act (I.subst `Dim1 x) val_loopx in
-      Cx.check_eq cx ~ty:mot_base val_loop0 val_base;
-      Cx.check_eq cx ~ty:mot_base val_loop1 val_base;
-
-      D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
 
     | T.Elim info ->
       let T.B (nm, mot) = info.mot in

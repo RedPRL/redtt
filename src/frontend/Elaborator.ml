@@ -440,23 +440,6 @@ struct
       let clauses = List.map elab_clause clauses in
       tac_elim ~tac_mot ~tac_scrut ~clauses ty
 
-    | _, E.S1Rec (omot, escrut, ebcase, (name_lcase, elcase)) ->
-      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) omot in
-      let tac_scrut ty = elab_chk env ty escrut in
-      let tac_bcase ty = elab_chk env ty ebcase in
-      let tac_lcase ty = elab_chk env ty elcase in
-      tac_s1_elim ~tac_mot ~tac_scrut ~tac_bcase ~tac_lcase:(name_lcase, tac_lcase) ty
-
-    | Tm.Univ _, E.S1 ->
-      M.ret @@ Tm.make Tm.S1
-
-    | Tm.S1, E.Base ->
-      M.ret @@ Tm.make Tm.Base
-
-    | Tm.S1, E.Loop r ->
-      elab_dim env r <<@> fun r ->
-        Tm.make (Tm.Loop r)
-
     | Tm.Univ _, E.Ext (names, ety, esys) ->
       let univ = ty in
       let xs = List.map (fun x -> Name.named (Some x)) names in

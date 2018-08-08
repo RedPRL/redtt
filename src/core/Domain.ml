@@ -39,12 +39,6 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
   | CoRThunk face ->
     Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
-  | S1 ->
-    Format.fprintf fmt "S1"
-  | Base ->
-    Format.fprintf fmt "base"
-  | Loop _x ->
-    Format.fprintf fmt "<loop>"
   | Pi {dom; cod} ->
     Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
   | Sg {dom; cod} ->
@@ -208,9 +202,6 @@ and pp_neu fmt neu =
 
   | Meta {name; _} ->
     Name.pp fmt name
-
-  | S1Rec _ ->
-    Format.fprintf fmt "<S1-rec>"
 
   | Elim _ ->
     Format.fprintf fmt "<elim>"

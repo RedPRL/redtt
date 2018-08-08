@@ -23,9 +23,6 @@ and eterm =
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
 
-  | S1 | Base | Loop of eterm
-  | S1Rec of eterm option * eterm * eterm * (string * eterm)
-
   | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
 
   | Pi of etele * eterm

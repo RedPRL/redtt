@@ -315,15 +315,6 @@ struct
     | Univ _ ->
       make con
 
-    | S1 ->
-      make con
-
-    | Base ->
-      make con
-
-    | Loop x ->
-      make_loop @@ I.act phi @@ `Atom x
-
     | Lam clo ->
       make @@ Lam (Clo.act phi clo)
 
@@ -493,18 +484,6 @@ struct
           step @@ cdr v
       end
 
-    | S1Rec info ->
-      let mot = Clo.act phi info.mot in
-      let bcase = Value.act phi info.bcase in
-      let lcase = Abs.act phi info.lcase in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          ret @@ S1Rec {mot; neu; bcase; lcase}
-        | Step v ->
-          step @@ s1_rec mot v bcase lcase
-      end
-
     | Elim info ->
       let mot = Clo.act phi info.mot in
       let go (lbl, nclo) = lbl, NClo.act phi nclo in
@@ -660,13 +639,6 @@ struct
     | `Dim1 ->
       el1
 
-  and make_loop mx : value =
-    match mx with
-    | `Atom x ->
-      rigid_loop x
-    | _ ->
-      make @@ Base
-
   and make_coe mdir abs el : value =
     match mdir with
     | `Ok dir ->
@@ -759,9 +731,6 @@ struct
 
   and rigid_vin x el0 el1 : value =
     make @@ VIn {x; el0; el1}
-
-  and rigid_loop x : value =
-    make @@ Loop x
 
   and rigid_ncoe_up dir abs neu ~rst_sys =
     let ncoe = NCoe {dir; abs; neu} in
@@ -875,7 +844,7 @@ struct
       make @@ Coe {dir; abs; el}
 
     (* TODO: what about neutral element of the universe? is this even correct? *)
-    | S1 | Univ _ ->
+    | Univ _ ->
       el
 
     | Data _ ->
@@ -1232,9 +1201,6 @@ struct
     | Pi _ | Sg _ | Ext _ | Up _ ->
       make @@ HCom {dir; ty; cap; sys}
 
-    | S1 ->
-      make @@ FHCom {dir; cap; sys}
-
     | Data dlbl ->
       let desc = Sig.lookup_datatype dlbl in
       if Desc.is_strict_set desc then
@@ -1344,7 +1310,7 @@ struct
 
     (* `Ext _`: the expansion will stop after a valid
      * correction system, so it is not so bad. *)
-    | Ext _ | Univ _ | FHCom _ | V _ | S1 | Data _ ->
+    | Ext _ | Univ _ | FHCom _ | V _ | Data _ ->
       let aux sys =
         match sys with
         | [] -> cap
@@ -1552,15 +1518,6 @@ struct
     | Tm.Univ {kind; lvl} ->
       make @@ Univ {kind; lvl}
 
-    | Tm.S1 ->
-      make S1
-
-    | Tm.Base ->
-      make Base
-
-    | Tm.Loop r ->
-      make_loop @@ eval_dim rho r
-
     | Tm.Box info ->
       let r = eval_dim rho info.r  in
       let r' = eval_dim rho info.r' in
@@ -1664,11 +1621,6 @@ struct
       let ty1 = eval rho info.ty1 in
       let equiv phi0 = eval (Env.act phi0 rho) info.equiv in
       vproj I.idn r ~ty0 ~ty1 ~equiv ~el:vhd
-    | Tm.S1Rec info ->
-      let mot = clo info.mot rho in
-      let bcase = eval rho info.bcase in
-      let lcase = eval_bnd rho info.lcase in
-      s1_rec mot vhd bcase lcase
     | Tm.Cap info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
@@ -2313,37 +2265,6 @@ struct
 
     | _ ->
       raise @@ E (RecursorUnexpectedArgument ("data type", scrut))
-
-  and s1_rec mot scrut bcase lcase =
-    match unleash scrut with
-    | Base ->
-      bcase
-    | Loop x ->
-      Abs.inst1 lcase @@ `Atom x
-    | FHCom info ->
-      let apply_rec tm = s1_rec mot tm bcase lcase in
-      let r, _ = Dir.unleash info.dir in
-      let ty = Abs.make1 @@ fun y ->
-        inst_clo mot @@
-        make_fhcom (Dir.make r (`Atom y)) info.cap (`Ok info.sys)
-      in
-      let face = Face.map @@ fun ri r'i absi ->
-        let y, el = Abs.unleash1 absi in
-        Abs.bind1 y @@ Value.act (I.equate ri r'i) @@ apply_rec el
-      in
-      rigid_com info.dir ty (apply_rec info.cap) (List.map face info.sys)
-    | Up up ->
-      let neu = S1Rec {mot; neu = up.neu; bcase; lcase} in
-      let mot' = inst_clo mot scrut in
-      let s1_rec_face =
-        Face.map @@ fun r r' a ->
-        let phi = I.equate r r' in
-        s1_rec (Clo.act phi mot) a (Value.act phi bcase) (Abs.act phi lcase)
-      in
-      let s1_rec_sys = List.map s1_rec_face up.sys in
-      make @@ Up {ty = mot'; neu; sys = s1_rec_sys}
-    | _ ->
-      raise @@ E (RecursorUnexpectedArgument ("the circle", scrut))
 
   and car v =
     match unleash v with

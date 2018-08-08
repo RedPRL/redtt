@@ -222,16 +222,6 @@ struct
         else
           failwith "Expected equal universe levels"
 
-      | _, S1, S1 ->
-        Tm.make Tm.S1
-
-      | _, Base, Base ->
-        Tm.make Tm.Base
-
-      | _, Loop x0, Loop x1 ->
-        let tx = equate_atom env x0 x1 in
-        Tm.make @@ Tm.Loop tx
-
       | _, Pi pi0, Pi pi1 ->
         let dom = equate env ty pi0.dom pi1.dom in
         let var = generic env pi0.dom in
@@ -508,28 +498,6 @@ struct
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
         failwith "Datatype mismatch"
-
-    | S1Rec rec0, S1Rec rec1 ->
-      let mot =
-        let var = generic env @@ make S1 in
-        let env' = Env.succ env in
-        let vmot0 = inst_clo rec0.mot var in
-        let vmot1 = inst_clo rec1.mot var in
-        equate_ty env' vmot0 vmot1
-      in
-      let bcase =
-        let vmot_base = inst_clo rec0.mot @@ make Base in
-        equate env vmot_base rec0.bcase rec1.bcase
-      in
-      let x_lcase, lcase =
-        let x_lcase, lcase0 = Abs.unleash1 rec0.lcase in
-        let lcase1 = Abs.inst1 rec1.lcase (`Atom x_lcase) in
-        let env' = Env.abs env (Emp #< x_lcase) in
-        let vmot_loop = inst_clo rec0.mot @@ make @@ Loop x_lcase in
-        x_lcase, equate env' vmot_loop lcase0 lcase1
-      in
-      let frame = Tm.S1Rec {mot = Tm.B (clo_name rec0.mot, mot); bcase = bcase; lcase = Tm.B (Name.name x_lcase, lcase)} in
-      equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
 
     | VProj vproj0, VProj vproj1 ->
       let x0 = vproj0.x in

@@ -22,10 +22,6 @@ type 'a tmf =
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | VIn of {r : 'a; tm0 : 'a; tm1 : 'a}
 
-  | S1
-  | Base
-  | Loop of 'a
-
   | Lam of 'a bnd
   | ExtLam of 'a nbnd
   | CoRThunk of ('a, 'a) face
@@ -73,7 +69,6 @@ and 'a frame =
   | Cdr
   | FunApp of 'a
   | ExtApp of 'a list
-  | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | LblCall

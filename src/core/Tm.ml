@@ -56,7 +56,7 @@ struct
 
   and traverse_con =
     function
-    | (Univ _ | S1 | Dim0 | Dim1 | TickConst | Base as con) ->
+    | (Univ _ | Dim0 | Dim1 | TickConst as con) ->
       con
 
     | FHCom info ->
@@ -110,10 +110,6 @@ struct
       let tm0 = traverse_tm info.tm0 in
       let tm1 = traverse_tm info.tm1 in
       VIn {r; tm0; tm1}
-
-    | Loop r ->
-      let r' = traverse_tm r in
-      Loop r'
 
     | Lam bnd ->
       let bnd' = traverse_bnd traverse_tm bnd in
@@ -324,12 +320,6 @@ struct
     | ExtApp ts ->
       let ts' = traverse_list traverse_tm ts in
       ExtApp ts'
-
-    | S1Rec info ->
-      let mot = traverse_bnd traverse_tm info.mot in
-      let bcase = traverse_tm info.bcase in
-      let lcase = traverse_bnd traverse_tm info.lcase in
-      S1Rec {mot; bcase; lcase}
 
     | Elim info ->
       let mot = traverse_bnd traverse_tm info.mot in
@@ -698,15 +688,6 @@ let rec pp env fmt =
     | TickConst ->
       Uuseg_string.pp_utf_8 fmt "∙"
 
-    | S1 ->
-      Format.fprintf fmt "S1"
-
-    | Base ->
-      Format.fprintf fmt "base"
-
-    | Loop r ->
-      Format.fprintf fmt "(loop %a)" (pp env) r
-
     | Univ {kind; lvl} ->
       Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
 
@@ -833,16 +814,6 @@ and pp_cmd env fmt (hd, sp) =
           Format.fprintf fmt "@[<hv1>(%a@ %a)@]" (go `FunApp) sp (pp env) t
       | ExtApp ts ->
         Format.fprintf fmt "@[<hv1>(%s %a@ %a)@]" "@" (go `ExtApp) sp (pp_terms env) ts
-      | S1Rec {mot = B (nm_mot, mot); bcase; lcase = B (nm_lcase, lcase)} ->
-        let x_mot, env_mot = Pp.Env.bind nm_mot env in
-        let x_lcase, env_lcase = Pp.Env.bind nm_lcase env in
-        Format.fprintf fmt "@[<hv1>(S1rec@ [%a] %a@ %a %a [%a] %a)@]"
-          Uuseg_string.pp_utf_8 x_mot
-          (pp env_mot) mot
-          (go `S1Rec) sp
-          (pp env) bcase
-          Uuseg_string.pp_utf_8 x_lcase
-          (pp env_lcase) lcase
       | Elim info ->
         let B (nm_mot, mot) = info.mot in
         let x_mot, env_mot = Pp.Env.bind nm_mot env in
@@ -1172,11 +1143,6 @@ let map_frame f =
     FunApp (f t)
   | ExtApp ts ->
     ExtApp (List.map f ts)
-  | S1Rec info ->
-    let mot = map_bnd f info.mot in
-    let bcase = f info.bcase in
-    let lcase = map_bnd f info.lcase in
-    S1Rec {mot; bcase; lcase}
   | Elim info ->
     let mot = map_bnd f info.mot in
     let clauses = List.map (fun (lbl, bnd) -> lbl, map_nbnd f bnd) info.clauses in
@@ -1220,9 +1186,8 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Dim0 | Dim1 | TickConst | S1 | Base | Data _) as con ->
+  | (Univ _ | Dim0 | Dim1 | TickConst | Data _) as con ->
     con
-  | Loop r -> Loop (f r)
   | Cons (t0, t1) ->
     Cons (f t0, f t1)
   | LblRet t ->

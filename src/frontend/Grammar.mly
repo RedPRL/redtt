@@ -17,7 +17,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK LOCK
-%token S1 ELIM LOOP BASE UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
 %token EOF
@@ -70,11 +70,6 @@ atomic_eterm:
     { E.Num n }
   | BULLET
     { E.TickConst }
-  | S1
-    { E.S1 }
-  | BASE
-    { E.Base }
-
 
 eframe:
   | e = atomic_eterm
@@ -102,10 +97,6 @@ pipe_block(X):
   | x = block(preceded(option(PIPE), separated_list(PIPE, X)))
     { x }
 
-s1_elim:
-  | option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm
-    { eb, x, el }
-
 eterm:
   | e = atomic_eterm
     { e }
@@ -123,13 +114,6 @@ eterm:
 
   | ELIM; scrut = eterm; clauses = pipe_block(eclause)
     { E.Elim {mot = None; scrut; clauses} }
-
-  | LOOP; r = eterm
-    { E.Loop r }
-
-  | ELIM; e0 = eterm; s1_elim = block(s1_elim)
-    { let eb, x, el = s1_elim in
-      E.S1Rec (None, e0, eb, (x, el)) }
 
   | DFIX; LSQ; r = eterm; RSQ; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
     { E.DFixLine {r; name; ty; bdy} }

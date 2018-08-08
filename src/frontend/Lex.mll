@@ -41,7 +41,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("lock", LOCK);
       ("🔓", LOCK);
       ("elim", ELIM);
-      ("S1", S1);
       ("fst", FST);
       ("snd", SND);
       ("coe", COE);
@@ -61,8 +60,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("open", OPEN);
       ("shut", SHUT);
       ("call", CALL);
-      ("base", BASE);
-      ("loop", LOOP);
       ("pre", PRE);
       ("kan", KAN);
       ("U", UNIV);
