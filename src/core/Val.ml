@@ -838,12 +838,16 @@ struct
           (* My lord, I have no idea if this is right. ouch!! *)
           let faces =
             eval_bterm_boundary dlbl desc Env.emp
-              ~const_args:(make_const_args @@ Dir.make (`Atom x) r')
+              ~const_args:(make_const_args @@ Dir.make r (`Atom x))
               ~rec_args:(make_rec_args @@ Dir.make r (`Atom x))
-              ~rs:(failwith "")
+              ~rs:info.rs
               constr.boundary
           in
-          let correction = List.map (Face.map @@ fun _ _ -> Abs.bind1 x) faces in
+          let fix_face =
+            Face.map @@ fun _ _ el ->
+            Abs.bind1 x @@ make_coe (Dir.make (`Atom x) r') abs el
+          in
+          let correction = List.map fix_face faces in
           make_fhcom (`Ok dir) intro @@ force_abs_sys correction
       end
 
