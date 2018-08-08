@@ -2292,6 +2292,9 @@ struct
       let elim_sys = List.map elim_face up.sys in
       make @@ Up {ty = mot'; neu; sys = elim_sys}
 
+    | FHCom info ->
+      failwith "TODO: elim_data of fhcom"
+
     | _ ->
       raise @@ E (RecursorUnexpectedArgument ("data type", scrut))
 
