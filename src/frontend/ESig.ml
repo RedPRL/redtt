@@ -19,7 +19,7 @@ and eterm =
   | Hope
   | Lam of string list * eterm
   | Tuple of eterm list
-  | Type
+  | Type of Kind.t
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
 

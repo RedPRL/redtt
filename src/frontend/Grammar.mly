@@ -56,8 +56,8 @@ atomic_eterm:
     { E.Hole a }
   | HOLE_NAME; LBR; e = eterm; RBR
     { E.Guess e }
-  | TYPE
-    { E.Type }
+  | TYPE; k = kind
+    { E.Type k }
   | LGL; es = separated_list(COMMA, eterm); RGL
     { E.Tuple es }
   | LPR; e = eterm; RPR
