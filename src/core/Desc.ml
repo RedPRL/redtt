@@ -22,7 +22,7 @@ struct
 end
 
 type ('a, 'b) constr =
-  {params : (string * 'a) list;
+  {const_specs : (string * 'a) list;
    args : (string * 'a arg_ty) list;
    dims : string list;
    boundary : ('a, 'b) Boundary.sys}

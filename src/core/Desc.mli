@@ -29,9 +29,9 @@ end
     and dimensions.
 
     When we generalized to indexed inductive types, the parameters will become {e bound} in the
-    arguments. TODO: rename [params] to [const_args] and [args] to [rec_args]. *)
+    arguments. TODO: rename [args] to [rec_args]. *)
 type ('a, 'b) constr =
-  {params : (string * 'a) list;
+  {const_specs : (string * 'a) list;
    args : (string * 'a arg_ty) list;
    dims : string list;
    boundary : ('a, 'b) Boundary.sys}

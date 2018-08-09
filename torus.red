@@ -20,3 +20,4 @@ let t2c (t : torus) : s1 × s1 =
   | square i j ⇒ <loop j, loop i>
   ]
 
+debug

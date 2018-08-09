@@ -359,19 +359,19 @@ struct
         raise @@ E err
 
   and equate_constr_args env dlbl constr =
-    let rec go_params acc venv ps els0 els1 =
-      match ps, els0, els1 with
+    let rec go_params acc venv cargs els0 els1 =
+      match cargs, els0, els1 with
       | [], _, _ ->
         Bwd.to_list acc, els0, els1
-      | (_, pty) :: ps, el0 :: els0, el1 :: els1 ->
-        let vty = eval venv pty in
+      | (_, ty) :: cargs, el0 :: els0, el1 :: els1 ->
+        let vty = eval venv ty in
         let tm0 = equate env vty el0 el1 in
-        go_params (acc #< tm0) (D.Env.push (`Val el0) venv) ps els0 els1
+        go_params (acc #< tm0) (D.Env.push (`Val el0) venv) cargs els0 els1
       | _ ->
         failwith "equate_constr_args"
     in
     fun els0 els1 ->
-      let tps, els0', els1' = go_params Emp D.Env.emp constr.params els0 els1 in
+      let tps, els0', els1' = go_params Emp D.Env.emp constr.const_specs els0 els1 in
       let self_ty = D.make @@ D.Data dlbl in
       let targs = List.map2 (equate env self_ty) els0' els1' in
       tps @ targs
@@ -464,24 +464,24 @@ struct
           let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
           let env', cvs, rvs, rs =
             let open Desc in
-            let rec build_cx qenv env (cvs, rvs) rs ps args dims =
-              match ps, args, dims with
-              | (_, pty) :: ps, _, _ ->
+            let rec build_cx qenv env (cvs, rvs) rs tys args dims =
+              match tys, args, dims with
+              | (_, pty) :: tys, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
                 let env' = D.Env.push (`Val v) env in
-                build_cx (Env.succ qenv) env' (cvs #< v, rvs) rs ps args dims
+                build_cx (Env.succ qenv) env' (cvs #< v, rvs) rs tys args dims
               | [], (_, Self) :: args, _ ->
                 let vx = generic qenv data_ty in
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
-                build_cx (Env.succ qenv') env (cvs, rvs #< vx #< vih) rs [] args dims
+                build_cx (Env.succ qenv') env (cvs, rvs #< vx #< vih) rs tys args dims
               | [], [], dims ->
                 let xs = Bwd.map (fun x -> Name.named @@ Some x) @@ Bwd.from_list dims in
                 let qenv' = Env.abs qenv xs in
                 qenv', Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env D.Env.emp (Emp, Emp) Emp constr.params constr.args constr.dims
+            build_cx env D.Env.emp (Emp, Emp) Emp constr.const_specs constr.args constr.dims
           in
           let vs = cvs @ rvs in
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in

@@ -781,7 +781,7 @@ struct
       let r, r' = Dir.unleash dir in
 
       let make_const_args dir =
-        multi_coe Env.emp dir (x, constr.params) info.const_args
+        multi_coe Env.emp dir (x, constr.const_specs) info.const_args
       in
 
       let coe_rec_arg dir _arg_spec arg =
@@ -1172,8 +1172,8 @@ struct
       let constr = Desc.lookup_constr info.clbl desc in
 
       (* TODO: clean this up! this was written before I split the args into two lists *)
-      let args' = make_args 0 Emp (info.const_args @ info.rec_args) constr.params constr.args in
-      let const_args, rec_args = ListUtil.split (List.length constr.params) args' in
+      let args' = make_args 0 Emp (info.const_args @ info.rec_args) constr.const_specs constr.args in
+      let const_args, rec_args = ListUtil.split (List.length constr.const_specs) args' in
 
       make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
 
@@ -1569,7 +1569,7 @@ struct
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr clbl desc in
-      let tconst_args, args = ListUtil.split (List.length constr.params) args in
+      let tconst_args, args = ListUtil.split (List.length constr.const_specs) args in
       let trec_args, trs = ListUtil.split (List.length constr.args) args in
       let const_args = List.map (eval rho) tconst_args in
       let rec_args = List.map (eval rho) trec_args in
@@ -2230,7 +2230,7 @@ struct
       in
 
       (* CLEANUP *)
-      inst_nclo nclo @@ go (info.const_args @ info.rec_args) info.rs constr.params constr.args constr.dims
+      inst_nclo nclo @@ go (info.const_args @ info.rec_args) info.rs constr.const_specs constr.args constr.dims
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in

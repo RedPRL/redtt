@@ -327,20 +327,20 @@ let rec check cx ty tm =
 
 and check_constr cx dlbl constr tms =
   let vdataty = D.make @@ D.Data dlbl in
-  let rec go cx' ps args dims tms =
-    match ps, args, dims, tms with
+  let rec go cx' tys args dims tms =
+    match tys, args, dims, tms with
     | [], args, dims, _ ->
       let tms, trs = ListUtil.split (List.length args) tms in
       List.iter2 (fun (_, Desc.Self) tm -> check cx vdataty tm) args tms;
       List.iter2 (fun _ tm -> check_dim cx tm) dims trs;
-    | (plbl, pty) :: ps, args, dims, tm :: tms ->
-      let vpty = Cx.eval cx' pty in
-      let varg = check_eval cx vpty tm in
-      let cx' = Cx.def cx ~nm:(Some plbl) ~ty:vpty ~el:varg in
-      go cx' ps args dims tms
+    | (plbl, ty) :: tys, args, dims, tm :: tms ->
+      let vty = Cx.eval cx' ty in
+      let varg = check_eval cx vty tm in
+      let cx' = Cx.def cx ~nm:(Some plbl) ~ty:vty ~el:varg in
+      go cx' tys args dims tms
     | _ -> failwith "constructor arguments malformed"
   in
-  go cx constr.params constr.args constr.dims tms
+  go cx constr.const_specs constr.args constr.dims tms
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
@@ -588,7 +588,7 @@ and infer_spine cx hd =
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', nms, cvs, rvs, rs = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp) constr.params constr.args constr.dims in
+        let cx', nms, cvs, rvs, rs = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp) constr.const_specs constr.args constr.dims in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 

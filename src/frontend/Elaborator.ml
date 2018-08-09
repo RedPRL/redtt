@@ -205,22 +205,22 @@ struct
           elab_constr_boundary env dlbl constrs constr.boundary >>= fun boundary ->
           M.ret
             (clbl,
-             {params = abstract_tele Emp @@ Bwd.to_list acc;
+             {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
               args;
               dims = constr.dims;
               boundary})
         end
 
-      | (lbl, ety) :: prms ->
+      | (lbl, ety) :: const_specs ->
         (* TODO: support higher universes *)
         let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
         elab_chk env univ0 ety >>= bind_in_scope >>= fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
-        go (acc #< (lbl, x, pty)) prms
+        go (acc #< (lbl, x, pty)) const_specs
     in
 
-    go Emp constr.params
+    go Emp constr.const_specs
 
   and elab_constr_boundary env dlbl constrs sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
     traverse (elab_constr_face env dlbl constrs) sys
@@ -273,7 +273,7 @@ struct
       end
 
     | `Constr (clbl, constr) ->
-      let rec go_params acc ps frms =
+      let rec go_const_specs acc ps frms =
         match ps, frms with
         | [], _ ->
           M.ret (List.rev_map snd acc, frms)
@@ -282,7 +282,7 @@ struct
           let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.Down {ty; tm}, Emp) sub) acc @@ Tm.shift 0 in
           let pty' = Tm.subst sub pty in
           elab_chk env pty' e >>= bind_in_scope >>= fun t ->
-          go_params ((pty', t) :: acc) ps frms
+          go_const_specs ((pty', t) :: acc) ps frms
         | _ ->
           failwith "elab_intro: malformed parameters"
       in
@@ -309,7 +309,7 @@ struct
           failwith "Dimensions length mismatch in boundary term"
       in
 
-      go_params [] constr.params @@ Bwd.to_list spine >>= fun (const_args, frms) ->
+      go_const_specs [] constr.const_specs @@ Bwd.to_list spine >>= fun (const_args, frms) ->
       go_args Emp constr.args frms >>= fun (rec_args, frms) ->
       go_dims Emp constr.dims frms >>= fun rs ->
       M.ret @@ Desc.Boundary.Intro {clbl; const_args; rec_args; rs}
@@ -818,7 +818,7 @@ struct
       | Snoc (spine, frm) ->
         kind_of_frame env frm >>= function
         | `ExtApp dim ->
-          go spine (dim :: dims)
+          go spine @@ dim :: dims
         | _ ->
           M.ret (spine #< frm, Bwd.from_list dims)
     in
@@ -878,7 +878,7 @@ struct
       | _ ->
         failwith "todo: go_args"
     in
-    go_params [] constr.params @@ Bwd.to_list frms >>= fun (tps, frms) ->
+    go_params [] constr.const_specs @@ Bwd.to_list frms >>= fun (tps, frms) ->
     go_args constr.args constr.dims frms >>= fun targs ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
 
@@ -949,7 +949,7 @@ struct
       evaluator <<@> fun (_, (module V)) ->
         let tclo = V.unleash_later vty in
         let tick = Tm.make Tm.TickConst in
-        let vty' = V.inst_tick_clo tclo @@ Domain.TickConst in
+        let vty' = V.inst_tick_clo tclo Domain.TickConst in
         vty', (hd, sp #< (Tm.Prev tick))
 
     | spine, `Prev (E.Var (name, _)) ->
