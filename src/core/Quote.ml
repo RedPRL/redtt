@@ -753,69 +753,6 @@ struct
 
   let rec subtype env ty0 ty1 =
     fancy_subtype env ty0 [] ty1 []
-  (* match unleash ty0, unleash ty1 with
-     | Pi pi0, Pi pi1 ->
-     subtype env pi1.dom pi0.dom;
-     let var = generic env pi0.dom in
-     let vcod0 = inst_clo pi0.cod var in
-     let vcod1 = inst_clo pi1.cod var in
-     subtype (Env.succ env) vcod0 vcod1
-
-     | Sg sg0, Sg sg1 ->
-     subtype env sg0.dom sg1.dom;
-     let var = generic env sg0.dom in
-     let vcod0 = inst_clo sg0.cod var in
-     let vcod1 = inst_clo sg1.cod var in
-     subtype (Env.succ env) vcod0 vcod1
-
-     | Later ltr0, Later ltr1 ->
-     let tick = TickGen (`Lvl (None, Env.len env)) in
-     let vcod0 = inst_tick_clo ltr0 tick in
-     let vcod1 = inst_tick_clo ltr1 tick in
-     subtype (Env.succ env) vcod0 vcod1
-
-     | BoxModality ty0, BoxModality ty1 ->
-     subtype env ty0 ty1
-
-     | Ext abs0, Ext abs1 ->
-     let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
-     let ty1x, sys1x = ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
-     let envx = Env.abs env xs in
-     subtype envx ty0x ty1x;
-     approx_restriction envx ty0x ty1x sys0x sys1x
-
-     | LblTy info0, LblTy info1 ->
-     if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
-      subtype env info0.ty info1.ty;
-     let go_arg (nf0, nf1) =
-      equiv_ty env nf0.ty nf1.ty;
-      equiv env ~ty:nf0.ty nf0.el nf1.el
-     in
-     List.iter go_arg @@ List.combine info0.args info1.args
-
-     | Univ info0, Univ info1 ->
-     if Kind.lte info0.kind info1.kind && Lvl.lte info0.lvl info1.lvl then
-      ()
-     else
-      failwith "Universe subtyping error"
-
-
-     (* The following code is kind of complicated. What it does is the following:
-     1. First, turn both sides into a restriction type somehow.
-     2. Then, using a generic element, check that the restriction of the lhs implies the restriction of the rhs.
-   *)
-     | Rst rst0, con1 ->
-     let ty0, sys0 = rst0.ty, rst0.sys in
-     let ty1, sys1 =
-      match con1 with
-      | Rst rst1 -> rst1.ty, rst1.sys
-      | _ -> ty1, []
-     in
-     subtype env ty0 ty1;
-     approx_restriction env ty0 ty1 sys0 sys1
-
-     | _ ->
-     equiv_ty env ty0 ty1 *)
 
   and fancy_subtype env ty0 sys0 ty1 sys1 =
     match unleash ty0, unleash ty1 with
