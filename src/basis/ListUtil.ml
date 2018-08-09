@@ -16,3 +16,13 @@ let rec index_of pred xs =
     0
   | _ :: xs ->
     1 + index_of pred xs
+
+
+let rec map3 f xs ys zs =
+  match xs, ys, zs with
+  | [], [], [] ->
+    []
+  | x :: xs, y :: ys, z :: zs ->
+    f x y z :: map3 f xs ys zs
+  | _ ->
+    failwith "map3: length mismatch"

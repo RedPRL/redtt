@@ -1,8 +1,10 @@
 open Domain
-open RedBasis.Bwd
+open RedBasis
+open Bwd
 open BwdNotation
 
 module D = Domain
+module B = Desc.Boundary
 
 
 module Env :
@@ -71,6 +73,15 @@ sig
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
+
+  val equiv_boundary_value
+    : env
+    -> Desc.data_label
+    -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+    -> Tm.tm Desc.arg_ty
+    -> value
+    -> value
+    -> unit
 end
 
 
@@ -349,32 +360,35 @@ struct
       | Data dlbl, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
         let desc = V.Sig.lookup_datatype dlbl in
         let constr = Desc.lookup_constr info0.clbl desc in
-        (* TODO: change equate_constr_args to take two sets of arguments *)
-        let targs = equate_constr_args env dlbl constr (info0.const_args @ info0.rec_args) (info1.const_args @ info1.rec_args) in
+        let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
+        let rec_args = equate_constr_rec_args env dlbl constr info0.rec_args info1.rec_args in
         let trs = equate_dims env info0.rs info1.rs in
-        Tm.make @@ Tm.Intro (dlbl, info0.clbl, targs @ trs)
+        Tm.make @@ Tm.Intro (dlbl, info0.clbl, const_args @ rec_args @ trs)
 
       | _ ->
         let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
 
-  and equate_constr_args env dlbl constr =
-    let rec go_params acc venv cargs els0 els1 =
-      match cargs, els0, els1 with
-      | [], _, _ ->
-        Bwd.to_list acc, els0, els1
-      | (_, ty) :: cargs, el0 :: els0, el1 :: els1 ->
+  and equate_constr_const_args env constr els0 els1 =
+    let open Desc in
+    let rec go acc venv const_specs els0 els1 =
+      match const_specs, els0, els1 with
+      | [], [], [] ->
+        Bwd.to_list acc
+      | (_, ty) :: const_specs, el0 :: els0, el1 :: els1 ->
         let vty = eval venv ty in
         let tm0 = equate env vty el0 el1 in
-        go_params (acc #< tm0) (D.Env.push (`Val el0) venv) cargs els0 els1
+        go (acc #< tm0) (D.Env.push (`Val el0) venv) const_specs els0 els1
       | _ ->
         failwith "equate_constr_args"
     in
-    fun els0 els1 ->
-      let tps, els0', els1' = go_params Emp D.Env.emp constr.const_specs els0 els1 in
-      let self_ty = D.make @@ D.Data dlbl in
-      let targs = List.map2 (equate env self_ty) els0' els1' in
-      tps @ targs
+    go Emp D.Env.emp constr.const_specs els0 els1
+
+  and equate_constr_rec_args env dlbl constr els0 els1 =
+    let open Desc in
+    (* TODO: factor out *)
+    let realize_spec_ty Self = D.make @@ D.Data dlbl in
+    ListUtil.map3 (fun (_, spec_ty) -> equate env @@ realize_spec_ty spec_ty) constr.rec_specs els0 els1
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
@@ -838,5 +852,41 @@ struct
         Format.eprintf "Unexpected error in subtyping: %s@." (Printexc.to_string exn);
         raise exn
     end
+
+
+  let rec equate_boundary_value env (dlbl, desc) rec_spec el0 el1 =
+    match rec_spec with
+    | Desc.Self ->
+      begin
+        match unleash el0, unleash el1 with
+        | D.Intro info0, D.Intro info1 when info0.clbl = info1.clbl ->
+          let constr = Desc.lookup_constr info0.clbl desc in
+          let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
+          let rec_args =
+            ListUtil.map3
+              (fun (_, spec) -> equate_boundary_value env (dlbl, desc) spec)
+              constr.rec_specs
+              info0.rec_args
+              info1.rec_args
+          in
+          let rs = equate_dims env info0.rs info1.rs in
+          B.Intro {clbl = info0.clbl; const_args; rec_args; rs = rs}
+        | D.Up info0, D.Up info1 ->
+          equate_boundary_neu env info0.neu info1.neu
+        | _ ->
+          failwith "equate_boundary_value"
+      end
+
+  and equate_boundary_neu env neu0 neu1 =
+    match neu0, neu1 with
+    | D.Lvl (_, lvl0), D.Lvl (_, lvl1) when lvl0 = lvl1 ->
+      let ix = Env.ix_of_lvl lvl0 env in
+      B.Var ix
+    | _ ->
+      failwith "equate_boundary_neu"
+
+
+  let equiv_boundary_value env dlbl desc rec_spec el0 el1 =
+    ignore @@ equate_boundary_value env (dlbl, desc) rec_spec el0 el1
 
 end

@@ -34,6 +34,15 @@ sig
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
+
+  val equiv_boundary_value
+    : env
+    -> Desc.data_label
+    -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+    -> Tm.tm Desc.arg_ty
+    -> value
+    -> value
+    -> unit
 end
 
 module M (V : Val.S) : S
