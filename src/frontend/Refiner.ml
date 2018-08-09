@@ -12,6 +12,9 @@ open Notation
 type chk_tac = ty -> tm M.m
 type inf_tac = (ty * tm) M.m
 
+open Tm.Notation
+
+
 let normalization_clock = ref 0.
 
 let _ =
@@ -70,8 +73,7 @@ let push_restriction sys ty =
     let x, codx = Tm.unbind cod in
     let app_tm tm =
       let var = Tm.up @@ Tm.var x in
-      let hd = Tm.Down {ty; tm} in
-      Tm.up (hd, Emp #< (Tm.FunApp var))
+      Tm.up @@ Tm.ann ~ty ~tm @< Tm.FunApp var
     in
     let app_sys = on_sys app_tm sys in
     let rcodx = Tm.make @@ Tm.Rst {ty = codx; sys = app_sys} in
@@ -82,8 +84,7 @@ let push_restriction sys ty =
     let xs, tyxs, sysxs = Tm.unbind_ext ebnd in
     let app_tm tm =
       let vars = List.map (fun x -> Tm.up @@ Tm.var x) @@ Bwd.to_list xs in
-      let hd = Tm.Down {ty; tm} in
-      Tm.up (hd , Emp #< (Tm.ExtApp vars))
+      Tm.up @@ Tm.ann ~ty ~tm @< Tm.ExtApp vars
     in
     let ebnd' = Tm.bind_ext xs tyxs @@ sysxs @ on_sys app_tm sys in
     let rty = Tm.make @@ Tm.Ext ebnd' in
@@ -130,7 +131,6 @@ let tac_wrap_nf tac ty =
     normalize_ty ty >>= tac_rst tac
 
 
-
 let tac_let name itac ctac =
   fun ty ->
     itac >>= fun (let_ty, let_tm) ->
@@ -140,8 +140,7 @@ let tac_let name itac ctac =
     in
     let x = Name.named @@ Some name in
     M.in_scope x (`P singleton_ty) (ctac ty) >>= fun bdyx ->
-    let inf = Tm.Down {ty = let_ty; tm = let_tm}, Emp in
-    M.ret @@ Tm.make @@ Tm.Let (inf, Tm.bind x bdyx)
+    M.ret @@ Tm.make @@ Tm.Let (Tm.ann ~ty:let_ty ~tm:let_tm, Tm.bind x bdyx)
 
 
 let rec tac_lambda names tac ty =
@@ -230,24 +229,24 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           | _ -> false
         in
         if is_dependent then
-          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
-          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
-          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
+          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun mot ->
+          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(Tm.up @@ mot @< Tm.FunApp scrut) >>
           M.unify >>
-          let wmothd, wmotsp = Tm.subst_cmd (Tm.shift 1) (mothd, motsp) in
-          M.ret @@ Tm.B (None, Tm.up (wmothd, wmotsp #< (Tm.FunApp (Tm.up @@ Tm.ix 0))))
+          M.ret @@ Tm.B (None, Tm.up @@ Tm.subst_cmd (Tm.shift 1) mot @< Tm.FunApp (Tm.up @@ Tm.ix 0))
         else
           M.ret @@ Tm.B (None, Tm.subst (Tm.shift 1) ty)
       | Some tac_mot ->
         tac_mot mot_ty >>= fun mot ->
-        let mothd = Tm.Down {ty = Tm.subst (Tm.shift 1) mot_ty; tm = Tm.subst (Tm.shift 1) mot} in
-        let motx = (mothd, Emp #< (Tm.FunApp (Tm.up @@ Tm.ix 0))) in
+        let motx =
+          Tm.ann ~ty:(Tm.subst (Tm.shift 1) mot_ty) ~tm:(Tm.subst (Tm.shift 1) mot)
+          @< Tm.FunApp (Tm.up @@ Tm.ix 0)
+        in
         M.ret @@ Tm.B (None, Tm.up @@ motx)
     end >>= fun bmot ->
 
     let mot arg =
       let Tm.B (_, motx) = bmot in
-      let arg' = Tm.Down {ty = data_ty; tm = arg}, Emp in
+      let arg' = Tm.ann ~ty:data_ty ~tm:arg in
       Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
     in
 
@@ -389,10 +388,10 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
 
     refine_clauses [] clauses >>= fun tclauses ->
 
-    let hd = Tm.Down {ty = data_ty; tm = scrut} in
     let bmot =
       let x = Name.fresh () in
       Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
     in
-    let frm = Tm.Elim {dlbl; mot = bmot; clauses = tclauses} in
-    M.ret @@ Tm.up (hd, Emp #< frm)
+    M.ret @@ Tm.up @@
+    Tm.ann ~ty:data_ty ~tm:scrut
+    @< Tm.Elim {dlbl; mot = bmot; clauses = tclauses}

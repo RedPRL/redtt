@@ -938,6 +938,9 @@ and pp_bface env fmt face =
 
 let up cmd = make @@ Up cmd
 
+let ann ~ty ~tm =
+  Down {ty; tm}, Emp
+
 let car (hd, sp) =
   hd, sp #< Car
 
@@ -952,54 +955,52 @@ let let_ nm t0 t1 = make @@ Let (t0, B (nm, t1))
 let cons t0 t1 = make @@ Cons (t0, t1)
 let univ ~kind ~lvl = make @@ Univ {kind; lvl}
 
-module Macro =
-struct
-  let arr ty0 ty1 =
-    pi None ty0 @@
-    subst (Shift 1) ty1
 
-  let times ty0 ty1 =
-    sg None ty0 @@
-    subst (Shift 1) ty1
+let arr ty0 ty1 =
+  pi None ty0 @@
+  subst (Shift 1) ty1
 
-  let path ty tm0 tm1 =
-    let ty' = subst (Shift 1) ty in
-    let face0 = up (ix 0), make Dim0, Some (subst (Shift 1) tm0) in
-    let face1 = up (ix 0), make Dim1, Some (subst (Shift 1) tm1) in
-    let sys = [face0; face1] in
-    make @@ Ext (NB (Emp #< None, (ty', sys)))
+let times ty0 ty1 =
+  sg None ty0 @@
+  subst (Shift 1) ty1
 
-  let fiber ~ty0 ~ty1 ~f ~x =
-    sg (Some "ix") ty0 @@
-    let app =
-      Down {tm = subst (Shift 1) f; ty = arr ty0 ty1},
-      (Emp #< (FunApp (up (ix 0))))
-    in
-    path
-      (subst (Shift 1) ty1)
-      (up app)
-      (subst (Shift 1) x)
+let path ty tm0 tm1 =
+  let ty' = subst (Shift 1) ty in
+  let face0 = up (ix 0), make Dim0, Some (subst (Shift 1) tm0) in
+  let face1 = up (ix 0), make Dim1, Some (subst (Shift 1) tm1) in
+  let sys = [face0; face1] in
+  make @@ Ext (NB (Emp #< None, (ty', sys)))
 
-  let proj2 = Shift 2
+let fiber ~ty0 ~ty1 ~f ~x =
+  sg (Some "ix") ty0 @@
+  let app =
+    Down {tm = subst (Shift 1) f; ty = arr ty0 ty1},
+    (Emp #< (FunApp (up (ix 0))))
+  in
+  path
+    (subst (Shift 1) ty1)
+    (up app)
+    (subst (Shift 1) x)
 
-  let is_contr ty =
-    sg (Some "center") ty @@
-    pi (Some "other") (subst (Shift 1) ty) @@
-    path
-      (subst proj2 ty)
-      (up @@ ix 0)
-      (up @@ ix 1)
+let proj2 = Shift 2
 
-  let equiv ty0 ty1 =
-    sg (Some "fun") (arr ty0 ty1) @@
-    pi (Some "el") (subst (Shift 1) ty1) @@
-    is_contr @@
-    fiber
-      ~ty0:(subst proj2 ty0)
-      ~ty1:(subst proj2 ty1)
-      ~f:(up @@ ix 1)
-      ~x:(up @@ ix 0)
-end
+let is_contr ty =
+  sg (Some "center") ty @@
+  pi (Some "other") (subst (Shift 1) ty) @@
+  path
+    (subst proj2 ty)
+    (up @@ ix 0)
+    (up @@ ix 1)
+
+let equiv ty0 ty1 =
+  sg (Some "fun") (arr ty0 ty1) @@
+  pi (Some "el") (subst (Shift 1) ty1) @@
+  is_contr @@
+  fiber
+    ~ty0:(subst proj2 ty0)
+    ~ty1:(subst proj2 ty1)
+    ~f:(up @@ ix 1)
+    ~x:(up @@ ix 0)
 
 
 module OccursAlg (Init : sig val fl : Occurs.flavor end) :
@@ -1384,6 +1385,13 @@ let rec shift_univ k tm =
 
 
 let pp0 fmt tm = pp Pp.Env.emp fmt @@ eta_contract tm
+
+module Notation =
+struct
+  let (@<) cmd frm =
+    let hd, sp = cmd in
+    hd, sp #< frm
+end
 
 module Error =
 struct

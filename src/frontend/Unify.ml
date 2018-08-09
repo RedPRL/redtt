@@ -11,6 +11,7 @@ open Notation
 
 type telescope = params
 
+open Tm.Notation
 
 
 let rec telescope ty : telescope * ty =
@@ -419,7 +420,7 @@ let (%%) (ty, tm) frame =
   base_cx >>= fun cx ->
   let vty = Cx.eval cx ty in
   plug (vty, tm) frame >>= fun tm' ->
-  let vty' = Typing.infer cx (Tm.Down {ty; tm}, Emp #< frame) in
+  let vty' = Typing.infer cx @@ Tm.ann ~ty ~tm @< frame in
   let ty' = Cx.quote_ty cx vty' in
   ret (ty', tm')
 

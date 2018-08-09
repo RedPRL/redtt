@@ -20,6 +20,8 @@ struct
   module Notation = Monad.Notation (M)
   open Notation
 
+  open Tm.Notation
+
   let rec traverse f xs =
     match xs with
     | [] ->
@@ -303,7 +305,7 @@ struct
           M.ret (List.rev_map snd acc, frms)
         | (_, pty) :: ps, E.App e :: frms ->
           (* TODO: might be backwards *)
-          let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.Down {ty; tm}, Emp) sub) acc @@ Tm.shift 0 in
+          let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
           let pty' = Tm.subst sub pty in
           elab_chk env pty' e >>= bind_in_scope >>= fun t ->
           go_const_specs ((pty', t) :: acc) ps frms
@@ -537,7 +539,7 @@ struct
       elab_chk env ty e
     | Tm.Sg (dom, cod), Tuple (e :: es) ->
       elab_chk env dom e >>= fun tm0 ->
-      let cmd0 = Tm.Down {ty = dom; tm = tm0}, Emp in
+      let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
       let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
       elab_chk env cod' (Tuple es) <<@> Tm.cons tm0
 
@@ -703,9 +705,7 @@ struct
           let sign = Cx.globals cx in
           let _ = GlobalEnv.lookup_datatype name sign in
           let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
-          let hd = Tm.Down {ty = univ0; tm = Tm.make @@ Tm.Data name} in
-          let cmd = hd, Emp in
-          univ0, cmd
+          univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
       end
 
     | E.Quo tmfam ->
@@ -741,7 +741,7 @@ struct
       end >>= fun (fam_r, fam_r') ->
       elab_chk env fam_r info.tm <<@> fun tm ->
         let varx = Tm.up @@ Tm.var x in
-        let tyx = Tm.up (Tm.Down {ty = univ_fam; tm = fam}, Emp #< (Tm.ExtApp [varx])) in
+        let tyx = Tm.up @@ Tm.ann ~ty:univ_fam ~tm:fam @< Tm.ExtApp [varx] in
         let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
         fam_r', (coe, Emp)
 
@@ -790,7 +790,7 @@ struct
           let dfix = Tm.DFix {r; ty; bdy}, Emp in
           let Tm.B (_, bdy') = bdy in
           let fix = Tm.subst (Tm.dot dfix @@ Tm.shift 0) bdy' in
-          ty, (Tm.Down {tm = fix; ty}, Emp)
+          ty, Tm.ann ~tm:fix ~ty
       end
 
     | _ ->
@@ -883,7 +883,7 @@ struct
         M.ret (List.rev_map snd acc, frms)
       | (_, ty) :: const_specs, E.App e :: frms ->
         (* TODO: might be backwards *)
-        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.Down {ty; tm}, Emp) sub) acc @@ Tm.shift 0 in
+        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
         let ty' = Tm.subst sub ty in
         elab_chk env ty' e >>= fun t ->
         go_const_args ((ty', t) :: acc) const_specs frms
@@ -1000,4 +1000,3 @@ struct
 
 
 end
-
