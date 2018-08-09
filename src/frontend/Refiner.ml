@@ -216,11 +216,10 @@ let unleash_data ty =
 let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
+    normalize_ty data_ty >>= fun data_ty ->
 
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
     let mot_ty = Tm.pi None data_ty univ in
-
-
 
     begin
       match tac_mot with
