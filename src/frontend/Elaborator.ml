@@ -192,6 +192,7 @@ struct
     let rec go acc =
       function
       | [] ->
+        let const_specs = abstract_tele Emp @@ Bwd.to_list acc in
         (* TODO: when self args are more complex, we'll need to abstract them over
            the parameters too. *)
         traverse elab_arg_ty constr.rec_specs >>= fun rec_specs ->
@@ -202,7 +203,7 @@ struct
         in
         M.in_scopes psi @@
         begin
-          elab_constr_boundary env dlbl constrs constr.boundary >>= fun boundary ->
+          elab_constr_boundary env dlbl constrs (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
           M.ret
             (clbl,
              {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
@@ -222,8 +223,31 @@ struct
 
     go Emp constr.const_specs
 
-  and elab_constr_boundary env dlbl constrs sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
-    traverse (elab_constr_face env dlbl constrs) sys
+  and elab_constr_boundary env dlbl constrs (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
+    M.lift C.base_cx >>= fun cx ->
+    let (module V) = Cx.evaluator cx in
+    let module D = Domain in
+
+    let rec build_cx cx env (nms, cvs, rvs, rs) const_specs rec_specs dim_specs =
+      match const_specs, rec_specs, dim_specs with
+      | (plbl, pty) :: const_specs, _, _ ->
+        let vty = V.eval env pty in
+        let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
+        build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some plbl), cvs #< v, rvs, rs) const_specs rec_specs dim_specs
+      | [], (nm, Desc.Self) :: rec_specs, _ ->
+        let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data dlbl in
+        build_cx cx_x env (nms #< (Some nm), cvs, rvs #< v_x, rs) const_specs rec_specs dim_specs
+      | [], [], nm :: dim_specs ->
+        let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
+        build_cx cx' env (nms #< (Some nm), cvs, rvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
+      | [], [], [] ->
+        cx
+    in
+
+    let cx' = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp) const_specs rec_specs dim_specs in
+    traverse (elab_constr_face env dlbl constrs) sys >>= fun bdry ->
+    Typing.check_constr_boundary_sys cx' dlbl constrs bdry;
+    M.ret bdry
 
   and elab_constr_face env dlbl constrs (er0, er1, e) =
     elab_dim env er0 >>= bind_in_scope >>= fun r0 ->
