@@ -623,7 +623,7 @@ and infer_spine cx hd =
 
       in
 
-      check_clauses [] desc;
+      check_clauses [] desc.constrs;
       D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
 
 

@@ -278,7 +278,7 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
             M.emit @@ M.UserHole {name = Some lbl; ty; tele = psi; tm = Tm.up tm} >>
             M.ret @@ Tm.up tm
       in
-      List.map (fun (lbl, _) -> find_clause lbl) desc
+      List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
     in
 
     begin

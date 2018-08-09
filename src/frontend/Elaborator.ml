@@ -167,12 +167,12 @@ struct
   and elab_datatype env dlbl edesc =
     let rec go acc =
       function
-      | [] -> M.ret @@ List.rev acc
+      | [] -> M.ret @@ Desc.{constrs = List.rev acc}
       | econstr :: econstrs ->
         elab_constr env dlbl acc econstr >>= fun constr ->
         go (constr :: acc) econstrs
     in
-    go [] edesc
+    go [] edesc.constrs
 
   and elab_constr env dlbl constrs (clbl, constr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) constrs then
@@ -246,7 +246,7 @@ struct
 
     let cx' = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp) const_specs rec_specs dim_specs in
     traverse (elab_constr_face env dlbl constrs) sys >>= fun bdry ->
-    Typing.check_constr_boundary_sys cx' dlbl constrs bdry;
+    Typing.check_constr_boundary_sys cx' dlbl {constrs} bdry;
     M.ret bdry
 
   and elab_constr_face env dlbl constrs (er0, er1, e) =

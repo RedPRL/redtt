@@ -507,7 +507,7 @@ struct
           clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)
         in
 
-        let clauses = List.map quote_clause desc in
+        let clauses = List.map quote_clause desc.constrs in
         let frame = Tm.Elim {dlbl; mot; clauses} in
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else

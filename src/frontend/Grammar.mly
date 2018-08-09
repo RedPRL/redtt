@@ -35,7 +35,7 @@ edecl:
     { E.Debug f }
   | DATA; dlbl = ATOM; WHERE; option(PIPE); constrs = separated_list(PIPE, desc_constr)
     { let desc = List.map (fun constr -> constr dlbl) constrs in
-      E.Data (dlbl, desc) }
+      E.Data (dlbl, {constrs = desc}) }
   | IMPORT; a = ATOM
     { E.Import a }
   | QUIT
