@@ -61,7 +61,8 @@ and neu =
   | Var of {name : Name.t; twin : Tm.twin; ushift : int}
   | Meta of {name : Name.t; ushift : int}
 
-  | NHCom of {dir : dir; ty : value; cap : neu; sys : comp_sys}
+  | NHComAtType of {dir : dir; univ : value; ty : neu; cap : value; sys : comp_sys}
+  | NHComAtCap of {dir : dir; ty : value; cap : neu; sys : comp_sys}
   | NCoe of {dir : dir; abs : abs; neu : neu}
 
   | FunApp of neu * nf

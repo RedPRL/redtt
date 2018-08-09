@@ -387,7 +387,20 @@ struct
 
   and act_neu phi con =
     match con with
-    | NHCom info ->
+    | NHComAtType info ->
+      let dir = Dir.act phi info.dir in
+      let univ = Value.act phi info.univ in
+      let cap = Value.act phi info.cap in
+      let sys = CompSys.act phi info.sys in
+      let ty =
+        match act_neu phi info.ty with
+        | Ret neu ->
+          reflect univ neu []
+        | Step ty -> ty
+      in
+      step @@ make_hcom dir ty cap sys
+
+    | NHComAtCap info ->
       let dir = Dir.act phi info.dir in
       let ty = Value.act phi info.ty in
       let sys = CompSys.act phi info.sys in
@@ -1178,14 +1191,27 @@ struct
       make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
 
     | _, Up info ->
-      rigid_nhcom_up dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
+      rigid_nhcom_up_at_cap dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
 
     | _ ->
       raise @@ E (RigidHComUnexpectedArgument cap)
 
 
-  and rigid_nhcom_up dir ty cap ~comp_sys ~rst_sys =
-    let neu = NHCom {dir; ty; cap; sys = comp_sys} in
+  and rigid_nhcom_up_at_type dir univ ty cap ~comp_sys ~rst_sys =
+    let neu = NHComAtType {dir; univ; ty; cap; sys = comp_sys} in
+    let hcom_face r r' ty =
+      let phi = I.equate r r' in
+      let dir_phi = Dir.act phi dir in
+      let cap_phi = Value.act phi cap in
+      let sys_phi = CompSys.act phi comp_sys in
+      make_hcom dir_phi ty cap_phi sys_phi
+    in
+    let ty = reflect univ ty [] in
+    let rst_sys = List.map (Face.map hcom_face) rst_sys in
+    make @@ Up {ty; neu; sys = rst_sys}
+
+  and rigid_nhcom_up_at_cap dir ty cap ~comp_sys ~rst_sys =
+    let neu = NHComAtCap {dir; ty; cap; sys = comp_sys} in
     let hcom_face r r' el =
       let phi = I.equate r r' in
       let dir_phi = Dir.act phi dir in
@@ -1198,8 +1224,11 @@ struct
 
   and rigid_hcom dir ty cap sys : value =
     match unleash ty with
-    | Pi _ | Sg _ | Ext _ | Up _ ->
+    | Pi _ | Sg _ | Ext _ ->
       make @@ HCom {dir; ty; cap; sys}
+
+    | Up info ->
+      rigid_nhcom_up_at_type dir info.ty info.neu cap ~comp_sys:sys ~rst_sys:info.sys
 
     | Data dlbl ->
       let desc = Sig.lookup_datatype dlbl in

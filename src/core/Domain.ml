@@ -177,9 +177,13 @@ and pp_neu fmt neu =
   | Lvl (Some x, _) ->
     Uuseg_string.pp_utf_8 fmt x
 
-  | NHCom info ->
+  | NHComAtType info ->
     let r, r' = Dir.unleash info.dir in
-    Format.fprintf fmt "@[<1>(nhcom %a %a@ %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_neu info.cap pp_comp_sys info.sys
+    Format.fprintf fmt "@[<1>(nhcom-type %a %a@ %a@ %a@ %a)@]" I.pp r I.pp r' pp_neu info.ty pp_value info.cap pp_comp_sys info.sys
+
+  | NHComAtCap info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(nhcom-cap %a %a@ %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_neu info.cap pp_comp_sys info.sys
 
   | NCoe info ->
     let r, r' = Dir.unleash info.dir in
