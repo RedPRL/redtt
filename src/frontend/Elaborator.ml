@@ -198,7 +198,7 @@ struct
 
         let psi =
           List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) rec_specs
-          @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dims
+          @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dim_specs
         in
         M.in_scopes psi @@
         begin
@@ -207,7 +207,7 @@ struct
             (clbl,
              {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
               rec_specs;
-              dims = constr.dims;
+              dim_specs = constr.dim_specs;
               boundary})
         end
 
@@ -298,20 +298,20 @@ struct
           failwith "todo: go_args"
       in
 
-      let rec go_dims acc dims frms =
-        match dims, frms with
+      let rec go_dims acc dim_specs frms =
+        match dim_specs, frms with
         | [], [] ->
           M.ret @@ Bwd.to_list acc
-        | _ :: dims, E.App e :: frms ->
+        | _ :: dim_specs, E.App e :: frms ->
           elab_dim env e >>= bind_in_scope >>= fun r ->
-          go_dims (acc #< r) dims frms
+          go_dims (acc #< r) dim_specs frms
         | _ ->
           failwith "Dimensions length mismatch in boundary term"
       in
 
       go_const_specs [] constr.const_specs @@ Bwd.to_list spine >>= fun (const_args, frms) ->
       go_args Emp constr.rec_specs frms >>= fun (rec_args, frms) ->
-      go_dims Emp constr.dims frms >>= fun rs ->
+      go_dims Emp constr.dim_specs frms >>= fun rs ->
       M.ret @@ Desc.Boundary.Intro {clbl; const_args; rec_args; rs}
 
 
@@ -853,33 +853,33 @@ struct
       elab_mode_switch_cut env exp frms ty
 
   and elab_intro env dlbl clbl constr frms =
-    let rec go_params acc ps frms =
-      match ps, frms with
+    let rec go_const_args acc const_specs frms =
+      match const_specs, frms with
       | [], _ ->
         M.ret (List.rev_map snd acc, frms)
-      | (_, pty) :: ps, E.App e :: frms ->
+      | (_, ty) :: const_specs, E.App e :: frms ->
         (* TODO: might be backwards *)
         let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.Down {ty; tm}, Emp) sub) acc @@ Tm.shift 0 in
-        let pty' = Tm.subst sub pty in
-        elab_chk env pty' e >>= fun t ->
-        go_params ((pty', t) :: acc) ps frms
+        let ty' = Tm.subst sub ty in
+        elab_chk env ty' e >>= fun t ->
+        go_const_args ((ty', t) :: acc) const_specs frms
       | _ ->
         failwith "elab_intro: malformed parameters"
     in
-    let rec go_args arg_tys dims frms =
-      match arg_tys, dims, frms with
+    let rec go_rec_args rec_specs dims frms =
+      match rec_specs, dims, frms with
       | [], [], [] ->
         M.ret []
       | [], _ :: dims, E.App r :: frms ->
-        (fun x xs -> x :: xs) <@>> elab_dim env r <*> go_args arg_tys dims frms
-      | (_, Desc.Self) :: arg_tys, dims, E.App e :: frms ->
+        (fun x xs -> x :: xs) <@>> elab_dim env r <*> go_rec_args rec_specs dims frms
+      | (_, Desc.Self) :: rec_specs, dims, E.App e :: frms ->
         let self_ty = Tm.make @@ Tm.Data dlbl in
-        (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_args arg_tys dims frms
+        (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_rec_args rec_specs dims frms
       | _ ->
         failwith "todo: go_args"
     in
-    go_params [] constr.const_specs @@ Bwd.to_list frms >>= fun (tps, frms) ->
-    go_args constr.rec_specs constr.dims frms >>= fun targs ->
+    go_const_args [] constr.const_specs @@ Bwd.to_list frms >>= fun (tps, frms) ->
+    go_rec_args constr.rec_specs constr.dim_specs frms >>= fun targs ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
 
   and elab_mode_switch_cut env exp frms ty =

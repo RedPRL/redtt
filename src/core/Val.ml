@@ -2214,15 +2214,16 @@ struct
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
 
-      let rec go vs rs const_specs rec_specs dims =
-        match vs, rs, const_specs, rec_specs, dims with
+      (* Clean this up with some kind of a state type for the traversal maybe. Barf! *)
+      let rec go vs rs const_specs rec_specs dim_specs =
+        match vs, rs, const_specs, rec_specs, dim_specs with
         | v :: vs, _, (_, _) :: const_specs, _, _ ->
-          `Val v :: go vs rs const_specs rec_specs dims
+          `Val v :: go vs rs const_specs rec_specs dim_specs
         | v :: vs, _,  [], (_, Desc.Self) :: rec_specs, _ ->
           let v_ih = elim_data dlbl ~mot ~scrut:v ~clauses in
-          `Val v :: `Val v_ih :: go vs rs [] rec_specs dims
+          `Val v :: `Val v_ih :: go vs rs const_specs rec_specs dim_specs
         | [], r :: rs, [], [], _ :: dims ->
-          `Dim r :: go [] rs [] [] dims
+          `Dim r :: go [] rs const_specs rec_specs dims
         | [], [], [], [], [] ->
           []
         | _ ->
@@ -2230,7 +2231,7 @@ struct
       in
 
       (* CLEANUP *)
-      inst_nclo nclo @@ go (info.const_args @ info.rec_args) info.rs constr.const_specs constr.rec_specs constr.dims
+      inst_nclo nclo @@ go (info.const_args @ info.rec_args) info.rs constr.const_specs constr.rec_specs constr.dim_specs
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in

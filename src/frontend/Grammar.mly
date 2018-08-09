@@ -201,8 +201,8 @@ desc_constr:
   rec_specs = loption(nonempty_list(desc_rec_spec));
   extent = desc_extent
   { fun dlbl ->
-    let dims, boundary = extent in
-    clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dims; boundary} }
+    let dim_specs, boundary = extent in
+    clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dim_specs; boundary} }
 
 desc_extent:
   | AT;

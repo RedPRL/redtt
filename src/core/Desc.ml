@@ -24,7 +24,7 @@ end
 type ('a, 'b) constr =
   {const_specs : (string * 'a) list;
    rec_specs : (string * 'a arg_ty) list;
-   dims : string list;
+   dim_specs : string list;
    boundary : ('a, 'b) Boundary.sys}
 
 
@@ -43,7 +43,7 @@ let lookup_constr lbl desc =
 
 let is_strict_set desc =
   let constr_is_point constr =
-    match constr.dims with
+    match constr.dim_specs with
     | [] -> true
     | _ -> false
   in
