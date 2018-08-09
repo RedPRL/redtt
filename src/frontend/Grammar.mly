@@ -198,11 +198,11 @@ etele_cell:
 desc_constr:
 | clbl = ATOM;
   const_specs = loption(nonempty_list(desc_const_spec));
-  args = loption(nonempty_list(desc_arg));
+  rec_specs = loption(nonempty_list(desc_rec_spec));
   extent = desc_extent
   { fun dlbl ->
     let dims, boundary = extent in
-    clbl, Desc.{const_specs; args = List.map (fun arg -> arg dlbl) args; dims; boundary} }
+    clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dims; boundary} }
 
 desc_extent:
   | AT;
@@ -214,7 +214,7 @@ desc_extent:
 
 
 %inline
-desc_arg:
+desc_rec_spec:
 | LPR; x = ATOM; COLON; self = ATOM; RPR
   { fun name ->
       if name = self then (x, Desc.Self) else failwith ("Expected " ^ name ^ " but got " ^ self)}

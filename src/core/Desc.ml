@@ -23,7 +23,7 @@ end
 
 type ('a, 'b) constr =
   {const_specs : (string * 'a) list;
-   args : (string * 'a arg_ty) list;
+   rec_specs : (string * 'a arg_ty) list;
    dims : string list;
    boundary : ('a, 'b) Boundary.sys}
 

@@ -464,24 +464,24 @@ struct
           let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
           let env', cvs, rvs, rs =
             let open Desc in
-            let rec build_cx qenv env (cvs, rvs) rs tys args dims =
-              match tys, args, dims with
-              | (_, pty) :: tys, _, _ ->
+            let rec build_cx qenv env (cvs, rvs) rs const_specs rec_specs dims =
+              match const_specs, rec_specs, dims with
+              | (_, pty) :: const_specs, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
                 let env' = D.Env.push (`Val v) env in
-                build_cx (Env.succ qenv) env' (cvs #< v, rvs) rs tys args dims
-              | [], (_, Self) :: args, _ ->
+                build_cx (Env.succ qenv) env' (cvs #< v, rvs) rs const_specs rec_specs dims
+              | [], (_, Self) :: rec_specs, _ ->
                 let vx = generic qenv data_ty in
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
-                build_cx (Env.succ qenv') env (cvs, rvs #< vx #< vih) rs tys args dims
+                build_cx (Env.succ qenv') env (cvs, rvs #< vx #< vih) rs const_specs rec_specs dims
               | [], [], dims ->
                 let xs = Bwd.map (fun x -> Name.named @@ Some x) @@ Bwd.from_list dims in
                 let qenv' = Env.abs qenv xs in
                 qenv', Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env D.Env.emp (Emp, Emp) Emp constr.const_specs constr.args constr.dims
+            build_cx env D.Env.emp (Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dims
           in
           let vs = cvs @ rvs in
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in

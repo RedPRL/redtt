@@ -790,7 +790,7 @@ struct
         make_coe dir abs arg
       in
 
-      let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.args info.rec_args in
+      let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.rec_specs info.rec_args in
       let rs = info.rs in
       let intro =
         make_intro Env.emp ~dlbl ~clbl:info.clbl
@@ -1172,7 +1172,7 @@ struct
       let constr = Desc.lookup_constr info.clbl desc in
 
       (* TODO: clean this up! this was written before I split the args into two lists *)
-      let args' = make_args 0 Emp (info.const_args @ info.rec_args) constr.const_specs constr.args in
+      let args' = make_args 0 Emp (info.const_args @ info.rec_args) constr.const_specs constr.rec_specs in
       let const_args, rec_args = ListUtil.split (List.length constr.const_specs) args' in
 
       make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
@@ -1570,7 +1570,7 @@ struct
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr clbl desc in
       let tconst_args, args = ListUtil.split (List.length constr.const_specs) args in
-      let trec_args, trs = ListUtil.split (List.length constr.args) args in
+      let trec_args, trs = ListUtil.split (List.length constr.rec_specs) args in
       let const_args = List.map (eval rho) tconst_args in
       let rec_args = List.map (eval rho) trec_args in
       let rs = List.map (eval_dim rho) trs in
@@ -2214,13 +2214,13 @@ struct
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
 
-      let rec go vs rs ps args dims =
-        match vs, rs, ps, args, dims with
-        | v :: vs, _, (_, _) :: ps, _, _ ->
-          `Val v :: go vs rs ps args dims
-        | v :: vs, _,  [], (_, Desc.Self) :: args, _ ->
+      let rec go vs rs const_specs rec_specs dims =
+        match vs, rs, const_specs, rec_specs, dims with
+        | v :: vs, _, (_, _) :: const_specs, _, _ ->
+          `Val v :: go vs rs const_specs rec_specs dims
+        | v :: vs, _,  [], (_, Desc.Self) :: rec_specs, _ ->
           let v_ih = elim_data dlbl ~mot ~scrut:v ~clauses in
-          `Val v :: `Val v_ih :: go vs rs [] args dims
+          `Val v :: `Val v_ih :: go vs rs [] rec_specs dims
         | [], r :: rs, [], [], _ :: dims ->
           `Dim r :: go [] rs [] [] dims
         | [], [], [], [], [] ->
@@ -2230,7 +2230,7 @@ struct
       in
 
       (* CLEANUP *)
-      inst_nclo nclo @@ go (info.const_args @ info.rec_args) info.rs constr.const_specs constr.args constr.dims
+      inst_nclo nclo @@ go (info.const_args @ info.rec_args) info.rs constr.const_specs constr.rec_specs constr.dims
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in

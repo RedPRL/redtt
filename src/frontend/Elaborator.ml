@@ -194,10 +194,10 @@ struct
       | [] ->
         (* TODO: when self args are more complex, we'll need to abstract them over
            the parameters too. *)
-        traverse elab_arg_ty constr.args >>= fun args ->
+        traverse elab_arg_ty constr.rec_specs >>= fun rec_specs ->
 
         let psi =
-          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) args
+          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) rec_specs
           @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dims
         in
         M.in_scopes psi @@
@@ -206,7 +206,7 @@ struct
           M.ret
             (clbl,
              {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
-              args;
+              rec_specs;
               dims = constr.dims;
               boundary})
         end
@@ -310,7 +310,7 @@ struct
       in
 
       go_const_specs [] constr.const_specs @@ Bwd.to_list spine >>= fun (const_args, frms) ->
-      go_args Emp constr.args frms >>= fun (rec_args, frms) ->
+      go_args Emp constr.rec_specs frms >>= fun (rec_args, frms) ->
       go_dims Emp constr.dims frms >>= fun rs ->
       M.ret @@ Desc.Boundary.Intro {clbl; const_args; rec_args; rs}
 
@@ -879,7 +879,7 @@ struct
         failwith "todo: go_args"
     in
     go_params [] constr.const_specs @@ Bwd.to_list frms >>= fun (tps, frms) ->
-    go_args constr.args constr.dims frms >>= fun targs ->
+    go_args constr.rec_specs constr.dims frms >>= fun targs ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
 
   and elab_mode_switch_cut env exp frms ty =

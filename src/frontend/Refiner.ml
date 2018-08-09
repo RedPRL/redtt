@@ -270,7 +270,7 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let constr = Desc.lookup_constr lbl desc in
           let pbinds =
             List.map (fun (nm, _) -> ESig.PVar nm) constr.const_specs
-            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.args
+            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.rec_specs
             @ List.map (fun x -> ESig.PVar x) constr.dims
           in
           lbl, pbinds, fun ty ->
@@ -333,7 +333,7 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           failwith "refine_clause"
       in
       let psi, tms, const_args, rec_args, rs =
-        go Emp D.Env.emp (Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.args constr.dims
+        go Emp D.Env.emp (Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dims
       in
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
