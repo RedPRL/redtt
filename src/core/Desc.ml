@@ -29,13 +29,14 @@ type ('a, 'b) constr =
 
 
 (** A datatype description is just a list of named constructors. *)
-type ('a, 'b) desc = (con_label * ('a, 'b) constr) list
+type ('a, 'b) desc =
+  {constrs : (con_label * ('a, 'b) constr) list}
 
 exception ConstructorNotFound of con_label
 
 let lookup_constr lbl desc =
   try
-    let _, constr = List.find (fun (lbl', _) -> lbl' = lbl) desc in
+    let _, constr = List.find (fun (lbl', _) -> lbl' = lbl) desc.constrs in
     constr
   with
   | _ ->
@@ -47,7 +48,7 @@ let is_strict_set desc =
     | [] -> true
     | _ -> false
   in
-  List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc true
+  List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc.constrs true
 
 let pp_data_label = Uuseg_string.pp_utf_8
 let pp_con_label = Uuseg_string.pp_utf_8

@@ -51,6 +51,8 @@ val eta_contract : tm -> tm
 
 
 val up : tm cmd -> tm
+val ann : ty:tm -> tm:tm -> tm cmd
+
 val ix : ?twin:twin -> int -> tm cmd
 val var : ?twin:twin -> Name.t -> tm cmd
 val car : tm cmd -> tm cmd
@@ -65,20 +67,15 @@ val cons : tm -> tm -> tm
 val univ : kind:Kind.t -> lvl:Lvl.t -> tm
 
 
+val arr : tm -> tm -> tm
+val times : tm -> tm -> tm
 
+(* non-dependent path *)
+val path : tm -> tm -> tm -> tm
+val is_contr : tm -> tm
+val fiber : ty0:tm -> ty1:tm -> f:tm -> x:tm -> tm
+val equiv : tm -> tm -> tm
 
-module Macro :
-sig
-  val arr : tm -> tm -> tm
-  val times : tm -> tm -> tm
-
-  (* non-dependent path *)
-  val path : tm -> tm -> tm -> tm
-
-  val is_contr : tm -> tm
-  val fiber : ty0:tm -> ty1:tm -> f:tm -> x:tm -> tm
-  val equiv : tm -> tm -> tm
-end
 
 val pp : tm Pp.t
 val pp0 : tm Pp.t0
@@ -88,10 +85,15 @@ val pp_frame : tm frame Pp.t
 val pp_spine : tm spine Pp.t
 val pp_sys : (tm, tm) system Pp.t
 
-
 include Occurs.S with type t := tm
 
 module Sp :
 sig
   include Occurs.S with type t = tm spine
+end
+
+
+module Notation :
+sig
+  val (@<) : 'a cmd -> 'a frame -> 'a cmd
 end

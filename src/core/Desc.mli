@@ -38,7 +38,8 @@ type ('a, 'b) constr =
 
 
 (** A datatype description is just a list of named constructors. *)
-type ('a, 'b) desc = (con_label * ('a, 'b) constr) list
+type ('a, 'b) desc =
+  {constrs : (con_label * ('a, 'b) constr) list}
 
 exception ConstructorNotFound of con_label
 val lookup_constr : con_label -> ('a, 'b) desc -> ('a, 'b) constr

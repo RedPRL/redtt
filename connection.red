@@ -1,6 +1,6 @@
 import path
 
-let singleton (A : type) (M : A) : `(U pre 0) =
+let singleton (A : type) (M : A) : type pre =
   restrict A [
   | 0=0 ⇒ M
   ]

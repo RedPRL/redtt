@@ -35,7 +35,7 @@ edecl:
     { E.Debug f }
   | DATA; dlbl = ATOM; WHERE; option(PIPE); constrs = separated_list(PIPE, desc_constr)
     { let desc = List.map (fun constr -> constr dlbl) constrs in
-      E.Data (dlbl, desc) }
+      E.Data (dlbl, {constrs = desc}) }
   | IMPORT; a = ATOM
     { E.Import a }
   | QUIT
@@ -56,8 +56,8 @@ atomic_eterm:
     { E.Hole a }
   | HOLE_NAME; LBR; e = eterm; RBR
     { E.Guess e }
-  | TYPE
-    { E.Type }
+  | TYPE; k = kind
+    { E.Type k }
   | LGL; es = separated_list(COMMA, eterm); RGL
     { E.Tuple es }
   | LPR; e = eterm; RPR
