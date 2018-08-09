@@ -74,6 +74,8 @@ sig
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
 
+  val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit
+
   val equiv_boundary_value
     : env
     -> Desc.data_label
@@ -750,69 +752,157 @@ struct
     equate_neu env neu neu
 
   let rec subtype env ty0 ty1 =
+    fancy_subtype env ty0 [] ty1 []
+  (* match unleash ty0, unleash ty1 with
+     | Pi pi0, Pi pi1 ->
+     subtype env pi1.dom pi0.dom;
+     let var = generic env pi0.dom in
+     let vcod0 = inst_clo pi0.cod var in
+     let vcod1 = inst_clo pi1.cod var in
+     subtype (Env.succ env) vcod0 vcod1
+
+     | Sg sg0, Sg sg1 ->
+     subtype env sg0.dom sg1.dom;
+     let var = generic env sg0.dom in
+     let vcod0 = inst_clo sg0.cod var in
+     let vcod1 = inst_clo sg1.cod var in
+     subtype (Env.succ env) vcod0 vcod1
+
+     | Later ltr0, Later ltr1 ->
+     let tick = TickGen (`Lvl (None, Env.len env)) in
+     let vcod0 = inst_tick_clo ltr0 tick in
+     let vcod1 = inst_tick_clo ltr1 tick in
+     subtype (Env.succ env) vcod0 vcod1
+
+     | BoxModality ty0, BoxModality ty1 ->
+     subtype env ty0 ty1
+
+     | Ext abs0, Ext abs1 ->
+     let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
+     let ty1x, sys1x = ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
+     let envx = Env.abs env xs in
+     subtype envx ty0x ty1x;
+     approx_restriction envx ty0x ty1x sys0x sys1x
+
+     | LblTy info0, LblTy info1 ->
+     if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
+      subtype env info0.ty info1.ty;
+     let go_arg (nf0, nf1) =
+      equiv_ty env nf0.ty nf1.ty;
+      equiv env ~ty:nf0.ty nf0.el nf1.el
+     in
+     List.iter go_arg @@ List.combine info0.args info1.args
+
+     | Univ info0, Univ info1 ->
+     if Kind.lte info0.kind info1.kind && Lvl.lte info0.lvl info1.lvl then
+      ()
+     else
+      failwith "Universe subtyping error"
+
+
+     (* The following code is kind of complicated. What it does is the following:
+     1. First, turn both sides into a restriction type somehow.
+     2. Then, using a generic element, check that the restriction of the lhs implies the restriction of the rhs.
+   *)
+     | Rst rst0, con1 ->
+     let ty0, sys0 = rst0.ty, rst0.sys in
+     let ty1, sys1 =
+      match con1 with
+      | Rst rst1 -> rst1.ty, rst1.sys
+      | _ -> ty1, []
+     in
+     subtype env ty0 ty1;
+     approx_restriction env ty0 ty1 sys0 sys1
+
+     | _ ->
+     equiv_ty env ty0 ty1 *)
+
+  and fancy_subtype env ty0 sys0 ty1 sys1 =
     match unleash ty0, unleash ty1 with
+    | _, Rst rst1 ->
+      fancy_subtype env ty0 sys0 rst1.ty (rst1.sys @ sys1)
+
+    | Rst rst0, _ ->
+      begin
+        (* backtracking :( ) *)
+        try fancy_subtype env rst0.ty sys0 ty1 sys1
+        with _ ->
+          fancy_subtype env rst0.ty (rst0.sys @ sys0) ty1 sys1
+      end
+
     | Pi pi0, Pi pi1 ->
-      subtype env pi1.dom pi0.dom;
+      fancy_subtype env pi1.dom [] pi0.dom [];
       let var = generic env pi0.dom in
       let vcod0 = inst_clo pi0.cod var in
       let vcod1 = inst_clo pi1.cod var in
-      subtype (Env.succ env) vcod0 vcod1
+      let face _r _r' v = apply v var in
+      let sys0 = map_sys face sys0 in
+      let sys1 = map_sys face sys1 in
+      fancy_subtype (Env.succ env) vcod0 sys0 vcod1 sys1
 
     | Sg sg0, Sg sg1 ->
-      subtype env sg0.dom sg1.dom;
+      let sys00 = map_sys (fun _ _ -> car) sys0 in
+      let sys10 = map_sys (fun _ _ -> car) sys1 in
+      fancy_subtype env sg0.dom sys00 sg1.dom sys10;
       let var = generic env sg0.dom in
       let vcod0 = inst_clo sg0.cod var in
       let vcod1 = inst_clo sg1.cod var in
-      subtype (Env.succ env) vcod0 vcod1
+      let sys01 = map_sys (fun _ _ -> cdr) sys0 in
+      let sys11 = map_sys (fun _ _ -> cdr) sys1 in
+      fancy_subtype (Env.succ env) vcod0 sys01 vcod1 sys11
 
     | Later ltr0, Later ltr1 ->
       let tick = TickGen (`Lvl (None, Env.len env)) in
       let vcod0 = inst_tick_clo ltr0 tick in
       let vcod1 = inst_tick_clo ltr1 tick in
-      subtype (Env.succ env) vcod0 vcod1
+      let sys0 = map_sys (fun _ _ -> prev tick) sys0 in
+      let sys1 = map_sys (fun _ _ -> prev tick) sys1 in
+      fancy_subtype (Env.succ env) vcod0 sys0 vcod1 sys1
 
     | BoxModality ty0, BoxModality ty1 ->
-      subtype env ty0 ty1
+      let sys0 = map_sys (fun _ _ -> modal_open) sys0 in
+      let sys1 = map_sys (fun _ _ -> modal_open) sys1 in
+      fancy_subtype env ty0 sys0 ty1 sys1
 
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
-      let ty1x, sys1x = ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
-      let envx = Env.abs env xs in
-      subtype envx ty0x ty1x;
-      approx_restriction envx ty0x ty1x sys0x sys1x
+      let rs = Bwd.map (fun x -> `Atom x) xs in
+      let ty1x, sys1x = ExtAbs.inst abs1 rs in
+      let envxs = Env.abs env xs in
+      let rs_lst = Bwd.to_list rs in
+      let face r r' v =
+        let phi = I.equate r r' in
+        let rs' = List.map (I.act phi) rs_lst in
+        ext_apply v rs'
+      in
+      let sys0' = map_sys face sys0 in
+      let sys1' = map_sys face sys1 in
+      fancy_subtype envxs ty0x (sys0x @ sys0') ty1x (sys1x @ sys1')
+
 
     | LblTy info0, LblTy info1 ->
       if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
-        subtype env info0.ty info1.ty;
-      let go_arg (nf0, nf1) =
-        equiv_ty env nf0.ty nf1.ty;
-        equiv env ~ty:nf0.ty nf0.el nf1.el
-      in
-      List.iter go_arg @@ List.combine info0.args info1.args
+        let sys0 = map_sys (fun _ _ -> lbl_call) sys0 in
+        let sys1 = map_sys (fun _ _ -> lbl_call) sys1 in
+        fancy_subtype env info0.ty sys0 info1.ty sys1;
+        let go_arg (nf0, nf1) =
+          equiv_ty env nf0.ty nf1.ty;
+          equiv env ~ty:nf0.ty nf0.el nf1.el
+        in
+        List.iter go_arg @@ List.combine info0.args info1.args
 
     | Univ info0, Univ info1 ->
       if Kind.lte info0.kind info1.kind && Lvl.lte info0.lvl info1.lvl then
-        ()
+        approx_restriction env ty0 ty1 sys0 sys1
       else
         failwith "Universe subtyping error"
 
-
-    (* The following code is kind of complicated. What it does is the following:
-       1. First, turn both sides into a restriction type somehow.
-       2. Then, using a generic element, check that the restriction of the lhs implies the restriction of the rhs.
-    *)
-    | Rst rst0, con1 ->
-      let ty0, sys0 = rst0.ty, rst0.sys in
-      let ty1, sys1 =
-        match con1 with
-        | Rst rst1 -> rst1.ty, rst1.sys
-        | _ -> ty1, []
-      in
-      subtype env ty0 ty1;
+    | _ ->
+      equiv_ty env ty0 ty1;
       approx_restriction env ty0 ty1 sys0 sys1
 
-    | _ ->
-      equiv_ty env ty0 ty1
+  and map_sys f =
+    List.map (Face.map f)
 
   and approx_restriction env ty0 ty1 sys0 sys1 =
     (* A semantic indeterminate of the first type *)
@@ -847,6 +937,7 @@ struct
         done
       with
       | Break ->
+        (* Format.eprintf "%a <= %a@.@." pp_val_sys sys0 pp_val_sys sys1; *)
         failwith "restriction subtyping"
       | exn ->
         Format.eprintf "Unexpected error in subtyping: %s@." (Printexc.to_string exn);

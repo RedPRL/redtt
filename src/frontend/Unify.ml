@@ -574,9 +574,14 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
   in
   go sp0 sp1
 
-let approx_sys _ty0 _ty1 _sys0 _sys1 =
-  Format.eprintf "TODO!!!!@.";
-  ret ()
+let approx_sys ty0 sys0 ty1 sys1 =
+  base_cx >>= fun cx ->
+  let (module Q) = Cx.quoter cx in
+  let vty0 = Cx.eval cx ty0 in
+  let vty1 = Cx.eval cx ty1 in
+  let vsys0 = Cx.eval_tm_sys cx sys0 in
+  let vsys1 = Cx.eval_tm_sys cx sys1 in
+  ret @@ Q.approx_restriction (Cx.qenv cx) vty0 vty1 vsys0 vsys1
 
 let restriction_subtype ty0 sys0 ty1 sys1 =
   active @@ Subtype {ty0; ty1} >>
