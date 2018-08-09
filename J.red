@@ -8,10 +8,10 @@ let J
   =
   let ty : dim → type = λ i →
     let h : dim → A = λ j →
-      comp 0 j a with
+      comp 0 j a [
       | i=0 ⇒ λ _ → a
       | i=1 ⇒ λ k → p k
-      end
+      ]
     in
     C (h 1) (λ k → h k)
   in
@@ -24,21 +24,21 @@ let J/eq
   =
   let square : dim → dim → A =
     λ i j →
-      comp 0 j a with
+      comp 0 j a [
       | i=0 ⇒ λ _ → a
       | i=1 ⇒ λ _ → a
-      end
+      ]
   in
   λ k →
     comp 0 1 d in λ i →
       let aux : dim → A =
         λ j →
-          comp 0 j a with
+          comp 0 j a [
           | k=0 ⇒ λ l → square i l
           | k=1 ⇒ λ _ → a
           | i=0 ⇒ λ _ → a
           | i=1 ⇒ λ _ → a
-          end
+          ]
       in
       C (aux 1) (λ l → aux l)
     with

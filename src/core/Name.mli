@@ -8,4 +8,4 @@ val fresh : unit -> t
 val to_string : t -> string
 val name : t -> string option
 
-val pp : t Pretty.t0
+val pp : t Pp.t0

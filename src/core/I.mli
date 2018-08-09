@@ -35,8 +35,8 @@ val compare : t -> t -> compare
 val absent : atom -> t -> bool
 
 
-val pp : t Pretty.t0
-val pp_action : action Pretty.t0
+val pp : t Pp.t0
+val pp_action : action Pp.t0
 
 
 exception Inconsistent

@@ -14,7 +14,7 @@ type lock_info = {constant : bool; birth : int}
 
 type t =
   {rel : Restriction.t;
-   data_decls : Tm.tm Desc.desc StringTable.t;
+   data_decls : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc StringTable.t;
    table : (entry param * lock_info) T.t;
    lock : int -> bool;
    killed : int -> bool;
@@ -37,7 +37,10 @@ let declare_datatype dlbl desc (sg : t) : t =
    data_decls = StringTable.add dlbl desc sg.data_decls}
 
 let lookup_datatype dlbl sg =
-  StringTable.find dlbl sg.data_decls
+  try
+    StringTable.find dlbl sg.data_decls
+  with
+  | _ -> failwith ("Datatype not found: " ^ dlbl)
 
 let ext_ (sg : t) ~constant nm param : t =
   let linfo = {constant; birth = sg.len} in

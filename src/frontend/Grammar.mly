@@ -17,8 +17,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW BULLET
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK LOCK
-%token S1 S1_ELIM ELIM LOOP BASE UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
-%token OF
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
 %token EOF
@@ -71,11 +70,6 @@ atomic_eterm:
     { E.Num n }
   | BULLET
     { E.TickConst }
-  | S1
-    { E.S1 }
-  | BASE
-    { E.Base }
-
 
 eframe:
   | e = atomic_eterm
@@ -92,6 +86,17 @@ eframe:
       | 1 -> E.Cdr
       | _ -> failwith "Parser: invalid projection" }
 
+
+block(X):
+  | WITH; x = X; END
+    { x }
+  | LSQ; x = X; RSQ
+    { x }
+
+pipe_block(X):
+  | x = block(preceded(option(PIPE), separated_list(PIPE, X)))
+    { x }
+
 eterm:
   | e = atomic_eterm
     { e }
@@ -104,17 +109,11 @@ eterm:
   | LET; name = ATOM; EQUALS; tm = eterm; IN; body = eterm
     { E.Let {name; ty = None; tm; body} }
 
-  | ELIM; scrut = eterm; IN; mot = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
+  | ELIM; scrut = eterm; IN; mot = eterm; clauses = pipe_block(eclause)
     { E.Elim {mot = Some mot; scrut; clauses} }
 
-  | ELIM; scrut = eterm; WITH; option(PIPE); clauses = separated_list(PIPE, eclause); END
+  | ELIM; scrut = eterm; clauses = pipe_block(eclause)
     { E.Elim {mot = None; scrut; clauses} }
-
-  | LOOP; r = eterm
-    { E.Loop r }
-
-  | S1_ELIM; e0 = eterm; WITH; option(PIPE); BASE; RRIGHT_ARROW; eb = eterm; PIPE; LOOP; x = ATOM; RRIGHT_ARROW; el = eterm; END
-    { E.S1Rec (None, e0, eb, (x, el)) }
 
   | DFIX; LSQ; r = eterm; RSQ; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
     { E.DFixLine {r; name; ty; bdy} }
@@ -131,10 +130,10 @@ eterm:
   | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm= atomic_eterm; IN; fam = eterm
     { E.Coe {r = r0; r' = r1; fam; tm} }
 
-  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; sys = pipe_block(eface)
     { E.HCom {r = r0; r' = r1; cap; sys}}
 
-  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; IN; fam = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; IN; fam = eterm; sys = pipe_block(eface)
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = eterm
@@ -143,10 +142,10 @@ eterm:
   | tele = nonempty_list(etele_cell); TIMES; cod = eterm
     { E.Sg (List.flatten tele, cod) }
 
-  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; sys = pipe_block(eface)
     { E.Ext (dims, ty, sys)}
 
-  | RESTRICT; ty = eterm; WITH; option(PIPE); sys = separated_list(PIPE, eface); END
+  | RESTRICT; ty = eterm; sys = pipe_block(eface)
     { E.Rst (ty, sys)}
 
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
@@ -196,33 +195,33 @@ etele_cell:
 
 
 
-
 desc_constr:
-| clbl = ATOM
-  { fun _dlbl ->
-    clbl, Desc.{params = []; args = []} }
-
-| clbl = ATOM; OF; params = nonempty_list(desc_param); TIMES; args = separated_nonempty_list(TIMES, desc_arg)
+| clbl = ATOM;
+  const_specs = loption(nonempty_list(desc_const_spec));
+  rec_specs = loption(nonempty_list(desc_rec_spec));
+  extent = desc_extent
   { fun dlbl ->
-    clbl, Desc.{params; args = List.map (fun arg -> arg dlbl) args} }
+    let dim_specs, boundary = extent in
+    clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dim_specs; boundary} }
 
-| clbl = ATOM; OF; params = nonempty_list(desc_param)
-  { fun _dlbl ->
-    clbl, Desc.{params; args = []} }
+desc_extent:
+  | AT;
+    dims = list(ATOM);
+    boundary = pipe_block(eface)
+    { dims, boundary }
+  | { [], [] }
 
-| clbl = ATOM; OF; args = separated_nonempty_list(TIMES, desc_arg)
-  { fun dlbl ->
-    clbl, Desc.{params = []; args = List.map (fun arg -> arg dlbl) args} }
+
 
 %inline
-desc_arg:
-| self = ATOM
+desc_rec_spec:
+| LPR; x = ATOM; COLON; self = ATOM; RPR
   { fun name ->
-      if name = self then Desc.Self else failwith ("Expected " ^ name ^ " but got " ^ self)}
+      if name = self then (x, Desc.Self) else failwith ("Expected " ^ name ^ " but got " ^ self)}
 
 %inline
-desc_param:
-| LPR; x = ATOM; COLON; ty = eterm; RPR
+desc_const_spec:
+| LSQ; x = ATOM; COLON; ty = eterm; RSQ
   { x, ty }
 
 
@@ -387,10 +386,10 @@ tm:
       make_node $startpos $endpos @@
       Tm.Data dlbl }
 
-  | LPR; INTRO; clbl = ATOM; es = elist(tm); RPR
+  | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      Tm.Intro (clbl, es env) }
+      Tm.Intro (dlbl, clbl, es env) }
 
   | e = cmd
     { fun env ->

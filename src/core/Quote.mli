@@ -20,7 +20,7 @@ type env = Env.t
 
 module Error : sig
   type t
-  val pp : t Pretty.t0
+  val pp : t Pp.t0
   exception E of t
 end
 
@@ -29,11 +29,20 @@ sig
   val quote_nf : env -> nf -> Tm.tm
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
+  val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
 
+  val equiv_boundary_value
+    : env
+    -> Desc.data_label
+    -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+    -> Tm.tm Desc.arg_ty
+    -> value
+    -> value
+    -> unit
 end
 
 module M (V : Val.S) : S

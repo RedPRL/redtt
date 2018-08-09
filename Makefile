@@ -23,6 +23,7 @@ examples:
 	${DUNE} exec -- redtt load-file int.red
 	${DUNE} exec -- redtt load-file bool.red
 	${DUNE} exec -- redtt load-file omega1s1.red
+	${DUNE} exec -- redtt load-file torus.red
 	${DUNE} exec -- redtt load-file modal.red
 	${DUNE} exec -- redtt load-file isotoequiv.red
 	${DUNE} exec -- redtt load-file invariance.red

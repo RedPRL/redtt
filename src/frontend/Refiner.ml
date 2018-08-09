@@ -210,17 +210,18 @@ let unleash_data ty =
   match Tm.unleash ty with
   | Tm.Data dlbl -> dlbl
   | _ ->
-    Format.eprintf "Shit: %a@." Tm.pp0 ty;
+    Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
-
-module MonadUtil = Monad.Util (ElabMonad)
-open MonadUtil
 
 let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
+
     let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
     let mot_ty = Tm.pi None data_ty univ in
+
+
+
     begin
       match tac_mot with
       | None ->
@@ -234,21 +235,29 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
           M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(mot scrut) >>
           M.unify >>
-          M.ret mot
+          let wmothd, wmotsp = Tm.subst_cmd (Tm.shift 1) (mothd, motsp) in
+          M.ret @@ Tm.B (None, Tm.up (wmothd, wmotsp #< (Tm.FunApp (Tm.up @@ Tm.ix 0))))
         else
-          M.ret (fun _ -> ty)
+          M.ret @@ Tm.B (None, Tm.subst (Tm.shift 1) ty)
       | Some tac_mot ->
         tac_mot mot_ty >>= fun mot ->
-        let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-        M.ret fmot
-    end >>= fun mot ->
+        let mothd = Tm.Down {ty = Tm.subst (Tm.shift 1) mot_ty; tm = Tm.subst (Tm.shift 1) mot} in
+        let motx = (mothd, Emp #< (Tm.FunApp (Tm.up @@ Tm.ix 0))) in
+        M.ret @@ Tm.B (None, Tm.up @@ motx)
+    end >>= fun bmot ->
+
+    let mot arg =
+      let Tm.B (_, motx) = bmot in
+      let arg' = Tm.Down {ty = data_ty; tm = arg}, Emp in
+      Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
+    in
 
     let dlbl = unleash_data data_ty in
+    let data_vty = D.make @@ D.Data dlbl in
 
     begin
       M.lift C.base_cx <<@> fun cx ->
-        let sign = Cx.globals cx in
-        GlobalEnv.lookup_datatype dlbl sign
+        GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
     end >>= fun desc ->
 
     (* Add holes for any missing clauses *)
@@ -260,8 +269,9 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
         | _ ->
           let constr = Desc.lookup_constr lbl desc in
           let pbinds =
-            List.map (fun (plbl, _) -> ESig.PVar plbl) constr.params
-            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.args
+            List.map (fun (nm, _) -> ESig.PVar nm) constr.const_specs
+            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.rec_specs
+            @ List.map (fun x -> ESig.PVar x) constr.dim_specs
           in
           lbl, pbinds, fun ty ->
             M.lift C.ask >>= fun psi ->
@@ -277,51 +287,108 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
         Cx.evaluator cx, Cx.quoter cx
     end >>= fun ((module V), (module Q)) ->
 
-    let refine_clause (clbl, pbinds, (clause_tac : chk_tac)) =
+
+    (* TODO: factor this out into another tactic. *)
+    let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
       let constr = lookup_constr clbl desc in
-      let rec go psi env tms pbinds ps args =
-        match pbinds, ps, args with
-        | ESig.PVar nm :: pbinds, (_plbl, pty) :: ps, _ ->
+      let rec go psi env (tms, cargs, rargs, rs) pbinds ps args dims =
+        match pbinds, ps, args, dims with
+        | ESig.PVar nm :: pbinds, (_plbl, pty) :: ps, _, _->
           let x = Name.named @@ Some nm in
           let vty = V.eval env pty in
           let tty = Q.quote_ty Quote.Env.emp vty in
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let x_tm = Tm.up @@ Tm.var x in
-          let env' = D.Env.push (D.Val x_el) env in
-          go (psi #< (x, `P tty)) env' (tms #< x_tm) pbinds ps args
+          let env' = D.Env.push (`Val x_el) env in
+          go (psi #< (x, `P tty)) env' (tms #< x_tm, cargs #< x_el, rargs, rs) pbinds ps args dims
 
-        | ESig.PVar nm :: pbinds, [], Self :: args ->
+        | ESig.PVar nm :: pbinds, [], (_, Self) :: args, _ ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.fresh () in
           let x_tm = Tm.up @@ Tm.var x in
+          let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let ih_ty = mot x_tm in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, rs) pbinds [] args dims
 
-        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], Self :: args ->
+        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: args, _ ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.named @@ Some nm_ih in
           let x_tm = Tm.up @@ Tm.var x in
           let ih_ty = mot x_tm in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm) pbinds [] args
+          let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, rs) pbinds [] args dims
 
-        | _, [], [] ->
-          psi, Bwd.to_list tms
+        | ESig.PVar nm :: pbinds, [], [], _ :: dims ->
+          let x = Name.named @@ Some nm in
+          let x_tm = Tm.up @@ Tm.var x in
+          let r = `Atom x in
+          let env' = D.Env.push (`Dim r) env in
+          go (psi #< (x, `I)) env' (tms #< x_tm, cargs, rargs, rs #< r) pbinds [] [] dims
+
+        | _, [], [], [] ->
+          psi, Bwd.to_list tms, Bwd.to_list cargs, Bwd.to_list rargs, Bwd.to_list rs
 
         | _ ->
           failwith "refine_clause"
       in
-      let psi, tms = go Emp D.Env.emp Emp pbinds constr.params constr.args in
-      let intro = Tm.make @@ Tm.Intro (clbl, tms) in
+      let psi, tms, const_args, rec_args, rs =
+        go Emp D.Env.emp (Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs
+      in
+      let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
-      begin
-        M.in_scopes (Bwd.to_list psi) @@
-        clause_tac clause_ty <<@> Tm.bindn (Bwd.map fst psi)
-      end >>= fun bdy ->
-      M.ret (clbl, bdy)
+
+      M.in_scopes (Bwd.to_list psi) begin
+        begin
+          M.lift C.base_cx <<@> fun cx ->
+            cx, Cx.evaluator cx, Cx.quoter cx
+        end >>= fun (cx, (module V), (module Q)) ->
+
+        let image_of_face face =
+          let elim_face r r' scrut =
+            let phi = I.equate r r' in
+            let rho = D.Env.act phi @@ Cx.env cx in
+            let mot = V.make_closure rho bmot in
+            let clauses = List.map (fun (clbl, nbnd) -> clbl, D.NClo {nbnd; rho}) earlier_clauses in
+            V.elim_data dlbl ~mot:mot ~scrut:scrut ~clauses
+          in
+          Face.map elim_face @@
+          let env0 = D.Env.clear_locals @@ Cx.env cx in
+          V.eval_bterm_face dlbl desc env0 face
+            ~const_args
+            ~rec_args
+            ~rs
+        in
+
+        (* What is the image of the boundary in the current fiber of the motive? *)
+        let tsys =
+          let val_sys = List.map image_of_face constr.boundary in
+          let vty = Cx.eval cx clause_ty in
+          Q.quote_val_sys (Cx.qenv cx) vty val_sys
+        in
+
+        (* We run the clause tactic with the goal type restricted by the boundary above *)
+        let clause_rty =
+          match tsys with
+          | [] -> clause_ty
+          | _ -> Tm.make @@ Tm.Rst {ty = clause_ty; sys = tsys}
+        in
+
+        clause_tac clause_rty <<@> fun bdy ->
+          clbl, Tm.bindn (Bwd.map fst psi) bdy
+      end
     in
 
-    traverse (fun x -> x) @@ List.map refine_clause clauses >>= fun tclauses ->
+    let rec refine_clauses acc =
+      function
+      | [] ->
+        M.ret acc
+      | clause :: clauses ->
+        refine_clause acc clause >>= fun tclause ->
+        refine_clauses (tclause :: acc) clauses
+    in
+
+    refine_clauses [] clauses >>= fun tclauses ->
 
     let hd = Tm.Down {ty = data_ty; tm = scrut} in
     let bmot =
@@ -329,53 +396,4 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
       Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
     in
     let frm = Tm.Elim {dlbl; mot = bmot; clauses = tclauses} in
-    M.ret @@ Tm.up (hd, Emp #< frm)
-
-let tac_s1_elim ~tac_mot ~tac_scrut ~tac_bcase ~tac_lcase:(nm_lcase, tac_lcase) =
-  fun ty ->
-    let pre_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-    let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
-    let s1 = Tm.make @@ Tm.S1 in
-    let mot_ty = Tm.pi None s1 kan_univ in
-    let x_lcase = Name.named @@ Some nm_lcase in
-    tac_scrut s1 >>= fun scrut ->
-    begin
-      match tac_mot with
-      | None ->
-        let is_dependent =
-          match Tm.unleash scrut with
-          | Tm.Up (Tm.Var {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
-          | _ -> false
-        in
-        if is_dependent then
-          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun (mothd, motsp) ->
-          let mot arg = Tm.up (mothd, motsp #< (Tm.FunApp arg)) in
-          M.lift @@ C.active @@ Problem.eqn ~ty0:pre_univ ~ty1:pre_univ ~tm0:ty ~tm1:(mot scrut) >>
-          M.unify >>
-          M.ret mot
-        else
-          M.ret (fun _ -> ty)
-      | Some tac_mot ->
-        tac_mot mot_ty >>= fun mot ->
-        let fmot arg = Tm.up (Tm.Down {ty = mot_ty; tm = mot}, Emp #< (Tm.FunApp arg)) in
-        M.ret fmot
-    end >>= fun mot ->
-
-    let mot_base = mot @@ Tm.make Tm.Base in
-
-    tac_bcase mot_base >>= fun bcase ->
-
-    let mot_loop = mot @@ Tm.make @@ Tm.Loop (Tm.up (Tm.var x_lcase)) in
-
-    M.in_scope x_lcase `I begin
-      tac_lcase mot_loop >>= fun tm ->
-      M.ret @@ Tm.bind x_lcase tm
-    end >>= fun lcase ->
-
-    let hd = Tm.Down {ty = s1; tm = scrut} in
-    let bmot =
-      let x = Name.fresh () in
-      Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
-    in
-    let frm = Tm.S1Rec {mot = bmot; bcase; lcase} in
     M.ret @@ Tm.up (hd, Emp #< frm)

@@ -21,8 +21,8 @@ val clear_locks : t -> t
 val kill_from_tick : t -> Name.t -> t
 
 
-val declare_datatype : Desc.data_label -> Tm.tm Desc.desc -> t -> t
-val lookup_datatype : Desc.data_label -> t -> Tm.tm Desc.desc
+val declare_datatype : Desc.data_label -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc -> t -> t
+val lookup_datatype : Desc.data_label -> t -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
 
 
 
@@ -32,6 +32,6 @@ val lookup_kind : t -> Name.t -> unit param
 val restriction : t -> Restriction.t
 
 
-val pp : t Pretty.t0
+val pp : t Pp.t0
 
 module M (Sig : sig val globals : t end) : Val.Sig

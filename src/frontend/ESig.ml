@@ -3,7 +3,7 @@ open RedBasis.Bwd
 
 type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
-  | Data of string * eterm Desc.desc
+  | Data of string * (eterm, eterm) Desc.desc
   | Debug of [ `All | `Constraints | `Unsolved ]
   | Import of string
   | Quit
@@ -22,9 +22,6 @@ and eterm =
   | Type
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
-
-  | S1 | Base | Loop of eterm
-  | S1Rec of eterm option * eterm * eterm * (string * eterm)
 
   | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
 

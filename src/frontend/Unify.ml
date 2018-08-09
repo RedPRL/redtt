@@ -83,6 +83,9 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     [Tm.ExtApp [Tm.up @@ Tm.var x]]
   | `P _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
+  | `SelfArg _ ->
+    (* ??? *)
+    [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `Tw _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `R _ ->
@@ -142,7 +145,7 @@ let to_var t =
   | Tm.Up (Tm.Var {name; _}, Emp) ->
     Some name
   | _ ->
-    (* Format.eprintf "to_var: %a@.@." (Tm.pp Pretty.Env.emp) t; *)
+    (* Format.eprintf "to_var: %a@.@." (Tm.pp Pp.Env.emp) t; *)
     None
 
 
@@ -488,7 +491,7 @@ let is_orthogonal q =
   | Tm.Ext _, Tm.Rst _ -> true
 
   | Tm.Data dlbl0, Tm.Data dlbl1 -> not (dlbl0 = dlbl1)
-  | Tm.Intro (clbl0, _), Tm.Intro (clbl1, _) -> not (clbl0 = clbl1)
+  | Tm.Intro (_, clbl0, _), Tm.Intro (_, clbl1, _) -> not (clbl0 = clbl1)
 
   | _ -> false
 
@@ -617,7 +620,7 @@ let rec subtype ty0 ty1 =
           end >>
           go sys0 sys1
         | _ ->
-          (* Format.eprintf "shoot??: %a <= %a@ / %a <= %a@." Tm.pp0 ty'0 Tm.pp0 ty'1 (Tm.pp_sys Pretty.Env.emp) sys0 (Tm.pp_sys Pretty.Env.emp) sys1; *)
+          (* Format.eprintf "shoot??: %a <= %a@ / %a <= %a@." Tm.pp0 ty'0 Tm.pp0 ty'1 (Tm.pp_sys Pp.Env.emp) sys0 (Tm.pp_sys Pp.Env.emp) sys1; *)
           failwith "Extension subtype: nope"
       in
       in_scopes ps begin
@@ -879,7 +882,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | `I | `Tick | `Lock | `ClearLocks | `KillFromTick _ as p ->
+        | `I | `Tick | `Lock | `ClearLocks | `KillFromTick _ | `SelfArg _ as p ->
           in_scope x p @@
           solver probx
 

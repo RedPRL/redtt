@@ -22,11 +22,14 @@ type cx =
    hyps : hyp list;
    env : Domain.env;
    qenv : Quote.env;
-   ppenv : Pretty.env;
+   ppenv : Pp.env;
    rel : Restriction.t;
    all_locks : int}
 
 type t = cx
+
+let env cx = cx.env
+let qenv cx = cx.qenv
 
 let globals cx =
   cx.sign
@@ -35,7 +38,7 @@ let clear_locals cx =
   {cx with
    qenv = Quote.Env.emp;
    hyps = [];
-   ppenv = Pretty.Env.emp;
+   ppenv = Pp.Env.emp;
    env = Domain.Env.clear_locals cx.env;
    all_locks = 0}
 let ext_lock cx =
@@ -86,20 +89,20 @@ let ext cx ~nm ty sys =
   let (module V) = evaluator cx in
   let var = V.reflect ty (Domain.Lvl (nm, n)) sys in
   {cx with
-   env = Domain.Env.push (Domain.Val var) cx.env;
+   env = Domain.Env.push (`Val var) cx.env;
    hyps = {classifier = `Ty ty; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.succ cx.qenv;
-   ppenv = snd @@ Pretty.Env.bind nm cx.ppenv},
+   ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
   var
 
 let ext_tick cx ~nm =
   let n = Quote.Env.len cx.qenv in
   let tick = Domain.TickGen (`Lvl (nm, n)) in
   {cx with
-   env = Domain.Env.push (Domain.Tick tick) cx.env;
+   env = Domain.Env.push (`Tick tick) cx.env;
    hyps = {classifier = `Tick; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.succ cx.qenv;
-   ppenv = snd @@ Pretty.Env.bind nm cx.ppenv},
+   ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
   tick
 
 let ext_ty cx ~nm ty =
@@ -112,10 +115,10 @@ let def cx ~nm ~ty ~el =
 let ext_dim cx ~nm =
   let x = Name.named nm in
   {cx with
-   env = Domain.Env.push (Domain.Atom (`Atom x)) cx.env;
+   env = Domain.Env.push (`Dim (`Atom x)) cx.env;
    hyps = {classifier = `I; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.abs cx.qenv @@ Emp #< x;
-   ppenv = snd @@ Pretty.Env.bind nm cx.ppenv},
+   ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
   x
 
 let rec ext_dims cx ~nms =
@@ -224,6 +227,6 @@ let init globals =
    env = Domain.Env.emp;
    qenv = Quote.Env.emp;
    hyps = [];
-   ppenv = Pretty.Env.emp;
+   ppenv = Pp.Env.emp;
    rel = GlobalEnv.restriction globals;
    all_locks = 0}

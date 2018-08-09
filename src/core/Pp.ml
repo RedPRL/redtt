@@ -9,7 +9,7 @@ struct
     with
     | _ ->
       "{" ^ string_of_int i ^ "}"
-  (* failwith "Pretty printer: tried to resolve bound variable out of range" *)
+  (* failwith "Pp printer: tried to resolve bound variable out of range" *)
 
   let bind_fresh (i, xs) =
     let x = "x" ^ string_of_int i in

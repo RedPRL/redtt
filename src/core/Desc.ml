@@ -1,16 +1,35 @@
 type 'a arg_ty =
   | Self
 
-type 'a tele = 'a list
-
-type 'a constr =
-  {params : (string * 'a) tele;
-   args : 'a arg_ty list}
 
 type data_label = string
 type con_label = string
 
-type 'a desc = (con_label * 'a constr) list
+
+module Boundary =
+struct
+  type 'a term =
+    | Var of int
+    | Intro of
+        { clbl : con_label;
+          const_args : 'a list;
+          rec_args : 'a term list;
+          rs : 'a list}
+    (* TODO: fhcom, lam, app *)
+
+  type ('a, 'b) face = 'a * 'a * 'b
+  type ('a, 'b) sys = ('a, 'b) face list
+end
+
+type ('a, 'b) constr =
+  {const_specs : (string * 'a) list;
+   rec_specs : (string * 'a arg_ty) list;
+   dim_specs : string list;
+   boundary : ('a, 'b) Boundary.sys}
+
+
+(** A datatype description is just a list of named constructors. *)
+type ('a, 'b) desc = (con_label * ('a, 'b) constr) list
 
 exception ConstructorNotFound of con_label
 
@@ -22,65 +41,13 @@ let lookup_constr lbl desc =
   | _ ->
     raise @@ ConstructorNotFound lbl
 
-let is_strict_set _ = true
+let is_strict_set desc =
+  let constr_is_point constr =
+    match constr.dim_specs with
+    | [] -> true
+    | _ -> false
+  in
+  List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc true
 
 let pp_data_label = Uuseg_string.pp_utf_8
 let pp_con_label = Uuseg_string.pp_utf_8
-
-
-let pp_arg_ty fmt =
-  function
-  | Self ->
-    Format.fprintf fmt "self"
-
-let pp_constr pp fmt constr =
-  let pp_param env fmt (nm, ty) =
-    Format.fprintf fmt "(%a : %a)"
-      Uuseg_string.pp_utf_8 nm
-      (pp env) ty
-  in
-
-  let rec go_params env fmt =
-    function
-    | [nm, p] ->
-      let nm, env' = Pretty.Env.bind (Some nm) env in
-      Format.fprintf fmt "%a %a"
-        (pp_param env) (nm, p)
-        (go_args env') constr.args
-    | (nm, p) :: ps ->
-      let nm, env' = Pretty.Env.bind (Some nm) env in
-      Format.fprintf fmt "%a %a"
-        (pp_param env) (nm, p)
-        (go_params env') ps
-    | [] ->
-      go_args env fmt constr.args
-
-  and go_args _ fmt =
-    function
-    | [] ->
-      ()
-    | args ->
-      let pp_sep fmt () = Format.fprintf fmt " " in
-      Format.fprintf fmt "of ";
-      Format.pp_print_list ~pp_sep pp_arg_ty fmt args
-
-  in
-  go_params Pretty.Env.emp fmt constr.params
-
-let pp_labeled_constr pp fmt (lbl, constr) =
-  Format.fprintf fmt "| %a @[<hv1>%a@]"
-    Uuseg_string.pp_utf_8 lbl
-    (pp_constr pp) constr
-
-let pp_constrs pp fmt =
-  let pp_sep fmt () = Format.pp_print_newline fmt () in
-  Format.pp_print_list ~pp_sep (pp_labeled_constr pp) fmt
-
-let pp_desc pp fmt constrs =
-  Format.fprintf fmt "@[<v>data where@ %a@ end@]"
-    (pp_constrs pp) constrs
-
-
-(* let nats : 'a desc =
-   ["ze", {params = []; args = []};
-   "su", {params = []; args = [Self]}] *)

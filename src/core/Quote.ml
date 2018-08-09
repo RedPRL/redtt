@@ -1,8 +1,10 @@
 open Domain
-open RedBasis.Bwd
+open RedBasis
+open Bwd
 open BwdNotation
 
 module D = Domain
+module B = Desc.Boundary
 
 
 module Env :
@@ -66,10 +68,20 @@ sig
   val quote_nf : env -> nf -> Tm.tm
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
+  val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
+
+  val equiv_boundary_value
+    : env
+    -> Desc.data_label
+    -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+    -> Tm.tm Desc.arg_ty
+    -> value
+    -> value
+    -> unit
 end
 
 
@@ -221,16 +233,6 @@ struct
         else
           failwith "Expected equal universe levels"
 
-      | _, S1, S1 ->
-        Tm.make Tm.S1
-
-      | _, Base, Base ->
-        Tm.make Tm.Base
-
-      | _, Loop x0, Loop x1 ->
-        let tx = equate_atom env x0 x1 in
-        Tm.make @@ Tm.Loop tx
-
       | _, Pi pi0, Pi pi1 ->
         let dom = equate env ty pi0.dom pi1.dom in
         let var = generic env pi0.dom in
@@ -355,33 +357,38 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
-      | Data dlbl, Intro (clbl0, args0), Intro (clbl1, args1) when clbl0 = clbl1 ->
+      | Data dlbl, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
         let desc = V.Sig.lookup_datatype dlbl in
-        let constr = Desc.lookup_constr clbl0 desc in
-        let targs = equate_constr_args env dlbl constr args0 args1 in
-        Tm.make @@ Tm.Intro (clbl0, targs)
+        let constr = Desc.lookup_constr info0.clbl desc in
+        let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
+        let rec_args = equate_constr_rec_args env dlbl constr info0.rec_args info1.rec_args in
+        let trs = equate_dims env info0.rs info1.rs in
+        Tm.make @@ Tm.Intro (dlbl, info0.clbl, const_args @ rec_args @ trs)
 
       | _ ->
         let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
 
-  and equate_constr_args env dlbl constr =
-    let rec go_params acc venv ps els0 els1 =
-      match ps, els0, els1 with
-      | [], _, _ ->
-        Bwd.to_list acc, els0, els1
-      | (_, pty) :: ps, el0 :: els0, el1 :: els1 ->
-        let vty = eval venv pty in
+  and equate_constr_const_args env constr els0 els1 =
+    let open Desc in
+    let rec go acc venv const_specs els0 els1 =
+      match const_specs, els0, els1 with
+      | [], [], [] ->
+        Bwd.to_list acc
+      | (_, ty) :: const_specs, el0 :: els0, el1 :: els1 ->
+        let vty = eval venv ty in
         let tm0 = equate env vty el0 el1 in
-        go_params (acc #< tm0) (D.Env.push (D.Val el0) venv) ps els0 els1
+        go (acc #< tm0) (D.Env.push (`Val el0) venv) const_specs els0 els1
       | _ ->
         failwith "equate_constr_args"
     in
-    fun els0 els1 ->
-      let tps, els0', els1' = go_params Emp D.Env.emp constr.params els0 els1 in
-      let self_ty = D.make @@ D.Data dlbl in
-      let targs = List.map2 (equate env self_ty) els0' els1' in
-      tps @ targs
+    go Emp D.Env.emp constr.const_specs els0 els1
+
+  and equate_constr_rec_args env dlbl constr els0 els1 =
+    let open Desc in
+    (* TODO: factor out *)
+    let realize_spec_ty Self = D.make @@ D.Data dlbl in
+    ListUtil.map3 (fun (_, spec_ty) -> equate env @@ realize_spec_ty spec_ty) constr.rec_specs els0 els1
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
@@ -408,6 +415,13 @@ struct
       let cap = equate_neu env info0.cap info1.cap in
       let sys = equate_comp_sys env info0.ty info0.sys info1.sys in
       Tm.HCom {r = tr; r' = tr'; ty; cap = Tm.up cap; sys}, Bwd.from_list stk
+
+    | NCoe info0, NCoe info1 ->
+      let tr, tr' = equate_dir env info0.dir info1.dir in
+      let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+      let bnd = equate_val_abs env univ info0.abs info1.abs in
+      let tm = equate_neu env info0.neu info1.neu in
+      Tm.Coe {r = tr; r' = tr'; ty = bnd; tm = Tm.up tm}, Bwd.from_list stk
 
     | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
       let ty = equate_ty env ty0 ty1 in
@@ -462,28 +476,32 @@ struct
         let quote_clause (clbl, constr) =
           let _, clause0 = List.find (fun (clbl', _) -> clbl = clbl') elim0.clauses in
           let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
-          let env', vs =
+          let env', cvs, rvs, rs =
             let open Desc in
-            let rec build_cx qenv env vs ps args =
-              match ps, args with
-              | (_, pty) :: ps, _ ->
+            let rec build_cx qenv env (cvs, rvs) rs const_specs rec_specs dim_specs =
+              match const_specs, rec_specs, dim_specs with
+              | (_, pty) :: const_specs, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
-                let env' = D.Env.push (D.Val v) env in
-                build_cx (Env.succ qenv) env' (vs #< v) ps args
-              | [], Self :: args ->
+                let env' = D.Env.push (`Val v) env in
+                build_cx (Env.succ qenv) env' (cvs #< v, rvs) rs const_specs rec_specs dim_specs
+              | [], (_, Self) :: rec_specs, _ ->
                 let vx = generic qenv data_ty in
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
-                build_cx (Env.succ qenv') env (vs #< vx #< vih) [] args
-              | [], [] ->
-                qenv, Bwd.to_list vs
+                build_cx (Env.succ qenv') env (cvs, rvs #< vx #< vih) rs const_specs rec_specs dim_specs
+              | [], [], dims ->
+                let xs = Bwd.map (fun x -> Name.named @@ Some x) @@ Bwd.from_list dims in
+                let qenv' = Env.abs qenv xs in
+                qenv', Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env D.Env.emp Emp constr.params constr.args
+            build_cx env D.Env.emp (Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
           in
-          let bdy0 = inst_nclo clause0 vs in
-          let bdy1 = inst_nclo clause1 vs in
-          let intro = D.make @@ D.Intro (clbl, vs) in
+          let vs = cvs @ rvs in
+          let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
+          let bdy0 = inst_nclo clause0 cells in
+          let bdy1 = inst_nclo clause1 cells in
+          let intro = make_intro D.Env.emp ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)
@@ -494,28 +512,6 @@ struct
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
         failwith "Datatype mismatch"
-
-    | S1Rec rec0, S1Rec rec1 ->
-      let mot =
-        let var = generic env @@ make S1 in
-        let env' = Env.succ env in
-        let vmot0 = inst_clo rec0.mot var in
-        let vmot1 = inst_clo rec1.mot var in
-        equate_ty env' vmot0 vmot1
-      in
-      let bcase =
-        let vmot_base = inst_clo rec0.mot @@ make Base in
-        equate env vmot_base rec0.bcase rec1.bcase
-      in
-      let x_lcase, lcase =
-        let x_lcase, lcase0 = Abs.unleash1 rec0.lcase in
-        let lcase1 = Abs.inst1 rec1.lcase (`Atom x_lcase) in
-        let env' = Env.abs env (Emp #< x_lcase) in
-        let vmot_loop = inst_clo rec0.mot @@ make @@ Loop x_lcase in
-        x_lcase, equate env' vmot_loop lcase0 lcase1
-      in
-      let frame = Tm.S1Rec {mot = Tm.B (clo_name rec0.mot, mot); bcase = bcase; lcase = Tm.B (Name.name x_lcase, lcase)} in
-      equate_neu_ env rec0.neu rec1.neu @@ frame :: stk
 
     | VProj vproj0, VProj vproj1 ->
       let x0 = vproj0.x in
@@ -568,6 +564,9 @@ struct
     with
     | Invalid_argument _ ->
       failwith "equate_val_sys length mismatch"
+
+  and quote_val_sys env ty sys =
+    equate_val_sys env ty sys sys
 
   and equate_comp_sys env ty sys0 sys1 =
     try
@@ -855,5 +854,39 @@ struct
     end
 
 
+  let rec equate_boundary_value env (dlbl, desc) rec_spec el0 el1 =
+    match rec_spec with
+    | Desc.Self ->
+      begin
+        match unleash el0, unleash el1 with
+        | D.Intro info0, D.Intro info1 when info0.clbl = info1.clbl ->
+          let constr = Desc.lookup_constr info0.clbl desc in
+          let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
+          let rec_args =
+            ListUtil.map3
+              (fun (_, spec) -> equate_boundary_value env (dlbl, desc) spec)
+              constr.rec_specs
+              info0.rec_args
+              info1.rec_args
+          in
+          let rs = equate_dims env info0.rs info1.rs in
+          B.Intro {clbl = info0.clbl; const_args; rec_args; rs = rs}
+        | D.Up info0, D.Up info1 ->
+          equate_boundary_neu env info0.neu info1.neu
+        | _ ->
+          failwith "equate_boundary_value"
+      end
+
+  and equate_boundary_neu env neu0 neu1 =
+    match neu0, neu1 with
+    | D.Lvl (_, lvl0), D.Lvl (_, lvl1) when lvl0 = lvl1 ->
+      let ix = Env.ix_of_lvl lvl0 env in
+      B.Var ix
+    | _ ->
+      failwith "equate_boundary_neu"
+
+
+  let equiv_boundary_value env dlbl desc rec_spec el0 el1 =
+    ignore @@ equate_boundary_value env (dlbl, desc) rec_spec el0 el1
 
 end

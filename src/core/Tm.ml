@@ -2,94 +2,7 @@ open RedBasis
 open Bwd
 open BwdNotation
 
-type twin = [`Only | `TwinL | `TwinR]
-
-type 'a bnd = B of string option * 'a
-type 'a nbnd = NB of string option bwd * 'a
-
-type ('r, 'a) face = 'r * 'r * 'a option
-type ('r, 'a) system = ('r, 'a) face list
-
-type 'a tmf =
-  | FHCom of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a bnd) system}
-
-  | Univ of {kind : Kind.t; lvl : Lvl.t}
-  | Pi of 'a * 'a bnd
-  | Ext of ('a * ('a, 'a) system) nbnd
-  | Rst of {ty : 'a; sys : ('a, 'a) system}
-  | CoR of ('a, 'a) face
-  | Sg of 'a * 'a bnd
-
-  | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
-  | VIn of {r : 'a; tm0 : 'a; tm1 : 'a}
-
-  | S1
-  | Base
-  | Loop of 'a
-
-  | Lam of 'a bnd
-  | ExtLam of 'a nbnd
-  | CoRThunk of ('a, 'a) face
-
-  | Cons of 'a * 'a
-
-  | Dim0
-  | Dim1
-  | TickConst
-
-  | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
-
-  (* Labelled types from Epigram *)
-  | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
-  | LblRet of 'a
-
-  | Later of 'a bnd
-  | Next of 'a bnd
-
-  | BoxModality of 'a
-  | Shut of 'a
-
-  | Up of 'a cmd
-  | Let of 'a cmd * 'a bnd
-
-
-  | Data of Desc.data_label
-  | Intro of Desc.con_label * 'a list
-
-
-
-
-and 'a head =
-  | Meta of {name: Name.t; ushift : int}
-  | Var of {name : Name.t; twin : twin; ushift : int}
-  | Ix of int * twin
-  | Down of {ty : 'a; tm : 'a}
-  | DFix of {r : 'a; ty : 'a; bdy : 'a bnd}
-  | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
-  | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
-  | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
-  | GHCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
-  | GCom of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
-
-
-and 'a frame =
-  | Car
-  | Cdr
-  | FunApp of 'a
-  | ExtApp of 'a list
-  | S1Rec of {mot : 'a bnd; bcase : 'a; lcase : 'a bnd}
-  | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
-  | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
-  | LblCall
-  | CoRForce
-  | Prev of 'a
-  | Open
-
-  | Elim of {dlbl : Desc.data_label; mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
-
-and 'a spine = 'a frame bwd
-and 'a cmd = 'a head * 'a spine
-
+include TmData
 
 type 'a subst =
   | Shift of int
@@ -132,7 +45,9 @@ end
 
 module Traverse (A : Alg) : sig
   val traverse_tm : tm -> tm
+  val traverse_head : tm head -> tm cmd
   val traverse_spine : tm spine -> tm spine
+  val traverse_cmd : tm cmd -> tm cmd
 end =
 struct
   let rec traverse_tm (Tm con) =
@@ -141,7 +56,7 @@ struct
 
   and traverse_con =
     function
-    | (Univ _ | S1 | Dim0 | Dim1 | TickConst | Base as con) ->
+    | (Univ _ | Dim0 | Dim1 | TickConst as con) ->
       con
 
     | FHCom info ->
@@ -195,10 +110,6 @@ struct
       let tm0 = traverse_tm info.tm0 in
       let tm1 = traverse_tm info.tm1 in
       VIn {r; tm0; tm1}
-
-    | Loop r ->
-      let r' = traverse_tm r in
-      Loop r'
 
     | Lam bnd ->
       let bnd' = traverse_bnd traverse_tm bnd in
@@ -256,9 +167,9 @@ struct
     | Data lbl ->
       Data lbl
 
-    | Intro (clbl, args) ->
+    | Intro (dlbl, clbl, args) ->
       let args' = traverse_list traverse_tm args in
-      Intro (clbl, args')
+      Intro (dlbl, clbl, args')
 
 
   and traverse_cmd (hd, sp) =
@@ -410,12 +321,6 @@ struct
       let ts' = traverse_list traverse_tm ts in
       ExtApp ts'
 
-    | S1Rec info ->
-      let mot = traverse_bnd traverse_tm info.mot in
-      let bcase = traverse_tm info.bcase in
-      let lcase = traverse_bnd traverse_tm info.lcase in
-      S1Rec {mot; bcase; lcase}
-
     | Elim info ->
       let mot = traverse_bnd traverse_tm info.mot in
       let clauses = List.map (fun (lbl, bnd) -> lbl, traverse_nbnd traverse_tm bnd) info.clauses in
@@ -533,6 +438,11 @@ let subst sub tm =
   let module Init = struct let subst = sub end in
   let module T = Traverse (SubstAlg (Init)) in
   T.traverse_tm tm
+
+let subst_cmd sub cmd =
+  let module Init = struct let subst = sub end in
+  let module T = Traverse (SubstAlg (Init)) in
+  T.traverse_cmd cmd
 
 
 let make con =
@@ -710,21 +620,21 @@ let rec pp env fmt =
   let rec go env mode fmt (Tm t) =
     match t with
     | Pi (dom, B (nm, cod)) ->
-      let x, env' = Pretty.Env.bind nm env in
+      let x, env' = Pp.Env.bind nm env in
       if mode = `Pi then
         Format.fprintf fmt "[%a : %a]@ %a" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Pi) cod
       else
         Format.fprintf fmt "@[<hv1>(%a @[<hv>[%a : %a]@ %a@])@]" Uuseg_string.pp_utf_8 "→" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Pi) cod
 
     | Sg (dom, B (nm, cod)) ->
-      let x, env' = Pretty.Env.bind nm env in
+      let x, env' = Pp.Env.bind nm env in
       if mode = `Sg then
         Format.fprintf fmt "[%a : %a]@ %a" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Sg) cod
       else
         Format.fprintf fmt "@[<hv1>(%a @[<hv>[%a : %a]@ %a@])@]" Uuseg_string.pp_utf_8 "×" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Sg) cod
 
     | Ext (NB (nms, (cod, sys))) ->
-      let xs, env' = Pretty.Env.bindn (Bwd.to_list nms) env in
+      let xs, env' = Pp.Env.bindn (Bwd.to_list nms) env in
       begin
         match sys with
         | [] ->
@@ -753,14 +663,14 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<hv1>(Vin %a@ %a@ %a)@]" (pp env) info.r (pp env) info.tm0 (pp env) info.tm1
 
     | Lam (B (nm, tm)) ->
-      let x, env' = Pretty.Env.bind nm env in
+      let x, env' = Pp.Env.bind nm env in
       if mode = `Lam then
         Format.fprintf fmt "[%a]@ %a" Uuseg_string.pp_utf_8 x (go env' `Lam) tm
       else
         Format.fprintf fmt "@[<1>(λ [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (go env' `Lam) tm
 
     | ExtLam (NB (nms, tm)) ->
-      let xs, env' = Pretty.Env.bindn (Bwd.to_list nms) env in
+      let xs, env' = Pp.Env.bindn (Bwd.to_list nms) env in
       if mode = `Lam then
         Format.fprintf fmt "<%a>@ %a" pp_strings xs (go env' `Lam) tm
       else
@@ -777,15 +687,6 @@ let rec pp env fmt =
 
     | TickConst ->
       Uuseg_string.pp_utf_8 fmt "∙"
-
-    | S1 ->
-      Format.fprintf fmt "S1"
-
-    | Base ->
-      Format.fprintf fmt "base"
-
-    | Loop r ->
-      Format.fprintf fmt "(loop %a)" (pp env) r
 
     | Univ {kind; lvl} ->
       Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
@@ -818,11 +719,11 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<hv1>(box %a %a@ %a@ @[<hv>%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
 
     | Later (B (nm, t)) ->
-      let x, env' = Pretty.Env.bind nm env in
+      let x, env' = Pp.Env.bind nm env in
       Format.fprintf fmt "@[<hv1>(%a [%a]@ %a)@]" Uuseg_string.pp_utf_8 "▷" Uuseg_string.pp_utf_8 x (pp env') t
 
     | Next (B (nm, t)) ->
-      let x, env' = Pretty.Env.bind nm env in
+      let x, env' = Pp.Env.bind nm env in
       Format.fprintf fmt "@[<hv1>(next [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') t
 
     | BoxModality t ->
@@ -832,7 +733,7 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<hv1>(shut@ %a)@]" (pp env) t
 
     | Let (cmd, B (nm, t)) ->
-      let x, env' = Pretty.Env.bind nm env in
+      let x, env' = Pp.Env.bind nm env in
       Format.fprintf fmt "@[<hv1>(let@ @[<hv1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
 
     | Up cmd ->
@@ -841,7 +742,7 @@ let rec pp env fmt =
     | Data lbl ->
       Desc.pp_data_label fmt lbl
 
-    | Intro (clbl, args) ->
+    | Intro (_dlbl, clbl, args) ->
       begin
         match args with
         | [] ->
@@ -858,27 +759,27 @@ let rec pp env fmt =
 and pp_head env fmt =
   function
   | Coe {r; r'; ty = B (nm, ty); tm} ->
-    let x, env' = Pretty.Env.bind nm env in
+    let x, env' = Pp.Env.bind nm env in
     Format.fprintf fmt "@[<hv1>(coe %a %a@ <%a> %a@ %a)@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) tm
 
   | HCom {r; r'; ty; cap; sys} ->
     Format.fprintf fmt "@[<hv1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
 
   | Com {r; r'; ty = B (nm, ty); cap; sys} ->
-    let x, env' = Pretty.Env.bind nm env in
+    let x, env' = Pp.Env.bind nm env in
     Format.fprintf fmt "@[<hv1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
 
   | GHCom {r; r'; ty; cap; sys} ->
     Format.fprintf fmt "@[<hv1>(ghcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
 
   | GCom {r; r'; ty = B (nm, ty); cap; sys} ->
-    let x, env' = Pretty.Env.bind nm env in
+    let x, env' = Pp.Env.bind nm env in
     Format.fprintf fmt "@[<hv1>(gcom %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
 
   | Ix (ix, _tw) ->
     (* Format.fprintf fmt "#%i/" ix; *)
     Uuseg_string.pp_utf_8 fmt @@
-    Pretty.Env.var ix env
+    Pp.Env.var ix env
 
   | Var info ->
     Name.pp fmt info.name;
@@ -893,7 +794,7 @@ and pp_head env fmt =
     Format.fprintf fmt "@[<hv1>(: @[<hov>%a@ %a@])@]" (pp env) ty (pp env) tm
 
   | DFix {r; ty; bdy = B (nm, bdy)} ->
-    let x, env' = Pretty.Env.bind nm env in
+    let x, env' = Pp.Env.bind nm env in
     Format.fprintf fmt "@[<hv1>(dfix %a %a@ [%a] %a)@]" (pp env) r (pp env) ty Uuseg_string.pp_utf_8 x (pp env') bdy
 
 and pp_cmd env fmt (hd, sp) =
@@ -913,19 +814,9 @@ and pp_cmd env fmt (hd, sp) =
           Format.fprintf fmt "@[<hv1>(%a@ %a)@]" (go `FunApp) sp (pp env) t
       | ExtApp ts ->
         Format.fprintf fmt "@[<hv1>(%s %a@ %a)@]" "@" (go `ExtApp) sp (pp_terms env) ts
-      | S1Rec {mot = B (nm_mot, mot); bcase; lcase = B (nm_lcase, lcase)} ->
-        let x_mot, env_mot = Pretty.Env.bind nm_mot env in
-        let x_lcase, env_lcase = Pretty.Env.bind nm_lcase env in
-        Format.fprintf fmt "@[<hv1>(S1rec@ [%a] %a@ %a %a [%a] %a)@]"
-          Uuseg_string.pp_utf_8 x_mot
-          (pp env_mot) mot
-          (go `S1Rec) sp
-          (pp env) bcase
-          Uuseg_string.pp_utf_8 x_lcase
-          (pp env_lcase) lcase
       | Elim info ->
         let B (nm_mot, mot) = info.mot in
-        let x_mot, env_mot = Pretty.Env.bind nm_mot env in
+        let x_mot, env_mot = Pp.Env.bind nm_mot env in
         (* TODO *)
         Format.fprintf fmt "@[<hv1>(%a.elim@ [%a] %a@ %a@ %a)@]"
           Desc.pp_data_label info.dlbl
@@ -965,7 +856,7 @@ and pp_nbnd env fmt nbnd =
   | Emp ->
     pp env fmt tm
   | _ ->
-    let xs, env' = Pretty.Env.bindn (Bwd.to_list nms) env in
+    let xs, env' = Pp.Env.bindn (Bwd.to_list nms) env in
     Format.fprintf fmt "@[<hv1>[%a]@ %a@]" pp_strings xs (pp env') tm
 
 and pp_spine env fmt sp =
@@ -1041,7 +932,7 @@ and pp_bface env fmt face =
     Format.fprintf fmt "@[<hv1>[%a=%a@ -]@]" (pp env) r (pp env) r'
 
   | Some (B (nm, tm)) ->
-    let x, env' = Pretty.Env.bind nm env in
+    let x, env' = Pp.Env.bind nm env in
     Format.fprintf fmt "@[<hv1>[%a=%a@ <%a> %a]@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') tm
 
 
@@ -1252,11 +1143,6 @@ let map_frame f =
     FunApp (f t)
   | ExtApp ts ->
     ExtApp (List.map f ts)
-  | S1Rec info ->
-    let mot = map_bnd f info.mot in
-    let bcase = f info.bcase in
-    let lcase = map_bnd f info.lcase in
-    S1Rec {mot; bcase; lcase}
   | Elim info ->
     let mot = map_bnd f info.mot in
     let clauses = List.map (fun (lbl, bnd) -> lbl, map_nbnd f bnd) info.clauses in
@@ -1300,9 +1186,8 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Dim0 | Dim1 | TickConst | S1 | Base | Data _) as con ->
+  | (Univ _ | Dim0 | Dim1 | TickConst | Data _) as con ->
     con
-  | Loop r -> Loop (f r)
   | Cons (t0, t1) ->
     Cons (f t0, f t1)
   | LblRet t ->
@@ -1366,8 +1251,8 @@ let map_tmf f =
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
     Let (map_cmd f cmd, map_bnd f bnd)
-  | Intro (clbl, args) ->
-    Intro (clbl, List.map f args)
+  | Intro (dlbl, clbl, args) ->
+    Intro (dlbl, clbl, List.map f args)
 
 
 
@@ -1498,7 +1383,7 @@ let rec shift_univ k tm =
       Tm (map_tmf (shift_univ k) tmf)
 
 
-let pp0 fmt tm = pp Pretty.Env.emp fmt @@ eta_contract tm
+let pp0 fmt tm = pp Pp.Env.emp fmt @@ eta_contract tm
 
 module Error =
 struct
