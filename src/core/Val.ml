@@ -786,7 +786,7 @@ struct
 
   (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
   and rigid_coe_data_intro dir abs ~dlbl ~clbl ~const_args ~rec_args ~rs =
-    let x, _ = Abs.unleash1 abs in
+    let x = Name.fresh () in
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
 
