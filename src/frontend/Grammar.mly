@@ -6,6 +6,9 @@
   open BwdNotation
   module E = ESig
   module R = ResEnv
+
+  let eterm pos0 pos1 con =
+    E.{con; span = Some (pos0, pos1)}
 %}
 
 %token <int> NUMERAL
@@ -49,7 +52,7 @@ debug_filter:
       | "constraints" -> `Constraints
       | _ -> failwith "Invalid debug filter: try 'all' or 'constraints' " }
 
-atomic_eterm:
+atomic_econ:
   | BACKTICK; t = tm
     { E.Quo t }
   | a = HOLE_NAME;
@@ -61,7 +64,7 @@ atomic_eterm:
   | LGL; es = separated_list(COMMA, eterm); RGL
     { E.Tuple es }
   | LPR; e = eterm; RPR
-    { e }
+    { e.con }
   | a = ATOM; CARET; k = NUMERAL
     { E.Var (a, k) }
   | a = ATOM;
@@ -70,6 +73,10 @@ atomic_eterm:
     { E.Num n }
   | BULLET
     { E.TickConst }
+
+atomic_eterm:
+  | e = atomic_econ
+    { eterm $startpos $endpos e }
 
 eframe:
   | e = atomic_eterm
@@ -97,8 +104,8 @@ pipe_block(X):
   | x = block(preceded(option(PIPE), separated_list(PIPE, X)))
     { x }
 
-eterm:
-  | e = atomic_eterm
+econ:
+  | e = atomic_econ
     { e }
   | e = atomic_eterm; fs = nonempty_list(eframe)
     { E.Cut (e, Bwd.from_list fs) }
@@ -119,13 +126,13 @@ eterm:
     { E.DFixLine {r; name; ty; bdy} }
 
   | DFIX; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
-    { E.DFixLine {r = E.Num 0; name; ty; bdy} }
+    { E.DFixLine {r = {con = E.Num 0; span = None}; name; ty; bdy} }
 
   | FIX; LSQ; r = eterm; RSQ; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
     { E.FixLine {r; name; ty; bdy} }
 
   | FIX; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
-    { E.FixLine {r = E.Num 0; name; ty; bdy} }
+    { E.FixLine {r = {con = E.Num 0; span = None}; name; ty; bdy} }
 
   | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm= atomic_eterm; IN; fam = eterm
     { E.Coe {r = r0; r' = r1; fam; tm} }
@@ -159,6 +166,10 @@ eterm:
 
   | SHUT; tm = eterm
     { E.Shut tm }
+
+eterm:
+  | e = econ
+    { eterm $startpos $endpos e }
 
 eclause:
   | lbl = ATOM; pbinds = list(epatbind); RRIGHT_ARROW; bdy = eterm

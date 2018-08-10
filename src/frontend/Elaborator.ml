@@ -73,11 +73,11 @@ struct
 
   let kind_of_frame env =
     function
-    | E.App E.TickConst ->
-      M.ret @@ `Prev E.TickConst
-    | E.App (E.Num (0 | 1) as e) ->
+    | E.App ({con = E.TickConst} as e) ->
+      M.ret @@ `Prev e
+    | E.App ({con = E.Num (0 | 1)} as e) ->
       M.ret @@ `ExtApp e
-    | E.App (E.Var (nm, _) as e) ->
+    | E.App ({con = E.Var (nm, _)} as e) ->
       get_resolver env >>= fun renv ->
       begin
         try
@@ -260,11 +260,11 @@ struct
         r0, r1, bt
     end
 
-  and elab_boundary_term env dlbl constrs =
-    function
+  and elab_boundary_term env dlbl constrs e =
+    match e.con with
     | E.Var (nm, _) ->
       elab_boundary_cut env dlbl constrs nm Emp
-    | E.Cut (E.Var (nm, _), spine) ->
+    | E.Cut ({con = E.Var (nm, _)}, spine) ->
       elab_boundary_cut env dlbl constrs nm spine
     | _ ->
       failwith "TODO: elaborate_boundary_term"
@@ -393,7 +393,7 @@ struct
      As an example, see what we have done with tac_lambda, tac_if, etc. *)
   and elab_chk env ty e : tm M.m =
     normalize_ty ty >>= fun ty ->
-    match Tm.unleash ty, e with
+    match Tm.unleash ty, e.con with
     | Tm.Rst rst, E.Guess e ->
       elab_chk env rst.ty e >>= fun tm ->
       M.lift C.ask >>= fun psi ->
@@ -446,7 +446,7 @@ struct
       begin
         match Tm.unleash tm with
         | Tm.Up _ ->
-          elab_up env ty @@ E.Quo tmfam
+          elab_up env ty {e with con = E.Quo tmfam }
         | _ ->
           M.ret @@ tmfam renv
       end
@@ -491,7 +491,7 @@ struct
       elab_chk env ty edom >>= fun dom ->
       let x = Name.named @@ Some name in
       M.in_scope x (`P dom) begin
-        elab_chk env ty (E.Pi (etele, ecod))
+        elab_chk env ty {e with con = E.Pi (etele, ecod)}
         <<@> Tm.bind x
         <<@> fun cod -> Tm.make @@ Tm.Pi (dom, cod)
       end
@@ -499,7 +499,7 @@ struct
     | Tm.Univ _, E.Pi (`I name :: etele, ecod) ->
       let x = Name.named @@ Some name in
       M.in_scope x `I begin
-        elab_chk env ty (E.Pi (etele, ecod))
+        elab_chk env ty { e with con = E.Pi (etele, ecod)}
         <<@> fun codx ->
           let ebnd = Tm.bind_ext (Emp #< x) codx [] in
           Tm.make @@ Tm.Ext ebnd
@@ -508,7 +508,7 @@ struct
     | Tm.Univ _, E.Pi (`Tick name :: etele, ecod) ->
       let x = Name.named @@ Some name in
       M.in_scope x `Tick begin
-        elab_chk env ty (E.Pi (etele, ecod))
+        elab_chk env ty {e with con = E.Pi (etele, ecod)}
         <<@> Tm.bind x
         <<@> fun bnd -> Tm.make @@ Tm.Later bnd
       end
@@ -516,7 +516,7 @@ struct
     | Tm.Univ _, E.Pi (`Lock :: etele, ecod) ->
       let x = Name.fresh () in
       M.in_scope x `Lock begin
-        elab_chk env ty (E.Pi (etele, ecod))
+        elab_chk env ty {e with con = E.Pi (etele, ecod)}
         <<@> fun ty -> Tm.make @@ Tm.BoxModality ty
       end
 
@@ -527,7 +527,7 @@ struct
       elab_chk env ty edom >>= fun dom ->
       let x = Name.named @@ Some name in
       M.in_scope x (`P dom) begin
-        elab_chk env ty (E.Sg (etele, ecod))
+        elab_chk env ty {e with con = E.Sg (etele, ecod)}
         <<@> Tm.bind x
         <<@> fun cod -> Tm.make @@ Tm.Sg (dom, cod)
       end
@@ -541,7 +541,7 @@ struct
       elab_chk env dom e >>= fun tm0 ->
       let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
       let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
-      elab_chk env cod' (Tuple es) <<@> Tm.cons tm0
+      elab_chk env cod' {e with con = E.Tuple es} <<@> Tm.cons tm0
 
     | Tm.Univ info, Type kind ->
       begin
@@ -577,7 +577,7 @@ struct
     | _, E.Var _ ->
       elab_chk_cut env e Emp ty
 
-    | _, e ->
+    | _, _ ->
       elab_up env ty e
 
   and elab_tm_sys env ty =
@@ -693,7 +693,7 @@ struct
 
 
   and elab_inf env e : (ty * tm Tm.cmd) M.m =
-    match e with
+    match e.con with
     | E.Var (name, ushift) ->
       begin
         elab_var env name ushift >>= fun (a, cmd) ->
@@ -797,7 +797,7 @@ struct
       failwith "Can't infer"
 
   and elab_dim env e =
-    match e with
+    match e.con with
     | E.Var (name, 0) ->
       get_resolver env >>= fun renv ->
       begin
@@ -858,7 +858,7 @@ struct
     match Tm.unleash ty with
     | Tm.Data dlbl ->
       begin
-        match exp with
+        match exp.con with
         | E.Var (clbl, _) ->
           begin
             M.lift C.base_cx >>= fun cx ->
@@ -966,7 +966,7 @@ struct
         let cod' = V.inst_clo cod @@ Cx.eval_cmd cx (hd, sp #< Tm.Car) in
         cod', (hd, sp #< Tm.Cdr)
 
-    | spine, `Prev E.TickConst ->
+    | spine, `Prev {con = E.TickConst} ->
       M.in_scope (Name.fresh ()) `Lock begin
         elab_cut env exp spine
       end >>= fun (vty, (hd, sp)) ->
@@ -976,7 +976,7 @@ struct
         let vty' = V.inst_tick_clo tclo Domain.TickConst in
         vty', (hd, sp #< (Tm.Prev tick))
 
-    | spine, `Prev (E.Var (name, _)) ->
+    | spine, `Prev {con = E.Var (name, _)} ->
       elab_var env name 0 >>= fun (_, tick) ->
       M.in_scope (Name.fresh ()) (`KillFromTick (Tm.up tick)) begin
         elab_cut env exp spine
