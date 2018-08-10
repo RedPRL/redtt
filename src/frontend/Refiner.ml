@@ -222,26 +222,26 @@ let guess_motive scrut ty =
   | _ ->
     M.ret @@ Tm.bind (Name.fresh ()) ty
 
+let make_motive ~data_ty ~tac_mot ~scrut ~ty =
+  match tac_mot with
+  | None ->
+    guess_motive scrut ty
+  | Some tac_mot ->
+    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    let mot_ty = Tm.pi None data_ty univ in
+    tac_mot mot_ty >>= fun mot ->
+    let motx =
+      Tm.ann ~ty:(Tm.subst (Tm.shift 1) mot_ty) ~tm:(Tm.subst (Tm.shift 1) mot)
+      @< Tm.FunApp (Tm.up @@ Tm.ix 0)
+    in
+    M.ret @@ Tm.B (None, Tm.up @@ motx)
+
 let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
 
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-    let mot_ty = Tm.pi None data_ty univ in
-
-    begin
-      match tac_mot with
-      | None ->
-        guess_motive scrut ty
-      | Some tac_mot ->
-        tac_mot mot_ty >>= fun mot ->
-        let motx =
-          Tm.ann ~ty:(Tm.subst (Tm.shift 1) mot_ty) ~tm:(Tm.subst (Tm.shift 1) mot)
-          @< Tm.FunApp (Tm.up @@ Tm.ix 0)
-        in
-        M.ret @@ Tm.B (None, Tm.up @@ motx)
-    end >>= fun bmot ->
+    make_motive ~data_ty ~scrut ~tac_mot ~ty >>= fun bmot ->
 
     let mot arg =
       let Tm.B (_, motx) = bmot in
