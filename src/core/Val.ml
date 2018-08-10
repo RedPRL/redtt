@@ -784,54 +784,58 @@ struct
     | `Same _ ->
       args
 
+  (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
+  and rigid_coe_data_intro dir abs ~dlbl ~clbl ~const_args ~rec_args ~rs =
+    let x, _ = Abs.unleash1 abs in
+    let desc = Sig.lookup_datatype dlbl in
+    let constr = Desc.lookup_constr clbl desc in
+
+    let r, r' = Dir.unleash dir in
+
+    let make_const_args dir =
+      multi_coe Env.emp dir (x, constr.const_specs) const_args
+    in
+
+    let coe_rec_arg dir _arg_spec arg =
+      (* TODO: when we add more recursive argument types, please fix!!! Change this to coerce in the
+         realization of the "argument spec". *)
+      make_coe dir abs arg
+    in
+
+    let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.rec_specs rec_args in
+    let intro =
+      make_intro Env.emp ~dlbl ~clbl
+        ~const_args:(make_const_args (`Ok dir))
+        ~rec_args:(make_rec_args (`Ok dir))
+        ~rs
+    in
+
+    begin
+      match constr.boundary with
+      | [] ->
+        intro
+      | _ ->
+        (* My lord, I have no idea if this is right. ouch!! *)
+        let faces =
+          eval_bterm_boundary dlbl desc Env.emp
+            ~const_args:(make_const_args @@ Dir.make r (`Atom x))
+            ~rec_args:(make_rec_args @@ Dir.make r (`Atom x))
+            ~rs
+            constr.boundary
+        in
+        let fix_face =
+          Face.map @@ fun _ _ el ->
+          Abs.bind1 x @@ make_coe (Dir.make (`Atom x) r') abs el
+        in
+        let correction = List.map fix_face faces in
+        make_fhcom (`Ok dir) intro @@ force_abs_sys correction
+    end
+
   and rigid_coe_data dir abs el =
-    let x, tyx = Abs.unleash1 abs in
+    let _, tyx = Abs.unleash1 abs in
     match unleash tyx, unleash el with
     | Data dlbl, Intro info ->
-      (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
-      let desc = Sig.lookup_datatype dlbl in
-      let constr = Desc.lookup_constr info.clbl desc in
-      let r, r' = Dir.unleash dir in
-
-      let make_const_args dir =
-        multi_coe Env.emp dir (x, constr.const_specs) info.const_args
-      in
-
-      let coe_rec_arg dir _arg_spec arg =
-        (* TODO: when we add more recursive argument types, please fix!!! Change this to coerce in the
-           realization of the "argument spec". *)
-        make_coe dir abs arg
-      in
-
-      let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.rec_specs info.rec_args in
-      let rs = info.rs in
-      let intro =
-        make_intro Env.emp ~dlbl ~clbl:info.clbl
-          ~const_args:(make_const_args (`Ok dir))
-          ~rec_args:(make_rec_args (`Ok dir))
-          ~rs
-      in
-
-      begin
-        match constr.boundary with
-        | [] ->
-          intro
-        | _ ->
-          (* My lord, I have no idea if this is right. ouch!! *)
-          let faces =
-            eval_bterm_boundary dlbl desc Env.emp
-              ~const_args:(make_const_args @@ Dir.make r (`Atom x))
-              ~rec_args:(make_rec_args @@ Dir.make r (`Atom x))
-              ~rs:info.rs
-              constr.boundary
-          in
-          let fix_face =
-            Face.map @@ fun _ _ el ->
-            Abs.bind1 x @@ make_coe (Dir.make (`Atom x) r') abs el
-          in
-          let correction = List.map fix_face faces in
-          make_fhcom (`Ok dir) intro @@ force_abs_sys correction
-      end
+      rigid_coe_data_intro dir abs ~dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
 
     | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
@@ -1386,6 +1390,7 @@ struct
       raise @@ E err
 
   and rigid_com dir abs cap (sys : comp_sys) : value =
+    (* Format.eprintf "rigid_com in: %a@.@." pp_abs abs; *)
     let _, r' = Dir.unleash dir in
     let ty = Abs.inst1 abs r' in
     let capcoe = rigid_coe dir abs cap in
@@ -1605,14 +1610,12 @@ struct
       let rs = List.map (eval_dim rho) trs in
       make_intro (Env.clear_locals rho) ~dlbl ~clbl ~const_args ~rec_args ~rs
 
-
   and make_intro rho ~dlbl ~clbl ~const_args ~rec_args ~rs =
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
     let sys = eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs constr.boundary in
     match force_val_sys sys with
     | `Ok sys ->
-      (* Did I just fix a bug?? *)
       make @@ Intro {dlbl; clbl; const_args; rec_args; rs; sys}
     | `Proj v ->
       v

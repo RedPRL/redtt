@@ -62,13 +62,15 @@ exception ChkMatch
    It is perhaps a bit too ambitious to fully unleash, until we have developed the Immortal
    subtyping and definitional equivalence theory that really gets down with eta laws of
    restriction types. *)
-let push_restriction sys ty =
+let rec push_restriction sys ty =
   normalize_ty ty >>= fun ty ->
   let on_sys f =
     List.map @@ fun (r, r', otm) ->
     r, r', Option.map f otm
   in
   match Tm.unleash ty with
+  | Tm.Rst rst ->
+    push_restriction (rst.sys @ sys) rst.ty
   | Tm.Pi (dom, cod) ->
     let x, codx = Tm.unbind cod in
     let app_tm tm =
@@ -105,6 +107,7 @@ let push_restriction sys ty =
 
 let rec tac_rst tac ty =
   let rec go sys ty =
+    normalize_ty ty >>= fun ty ->
     match Tm.unleash ty with
     | Tm.Rst rst ->
       go (rst.sys @ sys) rst.ty
@@ -116,15 +119,15 @@ let rec tac_rst tac ty =
           normalize_ty ty >>= fun ty ->
           push_restriction sys ty >>= function
           | `Positive ->
-            tac ty >>=
+            tac_wrap_nf tac ty >>=
             guess_restricted ty sys
           | `Negative rty ->
-            tac rty
+            tac_wrap_nf tac rty
       end
   in go [] ty
 
 
-let tac_wrap_nf tac ty =
+and tac_wrap_nf tac ty =
   try tac ty
   with
   | ChkMatch ->
@@ -212,37 +215,33 @@ let unleash_data ty =
     Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
 
+let guess_motive scrut ty =
+  match Tm.unleash scrut with
+  | Tm.Up (Tm.Var var, Emp) ->
+    M.ret @@ Tm.bind var.name ty
+  | _ ->
+    M.ret @@ Tm.bind (Name.fresh ()) ty
+
+let make_motive ~data_ty ~tac_mot ~scrut ~ty =
+  match tac_mot with
+  | None ->
+    guess_motive scrut ty
+  | Some tac_mot ->
+    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    let mot_ty = Tm.pi None data_ty univ in
+    tac_mot mot_ty >>= fun mot ->
+    let motx =
+      Tm.ann ~ty:(Tm.subst (Tm.shift 1) mot_ty) ~tm:(Tm.subst (Tm.shift 1) mot)
+      @< Tm.FunApp (Tm.up @@ Tm.ix 0)
+    in
+    M.ret @@ Tm.B (None, Tm.up @@ motx)
+
 let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
 
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
-    let mot_ty = Tm.pi None data_ty univ in
-
-    begin
-      match tac_mot with
-      | None ->
-        let is_dependent =
-          match Tm.unleash scrut with
-          | Tm.Up (Tm.Var {name; _}, _) when Occurs.Set.mem name @@ Tm.free `Vars ty -> true
-          | _ -> false
-        in
-        if is_dependent then
-          M.lift @@ U.push_hole `Flex Emp mot_ty >>= fun mot ->
-          M.lift @@ C.active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty ~tm1:(Tm.up @@ mot @< Tm.FunApp scrut) >>
-          M.unify >>
-          M.ret @@ Tm.B (None, Tm.up @@ Tm.subst_cmd (Tm.shift 1) mot @< Tm.FunApp (Tm.up @@ Tm.ix 0))
-        else
-          M.ret @@ Tm.B (None, Tm.subst (Tm.shift 1) ty)
-      | Some tac_mot ->
-        tac_mot mot_ty >>= fun mot ->
-        let motx =
-          Tm.ann ~ty:(Tm.subst (Tm.shift 1) mot_ty) ~tm:(Tm.subst (Tm.shift 1) mot)
-          @< Tm.FunApp (Tm.up @@ Tm.ix 0)
-        in
-        M.ret @@ Tm.B (None, Tm.up @@ motx)
-    end >>= fun bmot ->
+    make_motive ~data_ty ~scrut ~tac_mot ~ty >>= fun bmot ->
 
     let mot arg =
       let Tm.B (_, motx) = bmot in
@@ -290,32 +289,32 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
     let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
       let constr = lookup_constr clbl desc in
-      let rec go psi env (tms, cargs, rargs, rs) pbinds ps args dims =
-        match pbinds, ps, args, dims with
-        | ESig.PVar nm :: pbinds, (_plbl, pty) :: ps, _, _->
+      let rec go psi env (tms, cargs, rargs, rs) pbinds const_specs rec_specs dims =
+        match pbinds, const_specs, rec_specs, dims with
+        | ESig.PVar nm :: pbinds, (_plbl, pty) :: const_specs, _, _->
           let x = Name.named @@ Some nm in
           let vty = V.eval env pty in
           let tty = Q.quote_ty Quote.Env.emp vty in
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let x_tm = Tm.up @@ Tm.var x in
           let env' = D.Env.push (`Val x_el) env in
-          go (psi #< (x, `P tty)) env' (tms #< x_tm, cargs #< x_el, rargs, rs) pbinds ps args dims
+          go (psi #< (x, `P tty)) env' (tms #< x_tm, cargs #< x_el, rargs, rs) pbinds const_specs rec_specs dims
 
-        | ESig.PVar nm :: pbinds, [], (_, Self) :: args, _ ->
+        | ESig.PVar nm :: pbinds, [], (_, Self) :: rec_specs, _ ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.fresh () in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let ih_ty = mot x_tm in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, rs) pbinds [] args dims
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, rs) pbinds const_specs rec_specs dims
 
-        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: args, _ ->
+        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: rec_specs, _ ->
           let x = Name.named @@ Some nm in
           let x_ih = Name.named @@ Some nm_ih in
           let x_tm = Tm.up @@ Tm.var x in
           let ih_ty = mot x_tm in
           let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, rs) pbinds [] args dims
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, rs) pbinds const_specs rec_specs dims
 
         | ESig.PVar nm :: pbinds, [], [], _ :: dims ->
           let x = Name.named @@ Some nm in
