@@ -4,7 +4,7 @@ open RedTT_Core
 module C = Contextual
 module U = Unify
 
-type location = (Lexing.position * Lexing.position) option
+type location = Log.location
 
 type diagnostic =
   | UserHole of
@@ -63,21 +63,6 @@ let rec normalize_tele =
     C.in_scope x p (normalize_tele tele) >>= fun psi ->
     C.ret @@ (x,p) :: psi
 
-let pp_message ~loc ~tag pp fmt data =
-  match loc with
-  | None ->
-    pp fmt data
-  | Some (start_pos, end_pos) ->
-    let open Lexing in
-    Format.fprintf fmt "@[%a:%i.%i-%i.%i [%a]:@,  @[%a@]@]"
-      Uuseg_string.pp_utf_8 start_pos.pos_fname
-      start_pos.pos_lnum
-      (start_pos.pos_cnum - end_pos.pos_bol)
-      end_pos.pos_lnum
-      (end_pos.pos_cnum - end_pos.pos_bol)
-      Uuseg_string.pp_utf_8 tag
-      pp data
-
 let print_diagnostic =
   function
   | (loc, UserHole {name; tele; ty; _}) ->
@@ -94,7 +79,7 @@ let print_diagnostic =
           Uuseg_string.pp_utf_8 "⊢"
           Tm.pp0 ty
       in
-      pp_message ~loc ~tag:"Info" pp Format.std_formatter ();
+      Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
       C.ret ()
     end
 

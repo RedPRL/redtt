@@ -15,7 +15,7 @@ val local : (params -> params) -> 'a m -> 'a m
 val isolate : 'a m -> 'a m
 val unify : unit m
 
-type location = (Lexing.position * Lexing.position) option
+type location = Log.location
 
 type diagnostic =
   | UserHole of
