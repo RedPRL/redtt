@@ -410,7 +410,7 @@ struct
       M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
       begin
         if name = Some "_" then M.ret () else
-          M.emit @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm}
+          M.emit e.span @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm}
       end >>
       M.ret @@ Tm.up tm
 
@@ -464,7 +464,7 @@ struct
           end
       in
       let clauses = List.map elab_clause clauses in
-      tac_elim ~tac_mot ~tac_scrut ~clauses ty
+      tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses ty
 
     | Tm.Univ _, E.Ext (names, ety, esys) ->
       let univ = ty in

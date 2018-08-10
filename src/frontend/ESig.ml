@@ -3,7 +3,7 @@ open RedBasis.Bwd
 
 type 'a info =
   {con : 'a;
-   span : (Lexing.position * Lexing.position) option}
+   span : ElabMonad.location}
 
 type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm

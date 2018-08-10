@@ -236,7 +236,7 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
     in
     M.ret @@ Tm.B (None, Tm.up @@ motx)
 
-let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
+let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun ty ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
@@ -273,7 +273,7 @@ let tac_elim ~tac_mot ~tac_scrut ~clauses : chk_tac =
           lbl, pbinds, fun ty ->
             M.lift C.ask >>= fun psi ->
             M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
-            M.emit @@ M.UserHole {name = Some lbl; ty; tele = psi; tm = Tm.up tm} >>
+            M.emit loc @@ M.UserHole {name = Some lbl; ty; tele = psi; tm = Tm.up tm} >>
             M.ret @@ Tm.up tm
       in
       List.map (fun (lbl, _) -> find_clause lbl) desc.constrs

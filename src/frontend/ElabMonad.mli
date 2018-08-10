@@ -15,10 +15,16 @@ val local : (params -> params) -> 'a m -> 'a m
 val isolate : 'a m -> 'a m
 val unify : unit m
 
-type diagnostic =
-  | UserHole of {name : string option; tele : Unify.telescope; ty : Tm.tm; tm : Tm.tm}
+type location = (Lexing.position * Lexing.position) option
 
-val emit : diagnostic -> unit m
+type diagnostic =
+  | UserHole of
+      {name : string option;
+       tele : Unify.telescope;
+       ty : Tm.tm;
+       tm : Tm.tm}
+
+val emit : location -> diagnostic -> unit m
 val report : 'a m -> 'a m
 
 val run : 'a m -> 'a
