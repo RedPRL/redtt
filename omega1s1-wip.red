@@ -43,6 +43,11 @@ let nat/25 : nat =
 let int/50 : int =
   pos (plus nat/25 nat/25)
 
-let winding-loop-testing1 : Path int int/50 (winding (loopn int/50)) =
+let int/5 : int = pos nat/five
+
+let winding-test/5 : Path int int/5 (winding (loopn int/5)) =
+  λ _ → int/5
+
+let winding-test/50 : Path int int/50 (winding (loopn int/50)) =
   λ _ → int/50
 
