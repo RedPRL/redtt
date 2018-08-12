@@ -54,9 +54,9 @@ and pp_con fmt : con -> unit =
   | Cons (v0, v1) ->
     Format.fprintf fmt "@[<1>(pair@ %a %a)@]" pp_value v0 pp_value v1
   | V info ->
-    Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
+    Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)@]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
   | VIn info ->
-    Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)]" Name.pp info.x pp_value info.el0 pp_value info.el1
+    Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)@]" Name.pp info.x pp_value info.el0 pp_value info.el1
   | Coe info ->
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
@@ -67,8 +67,9 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<ghcom>"
   | FHCom _ ->
     Format.fprintf fmt "<fhcom>"
-  | Box _ ->
-    Format.fprintf fmt "<box>"
+  | Box info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(box %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.cap pp_val_sys info.sys
   | LblTy {lbl; args; ty} ->
     begin
       match args with
