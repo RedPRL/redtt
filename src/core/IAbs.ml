@@ -103,7 +103,7 @@ struct
 
   let make1 gen =
     let x = Name.fresh () in
-    bind1 x (gen x)
+    unsafe_bind1 x (gen x)
 
   let act phi abs =
     let xs, node = unleash abs in
