@@ -1160,14 +1160,14 @@ struct
 
       let peel_sys k sys = List.map (peel_face k) sys in
 
-      let rec make_args i acc args ps atys =
-        match args, ps, atys with
-        | el :: args, _ :: ps, _ ->
-          make_args (i + 1) (acc #< el) args ps atys
-        | el :: args, [], (_, Desc.Self) :: atys ->
+      let rec make_args i acc cvs rvs const_specs rec_specs =
+        match cvs, rvs, const_specs, rec_specs with
+        | el :: cvs, _, _ :: const_specs, _ ->
+          make_args (i + 1) (acc #< el) cvs rvs const_specs rec_specs
+        | [], el :: rvs, [], (_, Desc.Self) :: rec_specs ->
           let hcom = rigid_hcom dir ty el (peel_sys i sys) in
-          make_args (i + 1) (acc #< hcom) args ps atys
-        | [], [], [] ->
+          make_args (i + 1) (acc #< hcom) cvs rvs const_specs rec_specs
+        | [], [], [], []->
           Bwd.to_list acc
         | _ ->
           failwith "rigid_hcom_strict_data"
@@ -1176,8 +1176,7 @@ struct
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
 
-      (* TODO: clean this up! this was written before I split the args into two lists *)
-      let args' = make_args 0 Emp (info.const_args @ info.rec_args) constr.const_specs constr.rec_specs in
+      let args' = make_args 0 Emp info.const_args info.rec_args constr.const_specs constr.rec_specs in
       let const_args, rec_args = ListUtil.split (List.length constr.const_specs) args' in
 
       make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
