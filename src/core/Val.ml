@@ -1154,9 +1154,8 @@ struct
       in
 
       let peel_face k =
-        Face.map @@ fun _ _ abs ->
-        let x, elx = Abs.unleash1 abs in
-        Abs.bind1 x @@ peel_arg k elx
+        Face.map @@ fun _ _ ->
+        Abs.unsafe_map (peel_arg k)
       in
 
       let peel_sys k sys = List.map (peel_face k) sys in
@@ -2324,9 +2323,8 @@ struct
       let dom, _ = unleash_sg info.ty in
       let cap = car info.cap in
       let face =
-        Face.map @@ fun _ _ abs ->
-        let y, v = Abs.unleash1 abs in
-        Abs.bind1 y @@ car v
+        Face.map @@ fun _ _ ->
+        Abs.unsafe_map car
       in
       let sys = List.map face info.sys in
       rigid_hcom info.dir dom cap sys
@@ -2335,9 +2333,8 @@ struct
       let dom, _ = unleash_sg info.ty in
       let cap = car info.cap in
       let face =
-        Face.map @@ fun _ _ abs ->
-        let y, v = Abs.unleash1 abs in
-        Abs.bind1 y @@ car v
+        Face.map @@ fun _ _ ->
+        Abs.unsafe_map car
       in
       let sys = List.map face info.sys in
       rigid_ghcom info.dir dom cap sys
