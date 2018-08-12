@@ -1832,7 +1832,7 @@ struct
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = Bwd.map Name.named nms in
     let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs) rho in
-    ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
+    ExtAbs.unsafe_bind xs (eval rho tm, eval_tm_sys rho sys)
 
   and unleash_data v =
     match unleash v with
