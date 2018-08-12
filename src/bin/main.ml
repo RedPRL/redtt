@@ -29,8 +29,23 @@ let cmd_load_file =
     , info "load-file" ~doc
     )
 
+let cmd_from_stdin =
+  let doc = "read from stdin" in
+  let file_name =
+    Arg.
+      ( required
+        & pos ~rev:true 0 (some string) None
+        & info [] ~doc ~docv:"FILE"
+      ) in
+  Term.
+    ( pure Frontend.load_from_stdin $ file_name
+    , info "from-stdin" ~doc
+    )
+
+
 let cmds : command list = [
   cmd_load_file;
+  cmd_from_stdin;
   cmd_help;
 ]
 

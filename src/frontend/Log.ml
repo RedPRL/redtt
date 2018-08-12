@@ -17,7 +17,7 @@ let pp_message ~loc ~lvl pp fmt data =
     pp fmt data
   | Some (start_pos, end_pos) ->
     let open Lexing in
-    Format.fprintf fmt "@[%a:%i.%i-%i.%i [%a]:@,  @[%a@]@]"
+    Format.fprintf fmt "@.@.@[<v>%a:%i.%i-%i.%i [%a]:@,  %a@]@.@."
       Uuseg_string.pp_utf_8 start_pos.pos_fname
       start_pos.pos_lnum
       (start_pos.pos_cnum - end_pos.pos_bol)

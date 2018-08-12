@@ -73,7 +73,7 @@ let print_diagnostic =
       let vty = Cx.eval cx ty in
       let ty = Cx.quote_ty cx vty in
       let pp fmt () =
-        Format.fprintf fmt "?%s:@,  @[<v>@[<v>%a@]@,%a %a@]@.@."
+        Format.fprintf fmt "@[<v>?%s:@; @[<v>%a@]@,%a %a@]"
           (match name with Some name -> name | None -> "Hole")
           Dev.pp_params (Bwd.from_list tele)
           Uuseg_string.pp_utf_8 "⊢"
