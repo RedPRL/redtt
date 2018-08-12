@@ -757,7 +757,7 @@ struct
     | (_, spec) :: const_specs, arg :: args ->
       let vty = eval env spec in
       let r, r' = Dir.unleash dir in
-      let coe_hd s = make_coe (Dir.make r s) (Abs.bind1 x vty) arg in
+      let coe_hd s = make_coe (Dir.make r s) (Abs.unsafe_bind1 x vty) arg in
       let coe_tl =
         let coe_hd_x = coe_hd @@ `Atom x in
         rigid_multi_coe (Env.push (`Val coe_hd_x) env) dir (x, const_specs) args
