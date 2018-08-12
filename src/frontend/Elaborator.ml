@@ -722,10 +722,7 @@ struct
       end
 
     | E.Cut (e, fs) ->
-      elab_cut env e fs >>= fun (vty, cmd) ->
-      M.lift C.base_cx <<@> fun cx ->
-        let ty = Cx.quote_ty cx vty in
-        ty, cmd
+      elab_cut env e fs
 
     | E.Coe info ->
       elab_dim env info.r >>= fun tr ->
@@ -907,9 +904,7 @@ struct
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
 
   and elab_mode_switch_cut env exp frms ty =
-    elab_cut env exp frms >>= fun (vty, cmd) ->
-    M.lift C.base_cx >>= fun cx ->
-    let ty' = Cx.quote_ty cx vty in
+    elab_cut env exp frms >>= fun (ty', cmd) ->
     M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
     M.unify >>
     M.lift (C.check_subtype ty' ty) >>= function
@@ -922,78 +917,87 @@ struct
   and elab_cut env exp frms =
     bite_from_spine env frms >>= function
     | _, `Done ->
-      elab_inf env exp >>= fun (ty, cmd) ->
-      M.lift @@ Unify.eval ty <<@> fun vty ->
-          vty, cmd
+      elab_inf env exp
 
     | spine, `ExtApp dims ->
-      let rec go dims (vty, (hd, sp)) =
+      let rec go dims (ty, (hd, sp)) =
         match dims with
         | [] ->
-          M.ret (vty, (hd, sp))
+          M.ret (ty, (hd, sp))
         | _ ->
           evaluator >>= fun (cx, (module V)) ->
+          let vty = Cx.eval cx ty in
           let n = Domain.ExtAbs.len @@ V.unleash_ext vty in
           let dims0, dims1 = ListUtil.split n dims in
           traverse (elab_dim env) dims0 >>= fun trs0 ->
           let rs0 = List.map (Cx.eval_dim cx) trs0 in
           let ty, _ = V.unleash_ext_with vty rs0 in
-          go dims1 (ty, (hd, sp #< (Tm.ExtApp trs0)))
+          go dims1 (Cx.quote_ty cx ty, (hd, sp #< (Tm.ExtApp trs0)))
       in
 
       elab_cut env exp spine >>= go dims
 
     | spine, `FunApp e ->
-      elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
+      elab_cut env exp spine >>= fun (ty, (hd, sp)) ->
       evaluator >>= fun (cx, (module V)) ->
+      let vty = Cx.eval cx ty in
       let dom, cod = V.unleash_pi vty in
-      let tdom = Cx.quote_ty cx dom in
+      let tdom =
+        try
+          Cx.quote_ty cx dom
+        with exn -> Format.eprintf "elab-cut tried to quote: %a" Domain.pp_value dom; raise exn
+      in
       elab_chk env tdom e >>= fun arg ->
       evaluator <<@> fun (cx, (module V)) ->
         let varg = Cx.eval cx arg in
-        V.inst_clo cod varg, (hd, sp #< (Tm.FunApp arg))
+        Cx.quote_ty cx (V.inst_clo cod varg), (hd, sp #< (Tm.FunApp arg))
 
     | spine, `Car ->
-      elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
-      evaluator <<@> fun (_, (module V)) ->
+      elab_cut env exp spine >>= fun (ty, (hd, sp)) ->
+      evaluator <<@> fun (cx, (module V)) ->
+        let vty = Cx.eval cx ty in
         let dom, _ = V.unleash_sg vty in
-        dom, (hd, sp #< Tm.Car)
+        Cx.quote_ty cx dom, (hd, sp #< Tm.Car)
 
     | spine, `Cdr ->
-      elab_cut env exp spine >>= fun (vty, (hd, sp)) ->
+      elab_cut env exp spine >>= fun (ty, (hd, sp)) ->
       evaluator <<@> fun (cx, (module V)) ->
+        let vty = Cx.eval cx ty in
         let _, cod = V.unleash_sg vty in
         let cod' = V.inst_clo cod @@ Cx.eval_cmd cx (hd, sp #< Tm.Car) in
-        cod', (hd, sp #< Tm.Cdr)
+        Cx.quote_ty cx cod', (hd, sp #< Tm.Cdr)
 
     | spine, `Prev {con = E.TickConst} ->
       M.in_scope (Name.fresh ()) `Lock begin
         elab_cut env exp spine
-      end >>= fun (vty, (hd, sp)) ->
-      evaluator <<@> fun (_, (module V)) ->
+      end >>= fun (ty, (hd, sp)) ->
+      evaluator <<@> fun (cx, (module V)) ->
+        let vty = Cx.eval cx ty in
         let tclo = V.unleash_later vty in
         let tick = Tm.make Tm.TickConst in
         let vty' = V.inst_tick_clo tclo Domain.TickConst in
-        vty', (hd, sp #< (Tm.Prev tick))
+        Cx.quote_ty cx vty', (hd, sp #< (Tm.Prev tick))
 
     | spine, `Prev {con = E.Var (name, _)} ->
       elab_var env name 0 >>= fun (_, tick) ->
       M.in_scope (Name.fresh ()) (`KillFromTick (Tm.up tick)) begin
         elab_cut env exp spine
-      end >>= fun (vty, (hd, sp)) ->
+      end >>= fun (ty, (hd, sp)) ->
       evaluator <<@> fun (cx, (module V)) ->
+        let vty = Cx.eval cx ty in
         let tclo = V.unleash_later vty in
         let vtck = Cx.eval_tick cx (Tm.up tick) in
         let vty' = V.inst_tick_clo tclo vtck in
-        vty', (hd, sp #< (Tm.Prev (Tm.up tick)))
+        Cx.quote_ty cx vty', (hd, sp #< (Tm.Prev (Tm.up tick)))
 
     | spine, `Open ->
       M.in_scope (Name.fresh ()) `ClearLocks begin
         elab_cut env exp spine
-      end >>= fun (vty, (hd, sp)) ->
-      evaluator <<@> fun (_, (module V)) ->
+      end >>= fun (ty, (hd, sp)) ->
+      evaluator <<@> fun (cx, (module V)) ->
+        let vty = Cx.eval cx ty in
         let vty' = V.unleash_box_modality vty in
-        vty', (hd, sp #< Tm.Open)
+        Cx.quote_ty cx vty', (hd, sp #< Tm.Open)
 
     | _ ->
       failwith "elab_cut"
