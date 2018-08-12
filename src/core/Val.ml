@@ -2379,9 +2379,8 @@ struct
         let z = Name.fresh () in
         let msys =
           let face =
-            Face.map @@ fun _ _ absi ->
-            let yi, vi = Abs.unleash absi in
-            Abs.bind yi @@ car vi
+            Face.map @@ fun _ _ ->
+            Abs.unsafe_map car
           in
           `Ok (List.map face info.sys)
         in
@@ -2392,14 +2391,13 @@ struct
             (car info.cap)
             msys
         in
-        Abs.bind1 z @@ inst_clo cod hcom
+        Abs.unsafe_bind1 z @@ inst_clo cod hcom
       in
       let cap = cdr info.cap in
       let sys =
         let face =
-          Face.map @@ fun _ _ absi ->
-          let yi, vi = Abs.unleash absi in
-          Abs.bind yi @@ cdr vi
+          Face.map @@ fun _ _ ->
+          Abs.unsafe_map cdr
         in
         List.map face info.sys
       in
@@ -2412,9 +2410,8 @@ struct
         let z = Name.fresh () in
         let msys =
           let face =
-            Face.map @@ fun _ _ absi ->
-            let yi, vi = Abs.unleash absi in
-            Abs.bind yi @@ car vi
+            Face.map @@ fun _ _ ->
+            Abs.unsafe_map car
           in
           `Ok (List.map face info.sys)
         in
@@ -2425,14 +2422,13 @@ struct
             (car info.cap)
             msys
         in
-        Abs.bind1 z @@ inst_clo cod hcom
+        Abs.unsafe_bind1 z @@ inst_clo cod hcom
       in
       let cap = cdr info.cap in
       let sys =
         let face =
-          Face.map @@ fun _ _ absi ->
-          let yi, vi = Abs.unleash absi in
-          Abs.bind yi @@ cdr vi
+          Face.map @@ fun _ _ ->
+          Abs.unsafe_map cdr
         in
         List.map face info.sys
       in
