@@ -4,6 +4,8 @@ open RedTT_Core
 module C = Contextual
 module U = Unify
 
+type location = Log.location
+
 type diagnostic =
   | UserHole of
       {name : string option;
@@ -11,7 +13,7 @@ type diagnostic =
        ty : Tm.tm;
        tm : Tm.tm}
 
-type 'a m = ('a * diagnostic bwd) C.m
+type 'a m = ('a * (location * diagnostic) bwd) C.m
 
 let optional (m : 'a m) : 'a option m =
   C.bind (C.optional m) @@ function
@@ -29,8 +31,8 @@ let bind m k =
 let lift m =
   C.bind m ret
 
-let emit d =
-  C.ret ((), Emp #< d)
+let emit l d =
+  C.ret ((), Emp #< (l, d))
 
 let normalize_param p =
   let module Notation = Monad.Notation (C) in
@@ -63,18 +65,21 @@ let rec normalize_tele =
 
 let print_diagnostic =
   function
-  | UserHole {name; tele; ty; _} ->
+  | (loc, UserHole {name; tele; ty; _}) ->
     C.local (fun _ -> tele) @@
     begin
       C.bind C.base_cx @@ fun cx ->
       C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
       let vty = Cx.eval cx ty in
       let ty = Cx.quote_ty cx vty in
-      Format.printf "@.?%s:@,  @[<v>@[<v>%a@]@,%a %a@]@.@."
-        (match name with Some name -> name | None -> "Hole")
-        Dev.pp_params (Bwd.from_list tele)
-        Uuseg_string.pp_utf_8 "⊢"
-        Tm.pp0 ty;
+      let pp fmt () =
+        Format.fprintf fmt "?%s:@,  @[<v>@[<v>%a@]@,%a %a@]@.@."
+          (match name with Some name -> name | None -> "Hole")
+          Dev.pp_params (Bwd.from_list tele)
+          Uuseg_string.pp_utf_8 "⊢"
+          Tm.pp0 ty
+      in
+      Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
       C.ret ()
     end
 

@@ -487,28 +487,27 @@ struct
         let quote_clause (clbl, constr) =
           let _, clause0 = List.find (fun (clbl', _) -> clbl = clbl') elim0.clauses in
           let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
-          let env', cvs, rvs, rs =
+          let env', vs, cvs, rvs, rs =
             let open Desc in
-            let rec build_cx qenv env (cvs, rvs) rs const_specs rec_specs dim_specs =
+            let rec build_cx qenv env (vs, cvs, rvs) rs const_specs rec_specs dim_specs =
               match const_specs, rec_specs, dim_specs with
               | (_, pty) :: const_specs, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
                 let env' = D.Env.push (`Val v) env in
-                build_cx (Env.succ qenv) env' (cvs #< v, rvs) rs const_specs rec_specs dim_specs
+                build_cx (Env.succ qenv) env' (vs #< v, cvs #< v, rvs) rs const_specs rec_specs dim_specs
               | [], (_, Self) :: rec_specs, _ ->
                 let vx = generic qenv data_ty in
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
-                build_cx (Env.succ qenv') env (cvs, rvs #< vx #< vih) rs const_specs rec_specs dim_specs
+                build_cx (Env.succ qenv') env (vs #< vx #< vih, cvs, rvs #< vx) rs const_specs rec_specs dim_specs
               | [], [], dims ->
                 let xs = Bwd.map (fun x -> Name.named @@ Some x) @@ Bwd.from_list dims in
                 let qenv' = Env.abs qenv xs in
-                qenv', Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
+                qenv', Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env D.Env.emp (Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
+            build_cx env D.Env.emp (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
           in
-          let vs = cvs @ rvs in
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
           let bdy1 = inst_nclo clause1 cells in

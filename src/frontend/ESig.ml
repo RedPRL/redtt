@@ -1,6 +1,10 @@
 open RedTT_Core
 open RedBasis.Bwd
 
+type 'a info =
+  {con : 'a;
+   span : ElabMonad.location}
+
 type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
   | Data of string * (eterm, eterm) Desc.desc
@@ -8,13 +12,20 @@ type edecl =
   | Import of string
   | Quit
 
-and escheme = etele * eterm
-and ecell = [`Ty of string * eterm | `Tick of string | `I of string | `Lock ]
+and escheme =
+  etele * eterm
+
+and ecell =
+  [ `Ty of string * eterm
+  | `Tick of string
+  | `I of string
+  | `Lock
+  ]
+
 and etele = ecell list
 
-and eterm =
+and econ =
   | Guess of eterm
-
   | Hole of string option
   | Hope
   | Lam of string list * eterm
@@ -45,8 +56,16 @@ and eterm =
   | Var of string * int
   | Num of int
 
-and eclause = Desc.con_label * epatbind list * eterm
-and epatbind = PVar of string | PIndVar of string * string
+and eterm = econ info
+
+and eclause =
+  Desc.con_label
+  * epatbind list
+  * eterm
+
+and epatbind =
+  | PVar of string
+  | PIndVar of string * string
 
 and esys = eface list
 
@@ -58,10 +77,9 @@ and frame =
   | Cdr
   | Open
 
-(* e-sigarette ;-) *)
+
 type esig =
   edecl list
-
 
 (* Please fill this in. I'm just using it for debugging. *)
 let rec pp fmt =
