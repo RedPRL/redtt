@@ -1255,7 +1255,7 @@ struct
 
       (* This serves as `O` and the diagonal face in [F]
        * for the coherence conditions in `fhcom.sys` and `s=s'`. *)
-      let hcom_template phi y_dest ~ty =
+      let hcom_template phi y_dest ty =
         make_hcom
           (Dir.make (I.act phi r) y_dest)
           ty
@@ -1279,20 +1279,20 @@ struct
             let phi = I.equate si s'i in
             Abs.make1 @@ fun y ->
             (* this is not the most efficient code, but maybe we can afford this? *)
-            cap_aux phi @@ hcom_template phi (`Atom y) ~ty:(Value.act phi (Abs.inst1 abs s'))
+            cap_aux phi @@ hcom_template phi (`Atom y) (Value.act phi (Abs.inst1 abs s'))
           in
           List.map face fhcom.sys
         in
         let diag =
           AbsFace.make_from_dir I.idn fhcom.dir @@ fun phi ->
-          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) ~ty:(Value.act phi fhcom.cap)
+          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Value.act phi fhcom.cap)
         in
         Option.filter_map force_abs_face [diag] @ (ri_faces @ si_faces)
       in
       let boundary =
         Face.map @@ fun si s'i abs ->
         let phi = I.equate si s'i in
-        hcom_template phi (I.act phi r') ~ty:(Value.act phi (Abs.inst1 abs s'))
+        hcom_template phi (I.act phi r') (Value.act phi (Abs.inst1 abs s'))
       in
       rigid_box fhcom.dir new_cap @@
       List.map boundary fhcom.sys
