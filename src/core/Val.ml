@@ -1818,9 +1818,9 @@ struct
 
   and eval_bnd rho bnd =
     let Tm.B (_, tm) = bnd in
-    let x = Name.fresh () in
+    Abs.make1 @@ fun x ->
     let rho = Env.push (`Dim (`Atom x)) rho in
-    Abs.unsafe_bind1 x @@ eval rho tm
+    eval rho tm
 
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
@@ -2303,7 +2303,7 @@ struct
 
     | Up info ->
       let dom, _ = unleash_sg info.ty in
-      let car_sys = List.map (Face.map (fun _ _ a -> car a)) info.sys in
+      let car_sys = List.map (Face.map (fun _ _ -> car)) info.sys in
       make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
 
     | Coe info ->
@@ -2343,7 +2343,7 @@ struct
 
     | Up info ->
       let _, cod = unleash_sg info.ty in
-      let cdr_sys = List.map (Face.map (fun _ _ a -> cdr a)) info.sys in
+      let cdr_sys = List.map (Face.map (fun _ _ -> cdr)) info.sys in
       let cod_car = inst_clo cod @@ car v in
       make @@ Up {ty = cod_car; neu = Cdr info.neu; sys = cdr_sys}
 
@@ -2396,9 +2396,9 @@ struct
 
     | GHCom info ->
       let abs =
+        Abs.make1 @@ fun z ->
         let r, _ = Dir.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
-        let z = Name.fresh () in
         let msys =
           let face =
             Face.map @@ fun _ _ ->
@@ -2413,7 +2413,7 @@ struct
             (car info.cap)
             msys
         in
-        Abs.unsafe_bind1 z @@ inst_clo cod hcom
+        inst_clo cod hcom
       in
       let cap = cdr info.cap in
       let sys =
