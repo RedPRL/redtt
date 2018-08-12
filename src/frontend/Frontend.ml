@@ -6,9 +6,8 @@ let print_position outx lexbuf =
   Format.fprintf outx "%s:%d:%d" pos.pos_fname
     pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
 
-let read_file file_name =
+let read_from_channel file_name channel =
   let open Lwt.Infix in
-  Lwt_io.open_file ~mode:Lwt_io.Input file_name >>= fun channel ->
   let (lexbuf, tokens) = Lex.tokens ~file_name channel in
   let checkpoint = Grammar.Incremental.esig @@ Lexing.lexeme_start_p lexbuf in
   begin
@@ -19,7 +18,12 @@ let read_file file_name =
     Lwt.return []
   end
 
-let load_file file_name =
+let read_file file_name =
+  let open Lwt.Infix in
+  Lwt_io.open_file ~mode:Lwt_io.Input file_name >>=
+  read_from_channel file_name
+
+let execute_signature esig =
   let module I =
   struct
     let cache = Hashtbl.create 20
@@ -34,8 +38,6 @@ let load_file file_name =
   end
   in
   let module Elaborator = Elaborator.Make (I) in
-  let open Lwt.Infix in
-  read_file file_name >>= fun esig ->
   begin
     try
       ignore @@ ElabMonad.run @@ ElabMonad.report @@ Elaborator.elab_sig Elaborator.T.empty esig;
@@ -47,3 +49,12 @@ let load_file file_name =
       Diagnostics.terminated ();
       exit 1
   end
+
+let load_file file_name =
+  let open Lwt.Infix in
+  read_file file_name >>= execute_signature
+
+let load_from_stdin file_name =
+  let open Lwt.Infix in
+  read_from_channel file_name Lwt_io.stdin
+  >>= execute_signature
