@@ -2366,7 +2366,7 @@ struct
       let abs =
         let r, _ = Dir.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
-        let z = Name.fresh () in
+        Abs.make1 @@ fun z ->
         let msys =
           let face =
             Face.map @@ fun _ _ ->
@@ -2381,7 +2381,7 @@ struct
             (car info.cap)
             msys
         in
-        Abs.unsafe_bind1 z @@ inst_clo cod hcom
+        inst_clo cod hcom
       in
       let cap = cdr info.cap in
       let sys =
