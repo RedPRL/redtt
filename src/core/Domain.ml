@@ -32,7 +32,7 @@ and pp_env fmt =
 and pp_con fmt : con -> unit =
   function
   | Up up ->
-    Format.fprintf fmt "%a" pp_neu up.neu
+    Format.fprintf fmt "@[<hv1>(up@ %a@ %a@ [%a])@]" pp_value up.ty pp_neu up.neu pp_val_sys up.sys
   | Lam clo ->
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
   | ExtLam abs ->
@@ -207,8 +207,12 @@ and pp_neu fmt neu =
   | Meta {name; _} ->
     Name.pp fmt name
 
-  | Elim _ ->
-    Format.fprintf fmt "<elim>"
+  | Elim info ->
+    Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a@ %a)@]"
+      Desc.pp_data_label info.dlbl
+      pp_clo info.mot
+      pp_neu info.neu
+      pp_elim_clauses info.clauses
 
   | Cap _ ->
     Format.fprintf fmt "<cap>"
@@ -234,6 +238,12 @@ and pp_neu fmt neu =
   | Open _ ->
     Format.fprintf fmt "<open>"
 
+and pp_elim_clauses fmt clauses =
+  let pp_sep fmt () = Format.fprintf fmt "@ " in
+  Format.pp_print_list ~pp_sep pp_elim_clause fmt clauses
+
+and pp_elim_clause fmt (clbl, nclo) =
+  Format.fprintf fmt "@[<hv1>[%a@ %a]@]" Uuseg_string.pp_utf_8 clbl pp_nclo nclo
 
 and pp_nf fmt nf =
   pp_value fmt nf.el
