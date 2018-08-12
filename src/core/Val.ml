@@ -2246,27 +2246,21 @@ struct
     match unleash scrut with
     | Intro info ->
       let _, nclo = List.find (fun (clbl', _) -> info.clbl = clbl') clauses in
-      let desc = Sig.lookup_datatype dlbl in
-      let constr = Desc.lookup_constr info.clbl desc in
 
       (* Clean this up with some kind of a state type for the traversal maybe. Barf! *)
-      let rec go vs rs const_specs rec_specs dim_specs =
-        match vs, rs, const_specs, rec_specs, dim_specs with
-        | v :: vs, _, (_, _) :: const_specs, _, _ ->
-          `Val v :: go vs rs const_specs rec_specs dim_specs
-        | v :: vs, _,  [], (_, Desc.Self) :: rec_specs, _ ->
+      let rec go cvs rvs rs =
+        match cvs, rvs, rs with
+        | v :: cvs, _, _->
+          `Val v :: go cvs rvs rs
+        | [], v :: rvs, _ ->
           let v_ih = elim_data dlbl ~mot ~scrut:v ~clauses in
-          `Val v :: `Val v_ih :: go vs rs const_specs rec_specs dim_specs
-        | [], r :: rs, [], [], _ :: dims ->
-          `Dim r :: go [] rs const_specs rec_specs dims
-        | [], [], [], [], [] ->
+          `Val v :: `Val v_ih :: go cvs rvs rs
+        | [], [], r :: rs ->
+          `Dim r :: go cvs rvs rs
+        | [], [], [] ->
           []
-        | _ ->
-          failwith "elim_data/intro"
       in
-
-      (* CLEANUP *)
-      inst_nclo nclo @@ go (info.const_args @ info.rec_args) info.rs constr.const_specs constr.rec_specs constr.dim_specs
+      inst_nclo nclo @@ go info.const_args info.rec_args info.rs
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in
