@@ -1246,44 +1246,56 @@ struct
       let _, s' = Dir.unleash fhcom.dir in
 
       (* This is C_M in [F], with an extra parameter `phi` to get along with NbE. *)
-      let cap_aux phi el = make_cap (Dir.act phi fhcom.dir) (Value.act phi fhcom.cap) (CompSys.act phi fhcom.sys) el in
+      let cap_aux phi el =
+        let mdir = Dir.act phi fhcom.dir in
+        let ty = Value.act phi fhcom.cap in
+        let msys = CompSys.act phi fhcom.sys in
+        make_cap mdir ty msys el
+      in
 
       (* This serves as `O` and the diagonal face in [F]
        * for the coherence conditions in `fhcom.sys` and `s=s'`. *)
-      let hcom_template phi y_dest ty = make_hcom
-          (Dir.make (I.act phi r) y_dest) ty
-          (Value.act phi fhcom.cap) (CompSys.act phi fhcom.sys)
+      let hcom_template phi y_dest ~ty =
+        make_hcom
+          (Dir.make (I.act phi r) y_dest)
+          ty
+          (Value.act phi cap)
+          (CompSys.act phi sys)
       in
 
       (* This is `P` in [F]. *)
-      let new_cap = rigid_hcom dir fhcom.cap (cap_aux I.idn cap) @@
+      let new_cap =
+        rigid_hcom dir fhcom.cap (cap_aux I.idn cap) @@
         let ri_faces =
           let face = Face.map @@ fun ri r'i abs ->
             let y, el = Abs.unleash1 abs in
-            Abs.bind1 y (cap_aux (I.equate ri r'i) el)
+            Abs.bind1 y @@ cap_aux (I.equate ri r'i) el
           in
           List.map face sys
         in
         let si_faces =
-          let face = Face.map @@ fun si s'i abs ->
+          let face =
+            Face.map @@ fun si s'i abs ->
             let phi = I.equate si s'i in
             Abs.make1 @@ fun y ->
             (* this is not the most efficient code, but maybe we can afford this? *)
-            cap_aux phi (hcom_template phi (`Atom y) (Value.act phi (Abs.inst1 abs s')))
+            cap_aux phi @@ hcom_template phi (`Atom y) ~ty:(Value.act phi (Abs.inst1 abs s'))
           in
           List.map face fhcom.sys
         in
-        let diag = AbsFace.make_from_dir I.idn fhcom.dir @@ fun phi ->
-          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Value.act phi fhcom.cap)
+        let diag =
+          AbsFace.make_from_dir I.idn fhcom.dir @@ fun phi ->
+          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) ~ty:(Value.act phi fhcom.cap)
         in
         Option.filter_map force_abs_face [diag] @ (ri_faces @ si_faces)
       in
-      let boundary = Face.map @@ fun si s'i abs ->
+      let boundary =
+        Face.map @@ fun si s'i abs ->
         let phi = I.equate si s'i in
-        hcom_template phi (I.act phi r') (Value.act phi (Abs.inst1 abs s'))
+        hcom_template phi (I.act phi r') ~ty:(Value.act phi (Abs.inst1 abs s'))
       in
-      rigid_box fhcom.dir new_cap
-        (List.map boundary fhcom.sys)
+      rigid_box fhcom.dir new_cap @@
+      List.map boundary fhcom.sys
 
     | V {x; ty0; ty1; equiv} ->
       let r, _ = Dir.unleash dir in
@@ -2446,9 +2458,14 @@ struct
     match unleash el with
     | Box info -> info.cap
     | Up info ->
-      let cap_sys = List.map (Face.map (fun ri r'i a ->
+      let cap_sys =
+        let face =
+          Face.map @@ fun ri r'i a ->
           let phi = I.equate ri r'i in
-          make_cap (Dir.act phi dir) (Value.act phi ty) (CompSys.act phi sys) a)) info.sys in
+          make_cap (Dir.act phi dir) (Value.act phi ty) (CompSys.act phi sys) a
+        in
+        List.map face info.sys
+      in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
     | _ ->
       raise @@ E (RigidCapUnexpectedArgument el)
