@@ -1809,13 +1809,13 @@ struct
     let Tm.B (_, tm) = bnd in
     let x = Name.fresh () in
     let rho = Env.push (`Dim (`Atom x)) rho in
-    Abs.bind1 x @@ eval rho tm
+    Abs.unsafe_bind1 x @@ eval rho tm
 
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = Bwd.map Name.named nms in
     let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs) rho in
-    Abs.bind xs @@ eval rho tm
+    Abs.unsafe_bind xs @@ eval rho tm
 
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
