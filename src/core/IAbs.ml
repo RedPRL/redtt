@@ -19,12 +19,16 @@ sig
 
   include Sort.S with type 'a m = 'a with type t = el abs
 
+  val unsafe_map : (el -> el) -> t -> t
+
+  val unsafe_bind : atom bwd -> el -> t
   val bind : atom bwd -> el -> t
   val unleash : t -> atom bwd * el
   val inst : t -> I.t bwd -> el
 
   val len : t -> int
 
+  val unsafe_bind1 : atom -> el -> t
   val bind1 : atom -> el -> t
   val unleash1 : t -> atom * el
   val inst1 : t -> I.t -> el
@@ -37,6 +41,9 @@ struct
   type el = X.t
   type 'a m = 'a
   type t = X.t abs
+
+  let unsafe_map f abs =
+    {abs with node = f abs.node}
 
   let len abs = Bwd.length abs.atoms
 
@@ -66,8 +73,21 @@ struct
     in
     go [] atoms I.idn
 
+  let unsafe_bind atoms node =
+    let rec go ys atoms =
+      match atoms with
+      | Emp ->
+        {atoms = Bwd.from_list ys; node = node}
+      | Snoc (atoms, x) ->
+        go (x :: ys) atoms
+    in
+    go [] atoms
+
   let bind1 x el =
     bind (Emp #< x) el
+
+  let unsafe_bind1 x el =
+    unsafe_bind (Emp #< x) el
 
   let unleash1 abs =
     let xs, el = unleash abs in
