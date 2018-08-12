@@ -139,12 +139,12 @@ and pp_val_face : type x. _ -> (x, value) face -> unit =
   fun fmt ->
     function
     | Face.True (r0, r1, v) ->
-      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_value v
+      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_value (Lazy.force v)
     | Face.False (r0, r1) ->
       Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
     | Face.Indet (p, v) ->
       let r0, r1 = Eq.unleash p in
-      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_value v
+      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_value (Lazy.force v)
 
 and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
   fun fmt ->
@@ -155,12 +155,12 @@ and pp_comp_face : type x. _ -> (x, abs) face -> unit =
   fun fmt ->
     function
     | Face.True (r0, r1, v) ->
-      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_abs v
+      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_abs (Lazy.force v)
     | Face.False (r0, r1) ->
       Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
     | Face.Indet (p, v) ->
       let r0, r1 = Eq.unleash p in
-      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs v
+      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs (Lazy.force v)
 
 and pp_clo fmt (Clo clo) =
   let Tm.B (_, tm) = clo.bnd in
@@ -283,7 +283,7 @@ module AbsFace = Face.M (Abs)
 let force_abs_face face =
   match face with
   | Face.True (_, _, abs) ->
-    raise @@ ProjAbs abs
+    raise @@ ProjAbs (Lazy.force abs)
   | Face.False _ -> None
   | Face.Indet (xi, abs) ->
     Some (Face.Indet (xi, abs))
@@ -291,7 +291,7 @@ let force_abs_face face =
 let force_val_face (face : val_face) =
   match face with
   | Face.True (_, _, v) ->
-    raise @@ ProjVal v
+    raise @@ ProjVal (Lazy.force v)
   | Face.False _ -> None
   | Face.Indet (xi, v) ->
     Some (Face.Indet (xi, v))
@@ -330,7 +330,7 @@ struct
     | face :: sys ->
       match AbsFace.act phi face with
       | Face.True (_, _, abs) ->
-        raise @@ Proj abs
+        raise @@ Proj (Lazy.force abs)
       | Face.False _ ->
         act_aux phi sys
       | Face.Indet (p, t) ->
@@ -374,7 +374,7 @@ struct
     | face :: sys ->
       match ValFace.act phi face with
       | Face.True (_, _, value) ->
-        raise @@ Proj value
+        raise @@ Proj (Lazy.force value)
       | Face.False _ ->
         act_aux phi sys
       | Face.Indet (p, t) ->

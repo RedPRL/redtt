@@ -34,8 +34,12 @@ let two : int = pos (suc (suc zero))
 let winding-loop-testing0 : Path int two (winding (loopn two)) =
   λ _ → two
 
-let five : int = pos (suc (suc (suc (suc (suc zero)))))
+let nat/five : nat =
+  suc (suc (suc (suc (suc zero))))
 
-let winding-loop-testing1 : Path int five (winding (loopn five)) =
-  λ _ → five
+let int/25 : int =
+  pos (plus nat/five (plus nat/five (plus nat/five (plus nat/five nat/five))))
+
+let winding-loop-testing1 : Path int int/25 (winding (loopn int/25)) =
+  λ _ → int/25
 

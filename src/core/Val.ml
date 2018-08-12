@@ -1360,7 +1360,7 @@ struct
             | `Proj abs -> abs
             | `Ok rest0 ->
               let r'i = I.act phi r'i in
-              let ghcom00 = AbsFace.make phi r'i dim0 @@ fun phi -> Abs.act phi absi in
+              let ghcom00 = AbsFace.make phi r'i dim0 @@ fun phi -> Abs.act phi @@ Lazy.force absi in
               let ghcom01 = AbsFace.make phi r'i dim1 @@ fun phi ->
                 Abs.make1 @@ fun y ->
                 (* TODO this can be optimized further by expanding
@@ -1478,12 +1478,12 @@ struct
     let r1 = eval_dim rho' tr1 in
     match Eq.make r0 r1 with
     | `Ok xi ->
-      let v = Value.act (I.equate r0 r1) @@ eval_bterm dlbl desc rho' btm in
+      let v = lazy begin Value.act (I.equate r0 r1) @@ eval_bterm dlbl desc rho' btm end in
       Face.Indet (xi, v)
     | `Apart _ ->
       Face.False (r0, r1)
     | `Same _ ->
-      let v = eval_bterm dlbl desc rho' btm in
+      let v = lazy begin eval_bterm dlbl desc rho' btm end in
       Face.True (r0, r1, v)
 
 
@@ -1765,13 +1765,13 @@ struct
     | `Ok xi ->
       let bnd = Option.get_exn obnd in
       let rho' = Env.act (I.equate sr sr') rho in
-      let abs = eval_bnd rho' bnd in
+      let abs = lazy begin eval_bnd rho' bnd end in
       Face.Indet (xi, abs)
     | `Apart _ ->
       Face.False (sr, sr')
     | `Same _ ->
       let bnd = Option.get_exn obnd in
-      let abs = eval_bnd rho bnd in
+      let abs = lazy begin eval_bnd rho bnd end in
       Face.True (sr, sr', abs)
 
   and eval_rigid_bnd_sys rho sys  =
@@ -1793,13 +1793,13 @@ struct
       let tm = Option.get_exn otm in
       let rho' = Env.act (I.equate r r') rho in
       (* The problem here is that the this is not affecting GLOBALS! *)
-      let el = eval rho' tm in
+      let el = lazy begin eval rho' tm end in
       Face.Indet (xi, el)
     | `Apart _ ->
       Face.False (r, r')
     | `Same _ ->
       let tm = Option.get_exn otm in
-      let el = eval rho tm in
+      let el = lazy begin eval rho tm end in
       Face.True (r, r', el)
 
   and eval_tm_sys rho sys : val_sys =
@@ -1942,7 +1942,7 @@ struct
     | CoRThunk face ->
       begin
         match face with
-        | Face.True (_, _, v) -> v
+        | Face.True (_, _, v) -> Lazy.force v
         | _ ->
           raise @@ E (ForcedUntrueCorestriction face)
       end
@@ -1957,7 +1957,7 @@ struct
             corestriction_force a
           in
           let force_sys = List.map force_face info.sys in
-          make @@ Up {ty; neu = force; sys = force_sys}
+          make @@ Up {ty = Lazy.force ty; neu = force; sys = force_sys}
         | _ as face ->
           raise @@ E (ForcedUntrueCorestriction face)
       end

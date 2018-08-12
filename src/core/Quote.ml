@@ -198,7 +198,7 @@ struct
           let tr' = quote_dim env r' in
           let force0 = corestriction_force el0 in
           let force1 = corestriction_force el1 in
-          let tm = equate env ty force0 force1 in
+          let tm = equate env (Lazy.force ty) force0 force1 in
           Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
 
         | Face.Indet (p, ty) ->
@@ -208,7 +208,7 @@ struct
           let phi = I.equate r r' in
           let force0 = corestriction_force @@ Domain.Value.act phi el0 in
           let force1 = corestriction_force @@ Domain.Value.act phi el1 in
-          let tm = equate env ty force0 force1 in
+          let tm = equate env (Lazy.force ty) force0 force1 in
           Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
       end
 
@@ -604,7 +604,7 @@ struct
     | Face.True (r0, r'0, v0), Face.True (r1, r'1, v1) ->
       let tr = equate_dim env r0 r1 in
       let tr' = equate_dim env r'0 r'1 in
-      let t = equate env ty v0 v1 in
+      let t = equate env ty (Lazy.force v0) (Lazy.force v1) in
       tr, tr', Some t
 
     | Face.False (r0, r'0), Face.False (r1, r'1) ->
@@ -616,7 +616,7 @@ struct
       let r, r' = Eq.unleash p0 in
       let phi = I.equate r r' in
       let tr, tr' = equate_eq env p0 p1 in
-      let v = equate env (Value.act phi ty) v0 v1 in
+      let v = equate env (Value.act phi ty) (Lazy.force v0) (Lazy.force v1) in
       tr, tr', Some v
 
     | _ -> failwith "equate_val_face"
@@ -627,14 +627,14 @@ struct
       let r, r' = Eq.unleash p0 in
       let phi = I.equate r r' in
       let tr, tr' = equate_eq env p0 p1 in
-      let bnd = equate_val_abs env (Value.act phi ty) abs0 abs1 in
+      let bnd = equate_val_abs env (Value.act phi ty) (Lazy.force abs0) (Lazy.force abs1) in
       tr, tr', Some bnd
 
   and equate_box_boundary env s' ty bdry0 bdry1 =
     match ty, bdry0, bdry1 with
     | Face.Indet (p_ty, abs), Face.Indet (p0, b0), Face.Indet (p1, b1) ->
       let tr, tr' = equate_eq3 env p_ty p0 p1 in
-      let b = equate env (Abs.inst1 abs s') b0 b1 in
+      let b = equate env (Abs.inst1 (Lazy.force abs) s') (Lazy.force b0) (Lazy.force b1) in
       tr, tr', Some b
 
   and equate_val_abs env ty abs0 abs1 =
@@ -857,7 +857,7 @@ struct
       match face with
       | Face.True (_, _, v) ->
         (* In this case, we need to see that the indeterminate is already equal to the face *)
-        begin try equiv env ~ty:ty1 gen v; true with _ -> false end
+        begin try equiv env ~ty:ty1 gen (Lazy.force v); true with _ -> false end
 
       | Face.False _ ->
         (* This one is vacuous *)
@@ -869,7 +869,7 @@ struct
         let r, r' = Eq.unleash p in
         let gen_rr' = Value.act (I.equate r r') gen in
         let ty_rr' = Value.act (I.equate r r') ty1 in
-        begin try equiv env ~ty:ty_rr' gen_rr' v; true with _ -> false end
+        begin try equiv env ~ty:ty_rr' gen_rr' @@ Lazy.force v; true with _ -> false end
     in
 
     (* This algorithm is very wrong ;-) *)

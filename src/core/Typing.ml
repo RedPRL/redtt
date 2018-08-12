@@ -258,7 +258,7 @@ let rec check cx ty tm =
         begin
           match I.compare r'0 r0, I.compare r'1 r1 with
           | `Same, `Same ->
-            check cx ty tm
+            check cx (Lazy.force ty) tm
           | _ ->
             failwith "co-restriction mismatch"
         end
@@ -270,7 +270,7 @@ let rec check cx ty tm =
             begin
               try
                 let cx', phi = Cx.restrict cx r'0 r'1 in
-                check cx' (Domain.Value.act phi ty) tm
+                check cx' (Domain.Value.act phi @@ Lazy.force ty) tm
               with
               | I.Inconsistent -> ()
             end
@@ -375,7 +375,7 @@ and check_boundary cx ty sys tm =
 and check_boundary_face cx ty face tm =
   match face with
   | Face.True (_, _, el) ->
-    Cx.check_eq cx ~ty el @@
+    Cx.check_eq cx ~ty (Lazy.force el) @@
     Cx.eval cx tm
 
   | Face.False _ ->
@@ -385,7 +385,7 @@ and check_boundary_face cx ty face tm =
     let r, r' = Eq.unleash p in
     try
       let cx', phi = Cx.restrict cx r r' in
-      Cx.check_eq cx' ~ty:(D.Value.act phi ty) el @@
+      Cx.check_eq cx' ~ty:(D.Value.act phi ty) (Lazy.force el) @@
       Cx.eval cx' tm
     with
     | I.Inconsistent ->
@@ -649,7 +649,7 @@ and infer_spine cx hd =
       begin
         match V.unleash_corestriction_ty ih.ty with
         | Face.True (_, _, ty) ->
-          D.{el = Cx.eval_frame cx ih.el frm; ty}
+          D.{el = Cx.eval_frame cx ih.el frm; ty = Lazy.force ty}
         | _ -> failwith "Cannot force co-restriction when it is not true!"
       end
 
