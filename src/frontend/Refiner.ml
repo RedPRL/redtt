@@ -188,7 +188,7 @@ let rec tac_lambda names tac ty =
           | _ -> failwith "Elab: incorrect number of binders when refining extension type"
         in
         let xs, tac' = bite nms Emp names in
-        let ty, sys = Tm.unbind_ext_with (Bwd.to_list xs) ebnd in
+        let ty, sys = Tm.unbind_ext_with (Bwd.to_list @@ Bwd.map (fun x -> Tm.var x) xs) ebnd in
         let rty = Tm.make @@ Tm.Rst {ty; sys} in
         let ps = List.map (fun x -> (x, `I)) @@ Bwd.to_list xs in
         M.in_scopes ps begin

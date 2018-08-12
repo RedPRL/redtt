@@ -611,7 +611,7 @@ let rec subtype ty0 ty1 =
     | Tm.Ext ebnd0, Tm.Ext ebnd1 ->
       let xs, ty0, sys0 = Tm.unbind_ext ebnd0 in
       let xs_fwd = Bwd.to_list xs in
-      let ty1, sys1 = Tm.unbind_ext_with xs_fwd ebnd1 in
+      let ty1, sys1 = Tm.unbind_ext_with (List.map Tm.var xs_fwd) ebnd1 in
       let ps = List.map (fun x -> (x, `I)) xs_fwd in
       let rec go sys0 sys1 =
         match sys0, sys1 with

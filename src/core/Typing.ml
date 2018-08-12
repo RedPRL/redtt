@@ -61,6 +61,8 @@ and check_dim_cmd cx =
       | Tm.Var _ ->
         (* TODO: lookup in global context, make sure it is a dimension *)
         ()
+      | Tm.DownX r ->
+        check_dim cx r
       | _ -> failwith ""
     end
   | _ ->
@@ -748,6 +750,9 @@ and infer_head cx =
     let ty = check_eval_ty cx info.ty in
     check cx ty info.tm;
     ty
+
+  | T.DownX _ ->
+    failwith "infer_head/DownX"
 
   | T.DFix info ->
     check_dim cx info.r;

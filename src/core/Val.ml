@@ -182,7 +182,7 @@ struct
   let make_closure rho bnd =
     Clo {bnd; rho}
 
-  let eval_dim rho tm =
+  let rec eval_dim rho tm =
     match Tm.unleash tm with
     | Tm.Dim0 ->
       `Dim0
@@ -205,6 +205,9 @@ struct
 
         | Tm.Meta meta ->
           I.act rho.global @@ Sig.global_dim meta.name
+
+        | Tm.DownX r ->
+          eval_dim rho r
 
         | _ ->
           let err = ExpectedDimensionTerm tm in
@@ -1661,6 +1664,9 @@ struct
     function
     | Tm.Down info ->
       eval rho info.tm
+
+    | Tm.DownX _ ->
+      failwith "eval_head/DownX"
 
     | Tm.DFix info ->
       let r = eval_dim rho info.r in
