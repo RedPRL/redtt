@@ -167,7 +167,7 @@ struct
       M.ret env
 
   and elab_datatype env dlbl edesc =
-    let rec go acc eparams econstrs =
+    let rec go cx acc vparams eparams econstrs =
       match eparams, econstrs with
       | (lbl, epty) :: eparams, _ ->
         let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
@@ -175,21 +175,24 @@ struct
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
         let acc' = Desc.{acc with params = acc.params @ [(lbl, pty)]} in
-        go acc' eparams econstrs
+        let vty = Cx.eval cx pty in
+        let cx', vparam = Cx.ext_ty cx ~nm:(Some lbl) vty in
+        go cx' acc' (vparams @ [vparam]) eparams econstrs
 
       | [], [] -> M.ret acc
 
       | [], econstr :: econstrs ->
-        elab_constr env dlbl acc econstr >>= fun constr ->
-        go Desc.{acc with constrs = acc.constrs @ [constr]} eparams econstrs
+        elab_constr env dlbl vparams acc econstr >>= fun constr ->
+        go cx Desc.{acc with constrs = acc.constrs @ [constr]} vparams eparams econstrs
     in
     match edesc.kind with
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
     | _ ->
-      go Desc.{edesc with constrs = []; params = []} edesc.params edesc.constrs
+      M.lift C.base_cx >>= fun cx ->
+      go cx Desc.{edesc with constrs = []; params = []} [] edesc.params edesc.constrs
 
-  and elab_constr env dlbl desc (clbl, constr) =
+  and elab_constr env dlbl params desc (clbl, constr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
       failwith "Duplicate constructor in datatype";
 
@@ -218,7 +221,7 @@ struct
         in
         M.in_scopes psi @@
         begin
-          elab_constr_boundary env dlbl desc (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
+          elab_constr_boundary env dlbl params desc (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
           M.ret
             (clbl,
              {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
@@ -237,7 +240,7 @@ struct
 
     go Emp constr.const_specs
 
-  and elab_constr_boundary env dlbl desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
+  and elab_constr_boundary env dlbl params desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
     M.lift C.base_cx >>= fun cx ->
     let (module V) = Cx.evaluator cx in
     let module D = Domain in
@@ -253,8 +256,7 @@ struct
         let cx', v = Cx.ext_ty cx ~nm:(Some lbl) vty in
         build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some lbl), cvs #< v, rvs, rs) param_specs const_specs rec_specs dim_specs
       | [], [], (nm, Desc.Self) :: rec_specs, _ ->
-        (* TODO[params] *)
-        let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data {dlbl; params = []} in
+        let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data {dlbl; params} in
         build_cx cx_x env (nms #< (Some nm), cvs, rvs #< v_x, rs) param_specs const_specs rec_specs dim_specs
       | [], [], [], nm :: dim_specs ->
         let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
