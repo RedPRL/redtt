@@ -36,13 +36,24 @@ edecl:
     { E.Define (a, `Opaque, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
-  | DATA; dlbl = ATOM; WHERE; option(PIPE); constrs = separated_list(PIPE, desc_constr)
+
+  | DATA; dlbl = ATOM;
+    WHERE; option(PIPE);
+    constrs = separated_list(PIPE, desc_constr)
     { let desc = List.map (fun constr -> constr dlbl) constrs in
       E.Data (dlbl, {constrs = desc}) }
+
   | IMPORT; a = ATOM
     { E.Import a }
   | QUIT
     { E.Quit }
+
+univ_spec:
+  | TYPE; k = kind
+    { (k, `Const 0) }
+  | TYPE; k = kind; CARET; l = NUMERAL
+    { (k, `Const l) }
+
 
 debug_filter:
   | { `All }
@@ -59,8 +70,8 @@ atomic_econ:
     { E.Hole a }
   | HOLE_NAME; LBR; e = eterm; RBR
     { E.Guess e }
-  | TYPE; k = kind
-    { E.Type k }
+  | spec = univ_spec
+    { let k, l = spec in E.Type (k, l) }
   | LGL; es = separated_list(COMMA, eterm); RGL
     { E.Tuple es }
   | LPR; e = eterm; RPR

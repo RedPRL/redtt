@@ -543,12 +543,12 @@ struct
       let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
       elab_chk env cod' {e with con = E.Tuple es} <<@> Tm.cons tm0
 
-    | Tm.Univ info, Type kind ->
+    | Tm.Univ info, Type (kind, lvl) ->
       begin
-        if Lvl.greater info.lvl (`Const 0) then
+        if Lvl.greater info.lvl lvl then
           match Tm.unleash ty with
           | Tm.Univ _ ->
-            M.ret @@ Tm.univ ~kind ~lvl:(`Const 0)
+            M.ret @@ Tm.univ ~kind ~lvl
           | _ ->
             failwith "Type"
         else

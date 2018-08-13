@@ -30,7 +30,7 @@ and econ =
   | Hope
   | Lam of string list * eterm
   | Tuple of eterm list
-  | Type of Kind.t
+  | Type of Kind.t * Lvl.t
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
 
