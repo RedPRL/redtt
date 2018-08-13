@@ -187,12 +187,12 @@ struct
     let open Desc in
     let elab_rec_spec (x, Self) = M.ret (x, Self) in
 
-    let rec abstract_tele xs (ps : _ list) =
-      match ps with
+    let rec abstract_tele xs =
+      function
       | [] -> []
-      | (lbl, x, p) :: ps ->
-        let Tm.NB (_, p') = Tm.bindn xs p in
-        (lbl, p') :: abstract_tele (xs #< x) ps
+      | (lbl, x, ty) :: const_specs ->
+        let Tm.NB (_, ty') = Tm.bindn xs ty in
+        (lbl, ty') :: abstract_tele (xs #< x) const_specs
     in
 
     let rec go acc =
