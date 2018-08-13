@@ -164,8 +164,9 @@ struct
       let cmd' = traverse_cmd cmd in
       Up cmd'
 
-    | Data lbl ->
-      Data lbl
+    | Data data ->
+      let params = traverse_list traverse_tm data.params in
+      Data {data with params}
 
     | Intro (dlbl, clbl, args) ->
       let args' = traverse_list traverse_tm args in
@@ -743,7 +744,15 @@ let rec pp env fmt =
       pp_cmd env fmt cmd
 
     | Data data ->
-      Desc.pp_data_label fmt data.dlbl
+      begin
+        match data.params with
+        | [] ->
+          Desc.pp_data_label fmt data.dlbl
+        | params ->
+          Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
+            Desc.pp_data_label data.dlbl
+            (pp_terms env) params
+      end
 
     | Intro (_dlbl, clbl, args) ->
       begin
@@ -1195,7 +1204,7 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Dim0 | Dim1 | TickConst | Data _) as con ->
+  | (Univ _ | Dim0 | Dim1 | TickConst) as con ->
     con
   | Cons (t0, t1) ->
     Cons (f t0, f t1)
@@ -1260,9 +1269,10 @@ let map_tmf f =
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
     Let (map_cmd f cmd, map_bnd f bnd)
+  | Data {dlbl; params} ->
+    Data {dlbl; params = List.map f params}
   | Intro (dlbl, clbl, args) ->
     Intro (dlbl, clbl, List.map f args)
-
 
 
 let rec opt_traverse f xs =
