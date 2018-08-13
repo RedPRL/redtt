@@ -220,7 +220,7 @@ let rec check cx ty tm =
     else
       failwith "Universe level/kind error"
 
-  | D.Data dlbl, T.Intro (dlbl', clbl, args) when dlbl = dlbl' ->
+  | D.Data data, T.Intro (dlbl, clbl, args) when data.dlbl = dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     let constr = Desc.lookup_constr clbl desc in
     check_constr cx dlbl constr args
@@ -331,7 +331,7 @@ let rec check cx ty tm =
     failwith "Type error"
 
 and check_constr cx dlbl constr tms =
-  let vdataty = D.make @@ D.Data dlbl in
+  let vdataty = D.make @@ D.Data {dlbl} in
   let rec go cx' const_specs rec_specs dim_specs tms =
     match const_specs, rec_specs, dim_specs, tms with
     | [], rec_specs, dim_specs, _ ->

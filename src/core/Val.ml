@@ -823,8 +823,8 @@ struct
   and rigid_coe_data dir abs el =
     let _, tyx = Abs.unleash1 abs in
     match unleash tyx, unleash el with
-    | Data dlbl, Intro info ->
-      rigid_coe_data_intro dir abs ~dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
+    | Data data, Intro info ->
+      rigid_coe_data_intro dir abs ~dlbl:data.dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
 
     | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
@@ -1144,7 +1144,7 @@ struct
   (* presupposes no dimension arguments *)
   and rigid_hcom_strict_data dir ty cap sys =
     match unleash ty, unleash cap with
-    | Data dlbl, Intro info ->
+    | Data data, Intro info ->
       let peel_arg k el =
         match unleash el with
         | Intro info' ->
@@ -1178,13 +1178,13 @@ struct
           failwith "rigid_hcom_strict_data"
       in
 
-      let desc = Sig.lookup_datatype dlbl in
+      let desc = Sig.lookup_datatype data.dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
 
       let args' = make_args 0 Emp info.const_args info.rec_args constr.const_specs constr.rec_specs in
       let const_args, rec_args = ListUtil.split (List.length constr.const_specs) args' in
 
-      make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
+      make @@ Intro {dlbl = data.dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
 
     | _, Up info ->
       rigid_nhcom_up_at_cap dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
@@ -1226,8 +1226,8 @@ struct
     | Up info ->
       rigid_nhcom_up_at_type dir info.ty info.neu cap ~comp_sys:sys ~rst_sys:info.sys
 
-    | Data dlbl ->
-      let desc = Sig.lookup_datatype dlbl in
+    | Data data ->
+      let desc = Sig.lookup_datatype data.dlbl in
       if Desc.is_strict_set desc then
         rigid_hcom_strict_data dir ty cap sys
       else
@@ -1603,8 +1603,8 @@ struct
       let v = eval rho t in
       make @@ Shut v
 
-    | Tm.Data lbl ->
-      make @@ Data lbl
+    | Tm.Data dlbl ->
+      make @@ Data {dlbl}
 
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
@@ -1844,7 +1844,7 @@ struct
 
   and unleash_data v =
     match unleash v with
-    | Data dlbl -> dlbl
+    | Data data -> data.dlbl
     | Rst rst -> unleash_data rst.ty
     | _ ->
       raise @@ E (UnleashDataError v)

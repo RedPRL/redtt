@@ -97,8 +97,8 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<box-modality>"
   | Shut _ ->
     Format.fprintf fmt "<shut>"
-  | Data lbl ->
-    Uuseg_string.pp_utf_8 fmt lbl
+  | Data data ->
+    Uuseg_string.pp_utf_8 fmt data.dlbl
   | Intro info ->
     Format.fprintf fmt "@[<hv1>(%a %a %a %a)@]"
       Uuseg_string.pp_utf_8 info.clbl

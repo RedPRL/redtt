@@ -250,7 +250,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     in
 
     let dlbl = unleash_data data_ty in
-    let data_vty = D.make @@ D.Data dlbl in
+    let data_vty = D.make @@ D.Data {dlbl} in
 
     begin
       M.lift C.base_cx <<@> fun cx ->
