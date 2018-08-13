@@ -717,14 +717,6 @@ struct
         elab_var env name ushift >>= fun (a, cmd) ->
         M.lift (C.lookup_var a `Only) <+> (M.lift (C.lookup_meta a) <<@> fst) <<@> fun ty ->
           Tm.shift_univ ushift ty, cmd
-      end <+>
-      begin
-        M.lift C.base_cx <<@> fun cx ->
-          let sign = Cx.globals cx in
-          let _ = GlobalEnv.lookup_datatype name sign in
-          let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-          (* TODO[params] *)
-          univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {dlbl = name; params = []})
       end
 
     | E.Quo tmfam ->
@@ -889,6 +881,21 @@ struct
           elab_mode_switch_cut env exp frms ty
       end
 
+    | Tm.Univ _ ->
+      begin
+        match exp.con with
+        | E.Var (dlbl, _) ->
+          begin
+            M.lift C.base_cx >>= fun cx ->
+            let sign = Cx.globals cx in
+            let desc = GlobalEnv.lookup_datatype dlbl sign in
+            elab_data env dlbl desc frms
+          end
+          <+> elab_mode_switch_cut env exp frms ty
+        | _ ->
+          elab_mode_switch_cut env exp frms ty
+      end
+
     | _ ->
       elab_mode_switch_cut env exp frms ty
 
@@ -922,6 +929,14 @@ struct
     go_const_args [] constr.const_specs @@ Bwd.to_list frms >>= fun (tps, frms) ->
     go_rec_args constr.rec_specs constr.dim_specs frms >>= fun targs ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
+
+  and elab_data _env dlbl _desc frms =
+    match frms with
+    | Emp ->
+      (* TODO[params] *)
+      M.ret @@ Tm.make @@ Tm.Data {dlbl; params = []}
+    | _ ->
+      failwith "elab_data: TODO, case for >0 frames"
 
   and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (ty', cmd) ->
