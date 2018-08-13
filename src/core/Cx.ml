@@ -137,7 +137,7 @@ let make_closure cx bnd =
   Domain.Clo {rho = cx.env; bnd}
 
 let lookup i {hyps; _} =
-  let hyp = List.nth hyps i in
+  let hyp = try List.nth hyps i with _ -> failwith "Cx.lookup out of range" in
   if (hyp.killed || hyp.locked) && hyp.classifier != `I then
     failwith "Hypothesis is inaccessible"
   else

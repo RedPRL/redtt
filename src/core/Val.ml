@@ -1148,7 +1148,12 @@ struct
       let peel_arg k el =
         match unleash el with
         | Intro info' ->
-          List.nth (info'.const_args @ info'.rec_args) k
+          begin
+            try
+              List.nth (info'.const_args @ info'.rec_args) k
+            with
+            | _ -> failwith "rigid_hcom_strict_data: out of range"
+          end
         | _ ->
           failwith "rigid_hcom_strict_data: peel_arg"
       in
@@ -1457,6 +1462,8 @@ struct
         | cell ->
           let err = UnexpectedEnvCell cell in
           raise @@ E err
+        | exception _ ->
+          failwith "eval_bterm: variable out of range"
       end
 
   and eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs =
@@ -1735,6 +1742,8 @@ struct
         | cell ->
           let err = UnexpectedEnvCell cell in
           raise @@ E err
+        | exception _ ->
+          failwith "eval_head: de bruijn index out of range"
       end
 
     | Tm.Var info ->
