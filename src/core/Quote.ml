@@ -245,7 +245,8 @@ struct
 
       | _, Data data0, Data data1 ->
         if data0.dlbl = data1.dlbl then
-          Tm.make @@ Tm.Data {dlbl = data0.dlbl}
+          (* TODO[params] *)
+          Tm.make @@ Tm.Data {dlbl = data0.dlbl; params = []}
         else
           raise @@ E (ErrEquateLbl (data0.dlbl, data1.dlbl))
 

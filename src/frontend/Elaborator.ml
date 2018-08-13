@@ -723,7 +723,8 @@ struct
           let sign = Cx.globals cx in
           let _ = GlobalEnv.lookup_datatype name sign in
           let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-          univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {dlbl = name})
+          (* TODO[params] *)
+          univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {dlbl = name; params = []})
       end
 
     | E.Quo tmfam ->
@@ -912,7 +913,8 @@ struct
       | [], _ :: dims, E.App r :: frms ->
         (fun x xs -> x :: xs) <@>> elab_dim env r <*> go_rec_args rec_specs dims frms
       | (_, Desc.Self) :: rec_specs, dims, E.App e :: frms ->
-        let self_ty = Tm.make @@ Tm.Data {dlbl} in
+        (* TODO[params] *)
+        let self_ty = Tm.make @@ Tm.Data {dlbl; params = []} in
         (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_rec_args rec_specs dims frms
       | _ ->
         failwith "todo: go_args"
