@@ -389,7 +389,8 @@ struct
   and equate_constr_rec_args env dlbl constr els0 els1 =
     let open Desc in
     (* TODO: factor out *)
-    let realize_spec_ty Self = D.make @@ D.Data {dlbl} in
+    (* TODO[params] *)
+    let realize_spec_ty Self = D.make @@ D.Data {dlbl; params = []} in
     ListUtil.map3 (fun (_, spec_ty) -> equate env @@ realize_spec_ty spec_ty) constr.rec_specs els0 els1
 
   and equate_neu_ env neu0 neu1 stk =
@@ -472,7 +473,8 @@ struct
     | Elim elim0, Elim elim1 ->
       if elim0.dlbl = elim1.dlbl then
         let dlbl = elim0.dlbl in
-        let data_ty = D.make @@ D.Data {dlbl} in
+        (* TODO[params] *)
+        let data_ty = D.make @@ D.Data {dlbl; params = []} in
         let mot =
           let var = generic env data_ty in
           let env' = Env.succ env in

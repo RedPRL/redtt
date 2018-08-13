@@ -253,7 +253,8 @@ struct
         let cx', v = Cx.ext_ty cx ~nm:(Some lbl) vty in
         build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some lbl), cvs #< v, rvs, rs) param_specs const_specs rec_specs dim_specs
       | [], [], (nm, Desc.Self) :: rec_specs, _ ->
-        let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data {dlbl} in
+        (* TODO[params] *)
+        let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data {dlbl; params = []} in
         build_cx cx_x env (nms #< (Some nm), cvs, rvs #< v_x, rs) param_specs const_specs rec_specs dim_specs
       | [], [], [], nm :: dim_specs ->
         let cx', x = Cx.ext_dim cx ~nm:(Some nm) in

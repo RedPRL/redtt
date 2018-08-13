@@ -1605,7 +1605,8 @@ struct
 
     | Tm.Data data ->
       let dlbl = data.dlbl in
-      make @@ Data {dlbl}
+      (* TODO[params] *)
+      make @@ Data {dlbl; params = []}
 
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in

@@ -331,7 +331,8 @@ let rec check cx ty tm =
     failwith "Type error"
 
 and check_constr cx dlbl constr tms =
-  let vdataty = D.make @@ D.Data {dlbl} in
+  (* TODO[params] *)
+  let vdataty = D.make @@ D.Data {dlbl; params = []} in
   let rec go cx' const_specs rec_specs dim_specs tms =
     match const_specs, rec_specs, dim_specs, tms with
     | [], rec_specs, dim_specs, _ ->

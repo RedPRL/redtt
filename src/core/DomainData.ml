@@ -47,7 +47,8 @@ type con =
   | BoxModality of value
   | Shut of value
 
-  | Data of {dlbl : Desc.data_label}
+  | Data of {dlbl : Desc.data_label; params : value list}
+
   | Intro of
       {dlbl : Desc.data_label;
        clbl : Desc.con_label;
