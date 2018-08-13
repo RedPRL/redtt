@@ -245,8 +245,9 @@ struct
 
       | _, Data data0, Data data1 ->
         if data0.dlbl = data1.dlbl then
-          (* TODO[params] *)
-          Tm.make @@ Tm.Data {dlbl = data0.dlbl; params = []}
+          let desc = Sig.lookup_datatype data0.dlbl in
+          let params = equate_data_params env desc data0.params data1.params in
+          Tm.make @@ Tm.Data {dlbl = data0.dlbl; params}
         else
           raise @@ E (ErrEquateLbl (data0.dlbl, data1.dlbl))
 
@@ -380,12 +381,28 @@ struct
         Bwd.to_list acc
       | (_, ty) :: const_specs, el0 :: els0, el1 :: els1 ->
         let vty = eval venv ty in
-        let tm0 = equate env vty el0 el1 in
-        go (acc #< tm0) (D.Env.push (`Val el0) venv) const_specs els0 els1
+        let tm = equate env vty el0 el1 in
+        go (acc #< tm) (D.Env.push (`Val el0) venv) const_specs els0 els1
       | _ ->
         failwith "equate_constr_args"
     in
     go Emp D.Env.emp constr.const_specs els0 els1
+
+  and equate_data_params env desc els0 els1 =
+    let open Desc in
+    let rec go acc venv param_specs els0 els1 =
+      match param_specs, els0, els1 with
+      | [], [], [] ->
+        Bwd.to_list acc
+      | (_, ty) :: param_specs, el0 :: els0, el1 :: els1 ->
+        let vty = eval venv ty in
+        let tm = equate env vty el0 el1 in
+        go (acc #< tm) (D.Env.push (`Val el0) venv) param_specs els0 els1
+      | _ ->
+        failwith "equate_data_params"
+    in
+    go Emp D.Env.emp desc.params els0 els1
+
 
   and equate_constr_rec_args env dlbl params constr els0 els1 =
     let open Desc in
