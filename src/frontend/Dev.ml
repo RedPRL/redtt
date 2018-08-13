@@ -31,7 +31,7 @@ type 'a param =
   | `P of 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
-  | `SelfArg of 'a Desc.arg_ty
+  | `SelfArg of 'a Desc.rec_spec
   ]
 
 type params = (Name.t * ty param) bwd

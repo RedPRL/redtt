@@ -1,6 +1,6 @@
 (** Recursive argument types; currently this includes only [Self]; in the future, this will be extended with an indexed
     version of [Self], as well a formal function type. *)
-type 'a arg_ty =
+type 'a rec_spec =
   | Self
 
 (* TODO: abstract *)
@@ -32,7 +32,7 @@ end
     arguments. TODO: rename [args] to [rec_args]. *)
 type ('a, 'b) constr =
   {const_specs : (string * 'a) list;
-   rec_specs : (string * 'a arg_ty) list;
+   rec_specs : (string * 'a rec_spec) list;
    dim_specs : string list;
    boundary : ('a, 'b) Boundary.sys}
 

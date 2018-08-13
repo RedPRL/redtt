@@ -181,7 +181,7 @@ struct
       failwith "Duplicate constructor in datatype";
 
     let open Desc in
-    let elab_arg_ty (x, Self) = M.ret (x, Self) in
+    let elab_rec_spec (x, Self) = M.ret (x, Self) in
 
     let rec abstract_tele xs (ps : _ list) =
       match ps with
@@ -197,7 +197,7 @@ struct
         let const_specs = abstract_tele Emp @@ Bwd.to_list acc in
         (* TODO: when self args are more complex, we'll need to abstract them over
            the parameters too. *)
-        traverse elab_arg_ty constr.rec_specs >>= fun rec_specs ->
+        traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
 
         let psi =
           List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) rec_specs
@@ -314,13 +314,13 @@ struct
           failwith "elab_intro: malformed parameters"
       in
 
-      let rec go_args acc arg_tys frms =
-        match arg_tys, frms with
+      let rec go_args acc rec_specs frms =
+        match rec_specs, frms with
         | [], _ ->
           M.ret (Bwd.to_list acc, frms)
-        | (_, Desc.Self) :: arg_tys, E.App e :: frms ->
+        | (_, Desc.Self) :: rec_specs, E.App e :: frms ->
           elab_boundary_term env dlbl desc e >>= fun bt ->
-          go_args (acc #< bt) arg_tys frms
+          go_args (acc #< bt) rec_specs frms
         | _ ->
           failwith "todo: go_args"
       in

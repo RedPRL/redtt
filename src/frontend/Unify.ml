@@ -372,11 +372,11 @@ let evaluator =
   base_cx >>= fun cx ->
   ret (cx, Cx.evaluator cx)
 
-let inst_ty_bnd bnd (arg_ty, arg) =
+let inst_ty_bnd bnd (rec_spec, arg) =
   base_cx >>= fun cx ->
   let Tm.B (nm, tm) = bnd in
   let varg = Cx.eval cx arg in
-  let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
+  let lcx = Cx.def cx ~nm ~ty:rec_spec ~el:varg in
   ret @@ Cx.quote_ty cx @@ Cx.eval lcx tm
 
 let eval tm =
@@ -384,11 +384,11 @@ let eval tm =
   ret @@ Cx.eval cx tm
 
 
-let inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
+let inst_bnd (ty_clo, tm_bnd) (rec_spec, arg) =
   evaluator >>= fun (cx, (module V)) ->
   let Tm.B (nm, tm) = tm_bnd in
   let varg = Cx.eval cx arg in
-  let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
+  let lcx = Cx.def cx ~nm ~ty:rec_spec ~el:varg in
   let vty = V.inst_clo ty_clo varg in
   ret @@ Cx.quote cx ~ty:vty @@ Cx.eval lcx tm
 

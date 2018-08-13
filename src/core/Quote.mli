@@ -41,7 +41,7 @@ sig
     : env
     -> Desc.data_label
     -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
-    -> Tm.tm Desc.arg_ty
+    -> Tm.tm Desc.rec_spec
     -> value
     -> value
     -> unit
