@@ -32,7 +32,7 @@ and pp_env fmt =
 and pp_con fmt : con -> unit =
   function
   | Up up ->
-    Format.fprintf fmt "%a" pp_neu up.neu
+    Format.fprintf fmt "@[<hv1>(up@ %a@ %a@ [%a])@]" pp_value up.ty pp_neu up.neu pp_val_sys up.sys
   | Lam clo ->
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
   | ExtLam abs ->
@@ -54,9 +54,9 @@ and pp_con fmt : con -> unit =
   | Cons (v0, v1) ->
     Format.fprintf fmt "@[<1>(pair@ %a %a)@]" pp_value v0 pp_value v1
   | V info ->
-    Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
+    Format.fprintf fmt "@[<1>(V@ %a@ %a@ %a@ %a)@]" Name.pp info.x pp_value info.ty0 pp_value info.ty1 pp_value info.equiv
   | VIn info ->
-    Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)]" Name.pp info.x pp_value info.el0 pp_value info.el1
+    Format.fprintf fmt "@[<1>(Vin@ %a@ %a@ %a)@]" Name.pp info.x pp_value info.el0 pp_value info.el1
   | Coe info ->
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(coe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
@@ -67,8 +67,9 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<ghcom>"
   | FHCom _ ->
     Format.fprintf fmt "<fhcom>"
-  | Box _ ->
-    Format.fprintf fmt "<box>"
+  | Box info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(box %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.cap pp_val_sys info.sys
   | LblTy {lbl; args; ty} ->
     begin
       match args with
@@ -138,12 +139,12 @@ and pp_val_face : type x. _ -> (x, value) face -> unit =
   fun fmt ->
     function
     | Face.True (r0, r1, v) ->
-      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_value v
+      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_value (Lazy.force v)
     | Face.False (r0, r1) ->
       Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
     | Face.Indet (p, v) ->
       let r0, r1 = Eq.unleash p in
-      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_value v
+      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_value (Lazy.force v)
 
 and pp_comp_sys : type x. Format.formatter -> (x, abs) face list -> unit =
   fun fmt ->
@@ -154,12 +155,12 @@ and pp_comp_face : type x. _ -> (x, abs) face -> unit =
   fun fmt ->
     function
     | Face.True (r0, r1, v) ->
-      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_abs v
+      Format.fprintf fmt "@[<1>[!%a=%a@ %a]@]" I.pp r0 I.pp r1 pp_abs (Lazy.force v)
     | Face.False (r0, r1) ->
       Format.fprintf fmt "@[<1>[%a/=%a]@]" I.pp r0 I.pp r1
     | Face.Indet (p, v) ->
       let r0, r1 = Eq.unleash p in
-      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs v
+      Format.fprintf fmt "@[<1>[?%a=%a %a]@]" I.pp r0 I.pp r1 pp_abs (Lazy.force v)
 
 and pp_clo fmt (Clo clo) =
   let Tm.B (_, tm) = clo.bnd in
@@ -207,8 +208,12 @@ and pp_neu fmt neu =
   | Meta {name; _} ->
     Name.pp fmt name
 
-  | Elim _ ->
-    Format.fprintf fmt "<elim>"
+  | Elim info ->
+    Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a@ %a)@]"
+      Desc.pp_data_label info.dlbl
+      pp_clo info.mot
+      pp_neu info.neu
+      pp_elim_clauses info.clauses
 
   | Cap _ ->
     Format.fprintf fmt "<cap>"
@@ -234,6 +239,12 @@ and pp_neu fmt neu =
   | Open _ ->
     Format.fprintf fmt "<open>"
 
+and pp_elim_clauses fmt clauses =
+  let pp_sep fmt () = Format.fprintf fmt "@ " in
+  Format.pp_print_list ~pp_sep pp_elim_clause fmt clauses
+
+and pp_elim_clause fmt (clbl, nclo) =
+  Format.fprintf fmt "@[<hv1>[%a@ %a]@]" Uuseg_string.pp_utf_8 clbl pp_nclo nclo
 
 and pp_nf fmt nf =
   pp_value fmt nf.el
@@ -272,7 +283,7 @@ module AbsFace = Face.M (Abs)
 let force_abs_face face =
   match face with
   | Face.True (_, _, abs) ->
-    raise @@ ProjAbs abs
+    raise @@ ProjAbs (Lazy.force abs)
   | Face.False _ -> None
   | Face.Indet (xi, abs) ->
     Some (Face.Indet (xi, abs))
@@ -280,7 +291,7 @@ let force_abs_face face =
 let force_val_face (face : val_face) =
   match face with
   | Face.True (_, _, v) ->
-    raise @@ ProjVal v
+    raise @@ ProjVal (Lazy.force v)
   | Face.False _ -> None
   | Face.Indet (xi, v) ->
     Some (Face.Indet (xi, v))
@@ -319,7 +330,7 @@ struct
     | face :: sys ->
       match AbsFace.act phi face with
       | Face.True (_, _, abs) ->
-        raise @@ Proj abs
+        raise @@ Proj (Lazy.force abs)
       | Face.False _ ->
         act_aux phi sys
       | Face.Indet (p, t) ->
@@ -363,7 +374,7 @@ struct
     | face :: sys ->
       match ValFace.act phi face with
       | Face.True (_, _, value) ->
-        raise @@ Proj value
+        raise @@ Proj (Lazy.force value)
       | Face.False _ ->
         act_aux phi sys
       | Face.Indet (p, t) ->

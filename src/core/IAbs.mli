@@ -12,11 +12,16 @@ sig
 
   include Sort.S with type 'a m = 'a with type t = el abs
 
+  val unsafe_map : (el -> el) -> t -> t
+
+  val unsafe_bind : atom bwd -> el -> t
   val bind : atom bwd -> el -> t
   val unleash : t -> atom bwd * el
   val inst : t -> I.t bwd -> el
 
   val len : t -> int
+
+  val unsafe_bind1 : atom -> el -> t
 
   val bind1 : atom -> el -> t
   val unleash1 : t -> atom * el

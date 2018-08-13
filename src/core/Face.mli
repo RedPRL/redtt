@@ -1,7 +1,7 @@
 type (_, 'a) face =
   | False : I.t * I.t -> ([`Any], 'a) face
-  | True : I.t * I.t * 'a -> ([`Any], 'a) face
-  | Indet : Eq.t * 'a -> ('x, 'a) face
+  | True : I.t * I.t * 'a lazy_t -> ([`Any], 'a) face
+  | Indet : Eq.t * 'a lazy_t -> ('x, 'a) face
 
 val map : (I.t -> I.t -> 'a -> 'b) -> ('x, 'a) face -> ('x, 'b) face
 

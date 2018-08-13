@@ -17,7 +17,7 @@ type tm = Tm of tm tmf
 
 type error =
   | InvalidDeBruijnIndex of int
-  | UnbindExtLengthMismatch of Name.t list * (tm * (tm, tm) system) nbnd
+  | UnbindExtLengthMismatch of tm cmd list * (tm * (tm, tm) system) nbnd
 
 exception E of error
 
@@ -201,6 +201,9 @@ struct
       let ty = traverse_tm info.ty in
       let tm = traverse_tm info.tm in
       Down {ty; tm}, Emp
+
+    | DownX r ->
+      DownX (traverse_tm r), Emp
 
     | DFix info ->
       let r = traverse_tm info.r in
@@ -579,18 +582,18 @@ let unbind_ext (NB (nms, (ty, sys))) =
   in
   go 0 nms [] ty sys
 
-let unbind_ext_with xs ebnd =
+let unbind_ext_with rs ebnd =
   let NB (nms, (ty, sys)) = ebnd in
-  let rec go k xs ty sys =
-    match xs with
+  let rec go k rs ty sys =
+    match rs with
     | [] -> ty, sys
-    | x :: xs ->
-      go (k + 1) xs (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
+    | r :: rs ->
+      go (k + 1) rs (open_var k (fun _ -> r) ty) (map_tm_sys (open_var k (fun _ -> r)) sys)
   in
-  if Bwd.length nms = List.length xs then
-    go 0 xs ty sys
+  if Bwd.length nms = List.length rs then
+    go 0 rs ty sys
   else
-    let err = UnbindExtLengthMismatch (xs, ebnd) in
+    let err = UnbindExtLengthMismatch (rs, ebnd) in
     raise @@ E err
 
 
@@ -792,6 +795,9 @@ and pp_head env fmt =
 
   | Down {ty; tm} ->
     Format.fprintf fmt "@[<hv1>(: @[<hov>%a@ %a@])@]" (pp env) ty (pp env) tm
+
+  | DownX r ->
+    pp env fmt r
 
   | DFix {r; ty; bdy = B (nm, bdy)} ->
     let x, env' = Pp.Env.bind nm env in
@@ -1096,6 +1102,8 @@ let map_head f =
     let ty = f info.ty in
     let tm = f info.tm in
     Down {ty; tm}
+  | DownX r ->
+    DownX (f r)
   | DFix info ->
     let r = f info.r in
     let ty = f info.ty in

@@ -1,7 +1,7 @@
 type (_, 'a) face =
   | False : I.t * I.t -> ([`Any], 'a) face
-  | True : I.t * I.t * 'a -> ([`Any], 'a) face
-  | Indet : Eq.t * 'a -> ('x, 'a) face
+  | True : I.t * I.t * 'a lazy_t -> ([`Any], 'a) face
+  | Indet : Eq.t * 'a lazy_t -> ('x, 'a) face
 
 let map : type x. (I.t -> I.t -> 'a -> 'b) -> (x, 'a) face -> (x, 'b) face =
   fun f face ->
@@ -9,10 +9,10 @@ let map : type x. (I.t -> I.t -> 'a -> 'b) -> (x, 'a) face -> (x, 'b) face =
     | False (r, r') ->
       False (r, r')
     | True (r, r', v) ->
-      True (r, r', f r r' v)
+      True (r, r', lazy (f r r' (Lazy.force v)))
     | Indet (p, v) ->
       let r, r' = Eq.unleash p in
-      Indet (p, f r r' v)
+      Indet (p, lazy (f r r' (Lazy.force v)))
 
 let get_cond : type x. (x, 'a) face -> I.t * I.t =
   fun face ->
@@ -54,7 +54,7 @@ struct
   let rigid : I.action -> Eq.t -> (I.action -> X.t) -> 'x t =
     fun phi eq a ->
       let r, r' = Eq.unleash eq in
-      Indet (eq, a (I.cmp (I.equate r r') phi))
+      Indet (eq, lazy begin a (I.cmp (I.equate r r') phi) end)
 
   let make : I.action -> I.t -> I.t -> (I.action -> X.t) -> [`Any] t =
     fun phi r r' a ->
@@ -64,7 +64,7 @@ struct
       | `Apart _ ->
         False (r, r')
       | `Same _ ->
-        True (r, r', a (I.cmp (I.equate r r') phi))
+        True (r, r', lazy begin a (I.cmp (I.equate r r') phi) end)
 
   let make_from_dir : I.action -> Dir.t -> (I.action -> X.t) -> [`Any] t =
     fun phi dir a ->
@@ -83,7 +83,7 @@ struct
     fun phi face ->
       match face with
       | True (c, d, t) ->
-        True (I.act phi c, I.act phi d, X.act phi t)
+        True (I.act phi c, I.act phi d, lazy begin X.act phi @@ Lazy.force t end)
       | False (r, r') ->
         begin
           match Eq.make (I.act phi r) (I.act phi r') with
@@ -94,12 +94,12 @@ struct
         begin
           match Eq.act phi p with
           | `Same (c, d) ->
-            let t' = X.act phi t in
+            let t' = lazy begin X.act phi @@ Lazy.force t end in
             True (c, d, t')
           | `Apart (c, d) ->
             False (c, d)
           | `Ok p' ->
-            rigid phi p' (fun phi -> X.act phi t)
+            rigid phi p' (fun phi -> X.act phi @@ Lazy.force t)
         end
 end
 

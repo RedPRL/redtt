@@ -182,7 +182,7 @@ struct
   let make_closure rho bnd =
     Clo {bnd; rho}
 
-  let eval_dim rho tm =
+  let rec eval_dim rho tm =
     match Tm.unleash tm with
     | Tm.Dim0 ->
       `Dim0
@@ -205,6 +205,9 @@ struct
 
         | Tm.Meta meta ->
           I.act rho.global @@ Sig.global_dim meta.name
+
+        | Tm.DownX r ->
+          eval_dim rho r
 
         | _ ->
           let err = ExpectedDimensionTerm tm in
@@ -528,22 +531,8 @@ struct
           step @@ corestriction_force v
       end
 
-    | Lvl _ ->
+    | (Lvl _ | Var _ | Meta _) ->
       ret con
-
-    | Var {name; ushift; twin} ->
-      let tty, tsys = Sig.lookup name twin in
-      let rho' = {Env.emp with global = phi} in
-      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
-      let vty = eval rho' @@ Tm.shift_univ ushift tty in
-      step @@ reflect vty (Var {name; ushift; twin}) vsys
-
-    | Meta {name; ushift} ->
-      let tty, tsys = Sig.lookup name `Only in
-      let rho' = {Env.emp with global = phi} in
-      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
-      let vty = eval rho' @@ Tm.shift_univ ushift tty in
-      step @@ reflect vty (Meta {name; ushift}) vsys
 
     | Prev (tick, neu) ->
       begin
@@ -768,7 +757,7 @@ struct
     | (_, spec) :: const_specs, arg :: args ->
       let vty = eval env spec in
       let r, r' = Dir.unleash dir in
-      let coe_hd s = make_coe (Dir.make r s) (Abs.bind1 x vty) arg in
+      let coe_hd s = make_coe (Dir.make r s) (Abs.unsafe_bind1 x vty) arg in
       let coe_tl =
         let coe_hd_x = coe_hd @@ `Atom x in
         rigid_multi_coe (Env.push (`Val coe_hd_x) env) dir (x, const_specs) args
@@ -1165,21 +1154,20 @@ struct
       in
 
       let peel_face k =
-        Face.map @@ fun _ _ abs ->
-        let x, elx = Abs.unleash1 abs in
-        Abs.bind1 x @@ peel_arg k elx
+        Face.map @@ fun _ _ ->
+        Abs.unsafe_map (peel_arg k)
       in
 
       let peel_sys k sys = List.map (peel_face k) sys in
 
-      let rec make_args i acc args ps atys =
-        match args, ps, atys with
-        | el :: args, _ :: ps, _ ->
-          make_args (i + 1) (acc #< el) args ps atys
-        | el :: args, [], (_, Desc.Self) :: atys ->
+      let rec make_args i acc cvs rvs const_specs rec_specs =
+        match cvs, rvs, const_specs, rec_specs with
+        | el :: cvs, _, _ :: const_specs, _ ->
+          make_args (i + 1) (acc #< el) cvs rvs const_specs rec_specs
+        | [], el :: rvs, [], (_, Desc.Self) :: rec_specs ->
           let hcom = rigid_hcom dir ty el (peel_sys i sys) in
-          make_args (i + 1) (acc #< hcom) args ps atys
-        | [], [], [] ->
+          make_args (i + 1) (acc #< hcom) cvs rvs const_specs rec_specs
+        | [], [], [], []->
           Bwd.to_list acc
         | _ ->
           failwith "rigid_hcom_strict_data"
@@ -1188,8 +1176,7 @@ struct
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
 
-      (* TODO: clean this up! this was written before I split the args into two lists *)
-      let args' = make_args 0 Emp (info.const_args @ info.rec_args) constr.const_specs constr.rec_specs in
+      let args' = make_args 0 Emp info.const_args info.rec_args constr.const_specs constr.rec_specs in
       let const_args, rec_args = ListUtil.split (List.length constr.const_specs) args' in
 
       make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
@@ -1257,44 +1244,56 @@ struct
       let _, s' = Dir.unleash fhcom.dir in
 
       (* This is C_M in [F], with an extra parameter `phi` to get along with NbE. *)
-      let cap_aux phi el = make_cap (Dir.act phi fhcom.dir) (Value.act phi fhcom.cap) (CompSys.act phi fhcom.sys) el in
+      let cap_aux phi el =
+        let mdir = Dir.act phi fhcom.dir in
+        let ty = Value.act phi fhcom.cap in
+        let msys = CompSys.act phi fhcom.sys in
+        make_cap mdir ty msys el
+      in
 
       (* This serves as `O` and the diagonal face in [F]
        * for the coherence conditions in `fhcom.sys` and `s=s'`. *)
-      let hcom_template phi y_dest ty = make_hcom
-          (Dir.make (I.act phi r) y_dest) ty
-          (Value.act phi fhcom.cap) (CompSys.act phi fhcom.sys)
+      let hcom_template phi y_dest ty =
+        make_hcom
+          (Dir.make (I.act phi r) y_dest)
+          ty
+          (Value.act phi cap)
+          (CompSys.act phi sys)
       in
 
       (* This is `P` in [F]. *)
-      let new_cap = rigid_hcom dir fhcom.cap (cap_aux I.idn cap) @@
+      let new_cap =
+        rigid_hcom dir fhcom.cap (cap_aux I.idn cap) @@
         let ri_faces =
           let face = Face.map @@ fun ri r'i abs ->
             let y, el = Abs.unleash1 abs in
-            Abs.bind1 y (cap_aux (I.equate ri r'i) el)
+            Abs.bind1 y @@ cap_aux (I.equate ri r'i) el
           in
           List.map face sys
         in
         let si_faces =
-          let face = Face.map @@ fun si s'i abs ->
+          let face =
+            Face.map @@ fun si s'i abs ->
             let phi = I.equate si s'i in
             Abs.make1 @@ fun y ->
             (* this is not the most efficient code, but maybe we can afford this? *)
-            cap_aux phi (hcom_template phi (`Atom y) (Value.act phi (Abs.inst1 abs s')))
+            cap_aux phi @@ hcom_template phi (`Atom y) (Value.act phi (Abs.inst1 abs s'))
           in
           List.map face fhcom.sys
         in
-        let diag = AbsFace.make_from_dir I.idn fhcom.dir @@ fun phi ->
+        let diag =
+          AbsFace.make_from_dir I.idn fhcom.dir @@ fun phi ->
           Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Value.act phi fhcom.cap)
         in
         Option.filter_map force_abs_face [diag] @ (ri_faces @ si_faces)
       in
-      let boundary = Face.map @@ fun si s'i abs ->
+      let boundary =
+        Face.map @@ fun si s'i abs ->
         let phi = I.equate si s'i in
         hcom_template phi (I.act phi r') (Value.act phi (Abs.inst1 abs s'))
       in
-      rigid_box fhcom.dir new_cap
-        (List.map boundary fhcom.sys)
+      rigid_box fhcom.dir new_cap @@
+      List.map boundary fhcom.sys
 
     | V {x; ty0; ty1; equiv} ->
       let r, _ = Dir.unleash dir in
@@ -1360,7 +1359,7 @@ struct
             | `Proj abs -> abs
             | `Ok rest0 ->
               let r'i = I.act phi r'i in
-              let ghcom00 = AbsFace.make phi r'i dim0 @@ fun phi -> Abs.act phi absi in
+              let ghcom00 = AbsFace.make phi r'i dim0 @@ fun phi -> Abs.act phi @@ Lazy.force absi in
               let ghcom01 = AbsFace.make phi r'i dim1 @@ fun phi ->
                 Abs.make1 @@ fun y ->
                 (* TODO this can be optimized further by expanding
@@ -1478,12 +1477,12 @@ struct
     let r1 = eval_dim rho' tr1 in
     match Eq.make r0 r1 with
     | `Ok xi ->
-      let v = Value.act (I.equate r0 r1) @@ eval_bterm dlbl desc rho' btm in
+      let v = lazy begin Value.act (I.equate r0 r1) @@ eval_bterm dlbl desc rho' btm end in
       Face.Indet (xi, v)
     | `Apart _ ->
       Face.False (r0, r1)
     | `Same _ ->
-      let v = eval_bterm dlbl desc rho' btm in
+      let v = lazy begin eval_bterm dlbl desc rho' btm end in
       Face.True (r0, r1, v)
 
 
@@ -1676,6 +1675,9 @@ struct
     | Tm.Down info ->
       eval rho info.tm
 
+    | Tm.DownX _ ->
+      failwith "eval_head/DownX"
+
     | Tm.DFix info ->
       let r = eval_dim rho info.r in
       let ty = eval rho info.ty in
@@ -1762,13 +1764,13 @@ struct
     | `Ok xi ->
       let bnd = Option.get_exn obnd in
       let rho' = Env.act (I.equate sr sr') rho in
-      let abs = eval_bnd rho' bnd in
+      let abs = lazy begin eval_bnd rho' bnd end in
       Face.Indet (xi, abs)
     | `Apart _ ->
       Face.False (sr, sr')
     | `Same _ ->
       let bnd = Option.get_exn obnd in
-      let abs = eval_bnd rho bnd in
+      let abs = lazy begin eval_bnd rho bnd end in
       Face.True (sr, sr', abs)
 
   and eval_rigid_bnd_sys rho sys  =
@@ -1790,13 +1792,13 @@ struct
       let tm = Option.get_exn otm in
       let rho' = Env.act (I.equate r r') rho in
       (* The problem here is that the this is not affecting GLOBALS! *)
-      let el = eval rho' tm in
+      let el = lazy begin eval rho' tm end in
       Face.Indet (xi, el)
     | `Apart _ ->
       Face.False (r, r')
     | `Same _ ->
       let tm = Option.get_exn otm in
-      let el = eval rho tm in
+      let el = lazy begin eval rho tm end in
       Face.True (r, r', el)
 
   and eval_tm_sys rho sys : val_sys =
@@ -1815,21 +1817,21 @@ struct
 
   and eval_bnd rho bnd =
     let Tm.B (_, tm) = bnd in
-    let x = Name.fresh () in
+    Abs.make1 @@ fun x ->
     let rho = Env.push (`Dim (`Atom x)) rho in
-    Abs.bind1 x @@ eval rho tm
+    eval rho tm
 
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = Bwd.map Name.named nms in
     let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs) rho in
-    Abs.bind xs @@ eval rho tm
+    Abs.unsafe_bind xs @@ eval rho tm
 
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = Bwd.map Name.named nms in
     let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs) rho in
-    ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys)
+    ExtAbs.unsafe_bind xs (eval rho tm, eval_tm_sys rho sys)
 
   and unleash_data v =
     match unleash v with
@@ -1939,7 +1941,7 @@ struct
     | CoRThunk face ->
       begin
         match face with
-        | Face.True (_, _, v) -> v
+        | Face.True (_, _, v) -> Lazy.force v
         | _ ->
           raise @@ E (ForcedUntrueCorestriction face)
       end
@@ -1954,7 +1956,7 @@ struct
             corestriction_force a
           in
           let force_sys = List.map force_face info.sys in
-          make @@ Up {ty; neu = force; sys = force_sys}
+          make @@ Up {ty = Lazy.force ty; neu = force; sys = force_sys}
         | _ as face ->
           raise @@ E (ForcedUntrueCorestriction face)
       end
@@ -2243,27 +2245,21 @@ struct
     match unleash scrut with
     | Intro info ->
       let _, nclo = List.find (fun (clbl', _) -> info.clbl = clbl') clauses in
-      let desc = Sig.lookup_datatype dlbl in
-      let constr = Desc.lookup_constr info.clbl desc in
 
       (* Clean this up with some kind of a state type for the traversal maybe. Barf! *)
-      let rec go vs rs const_specs rec_specs dim_specs =
-        match vs, rs, const_specs, rec_specs, dim_specs with
-        | v :: vs, _, (_, _) :: const_specs, _, _ ->
-          `Val v :: go vs rs const_specs rec_specs dim_specs
-        | v :: vs, _,  [], (_, Desc.Self) :: rec_specs, _ ->
+      let rec go cvs rvs rs =
+        match cvs, rvs, rs with
+        | v :: cvs, _, _->
+          `Val v :: go cvs rvs rs
+        | [], v :: rvs, _ ->
           let v_ih = elim_data dlbl ~mot ~scrut:v ~clauses in
-          `Val v :: `Val v_ih :: go vs rs const_specs rec_specs dim_specs
-        | [], r :: rs, [], [], _ :: dims ->
-          `Dim r :: go [] rs const_specs rec_specs dims
-        | [], [], [], [], [] ->
+          `Val v :: `Val v_ih :: go cvs rvs rs
+        | [], [], r :: rs ->
+          `Dim r :: go cvs rvs rs
+        | [], [], [] ->
           []
-        | _ ->
-          failwith "elim_data/intro"
       in
-
-      (* CLEANUP *)
-      inst_nclo nclo @@ go (info.const_args @ info.rec_args) info.rs constr.const_specs constr.rec_specs constr.dim_specs
+      inst_nclo nclo @@ go info.const_args info.rec_args info.rs
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in
@@ -2306,7 +2302,7 @@ struct
 
     | Up info ->
       let dom, _ = unleash_sg info.ty in
-      let car_sys = List.map (Face.map (fun _ _ a -> car a)) info.sys in
+      let car_sys = List.map (Face.map (fun _ _ -> car)) info.sys in
       make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
 
     | Coe info ->
@@ -2320,9 +2316,8 @@ struct
       let dom, _ = unleash_sg info.ty in
       let cap = car info.cap in
       let face =
-        Face.map @@ fun _ _ abs ->
-        let y, v = Abs.unleash1 abs in
-        Abs.bind1 y @@ car v
+        Face.map @@ fun _ _ ->
+        Abs.unsafe_map car
       in
       let sys = List.map face info.sys in
       rigid_hcom info.dir dom cap sys
@@ -2331,9 +2326,8 @@ struct
       let dom, _ = unleash_sg info.ty in
       let cap = car info.cap in
       let face =
-        Face.map @@ fun _ _ abs ->
-        let y, v = Abs.unleash1 abs in
-        Abs.bind1 y @@ car v
+        Face.map @@ fun _ _ ->
+        Abs.unsafe_map car
       in
       let sys = List.map face info.sys in
       rigid_ghcom info.dir dom cap sys
@@ -2348,7 +2342,7 @@ struct
 
     | Up info ->
       let _, cod = unleash_sg info.ty in
-      let cdr_sys = List.map (Face.map (fun _ _ a -> cdr a)) info.sys in
+      let cdr_sys = List.map (Face.map (fun _ _ -> cdr)) info.sys in
       let cod_car = inst_clo cod @@ car v in
       make @@ Up {ty = cod_car; neu = Cdr info.neu; sys = cdr_sys}
 
@@ -2372,12 +2366,11 @@ struct
       let abs =
         let r, _ = Dir.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
-        let z = Name.fresh () in
+        Abs.make1 @@ fun z ->
         let msys =
           let face =
-            Face.map @@ fun _ _ absi ->
-            let yi, vi = Abs.unleash absi in
-            Abs.bind yi @@ car vi
+            Face.map @@ fun _ _ ->
+            Abs.unsafe_map car
           in
           `Ok (List.map face info.sys)
         in
@@ -2388,14 +2381,13 @@ struct
             (car info.cap)
             msys
         in
-        Abs.bind1 z @@ inst_clo cod hcom
+        inst_clo cod hcom
       in
       let cap = cdr info.cap in
       let sys =
         let face =
-          Face.map @@ fun _ _ absi ->
-          let yi, vi = Abs.unleash absi in
-          Abs.bind yi @@ cdr vi
+          Face.map @@ fun _ _ ->
+          Abs.unsafe_map cdr
         in
         List.map face info.sys
       in
@@ -2403,14 +2395,13 @@ struct
 
     | GHCom info ->
       let abs =
+        Abs.make1 @@ fun z ->
         let r, _ = Dir.unleash info.dir in
         let dom, cod = unleash_sg info.ty in
-        let z = Name.fresh () in
         let msys =
           let face =
-            Face.map @@ fun _ _ absi ->
-            let yi, vi = Abs.unleash absi in
-            Abs.bind yi @@ car vi
+            Face.map @@ fun _ _ ->
+            Abs.unsafe_map car
           in
           `Ok (List.map face info.sys)
         in
@@ -2421,14 +2412,13 @@ struct
             (car info.cap)
             msys
         in
-        Abs.bind1 z @@ inst_clo cod hcom
+        inst_clo cod hcom
       in
       let cap = cdr info.cap in
       let sys =
         let face =
-          Face.map @@ fun _ _ absi ->
-          let yi, vi = Abs.unleash absi in
-          Abs.bind yi @@ cdr vi
+          Face.map @@ fun _ _ ->
+          Abs.unsafe_map cdr
         in
         List.map face info.sys
       in
@@ -2454,9 +2444,14 @@ struct
     match unleash el with
     | Box info -> info.cap
     | Up info ->
-      let cap_sys = List.map (Face.map (fun ri r'i a ->
+      let cap_sys =
+        let face =
+          Face.map @@ fun ri r'i a ->
           let phi = I.equate ri r'i in
-          make_cap (Dir.act phi dir) (Value.act phi ty) (CompSys.act phi sys) a)) info.sys in
+          make_cap (Dir.act phi dir) (Value.act phi ty) (CompSys.act phi sys) a
+        in
+        List.map face info.sys
+      in
       make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
     | _ ->
       raise @@ E (RigidCapUnexpectedArgument el)
