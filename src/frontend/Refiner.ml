@@ -227,7 +227,7 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
   | None ->
     guess_motive scrut ty
   | Some tac_mot ->
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
     let mot_ty = Tm.pi None data_ty univ in
     tac_mot mot_ty >>= fun mot ->
     let motx =

@@ -282,7 +282,7 @@ struct
         Tm.make @@ Tm.Rst {ty; sys}
 
       | _, CoR face0, CoR face1 ->
-        let univ = D.make @@ Univ {lvl = Lvl.Omega; kind = Kind.Pre} in
+        let univ = D.make @@ Univ {lvl = `Omega; kind = `Pre} in
         let face = equate_val_face env univ face0 face1 in
         Tm.make @@ Tm.CoR face
 
@@ -338,7 +338,7 @@ struct
 
       | _, Coe coe0, Coe coe1 ->
         let tr, tr' = equate_dir env coe0.dir coe1.dir in
-        let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+        let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
         let bnd = equate_val_abs env univ coe0.abs coe1.abs in
         let tyr =
           let r, _ = Dir.unleash coe0.dir in
@@ -429,7 +429,7 @@ struct
 
     | NCoe info0, NCoe info1 ->
       let tr, tr' = equate_dir env info0.dir info1.dir in
-      let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+      let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
       let bnd = equate_val_abs env univ info0.abs info1.abs in
       let tm = equate_neu env info0.neu info1.neu in
       Tm.Coe {r = tr; r' = tr'; ty = bnd; tm = Tm.up tm}, Bwd.from_list stk
@@ -538,7 +538,7 @@ struct
     | Cap cap0, Cap cap1 ->
       let tr, tr' = equate_dir env cap0.dir cap1.dir in
       let ty = equate_ty env cap0.ty cap1.ty in
-      let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+      let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
       let sys = equate_comp_sys env univ cap0.sys cap1.sys in
       let frame = Tm.Cap {r = tr; r' = tr'; ty; sys} in
       equate_neu_ env cap0.neu cap1.neu @@ frame :: stk
@@ -564,7 +564,7 @@ struct
     equate_neu_ env neu0 neu1 []
 
   and equate_ty env ty0 ty1 =
-    let univ = make @@ Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+    let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
     equate env univ ty0 ty1
 
 

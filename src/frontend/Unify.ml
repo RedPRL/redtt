@@ -592,7 +592,7 @@ let restriction_subtype ty0 sys0 ty1 sys1 =
 (* invariant: will not be called on inequations which are already reflexive *)
 let rec subtype ty0 ty1 =
   if ty0 = ty1 then ret () else
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
     match Tm.unleash ty0, Tm.unleash ty1 with
     | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
       let x = Name.fresh () in
@@ -849,7 +849,7 @@ let rec lower tele alpha ty =
     ret false
 
 let is_reflexive q =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
   check_eq ~ty:univ q.ty0 q.ty1 >>= function
   | `Ok ->
     begin
@@ -905,7 +905,7 @@ let rec solver prob =
           end
 
         | `Tw (ty0, ty1) ->
-          let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+          let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
           begin
             check_eq ~ty:univ ty0 ty1 >>= function
             | `Ok ->

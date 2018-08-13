@@ -345,12 +345,12 @@ let subst_decl sub ~ty =
   | Defn (opacity, t) ->
     Defn (opacity, subst_tm sub ~ty t)
   | Guess info ->
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
     let ty' = subst_tm sub ~ty:univ info.ty in
     Guess {ty = ty'; tm = subst_tm sub ~ty:ty' info.tm}
 
 let subst_equation sub q =
-  let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
+  let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
   let ty0 = subst_tm sub ~ty:univ q.ty0 in
   let ty1 = subst_tm sub ~ty:univ q.ty1 in
   let tm0 = subst_tm sub ~ty:ty0 q.tm0 in
@@ -358,7 +358,7 @@ let subst_equation sub q =
   {ty0; ty1; tm0; tm1}
 
 let subst_param sub =
-  let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
+  let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
   function
   | (`I | `Tick | `Lock | `ClearLocks | `SelfArg Desc.Self) as p ->
     p, sub
@@ -373,7 +373,7 @@ let subst_param sub =
     `R (r0, r1), GlobalEnv.restrict r0 r1 sub
 
 let rec subst_problem sub =
-  let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
+  let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
   function
   | Unify q ->
     Unify (subst_equation sub q)
@@ -409,7 +409,7 @@ let rec subst_problem sub =
 let subst_entry sub =
   function
   | E (x, ty, decl) ->
-    let univ = Tm.univ ~kind:Kind.Pre ~lvl:Lvl.Omega in
+    let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
     E (x, subst_tm sub ~ty:univ ty, subst_decl sub ~ty decl)
   | Q (s, p) ->
     let p' = subst_problem sub p in

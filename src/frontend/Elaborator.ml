@@ -38,7 +38,7 @@ struct
     | Chk of ty
     | Inf
 
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre
+  let univ = Tm.univ ~lvl:`Omega ~kind:`Pre
 
   let get_resolver env =
     let rec go_globals renv  =
@@ -216,7 +216,7 @@ struct
 
       | (lbl, ety) :: const_specs ->
         (* TODO: support higher universes *)
-        let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
+        let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
         elab_chk env univ0 ety >>= bind_in_scope >>= fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
@@ -545,10 +545,10 @@ struct
 
     | Tm.Univ info, Type kind ->
       begin
-        if Lvl.greater info.lvl (Lvl.Const 0) then
+        if Lvl.greater info.lvl (`Const 0) then
           match Tm.unleash ty with
           | Tm.Univ _ ->
-            M.ret @@ Tm.univ ~kind ~lvl:(Lvl.Const 0)
+            M.ret @@ Tm.univ ~kind ~lvl:(`Const 0)
           | _ ->
             failwith "Type"
         else
@@ -561,7 +561,7 @@ struct
     | _, E.HCom info ->
       elab_dim env info.r >>= fun r ->
       elab_dim env info.r' >>= fun r' ->
-      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kan in
+      let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       begin
         M.lift @@ C.check ~ty:kan_univ ty >>= function
         | `Ok ->
@@ -704,7 +704,7 @@ struct
         M.lift C.base_cx <<@> fun cx ->
           let sign = Cx.globals cx in
           let _ = GlobalEnv.lookup_datatype name sign in
-          let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
+          let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
           univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
       end
 
@@ -728,7 +728,7 @@ struct
       elab_dim env info.r >>= fun tr ->
       elab_dim env info.r' >>= fun tr' ->
       let x = Name.fresh () in
-      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
+      let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
       elab_chk env univ_fam info.fam >>= fun fam ->
       begin
@@ -746,7 +746,7 @@ struct
       elab_dim env info.r >>= fun tr ->
       elab_dim env info.r' >>= fun tr' ->
       let x = Name.fresh () in
-      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
+      let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
       elab_chk env univ_fam info.fam >>= fun fam ->
       M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr] >>= fun (_, fam_r) ->

@@ -181,19 +181,19 @@ let rec check cx ty tm =
   | D.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
     let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
     let vcod = check_eval cxx ty cod in
-    if Kind.lte univ.kind Kind.Kan then
+    if Kind.lte univ.kind `Kan then
       check_extension_cofibration xs @@ cofibration_of_sys cxx sys
     else
       ();
     check_ext_sys cxx vcod sys
 
   | D.Univ univ, T.Rst info ->
-    if univ.kind = Kind.Pre then () else failwith "Restriction type is not Kan";
+    if univ.kind = `Pre then () else failwith "Restriction type is not Kan";
     let ty = check_eval cx ty info.ty in
     check_ext_sys cx ty info.sys
 
   | D.Univ univ, T.CoR (tr, tr', oty) ->
-    if univ.kind = Kind.Pre then () else failwith "Co-restriction type is not known to be Kan";
+    if univ.kind = `Pre then () else failwith "Co-restriction type is not known to be Kan";
     let r = check_eval_dim cx tr in
     let r' = check_eval_dim cx tr' in
     begin
@@ -769,7 +769,7 @@ and check_eval cx ty tm =
   Cx.eval cx tm
 
 and check_ty cx ty =
-  let univ = D.make @@ D.Univ {kind = Kind.Pre; lvl = Lvl.Omega} in
+  let univ = D.make @@ D.Univ {kind = `Pre; lvl = `Omega} in
   check cx univ ty
 
 and check_eval_dim cx tr =

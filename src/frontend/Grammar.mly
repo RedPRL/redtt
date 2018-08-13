@@ -315,10 +315,10 @@ constrained:
 
 kind:
   | KAN
-    { Kind.Kan }
+    { `Kan }
   | PRE
-    { Kind.Pre }
-  | { Kind.Kan }
+    { `Pre }
+  | { `Kan }
 
 tm:
   | BULLET
@@ -332,7 +332,7 @@ tm:
   | LPR; UNIV; k = kind; i = NUMERAL; RPR
     { fun _env ->
       make_node $startpos $endpos @@
-      Tm.Univ {kind = k; lvl = Lvl.Const i} }
+      Tm.Univ {kind = k; lvl = `Const i} }
 
   | LPR; V; r = tm; ty0 = tm; ty1 = tm; equiv = tm; RPR
     { fun env ->
