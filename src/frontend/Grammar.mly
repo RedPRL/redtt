@@ -38,10 +38,16 @@ edecl:
     { E.Debug f }
 
   | DATA; dlbl = ATOM;
+    univ_spec = option(preceded(COLON, univ_spec));
     WHERE; option(PIPE);
     constrs = separated_list(PIPE, desc_constr)
     { let desc = List.map (fun constr -> constr dlbl) constrs in
-      E.Data (dlbl, {constrs = desc}) }
+      let kind, lvl =
+        match univ_spec with
+        | Some (k, l) -> k, l
+        | None -> `Kan, `Const 0
+      in
+      E.Data (dlbl, {constrs = desc; kind; lvl}) }
 
   | IMPORT; a = ATOM
     { E.Import a }

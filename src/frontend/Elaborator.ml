@@ -169,15 +169,15 @@ struct
   and elab_datatype env dlbl edesc =
     let rec go acc =
       function
-      | [] -> M.ret @@ Desc.{constrs = List.rev acc}
+      | [] -> M.ret acc
       | econstr :: econstrs ->
         elab_constr env dlbl acc econstr >>= fun constr ->
-        go (constr :: acc) econstrs
+        go Desc.{edesc with constrs = acc.constrs @ [constr]} econstrs
     in
-    go [] edesc.constrs
+    go Desc.{edesc with constrs = []} edesc.constrs
 
-  and elab_constr env dlbl constrs (clbl, constr) =
-    if List.exists (fun (lbl, _) -> clbl = lbl) constrs then
+  and elab_constr env dlbl desc (clbl, constr) =
+    if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
       failwith "Duplicate constructor in datatype";
 
     let open Desc in
@@ -205,7 +205,7 @@ struct
         in
         M.in_scopes psi @@
         begin
-          elab_constr_boundary env dlbl constrs (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
+          elab_constr_boundary env dlbl desc (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
           M.ret
             (clbl,
              {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
@@ -225,7 +225,7 @@ struct
 
     go Emp constr.const_specs
 
-  and elab_constr_boundary env dlbl constrs (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
+  and elab_constr_boundary env dlbl desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
     M.lift C.base_cx >>= fun cx ->
     let (module V) = Cx.evaluator cx in
     let module D = Domain in
@@ -247,29 +247,30 @@ struct
     in
 
     let cx' = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp) const_specs rec_specs dim_specs in
-    traverse (elab_constr_face env dlbl constrs) sys >>= fun bdry ->
-    Typing.check_constr_boundary_sys cx' dlbl {constrs} bdry;
+    traverse (elab_constr_face env dlbl desc) sys >>= fun bdry ->
+    Typing.check_constr_boundary_sys cx' dlbl desc bdry;
     M.ret bdry
 
-  and elab_constr_face env dlbl constrs (er0, er1, e) =
+  and elab_constr_face env dlbl desc (er0, er1, e) =
     elab_dim env er0 >>= bind_in_scope >>= fun r0 ->
     elab_dim env er1 >>= bind_in_scope >>= fun r1 ->
     M.in_scope (Name.fresh ()) (`R (r0, r1)) @@
     begin
-      elab_boundary_term env dlbl constrs e <<@> fun bt ->
+      elab_boundary_term env dlbl desc e <<@> fun bt ->
         r0, r1, bt
     end
 
-  and elab_boundary_term env dlbl constrs e =
+  and elab_boundary_term env dlbl desc e =
     match e.con with
     | E.Var (nm, _) ->
-      elab_boundary_cut env dlbl constrs nm Emp
+      elab_boundary_cut env dlbl desc nm Emp
     | E.Cut ({con = E.Var (nm, _)}, spine) ->
-      elab_boundary_cut env dlbl constrs nm spine
+      elab_boundary_cut env dlbl desc nm spine
     | _ ->
       failwith "TODO: elaborate_boundary_term"
 
-  and boundary_resolve_name env constrs name =
+  and boundary_resolve_name env desc name =
+    let open Desc in
     begin
       get_resolver env >>= fun renv ->
       match ResEnv.get name renv with
@@ -284,11 +285,11 @@ struct
     <+>
     begin
       M.ret () >>= fun _ ->
-      M.ret @@ `Constr (List.find (fun (lbl, _) -> name = lbl) constrs)
+      M.ret @@ `Constr (List.find (fun (lbl, _) -> name = lbl) desc.constrs)
     end
 
-  and elab_boundary_cut env dlbl constrs name spine =
-    boundary_resolve_name env constrs name >>= function
+  and elab_boundary_cut env dlbl desc name spine =
+    boundary_resolve_name env desc name >>= function
     | `Ix ix ->
       begin
         match spine with
@@ -318,7 +319,7 @@ struct
         | [], _ ->
           M.ret (Bwd.to_list acc, frms)
         | (_, Desc.Self) :: arg_tys, E.App e :: frms ->
-          elab_boundary_term env dlbl constrs e >>= fun bt ->
+          elab_boundary_term env dlbl desc e >>= fun bt ->
           go_args (acc #< bt) arg_tys frms
         | _ ->
           failwith "todo: go_args"
