@@ -172,13 +172,13 @@ struct
       | [] -> M.ret acc
       | econstr :: econstrs ->
         elab_constr env dlbl acc econstr >>= fun constr ->
-        go Desc.{edesc with constrs = acc.constrs @ [constr]} econstrs
+        go Desc.{acc with constrs = acc.constrs @ [constr]} econstrs
     in
     match edesc.kind with
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
     | _ ->
-      go Desc.{edesc with constrs = []} edesc.constrs
+      go Desc.{edesc with constrs = []; params = []} edesc.constrs
 
   and elab_constr env dlbl desc (clbl, constr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then

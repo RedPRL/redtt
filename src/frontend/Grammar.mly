@@ -47,7 +47,7 @@ edecl:
         | Some (k, l) -> k, l
         | None -> `Kan, `Const 0
       in
-      E.Data (dlbl, {constrs = desc; kind; lvl}) }
+      E.Data (dlbl, {constrs = desc; kind; lvl; params = []}) }
 
   | IMPORT; a = ATOM
     { E.Import a }
