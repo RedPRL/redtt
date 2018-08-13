@@ -167,32 +167,35 @@ struct
       M.ret env
 
   and elab_datatype env dlbl edesc =
-    let rec go cx acc vparams eparams econstrs =
+    let rec go cx acc (xs, vparams) eparams econstrs =
       match eparams, econstrs with
       | (lbl, epty) :: eparams, _ ->
         let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
         elab_chk env univ epty >>= bind_in_scope >>= fun pty ->
+        Format.eprintf "elab_datatype / param / %s / %a@." lbl Tm.pp0 pty;
         let x = Name.named @@ Some lbl in
-        M.in_scope x (`P pty) @@
-        let acc' = Desc.{acc with params = acc.params @ [(lbl, pty)]} in
-        let vty = Cx.eval cx pty in
-        let cx', vparam = Cx.ext_ty cx ~nm:(Some lbl) vty in
-        go cx' acc' (vparams @ [vparam]) eparams econstrs
+        M.in_scope x (`P pty) begin
+          let acc' = Desc.{acc with params = acc.params @ [(lbl, pty)]} in
+          let vty = Cx.eval cx pty in
+          let cx', vparam = Cx.ext_ty cx ~nm:(Some lbl) vty in
+          go cx' acc' (xs #< x, vparams @ [vparam]) eparams econstrs
+        end
+
+      | [], econstr :: econstrs ->
+        elab_constr env dlbl (xs, vparams) acc econstr >>= fun constr ->
+        go cx Desc.{acc with constrs = acc.constrs @ [constr]} (xs, vparams) eparams econstrs
 
       | [], [] -> M.ret acc
 
-      | [], econstr :: econstrs ->
-        elab_constr env dlbl vparams acc econstr >>= fun constr ->
-        go cx Desc.{acc with constrs = acc.constrs @ [constr]} vparams eparams econstrs
     in
     match edesc.kind with
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
     | _ ->
       M.lift C.base_cx >>= fun cx ->
-      go cx Desc.{edesc with constrs = []; params = []} [] edesc.params edesc.constrs
+      go cx Desc.{edesc with constrs = []; params = []} (Emp, []) edesc.params edesc.constrs
 
-  and elab_constr env dlbl params desc (clbl, constr) =
+  and elab_constr env dlbl (pxs, params) desc (clbl, constr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
       failwith "Duplicate constructor in datatype";
 
@@ -203,7 +206,8 @@ struct
       function
       | [] -> []
       | (lbl, x, ty) :: const_specs ->
-        let Tm.NB (_, ty') = Tm.bindn xs ty in
+        let Tm.NB (_, ty') = Tm.bindn (pxs <.> xs) ty in
+        Format.eprintf "abstracttele: %s / %a => %a@." lbl Tm.pp0 ty Tm.pp0 ty';
         (lbl, ty') :: abstract_tele (xs #< x) const_specs
     in
 
@@ -212,7 +216,7 @@ struct
       | [] ->
         let const_specs = abstract_tele Emp @@ Bwd.to_list acc in
         (* TODO: when self args are more complex, we'll need to abstract them over
-           the parameters too. *)
+           the constant arguments too. *)
         traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
 
         let psi =
@@ -224,7 +228,7 @@ struct
           elab_constr_boundary env dlbl params desc (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
           M.ret
             (clbl,
-             {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
+             {const_specs;
               rec_specs;
               dim_specs = constr.dim_specs;
               boundary})
@@ -232,7 +236,7 @@ struct
 
       | (lbl, ety) :: const_specs ->
         let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
-        elab_chk env univ ety >>= bind_in_scope >>= fun pty ->
+        elab_chk env univ ety >>=fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
         go (acc #< (lbl, x, pty)) const_specs
@@ -870,14 +874,15 @@ struct
       begin
         match exp.con with
         | E.Var (clbl, _) ->
+          elab_mode_switch_cut env exp frms ty
+          <+>
           begin
             M.lift C.base_cx >>= fun cx ->
             let sign = Cx.globals cx in
             let desc = GlobalEnv.lookup_datatype data.dlbl sign in
             let constr = Desc.lookup_constr clbl desc in
-            elab_intro env data.dlbl clbl constr frms
+            elab_intro env data.dlbl (desc.params, data.params) clbl constr frms
           end
-          <+> elab_mode_switch_cut env exp frms ty
 
         | _ ->
           elab_mode_switch_cut env exp frms ty
@@ -901,19 +906,21 @@ struct
     | _ ->
       elab_mode_switch_cut env exp frms ty
 
-  and elab_intro env dlbl clbl constr frms =
+  and elab_intro env dlbl (param_specs, params) clbl constr frms =
+    (* Is this backwards? *)
+    let params' = List.map2 (fun (_, ty) tm -> ty, tm) param_specs params in
     let rec go_const_args acc const_specs frms =
       match const_specs, frms with
       | [], _ ->
         M.ret (List.rev_map snd acc, frms)
       | (_, ty) :: const_specs, E.App e :: frms ->
-        (* TODO: might be backwards *)
-        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
+        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) (List.rev @@ params' @ acc) @@ Tm.shift 0 in
         let ty' = Tm.subst sub ty in
+        normalize_ty ty' >>= fun ty' ->
         elab_chk env ty' e >>= fun t ->
         go_const_args ((ty', t) :: acc) const_specs frms
       | _ ->
-        failwith "elab_intro: malformed parameters"
+        failwith "elab_intro: malformed constant arguments"
     in
     let rec go_rec_args rec_specs dims frms =
       match rec_specs, dims, frms with
@@ -922,8 +929,7 @@ struct
       | [], _ :: dims, E.App r :: frms ->
         (fun x xs -> x :: xs) <@>> elab_dim env r <*> go_rec_args rec_specs dims frms
       | (_, Desc.Self) :: rec_specs, dims, E.App e :: frms ->
-        (* TODO[params] *)
-        let self_ty = Tm.make @@ Tm.Data {dlbl; params = []} in
+        let self_ty = Tm.make @@ Tm.Data {dlbl; params = params} in
         (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_rec_args rec_specs dims frms
       | _ ->
         failwith "todo: go_args"
@@ -946,7 +952,7 @@ struct
         failwith "elab_data: malformed parameters"
     in
     go [] desc.params (Bwd.to_list frms) <<@> fun params ->
-      Tm.make @@ Tm.Data {dlbl; params }
+      Tm.make @@ Tm.Data {dlbl; params}
 
   and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (ty', cmd) ->

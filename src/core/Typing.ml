@@ -327,7 +327,7 @@ let rec check cx ty tm =
     check cx' ty t1
 
   | _ ->
-    (* Format.eprintf "Failed to check term %a@." (Tm.pp (CxUtil.ppenv cx)) tm; *)
+    (* Format.eprintf "Failed to check term %a >: %a@." D.pp_value ty (Tm.pp (Cx.ppenv cx)) tm; *)
     failwith "Type error"
 
 and check_constr cx dlbl param_specs constr params tms =
@@ -337,17 +337,17 @@ and check_constr cx dlbl param_specs constr params tms =
     match param_specs, const_specs, rec_specs, dim_specs, params, tms with
     | [], [], rec_specs, dim_specs, _, _->
       let tms, trs = ListUtil.split (List.length rec_specs) tms in
-      List.iter2 (fun (_, Desc.Self) tm -> check cx vdataty tm) rec_specs tms;
-      List.iter2 (fun _ tm -> check_dim cx tm) dim_specs trs;
+      List.iter2 (fun (_, Desc.Self) tm -> check cx' vdataty tm) rec_specs tms;
+      List.iter2 (fun _ tm -> check_dim cx' tm) dim_specs trs;
     | [], (lbl, ty) :: const_specs, rec_specs, dim_specs, _, tm :: tms ->
       let vty = Cx.eval cx' ty in
-      let varg = check_eval cx vty tm in
-      let cx' = Cx.def cx ~nm:(Some lbl) ~ty:vty ~el:varg in
-      go cx' param_specs const_specs rec_specs dim_specs params tms
+      let varg = check_eval cx' vty tm in
+      let cx'' = Cx.def cx' ~nm:(Some lbl) ~ty:vty ~el:varg in
+      go cx'' param_specs const_specs rec_specs dim_specs params tms
     | (lbl, ty) :: param_specs, _, _, _, pv :: params, _ ->
       let vty = Cx.eval cx' ty in
-      let cx' = Cx.def cx ~nm:(Some lbl) ~ty:vty ~el:pv in
-      go cx' param_specs const_specs rec_specs dim_specs params tms
+      let cx'' = Cx.def cx' ~nm:(Some lbl) ~ty:vty ~el:pv in
+      go cx'' param_specs const_specs rec_specs dim_specs params tms
     | _ -> failwith "constructor arguments malformed"
   in
   go cx param_specs constr.const_specs constr.rec_specs constr.dim_specs params tms
