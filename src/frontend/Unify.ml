@@ -372,11 +372,11 @@ let evaluator =
   base_cx >>= fun cx ->
   ret (cx, Cx.evaluator cx)
 
-let inst_ty_bnd bnd (arg_ty, arg) =
+let inst_ty_bnd bnd (rec_spec, arg) =
   base_cx >>= fun cx ->
   let Tm.B (nm, tm) = bnd in
   let varg = Cx.eval cx arg in
-  let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
+  let lcx = Cx.def cx ~nm ~ty:rec_spec ~el:varg in
   ret @@ Cx.quote_ty cx @@ Cx.eval lcx tm
 
 let eval tm =
@@ -384,11 +384,11 @@ let eval tm =
   ret @@ Cx.eval cx tm
 
 
-let inst_bnd (ty_clo, tm_bnd) (arg_ty, arg) =
+let inst_bnd (ty_clo, tm_bnd) (rec_spec, arg) =
   evaluator >>= fun (cx, (module V)) ->
   let Tm.B (nm, tm) = tm_bnd in
   let varg = Cx.eval cx arg in
-  let lcx = Cx.def cx ~nm ~ty:arg_ty ~el:varg in
+  let lcx = Cx.def cx ~nm ~ty:rec_spec ~el:varg in
   let vty = V.inst_clo ty_clo varg in
   ret @@ Cx.quote cx ~ty:vty @@ Cx.eval lcx tm
 
@@ -592,7 +592,7 @@ let restriction_subtype ty0 sys0 ty1 sys1 =
 (* invariant: will not be called on inequations which are already reflexive *)
 let rec subtype ty0 ty1 =
   if ty0 = ty1 then ret () else
-    let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+    let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
     match Tm.unleash ty0, Tm.unleash ty1 with
     | Tm.Pi (dom0, cod0), Tm.Pi (dom1, cod1) ->
       let x = Name.fresh () in
@@ -849,7 +849,7 @@ let rec lower tele alpha ty =
     ret false
 
 let is_reflexive q =
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+  let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
   check_eq ~ty:univ q.ty0 q.ty1 >>= function
   | `Ok ->
     begin
@@ -905,7 +905,7 @@ let rec solver prob =
           end
 
         | `Tw (ty0, ty1) ->
-          let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre in
+          let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
           begin
             check_eq ~ty:univ ty0 ty1 >>= function
             | `Ok ->

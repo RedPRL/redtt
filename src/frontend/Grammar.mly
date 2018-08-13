@@ -36,13 +36,30 @@ edecl:
     { E.Define (a, `Opaque, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
-  | DATA; dlbl = ATOM; WHERE; option(PIPE); constrs = separated_list(PIPE, desc_constr)
+
+  | DATA; dlbl = ATOM;
+    univ_spec = option(preceded(COLON, univ_spec));
+    WHERE; option(PIPE);
+    constrs = separated_list(PIPE, desc_constr)
     { let desc = List.map (fun constr -> constr dlbl) constrs in
-      E.Data (dlbl, {constrs = desc}) }
+      let kind, lvl =
+        match univ_spec with
+        | Some (k, l) -> k, l
+        | None -> `Kan, `Const 0
+      in
+      E.Data (dlbl, {constrs = desc; kind; lvl}) }
+
   | IMPORT; a = ATOM
     { E.Import a }
   | QUIT
     { E.Quit }
+
+univ_spec:
+  | TYPE; k = kind
+    { (k, `Const 0) }
+  | TYPE; k = kind; CARET; l = NUMERAL
+    { (k, `Const l) }
+
 
 debug_filter:
   | { `All }
@@ -59,8 +76,8 @@ atomic_econ:
     { E.Hole a }
   | HOLE_NAME; LBR; e = eterm; RBR
     { E.Guess e }
-  | TYPE; k = kind
-    { E.Type k }
+  | spec = univ_spec
+    { let k, l = spec in E.Type (k, l) }
   | LGL; es = separated_list(COMMA, eterm); RGL
     { E.Tuple es }
   | LPR; e = eterm; RPR
@@ -315,10 +332,10 @@ constrained:
 
 kind:
   | KAN
-    { Kind.Kan }
+    { `Kan }
   | PRE
-    { Kind.Pre }
-  | { Kind.Kan }
+    { `Pre }
+  | { `Kan }
 
 tm:
   | BULLET
@@ -332,7 +349,7 @@ tm:
   | LPR; UNIV; k = kind; i = NUMERAL; RPR
     { fun _env ->
       make_node $startpos $endpos @@
-      Tm.Univ {kind = k; lvl = Lvl.Const i} }
+      Tm.Univ {kind = k; lvl = `Const i} }
 
   | LPR; V; r = tm; ty0 = tm; ty1 = tm; equiv = tm; RPR
     { fun env ->

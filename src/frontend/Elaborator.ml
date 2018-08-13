@@ -38,7 +38,7 @@ struct
     | Chk of ty
     | Inf
 
-  let univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Pre
+  let univ = Tm.univ ~lvl:`Omega ~kind:`Pre
 
   let get_resolver env =
     let rec go_globals renv  =
@@ -169,19 +169,23 @@ struct
   and elab_datatype env dlbl edesc =
     let rec go acc =
       function
-      | [] -> M.ret @@ Desc.{constrs = List.rev acc}
+      | [] -> M.ret acc
       | econstr :: econstrs ->
         elab_constr env dlbl acc econstr >>= fun constr ->
-        go (constr :: acc) econstrs
+        go Desc.{edesc with constrs = acc.constrs @ [constr]} econstrs
     in
-    go [] edesc.constrs
+    match edesc.kind with
+    | `Reg ->
+      failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
+    | _ ->
+      go Desc.{edesc with constrs = []} edesc.constrs
 
-  and elab_constr env dlbl constrs (clbl, constr) =
-    if List.exists (fun (lbl, _) -> clbl = lbl) constrs then
+  and elab_constr env dlbl desc (clbl, constr) =
+    if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
       failwith "Duplicate constructor in datatype";
 
     let open Desc in
-    let elab_arg_ty (x, Self) = M.ret (x, Self) in
+    let elab_rec_spec (x, Self) = M.ret (x, Self) in
 
     let rec abstract_tele xs (ps : _ list) =
       match ps with
@@ -197,7 +201,7 @@ struct
         let const_specs = abstract_tele Emp @@ Bwd.to_list acc in
         (* TODO: when self args are more complex, we'll need to abstract them over
            the parameters too. *)
-        traverse elab_arg_ty constr.rec_specs >>= fun rec_specs ->
+        traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
 
         let psi =
           List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) rec_specs
@@ -205,7 +209,7 @@ struct
         in
         M.in_scopes psi @@
         begin
-          elab_constr_boundary env dlbl constrs (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
+          elab_constr_boundary env dlbl desc (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
           M.ret
             (clbl,
              {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
@@ -216,8 +220,8 @@ struct
 
       | (lbl, ety) :: const_specs ->
         (* TODO: support higher universes *)
-        let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
-        elab_chk env univ0 ety >>= bind_in_scope >>= fun pty ->
+        let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
+        elab_chk env univ ety >>= bind_in_scope >>= fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
         go (acc #< (lbl, x, pty)) const_specs
@@ -225,7 +229,7 @@ struct
 
     go Emp constr.const_specs
 
-  and elab_constr_boundary env dlbl constrs (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
+  and elab_constr_boundary env dlbl desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
     M.lift C.base_cx >>= fun cx ->
     let (module V) = Cx.evaluator cx in
     let module D = Domain in
@@ -247,29 +251,30 @@ struct
     in
 
     let cx' = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp) const_specs rec_specs dim_specs in
-    traverse (elab_constr_face env dlbl constrs) sys >>= fun bdry ->
-    Typing.check_constr_boundary_sys cx' dlbl {constrs} bdry;
+    traverse (elab_constr_face env dlbl desc) sys >>= fun bdry ->
+    Typing.check_constr_boundary_sys cx' dlbl desc bdry;
     M.ret bdry
 
-  and elab_constr_face env dlbl constrs (er0, er1, e) =
+  and elab_constr_face env dlbl desc (er0, er1, e) =
     elab_dim env er0 >>= bind_in_scope >>= fun r0 ->
     elab_dim env er1 >>= bind_in_scope >>= fun r1 ->
     M.in_scope (Name.fresh ()) (`R (r0, r1)) @@
     begin
-      elab_boundary_term env dlbl constrs e <<@> fun bt ->
+      elab_boundary_term env dlbl desc e <<@> fun bt ->
         r0, r1, bt
     end
 
-  and elab_boundary_term env dlbl constrs e =
+  and elab_boundary_term env dlbl desc e =
     match e.con with
     | E.Var (nm, _) ->
-      elab_boundary_cut env dlbl constrs nm Emp
+      elab_boundary_cut env dlbl desc nm Emp
     | E.Cut ({con = E.Var (nm, _)}, spine) ->
-      elab_boundary_cut env dlbl constrs nm spine
+      elab_boundary_cut env dlbl desc nm spine
     | _ ->
       failwith "TODO: elaborate_boundary_term"
 
-  and boundary_resolve_name env constrs name =
+  and boundary_resolve_name env desc name =
+    let open Desc in
     begin
       get_resolver env >>= fun renv ->
       match ResEnv.get name renv with
@@ -284,11 +289,11 @@ struct
     <+>
     begin
       M.ret () >>= fun _ ->
-      M.ret @@ `Constr (List.find (fun (lbl, _) -> name = lbl) constrs)
+      M.ret @@ `Constr (List.find (fun (lbl, _) -> name = lbl) desc.constrs)
     end
 
-  and elab_boundary_cut env dlbl constrs name spine =
-    boundary_resolve_name env constrs name >>= function
+  and elab_boundary_cut env dlbl desc name spine =
+    boundary_resolve_name env desc name >>= function
     | `Ix ix ->
       begin
         match spine with
@@ -313,13 +318,13 @@ struct
           failwith "elab_intro: malformed parameters"
       in
 
-      let rec go_args acc arg_tys frms =
-        match arg_tys, frms with
+      let rec go_args acc rec_specs frms =
+        match rec_specs, frms with
         | [], _ ->
           M.ret (Bwd.to_list acc, frms)
-        | (_, Desc.Self) :: arg_tys, E.App e :: frms ->
-          elab_boundary_term env dlbl constrs e >>= fun bt ->
-          go_args (acc #< bt) arg_tys frms
+        | (_, Desc.Self) :: rec_specs, E.App e :: frms ->
+          elab_boundary_term env dlbl desc e >>= fun bt ->
+          go_args (acc #< bt) rec_specs frms
         | _ ->
           failwith "todo: go_args"
       in
@@ -543,12 +548,12 @@ struct
       let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
       elab_chk env cod' {e with con = E.Tuple es} <<@> Tm.cons tm0
 
-    | Tm.Univ info, Type kind ->
+    | Tm.Univ info, Type (kind, lvl) ->
       begin
-        if Lvl.greater info.lvl (Lvl.Const 0) then
+        if Lvl.greater info.lvl lvl then
           match Tm.unleash ty with
           | Tm.Univ _ ->
-            M.ret @@ Tm.univ ~kind ~lvl:(Lvl.Const 0)
+            M.ret @@ Tm.univ ~kind ~lvl
           | _ ->
             failwith "Type"
         else
@@ -561,7 +566,7 @@ struct
     | _, E.HCom info ->
       elab_dim env info.r >>= fun r ->
       elab_dim env info.r' >>= fun r' ->
-      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kan in
+      let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       begin
         M.lift @@ C.check ~ty:kan_univ ty >>= function
         | `Ok ->
@@ -704,7 +709,7 @@ struct
         M.lift C.base_cx <<@> fun cx ->
           let sign = Cx.globals cx in
           let _ = GlobalEnv.lookup_datatype name sign in
-          let univ0 = Tm.univ ~kind:Kind.Kan ~lvl:(Lvl.Const 0) in
+          let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
           univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
       end
 
@@ -728,7 +733,7 @@ struct
       elab_dim env info.r >>= fun tr ->
       elab_dim env info.r' >>= fun tr' ->
       let x = Name.fresh () in
-      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
+      let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
       elab_chk env univ_fam info.fam >>= fun fam ->
       begin
@@ -746,7 +751,7 @@ struct
       elab_dim env info.r >>= fun tr ->
       elab_dim env info.r' >>= fun tr' ->
       let x = Name.fresh () in
-      let kan_univ = Tm.univ ~lvl:Lvl.Omega ~kind:Kind.Kan in
+      let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
       elab_chk env univ_fam info.fam >>= fun fam ->
       M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr] >>= fun (_, fam_r) ->

@@ -1,4 +1,4 @@
-type 'a arg_ty =
+type 'a rec_spec =
   | Self
 
 
@@ -23,14 +23,16 @@ end
 
 type ('a, 'b) constr =
   {const_specs : (string * 'a) list;
-   rec_specs : (string * 'a arg_ty) list;
+   rec_specs : (string * 'a rec_spec) list;
    dim_specs : string list;
    boundary : ('a, 'b) Boundary.sys}
 
 
 (** A datatype description is just a list of named constructors. *)
 type ('a, 'b) desc =
-  {constrs : (con_label * ('a, 'b) constr) list}
+  {kind : Kind.t;
+   lvl : Lvl.t;
+   constrs : (con_label * ('a, 'b) constr) list}
 
 exception ConstructorNotFound of con_label
 
