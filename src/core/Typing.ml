@@ -223,7 +223,7 @@ let rec check cx ty tm =
   | D.Data data, T.Intro (dlbl, clbl, args) when data.dlbl = dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     let constr = Desc.lookup_constr clbl desc in
-    check_constr cx dlbl constr args
+    check_constr cx dlbl desc.params constr data.params args
 
 
   | D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
@@ -330,23 +330,27 @@ let rec check cx ty tm =
     (* Format.eprintf "Failed to check term %a@." (Tm.pp (CxUtil.ppenv cx)) tm; *)
     failwith "Type error"
 
-and check_constr cx dlbl constr tms =
-  (* TODO[params] *)
-  let vdataty = D.make @@ D.Data {dlbl; params = []} in
-  let rec go cx' const_specs rec_specs dim_specs tms =
-    match const_specs, rec_specs, dim_specs, tms with
-    | [], rec_specs, dim_specs, _ ->
+and check_constr cx dlbl param_specs constr params tms =
+  (* Tentative *)
+  let vdataty = D.make @@ D.Data {dlbl; params} in
+  let rec go cx' param_specs const_specs rec_specs dim_specs params tms =
+    match param_specs, const_specs, rec_specs, dim_specs, params, tms with
+    | [], [], rec_specs, dim_specs, _, _->
       let tms, trs = ListUtil.split (List.length rec_specs) tms in
       List.iter2 (fun (_, Desc.Self) tm -> check cx vdataty tm) rec_specs tms;
       List.iter2 (fun _ tm -> check_dim cx tm) dim_specs trs;
-    | (plbl, ty) :: const_specs, rec_specs, dim_specs, tm :: tms ->
+    | [], (lbl, ty) :: const_specs, rec_specs, dim_specs, _, tm :: tms ->
       let vty = Cx.eval cx' ty in
       let varg = check_eval cx vty tm in
-      let cx' = Cx.def cx ~nm:(Some plbl) ~ty:vty ~el:varg in
-      go cx' const_specs rec_specs dim_specs tms
+      let cx' = Cx.def cx ~nm:(Some lbl) ~ty:vty ~el:varg in
+      go cx' param_specs const_specs rec_specs dim_specs params tms
+    | (lbl, ty) :: param_specs, _, _, _, pv :: params, _ ->
+      let vty = Cx.eval cx' ty in
+      let cx' = Cx.def cx ~nm:(Some lbl) ~ty:vty ~el:pv in
+      go cx' param_specs const_specs rec_specs dim_specs params tms
     | _ -> failwith "constructor arguments malformed"
   in
-  go cx constr.const_specs constr.rec_specs constr.dim_specs tms
+  go cx param_specs constr.const_specs constr.rec_specs constr.dim_specs params tms
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
