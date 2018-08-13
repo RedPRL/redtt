@@ -930,13 +930,21 @@ struct
     go_rec_args constr.rec_specs constr.dim_specs frms >>= fun targs ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
 
-  and elab_data _env dlbl _desc frms =
-    match frms with
-    | Emp ->
-      (* TODO[params] *)
-      M.ret @@ Tm.make @@ Tm.Data {dlbl; params = []}
-    | _ ->
-      failwith "elab_data: TODO, case for >0 frames"
+  and elab_data env dlbl desc frms =
+    let rec go acc param_specs frms =
+      match param_specs, frms with
+      | (_, pty) :: param_specs, E.App e :: frms ->
+        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
+        let pty' = Tm.subst sub pty in
+        elab_chk env pty' e >>= fun t ->
+        go ((pty', t) :: acc) param_specs frms
+      | [], [] ->
+        M.ret @@ List.rev_map snd acc
+      | _ ->
+        failwith "elab_data: malformed parameters"
+    in
+    go [] desc.params (Bwd.to_list frms) <<@> fun params ->
+      Tm.make @@ Tm.Data {dlbl; params }
 
   and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (ty', cmd) ->
