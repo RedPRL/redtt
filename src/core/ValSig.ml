@@ -62,7 +62,7 @@ sig
   val prev : tick -> value -> value
   val modal_open : value -> value
 
-  val elim_data : Desc.data_label -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
+  val elim_data : Desc.data_label -> params:value list -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
 
   val car : value -> value
   val cdr : value -> value

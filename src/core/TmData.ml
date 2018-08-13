@@ -77,7 +77,7 @@ and 'a frame =
   | Prev of 'a
   | Open
 
-  | Elim of {dlbl : Desc.data_label; mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
+  | Elim of {dlbl : Desc.data_label; params : 'a list; mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine

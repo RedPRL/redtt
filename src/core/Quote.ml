@@ -490,8 +490,7 @@ struct
     | Elim elim0, Elim elim1 ->
       if elim0.dlbl = elim1.dlbl then
         let dlbl = elim0.dlbl in
-        (* TODO[params] *)
-        let data_ty = D.make @@ D.Data {dlbl; params = []} in
+        let data_ty = D.make @@ D.Data {dlbl; params = elim0.params} in
         let mot =
           let var = generic env data_ty in
           let env' = Env.succ env in
@@ -536,8 +535,9 @@ struct
           clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)
         in
 
+        let params = equate_data_params env desc elim0.params elim1.params in
         let clauses = List.map quote_clause desc.constrs in
-        let frame = Tm.Elim {dlbl; mot; clauses} in
+        let frame = Tm.Elim {dlbl; params; mot; clauses} in
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
         failwith "Datatype mismatch"

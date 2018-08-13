@@ -210,7 +210,7 @@ let rec tac_lambda names tac ty =
 
 let unleash_data ty =
   match Tm.unleash ty with
-  | Tm.Data data -> data.dlbl
+  | Tm.Data data -> data.dlbl, data.params
   | _ ->
     Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
@@ -249,14 +249,14 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
       Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
     in
 
-    let dlbl = unleash_data data_ty in
-    (* TODO[params] *)
-    let data_vty = D.make @@ D.Data {dlbl; params = []} in
 
+    let dlbl, tparams = unleash_data data_ty in
     begin
-      M.lift C.base_cx <<@> fun cx ->
-        GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
-    end >>= fun desc ->
+      M.lift C.base_cx >>= fun cx ->
+      M.ret (GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx, List.map (Cx.eval cx) tparams)
+    end >>= fun (desc, params) ->
+
+    let data_vty = D.make @@ D.Data {dlbl; params} in
 
     (* Add holes for any missing clauses *)
     let clauses =
@@ -348,7 +348,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             let rho = D.Env.act phi @@ Cx.env cx in
             let mot = V.make_closure rho bmot in
             let clauses = List.map (fun (clbl, nbnd) -> clbl, D.NClo {nbnd; rho}) earlier_clauses in
-            V.elim_data dlbl ~mot:mot ~scrut:scrut ~clauses
+            V.elim_data dlbl ~params ~mot:mot ~scrut:scrut ~clauses
           in
           Face.map elim_face @@
           let env0 = D.Env.clear_locals @@ Cx.env cx in
@@ -394,4 +394,4 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     in
     M.ret @@ Tm.up @@
     Tm.ann ~ty:data_ty ~tm:scrut
-    @< Tm.Elim {dlbl; mot = bmot; clauses = tclauses}
+    @< Tm.Elim {dlbl; params = tparams; mot = bmot; clauses = tclauses}

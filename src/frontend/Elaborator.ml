@@ -207,7 +207,6 @@ struct
       | [] -> []
       | (lbl, x, ty) :: const_specs ->
         let Tm.NB (_, ty') = Tm.bindn (pxs <.> xs) ty in
-        Format.eprintf "abstracttele: %s / %a => %a@." lbl Tm.pp0 ty Tm.pp0 ty';
         (lbl, ty') :: abstract_tele (xs #< x) const_specs
     in
 

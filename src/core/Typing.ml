@@ -570,6 +570,8 @@ and infer_spine cx hd =
       let desc = V.Sig.lookup_datatype info.dlbl in
       let used_labels = Hashtbl.create 10 in
 
+      (* TODO: check params *)
+      let params = List.map (Cx.eval cx) info.params in
 
       let check_clause earlier_clauses lbl constr =
         let open Desc in
@@ -607,8 +609,9 @@ and infer_spine cx hd =
           let elim_face r r' scrut =
             let phi = I.equate r r' in
             let mot = D.Clo.act phi mot_clo in
+            let params = List.map (D.Value.act phi) params in
             let clauses = List.map (fun (lbl, nclo) -> lbl, D.NClo.act phi nclo) earlier_clauses in
-            V.elim_data info.dlbl ~mot ~scrut ~clauses
+            V.elim_data info.dlbl ~params ~mot ~scrut ~clauses
           in
           Face.map elim_face @@
           let env0 = D.Env.clear_locals (Cx.env cx) in

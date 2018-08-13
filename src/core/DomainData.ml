@@ -73,6 +73,7 @@ and neu =
 
   | Elim of
       {dlbl : Desc.data_label;
+       params : value list;
        mot : clo;
        neu : neu;
        clauses : (Desc.con_label * nclo) list}
