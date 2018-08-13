@@ -210,7 +210,7 @@ let rec tac_lambda names tac ty =
 
 let unleash_data ty =
   match Tm.unleash ty with
-  | Tm.Data dlbl -> dlbl
+  | Tm.Data data -> data.dlbl
   | _ ->
     Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"

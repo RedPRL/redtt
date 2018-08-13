@@ -722,7 +722,7 @@ struct
           let sign = Cx.globals cx in
           let _ = GlobalEnv.lookup_datatype name sign in
           let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-          univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
+          univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {dlbl = name})
       end
 
     | E.Quo tmfam ->
@@ -870,16 +870,16 @@ struct
 
   and elab_chk_cut env exp frms ty =
     match Tm.unleash ty with
-    | Tm.Data dlbl ->
+    | Tm.Data data ->
       begin
         match exp.con with
         | E.Var (clbl, _) ->
           begin
             M.lift C.base_cx >>= fun cx ->
             let sign = Cx.globals cx in
-            let desc = GlobalEnv.lookup_datatype dlbl sign in
+            let desc = GlobalEnv.lookup_datatype data.dlbl sign in
             let constr = Desc.lookup_constr clbl desc in
-            elab_intro env dlbl clbl constr frms
+            elab_intro env data.dlbl clbl constr frms
           end
           <+> elab_mode_switch_cut env exp frms ty
 
@@ -911,7 +911,7 @@ struct
       | [], _ :: dims, E.App r :: frms ->
         (fun x xs -> x :: xs) <@>> elab_dim env r <*> go_rec_args rec_specs dims frms
       | (_, Desc.Self) :: rec_specs, dims, E.App e :: frms ->
-        let self_ty = Tm.make @@ Tm.Data dlbl in
+        let self_ty = Tm.make @@ Tm.Data {dlbl} in
         (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_rec_args rec_specs dims frms
       | _ ->
         failwith "todo: go_args"

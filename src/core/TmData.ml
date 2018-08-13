@@ -47,7 +47,7 @@ type 'a tmf =
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
-  | Data of Desc.data_label
+  | Data of {dlbl : Desc.data_label}
   | Intro of Desc.data_label * Desc.con_label * 'a list
 
 

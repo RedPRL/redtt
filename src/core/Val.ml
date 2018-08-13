@@ -1603,7 +1603,8 @@ struct
       let v = eval rho t in
       make @@ Shut v
 
-    | Tm.Data dlbl ->
+    | Tm.Data data ->
+      let dlbl = data.dlbl in
       make @@ Data {dlbl}
 
     | Tm.Intro (dlbl, clbl, args) ->

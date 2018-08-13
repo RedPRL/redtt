@@ -742,8 +742,8 @@ let rec pp env fmt =
     | Up cmd ->
       pp_cmd env fmt cmd
 
-    | Data lbl ->
-      Desc.pp_data_label fmt lbl
+    | Data data ->
+      Desc.pp_data_label fmt data.dlbl
 
     | Intro (_dlbl, clbl, args) ->
       begin

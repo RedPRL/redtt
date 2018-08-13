@@ -491,7 +491,7 @@ let is_orthogonal q =
   | Tm.Ext _, Tm.Data _ -> true
   | Tm.Ext _, Tm.Rst _ -> true
 
-  | Tm.Data dlbl0, Tm.Data dlbl1 -> not (dlbl0 = dlbl1)
+  | Tm.Data data0, Tm.Data data1 -> not (data0.dlbl = data1.dlbl)
   | Tm.Intro (_, clbl0, _), Tm.Intro (_, clbl1, _) -> not (clbl0 = clbl1)
 
   | _ -> false

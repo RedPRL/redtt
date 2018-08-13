@@ -213,8 +213,8 @@ let rec check cx ty tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-  | D.Univ univ, T.Data dlbl ->
-    let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+  | D.Univ univ, T.Data data ->
+    let desc = GlobalEnv.lookup_datatype data.dlbl @@ Cx.globals cx in
     if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
       ()
     else
