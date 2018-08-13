@@ -98,8 +98,12 @@ and pp_con fmt : con -> unit =
   | Shut _ ->
     Format.fprintf fmt "<shut>"
   | Data data ->
-    Uuseg_string.pp_utf_8 fmt data.dlbl
+    (* TODO: handle case where params empty more gracefully *)
+    Format.fprintf fmt "@[<hv1>(%a %a)@]"
+      Uuseg_string.pp_utf_8 data.dlbl
+      pp_values data.params
   | Intro info ->
+    (* TODO: handle case where const_args, rec_args or rs empty more gracefully *)
     Format.fprintf fmt "@[<hv1>(%a %a %a %a)@]"
       Uuseg_string.pp_utf_8 info.clbl
       pp_values info.const_args

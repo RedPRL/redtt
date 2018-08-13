@@ -373,8 +373,10 @@ struct
     | Shut v ->
       make @@ Shut (Value.act phi v)
 
-    | Data lbl ->
-      make @@ Data lbl
+    | Data data ->
+      let dlbl = data.dlbl in
+      let params = List.map (Value.act phi) data.params in
+      make @@ Data {dlbl; params}
 
     | Intro info ->
       begin
@@ -774,15 +776,18 @@ struct
       args
 
   (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
-  and rigid_coe_data_intro dir abs ~dlbl ~clbl ~const_args ~rec_args ~rs =
+  and rigid_coe_data_intro dir abs ~dlbl ~params ~clbl ~const_args ~rec_args ~rs =
     let x = Name.fresh () in
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
 
     let r, r' = Dir.unleash dir in
 
+    (* TODO: check if this is backwards *)
+    let env0 = Env.push_many (List.map (fun v -> `Val v) params) Env.emp in
+
     let make_const_args dir =
-      multi_coe Env.emp dir (x, constr.const_specs) const_args
+      multi_coe env0 dir (x, constr.const_specs) const_args
     in
 
     let coe_rec_arg dir _arg_spec arg =
@@ -793,7 +798,8 @@ struct
 
     let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.rec_specs rec_args in
     let intro =
-      make_intro Env.emp ~dlbl ~clbl
+      (* should this be [env0] or [Env.emp]? *)
+      make_intro env0 ~dlbl ~clbl
         ~const_args:(make_const_args (`Ok dir))
         ~rec_args:(make_rec_args (`Ok dir))
         ~rs
@@ -824,7 +830,7 @@ struct
     let _, tyx = Abs.unleash1 abs in
     match unleash tyx, unleash el with
     | Data data, Intro info ->
-      rigid_coe_data_intro dir abs ~dlbl:data.dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
+      rigid_coe_data_intro dir abs ~dlbl:data.dlbl ~params:data.params ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
 
     | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
@@ -1605,8 +1611,8 @@ struct
 
     | Tm.Data data ->
       let dlbl = data.dlbl in
-      (* TODO[params] *)
-      make @@ Data {dlbl; params = []}
+      let params = List.map (eval rho) data.params in
+      make @@ Data {dlbl; params}
 
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
@@ -1846,7 +1852,7 @@ struct
 
   and unleash_data v =
     match unleash v with
-    | Data data -> data.dlbl
+    | Data data -> data.dlbl, data.params
     | Rst rst -> unleash_data rst.ty
     | _ ->
       raise @@ E (UnleashDataError v)
