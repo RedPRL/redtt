@@ -174,7 +174,11 @@ struct
         elab_constr env dlbl acc econstr >>= fun constr ->
         go Desc.{edesc with constrs = acc.constrs @ [constr]} econstrs
     in
-    go Desc.{edesc with constrs = []} edesc.constrs
+    match edesc.kind with
+    | `Reg ->
+      failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
+    | _ ->
+      go Desc.{edesc with constrs = []} edesc.constrs
 
   and elab_constr env dlbl desc (clbl, constr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
@@ -216,8 +220,8 @@ struct
 
       | (lbl, ety) :: const_specs ->
         (* TODO: support higher universes *)
-        let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-        elab_chk env univ0 ety >>= bind_in_scope >>= fun pty ->
+        let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
+        elab_chk env univ ety >>= bind_in_scope >>= fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
         go (acc #< (lbl, x, pty)) const_specs
