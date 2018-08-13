@@ -167,18 +167,22 @@ struct
       M.ret env
 
   and elab_datatype env dlbl edesc =
-    let rec go acc =
-      function
-      | [] -> M.ret acc
-      | econstr :: econstrs ->
+    let rec go acc eparams econstrs =
+      match eparams, econstrs with
+      | (_lbl, _epty) :: _eparams, _ ->
+        failwith "elab_datatype"
+
+      | [], [] -> M.ret acc
+
+      | [], econstr :: econstrs ->
         elab_constr env dlbl acc econstr >>= fun constr ->
-        go Desc.{acc with constrs = acc.constrs @ [constr]} econstrs
+        go Desc.{acc with constrs = acc.constrs @ [constr]} eparams econstrs
     in
     match edesc.kind with
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
     | _ ->
-      go Desc.{edesc with constrs = []; params = []} edesc.constrs
+      go Desc.{edesc with constrs = []; params = []} edesc.params edesc.constrs
 
   and elab_constr env dlbl desc (clbl, constr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then

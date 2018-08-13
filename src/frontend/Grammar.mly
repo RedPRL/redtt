@@ -38,16 +38,17 @@ edecl:
     { E.Debug f }
 
   | DATA; dlbl = ATOM;
+    params = loption(nonempty_list(desc_param));
     univ_spec = option(preceded(COLON, univ_spec));
     WHERE; option(PIPE);
-    constrs = separated_list(PIPE, desc_constr)
+    constrs = separated_list(PIPE, desc_constr);
     { let desc = List.map (fun constr -> constr dlbl) constrs in
       let kind, lvl =
         match univ_spec with
         | Some (k, l) -> k, l
         | None -> `Kan, `Const 0
       in
-      E.Data (dlbl, {constrs = desc; kind; lvl; params = []}) }
+      E.Data (dlbl, {params; kind; lvl; constrs = desc}) }
 
   | IMPORT; a = ATOM
     { E.Import a }
@@ -252,6 +253,10 @@ desc_const_spec:
 | LSQ; x = ATOM; COLON; ty = eterm; RSQ
   { x, ty }
 
+%inline
+desc_param:
+| LPR; x = ATOM; COLON; ty = eterm; RPR
+  { x, ty }
 
 
 esig:
