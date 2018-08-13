@@ -364,7 +364,7 @@ struct
         let desc = V.Sig.lookup_datatype data.dlbl in
         let constr = Desc.lookup_constr info0.clbl desc in
         let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
-        let rec_args = equate_constr_rec_args env data.dlbl constr info0.rec_args info1.rec_args in
+        let rec_args = equate_constr_rec_args env data.dlbl data.params constr info0.rec_args info1.rec_args in
         let trs = equate_dims env info0.rs info1.rs in
         Tm.make @@ Tm.Intro (data.dlbl, info0.clbl, const_args @ rec_args @ trs)
 
@@ -387,11 +387,10 @@ struct
     in
     go Emp D.Env.emp constr.const_specs els0 els1
 
-  and equate_constr_rec_args env dlbl constr els0 els1 =
+  and equate_constr_rec_args env dlbl params constr els0 els1 =
     let open Desc in
     (* TODO: factor out *)
-    (* TODO[params] *)
-    let realize_spec_ty Self = D.make @@ D.Data {dlbl; params = []} in
+    let realize_spec_ty Self = D.make @@ D.Data {dlbl; params} in
     ListUtil.map3 (fun (_, spec_ty) -> equate env @@ realize_spec_ty spec_ty) constr.rec_specs els0 els1
 
   and equate_neu_ env neu0 neu1 stk =
