@@ -749,9 +749,15 @@ struct
 
   and fancy_subtype env ty0 sys0 ty1 sys1 =
     match unleash ty0, unleash ty1 with
-    | Rst rst0, Rst rst1 ->
+    | _, Rst rst1 ->
+      fancy_subtype env ty0 sys0 rst1.ty (rst1.sys @ sys1)
+
+    | Rst rst0, _ ->
       begin
-        fancy_subtype env rst0.ty (rst0.sys @ sys0) ty1 (rst1.sys @ sys1)
+        (* backtracking :( ) *)
+        try fancy_subtype env rst0.ty sys0 ty1 sys1
+        with _ ->
+          fancy_subtype env rst0.ty (rst0.sys @ sys0) ty1 sys1
       end
 
     | Pi pi0, Pi pi1 ->

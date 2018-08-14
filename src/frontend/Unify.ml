@@ -639,6 +639,9 @@ let rec subtype ty0 ty1 =
     | Tm.Rst rst0, Tm.Rst rst1 ->
       restriction_subtype rst0.ty rst0.sys rst1.ty rst1.sys
 
+    | Tm.Rst _, _ ->
+      active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}}
+
     | _ ->
       active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
