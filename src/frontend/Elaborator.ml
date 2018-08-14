@@ -231,23 +231,23 @@ struct
     let (module V) = Cx.evaluator cx in
     let module D = Domain in
 
-    let rec build_cx cx env (nms, cvs, rvs, rs) const_specs rec_specs dim_specs =
+    let rec build_cx cx env const_specs rec_specs dim_specs =
       match const_specs, rec_specs, dim_specs with
       | (plbl, pty) :: const_specs, _, _ ->
         let vty = V.eval env pty in
         let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-        build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some plbl), cvs #< v, rvs, rs) const_specs rec_specs dim_specs
+        build_cx cx' (D.Env.push (`Val v) env)  const_specs rec_specs dim_specs
       | [], (nm, Desc.Self) :: rec_specs, _ ->
-        let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data dlbl in
-        build_cx cx_x env (nms #< (Some nm), cvs, rvs #< v_x, rs) const_specs rec_specs dim_specs
+        let cx_x, _ = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data dlbl in
+        build_cx cx_x env  const_specs rec_specs dim_specs
       | [], [], nm :: dim_specs ->
-        let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
-        build_cx cx' env (nms #< (Some nm), cvs, rvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
+        let cx', _ = Cx.ext_dim cx ~nm:(Some nm) in
+        build_cx cx' env  const_specs rec_specs dim_specs
       | [], [], [] ->
         cx
     in
 
-    let cx' = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp) const_specs rec_specs dim_specs in
+    let cx' = build_cx cx D.Env.emp const_specs rec_specs dim_specs in
     traverse (elab_constr_face env dlbl desc) sys >>= fun bdry ->
     Typing.check_constr_boundary_sys cx' dlbl desc bdry;
     M.ret bdry
