@@ -578,6 +578,14 @@ struct
       {ty; el}
 
   and unleash : value -> con =
+    let add_sys sys el=
+      match unleash el with
+      | Up up ->
+        Up {up with sys = sys @ up.sys}
+      | con ->
+        con
+    in
+
     fun (Node info) ->
       let con =
         match info.action = I.idn with
@@ -596,9 +604,9 @@ struct
             begin
               match force_val_sys rst.sys with
               | `Proj el ->
-                unleash el
-              | `Ok sys ->
-                Up {ty = rst.ty; neu = up.neu; sys}
+                add_sys up.sys el
+              | `Ok rsys ->
+                add_sys rsys @@ make @@ Up {up with ty = rst.ty}
             end
           | _ ->
             con
