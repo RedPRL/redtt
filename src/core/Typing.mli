@@ -10,7 +10,6 @@ end
 
 val check : cx -> value -> Tm.tm -> unit
 val infer : cx -> Tm.tm Tm.cmd -> value
-val check_boundary : cx -> value -> Domain.val_sys -> Tm.tm -> unit
 
 val check_constr_boundary_sys
   : cx

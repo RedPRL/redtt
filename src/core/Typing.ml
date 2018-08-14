@@ -149,28 +149,35 @@ let check_extension_cofibration xs cofib =
   | _ ->
     check_valid_cofibration ~xs:(Some xs) cofib
 
-let rec check cx ty tm =
+let rec check_ cx ty rst tm =
   let (module V) = Cx.evaluator cx in
   match V.unleash ty, T.unleash tm with
   | D.Univ info0, T.Univ info1 ->
     (* TODO: what about kinds? I think it's fine, since we learned from Andy Pitts how to make
        the pretype universe Kan. But I may need to add those "ecom" thingies, LOL. *)
-    if Lvl.greater info0.lvl info1.lvl then () else
-      failwith "Predicativity violation"
+    begin
+      if Lvl.greater info0.lvl info1.lvl then () else
+        failwith "Predicativity violation"
+    end;
+    check_boundary cx ty rst @@ Cx.eval cx tm
+
 
   | D.Univ _, T.Pi (dom, B (nm, cod)) ->
     let vdom = check_eval cx ty dom in
     let cxx', _ = Cx.ext_ty cx ~nm vdom in
-    check cxx' ty cod
+    check cxx' ty cod;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | D.Univ _, T.Sg (dom, B (nm, cod)) ->
     let vdom = check_eval cx ty dom in
     let cxx, _ = Cx.ext_ty cx ~nm vdom in
-    check cxx ty cod
+    check cxx ty cod;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | D.Univ _, T.Later (B (nm, cod)) ->
     let cxx, _ = Cx.ext_tick cx ~nm in
-    check cxx ty cod
+    check cxx ty cod;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | D.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
     let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
@@ -179,12 +186,14 @@ let rec check cx ty tm =
       check_extension_cofibration xs @@ cofibration_of_sys cxx sys
     else
       ();
-    check_ext_sys cxx vcod sys
+    check_ext_sys cxx vcod sys;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | D.Univ univ, T.Rst info ->
     if univ.kind = `Pre then () else failwith "Restriction type is not Kan";
     let ty = check_eval cx ty info.ty in
-    check_ext_sys cx ty info.sys
+    check_ext_sys cx ty info.sys;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | D.Univ univ, T.CoR (tr, tr', oty) ->
     if univ.kind = `Pre then () else failwith "Co-restriction type is not known to be Kan";
@@ -199,46 +208,57 @@ let rec check cx ty tm =
         check cxrr' ty ty'
       | _ ->
         failwith "co-restriction type malformed"
-    end
+    end;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | D.Univ _, T.V info ->
     check_dim cx info.r;
     let ty0 = check_eval cx ty info.ty0 in
     let ty1 = check_eval cx ty info.ty1 in
-    check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
+    check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | D.Univ univ, T.Data dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
-    if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
-      ()
-    else
-      failwith "Universe level/kind error"
+    begin
+      if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
+        ()
+      else
+        failwith "Universe level/kind error"
+    end;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | D.Data dlbl, T.Intro (dlbl', clbl, args) when dlbl = dlbl' ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     let constr = Desc.lookup_constr clbl desc in
-    check_constr cx dlbl constr args
+    check_constr cx dlbl constr args;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
 
   | D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
     let cxx, x = Cx.ext_ty cx ~nm dom in
     let vcod = V.inst_clo cod x in
-    check cxx vcod tm
+    let rst' = List.map (Face.map (fun r r' v -> V.apply v @@ D.Value.act (I.equate r r') x)) rst in
+    check_ cxx vcod rst' tm
 
   | D.Later tclo, T.Next (T.B (nm, tm)) ->
     let cxx, tck = Cx.ext_tick cx ~nm in
     let vty = V.inst_tick_clo tclo tck in
-    check cxx vty tm
+    let rst' = List.map (Face.map (fun _ _ -> V.prev tck)) rst in
+    check_ cxx vty rst' tm
 
   | D.Sg {dom; cod}, T.Cons (t0, t1) ->
-    let v = check_eval cx dom t0 in
+    let rst0 = List.map (Face.map (fun _ _ -> V.car)) rst in
+    let rst1 = List.map (Face.map (fun _ _ -> V.cdr)) rst in
+    let v = check_eval_ cx dom rst0 t0 in
     let vcod = V.inst_clo cod v in
-    check cx vcod t1
+    check_ cx vcod rst1 t1
 
   | D.Ext ext_abs, T.ExtLam (T.NB (nms, tm)) ->
     let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
     let codx, sysx = Domain.ExtAbs.inst ext_abs @@ Bwd.map (fun x -> `Atom x) @@ Bwd.from_list xs in
-    check_boundary cxx codx sysx tm
+    let rst' = List.map (Face.map (fun _ _ el -> V.ext_apply el @@ List.map (fun x -> `Atom x) xs)) rst in
+    check_ cxx codx (rst' @ sysx) tm
 
   | D.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
     let r'0 = check_eval_dim cx tr0 in
@@ -251,7 +271,8 @@ let rec check cx ty tm =
         begin
           match I.compare r'0 r0, I.compare r'1 r1 with
           | `Same, `Same ->
-            check cx (Lazy.force ty) tm
+            let rst' = List.map (Face.map (fun _ _ -> V.corestriction_force)) rst in
+            check_ cx (Lazy.force ty) rst' tm
           | _ ->
             failwith "co-restriction mismatch"
         end
@@ -263,7 +284,9 @@ let rec check cx ty tm =
             begin
               try
                 let cx', phi = Cx.restrict cx r'0 r'1 in
-                check cx' (Domain.Value.act phi @@ Lazy.force ty) tm
+                (* is this right?? : *)
+                let rst' = List.map (Face.map (fun _ _ -> V.corestriction_force)) rst in
+                check_ cx' (Domain.Value.act phi @@ Lazy.force ty) rst' tm
               with
               | I.Inconsistent -> ()
             end
@@ -276,11 +299,13 @@ let rec check cx ty tm =
     end
 
   | D.Rst {ty; sys}, _ ->
-    check cx ty tm;
-    check_boundary cx ty sys tm
+    check_ cx ty (sys @ rst) tm
 
   | D.Univ _, T.FHCom info ->
-    check_fhcom cx ty info.r info.r' info.cap info.sys
+    check_fhcom cx ty info.r info.r' info.cap info.sys;
+    let el = Cx.eval cx tm in
+    check_boundary cx ty rst el
+
 
   | D.Univ _, T.LblTy info ->
     check cx ty info.ty;
@@ -288,10 +313,12 @@ let rec check cx ty tm =
       let vty = check_eval_ty cx ty in
       check cx vty tm
     in
-    List.iter go_arg info.args
+    List.iter go_arg info.args;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | D.LblTy info, T.LblRet t ->
-    check cx info.ty t
+    let rst' = List.map (Face.map (fun _ _ -> V.lbl_call)) rst in
+    check_ cx info.ty rst' t
 
   | D.V vty, T.VIn vin ->
     let r = check_eval_dim cx vin.r in
@@ -304,21 +331,27 @@ let rec check cx ty tm =
         Cx.check_eq cx' ~ty:(D.Value.act phi vty.ty1) (V.apply (V.car vty.equiv) el0) @@ D.Value.act phi el1
       | _ ->
         failwith "v/vin dimension mismatch"
-    end
+    end;
+    check_boundary cx ty rst @@ Cx.eval cx tm
 
   | _, T.Up tm ->
     let ty' = infer cx tm in
-    Cx.check_subtype cx ty' ty
+    Cx.check_subtype cx ty' ty;
+    check_boundary cx ty rst @@ Cx.eval_cmd cx tm
 
   | _, T.Let (cmd, T.B (nm, t1)) ->
     let ty' = infer cx cmd in
     let el = Cx.eval_cmd cx cmd in
     let cx' = Cx.def cx ~nm ~ty:ty' ~el in
-    check cx' ty t1
+    (* TODO: right?? *)
+    check_ cx' ty rst t1
 
   | _ ->
     (* Format.eprintf "Failed to check term %a@." (Tm.pp (CxUtil.ppenv cx)) tm; *)
     failwith "Type error"
+
+and check cx ty tm =
+  check_ cx ty [] tm
 
 and check_constr cx dlbl constr tms =
   let vdataty = D.make @@ D.Data dlbl in
@@ -354,32 +387,29 @@ and check_fhcom cx ty tr tr' tcap tsys =
   check_valid_cofibration @@ cofibration_of_sys cx tsys;
   check_comp_sys cx r (cxx, x, ty) cap tsys
 
-and check_boundary cx ty sys tm =
+and check_boundary cx ty sys el =
   let rec go sys =
     match sys with
     | [] -> ()
     | face :: sys ->
-      check_boundary_face cx ty face tm;
+      check_boundary_face cx ty face el;
       go sys
   in
-  check cx ty tm;
   go sys
 
-and check_boundary_face cx ty face tm =
+and check_boundary_face cx ty face el =
   match face with
-  | Face.True (_, _, el) ->
-    Cx.check_eq cx ~ty (Lazy.force el) @@
-    Cx.eval cx tm
+  | Face.True (_, _, el') ->
+    Cx.check_eq cx ~ty (Lazy.force el') el
 
   | Face.False _ ->
     ()
 
-  | Face.Indet (p, el) ->
+  | Face.Indet (p, el') ->
     let r, r' = Eq.unleash p in
     try
       let cx', phi = Cx.restrict cx r r' in
-      Cx.check_eq cx' ~ty:(D.Value.act phi ty) (Lazy.force el) @@
-      Cx.eval cx' tm
+      Cx.check_eq cx' ~ty:(D.Value.act phi ty) (Lazy.force el') @@ D.Value.act phi el
     with
     | I.Inconsistent ->
       ()
@@ -603,7 +633,7 @@ and infer_spine cx hd =
             ~rs:rs
         in
         let boundary = List.map image_of_face constr.boundary in
-        check_boundary cx' ty boundary bdy;
+        check_ cx' ty boundary bdy;
         Tm.NB (nms, bdy)
       in
 
@@ -747,6 +777,10 @@ and infer_head cx =
 
 and check_eval cx ty tm =
   check cx ty tm;
+  Cx.eval cx tm
+
+and check_eval_ cx ty rst tm =
+  check_ cx ty rst tm;
   Cx.eval cx tm
 
 and check_ty cx ty =
