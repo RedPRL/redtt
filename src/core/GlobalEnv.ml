@@ -16,7 +16,6 @@ type t =
   {rel : Restriction.t;
    data_decls : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc StringTable.t;
    table : (entry param * lock_info) T.t;
-   lock : int -> bool;
    killed : int -> bool;
    under_tick : int -> bool;
    len : int}
@@ -26,7 +25,6 @@ let emp () =
   {table = T.empty;
    data_decls = StringTable.empty;
    rel = Restriction.emp ();
-   lock = (fun _ -> false);
    killed = (fun _ -> false);
    under_tick = (fun _ -> false);
    len = 0}
@@ -73,15 +71,6 @@ let ext_dim (sg : t) nm : t =
   ext_ sg ~constant:false nm `I
 
 
-let ext_lock (sg : t) : t =
-  {sg with
-   lock = fun i -> if i < sg.len then true else sg.lock i}
-
-let clear_locks (sg : t) : t =
-  {sg with
-   lock = (fun i -> if sg.under_tick i then sg.lock i else false)}
-
-
 let rec index_of pred xs =
   match xs with
   | [] -> failwith "index_of"
@@ -97,9 +86,8 @@ let kill_from_tick (sg : t) nm : t =
 
 let lookup_entry sg nm tw =
   let prm, linfo = T.find nm sg.table in
-  let locked = sg.lock linfo.birth in
   let killed = sg.killed linfo.birth in
-  if not linfo.constant && (locked || killed) then
+  if not linfo.constant && killed then
     failwith "GlobalEnv.lookup_entry: not accessible (modal!!)"
   else
     match prm, tw with

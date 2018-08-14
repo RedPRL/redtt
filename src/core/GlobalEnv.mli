@@ -15,9 +15,7 @@ val ext : t -> Name.t -> entry param -> t
 val ext_meta : t -> Name.t -> entry param -> t
 val ext_dim : t -> Name.t -> t
 val ext_tick : t -> Name.t -> t
-val ext_lock : t -> t
 val restrict : Tm.tm -> Tm.tm -> t -> t
-val clear_locks : t -> t
 val kill_from_tick : t -> Name.t -> t
 
 

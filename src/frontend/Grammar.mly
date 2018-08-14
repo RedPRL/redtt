@@ -88,8 +88,6 @@ atomic_econ:
     { if a = "_" then E.Hope else E.Var (a, 0) }
   | n = NUMERAL;
     { E.Num n }
-  | BULLET
-    { E.TickConst }
 
 atomic_eterm:
   | e = atomic_econ
@@ -327,9 +325,6 @@ kind:
   | { `Kan }
 
 tm:
-  | BULLET
-    { fun _env ->
-      make_node $startpos $endpos Tm.TickConst }
 
   | i = NUMERAL
     { fun _env ->

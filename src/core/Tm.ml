@@ -56,7 +56,7 @@ struct
 
   and traverse_con =
     function
-    | (Univ _ | Dim0 | Dim1 | TickConst as con) ->
+    | (Univ _ | Dim0 | Dim1 as con) ->
       con
 
     | FHCom info ->
@@ -677,9 +677,6 @@ let rec pp env fmt =
     | Dim1 ->
       Format.fprintf fmt "1"
 
-    | TickConst ->
-      Uuseg_string.pp_utf_8 fmt "∙"
-
     | Univ {kind; lvl} ->
       Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
 
@@ -1174,7 +1171,7 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Dim0 | Dim1 | TickConst | Data _) as con ->
+  | (Univ _ | Dim0 | Dim1 | Data _) as con ->
     con
   | Cons (t0, t1) ->
     Cons (f t0, f t1)

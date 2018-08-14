@@ -73,8 +73,6 @@ struct
 
   let kind_of_frame env =
     function
-    | E.App ({con = E.TickConst} as e) ->
-      M.ret @@ `Prev e
     | E.App ({con = E.Num (0 | 1)} as e) ->
       M.ret @@ `ExtApp e
     | E.App ({con = E.Var (nm, _)} as e) ->

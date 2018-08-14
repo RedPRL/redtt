@@ -723,8 +723,6 @@ struct
 
   and quote_tick env tck =
     match tck with
-    | TickConst ->
-      Tm.make Tm.TickConst
     | TickGen (`Lvl (_, lvl)) ->
       let ix = Env.ix_of_lvl lvl env in
       Tm.up @@ Tm.ix ix

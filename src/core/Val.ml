@@ -214,8 +214,6 @@ struct
 
   let eval_tick rho tm =
     match Tm.unleash tm with
-    | Tm.TickConst ->
-      TickConst
     | Tm.Up (hd, Emp) ->
       begin
         match hd with
@@ -1549,9 +1547,6 @@ struct
     | (Tm.Dim0 | Tm.Dim1) ->
       raise @@ E (UnexpectedDimensionTerm tm)
 
-    | Tm.TickConst ->
-      raise @@ E (UnexpectedTickTerm tm)
-
     | Tm.Up cmd ->
       eval_cmd rho cmd
 
@@ -2069,8 +2064,6 @@ struct
     | DFix dfix ->
       begin
         match tick with
-        | TickConst ->
-          inst_clo dfix.clo el
         | TickGen gen ->
           let neu = Fix (gen, dfix.ty, dfix.clo) in
           make @@ Up {ty = dfix.ty; neu; sys = []}
@@ -2078,8 +2071,6 @@ struct
     | DFixLine dfix ->
       begin
         match tick with
-        | TickConst ->
-          inst_clo dfix.clo el
         | TickGen gen ->
           let neu = FixLine (dfix.x, gen, dfix.ty, dfix.clo) in
           make @@ Up {ty = dfix.ty; neu; sys = []}

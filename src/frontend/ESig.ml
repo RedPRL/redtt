@@ -46,7 +46,6 @@ and econ =
 
   | Shut of eterm
 
-  | TickConst
   | DFixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
   | FixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
 

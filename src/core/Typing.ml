@@ -70,8 +70,6 @@ and check_dim_cmd cx =
 
 let rec check_tick cx tr =
   match T.unleash tr with
-  | T.TickConst ->
-    ()
   | T.Up cmd ->
     check_tick_cmd cx cmd
   | _ ->
@@ -653,11 +651,6 @@ and infer_spine cx hd =
       let vtick = Cx.eval_tick cx tick in
       begin
         match vtick with
-        | D.TickConst ->
-          let cx' = Cx.ext_lock cx in
-          let ih = infer_spine cx' hd sp in
-          let tclo = V.unleash_later ih.ty in
-          D.{el = V.prev vtick ih.el; ty = V.inst_tick_clo tclo vtick}
         | D.TickGen tgen ->
           let cx' = Cx.kill_from_tick cx tgen in
           let ih = infer_spine cx' hd sp in

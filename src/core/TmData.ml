@@ -30,7 +30,6 @@ type 'a tmf =
 
   | Dim0
   | Dim1
-  | TickConst
 
   | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
 

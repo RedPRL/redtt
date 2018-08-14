@@ -8,7 +8,6 @@ type tick_gen =
   [`Lvl of string option * int | `Global of Name.t ]
 
 type tick =
-  | TickConst
   | TickGen of tick_gen
 
 

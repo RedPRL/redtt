@@ -10,10 +10,7 @@ val qenv : t -> Quote.env
 
 val clear_locals : t -> t
 
-(* Modal left adjoints *)
-val ext_lock : t -> t
-val clear_locks : t -> t
-
+(* Modal *)
 val kill_from_tick : t -> Domain.tick_gen -> t
 
 val ext_ty : t -> nm:string option -> value -> t * value

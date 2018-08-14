@@ -38,8 +38,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("✓", TICK);
       ("dim", DIM);
       ("𝕀", DIM);
-      ("lock", LOCK);
-      ("🔓", LOCK);
       ("elim", ELIM);
       ("fst", FST);
       ("snd", SND);
