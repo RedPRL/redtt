@@ -46,6 +46,12 @@ let normalize_param p =
   match p with
   | `P ty ->
     C.ret @@ `P (normalize_ty ty)
+  | `Def (ty, tm) ->
+    let vty = Cx.eval cx ty in
+    let ty' = Cx.quote_ty cx vty in
+    let el = Cx.eval cx tm in
+    let tm' = Cx.quote cx ~ty:vty el in
+    C.ret @@ `Def (ty', tm')
   | `Tw (ty0, ty1) ->
     C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
   | (`I | `Tick | `KillFromTick _ | `SelfArg Desc.Self) as p ->

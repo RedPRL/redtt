@@ -80,18 +80,19 @@ and tac_wrap_nf tac ty =
   try tac ty
   with
   | ChkMatch ->
-    normalize_ty ty >>= tac_rst tac
+    normalize_ty ty >>=
+    tac_rst tac
 
 
 let tac_let name itac ctac =
   fun ty ->
     itac >>= fun (let_ty, let_tm) ->
-    let singleton_ty =
-      let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some let_tm in
-      Tm.make @@ Tm.Rst {ty = let_ty; sys = [face]}
-    in
+    (* let singleton_ty =
+       let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some let_tm in
+       Tm.make @@ Tm.Rst {ty = let_ty; sys = [face]}
+       in *)
     let x = Name.named @@ Some name in
-    M.in_scope x (`P singleton_ty) (ctac ty) >>= fun bdyx ->
+    M.in_scope x (`Def (let_ty, let_tm)) (ctac ty) >>= fun bdyx ->
     M.ret @@ Tm.make @@ Tm.Let (Tm.ann ~ty:let_ty ~tm:let_tm, Tm.bind x bdyx)
 
 

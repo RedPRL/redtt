@@ -36,6 +36,8 @@ let rec abstract_tm xs tm =
   | Emp -> tm
   | Snoc (xs, (x, `P _)) ->
     abstract_tm xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+  | Snoc (xs, (x, `Def (ty, def))) ->
+    abstract_tm xs @@ Tm.unbind_with (Tm.ann ~ty ~tm:def) @@ Tm.bind x tm
   | Snoc (xs, (x, `Tick)) ->
     abstract_tm xs @@ Tm.make @@ Tm.Next (Tm.bind x tm)
   | Snoc (xs, (x, `I)) ->
@@ -53,6 +55,8 @@ let rec abstract_ty (gm : telescope) cod =
   | Emp -> cod
   | Snoc (gm, (x, `P dom)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Pi (dom, Tm.bind x cod)
+  | Snoc (gm, (x, `Def (dom, def))) ->
+    abstract_ty gm @@ Tm.unbind_with (Tm.ann ~ty:dom ~tm:def) @@ Tm.bind x cod
   | Snoc (gm, (_, `R (r, r'))) ->
     abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
   | Snoc (gm, (x, `I)) ->
@@ -72,6 +76,8 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     [Tm.ExtApp [Tm.up @@ Tm.var x]]
   | `P _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
+  | `Def _ ->
+    []
   | `SelfArg _ ->
     (* ??? *)
     [Tm.FunApp (Tm.up @@ Tm.var x)]
@@ -886,6 +892,18 @@ let rec solver prob =
             | None ->
               in_scope x (`P ty) @@
               solver probx
+          end
+
+        | `Def (ty, tm) ->
+          begin
+            (* match split_sigma Emp x ty with
+               | Some (y, ty0, z, ty1, s, _) ->
+               (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
+               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
+               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
+               | None -> *)
+            in_scope x (`Def (ty, tm)) @@
+            solver probx
           end
 
         | `Tw (ty0, ty1) ->

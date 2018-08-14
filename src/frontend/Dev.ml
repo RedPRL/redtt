@@ -27,6 +27,7 @@ type 'a param =
   | `Tick
   | `KillFromTick of 'a
   | `P of 'a
+  | `Def of 'a * 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
   | `SelfArg of 'a Desc.rec_spec
@@ -78,6 +79,8 @@ let param_open_var k x =
     `KillFromTick (Tm.open_var k (fun twin -> Tm.var x ~twin) tck)
   | `P ty ->
     `P (Tm.open_var k (fun twin -> Tm.var x ~twin) ty)
+  | `Def (ty, tm) ->
+    `Def (Tm.open_var k (fun twin -> Tm.var x ~twin) ty, Tm.open_var k (fun twin -> Tm.var x ~twin) tm)
   | `Tw (ty0, ty1) ->
     `Tw (Tm.open_var k (fun twin -> Tm.var x ~twin) ty0, Tm.open_var k (fun twin -> Tm.var x ~twin) ty1)
   | `R (r0, r1) ->
@@ -93,6 +96,8 @@ let param_close_var x k =
     `KillFromTick (Tm.close_var x ~twin:(fun tw -> tw) k tck)
   | `P ty ->
     `P (Tm.close_var x ~twin:(fun tw -> tw) k ty)
+  | `Def (ty, tm) ->
+    `Def (Tm.close_var x ~twin:(fun tw -> tw) k ty, Tm.close_var x ~twin:(fun tw -> tw) k tm)
   | `Tw (ty0, ty1) ->
     `Tw (Tm.close_var x ~twin:(fun tw -> tw) k ty0, Tm.close_var x ~twin:(fun tw -> tw) k ty1)
   | `R (r0, r1) ->
@@ -179,6 +184,8 @@ let pp_param fmt =
     Format.fprintf fmt "<kill-after-tick>"
   | `P ty ->
     Tm.pp0 fmt ty
+  | `Def (ty, _) -> (* TODO *)
+    Tm.pp0 fmt ty
   | `Tw (ty0, ty1) ->
     Format.fprintf fmt "%a %a %a"
       Tm.pp0 ty0
@@ -198,6 +205,12 @@ let pp_param_cell fmt (x, param) =
     Format.fprintf fmt "@[<1>%a : %a@]"
       Name.pp x
       Tm.pp0 ty
+
+  | `Def (ty, tm) ->
+    Format.fprintf fmt "@[<1>%a : %a = %a@]"
+      Name.pp x
+      Tm.pp0 ty
+      Tm.pp0 tm
 
   | `Tw (ty0, ty1) ->
     Format.fprintf fmt "@[<1>%a : %a %a %a@]"
@@ -354,6 +367,8 @@ let subst_param sub =
     `KillFromTick (subst_tm sub ~ty:univ tck), sub
   | `P ty ->
     `P (subst_tm sub ~ty:univ ty), sub
+  | `Def (ty, tm) ->
+    `Def (subst_tm sub ~ty:univ ty, subst_tm sub ~ty tm), sub
   | `Tw (ty0, ty1) ->
     `Tw (subst_tm sub ~ty:univ ty0, subst_tm sub ~ty:univ ty1), sub
   | `R (r0, r1) ->
@@ -376,6 +391,12 @@ let rec subst_problem sub =
       match param with
       | `P ty ->
         let sub'' = GlobalEnv.ext sub' x @@ `P {ty; sys = []}  in
+        let probx' = subst_problem sub'' probx in
+        let prob' = bind x param' probx' in
+        All (param', prob')
+      | `Def (ty, tm) ->
+        let sys = [Tm.make Dim0, Tm.make Dim0, Some tm] in
+        let sub'' = GlobalEnv.ext sub' x @@ `P {ty; sys}  in
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
@@ -415,6 +436,8 @@ struct
     | (`I | `Tick | `SelfArg Desc.Self) -> Occurs.Set.empty
     | `KillFromTick tck -> Tm.free fl tck
     | `P ty -> Tm.free fl ty
+    | `Def (ty, tm) ->
+      Occurs.Set.union (Tm.free fl ty) (Tm.free fl tm)
     | `Tw (ty0, ty1) ->
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)
     | `R (r0, r1) ->

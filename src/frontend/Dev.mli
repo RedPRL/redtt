@@ -24,6 +24,7 @@ type 'a param =
   | `Tick
   | `KillFromTick of 'a
   | `P of 'a
+  | `Def of 'a * 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
   | `SelfArg of 'a Desc.rec_spec

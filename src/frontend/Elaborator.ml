@@ -85,8 +85,7 @@ struct
               M.lift C.get_global_env >>= fun env ->
               begin
                 match GlobalEnv.lookup_kind env alpha with
-                | `P _ -> M.ret @@ `FunApp e
-                | `Tw _ -> M.ret @@ `FunApp e
+                | (`P _ | `Tw _) -> M.ret @@ `FunApp e
                 | `I -> M.ret @@ `ExtApp e
                 | `Tick -> M.ret @@ `Prev e
               end
@@ -349,6 +348,7 @@ struct
       let go (x, param) =
         match param with
         | `P _ -> [x]
+        | `Def _ -> [x]
         | `I -> [x]
         | `SelfArg _ -> [x]
         | `Tick -> [x]

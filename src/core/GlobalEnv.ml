@@ -130,7 +130,7 @@ let pp fmt sg =
     | `Tw _ ->
       Format.fprintf fmt "%a[twin]"
         Name.pp nm
-    | (`Tick | `I | `P _) ->
+    | (`Tick | `I | `P _ | `Def _) ->
       Format.fprintf fmt "%a"
         Name.pp nm
   in
