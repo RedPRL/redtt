@@ -1451,7 +1451,9 @@ struct
     let rho' =
       Env.push_many
         begin
-          (* This is not backwards, FYI. *)
+          List.rev @@
+          (* ~~This is not backwards, FYI.~~ *)
+          (* NARRATOR VOICE: it was backwards. *)
           List.map (fun x -> `Val x) const_args
           @ List.map (fun x -> `Val x) rec_args
           @ List.map (fun x -> `Dim x) rs
