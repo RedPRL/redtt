@@ -1197,7 +1197,7 @@ struct
       let sys_phi = CompSys.act phi comp_sys in
       make_hcom dir_phi ty cap_phi sys_phi
     in
-    let ty = reflect univ ty [] in
+    let ty = reflect univ ty @@ ValSys.from_rigid rst_sys in
     let rst_sys = List.map (Face.map hcom_face) rst_sys in
     make @@ Up {ty; neu; sys = rst_sys}
 
