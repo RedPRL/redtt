@@ -19,7 +19,6 @@ and ecell =
   [ `Ty of string * eterm
   | `Tick of string
   | `I of string
-  | `Lock
   ]
 
 and etele = ecell list

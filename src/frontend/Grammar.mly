@@ -98,8 +98,6 @@ atomic_eterm:
 eframe:
   | e = atomic_eterm
     { E.App e }
-  | BANG
-    { E.Open }
   | DOT FST
     { E.Car }
   | DOT SND
@@ -178,12 +176,6 @@ econ:
   | dom = atomic_eterm; TIMES; cod = eterm
     { E.Sg ([`Ty ("_", dom)], cod) }
 
-  | BOX_MODALITY; ty = eterm
-    { E.Pi ([`Lock], ty)}
-
-  | SHUT; tm = eterm
-    { E.Shut tm }
-
 eterm:
   | e = econ
     { eterm $startpos $endpos e }
@@ -218,9 +210,6 @@ etele_cell:
     { [`I "_"] }
   | TICK
     { [`Tick "_"] }
-  | LOCK
-    { [`Lock] }
-
 
 
 desc_constr:
@@ -379,11 +368,6 @@ tm:
       make_node $startpos $endpos @@
       Tm.Later (ty env) }
 
-  | LPR; BOX_MODALITY; ty = tm; RPR
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.BoxModality (ty env) }
-
   | LPR; rst = constrained; RPR
     { fun env ->
       let ty, sys = rst env in
@@ -398,11 +382,6 @@ tm:
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Next (bnd env) }
-
-  | LPR; SHUT; tm = tm; RPR
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.Shut (tm env) }
 
   | LPR; PAIR; e0 = tm; e1 = tm; RPR
     { fun env ->
@@ -491,11 +470,6 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< (Tm.Prev (t env)) }
-
-  | LPR; OPEN; e = cut; RPR
-    { fun env ->
-      let hd, fs = e env in
-      hd, fs #< Tm.Open }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->

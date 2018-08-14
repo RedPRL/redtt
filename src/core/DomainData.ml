@@ -44,9 +44,6 @@ type con =
   | DFix of {ty : value; clo : clo}
   | DFixLine of {x : atom; ty : value; clo : clo}
 
-  | BoxModality of value
-  | Shut of value
-
   | Data of Desc.data_label
   | Intro of
       {dlbl : Desc.data_label;
@@ -86,8 +83,6 @@ and neu =
   | Prev of tick * neu
   | Fix of tick_gen * value * clo
   | FixLine of atom * tick_gen * value * clo
-
-  | Open of neu
 
 and nf = {ty : value; el : value}
 

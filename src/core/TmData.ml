@@ -41,9 +41,6 @@ type 'a tmf =
   | Later of 'a bnd
   | Next of 'a bnd
 
-  | BoxModality of 'a
-  | Shut of 'a
-
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
@@ -75,7 +72,6 @@ and 'a frame =
   | LblCall
   | CoRForce
   | Prev of 'a
-  | Open
 
   | Elim of {dlbl : Desc.data_label; mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
 

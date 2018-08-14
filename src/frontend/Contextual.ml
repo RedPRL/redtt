@@ -175,10 +175,6 @@ let get_global_env =
       GlobalEnv.ext_dim (go_params psi) x
     | Snoc (psi, (x, `Tick)) ->
       GlobalEnv.ext_tick (go_params psi) x
-    | Snoc (psi, (_, `Lock)) ->
-      GlobalEnv.ext_lock @@ go_params psi
-    | Snoc (psi, (_, `ClearLocks)) ->
-      GlobalEnv.clear_locks @@ go_params psi
     | Snoc (psi, (_, `KillFromTick tck)) ->
       begin
         match Tm.unleash tck with

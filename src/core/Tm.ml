@@ -147,14 +147,6 @@ struct
       let bnd' = traverse_bnd traverse_tm bnd in
       Next bnd'
 
-    | BoxModality t ->
-      let t' = traverse_tm t in
-      BoxModality t'
-
-    | Shut t ->
-      let t' = traverse_tm t in
-      Shut t'
-
     | Let (cmd, bnd) ->
       let cmd' = traverse_cmd cmd in
       let bnd' = traverse_bnd traverse_tm bnd in
@@ -346,9 +338,6 @@ struct
     | Prev tick ->
       let tick = traverse_tm tick in
       Prev tick
-
-    | Open ->
-      Open
 
 end
 
@@ -729,12 +718,6 @@ let rec pp env fmt =
       let x, env' = Pp.Env.bind nm env in
       Format.fprintf fmt "@[<hv1>(next [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') t
 
-    | BoxModality t ->
-      Format.fprintf fmt "@[<hv1>(%a@ %a)@]" Uuseg_string.pp_utf_8 "□" (pp env) t
-
-    | Shut t ->
-      Format.fprintf fmt "@[<hv1>(shut@ %a)@]" (pp env) t
-
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pp.Env.bind nm env in
       Format.fprintf fmt "@[<hv1>(let@ @[<hv1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
@@ -842,8 +825,6 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<hv1>(force@ %a)@]" (go `Force) sp
       | Prev tick ->
         Format.fprintf fmt "@[<hv1>(prev %a@ %a)@]" (pp env) tick (go `Prev) sp
-      | Open ->
-        Format.fprintf fmt "@[<hv1>(open@ %a)@]" (go `Open) sp
   in
   go `Start fmt sp
 
@@ -1171,8 +1152,6 @@ let map_frame f =
   | Prev tick ->
     let tick = f tick in
     Prev tick
-  | Open ->
-    Open
 
 let map_spine f =
   Bwd.map @@ map_frame f
@@ -1250,12 +1229,6 @@ let map_tmf f =
   | Next bnd ->
     let bnd = map_bnd f bnd in
     Next bnd
-  | BoxModality t ->
-    let t = f t in
-    BoxModality t
-  | Shut t ->
-    let t = f t in
-    Shut t
   | Up cmd ->
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
@@ -1324,16 +1297,6 @@ let rec eta_contract t =
         end
       | _ ->
         make @@ Next (bind y tm'y)
-    end
-
-  | Shut tm ->
-    let tm' = eta_contract tm in
-    begin
-      match unleash tm' with
-      | Up (hd, Snoc (sp, Open)) ->
-        up (hd, sp)
-      | _ ->
-        make @@ Shut tm'
     end
 
   | ExtLam nbnd ->

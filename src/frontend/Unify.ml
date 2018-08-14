@@ -28,10 +28,6 @@ let rec telescope ty : telescope * ty =
     let x, codx = Tm.unbind cod in
     let tel, ty = telescope codx in
     (Emp #< (x, `Tick)) <.> tel, ty
-  | Tm.BoxModality ty ->
-    let x = Name.fresh () in
-    let tel, ty = telescope ty in
-    (Emp #< (x, `Lock)) <.> tel, ty
   | _ ->
     Emp, ty
 
@@ -45,12 +41,8 @@ let rec abstract_tm xs tm =
   | Snoc (xs, (x, `I)) ->
     let bnd = Tm.NB (Emp #< None, Tm.close_var x 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
-  | Snoc (xs, (_, `Lock)) ->
-    abstract_tm xs @@ Tm.make @@ Tm.Shut tm
   | Snoc (xs, (_, `R (r, r'))) ->
     abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
-  | Snoc (xs, (_, `ClearLocks)) ->
-    abstract_tm xs tm
   | Snoc (xs, (_, `KillFromTick _)) ->
     abstract_tm xs tm
   | _ ->
@@ -68,10 +60,6 @@ let rec abstract_ty (gm : telescope) cod =
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB (Emp #< (Name.name x), (cod', [])))
   | Snoc (gm, (x, `Tick)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Later (Tm.bind x cod)
-  | Snoc (gm, (_, `Lock)) ->
-    abstract_ty gm @@ Tm.make @@ Tm.BoxModality cod
-  | Snoc (gm, (_, `ClearLocks)) ->
-    abstract_ty gm cod
   | Snoc (gm, (_, `KillFromTick _)) ->
     abstract_ty gm cod
   | _ ->
@@ -93,10 +81,6 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     [Tm.CoRForce]
   | `Tick ->
     [Tm.Prev (Tm.up @@ Tm.var x)]
-  | `Lock ->
-    [Tm.Open]
-  | `ClearLocks ->
-    []
   | `KillFromTick _ ->
     []
 
@@ -888,7 +872,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | `I | `Tick | `Lock | `ClearLocks | `KillFromTick _ | `SelfArg _ as p ->
+        | `I | `Tick | `KillFromTick _ | `SelfArg _ as p ->
           in_scope x p @@
           solver probx
 

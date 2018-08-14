@@ -22,8 +22,6 @@ type ('a, 'b) equation =
 type 'a param =
   [ `I
   | `Tick
-  | `Lock
-  | `ClearLocks
   | `KillFromTick of 'a
   | `P of 'a
   | `Tw of 'a * 'a

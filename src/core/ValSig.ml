@@ -60,7 +60,6 @@ sig
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
   val prev : tick -> value -> value
-  val modal_open : value -> value
 
   val elim_data : Desc.data_label -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
 
@@ -79,7 +78,6 @@ sig
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
   val unleash_later : value -> tick_clo
-  val unleash_box_modality : value -> value
   val unleash_fhcom : value -> dir * value * comp_sys
   val unleash_ext_with : value -> dim list -> value * val_sys
   val unleash_ext : value -> ext_abs

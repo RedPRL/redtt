@@ -174,10 +174,6 @@ let rec check cx ty tm =
     let cxx, _ = Cx.ext_tick cx ~nm in
     check cxx ty cod
 
-  | D.Univ _, T.BoxModality t ->
-    let cx' = Cx.ext_lock cx in
-    check cx' ty t
-
   | D.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
     let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
     let vcod = check_eval cxx ty cod in
@@ -235,10 +231,6 @@ let rec check cx ty tm =
     let cxx, tck = Cx.ext_tick cx ~nm in
     let vty = V.inst_tick_clo tclo tck in
     check cxx vty tm
-
-  | D.BoxModality vty, T.Shut tm ->
-    let cx' = Cx.ext_lock cx in
-    check cx' vty tm
 
   | D.Sg {dom; cod}, T.Cons (t0, t1) ->
     let v = check_eval cx dom t0 in
@@ -672,13 +664,6 @@ and infer_spine cx hd =
           let tclo = V.unleash_later ih.ty in
           D.{el = V.prev vtick ih.el; ty = V.inst_tick_clo tclo vtick}
       end
-
-    | T.Open ->
-      let cx' = Cx.clear_locks cx in
-      let ih = infer_spine cx' hd sp in
-      let ty = V.unleash_box_modality ih.ty in
-      D.{el = V.modal_open ih.el; ty}
-
 
 and infer_head cx =
   function

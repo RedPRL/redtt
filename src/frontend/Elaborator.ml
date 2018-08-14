@@ -382,10 +382,6 @@ struct
         let x = Name.named @@ Some name in
         M.in_scope x `I @@
         go cells
-      | `Lock :: cells ->
-        let x = Name.fresh () in
-        M.in_scope x `Lock @@
-        go cells
       | _ -> failwith "TODO: elab_scheme"
     in
     go cells
@@ -403,12 +399,6 @@ struct
       elab_chk env rst.ty e >>= fun tm ->
       M.lift C.ask >>= fun psi ->
       M.lift @@ U.push_guess psi ~ty0:ty ~ty1:rst.ty tm
-
-    | Tm.BoxModality ty, E.Shut e ->
-      M.in_scope (Name.fresh ()) `Lock begin
-        elab_chk env ty e
-      end <<@> fun tm ->
-        Tm.make @@ Tm.Shut tm
 
     | _, E.Hole name ->
       M.lift C.ask >>= fun psi ->
@@ -516,13 +506,6 @@ struct
         elab_chk env ty {e with con = E.Pi (etele, ecod)}
         <<@> Tm.bind x
         <<@> fun bnd -> Tm.make @@ Tm.Later bnd
-      end
-
-    | Tm.Univ _, E.Pi (`Lock :: etele, ecod) ->
-      let x = Name.fresh () in
-      M.in_scope x `Lock begin
-        elab_chk env ty {e with con = E.Pi (etele, ecod)}
-        <<@> fun ty -> Tm.make @@ Tm.BoxModality ty
       end
 
     | Tm.Univ _, E.Sg ([], e) ->
@@ -997,21 +980,6 @@ struct
           raise ChkMatch
       end
 
-    | spine, `Prev {con = E.TickConst} ->
-      M.in_scope (Name.fresh ()) `Lock begin
-        elab_cut env exp spine
-      end >>= fun (ty, cmd) ->
-      try_nf ty @@ fun ty ->
-      begin
-        match unleash ty with
-        | Later ltr ->
-          let tick = Tm.make Tm.TickConst in
-          let ty' = Tm.unbind_with (Tm.DownX tick, Emp) ltr in
-          M.ret (ty', cmd @< Tm.Prev tick)
-        | _ ->
-          raise ChkMatch
-      end
-
     | spine, `Prev {con = E.Var (name, _)} ->
       elab_var env name 0 >>= fun (_, tick) ->
       M.in_scope (Name.fresh ()) (`KillFromTick (Tm.up tick)) begin
@@ -1023,19 +991,6 @@ struct
         | Later ltr ->
           let ty' = Tm.unbind_with tick ltr in
           M.ret (ty', cmd @< Tm.Prev (Tm.up tick))
-        | _ ->
-          raise ChkMatch
-      end
-
-    | spine, `Open ->
-      M.in_scope (Name.fresh ()) `ClearLocks begin
-        elab_cut env exp spine
-      end >>= fun (ty, cmd) ->
-      try_nf ty @@ fun ty ->
-      begin
-        match unleash ty with
-        | Tm.BoxModality ty' ->
-          M.ret (ty', cmd @< Tm.Open)
         | _ ->
           raise ChkMatch
       end

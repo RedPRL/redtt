@@ -93,10 +93,6 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<dfix>"
   | DFixLine _ ->
     Format.fprintf fmt "<dfix-line>"
-  | BoxModality _ ->
-    Format.fprintf fmt "<box-modality>"
-  | Shut _ ->
-    Format.fprintf fmt "<shut>"
   | Data lbl ->
     Uuseg_string.pp_utf_8 fmt lbl
   | Intro info ->
@@ -235,9 +231,6 @@ and pp_neu fmt neu =
 
   | FixLine _ ->
     Format.fprintf fmt "<fix-line>"
-
-  | Open _ ->
-    Format.fprintf fmt "<open>"
 
 and pp_elim_clauses fmt clauses =
   let pp_sep fmt () = Format.fprintf fmt "@ " in

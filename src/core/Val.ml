@@ -36,7 +36,6 @@ type error =
   | UnleashExtError of value
   | UnleashVError of value
   | UnleashLaterError of value
-  | UnleashBoxModalityError of value
   | UnleashCoRError of value
   | UnleashLblTyError of value
   | UnleashFHComError of value
@@ -132,10 +131,6 @@ struct
     | UnleashLaterError v ->
       Format.fprintf fmt
         "Tried to unleash %a as later modality."
-        pp_value v
-    | UnleashBoxModalityError v ->
-      Format.fprintf fmt
-        "Tried to unleash %a as box modality."
         pp_value v
     | UnleashExtError v ->
       Format.fprintf fmt
@@ -367,12 +362,6 @@ struct
       let clo = Clo.act phi info.clo in
       make_dfix_line r ty clo
 
-    | BoxModality v ->
-      make @@ BoxModality (Value.act phi v)
-
-    | Shut v ->
-      make @@ Shut (Value.act phi v)
-
     | Data lbl ->
       make @@ Data lbl
 
@@ -542,16 +531,6 @@ struct
         | Step v ->
           step @@ prev tick v
       end
-
-    | Open neu ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ Open neu
-        | Step v ->
-          step @@ modal_open v
-      end
-
 
     | Fix (tick, ty, clo) ->
       ret @@ Fix (tick, Value.act phi ty, Clo.act phi clo)
@@ -854,7 +833,7 @@ struct
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
-    | Pi _ | Sg _ | Ext _ | Up _ | Later _ | BoxModality _ ->
+    | Pi _ | Sg _ | Ext _ | Up _ | Later _ ->
       make @@ Coe {dir; abs; el}
 
     (* TODO: what about neutral element of the universe? is this even correct? *)
@@ -1596,14 +1575,6 @@ struct
       let tclo = TickClo {bnd; rho} in
       make @@ Next tclo
 
-    | Tm.BoxModality ty ->
-      let vty = eval rho ty in
-      make @@ BoxModality vty
-
-    | Tm.Shut t ->
-      let v = eval rho t in
-      make @@ Shut v
-
     | Tm.Data lbl ->
       make @@ Data lbl
 
@@ -1670,8 +1641,6 @@ struct
     | Tm.Prev tick ->
       let vtick = eval_tick rho tick in
       prev vtick vhd
-    | Tm.Open ->
-      modal_open vhd
     | Tm.Elim info ->
       let mot = clo info.mot rho in
       let clauses = List.map (fun (lbl, nbnd) -> lbl, nclo nbnd rho) info.clauses in
@@ -1862,13 +1831,6 @@ struct
     | Rst rst -> unleash_later rst.ty
     | _ ->
       raise @@ E (UnleashLaterError v)
-
-  and unleash_box_modality v =
-    match unleash v with
-    | BoxModality ty -> ty
-    | Rst rst -> unleash_box_modality rst.ty
-    | _ ->
-      raise @@ E (UnleashBoxModalityError v)
 
   and unleash_sg v =
     match unleash v with
@@ -2170,53 +2132,6 @@ struct
 
     | _ ->
       failwith "prev"
-
-
-  and modal_open el =
-    match unleash el with
-    | Shut el ->
-      el
-
-    | Up info ->
-      let ty = unleash_box_modality info.ty in
-      let open_face = Face.map @@ fun _ _ a -> modal_open a in
-      let open_sys = List.map open_face info.sys in
-      make @@ Up {ty; neu = Open info.neu; sys = open_sys}
-
-    | Coe info ->
-      (* EXPERIMENTAL !!! *)
-      let x, boxtyx = Abs.unleash1 info.abs in
-      let tyx = unleash_box_modality boxtyx in
-      let abs = Abs.bind1 x tyx in
-      let el = modal_open info.el in
-      rigid_coe info.dir abs el
-
-    | HCom info ->
-      (* EXPERIMENTAL !!! *)
-      let ty = unleash_box_modality info.ty in
-      let cap = modal_open info.cap in
-      let open_face =
-        Face.map @@ fun _ _ abs ->
-        let x, v = Abs.unleash1 abs in
-        Abs.bind1 x @@ modal_open v
-      in
-      let sys = List.map open_face info.sys in
-      rigid_hcom info.dir ty cap sys
-
-    | GHCom info ->
-      (* EXPERIMENTAL !!! *)
-      let ty = unleash_box_modality info.ty in
-      let cap = modal_open info.cap in
-      let open_face =
-        Face.map @@ fun _ _ abs ->
-        let x, v = Abs.unleash1 abs in
-        Abs.bind1 x @@ modal_open v
-      in
-      let sys = List.map open_face info.sys in
-      rigid_ghcom info.dir ty cap sys
-
-    | _ ->
-      failwith "modal_open"
 
 
   (* the equation oracle `phi` is for continuations `ty0` and `equiv`

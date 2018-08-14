@@ -176,12 +176,6 @@ struct
       let bdy = equate (Env.succ env) ty prev0 prev1 in
       Tm.make @@ Tm.Next (Tm.B (None, bdy))
 
-    | BoxModality ty ->
-      let open0 = modal_open el0 in
-      let open1 = modal_open el1 in
-      let t = equate env ty open0 open1 in
-      Tm.make @@ Tm.Shut t
-
     | Rst {ty; _} ->
       equate env ty el0 el1
 
@@ -255,10 +249,6 @@ struct
         let vcod1 = inst_tick_clo ltr1 tick in
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.make @@ Tm.Later (Tm.B (None, cod))
-
-      | _, BoxModality ty0, BoxModality ty1 ->
-        let ty = equate env ty ty0 ty1 in
-        Tm.make @@ Tm.BoxModality ty
 
       | _, Sg sg0, Sg sg1 ->
         let dom = equate env ty sg0.dom sg1.dom in
@@ -553,9 +543,6 @@ struct
       let tick = equate_tick env tick0 tick1 in
       equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
 
-    | Open neu0, Open neu1 ->
-      equate_neu_ env neu0 neu1 @@ Tm.Open :: stk
-
     | _ ->
       let err = ErrEquateNeu {env; neu0; neu1} in
       raise @@ E err
@@ -803,11 +790,6 @@ struct
       let sys0 = map_sys (fun _ _ -> prev tick) sys0 in
       let sys1 = map_sys (fun _ _ -> prev tick) sys1 in
       fancy_subtype (Env.succ env) vcod0 sys0 vcod1 sys1
-
-    | BoxModality ty0, BoxModality ty1 ->
-      let sys0 = map_sys (fun _ _ -> modal_open) sys0 in
-      let sys1 = map_sys (fun _ _ -> modal_open) sys1 in
-      fancy_subtype env ty0 sys0 ty1 sys1
 
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
