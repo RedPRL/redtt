@@ -2,6 +2,12 @@ import path
 
 ; Here are some tricky examples that Evan Cavallo came up with to expose bugs.
 
+data O where
+| obase
+| oloop (y : O) @ i
+  [ i=0 ⇒ y
+  | i=1 ⇒ y
+  ]
 
 let thing0 (A : type) (B : (dim → A) → type) (p : dim → A) (b : B p) : B p =
   let ty : dim → type = λ k →

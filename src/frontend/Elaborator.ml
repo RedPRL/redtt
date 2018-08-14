@@ -201,8 +201,8 @@ struct
         traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
 
         let psi =
-          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) rec_specs
-          @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dim_specs
+          List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dim_specs
+          @ List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) rec_specs
         in
         M.in_scopes psi @@
         begin
