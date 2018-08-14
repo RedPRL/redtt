@@ -3,7 +3,12 @@ open RedTT_Core
 open Dev open Bwd open BwdNotation
 
 module D = Domain
-module M = ElabMonad
+module M =
+struct
+  include ElabMonad
+  module Util = Monad.Util(ElabMonad)
+end
+
 module C = Contextual
 module U = Unify
 module Notation = Monad.Notation (M)
@@ -153,8 +158,6 @@ let rec tac_lambda names tac goal =
         raise ChkMatch
     end
 
-(* TODO factor out the motive inference algorithm *)
-
 let unleash_data ty =
   match Tm.unleash ty with
   | Tm.Data dlbl -> dlbl
@@ -205,7 +208,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     end >>= fun desc ->
 
     (* Add holes for any missing clauses *)
-    let clauses =
+    let eclauses =
       let find_clause lbl =
         try
           List.find (fun (lbl', _, _) -> lbl = lbl') clauses
@@ -276,9 +279,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
         | _ ->
           failwith "refine_clause"
       in
-      let psi, tms, const_args, rec_args, rs =
-        go Emp D.Env.emp (Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs
-      in
+
+      let psi, tms, const_args, rec_args, rs = go Emp D.Env.emp (Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
 
@@ -323,21 +325,5 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
       end
     in
 
-    let rec refine_clauses acc =
-      function
-      | [] ->
-        M.ret acc
-      | clause :: clauses ->
-        refine_clause acc clause >>= fun tclause ->
-        refine_clauses (tclause :: acc) clauses
-    in
-
-    refine_clauses [] clauses >>= fun tclauses ->
-
-    let bmot =
-      let x = Name.fresh () in
-      Tm.bind x @@ mot @@ Tm.up @@ Tm.var x
-    in
-    M.ret @@ Tm.up @@
-    Tm.ann ~ty:data_ty ~tm:scrut
-    @< Tm.Elim {dlbl; mot = bmot; clauses = tclauses}
+    M.Util.fold_left (fun acc clause -> refine_clause acc clause <<@> fun cl -> cl :: acc) [] eclauses >>= fun clauses ->
+    M.ret @@ Tm.up @@ Tm.ann ~ty:data_ty ~tm:scrut @< Tm.Elim {dlbl; mot = bmot; clauses}
