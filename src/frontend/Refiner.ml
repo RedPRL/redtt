@@ -58,53 +58,6 @@ let guess_restricted ty sys tm =
 
 exception ChkMatch
 
-(* The idea of this function is to push a restriction downward into a negative type.
-   It is perhaps a bit too ambitious to fully unleash, until we have developed the Immortal
-   subtyping and definitional equivalence theory that really gets down with eta laws of
-   restriction types. *)
-let rec push_restriction sys ty =
-  normalize_ty ty >>= fun ty ->
-  let on_sys f =
-    List.map @@ fun (r, r', otm) ->
-    r, r', Option.map f otm
-  in
-  match Tm.unleash ty with
-  | Tm.Rst rst ->
-    push_restriction (rst.sys @ sys) rst.ty
-  | Tm.Pi (dom, cod) ->
-    let x, codx = Tm.unbind cod in
-    let app_tm tm =
-      let var = Tm.up @@ Tm.var x in
-      Tm.up @@ Tm.ann ~ty ~tm @< Tm.FunApp var
-    in
-    let app_sys = on_sys app_tm sys in
-    let rcodx = Tm.make @@ Tm.Rst {ty = codx; sys = app_sys} in
-    let rty = Tm.make @@ Tm.Pi (dom, Tm.bind x rcodx) in
-    M.ret @@ `Negative rty
-
-  | Tm.Ext ebnd ->
-    let xs, tyxs, sysxs = Tm.unbind_ext ebnd in
-    let app_tm tm =
-      let vars = List.map (fun x -> Tm.up @@ Tm.var x) @@ Bwd.to_list xs in
-      Tm.up @@ Tm.ann ~ty ~tm @< Tm.ExtApp vars
-    in
-    let ebnd' = Tm.bind_ext xs tyxs @@ sysxs @ on_sys app_tm sys in
-    let rty = Tm.make @@ Tm.Ext ebnd' in
-    M.ret @@ `Negative rty
-
-  (* | Tm.Sg (dom, cod) ->
-     let car tm = Tm.up (Tm.Down {ty; tm}, Emp #< Tm.Car) in
-     let cdr tm = Tm.up (Tm.Down {ty; tm}, Emp #< Tm.Cdr) in
-     let x, codx = Tm.unbind cod in
-     let rdom = Tm.make @@ Tm.Rst {ty = dom; sys = on_sys car sys} in
-     let rcodx = Tm.make @@ Tm.Rst {ty = codx; sys = on_sys cdr sys} in
-     let rty = Tm.make @@ Tm.Sg (rdom, Tm.bind x rcodx) in
-     M.ret @@ `Negative rty *)
-
-
-  | _ ->
-    M.ret `Positive
-
 let rec tac_rst tac ty =
   let rec go sys ty =
     normalize_ty ty >>= fun ty ->
@@ -117,12 +70,8 @@ let rec tac_rst tac ty =
         | [] -> tac ty
         | _ ->
           normalize_ty ty >>= fun ty ->
-          push_restriction sys ty >>= function
-          | `Positive ->
-            tac_wrap_nf tac ty >>=
-            guess_restricted ty sys
-          | `Negative rty ->
-            tac_wrap_nf tac rty
+          tac_wrap_nf tac ty >>=
+          guess_restricted ty sys
       end
   in go [] ty
 
