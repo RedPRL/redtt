@@ -9,7 +9,9 @@ module U = Unify
 module Notation = Monad.Notation (M)
 open Notation
 
-type chk_tac = ty -> tm M.m
+type sys = (tm, tm) Tm.system
+type goal = {ty : ty}
+type chk_tac = goal -> tm M.m
 type inf_tac = (ty * tm) M.m
 
 open Tm.Notation
@@ -58,7 +60,7 @@ let guess_restricted ty sys tm =
 
 exception ChkMatch
 
-let rec tac_rst tac ty =
+let rec tac_rst tac goal =
   let rec go sys ty =
     normalize_ty ty >>= fun ty ->
     match Tm.unleash ty with
@@ -67,21 +69,20 @@ let rec tac_rst tac ty =
     | _ ->
       begin
         match sys with
-        | [] -> tac ty
+        | [] -> tac {ty}
         | _ ->
-          normalize_ty ty >>= fun ty ->
-          tac_wrap_nf tac ty >>=
+          tac_wrap_nf tac {ty} >>=
           guess_restricted ty sys
       end
-  in go [] ty
+  in go [] goal.ty
 
 
-and tac_wrap_nf tac ty =
-  try tac ty
+and tac_wrap_nf tac goal =
+  try tac goal
   with
   | ChkMatch ->
-    normalize_ty ty >>=
-    tac_rst tac
+    normalize_ty goal.ty >>= fun ty ->
+    tac_rst tac {ty}
 
 
 let tac_let name itac ctac =
@@ -92,17 +93,17 @@ let tac_let name itac ctac =
     M.ret @@ Tm.make @@ Tm.Let (Tm.ann ~ty:let_ty ~tm:let_tm, Tm.bind x bdyx)
 
 
-let rec tac_lambda names tac ty =
-  match Tm.unleash ty with
+let rec tac_lambda names tac goal =
+  match Tm.unleash goal.ty with
   | Tm.Pi (dom, cod) ->
     begin
       match names with
-      | [] -> tac ty
+      | [] -> tac goal
       | name :: names ->
         let x = Name.named @@ Some name in
         let codx = Tm.unbind_with (Tm.var x) cod in
         M.in_scope x (`P dom) begin
-          tac_wrap_nf (tac_lambda names tac) codx
+          tac_wrap_nf (tac_lambda names tac) {ty = codx}
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
     end
@@ -110,12 +111,12 @@ let rec tac_lambda names tac ty =
   | Tm.Later cod ->
     begin
       match names with
-      | [] -> tac ty
+      | [] -> tac goal
       | name :: names ->
         let x = Name.named @@ Some name in
         let codx = Tm.unbind_with (Tm.var x) cod in
         M.in_scope x `Tick begin
-          tac_wrap_nf (tac_lambda names tac) codx
+          tac_wrap_nf (tac_lambda names tac) {ty = codx}
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Next (Tm.bind x bdyx)
     end
@@ -123,7 +124,7 @@ let rec tac_lambda names tac ty =
   | Tm.Ext (Tm.NB (nms, _) as ebnd) ->
     begin
       match names with
-      | [] -> tac ty
+      | [] -> tac goal
       | _ ->
         let rec bite nms lnames rnames =
           match nms, rnames with
@@ -138,7 +139,7 @@ let rec tac_lambda names tac ty =
         let rty = Tm.make @@ Tm.Rst {ty; sys} in
         let ps = List.map (fun x -> (x, `I)) @@ Bwd.to_list xs in
         M.in_scopes ps begin
-          tac' rty
+          tac' {ty = rty}
         end >>= fun bdyxs ->
         let lam = Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs) in
         M.ret lam
@@ -147,7 +148,7 @@ let rec tac_lambda names tac ty =
   | _ ->
     begin
       match names with
-      | [] -> tac ty
+      | [] -> tac goal
       | _ ->
         raise ChkMatch
     end
@@ -175,7 +176,7 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
   | Some tac_mot ->
     let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
     let mot_ty = Tm.pi None data_ty univ in
-    tac_mot mot_ty >>= fun mot ->
+    tac_mot {ty = mot_ty} >>= fun mot ->
     let motx =
       Tm.ann ~ty:(Tm.subst (Tm.shift 1) mot_ty) ~tm:(Tm.subst (Tm.shift 1) mot)
       @< Tm.FunApp (Tm.up @@ Tm.ix 0)
@@ -183,11 +184,11 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
     M.ret @@ Tm.B (None, Tm.up @@ motx)
 
 let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
-  fun ty ->
+  fun goal ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
 
-    make_motive ~data_ty ~scrut ~tac_mot ~ty >>= fun bmot ->
+    make_motive ~data_ty ~scrut ~tac_mot ~ty:goal.ty >>= fun bmot ->
 
     let mot arg =
       let Tm.B (_, motx) = bmot in
@@ -216,10 +217,10 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.rec_specs
             @ List.map (fun x -> ESig.PVar x) constr.dim_specs
           in
-          lbl, pbinds, fun ty ->
+          lbl, pbinds, fun goal ->
             M.lift C.ask >>= fun psi ->
-            M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
-            M.emit loc @@ M.UserHole {name = Some lbl; ty; tele = psi; tm = Tm.up tm} >>
+            M.lift @@ U.push_hole `Rigid psi goal.ty >>= fun tm ->
+            M.emit loc @@ M.UserHole {name = Some lbl; ty = goal.ty; tele = psi; tm = Tm.up tm} >>
             M.ret @@ Tm.up tm
       in
       List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
@@ -317,7 +318,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           | _ -> Tm.make @@ Tm.Rst {ty = clause_ty; sys = tsys}
         in
 
-        clause_tac clause_rty <<@> fun bdy ->
+        clause_tac {ty = clause_rty} <<@> fun bdy ->
           clbl, Tm.bindn (Bwd.map fst psi) bdy
       end
     in

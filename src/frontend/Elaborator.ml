@@ -125,7 +125,7 @@ struct
       let now0 = Unix.gettimeofday () in
       elab_scheme env scheme @@ fun cod ->
       M.unify >>
-      elab_chk env cod e >>= fun tm ->
+      elab_chk env e {ty = cod} >>= fun tm ->
       let alpha = Name.named @@ Some name in
 
       M.lift C.ask >>= fun psi ->
@@ -218,7 +218,7 @@ struct
       | (lbl, ety) :: const_specs ->
         (* TODO: support higher universes *)
         let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
-        elab_chk env univ ety >>= bind_in_scope >>= fun pty ->
+        elab_chk env ety {ty = univ} >>= bind_in_scope >>= fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
         go (acc #< (lbl, x, pty)) const_specs
@@ -309,7 +309,7 @@ struct
           (* TODO: might be backwards *)
           let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
           let pty' = Tm.subst sub pty in
-          elab_chk env pty' e >>= bind_in_scope >>= fun t ->
+          elab_chk env e {ty = pty'} >>= bind_in_scope >>= fun t ->
           go_const_specs ((pty', t) :: acc) ps frms
         | _ ->
           failwith "elab_intro: malformed parameters"
@@ -365,10 +365,10 @@ struct
     let rec go =
       function
       | [] ->
-        elab_chk env univ ecod >>=
+        elab_chk env ecod {ty = univ} >>=
         kont
       | `Ty (name, edom) :: cells ->
-        elab_chk env univ edom >>= normalize_ty >>= fun dom ->
+        elab_chk env edom {ty = univ} >>= normalize_ty >>= fun dom ->
         let x = Name.named @@ Some name in
         M.in_scope x (`P dom) @@
         go cells
@@ -390,181 +390,182 @@ struct
 
   (* TODO: we will be disentangling all the elaboration of concrete expressions from tactics which produce redtt proofs.
      As an example, see what we have done with tac_lambda, tac_if, etc. *)
-  and elab_chk env ty e : tm M.m =
-    normalize_ty ty >>= fun ty ->
-    match Tm.unleash ty, e.con with
-    | Tm.Rst rst, E.Guess e ->
-      elab_chk env rst.ty e >>= fun tm ->
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_guess psi ~ty0:ty ~ty1:rst.ty tm
+  and elab_chk env e : chk_tac =
+    fun goal ->
+      normalize_ty goal.ty >>= fun ty ->
+      match Tm.unleash ty, e.con with
+      | Tm.Rst rst, E.Guess e ->
+        elab_chk env e {ty = rst.ty} >>= fun tm ->
+        M.lift C.ask >>= fun psi ->
+        M.lift @@ U.push_guess psi ~ty0:ty ~ty1:rst.ty tm
 
-    | _, E.Hole name ->
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
-      begin
-        if name = Some "_" then M.ret () else
-          M.emit e.span @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm}
-      end >>
-      M.ret @@ Tm.up tm
+      | _, E.Hole name ->
+        M.lift C.ask >>= fun psi ->
+        M.lift @@ U.push_hole `Rigid psi ty >>= fun tm ->
+        begin
+          if name = Some "_" then M.ret () else
+            M.emit e.span @@ M.UserHole {name; ty; tele = psi; tm = Tm.up tm}
+        end >>
+        M.ret @@ Tm.up tm
 
-    | _, E.Hope ->
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.push_hole `Flex psi ty <<@> Tm.up
-
-
-    | _, E.Let info ->
-      let itac =
-        match info.ty with
-        | None ->
-          elab_inf env info.tm <<@> fun (let_ty, let_tm) ->
-            let_ty, Tm.up let_tm
-        | Some ety ->
-          elab_chk env univ ety >>= fun let_ty ->
-          elab_chk env let_ty info.tm <<@> fun let_tm ->
-            let_ty, let_tm
-      in
-      let ctac ty = elab_chk env ty info.body in
-      tac_let info.name itac ctac ty
-
-    | Tm.Rst _, _ ->
-      tac_rst (fun ty -> elab_chk env ty e) ty
-
-    | _, E.Lam (names, e) ->
-      let tac ty = elab_chk env ty e in
-      tac_wrap_nf (tac_lambda names tac) ty
-
-    | _, E.Quo tmfam ->
-      get_resolver env >>= fun renv ->
-      let tm = tmfam renv in
-      begin
-        match Tm.unleash tm with
-        | Tm.Up _ ->
-          elab_up env ty {e with con = E.Quo tmfam }
-        | _ ->
-          M.ret @@ tmfam renv
-      end
+      | _, E.Hope ->
+        M.lift C.ask >>= fun psi ->
+        M.lift @@ U.push_hole `Flex psi ty <<@> Tm.up
 
 
-    | _, E.Elim {mot; scrut; clauses} ->
-      let tac_mot = Option.map (fun emot ty -> elab_chk env ty emot) mot in
-      let tac_scrut = elab_inf env scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
-      let used = Hashtbl.create 10 in
-      let elab_clause (lbl, pbinds, bdy) =
-        if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
-          begin
-            Hashtbl.add used lbl ();
-            lbl, pbinds, fun ty -> elab_chk env ty bdy
-          end
-      in
-      let clauses = List.map elab_clause clauses in
-      tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses ty
+      | _, E.Let info ->
+        let itac =
+          match info.ty with
+          | None ->
+            elab_inf env info.tm <<@> fun (let_ty, let_tm) ->
+              let_ty, Tm.up let_tm
+          | Some ety ->
+            elab_chk env ety {ty = univ} >>= fun let_ty ->
+            elab_chk env info.tm {ty= let_ty} <<@> fun let_tm ->
+              let_ty, let_tm
+        in
+        let ctac goal = elab_chk env info.body goal in
+        tac_let info.name itac ctac goal
 
-    | Tm.Univ _, E.Ext (names, ety, esys) ->
-      let univ = ty in
-      let xs = List.map (fun x -> Name.named (Some x)) names in
-      let ps = List.map (fun x -> (x, `I)) xs in
-      M.in_scopes ps begin
-        elab_chk env univ ety >>= fun tyxs ->
-        elab_tm_sys env tyxs esys <<@> fun sysxs ->
-          let ebnd = Tm.bind_ext (Bwd.from_list xs) tyxs sysxs in
-          let ext_ty = Tm.make @@ Tm.Ext ebnd in
-          ext_ty
-      end
+      | Tm.Rst _, _ ->
+        tac_rst (elab_chk env e) goal
 
-    | Tm.Univ _, E.Rst (ety, esys) ->
-      let univ = ty in
-      elab_chk env univ ety >>= fun ty ->
-      elab_tm_sys env ty esys <<@> fun sys ->
-        Tm.make @@ Tm.Rst {ty; sys}
+      | _, E.Lam (names, e) ->
+        let tac = elab_chk env e in
+        tac_wrap_nf (tac_lambda names tac) goal
 
-    | Tm.Univ _, E.Pi ([], e) ->
-      elab_chk env ty e
-
-    | Tm.Univ _, E.Pi (`Ty (name, edom) :: etele, ecod) ->
-      elab_chk env ty edom >>= fun dom ->
-      let x = Name.named @@ Some name in
-      M.in_scope x (`P dom) begin
-        elab_chk env ty {e with con = E.Pi (etele, ecod)}
-        <<@> Tm.bind x
-        <<@> fun cod -> Tm.make @@ Tm.Pi (dom, cod)
-      end
-
-    | Tm.Univ _, E.Pi (`I name :: etele, ecod) ->
-      let x = Name.named @@ Some name in
-      M.in_scope x `I begin
-        elab_chk env ty { e with con = E.Pi (etele, ecod)}
-        <<@> fun codx ->
-          let ebnd = Tm.bind_ext (Emp #< x) codx [] in
-          Tm.make @@ Tm.Ext ebnd
-      end
-
-    | Tm.Univ _, E.Pi (`Tick name :: etele, ecod) ->
-      let x = Name.named @@ Some name in
-      M.in_scope x `Tick begin
-        elab_chk env ty {e with con = E.Pi (etele, ecod)}
-        <<@> Tm.bind x
-        <<@> fun bnd -> Tm.make @@ Tm.Later bnd
-      end
-
-    | Tm.Univ _, E.Sg ([], e) ->
-      elab_chk env ty e
-
-    | Tm.Univ _, E.Sg (`Ty (name, edom) :: etele, ecod) ->
-      elab_chk env ty edom >>= fun dom ->
-      let x = Name.named @@ Some name in
-      M.in_scope x (`P dom) begin
-        elab_chk env ty {e with con = E.Sg (etele, ecod)}
-        <<@> Tm.bind x
-        <<@> fun cod -> Tm.make @@ Tm.Sg (dom, cod)
-      end
-
-
-    | _, Tuple [] ->
-      failwith "empty tuple"
-    | _, Tuple [e] ->
-      elab_chk env ty e
-    | Tm.Sg (dom, cod), Tuple (e :: es) ->
-      elab_chk env dom e >>= fun tm0 ->
-      let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
-      let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
-      elab_chk env cod' {e with con = E.Tuple es} <<@> Tm.cons tm0
-
-    | Tm.Univ info, Type (kind, lvl) ->
-      begin
-        if Lvl.greater info.lvl lvl then
-          match Tm.unleash ty with
-          | Tm.Univ _ ->
-            M.ret @@ Tm.univ ~kind ~lvl
+      | _, E.Quo tmfam ->
+        get_resolver env >>= fun renv ->
+        let tm = tmfam renv in
+        begin
+          match Tm.unleash tm with
+          | Tm.Up _ ->
+            elab_up env ty {e with con = E.Quo tmfam }
           | _ ->
-            failwith "Type"
-        else
-          failwith "Elaborator: universe level error"
-      end
+            M.ret @@ tmfam renv
+        end
 
-    | _, E.Cut (e, fs) ->
-      elab_chk_cut env e fs ty
 
-    | _, E.HCom info ->
-      elab_dim env info.r >>= fun r ->
-      elab_dim env info.r' >>= fun r' ->
-      let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
-      begin
-        M.lift @@ C.check ~ty:kan_univ ty >>= function
-        | `Ok ->
-          elab_chk env ty info.cap >>= fun cap ->
-          elab_hcom_sys env r ty cap info.sys <<@> fun sys ->
-            let hcom = Tm.HCom {r; r'; ty; cap; sys} in
-            Tm.up (hcom, Emp)
+      | _, E.Elim {mot; scrut; clauses} ->
+        let tac_mot = Option.map (elab_chk env) mot in
+        let tac_scrut = elab_inf env scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
+        let used = Hashtbl.create 10 in
+        let elab_clause (lbl, pbinds, bdy) =
+          if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
+            begin
+              Hashtbl.add used lbl ();
+              lbl, pbinds, elab_chk env bdy
+            end
+        in
+        let clauses = List.map elab_clause clauses in
+        tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses goal
 
-        | `Exn exn ->
-          raise exn
-      end
+      | Tm.Univ _, E.Ext (names, ety, esys) ->
+        let univ = ty in
+        let xs = List.map (fun x -> Name.named (Some x)) names in
+        let ps = List.map (fun x -> (x, `I)) xs in
+        M.in_scopes ps begin
+          elab_chk env ety {ty = univ} >>= fun tyxs ->
+          elab_tm_sys env tyxs esys <<@> fun sysxs ->
+            let ebnd = Tm.bind_ext (Bwd.from_list xs) tyxs sysxs in
+            let ext_ty = Tm.make @@ Tm.Ext ebnd in
+            ext_ty
+        end
 
-    | _, E.Var _ ->
-      elab_chk_cut env e Emp ty
+      | Tm.Univ _, E.Rst (ety, esys) ->
+        let univ = ty in
+        elab_chk env ety {ty = univ} >>= fun ty ->
+        elab_tm_sys env ty esys <<@> fun sys ->
+          Tm.make @@ Tm.Rst {ty; sys}
 
-    | _, _ ->
-      elab_up env ty e
+      | Tm.Univ _, E.Pi ([], e) ->
+        elab_chk env e goal
+
+      | Tm.Univ _, E.Pi (`Ty (name, edom) :: etele, ecod) ->
+        elab_chk env edom {ty} >>= fun dom ->
+        let x = Name.named @@ Some name in
+        M.in_scope x (`P dom) begin
+          elab_chk env {e with con = E.Pi (etele, ecod)} {ty}
+          <<@> Tm.bind x
+          <<@> fun cod -> Tm.make @@ Tm.Pi (dom, cod)
+        end
+
+      | Tm.Univ _, E.Pi (`I name :: etele, ecod) ->
+        let x = Name.named @@ Some name in
+        M.in_scope x `I begin
+          elab_chk env { e with con = E.Pi (etele, ecod)} {ty}
+          <<@> fun codx ->
+            let ebnd = Tm.bind_ext (Emp #< x) codx [] in
+            Tm.make @@ Tm.Ext ebnd
+        end
+
+      | Tm.Univ _, E.Pi (`Tick name :: etele, ecod) ->
+        let x = Name.named @@ Some name in
+        M.in_scope x `Tick begin
+          elab_chk env {e with con = E.Pi (etele, ecod)} {ty}
+          <<@> Tm.bind x
+          <<@> fun bnd -> Tm.make @@ Tm.Later bnd
+        end
+
+      | Tm.Univ _, E.Sg ([], e) ->
+        elab_chk env e {ty}
+
+      | Tm.Univ _, E.Sg (`Ty (name, edom) :: etele, ecod) ->
+        elab_chk env edom {ty} >>= fun dom ->
+        let x = Name.named @@ Some name in
+        M.in_scope x (`P dom) begin
+          elab_chk env {e with con = E.Sg (etele, ecod)} {ty}
+          <<@> Tm.bind x
+          <<@> fun cod -> Tm.make @@ Tm.Sg (dom, cod)
+        end
+
+
+      | _, Tuple [] ->
+        failwith "empty tuple"
+      | _, Tuple [e] ->
+        elab_chk env e {ty}
+      | Tm.Sg (dom, cod), Tuple (e :: es) ->
+        elab_chk env e {ty = dom} >>= fun tm0 ->
+        let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
+        let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
+        elab_chk env {e with con = E.Tuple es} {ty = cod'} <<@> Tm.cons tm0
+
+      | Tm.Univ info, Type (kind, lvl) ->
+        begin
+          if Lvl.greater info.lvl lvl then
+            match Tm.unleash ty with
+            | Tm.Univ _ ->
+              M.ret @@ Tm.univ ~kind ~lvl
+            | _ ->
+              failwith "Type"
+          else
+            failwith "Elaborator: universe level error"
+        end
+
+      | _, E.Cut (e, fs) ->
+        elab_chk_cut env e fs ty
+
+      | _, E.HCom info ->
+        elab_dim env info.r >>= fun r ->
+        elab_dim env info.r' >>= fun r' ->
+        let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
+        begin
+          M.lift @@ C.check ~ty:kan_univ ty >>= function
+          | `Ok ->
+            elab_chk env info.cap {ty} >>= fun cap ->
+            elab_hcom_sys env r ty cap info.sys <<@> fun sys ->
+              let hcom = Tm.HCom {r; r'; ty; cap; sys} in
+              Tm.up (hcom, Emp)
+
+          | `Exn exn ->
+            raise exn
+        end
+
+      | _, E.Var _ ->
+        elab_chk_cut env e Emp ty
+
+      | _, _ ->
+        elab_up env ty e
 
   and elab_tm_sys env ty =
     let rec go acc =
@@ -578,7 +579,7 @@ struct
         elab_dim env e_r' >>= fun r' ->
         begin
           M.under_restriction r r' begin
-            elab_chk env rst_ty e
+            elab_chk env e {ty = rst_ty}
           end
         end >>= fun obnd ->
         let face = r, r', obnd in
@@ -610,7 +611,7 @@ struct
         elab_dim env e_r' >>= fun r' ->
         begin
           M.under_restriction r r' begin
-            elab_chk env ext_ty e >>= fun line ->
+            elab_chk env e {ty = ext_ty} >>= fun line ->
             M.in_scope x `I (M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx]) >>= fun (_, tmx) ->
             M.ret @@ Tm.bind x tmx
           end
@@ -645,7 +646,7 @@ struct
         elab_dim env e_r' >>= fun r' ->
         begin
           M.under_restriction r r' begin
-            elab_chk env ext_ty e >>= fun line ->
+            elab_chk env e {ty = ext_ty} >>= fun line ->
             M.in_scope x `I (M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx]) >>= fun (_, tmx) ->
             M.ret @@ Tm.bind x tmx
           end
@@ -716,13 +717,13 @@ struct
       let x = Name.fresh () in
       let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
-      elab_chk env univ_fam info.fam >>= fun fam ->
+      elab_chk env info.fam {ty = univ_fam} >>= fun fam ->
       begin
         (M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr] <<@> snd)
         <&>
         (M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr'] <<@> snd)
       end >>= fun (fam_r, fam_r') ->
-      elab_chk env fam_r info.tm <<@> fun tm ->
+      elab_chk env info.tm {ty = fam_r} <<@> fun tm ->
         let varx = Tm.up @@ Tm.var x in
         let tyx = Tm.up @@ Tm.ann ~ty:univ_fam ~tm:fam @< Tm.ExtApp [varx] in
         let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
@@ -734,10 +735,10 @@ struct
       let x = Name.fresh () in
       let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
-      elab_chk env univ_fam info.fam >>= fun fam ->
+      elab_chk env info.fam {ty = univ_fam} >>= fun fam ->
       M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr] >>= fun (_, fam_r) ->
       M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr'] >>= fun (_, fam_r') ->
-      elab_chk env fam_r info.cap >>= fun cap ->
+      elab_chk env info.cap {ty = fam_r} >>= fun cap ->
       M.in_scope x `I begin
         let varx = Tm.up @@ Tm.var x in
         M.lift @@ (univ_fam, fam) %% Tm.ExtApp [varx]
@@ -748,26 +749,26 @@ struct
         fam_r', (com, Emp)
 
     | E.DFixLine info ->
-      elab_chk env univ info.ty >>= fun ty ->
+      elab_chk env info.ty {ty = univ} >>= fun ty ->
       elab_dim env info.r >>= fun r ->
       let wk_ty = Tm.subst (Tm.shift 1) ty in
       let ltr_ty = Tm.make @@ Tm.Later (Tm.B (None, wk_ty)) in
       let x = Name.named @@ Some info.name in
       M.in_scope x (`P ltr_ty) begin
-        elab_chk env ty info.bdy
+        elab_chk env info.bdy {ty}
         <<@> Tm.bind x
         <<@> fun bdy ->
           ltr_ty, (Tm.DFix {r; ty; bdy}, Emp)
       end
 
     | E.FixLine info ->
-      elab_chk env univ info.ty >>= fun ty ->
+      elab_chk env info.ty {ty = univ} >>= fun ty ->
       elab_dim env info.r >>= fun r ->
       let wk_ty = Tm.subst (Tm.shift 1) ty in
       let ltr_ty = Tm.make @@ Tm.Later (Tm.B (None, wk_ty)) in
       let x = Name.named @@ Some info.name in
       M.in_scope x (`P ltr_ty) begin
-        elab_chk env ty info.bdy
+        elab_chk env info.bdy {ty}
         <<@> Tm.bind x
         <<@> fun bdy ->
           let dfix = Tm.DFix {r; ty; bdy}, Emp in
@@ -868,7 +869,7 @@ struct
         (* TODO: might be backwards *)
         let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
         let ty' = Tm.subst sub ty in
-        elab_chk env ty' e >>= fun t ->
+        elab_chk env e {ty = ty'} >>= fun t ->
         go_const_args ((ty', t) :: acc) const_specs frms
       | _ ->
         failwith "elab_intro: malformed parameters"
@@ -881,7 +882,7 @@ struct
         (fun x xs -> x :: xs) <@>> elab_dim env r <*> go_rec_args rec_specs dims frms
       | (_, Desc.Self) :: rec_specs, dims, E.App e :: frms ->
         let self_ty = Tm.make @@ Tm.Data dlbl in
-        (fun x xs -> x :: xs) <@>> elab_chk env self_ty e <*> go_rec_args rec_specs dims frms
+        (fun x xs -> x :: xs) <@>> elab_chk env e {ty = self_ty} <*> go_rec_args rec_specs dims frms
       | _ ->
         failwith "todo: go_args"
     in
@@ -948,7 +949,7 @@ struct
       begin
         match unleash ty with
         | Tm.Pi (dom, cod) ->
-          elab_chk env dom e <<@> fun arg ->
+          elab_chk env e {ty = dom} <<@> fun arg ->
             Tm.unbind_with (Tm.ann ~ty:dom ~tm:arg) cod, cmd @< Tm.FunApp arg
         | _ ->
           raise ChkMatch

@@ -2,7 +2,11 @@ open Dev
 open RedTT_Core
 open ElabMonad
 
-type chk_tac = ty -> tm m
+type sys = (tm, tm) Tm.system
+
+type goal = {ty : ty}
+type chk_tac = goal -> tm m
+
 type inf_tac = (ty * tm) m
 
 exception ChkMatch
