@@ -253,12 +253,14 @@ struct
     M.ret bdry
 
   and elab_constr_face env dlbl desc (er0, er1, e) =
-    elab_dim env er0 >>= bind_in_scope >>= fun r0 ->
-    elab_dim env er1 >>= bind_in_scope >>= fun r1 ->
+    elab_dim env er0 >>= fun r0 ->
+    bind_in_scope r0 >>= fun r0' ->
+    elab_dim env er1 >>= fun r1 ->
+    bind_in_scope r1 >>= fun r1' ->
     M.in_scope (Name.fresh ()) (`R (r0, r1)) @@
     begin
       elab_boundary_term env dlbl desc e <<@> fun bt ->
-        r0, r1, bt
+        r0', r1', bt
     end
 
   and elab_boundary_term env dlbl desc e =

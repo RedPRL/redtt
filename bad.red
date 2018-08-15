@@ -79,3 +79,13 @@ let id (o : O) : O =
   | obase ⇒ obase
   | oloop (o' ⇒ id/o') i ⇒ oloop id/o' i
   ]
+
+data void where
+
+; Still broken:
+data T where
+| tbase [u : void]
+| tloop [u : void] @ i
+  [ i=0 ⇒ tbase u
+  | i=1 ⇒ tbase u
+  ]

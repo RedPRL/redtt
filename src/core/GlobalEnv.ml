@@ -118,7 +118,10 @@ let restrict tr0 tr1 sg =
     | Tm.Up (Tm.Var {name; _}, Emp) -> `Atom name
     | Tm.Dim0 -> `Dim0
     | Tm.Dim1 -> `Dim1
-    | _ -> failwith "Restrict: expected dimension"
+    | _ ->
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
+      failwith "Restrict: expected dimension"
   in
   let rel', _ = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel in
   {sg with rel = rel'}
