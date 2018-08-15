@@ -14,6 +14,9 @@ val pp_val_sys : Format.formatter -> ('x, value) face list -> unit
 val pp_comp_sys : Format.formatter -> comp_sys -> unit
 val pp_names : Format.formatter -> Name.t bwd -> unit
 
+val pp_env_cell : Format.formatter -> env_el -> unit
+val pp_env : Format.formatter -> env -> unit
+
 
 exception ProjAbs of abs
 exception ProjVal of value

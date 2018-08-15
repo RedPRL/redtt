@@ -93,9 +93,10 @@ struct
       Format.fprintf fmt
         "Unexpected argument to labeled type projection:@ %a."
         pp_value v
-    | UnexpectedEnvCell _ ->
+    | UnexpectedEnvCell cell ->
       Format.fprintf fmt
-        "Did not find what was expected in the environment."
+        "Did not find what was expected in the environment: %a"
+        pp_env_cell cell
     | ExpectedDimensionTerm t ->
       Format.fprintf fmt
         "Tried to evaluate non-dimension term %a as dimension."

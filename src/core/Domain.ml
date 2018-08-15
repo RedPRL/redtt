@@ -24,9 +24,9 @@ let rec pp_env_cell fmt =
   | `Tick _ ->
     Format.fprintf fmt "<tick>"
 
-and pp_env fmt =
+and pp_env fmt env =
   let pp_sep fmt () = Format.fprintf fmt ", " in
-  Format.pp_print_list ~pp_sep pp_env_cell fmt
+  Format.pp_print_list ~pp_sep pp_env_cell fmt env.cells
 
 
 and pp_con fmt : con -> unit =
@@ -160,11 +160,11 @@ and pp_comp_face : type x. _ -> (x, abs) face -> unit =
 
 and pp_clo fmt (Clo clo) =
   let Tm.B (_, tm) = clo.bnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
+  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
 
 and pp_nclo fmt (NClo clo) =
   let Tm.NB (_, tm) = clo.nbnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
+  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
 
 and pp_neu fmt neu =
   match neu with
