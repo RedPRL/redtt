@@ -82,7 +82,6 @@ let id (o : O) : O =
 
 data void where
 
-; Still broken:
 data T where
 | tbase [u : void]
 | tloop [u : void] @ i
