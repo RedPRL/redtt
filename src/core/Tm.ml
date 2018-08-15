@@ -445,6 +445,10 @@ let make con =
   match con with
   | Up (Ix (ix, _), _) when ix < 0 ->
     raise @@ E (InvalidDeBruijnIndex ix)
+  | Up (Down {tm = Tm (Up (hd, sp)); _}, sp') ->
+    Tm (Up (hd, sp <.> sp'))
+  | Up (Down {tm; _}, Emp) ->
+    tm
   | _ -> Tm con
 
 let unleash (Tm con) = con
