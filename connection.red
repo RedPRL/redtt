@@ -18,15 +18,15 @@ let connection/or
     λ l k →
       comp 0 l (p k) [
       | k=1 ⇒ λ _ → p 1
-      | k=0 ⇒ λ m → p m
+      | k=0 ⇒ p
       ]
   in
   comp 1 0 (p 1) [
-  | i=0 ⇒ λ k → face j k
-  | i=1 ⇒ λ k → face 1 k
-  | j=0 ⇒ λ k → face i k
-  | j=1 ⇒ λ k → face 1 k
-  | i=j ⇒ λ k → face i k
+  | i=0 ⇒ face j
+  | i=1 ⇒ face 1
+  | j=0 ⇒ face i
+  | j=1 ⇒ face 1
+  | i=j ⇒ face i
   ]
 
 let connection/and
@@ -44,15 +44,15 @@ let connection/and
      λ l k →
        comp 1 l (p k) [
        | k=0 ⇒ λ _ → p 0
-       | k=1 ⇒ λ m → p m
+       | k=1 ⇒ p
        ]
    in
    comp 0 1 (p 0) [
-   | i=0 ⇒ λ k → face 0 k
-   | i=1 ⇒ λ k → face j k
-   | j=0 ⇒ λ k → face 0 k
-   | j=1 ⇒ λ k → face i k
-   | i=j ⇒ λ k → face i k
+   | i=0 ⇒ face 0
+   | i=1 ⇒ face j
+   | j=0 ⇒ face 0
+   | j=1 ⇒ face i
+   | i=j ⇒ face i
    ]
 
 

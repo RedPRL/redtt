@@ -41,11 +41,11 @@ let IdEquiv (A : type) : Equiv A A =
       let aux : dim → A =
         λ j →
         comp 1 j a [
-        | i=0 ⇒ λ k → p.1 k
+        | i=0 ⇒ p.1
         | i=1 ⇒ λ _ → a
         ]
       in
-      <aux 0, λ j → aux j>
+      <aux 0, aux>
     >
   >
 
@@ -69,10 +69,10 @@ let PropSet
   =
   λ a b p q i j →
     comp 0 1 a [
-    | j=0 ⇒ λ k → A/prop a a k
-    | j=1 ⇒ λ k → A/prop a b k
-    | i=0 ⇒ λ k → A/prop a (p j) k
-    | i=1 ⇒ λ k → A/prop a (q j) k
+    | j=0 ⇒ A/prop a a
+    | j=1 ⇒ A/prop a b
+    | i=0 ⇒ A/prop a (p j)
+    | i=1 ⇒ A/prop a (q j)
     ]
 
 let LemSig
@@ -106,7 +106,7 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
       λ a b i →
         comp 1 0 (contr.1 a i) [
         | i=0 ⇒ λ _ → a
-        | i=1 ⇒ λ j → contr.1 b j
+        | i=1 ⇒ contr.1 b
         ]
     in
 
@@ -229,7 +229,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
             let ctr/B : dim → B =
               λ j →
                 comp 1 j b [
-                | i=0 ⇒ λ k → w .1 .1 b .0 .1 k
+                | i=0 ⇒ w .1 .1 b .0 .1
                 | i=1 ⇒ λ _ → b
                 ]
             in
@@ -241,14 +241,14 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
                 let filler : dim → B =
                   λ l →
                     comp 1 l b [
-                    | i=0 ⇒ λ k → w .1 .1 b .1 v j .1 k
+                    | i=0 ⇒ w .1 .1 b .1 v j .1
                     | i=1 ⇒ λ k → connection/or B (v .1) j k
-                    | j=0 ⇒ λ k → v .1 k
-                    | j=1 ⇒ λ k → ctr/B k
+                    | j=0 ⇒ v .1
+                    | j=1 ⇒ ctr/B
                     ]
                 in
                 < `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))
-                , λ j → filler j
+                , filler
                 >
             >
        >

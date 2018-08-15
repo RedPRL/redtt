@@ -179,6 +179,9 @@ let quote_ty cx ty =
   let (module Q) = quoter cx in
   Q.quote_ty cx.qenv ty
 
+let quote_dim cx r =
+  let (module Q) = quoter cx in
+  Q.quote_dim cx.qenv r
 
 let check_eq cx ~ty el0 el1 =
   let (module Q) = quoter cx in

@@ -3,6 +3,8 @@ module T = Tm
 module D = Domain
 module B = Desc.Boundary
 
+open Tm.Notation
+
 type value = D.value
 
 type cx = Cx.t
@@ -248,6 +250,17 @@ let rec check_ cx ty rst tm =
     let codx, sysx = Domain.ExtAbs.inst ext_abs @@ Bwd.map (fun x -> `Atom x) @@ Bwd.from_list xs in
     let rst' = List.map (Face.map (fun _ _ el -> V.ext_apply el @@ List.map (fun x -> `Atom x) xs)) rst in
     check_ cxx codx (rst' @ sysx) tm
+
+  | _, D.Ext ext_abs, T.Up cmd ->
+    let n = D.ExtAbs.len ext_abs in
+    let nms = ListUtil.tabulate n @@ fun _ -> None in
+    let cxx, xs = Cx.ext_dims cx ~nms in
+    let rs = List.map (fun x -> `Atom x) xs in
+    let trs = List.map (Cx.quote_dim cx) rs in
+    let codx, sysx = Domain.ExtAbs.inst ext_abs @@ Bwd.from_list rs in
+    let cmd' = T.subst_cmd (T.shift n) cmd in
+    let rst' = List.map (Face.map (fun _ _ el -> V.ext_apply el @@ List.map (fun x -> `Atom x) xs)) rst in
+    check_ cxx codx (rst' @ sysx) @@ Tm.up @@ cmd' @< Tm.ExtApp trs
 
   | _, D.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
     let r'0 = check_eval_dim cx tr0 in
