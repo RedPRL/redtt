@@ -387,8 +387,8 @@ let plug (ty, tm) frame =
   let (module V) = Cx.evaluator cx in
 
   match Tm.unleash tm, frame with
-  | Tm.Up (hd, sp), _ ->
-    ret @@ Tm.up (hd, sp #< frame)
+  | Tm.Up cmd, _ ->
+    ret @@ Tm.up @@ cmd @< frame
   | Tm.Lam bnd, Tm.FunApp arg ->
     let dom, cod = V.unleash_pi ty in
     inst_bnd (cod, bnd) (dom, arg)
