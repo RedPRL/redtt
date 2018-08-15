@@ -4,6 +4,12 @@ open BwdNotation
 
 include TmData
 
+type tm = Tm of tm tmf
+type btm = tm Desc.Boundary.term
+type bface = (tm, btm) Desc.Boundary.face
+type bsys = (tm, btm) Desc.Boundary.sys
+type data_desc = (tm, btm) Desc.desc
+
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
@@ -12,8 +18,6 @@ type 'a subst =
 let shift i = Shift i
 let dot a sb = Dot (a, sb)
 
-
-type tm = Tm of tm tmf
 
 type error =
   | InvalidDeBruijnIndex of int

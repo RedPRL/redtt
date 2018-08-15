@@ -2159,9 +2159,17 @@ struct
       raise @@ E err
 
   and elim_data dlbl ~mot ~scrut ~clauses =
+    let find_clause clbl =
+      try
+        snd @@ List.find (fun (clbl', _) -> clbl = clbl') clauses
+      with
+      | Not_found ->
+        raise @@ MissingElimClause clbl
+    in
+
     match unleash scrut with
     | Intro info ->
-      let _, nclo = List.find (fun (clbl', _) -> info.clbl = clbl') clauses in
+      let nclo = find_clause info.clbl in
 
       (* Clean this up with some kind of a state type for the traversal maybe. Barf! *)
       let rec go cvs rvs rs =

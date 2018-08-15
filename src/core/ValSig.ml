@@ -11,8 +11,10 @@ sig
   (** Return the type and boundary of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
 
-  val lookup_datatype : Desc.data_label -> (Tm.tm, Tm.tm B.term) Desc.desc
+  val lookup_datatype : Desc.data_label -> Tm.data_desc
 end
+
+exception MissingElimClause of Desc.con_label
 
 module type S =
 sig
@@ -30,29 +32,29 @@ sig
 
   val eval_bterm
     : Desc.data_label
-    -> (Tm.tm, Tm.tm B.term) Desc.desc
+    -> Tm.data_desc
     -> env
-    -> Tm.tm B.term
+    -> Tm.btm
     -> value
 
   val eval_bterm_boundary
     : Desc.data_label
-    -> (Tm.tm, Tm.tm B.term) Desc.desc
+    -> Tm.data_desc
     -> env
     -> const_args:value list
     -> rec_args:value list
     -> rs:I.t list
-    -> (Tm.tm, Tm.tm B.term) B.sys
+    -> Tm.bsys
     -> val_sys
 
   val eval_bterm_face
     : Desc.data_label
-    -> (Tm.tm, Tm.tm B.term) Desc.desc
+    -> Tm.data_desc
     -> env
     -> const_args:value list
     -> rec_args:value list
     -> rs:I.t list
-    -> (Tm.tm, Tm.tm B.term) B.face
+    -> Tm.bface
     -> val_face
 
   val make_closure : env -> Tm.tm Tm.bnd -> clo
