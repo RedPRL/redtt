@@ -290,25 +290,27 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             cx, Cx.evaluator cx, Cx.quoter cx
         end >>= fun (cx, (module V), (module Q)) ->
 
-        let image_of_face face =
-          let elim_face r r' scrut =
+        (* let image_of_face face =
+           let elim_face r r' scrut =
             let phi = I.equate r r' in
             let rho = D.Env.act phi @@ Cx.env cx in
             let mot = V.make_closure rho bmot in
             let clauses = List.map (fun (clbl, nbnd) -> clbl, D.NClo {nbnd; rho}) earlier_clauses in
             V.elim_data dlbl ~mot:mot ~scrut:scrut ~clauses
-          in
-          Face.map elim_face @@
-          let env0 = D.Env.clear_locals @@ Cx.env cx in
-          V.eval_bterm_face dlbl desc env0 face
+           in
+           Face.map elim_face @@
+           let env0 = D.Env.clear_locals @@ Cx.env cx in
+           V.eval_bterm_face dlbl desc env0 face
             ~const_args
             ~rec_args
             ~rs
-        in
+           in *)
 
         (* What is the image of the boundary in the current fiber of the motive? *)
         let tsys =
-          let val_sys = List.map image_of_face constr.boundary in
+          Format.eprintf "TODO: calculate boundary of elim clause@.";
+          (* let val_sys = List.map image_of_face constr.boundary in *)
+          let val_sys = [] in
           let vty = Cx.eval cx clause_ty in
           Q.quote_val_sys (Cx.qenv cx) vty val_sys
         in

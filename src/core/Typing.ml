@@ -586,7 +586,7 @@ and infer_spine cx hd =
       let used_labels = Hashtbl.create 10 in
 
 
-      let check_clause earlier_clauses lbl constr =
+      let check_clause lbl constr =
         let open Desc in
         if Hashtbl.mem used_labels lbl then failwith "Duplicate case in eliminator";
         Hashtbl.add used_labels lbl ();
@@ -618,21 +618,20 @@ and infer_spine cx hd =
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 
-        let image_of_face face =
-          let elim_face r r' scrut =
-            let phi = I.equate r r' in
-            let mot = D.Clo.act phi mot_clo in
-            let clauses = List.map (fun (lbl, nclo) -> lbl, D.NClo.act phi nclo) earlier_clauses in
-            V.elim_data info.dlbl ~mot ~scrut ~clauses
-          in
+          (*
+        let image_of_face _face =
           Face.map elim_face @@
-          let env0 = D.Env.clear_locals (Cx.env cx) in
-          V.eval_bterm_face info.dlbl desc env0 face
-            ~const_args:cvs
-            ~rec_args:rvs
-            ~rs:rs
+             let env0 = D.Env.clear_locals (Cx.env cx) in
+             V.eval_bterm_face info.dlbl desc env0 face
+             ~const_args:cvs
+             ~rec_args:rvs
+             ~rs:rs
         in
-        let boundary = List.map image_of_face constr.boundary in
+              *)
+
+        (* let boundary = List.map image_of_face constr.boundary in *)
+        Format.eprintf "Typechecker: todo, calculate boundary of elim clause@.";
+        let boundary = [] in
         check_ cx' ty boundary bdy;
         Tm.NB (nms, bdy)
       in
@@ -642,7 +641,7 @@ and infer_spine cx hd =
         | [] ->
           ()
         | (lbl, constr) :: constrs ->
-          let nbnd = check_clause acc lbl constr in
+          let nbnd = check_clause lbl constr in
           let nclo = D.NClo {nbnd; rho = Cx.env cx} in
           check_clauses ((lbl, nclo) :: acc) constrs
 
