@@ -28,3 +28,6 @@ val tac_rst : chk_tac -> chk_tac
 
 val normalize_ty : ty -> ty m
 
+
+
+val bind_in_scope : tm -> tm m

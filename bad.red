@@ -72,3 +72,10 @@ let experiment (A : type) (u : A)
 ;    | i=0 => lam j -> ?left
 ;    | i=1 => lam j -> ?right
 ;    ]
+
+
+let id (o : O) : O =
+  elim o [
+  | obase ⇒ obase
+  | oloop (o' ⇒ id/o') i ⇒ oloop id/o' i
+  ]

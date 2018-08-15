@@ -353,22 +353,6 @@ struct
       M.ret @@ Desc.Boundary.Intro {clbl; const_args; rec_args; rs}
 
 
-  and bind_in_scope tm =
-    M.lift C.ask <<@> fun psi ->
-      let go (x, param) =
-        match param with
-        | `P _ -> [x]
-        | `Def _ -> [x]
-        | `I -> [x]
-        | `SelfArg _ -> [x]
-        | `Tick -> [x]
-        | `Tw _ -> []
-        | _ -> []
-      in
-      let xs = Bwd.flat_map go psi in
-      let Tm.NB (_, tm) = Tm.bindn xs tm in
-      tm
-
 
 
   and elab_scheme env (cells, ecod) kont =
