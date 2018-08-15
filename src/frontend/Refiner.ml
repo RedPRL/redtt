@@ -243,8 +243,9 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           in
           lbl, pbinds, fun goal ->
             M.lift C.ask >>= fun psi ->
-            M.lift @@ U.push_hole `Rigid psi goal.ty >>= fun tm ->
-            M.emit loc @@ M.UserHole {name = Some lbl; ty = goal.ty; tele = psi; tm = Tm.up tm} >>
+            let rty = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
+            M.lift @@ U.push_hole `Rigid psi rty  >>= fun tm ->
+            M.emit loc @@ M.UserHole {name = Some lbl; ty = rty; tele = psi; tm = Tm.up tm} >>
             M.ret @@ Tm.up tm
       in
       List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
