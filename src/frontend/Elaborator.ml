@@ -387,6 +387,8 @@ struct
      As an example, see what we have done with tac_lambda, tac_if, etc. *)
   and elab_chk env e : chk_tac =
     fun goal ->
+      (* TODO speed up elaboration by not normalizing, but raising ChkMatch if we don't know what to do.
+         Then wrap the whole thing in tac_wrap_nf. *)
       normalize_ty goal.ty >>= fun ty ->
       match goal.sys, Tm.unleash ty, e.con with
       | _, _, E.Guess e ->
