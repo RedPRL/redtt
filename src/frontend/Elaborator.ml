@@ -597,6 +597,8 @@ struct
     in
     go Emp
 
+
+
   and elab_hcom_sys env s ty cap =
     let rec go acc =
       function
@@ -668,13 +670,14 @@ struct
 
   and elab_up env ty inf =
     elab_inf env inf >>= fun (ty', cmd) ->
-    M.lift (C.check_subtype ty' ty) >>= function
+    M.lift (C.check ~ty @@ Tm.up cmd) >>= function
     | `Ok -> M.ret @@ Tm.up cmd
-    | _ ->
+    | `Exn exn ->
       M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
       M.unify >>
-      M.lift (C.check_subtype ty' ty) >>= function
-      | `Ok -> M.ret @@ Tm.up cmd
+      M.lift (C.check ~ty @@ Tm.up cmd) >>= function
+      | `Ok ->
+        M.ret @@ Tm.up cmd
       | `Exn exn ->
         raise exn
 
@@ -902,13 +905,17 @@ struct
 
   and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (ty', cmd) ->
-    M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-    M.unify >>
-    M.lift (C.check_subtype ty' ty) >>= function
+    M.lift (C.check ~ty @@ Tm.up cmd) >>= function
     | `Ok ->
       M.ret @@ Tm.up cmd
     | `Exn exn ->
-      raise exn
+      M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+      M.unify >>
+      M.lift (C.check ~ty @@ Tm.up cmd) >>= function
+      | `Ok ->
+        M.ret @@ Tm.up cmd
+      | `Exn exn ->
+        raise exn
 
   and elab_cut env exp frms =
     elab_cut_ env exp frms >>= fun (ty, cmd) ->
