@@ -38,7 +38,6 @@ and econ =
   | Pi of etele * eterm
   | Sg of etele * eterm
   | Ext of string list * eterm * esys
-  | Rst of eterm * esys
 
   | Coe of {r : eterm; r' : eterm; fam : eterm; tm : eterm}
   | HCom of {r : eterm; r' : eterm; cap : eterm; sys : esys}

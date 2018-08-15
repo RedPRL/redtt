@@ -32,8 +32,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("where", WHERE);
       ("data", DATA);
       ("end", END);
-      ("[]", BOX_MODALITY);
-      ("□", BOX_MODALITY);
       ("tick", TICK);
       ("✓", TICK);
       ("dim", DIM);
@@ -55,8 +53,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("prev", PREV);
       ("dfix", DFIX);
       ("fix", FIX);
-      ("open", OPEN);
-      ("shut", SHUT);
       ("call", CALL);
       ("pre", PRE);
       ("kan", KAN);
@@ -135,10 +131,6 @@ rule token = parse
     { Lwt.return RRIGHT_ARROW }
   | "→"
     { Lwt.return RIGHT_ARROW }
-  | "<>"
-    { Lwt.return BULLET}
-  | "∙"
-    { Lwt.return BULLET }
   | "<"
     { Lwt.return LGL }
   | ">"

@@ -644,9 +644,9 @@ let rec pp env fmt =
       begin
         match sys with
         | [] ->
-          Format.fprintf fmt "%a" (pp env) ty
+          Format.fprintf fmt "@[<hv1>(restrict %a)]" (pp env) ty
         | _ ->
-          Format.fprintf fmt "@[<hv1>(%a@ @[<hv>%a@])@]" (pp env) ty (pp_sys env) sys
+          Format.fprintf fmt "@[<hv1>(restrict %a@ @[<hv>%a@])@]" (pp env) ty (pp_sys env) sys
       end
 
     | CoR face ->

@@ -1,10 +1,5 @@
 import path
 
-let singleton (A : type) (M : A) : type pre =
-  restrict A [
-  | 0=0 ⇒ M
-  ]
-
 let connection/or
  (A : type)
  (p : dim → A)
@@ -33,15 +28,6 @@ let connection/or
   | j=1 ⇒ λ k → face 1 k
   | i=j ⇒ λ k → face i k
   ]
-
-; an example of using the singleton type to establish an exact equality
-let connection/or/diagonal
- (A : type)
- (p : dim → A)
- : singleton _ p
- =
- λ i →
-   connection/or _ p i i
 
 let connection/and
  (A : type)

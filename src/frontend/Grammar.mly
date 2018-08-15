@@ -17,10 +17,10 @@
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
 %token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BANG
 %token EQUALS
-%token RIGHT_ARROW RRIGHT_ARROW BULLET
+%token RIGHT_ARROW RRIGHT_ARROW
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK LOCK
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX
 %token IMPORT OPAQUE QUIT
 %token TYPE PRE KAN
 %token EOF
@@ -164,9 +164,6 @@ econ:
 
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; sys = pipe_block(eface)
     { E.Ext (dims, ty, sys)}
-
-  | RESTRICT; ty = eterm; sys = pipe_block(eface)
-    { E.Rst (ty, sys)}
 
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
     { E.Pi ([`Ty ("_", dom)], cod) }
@@ -362,12 +359,6 @@ tm:
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Later (ty env) }
-
-  | LPR; rst = constrained; RPR
-    { fun env ->
-      let ty, sys = rst env in
-      make_node $startpos $endpos @@
-      Tm.Rst {ty; sys} }
 
   | LPR; LAM; mb = multibind(tm); RPR
     { fun env ->

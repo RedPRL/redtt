@@ -470,12 +470,6 @@ struct
             ext_ty
         end
 
-      | [], Tm.Univ _, E.Rst (ety, esys) ->
-        let univ = ty in
-        elab_chk env ety {ty = univ; sys = []} >>= fun ty ->
-        elab_tm_sys env ty esys <<@> fun sys ->
-          Tm.make @@ Tm.Rst {ty; sys}
-
       | [], Tm.Univ _, E.Pi ([], e) ->
         elab_chk env e goal
 
