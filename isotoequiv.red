@@ -36,7 +36,7 @@ let Iso/fiber-is-prop
         ]
     in
     λ i →
-     < sq2 i 0
+     < auto
      , λ j →
         let aux : A =
           comp 1 0 (sq2 i j) [
