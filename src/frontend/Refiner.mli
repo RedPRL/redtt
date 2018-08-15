@@ -3,10 +3,8 @@ open RedTT_Core
 open ElabMonad
 
 type sys = (tm, tm) Tm.system
-
-type goal = {ty : ty}
+type goal = {ty : ty; sys : sys}
 type chk_tac = goal -> tm m
-
 type inf_tac = (ty * tm) m
 
 exception ChkMatch
@@ -23,8 +21,7 @@ val tac_elim : loc:location -> tac_mot:chk_tac option -> tac_scrut:inf_tac -> cl
 val tac_let : string -> inf_tac -> chk_tac -> chk_tac
 
 
-(** A tactical which adds support for restriction *)
-val tac_rst : chk_tac -> chk_tac
+val guess_restricted : tm -> chk_tac
 
 val normalize_ty : ty -> ty m
 

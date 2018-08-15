@@ -354,6 +354,7 @@ let rec check_ cx ty rst tm =
 and check cx ty tm =
   check_ cx ty [] tm
 
+
 and check_constr cx dlbl constr tms =
   let vdataty = D.make @@ D.Data dlbl in
   let rec go cx' const_specs rec_specs dim_specs tms =

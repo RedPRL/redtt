@@ -17,7 +17,7 @@ module Notation = Monad.Notation (M)
 open Notation
 
 type sys = (tm, tm) Tm.system
-type goal = {ty : ty}
+type goal = {ty : ty; sys : sys}
 type chk_tac = goal -> tm M.m
 type inf_tac = (ty * tm) M.m
 
@@ -40,7 +40,9 @@ let normalize_ty ty =
   M.ret ty
 
 
-let guess_restricted ty sys tm =
+let guess_restricted tm goal =
+  let ty = goal.ty in
+  let sys = goal.sys in
   let rty = Tm.make @@ Tm.Rst {ty; sys} in
   M.lift @@ C.check ~ty:rty tm >>= function
   | `Ok -> M.ret tm
@@ -83,39 +85,23 @@ let bind_in_scope tm =
     let Tm.NB (_, tm) = Tm.bindn xs tm in
     tm
 
-
-let rec tac_rst tac goal =
-  let rec go sys ty =
-    normalize_ty ty >>= fun ty ->
-    match Tm.unleash ty with
-    | Tm.Rst rst ->
-      go (rst.sys @ sys) rst.ty
-    | _ ->
-      begin
-        match sys with
-        | [] -> tac {ty}
-        | _ ->
-          tac_wrap_nf tac {ty} >>=
-          guess_restricted ty sys
-      end
-  in go [] goal.ty
-
-
-and tac_wrap_nf tac goal =
+let tac_wrap_nf tac goal =
   try tac goal
   with
   | ChkMatch ->
     normalize_ty goal.ty >>= fun ty ->
-    tac_rst tac {ty}
+    tac {ty; sys = goal.sys}
 
 
 let tac_let name itac ctac =
-  fun ty ->
+  fun goal ->
     itac >>= fun (let_ty, let_tm) ->
     let x = Name.named @@ Some name in
-    M.in_scope x (`Def (let_ty, let_tm)) (ctac ty) >>= fun bdyx ->
+    M.in_scope x (`Def (let_ty, let_tm)) (ctac goal) >>= fun bdyx ->
     M.ret @@ Tm.make @@ Tm.Let (Tm.ann ~ty:let_ty ~tm:let_tm, Tm.bind x bdyx)
 
+
+let flip f x y = f y x
 
 let rec tac_lambda names tac goal =
   match Tm.unleash goal.ty with
@@ -126,8 +112,13 @@ let rec tac_lambda names tac goal =
       | name :: names ->
         let x = Name.named @@ Some name in
         let codx = Tm.unbind_with (Tm.var x) cod in
+        let sysx =
+          flip List.map goal.sys @@ fun (r, r', otm) ->
+          r, r', flip Option.map otm @@ fun tm ->
+          Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.FunApp (Tm.up @@ Tm.var x)
+        in
         M.in_scope x (`P dom) begin
-          tac_wrap_nf (tac_lambda names tac) {ty = codx}
+          tac_wrap_nf (tac_lambda names tac) {ty = codx; sys = sysx}
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
     end
@@ -139,8 +130,13 @@ let rec tac_lambda names tac goal =
       | name :: names ->
         let x = Name.named @@ Some name in
         let codx = Tm.unbind_with (Tm.var x) cod in
+        let sysx =
+          flip List.map goal.sys @@ fun (r, r', otm) ->
+          r, r', flip Option.map otm @@ fun tm ->
+          Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Prev (Tm.up @@ Tm.var x)
+        in
         M.in_scope x `Tick begin
-          tac_wrap_nf (tac_lambda names tac) {ty = codx}
+          tac_wrap_nf (tac_lambda names tac) {ty = codx; sys = sysx}
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Next (Tm.bind x bdyx)
     end
@@ -159,11 +155,17 @@ let rec tac_lambda names tac goal =
           | _ -> failwith "Elab: incorrect number of binders when refining extension type"
         in
         let xs, tac' = bite nms Emp names in
-        let ty, sys = Tm.unbind_ext_with (Bwd.to_list @@ Bwd.map (fun x -> Tm.var x) xs) ebnd in
-        let rty = Tm.make @@ Tm.Rst {ty; sys} in
-        let ps = List.map (fun x -> (x, `I)) @@ Bwd.to_list xs in
+        let xs_fwd = Bwd.to_list xs in
+        let xs_tms = List.map (fun x -> Tm.var x) xs_fwd in
+        let tyxs, sysxs = Tm.unbind_ext_with xs_tms ebnd in
+        let ps = List.map (fun x -> (x, `I)) xs_fwd in
+        let sys'xs =
+          flip List.map goal.sys @@ fun (r, r', otm) ->
+          r, r', flip Option.map otm @@ fun tm ->
+          Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.ExtApp (List.map Tm.up xs_tms)
+        in
         M.in_scopes ps begin
-          tac' {ty = rty}
+          tac' {ty = tyxs; sys = sysxs @ sys'xs}
         end >>= fun bdyxs ->
         let lam = Tm.make @@ Tm.ExtLam (Tm.bindn xs bdyxs) in
         M.ret lam
@@ -198,7 +200,7 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
   | Some tac_mot ->
     let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
     let mot_ty = Tm.pi None data_ty univ in
-    tac_mot {ty = mot_ty} >>= fun mot ->
+    tac_mot {ty = mot_ty; sys = []} >>= fun mot ->
     let motx =
       Tm.ann ~ty:(Tm.subst (Tm.shift 1) mot_ty) ~tm:(Tm.subst (Tm.shift 1) mot)
       @< Tm.FunApp (Tm.up @@ Tm.ix 0)
@@ -341,13 +343,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
         in
 
         (* We run the clause tactic with the goal type restricted by the boundary above *)
-        let clause_rty =
-          match tsys with
-          | [] -> clause_ty
-          | _ -> Tm.make @@ Tm.Rst {ty = clause_ty; sys = tsys}
-        in
-
-        clause_tac {ty = clause_rty} <<@> fun bdy ->
+        clause_tac {ty = clause_ty; sys = tsys} <<@> fun bdy ->
           clbl, Tm.bindn (Bwd.map fst psi) bdy
       end
     in

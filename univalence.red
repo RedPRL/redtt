@@ -97,8 +97,7 @@ let PropSig
   : IsProp ((a : A) × B a)
   =
   λ u v →
-    LemSig _ _ B/prop _ _ (A/prop (u.0) (v.0))
-
+    LemSig A B B/prop u v (A/prop (u.0) (v.0))
 
 opaque
 let PropIsContr (A : type) : IsProp (IsContr A) =

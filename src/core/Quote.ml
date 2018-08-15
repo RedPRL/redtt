@@ -358,6 +358,9 @@ struct
         Tm.make @@ Tm.Intro (dlbl, info0.clbl, const_args @ rec_args @ trs)
 
       | _ ->
+        (* For more readable error messages *)
+        let el0 = D.make @@ V.unleash el0 in
+        let el1 = D.make @@ V.unleash el1 in
         let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
 
@@ -687,7 +690,8 @@ struct
     | `Same ->
       quote_dim env r
     | _ ->
-      (* Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      (*
+         Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
       failwith "equate_dim: dimensions did not match"
@@ -698,7 +702,8 @@ struct
     | `Same, `Same ->
       quote_dim env r
     | _ ->
-      (* Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      (*
+         Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
       failwith "equate_dim3: dimensions did not match"
