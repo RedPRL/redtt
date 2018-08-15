@@ -474,9 +474,17 @@ struct
 
         let desc = V.Sig.lookup_datatype dlbl in
 
+        let find_clause clbl clauses =
+          try
+            snd @@ List.find (fun (clbl', _) -> clbl = clbl') clauses
+          with
+          | Not_found ->
+            failwith "Quote: elim / find_clause"
+        in
+
         let quote_clause (clbl, constr) =
-          let _, clause0 = List.find (fun (clbl', _) -> clbl = clbl') elim0.clauses in
-          let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
+          let clause0 = find_clause clbl elim0.clauses in
+          let clause1 = find_clause clbl elim1.clauses in
           let env', vs, cvs, rvs, rs =
             let open Desc in
             let rec build_cx qenv env (vs, cvs, rvs) rs const_specs rec_specs dim_specs =
