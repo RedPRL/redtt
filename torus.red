@@ -17,7 +17,5 @@ let t2c (t : torus) : s1 × s1 =
   | pt ⇒ <base, base>
   | p/one i ⇒ <loop i, base>
   | p/two i ⇒ <base, loop i>
-  | square i j ⇒ <loop j, loop i>
+  | square i j ⇒ <auto, auto>
   ]
-
-debug

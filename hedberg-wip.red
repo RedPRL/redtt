@@ -23,10 +23,9 @@ let or/elim
   (m0 : A → C)
   (m1 : B → C)
   : C =
-  sg/elim bool (λ b → elim b [tt ⇒ A | ff ⇒ B]) (λ _ _ → C) t
+  sg/elim bool _ (λ _ _ → C) t
     (λ b →
-      elim b in (λ b → (elim b in (λ _ → type) [tt ⇒ A | ff ⇒ B]) → C)
-      [tt ⇒ m0 | ff ⇒ m1])
+      elim b [tt ⇒ m0 | ff ⇒ m1])
 
 let neg (A : type) : type =
   A → void

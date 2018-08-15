@@ -13,7 +13,7 @@ let nat-pred (x : nat) : nat =
 
 
 let nat-pred/suc (x : nat) : Path nat x (nat-pred (suc x)) =
-  λ _ → x
+  auto
 
 let plus : nat → nat → nat =
   λ m n →
@@ -23,23 +23,23 @@ let plus : nat → nat → nat =
     ]
 
 let plus/unit/l (n : nat) : Path nat (plus zero n) n =
-  λ i → n
+  auto
 
 let plus/unit/r (n : nat) : Path nat (plus n zero) n =
   elim n [
-  | zero ⇒ λ _ → zero
+  | zero ⇒ auto
   | suc (n ⇒ path/n) ⇒ λ i → suc (path/n i)
   ]
 
 let plus/assoc (n : nat) : (m, o : nat) → Path nat (plus n (plus m o)) (plus (plus n m) o) =
   elim n [
-  | zero ⇒ λ m o i → plus m o
+  | zero ⇒ auto
   | suc (n ⇒ plus/assoc/n) ⇒ λ m o i → suc (plus/assoc/n m o i)
   ]
 
 let plus/suc/r (n : nat) : (m : nat) → Path nat (plus n (suc m)) (suc (plus n m)) =
   elim n [
-  | zero ⇒ λ m _ → suc m
+  | zero ⇒ auto
   | suc (n ⇒ plus/n/suc/r) ⇒ λ m i → suc (plus/n/suc/r m i)
   ]
 

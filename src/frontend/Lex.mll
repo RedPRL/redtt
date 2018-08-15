@@ -46,7 +46,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("comp", COMP);
       ("vproj", VPROJ);
       ("vin", VIN);
-      ("restrict", RESTRICT);
       ("let", LET);
       ("lam", LAM);
       ("next", NEXT);
@@ -54,6 +53,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("dfix", DFIX);
       ("fix", FIX);
       ("call", CALL);
+      ("auto", AUTO);
       ("pre", PRE);
       ("kan", KAN);
       ("U", UNIV);
@@ -83,8 +83,6 @@ rule token = parse
     { Lwt.return (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
   | ';'
     {comment lexbuf}
-  | '!'
-    { Lwt.return BANG }
   | '('
     { Lwt.return LPR }
   | ')'

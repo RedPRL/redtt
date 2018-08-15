@@ -381,8 +381,6 @@ struct
 
 
 
-
-
   (* TODO: we will be disentangling all the elaboration of concrete expressions from tactics which produce redtt proofs.
      As an example, see what we have done with tac_lambda, tac_if, etc. *)
   and elab_chk env e : chk_tac =
@@ -408,10 +406,10 @@ struct
         M.ret @@ Tm.up tm
 
       | _, _, E.Hope ->
-        M.lift C.ask >>= fun psi ->
-        let rty = Tm.make @@ Tm.Rst {ty; sys = goal.sys} in
-        M.lift @@ U.push_hole `Flex psi rty <<@> Tm.up
+        hope goal
 
+      | _, _, E.Auto ->
+        auto goal
 
       | _, _, E.Let info ->
         let itac =

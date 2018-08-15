@@ -50,6 +50,8 @@ and econ =
 
   | Cut of eterm * frame bwd
 
+  | Auto
+
   | Var of string * int
   | Num of int
 

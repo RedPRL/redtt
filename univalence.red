@@ -29,20 +29,20 @@ let RetIsContr
     λ a i →
       comp 0 1 (g (c.1 (f a) i)) [
       | i=0 ⇒ h a
-      | i=1 ⇒ λ _ → g (c.0)
+      | i=1 ⇒ auto
       ]
   >
 
 let IdEquiv (A : type) : Equiv A A =
   < λ a → a
   , λ a →
-    < <a, λ _ → a>
+    < <a, auto>
     , λ p i →
       let aux : dim → A =
         λ j →
         comp 1 j a [
         | i=0 ⇒ p.1
-        | i=1 ⇒ λ _ → a
+        | i=1 ⇒ auto
         ]
       in
       <aux 0, aux>
@@ -87,7 +87,7 @@ let LemSig
     , let coe0 = coe 0 i (u.1) in λ j → B (P j) in
       let coe1 = coe 1 i (v.1) in λ j → B (P j) in
       B/prop (P i) coe0 coe1 i
-     >
+    >
 
 
 let PropSig
@@ -105,13 +105,13 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
     let A/prop : IsProp A =
       λ a b i →
         comp 1 0 (contr.1 a i) [
-        | i=0 ⇒ λ _ → a
+        | i=0 ⇒ auto
         | i=1 ⇒ contr.1 b
         ]
     in
 
     let contr/A/prop =
-      PropSig A (λ a → (b : A) → Path A b a) A/prop
+      PropSig _ (λ a → (b : A) → Path A b a) A/prop
         (λ a → PropPi A (λ b → Path A b a) (λ b → PropSet A A/prop b a))
     in
 
@@ -142,7 +142,7 @@ let UA/beta
   : Path _ (coe 0 1 a in UA _ _ E) (E.0 a)
   =
   λ i →
-    coe i 1 (E.0 a) in λ _ → B
+    coe i 1 (E.0 a) in auto
 
 let SigEquivToPath
   (A : type)
@@ -186,12 +186,12 @@ let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
   , λ X i →
     < comp 0 1 A [
       | i=0 ⇒ X.1
-      | i=1 ⇒ λ _ → A
+      | i=1 ⇒ auto
       ]
     , λ j →
       comp 0 j A [
       | i=0 ⇒ X.1
-      | i=1 ⇒ λ _ → A
+      | i=1 ⇒ auto
       ]
     >
   >
@@ -213,7 +213,7 @@ let univalence (A : type) : IsContr^1 ((B : type) × Equiv A B) =
 let IdEquiv/connection (B : type) : Equiv B B =
   < λ b → b
   , λ b →
-    < <b, λ _ → b>
+    < <b, auto>
     , λ v i → <v.1 i, λ j → connection/or B (v.1) i j>
     >
   >
@@ -221,37 +221,37 @@ let IdEquiv/connection (B : type) : Equiv B B =
 let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
   < <B, IdEquiv/connection B>
   , λ w i →
-       let VB : type = `(V i (fst w) B (snd w)) in
-       let proj/B : VB → B = λ g → `(vproj i g (fst w) B (snd w)) in
-       < VB
-       , proj/B
-       , λ b →
-            let ctr/B : dim → B =
-              λ j →
-                comp 1 j b [
-                | i=0 ⇒ w .1 .1 b .0 .1
-                | i=1 ⇒ λ _ → b
-                ]
-            in
-            let ctr : Fiber VB B proj/B b =
-              < `(vin i (fst (fst ((snd (snd w)) b))) (@ ctr/B 0)), λ l → ctr/B l >
-            in
-            < ctr
-            , λ v j →
-                let filler : dim → B =
-                  λ l →
-                    comp 1 l b [
-                    | i=0 ⇒ w .1 .1 b .1 v j .1
-                    | i=1 ⇒ λ k → connection/or B (v .1) j k
-                    | j=0 ⇒ v .1
-                    | j=1 ⇒ ctr/B
-                    ]
-                in
-                < `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))
-                , filler
-                >
-            >
-       >
+      let VB : type = `(V i (fst w) B (snd w)) in
+      let proj/B : VB → B = λ g → `(vproj i g (fst w) B (snd w)) in
+      < _
+      , proj/B
+      , λ b →
+           let ctr/B : dim → B =
+             λ j →
+               comp 1 j b [
+               | i=0 ⇒ w .1 .1 b .0 .1
+               | i=1 ⇒ auto
+               ]
+           in
+           let ctr : Fiber VB B proj/B b =
+             < `(vin i (fst (fst ((snd (snd w)) b))) (@ ctr/B 0)), ctr/B >
+           in
+           < ctr
+           , λ v j →
+               let filler : dim → B =
+                 λ l →
+                   comp 1 l b [
+                   | i=0 ⇒ w .1 .1 b .1 v j .1
+                   | i=1 ⇒ λ k → connection/or B (v .1) j k
+                   | j=0 ⇒ v .1
+                   | j=1 ⇒ ctr/B
+                   ]
+               in
+               < `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))
+               , filler
+               >
+           >
+      >
   >
 
 

@@ -351,3 +351,41 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
 
     M.Util.fold_left (fun acc clause -> refine_clause acc clause <<@> fun cl -> cl :: acc) [] eclauses >>= fun clauses ->
     M.ret @@ Tm.up @@ Tm.ann ~ty:data_ty ~tm:scrut @< Tm.Elim {dlbl; mot = bmot; clauses}
+
+let rec hope goal =
+  let rst = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
+  let rec try_system sys =
+    match sys with
+    | [] ->
+      M.lift C.ask >>= fun psi ->
+      let rty = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
+      M.lift @@ U.push_hole `Flex psi rty <<@> Tm.up
+    | (r, r', Some tm) :: sys ->
+      begin
+        M.lift @@ C.check ~ty:rst tm >>=
+        function
+        | `Ok ->
+          M.ret tm
+        | _ ->
+          try_system sys
+      end
+    | _ :: sys ->
+      try_system sys
+  in
+  try_system goal.sys
+
+(* TODO: introduce sigma, etc. *)
+let rec auto goal =
+  normalize_ty goal.ty >>= fun ty ->
+  let goal = {goal with ty} in
+  match Tm.unleash ty with
+  | Tm.Ext (Tm.NB (nms, _)) ->
+    let nms' = Bwd.to_list @@ Bwd.map (function Some nm -> nm | None -> "_") nms in
+    tac_lambda nms' auto goal
+
+  | Tm.Pi (dom, Tm.B (nm, _)) ->
+    let nms = [match nm with Some nm -> nm | None -> "_"] in
+    tac_lambda nms auto goal
+
+  | _ ->
+    hope goal
