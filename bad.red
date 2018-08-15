@@ -64,15 +64,21 @@ let experiment (A : type) (u : A)
     | i=1 => lam j k -> p k
     ]
 
-; TODO: doesn't work yet, need elaborator support
-
-;let experiment (A : type) (u : A) : Path A u u =
-;  lam i ->
-;    comp 0 1 ?cap [
-;    | i=0 => lam j -> ?left
-;    | i=1 => lam j -> ?right
-;    ]
-
+; Note to Evan: your example with the holes was not supposed to work after all.
+; You can surround the partially-defined composition with a question ?{ ... };
+; what this is deactivate the ambient restriction long enough for you to build
+; a term which satisfies it. This is useful for intermediate states that don't yet
+; satisfy the restriction. Once your term checks, then delete the ?{ ... }.
+;
+;;let experiment (A : type) (u : A) : Path A u u =
+;;  lam i ->
+;;  ?{
+;;    comp 0 1 ?cap [
+;;    | i=0 => lam j -> ?left
+;;    | i=1 => lam j -> ?right
+;;    ]
+;;  }
+;;
 
 let id (o : O) : O =
   elim o [
