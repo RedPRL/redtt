@@ -34,7 +34,6 @@ let shannon/path (A : type) (f : bool → A) : Path _ f (shannon A f) =
       | ff ⇒ auto
       ])
 
-quit
 let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
   λ p →
     < <pair-to-fun A p, λ _ → p>
