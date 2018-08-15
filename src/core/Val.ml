@@ -922,7 +922,8 @@ struct
       let recovery_general phi abs z_dest =
         make_gcom (Dir.make (I.act (I.cmp phi subst_r') s) z_dest) abs (naively_coerced_cap phi) @@
         force_abs_sys @@
-        let diag = AbsFace.make phi (I.act phi r) (I.act phi r') @@ fun phi ->
+        let diag =
+          AbsFace.make phi (I.act phi r) (I.act phi r') @@ fun phi ->
           Abs.make1 @@ fun y -> recovery_apart phi (Abs.act phi abs) (I.act phi r) (`Atom y) in
         let face =
           Face.map @@ fun sj s'j absj ->
@@ -937,9 +938,11 @@ struct
       let coerced_cap =
         make_hcom (Dir.act subst_r' fhcom.dir) (Value.act subst_r' fhcom.cap) (naively_coerced_cap I.idn) @@
         force_abs_sys @@
-        let diag = AbsFace.make_from_dir I.idn dir @@ fun phi ->
+        let diag =
+          AbsFace.make_from_dir I.idn dir @@ fun phi ->
           Abs.make1 @@ fun w -> origin phi (`Atom w) in
-        let face = Face.map @@ fun sj s'j absj ->
+        let face =
+          Face.map @@ fun sj s'j absj ->
           let phi = I.equate sj s'j in
           Abs.make1 @@ fun w ->
           make_coe (Dir.make (`Atom w) (I.act phi (I.act subst_r' s))) absj @@
@@ -949,7 +952,8 @@ struct
       in
       make_box (Dir.act subst_r' fhcom.dir) coerced_cap @@
       force_val_sys @@
-      let face = Face.map @@ fun sj s'j absj ->
+      let face =
+        Face.map @@ fun sj s'j absj ->
         let phi = I.equate sj s'j in
         recovery_general phi absj (I.act (I.cmp phi subst_r') s')
       in List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
@@ -996,24 +1000,29 @@ struct
            * `ext_apply (cdr fib) [`Dim1]` directly. *)
           let contr0 phi fib = apply (cdr @@ apply (cdr (Value.act phi equiv0)) (ext_apply (cdr fib) [`Dim1])) fib in
           (* The diagonal face for r=r'. *)
-          let face_diag = AbsFace.make_from_dir I.idn dir @@ fun phi ->
+          let face_diag =
+            AbsFace.make_from_dir I.idn dir @@ fun phi ->
             Abs.make1 @@ fun _ -> base phi (I.act phi r) (I.act phi r')
           in
           (* The face for r=0. *)
-          let face0 = AbsFace.make I.idn r `Dim0 @@ fun phi ->
+          let face0 =
+            AbsFace.make I.idn r `Dim0 @@ fun phi ->
             Abs.make1 @@ fun _ -> base0 phi (I.act phi r')
           in
           (* The face for r=1. This more optimized version is used
            * in [Y], [F] and [R1] but not [SVO]. *)
-          let face1 = AbsFace.make I.idn r `Dim1 @@ fun phi ->
+          let face1 =
+            AbsFace.make I.idn r `Dim1 @@ fun phi ->
             Abs.make1 @@ fun y ->
             let ty = Value.act phi @@ subst_r' info.ty1 in
             let cap = base1 phi (I.act phi r') in
             let msys = force_abs_sys @@
-              let face0 = AbsFace.make phi (I.act phi r') `Dim0 @@ fun phi ->
+              let face0 =
+                AbsFace.make phi (I.act phi r') `Dim0 @@ fun phi ->
                 Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 phi cap)) [`Atom z]
               in
-              let face1 = AbsFace.make phi (I.act phi r') `Dim1 @@ fun phi ->
+              let face1 =
+                AbsFace.make phi (I.act phi r') `Dim1 @@ fun phi ->
                 Abs.make1 @@ fun _ -> Value.act phi el in
               [face0; face1]
             in
@@ -1060,10 +1069,12 @@ struct
               (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
               make_hcom (Dir.make `Dim1 `Dim0) (fiber0_ty phi (base phi (I.act phi r) `Dim0)) (fiber0 phi (base phi (I.act phi r) `Dim0)) @@
               force_abs_sys @@
-              let face0 = AbsFace.make phi (I.act phi r) `Dim0 @@ fun phi ->
+              let face0 =
+                AbsFace.make phi (I.act phi r) `Dim0 @@ fun phi ->
                 Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) [`Atom w]
               in
-              let face1 = AbsFace.make phi (I.act phi r) `Dim1 @@ fun phi ->
+              let face1 =
+                AbsFace.make phi (I.act phi r) `Dim1 @@ fun phi ->
                 Abs.make1 @@ fun _ -> fiber0 phi (base1 phi `Dim0)
               in
               [face0; face1]
@@ -1251,7 +1262,8 @@ struct
       let new_cap =
         rigid_hcom dir fhcom.cap (cap_aux I.idn cap) @@
         let ri_faces =
-          let face = Face.map @@ fun ri r'i abs ->
+          let face =
+            Face.map @@ fun ri r'i abs ->
             let y, el = Abs.unleash1 abs in
             Abs.bind1 y @@ cap_aux (I.equate ri r'i) el
           in
@@ -1346,7 +1358,8 @@ struct
             | `Ok rest0 ->
               let r'i = I.act phi r'i in
               let ghcom00 = AbsFace.make phi r'i dim0 @@ fun phi -> Abs.act phi @@ Lazy.force absi in
-              let ghcom01 = AbsFace.make phi r'i dim1 @@ fun phi ->
+              let ghcom01 =
+                AbsFace.make phi r'i dim1 @@ fun phi ->
                 Abs.make1 @@ fun y ->
                 (* TODO this can be optimized further by expanding
                  * `make_ghcom` because `ty` is not changed and
