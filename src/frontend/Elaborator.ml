@@ -277,8 +277,18 @@ struct
       match ResEnv.get name renv with
       | `Var x ->
         M.lift C.ask >>= fun psi ->
-        (* backwards? *)
-        let ix = ListUtil.index_of (fun (y, _) -> x = y) @@ Bwd.to_list psi in
+        let go (x, param) =
+          match param with
+          | `P _ -> [x]
+          | `Def _ -> [x]
+          | `I -> [x]
+          | `SelfArg _ -> [x]
+          | `Tick -> [x]
+          | `Tw _ -> []
+          | _ -> []
+        in
+        let xs = Bwd.flat_map go psi in
+        let ix = Bwd.length xs - 1 - (ListUtil.index_of (fun y -> x = y) @@ Bwd.to_list xs) in
         M.ret @@ `Ix ix
       | `Ix _ ->
         failwith "impossible"

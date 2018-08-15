@@ -85,6 +85,8 @@ val pp_frame : tm frame Pp.t
 val pp_spine : tm spine Pp.t
 val pp_sys : (tm, tm) system Pp.t
 
+val pp_bterm : tm Desc.Boundary.term Pp.t0
+
 include Occurs.S with type t := tm
 
 module Sp :

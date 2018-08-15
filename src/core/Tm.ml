@@ -1351,6 +1351,13 @@ let rec shift_univ k tm =
     | tmf ->
       Tm (map_tmf (shift_univ k) tmf)
 
+let pp_bterm fmt =
+  let module B = Desc.Boundary in
+  function
+  | B.Var ix ->
+    Format.fprintf fmt "#%i" ix
+  | B.Intro _->
+    Format.fprintf fmt "<intro>"
 
 let pp0 fmt tm = pp Pp.Env.emp fmt @@ eta_contract tm
 
