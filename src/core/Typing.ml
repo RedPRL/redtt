@@ -624,14 +624,14 @@ and infer_spine cx hd =
           | B.Intro intro as bterm ->
             let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) nclos in
             let rargs = List.map (fun bt -> `Val (image_of_bterm phi bt)) intro.rec_args in
-            let cargs = List.map (fun t -> `Val (Cx.eval cx' t)) intro.const_args in
-            let dims = List.map (fun t -> `Dim (Cx.eval_dim cx' t)) intro.rs in (* is this right ? *)
+            let cargs = List.map (fun t -> `Val (D.Value.act phi @@ Cx.eval cx' t)) intro.const_args in
+            let dims = List.map (fun t -> `Dim (I.act phi @@ Cx.eval_dim cx' t)) intro.rs in (* is this right ? *)
             let cells = cargs @ rargs @ dims in
             V.inst_nclo nclo cells
           | B.Var ix ->
             (* This is so bad!! *)
             let ix' = ix - List.length rs in
-            Bwd.nth ihvs ix'
+            D.Value.act phi @@ Bwd.nth ihvs ix'
 
         in
 
