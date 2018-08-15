@@ -88,3 +88,15 @@ data T where
   [ i=0 ⇒ tbase u
   | i=1 ⇒ tbase u
   ]
+
+let compose (o1,o2 : O) : O =
+  elim o1 [
+  | obase ⇒ o2
+  | oloop (o1' ⇒ compose/o1'/o2) i ⇒ oloop compose/o1'/o2 i
+  ]
+
+let compose/obase/r (o : O) : Path O (compose o obase) o =
+  elim o [
+  | obase ⇒ lam _ -> obase
+  | oloop (o' ⇒ compose/obase/r/o') i ⇒ lam j -> oloop (compose/obase/r/o' j) i
+  ]

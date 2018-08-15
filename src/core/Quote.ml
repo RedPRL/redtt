@@ -499,10 +499,12 @@ struct
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
                 build_cx (Env.succ qenv') env (vs #< vx #< vih, cvs, rvs #< vx) rs const_specs rec_specs dim_specs
-              | [], [], dims ->
-                let xs = Bwd.map (fun x -> Name.named @@ Some x) @@ Bwd.from_list dims in
-                let qenv' = Env.abs qenv xs in
-                qenv', Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
+              | [], [], nm :: dim_specs ->
+                let x = Name.named @@ Some nm in
+                let qenv' = Env.abs qenv (Emp #< x) in
+                build_cx qenv' env (vs, cvs, rvs) (rs #< (`Atom x)) const_specs rec_specs dim_specs
+              | [], [], [] ->
+                qenv, Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
             build_cx env D.Env.emp (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
           in
