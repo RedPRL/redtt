@@ -1360,8 +1360,8 @@ let pp_bterm fmt =
   function
   | B.Var ix ->
     Format.fprintf fmt "#%i" ix
-  | B.Intro _->
-    Format.fprintf fmt "<intro>"
+  | B.Intro intro ->
+    Format.fprintf fmt "<intro: %s>" intro.clbl
 
 let pp0 fmt tm = pp Pp.Env.emp fmt @@ eta_contract tm
 

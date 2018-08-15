@@ -1,6 +1,7 @@
 module Q = Quote
 module T = Tm
 module D = Domain
+module B = Desc.Boundary
 
 type value = D.value
 
@@ -586,7 +587,7 @@ and infer_spine cx hd =
       let used_labels = Hashtbl.create 10 in
 
 
-      let check_clause lbl constr =
+      let check_clause nclos lbl constr =
         let open Desc in
         if Hashtbl.mem used_labels lbl then failwith "Duplicate case in eliminator";
         Hashtbl.add used_labels lbl ();
@@ -596,42 +597,53 @@ and infer_spine cx hd =
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
            the constructor, and should therefore begin with the *empty* environment. *)
-        let rec build_cx cx env (nms, cvs, rvs, rs) const_specs rec_specs dim_specs =
+        let rec build_cx cx ty_env (nms, cvs, rvs, ihvs, rs) const_specs rec_specs dim_specs =
           match const_specs, rec_specs, dim_specs with
           | (plbl, pty) :: const_specs, _, _ ->
-            let vty = V.eval env pty in
+            let vty = V.eval ty_env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some plbl), cvs #< v, rvs, rs) const_specs rec_specs dim_specs
+            build_cx cx' (D.Env.push (`Val v) ty_env) (nms #< (Some plbl), cvs #< v, rvs, ihvs, rs) const_specs rec_specs dim_specs
           | [], (nm, Self) :: rec_specs, _ ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
-            let cx_ih, _ = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih env (nms #< (Some nm) #< None, cvs, rvs #< v_x, rs) const_specs rec_specs dim_specs
+            let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
+            build_cx cx_ih ty_env (nms #< (Some nm) #< None, cvs, rvs #< v_x, ihvs #< v_ih, rs) const_specs rec_specs dim_specs
           | [], [], nm :: dim_specs ->
             let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
-            build_cx cx' env (nms #< (Some nm), cvs, rvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
+            build_cx cx' ty_env (nms #< (Some nm), cvs, rvs, ihvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
           | [], [], [] ->
-            cx, nms, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
+            cx, nms, Bwd.to_list cvs, Bwd.to_list rvs, ihvs, Bwd.to_list rs
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', nms, cvs, rvs, rs = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
+        let cx', nms, cvs, rvs, ihvs, rs = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 
-          (*
-        let image_of_face _face =
-          Face.map elim_face @@
-             let env0 = D.Env.clear_locals (Cx.env cx) in
-             V.eval_bterm_face info.dlbl desc env0 face
-             ~const_args:cvs
-             ~rec_args:rvs
-             ~rs:rs
-        in
-              *)
+        let rec image_of_bterm phi =
+          function
+          | B.Intro intro as bterm ->
+            let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) nclos in
+            let rargs = List.map (fun bt -> `Val (image_of_bterm phi bt)) intro.rec_args in
+            let cargs = List.map (fun t -> `Val (Cx.eval cx' t)) intro.const_args in
+            let dims = List.map (fun t -> `Dim (Cx.eval_dim cx' t)) intro.rs in (* is this right ? *)
+            let cells = cargs @ rargs @ dims in
+            V.inst_nclo nclo cells
+          | B.Var ix ->
+            (* This is so bad!! *)
+            let ix' = ix - List.length rs in
+            Bwd.nth ihvs ix'
 
-        (* let boundary = List.map image_of_face constr.boundary in *)
-        Format.eprintf "Typechecker: todo, calculate boundary of elim clause@.";
-        let boundary = [] in
+        in
+
+        let image_of_bface (tr, tr', btm) =
+          let env = Cx.env cx' in
+          let r = V.eval_dim env tr in
+          let r' = V.eval_dim env tr' in
+          D.ValFace.make I.idn r r' @@ fun phi ->
+          image_of_bterm phi btm
+        in
+
+        let boundary = List.map image_of_bface constr.boundary in
         check_ cx' ty boundary bdy;
         Tm.NB (nms, bdy)
       in
@@ -641,7 +653,7 @@ and infer_spine cx hd =
         | [] ->
           ()
         | (lbl, constr) :: constrs ->
-          let nbnd = check_clause lbl constr in
+          let nbnd = check_clause acc lbl constr in
           let nclo = D.NClo {nbnd; rho = Cx.env cx} in
           check_clauses ((lbl, nclo) :: acc) constrs
 
