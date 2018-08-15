@@ -78,12 +78,45 @@ let print_diagnostic =
       C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
       let vty = Cx.eval cx ty in
       let ty = Cx.quote_ty cx vty in
+
+      let pp_restriction fmt =
+        let pp_bdy fmt =
+          function
+          | None -> Format.fprintf fmt "-"
+          | Some tm -> Tm.pp0 fmt tm
+        in
+        let pp_face fmt (r, r', otm) =
+          Format.fprintf fmt "%a = %a %a @[%a@]"
+            Tm.pp0 r
+            Tm.pp0 r'
+            Uuseg_string.pp_utf_8 "⇒"
+            pp_bdy otm
+        in
+        Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_face fmt
+      in
+
+      let pp_restricted_ty fmt (ty, sys) =
+        match sys with
+        | [] -> Tm.pp0 fmt ty
+        | _ ->
+          Format.fprintf fmt "%a@,@,with the following faces:@,@,   @[<v>%a@]"
+            Tm.pp0 ty
+            pp_restriction sys
+      in
+
+      let ty, sys =
+        match Tm.unleash ty with
+        | Tm.Rst rst ->
+          rst.ty, rst.sys
+        | _ ->
+          ty, []
+      in
       let pp fmt () =
-        Format.fprintf fmt "@[<v>?%s:@; @[<v>%a@]@,%a %a@]"
+        Format.fprintf fmt "@[<v>?%s:@; @[<v>%a@]@,@[<v>%a %a@]@]"
           (match name with Some name -> name | None -> "Hole")
           Dev.pp_params (Bwd.from_list tele)
           Uuseg_string.pp_utf_8 "⊢"
-          Tm.pp0 ty
+          pp_restricted_ty (ty, sys)
       in
       Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
       C.ret ()
