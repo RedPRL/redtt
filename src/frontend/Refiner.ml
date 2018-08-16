@@ -352,7 +352,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     M.Util.fold_left (fun acc clause -> refine_clause acc clause <<@> fun cl -> cl :: acc) [] eclauses >>= fun clauses ->
     M.ret @@ Tm.up @@ Tm.ann ~ty:data_ty ~tm:scrut @< Tm.Elim {dlbl; mot = bmot; clauses}
 
-let rec hope goal =
+let rec tac_hope goal =
   let rst = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
   let rec try_system sys =
     match sys with
@@ -374,18 +374,30 @@ let rec hope goal =
   in
   try_system goal.sys
 
-(* TODO: introduce sigma, etc. *)
-let rec auto goal =
+
+let normalizing_goal tac goal =
   normalize_ty goal.ty >>= fun ty ->
-  let goal = {goal with ty} in
-  match Tm.unleash ty with
+  tac {goal with ty}
+
+let rec tac_fix ftac goal =
+  ftac (tac_fix ftac) goal
+
+let match_goal tac =
+  fun goal ->
+    tac goal goal
+
+(* TODO: introduce sigma, etc. *)
+let tac_auto =
+  tac_fix @@ fun tac_auto ->
+  normalizing_goal @@ match_goal @@ fun goal ->
+  match Tm.unleash goal.ty with
   | Tm.Ext (Tm.NB (nms, _)) ->
     let nms' = Bwd.to_list @@ Bwd.map (function Some nm -> nm | None -> "_") nms in
-    tac_lambda nms' auto goal
+    tac_lambda nms' tac_auto
 
   | Tm.Pi (dom, Tm.B (nm, _)) ->
     let nms = [match nm with Some nm -> nm | None -> "_"] in
-    tac_lambda nms auto goal
+    tac_lambda nms tac_auto
 
   | _ ->
-    hope goal
+    tac_hope

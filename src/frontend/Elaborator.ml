@@ -406,10 +406,10 @@ struct
         M.ret @@ Tm.up tm
 
       | _, _, E.Hope ->
-        hope goal
+        tac_hope goal
 
       | _, _, E.Auto ->
-        auto goal
+        tac_auto goal
 
       | _, _, E.Let info ->
         let itac =
