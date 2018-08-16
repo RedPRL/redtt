@@ -14,7 +14,7 @@ struct
   module C = Contextual
   module U = Unify
 
-  open Dev open Unify
+  open Dev
 
   module M = ElabMonad
   module MonadUtil = Monad.Util (M)
@@ -602,7 +602,7 @@ struct
         begin
           M.under_restriction r r' begin
             elab_chk env e {ty = ext_ty; sys = []} >>= fun line ->
-            M.in_scope x `I (M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx]) >>= fun (_, tmx) ->
+            let tmx = Tm.up @@ Tm.ann ~ty:ext_ty ~tm:line @< Tm.ExtApp [varx] in
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
@@ -637,7 +637,7 @@ struct
         begin
           M.under_restriction r r' begin
             elab_chk env e {ty = ext_ty; sys = []} >>= fun line ->
-            M.in_scope x `I (M.lift @@ (ext_ty, line) %% Tm.ExtApp [varx]) >>= fun (_, tmx) ->
+            let tmx = Tm.up @@ Tm.ann ~ty:ext_ty ~tm:line @< Tm.ExtApp [varx] in
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
@@ -709,11 +709,10 @@ struct
       let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
       elab_chk env info.fam {ty = univ_fam; sys = []} >>= fun fam ->
-      begin
-        (M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr] <<@> snd)
-        <&>
-        (M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr'] <<@> snd)
-      end >>= fun (fam_r, fam_r') ->
+
+      let fam_cmd = Tm.ann ~ty:univ_fam ~tm:fam in
+      let fam_r = Tm.up @@ fam_cmd @< Tm.ExtApp [tr] in
+      let fam_r' = Tm.up @@ fam_cmd @< Tm.ExtApp [tr'] in
       elab_chk env info.tm {ty = fam_r; sys = []} <<@> fun tm ->
         let varx = Tm.up @@ Tm.var x in
         let tyx = Tm.up @@ Tm.ann ~ty:univ_fam ~tm:fam @< Tm.ExtApp [varx] in
@@ -727,13 +726,15 @@ struct
       let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
       elab_chk env info.fam {ty = univ_fam; sys = []} >>= fun fam ->
-      M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr] >>= fun (_, fam_r) ->
-      M.lift @@ (univ_fam, fam) %% Tm.ExtApp [tr'] >>= fun (_, fam_r') ->
+
+      let fam_cmd = Tm.ann ~ty:univ_fam ~tm:fam in
+      let fam_r = Tm.up @@ fam_cmd @< Tm.ExtApp [tr] in
+      let fam_r' = Tm.up @@ fam_cmd @< Tm.ExtApp [tr'] in
+
       elab_chk env info.cap {ty = fam_r; sys = []} >>= fun cap ->
-      M.in_scope x `I begin
-        let varx = Tm.up @@ Tm.var x in
-        M.lift @@ (univ_fam, fam) %% Tm.ExtApp [varx]
-      end >>= fun (_, fam_x) ->
+
+      let varx = Tm.up @@ Tm.var x in
+      let fam_x = Tm.up @@ fam_cmd @< Tm.ExtApp [varx] in
       let tybnd = Tm.bind x fam_x in
       elab_com_sys env tr tybnd cap info.sys <<@> fun sys ->
         let com = Tm.Com {r = tr; r' = tr'; ty = tybnd; cap; sys} in
