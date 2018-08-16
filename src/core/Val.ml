@@ -420,6 +420,12 @@ struct
       in
       step @@ make_coe dir abs el
 
+    | NCoeAtType info ->
+      let dir = Dir.act phi info.dir in
+      let abs = Abs.act phi info.abs in
+      let el = Value.act phi info.el in
+      step @@ make_coe dir abs el
+
 
     | VProj info ->
       let mx = I.act phi @@ `Atom info.x in
@@ -832,8 +838,14 @@ struct
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
-    | Pi _ | Sg _ | Ext _ | Up _ | Later _ ->
+    | Pi _ | Sg _ | Ext _ | Later _ ->
       make @@ Coe {dir; abs; el}
+
+    | Up _ ->
+      let neu = NCoeAtType {dir; abs; el} in
+      let _, r' = Dir.unleash dir in
+      let ty_r' = Abs.inst1 abs r' in
+      reflect ty_r' neu []
 
     (* TODO: what about neutral element of the universe? is this even correct? *)
     | Univ _ ->

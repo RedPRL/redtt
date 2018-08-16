@@ -429,6 +429,16 @@ struct
       let tm = equate_neu env info0.neu info1.neu in
       Tm.Coe {r = tr; r' = tr'; ty = bnd; tm = Tm.up tm}, Bwd.from_list stk
 
+    | NCoeAtType info0, NCoeAtType info1 ->
+      let tr, tr' = equate_dir env info0.dir info1.dir in
+      let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
+      let bnd = equate_val_abs env univ info0.abs info1.abs in
+      let r, _ = Dir.unleash info0.dir in
+      let ty_r = Abs.inst1 info0.abs r in
+      let tm = equate env ty_r info0.el info1.el in
+      Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Bwd.from_list stk
+
+
     | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
       let ty = equate_ty env ty0 ty1 in
       let ltr_ty = make_later ty0 in

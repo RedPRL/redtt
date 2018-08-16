@@ -61,6 +61,9 @@ and neu =
   | NHComAtCap of {dir : dir; ty : value; cap : neu; sys : comp_sys}
   | NCoe of {dir : dir; abs : abs; neu : neu}
 
+  | NCoeAtType of {dir : dir; abs : abs; el : value}
+  (** Invariant: [abs] always has a neutral interior *)
+
   | FunApp of neu * nf
   | ExtApp of neu * dim list
   | Car of neu

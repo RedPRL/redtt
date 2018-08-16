@@ -43,7 +43,7 @@ let thing (A : type) (a,b : A) (p : Path A a b) : Path (Path A a b) p p =
   (coe 0 1 (λ _ → p) in ty) i j
 
 let experiment3 (A : type) (B : A -> type) (u : (a : A) -> B a) : Path ((a : A) -> B a) u u =
-  lam i ->
+  λ i ->
     comp 0 1 u [
     | i=0 => auto
     | i=1 => auto
@@ -54,7 +54,7 @@ let experiment3 (A : type) (B : A -> type) (u : (a : A) -> B a) : Path ((a : A) 
 let experiment (A : type) (u : A)
   : (p : Path A u u) -> (q : Path (Path A u u) p p) -> Path (Path A u u) p p
   =
-  lam p q i ->
+  λ p q i ->
     comp 0 1 p [
     | i=0 => q
     | i=1 => auto
@@ -67,11 +67,11 @@ let experiment (A : type) (u : A)
 ; satisfy the restriction. Once your term checks, then delete the ?{ ... }.
 ;
 ;;let experiment (A : type) (u : A) : Path A u u =
-;;  lam i ->
+;;  λ i ->
 ;;  ?{
 ;;    comp 0 1 ?cap [
-;;    | i=0 => lam j -> ?left
-;;    | i=1 => lam j -> ?right
+;;    | i=0 => λ j -> ?left
+;;    | i=1 => λ j -> ?right
 ;;    ]
 ;;  }
 ;;
@@ -100,5 +100,25 @@ let compose (o1,o2 : O) : O =
 let compose/obase/r (o : O) : Path O (compose o obase) o =
   elim o [
   | obase ⇒ auto
-  | oloop (o' ⇒ compose/obase/r/o') i ⇒ lam j -> oloop (compose/obase/r/o' j) i
+  | oloop (o' ⇒ compose/obase/r/o') i ⇒ λ j -> oloop (compose/obase/r/o' j) i
   ]
+
+
+
+
+
+data unit where
+| triv
+
+data twonit where
+| wrap [x : unit]
+
+let Code (n : twonit) : type =
+  elim n [ wrap n' => dim -> unit ]
+
+let test (p : Path twonit (wrap triv) (wrap triv)) : dim -> unit =
+  coe 0 1 (λ _ -> triv) in (λ i -> Code (p i))
+
+
+
+

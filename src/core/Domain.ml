@@ -186,6 +186,10 @@ and pp_neu fmt neu =
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_neu info.neu
 
+  | NCoeAtType info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
+
   | FunApp (neu, arg) ->
     Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
 
@@ -413,7 +417,6 @@ end
 
 module ExtAbs : IAbs.S with type el = value * val_sys =
   IAbs.M (Sort.Prod (Value) (ValSys))
-
 
 module Env :
 sig
