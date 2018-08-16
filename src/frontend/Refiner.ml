@@ -39,6 +39,17 @@ let normalize_ty ty =
   normalization_clock := !normalization_clock +. (now1 -. now0);
   M.ret ty
 
+let normalizing_goal tac goal =
+  normalize_ty goal.ty >>= fun ty ->
+  tac {goal with ty}
+
+let rec tac_fix ftac goal =
+  ftac (tac_fix ftac) goal
+
+let match_goal tac =
+  fun goal ->
+    tac goal goal
+
 
 let guess_restricted tm goal =
   let ty = goal.ty in
@@ -178,6 +189,29 @@ let rec tac_lambda names tac goal =
       | _ ->
         raise ChkMatch
     end
+
+let tac_pair tac0 tac1 : chk_tac =
+  fun goal ->
+    match Tm.unleash goal.ty with
+    | Tm.Sg (dom, cod) ->
+      let sys0 =
+        flip List.map goal.sys @@ fun (r, r', otm) ->
+        r, r', flip Option.map otm @@ fun tm ->
+        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Car
+      in
+      let sys1 =
+        flip List.map goal.sys @@ fun (r, r', otm) ->
+        r, r', flip Option.map otm @@ fun tm ->
+        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Cdr
+      in
+      tac0 {ty = dom; sys = sys0} >>= fun tm0 ->
+      let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
+      let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
+      tac1 {ty = cod'; sys = sys1} >>= fun tm1 ->
+      M.ret @@ Tm.cons tm0 tm1
+
+    | _ ->
+      raise ChkMatch
 
 let unleash_data ty =
   match Tm.unleash ty with
@@ -374,17 +408,24 @@ let rec tac_hope goal =
   in
   try_system goal.sys
 
-
-let normalizing_goal tac goal =
-  normalize_ty goal.ty >>= fun ty ->
-  tac {goal with ty}
-
-let rec tac_fix ftac goal =
-  ftac (tac_fix ftac) goal
-
-let match_goal tac =
+let tac_hole ~loc ~name : chk_tac =
   fun goal ->
-    tac goal goal
+    M.lift C.ask >>= fun psi ->
+    let rty = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
+    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
+    let tm = Tm.up cmd in
+    begin
+      if name = Some "_" then M.ret () else
+        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi; tm}
+    end >>
+    M.ret tm
+
+let tac_guess tac : chk_tac =
+  fun goal ->
+    tac {goal with sys = []} >>= fun tm ->
+    let rty = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
+    M.lift C.ask >>= fun psi ->
+    M.lift @@ U.push_guess psi ~ty0:rty ~ty1:goal.ty tm
 
 (* TODO: introduce sigma, etc. *)
 let tac_auto =

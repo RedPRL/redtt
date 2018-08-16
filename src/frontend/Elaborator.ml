@@ -388,22 +388,13 @@ struct
       (* TODO speed up elaboration by not normalizing, but raising ChkMatch if we don't know what to do.
          Then wrap the whole thing in tac_wrap_nf. *)
       normalize_ty goal.ty >>= fun ty ->
+      let goal = {goal with ty} in
       match goal.sys, Tm.unleash ty, e.con with
       | _, _, E.Guess e ->
-        elab_chk env e {ty = ty; sys = []} >>= fun tm ->
-        let rty = Tm.make @@ Tm.Rst {ty; sys = goal.sys} in
-        M.lift C.ask >>= fun psi ->
-        M.lift @@ U.push_guess psi ~ty0:rty ~ty1:ty tm
+        tac_guess (elab_chk env e) goal
 
       | _, _, E.Hole name ->
-        M.lift C.ask >>= fun psi ->
-        let rty = Tm.make @@ Tm.Rst {ty; sys = goal.sys} in
-        M.lift @@ U.push_hole `Rigid psi rty >>= fun tm ->
-        begin
-          if name = Some "_" then M.ret () else
-            M.emit e.span @@ M.UserHole {name; ty = rty; tele = psi; tm = Tm.up tm}
-        end >>
-        M.ret @@ Tm.up tm
+        tac_hole ~loc:e.span ~name goal
 
       | _, _, E.Hope ->
         tac_hope goal
@@ -516,23 +507,12 @@ struct
         failwith "empty tuple"
 
       | _, _, Tuple [e] ->
-        elab_chk env e {goal with ty}
+        elab_chk env e goal
 
-      | _, Tm.Sg (dom, cod), Tuple (e :: es) ->
-        let sys0 =
-          flip List.map goal.sys @@ fun (r, r', otm) ->
-          r, r', flip Option.map otm @@ fun tm ->
-          Tm.up @@ Tm.ann ~ty ~tm @< Tm.Car
-        in
-        let sys1 =
-          flip List.map goal.sys @@ fun (r, r', otm) ->
-          r, r', flip Option.map otm @@ fun tm ->
-          Tm.up @@ Tm.ann ~ty ~tm @< Tm.Cdr
-        in
-        elab_chk env e {ty = dom; sys = sys0} >>= fun tm0 ->
-        let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
-        let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
-        elab_chk env {e with con = E.Tuple es} {ty = cod'; sys = sys1} <<@> Tm.cons tm0
+      | _, Tm.Sg (dom, cod), Tuple (e0 :: es) as etuple ->
+        let tac0 = elab_chk env e0 in
+        let tac1 = elab_chk env @@ {e with con = Tuple es} in
+        tac_pair tac0 tac1 goal
 
       | [], Tm.Univ info, Type (kind, lvl) ->
         begin
