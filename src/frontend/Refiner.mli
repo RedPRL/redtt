@@ -36,8 +36,13 @@ val tac_lambda : string list -> chk_tac -> chk_tac
 (** Introduce a sigma type *)
 val tac_pair : chk_tac -> chk_tac -> chk_tac
 
-(** Call an elimination rule. *)
-val tac_elim : loc:location -> tac_mot:chk_tac option -> tac_scrut:inf_tac -> clauses:(Desc.con_label * ESig.epatbind list * chk_tac) list -> chk_tac
+(** Call a data elimination rule. *)
+val tac_elim
+  : loc:location
+  -> tac_mot:chk_tac option
+  -> tac_scrut:inf_tac
+  -> clauses:(Desc.con_label * ESig.epatbind list * chk_tac) list
+  -> chk_tac
 
 (** Introduce a let-binding. *)
 val tac_let : string -> inf_tac -> chk_tac -> chk_tac
