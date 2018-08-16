@@ -427,7 +427,6 @@ let tac_guess tac : chk_tac =
     M.lift C.ask >>= fun psi ->
     M.lift @@ U.push_guess psi ~ty0:rty ~ty1:goal.ty tm
 
-(* TODO: introduce sigma, etc. *)
 let tac_auto =
   tac_fix @@ fun tac_auto ->
   normalizing_goal @@ match_goal @@ fun goal ->
@@ -439,6 +438,9 @@ let tac_auto =
   | Tm.Pi (dom, Tm.B (nm, _)) ->
     let nms = [match nm with Some nm -> nm | None -> "_"] in
     tac_lambda nms tac_auto
+
+  | Tm.Sg (_, _) ->
+    tac_pair tac_auto tac_auto
 
   | _ ->
     tac_hope
