@@ -133,10 +133,6 @@ let EquivLemma
 ; per Dan Licata, UA and UABeta suffice for full univalence:
 ; https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
 
-let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
-  λ i →
-    `(V i A B E)
-
 let UA/beta
   (A,B : type) (E : Equiv A B) (a : A)
   : Path _ (coe 0 1 a in UA _ _ E) (E.0 a)
