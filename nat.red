@@ -72,7 +72,7 @@ let nat-refl (m : nat) : NatPathCode m m =
   | suc (m' ⇒ nat-refl/m') ⇒ nat-refl/m'
   ]
 
-let nat-path/encode (m : nat) (n : nat) (p : Path nat m n)
+let nat-path/encode (m,n : nat) (p : Path nat m n)
   : NatPathCode m n
   =
   coe 0 1 (nat-refl m) in λ i → NatPathCode m (p i)
