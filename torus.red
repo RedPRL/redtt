@@ -2,6 +2,9 @@ import path
 import s1
 import isotoequiv
 
+; cubicaltt version: https://github.com/mortberg/cubicaltt/blob/master/examples/torus.ctt
+; cubical agda version: https://github.com/Saizan/cubical-demo/blob/hits-transp/examples/Cubical/Examples/Torus.agda
+
 data torus where
 | pt
 | p/one @ i [i=0 ⇒ pt | i=1 ⇒ pt]
