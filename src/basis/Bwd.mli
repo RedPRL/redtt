@@ -15,9 +15,11 @@ end
 
 module Bwd :
 sig
+  val nth : 'a bwd -> int -> 'a
   val rev : 'a bwd -> 'a bwd
   val length : 'a bwd -> int
   val map : ('a -> 'b) -> 'a bwd -> 'b bwd
+  val mapi : (int -> 'a -> 'b) -> 'a bwd -> 'b bwd
   val flat_map : ('a -> 'b list) -> 'a bwd -> 'b bwd
   val filter : ('a -> bool) -> 'a bwd -> 'a bwd
   val to_list : 'a bwd -> 'a list

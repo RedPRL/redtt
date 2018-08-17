@@ -27,11 +27,11 @@ let shannon (A : type) (f : bool → A) : bool → A =
 
 
 let shannon/path (A : type) (f : bool → A) : Path _ f (shannon A f) =
-  funext bool _ _ _
+  funext _ _ f (shannon A f)
     (λ b →
-      elim b in λ x → Path _ (f x) (shannon A f x) [
-      | tt ⇒ λ _ → f tt
-      | ff ⇒ λ _ → f ff
+      elim b [
+      | tt ⇒ auto
+      | ff ⇒ auto
       ])
 
 let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
@@ -45,8 +45,8 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
           >)
       in λ j →
         [i] (f : bool → A) × Path (A × A) <f tt, f ff> p [
-        | i=0 ⇒ < shannon/path A (fib.0) j, fib.1 >
-        | i=1 ⇒ < pair-to-fun A p, λ _ → p >
+        | i=0 ⇒ <shannon/path A (fib.0) j, fib.1>
+        | i=1 ⇒ <pair-to-fun A p, auto>
         ]
     >
 

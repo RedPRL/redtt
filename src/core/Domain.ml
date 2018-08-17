@@ -1,4 +1,4 @@
-open RedBasis open Bwd
+open RedBasis open Bwd open BwdNotation
 include DomainData
 
 let rec make : con -> value =
@@ -24,9 +24,9 @@ let rec pp_env_cell fmt =
   | `Tick _ ->
     Format.fprintf fmt "<tick>"
 
-and pp_env fmt =
+and pp_env fmt env =
   let pp_sep fmt () = Format.fprintf fmt ", " in
-  Format.pp_print_list ~pp_sep pp_env_cell fmt
+  Format.pp_print_list ~pp_sep pp_env_cell fmt (Bwd.to_list env.cells)
 
 
 and pp_con fmt : con -> unit =
@@ -93,10 +93,6 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<dfix>"
   | DFixLine _ ->
     Format.fprintf fmt "<dfix-line>"
-  | BoxModality _ ->
-    Format.fprintf fmt "<box-modality>"
-  | Shut _ ->
-    Format.fprintf fmt "<shut>"
   | Data data ->
     (* TODO: handle case where params empty more gracefully *)
     Format.fprintf fmt "@[<hv1>(%a %a)@]"
@@ -168,11 +164,11 @@ and pp_comp_face : type x. _ -> (x, abs) face -> unit =
 
 and pp_clo fmt (Clo clo) =
   let Tm.B (_, tm) = clo.bnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
+  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
 
 and pp_nclo fmt (NClo clo) =
   let Tm.NB (_, tm) = clo.nbnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
+  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
 
 and pp_neu fmt neu =
   match neu with
@@ -193,6 +189,10 @@ and pp_neu fmt neu =
   | NCoe info ->
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_neu info.neu
+
+  | NCoeAtType info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
 
   | FunApp (neu, arg) ->
     Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
@@ -239,9 +239,6 @@ and pp_neu fmt neu =
 
   | FixLine _ ->
     Format.fprintf fmt "<fix-line>"
-
-  | Open _ ->
-    Format.fprintf fmt "<open>"
 
 and pp_elim_clauses fmt clauses =
   let pp_sep fmt () = Format.fprintf fmt "@ " in
@@ -425,7 +422,6 @@ end
 module ExtAbs : IAbs.S with type el = value * val_sys =
   IAbs.M (Sort.Prod (Value) (ValSys))
 
-
 module Env :
 sig
   include Sort.S
@@ -433,24 +429,24 @@ sig
     with type 'a m = 'a
   val emp : env
   val clear_locals : env -> env
-  val push : env_el -> env -> env
-  val push_many : env_el list -> env -> env
+  val snoc : env -> env_el -> env
+  val append : env -> env_el list -> env
   val act_env_el : I.action -> env_el -> env_el
 end =
 struct
   type t = env
   type 'a m = 'a
 
-  let emp = {cells = []; global = I.idn}
+  let emp = {cells = Emp; global = I.idn}
 
   let clear_locals rho =
-    {rho with cells = []}
+    {rho with cells = Emp}
 
-  let push el {cells; global} =
-    {cells = el :: cells; global}
+  let snoc {cells; global} el =
+    {cells = cells #< el; global}
 
-  let push_many els {cells; global} =
-    {cells = els @ cells; global}
+  let append {cells; global} els =
+    {cells = cells <>< els; global}
 
   let act_env_el phi =
     function
@@ -462,7 +458,7 @@ struct
       `Tick tck
 
   let act phi {cells; global} =
-    {cells = List.map (act_env_el phi) cells;
+    {cells = Bwd.map (act_env_el phi) cells;
      global = I.cmp phi global}
 end
 

@@ -22,6 +22,7 @@ module Notation (M : S) : Notation with type 'a m := 'a M.m
 
 module Util (M : S) :
 sig
-  val traverse : ('a -> 'b) -> 'a M.m list -> 'a list M.m
+  val traverse : ('a -> 'b M.m) -> 'a list -> 'b list M.m
+  val fold_left : ('a -> 'b -> 'a M.m) -> 'a -> 'b list -> 'a M.m
 end
 

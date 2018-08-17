@@ -29,6 +29,13 @@ module Bwd =
 struct
   open BwdNotation
 
+  let rec nth xs i =
+    match xs with
+    | Emp ->
+      failwith "Bwd.nth"
+    | Snoc (_, x) when i = 0 -> x
+    | Snoc (xs, _) -> nth xs @@ i - 1
+
 
   let rec length =
     function
@@ -40,6 +47,14 @@ struct
     function
     | Emp -> Emp
     | Snoc (xs, x) -> Snoc (map f xs, f x)
+
+  let mapi f =
+    let rec go i =
+      function
+      | Emp -> Emp
+      | Snoc (xs, x) -> Snoc (go (i + 1) xs, f i x)
+    in
+    go 0
 
   let rec flat_map f =
     function

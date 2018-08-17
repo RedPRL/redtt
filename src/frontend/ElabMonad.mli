@@ -23,6 +23,9 @@ type diagnostic =
        tele : Unify.telescope;
        ty : Tm.tm;
        tm : Tm.tm}
+  | PrintTerm of
+      {ty : Tm.tm;
+       tm : Tm.tm}
 
 val emit : location -> diagnostic -> unit m
 val report : 'a m -> 'a m

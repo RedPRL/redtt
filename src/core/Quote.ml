@@ -17,7 +17,7 @@ sig
   val make : int -> t
   val succ : t -> t
   val succn : int -> t -> t
-  val abs : t -> Name.t bwd -> t
+  val abs : t -> Name.t list -> t
 
   val ix_of_lvl : int -> t -> int
   val ix_of_atom : Name.t -> t -> int
@@ -48,8 +48,8 @@ struct
   (* I might be doing this backwards ;-) *)
   let rec abs env xs =
     match xs with
-    | Emp -> env
-    | Snoc (xs, x) -> abs (abs1 env x) xs
+    | [] -> env
+    | x :: xs -> abs (abs1 env x) xs
 
   let ix_of_lvl l env =
     env.n - (l + 1)
@@ -69,6 +69,8 @@ sig
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
   val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
+
+  val quote_dim : env -> I.t -> Tm.tm
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
@@ -162,11 +164,12 @@ struct
 
     | Ext abs ->
       let xs, (tyx, _) = Domain.ExtAbs.unleash abs in
-      let rs = List.map (fun x -> `Atom x) @@ Bwd.to_list xs in
+      let xs_fwd = Bwd.to_list xs in
+      let rs = List.map (fun x -> `Atom x) xs_fwd in
       let app0 = ext_apply el0 rs in
       let app1 = ext_apply el1 rs in
       Tm.ext_lam (Bwd.map Name.name xs) @@
-      equate (Env.abs env xs) tyx app0 app1
+      equate (Env.abs env xs_fwd) tyx app0 app1
 
     | Later ltr ->
       let tick = TickGen (`Lvl (None, Env.len env)) in
@@ -175,12 +178,6 @@ struct
       let ty = inst_tick_clo ltr tick in
       let bdy = equate (Env.succ env) ty prev0 prev1 in
       Tm.make @@ Tm.Next (Tm.B (None, bdy))
-
-    | BoxModality ty ->
-      let open0 = modal_open el0 in
-      let open1 = modal_open el1 in
-      let t = equate env ty open0 open1 in
-      Tm.make @@ Tm.Shut t
 
     | Rst {ty; _} ->
       equate env ty el0 el1
@@ -258,10 +255,6 @@ struct
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.make @@ Tm.Later (Tm.B (None, cod))
 
-      | _, BoxModality ty0, BoxModality ty1 ->
-        let ty = equate env ty ty0 ty1 in
-        Tm.make @@ Tm.BoxModality ty
-
       | _, Sg sg0, Sg sg1 ->
         let dom = equate env ty sg0.dom sg1.dom in
         let var = generic env sg0.dom in
@@ -272,8 +265,9 @@ struct
 
       | _, Ext abs0, Ext abs1 ->
         let xs, (ty0x, sys0x) = Domain.ExtAbs.unleash abs0 in
+        let xs_fwd = Bwd.to_list xs in
         let ty1x, sys1x = Domain.ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
-        let envx = Env.abs env xs in
+        let envx = Env.abs env xs_fwd in
         let tyx = equate envx ty ty0x ty1x in
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
         Tm.make @@ Tm.Ext (Tm.NB (Bwd.map Name.name xs, (tyx, sysx)))
@@ -370,6 +364,9 @@ struct
         Tm.make @@ Tm.Intro (data.dlbl, info0.clbl, const_args @ rec_args @ trs)
 
       | _ ->
+        (* For more readable error messages *)
+        let el0 = D.make @@ V.unleash el0 in
+        let el1 = D.make @@ V.unleash el1 in
         let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
 
@@ -381,8 +378,8 @@ struct
         Bwd.to_list acc
       | (_, ty) :: const_specs, el0 :: els0, el1 :: els1 ->
         let vty = eval venv ty in
-        let tm = equate env vty el0 el1 in
-        go (acc #< tm) (D.Env.push (`Val el0) venv) const_specs els0 els1
+        let tm0 = equate env vty el0 el1 in
+        go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) const_specs els0 els1
       | _ ->
         failwith "equate_constr_args"
     in
@@ -452,6 +449,16 @@ struct
       let tm = equate_neu env info0.neu info1.neu in
       Tm.Coe {r = tr; r' = tr'; ty = bnd; tm = Tm.up tm}, Bwd.from_list stk
 
+    | NCoeAtType info0, NCoeAtType info1 ->
+      let tr, tr' = equate_dir env info0.dir info1.dir in
+      let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
+      let bnd = equate_val_abs env univ info0.abs info1.abs in
+      let r, _ = Dir.unleash info0.dir in
+      let ty_r = Abs.inst1 info0.abs r in
+      let tm = equate env ty_r info0.el info1.el in
+      Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Bwd.from_list stk
+
+
     | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
       let ty = equate_ty env ty0 ty1 in
       let ltr_ty = make_later ty0 in
@@ -502,9 +509,17 @@ struct
 
         let desc = V.Sig.lookup_datatype dlbl in
 
+        let find_clause clbl clauses =
+          try
+            snd @@ List.find (fun (clbl', _) -> clbl = clbl') clauses
+          with
+          | Not_found ->
+            failwith "Quote: elim / find_clause"
+        in
+
         let quote_clause (clbl, constr) =
-          let _, clause0 = List.find (fun (clbl', _) -> clbl = clbl') elim0.clauses in
-          let _, clause1 = List.find (fun (clbl', _) -> clbl = clbl') elim1.clauses in
+          let clause0 = find_clause clbl elim0.clauses in
+          let clause1 = find_clause clbl elim1.clauses in
           let env', vs, cvs, rvs, rs =
             let open Desc in
             let rec build_cx qenv env (vs, cvs, rvs) rs const_specs rec_specs dim_specs =
@@ -512,17 +527,19 @@ struct
               | (_, pty) :: const_specs, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
-                let env' = D.Env.push (`Val v) env in
+                let env' = D.Env.snoc env @@ `Val v in
                 build_cx (Env.succ qenv) env' (vs #< v, cvs #< v, rvs) rs const_specs rec_specs dim_specs
               | [], (_, Self) :: rec_specs, _ ->
                 let vx = generic qenv data_ty in
                 let qenv' = Env.succ qenv in
                 let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
                 build_cx (Env.succ qenv') env (vs #< vx #< vih, cvs, rvs #< vx) rs const_specs rec_specs dim_specs
-              | [], [], dims ->
-                let xs = Bwd.map (fun x -> Name.named @@ Some x) @@ Bwd.from_list dims in
-                let qenv' = Env.abs qenv xs in
-                qenv', Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
+              | [], [], nm :: dim_specs ->
+                let x = Name.named @@ Some nm in
+                let qenv' = Env.abs qenv [x] in
+                build_cx qenv' env (vs, cvs, rvs) (rs #< (`Atom x)) const_specs rec_specs dim_specs
+              | [], [], [] ->
+                qenv, Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
             build_cx env D.Env.emp (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
           in
@@ -532,7 +549,8 @@ struct
           let intro = make_intro D.Env.emp ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
-          clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)
+          let nms = Bwd.from_list @@ ListUtil.tabulate (List.length cells) @@ fun _ -> None in
+          clbl, Tm.NB (nms, tbdy)
         in
 
         let params = equate_data_params env desc elim0.params elim1.params in
@@ -571,9 +589,6 @@ struct
     | Prev (tick0, neu0), Prev (tick1, neu1) ->
       let tick = equate_tick env tick0 tick1 in
       equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
-
-    | Open neu0, Open neu1 ->
-      equate_neu_ env neu0 neu1 @@ Tm.Open :: stk
 
     | _ ->
       let err = ErrEquateNeu {env; neu0; neu1} in
@@ -660,7 +675,7 @@ struct
     let x, v0x = Abs.unleash1 abs0 in
     let v1x = Abs.inst1 abs1 @@ `Atom x in
     try
-      let envx = Env.abs env @@ Emp #< x in
+      let envx = Env.abs env [x] in
       let tm = equate envx ty v0x v1x in
       Tm.B (Name.name x, tm)
     with
@@ -709,7 +724,8 @@ struct
     | `Same ->
       quote_dim env r
     | _ ->
-      (* Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      (*
+         Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
       failwith "equate_dim: dimensions did not match"
@@ -720,7 +736,8 @@ struct
     | `Same, `Same ->
       quote_dim env r
     | _ ->
-      (* Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      (*
+         Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
       failwith "equate_dim3: dimensions did not match"
@@ -755,8 +772,6 @@ struct
 
   and quote_tick env tck =
     match tck with
-    | TickConst ->
-      Tm.make Tm.TickConst
     | TickGen (`Lvl (_, lvl)) ->
       let ix = Env.ix_of_lvl lvl env in
       Tm.up @@ Tm.ix ix
@@ -823,20 +838,16 @@ struct
       let sys1 = map_sys (fun _ _ -> prev tick) sys1 in
       fancy_subtype (Env.succ env) vcod0 sys0 vcod1 sys1
 
-    | BoxModality ty0, BoxModality ty1 ->
-      let sys0 = map_sys (fun _ _ -> modal_open) sys0 in
-      let sys1 = map_sys (fun _ _ -> modal_open) sys1 in
-      fancy_subtype env ty0 sys0 ty1 sys1
-
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
+      let xs_fwd = Bwd.to_list xs in
       let rs = Bwd.map (fun x -> `Atom x) xs in
       let ty1x, sys1x = ExtAbs.inst abs1 rs in
-      let envxs = Env.abs env xs in
-      let rs_lst = Bwd.to_list rs in
+      let envxs = Env.abs env xs_fwd in
+      let rs_fwd = Bwd.to_list rs in
       let face r r' v =
         let phi = I.equate r r' in
-        let rs' = List.map (I.act phi) rs_lst in
+        let rs' = List.map (I.act phi) rs_fwd in
         ext_apply v rs'
       in
       let sys0' = map_sys face sys0 in

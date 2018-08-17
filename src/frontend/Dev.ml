@@ -25,10 +25,9 @@ type ('a, 'b) equation =
 type 'a param =
   [ `I
   | `Tick
-  | `Lock
-  | `ClearLocks
   | `KillFromTick of 'a
   | `P of 'a
+  | `Def of 'a * 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
   | `SelfArg of 'a Desc.rec_spec
@@ -75,11 +74,13 @@ let rec eqn_close_var x tw k q =
 
 let param_open_var k x =
   function
-  | (`I | `Tick | `Lock | `ClearLocks) as p -> p
+  | (`I | `Tick ) as p -> p
   | `KillFromTick tck ->
     `KillFromTick (Tm.open_var k (fun twin -> Tm.var x ~twin) tck)
   | `P ty ->
     `P (Tm.open_var k (fun twin -> Tm.var x ~twin) ty)
+  | `Def (ty, tm) ->
+    `Def (Tm.open_var k (fun twin -> Tm.var x ~twin) ty, Tm.open_var k (fun twin -> Tm.var x ~twin) tm)
   | `Tw (ty0, ty1) ->
     `Tw (Tm.open_var k (fun twin -> Tm.var x ~twin) ty0, Tm.open_var k (fun twin -> Tm.var x ~twin) ty1)
   | `R (r0, r1) ->
@@ -90,11 +91,13 @@ let param_open_var k x =
 
 let param_close_var x k =
   function
-  | (`I | `Tick | `Lock | `ClearLocks) as p -> p
+  | (`I | `Tick) as p -> p
   | `KillFromTick tck ->
     `KillFromTick (Tm.close_var x ~twin:(fun tw -> tw) k tck)
   | `P ty ->
     `P (Tm.close_var x ~twin:(fun tw -> tw) k ty)
+  | `Def (ty, tm) ->
+    `Def (Tm.close_var x ~twin:(fun tw -> tw) k ty, Tm.close_var x ~twin:(fun tw -> tw) k tm)
   | `Tw (ty0, ty1) ->
     `Tw (Tm.close_var x ~twin:(fun tw -> tw) k ty0, Tm.close_var x ~twin:(fun tw -> tw) k ty1)
   | `R (r0, r1) ->
@@ -177,13 +180,11 @@ let pp_param fmt =
     Format.fprintf fmt "dim"
   | `Tick ->
     Uuseg_string.pp_utf_8 fmt "✓"
-  | `Lock ->
-    Uuseg_string.pp_utf_8 fmt "🔓"
-  | `ClearLocks ->
-    Format.fprintf fmt "<clear-locks>"
   | `KillFromTick _ ->
     Format.fprintf fmt "<kill-after-tick>"
   | `P ty ->
+    Tm.pp0 fmt ty
+  | `Def (ty, _) -> (* TODO *)
     Tm.pp0 fmt ty
   | `Tw (ty0, ty1) ->
     Format.fprintf fmt "%a %a %a"
@@ -205,6 +206,12 @@ let pp_param_cell fmt (x, param) =
       Name.pp x
       Tm.pp0 ty
 
+  | `Def (ty, tm) ->
+    Format.fprintf fmt "@[<1>%a : %a = %a@]"
+      Name.pp x
+      Tm.pp0 ty
+      Tm.pp0 tm
+
   | `Tw (ty0, ty1) ->
     Format.fprintf fmt "@[<1>%a : %a %a %a@]"
       Name.pp x
@@ -221,12 +228,6 @@ let pp_param_cell fmt (x, param) =
       Name.pp x
       Uuseg_string.pp_utf_8
       "✓"
-
-  | `Lock ->
-    Uuseg_string.pp_utf_8 fmt "🔓"
-
-  | `ClearLocks ->
-    Format.fprintf fmt "<clear-locks>"
 
   | `KillFromTick tck ->
     Format.fprintf fmt "<clear-after-tick: %a>"
@@ -360,12 +361,14 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
   function
-  | (`I | `Tick | `Lock | `ClearLocks | `SelfArg Desc.Self) as p ->
+  | (`I | `Tick | `SelfArg Desc.Self) as p ->
     p, sub
   | `KillFromTick tck ->
     `KillFromTick (subst_tm sub ~ty:univ tck), sub
   | `P ty ->
     `P (subst_tm sub ~ty:univ ty), sub
+  | `Def (ty, tm) ->
+    `Def (subst_tm sub ~ty:univ ty, subst_tm sub ~ty tm), sub
   | `Tw (ty0, ty1) ->
     `Tw (subst_tm sub ~ty:univ ty0, subst_tm sub ~ty:univ ty1), sub
   | `R (r0, r1) ->
@@ -391,12 +394,18 @@ let rec subst_problem sub =
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
+      | `Def (ty, tm) ->
+        let sys = [Tm.make Dim0, Tm.make Dim0, Some tm] in
+        let sub'' = GlobalEnv.ext sub' x @@ `P {ty; sys}  in
+        let probx' = subst_problem sub'' probx in
+        let prob' = bind x param' probx' in
+        All (param', prob')
       | `Tw (ty0, ty1) ->
         let sub'' = GlobalEnv.ext sub' x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []}) in
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
-      | (`I | `Tick | `Lock | `ClearLocks | `KillFromTick _ | `SelfArg Desc.Self) ->
+      | (`I | `Tick | `KillFromTick _ | `SelfArg Desc.Self) ->
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
@@ -424,9 +433,11 @@ struct
 
   let free fl =
     function
-    | (`I | `Tick | `Lock | `ClearLocks | `SelfArg Desc.Self) -> Occurs.Set.empty
+    | (`I | `Tick | `SelfArg Desc.Self) -> Occurs.Set.empty
     | `KillFromTick tck -> Tm.free fl tck
     | `P ty -> Tm.free fl ty
+    | `Def (ty, tm) ->
+      Occurs.Set.union (Tm.free fl ty) (Tm.free fl tm)
     | `Tw (ty0, ty1) ->
       Occurs.Set.union (Tm.free fl ty0) (Tm.free fl ty1)
     | `R (r0, r1) ->

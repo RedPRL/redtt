@@ -32,7 +32,7 @@ let funext
   : Path ((x : A) → B x) f g
   =
   λ i x →
-    p x i
+    p _ i
 
 let symm/filler
   (A : type)
@@ -41,8 +41,8 @@ let symm/filler
   : A
   =
   comp 0 j (p 0) [
-  | i=0 ⇒ λ i → p i
-  | i=1 ⇒ λ _ → p 0
+  | i=0 ⇒ p
+  | i=1 ⇒ auto
   ]
 
 let symm
@@ -50,16 +50,14 @@ let symm
   (p : dim → A)
   : Path A (p 1) (p 0)
   =
-  λ i →
-    symm/filler _ p 1 i
+  symm/filler _ p 1
 
 let symm/unit
   (A : type)
   (a : A)
-  : (Path (Path _ a a) (λ _ → a) (symm _ (λ _ → a)))
+  : Path (Path _ a a) auto (symm _ (λ _ → a))
   =
-  λ i j →
-    symm/filler _ (λ _ → a) i j
+  symm/filler _ (λ _ → a)
 
 let trans/filler
   (A : type)
@@ -69,8 +67,8 @@ let trans/filler
   : A
   =
   comp 0 j (p i) [
-  | i=0 ⇒ λ _ → p 0
-  | i=1 ⇒ λ i → q i
+  | i=0 ⇒ auto
+  | i=1 ⇒ q
   ]
 
 let trans
@@ -79,28 +77,26 @@ let trans
   (q : [i] A [ i=0 ⇒ p 1 ])
   : Path _ (p 0) (q 1)
   =
-  λ i →
-    trans/filler _ p q 1 i
+  trans/filler _ p q 1
 
 let trans/unit/r
   (A : type)
   (p : dim → A)
-  : Path (Path _ (p 0) (p 1)) (λ i → p i) (trans _ p (λ _ → p 1))
+  : Path (Path _ (p 0) (p 1)) p (trans _ p (λ _ → p 1))
   =
-  λ i j →
-    trans/filler _ p (λ _ → p 1) i j
+  trans/filler _ p (λ _ → p 1)
 
 ; This proof gets simpler when dead tubes are deleted!
 let trans/sym/r
   (A : type)
   (p : dim → A)
-  : Path (Path _ (p 0) (p 0)) (λ _ → p 0) (trans _ p (symm _ p))
+  : Path (Path _ (p 0) (p 0)) auto (trans _ p (symm _ p))
   =
   λ k i →
     comp 0 1 (p i) [
-    | i=0 ⇒ λ _ → p 0
-    | i=1 ⇒ λ j → symm A p j
-    | k=0 ⇒ λ j → symm/filler A p i j
+    | i=0 ⇒ auto
+    | i=1 ⇒ symm A p
+    | k=0 ⇒ symm/filler A p i
     ;| k=1 ⇒ λ j → trans/filler A p (symm A p) j i
     ]
 
@@ -112,6 +108,6 @@ let symmd
   =
   λ i →
     comp 0 1 (p 0) in (λ j → symm/filler^1 _ A j i) [
-    | i=0 ⇒ λ j → p j
-    | i=1 ⇒ λ _ → p 0
+    | i=0 ⇒ p
+    | i=1 ⇒ auto
     ]

@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 type atom = I.atom
 type dir = Dir.t
 type dim = I.t
@@ -8,7 +10,6 @@ type tick_gen =
   [`Lvl of string option * int | `Global of Name.t ]
 
 type tick =
-  | TickConst
   | TickGen of tick_gen
 
 
@@ -44,11 +45,7 @@ type con =
   | DFix of {ty : value; clo : clo}
   | DFixLine of {x : atom; ty : value; clo : clo}
 
-  | BoxModality of value
-  | Shut of value
-
   | Data of {dlbl : Desc.data_label; params : value list}
-
   | Intro of
       {dlbl : Desc.data_label;
        clbl : Desc.con_label;
@@ -65,6 +62,9 @@ and neu =
   | NHComAtType of {dir : dir; univ : value; ty : neu; cap : value; sys : comp_sys}
   | NHComAtCap of {dir : dir; ty : value; cap : neu; sys : comp_sys}
   | NCoe of {dir : dir; abs : abs; neu : neu}
+
+  | NCoeAtType of {dir : dir; abs : abs; el : value}
+  (** Invariant: [abs] always has a neutral interior *)
 
   | FunApp of neu * nf
   | ExtApp of neu * dim list
@@ -88,8 +88,6 @@ and neu =
   | Prev of tick * neu
   | Fix of tick_gen * value * clo
   | FixLine of atom * tick_gen * value * clo
-
-  | Open of neu
 
 and nf = {ty : value; el : value}
 
@@ -121,4 +119,4 @@ and ext_abs = (value * val_sys) IAbs.abs
 and value = Node of {con : con; action : I.action}
 
 and env_el = [`Val of value | `Dim of I.t | `Tick of tick]
-and env = {cells : env_el list; global : I.action}
+and env = {cells : env_el bwd; global : I.action}

@@ -1,4 +1,3 @@
-open RedBasis.Bwd
 open Domain
 
 module Env :
@@ -10,7 +9,7 @@ sig
   val emp : t
   val make : int -> t
   val succ : t -> t
-  val abs : t -> Name.t bwd -> t
+  val abs : t -> Name.t list -> t
 
   val ix_of_lvl : int -> t -> int
   val ix_of_atom : Name.t -> t -> int
@@ -30,6 +29,8 @@ sig
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
   val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
+
+  val quote_dim : env -> I.t -> Tm.tm
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit

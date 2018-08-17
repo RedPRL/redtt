@@ -16,7 +16,7 @@ let loopn (n : int) : Path s1 base base =
   elim n [
   | pos n ⇒
     elim n [
-    | zero ⇒ λ _ → base
+    | zero ⇒ auto
     | suc (n ⇒ loopn) ⇒ trans s1 (λ i → loop i) loopn
     ]
   | negsuc n ⇒
@@ -32,7 +32,7 @@ let winding (l : Path s1 base base) : int =
 let two : int = pos (suc (suc zero))
 
 let winding-loop-testing0 : Path int two (winding (loopn two)) =
-  λ _ → two
+  auto
 
 let nat/five : nat =
   suc (suc (suc (suc (suc zero))))
@@ -46,8 +46,8 @@ let int/50 : int =
 let int/5 : int = pos nat/five
 
 let winding-test/5 : Path int int/5 (winding (loopn int/5)) =
-  λ _ → int/5
+  auto
 
 let winding-test/50 : Path int int/50 (winding (loopn int/50)) =
-  λ _ → int/50
+  auto
 
