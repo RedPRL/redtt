@@ -12,6 +12,8 @@ type step =
 let ret v = Ret v
 let step v = Step v
 
+exception StrictHComEncounteredNonConstructor
+
 
 type error =
   | UnexpectedEnvCell of env_el
@@ -1158,7 +1160,10 @@ struct
         match unleash el with
         | Intro info' ->
           List.nth (info'.const_args @ info'.rec_args) k
+        | Up _ ->
+          raise StrictHComEncounteredNonConstructor
         | _ ->
+          Format.eprintf "Very bad: %a@." pp_value el;
           failwith "rigid_hcom_strict_data: peel_arg"
       in
 
@@ -1231,9 +1236,13 @@ struct
       rigid_nhcom_up_at_type dir info.ty info.neu cap ~comp_sys:sys ~rst_sys:info.sys
 
     | Data dlbl ->
+      (* This all seems very iffy to me in the open term setting. Revisit and study. *)
       let desc = Sig.lookup_datatype dlbl in
       if Desc.is_strict_set desc then
-        rigid_hcom_strict_data dir ty cap sys
+        try rigid_hcom_strict_data dir ty cap sys
+        with
+        | StrictHComEncounteredNonConstructor ->
+          make @@ FHCom {dir; cap; sys}
       else
         make @@ FHCom {dir; cap; sys}
 
