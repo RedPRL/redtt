@@ -5,6 +5,7 @@ val clo_name : clo -> string option
 val nclo_names : nclo -> string option bwd
 
 val pp_abs : Format.formatter -> abs -> unit
+val pp_ext_abs : Format.formatter -> ext_abs -> unit
 val pp_value : Format.formatter -> value -> unit
 val pp_dims : Format.formatter -> I.t list -> unit
 val pp_neu : Format.formatter -> neu -> unit
