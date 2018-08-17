@@ -7,7 +7,7 @@ struct
   let emp = 0, Emp
   let var i (_, xs) =
     try
-      Bwd.nth xs i ^ "{" ^ string_of_int i ^ "}"
+      Bwd.nth xs i
     with
     | _ ->
       "{" ^ string_of_int i ^ "}"
@@ -28,7 +28,7 @@ struct
       let x = "x" ^ string_of_int i in
       x, (i + 1, xs #< x)
     | Some x ->
-      x, (i, xs #< x)
+      x, (i + 1, xs #< x)
 
   let bindn ((n, xs) : t) (nms : string option list) =
     let xs' = List.mapi (fun i nm -> match nm with Some x -> x | None -> "x" ^ string_of_int (n + i)) nms in

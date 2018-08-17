@@ -48,6 +48,14 @@ struct
     | Emp -> Emp
     | Snoc (xs, x) -> Snoc (map f xs, f x)
 
+  let mapi f =
+    let rec go i =
+      function
+      | Emp -> Emp
+      | Snoc (xs, x) -> Snoc (go (i + 1) xs, f i x)
+    in
+    go 0
+
   let rec flat_map f =
     function
     | Emp -> Emp
