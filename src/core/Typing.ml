@@ -622,7 +622,8 @@ and infer_spine cx hd =
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', nms, cvs, rvs, ihvs, rs = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
+        let env0 = D.Env.append D.Env.emp @@ List.map (fun x -> `Val x) params in
+        let cx', nms, cvs, rvs, ihvs, rs = build_cx cx env0 (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 

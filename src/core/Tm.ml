@@ -324,7 +324,8 @@ struct
     | Elim info ->
       let mot = traverse_bnd traverse_tm info.mot in
       let clauses = List.map (fun (lbl, bnd) -> lbl, traverse_nbnd traverse_tm bnd) info.clauses in
-      Elim {info with mot; clauses}
+      let params = traverse_list traverse_tm info.params in
+      Elim {info with mot; clauses; params}
 
     | VProj info ->
       let r = traverse_tm info.r in
@@ -1153,7 +1154,8 @@ let map_frame f =
   | Elim info ->
     let mot = map_bnd f info.mot in
     let clauses = List.map (fun (lbl, bnd) -> lbl, map_nbnd f bnd) info.clauses in
-    Elim {info with mot; clauses}
+    let params = List.map f info.params in
+    Elim {info with mot; clauses; params}
   | VProj info ->
     let r = f info.r in
     let ty0 = f info.ty0 in
