@@ -1,5 +1,7 @@
 import path
-
+import void
+import unit
+import hedberg
 
 data nat where
 | zero
@@ -50,3 +52,50 @@ let plus/comm (m : nat) : (n : nat) → Path nat (plus n m) (plus m n) =
   | suc (m ⇒ plus/comm/m) ⇒ λ n → trans _ (plus/suc/r n m) (λ i → suc (plus/comm/m n i))
   ]
 
+let NatPathCode (m : nat) : nat → type =
+  elim m [
+  | zero ⇒ λ n →
+    elim n [
+    | zero ⇒ unit
+    | suc _ ⇒ void
+    ]
+  | suc (m' ⇒ Code/m') ⇒ λ n →
+    elim n [
+    | zero ⇒ void
+    | suc n' ⇒ Code/m' n'
+    ]
+  ]
+
+let nat-refl (m : nat) : NatPathCode m m =
+  elim m [
+  | zero ⇒ triv
+  | suc (m' ⇒ nat-refl/m') ⇒ nat-refl/m'
+  ]
+
+let nat-path/encode (m : nat) (n : nat) (p : Path nat m n)
+  : NatPathCode m n
+  =
+  coe 0 1 (nat-refl m) in λ i → NatPathCode m (p i)
+
+let nat/discrete : discrete nat =
+  λ m →
+  elim m [
+  | zero ⇒ λ n →
+    elim n [
+    | zero ⇒ <tt, λ _ → zero>
+    | suc n' ⇒ <ff, nat-path/encode zero (suc n')>
+    ]
+  | suc (m' ⇒ nat/discrete/m') ⇒ λ n →
+    elim n [
+    | zero ⇒ <ff, nat-path/encode (suc m') zero>
+    | suc n' ⇒
+      or/elim (Path nat m' n') (neg (Path nat m' n'))
+        (or (Path nat (suc m') (suc n')) (neg (Path nat (suc m') (suc n'))))
+        (nat/discrete/m' n')
+        (λ l → <tt, λ i → suc (l i)>)
+        (λ r → <ff, λ p → r (λ i → nat-pred (p i))>)
+    ]
+  ]
+
+let nat/set : IsSet nat =
+  discrete/to/set nat nat/discrete
