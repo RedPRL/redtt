@@ -1238,6 +1238,10 @@ struct
     | Data dlbl ->
       (* It's too expensive to determine in advance if the system has constructors in all faces, so we just disable strict composition for now. *)
       make @@ FHCom {dir; cap; sys}
+
+    (* Note, that the following code looks like it would work, but it doesn't. The problem is that the exception gets thrown in a recursive call that is underneath a thunk,
+       so it is never caught. Generally, backtracking is not something we would support during evaluation. *)
+
     (* let desc = Sig.lookup_datatype dlbl in
        if Desc.is_strict_set desc then
        try rigid_hcom_strict_data dir ty cap sys
