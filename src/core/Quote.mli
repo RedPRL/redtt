@@ -1,4 +1,3 @@
-open RedBasis.Bwd
 open Domain
 
 module Env :
@@ -10,7 +9,7 @@ sig
   val emp : t
   val make : int -> t
   val succ : t -> t
-  val abs : t -> Name.t bwd -> t
+  val abs : t -> Name.t list -> t
 
   val ix_of_lvl : int -> t -> int
   val ix_of_atom : Name.t -> t -> int

@@ -1,6 +1,3 @@
-open RedBasis.Bwd
-open BwdNotation
-
 type value = Domain.value
 
 type hyp =
@@ -92,7 +89,7 @@ let ext_dim cx ~nm =
   {cx with
    env = Domain.Env.push (`Dim (`Atom x)) cx.env;
    hyps = {classifier = `I; locked = false; killed = false} :: cx.hyps;
-   qenv = Quote.Env.abs cx.qenv @@ Emp #< x;
+   qenv = Quote.Env.abs cx.qenv [x];
    ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
   x
 
