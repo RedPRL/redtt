@@ -1,17 +1,9 @@
 import path
+import ntype
 import equivalence
 import connection
 
 ; the code in this file is adapted from yacctt and redprl
-
-let IsProp (C : type) : type =
-  (c, c' : _) →
-    Path C c c'
-
-let IsSet (C : type) : type =
-  (c, c' : _) →
-    IsProp (Path C c c')
-
 
 let Retract (A,B : type) (f : A → B) (g : B → A) : type =
   (a : A) →

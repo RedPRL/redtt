@@ -1,9 +1,5 @@
 import bool
 
-;; WIP
-
-data void where
-
 let sg/elim
   (A : type) (B : A → type) (C : (x : A) (y : B x) → type)
   (t : (x : A) × B x)
@@ -27,16 +23,4 @@ let or/elim
     (λ b →
       elim b [tt ⇒ m0 | ff ⇒ m1])
 
-let neg (A : type) : type =
-  A → void
 
-let stable (A : type) : type =
-  (neg (neg A)) → A
-
-let dec (A : type) : type =
-  or A (neg A)
-
-let dec/stable (A : type) (d : dec A) : stable A =
-  or/elim A (neg A) (stable A) d
-    (λ a _ → a)
-    (λ x y → elim (y x) [])
