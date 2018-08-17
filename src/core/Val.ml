@@ -1236,15 +1236,16 @@ struct
       rigid_nhcom_up_at_type dir info.ty info.neu cap ~comp_sys:sys ~rst_sys:info.sys
 
     | Data dlbl ->
-      (* This all seems very iffy to me in the open term setting. Revisit and study. *)
-      let desc = Sig.lookup_datatype dlbl in
-      if Desc.is_strict_set desc then
-        try rigid_hcom_strict_data dir ty cap sys
-        with
-        | StrictHComEncounteredNonConstructor ->
-          make @@ FHCom {dir; cap; sys}
-      else
+      (* It's too expensive to determine in advance if the system has constructors in all faces, so we just disable strict composition for now. *)
+      make @@ FHCom {dir; cap; sys}
+    (* let desc = Sig.lookup_datatype dlbl in
+       if Desc.is_strict_set desc then
+       try rigid_hcom_strict_data dir ty cap sys
+       with
+       | StrictHComEncounteredNonConstructor ->
         make @@ FHCom {dir; cap; sys}
+       else
+       make @@ FHCom {dir; cap; sys} *)
 
     | Univ _ ->
       rigid_fhcom dir cap sys
