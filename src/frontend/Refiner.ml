@@ -303,7 +303,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let tty = Q.quote_ty Quote.Env.emp vty in
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let x_tm = Tm.up @@ Tm.var x in
-          let env' = D.Env.push (`Val x_el) env in
+          let env' = D.Env.snoc env @@ `Val x_el in
           go (psi #< (x, `P tty)) env' (tms #< x_tm, cargs #< x_el, rargs, ihs, rs) pbinds const_specs rec_specs dims
 
         | ESig.PVar nm :: pbinds, [], (_, Self) :: rec_specs, _ ->
@@ -326,7 +326,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x = Name.named @@ Some nm in
           let x_tm = Tm.up @@ Tm.var x in
           let r = `Atom x in
-          let env' = D.Env.push (`Dim r) env in
+          let env' = D.Env.snoc env @@ `Dim r in
           go (psi #< (x, `I)) env' (tms #< x_tm, cargs, rargs, ihs, rs #< r) pbinds [] [] dims
 
         | _, [], [], [] ->

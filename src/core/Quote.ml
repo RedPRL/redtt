@@ -17,7 +17,7 @@ sig
   val make : int -> t
   val succ : t -> t
   val succn : int -> t -> t
-  val abs : t -> Name.t bwd -> t
+  val abs : t -> Name.t list -> t
 
   val ix_of_lvl : int -> t -> int
   val ix_of_atom : Name.t -> t -> int
@@ -48,8 +48,8 @@ struct
   (* I might be doing this backwards ;-) *)
   let rec abs env xs =
     match xs with
-    | Emp -> env
-    | Snoc (xs, x) -> abs (abs1 env x) xs
+    | [] -> env
+    | x :: xs -> abs (abs1 env x) xs
 
   let ix_of_lvl l env =
     env.n - (l + 1)
@@ -164,11 +164,12 @@ struct
 
     | Ext abs ->
       let xs, (tyx, _) = Domain.ExtAbs.unleash abs in
-      let rs = List.map (fun x -> `Atom x) @@ Bwd.to_list xs in
+      let xs_fwd = Bwd.to_list xs in
+      let rs = List.map (fun x -> `Atom x) xs_fwd in
       let app0 = ext_apply el0 rs in
       let app1 = ext_apply el1 rs in
       Tm.ext_lam (Bwd.map Name.name xs) @@
-      equate (Env.abs env xs) tyx app0 app1
+      equate (Env.abs env xs_fwd) tyx app0 app1
 
     | Later ltr ->
       let tick = TickGen (`Lvl (None, Env.len env)) in
@@ -262,8 +263,9 @@ struct
 
       | _, Ext abs0, Ext abs1 ->
         let xs, (ty0x, sys0x) = Domain.ExtAbs.unleash abs0 in
+        let xs_fwd = Bwd.to_list xs in
         let ty1x, sys1x = Domain.ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
-        let envx = Env.abs env xs in
+        let envx = Env.abs env xs_fwd in
         let tyx = equate envx ty ty0x ty1x in
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
         Tm.make @@ Tm.Ext (Tm.NB (Bwd.map Name.name xs, (tyx, sysx)))
@@ -375,7 +377,7 @@ struct
       | (_, ty) :: const_specs, el0 :: els0, el1 :: els1 ->
         let vty = eval venv ty in
         let tm0 = equate env vty el0 el1 in
-        go (acc #< tm0) (D.Env.push (`Val el0) venv) const_specs els0 els1
+        go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) const_specs els0 els1
       | _ ->
         failwith "equate_constr_args"
     in
@@ -507,7 +509,7 @@ struct
               | (_, pty) :: const_specs, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
-                let env' = D.Env.push (`Val v) env in
+                let env' = D.Env.snoc env @@ `Val v in
                 build_cx (Env.succ qenv) env' (vs #< v, cvs #< v, rvs) rs const_specs rec_specs dim_specs
               | [], (_, Self) :: rec_specs, _ ->
                 let vx = generic qenv data_ty in
@@ -516,7 +518,7 @@ struct
                 build_cx (Env.succ qenv') env (vs #< vx #< vih, cvs, rvs #< vx) rs const_specs rec_specs dim_specs
               | [], [], nm :: dim_specs ->
                 let x = Name.named @@ Some nm in
-                let qenv' = Env.abs qenv (Emp #< x) in
+                let qenv' = Env.abs qenv [x] in
                 build_cx qenv' env (vs, cvs, rvs) (rs #< (`Atom x)) const_specs rec_specs dim_specs
               | [], [], [] ->
                 qenv, Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
@@ -654,7 +656,7 @@ struct
     let x, v0x = Abs.unleash1 abs0 in
     let v1x = Abs.inst1 abs1 @@ `Atom x in
     try
-      let envx = Env.abs env @@ Emp #< x in
+      let envx = Env.abs env [x] in
       let tm = equate envx ty v0x v1x in
       Tm.B (Name.name x, tm)
     with
@@ -819,13 +821,14 @@ struct
 
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in
+      let xs_fwd = Bwd.to_list xs in
       let rs = Bwd.map (fun x -> `Atom x) xs in
       let ty1x, sys1x = ExtAbs.inst abs1 rs in
-      let envxs = Env.abs env xs in
-      let rs_lst = Bwd.to_list rs in
+      let envxs = Env.abs env xs_fwd in
+      let rs_fwd = Bwd.to_list rs in
       let face r r' v =
         let phi = I.equate r r' in
-        let rs' = List.map (I.act phi) rs_lst in
+        let rs' = List.map (I.act phi) rs_fwd in
         ext_apply v rs'
       in
       let sys0' = map_sys face sys0 in

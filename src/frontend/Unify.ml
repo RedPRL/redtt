@@ -60,8 +60,7 @@ let rec abstract_ty (gm : telescope) cod =
   | Snoc (gm, (_, `R (r, r'))) ->
     abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
   | Snoc (gm, (x, `I)) ->
-    let cod' = Tm.close_var x ~twin:(fun tw -> tw) 0 cod in
-    abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB (Emp #< (Name.name x), (cod', [])))
+    abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) cod [])
   | Snoc (gm, (x, `Tick)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Later (Tm.bind x cod)
   | Snoc (gm, (_, `KillFromTick _)) ->

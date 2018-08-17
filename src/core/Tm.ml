@@ -570,22 +570,25 @@ let map_tm_sys f =
   List.map @@ map_tm_face f
 
 let unbind_ext (NB (nms, (ty, sys))) =
+  let n = Bwd.length nms in
   let rec go k nms xs ty sys =
     match nms with
     | Emp -> Bwd.from_list xs, ty, sys
     | Snoc (nms, nm)  ->
       let x = Name.named nm in
-      go (k + 1) nms (x :: xs) (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
+      go (k + 1) nms (x :: xs) (open_var (n - k - 1) (fun _ -> var x) ty) (map_tm_sys (open_var (n - k - 1) (fun _ -> var x)) sys)
   in
   go 0 nms [] ty sys
 
 let unbind_ext_with rs ebnd =
   let NB (nms, (ty, sys)) = ebnd in
+  let n = Bwd.length nms in
+
   let rec go k rs ty sys =
     match rs with
     | [] -> ty, sys
     | r :: rs ->
-      go (k + 1) rs (open_var k (fun _ -> r) ty) (map_tm_sys (open_var k (fun _ -> r)) sys)
+      go (k + 1) rs (open_var (n - k - 1) (fun _ -> r) ty) (map_tm_sys (open_var (n - k - 1) (fun _ -> r)) sys)
   in
   if Bwd.length nms = List.length rs then
     go 0 rs ty sys
@@ -620,21 +623,21 @@ let rec pp env fmt =
   let rec go env mode fmt (Tm t) =
     match t with
     | Pi (dom, B (nm, cod)) ->
-      let x, env' = Pp.Env.bind nm env in
+      let x, env' = Pp.Env.bind env nm  in
       if mode = `Pi then
         Format.fprintf fmt "[%a : %a]@ %a" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Pi) cod
       else
         Format.fprintf fmt "@[<hv1>(%a @[<hv>[%a : %a]@ %a@])@]" Uuseg_string.pp_utf_8 "→" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Pi) cod
 
     | Sg (dom, B (nm, cod)) ->
-      let x, env' = Pp.Env.bind nm env in
+      let x, env' = Pp.Env.bind env nm in
       if mode = `Sg then
         Format.fprintf fmt "[%a : %a]@ %a" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Sg) cod
       else
         Format.fprintf fmt "@[<hv1>(%a @[<hv>[%a : %a]@ %a@])@]" Uuseg_string.pp_utf_8 "×" Uuseg_string.pp_utf_8 x (pp env) dom (go env' `Sg) cod
 
     | Ext (NB (nms, (cod, sys))) ->
-      let xs, env' = Pp.Env.bindn (Bwd.to_list nms) env in
+      let xs, env' = Pp.Env.bindn env (Bwd.to_list nms) in
       begin
         match sys with
         | [] ->
@@ -663,14 +666,14 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<hv1>(Vin %a@ %a@ %a)@]" (pp env) info.r (pp env) info.tm0 (pp env) info.tm1
 
     | Lam (B (nm, tm)) ->
-      let x, env' = Pp.Env.bind nm env in
+      let x, env' = Pp.Env.bind env nm in
       if mode = `Lam then
         Format.fprintf fmt "[%a]@ %a" Uuseg_string.pp_utf_8 x (go env' `Lam) tm
       else
         Format.fprintf fmt "@[<1>(λ [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (go env' `Lam) tm
 
     | ExtLam (NB (nms, tm)) ->
-      let xs, env' = Pp.Env.bindn (Bwd.to_list nms) env in
+      let xs, env' = Pp.Env.bindn env (Bwd.to_list nms) in
       if mode = `Lam then
         Format.fprintf fmt "<%a>@ %a" pp_strings xs (go env' `Lam) tm
       else
@@ -716,15 +719,15 @@ let rec pp env fmt =
       Format.fprintf fmt "@[<hv1>(box %a %a@ %a@ @[<hv>%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
 
     | Later (B (nm, t)) ->
-      let x, env' = Pp.Env.bind nm env in
+      let x, env' = Pp.Env.bind env nm in
       Format.fprintf fmt "@[<hv1>(%a [%a]@ %a)@]" Uuseg_string.pp_utf_8 "▷" Uuseg_string.pp_utf_8 x (pp env') t
 
     | Next (B (nm, t)) ->
-      let x, env' = Pp.Env.bind nm env in
+      let x, env' = Pp.Env.bind env nm in
       Format.fprintf fmt "@[<hv1>(next [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') t
 
     | Let (cmd, B (nm, t)) ->
-      let x, env' = Pp.Env.bind nm env in
+      let x, env' = Pp.Env.bind env nm in
       Format.fprintf fmt "@[<hv1>(let@ @[<hv1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
 
     | Up cmd ->
@@ -750,21 +753,21 @@ let rec pp env fmt =
 and pp_head env fmt =
   function
   | Coe {r; r'; ty = B (nm, ty); tm} ->
-    let x, env' = Pp.Env.bind nm env in
+    let x, env' = Pp.Env.bind env nm in
     Format.fprintf fmt "@[<hv1>(coe %a %a@ <%a> %a@ %a)@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) tm
 
   | HCom {r; r'; ty; cap; sys} ->
     Format.fprintf fmt "@[<hv1>(hcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
 
   | Com {r; r'; ty = B (nm, ty); cap; sys} ->
-    let x, env' = Pp.Env.bind nm env in
+    let x, env' = Pp.Env.bind env nm in
     Format.fprintf fmt "@[<hv1>(com %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
 
   | GHCom {r; r'; ty; cap; sys} ->
     Format.fprintf fmt "@[<hv1>(ghcom %a %a@ %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) ty (pp env) cap (pp_bsys env) sys
 
   | GCom {r; r'; ty = B (nm, ty); cap; sys} ->
-    let x, env' = Pp.Env.bind nm env in
+    let x, env' = Pp.Env.bind env nm in
     Format.fprintf fmt "@[<hv1>(gcom %a %a@ [%a] %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') ty (pp env) cap (pp_bsys env) sys
 
   | Ix (ix, _tw) ->
@@ -788,7 +791,7 @@ and pp_head env fmt =
     pp env fmt r
 
   | DFix {r; ty; bdy = B (nm, bdy)} ->
-    let x, env' = Pp.Env.bind nm env in
+    let x, env' = Pp.Env.bind env nm in
     Format.fprintf fmt "@[<hv1>(dfix %a %a@ [%a] %a)@]" (pp env) r (pp env) ty Uuseg_string.pp_utf_8 x (pp env') bdy
 
 and pp_cmd env fmt (hd, sp) =
@@ -810,7 +813,7 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<hv1>(%s %a@ %a)@]" "@" (go `ExtApp) sp (pp_terms env) ts
       | Elim info ->
         let B (nm_mot, mot) = info.mot in
-        let x_mot, env_mot = Pp.Env.bind nm_mot env in
+        let x_mot, env_mot = Pp.Env.bind env nm_mot in
         (* TODO *)
         Format.fprintf fmt "@[<hv1>(%a.elim@ [%a] %a@ %a@ %a)@]"
           Desc.pp_data_label info.dlbl
@@ -848,7 +851,7 @@ and pp_nbnd env fmt nbnd =
   | Emp ->
     pp env fmt tm
   | _ ->
-    let xs, env' = Pp.Env.bindn (Bwd.to_list nms) env in
+    let xs, env' = Pp.Env.bindn env (Bwd.to_list nms) in
     Format.fprintf fmt "@[<hv1>[%a]@ %a@]" pp_strings xs (pp env') tm
 
 and pp_spine env fmt sp =
@@ -924,7 +927,7 @@ and pp_bface env fmt face =
     Format.fprintf fmt "@[<hv1>[%a=%a@ -]@]" (pp env) r (pp env) r'
 
   | Some (B (nm, tm)) ->
-    let x, env' = Pp.Env.bind nm env in
+    let x, env' = Pp.Env.bind env nm in
     Format.fprintf fmt "@[<hv1>[%a=%a@ <%a> %a]@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') tm
 
 

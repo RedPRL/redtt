@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 type atom = I.atom
 type dir = Dir.t
 type dim = I.t
@@ -116,4 +118,4 @@ and ext_abs = (value * val_sys) IAbs.abs
 and value = Node of {con : con; action : I.action}
 
 and env_el = [`Val of value | `Dim of I.t | `Tick of tick]
-and env = {cells : env_el list; global : I.action}
+and env = {cells : env_el bwd; global : I.action}

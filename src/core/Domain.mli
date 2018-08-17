@@ -5,6 +5,7 @@ val clo_name : clo -> string option
 val nclo_names : nclo -> string option bwd
 
 val pp_abs : Format.formatter -> abs -> unit
+val pp_ext_abs : Format.formatter -> ext_abs -> unit
 val pp_value : Format.formatter -> value -> unit
 val pp_dims : Format.formatter -> I.t list -> unit
 val pp_neu : Format.formatter -> neu -> unit
@@ -37,8 +38,13 @@ sig
     with type 'a m = 'a
   val emp : env
   val clear_locals : env -> env
-  val push : env_el -> env -> env
-  val push_many : env_el list -> env -> env
+
+  (* What direction do these go? Think of the environment as a snoc list, where things are projected by counting from the *right*.
+     So, if I have an environment [E], then [append E [x0; x1; x2]] is [E #< x0 #< x1 #< x2]
+  *)
+
+  val snoc : env -> env_el -> env
+  val append : env -> env_el list -> env
 end
 
 module Value : Sort.S

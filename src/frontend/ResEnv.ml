@@ -1,31 +1,32 @@
 open RedBasis
 open RedTT_Core
+open Bwd open BwdNotation
 
 module T = PersistentTable.M
-type t = string option list * (string, Name.t) T.t
+type t = string option bwd * (string, Name.t) T.t
 
-let init () = [], T.init ~size:30
-let bind x (env, tbl) = Some x :: env, tbl
+let init () = Emp, T.init ~size:30
+let bind x (env, tbl) = env #< (Some x), tbl
 
 (* TODO: is this backwards? *)
-let bindn xs (env, tbl) = List.map (fun x -> Some x) xs @ env, tbl
+let bindn xs (env, tbl) = env <>< List.map (fun x -> Some x) xs, tbl
 
-let bind_opt x (env, tbl) = x :: env, tbl
+let bind_opt x (env, tbl) = env #< x, tbl
 
 let rec get x (env, tbl) =
   let rec go env =
     match env with
-    | [] ->
+    | Emp ->
       failwith @@ "variable not found: " ^ x
-    | Some y :: ys ->
+    | Snoc (ys, Some y) ->
       if x = y
       then 0
       else 1 + go ys
-    | None :: ys ->
+    | Snoc (ys, None) ->
       1 + go ys
   in
   try
-    `Ix (go env )
+    `Ix (go env)
   with
   | _ ->
     match T.find x tbl with

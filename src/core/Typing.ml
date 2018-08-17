@@ -253,13 +253,16 @@ let rec check_ cx ty rst tm =
 
   | _, D.Ext ext_abs, T.Up cmd ->
     let n = D.ExtAbs.len ext_abs in
-    let nms = ListUtil.tabulate n @@ fun _ -> None in
+    let nms =
+      let xs, _ = D.ExtAbs.unleash ext_abs in
+      List.map Name.name @@ Bwd.to_list xs
+    in
     let cxx, xs = Cx.ext_dims cx ~nms in
     let rs = List.map (fun x -> `Atom x) xs in
-    let trs = List.map (Cx.quote_dim cx) rs in
+    let trs = List.map (Cx.quote_dim cxx) rs in
     let codx, sysx = Domain.ExtAbs.inst ext_abs @@ Bwd.from_list rs in
     let cmd' = T.subst_cmd (T.shift n) cmd in
-    let rst' = List.map (Face.map (fun _ _ el -> V.ext_apply el @@ List.map (fun x -> `Atom x) xs)) rst in
+    let rst' = List.map (Face.map (fun _ _ el -> V.ext_apply el rs)) rst in
     check_ cxx codx (rst' @ sysx) @@ Tm.up @@ cmd' @< Tm.ExtApp trs
 
   | _, D.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
@@ -604,7 +607,7 @@ and infer_spine cx hd =
           | (plbl, pty) :: const_specs, _, _ ->
             let vty = V.eval ty_env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (D.Env.push (`Val v) ty_env) (nms #< (Some plbl), cvs #< v, rvs, ihvs, rs) const_specs rec_specs dim_specs
+            build_cx cx' (D.Env.snoc ty_env @@ `Val v) (nms #< (Some plbl), cvs #< v, rvs, ihvs, rs) const_specs rec_specs dim_specs
           | [], (nm, Self) :: rec_specs, _ ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
             let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
