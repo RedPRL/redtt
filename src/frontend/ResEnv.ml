@@ -9,7 +9,7 @@ let init () = Emp, T.init ~size:30
 let bind x (env, tbl) = env #< (Some x), tbl
 
 (* TODO: is this backwards? *)
-let bindn xs (env, tbl) = env <>< List.rev_map (fun x -> Some x) xs, tbl
+let bindn xs (env, tbl) = env <>< List.map (fun x -> Some x) xs, tbl
 
 let bind_opt x (env, tbl) = env #< x, tbl
 
