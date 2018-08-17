@@ -529,7 +529,8 @@ struct
           let intro = make_intro D.Env.emp ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
-          clbl, Tm.NB (Bwd.map (fun _ -> None) @@ Bwd.from_list vs, tbdy)
+          let nms = Bwd.from_list @@ ListUtil.tabulate (List.length cells) @@ fun _ -> None in
+          clbl, Tm.NB (nms, tbdy)
         in
 
         let clauses = List.map quote_clause desc.constrs in

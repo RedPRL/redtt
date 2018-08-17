@@ -41,15 +41,16 @@ let c2t/transpose (c : s1) : s1 → torus =
     ]
   ]
 
+
+
 let c2t (cs : s1 × s1) : torus =
   c2t/transpose (cs.0) (cs.1)
 
-; The following should work, but is prevented by a bug
-; https://github.com/RedPRL/redtt/issues/240
-; let t2c2t (t : torus) : [i] torus [i=0 ⇒ c2t (t2c t) | i=1 ⇒ t] =
-;   elim t [
-;   | pt ⇒ auto
-;   | p/one i ⇒ auto
-;   | p/two i ⇒ auto
-;   | square i j ⇒ auto
-;   ]
+let t2c2t (t : torus) : [i] torus [i=0 ⇒ c2t (t2c t) | i=1 ⇒ t] =
+  elim t [
+  | pt ⇒ auto
+  | p/one i ⇒ auto
+  | p/two i ⇒ auto
+  | square i j ⇒ auto
+  ]
+
