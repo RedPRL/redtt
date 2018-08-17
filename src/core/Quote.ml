@@ -394,7 +394,7 @@ struct
       | (_, ty) :: param_specs, el0 :: els0, el1 :: els1 ->
         let vty = eval venv ty in
         let tm = equate env vty el0 el1 in
-        go (acc #< tm) (D.Env.push (`Val el0) venv) param_specs els0 els1
+        go (acc #< tm) (D.Env.snoc venv @@ `Val el0) param_specs els0 els1
       | _ ->
         failwith "equate_data_params"
     in

@@ -177,7 +177,7 @@ struct
       match eparams, econstrs with
       | (lbl, epty) :: eparams, _ ->
         let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
-        elab_chk env univ epty >>= bind_in_scope >>= fun pty ->
+        elab_chk env epty {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
         Format.eprintf "elab_datatype / param / %s / %a@." lbl Tm.pp0 pty;
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) begin
@@ -259,11 +259,11 @@ struct
       | (lbl, ty) :: param_specs, _, _, _ ->
         let vty = V.eval env ty in
         let cx', v = Cx.ext_ty cx ~nm:(Some lbl) vty in
-        build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some lbl), cvs, rvs, rs) param_specs const_specs rec_specs dim_specs
+        build_cx cx' (D.Env.snoc env @@ `Val v) (nms #< (Some lbl), cvs, rvs, rs) param_specs const_specs rec_specs dim_specs
       | [], (lbl, ty) :: const_specs, _, _ ->
         let vty = V.eval env ty in
         let cx', v = Cx.ext_ty cx ~nm:(Some lbl) vty in
-        build_cx cx' (D.Env.push (`Val v) env) (nms #< (Some lbl), cvs #< v, rvs, rs) param_specs const_specs rec_specs dim_specs
+        build_cx cx' (D.Env.snoc env @@ `Val v) (nms #< (Some lbl), cvs #< v, rvs, rs) param_specs const_specs rec_specs dim_specs
       | [], [], (nm, Desc.Self) :: rec_specs, _ ->
         let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data {dlbl; params} in
         build_cx cx_x env (nms #< (Some nm), cvs, rvs #< v_x, rs) param_specs const_specs rec_specs dim_specs
@@ -927,7 +927,7 @@ struct
       | (_, pty) :: param_specs, E.App e :: frms ->
         let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
         let pty' = Tm.subst sub pty in
-        elab_chk env pty' e >>= fun t ->
+        elab_chk env e {ty = pty'; sys = []} >>= fun t ->
         go ((pty', t) :: acc) param_specs frms
       | [], [] ->
         M.ret @@ List.rev_map snd acc

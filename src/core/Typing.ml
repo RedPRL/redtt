@@ -211,14 +211,14 @@ let rec check_ cx ty rst tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-  | D.Univ univ, T.Data data ->
+  | [], D.Univ univ, T.Data data ->
     let desc = GlobalEnv.lookup_datatype data.dlbl @@ Cx.globals cx in
     if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
       ()
     else
       failwith "Universe level/kind error"
 
-  | D.Data data, T.Intro (dlbl, clbl, args) when data.dlbl = dlbl ->
+  | [], D.Data data, T.Intro (dlbl, clbl, args) when data.dlbl = dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     let constr = Desc.lookup_constr clbl desc in
     check_constr cx dlbl desc.params constr data.params args

@@ -779,7 +779,7 @@ struct
     let r, r' = Dir.unleash dir in
 
     (* TODO: check if this is backwards *)
-    let env0 = Env.push_many (List.map (fun v -> `Val v) params) Env.emp in
+    let env0 = Env.append Env.emp @@ List.map (fun v -> `Val v) params in
 
     let make_const_args dir =
       multi_coe env0 dir (x, constr.const_specs) const_args
@@ -1250,7 +1250,7 @@ struct
     | Data data ->
       (* It's too expensive to determine in advance if the system has constructors in all faces, so we just disable strict composition for now. *)
       make @@ FHCom {dir; cap; sys}
-      
+
     | Univ _ ->
       rigid_fhcom dir cap sys
 
