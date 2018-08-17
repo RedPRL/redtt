@@ -817,7 +817,7 @@ and check_is_equivalence cx ~ty0 ~ty1 ~equiv =
   let type_of_equiv = V.Macro.equiv ty0 ty1 in
   check cx type_of_equiv equiv
 
-let check_constr_boundary_sys cx dlbl desc sys =
+let check_constr_boundary_sys cx dlbl desc ~params sys =
   let rec go sys acc =
     match sys with
     | [] ->
@@ -833,7 +833,7 @@ let check_constr_boundary_sys cx dlbl desc sys =
         | `Same | `Indet ->
           begin
             try
-              let cx', _ = Cx.restrict cx r0 r1 in
+              let cx', phi = Cx.restrict cx r0 r1 in
               (* TODO: check boundary type *)
               (* check cx' (D.Value.act phi ty) tm; *)
 
@@ -853,13 +853,13 @@ let check_constr_boundary_sys cx dlbl desc sys =
       let _r0, _r1, tm = face in
       begin
         try
-          let cx', _ = Cx.restrict cx r'0 r'1 in
+          let cx', phi = Cx.restrict cx r'0 r'1 in
           let (module Q) = Cx.quoter cx' in
           let (module V) = Cx.evaluator cx' in
           let v = V.eval_bterm dlbl desc (Cx.env cx') tm in
           let v' = V.eval_bterm dlbl desc (Cx.env cx') tm' in
-          (* let phi = I.cmp phi (I.equate r0 r1) in *)
-          Q.equiv_boundary_value (Cx.qenv cx') dlbl desc Desc.Self v v'
+          let params = List.map (D.Value.act phi) params in
+          Q.equiv_boundary_value (Cx.qenv cx') dlbl desc ~params Desc.Self v v'
         with
         | I.Inconsistent -> ()
       end;

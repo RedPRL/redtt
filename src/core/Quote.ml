@@ -82,6 +82,7 @@ sig
     : env
     -> Desc.data_label
     -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+    -> params:value list
     -> Tm.tm Desc.rec_spec
     -> value
     -> value
@@ -358,7 +359,7 @@ struct
       | Data data, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
         let desc = V.Sig.lookup_datatype data.dlbl in
         let constr = Desc.lookup_constr info0.clbl desc in
-        let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
+        let const_args = equate_constr_const_args env data.params constr info0.const_args info1.const_args in
         let rec_args = equate_constr_rec_args env data.dlbl data.params constr info0.rec_args info1.rec_args in
         let trs = equate_dims env info0.rs info1.rs in
         Tm.make @@ Tm.Intro (data.dlbl, info0.clbl, const_args @ rec_args @ trs)
@@ -370,7 +371,7 @@ struct
         let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
 
-  and equate_constr_const_args env constr els0 els1 =
+  and equate_constr_const_args env params constr els0 els1 =
     let open Desc in
     let rec go acc venv const_specs els0 els1 =
       match const_specs, els0, els1 with
@@ -383,7 +384,8 @@ struct
       | _ ->
         failwith "equate_constr_args"
     in
-    go Emp D.Env.emp constr.const_specs els0 els1
+    let venv0 = D.Env.append D.Env.emp @@ List.map (fun v -> `Val v) params in
+    go Emp venv0 constr.const_specs els0 els1
 
   and equate_data_params env desc els0 els1 =
     let open Desc in
@@ -517,6 +519,9 @@ struct
             failwith "Quote: elim / find_clause"
         in
 
+        let params = equate_data_params env desc elim0.params elim1.params in
+        let venv0 = D.Env.append D.Env.emp @@ List.map (fun v -> `Val v) elim0.params in
+
         let quote_clause (clbl, constr) =
           let clause0 = find_clause clbl elim0.clauses in
           let clause1 = find_clause clbl elim1.clauses in
@@ -541,7 +546,7 @@ struct
               | [], [], [] ->
                 qenv, Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env D.Env.emp (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
+            build_cx env venv0 (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
           in
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
@@ -553,7 +558,6 @@ struct
           clbl, Tm.NB (nms, tbdy)
         in
 
-        let params = equate_data_params env desc elim0.params elim1.params in
         let clauses = List.map quote_clause desc.constrs in
         let frame = Tm.Elim {dlbl; params; mot; clauses} in
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
@@ -920,17 +924,17 @@ struct
     end
 
 
-  let rec equate_boundary_value env (dlbl, desc) rec_spec el0 el1 =
+  let rec equate_boundary_value env (dlbl, desc, params) rec_spec el0 el1 =
     match rec_spec with
     | Desc.Self ->
       begin
         match unleash el0, unleash el1 with
         | D.Intro info0, D.Intro info1 when info0.clbl = info1.clbl ->
           let constr = Desc.lookup_constr info0.clbl desc in
-          let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
+          let const_args = equate_constr_const_args env params constr info0.const_args info1.const_args in
           let rec_args =
             ListUtil.map3
-              (fun (_, spec) -> equate_boundary_value env (dlbl, desc) spec)
+              (fun (_, spec) -> equate_boundary_value env (dlbl, desc, params) spec)
               constr.rec_specs
               info0.rec_args
               info1.rec_args
@@ -952,7 +956,7 @@ struct
       failwith "equate_boundary_neu"
 
 
-  let equiv_boundary_value env dlbl desc rec_spec el0 el1 =
-    ignore @@ equate_boundary_value env (dlbl, desc) rec_spec el0 el1
+  let equiv_boundary_value env dlbl desc ~params rec_spec el0 el1 =
+    ignore @@ equate_boundary_value env (dlbl, desc, params) rec_spec el0 el1
 
 end

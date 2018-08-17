@@ -42,6 +42,7 @@ sig
     : env
     -> Desc.data_label
     -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+    -> params:value list
     -> Tm.tm Desc.rec_spec
     -> value
     -> value
