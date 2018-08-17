@@ -20,8 +20,8 @@
 %token RIGHT_ARROW RRIGHT_ARROW
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL V VPROJ VIN NEXT PREV FIX DFIX AUTO
-%token IMPORT OPAQUE QUIT
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX AUTO
+%token IMPORT OPAQUE QUIT DEBUG NORMALIZE
 %token TYPE PRE KAN
 %token EOF
 
@@ -36,6 +36,8 @@ edecl:
     { E.Define (a, `Opaque, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
+  | NORMALIZE; e = eterm
+    { E.Normalize e }
 
   | DATA; dlbl = ATOM;
     univ_spec = option(preceded(COLON, univ_spec));

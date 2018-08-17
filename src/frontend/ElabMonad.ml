@@ -12,6 +12,9 @@ type diagnostic =
        tele : U.telescope;
        ty : Tm.tm;
        tm : Tm.tm}
+  | PrintTerm of
+      {ty : Tm.tm;
+       tm : Tm.tm}
 
 type 'a m = ('a * (location * diagnostic) bwd) C.m
 
@@ -71,6 +74,13 @@ let rec normalize_tele =
 
 let print_diagnostic =
   function
+  | (loc, PrintTerm {tm; ty}) ->
+    let pp fmt () =
+      Format.fprintf fmt "@[<v>%a@,@,has type@,@,%a@]" Tm.pp0 tm Tm.pp0 ty
+    in
+    Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
+    C.ret ()
+
   | (loc, UserHole {name; tele; ty; _}) ->
     C.local (fun _ -> tele) @@
     begin

@@ -150,6 +150,16 @@ struct
       M.lift @@ C.dump_state Format.std_formatter title filter >>
       M.ret env
 
+    | E.Normalize e ->
+      elab_inf env e >>= fun (ty, cmd) ->
+      M.lift C.base_cx >>= fun cx ->
+      let vty = Cx.eval cx ty in
+      let el = Cx.eval_cmd cx cmd in
+      let tm = Cx.quote cx ~ty:vty el in
+      M.emit e.span @@ M.PrintTerm {ty = ty; tm} >>
+      M.ret env
+
+
     | E.Import file_name ->
       begin
         match I.import file_name with

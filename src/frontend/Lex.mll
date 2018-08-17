@@ -58,6 +58,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("kan", KAN);
       ("U", UNIV);
       ("debug", DEBUG);
+      ("normalize", NORMALIZE);
       ("type", TYPE);
       ("import", IMPORT);
     ]

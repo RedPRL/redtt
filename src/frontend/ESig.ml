@@ -9,6 +9,7 @@ type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
   | Data of string * (eterm, eterm) Desc.desc
   | Debug of [ `All | `Constraints | `Unsolved ]
+  | Normalize of eterm
   | Import of string
   | Quit
 
