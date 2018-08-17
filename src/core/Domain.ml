@@ -1,4 +1,4 @@
-open RedBasis open Bwd
+open RedBasis open Bwd open BwdNotation
 include DomainData
 
 let rec make : con -> value =
@@ -26,7 +26,7 @@ let rec pp_env_cell fmt =
 
 and pp_env fmt env =
   let pp_sep fmt () = Format.fprintf fmt ", " in
-  Format.pp_print_list ~pp_sep pp_env_cell fmt env.cells
+  Format.pp_print_list ~pp_sep pp_env_cell fmt (Bwd.to_list env.cells)
 
 
 and pp_con fmt : con -> unit =
@@ -425,24 +425,24 @@ sig
     with type 'a m = 'a
   val emp : env
   val clear_locals : env -> env
-  val push : env_el -> env -> env
-  val push_many : env_el list -> env -> env
+  val snoc : env -> env_el -> env
+  val append : env -> env_el list -> env
   val act_env_el : I.action -> env_el -> env_el
 end =
 struct
   type t = env
   type 'a m = 'a
 
-  let emp = {cells = []; global = I.idn}
+  let emp = {cells = Emp; global = I.idn}
 
   let clear_locals rho =
-    {rho with cells = []}
+    {rho with cells = Emp}
 
-  let push el {cells; global} =
-    {cells = el :: cells; global}
+  let snoc {cells; global} el =
+    {cells = cells #< el; global}
 
-  let push_many els {cells; global} =
-    {cells = els @ cells; global}
+  let append {cells; global} els =
+    {cells = cells <>< els; global}
 
   let act_env_el phi =
     function
@@ -454,7 +454,7 @@ struct
       `Tick tck
 
   let act phi {cells; global} =
-    {cells = List.map (act_env_el phi) cells;
+    {cells = Bwd.map (act_env_el phi) cells;
      global = I.cmp phi global}
 end
 

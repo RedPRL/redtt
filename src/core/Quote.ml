@@ -377,7 +377,7 @@ struct
       | (_, ty) :: const_specs, el0 :: els0, el1 :: els1 ->
         let vty = eval venv ty in
         let tm0 = equate env vty el0 el1 in
-        go (acc #< tm0) (D.Env.push (`Val el0) venv) const_specs els0 els1
+        go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) const_specs els0 els1
       | _ ->
         failwith "equate_constr_args"
     in
@@ -509,7 +509,7 @@ struct
               | (_, pty) :: const_specs, _, _ ->
                 let vty = V.eval env pty in
                 let v = generic qenv vty in
-                let env' = D.Env.push (`Val v) env in
+                let env' = D.Env.snoc env @@ `Val v in
                 build_cx (Env.succ qenv) env' (vs #< v, cvs #< v, rvs) rs const_specs rec_specs dim_specs
               | [], (_, Self) :: rec_specs, _ ->
                 let vx = generic qenv data_ty in

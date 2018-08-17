@@ -191,7 +191,7 @@ struct
         match hd with
         | Tm.Ix (i, _) ->
           begin
-            match List.nth rho.cells i with
+            match Bwd.nth rho.cells i with
             | `Dim x -> x
             | cell ->
               let err = UnexpectedEnvCell cell in
@@ -222,7 +222,7 @@ struct
         match hd with
         | Tm.Ix (i, _) ->
           begin
-            match List.nth rho.cells i with
+            match Bwd.nth rho.cells i with
             | `Tick tck -> tck
             | cell ->
               let err = UnexpectedEnvCell cell in
@@ -754,7 +754,7 @@ struct
       let coe_hd s = make_coe (Dir.make r s) (Abs.unsafe_bind1 x vty) arg in
       let coe_tl =
         let coe_hd_x = coe_hd @@ `Atom x in
-        rigid_multi_coe (Env.push (`Val coe_hd_x) env) dir (x, const_specs) args
+        rigid_multi_coe (Env.snoc env @@ `Val coe_hd_x) dir (x, const_specs) args
       in
       coe_hd r' :: coe_tl
     | _ ->
@@ -1048,8 +1048,8 @@ struct
            * type in the semantic domain. *)
           let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.ix i in
-            eval (Env.push_many [`Val (Value.act phi ty00); `Val (Value.act phi ty10); `Val (car (Value.act phi equiv0)); `Val b] Env.emp) @@
-            Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
+            let env = Env.append Env.emp [`Val b; `Val (car (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
+            eval env @@ Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
           in
           (* This is to generate the element in `ty0` and also
            * the face for r'=0. This is `O` in [F]. *)
@@ -1477,7 +1477,7 @@ struct
 
     | B.Var ix ->
       begin
-        match List.nth rho.cells ix with
+        match Bwd.nth rho.cells ix with
         | `Val v -> v
         | cell ->
           let err = UnexpectedEnvCell cell in
@@ -1489,16 +1489,12 @@ struct
 
   and eval_bterm_face dlbl desc rho ~const_args ~rec_args ~rs (tr0, tr1, btm) =
     let rho' =
-      Env.push_many
-        begin
-          List.rev @@
-          (* ~~This is not backwards, FYI.~~ *)
-          (* NARRATOR VOICE: it was backwards. *)
-          List.map (fun x -> `Val x) const_args
-          @ List.map (fun x -> `Val x) rec_args
-          @ List.map (fun x -> `Dim x) rs
-        end
-        rho
+      Env.append rho @@
+      (* ~~This is not backwards, FYI.~~ *)
+      (* NARRATOR VOICE: it was backwards. *)
+      List.map (fun x -> `Val x) const_args
+      @ List.map (fun x -> `Val x) rec_args
+      @ List.map (fun x -> `Dim x) rs
     in
     let r0 = eval_dim rho' tr0 in
     let r1 = eval_dim rho' tr1 in
@@ -1594,7 +1590,7 @@ struct
 
     | Tm.Let (cmd, Tm.B (_, t)) ->
       let v0 = eval_cmd rho cmd in
-      eval (Env.push (`Val v0) rho) t
+      eval (Env.snoc rho @@ `Val v0) t
 
     | Tm.LblTy info ->
       let ty = eval rho info.ty in
@@ -1744,7 +1740,7 @@ struct
 
     | Tm.Ix (i, _) ->
       begin
-        match List.nth rho.cells i with
+        match Bwd.nth rho.cells i with
         | `Val v -> v
         | cell ->
           let err = UnexpectedEnvCell cell in
@@ -1832,20 +1828,22 @@ struct
   and eval_bnd rho bnd =
     let Tm.B (_, tm) = bnd in
     Abs.make1 @@ fun x ->
-    let rho = Env.push (`Dim (`Atom x)) rho in
+    let rho = Env.snoc rho @@ `Dim (`Atom x) in
     eval rho tm
 
   and eval_nbnd rho bnd =
     let Tm.NB (nms, tm) = bnd in
     let xs = Bwd.map Name.named nms in
-    let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs) rho in
+    let rho = Env.append rho @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs in
     Abs.unsafe_bind xs @@ eval rho tm
 
+  (* CORRECT *)
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = Bwd.map Name.named nms in
-    let rho = Env.push_many (List.rev @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs) rho in
-    ExtAbs.unsafe_bind xs (eval rho tm, eval_tm_sys rho sys)
+    let rho = Env.append rho @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs in
+    let res = ExtAbs.unsafe_bind xs (eval rho tm, eval_tm_sys rho sys) in
+    res
 
   and unleash_data v =
     match unleash v with
@@ -2425,27 +2423,26 @@ struct
     match clo with
     | Clo info ->
       let Tm.B (_, tm) = info.bnd in
-      eval (Env.push (`Val varg) info.rho) tm
+      eval (Env.snoc info.rho @@ `Val varg) tm
 
   and inst_nclo nclo vargs =
     match nclo with
     | NClo info ->
       let Tm.NB (_, tm) = info.nbnd in
-      (* Reversing makes sense here because: the left-most element of the environment is the innermost variable *)
-      eval (Env.push_many (List.rev vargs) info.rho) tm
+      eval (Env.append info.rho vargs) tm
 
   and inst_tick_clo clo tick =
     match clo with
     | TickClo info ->
       let Tm.B (_, tm) = info.bnd in
-      eval (Env.push (`Tick tick) info.rho) tm
+      eval (Env.snoc info.rho @@ `Tick tick) tm
     | TickCloConst v ->
       v
 
   module Macro =
   struct
     let equiv ty0 ty1 : value =
-      let rho = Env.push_many [`Val ty0; `Val ty1] Env.emp in
+      let rho = Env.append Env.emp [`Val ty1; `Val ty0] in
       eval rho @@
       Tm.equiv
         (Tm.up @@ Tm.ix 0)

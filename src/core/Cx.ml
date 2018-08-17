@@ -61,7 +61,7 @@ let ext cx ~nm ty sys =
   let (module V) = evaluator cx in
   let var = V.reflect ty (Domain.Lvl (nm, n)) sys in
   {cx with
-   env = Domain.Env.push (`Val var) cx.env;
+   env = Domain.Env.snoc cx.env @@ `Val var;
    hyps = {classifier = `Ty ty; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.succ cx.qenv;
    ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
@@ -71,7 +71,7 @@ let ext_tick cx ~nm =
   let n = Quote.Env.len cx.qenv in
   let tick = Domain.TickGen (`Lvl (nm, n)) in
   {cx with
-   env = Domain.Env.push (`Tick tick) cx.env;
+   env = Domain.Env.snoc cx.env @@ `Tick tick;
    hyps = {classifier = `Tick; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.succ cx.qenv;
    ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
@@ -87,7 +87,7 @@ let def cx ~nm ~ty ~el =
 let ext_dim cx ~nm =
   let x = Name.named nm in
   {cx with
-   env = Domain.Env.push (`Dim (`Atom x)) cx.env;
+   env = Domain.Env.snoc cx.env @@ `Dim (`Atom x);
    hyps = {classifier = `I; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.abs cx.qenv [x];
    ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
