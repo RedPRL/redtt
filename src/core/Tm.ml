@@ -570,22 +570,25 @@ let map_tm_sys f =
   List.map @@ map_tm_face f
 
 let unbind_ext (NB (nms, (ty, sys))) =
+  let n = Bwd.length nms in
   let rec go k nms xs ty sys =
     match nms with
     | Emp -> Bwd.from_list xs, ty, sys
     | Snoc (nms, nm)  ->
       let x = Name.named nm in
-      go (k + 1) nms (x :: xs) (open_var k (fun _ -> var x) ty) (map_tm_sys (open_var k (fun _ -> var x)) sys)
+      go (k + 1) nms (x :: xs) (open_var (n - k - 1) (fun _ -> var x) ty) (map_tm_sys (open_var (n - k - 1) (fun _ -> var x)) sys)
   in
   go 0 nms [] ty sys
 
 let unbind_ext_with rs ebnd =
   let NB (nms, (ty, sys)) = ebnd in
+  let n = Bwd.length nms in
+
   let rec go k rs ty sys =
     match rs with
     | [] -> ty, sys
     | r :: rs ->
-      go (k + 1) rs (open_var k (fun _ -> r) ty) (map_tm_sys (open_var k (fun _ -> r)) sys)
+      go (k + 1) rs (open_var (n - k - 1) (fun _ -> r) ty) (map_tm_sys (open_var (n - k - 1) (fun _ -> r)) sys)
   in
   if Bwd.length nms = List.length rs then
     go 0 rs ty sys
