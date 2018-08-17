@@ -45,7 +45,6 @@ let plus/suc/r (n : nat) : (m : nat) → Path nat (plus n (suc m)) (suc (plus n 
   | suc (n ⇒ plus/n/suc/r) ⇒ λ m i → suc (plus/n/suc/r m i)
   ]
 
-
 let plus/comm (m : nat) : (n : nat) → Path nat (plus n m) (plus m n) =
   elim m [
   | zero ⇒ plus/unit/r
@@ -82,18 +81,17 @@ let nat/discrete : discrete nat =
   elim m [
   | zero ⇒ λ n →
     elim n [
-    | zero ⇒ <tt, λ _ → zero>
-    | suc n' ⇒ <ff, nat-path/encode zero (suc n')>
+    | zero ⇒ inl auto
+    | suc n' ⇒ inr (nat-path/encode _ _)
     ]
   | suc (m' ⇒ nat/discrete/m') ⇒ λ n →
     elim n [
-    | zero ⇒ <ff, nat-path/encode (suc m') zero>
+    | zero ⇒ inr (nat-path/encode _ _)
     | suc n' ⇒
-      or/elim (Path nat m' n') (neg (Path nat m' n'))
-        (or (Path nat (suc m') (suc n')) (neg (Path nat (suc m') (suc n'))))
-        (nat/discrete/m' n')
-        (λ l → <tt, λ i → suc (l i)>)
-        (λ r → <ff, λ p → r (λ i → nat-pred (p i))>)
+      elim (nat/discrete/m' n') [
+      | inl l ⇒ inl (λ i → suc (l i))
+      | inr r ⇒ inr (λ p → r (λ i → nat-pred (p i)))
+      ]
     ]
   ]
 
