@@ -15,13 +15,13 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BANG
+%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET
 %token EQUALS
-%token RIGHT_ARROW RRIGHT_ARROW BULLET
+%token RIGHT_ARROW RRIGHT_ARROW
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
-%token DIM TICK LOCK
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET DEBUG CALL RESTRICT V VPROJ VIN NEXT PREV FIX DFIX BOX_MODALITY OPEN SHUT
-%token IMPORT OPAQUE QUIT
+%token DIM TICK
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX AUTO
+%token IMPORT OPAQUE QUIT DEBUG NORMALIZE
 %token TYPE PRE KAN
 %token EOF
 
@@ -36,6 +36,8 @@ edecl:
     { E.Define (a, `Opaque, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
+  | NORMALIZE; e = eterm
+    { E.Normalize e }
 
   | DATA; dlbl = ATOM;
     univ_spec = option(preceded(COLON, univ_spec));
@@ -86,10 +88,10 @@ atomic_econ:
     { E.Var (a, k) }
   | a = ATOM;
     { if a = "_" then E.Hope else E.Var (a, 0) }
+  | AUTO
+    { E.Auto }
   | n = NUMERAL;
     { E.Num n }
-  | BULLET
-    { E.TickConst }
 
 atomic_eterm:
   | e = atomic_econ
@@ -98,8 +100,6 @@ atomic_eterm:
 eframe:
   | e = atomic_eterm
     { E.App e }
-  | BANG
-    { E.Open }
   | DOT FST
     { E.Car }
   | DOT SND
@@ -169,20 +169,11 @@ econ:
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; sys = pipe_block(eface)
     { E.Ext (dims, ty, sys)}
 
-  | RESTRICT; ty = eterm; sys = pipe_block(eface)
-    { E.Rst (ty, sys)}
-
   | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
     { E.Pi ([`Ty ("_", dom)], cod) }
 
   | dom = atomic_eterm; TIMES; cod = eterm
     { E.Sg ([`Ty ("_", dom)], cod) }
-
-  | BOX_MODALITY; ty = eterm
-    { E.Pi ([`Lock], ty)}
-
-  | SHUT; tm = eterm
-    { E.Shut tm }
 
 eterm:
   | e = econ
@@ -218,9 +209,6 @@ etele_cell:
     { [`I "_"] }
   | TICK
     { [`Tick "_"] }
-  | LOCK
-    { [`Lock] }
-
 
 
 desc_constr:
@@ -338,9 +326,6 @@ kind:
   | { `Kan }
 
 tm:
-  | BULLET
-    { fun _env ->
-      make_node $startpos $endpos Tm.TickConst }
 
   | i = NUMERAL
     { fun _env ->
@@ -379,17 +364,6 @@ tm:
       make_node $startpos $endpos @@
       Tm.Later (ty env) }
 
-  | LPR; BOX_MODALITY; ty = tm; RPR
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.BoxModality (ty env) }
-
-  | LPR; rst = constrained; RPR
-    { fun env ->
-      let ty, sys = rst env in
-      make_node $startpos $endpos @@
-      Tm.Rst {ty; sys} }
-
   | LPR; LAM; mb = multibind(tm); RPR
     { fun env ->
       lam_from_multibind (Some ($startpos, $endpos)) @@ mb env }
@@ -398,11 +372,6 @@ tm:
     { fun env ->
       make_node $startpos $endpos @@
       Tm.Next (bnd env) }
-
-  | LPR; SHUT; tm = tm; RPR
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.Shut (tm env) }
 
   | LPR; PAIR; e0 = tm; e1 = tm; RPR
     { fun env ->
@@ -491,11 +460,6 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< (Tm.Prev (t env)) }
-
-  | LPR; OPEN; e = cut; RPR
-    { fun env ->
-      let hd, fs = e env in
-      hd, fs #< Tm.Open }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->

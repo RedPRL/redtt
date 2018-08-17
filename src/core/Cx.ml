@@ -23,8 +23,7 @@ type cx =
    env : Domain.env;
    qenv : Quote.env;
    ppenv : Pp.env;
-   rel : Restriction.t;
-   all_locks : int}
+   rel : Restriction.t}
 
 type t = cx
 
@@ -39,31 +38,7 @@ let clear_locals cx =
    qenv = Quote.Env.emp;
    hyps = [];
    ppenv = Pp.Env.emp;
-   env = Domain.Env.clear_locals cx.env;
-   all_locks = 0}
-let ext_lock cx =
-  {cx with
-   sign = GlobalEnv.ext_lock cx.sign;
-   hyps = List.map (fun hyp -> {hyp with locked = true}) cx.hyps;
-   all_locks = cx.all_locks + 1}
-
-let hyps_clear_locks hyps =
-  let rec go hyps =
-    match hyps with
-    | [] -> []
-    | hyp :: hyps ->
-      match hyp.classifier with
-      | `Tick -> hyp :: hyps (* Maybe not quite right *)
-      | _ ->
-        {hyp with locked = false} :: go hyps
-  in
-  go hyps
-
-let clear_locks cx =
-  {cx with
-   sign = GlobalEnv.clear_locks cx.sign;
-   hyps = hyps_clear_locks cx.hyps;
-   all_locks = 0}
+   env = Domain.Env.clear_locals cx.env}
 
 let kill_from_tick cx tgen =
   match tgen with
@@ -144,7 +119,6 @@ let lookup i {hyps; _} =
     hyp.classifier
 
 let lookup_constant nm tw cx =
-  (* For constants, the only locks that are relevant are the global ones. Ignore the local locks. *)
   GlobalEnv.lookup_ty cx.sign nm tw
 
 let restrict cx r r' =
@@ -205,6 +179,9 @@ let quote_ty cx ty =
   let (module Q) = quoter cx in
   Q.quote_ty cx.qenv ty
 
+let quote_dim cx r =
+  let (module Q) = quoter cx in
+  Q.quote_dim cx.qenv r
 
 let check_eq cx ~ty el0 el1 =
   let (module Q) = quoter cx in
@@ -228,5 +205,4 @@ let init globals =
    qenv = Quote.Env.emp;
    hyps = [];
    ppenv = Pp.Env.emp;
-   rel = GlobalEnv.restriction globals;
-   all_locks = 0}
+   rel = GlobalEnv.restriction globals}

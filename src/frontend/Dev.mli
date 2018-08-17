@@ -22,10 +22,9 @@ type ('a, 'b) equation =
 type 'a param =
   [ `I
   | `Tick
-  | `Lock
-  | `ClearLocks
   | `KillFromTick of 'a
   | `P of 'a
+  | `Def of 'a * 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
   | `SelfArg of 'a Desc.rec_spec

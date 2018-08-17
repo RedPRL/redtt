@@ -4,6 +4,12 @@ open BwdNotation
 
 include TmData
 
+type tm = Tm of tm tmf
+type btm = tm Desc.Boundary.term
+type bface = (tm, btm) Desc.Boundary.face
+type bsys = (tm, btm) Desc.Boundary.sys
+type data_desc = (tm, btm) Desc.desc
+
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
@@ -12,8 +18,6 @@ type 'a subst =
 let shift i = Shift i
 let dot a sb = Dot (a, sb)
 
-
-type tm = Tm of tm tmf
 
 type error =
   | InvalidDeBruijnIndex of int
@@ -56,7 +60,7 @@ struct
 
   and traverse_con =
     function
-    | (Univ _ | Dim0 | Dim1 | TickConst as con) ->
+    | (Univ _ | Dim0 | Dim1 as con) ->
       con
 
     | FHCom info ->
@@ -146,14 +150,6 @@ struct
     | Next bnd ->
       let bnd' = traverse_bnd traverse_tm bnd in
       Next bnd'
-
-    | BoxModality t ->
-      let t' = traverse_tm t in
-      BoxModality t'
-
-    | Shut t ->
-      let t' = traverse_tm t in
-      Shut t'
 
     | Let (cmd, bnd) ->
       let cmd' = traverse_cmd cmd in
@@ -347,9 +343,6 @@ struct
       let tick = traverse_tm tick in
       Prev tick
 
-    | Open ->
-      Open
-
 end
 
 
@@ -452,6 +445,10 @@ let make con =
   match con with
   | Up (Ix (ix, _), _) when ix < 0 ->
     raise @@ E (InvalidDeBruijnIndex ix)
+  | Up (Down {tm = Tm (Up (hd, sp)); _}, sp') ->
+    Tm (Up (hd, sp <.> sp'))
+  | Up (Down {tm; _}, Emp) ->
+    tm
   | _ -> Tm con
 
 let unleash (Tm con) = con
@@ -651,9 +648,9 @@ let rec pp env fmt =
       begin
         match sys with
         | [] ->
-          Format.fprintf fmt "%a" (pp env) ty
+          Format.fprintf fmt "@[<hv1>(restrict %a)]" (pp env) ty
         | _ ->
-          Format.fprintf fmt "@[<hv1>(%a@ @[<hv>%a@])@]" (pp env) ty (pp_sys env) sys
+          Format.fprintf fmt "@[<hv1>(restrict %a@ @[<hv>%a@])@]" (pp env) ty (pp_sys env) sys
       end
 
     | CoR face ->
@@ -687,9 +684,6 @@ let rec pp env fmt =
 
     | Dim1 ->
       Format.fprintf fmt "1"
-
-    | TickConst ->
-      Uuseg_string.pp_utf_8 fmt "∙"
 
     | Univ {kind; lvl} ->
       Format.fprintf fmt "(U %a %a)" Kind.pp kind Lvl.pp lvl
@@ -728,12 +722,6 @@ let rec pp env fmt =
     | Next (B (nm, t)) ->
       let x, env' = Pp.Env.bind nm env in
       Format.fprintf fmt "@[<hv1>(next [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') t
-
-    | BoxModality t ->
-      Format.fprintf fmt "@[<hv1>(%a@ %a)@]" Uuseg_string.pp_utf_8 "□" (pp env) t
-
-    | Shut t ->
-      Format.fprintf fmt "@[<hv1>(shut@ %a)@]" (pp env) t
 
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pp.Env.bind nm env in
@@ -842,8 +830,6 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@[<hv1>(force@ %a)@]" (go `Force) sp
       | Prev tick ->
         Format.fprintf fmt "@[<hv1>(prev %a@ %a)@]" (pp env) tick (go `Prev) sp
-      | Open ->
-        Format.fprintf fmt "@[<hv1>(open@ %a)@]" (go `Open) sp
   in
   go `Start fmt sp
 
@@ -1171,8 +1157,6 @@ let map_frame f =
   | Prev tick ->
     let tick = f tick in
     Prev tick
-  | Open ->
-    Open
 
 let map_spine f =
   Bwd.map @@ map_frame f
@@ -1195,7 +1179,7 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Dim0 | Dim1 | TickConst | Data _) as con ->
+  | (Univ _ | Dim0 | Dim1 | Data _) as con ->
     con
   | Cons (t0, t1) ->
     Cons (f t0, f t1)
@@ -1250,12 +1234,6 @@ let map_tmf f =
   | Next bnd ->
     let bnd = map_bnd f bnd in
     Next bnd
-  | BoxModality t ->
-    let t = f t in
-    BoxModality t
-  | Shut t ->
-    let t = f t in
-    Shut t
   | Up cmd ->
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
@@ -1326,16 +1304,6 @@ let rec eta_contract t =
         make @@ Next (bind y tm'y)
     end
 
-  | Shut tm ->
-    let tm' = eta_contract tm in
-    begin
-      match unleash tm' with
-      | Up (hd, Snoc (sp, Open)) ->
-        up (hd, sp)
-      | _ ->
-        make @@ Shut tm'
-    end
-
   | ExtLam nbnd ->
     let ys, tmys = unbindn nbnd in
     let tm'ys = eta_contract tmys in
@@ -1391,6 +1359,13 @@ let rec shift_univ k tm =
     | tmf ->
       Tm (map_tmf (shift_univ k) tmf)
 
+let pp_bterm fmt =
+  let module B = Desc.Boundary in
+  function
+  | B.Var ix ->
+    Format.fprintf fmt "#%i" ix
+  | B.Intro intro ->
+    Format.fprintf fmt "<intro: %s>" intro.clbl
 
 let pp0 fmt tm = pp Pp.Env.emp fmt @@ eta_contract tm
 

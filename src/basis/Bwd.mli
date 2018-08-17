@@ -15,6 +15,7 @@ end
 
 module Bwd :
 sig
+  val nth : 'a bwd -> int -> 'a
   val rev : 'a bwd -> 'a bwd
   val length : 'a bwd -> int
   val map : ('a -> 'b) -> 'a bwd -> 'b bwd

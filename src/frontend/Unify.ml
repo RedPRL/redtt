@@ -28,10 +28,6 @@ let rec telescope ty : telescope * ty =
     let x, codx = Tm.unbind cod in
     let tel, ty = telescope codx in
     (Emp #< (x, `Tick)) <.> tel, ty
-  | Tm.BoxModality ty ->
-    let x = Name.fresh () in
-    let tel, ty = telescope ty in
-    (Emp #< (x, `Lock)) <.> tel, ty
   | _ ->
     Emp, ty
 
@@ -40,17 +36,15 @@ let rec abstract_tm xs tm =
   | Emp -> tm
   | Snoc (xs, (x, `P _)) ->
     abstract_tm xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
+  | Snoc (xs, (x, `Def (ty, def))) ->
+    abstract_tm xs @@ Tm.unbind_with (Tm.ann ~ty ~tm:def) @@ Tm.bind x tm
   | Snoc (xs, (x, `Tick)) ->
     abstract_tm xs @@ Tm.make @@ Tm.Next (Tm.bind x tm)
   | Snoc (xs, (x, `I)) ->
     let bnd = Tm.NB (Emp #< None, Tm.close_var x 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
-  | Snoc (xs, (_, `Lock)) ->
-    abstract_tm xs @@ Tm.make @@ Tm.Shut tm
   | Snoc (xs, (_, `R (r, r'))) ->
     abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
-  | Snoc (xs, (_, `ClearLocks)) ->
-    abstract_tm xs tm
   | Snoc (xs, (_, `KillFromTick _)) ->
     abstract_tm xs tm
   | _ ->
@@ -61,6 +55,8 @@ let rec abstract_ty (gm : telescope) cod =
   | Emp -> cod
   | Snoc (gm, (x, `P dom)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Pi (dom, Tm.bind x cod)
+  | Snoc (gm, (x, `Def (dom, def))) ->
+    abstract_ty gm @@ Tm.unbind_with (Tm.ann ~ty:dom ~tm:def) @@ Tm.bind x cod
   | Snoc (gm, (_, `R (r, r'))) ->
     abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
   | Snoc (gm, (x, `I)) ->
@@ -68,10 +64,6 @@ let rec abstract_ty (gm : telescope) cod =
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.NB (Emp #< (Name.name x), (cod', [])))
   | Snoc (gm, (x, `Tick)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Later (Tm.bind x cod)
-  | Snoc (gm, (_, `Lock)) ->
-    abstract_ty gm @@ Tm.make @@ Tm.BoxModality cod
-  | Snoc (gm, (_, `ClearLocks)) ->
-    abstract_ty gm cod
   | Snoc (gm, (_, `KillFromTick _)) ->
     abstract_ty gm cod
   | _ ->
@@ -84,6 +76,8 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     [Tm.ExtApp [Tm.up @@ Tm.var x]]
   | `P _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
+  | `Def _ ->
+    []
   | `SelfArg _ ->
     (* ??? *)
     [Tm.FunApp (Tm.up @@ Tm.var x)]
@@ -93,10 +87,6 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     [Tm.CoRForce]
   | `Tick ->
     [Tm.Prev (Tm.up @@ Tm.var x)]
-  | `Lock ->
-    [Tm.Open]
-  | `ClearLocks ->
-    []
   | `KillFromTick _ ->
     []
 
@@ -397,8 +387,8 @@ let plug (ty, tm) frame =
   let (module V) = Cx.evaluator cx in
 
   match Tm.unleash tm, frame with
-  | Tm.Up (hd, sp), _ ->
-    ret @@ Tm.up (hd, sp #< frame)
+  | Tm.Up cmd, _ ->
+    ret @@ Tm.up @@ cmd @< frame
   | Tm.Lam bnd, Tm.FunApp arg ->
     let dom, cod = V.unleash_pi ty in
     inst_bnd (cod, bnd) (dom, arg)
@@ -888,7 +878,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | `I | `Tick | `Lock | `ClearLocks | `KillFromTick _ | `SelfArg _ as p ->
+        | `I | `Tick | `KillFromTick _ | `SelfArg _ as p ->
           in_scope x p @@
           solver probx
 
@@ -902,6 +892,18 @@ let rec solver prob =
             | None ->
               in_scope x (`P ty) @@
               solver probx
+          end
+
+        | `Def (ty, tm) ->
+          begin
+            (* match split_sigma Emp x ty with
+               | Some (y, ty0, z, ty1, s, _) ->
+               (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
+               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
+               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
+               | None -> *)
+            in_scope x (`Def (ty, tm)) @@
+            solver probx
           end
 
         | `Tw (ty0, ty1) ->

@@ -52,8 +52,17 @@ struct
   let rec traverse f =
     function
     | [] -> M.ret []
-    | m::ms ->
-      m >>= fun x ->
-      traverse f ms >>= fun xs ->
-      M.ret @@ x :: xs
+    | x::xs ->
+      f x >>= fun y ->
+      traverse f xs >>= fun ys ->
+      M.ret @@ y :: ys
+
+  let rec fold_left f acc xs =
+    match xs with
+    | [] ->
+      M.ret acc
+    | x :: xs ->
+      f acc x >>= fun a ->
+      fold_left f a xs
+
 end

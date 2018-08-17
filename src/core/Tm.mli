@@ -1,7 +1,12 @@
 open RedBasis.Bwd
 include module type of TmData
 
+
 type tm
+type btm = tm Desc.Boundary.term
+type bsys = (tm, btm) Desc.Boundary.sys
+type bface = (tm, btm) Desc.Boundary.face
+type data_desc = (tm, btm) Desc.desc
 
 module Error :
 sig
@@ -84,6 +89,8 @@ val pp_head : tm head Pp.t
 val pp_frame : tm frame Pp.t
 val pp_spine : tm spine Pp.t
 val pp_sys : (tm, tm) system Pp.t
+
+val pp_bterm : btm Pp.t0
 
 include Occurs.S with type t := tm
 

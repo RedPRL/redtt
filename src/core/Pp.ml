@@ -42,3 +42,8 @@ type env = Env.t
 
 type 'a t0 = Format.formatter -> 'a -> unit
 type 'a t = env -> 'a t0
+
+let pp_list pp fmt xs =
+  let pp_sep fmt () = Format.fprintf fmt ", " in
+  Format.fprintf fmt "@[<hv1>[%a]@]"
+    (Format.pp_print_list ~pp_sep pp) xs

@@ -10,10 +10,7 @@ val qenv : t -> Quote.env
 
 val clear_locals : t -> t
 
-(* Modal left adjoints *)
-val ext_lock : t -> t
-val clear_locks : t -> t
-
+(* Modal *)
 val kill_from_tick : t -> Domain.tick_gen -> t
 
 val ext_ty : t -> nm:string option -> value -> t * value
@@ -51,6 +48,7 @@ val check_eq : t -> ty:value -> value -> value -> unit
 val check_subtype : t -> value -> value -> unit
 val quote : t -> ty:value -> value -> Tm.tm
 val quote_ty : t -> value -> Tm.tm
+val quote_dim : t -> I.t -> Tm.tm
 val check_eq_ty : t -> value -> value -> unit
 
 val evaluator : t -> (module Val.S)

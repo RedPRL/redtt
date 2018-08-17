@@ -29,6 +29,13 @@ module Bwd =
 struct
   open BwdNotation
 
+  let rec nth xs i =
+    match xs with
+    | Emp ->
+      failwith "Bwd.nth"
+    | Snoc (_, x) when i = 0 -> x
+    | Snoc (xs, _) -> nth xs @@ i - 1
+
 
   let rec length =
     function

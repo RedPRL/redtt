@@ -9,6 +9,7 @@ type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
   | Data of string * (eterm, eterm) Desc.desc
   | Debug of [ `All | `Constraints | `Unsolved ]
+  | Normalize of eterm
   | Import of string
   | Quit
 
@@ -19,7 +20,6 @@ and ecell =
   [ `Ty of string * eterm
   | `Tick of string
   | `I of string
-  | `Lock
   ]
 
 and etele = ecell list
@@ -39,7 +39,6 @@ and econ =
   | Pi of etele * eterm
   | Sg of etele * eterm
   | Ext of string list * eterm * esys
-  | Rst of eterm * esys
 
   | Coe of {r : eterm; r' : eterm; fam : eterm; tm : eterm}
   | HCom of {r : eterm; r' : eterm; cap : eterm; sys : esys}
@@ -47,11 +46,12 @@ and econ =
 
   | Shut of eterm
 
-  | TickConst
   | DFixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
   | FixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
 
   | Cut of eterm * frame bwd
+
+  | Auto
 
   | Var of string * int
   | Num of int

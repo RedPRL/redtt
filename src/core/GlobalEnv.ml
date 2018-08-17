@@ -16,7 +16,6 @@ type t =
   {rel : Restriction.t;
    data_decls : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc StringTable.t;
    table : (entry param * lock_info) T.t;
-   lock : int -> bool;
    killed : int -> bool;
    under_tick : int -> bool;
    len : int}
@@ -26,7 +25,6 @@ let emp () =
   {table = T.empty;
    data_decls = StringTable.empty;
    rel = Restriction.emp ();
-   lock = (fun _ -> false);
    killed = (fun _ -> false);
    under_tick = (fun _ -> false);
    len = 0}
@@ -73,15 +71,6 @@ let ext_dim (sg : t) nm : t =
   ext_ sg ~constant:false nm `I
 
 
-let ext_lock (sg : t) : t =
-  {sg with
-   lock = fun i -> if i < sg.len then true else sg.lock i}
-
-let clear_locks (sg : t) : t =
-  {sg with
-   lock = (fun i -> if sg.under_tick i then sg.lock i else false)}
-
-
 let rec index_of pred xs =
   match xs with
   | [] -> failwith "index_of"
@@ -97,9 +86,8 @@ let kill_from_tick (sg : t) nm : t =
 
 let lookup_entry sg nm tw =
   let prm, linfo = T.find nm sg.table in
-  let locked = sg.lock linfo.birth in
   let killed = sg.killed linfo.birth in
-  if not linfo.constant && (locked || killed) then
+  if not linfo.constant && killed then
     failwith "GlobalEnv.lookup_entry: not accessible (modal!!)"
   else
     match prm, tw with
@@ -130,7 +118,10 @@ let restrict tr0 tr1 sg =
     | Tm.Up (Tm.Var {name; _}, Emp) -> `Atom name
     | Tm.Dim0 -> `Dim0
     | Tm.Dim1 -> `Dim1
-    | _ -> failwith "Restrict: expected dimension"
+    | _ ->
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
+      failwith "Restrict: expected dimension"
   in
   let rel', _ = Restriction.equate (ev_dim tr0) (ev_dim tr1) sg.rel in
   {sg with rel = rel'}
@@ -142,7 +133,7 @@ let pp fmt sg =
     | `Tw _ ->
       Format.fprintf fmt "%a[twin]"
         Name.pp nm
-    | (`Tick | `I | `P _) ->
+    | (`Tick | `I | `P _ | `Def _) ->
       Format.fprintf fmt "%a"
         Name.pp nm
   in

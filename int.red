@@ -30,11 +30,11 @@ let isuc (x : int) : int =
 
 let pred-isuc (n : int) : Path int (pred (isuc n)) n =
   elim n [
-  | pos n ⇒ λ _ → pos n
+  | pos n ⇒ auto
   | negsuc n ⇒
     elim n [
-    | zero ⇒ λ _ → negsuc zero
-    | suc n ⇒ λ _ → negsuc (suc n)
+    | zero ⇒ auto
+    | suc n ⇒ auto
     ]
   ]
 
@@ -42,11 +42,11 @@ let isuc-pred (n : int) : Path int (isuc (pred n)) n =
   elim n [
   | pos n ⇒
     elim n [
-    | zero ⇒ λ _ → pos zero
-    | suc n' ⇒ λ _ → pos (suc n')
+    | zero ⇒ auto
+    | suc n' ⇒ auto
     ]
-  | negsuc n ⇒ λ _ → negsuc n
+  | negsuc n ⇒ auto
   ]
 
 let isuc-equiv : Equiv int int =
-  Iso/Equiv _ _ < isuc, < pred, < isuc-pred, pred-isuc > > >
+  Iso/Equiv _ _ <isuc, <pred, <isuc-pred, pred-isuc>>>

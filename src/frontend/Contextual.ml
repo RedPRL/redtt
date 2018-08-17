@@ -175,10 +175,6 @@ let get_global_env =
       GlobalEnv.ext_dim (go_params psi) x
     | Snoc (psi, (x, `Tick)) ->
       GlobalEnv.ext_tick (go_params psi) x
-    | Snoc (psi, (_, `Lock)) ->
-      GlobalEnv.ext_lock @@ go_params psi
-    | Snoc (psi, (_, `ClearLocks)) ->
-      GlobalEnv.clear_locks @@ go_params psi
     | Snoc (psi, (_, `KillFromTick tck)) ->
       begin
         match Tm.unleash tck with
@@ -189,6 +185,8 @@ let get_global_env =
       end
     | Snoc (psi, (x, `P ty)) ->
       GlobalEnv.ext (go_params psi) x @@ `P {ty; sys = []}
+    | Snoc (psi, (x, `Def (ty, tm))) ->
+      GlobalEnv.define (go_params psi) x ~ty ~tm
     | Snoc (psi, (x, `Tw (ty0, ty1))) ->
       GlobalEnv.ext (go_params psi) x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []})
     | Snoc (psi, (_, `R (r0, r1))) ->
@@ -250,6 +248,8 @@ let lookup_var x w =
   let rec go gm =
     match w, gm with
     | `Only, Snoc (gm, (y, `P ty)) ->
+      if x = y then M.ret ty else go gm
+    | `Only, Snoc (gm, (y, `Def (ty, _))) ->
       if x = y then M.ret ty else go gm
     | `TwinL, Snoc (gm, (y, `Tw (ty0, _))) ->
       if x = y then M.ret ty0 else go gm

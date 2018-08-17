@@ -24,9 +24,9 @@ let rec pp_env_cell fmt =
   | `Tick _ ->
     Format.fprintf fmt "<tick>"
 
-and pp_env fmt =
+and pp_env fmt env =
   let pp_sep fmt () = Format.fprintf fmt ", " in
-  Format.pp_print_list ~pp_sep pp_env_cell fmt
+  Format.pp_print_list ~pp_sep pp_env_cell fmt env.cells
 
 
 and pp_con fmt : con -> unit =
@@ -93,10 +93,6 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<dfix>"
   | DFixLine _ ->
     Format.fprintf fmt "<dfix-line>"
-  | BoxModality _ ->
-    Format.fprintf fmt "<box-modality>"
-  | Shut _ ->
-    Format.fprintf fmt "<shut>"
   | Data lbl ->
     Uuseg_string.pp_utf_8 fmt lbl
   | Intro info ->
@@ -164,11 +160,11 @@ and pp_comp_face : type x. _ -> (x, abs) face -> unit =
 
 and pp_clo fmt (Clo clo) =
   let Tm.B (_, tm) = clo.bnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
+  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
 
 and pp_nclo fmt (NClo clo) =
   let Tm.NB (_, tm) = clo.nbnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho.cells
+  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
 
 and pp_neu fmt neu =
   match neu with
@@ -189,6 +185,10 @@ and pp_neu fmt neu =
   | NCoe info ->
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_neu info.neu
+
+  | NCoeAtType info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
 
   | FunApp (neu, arg) ->
     Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
@@ -235,9 +235,6 @@ and pp_neu fmt neu =
 
   | FixLine _ ->
     Format.fprintf fmt "<fix-line>"
-
-  | Open _ ->
-    Format.fprintf fmt "<open>"
 
 and pp_elim_clauses fmt clauses =
   let pp_sep fmt () = Format.fprintf fmt "@ " in
@@ -420,7 +417,6 @@ end
 
 module ExtAbs : IAbs.S with type el = value * val_sys =
   IAbs.M (Sort.Prod (Value) (ValSys))
-
 
 module Env :
 sig

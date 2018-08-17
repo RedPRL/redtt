@@ -15,3 +15,8 @@ let IsEquiv (A, B : type) (f : A → B) : type =
 
 let Equiv (A, B : type) : type =
   (f : A → B) × IsEquiv _ _ f
+
+let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
+  λ i →
+    `(V i A B E)
+

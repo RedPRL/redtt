@@ -31,6 +31,8 @@ sig
   val quote_ty : env -> value -> Tm.tm
   val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
 
+  val quote_dim : env -> I.t -> Tm.tm
+
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val subtype : env -> value -> value -> unit
