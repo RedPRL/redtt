@@ -3,8 +3,8 @@ sig
   type t
   val emp : t
   val var : int -> t -> string
-  val bind : string option -> t -> string * t
-  val bindn : string option list -> t -> string list * t
+  val bind : t -> string option -> string * t
+  val bindn : t -> string option list -> string list * t
   val bind_fresh : t -> string * t
 
   val proj : t -> t

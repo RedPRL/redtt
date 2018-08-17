@@ -64,7 +64,7 @@ let ext cx ~nm ty sys =
    env = Domain.Env.snoc cx.env @@ `Val var;
    hyps = {classifier = `Ty ty; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.succ cx.qenv;
-   ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
+   ppenv = snd @@ Pp.Env.bind cx.ppenv nm},
   var
 
 let ext_tick cx ~nm =
@@ -74,7 +74,7 @@ let ext_tick cx ~nm =
    env = Domain.Env.snoc cx.env @@ `Tick tick;
    hyps = {classifier = `Tick; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.succ cx.qenv;
-   ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
+   ppenv = snd @@ Pp.Env.bind cx.ppenv nm},
   tick
 
 let ext_ty cx ~nm ty =
@@ -90,7 +90,7 @@ let ext_dim cx ~nm =
    env = Domain.Env.snoc cx.env @@ `Dim (`Atom x);
    hyps = {classifier = `I; locked = false; killed = false} :: cx.hyps;
    qenv = Quote.Env.abs cx.qenv [x];
-   ppenv = snd @@ Pp.Env.bind nm cx.ppenv},
+   ppenv = snd @@ Pp.Env.bind cx.ppenv nm},
   x
 
 let rec ext_dims cx ~nms =
