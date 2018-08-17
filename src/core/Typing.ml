@@ -253,7 +253,10 @@ let rec check_ cx ty rst tm =
 
   | _, D.Ext ext_abs, T.Up cmd ->
     let n = D.ExtAbs.len ext_abs in
-    let nms = ListUtil.tabulate n @@ fun _ -> None in
+    let nms =
+      let xs, _ = D.ExtAbs.unleash ext_abs in
+      List.map Name.name @@ Bwd.to_list xs
+    in
     let cxx, xs = Cx.ext_dims cx ~nms in
     let rs = List.map (fun x -> `Atom x) xs in
     let trs = List.map (Cx.quote_dim cxx) rs in
