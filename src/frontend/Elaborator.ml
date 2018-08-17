@@ -178,7 +178,6 @@ struct
       | (lbl, epty) :: eparams, _ ->
         let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
         elab_chk env epty {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
-        Format.eprintf "elab_datatype / param / %s / %a@." lbl Tm.pp0 pty;
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) begin
           let acc' = Desc.{acc with params = acc.params @ [(lbl, pty)]} in
