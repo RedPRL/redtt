@@ -1358,15 +1358,14 @@ struct
 
   and rigid_ghcom dir ty cap sys : value =
     match unleash ty with
-    (* Who knows whether we can delay the expansion
-     * in `Up _`? Please move `Up _` to the second
-     * list if this does not work out. *)
-    | Pi _ | Sg _ | Up _ ->
+    | Pi _ | Sg _ ->
       make @@ GHCom {dir; ty; cap; sys}
 
     (* `Ext _`: the expansion will stop after a valid
-     * correction system, so it is not so bad. *)
-    | Ext _ | Univ _ | FHCom _ | V _ | Data _ ->
+     * correction system, so it is not so bad.
+     *
+     * `Up _`: perhaps we can have nghcom? *)
+    | Ext _ | Univ _ | FHCom _ | V _ | Data _ | Up _ ->
       let aux sys =
         match sys with
         | [] -> cap
