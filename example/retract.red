@@ -1,6 +1,5 @@
 import path
 import connection
-import equivalence
 
 let Retract (A,B : type) (f : A → B) (g : B → A) : type =
   (a : A) →
