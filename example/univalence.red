@@ -113,6 +113,33 @@ opaque
 let PropIsEquiv (A,B : type) (f : A → B) : IsProp (IsEquiv A B f) =
   λ e0 e1 i b → PropIsContr (Fiber A B f b) (e0 b) (e1 b) i
 
+; A direct proof that IsEquiv f is a prop, ported from cubicaltt to yacctt to redtt
+let PropIsEquivDirect (A,B : type) (f : A → B) : IsProp (IsEquiv A B f) =
+  λ ise ise' i y →
+    let a : A = (ise y).0.0 in
+    let p : Path B (f a) y = (ise y).0.1 in
+    let c : (w : Fiber A B f y) → Path (Fiber A B f y) w <a,p> =
+      (ise y).1
+    in
+    let a' : A = (ise' y).0.0 in
+    let p' : Path B (f a') y = (ise' y).0.1 in
+    let c' : (w : Fiber A B f y) → Path (Fiber A B f y) w <a',p'> =
+      (ise' y).1
+    in
+    < c' <a , p> i
+    , λ w →
+        let sq : PathD (λ j → Path (Fiber A B f y) w (c' <a,p> j)) (c w) (c' w) =
+          λ i j →
+            comp 0 1 (connection/and (Fiber A B f y) (c' w) i j) [
+            | i=0 ⇒ λ k → connection/and (Fiber A B f y) (c w) k j
+            | i=1 ⇒ λ _ → c' w j
+            | j=0 ⇒ λ _ → w
+            | j=1 ⇒ λ k → c' (c w k) i
+            ]
+        in
+        sq i
+    >
+
 opaque
 let EquivLemma
   (A,B : type) (E0, E1 : Equiv A B)
