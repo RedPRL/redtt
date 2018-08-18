@@ -833,7 +833,7 @@ let check_constr_boundary_sys cx dlbl desc ~params sys =
         | `Same | `Indet ->
           begin
             try
-              let cx', phi = Cx.restrict cx r0 r1 in
+              let cx', _ = Cx.restrict cx r0 r1 in
               (* TODO: check boundary type *)
               (* check cx' (D.Value.act phi ty) tm; *)
 
