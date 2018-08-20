@@ -225,6 +225,9 @@ let rec check_ cx ty rst tm =
     let constr = Desc.lookup_constr clbl desc in
     check_constr cx dlbl constr args;
 
+  | [], D.Data dlbl, T.FHCom info ->
+    check_fhcom cx ty info.r info.r' info.cap info.sys
+
 
   | _, D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
     let cxx, x = Cx.ext_ty cx ~nm dom in

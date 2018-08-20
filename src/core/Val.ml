@@ -768,7 +768,7 @@ struct
       args
 
   (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
-  and rigid_coe_data_intro dir abs ~dlbl ~clbl ~const_args ~rec_args ~rs =
+  and rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl ~const_args ~rec_args ~rs =
     let x = Name.fresh () in
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
@@ -814,11 +814,11 @@ struct
         make_fhcom (`Ok dir) intro @@ force_abs_sys correction
     end
 
-  and rigid_coe_data dir abs el =
+  and rigid_coe_nonstrict_data dir abs el =
     let _, tyx = Abs.unleash1 abs in
     match unleash tyx, unleash el with
     | Data dlbl, Intro info ->
-      rigid_coe_data_intro dir abs ~dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
+      rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
 
     | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
@@ -835,7 +835,7 @@ struct
       rigid_fhcom info.dir cap sys
 
     | _ ->
-      failwith "rigid_coe_data"
+      failwith "rigid_coe_nonstrict_data"
 
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
@@ -853,8 +853,10 @@ struct
     | Univ _ ->
       el
 
-    | Data _ ->
-      rigid_coe_data dir abs el
+    | Data dlbl ->
+      let desc = Sig.lookup_datatype dlbl in
+      if Desc.is_strict_set desc then el
+      else rigid_coe_nonstrict_data dir abs el
 
     | FHCom fhcom ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
@@ -1358,15 +1360,14 @@ struct
 
   and rigid_ghcom dir ty cap sys : value =
     match unleash ty with
-    (* Who knows whether we can delay the expansion
-     * in `Up _`? Please move `Up _` to the second
-     * list if this does not work out. *)
-    | Pi _ | Sg _ | Up _ ->
+    | Pi _ | Sg _ ->
       make @@ GHCom {dir; ty; cap; sys}
 
     (* `Ext _`: the expansion will stop after a valid
-     * correction system, so it is not so bad. *)
-    | Ext _ | Univ _ | FHCom _ | V _ | Data _ ->
+     * correction system, so it is not so bad.
+     *
+     * `Up _`: perhaps we can have nghcom? *)
+    | Ext _ | Univ _ | FHCom _ | V _ | Data _ | Up _ ->
       let aux sys =
         match sys with
         | [] -> cap

@@ -17,37 +17,28 @@ let loopn (n : int) : Path s1 base base =
   | pos n ⇒
     elim n [
     | zero ⇒ auto
-    | suc (n ⇒ loopn) ⇒ trans s1 (λ i → loop i) loopn
+    | suc (n ⇒ loopn) ⇒ trans s1 loopn (λ i → loop i)
     ]
   | negsuc n ⇒
     elim n [
     | zero ⇒ symm s1 (λ i → loop i)
-    | suc (n ⇒ loopn) ⇒ trans s1 (symm s1 (λ i → loop i)) loopn
+    | suc (n ⇒ loopn) ⇒ trans s1 loopn (symm s1 (λ i → loop i))
     ]
   ]
 
 let winding (l : Path s1 base base) : int =
   coe 0 1 (pos zero) in λ i → s1-univ-cover (l i)
 
-let two : int = pos (suc (suc zero))
-
-let winding-loop-testing0 : Path int two (winding (loopn two)) =
-  auto
-
-let nat/five : nat =
-  suc (suc (suc (suc (suc zero))))
-
-let nat/25 : nat =
-  plus nat/five (plus nat/five (plus nat/five (plus nat/five nat/five)))
-
-let int/50 : int =
-  pos (plus nat/25 nat/25)
-
-let int/5 : int = pos nat/five
-
-let winding-test/5 : Path int int/5 (winding (loopn int/5)) =
-  auto
-
-let winding-test/50 : Path int int/50 (winding (loopn int/50)) =
-  auto
-
+let winding-loopn (n : int) : Path int (winding (loopn n)) n =
+  elim n [
+  | pos n ⇒
+    elim n [
+    | zero ⇒ auto
+    | suc (n ⇒ loopn) ⇒ λ i → isuc (loopn i)
+    ]
+  | negsuc n ⇒
+    elim n [
+    | zero ⇒ auto
+    | suc (n ⇒ loopn) ⇒ λ i → pred (loopn i)
+    ]
+  ]
