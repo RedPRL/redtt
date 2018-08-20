@@ -29,7 +29,6 @@ let isuc (x : int) : int =
     ]
   ]
 
-
 let pred-isuc (n : int) : Path int (pred (isuc n)) n =
   elim n [
   | pos n ⇒ refl
@@ -52,6 +51,36 @@ let isuc-pred (n : int) : Path int (isuc (pred n)) n =
 
 let isuc-equiv : Equiv int int =
   Iso/Equiv _ _ <isuc, <pred, <isuc-pred, pred-isuc>>>
+
+let iplus (m, n : int) : int =
+  elim m [
+  | pos m =>
+    elim m [
+    | zero => n
+    | suc (n => m+n) => isuc m+n
+    ]
+  | negsuc m =>
+    elim m [
+    | zero => pred n
+    | suc (n => m+n) => pred m+n
+    ]
+  ]
+
+let izero : int = pos zero
+
+let iplus/unit-r (n : int) : Path int (iplus n izero) n =
+  elim n [
+  | pos n =>
+    elim n [
+    | zero => auto
+    | suc (n => n+0) => lam i -> isuc (n+0 i)
+    ]
+  | negsuc n =>
+    elim n [
+    | zero => auto
+    | suc (n => n+0) => lam i -> pred (n+0 i)
+    ]
+  ]
 
 let IntPathCode (x : int) : int → type =
   elim x [
