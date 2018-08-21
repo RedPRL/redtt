@@ -295,7 +295,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
       let constr = lookup_constr clbl desc in
-      let rec go psi env (tms, cargs, rargs, ihs, rs) pbinds const_specs rec_specs dims =
+      let rec go psi env benv (tms, cargs, rargs, ihs, rs) pbinds const_specs rec_specs dims =
         match pbinds, const_specs, rec_specs, dims with
         | ESig.PVar nm :: pbinds, (_plbl, pty) :: const_specs, _, _->
           let x = Name.named @@ Some nm in
@@ -304,7 +304,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let x_tm = Tm.up @@ Tm.var x in
           let env' = D.Env.snoc env @@ `Val x_el in
-          go (psi #< (x, `P tty)) env' (tms #< x_tm, cargs #< x_el, rargs, ihs, rs) pbinds const_specs rec_specs dims
+          let benv' = D.Env.snoc env @@ `Val x_el in
+          go (psi #< (x, `P tty)) env' benv' (tms #< x_tm, cargs #< x_el, rargs, ihs, rs) pbinds const_specs rec_specs dims
 
         | ESig.PVar nm :: pbinds, [], (_, Self) :: rec_specs, _ ->
           let x = Name.named @@ Some nm in
@@ -312,7 +313,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let ih_ty = mot x_tm in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
+          let benv' = D.Env.snoc benv @@ `Val x_el in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env benv' (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
 
         | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: rec_specs, _ ->
           let x = Name.named @@ Some nm in
@@ -320,23 +322,25 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_tm = Tm.up @@ Tm.var x in
           let ih_ty = mot x_tm in
           let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
+          let benv' = D.Env.snoc benv @@ `Val x_el in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env benv' (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
 
         | ESig.PVar nm :: pbinds, [], [], _ :: dims ->
           let x = Name.named @@ Some nm in
           let x_tm = Tm.up @@ Tm.var x in
           let r = `Atom x in
           let env' = D.Env.snoc env @@ `Dim r in
-          go (psi #< (x, `I)) env' (tms #< x_tm, cargs, rargs, ihs, rs #< r) pbinds [] [] dims
+          let benv' = D.Env.snoc benv @@ `Dim r in
+          go (psi #< (x, `I)) env' benv' (tms #< x_tm, cargs, rargs, ihs, rs #< r) pbinds [] [] dims
 
         | _, [], [], [] ->
-          psi, Bwd.to_list tms, Bwd.to_list cargs, Bwd.to_list rargs, ihs, Bwd.to_list rs
+          psi, benv, Bwd.to_list tms, Bwd.to_list cargs, Bwd.to_list rargs, ihs, Bwd.to_list rs
 
         | _ ->
           failwith "refine_clause"
       in
 
-      let psi, tms, const_args, rec_args, ihs, rs = go Emp D.Env.emp (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
+      let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp D.Env.emp D.Env.emp (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
       let sub = List.fold_left (fun sub (x,_) -> Tm.dot (Tm.var x) sub) (Tm.shift 0) (Bwd.to_list psi) in
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
@@ -353,10 +357,30 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             let nbnd : ty Tm.nbnd = snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) earlier_clauses in
             let nclo = D.NClo {nbnd; rho = Cx.env cx} in
             let cargs = List.map (fun t -> `Val (Cx.eval cx @@ Tm.subst sub t)) intro.const_args in
-            let rargs = List.map (fun bt -> `Val (image_of_bterm phi bt)) intro.rec_args in
+            let rargs =
+              try
+                List.flatten @@
+                List.map
+                  (fun bt ->
+                     let el = `Val (V.eval_bterm dlbl desc benv bterm) in
+                     let ih = `Val (image_of_bterm phi bt) in
+                     [el; ih])
+                  intro.rec_args
+              with
+                _ -> failwith "rargs"
+            in
             let dims = List.map (fun t -> `Dim (Cx.eval_dim cx @@ Tm.subst sub t)) intro.rs in
             let cells = cargs @ rargs @ dims in
-            V.inst_nclo nclo cells
+            begin
+              try
+                V.inst_nclo nclo cells
+              with _ ->
+                Format.eprintf "%s@."  intro.clbl;
+                Format.eprintf "clo: @[%a@]@." D.pp_nclo nclo;
+                Format.eprintf "cells: @[%a@]@." (Pp.pp_list D.pp_env_cell) cells;
+                failwith "inst_clo"
+            end
+
           | B.Var ix ->
             let ix' = ix - List.length rs in
             Cx.eval_cmd cx @@ Tm.var @@ Bwd.nth ihs ix'
