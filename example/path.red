@@ -86,6 +86,24 @@ let trans/unit/r
   =
   trans/filler _ p (λ _ → p 1)
 
+let trans/unit/l
+  (A : type)
+  (p : dim → A)
+  : Path (Path _ (p 0) (p 1)) p (trans _ (λ _ → p 0) p)
+  =
+  λ k i →
+  comp 0 1 (p 0) [
+  | k=0 ⇒ λ j →
+    comp 0 1 (p 0) [
+    | j=1 ⇒ λ l → comp 0 i (p 0) [ l=0 ⇒ auto | l=1 ⇒ p ]
+    | i=1 ⇒ λ l → comp 0 j (p 0) [ l=0 ⇒ auto | l=1 ⇒ p ]
+    | j=0 ⇒ auto
+    | i=0 ⇒ auto
+    ]
+  | i=0 ⇒ auto
+  | i=1 ⇒ p
+  ]
+
 ; This proof gets simpler when dead tubes are deleted!
 let trans/sym/r
   (A : type)
@@ -107,15 +125,15 @@ let trans/sym/l
   =
   λ k i →
     comp 0 1 (symm/filler A p k i) [
-    | i=0 ⇒ lam j →
+    | i=0 ⇒ λ j →
       comp 0 1 (p 1) [
-      | j=0 ⇒ λ l → comp 1 k (p 1) [ l=0 ⇒ λ _ → p 1 | l=1 ⇒ λ m → p m ]
-      | k=0 ⇒ λ l → comp 1 j (p 1) [ l=0 ⇒ λ _ → p 1 | l=1 ⇒ λ m → p m ]
-      | j=1 ⇒ λ _ → p 1
-      | k=1 ⇒ λ _ → p 1
+      | j=0 ⇒ λ l → comp 1 k (p 1) [ l=0 ⇒ auto | l=1 ⇒ p ]
+      | k=0 ⇒ λ l → comp 1 j (p 1) [ l=0 ⇒ auto | l=1 ⇒ p ]
+      | j=1 ⇒ auto
+      | k=1 ⇒ auto
       ]
-    | i=1 ⇒ λ m → p m
-    | k=0 ⇒ λ m → p m
+    | i=1 ⇒ p
+    | k=0 ⇒ p
     ;| k=1 ⇒ λ j → trans/filler A (symm A p) p j i
     ]
 
