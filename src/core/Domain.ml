@@ -115,7 +115,7 @@ and pp_value fmt value =
   if node.action = I.idn then
     pp_con fmt node.con
   else
-    Format.fprintf fmt "@[<hv1>@[<hv1>(%a)@]<%a>@]"
+    Format.fprintf fmt "@[<hv1>@[<hv1>%a@]@[<hv1><%a>@]@]"
       pp_con node.con I.pp_action node.action
 
 

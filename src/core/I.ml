@@ -137,4 +137,4 @@ let rec pp_action fmt =
   | Subst (r, x) ->
     Format.fprintf fmt "[%a/%a]" pp r Name.pp x
   | Cmp (phi1, phi0) ->
-    Format.fprintf fmt "%a %a %a" pp_action phi1 Uuseg_string.pp_utf_8 "∘" pp_action phi0
+    Format.fprintf fmt "%a@ %a %a" pp_action phi1 Uuseg_string.pp_utf_8 "∘" pp_action phi0
