@@ -9,7 +9,7 @@ let pp ih fmt {atoms; node} =
     let pp_sep fmt () = Format.fprintf fmt " " in
     Format.pp_print_list ~pp_sep Name.pp fmt (Bwd.to_list atoms)
   in
-  Format.fprintf fmt "<%a> %a"
+  Format.fprintf fmt "@[<hv1><%a>@ %a@]"
     pp_atoms atoms
     ih node
 
