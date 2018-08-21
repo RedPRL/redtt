@@ -32,7 +32,13 @@ and pp_env fmt env =
 and pp_con fmt : con -> unit =
   function
   | Up up ->
-    Format.fprintf fmt "@[<hv1>(up@ %a@ %a@ [%a])@]" pp_value up.ty pp_neu up.neu pp_val_sys up.sys
+    begin
+      match up.sys with
+      | [] ->
+        Format.fprintf fmt "@[<hv1>(up@ %a@ %a)@]" pp_value up.ty pp_neu up.neu
+      | _ ->
+        Format.fprintf fmt "@[<hv1>(up@ %a@ %a@ %a)@]" pp_value up.ty pp_neu up.neu pp_val_sys up.sys
+    end
   | Lam clo ->
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
   | ExtLam abs ->
@@ -65,8 +71,9 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(hcom %a %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
   | GHCom _ ->
     Format.fprintf fmt "<ghcom>"
-  | FHCom _ ->
-    Format.fprintf fmt "<fhcom>"
+  | FHCom info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(fhcom %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.cap pp_comp_sys info.sys
   | Box info ->
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(box %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.cap pp_val_sys info.sys
@@ -108,7 +115,7 @@ and pp_value fmt value =
   if node.action = I.idn then
     pp_con fmt node.con
   else
-    Format.fprintf fmt "@[<hv1>@[<hv1>(%a)@]<%a>@]"
+    Format.fprintf fmt "@[<hv1>@[<hv1>%a@]@[<hv1><%a>@]@]"
       pp_con node.con I.pp_action node.action
 
 
@@ -160,11 +167,11 @@ and pp_comp_face : type x. _ -> (x, abs) face -> unit =
 
 and pp_clo fmt (Clo clo) =
   let Tm.B (_, tm) = clo.bnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
+  Format.fprintf fmt "@[<hv1>(clo@ %a@ <:@ %a)@]" Tm.pp0 tm pp_env clo.rho
 
 and pp_nclo fmt (NClo clo) =
   let Tm.NB (_, tm) = clo.nbnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
+  Format.fprintf fmt "@[<hv1>(clo@ %a@ <:@ %a)@]" Tm.pp0 tm pp_env clo.rho
 
 and pp_neu fmt neu =
   match neu with
@@ -197,10 +204,10 @@ and pp_neu fmt neu =
     Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
 
   | Car neu ->
-    Format.fprintf fmt "@[<1>(car %a)@]" pp_neu neu
+    Format.fprintf fmt "@[<hv1>(car@ %a)@]" pp_neu neu
 
   | Cdr neu ->
-    Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
+    Format.fprintf fmt "@[<hv1>(cdr@ %a)@]" pp_neu neu
 
   | Var {name; _} ->
     Name.pp fmt name
@@ -265,9 +272,40 @@ struct
   type 'a m = 'a
   type t = value
 
-  let act : I.action -> value -> value =
+  exception Unstable
+
+  let rec act : I.action -> value -> value =
     fun phi (Node node) ->
-      Node {node with action = I.cmp phi node.action}
+      try
+        if node.action = I.idn then
+          match node.con with
+          | (Data _ | Univ _) -> Node node
+          | Up {ty; neu; sys = []} ->
+            begin
+              make @@ Up {ty = act phi ty; neu = act_neu phi neu; sys = []}
+            end
+          | _ ->
+            Node {node with action = I.cmp phi node.action}
+        else
+          Node {node with action = I.cmp phi node.action}
+      with
+      | _ ->
+        Node {node with action = I.cmp phi node.action}
+
+  and act_neu phi =
+    function
+    | Lvl (nm, lvl) ->
+      Lvl (nm, lvl)
+    | Car neu ->
+      Car (act_neu phi neu)
+    | Cdr neu ->
+      Cdr (act_neu phi neu)
+    | FunApp (neu, nf) ->
+      FunApp (act_neu phi neu, act_nf phi nf)
+    | _ -> raise Unstable
+
+  and act_nf phi nf =
+    {ty = act phi nf.ty; el = act phi nf.el}
 end
 
 exception ProjAbs of abs

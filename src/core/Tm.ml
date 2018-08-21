@@ -854,6 +854,11 @@ and pp_nbnd env fmt nbnd =
     let xs, env' = Pp.Env.bindn env (Bwd.to_list nms) in
     Format.fprintf fmt "@[<hv1>[%a]@ %a@]" pp_strings xs (pp env') tm
 
+and pp_bnd env fmt nbnd =
+  let B (nm, tm) = nbnd in
+  let x, env' = Pp.Env.bind env nm in
+  Format.fprintf fmt "@[<hv1>[%s]@ %a@]" x (pp env') tm
+
 and pp_spine env fmt sp =
   match sp with
   | Emp ->
