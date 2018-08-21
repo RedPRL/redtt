@@ -100,6 +100,25 @@ let trans/sym/r
     ;| k=1 ⇒ λ j → trans/filler A p (symm A p) j i
     ]
 
+let trans/sym/l
+  (A : type)
+  (p : dim → A)
+  : Path (Path _ (p 1) (p 1)) auto (trans _ (symm _ p) p)
+  =
+  λ k i →
+    comp 0 1 (symm/filler A p k i) [
+    | i=0 ⇒ lam j →
+      comp 0 1 (p 1) [
+      | j=0 ⇒ λ l → comp 1 k (p 1) [ l=0 ⇒ λ _ → p 1 | l=1 ⇒ λ m → p m ]
+      | k=0 ⇒ λ l → comp 1 j (p 1) [ l=0 ⇒ λ _ → p 1 | l=1 ⇒ λ m → p m ]
+      | j=1 ⇒ λ _ → p 1
+      | k=1 ⇒ λ _ → p 1
+      ]
+    | i=1 ⇒ λ m → p m
+    | k=0 ⇒ λ m → p m
+    ;| k=1 ⇒ λ j → trans/filler A (symm A p) p j i
+    ]
+
 ; Perhaps we could parallelize this proof? ;)
 let symmd
   (A : dim → type)
