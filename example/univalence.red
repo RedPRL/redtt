@@ -2,12 +2,9 @@ import path
 import ntype
 import equivalence
 import connection
+import retract
 
 ; the code in this file is adapted from yacctt and redprl
-
-let Retract (A,B : type) (f : A → B) (g : B → A) : type =
-  (a : A) →
-    Path A (g (f a)) a
 
 let RetIsContr
   (A,B : type)
@@ -180,7 +177,7 @@ let SigPathToEquiv
 opaque
 let UA/retract
   (A,B : type)
-  : Retract^3 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
+  : Retract^1 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
   =
   λ E →
     EquivLemma _ _ (PathToEquiv _ _ (UA A B E)) E
@@ -188,12 +185,20 @@ let UA/retract
 
 let UA/retract/sig
   (A : type)
-  : Retract^3 _ _ (SigEquivToPath A) (SigPathToEquiv A)
+  : Retract^1 _ _ (SigEquivToPath A) (SigPathToEquiv A)
   =
   λ singl i →
     < singl.0
     , UA/retract A (singl.0) (singl.1) i
     >
+
+let UA/IdEquiv (A : type)
+  : Path^1 (Path^1 type A A) (UA A A (IdEquiv A)) (λ _ → A)
+  =
+  trans^1 (Path^1 type A A)
+    (λ i → UA A A (coe 0 i (IdEquiv A) in λ _ → Equiv A A))
+    (path-retract/preserves/refl^1
+       type Equiv UA PathToEquiv UA/retract A)
 
 opaque
 let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
