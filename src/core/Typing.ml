@@ -605,25 +605,25 @@ and infer_spine cx hd =
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
            the constructor, and should therefore begin with the *empty* environment. *)
-        let rec build_cx cx ty_env (nms, cvs, rvs, ihvs, rs) const_specs rec_specs dim_specs =
+        let rec build_cx cx ty_env benv (nms, cvs, rvs, ihvs, rs) const_specs rec_specs dim_specs =
           match const_specs, rec_specs, dim_specs with
           | (plbl, pty) :: const_specs, _, _ ->
             let vty = V.eval ty_env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (D.Env.snoc ty_env @@ `Val v) (nms #< (Some plbl), cvs #< v, rvs, ihvs, rs) const_specs rec_specs dim_specs
+            build_cx cx' (D.Env.snoc ty_env @@ `Val v) (D.Env.snoc benv @@ `Val v) (nms #< (Some plbl), cvs #< v, rvs, ihvs, rs) const_specs rec_specs dim_specs
           | [], (nm, Self) :: rec_specs, _ ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
             let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih ty_env (nms #< (Some nm) #< None, cvs, rvs #< v_x, ihvs #< v_ih, rs) const_specs rec_specs dim_specs
+            build_cx cx_ih ty_env (D.Env.snoc benv @@ `Val v_x) (nms #< (Some nm) #< None, cvs, rvs #< v_x, ihvs #< v_ih, rs) const_specs rec_specs dim_specs
           | [], [], nm :: dim_specs ->
             let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
-            build_cx cx' ty_env (nms #< (Some nm), cvs, rvs, ihvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
+            build_cx cx' ty_env (D.Env.snoc benv @@ `Dim (`Atom x)) (nms #< (Some nm), cvs, rvs, ihvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
           | [], [], [] ->
-            cx, nms, Bwd.to_list cvs, Bwd.to_list rvs, ihvs, Bwd.to_list rs
+            cx, benv, nms, Bwd.to_list cvs, Bwd.to_list rvs, ihvs, Bwd.to_list rs
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', nms, cvs, rvs, ihvs, rs = build_cx cx D.Env.emp (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
+        let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx D.Env.emp D.Env.emp (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 
@@ -631,7 +631,15 @@ and infer_spine cx hd =
           function
           | B.Intro intro as bterm ->
             let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) nclos in
-            let rargs = List.map (fun bt -> `Val (image_of_bterm phi bt)) intro.rec_args in
+            let rargs =
+              List.flatten @@
+              List.map
+                (fun bt ->
+                   let el = `Val (V.eval_bterm info.dlbl desc benv bterm) in
+                   let ih = `Val (image_of_bterm phi bt) in
+                   [el; ih])
+                intro.rec_args
+            in
             let cargs = List.map (fun t -> `Val (D.Value.act phi @@ Cx.eval cx' t)) intro.const_args in
             let dims = List.map (fun t -> `Dim (I.act phi @@ Cx.eval_dim cx' t)) intro.rs in (* is this right ? *)
             let cells = cargs @ rargs @ dims in
