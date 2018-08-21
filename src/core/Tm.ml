@@ -873,8 +873,18 @@ and pp_frame env fmt =
     Format.fprintf fmt "car"
   | Cdr ->
     Format.fprintf fmt "cdr"
-  | _ ->
-    Format.fprintf fmt "<frame>"
+  | VProj _ ->
+    Format.fprintf fmt "<vproj>"
+  | Cap _ ->
+    Format.fprintf fmt "<cap>"
+  | LblCall ->
+    Format.fprintf fmt "lblcall"
+  | CoRForce ->
+    Format.fprintf fmt "corforce"
+  | Prev _ ->
+    Format.fprintf fmt "<prev>"
+  | Elim _ ->
+    Format.fprintf fmt "<elim>"
 
 and pp_lbl_args env fmt args =
   let pp_sep fmt () = Format.fprintf fmt " " in
