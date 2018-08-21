@@ -272,9 +272,40 @@ struct
   type 'a m = 'a
   type t = value
 
-  let act : I.action -> value -> value =
+  exception Unstable
+
+  let rec act : I.action -> value -> value =
     fun phi (Node node) ->
-      Node {node with action = I.cmp phi node.action}
+      try
+        if node.action = I.idn then
+          match node.con with
+          | (Data _ | Univ _) -> Node node
+          | Up {ty; neu; sys = []} ->
+            begin
+              make @@ Up {ty = act phi ty; neu = act_neu phi neu; sys = []}
+            end
+          | _ ->
+            Node {node with action = I.cmp phi node.action}
+        else
+          Node {node with action = I.cmp phi node.action}
+      with
+      | _ ->
+        Node {node with action = I.cmp phi node.action}
+
+  and act_neu phi =
+    function
+    | Lvl (nm, lvl) ->
+      Lvl (nm, lvl)
+    | Car neu ->
+      Car (act_neu phi neu)
+    | Cdr neu ->
+      Cdr (act_neu phi neu)
+    | FunApp (neu, nf) ->
+      FunApp (act_neu phi neu, act_nf phi nf)
+    | _ -> raise Unstable
+
+  and act_nf phi nf =
+    {ty = act phi nf.ty; el = act phi nf.el}
 end
 
 exception ProjAbs of abs
