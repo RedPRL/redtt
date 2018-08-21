@@ -30,13 +30,12 @@ let pf (pA : ptype) : pequiv^1 (p→ pbool pA) pA =
             | ff ⇒ pA.1
             ]
     , λ i → pA.1 > in
-  let bwdfwd : (f : pmap pbool pA) → Path _ (bwd (fwd.0 f)) f = λ f i → 
-    ?{
-       <λ b → elim b [
-                     | tt ⇒ f.0 tt
-                     | ff ⇒ symm _ (f.1) i
-                     ]
-       ,λ j → ?cfhm>
-     }
+  let bwdfwd : (f : pmap pbool pA) → Path _ (bwd (fwd.0 f)) f = λ f i →
+       < λ b → elim b [
+                      | tt ⇒ f.0 tt
+                      | ff ⇒ symm _ (f.1) i
+                      ]
+       , λ j → comp 0 i (f.1) [j=0 => symm _ (f.1) | j=1 => auto]
+       >
   in
   <fwd,(Iso/Equiv^1 _ _ <fwd.0,bwd,λ a i → a,bwdfwd>).1>
