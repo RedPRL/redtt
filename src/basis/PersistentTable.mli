@@ -7,7 +7,7 @@ sig
   val init : size:int -> ('k, 'a) t
   val get : 'k -> ('k, 'a) t -> 'a
   val set : 'k -> 'a -> ('k, 'a) t -> ('k, 'a) t
-  val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
+  val delete : 'k -> ('k, 'a) t -> ('k, 'a) t
 
   val find : 'k -> ('k, 'a) t -> 'a option
 end
