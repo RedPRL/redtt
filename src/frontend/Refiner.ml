@@ -451,20 +451,20 @@ let tac_guess tac : chk_tac =
     M.lift C.ask >>= fun psi ->
     M.lift @@ U.push_guess psi ~ty0:rty ~ty1:goal.ty tm
 
-let tac_auto =
-  tac_fix @@ fun tac_auto ->
+let tac_refl =
+  tac_fix @@ fun tac_refl ->
   normalizing_goal @@ match_goal @@ fun goal ->
   match Tm.unleash goal.ty with
   | Tm.Ext (Tm.NB (nms, _)) ->
     let nms' = Bwd.to_list @@ Bwd.map (function Some nm -> nm | None -> "_") nms in
-    tac_lambda nms' tac_auto
+    tac_lambda nms' tac_refl
 
   | Tm.Pi (dom, Tm.B (nm, _)) ->
     let nms = [match nm with Some nm -> nm | None -> "_"] in
-    tac_lambda nms tac_auto
+    tac_lambda nms tac_refl
 
   | Tm.Sg (_, _) ->
-    tac_pair tac_auto tac_auto
+    tac_pair tac_refl tac_refl
 
   | _ ->
     tac_hope

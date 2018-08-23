@@ -16,7 +16,7 @@ let loopn (n : int) : Path s1 base base =
   elim n [
   | pos n ⇒
     elim n [
-    | zero ⇒ auto
+    | zero ⇒ refl
     | suc (n ⇒ loopn) ⇒ trans s1 loopn (λ i → loop i)
     ]
   | negsuc n ⇒
@@ -33,12 +33,12 @@ let winding-loopn (n : int) : Path int (winding (loopn n)) n =
   elim n [
   | pos n ⇒
     elim n [
-    | zero ⇒ auto
+    | zero ⇒ refl
     | suc (n ⇒ loopn) ⇒ λ i → isuc (loopn i)
     ]
   | negsuc n ⇒
     elim n [
-    | zero ⇒ auto
+    | zero ⇒ refl
     | suc (n ⇒ loopn) ⇒ λ i → pred (loopn i)
     ]
   ]

@@ -42,7 +42,7 @@ let symm/filler
   =
   comp 0 j (p 0) [
   | i=0 ⇒ p
-  | i=1 ⇒ auto
+  | i=1 ⇒ refl
   ]
 
 let symm
@@ -55,7 +55,7 @@ let symm
 let symm/unit
   (A : type)
   (a : A)
-  : Path (Path _ a a) auto (symm _ (λ _ → a))
+  : Path (Path _ a a) refl (symm _ (λ _ → a))
   =
   symm/filler _ (λ _ → a)
 
@@ -67,7 +67,7 @@ let trans/filler
   : A
   =
   comp 0 j (p i) [
-  | i=0 ⇒ auto
+  | i=0 ⇒ refl
   | i=1 ⇒ q
   ]
 
@@ -90,11 +90,11 @@ let trans/unit/r
 let trans/sym/r
   (A : type)
   (p : dim → A)
-  : Path (Path _ (p 0) (p 0)) auto (trans _ p (symm _ p))
+  : Path (Path _ (p 0) (p 0)) refl (trans _ p (symm _ p))
   =
   λ k i →
     comp 0 1 (p i) [
-    | i=0 ⇒ auto
+    | i=0 ⇒ refl
     | i=1 ⇒ symm A p
     | k=0 ⇒ symm/filler A p i
     ;| k=1 ⇒ λ j → trans/filler A p (symm A p) j i
@@ -109,5 +109,5 @@ let symmd
   λ i →
     comp 0 1 (p 0) in (λ j → symm/filler^1 _ A j i) [
     | i=0 ⇒ p
-    | i=1 ⇒ auto
+    | i=1 ⇒ refl
     ]

@@ -409,8 +409,8 @@ struct
       | _, _, E.Hope ->
         tac_hope goal
 
-      | _, _, E.Auto ->
-        tac_auto goal
+      | _, _, E.Refl ->
+        tac_refl goal
 
       | _, _, E.Let info ->
         let itac =
