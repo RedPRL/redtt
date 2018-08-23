@@ -381,7 +381,7 @@ struct
       | _ ->
         failwith "equate_constr_args"
     in
-    go Emp D.Env.emp constr.const_specs els0 els1
+    go Emp empty_env constr.const_specs els0 els1
 
   and equate_constr_rec_args env dlbl constr els0 els1 =
     let open Desc in
@@ -523,12 +523,12 @@ struct
               | [], [], [] ->
                 qenv, Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env D.Env.emp (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
+            build_cx env empty_env (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
           in
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
           let bdy1 = inst_nclo clause1 cells in
-          let intro = make_intro D.Env.emp ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
+          let intro = make_intro empty_env ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           let nms = Bwd.from_list @@ ListUtil.tabulate (List.length cells) @@ fun _ -> None in
