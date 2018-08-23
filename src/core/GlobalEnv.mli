@@ -22,6 +22,9 @@ val kill_from_tick : t -> Name.t -> t
 val declare_datatype : Desc.data_label -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc -> t -> t
 val lookup_datatype : Desc.data_label -> t -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
 
+module T : module type of (Map.Make (Name))
+
+val global_dims : t -> I.t T.t
 
 
 val lookup_ty : t -> Name.t -> Tm.twin -> Tm.tm

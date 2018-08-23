@@ -170,6 +170,8 @@ module M (Sig : Sig) : S with module Sig = Sig =
 struct
   module Sig = Sig
 
+  let empty_env = Env.emp Sig.global_dims
+
   let make_closure rho bnd =
     Clo {bnd; rho}
 
@@ -192,10 +194,11 @@ struct
           end
 
         | Tm.Var info ->
-          I.act rho.global @@ Sig.global_dim info.name
-
-        | Tm.Meta meta ->
-          I.act rho.global @@ Sig.global_dim meta.name
+          begin
+            match DimEnv.find_opt info.name rho.global with
+            | Some r -> r
+            | None -> `Atom info.name
+          end
 
         | Tm.DownX r ->
           eval_dim rho r
@@ -564,7 +567,7 @@ struct
     let r, r' = Dir.unleash dir in
 
     let make_const_args dir =
-      multi_coe Env.emp dir (x, constr.const_specs) const_args
+      multi_coe empty_env dir (x, constr.const_specs) const_args
     in
 
     let coe_rec_arg dir _arg_spec arg =
@@ -575,7 +578,7 @@ struct
 
     let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.rec_specs rec_args in
     let intro =
-      make_intro Env.emp ~dlbl ~clbl
+      make_intro empty_env ~dlbl ~clbl
         ~const_args:(make_const_args (`Ok dir))
         ~rec_args:(make_rec_args (`Ok dir))
         ~rs
@@ -588,7 +591,7 @@ struct
       | _ ->
         (* My lord, I have no idea if this is right. ouch!! *)
         let faces =
-          eval_bterm_boundary dlbl desc Env.emp
+          eval_bterm_boundary dlbl desc empty_env
             ~const_args:(make_const_args @@ Dir.make r (`Atom x))
             ~rec_args:(make_rec_args @@ Dir.make r (`Atom x))
             ~rs
@@ -859,7 +862,7 @@ struct
            * type in the semantic domain. *)
           let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.ix i in
-            let env = Env.append Env.emp [`Val b; `Val (car (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
+            let env = Env.append empty_env [`Val b; `Val (car (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
             eval env @@ Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
           in
           (* This is to generate the element in `ty0` and also
@@ -2322,7 +2325,7 @@ struct
   module Macro =
   struct
     let equiv ty0 ty1 : value =
-      let rho = Env.append Env.emp [`Val ty1; `Val ty0] in
+      let rho = Env.append empty_env [`Val ty1; `Val ty0] in
       eval rho @@
       Tm.equiv
         (Tm.up @@ Tm.ix 0)
