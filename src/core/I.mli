@@ -14,7 +14,13 @@ val bind : 'a f -> ('a -> 'b f) -> 'b f
 
 type t = atom f
 
-type action
+
+type action =
+  | Subst of t * atom
+  | Swap of atom * atom
+  | Idn
+  | Cmp of action * action
+
 val idn : action
 val swap : atom -> atom -> action
 val subst : t -> atom -> action
