@@ -1301,7 +1301,7 @@ struct
           let face =
             Face.map @@ fun si s'i abs ->
             let phi = I.equate si s'i in
-            Abs.make1 @@ fun y ->
+            Abs.make1' "rigid_hcom/fhcom/si_faces" @@ fun y ->
             (* this is not the most efficient code, but maybe we can afford this? *)
             cap_aux phi @@ hcom_template phi (`Atom y) (Value.act phi (Abs.inst1 abs s'))
           in
@@ -1309,7 +1309,7 @@ struct
         in
         let diag =
           AbsFace.make_from_dir I.idn fhcom.dir @@ fun phi ->
-          Abs.make1 @@ fun y -> hcom_template phi (`Atom y) (Value.act phi fhcom.cap)
+          Abs.make1' "rigid_hcom/fhcom/diag" @@ fun y -> hcom_template phi (`Atom y) (Value.act phi fhcom.cap)
         in
         Option.filter_map force_abs_face [diag] @ (ri_faces @ si_faces)
       in
@@ -1331,13 +1331,13 @@ struct
         let hcom phi x_dest ty = make_hcom (Dir.make (I.act phi r) x_dest) ty (Value.act phi cap) (CompSys.act phi sys) in
         let face0 =
           AbsFace.gen_const I.idn x `Dim0 @@ fun phi ->
-          Abs.make1 @@ fun y ->
+          Abs.make1' "rigid_hcom/v/face0" @@ fun y ->
           apply (car (Value.act phi equiv)) @@
           hcom phi (`Atom y) ty0 (* ty0 is already under `phi0` *)
         in
         let face1 =
           AbsFace.gen_const I.idn x `Dim1 @@ fun phi ->
-          Abs.make1 @@ fun y ->
+          Abs.make1' "rigid_hcom/v/face1" @@ fun y ->
           hcom phi (`Atom y) (Value.act phi ty1)
         in
         let el1_cap = rigid_vproj x ~ty0 ~ty1 ~equiv ~el:cap in
@@ -1387,7 +1387,7 @@ struct
               let ghcom00 = AbsFace.make phi r'i dim0 @@ fun phi -> Abs.act phi @@ Lazy.force absi in
               let ghcom01 =
                 AbsFace.make phi r'i dim1 @@ fun phi ->
-                Abs.make1 @@ fun y ->
+                Abs.make1' "rigid_ghcom/negative/ghcom01" @@ fun y ->
                 (* TODO this can be optimized further by expanding
                  * `make_ghcom` because `ty` is not changed and
                  * in degenerate cases there is redundant renaming. *)
@@ -1399,7 +1399,7 @@ struct
               match force_abs_sys [ghcom00; ghcom01] with
               | `Proj abs -> abs
               | `Ok faces ->
-                Abs.make1 @@ fun y ->
+                Abs.make1' "rigid_ghcom/negative" @@ fun y ->
                 make_hcom (Dir.make (I.act phi r) (`Atom y)) (Value.act phi ty) (Value.act phi cap) (`Ok (faces @ rest))
           in
           let face0 = face (`Dim0, `Dim1) in
@@ -2079,7 +2079,7 @@ struct
         | `Ok boundary_sys ->
           let cap = ext_apply info.cap ss in
           let correction_sys =
-            let face = Face.map @@ fun _ _ v -> Abs.make1 @@ fun _ -> v in
+            let face = Face.map @@ fun _ _ v -> Abs.make1' "ext_apply/hcom" @@ fun _ -> v in
             List.map face boundary_sys
           in
           let comp_sys =

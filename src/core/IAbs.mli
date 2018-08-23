@@ -28,6 +28,7 @@ sig
   val inst1 : t -> I.t -> el
 
   val make1 : (atom -> el) -> t
+  val make1' : string -> (atom -> el) -> t
 end
 
 module M (X : Sort.S with type 'a m = 'a) : S with type el = X.t
