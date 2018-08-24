@@ -1,7 +1,6 @@
 ; this file contains a direct proof of univalence
 import equivalence
 import connection
-import connection
 
 let IdEquiv/connection (B : type) : Equiv B B =
   < λ b → b
