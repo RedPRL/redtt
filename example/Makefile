@@ -12,3 +12,4 @@ all:
 	${DUNE} exec -- redtt load-file isotoequiv.red
 	${DUNE} exec -- redtt load-file invariance.red
 	${DUNE} exec -- redtt load-file univalence.red
+	${DUNE} exec -- redtt load-file univalence-direct.red
