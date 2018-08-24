@@ -35,9 +35,9 @@ let path-retract/preserves/refl (A : type) (R : A → A → type)
     =
     λ i j →
       comp 0 1 (cap1 i j) [
-      | j=0 ⇒ auto
-      | j=1 ⇒ auto
-      | i=0 ⇒ auto
+      | j=0 ⇒ refl
+      | j=1 ⇒ refl
+      | i=0 ⇒ refl
       | i=1 ⇒ λ k → s x x (α x x (r x x (λ _ → x)) k) j
       ]
   in

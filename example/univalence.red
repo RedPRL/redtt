@@ -18,20 +18,20 @@ let RetIsContr
     λ a i →
       comp 0 1 (g (c.1 (f a) i)) [
       | i=0 ⇒ h a
-      | i=1 ⇒ auto
+      | i=1 ⇒ refl
       ]
   >
 
 let IdEquiv (A : type) : Equiv A A =
   < λ a → a
   , λ a →
-    < <a, auto>
+    < <a, refl>
     , λ p i →
       let aux : dim → A =
         λ j →
         comp 1 j a [
         | i=0 ⇒ p.1
-        | i=1 ⇒ auto
+        | i=1 ⇒ refl
         ]
       in
       <aux 0, aux>
@@ -94,7 +94,7 @@ let PropIsContr (A : type) : IsProp (IsContr A) =
     let A/prop : IsProp A =
       λ a b i →
         comp 1 0 (contr.1 a i) [
-        | i=0 ⇒ auto
+        | i=0 ⇒ refl
         | i=1 ⇒ contr.1 b
         ]
     in
@@ -154,7 +154,7 @@ let UA/beta
   : Path _ (coe 0 1 a in UA _ _ E) (E.0 a)
   =
   λ i →
-    coe i 1 (E.0 a) in auto
+    coe i 1 (E.0 a) in refl
 
 let SigEquivToPath
   (A : type)
@@ -206,12 +206,12 @@ let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
   , λ X i →
     < comp 0 1 A [
       | i=0 ⇒ X.1
-      | i=1 ⇒ auto
+      | i=1 ⇒ refl
       ]
     , λ j →
       comp 0 j A [
       | i=0 ⇒ X.1
-      | i=1 ⇒ auto
+      | i=1 ⇒ refl
       ]
     >
   >
@@ -233,7 +233,7 @@ let univalence (A : type) : IsContr^1 ((B : type) × Equiv A B) =
 let IdEquiv/connection (B : type) : Equiv B B =
   < λ b → b
   , λ b →
-    < <b, auto>
+    < <b, refl>
     , λ v i → <v.1 i, λ j → connection/or B (v.1) i j>
     >
   >
@@ -250,7 +250,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
              λ j →
                comp 1 j b [
                | i=0 ⇒ w .1 .1 b .0 .1
-               | i=1 ⇒ auto
+               | i=1 ⇒ refl
                ]
            in
            let ctr : Fiber VB B proj/B b =

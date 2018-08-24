@@ -21,7 +21,7 @@ let t2c (t : torus) : s1 × s1 =
   | pt ⇒ <base, base>
   | p/one i ⇒ <loop i, base>
   | p/two i ⇒ <base, loop i>
-  | square i j ⇒ auto
+  | square i j ⇒ refl
   ]
 
 let c2t/base (c : s1) : torus =
@@ -52,10 +52,10 @@ let c2t (cs : s1 × s1) : torus =
 
 let t2c2t (t : torus) : Path torus (c2t (t2c t)) t =
   elim t [
-  | pt ⇒ auto
-  | p/one i ⇒ auto
-  | p/two i ⇒ auto
-  | square i j ⇒ auto
+  | pt ⇒ refl
+  | p/one i ⇒ refl
+  | p/two i ⇒ refl
+  | square i j ⇒ refl
   ]
 
 
@@ -63,14 +63,14 @@ let c2t2c/transpose (c0 : s1) : (c1 : s1) → Path (s1 × s1) (t2c (c2t/transpos
   elim c0
   [ base ⇒ λ c1 →
     elim c1
-    [ base ⇒ auto
-    | loop j ⇒ auto
+    [ base ⇒ refl
+    | loop j ⇒ refl
     ]
 
   | loop i ⇒ λ c1 →
     elim c1
-    [ base ⇒ auto
-    | loop j ⇒ auto
+    [ base ⇒ refl
+    | loop j ⇒ refl
     ]
   ]
 
