@@ -15,6 +15,6 @@ let not∘not (x : bool) : _ =
 
 let not∘not/id/pt (x : bool) : Path _ (not∘not x) x =
   elim x [
-  | tt ⇒ auto
-  | ff ⇒ auto
+  | tt ⇒ refl
+  | ff ⇒ refl
   ]
