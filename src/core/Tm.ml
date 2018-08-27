@@ -864,7 +864,7 @@ and pp_spine env fmt sp =
   | Emp ->
     Format.fprintf fmt "[]"
   | Snoc (sp, f) ->
-    Format.fprintf fmt "%a; %a"
+    Format.fprintf fmt "%a. %a"
       (pp_spine env) sp
       (pp_frame env) f
 
@@ -878,6 +878,11 @@ and pp_frame env fmt =
     Format.fprintf fmt "car"
   | Cdr ->
     Format.fprintf fmt "cdr"
+  | Elim info ->
+    Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a)@]"
+      Desc.pp_data_label info.dlbl
+      (pp_bnd env) info.mot
+      (pp_elim_clauses env) info.clauses
   | _ ->
     Format.fprintf fmt "<frame>"
 
