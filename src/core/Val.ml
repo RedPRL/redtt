@@ -2292,7 +2292,26 @@ struct
         let phi = I.equate r r' in
         vproj phi (I.act phi @@ `Atom x) ~ty0:(fun phi0 -> Value.act phi0 ty0) ~ty1:(Value.act phi ty1) ~equiv:(fun phi0 -> Value.act phi0 equiv) ~el:a
       in
-      let vproj_sys = List.map vproj_face up.sys in
+      let faces01 =
+        let face0 =
+          let xi = Eq.gen_const x `Dim0 in
+          let phi = I.equate (`Atom x) `Dim0 in
+          let body =
+            lazy begin
+              let func = car (Value.act phi equiv) in
+              apply func el
+            end
+          in
+          Face.Indet (xi, body)
+        in
+        let face1 =
+          let xi = Eq.gen_const x `Dim0 in
+          let phi = I.equate (`Atom x) `Dim0 in
+          Face.Indet (xi, lazy begin Value.act phi el end)
+        in
+        [face0; face1]
+      in
+      let vproj_sys = faces01 @ List.map vproj_face up.sys in
       make @@ Up {ty = ty1; neu; sys = vproj_sys}
     | _ ->
       let err = RigidVProjUnexpectedArgument el in
