@@ -403,6 +403,17 @@ struct
           raise @@ E InternalMortalityError
       end
 
+    | NCoe info ->
+      begin
+        match Dir.act phi info.dir with
+        | `Ok dir ->
+          let abs = Abs.act phi info.abs in
+          let neu = act_neu' phi info.neu in
+          NCoe {dir; abs; neu}
+        | _ ->
+          raise @@ E InternalMortalityError
+      end
+
     | NCoeAtType info ->
       begin
         match Dir.act phi info.dir with
@@ -483,8 +494,17 @@ struct
       let clo = Clo.act phi clo in
       Fix (tick, ty, clo)
 
-    | _ ->
-      failwith "TODO"
+    | FixLine (x, tick, ty, clo) ->
+      begin
+        match I.act phi (`Atom x) with
+        | `Atom y ->
+          let ty = Value.act phi ty in
+          let clo = Clo.act phi clo in
+          FixLine (y, tick, ty, clo)
+        | _ ->
+          raise @@ E InternalMortalityError
+      end
+
 
   and act_neu phi con =
     match con with
