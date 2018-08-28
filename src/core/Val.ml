@@ -378,6 +378,45 @@ struct
           v
       end
 
+  and act_neu' phi =
+    function
+    | NHComAtType info ->
+      begin
+        match Dir.act phi info.dir, CompSys.act phi info.sys with
+        | `Ok dir, `Ok sys ->
+          let univ = Value.act phi info.univ in
+          let cap = Value.act phi info.cap in
+          let ty = act_neu' phi info.ty in
+          NHComAtType {dir; univ; ty; cap; sys}
+        | _ ->
+          raise @@ E InternalMortalityError
+      end
+
+    | NHComAtCap info ->
+      begin
+        match Dir.act phi info.dir, CompSys.act phi info.sys with
+        | `Ok dir, `Ok sys ->
+          let ty = Value.act phi info.ty in
+          let cap = act_neu' phi info.cap in
+          NHComAtCap {dir; ty; cap; sys}
+        | _ ->
+          raise @@ E InternalMortalityError
+      end
+
+    | NCoeAtType info ->
+      begin
+        match Dir.act phi info.dir with
+        | `Ok dir ->
+          let abs = Abs.act phi info.abs in
+          let el = Value.act phi info.el in
+          NCoeAtType {dir; abs; el}
+        | _ ->
+          raise @@ E InternalMortalityError
+      end
+
+    | _ ->
+      failwith "TODO"
+
   and act_neu phi con =
     match con with
     | NHComAtType info ->
