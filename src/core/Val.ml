@@ -427,6 +427,62 @@ struct
           raise @@ E InternalMortalityError
       end
 
+    | Cap info ->
+      begin
+        match Dir.act phi info.dir, CompSys.act phi info.sys with
+        | `Ok dir, `Ok sys ->
+          let ty = Value.act phi info.ty in
+          let neu = act_neu' phi info.neu in
+          Cap {dir; ty; neu; sys}
+        | _ ->
+          raise @@ E InternalMortalityError
+      end
+
+    | ExtApp (neu, rs) ->
+      let neu = act_neu' phi neu in
+      let rs = List.map (I.act phi) rs in
+      ExtApp (neu, rs)
+
+    | FunApp (neu, arg) ->
+      let neu = act_neu' phi neu in
+      let arg = act_nf phi arg in
+      FunApp (neu, arg)
+
+    | Car neu ->
+      let neu = act_neu' phi neu in
+      Car neu
+
+    | Cdr neu ->
+      let neu = act_neu' phi neu in
+      Cdr neu
+
+    | Elim info ->
+      let mot = Clo.act phi info.mot in
+      let go (lbl, nclo) = lbl, NClo.act phi nclo in
+      let clauses = List.map go info.clauses in
+      let neu = act_neu' phi info.neu in
+      Elim {dlbl = info.dlbl; mot; neu; clauses}
+
+    | LblCall neu ->
+      let neu = act_neu' phi neu in
+      LblCall neu
+
+    | CoRForce neu ->
+      let neu = act_neu' phi neu in
+      CoRForce neu
+
+    | (Lvl _ | Var _ | Meta _) as neu ->
+      neu
+
+    | Prev (tick, neu) ->
+      let neu = act_neu' phi neu in
+      Prev (tick, neu)
+
+    | Fix (tick, ty, clo) ->
+      let ty = Value.act phi ty in
+      let clo = Clo.act phi clo in
+      Fix (tick, ty, clo)
+
     | _ ->
       failwith "TODO"
 
