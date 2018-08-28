@@ -2285,7 +2285,36 @@ struct
         match tick with
         | TickGen gen ->
           let neu = FixLine (dfix.x, gen, dfix.ty, dfix.clo) in
-          make @@ Up {ty = dfix.ty; neu; sys = []}
+          let sys =
+            let face0 =
+              let xi = Eq.gen_const dfix.x `Dim0 in
+              let phi = I.equate (`Atom dfix.x) `Dim0 in
+              let body =
+                lazy begin
+                  let ty = Value.act phi dfix.ty in
+                  let clo = Clo.act phi dfix.clo in
+                  let neu = Fix (gen, ty, clo) in
+                  (* check that this is right?? *)
+                  reflect ty neu []
+                end
+              in
+              Face.Indet (xi, body)
+            in
+            let face1 =
+              let xi = Eq.gen_const dfix.x `Dim1 in
+              let phi = I.equate (`Atom dfix.x) `Dim1 in
+              let body =
+                lazy begin
+                  let ty = Value.act phi dfix.ty in
+                  let clo = Clo.act phi dfix.clo in
+                  inst_clo clo @@ make @@ DFix {ty; clo}
+                end
+              in
+              Face.Indet (xi, body)
+            in
+            [face0; face1]
+          in
+          make @@ Up {ty = dfix.ty; neu; sys}
       end
 
     | Up info ->
