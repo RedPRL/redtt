@@ -320,7 +320,7 @@ struct
       make @@ Cons (Value.act phi v0, Value.act phi v1)
 
     | LblTy {lbl; ty; args} ->
-      make @@ LblTy {lbl; ty = Value.act phi ty; args = List.map (act_nf phi) args}
+      make @@ LblTy {lbl; ty = Value.act phi ty; args = List.map (Nf.act phi) args}
 
     | LblRet v ->
       make @@ LblRet (Value.act phi v)
@@ -332,7 +332,7 @@ struct
         | `Proj v -> v
         | `Ok sys ->
           let ty = Value.act phi info.ty in
-          let neu = act_neu phi info.neu in
+          let neu = Neu.act phi info.neu in
           make @@ Up {ty; neu; sys}
       end
 
@@ -367,141 +367,6 @@ struct
         | `Proj v ->
           v
       end
-
-  and act_neu phi =
-    function
-    | NHComAtType info ->
-      begin
-        match Dir.act phi info.dir, CompSys.act phi info.sys with
-        | `Ok dir, `Ok sys ->
-          let univ = Value.act phi info.univ in
-          let cap = Value.act phi info.cap in
-          let ty = act_neu phi info.ty in
-          NHComAtType {dir; univ; ty; cap; sys}
-        | _ ->
-          raise @@ E InternalMortalityError
-      end
-
-    | NHComAtCap info ->
-      begin
-        match Dir.act phi info.dir, CompSys.act phi info.sys with
-        | `Ok dir, `Ok sys ->
-          let ty = Value.act phi info.ty in
-          let cap = act_neu phi info.cap in
-          NHComAtCap {dir; ty; cap; sys}
-        | _ ->
-          raise @@ E InternalMortalityError
-      end
-
-    | NCoe info ->
-      begin
-        match Dir.act phi info.dir with
-        | `Ok dir ->
-          let abs = Abs.act phi info.abs in
-          let neu = act_neu phi info.neu in
-          NCoe {dir; abs; neu}
-        | _ ->
-          raise @@ E InternalMortalityError
-      end
-
-    | NCoeAtType info ->
-      begin
-        match Dir.act phi info.dir with
-        | `Ok dir ->
-          let abs = Abs.act phi info.abs in
-          let el = Value.act phi info.el in
-          NCoeAtType {dir; abs; el}
-        | _ ->
-          raise @@ E InternalMortalityError
-      end
-
-    | VProj info ->
-      begin
-        match I.act phi @@ `Atom info.x with
-        | `Atom y ->
-          let ty0 = Value.act phi info.ty0 in
-          let ty1 = Value.act phi info.ty1 in
-          let equiv = Value.act phi info.equiv in
-          let neu = act_neu phi info.neu in
-          VProj {x = y; neu; ty0; ty1; equiv}
-        | _ ->
-          raise @@ E InternalMortalityError
-      end
-
-    | Cap info ->
-      begin
-        match Dir.act phi info.dir, CompSys.act phi info.sys with
-        | `Ok dir, `Ok sys ->
-          let ty = Value.act phi info.ty in
-          let neu = act_neu phi info.neu in
-          Cap {dir; ty; neu; sys}
-        | _ ->
-          raise @@ E InternalMortalityError
-      end
-
-    | ExtApp (neu, rs) ->
-      let neu = act_neu phi neu in
-      let rs = List.map (I.act phi) rs in
-      ExtApp (neu, rs)
-
-    | FunApp (neu, arg) ->
-      let neu = act_neu phi neu in
-      let arg = act_nf phi arg in
-      FunApp (neu, arg)
-
-    | Car neu ->
-      let neu = act_neu phi neu in
-      Car neu
-
-    | Cdr neu ->
-      let neu = act_neu phi neu in
-      Cdr neu
-
-    | Elim info ->
-      let mot = Clo.act phi info.mot in
-      let go (lbl, nclo) = lbl, NClo.act phi nclo in
-      let clauses = List.map go info.clauses in
-      let neu = act_neu phi info.neu in
-      Elim {dlbl = info.dlbl; mot; neu; clauses}
-
-    | LblCall neu ->
-      let neu = act_neu phi neu in
-      LblCall neu
-
-    | CoRForce neu ->
-      let neu = act_neu phi neu in
-      CoRForce neu
-
-    | (Lvl _ | Var _ | Meta _) as neu ->
-      neu
-
-    | Prev (tick, neu) ->
-      let neu = act_neu phi neu in
-      Prev (tick, neu)
-
-    | Fix (tick, ty, clo) ->
-      let ty = Value.act phi ty in
-      let clo = Clo.act phi clo in
-      Fix (tick, ty, clo)
-
-    | FixLine (x, tick, ty, clo) ->
-      begin
-        match I.act phi (`Atom x) with
-        | `Atom y ->
-          let ty = Value.act phi ty in
-          let clo = Clo.act phi clo in
-          FixLine (y, tick, ty, clo)
-        | _ ->
-          raise @@ E InternalMortalityError
-      end
-
-
-  and act_nf phi (nf : nf) =
-    match nf with
-    | info ->
-      let ty = Value.act phi info.ty in
-      let el = Value.act phi info.el in
-      {ty; el}
 
   and unleash : value -> con =
     let add_sys sys el=
@@ -685,7 +550,7 @@ struct
         let el =
           lazy begin
             let phi = I.equate r r' in
-            let neu' = act_neu phi neu in
+            let neu' = Neu.act phi neu in
             reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
           end
         in
@@ -1218,7 +1083,7 @@ struct
         let el =
           lazy begin
             let phi = I.equate r r' in
-            let neu' = act_neu phi cap in
+            let neu' = Neu.act phi cap in
             reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
           end
         in
