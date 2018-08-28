@@ -5,13 +5,6 @@ open Domain
 
 include ValSig
 
-type step =
-  | Ret : neu -> step
-  | Step : value -> step
-
-let ret v = Ret v
-let step v = Step v
-
 exception StrictHComEncounteredNonConstructor
 
 
