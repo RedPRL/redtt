@@ -333,17 +333,14 @@ struct
       make @@ LblRet (Value.act phi v)
 
     | Up info ->
-      let ty = Value.act phi info.ty in
       let sys = ValSys.act phi @@ ValSys.from_rigid info.sys in
       begin
         match force_val_sys sys with
         | `Proj v -> v
         | `Ok sys ->
-          match act_neu phi info.neu with
-          | Ret neu ->
-            make @@ Up {ty; neu; sys}
-          | Step v ->
-            v
+          let ty = Value.act phi info.ty in
+          let neu = act_neu' phi info.neu in
+          make @@ Up {ty; neu; sys}
       end
 
     | Later clo ->
@@ -505,184 +502,6 @@ struct
           raise @@ E InternalMortalityError
       end
 
-
-  and act_neu phi con =
-    match con with
-    | NHComAtType info ->
-      let dir = Dir.act phi info.dir in
-      let univ = Value.act phi info.univ in
-      let cap = Value.act phi info.cap in
-      let sys = CompSys.act phi info.sys in
-      let ty =
-        match act_neu phi info.ty with
-        | Ret neu ->
-          reflect univ neu []
-        | Step ty -> ty
-      in
-      step @@ make_hcom dir ty cap sys
-
-    | NHComAtCap info ->
-      let dir = Dir.act phi info.dir in
-      let ty = Value.act phi info.ty in
-      let sys = CompSys.act phi info.sys in
-      let cap =
-        match act_neu phi info.cap with
-        | Ret neu ->
-          reflect ty neu []
-        | Step cap -> cap
-      in
-      step @@ make_hcom dir ty cap sys
-
-    | NCoe info ->
-      let dir = Dir.act phi info.dir in
-      let abs = Abs.act phi info.abs in
-      let el =
-        match act_neu phi info.neu with
-        | Ret neu ->
-          let r =
-            match dir with
-            | `Ok dir -> fst @@ Dir.unleash dir
-            | `Same (r, _) -> r
-          in
-          let tyr = Abs.inst1 abs r in
-          reflect tyr neu []
-        | Step el -> el
-      in
-      step @@ make_coe dir abs el
-
-    | NCoeAtType info ->
-      let dir = Dir.act phi info.dir in
-      let abs = Abs.act phi info.abs in
-      let el = Value.act phi info.el in
-      step @@ make_coe dir abs el
-
-
-    | VProj info ->
-      let mx = I.act phi @@ `Atom info.x in
-      let ty0 phi0 = Value.act phi0 info.ty0 in
-      let ty1 = Value.act phi info.ty1 in
-      let equiv phi0 = Value.act phi0 info.equiv in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          let vty = make_v phi mx ty0 ty1 equiv in
-          let el = make @@ Up {ty = vty; neu = neu; sys = []} in
-          step @@ vproj phi mx ~ty0 ~ty1 ~equiv ~el
-        | Step el ->
-          step @@ vproj phi mx ~ty0 ~ty1 ~equiv ~el
-      end
-
-    | Cap info ->
-      let mdir = Dir.act phi info.dir in
-      let msys = CompSys.act phi info.sys in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          (* this is dumb; should refactor this with `cap`. *)
-          let el = make @@ Up {ty = info.ty; neu; sys = []} in
-          step @@ make_cap mdir info.ty msys el
-        | Step el ->
-          step @@ make_cap mdir info.ty msys el
-      end
-
-    | FunApp (neu, arg) ->
-      let varg = act_nf phi arg in
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ FunApp (neu, varg)
-        | Step v ->
-          let {el; _} = varg in
-          step @@ apply v el
-      end
-
-    | ExtApp (neu, rs) ->
-      let rs = List.map (I.act phi) rs in
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ ExtApp (neu, rs)
-        | Step v ->
-          step @@ ext_apply v rs
-      end
-
-    | Car neu ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ Car neu
-        | Step v ->
-          step @@ car v
-      end
-
-    | Cdr neu ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ Cdr neu
-        | Step v ->
-          step @@ cdr v
-      end
-
-    | Elim info ->
-      let mot = Clo.act phi info.mot in
-      let go (lbl, nclo) = lbl, NClo.act phi nclo in
-      let clauses = List.map go info.clauses in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          ret @@ Elim {info with mot; neu; clauses}
-        | Step v ->
-          step @@ elim_data info.dlbl ~mot ~scrut:v ~clauses
-      end
-
-
-    | LblCall neu ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ LblCall neu
-        | Step v ->
-          step @@ lbl_call v
-      end
-
-    | CoRForce neu ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ CoRForce neu
-        | Step v ->
-          step @@ corestriction_force v
-      end
-
-    | (Lvl _ | Var _ | Meta _) ->
-      ret con
-
-    | Prev (tick, neu) ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ Prev (tick, neu)
-        | Step v ->
-          step @@ prev tick v
-      end
-
-    | Fix (tick, ty, clo) ->
-      ret @@ Fix (tick, Value.act phi ty, Clo.act phi clo)
-
-    | FixLine (x, tick, ty, clo) ->
-      let ty' = Value.act phi ty in
-      let clo' = Clo.act phi clo in
-      begin
-        match I.act phi @@ `Atom x with
-        | `Atom y ->
-          ret @@ FixLine (y, tick, ty', clo')
-        | `Dim0 ->
-          ret @@ Fix (tick, ty', clo')
-        | `Dim1 ->
-          (* TODO: check that this is right *)
-          step @@ inst_clo clo' @@ make @@ DFix {ty = ty'; clo = clo'}
-      end
 
   and act_nf phi (nf : nf) =
     match nf with
@@ -873,10 +692,8 @@ struct
         let el =
           lazy begin
             let phi = I.equate r r' in
-            match act_neu phi neu with
-            | Ret neu' ->
-              reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
-            | Step v -> v
+            let neu' = act_neu' phi neu in
+            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
           end
         in
         [Face.Indet (xi, el)]
@@ -1408,9 +1225,8 @@ struct
         let el =
           lazy begin
             let phi = I.equate r r' in
-            match act_neu phi cap with
-            | Ret neu' -> reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
-            | Step v -> v
+            let neu' = act_neu' phi cap in
+            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
           end
         in
         [Face.Indet (xi, el)]
