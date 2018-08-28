@@ -1237,7 +1237,23 @@ struct
       make_hcom dir_phi ty cap_phi sys_phi
     in
     let ty = reflect univ ty @@ ValSys.from_rigid rst_sys in
-    let rst_sys = List.map (Face.map hcom_face) rst_sys in
+    let r, r' = Dir.unleash dir in
+    let tube_face : ([`Rigid], _) face -> _ face =
+      function
+      | Face.Indet (xi, abs) ->
+        let s, s' = Eq.unleash xi in
+        let phi = I.equate s s' in
+        Face.Indet (xi, lazy begin Abs.inst1 (Lazy.force abs) r' end)
+    in
+    let tube_faces = List.map tube_face comp_sys in
+    let cap_face =
+      match Eq.from_dir dir with
+      | `Ok xi ->
+        [Face.Indet (xi, lazy begin Value.act (I.equate r r') cap end)]
+      | `Apart _ ->
+        []
+    in
+    let rst_sys = cap_face @ tube_faces @ List.map (Face.map hcom_face) rst_sys in
     make @@ Up {ty; neu; sys = rst_sys}
 
   and rigid_nhcom_up_at_cap dir ty cap ~comp_sys ~rst_sys =
@@ -1249,7 +1265,31 @@ struct
       let sys_phi = CompSys.act phi comp_sys in
       make_hcom dir_phi ty_phi el sys_phi
     in
-    let rst_sys = List.map (Face.map hcom_face) rst_sys in
+    let r, r' = Dir.unleash dir in
+    let tube_face : ([`Rigid], _) face -> _ face =
+      function
+      | Face.Indet (xi, abs) ->
+        let s, s' = Eq.unleash xi in
+        let phi = I.equate s s' in
+        Face.Indet (xi, lazy begin Abs.inst1 (Lazy.force abs) r' end)
+    in
+    let tube_faces = List.map tube_face comp_sys in
+    let cap_face =
+      match Eq.from_dir dir with
+      | `Ok xi ->
+        let el =
+          lazy begin
+            let phi = I.equate r r' in
+            match act_neu phi cap with
+            | Ret neu' -> reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+            | Step v -> v
+          end
+        in
+        [Face.Indet (xi, el)]
+      | `Apart _ ->
+        []
+    in
+    let rst_sys = cap_face @ tube_faces @ List.map (Face.map hcom_face) rst_sys in
     make @@ Up {ty; neu; sys = rst_sys}
 
   and rigid_hcom dir ty cap sys : value =
