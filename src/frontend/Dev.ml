@@ -207,7 +207,7 @@ let pp_param_cell fmt (x, param) =
       Tm.pp0 ty
 
   | `Def (ty, tm) ->
-    Format.fprintf fmt "@[<1>%a : %a = %a@]"
+    Format.fprintf fmt "@[<1>%a @[<v>: %a@,= %a@]@]"
       Name.pp x
       Tm.pp0 ty
       Tm.pp0 tm

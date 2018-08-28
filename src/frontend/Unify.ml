@@ -13,6 +13,29 @@ type telescope = params
 
 open Tm.Notation
 
+type error =
+  | SpineMismatch of Tm.tm Tm.spine * Tm.tm Tm.spine
+
+exception E of error
+
+module Error =
+struct
+  let pp fmt =
+    function
+    | SpineMismatch (sp0,sp1) ->
+      Format.fprintf fmt
+        "@[<v>spine mismatch:@,  @[<v>%a@,%a@]@]"
+        (Tm.pp_spine Pp.Env.emp) sp0
+        (Tm.pp_spine Pp.Env.emp) sp1
+
+  let _ =
+    PpExn.install_printer @@ fun fmt ->
+    function
+    | E err ->
+      pp fmt err
+    | _ ->
+      raise PpExn.Unrecognized
+end
 
 let rec telescope ty : telescope * ty =
   match Tm.unleash ty with
@@ -558,7 +581,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       go sp0 sp1
 
     | _ ->
-      failwith "spine mismatch"
+      raise @@ E (SpineMismatch (sp0,sp1))
 
   in
   go sp0 sp1
