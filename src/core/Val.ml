@@ -730,17 +730,33 @@ struct
 
   and rigid_ncoe_up dir abs neu ~rst_sys =
     let ncoe = NCoe {dir; abs; neu} in
-    let ty =
-      let _, r' = Dir.unleash dir in
-      Abs.inst1 abs r'
-    in
+    let r, r' = Dir.unleash dir in
+    let ty = Abs.inst1 abs r' in
     let coe_face s s' el =
       let phi = I.equate s s' in
       let dir_phi = Dir.act phi dir in
       let abs_phi = Abs.act phi abs in
       make_coe dir_phi abs_phi el
     in
-    let ncoe_sys = List.map (Face.map coe_face) rst_sys in
+
+    let rr'_face =
+      match Eq.from_dir dir with
+      | `Ok xi ->
+        let el =
+          lazy begin
+            let phi = I.equate r r' in
+            match act_neu phi neu with
+            | Ret neu' ->
+              reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+            | Step v -> v
+          end
+        in
+        [Face.Indet (xi, el)]
+      | `Apart _ ->
+        []
+    in
+
+    let ncoe_sys = rr'_face @ List.map (Face.map coe_face) rst_sys in
     make @@ Up {ty; neu = ncoe; sys = ncoe_sys}
 
   (* TODO: check that this is right *)
@@ -845,9 +861,16 @@ struct
 
     | Up _ ->
       let neu = NCoeAtType {dir; abs; el} in
-      let _, r' = Dir.unleash dir in
+      let r, r' = Dir.unleash dir in
       let ty_r' = Abs.inst1 abs r' in
-      reflect ty_r' neu []
+      let sys =
+        match Eq.from_dir dir with
+        | `Ok xi ->
+          [Face.Indet (xi, lazy begin Value.act (I.equate r r') el end)]
+        | `Apart _ ->
+          []
+      in
+      reflect ty_r' neu sys
 
     (* TODO: what about neutral element of the universe? is this even correct? *)
     | Univ _ ->
