@@ -414,6 +414,19 @@ struct
           raise @@ E InternalMortalityError
       end
 
+    | VProj info ->
+      begin
+        match I.act phi @@ `Atom info.x with
+        | `Atom y ->
+          let ty0 = Value.act phi info.ty0 in
+          let ty1 = Value.act phi info.ty1 in
+          let equiv = Value.act phi info.equiv in
+          let neu = act_neu' phi info.neu in
+          VProj {x = y; neu; ty0; ty1; equiv}
+        | _ ->
+          raise @@ E InternalMortalityError
+      end
+
     | _ ->
       failwith "TODO"
 
@@ -2536,7 +2549,23 @@ struct
         in
         List.map face info.sys
       in
-      make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
+      let faces =
+        let face : ([`Rigid], _) face -> _ =
+          function
+          | Face.Indet (xi, abs) ->
+            let body =
+              lazy begin
+                let s, s' = Eq.unleash xi in
+                let phi = I.equate s s' in
+                let dir' = Dir.act phi @@ Dir.swap dir in
+                make_coe dir' (Lazy.force abs) @@ Value.act phi el
+              end
+            in
+            Face.Indet (xi, body)
+        in
+        List.map face sys
+      in
+      make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = faces @ cap_sys}
     | _ ->
       raise @@ E (RigidCapUnexpectedArgument el)
 
