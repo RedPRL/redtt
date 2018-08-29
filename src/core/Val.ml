@@ -662,18 +662,28 @@ struct
     | Pi _ | Sg _ | Ext _ | Later _ ->
       make @@ Coe {dir; abs; el}
 
-    | Up _ ->
+    | Up info ->
       let neu = NCoeAtType {dir; abs; el} in
       let r, r' = Dir.unleash dir in
       let ty_r' = Abs.inst1 abs r' in
       let sys =
+      let sys_rr' =
         match Eq.from_dir dir with
         | `Ok xi ->
           [Face.Indet (xi, lazy begin Value.act (I.equate r r') el end)]
         | `Apart _ ->
           []
       in
-      reflect ty_r' neu sys
+      let sys =
+        let face =
+          Face.map @@ fun s s' v ->
+          let phi = I.equate s s' in
+          let abs = Abs.bind1 x v in
+          make_coe (Dir.act phi dir) abs (Value.act phi el)
+        in
+        List.map face info.sys
+      in
+      reflect ty_r' neu @@ sys_rr' @ ValSys.from_rigid sys
 
     (* TODO: what about neutral element of the universe? is this even correct? *)
     | Univ _ ->
