@@ -49,7 +49,7 @@ and pp_con fmt : con -> unit =
   | Ext abs ->
     Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
   | Restrict face ->
-    Format.fprintf fmt "@[<1>(corestrict@ %a)@]" pp_val_face face
+    Format.fprintf fmt "@[<1>(restrict@ %a)@]" pp_val_face face
   | Univ {kind; lvl} ->
     Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
   | Cons (v0, v1) ->
