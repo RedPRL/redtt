@@ -63,8 +63,7 @@ and neu =
   | NHComAtCap of {dir : dir; ty : value; cap : neu; sys : comp_sys}
   | NCoe of {dir : dir; abs : abs; neu : neu}
 
-  | NCoeAtType of {dir : dir; abs : abs; el : value}
-  (** Invariant: [abs] always has a neutral interior *)
+  | NCoeAtType of {dir : dir; abs : neu_abs; el : value}
 
   | FunApp of neu * nf
   | ExtApp of neu * dim list
@@ -114,6 +113,7 @@ and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
 and ext_abs = (value * val_sys) IAbs.abs
+and neu_abs = (neu * val_sys) IAbs.abs
 
 and value = Node of {con : con; action : I.action}
 

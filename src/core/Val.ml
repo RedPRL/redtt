@@ -5,13 +5,6 @@ open Domain
 
 include ValSig
 
-type step =
-  | Ret : neu -> step
-  | Step : value -> step
-
-let ret v = Ret v
-let step v = Step v
-
 exception StrictHComEncounteredNonConstructor
 
 
@@ -327,23 +320,20 @@ struct
       make @@ Cons (Value.act phi v0, Value.act phi v1)
 
     | LblTy {lbl; ty; args} ->
-      make @@ LblTy {lbl; ty = Value.act phi ty; args = List.map (act_nf phi) args}
+      make @@ LblTy {lbl; ty = Value.act phi ty; args = List.map (Nf.act phi) args}
 
     | LblRet v ->
       make @@ LblRet (Value.act phi v)
 
     | Up info ->
-      let ty = Value.act phi info.ty in
       let sys = ValSys.act phi @@ ValSys.from_rigid info.sys in
       begin
         match force_val_sys sys with
         | `Proj v -> v
         | `Ok sys ->
-          match act_neu phi info.neu with
-          | Ret neu ->
-            make @@ Up {ty; neu; sys}
-          | Step v ->
-            v
+          let ty = Value.act phi info.ty in
+          let neu = Neu.act phi info.neu in
+          make @@ Up {ty; neu; sys}
       end
 
     | Later clo ->
@@ -377,191 +367,6 @@ struct
         | `Proj v ->
           v
       end
-
-  and act_neu phi con =
-    match con with
-    | NHComAtType info ->
-      let dir = Dir.act phi info.dir in
-      let univ = Value.act phi info.univ in
-      let cap = Value.act phi info.cap in
-      let sys = CompSys.act phi info.sys in
-      let ty =
-        match act_neu phi info.ty with
-        | Ret neu ->
-          reflect univ neu []
-        | Step ty -> ty
-      in
-      step @@ make_hcom dir ty cap sys
-
-    | NHComAtCap info ->
-      let dir = Dir.act phi info.dir in
-      let ty = Value.act phi info.ty in
-      let sys = CompSys.act phi info.sys in
-      let cap =
-        match act_neu phi info.cap with
-        | Ret neu ->
-          reflect ty neu []
-        | Step cap -> cap
-      in
-      step @@ make_hcom dir ty cap sys
-
-    | NCoe info ->
-      let dir = Dir.act phi info.dir in
-      let abs = Abs.act phi info.abs in
-      let el =
-        match act_neu phi info.neu with
-        | Ret neu ->
-          let r =
-            match dir with
-            | `Ok dir -> fst @@ Dir.unleash dir
-            | `Same (r, _) -> r
-          in
-          let tyr = Abs.inst1 abs r in
-          reflect tyr neu []
-        | Step el -> el
-      in
-      step @@ make_coe dir abs el
-
-    | NCoeAtType info ->
-      let dir = Dir.act phi info.dir in
-      let abs = Abs.act phi info.abs in
-      let el = Value.act phi info.el in
-      step @@ make_coe dir abs el
-
-
-    | VProj info ->
-      let mx = I.act phi @@ `Atom info.x in
-      let ty0 phi0 = Value.act phi0 info.ty0 in
-      let ty1 = Value.act phi info.ty1 in
-      let equiv phi0 = Value.act phi0 info.equiv in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          let vty = make_v phi mx ty0 ty1 equiv in
-          let el = make @@ Up {ty = vty; neu = neu; sys = []} in
-          step @@ vproj phi mx ~ty0 ~ty1 ~equiv ~el
-        | Step el ->
-          step @@ vproj phi mx ~ty0 ~ty1 ~equiv ~el
-      end
-
-    | Cap info ->
-      let mdir = Dir.act phi info.dir in
-      let msys = CompSys.act phi info.sys in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          (* this is dumb; should refactor this with `cap`. *)
-          let el = make @@ Up {ty = info.ty; neu; sys = []} in
-          step @@ make_cap mdir info.ty msys el
-        | Step el ->
-          step @@ make_cap mdir info.ty msys el
-      end
-
-    | FunApp (neu, arg) ->
-      let varg = act_nf phi arg in
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ FunApp (neu, varg)
-        | Step v ->
-          let {el; _} = varg in
-          step @@ apply v el
-      end
-
-    | ExtApp (neu, rs) ->
-      let rs = List.map (I.act phi) rs in
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ ExtApp (neu, rs)
-        | Step v ->
-          step @@ ext_apply v rs
-      end
-
-    | Car neu ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ Car neu
-        | Step v ->
-          step @@ car v
-      end
-
-    | Cdr neu ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ Cdr neu
-        | Step v ->
-          step @@ cdr v
-      end
-
-    | Elim info ->
-      let mot = Clo.act phi info.mot in
-      let go (lbl, nclo) = lbl, NClo.act phi nclo in
-      let clauses = List.map go info.clauses in
-      begin
-        match act_neu phi info.neu with
-        | Ret neu ->
-          ret @@ Elim {info with mot; neu; clauses}
-        | Step v ->
-          step @@ elim_data info.dlbl ~mot ~scrut:v ~clauses
-      end
-
-
-    | LblCall neu ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ LblCall neu
-        | Step v ->
-          step @@ lbl_call v
-      end
-
-    | CoRForce neu ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ CoRForce neu
-        | Step v ->
-          step @@ corestriction_force v
-      end
-
-    | (Lvl _ | Var _ | Meta _) ->
-      ret con
-
-    | Prev (tick, neu) ->
-      begin
-        match act_neu phi neu with
-        | Ret neu ->
-          ret @@ Prev (tick, neu)
-        | Step v ->
-          step @@ prev tick v
-      end
-
-    | Fix (tick, ty, clo) ->
-      ret @@ Fix (tick, Value.act phi ty, Clo.act phi clo)
-
-    | FixLine (x, tick, ty, clo) ->
-      let ty' = Value.act phi ty in
-      let clo' = Clo.act phi clo in
-      begin
-        match I.act phi @@ `Atom x with
-        | `Atom y ->
-          ret @@ FixLine (y, tick, ty', clo')
-        | `Dim0 ->
-          ret @@ Fix (tick, ty', clo')
-        | `Dim1 ->
-          (* TODO: check that this is right *)
-          step @@ inst_clo clo' @@ make @@ DFix {ty = ty'; clo = clo'}
-      end
-
-  and act_nf phi (nf : nf) =
-    match nf with
-    | info ->
-      let ty = Value.act phi info.ty in
-      let el = Value.act phi info.el in
-      {ty; el}
 
   and unleash : value -> con =
     let add_sys sys el=
@@ -730,17 +535,31 @@ struct
 
   and rigid_ncoe_up dir abs neu ~rst_sys =
     let ncoe = NCoe {dir; abs; neu} in
-    let ty =
-      let _, r' = Dir.unleash dir in
-      Abs.inst1 abs r'
-    in
+    let r, r' = Dir.unleash dir in
+    let ty = Abs.inst1 abs r' in
     let coe_face s s' el =
       let phi = I.equate s s' in
       let dir_phi = Dir.act phi dir in
       let abs_phi = Abs.act phi abs in
       make_coe dir_phi abs_phi el
     in
-    let ncoe_sys = List.map (Face.map coe_face) rst_sys in
+
+    let rr'_face =
+      match Eq.from_dir dir with
+      | `Ok xi ->
+        let el =
+          lazy begin
+            let phi = I.equate r r' in
+            let neu' = Neu.act phi neu in
+            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+          end
+        in
+        [Face.Indet (xi, el)]
+      | `Apart _ ->
+        []
+    in
+
+    let ncoe_sys = rr'_face @ List.map (Face.map coe_face) rst_sys in
     make @@ Up {ty; neu = ncoe; sys = ncoe_sys}
 
   (* TODO: check that this is right *)
@@ -843,11 +662,32 @@ struct
     | Pi _ | Sg _ | Ext _ | Later _ ->
       make @@ Coe {dir; abs; el}
 
-    | Up _ ->
+    | Up info ->
+      let abs = NeuAbs.bind1 x (info.neu, ValSys.from_rigid info.sys) in
       let neu = NCoeAtType {dir; abs; el} in
-      let _, r' = Dir.unleash dir in
-      let ty_r' = Abs.inst1 abs r' in
-      reflect ty_r' neu []
+      let r, r' = Dir.unleash dir in
+      let ty_r' =
+        let univ = make @@ Univ {lvl = `Omega; kind = `Pre} in
+        let neu_ty_r', neu_sys_r' = NeuAbs.inst1 abs r' in
+        reflect univ neu_ty_r' neu_sys_r'
+      in
+      let sys_rr' =
+        match Eq.from_dir dir with
+        | `Ok xi ->
+          [Face.Indet (xi, lazy begin Value.act (I.equate r r') el end)]
+        | `Apart _ ->
+          []
+      in
+      let sys =
+        let face =
+          Face.map @@ fun s s' v ->
+          let phi = I.equate s s' in
+          let abs = Abs.bind1 x v in
+          make_coe (Dir.act phi dir) abs (Value.act phi el)
+        in
+        sys_rr' @ List.map face @@ ValSys.forall x @@ ValSys.from_rigid info.sys
+      in
+      reflect ty_r' neu sys
 
     (* TODO: what about neutral element of the universe? is this even correct? *)
     | Univ _ ->
@@ -1214,7 +1054,23 @@ struct
       make_hcom dir_phi ty cap_phi sys_phi
     in
     let ty = reflect univ ty @@ ValSys.from_rigid rst_sys in
-    let rst_sys = List.map (Face.map hcom_face) rst_sys in
+    let r, r' = Dir.unleash dir in
+    let tube_face : ([`Rigid], _) face -> _ face =
+      function
+      | Face.Indet (xi, abs) ->
+        let s, s' = Eq.unleash xi in
+        let phi = I.equate s s' in
+        Face.Indet (xi, lazy begin Abs.inst1 (Lazy.force abs) r' end)
+    in
+    let tube_faces = List.map tube_face comp_sys in
+    let cap_face =
+      match Eq.from_dir dir with
+      | `Ok xi ->
+        [Face.Indet (xi, lazy begin Value.act (I.equate r r') cap end)]
+      | `Apart _ ->
+        []
+    in
+    let rst_sys = cap_face @ tube_faces @ List.map (Face.map hcom_face) rst_sys in
     make @@ Up {ty; neu; sys = rst_sys}
 
   and rigid_nhcom_up_at_cap dir ty cap ~comp_sys ~rst_sys =
@@ -1226,7 +1082,30 @@ struct
       let sys_phi = CompSys.act phi comp_sys in
       make_hcom dir_phi ty_phi el sys_phi
     in
-    let rst_sys = List.map (Face.map hcom_face) rst_sys in
+    let r, r' = Dir.unleash dir in
+    let tube_face : ([`Rigid], _) face -> _ face =
+      function
+      | Face.Indet (xi, abs) ->
+        let s, s' = Eq.unleash xi in
+        let phi = I.equate s s' in
+        Face.Indet (xi, lazy begin Abs.inst1 (Lazy.force abs) r' end)
+    in
+    let tube_faces = List.map tube_face comp_sys in
+    let cap_face =
+      match Eq.from_dir dir with
+      | `Ok xi ->
+        let el =
+          lazy begin
+            let phi = I.equate r r' in
+            let neu' = Neu.act phi cap in
+            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+          end
+        in
+        [Face.Indet (xi, el)]
+      | `Apart _ ->
+        []
+    in
+    let rst_sys = cap_face @ tube_faces @ List.map (Face.map hcom_face) rst_sys in
     make @@ Up {ty; neu; sys = rst_sys}
 
   and rigid_hcom dir ty cap sys : value =
@@ -2114,7 +1993,36 @@ struct
         match tick with
         | TickGen gen ->
           let neu = FixLine (dfix.x, gen, dfix.ty, dfix.clo) in
-          make @@ Up {ty = dfix.ty; neu; sys = []}
+          let sys =
+            let face0 =
+              let xi = Eq.gen_const dfix.x `Dim0 in
+              let phi = I.equate (`Atom dfix.x) `Dim0 in
+              let body =
+                lazy begin
+                  let ty = Value.act phi dfix.ty in
+                  let clo = Clo.act phi dfix.clo in
+                  let neu = Fix (gen, ty, clo) in
+                  (* check that this is right?? *)
+                  reflect ty neu []
+                end
+              in
+              Face.Indet (xi, body)
+            in
+            let face1 =
+              let xi = Eq.gen_const dfix.x `Dim1 in
+              let phi = I.equate (`Atom dfix.x) `Dim1 in
+              let body =
+                lazy begin
+                  let ty = Value.act phi dfix.ty in
+                  let clo = Clo.act phi dfix.clo in
+                  inst_clo clo @@ make @@ DFix {ty; clo}
+                end
+              in
+              Face.Indet (xi, body)
+            in
+            [face0; face1]
+          in
+          make @@ Up {ty = dfix.ty; neu; sys}
       end
 
     | Up info ->
@@ -2190,7 +2098,26 @@ struct
         let phi = I.equate r r' in
         vproj phi (I.act phi @@ `Atom x) ~ty0:(fun phi0 -> Value.act phi0 ty0) ~ty1:(Value.act phi ty1) ~equiv:(fun phi0 -> Value.act phi0 equiv) ~el:a
       in
-      let vproj_sys = List.map vproj_face up.sys in
+      let faces01 =
+        let face0 =
+          let xi = Eq.gen_const x `Dim0 in
+          let phi = I.equate (`Atom x) `Dim0 in
+          let body =
+            lazy begin
+              let func = car (Value.act phi equiv) in
+              apply func el
+            end
+          in
+          Face.Indet (xi, body)
+        in
+        let face1 =
+          let xi = Eq.gen_const x `Dim0 in
+          let phi = I.equate (`Atom x) `Dim0 in
+          Face.Indet (xi, lazy begin Value.act phi el end)
+        in
+        [face0; face1]
+      in
+      let vproj_sys = faces01 @ List.map vproj_face up.sys in
       make @@ Up {ty = ty1; neu; sys = vproj_sys}
     | _ ->
       let err = RigidVProjUnexpectedArgument el in
@@ -2415,7 +2342,23 @@ struct
         in
         List.map face info.sys
       in
-      make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = cap_sys}
+      let faces =
+        let face : ([`Rigid], _) face -> _ =
+          function
+          | Face.Indet (xi, abs) ->
+            let body =
+              lazy begin
+                let s, s' = Eq.unleash xi in
+                let phi = I.equate s s' in
+                let dir' = Dir.act phi @@ Dir.swap dir in
+                make_coe dir' (Lazy.force abs) @@ Value.act phi el
+              end
+            in
+            Face.Indet (xi, body)
+        in
+        List.map face sys
+      in
+      make @@ Up {ty; neu = Cap {dir; neu = info.neu; ty; sys}; sys = faces @ cap_sys}
     | _ ->
       raise @@ E (RigidCapUnexpectedArgument el)
 
