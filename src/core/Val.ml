@@ -685,9 +685,9 @@ struct
           let abs = Abs.bind1 x v in
           make_coe (Dir.act phi dir) abs (Value.act phi el)
         in
-        sys_rr' @ List.map face info.sys
+        sys_rr' @ ValSys.forall x @@ ValSys.from_rigid @@ List.map face info.sys
       in
-      reflect ty_r' neu @@ ValSys.from_rigid sys
+      reflect ty_r' neu sys
 
     (* TODO: what about neutral element of the universe? is this even correct? *)
     | Univ _ ->
