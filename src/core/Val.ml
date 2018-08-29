@@ -1734,12 +1734,6 @@ struct
     | _ ->
       raise @@ E (UnleashVError v)
 
-  and unleash_fhcom v =
-    match unleash v with
-    | FHCom info -> info.dir, info.cap, info.sys
-    | _ ->
-      raise @@ E (UnleashFHComError v)
-
   and unleash_lbl_ty v =
     match unleash v with
     | LblTy {lbl; args; ty} ->

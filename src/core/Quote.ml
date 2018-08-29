@@ -282,12 +282,11 @@ struct
         let equiv = equate env equiv_ty info0.equiv info1.equiv in
         Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
 
-      | _, Box info0, Box info1 ->
-        let dir, ty_cap, ty_sys = unleash_fhcom ty in
-        let _, s' = Dir.unleash dir in
-        let tr, tr' = equate_dir3 env dir info0.dir info1.dir in
-        let tcap = equate env ty_cap info0.cap info1.cap in
-        let tsys = equate_box_sys env s' ty_sys info0.sys info1.sys in
+      | FHCom fhcom, Box info0, Box info1 ->
+        let _, s' = Dir.unleash fhcom.dir in
+        let tr, tr' = equate_dir3 env fhcom.dir info0.dir info1.dir in
+        let tcap = equate env fhcom.cap info0.cap info1.cap in
+        let tsys = equate_box_sys env s' fhcom.sys info0.sys info1.sys in
         Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
 
       | _, LblTy info0, LblTy info1 ->
