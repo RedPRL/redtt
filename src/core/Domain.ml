@@ -603,7 +603,7 @@ sig
   include Sort.S
     with type t = env
     with type 'a m = 'a
-  val emp : env
+  val emp : dim DimEnv.t -> env
   val clear_locals : env -> env
   val snoc : env -> env_el -> env
   val append : env -> env_el list -> env
@@ -613,7 +613,8 @@ struct
   type t = env
   type 'a m = 'a
 
-  let emp = {cells = Emp; global = I.idn}
+  let emp global =
+    {cells = Emp; global}
 
   let clear_locals rho =
     {rho with cells = Emp}
@@ -635,7 +636,7 @@ struct
 
   let act phi {cells; global} =
     {cells = Bwd.map (act_env_el phi) cells;
-     global = I.cmp phi global}
+     global = DimEnv.map (I.act phi) global}
 end
 
 and Clo : Sort with type t = clo with type 'a m = 'a =

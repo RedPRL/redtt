@@ -34,6 +34,7 @@ sig
   val inst1 : t -> I.t -> el
 
   val make1 : (atom -> el) -> t
+  val make1' : string -> (atom -> el) -> t
 end
 
 module M (X : Sort.S with type 'a m = 'a) : S with type el = X.t =
@@ -107,6 +108,10 @@ struct
 
   let make1 gen =
     let x = Name.fresh () in
+    unsafe_bind1 x (gen x)
+
+  let make1' str gen =
+    let x = Name.named @@ Some str in
     unsafe_bind1 x (gen x)
 
   let act phi abs =

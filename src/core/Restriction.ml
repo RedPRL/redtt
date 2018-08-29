@@ -5,12 +5,18 @@ type dim = I.t
 
 type eqn = dim * dim
 
-module UF = DisjointSet.Make (PersistentTable.M)
+module T = PersistentTable.M
+module UF = DisjointSet.Make (T)
 
 type t =
-  {classes : dim UF.t;
-   chronicle : eqn list;
-   size : int}
+  {table : (dim, Name.t) T.t;
+   untable : (Name.t, dim) T.t;
+   classes : Name.t UF.t;
+   chronicle : eqn list}
+(* TODO: delete chronicle whenever possible *)
+
+let name_dim0 = Name.fresh ()
+let name_dim1 = Name.fresh ()
 
 let pp_eqn fmt (r, r') =
   Format.fprintf fmt "%a=%a" I.pp r I.pp r'
@@ -24,15 +30,26 @@ let pp fmt rst =
 
 
 let emp () =
-  {classes = UF.init ~size:100;
-   chronicle = [];
-   size = 0}
+  {table = T.set `Dim0 name_dim0 @@ T.set `Dim1 name_dim1 @@ T.init ~size:100;
+   untable = T.set name_dim0 `Dim0 @@ T.set name_dim1 `Dim1 @@ T.init ~size:100;
+   classes = UF.init ~size:100;
+   chronicle = []}
+
+let lookup_name r tbl untbl =
+  match T.find r tbl with
+  | Some x -> x, tbl, untbl
+  | None ->
+    let x = Name.fresh () in
+    x, T.set r x tbl, T.set x r untbl
 
 let equate_ r r' t =
   let dl = [r, r'] in
+  let x, table, untable = lookup_name r t.table t.untable in
+  let x', table, untable = lookup_name r' table untable in
   {chronicle = dl @ t.chronicle;
-   classes = UF.union r r' t.classes;
-   size = t.size + 1}
+   table;
+   untable;
+   classes = UF.union x x' t.classes}
 
 exception Inconsistent = I.Inconsistent
 
@@ -43,18 +60,16 @@ let find r t =
   | _ -> r
 
 let canonize r t =
-  let rr = find r t in
-  let res =
-    if rr = find `Dim0 t then
-      `Dim0
-    else if rr = find `Dim1 t then
-      `Dim1
-    else
-      rr
-  in
-  (* Format.printf "%a |= 0 ==> %a@." pp t D.pp_repr (find D.Dim0 t);
-     Format.printf "Canonizing %a in %a as %a@." D.pp_repr r pp t D.pp_repr res; *)
-  res
+  let repr, _, _ = lookup_name r t.table t.untable in
+  let rr = find repr t in
+  if rr = find name_dim0 t then
+    `Dim0
+  else if rr = find name_dim1 t then
+    `Dim1
+  else
+    match T.find rr t.untable with
+    | None -> r
+    | Some r -> r
 
 let compare r r' t =
   let cr = canonize r t in
@@ -98,3 +113,26 @@ let _ =
   assert (canonize x rst = `Dim0)
 
 
+
+let rec act phi t =
+  match phi with
+  | I.Idn -> t
+  | I.Swap (a, b) ->
+    let x_b, _, _ = lookup_name (`Atom a) t.table t.untable in
+    let x_a, _, _ = lookup_name (`Atom b) t.table t.untable in
+    let table = T.set (`Atom b) x_b @@ T.set (`Atom a) x_a t.table in
+    let untable = T.set x_b (`Atom b) @@ T.set x_a (`Atom a) t.untable in
+    {t with
+     table;
+     untable;
+     chronicle = List.map (fun (r, r') -> I.act phi r, I.act phi r') t.chronicle
+    }
+  | Cmp (phi0, phi1) ->
+    let t = act phi1 t in
+    act phi0 t
+  | Subst (r, x) ->
+    let t, _ = equate r (`Atom x) t in
+    let x_x, _, _ = lookup_name (`Atom x) t.table t.untable in
+    {t with
+     table = T.delete r t.table;
+     untable = T.delete x_x t.untable}

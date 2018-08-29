@@ -6,7 +6,7 @@ module type Sig =
 sig
   val restriction : Restriction.t
 
-  val global_dim : I.atom -> I.t
+  val global_dims : dim DimEnv.t
 
   (** Return the type and boundary of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
@@ -18,6 +18,8 @@ exception MissingElimClause of Desc.con_label
 
 module type S =
 sig
+  val empty_env : env
+
   val unleash : value -> con
 
   val reflect : value -> neu -> val_sys -> value
