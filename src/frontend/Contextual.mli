@@ -39,7 +39,7 @@ val active : problem -> unit m
 val block : problem -> unit m
 
 
-val check : ty:ty -> tm -> [`Ok | `Exn of exn] m
+val check : ty:ty -> ?sys:(tm, tm) Tm.system -> tm -> [`Ok | `Exn of exn] m
 val check_subtype : ty -> ty -> [`Ok | `Exn of exn] m
 val check_eq : ty:ty -> tm -> tm -> [`Ok | `Exn of exn] m
 val check_eq_dim : tm -> tm -> bool m

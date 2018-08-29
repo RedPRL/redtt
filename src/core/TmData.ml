@@ -15,7 +15,7 @@ type 'a tmf =
   | Univ of {kind : Kind.t; lvl : Lvl.t}
   | Pi of 'a * 'a bnd
   | Ext of ('a * ('a, 'a) system) nbnd
-  | Rst of {ty : 'a; sys : ('a, 'a) system}
+  (* | Rst of {ty : 'a; sys : ('a, 'a) system} *)
   | CoR of ('a, 'a) face
   | Sg of 'a * 'a bnd
 

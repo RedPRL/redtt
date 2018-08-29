@@ -88,10 +88,10 @@ struct
       in
       Ext ebnd'
 
-    | Rst info ->
-      let ty = traverse_tm info.ty in
-      let sys = traverse_list traverse_face info.sys in
-      Rst {ty; sys}
+    (* | Rst info ->
+       let ty = traverse_tm info.ty in
+       let sys = traverse_list traverse_face info.sys in
+       Rst {ty; sys} *)
 
     | CoR face ->
       let face' = traverse_face face in
@@ -647,14 +647,14 @@ let rec pp env fmt =
       end
 
 
-    | Rst {ty; sys}  ->
-      begin
+    (* | Rst {ty; sys}  ->
+       begin
         match sys with
         | [] ->
           Format.fprintf fmt "@[<hv1>(restrict %a)]" (pp env) ty
         | _ ->
           Format.fprintf fmt "@[<hv1>(restrict %a@ @[<hv>%a@])@]" (pp env) ty (pp_sys env) sys
-      end
+       end *)
 
     | CoR face ->
       Format.fprintf fmt "@[<hv1>(=>@ %a)@]" (pp_face env) face
@@ -810,7 +810,13 @@ and pp_cmd env fmt (hd, sp) =
         else
           Format.fprintf fmt "@[<hv1>(%a@ %a)@]" (go `FunApp) sp (pp env) t
       | ExtApp ts ->
-        Format.fprintf fmt "@[<hv1>(%s %a@ %a)@]" "@" (go `ExtApp) sp (pp_terms env) ts
+        begin
+          match ts with
+          | [] ->
+            Format.fprintf fmt "@[<hv1>(%s %a)@]" "@" (go `ExtApp) sp
+          | _ ->
+            Format.fprintf fmt "@[<hv1>(%s %a@ %a)@]" "@" (go `ExtApp) sp (pp_terms env) ts
+        end
       | Elim info ->
         let B (nm_mot, mot) = info.mot in
         let x_mot, env_mot = Pp.Env.bind env nm_mot in
@@ -1006,6 +1012,17 @@ let equiv ty0 ty1 =
     ~ty1:(subst proj2 ty1)
     ~f:(up @@ ix 1)
     ~x:(up @@ ix 0)
+
+
+let refine_ty ty sys =
+  let ebnd = NB (Emp, (ty, sys)) in
+  make @@ Ext ebnd
+
+let refine_thunk tm =
+  make @@ ExtLam (NB (Emp, tm))
+
+let refine_force (hd, sp) =
+  hd, sp #< (ExtApp [])
 
 
 module OccursAlg (Init : sig val fl : Occurs.flavor end) :
@@ -1210,8 +1227,8 @@ let map_tmf f =
     Sg (f dom, map_bnd f cod)
   | Ext ebnd ->
     Ext (map_ext_bnd f ebnd)
-  | Rst {ty; sys} ->
-    Rst {ty = f ty; sys = map_tm_sys f sys}
+  (* | Rst {ty; sys} ->
+     Rst {ty = f ty; sys = map_tm_sys f sys} *)
   | CoR face ->
     CoR (map_tm_face f face)
   | V info ->

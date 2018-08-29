@@ -179,8 +179,8 @@ struct
       let bdy = equate (Env.succ env) ty prev0 prev1 in
       Tm.make @@ Tm.Next (Tm.B (None, bdy))
 
-    | Rst {ty; _} ->
-      equate env ty el0 el1
+    (* | Rst {ty; _} ->
+       equate env ty el0 el1 *)
 
     | CoR face ->
       begin
@@ -270,10 +270,10 @@ struct
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
         Tm.make @@ Tm.Ext (Tm.NB (Bwd.map Name.name xs, (tyx, sysx)))
 
-      | _, Rst info0, Rst info1 ->
-        let ty = equate env ty info0.ty info1.ty in
-        let sys = equate_val_sys env info0.ty info0.sys info1.sys in
-        Tm.make @@ Tm.Rst {ty; sys}
+      (* | _, Rst info0, Rst info1 ->
+         let ty = equate env ty info0.ty info1.ty in
+         let sys = equate_val_sys env info0.ty info0.sys info1.sys in
+         Tm.make @@ Tm.Rst {ty; sys} *)
 
       | _, CoR face0, CoR face1 ->
         let univ = D.make @@ Univ {lvl = `Omega; kind = `Pre} in
@@ -791,16 +791,16 @@ struct
 
   and fancy_subtype env ty0 sys0 ty1 sys1 =
     match unleash ty0, unleash ty1 with
-    | _, Rst rst1 ->
-      fancy_subtype env ty0 sys0 rst1.ty (rst1.sys @ sys1)
+    (* | _, Rst rst1 ->
+       fancy_subtype env ty0 sys0 rst1.ty (rst1.sys @ sys1)
 
-    | Rst rst0, _ ->
-      begin
+       | Rst rst0, _ ->
+       begin
         (* backtracking :( ) *)
         try fancy_subtype env rst0.ty sys0 ty1 sys1
         with _ ->
           fancy_subtype env rst0.ty (rst0.sys @ sys0) ty1 sys1
-      end
+       end *)
 
     | Pi pi0, Pi pi1 ->
       fancy_subtype env pi1.dom [] pi0.dom [];

@@ -250,10 +250,10 @@ struct
       let abs' = ExtAbs.act phi abs in
       make @@ Ext abs'
 
-    | Rst info ->
-      let ty = Value.act phi info.ty in
-      let sys = ValSys.act phi info.sys in
-      make @@ Rst {ty; sys}
+    (* | Rst info ->
+       let ty = Value.act phi info.ty in
+       let sys = ValSys.act phi info.sys in
+       make @@ Rst {ty; sys} *)
 
     | CoR face ->
       let face = ValFace.act phi face in
@@ -391,14 +391,14 @@ struct
       | Up up ->
         begin
           match unleash up.ty with
-          | Rst rst ->
-            begin
+          (* | Rst rst ->
+             begin
               match force_val_sys rst.sys with
               | `Proj el ->
                 add_sys up.sys el
               | `Ok rsys ->
                 add_sys rsys @@ make @@ Up {up with ty = rst.ty}
-            end
+             end *)
           | _ ->
             con
         end
@@ -1406,10 +1406,10 @@ struct
       let abs = eval_ext_bnd rho bnd in
       make @@ Ext abs
 
-    | Tm.Rst info ->
-      let ty = eval rho info.ty in
-      let sys = eval_tm_sys rho info.sys in
-      make @@ Rst {ty; sys}
+    (* | Tm.Rst info ->
+       let ty = eval rho info.ty in
+       let sys = eval_tm_sys rho info.sys in
+       make @@ Rst {ty; sys} *)
 
     | Tm.CoR tface ->
       let face = eval_tm_face rho tface in
@@ -1728,14 +1728,14 @@ struct
   and unleash_data v =
     match unleash v with
     | Data dlbl -> dlbl
-    | Rst rst -> unleash_data rst.ty
+    (* | Rst rst -> unleash_data rst.ty *)
     | _ ->
       raise @@ E (UnleashDataError v)
 
   and unleash_pi v =
     match unleash v with
     | Pi {dom; cod} -> dom, cod
-    | Rst rst -> unleash_pi rst.ty
+    (* | Rst rst -> unleash_pi rst.ty *)
     | _ ->
       raise @@ E (UnleashPiError v)
 
@@ -1743,14 +1743,14 @@ struct
   and unleash_later v =
     match unleash v with
     | Later clo -> clo
-    | Rst rst -> unleash_later rst.ty
+    (* | Rst rst -> unleash_later rst.ty *)
     | _ ->
       raise @@ E (UnleashLaterError v)
 
   and unleash_sg v =
     match unleash v with
     | Sg {dom; cod} -> dom, cod
-    | Rst rst -> unleash_sg rst.ty
+    (* | Rst rst -> unleash_sg rst.ty *)
     | _ ->
       raise @@ E (UnleashSgError v)
 
@@ -1758,8 +1758,8 @@ struct
     match unleash v with
     | Ext abs ->
       ExtAbs.inst abs (Bwd.from_list rs)
-    | Rst rst ->
-      unleash_ext_with rst.ty rs
+    (* | Rst rst ->
+       unleash_ext_with rst.ty rs *)
     | _ ->
       raise @@ E (UnleashExtError v)
 
@@ -1767,8 +1767,8 @@ struct
     match unleash v with
     | Ext abs ->
       abs
-    | Rst rst ->
-      unleash_ext rst.ty
+    (* | Rst rst ->
+       unleash_ext rst.ty *)
     | _ ->
       raise @@ E (UnleashExtError v)
 
@@ -1776,15 +1776,15 @@ struct
     match unleash v with
     | V {x; ty0; ty1; equiv} ->
       x, ty0, ty1, equiv
-    | Rst rst ->
-      unleash_v rst.ty
+    (* | Rst rst ->
+       unleash_v rst.ty *)
     | _ ->
       raise @@ E (UnleashVError v)
 
   and unleash_fhcom v =
     match unleash v with
     | FHCom info -> info.dir, info.cap, info.sys
-    | Rst rst -> unleash_fhcom rst.ty
+    (* | Rst rst -> unleash_fhcom rst.ty *)
     | _ ->
       raise @@ E (UnleashFHComError v)
 
@@ -1792,8 +1792,8 @@ struct
     match unleash v with
     | LblTy {lbl; args; ty} ->
       lbl, args, ty
-    | Rst rst ->
-      unleash_lbl_ty rst.ty
+    (* | Rst rst ->
+       unleash_lbl_ty rst.ty *)
     | _ ->
       raise @@ E (UnleashLblTyError v)
 
@@ -1801,8 +1801,8 @@ struct
     match unleash v with
     | CoR face ->
       face
-    | Rst rst ->
-      unleash_corestriction_ty rst.ty
+    (* | Rst rst ->
+       unleash_corestriction_ty rst.ty *)
     | _ ->
       raise @@ E (UnleashCoRError v)
 

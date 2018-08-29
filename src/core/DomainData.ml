@@ -16,7 +16,7 @@ type tick =
 type con =
   | Pi of {dom : value; cod : clo}
   | Sg of {dom : value; cod : clo}
-  | Rst of {ty : value; sys : val_sys}
+  (* | Rst of {ty : value; sys : val_sys} *)
   | CoR of val_face
   | Ext of ext_abs
 
