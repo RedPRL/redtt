@@ -116,8 +116,8 @@ let print_diagnostic =
 
       let ty, sys =
         match Tm.unleash ty with
-        (* | Tm.Rst rst ->
-           rst.ty, rst.sys *)
+        | Tm.Ext (Tm.NB (Emp, (ty, sys))) ->
+          ty, sys
         | _ ->
           ty, []
       in

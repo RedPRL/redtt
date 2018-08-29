@@ -88,11 +88,6 @@ struct
       in
       Ext ebnd'
 
-    (* | Rst info ->
-       let ty = traverse_tm info.ty in
-       let sys = traverse_list traverse_face info.sys in
-       Rst {ty; sys} *)
-
     | CoR face ->
       let face' = traverse_face face in
       CoR face'
@@ -645,16 +640,6 @@ let rec pp env fmt =
         | _ ->
           Format.fprintf fmt "@[<hv1>(# @[<hv1><%a>@ %a@ @[<hv>%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
       end
-
-
-    (* | Rst {ty; sys}  ->
-       begin
-        match sys with
-        | [] ->
-          Format.fprintf fmt "@[<hv1>(restrict %a)]" (pp env) ty
-        | _ ->
-          Format.fprintf fmt "@[<hv1>(restrict %a@ @[<hv>%a@])@]" (pp env) ty (pp_sys env) sys
-       end *)
 
     | CoR face ->
       Format.fprintf fmt "@[<hv1>(=>@ %a)@]" (pp_face env) face
@@ -1227,8 +1212,6 @@ let map_tmf f =
     Sg (f dom, map_bnd f cod)
   | Ext ebnd ->
     Ext (map_ext_bnd f ebnd)
-  (* | Rst {ty; sys} ->
-     Rst {ty = f ty; sys = map_tm_sys f sys} *)
   | CoR face ->
     CoR (map_tm_face f face)
   | V info ->

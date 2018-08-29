@@ -48,8 +48,6 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
   | Ext abs ->
     Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
-  (* | Rst {ty; sys} ->
-     Format.fprintf fmt "@[<1>(restrict@ %a@ %a)@]" pp_value ty pp_val_sys sys *)
   | CoR face ->
     Format.fprintf fmt "@[<1>(corestrict@ %a)@]" pp_val_face face
   | Univ {kind; lvl} ->

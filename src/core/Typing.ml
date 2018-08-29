@@ -185,11 +185,6 @@ let rec check_ cx ty rst tm =
       ();
     check_ext_sys cxx vcod sys
 
-  (* | [], D.Univ univ, T.Rst info ->
-     if univ.kind = `Pre then () else failwith "Restriction type is not Kan";
-     let ty = check_eval cx ty info.ty in
-     check_ext_sys cx ty info.sys *)
-
   | [], D.Univ univ, T.CoR (tr, tr', oty) ->
     if univ.kind = `Pre then () else failwith "Co-restriction type is not known to be Kan";
     let r = check_eval_dim cx tr in
@@ -305,9 +300,6 @@ let rec check_ cx ty rst tm =
         Format.eprintf "@.@.type restriction didn't match thunk@.@.";
         failwith "Malformed element of co-restriction type"
     end
-  (*
-  | _, D.Rst {ty; sys}, _ ->
-    check_ cx ty (sys @ rst) tm *)
 
   | [], D.Univ _, T.FHCom info ->
     check_fhcom cx ty info.r info.r' info.cap info.sys
