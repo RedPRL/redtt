@@ -16,7 +16,7 @@ type tick =
 type con =
   | Pi of {dom : value; cod : clo}
   | Sg of {dom : value; cod : clo}
-  | CoR of val_face
+  | Restrict of val_face
   | Ext of ext_abs
 
   | Coe of {dir : dir; abs : abs; el : value}
@@ -31,7 +31,7 @@ type con =
 
   | Lam of clo
   | ExtLam of nclo
-  | CoRThunk of val_face
+  | RestrictThunk of val_face
 
   | Cons of value * value
 
@@ -80,7 +80,7 @@ and neu =
   | Cap of {dir : dir; ty : value; sys : comp_sys; neu : neu}
 
   | LblCall of neu
-  | CoRForce of neu
+  | RestrictForce of neu
 
   | Prev of tick * neu
   | Fix of tick_gen * value * clo

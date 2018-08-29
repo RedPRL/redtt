@@ -43,7 +43,7 @@ let rec telescope ty : telescope * ty =
     let x, codx = Tm.unbind cod in
     let tel, ty = telescope codx in
     (Emp #< (x, `P dom)) <.> tel, ty
-  | Tm.CoR (r, r', Some ty) ->
+  | Tm.Restrict (r, r', Some ty) ->
     let x = Name.fresh () in
     let tel, ty = telescope ty in
     (Emp #< (x, `R (r, r'))) <.> tel, ty
@@ -70,7 +70,7 @@ let rec abstract_tm xs tm =
     let bnd = Tm.NB (Emp, tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
   | Snoc (xs, (_, `R (r, r'))) ->
-    abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
+    abstract_tm xs @@ Tm.make @@ Tm.RestrictThunk (r, r', Some tm)
   | Snoc (xs, (_, `KillFromTick _)) ->
     abstract_tm xs tm
   | _ ->
@@ -84,7 +84,7 @@ let rec abstract_ty (gm : telescope) cod =
   | Snoc (gm, (x, `Def (dom, def))) ->
     abstract_ty gm @@ Tm.unbind_with (Tm.ann ~ty:dom ~tm:def) @@ Tm.bind x cod
   | Snoc (gm, (_, `R (r, r'))) ->
-    abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
+    abstract_ty gm @@ Tm.make @@ Tm.Restrict (r, r', Some cod)
   | Snoc (gm, (x, `I)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) cod [])
   | Snoc (gm, (_, `NullaryExt)) ->
@@ -113,7 +113,7 @@ let telescope_to_spine : telescope -> tm Tm.spine =
   | `Tw _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `R _ ->
-    [Tm.CoRForce]
+    [Tm.RestrictForce]
   | `Tick ->
     [Tm.Prev (Tm.up @@ Tm.var x)]
   | `KillFromTick _ ->
@@ -579,7 +579,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
       failwith "TODO: match_spine/vproj"
 
-    | Snoc (sp0, Tm.CoRForce), Snoc (sp1, Tm.CoRForce) ->
+    | Snoc (sp0, Tm.RestrictForce), Snoc (sp1, Tm.RestrictForce) ->
       go sp0 sp1
 
     | _ ->

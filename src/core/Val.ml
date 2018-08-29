@@ -31,11 +31,11 @@ type error =
   | UnleashExtError of value
   | UnleashVError of value
   | UnleashLaterError of value
-  | UnleashCoRError of value
+  | UnleashRestrictError of value
   | UnleashLblTyError of value
   | UnleashFHComError of value
-  | ForcedUntrueCorestriction of val_face
-  | ForcedUnexpectedCorestriction of value
+  | ForcedUntrueRestriction of val_face
+  | ForcedUnexpectedRestriction of value
 
 
 exception E of error
@@ -132,7 +132,7 @@ struct
       Format.fprintf fmt
         "Tried to unleash %a as extension type."
         pp_value v
-    | UnleashCoRError v ->
+    | UnleashRestrictError v ->
       Format.fprintf fmt
         "Tried to unleash %a as co-restriction type."
         pp_value v
@@ -144,11 +144,11 @@ struct
       Format.fprintf fmt
         "Tried to unleash %a as labeled type."
         pp_value v
-    | ForcedUntrueCorestriction face ->
+    | ForcedUntrueRestriction face ->
       Format.fprintf fmt
         "Cannot force untrue co-restriction:@ %a."
         pp_val_face face
-    | ForcedUnexpectedCorestriction v ->
+    | ForcedUnexpectedRestriction v ->
       Format.fprintf fmt
         "Cannot force unrecognized co-restriction:@ %a."
         pp_value v
@@ -250,9 +250,9 @@ struct
       let abs' = ExtAbs.act phi abs in
       make @@ Ext abs'
 
-    | CoR face ->
+    | Restrict face ->
       let face = ValFace.act phi face in
-      make @@ CoR face
+      make @@ Restrict face
 
     | Coe info ->
       make_coe
@@ -308,8 +308,8 @@ struct
     | ExtLam clo ->
       make @@ ExtLam (NClo.act phi clo)
 
-    | CoRThunk v ->
-      make @@ CoRThunk (ValFace.act phi v)
+    | RestrictThunk v ->
+      make @@ RestrictThunk (ValFace.act phi v)
 
     | Cons (v0, v1) ->
       make @@ Cons (Value.act phi v0, Value.act phi v1)
@@ -1374,9 +1374,9 @@ struct
       let abs = eval_ext_bnd rho bnd in
       make @@ Ext abs
 
-    | Tm.CoR tface ->
+    | Tm.Restrict tface ->
       let face = eval_tm_face rho tface in
-      make @@ CoR face
+      make @@ Restrict face
 
     | Tm.V info ->
       let r = eval_dim rho info.r in
@@ -1397,9 +1397,9 @@ struct
     | Tm.ExtLam bnd ->
       make @@ ExtLam (nclo bnd rho)
 
-    | Tm.CoRThunk face ->
+    | Tm.RestrictThunk face ->
       let vface = eval_tm_face rho face in
-      make @@ CoRThunk vface
+      make @@ RestrictThunk vface
 
     | Tm.Cons (t0, t1) ->
       let v0 = eval rho t0 in
@@ -1489,8 +1489,8 @@ struct
     function
     | Tm.LblCall ->
       lbl_call vhd
-    | Tm.CoRForce ->
-      corestriction_force vhd
+    | Tm.RestrictForce ->
+      restriction_force vhd
     | Tm.FunApp t ->
       let v = eval rho t in
       apply vhd v
@@ -1747,12 +1747,12 @@ struct
     | _ ->
       raise @@ E (UnleashLblTyError v)
 
-  and unleash_corestriction_ty v =
+  and unleash_restriction_ty v =
     match unleash v with
-    | CoR face ->
+    | Restrict face ->
       face
     | _ ->
-      raise @@ E (UnleashCoRError v)
+      raise @@ E (UnleashRestrictError v)
 
   and lbl_call v =
     match unleash v with
@@ -1769,33 +1769,33 @@ struct
     | _ ->
       raise @@ E (LblCallUnexpectedArgument v)
 
-  and corestriction_force v =
+  and restriction_force v =
     match unleash v with
-    | CoRThunk face ->
+    | RestrictThunk face ->
       begin
         match face with
         | Face.True (_, _, v) -> Lazy.force v
         | _ ->
-          raise @@ E (ForcedUntrueCorestriction face)
+          raise @@ E (ForcedUntrueRestriction face)
       end
 
     | Up info ->
       begin
-        match unleash_corestriction_ty info.ty with
+        match unleash_restriction_ty info.ty with
         | Face.True (_, _, ty) ->
-          let force = CoRForce info.neu in
+          let force = RestrictForce info.neu in
           let force_face =
             Face.map @@ fun _ _ a ->
-            corestriction_force a
+            restriction_force a
           in
           let force_sys = List.map force_face info.sys in
           make @@ Up {ty = Lazy.force ty; neu = force; sys = force_sys}
         | _ as face ->
-          raise @@ E (ForcedUntrueCorestriction face)
+          raise @@ E (ForcedUntrueRestriction face)
       end
 
     | _ ->
-      raise @@ E (ForcedUnexpectedCorestriction v)
+      raise @@ E (ForcedUnexpectedRestriction v)
 
   and apply vfun varg =
     match unleash vfun with

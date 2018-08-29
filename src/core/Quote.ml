@@ -179,31 +179,31 @@ struct
       let bdy = equate (Env.succ env) ty prev0 prev1 in
       Tm.make @@ Tm.Next (Tm.B (None, bdy))
 
-    | CoR face ->
+    | Restrict face ->
       begin
         match face with
         | Face.False (r, r') ->
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
-          Tm.make @@ Tm.CoRThunk (tr, tr', None)
+          Tm.make @@ Tm.RestrictThunk (tr, tr', None)
 
         | Face.True (r, r', ty) ->
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
-          let force0 = corestriction_force el0 in
-          let force1 = corestriction_force el1 in
+          let force0 = restriction_force el0 in
+          let force1 = restriction_force el1 in
           let tm = equate env (Lazy.force ty) force0 force1 in
-          Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
+          Tm.make @@ Tm.RestrictThunk (tr, tr', Some tm)
 
         | Face.Indet (p, ty) ->
           let r, r' = Eq.unleash p in
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
           let phi = I.equate r r' in
-          let force0 = corestriction_force @@ Domain.Value.act phi el0 in
-          let force1 = corestriction_force @@ Domain.Value.act phi el1 in
+          let force0 = restriction_force @@ Domain.Value.act phi el0 in
+          let force1 = restriction_force @@ Domain.Value.act phi el1 in
           let tm = equate env (Lazy.force ty) force0 force1 in
-          Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
+          Tm.make @@ Tm.RestrictThunk (tr, tr', Some tm)
       end
 
     | LblTy {ty; _} ->
@@ -267,10 +267,10 @@ struct
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
         Tm.make @@ Tm.Ext (Tm.NB (Bwd.map Name.name xs, (tyx, sysx)))
 
-      | _, CoR face0, CoR face1 ->
+      | _, Restrict face0, Restrict face1 ->
         let univ = D.make @@ Univ {lvl = `Omega; kind = `Pre} in
         let face = equate_val_face env univ face0 face1 in
-        Tm.make @@ Tm.CoR face
+        Tm.make @@ Tm.Restrict face
 
       | _, V info0, V info1 ->
         let x0 = info0.x in
@@ -557,8 +557,8 @@ struct
     | LblCall neu0, LblCall neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
 
-    | CoRForce neu0, CoRForce neu1 ->
-      equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
+    | RestrictForce neu0, RestrictForce neu1 ->
+      equate_neu_ env neu0 neu1 @@ Tm.RestrictForce :: stk
 
     | Prev (tick0, neu0), Prev (tick1, neu1) ->
       let tick = equate_tick env tick0 tick1 in

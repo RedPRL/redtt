@@ -40,7 +40,7 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
   | ExtLam clo ->
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_nclo clo
-  | CoRThunk face ->
+  | RestrictThunk face ->
     Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
   | Pi {dom; cod} ->
     Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
@@ -48,7 +48,7 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
   | Ext abs ->
     Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
-  | CoR face ->
+  | Restrict face ->
     Format.fprintf fmt "@[<1>(corestrict@ %a)@]" pp_val_face face
   | Univ {kind; lvl} ->
     Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
@@ -239,7 +239,7 @@ and pp_neu fmt neu =
   | LblCall neu ->
     Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
 
-  | CoRForce neu ->
+  | RestrictForce neu ->
     Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
 
   | Prev _ ->
@@ -445,9 +445,9 @@ struct
       let neu = act phi neu in
       LblCall neu
 
-    | CoRForce neu ->
+    | RestrictForce neu ->
       let neu = act phi neu in
-      CoRForce neu
+      RestrictForce neu
 
     | (Lvl _ | Var _ | Meta _) as neu ->
       neu

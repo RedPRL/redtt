@@ -15,7 +15,7 @@ type 'a tmf =
   | Univ of {kind : Kind.t; lvl : Lvl.t}
   | Pi of 'a * 'a bnd
   | Ext of ('a * ('a, 'a) system) nbnd
-  | CoR of ('a, 'a) face
+  | Restrict of ('a, 'a) face
   | Sg of 'a * 'a bnd
 
   | V of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
@@ -23,7 +23,7 @@ type 'a tmf =
 
   | Lam of 'a bnd
   | ExtLam of 'a nbnd
-  | CoRThunk of ('a, 'a) face
+  | RestrictThunk of ('a, 'a) face
 
   | Cons of 'a * 'a
 
@@ -68,7 +68,7 @@ and 'a frame =
   | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | LblCall
-  | CoRForce
+  | RestrictForce
   | Prev of 'a
 
   | Elim of {dlbl : Desc.data_label; mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}

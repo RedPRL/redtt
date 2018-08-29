@@ -185,7 +185,7 @@ let rec check_ cx ty rst tm =
       ();
     check_ext_sys cxx vcod sys
 
-  | [], D.Univ univ, T.CoR (tr, tr', oty) ->
+  | [], D.Univ univ, T.Restrict (tr, tr', oty) ->
     if univ.kind = `Pre then () else failwith "Co-restriction type is not known to be Kan";
     let r = check_eval_dim cx tr in
     let r' = check_eval_dim cx tr' in
@@ -263,7 +263,7 @@ let rec check_ cx ty rst tm =
     let rst' = List.map (Face.map (fun _ _ el -> V.ext_apply el rs)) rst in
     check_ cxx codx (rst' @ sysx) @@ Tm.up @@ cmd' @< Tm.ExtApp trs
 
-  | _, D.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
+  | _, D.Restrict ty_face, T.RestrictThunk (tr0, tr1, otm) ->
     let r'0 = check_eval_dim cx tr0 in
     let r'1 = check_eval_dim cx tr1 in
     begin
@@ -274,7 +274,7 @@ let rec check_ cx ty rst tm =
         begin
           match I.compare r'0 r0, I.compare r'1 r1 with
           | `Same, `Same ->
-            let rst' = List.map (Face.map (fun _ _ -> V.corestriction_force)) rst in
+            let rst' = List.map (Face.map (fun _ _ -> V.restriction_force)) rst in
             check_ cx (Lazy.force ty) rst' tm
           | _ ->
             failwith "co-restriction mismatch"
@@ -288,7 +288,7 @@ let rec check_ cx ty rst tm =
               try
                 let cx', phi = Cx.restrict cx r'0 r'1 in
                 (* is this right?? : *)
-                let rst' = List.map (Face.map (fun _ _ -> V.corestriction_force)) rst in
+                let rst' = List.map (Face.map (fun _ _ -> V.restriction_force)) rst in
                 check_ cx' (Domain.Value.act phi @@ Lazy.force ty) rst' tm
               with
               | I.Inconsistent -> ()
@@ -686,10 +686,10 @@ and infer_spine cx hd =
       let _, _, ty = V.unleash_lbl_ty ih.ty in
       D.{el = Cx.eval_frame cx ih.el frm; ty}
 
-    | Tm.CoRForce ->
+    | Tm.RestrictForce ->
       let ih = infer_spine cx hd sp in
       begin
-        match V.unleash_corestriction_ty ih.ty with
+        match V.unleash_restriction_ty ih.ty with
         | Face.True (_, _, ty) ->
           D.{el = Cx.eval_frame cx ih.el frm; ty = Lazy.force ty}
         | _ -> failwith "Cannot force co-restriction when it is not true!"
