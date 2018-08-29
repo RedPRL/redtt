@@ -1751,8 +1751,6 @@ struct
     match unleash v with
     | CoR face ->
       face
-    (* | Rst rst ->
-       unleash_corestriction_ty rst.ty *)
     | _ ->
       raise @@ E (UnleashCoRError v)
 

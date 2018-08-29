@@ -426,9 +426,6 @@ struct
         let ctac goal = elab_chk env info.body goal in
         tac_let info.name itac ctac goal
 
-      (* | _, Tm.Rst rst, _ ->
-         elab_chk env e {ty = rst.ty; sys = rst.sys @ goal.sys} *)
-
       | _, _, E.Lam (names, e) ->
         let tac = elab_chk env e in
         tac_wrap_nf (tac_lambda names tac) goal
@@ -920,7 +917,6 @@ struct
   and elab_cut_ env exp frms =
     let rec unleash tm =
       match Tm.unleash tm with
-      (* | Tm.Rst rst -> unleash rst.ty *)
       | con -> con
     in
 

@@ -485,38 +485,27 @@ let is_orthogonal q =
   | Tm.Pi _, Tm.Univ _ -> true
   | Tm.Pi _, Tm.Sg _ -> true
   | Tm.Pi _, Tm.Data _ -> true
-  (* | Tm.Pi _, Tm.Rst _ -> true *)
   | Tm.Pi _, Tm.Ext _ -> true
 
   | Tm.Univ _, Tm.Pi _ -> true
   | Tm.Univ _, Tm.Sg _ -> true
   | Tm.Univ _, Tm.Data _ -> true
-  (* | Tm.Univ _, Tm.Rst _ -> true *)
   | Tm.Univ _, Tm.Ext _ -> true
 
   | Tm.Sg _, Tm.Pi _ -> true
   | Tm.Sg _, Tm.Univ _ -> true
   | Tm.Sg _, Tm.Data _ -> true
-  (* | Tm.Sg _, Tm.Rst _ -> true *)
   | Tm.Sg _, Tm.Ext _ -> true
 
   | Tm.Data _, Tm.Univ _ -> true
   | Tm.Data _, Tm.Sg _ -> true
   | Tm.Data _, Tm.Ext _ -> true
   | Tm.Data _, Tm.Pi _ -> true
-  (* | Tm.Data _, Tm.Rst _ -> true *)
-
-  (* | Tm.Rst _, Tm.Univ _ -> true
-     | Tm.Rst _, Tm.Pi _ -> true
-     | Tm.Rst _, Tm.Sg _ -> true
-     | Tm.Rst _, Tm.Ext _ -> true
-     | Tm.Rst _, Tm.Data _ -> true *)
 
   | Tm.Ext _, Tm.Pi _ -> true
   | Tm.Ext _, Tm.Sg _ -> true
   | Tm.Ext _, Tm.Univ _ -> true
   | Tm.Ext _, Tm.Data _ -> true
-  (* | Tm.Ext _, Tm.Rst _ -> true *)
 
   | Tm.Data dlbl0, Tm.Data dlbl1 -> not (dlbl0 = dlbl1)
   | Tm.Intro (_, clbl0, _), Tm.Intro (_, clbl1, _) -> not (clbl0 = clbl1)
@@ -559,8 +548,6 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       (* TODO: unify the dimension spines ts0, ts1 *)
       let ty'0, sys0 = V.unleash_ext_with ty0 rs0 in
       let ty'1, sys1 = V.unleash_ext_with ty1 rs1 in
-      (* let rst0 = D.make @@ D.Rst {ty = ty'0; sys = sys0} in
-         let rst1 = D.make @@ D.Rst {ty = ty'1; sys = sys1} in *)
       ret (ty'0, ty'1)
 
     | Snoc (sp0, Tm.Car), Snoc (sp1, Tm.Car) ->
@@ -673,12 +660,6 @@ let rec subtype ty0 ty1 =
     | _, Tm.Up (Tm.Meta _, _) ->
       active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
-    (* | Tm.Rst rst0, Tm.Rst rst1 ->
-       restriction_subtype rst0.ty rst0.sys rst1.ty rst1.sys *)
-
-    (* | Tm.Rst _, _ ->
-       active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}} *)
-
     | _ ->
       active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
 
@@ -772,9 +753,6 @@ let unify q =
         ret @@ Problem.all_dims xs_lst @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
       end >>= fun prob ->
     active prob
-
-  (* | Tm.Rst info0, Tm.Rst info1 ->
-     active @@ Unify {q with ty0 = info0.ty; ty1 = info1.ty} *)
 
   | _ ->
     match Tm.unleash q.tm0, Tm.unleash q.tm1 with
