@@ -663,17 +663,22 @@ struct
       make @@ Coe {dir; abs; el}
 
     | Up info ->
+      let abs = NeuAbs.bind1 x (info.neu, ValSys.from_rigid info.sys) in
       let neu = NCoeAtType {dir; abs; el} in
       let r, r' = Dir.unleash dir in
-      let ty_r' = Abs.inst1 abs r' in
+      let ty_r' =
+        let univ = make @@ Univ {lvl = `Omega; kind = `Pre} in
+        let neu_ty_r', neu_sys_r' = NeuAbs.inst1 abs r' in
+        reflect univ neu_ty_r' neu_sys_r'
+      in
+      let sys_rr' =
+        match Eq.from_dir dir with
+        | `Ok xi ->
+          [Face.Indet (xi, lazy begin Value.act (I.equate r r') el end)]
+        | `Apart _ ->
+          []
+      in
       let sys =
-        let sys_rr' =
-          match Eq.from_dir dir with
-          | `Ok xi ->
-            [Face.Indet (xi, lazy begin Value.act (I.equate r r') el end)]
-          | `Apart _ ->
-            []
-        in
         let face =
           Face.map @@ fun s s' v ->
           let phi = I.equate s s' in

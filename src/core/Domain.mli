@@ -60,6 +60,9 @@ module Nf : Sort.S
   with type 'a m = 'a
 
 
+module NeuAbs : IAbs.S
+  with type el = neu * val_sys
+
 module ExtAbs : IAbs.S
   with type el = value * val_sys
 

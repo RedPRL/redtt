@@ -434,9 +434,10 @@ struct
     | NCoeAtType info0, NCoeAtType info1 ->
       let tr, tr' = equate_dir env info0.dir info1.dir in
       let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
-      let bnd = equate_val_abs env univ info0.abs info1.abs in
+      let bnd = equate_neu_abs env info0.abs info1.abs in
       let r, _ = Dir.unleash info0.dir in
-      let ty_r = Abs.inst1 info0.abs r in
+      let neu_ty_r, sys_ty_r = NeuAbs.inst1 info0.abs r in
+      let ty_r = reflect univ neu_ty_r sys_ty_r in
       let tm = equate env ty_r info0.el info1.el in
       Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Bwd.from_list stk
 
@@ -662,6 +663,17 @@ struct
     with
     | exn ->
       (* Format.eprintf "Failed to equate abs: @[<v>%a@,= %a@]@." pp_abs abs0 pp_abs abs1; *)
+      raise exn
+
+  and equate_neu_abs env abs0 abs1 =
+    let x, (neu0x, _) = NeuAbs.unleash1 abs0 in
+    let neu1x, _ = NeuAbs.inst1 abs1 @@ `Atom x in
+    try
+      let envx = Env.abs env [x] in
+      let cmd = equate_neu envx neu0x neu1x in
+      Tm.B (Name.name x, Tm.up cmd)
+    with
+    | exn ->
       raise exn
 
   and equate_eq env p0 p1 =

@@ -122,6 +122,9 @@ and pp_value fmt value =
 and pp_abs fmt =
   IAbs.pp pp_value fmt
 
+and pp_neu_abs fmt =
+  IAbs.pp (fun fmt (neu, _) -> pp_neu fmt neu) fmt
+
 and pp_names fmt xs =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep Name.pp fmt (Bwd.to_list xs)
@@ -195,7 +198,7 @@ and pp_neu fmt neu =
 
   | NCoeAtType info ->
     let r, r' = Dir.unleash info.dir in
-    Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
+    Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_neu_abs info.abs pp_value info.el
 
   | FunApp (neu, arg) ->
     Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
@@ -216,11 +219,11 @@ and pp_neu fmt neu =
     Name.pp fmt name
 
   | Elim info ->
-    Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a@ %a)@]"
+    Format.fprintf fmt "@[<hv1>(%a.elim@ %a)@]"
       Desc.pp_data_label info.dlbl
-      pp_clo info.mot
+      (* pp_clo info.mot *)
       pp_neu info.neu
-      pp_elim_clauses info.clauses
+  (* pp_elim_clauses info.clauses *)
 
   | Cap _ ->
     Format.fprintf fmt "<cap>"
@@ -377,7 +380,7 @@ struct
       begin
         match Dir.act phi info.dir with
         | `Ok dir ->
-          let abs = Abs.act phi info.abs in
+          let abs = NeuAbs.act phi info.abs in
           let el = Value.act phi info.el in
           NCoeAtType {dir; abs; el}
         | _ ->
@@ -591,6 +594,9 @@ end
 
 and ExtAbs : IAbs.S with type el = value * val_sys =
   IAbs.M (Sort.Prod (Value) (ValSys))
+
+and NeuAbs : IAbs.S with type el = neu * val_sys =
+  IAbs.M (Sort.Prod (Neu) (ValSys))
 
 and Env :
 sig
