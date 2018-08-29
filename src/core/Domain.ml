@@ -6,14 +6,11 @@ let rec make : con -> value =
     Node {con; action = I.idn}
 
 and make_later ty =
-  let tclo = TickCloConst ty in
+  let tclo = TickCloConst (lazy ty) in
   make @@ Later tclo
 
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
   nm
-
-let nclo_names (NClo {nbnd = Tm.NB (nms, _); _}) =
-  nms
 
 let rec pp_env_cell fmt =
   function
@@ -41,8 +38,8 @@ and pp_con fmt : con -> unit =
     end
   | Lam clo ->
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
-  | ExtLam abs ->
-    Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
+  | ExtLam clo ->
+    Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_nclo clo
   | CoRThunk face ->
     Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
   | Pi {dom; cod} ->
@@ -172,9 +169,13 @@ and pp_clo fmt (Clo clo) =
   let Tm.B (_, tm) = clo.bnd in
   Format.fprintf fmt "@[<hv1>(clo@ %a@ <:@ %a)@]" Tm.pp0 tm pp_env clo.rho
 
-and pp_nclo fmt (NClo clo) =
-  let Tm.NB (_, tm) = clo.nbnd in
-  Format.fprintf fmt "@[<hv1>(clo@ %a@ <:@ %a)@]" Tm.pp0 tm pp_env clo.rho
+and pp_nclo fmt =
+  function
+  | NClo clo ->
+    let Tm.NB (_, tm) = clo.nbnd in
+    Format.fprintf fmt "@[<hv1>(clo@ %a@ <:@ %a)@]" Tm.pp0 tm pp_env clo.rho
+  | NCloConst v ->
+    Format.fprintf fmt "@[<hv1>(clo/const@ %a)@]" pp_value (Lazy.force v)
 
 and pp_neu fmt neu =
   match neu with
@@ -659,7 +660,7 @@ struct
     | TickClo info ->
       TickClo {info with rho = Env.act phi info.rho}
     | TickCloConst v ->
-      TickCloConst (Value.act phi v)
+      TickCloConst (lazy begin Value.act phi @@ Lazy.force v end)
 end
 
 and NClo : Sort with type t = nclo with type 'a m = 'a =
@@ -671,4 +672,6 @@ struct
     match clo with
     | NClo info ->
       NClo {info with rho = Env.act phi info.rho}
+    | NCloConst v ->
+      NCloConst (lazy begin Value.act phi @@ Lazy.force v end)
 end

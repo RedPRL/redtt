@@ -310,8 +310,8 @@ struct
     | Lam clo ->
       make @@ Lam (Clo.act phi clo)
 
-    | ExtLam abs ->
-      make @@ ExtLam (Abs.act phi abs)
+    | ExtLam clo ->
+      make @@ ExtLam (NClo.act phi clo)
 
     | CoRThunk v ->
       make @@ CoRThunk (ValFace.act phi v)
@@ -406,9 +406,6 @@ struct
         con
 
   and make_cons (a, b) = make @@ Cons (a, b)
-
-  and make_extlam abs = make @@ ExtLam abs
-
   and make_dfix_line r ty clo =
     match r with
     | `Atom x ->
@@ -416,7 +413,7 @@ struct
     | `Dim0 ->
       make @@ DFix {ty; clo}
     | `Dim1 ->
-      let bdy = inst_clo clo @@ make @@ DFix {ty; clo} in
+      let bdy = lazy begin inst_clo clo @@ make @@ DFix {ty; clo} end in
       let tclo = TickCloConst bdy in
       make @@ Next tclo
 
@@ -898,8 +895,10 @@ struct
           let fixer_fiber phi =
             (* Turns out `fiber_at_face0` will be
              * used for multiple times. *)
-            let fiber_at_face0 phi = make_cons
-                (Value.act phi el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
+            let fiber_at_face0 phi =
+              make_cons
+                (Value.act phi el,
+                 make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
             in
             let mode = `UNIFORM_HCOM in (* how should we switch this? *)
             match mode with
@@ -916,7 +915,9 @@ struct
                     contr0 phi @@
                     make_coe (Dir.make `Dim0 (I.act phi r)) (Abs.bind1 r_atom (fiber0_ty phi (base phi (I.act phi r) `Dim0))) @@
                     (* the fiber *)
-                    make_cons (Value.act (I.cmp phi (I.subst `Dim0 r_atom)) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
+                    make_cons
+                      (Value.act (I.cmp phi (I.subst `Dim0 r_atom)) el,
+                       make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
                   in
                   ext_apply path_in_fiber0_ty [r]
               end
@@ -1431,8 +1432,7 @@ struct
       make @@ Lam (clo bnd rho)
 
     | Tm.ExtLam bnd ->
-      let abs = eval_nbnd rho bnd in
-      make @@ ExtLam abs
+      make @@ ExtLam (nclo bnd rho)
 
     | Tm.CoRThunk face ->
       let vface = eval_tm_face rho face in
@@ -1444,7 +1444,7 @@ struct
       make @@ Cons (v0, v1)
 
     | Tm.FHCom info ->
-      let r = eval_dim rho info.r  in
+      let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
       let dir = Dir.make r r' in
       let cap = eval rho info.cap in
@@ -1911,8 +1911,8 @@ struct
 
   and ext_apply vext (ss : I.t list) =
     match unleash vext with
-    | ExtLam abs ->
-      Abs.inst abs (Bwd.from_list ss)
+    | ExtLam nclo ->
+      inst_nclo nclo @@ List.map (fun x -> `Dim x) ss
 
     | Up info ->
       let tyr, sysr = unleash_ext_with info.ty ss in
@@ -2363,17 +2363,19 @@ struct
       raise @@ E (RigidCapUnexpectedArgument el)
 
 
-  and inst_clo clo varg =
+  and inst_clo clo varg : value =
     match clo with
     | Clo info ->
       let Tm.B (_, tm) = info.bnd in
       eval (Env.snoc info.rho @@ `Val varg) tm
 
-  and inst_nclo nclo vargs =
+  and inst_nclo nclo vargs : value =
     match nclo with
     | NClo info ->
       let Tm.NB (_, tm) = info.nbnd in
       eval (Env.append info.rho vargs) tm
+    | NCloConst v ->
+      Lazy.force v
 
   and inst_tick_clo clo tick =
     match clo with
@@ -2381,7 +2383,7 @@ struct
       let Tm.B (_, tm) = info.bnd in
       eval (Env.snoc info.rho @@ `Tick tick) tm
     | TickCloConst v ->
-      v
+      Lazy.force v
 
   module Macro =
   struct

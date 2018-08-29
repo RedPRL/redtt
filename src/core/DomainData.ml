@@ -31,7 +31,7 @@ type con =
   | VIn of {x : atom; el0 : value; el1 : value}
 
   | Lam of clo
-  | ExtLam of abs
+  | ExtLam of nclo
   | CoRThunk of val_face
 
   | Cons of value * value
@@ -96,13 +96,14 @@ and clo =
 
 and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
+  | NCloConst of value Lazy.t
 
 and bclo =
   | BClo of {len : int; btm : Tm.tm Desc.Boundary.term; rho : env}
 
 and tick_clo =
   | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}
-  | TickCloConst of value
+  | TickCloConst of value Lazy.t
 
 and rigid_abs_face = ([`Rigid], abs) face
 and val_face = ([`Any], value) face

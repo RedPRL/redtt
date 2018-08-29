@@ -2,7 +2,6 @@ open RedBasis.Bwd
 include module type of DomainData
 
 val clo_name : clo -> string option
-val nclo_names : nclo -> string option bwd
 
 val pp_abs : Format.formatter -> abs -> unit
 val pp_ext_abs : Format.formatter -> ext_abs -> unit
