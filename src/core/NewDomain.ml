@@ -1,5 +1,5 @@
 open RedBasis
-open RedBasis.Bwd
+open Bwd
 open BwdNotation
 
 type dim =
@@ -352,9 +352,15 @@ and Abs : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
 
     let subst r z abs =
       let Abs (xs, a) = abs in
-      let ys, pi = Perm.freshen xs in
-      let a' = X.swap pi a in
-      Abs (ys, a')
+      if Bwd.mem z xs then abs else
+        match r with
+        | Atom y when Bwd.mem y xs ->
+          let ys, pi = Perm.freshen xs in
+          let a' = X.subst r z @@ X.swap pi a in
+          Abs (ys, a')
+        | _ ->
+          let a' = X.subst r z a in
+          Abs (xs, a')
 
     let run rel abs =
       let Abs (xs, a) = abs in

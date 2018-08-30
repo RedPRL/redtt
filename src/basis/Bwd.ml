@@ -36,6 +36,11 @@ struct
     | Snoc (_, x) when i = 0 -> x
     | Snoc (xs, _) -> nth xs @@ i - 1
 
+  let rec mem a xs =
+    match xs with
+    | Emp -> false
+    | Snoc (xs, x) ->
+      if a = x then true else mem a xs
 
   let rec length =
     function
