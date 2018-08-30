@@ -75,6 +75,9 @@ sig
   (** [swap] is a purely syntactic operation which perserves the property of being a Ξ-value. *)
   val swap : perm -> t -> t
 
+  (** [subst] is a purely syntactic operation that does {e not} preserve the property of being a Ξ-value; it should usually be followed by [run]. *)
+  val subst : dim -> Name.t -> t -> t
+
   (** [run] brings the element underneath the restriction Ξ. *)
   val run : rel -> t -> t
 end
@@ -108,16 +111,6 @@ struct
     Syn.eval rel (env #< cell) tm
 end
 
-and Dim : Domain with type t = dim =
-struct
-  type t = dim
-
-  let swap pi s =
-    failwith ""
-
-  let run _ r = r
-end
-
 and Val : DomainPlug with type t = value =
 struct
   type t = value
@@ -125,8 +118,8 @@ struct
   module ValSys = Sys (Val)
 
   let run _ = failwith ""
-
   let swap _ = failwith ""
+  let subst _ = failwith ""
 
   let plug rel frm hd =
     match frm, hd with
@@ -152,6 +145,8 @@ struct
   let swap _ = failwith ""
   let run _ = failwith ""
   let plug _ = failwith ""
+  let subst _ = failwith ""
+
   let plug rel frm neu =
     {neu with
      frames = neu.frames #< frm}
@@ -165,6 +160,7 @@ end =
 struct
   type t = frame
   let swap _ = failwith ""
+  let subst _ = failwith ""
   let run _ = failwith ""
 
   let occurs xs =
@@ -183,6 +179,7 @@ and Sys : functor (X : DomainPlug) -> DomainPlug with type t = X.t sys =
     module Face = Face (X)
 
     let swap _ _ = failwith ""
+    let subst _ _ = failwith ""
     let run _ _ = failwith ""
 
     let plug rel frm sys =
@@ -195,6 +192,7 @@ and Face : functor (X : DomainPlug) -> DomainPlug with type t = X.t face =
     type t = X.t face
 
     let swap _ _ = failwith ""
+    let subst _ _ = failwith ""
     let run _ _ = failwith ""
 
     let plug rel frm ((r, r'), bdy) =
@@ -209,6 +207,7 @@ and Abs : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
     type t = X.t abs
 
     let swap _ _ = failwith ""
+    let subst _ _ = failwith ""
     let run _ _ = failwith ""
 
     let plug rel frm abs =
