@@ -40,7 +40,7 @@ let pf (pA : ptype) : pequiv^1 (p→ pbool pA) pA =
          | ff ⇒ symm _ (f.1) i
          ]
        , λ j →
-          comp 0 i (pA.1) [j=0 => symm (pA.0) (f.1)| j=1 => auto]
+          comp 0 i (pA.1) [j=0 => symm (pA.0) (f.1)| j=1 => refl]
        >
     in
     λ i →
