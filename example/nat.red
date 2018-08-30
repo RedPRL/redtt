@@ -82,7 +82,7 @@ let nat/discrete : discrete nat =
   elim m [
   | zero ⇒ λ n →
     elim n [
-    | zero ⇒ <tt, λ _ → zero>
+    | zero ⇒ <tt, refl>
     | suc n' ⇒ <ff, nat-path/encode zero (suc n')>
     ]
   | suc (m' ⇒ nat/discrete/m') ⇒ λ n →

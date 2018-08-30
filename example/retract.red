@@ -13,9 +13,7 @@ let path-retract/preserves/refl (A : type) (R : A → A → type)
   : (x : A) → Path (Path A x x) (s x x (r x x (λ _ → x))) (λ _ → x)
   =
   λ x →
-  let q : Path A x x =
-    s x x (r x x (λ _ → x))
-  in
+  let q = s x x (r x x refl) in
   let cap1 : [i j] A [
     | j=0 ⇒ x
     | j=1 ⇒ q i
@@ -46,13 +44,13 @@ let path-retract/preserves/refl (A : type) (R : A → A → type)
     λ m k →
      comp 0 m x [
      | k=0 ⇒ q
-     | k=1 ⇒ λ _ → x
+     | k=1 ⇒ refl
      ]
   in
   λ i j →
     comp 0 1 (cap2 i j) [
-    | j=0 ⇒ λ _ → x
+    | j=0 ⇒ refl
     | j=1 ⇒ face i
-    | i=0 ⇒ λ _ → q j
+    | i=0 ⇒ refl
     | i=1 ⇒ face j
     ]
