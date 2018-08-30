@@ -16,8 +16,7 @@ type tick =
 type con =
   | Pi of {dom : value; cod : clo}
   | Sg of {dom : value; cod : clo}
-  | Rst of {ty : value; sys : val_sys}
-  | CoR of val_face
+  | Restrict of val_face
   | Ext of ext_abs
 
   | Coe of {dir : dir; abs : abs; el : value}
@@ -31,8 +30,8 @@ type con =
   | VIn of {x : atom; el0 : value; el1 : value}
 
   | Lam of clo
-  | ExtLam of abs
-  | CoRThunk of val_face
+  | ExtLam of nclo
+  | RestrictThunk of val_face
 
   | Cons of value * value
 
@@ -63,8 +62,7 @@ and neu =
   | NHComAtCap of {dir : dir; ty : value; cap : neu; sys : comp_sys}
   | NCoe of {dir : dir; abs : abs; neu : neu}
 
-  | NCoeAtType of {dir : dir; abs : abs; el : value}
-  (** Invariant: [abs] always has a neutral interior *)
+  | NCoeAtType of {dir : dir; abs : neu_abs; el : value}
 
   | FunApp of neu * nf
   | ExtApp of neu * dim list
@@ -82,7 +80,7 @@ and neu =
   | Cap of {dir : dir; ty : value; sys : comp_sys; neu : neu}
 
   | LblCall of neu
-  | CoRForce of neu
+  | RestrictForce of neu
 
   | Prev of tick * neu
   | Fix of tick_gen * value * clo
@@ -97,13 +95,14 @@ and clo =
 
 and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
+  | NCloConst of value Lazy.t
 
 and bclo =
   | BClo of {len : int; btm : Tm.tm Desc.Boundary.term; rho : env}
 
 and tick_clo =
   | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}
-  | TickCloConst of value
+  | TickCloConst of value Lazy.t
 
 and rigid_abs_face = ([`Rigid], abs) face
 and val_face = ([`Any], value) face
@@ -114,6 +113,7 @@ and val_sys = val_face list
 and rigid_val_sys = rigid_val_face list
 and box_sys = rigid_val_sys
 and ext_abs = (value * val_sys) IAbs.abs
+and neu_abs = (neu * val_sys) IAbs.abs
 
 and value = Node of {con : con; action : I.action}
 

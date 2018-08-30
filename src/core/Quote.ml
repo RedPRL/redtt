@@ -179,34 +179,31 @@ struct
       let bdy = equate (Env.succ env) ty prev0 prev1 in
       Tm.make @@ Tm.Next (Tm.B (None, bdy))
 
-    | Rst {ty; _} ->
-      equate env ty el0 el1
-
-    | CoR face ->
+    | Restrict face ->
       begin
         match face with
         | Face.False (r, r') ->
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
-          Tm.make @@ Tm.CoRThunk (tr, tr', None)
+          Tm.make @@ Tm.RestrictThunk (tr, tr', None)
 
         | Face.True (r, r', ty) ->
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
-          let force0 = corestriction_force el0 in
-          let force1 = corestriction_force el1 in
+          let force0 = restriction_force el0 in
+          let force1 = restriction_force el1 in
           let tm = equate env (Lazy.force ty) force0 force1 in
-          Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
+          Tm.make @@ Tm.RestrictThunk (tr, tr', Some tm)
 
         | Face.Indet (p, ty) ->
           let r, r' = Eq.unleash p in
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
           let phi = I.equate r r' in
-          let force0 = corestriction_force @@ Domain.Value.act phi el0 in
-          let force1 = corestriction_force @@ Domain.Value.act phi el1 in
+          let force0 = restriction_force @@ Domain.Value.act phi el0 in
+          let force1 = restriction_force @@ Domain.Value.act phi el1 in
           let tm = equate env (Lazy.force ty) force0 force1 in
-          Tm.make @@ Tm.CoRThunk (tr, tr', Some tm)
+          Tm.make @@ Tm.RestrictThunk (tr, tr', Some tm)
       end
 
     | LblTy {ty; _} ->
@@ -270,15 +267,10 @@ struct
         let sysx = equate_val_sys envx ty0x sys0x sys1x in
         Tm.make @@ Tm.Ext (Tm.NB (Bwd.map Name.name xs, (tyx, sysx)))
 
-      | _, Rst info0, Rst info1 ->
-        let ty = equate env ty info0.ty info1.ty in
-        let sys = equate_val_sys env info0.ty info0.sys info1.sys in
-        Tm.make @@ Tm.Rst {ty; sys}
-
-      | _, CoR face0, CoR face1 ->
+      | _, Restrict face0, Restrict face1 ->
         let univ = D.make @@ Univ {lvl = `Omega; kind = `Pre} in
         let face = equate_val_face env univ face0 face1 in
-        Tm.make @@ Tm.CoR face
+        Tm.make @@ Tm.Restrict face
 
       | _, V info0, V info1 ->
         let x0 = info0.x in
@@ -290,12 +282,11 @@ struct
         let equiv = equate env equiv_ty info0.equiv info1.equiv in
         Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
 
-      | _, Box info0, Box info1 ->
-        let dir, ty_cap, ty_sys = unleash_fhcom ty in
-        let _, s' = Dir.unleash dir in
-        let tr, tr' = equate_dir3 env dir info0.dir info1.dir in
-        let tcap = equate env ty_cap info0.cap info1.cap in
-        let tsys = equate_box_sys env s' ty_sys info0.sys info1.sys in
+      | FHCom fhcom, Box info0, Box info1 ->
+        let _, s' = Dir.unleash fhcom.dir in
+        let tr, tr' = equate_dir3 env fhcom.dir info0.dir info1.dir in
+        let tcap = equate env fhcom.cap info0.cap info1.cap in
+        let tsys = equate_box_sys env s' fhcom.sys info0.sys info1.sys in
         Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
 
       | _, LblTy info0, LblTy info1 ->
@@ -434,9 +425,10 @@ struct
     | NCoeAtType info0, NCoeAtType info1 ->
       let tr, tr' = equate_dir env info0.dir info1.dir in
       let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
-      let bnd = equate_val_abs env univ info0.abs info1.abs in
+      let bnd = equate_neu_abs env info0.abs info1.abs in
       let r, _ = Dir.unleash info0.dir in
-      let ty_r = Abs.inst1 info0.abs r in
+      let neu_ty_r, sys_ty_r = NeuAbs.inst1 info0.abs r in
+      let ty_r = reflect univ neu_ty_r sys_ty_r in
       let tm = equate env ty_r info0.el info1.el in
       Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Bwd.from_list stk
 
@@ -564,8 +556,8 @@ struct
     | LblCall neu0, LblCall neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
 
-    | CoRForce neu0, CoRForce neu1 ->
-      equate_neu_ env neu0 neu1 @@ Tm.CoRForce :: stk
+    | RestrictForce neu0, RestrictForce neu1 ->
+      equate_neu_ env neu0 neu1 @@ Tm.RestrictForce :: stk
 
     | Prev (tick0, neu0), Prev (tick1, neu1) ->
       let tick = equate_tick env tick0 tick1 in
@@ -662,6 +654,17 @@ struct
     with
     | exn ->
       (* Format.eprintf "Failed to equate abs: @[<v>%a@,= %a@]@." pp_abs abs0 pp_abs abs1; *)
+      raise exn
+
+  and equate_neu_abs env abs0 abs1 =
+    let x, (neu0x, _) = NeuAbs.unleash1 abs0 in
+    let neu1x, _ = NeuAbs.inst1 abs1 @@ `Atom x in
+    try
+      let envx = Env.abs env [x] in
+      let cmd = equate_neu envx neu0x neu1x in
+      Tm.B (Name.name x, Tm.up cmd)
+    with
+    | exn ->
       raise exn
 
   and equate_eq env p0 p1 =
@@ -779,17 +782,6 @@ struct
 
   and fancy_subtype env ty0 sys0 ty1 sys1 =
     match unleash ty0, unleash ty1 with
-    | _, Rst rst1 ->
-      fancy_subtype env ty0 sys0 rst1.ty (rst1.sys @ sys1)
-
-    | Rst rst0, _ ->
-      begin
-        (* backtracking :( ) *)
-        try fancy_subtype env rst0.ty sys0 ty1 sys1
-        with _ ->
-          fancy_subtype env rst0.ty (rst0.sys @ sys0) ty1 sys1
-      end
-
     | Pi pi0, Pi pi1 ->
       fancy_subtype env pi1.dom [] pi0.dom [];
       let var = generic env pi0.dom in

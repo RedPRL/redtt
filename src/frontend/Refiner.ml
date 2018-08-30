@@ -54,8 +54,7 @@ let match_goal tac =
 let guess_restricted tm goal =
   let ty = goal.ty in
   let sys = goal.sys in
-  let rty = Tm.make @@ Tm.Rst {ty; sys} in
-  M.lift @@ C.check ~ty:rty tm >>= function
+  M.lift @@ C.check ~ty ~sys tm >>= function
   | `Ok -> M.ret tm
   | _ ->
     let rec go =
@@ -73,7 +72,7 @@ let guess_restricted tm goal =
     in
     go sys >>
     M.unify >>
-    M.lift @@ C.check ~ty:rty tm >>= function
+    M.lift @@ C.check ~ty ~sys tm >>= function
     | `Ok -> M.ret tm
     | `Exn exn ->
       raise exn
@@ -169,7 +168,13 @@ let rec tac_lambda names tac goal =
         let xs_fwd = Bwd.to_list xs in
         let xs_tms = List.map (fun x -> Tm.var x) xs_fwd in
         let tyxs, sysxs = Tm.unbind_ext_with xs_tms ebnd in
-        let ps = List.map (fun x -> (x, `I)) xs_fwd in
+        let ps =
+          match xs_fwd with
+          | [] ->
+            [(Name.fresh (), `NullaryExt)]
+          | _ ->
+            List.map (fun x -> (x, `I)) xs_fwd
+        in
         let sys'xs =
           flip List.map goal.sys @@ fun (r, r', otm) ->
           r, r', flip Option.map otm @@ fun tm ->
@@ -277,10 +282,10 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           in
           lbl, pbinds, fun goal ->
             M.lift C.ask >>= fun psi ->
-            let rty = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
-            M.lift @@ U.push_hole `Rigid psi rty  >>= fun tm ->
-            M.emit loc @@ M.UserHole {name = Some lbl; ty = rty; tele = psi; tm = Tm.up tm} >>
-            M.ret @@ Tm.up tm
+            let rty = Tm.refine_ty goal.ty goal.sys in
+            M.lift @@ U.push_hole `Rigid psi rty  >>= fun cmd ->
+            M.emit loc @@ M.UserHole {name = Some lbl; ty = rty; tele = psi; tm = Tm.up cmd} >>
+            M.ret @@ Tm.up @@ Tm.refine_force cmd
       in
       List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
     in
@@ -411,16 +416,15 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     M.ret @@ Tm.up @@ Tm.ann ~ty:data_ty ~tm:scrut @< Tm.Elim {dlbl; mot = bmot; clauses}
 
 let rec tac_hope goal =
-  let rst = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
   let rec try_system sys =
     match sys with
     | [] ->
       M.lift C.ask >>= fun psi ->
-      let rty = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
-      M.lift @@ U.push_hole `Flex psi rty <<@> Tm.up
+      let rty = Tm.refine_ty goal.ty goal.sys in
+      M.lift @@ U.push_hole `Flex psi rty <<@> fun cmd -> Tm.up @@ Tm.refine_force cmd
     | (r, r', Some tm) :: sys ->
       begin
-        M.lift @@ C.check ~ty:rst tm >>=
+        M.lift @@ C.check ~ty:goal.ty ~sys:goal.sys tm >>=
         function
         | `Ok ->
           M.ret tm
@@ -435,21 +439,22 @@ let rec tac_hope goal =
 let tac_hole ~loc ~name : chk_tac =
   fun goal ->
     M.lift C.ask >>= fun psi ->
-    let rty = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
+    let rty = Tm.refine_ty goal.ty goal.sys in
     M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
-    let tm = Tm.up cmd in
     begin
       if name = Some "_" then M.ret () else
-        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi; tm}
+        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi; tm = Tm.up cmd}
     end >>
-    M.ret tm
+    M.ret @@ Tm.up @@ Tm.refine_force cmd
 
 let tac_guess tac : chk_tac =
   fun goal ->
     tac {goal with sys = []} >>= fun tm ->
-    let rty = Tm.make @@ Tm.Rst {ty = goal.ty; sys = goal.sys} in
+    let rty = Tm.refine_ty goal.ty goal.sys in
+    let rty0 = Tm.refine_ty goal.ty [] in
     M.lift C.ask >>= fun psi ->
-    M.lift @@ U.push_guess psi ~ty0:rty ~ty1:goal.ty tm
+    M.lift @@ U.push_guess psi ~ty0:rty ~ty1:rty0 (Tm.refine_thunk tm) <<@> fun tm ->
+        Tm.up @@ Tm.refine_force @@ Tm.ann ~ty:rty ~tm
 
 let tac_refl =
   tac_fix @@ fun tac_refl ->
