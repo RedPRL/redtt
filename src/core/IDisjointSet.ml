@@ -4,7 +4,8 @@ sig
 
   val init : size:int -> t
   val union : I.t -> I.t -> t -> t
-  val hide : Name.t -> t -> t
+  val subst : I.t -> Name.t -> t -> t
+  val swap : Name.t -> Name.t -> t -> t
   val test : I.t -> I.t -> t -> bool
 end
 
@@ -40,12 +41,14 @@ struct
       let f = T.set x (`Atom x) f in
       f, `Atom x
 
+  let find' (x : int) (h : t) : int I.f =
+    let f, cx = find_aux x h.parent in
+    h.parent <- f;
+    cx
+
   let find (x : int I.f) (h : t) : int I.f =
     match x with
-    | `Atom x ->
-      let f, cx = find_aux x h.parent in
-      h.parent <- f;
-      cx
+    | `Atom x -> find' x h
     | c -> c
 
   let get_rank cx h =
@@ -77,13 +80,13 @@ struct
       {h with parent = T.set cy cx h.parent}
     | cx, cy -> if cx == cy then h else raise I.Inconsistent
 
+  let reserve_index' (x : Name.t) (h : t) : int * t =
+    try T.get x h.index, h
+    with _ -> h.next, {h with index = T.set x h.next h.index; next = h.next + 1}
+
   let reserve_index (x : I.t) (h : t) : int I.f * t =
     match x with
-    | `Atom x ->
-      begin
-        try `Atom (T.get x h.index), h
-        with _ -> `Atom h.next, {h with index = T.set x h.next h.index; next = h.next + 1}
-      end
+    | `Atom x -> let x, h = reserve_index' x h in `Atom x, h
     | `Dim0 -> `Dim0, h
     | `Dim1 -> `Dim1, h
 
@@ -107,5 +110,15 @@ struct
 
   let hide (x : Name.t) (h : t) =
     {h with index = T.remove x h.index}
+
+  let subst (r : I.t) (x : Name.t) (h : t) =
+    hide x (union (`Atom x) r h)
+
+  let swap (x : Name.t) (y : Name.t) (h : t) =
+    if x == y then h else
+    let x', h = reserve_index' x h in
+    let y', h = reserve_index' y h in
+    if x' == y' then h else
+    {h with index = T.set y x' (T.set x y' h.index)}
 
 end
