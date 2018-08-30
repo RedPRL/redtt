@@ -34,16 +34,7 @@ let equate r r' t =
    classes = IDS.union r r' t.classes;
    size = t.size + 1}
 
-let compare r r' t = IDS.test r r' t.classes
-
-let as_action t =
-  let rec go =
-    function
-    | [] -> I.idn
-    | (r, r') :: chr ->
-      I.cmp (I.equate r r') (go chr)
-  in
-  go t.chronicle
+let compare r r' t = IDS.compare r r' t.classes
 
 (* poor man's tests *)
 let _  =
@@ -59,4 +50,4 @@ let _  =
 let _ =
   let x = `Atom (Name.named (Some "i")) in
   let rst = equate x `Dim0 @@ emp () in
-  assert (compare x `Dim0 rst)
+  assert (compare x `Dim0 rst == `Same)

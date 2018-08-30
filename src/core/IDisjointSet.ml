@@ -6,7 +6,7 @@ sig
   val union : I.t -> I.t -> t -> t
   val subst : I.t -> Name.t -> t -> t
   val swap : Name.t -> Name.t -> t -> t
-  val test : I.t -> I.t -> t -> I.compare
+  val compare : I.t -> I.t -> t -> I.compare
 end
 
 module Make (T : RedBasis.PersistentTable.S) : S =
@@ -101,7 +101,7 @@ struct
     | `Dim0 -> `Ok `Dim0
     | `Dim1 -> `Ok `Dim1
 
-  let test x y (h : t) =
+  let compare x y (h : t) =
     match query_index x h.index, query_index y h.index with
     | `Owned, `Owned -> if x == y then `Same else `Indet
     | `Owned, `Ok _ -> `Indet
