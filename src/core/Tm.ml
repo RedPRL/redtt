@@ -88,14 +88,9 @@ struct
       in
       Ext ebnd'
 
-    | Rst info ->
-      let ty = traverse_tm info.ty in
-      let sys = traverse_list traverse_face info.sys in
-      Rst {ty; sys}
-
-    | CoR face ->
+    | Restrict face ->
       let face' = traverse_face face in
-      CoR face'
+      Restrict face'
 
     | Cons (t0, t1) ->
       let t0' = traverse_tm t0 in
@@ -123,9 +118,9 @@ struct
       let nbnd' = traverse_nbnd traverse_tm nbnd in
       ExtLam nbnd'
 
-    | CoRThunk face ->
+    | RestrictThunk face ->
       let face' = traverse_face face in
-      CoRThunk face'
+      RestrictThunk face'
 
     | Box info ->
       let r = traverse_tm info.r in
@@ -309,7 +304,7 @@ struct
 
   and traverse_frame =
     function
-    | (Car | Cdr | LblCall | CoRForce as frm) ->
+    | (Car | Cdr | LblCall | RestrictForce as frm) ->
       frm
 
     | FunApp t ->
@@ -646,17 +641,7 @@ let rec pp env fmt =
           Format.fprintf fmt "@[<hv1>(# @[<hv1><%a>@ %a@ @[<hv>%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
       end
 
-
-    | Rst {ty; sys}  ->
-      begin
-        match sys with
-        | [] ->
-          Format.fprintf fmt "@[<hv1>(restrict %a)]" (pp env) ty
-        | _ ->
-          Format.fprintf fmt "@[<hv1>(restrict %a@ @[<hv>%a@])@]" (pp env) ty (pp_sys env) sys
-      end
-
-    | CoR face ->
+    | Restrict face ->
       Format.fprintf fmt "@[<hv1>(=>@ %a)@]" (pp_face env) face
 
     | V info ->
@@ -679,7 +664,7 @@ let rec pp env fmt =
       else
         Format.fprintf fmt "@[<hv1>(λ <%a>@ %a)@]" pp_strings xs (go env' `Lam) tm
 
-    | CoRThunk face ->
+    | RestrictThunk face ->
       pp_face env fmt face
 
     | Dim0 ->
@@ -810,7 +795,13 @@ and pp_cmd env fmt (hd, sp) =
         else
           Format.fprintf fmt "@[<hv1>(%a@ %a)@]" (go `FunApp) sp (pp env) t
       | ExtApp ts ->
-        Format.fprintf fmt "@[<hv1>(%s %a@ %a)@]" "@" (go `ExtApp) sp (pp_terms env) ts
+        begin
+          match ts with
+          | [] ->
+            Format.fprintf fmt "@[<hv1>(%s %a)@]" "@" (go `ExtApp) sp
+          | _ ->
+            Format.fprintf fmt "@[<hv1>(%s %a@ %a)@]" "@" (go `ExtApp) sp (pp_terms env) ts
+        end
       | Elim info ->
         let B (nm_mot, mot) = info.mot in
         let x_mot, env_mot = Pp.Env.bind env nm_mot in
@@ -829,7 +820,7 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@<cap>"
       | LblCall ->
         Format.fprintf fmt "@[<hv1>(call@ %a)@]" (go `Call) sp
-      | CoRForce ->
+      | RestrictForce ->
         Format.fprintf fmt "@[<hv1>(force@ %a)@]" (go `Force) sp
       | Prev tick ->
         Format.fprintf fmt "@[<hv1>(prev %a@ %a)@]" (pp env) tick (go `Prev) sp
@@ -864,7 +855,7 @@ and pp_spine env fmt sp =
   | Emp ->
     Format.fprintf fmt "[]"
   | Snoc (sp, f) ->
-    Format.fprintf fmt "%a; %a"
+    Format.fprintf fmt "%a. %a"
       (pp_spine env) sp
       (pp_frame env) f
 
@@ -884,12 +875,15 @@ and pp_frame env fmt =
     Format.fprintf fmt "<cap>"
   | LblCall ->
     Format.fprintf fmt "lblcall"
-  | CoRForce ->
-    Format.fprintf fmt "corforce"
+  | RestrictForce ->
+    Format.fprintf fmt "restrict-force"
   | Prev _ ->
     Format.fprintf fmt "<prev>"
-  | Elim _ ->
-    Format.fprintf fmt "<elim>"
+  | Elim info ->
+    Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a)@]"
+      Desc.pp_data_label info.dlbl
+      (pp_bnd env) info.mot
+      (pp_elim_clauses env) info.clauses
 
 and pp_lbl_args env fmt args =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -1011,6 +1005,17 @@ let equiv ty0 ty1 =
     ~ty1:(subst proj2 ty1)
     ~f:(up @@ ix 1)
     ~x:(up @@ ix 0)
+
+
+let refine_ty ty sys =
+  let ebnd = NB (Emp, (ty, sys)) in
+  make @@ Ext ebnd
+
+let refine_thunk tm =
+  make @@ ExtLam (NB (Emp, tm))
+
+let refine_force (hd, sp) =
+  hd, sp #< (ExtApp [])
 
 
 module OccursAlg (Init : sig val fl : Occurs.flavor end) :
@@ -1150,7 +1155,7 @@ let map_head f =
 
 let map_frame f =
   function
-  | (Car | Cdr | LblCall | CoRForce) as frm ->
+  | (Car | Cdr | LblCall | RestrictForce) as frm ->
     frm
   | FunApp t ->
     FunApp (f t)
@@ -1215,10 +1220,8 @@ let map_tmf f =
     Sg (f dom, map_bnd f cod)
   | Ext ebnd ->
     Ext (map_ext_bnd f ebnd)
-  | Rst {ty; sys} ->
-    Rst {ty = f ty; sys = map_tm_sys f sys}
-  | CoR face ->
-    CoR (map_tm_face f face)
+  | Restrict face ->
+    Restrict (map_tm_face f face)
   | V info ->
     let r = f info.r in
     let ty0 = f info.ty0 in
@@ -1234,8 +1237,8 @@ let map_tmf f =
     Lam (map_bnd f bnd)
   | ExtLam nbnd ->
     ExtLam (map_nbnd f nbnd)
-  | CoRThunk face ->
-    CoRThunk (map_tm_face f face)
+  | RestrictThunk face ->
+    RestrictThunk (map_tm_face f face)
   | Box info ->
     let r = f info.r in
     let r' = f info.r' in

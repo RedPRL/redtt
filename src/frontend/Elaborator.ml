@@ -409,8 +409,8 @@ struct
       | _, _, E.Hope ->
         tac_hope goal
 
-      | _, _, E.Auto ->
-        tac_auto goal
+      | _, _, E.Refl ->
+        tac_refl goal
 
       | _, _, E.Let info ->
         let itac =
@@ -425,9 +425,6 @@ struct
         in
         let ctac goal = elab_chk env info.body goal in
         tac_let info.name itac ctac goal
-
-      | _, Tm.Rst rst, _ ->
-        elab_chk env e {ty = rst.ty; sys = rst.sys @ goal.sys}
 
       | _, _, E.Lam (names, e) ->
         let tac = elab_chk env e in
@@ -462,7 +459,11 @@ struct
       | [], Tm.Univ _, E.Ext (names, ety, esys) ->
         let univ = ty in
         let xs = List.map (fun x -> Name.named (Some x)) names in
-        let ps = List.map (fun x -> (x, `I)) xs in
+        let ps =
+          match xs with
+          | [] -> [(Name.fresh (), `NullaryExt)]
+          | _ -> List.map (fun x -> (x, `I)) xs
+        in
         M.in_scopes ps begin
           elab_chk env ety {ty = univ; sys = []} >>= fun tyxs ->
           elab_tm_sys env tyxs esys <<@> fun sysxs ->
@@ -904,6 +905,8 @@ struct
       | `Ok ->
         M.ret @@ Tm.up cmd
       | `Exn exn ->
+        M.lift @@ C.dump_state Format.err_formatter "foo" `All >>= fun _ ->
+        Format.eprintf "raising exn@.";
         raise exn
 
   and elab_cut env exp frms =
@@ -914,7 +917,6 @@ struct
   and elab_cut_ env exp frms =
     let rec unleash tm =
       match Tm.unleash tm with
-      | Tm.Rst rst -> unleash rst.ty
       | con -> con
     in
 

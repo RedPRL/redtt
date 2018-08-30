@@ -24,7 +24,7 @@ syn match   redttHole '?\k*'
 
 syn keyword redttKeyw data intro where in with end elim
 syn keyword redttKeyw V fst snd coe com pair hcom comp vproj
-syn keyword redttKeyw restrict if lam call
+syn keyword redttKeyw refl restrict if lam call
 syn keyword redttKeyw pre kan U type then else
 syn keyword redttKeyw open shut tick dim prev next dfix fix
 

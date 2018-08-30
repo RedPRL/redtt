@@ -81,6 +81,11 @@ val is_contr : tm -> tm
 val fiber : ty0:tm -> ty1:tm -> f:tm -> x:tm -> tm
 val equiv : tm -> tm -> tm
 
+(** boundary refinement *)
+val refine_ty : tm -> (tm, tm) system -> tm
+val refine_thunk : tm -> tm
+val refine_force : 'a cmd -> 'a cmd
+
 
 val pp : tm Pp.t
 val pp0 : tm Pp.t0

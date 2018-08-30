@@ -13,6 +13,29 @@ type telescope = params
 
 open Tm.Notation
 
+type error =
+  | SpineMismatch of Tm.tm Tm.spine * Tm.tm Tm.spine
+
+exception E of error
+
+module Error =
+struct
+  let pp fmt =
+    function
+    | SpineMismatch (sp0,sp1) ->
+      Format.fprintf fmt
+        "@[<v>spine mismatch:@,  @[<v>%a@,%a@]@]"
+        (Tm.pp_spine Pp.Env.emp) sp0
+        (Tm.pp_spine Pp.Env.emp) sp1
+
+  let _ =
+    PpExn.install_printer @@ fun fmt ->
+    function
+    | E err ->
+      pp fmt err
+    | _ ->
+      raise PpExn.Unrecognized
+end
 
 let rec telescope ty : telescope * ty =
   match Tm.unleash ty with
@@ -20,7 +43,7 @@ let rec telescope ty : telescope * ty =
     let x, codx = Tm.unbind cod in
     let tel, ty = telescope codx in
     (Emp #< (x, `P dom)) <.> tel, ty
-  | Tm.CoR (r, r', Some ty) ->
+  | Tm.Restrict (r, r', Some ty) ->
     let x = Name.fresh () in
     let tel, ty = telescope ty in
     (Emp #< (x, `R (r, r'))) <.> tel, ty
@@ -43,8 +66,11 @@ let rec abstract_tm xs tm =
   | Snoc (xs, (x, `I)) ->
     let bnd = Tm.NB (Emp #< None, Tm.close_var x 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
+  | Snoc (xs, (_, `NullaryExt)) ->
+    let bnd = Tm.NB (Emp, tm) in
+    abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
   | Snoc (xs, (_, `R (r, r'))) ->
-    abstract_tm xs @@ Tm.make @@ Tm.CoRThunk (r, r', Some tm)
+    abstract_tm xs @@ Tm.make @@ Tm.RestrictThunk (r, r', Some tm)
   | Snoc (xs, (_, `KillFromTick _)) ->
     abstract_tm xs tm
   | _ ->
@@ -58,9 +84,11 @@ let rec abstract_ty (gm : telescope) cod =
   | Snoc (gm, (x, `Def (dom, def))) ->
     abstract_ty gm @@ Tm.unbind_with (Tm.ann ~ty:dom ~tm:def) @@ Tm.bind x cod
   | Snoc (gm, (_, `R (r, r'))) ->
-    abstract_ty gm @@ Tm.make @@ Tm.CoR (r, r', Some cod)
+    abstract_ty gm @@ Tm.make @@ Tm.Restrict (r, r', Some cod)
   | Snoc (gm, (x, `I)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) cod [])
+  | Snoc (gm, (_, `NullaryExt)) ->
+    abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.bind_ext Emp cod [])
   | Snoc (gm, (x, `Tick)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Later (Tm.bind x cod)
   | Snoc (gm, (_, `KillFromTick _)) ->
@@ -73,6 +101,8 @@ let telescope_to_spine : telescope -> tm Tm.spine =
   match param with
   | `I ->
     [Tm.ExtApp [Tm.up @@ Tm.var x]]
+  | `NullaryExt ->
+    [Tm.ExtApp []]
   | `P _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `Def _ ->
@@ -83,7 +113,7 @@ let telescope_to_spine : telescope -> tm Tm.spine =
   | `Tw _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `R _ ->
-    [Tm.CoRForce]
+    [Tm.RestrictForce]
   | `Tick ->
     [Tm.Prev (Tm.up @@ Tm.var x)]
   | `KillFromTick _ ->
@@ -145,14 +175,18 @@ let rec spine_to_tele sp =
   | Snoc (sp, Tm.FunApp t) ->
     begin
       match to_var t with
-      | Some x -> Option.map (fun xs -> xs #< (x, `P ())) @@ spine_to_tele sp
-      | None -> None
+      | Some x ->
+        Option.map (fun xs -> xs #< (x, `P ())) @@ spine_to_tele sp
+      | None ->
+        None
     end
   | Snoc (sp, Tm.ExtApp ts) ->
     begin
       match opt_traverse to_var ts with
-      | Some xs -> Option.map (fun ys -> ys <>< List.map (fun x -> (x, `I)) xs) @@ spine_to_tele sp
-      | None -> None
+      | Some xs ->
+        Option.map (fun ys -> ys <>< match xs with [] -> [(Name.fresh (), `NullaryExt)] | _ -> List.map (fun x -> (x, `I)) xs) @@ spine_to_tele sp
+      | None ->
+        None
     end
   | _ -> None
 
@@ -171,6 +205,8 @@ let linear_on t tele =
       not (occurs_in x xs && Occurs.Set.mem x fvs) && go xs
     | Snoc (xs, (x, `I)) ->
       not (occurs_in x xs && Occurs.Set.mem x fvs) && go xs
+    | Snoc (xs, (_, `NullaryExt)) ->
+      go xs
     | Snoc (_, _) ->
       failwith "linear_on"
   in go tele
@@ -186,8 +222,10 @@ let invert alpha ty sp t =
         local (fun _ -> Emp) begin
           check ~ty lam_tm
         end >>= function
-        | `Ok -> ret @@ Some lam_tm
-        | _ -> ret None
+        | `Ok ->
+          ret @@ Some lam_tm
+        | `Exn exn ->
+          ret None
       end
     | _ ->
       ret None
@@ -447,38 +485,27 @@ let is_orthogonal q =
   | Tm.Pi _, Tm.Univ _ -> true
   | Tm.Pi _, Tm.Sg _ -> true
   | Tm.Pi _, Tm.Data _ -> true
-  | Tm.Pi _, Tm.Rst _ -> true
   | Tm.Pi _, Tm.Ext _ -> true
 
   | Tm.Univ _, Tm.Pi _ -> true
   | Tm.Univ _, Tm.Sg _ -> true
   | Tm.Univ _, Tm.Data _ -> true
-  | Tm.Univ _, Tm.Rst _ -> true
   | Tm.Univ _, Tm.Ext _ -> true
 
   | Tm.Sg _, Tm.Pi _ -> true
   | Tm.Sg _, Tm.Univ _ -> true
   | Tm.Sg _, Tm.Data _ -> true
-  | Tm.Sg _, Tm.Rst _ -> true
   | Tm.Sg _, Tm.Ext _ -> true
 
   | Tm.Data _, Tm.Univ _ -> true
   | Tm.Data _, Tm.Sg _ -> true
   | Tm.Data _, Tm.Ext _ -> true
   | Tm.Data _, Tm.Pi _ -> true
-  | Tm.Data _, Tm.Rst _ -> true
-
-  | Tm.Rst _, Tm.Univ _ -> true
-  | Tm.Rst _, Tm.Pi _ -> true
-  | Tm.Rst _, Tm.Sg _ -> true
-  | Tm.Rst _, Tm.Ext _ -> true
-  | Tm.Rst _, Tm.Data _ -> true
 
   | Tm.Ext _, Tm.Pi _ -> true
   | Tm.Ext _, Tm.Sg _ -> true
   | Tm.Ext _, Tm.Univ _ -> true
   | Tm.Ext _, Tm.Data _ -> true
-  | Tm.Ext _, Tm.Rst _ -> true
 
   | Tm.Data dlbl0, Tm.Data dlbl1 -> not (dlbl0 = dlbl1)
   | Tm.Intro (_, clbl0, _), Tm.Intro (_, clbl1, _) -> not (clbl0 = clbl1)
@@ -521,9 +548,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       (* TODO: unify the dimension spines ts0, ts1 *)
       let ty'0, sys0 = V.unleash_ext_with ty0 rs0 in
       let ty'1, sys1 = V.unleash_ext_with ty1 rs1 in
-      let rst0 = D.make @@ D.Rst {ty = ty'0; sys = sys0} in
-      let rst1 = D.make @@ D.Rst {ty = ty'1; sys = sys1} in
-      ret (rst0, rst1)
+      ret (ty'0, ty'1)
 
     | Snoc (sp0, Tm.Car), Snoc (sp1, Tm.Car) ->
       go sp0 sp1 >>= fun (ty0, ty1) ->
@@ -554,7 +579,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
       failwith "TODO: match_spine/vproj"
 
-    | Snoc (sp0, Tm.CoRForce), Snoc (sp1, Tm.CoRForce) ->
+    | Snoc (sp0, Tm.RestrictForce), Snoc (sp1, Tm.RestrictForce) ->
       go sp0 sp1
 
     | Snoc (_, tm0), Snoc (_, tm1) ->
@@ -562,7 +587,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       failwith "mismatch"
 
     | _ ->
-      failwith "spine mismatch"
+      raise @@ E (SpineMismatch (sp0,sp1))
 
   in
   go sp0 sp1
@@ -638,12 +663,6 @@ let rec subtype ty0 ty1 =
 
     | _, Tm.Up (Tm.Meta _, _) ->
       active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
-
-    | Tm.Rst rst0, Tm.Rst rst1 ->
-      restriction_subtype rst0.ty rst0.sys rst1.ty rst1.sys
-
-    | Tm.Rst _, _ ->
-      active @@ Subtype {ty0; ty1 = Tm.make @@ Tm.Rst {ty = ty1; sys = []}}
 
     | _ ->
       active @@ Problem.eqn ~ty0:univ ~ty1:univ ~tm0:ty0 ~tm1:ty1
@@ -725,7 +744,11 @@ let unify q =
     let xs = Bwd.map Name.named nms0 in
     let xs_lst = Bwd.to_list xs in
     let vars = List.map (fun x -> Tm.up @@ Tm.var x) xs_lst in
-    let psi = List.map (fun x -> (x, `I)) @@ xs_lst in
+    let psi =
+      match xs_lst with
+      | [] -> List.map (fun x -> (x, `I)) @@ xs_lst
+      | _ -> [(Name.fresh (), `NullaryExt)]
+    in
 
     in_scopes psi
       begin
@@ -734,9 +757,6 @@ let unify q =
         ret @@ Problem.all_dims xs_lst @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
       end >>= fun prob ->
     active prob
-
-  | Tm.Rst info0, Tm.Rst info1 ->
-    active @@ Unify {q with ty0 = info0.ty; ty1 = info1.ty}
 
   | _ ->
     match Tm.unleash q.tm0, Tm.unleash q.tm1 with
@@ -881,7 +901,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | `I | `Tick | `KillFromTick _ | `SelfArg _ as p ->
+        | `I | `Tick | `NullaryExt | `KillFromTick _ | `SelfArg _ as p ->
           in_scope x p @@
           solver probx
 
