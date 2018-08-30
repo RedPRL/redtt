@@ -8,7 +8,7 @@ sig
   val union : I.t -> I.t -> t -> t
   val subst : I.t -> Name.t -> t -> t
   val swap : Name.t -> Name.t -> t -> t
-  val test : I.t -> I.t -> t -> bool
+  val test : I.t -> I.t -> t -> I.compare
 end
 
 module Make (T : RedBasis.PersistentTable.S) : S
