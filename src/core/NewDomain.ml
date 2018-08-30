@@ -141,6 +141,14 @@ struct
     Syn.eval rel (env #< cell) tm
 end
 
+and Env : Domain with type t = env =
+struct
+  type t = env
+  let swap _ _ = failwith ""
+  let subst _ _ = failwith ""
+  let run _ _ = failwith ""
+end
+
 and Val : DomainPlug with type t = value =
 struct
   type t = value
