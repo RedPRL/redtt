@@ -1,6 +1,8 @@
 import bool
 import isotoequiv
 
+
+
 let ptype : type^1 = (A : type) × A
 
 let pmap (pA,pB : ptype) : type^1 =
@@ -44,7 +46,11 @@ let pf (pA : ptype) : pequiv^1 (p→ pbool pA) pA =
        >
     in
     λ i →
-      let taste = foo 1 in
-      ?
+      < trans _ (λ j → foo j .0) (symm _ (shannon/path _ (f.0))) i
+      ,
+
+      λ k →
+        ?
+      >
   in
   <fwd,(Iso/Equiv^1 _ _ <fwd.0,bwd,λ a i → a,bwdfwd>).1>
