@@ -9,25 +9,38 @@ type dim =
 
 type 'a face = (dim * dim) * 'a Lazy.t
 type 'a sys = 'a face list
-type 'a abs = Abs of Name.t bwd * 'a
+type 'a abs = Abs of Name.t * 'a
+
 
 (** This is the type of "prevalues", that is the domain from which values come.
     A prevalue can be judged to be a value with respect to a restriction / dimension
     theory. I think we will not write code that checks that something is a value, but instead
     make this involved in the pre-and-post- conditions of the semantic operations. *)
 type value =
-  | Pi of {dom : value; cod : clo}
-  | Sg of {dom : value; cod : clo}
+  | Pi of quantifier
+  | Sg of quantifier
   | Lam of clo
   | Cons of value * value
+  | Coe of {r : dim; r' : dim; ty : quantifier abs vkan; cap : value}
+  | HCom of {r : dim; r' : dim; ty : quantifier vkan; cap : value; sys : value abs sys}
   | Neu of {ty : value; neu : neu; sys : value sys}
+
+and quantifier =
+  {dom : value;
+   cod : clo}
+
+and 'a vkan =
+  | KanPi of 'a
+  | KanSg of 'a
 
 and head =
   | Lvl of int
+  | NCoe of {r : dim; r' : dim; ty : neu abs; cap : value}
 
 and frame =
   | FunApp of value
   | Car
+  | Cdr
 
 and neu =
   {head : head;
@@ -64,13 +77,14 @@ end
 module Perm :
 sig
   type t
-  val freshen : Name.t bwd -> Name.t bwd * t
+  val freshen_name : Name.t -> Name.t * t
+  val freshen_names : Name.t bwd -> Name.t bwd * t
   val swap_name : t -> Name.t -> Name.t
 end =
 struct
   type t
-  let freshen _ = failwith ""
-
+  let freshen_name _ = failwith ""
+  let freshen_names _ = failwith ""
   let swap_name _ = failwith ""
 end
 
@@ -154,6 +168,13 @@ struct
   type t = value
 
   module ValSys = Sys (Val)
+  module AbsSys = Sys (AbsPlug (Val))
+  module VCoeTy = VKan (Abs (Quantifier))
+  module VHComTy = VKan (Quantifier)
+
+  let swap _ _ = failwith ""
+  let subst _ _ _ = failwith ""
+
 
   let rec run rel =
     function
@@ -186,20 +207,36 @@ struct
       let v1 = run rel v1 in
       Cons (v0, v1)
 
+    | Coe info ->
+      begin
+        match Rel.status info.r info.r' rel with
+        | `Equal ->
+          run rel info.cap
+        | _ ->
+          let ty = VCoeTy.run rel info.ty in
+          let cap = run rel info.cap in
+          Coe {info with ty; cap}
+      end
 
-  let swap _ = failwith ""
-  let subst _ = failwith ""
+    | HCom info ->
+      begin
+        match Rel.status info.r info.r' rel with
+        | `Equal ->
+          run rel info.cap
+        | _ ->
+          match AbsSys.run rel info.sys with
+          | sys ->
+            let cap = run rel info.cap in
+            let ty = VHComTy.run rel info.ty in
+            HCom {info with ty; cap; sys}
 
-  let plug_ty rel frm ty =
-    match ty, frm with
-    | Pi {dom; cod}, FunApp arg ->
-      Clo.inst rel cod @@ Val arg
-    | Sg {dom; _}, Car ->
-      dom
-    | _ ->
-      failwith ""
+          | exception (AbsSys.Triv abs) ->
+            let Abs (x, vx) = abs in
+            hsubst rel info.r' x vx
+      end
 
-  let plug rel frm hd =
+
+  and plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
       Clo.inst rel clo @@ Val arg
@@ -207,14 +244,79 @@ struct
     | Car, Cons (v0, _) ->
       v0
 
+    | Car, Coe {r; r'; ty = KanSg abs; cap} ->
+      let cap = plug rel Car cap in
+      let ty =
+        let Abs (xs, {dom; cod}) = abs in
+        Abs (xs, dom)
+      in
+      dispatch_coe rel r r' ty cap
+
+    | Cdr, Cons (_, v1) ->
+      v1
+
     | _, Neu info ->
       let neu = Neu.plug rel frm info.neu in
       let sys = ValSys.plug rel frm info.sys in
-      let ty = plug_ty rel frm info.ty in
+      let ty = plug_ty rel frm info.ty hd in
       Neu {ty; neu; sys}
 
     | _ ->
       failwith ""
+
+  and plug_ty rel frm ty hd =
+    match ty, frm with
+    | Pi {dom; cod}, FunApp arg ->
+      Clo.inst rel cod @@ Val arg
+
+    | Sg {dom; _}, Car ->
+      dom
+
+    | Sg {dom; cod}, Cdr ->
+      let car = plug rel Car hd in
+      Clo.inst rel cod @@ Val car
+
+    | _ ->
+      failwith ""
+
+  (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
+  and dispatch_coe rel r r' abs cap =
+    let Abs (x, tyx) = abs in
+    match tyx with
+    | Sg quant ->
+      Coe {r; r'; ty = KanSg (Abs (x, quant)); cap}
+
+    | Pi quant ->
+      Coe {r; r'; ty = KanPi (Abs (x, quant)); cap}
+
+    | Neu info ->
+      let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
+      let ty = hsubst rel r' x tyx in
+      let sys = [(r, r'), lazy cap] in
+      Neu {ty; neu; sys}
+
+    | _ -> failwith ""
+
+  and hsubst rel r x v =
+    let rel' = Rel.union r (Atom x) rel in
+    run rel' @@ subst r x v
+end
+
+and VKan : functor (X : Domain) -> Domain with type t = X.t vkan =
+  functor (X : Domain) ->
+  struct
+    type t = X.t vkan
+    let swap _ = failwith ""
+    let run _ = failwith ""
+    let subst _ = failwith ""
+  end
+
+and Quantifier : Domain with type t = quantifier =
+struct
+  type t = quantifier
+  let swap _ = failwith ""
+  let subst _ = failwith ""
+  let run _ = failwith ""
 end
 
 and Neu : DomainPlug with type t = neu =
@@ -243,7 +345,7 @@ struct
     | FunApp arg ->
       let arg = Val.swap pi arg in
       FunApp arg
-    | Car as frm ->
+    | Car | Cdr as frm ->
       frm
 
   let subst r x =
@@ -251,7 +353,7 @@ struct
     | FunApp arg ->
       let arg = Val.subst r x arg in
       FunApp arg
-    | Car as frm ->
+    | Car | Cdr as frm ->
       frm
 
 
@@ -260,14 +362,14 @@ struct
     | FunApp arg ->
       let arg = Val.run rel arg in
       FunApp arg
-    | Car as frm ->
+    | Car | Cdr as frm ->
       frm
 
   let occurs xs =
     function
     | FunApp _ ->
       `Might
-    | Car ->
+    | Car | Cdr ->
       `No
 end
 
@@ -347,46 +449,53 @@ and Face :
       end
   end
 
-and Abs : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
-  functor (X : DomainPlug) ->
+and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
+  functor (X : Domain) ->
   struct
     type t = X.t abs
 
     let swap pi abs =
-      let Abs (xs, a) = abs in
-      let xs' = Bwd.map (Perm.swap_name pi) xs in
+      let Abs (x, a) = abs in
+      let x' = Perm.swap_name pi x in
       let a' = X.swap pi a in
-      Abs (xs', a')
+      Abs (x', a')
 
     let subst r z abs =
-      let Abs (xs, a) = abs in
-      if Bwd.mem z xs then abs else
+      let Abs (x, a) = abs in
+      if z = x then abs else
         match r with
-        | Atom y when Bwd.mem y xs ->
-          let ys, pi = Perm.freshen xs in
+        | Atom y when y = x ->
+          let y, pi = Perm.freshen_name x in
           let a' = X.subst r z @@ X.swap pi a in
-          Abs (ys, a')
+          Abs (y, a')
         | _ ->
           let a' = X.subst r z a in
-          Abs (xs, a')
+          Abs (x, a')
 
     let run rel abs =
-      let Abs (xs, a) = abs in
+      let Abs (x, a) = abs in
       (* TODO: I think the following makes sense, but let's double check. The alternative is to freshen, but it seems like we don't need to if we can un-associate these names. *)
-      let rel' = Rel.hide xs rel in
+      let rel' = Rel.hide (Emp #< x) rel in
       let a' = X.run rel' a in
-      Abs (xs, a')
+      Abs (x, a')
+  end
+
+and AbsPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
+  functor (X : DomainPlug) ->
+  struct
+    module M = Abs(X)
+    include M
 
     let plug rel frm abs =
-      let Abs (xs, a) = abs in
-      match Frame.occurs xs frm with
+      let Abs (x, a) = abs in
+      match Frame.occurs (Emp #< x) frm with
       | `No ->
         let a' = X.plug rel frm a in
-        Abs (xs, a')
+        Abs (x, a')
       | `Might ->
-        let ys, pi = Perm.freshen xs in
-        let rel' = Rel.hide xs rel in
+        let y, pi = Perm.freshen_name x in
+        let rel' = Rel.hide (Emp #< x) rel in
         let a' = X.plug rel' frm @@ X.swap pi a in
-        Abs (ys, a')
+        Abs (y, a')
 
   end
