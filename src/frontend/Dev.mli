@@ -19,8 +19,12 @@ type ('a, 'b) equation =
    ty1 : ty;
    tm1 : 'b}
 
+(* The [param] and [params] types are really dumb; it should not be any kind of list. Instead it should be an ordinary datatype.
+   Right now we're going through such stupid contortions to make it a last. For instance, not every cell
+   should be binding a variable, lmao! *)
 type 'a param =
   [ `I
+  | `NullaryExt
   | `Tick
   | `KillFromTick of 'a
   | `P of 'a

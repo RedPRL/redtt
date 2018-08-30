@@ -31,11 +31,11 @@ type error =
   | UnleashExtError of value
   | UnleashVError of value
   | UnleashLaterError of value
-  | UnleashCoRError of value
+  | UnleashRestrictError of value
   | UnleashLblTyError of value
   | UnleashFHComError of value
-  | ForcedUntrueCorestriction of val_face
-  | ForcedUnexpectedCorestriction of value
+  | ForcedUntrueRestriction of val_face
+  | ForcedUnexpectedRestriction of value
 
 
 exception E of error
@@ -132,7 +132,7 @@ struct
       Format.fprintf fmt
         "Tried to unleash %a as extension type."
         pp_value v
-    | UnleashCoRError v ->
+    | UnleashRestrictError v ->
       Format.fprintf fmt
         "Tried to unleash %a as co-restriction type."
         pp_value v
@@ -144,11 +144,11 @@ struct
       Format.fprintf fmt
         "Tried to unleash %a as labeled type."
         pp_value v
-    | ForcedUntrueCorestriction face ->
+    | ForcedUntrueRestriction face ->
       Format.fprintf fmt
         "Cannot force untrue co-restriction:@ %a."
         pp_val_face face
-    | ForcedUnexpectedCorestriction v ->
+    | ForcedUnexpectedRestriction v ->
       Format.fprintf fmt
         "Cannot force unrecognized co-restriction:@ %a."
         pp_value v
@@ -250,14 +250,9 @@ struct
       let abs' = ExtAbs.act phi abs in
       make @@ Ext abs'
 
-    | Rst info ->
-      let ty = Value.act phi info.ty in
-      let sys = ValSys.act phi info.sys in
-      make @@ Rst {ty; sys}
-
-    | CoR face ->
+    | Restrict face ->
       let face = ValFace.act phi face in
-      make @@ CoR face
+      make @@ Restrict face
 
     | Coe info ->
       make_coe
@@ -310,11 +305,11 @@ struct
     | Lam clo ->
       make @@ Lam (Clo.act phi clo)
 
-    | ExtLam abs ->
-      make @@ ExtLam (Abs.act phi abs)
+    | ExtLam clo ->
+      make @@ ExtLam (NClo.act phi clo)
 
-    | CoRThunk v ->
-      make @@ CoRThunk (ValFace.act phi v)
+    | RestrictThunk v ->
+      make @@ RestrictThunk (ValFace.act phi v)
 
     | Cons (v0, v1) ->
       make @@ Cons (Value.act phi v0, Value.act phi v1)
@@ -369,46 +364,16 @@ struct
       end
 
   and unleash : value -> con =
-    let add_sys sys el=
-      match unleash el with
-      | Up up ->
-        Up {up with sys = sys @ up.sys}
-      | con ->
-        con
-    in
-
     fun (Node info) ->
-      let con =
-        match info.action = I.idn with
-        | true ->
-          info.con
-        | false ->
-          let node' = act_can info.action info.con in
-          let con = unleash node' in
-          con
-      in
-      match con with
-      | Up up ->
-        begin
-          match unleash up.ty with
-          | Rst rst ->
-            begin
-              match force_val_sys rst.sys with
-              | `Proj el ->
-                add_sys up.sys el
-              | `Ok rsys ->
-                add_sys rsys @@ make @@ Up {up with ty = rst.ty}
-            end
-          | _ ->
-            con
-        end
-      | _ ->
+      match info.action = I.idn with
+      | true ->
+        info.con
+      | false ->
+        let node' = act_can info.action info.con in
+        let con = unleash node' in
         con
 
   and make_cons (a, b) = make @@ Cons (a, b)
-
-  and make_extlam abs = make @@ ExtLam abs
-
   and make_dfix_line r ty clo =
     match r with
     | `Atom x ->
@@ -416,7 +381,7 @@ struct
     | `Dim0 ->
       make @@ DFix {ty; clo}
     | `Dim1 ->
-      let bdy = inst_clo clo @@ make @@ DFix {ty; clo} in
+      let bdy = lazy begin inst_clo clo @@ make @@ DFix {ty; clo} end in
       let tclo = TickCloConst bdy in
       make @@ Next tclo
 
@@ -898,8 +863,10 @@ struct
           let fixer_fiber phi =
             (* Turns out `fiber_at_face0` will be
              * used for multiple times. *)
-            let fiber_at_face0 phi = make_cons
-                (Value.act phi el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
+            let fiber_at_face0 phi =
+              make_cons
+                (Value.act phi el,
+                 make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
             in
             let mode = `UNIFORM_HCOM in (* how should we switch this? *)
             match mode with
@@ -916,7 +883,9 @@ struct
                     contr0 phi @@
                     make_coe (Dir.make `Dim0 (I.act phi r)) (Abs.bind1 r_atom (fiber0_ty phi (base phi (I.act phi r) `Dim0))) @@
                     (* the fiber *)
-                    make_cons (Value.act (I.cmp phi (I.subst `Dim0 r_atom)) el, make_extlam @@ Abs.make1 @@ fun _ -> base0 phi `Dim0)
+                    make_cons
+                      (Value.act (I.cmp phi (I.subst `Dim0 r_atom)) el,
+                       make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
                   in
                   ext_apply path_in_fiber0_ty [r]
               end
@@ -1405,14 +1374,9 @@ struct
       let abs = eval_ext_bnd rho bnd in
       make @@ Ext abs
 
-    | Tm.Rst info ->
-      let ty = eval rho info.ty in
-      let sys = eval_tm_sys rho info.sys in
-      make @@ Rst {ty; sys}
-
-    | Tm.CoR tface ->
+    | Tm.Restrict tface ->
       let face = eval_tm_face rho tface in
-      make @@ CoR face
+      make @@ Restrict face
 
     | Tm.V info ->
       let r = eval_dim rho info.r in
@@ -1431,12 +1395,11 @@ struct
       make @@ Lam (clo bnd rho)
 
     | Tm.ExtLam bnd ->
-      let abs = eval_nbnd rho bnd in
-      make @@ ExtLam abs
+      make @@ ExtLam (nclo bnd rho)
 
-    | Tm.CoRThunk face ->
+    | Tm.RestrictThunk face ->
       let vface = eval_tm_face rho face in
-      make @@ CoRThunk vface
+      make @@ RestrictThunk vface
 
     | Tm.Cons (t0, t1) ->
       let v0 = eval rho t0 in
@@ -1444,7 +1407,7 @@ struct
       make @@ Cons (v0, v1)
 
     | Tm.FHCom info ->
-      let r = eval_dim rho info.r  in
+      let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
       let dir = Dir.make r r' in
       let cap = eval rho info.cap in
@@ -1526,8 +1489,8 @@ struct
     function
     | Tm.LblCall ->
       lbl_call vhd
-    | Tm.CoRForce ->
-      corestriction_force vhd
+    | Tm.RestrictForce ->
+      restriction_force vhd
     | Tm.FunApp t ->
       let v = eval rho t in
       apply vhd v
@@ -1728,14 +1691,12 @@ struct
   and unleash_data v =
     match unleash v with
     | Data dlbl -> dlbl
-    | Rst rst -> unleash_data rst.ty
     | _ ->
       raise @@ E (UnleashDataError v)
 
   and unleash_pi v =
     match unleash v with
     | Pi {dom; cod} -> dom, cod
-    | Rst rst -> unleash_pi rst.ty
     | _ ->
       raise @@ E (UnleashPiError v)
 
@@ -1743,14 +1704,12 @@ struct
   and unleash_later v =
     match unleash v with
     | Later clo -> clo
-    | Rst rst -> unleash_later rst.ty
     | _ ->
       raise @@ E (UnleashLaterError v)
 
   and unleash_sg v =
     match unleash v with
     | Sg {dom; cod} -> dom, cod
-    | Rst rst -> unleash_sg rst.ty
     | _ ->
       raise @@ E (UnleashSgError v)
 
@@ -1758,8 +1717,6 @@ struct
     match unleash v with
     | Ext abs ->
       ExtAbs.inst abs (Bwd.from_list rs)
-    | Rst rst ->
-      unleash_ext_with rst.ty rs
     | _ ->
       raise @@ E (UnleashExtError v)
 
@@ -1767,8 +1724,6 @@ struct
     match unleash v with
     | Ext abs ->
       abs
-    | Rst rst ->
-      unleash_ext rst.ty
     | _ ->
       raise @@ E (UnleashExtError v)
 
@@ -1776,35 +1731,22 @@ struct
     match unleash v with
     | V {x; ty0; ty1; equiv} ->
       x, ty0, ty1, equiv
-    | Rst rst ->
-      unleash_v rst.ty
     | _ ->
       raise @@ E (UnleashVError v)
-
-  and unleash_fhcom v =
-    match unleash v with
-    | FHCom info -> info.dir, info.cap, info.sys
-    | Rst rst -> unleash_fhcom rst.ty
-    | _ ->
-      raise @@ E (UnleashFHComError v)
 
   and unleash_lbl_ty v =
     match unleash v with
     | LblTy {lbl; args; ty} ->
       lbl, args, ty
-    | Rst rst ->
-      unleash_lbl_ty rst.ty
     | _ ->
       raise @@ E (UnleashLblTyError v)
 
-  and unleash_corestriction_ty v =
+  and unleash_restriction_ty v =
     match unleash v with
-    | CoR face ->
+    | Restrict face ->
       face
-    | Rst rst ->
-      unleash_corestriction_ty rst.ty
     | _ ->
-      raise @@ E (UnleashCoRError v)
+      raise @@ E (UnleashRestrictError v)
 
   and lbl_call v =
     match unleash v with
@@ -1821,33 +1763,33 @@ struct
     | _ ->
       raise @@ E (LblCallUnexpectedArgument v)
 
-  and corestriction_force v =
+  and restriction_force v =
     match unleash v with
-    | CoRThunk face ->
+    | RestrictThunk face ->
       begin
         match face with
         | Face.True (_, _, v) -> Lazy.force v
         | _ ->
-          raise @@ E (ForcedUntrueCorestriction face)
+          raise @@ E (ForcedUntrueRestriction face)
       end
 
     | Up info ->
       begin
-        match unleash_corestriction_ty info.ty with
+        match unleash_restriction_ty info.ty with
         | Face.True (_, _, ty) ->
-          let force = CoRForce info.neu in
+          let force = RestrictForce info.neu in
           let force_face =
             Face.map @@ fun _ _ a ->
-            corestriction_force a
+            restriction_force a
           in
           let force_sys = List.map force_face info.sys in
           make @@ Up {ty = Lazy.force ty; neu = force; sys = force_sys}
         | _ as face ->
-          raise @@ E (ForcedUntrueCorestriction face)
+          raise @@ E (ForcedUntrueRestriction face)
       end
 
     | _ ->
-      raise @@ E (ForcedUnexpectedCorestriction v)
+      raise @@ E (ForcedUnexpectedRestriction v)
 
   and apply vfun varg =
     match unleash vfun with
@@ -1911,8 +1853,8 @@ struct
 
   and ext_apply vext (ss : I.t list) =
     match unleash vext with
-    | ExtLam abs ->
-      Abs.inst abs (Bwd.from_list ss)
+    | ExtLam nclo ->
+      inst_nclo nclo @@ List.map (fun x -> `Dim x) ss
 
     | Up info ->
       let tyr, sysr = unleash_ext_with info.ty ss in
@@ -2363,17 +2305,19 @@ struct
       raise @@ E (RigidCapUnexpectedArgument el)
 
 
-  and inst_clo clo varg =
+  and inst_clo clo varg : value =
     match clo with
     | Clo info ->
       let Tm.B (_, tm) = info.bnd in
       eval (Env.snoc info.rho @@ `Val varg) tm
 
-  and inst_nclo nclo vargs =
+  and inst_nclo nclo vargs : value =
     match nclo with
     | NClo info ->
       let Tm.NB (_, tm) = info.nbnd in
       eval (Env.append info.rho vargs) tm
+    | NCloConst v ->
+      Lazy.force v
 
   and inst_tick_clo clo tick =
     match clo with
@@ -2381,7 +2325,7 @@ struct
       let Tm.B (_, tm) = info.bnd in
       eval (Env.snoc info.rho @@ `Tick tick) tm
     | TickCloConst v ->
-      v
+      Lazy.force v
 
   module Macro =
   struct

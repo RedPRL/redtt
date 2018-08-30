@@ -57,7 +57,7 @@ let normalize_param p =
     C.ret @@ `Def (ty', tm')
   | `Tw (ty0, ty1) ->
     C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
-  | (`I | `Tick | `KillFromTick _ | `SelfArg Desc.Self) as p ->
+  | (`I | `NullaryExt | `Tick | `KillFromTick _ | `SelfArg Desc.Self) as p ->
     C.ret p
   | `R (r0, r1) ->
     C.ret @@ `R (r0, r1)
@@ -116,8 +116,8 @@ let print_diagnostic =
 
       let ty, sys =
         match Tm.unleash ty with
-        | Tm.Rst rst ->
-          rst.ty, rst.sys
+        | Tm.Ext (Tm.NB (Emp, (ty, sys))) ->
+          ty, sys
         | _ ->
           ty, []
       in

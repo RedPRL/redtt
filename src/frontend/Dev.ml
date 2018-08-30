@@ -24,6 +24,7 @@ type ('a, 'b) equation =
 
 type 'a param =
   [ `I
+  | `NullaryExt
   | `Tick
   | `KillFromTick of 'a
   | `P of 'a
@@ -74,7 +75,7 @@ let rec eqn_close_var x tw k q =
 
 let param_open_var k x =
   function
-  | (`I | `Tick ) as p -> p
+  | (`I | `Tick | `NullaryExt) as p -> p
   | `KillFromTick tck ->
     `KillFromTick (Tm.open_var k (fun twin -> Tm.var x ~twin) tck)
   | `P ty ->
@@ -91,7 +92,7 @@ let param_open_var k x =
 
 let param_close_var x k =
   function
-  | (`I | `Tick) as p -> p
+  | (`I | `Tick | `NullaryExt) as p -> p
   | `KillFromTick tck ->
     `KillFromTick (Tm.close_var x ~twin:(fun tw -> tw) k tck)
   | `P ty ->
@@ -178,6 +179,9 @@ let pp_param fmt =
   function
   | `I ->
     Format.fprintf fmt "dim"
+  | `NullaryExt ->
+    ()
+  (* Format.fprintf fmt "dim" *)
   | `Tick ->
     Uuseg_string.pp_utf_8 fmt "✓"
   | `KillFromTick _ ->
@@ -222,6 +226,9 @@ let pp_param_cell fmt (x, param) =
   | `I ->
     Format.fprintf fmt "@[<1>%a : dim@]"
       Name.pp x
+
+  | `NullaryExt ->
+    ()
 
   | `Tick ->
     Format.fprintf fmt "@[<1>%a : %a@]"
@@ -361,7 +368,7 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
   function
-  | (`I | `Tick | `SelfArg Desc.Self) as p ->
+  | (`I | `NullaryExt | `Tick | `SelfArg Desc.Self) as p ->
     p, sub
   | `KillFromTick tck ->
     `KillFromTick (subst_tm sub ~ty:univ tck), sub
@@ -405,7 +412,7 @@ let rec subst_problem sub =
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
-      | (`I | `Tick | `KillFromTick _ | `SelfArg Desc.Self) ->
+      | (`I | `NullaryExt | `Tick | `KillFromTick _ | `SelfArg Desc.Self) ->
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
@@ -433,7 +440,7 @@ struct
 
   let free fl =
     function
-    | (`I | `Tick | `SelfArg Desc.Self) -> Occurs.Set.empty
+    | (`I | `NullaryExt | `Tick | `SelfArg Desc.Self) -> Occurs.Set.empty
     | `KillFromTick tck -> Tm.free fl tck
     | `P ty -> Tm.free fl ty
     | `Def (ty, tm) ->

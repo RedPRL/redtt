@@ -16,8 +16,7 @@ type tick =
 type con =
   | Pi of {dom : value; cod : clo}
   | Sg of {dom : value; cod : clo}
-  | Rst of {ty : value; sys : val_sys}
-  | CoR of val_face
+  | Restrict of val_face
   | Ext of ext_abs
 
   | Coe of {dir : dir; abs : abs; el : value}
@@ -31,8 +30,8 @@ type con =
   | VIn of {x : atom; el0 : value; el1 : value}
 
   | Lam of clo
-  | ExtLam of abs
-  | CoRThunk of val_face
+  | ExtLam of nclo
+  | RestrictThunk of val_face
 
   | Cons of value * value
 
@@ -81,7 +80,7 @@ and neu =
   | Cap of {dir : dir; ty : value; sys : comp_sys; neu : neu}
 
   | LblCall of neu
-  | CoRForce of neu
+  | RestrictForce of neu
 
   | Prev of tick * neu
   | Fix of tick_gen * value * clo
@@ -96,13 +95,14 @@ and clo =
 
 and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
+  | NCloConst of value Lazy.t
 
 and bclo =
   | BClo of {len : int; btm : Tm.tm Desc.Boundary.term; rho : env}
 
 and tick_clo =
   | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}
-  | TickCloConst of value
+  | TickCloConst of value Lazy.t
 
 and rigid_abs_face = ([`Rigid], abs) face
 and val_face = ([`Any], value) face
