@@ -28,8 +28,6 @@ let emp () =
    chronicle = [];
    size = 0}
 
-exception Inconsistent = I.Inconsistent
-
 let equate r r' t =
   let dl = [r, r'] in
   {chronicle = dl @ t.chronicle;
@@ -56,7 +54,7 @@ let _  =
     Format.printf "Test failure: {@[<1>%a@]}@.\n" pp_chronicle rst.chronicle;
     failwith "Test failed"
   with
-  | Inconsistent -> ()
+  | I.Inconsistent -> ()
 
 let _ =
   let x = `Atom (Name.named (Some "i")) in
