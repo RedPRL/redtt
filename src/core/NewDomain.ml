@@ -1,3 +1,4 @@
+open RedBasis
 open RedBasis.Bwd
 open BwdNotation
 
@@ -286,7 +287,7 @@ and Sys :
         | Face.Dead -> []
         | Face.Triv bdy -> raise @@ Triv bdy
       in
-      List.flatten @@ List.map run_face sys
+      ListUtil.flat_map run_face sys
 
     let plug rel frm sys =
       List.map (Face.plug rel frm) sys

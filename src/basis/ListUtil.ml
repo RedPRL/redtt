@@ -8,6 +8,12 @@ let rec split n xs =
   | _ ->
     failwith "ListUtil.take"
 
+let rec flat_map f xs =
+  match xs with
+  | [] -> []
+  | x :: xs ->
+    f x @ flat_map f xs
+
 let rec index_of pred xs =
   match xs with
   | [] ->
