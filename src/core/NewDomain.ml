@@ -11,7 +11,6 @@ type 'a face = (dim * dim) * 'a Lazy.t
 type 'a sys = 'a face list
 type 'a abs = Abs of Name.t * 'a
 
-
 (** This is the type of "prevalues", that is the domain from which values come.
     A prevalue can be judged to be a value with respect to a restriction / dimension
     theory. I think we will not write code that checks that something is a value, but instead
@@ -19,19 +18,30 @@ type 'a abs = Abs of Name.t * 'a
 type value =
   | Pi of quantifier
   | Sg of quantifier
+  | Ext of ext_clo
+
   | Lam of clo
+  | ExtLam of nclo
   | Cons of value * value
-  | Coe of {r : dim; r' : dim; ty : quantifier abs vkan; cap : value}
-  | HCom of {r : dim; r' : dim; ty : quantifier vkan; cap : value; sys : value abs sys}
+  | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value}
+  | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : value abs sys}
   | Neu of {ty : value; neu : neu; sys : value sys}
 
 and quantifier =
   {dom : value;
    cod : clo}
 
-and 'a vkan =
-  | KanPi of 'a
-  | KanSg of 'a
+and coe_shape =
+  [ `Pi of quantifier abs (* coe in pi *)
+  | `Sg of quantifier abs (* coe in sigma *)
+  ]
+
+and hcom_shape =
+  [ `Pi of quantifier   (** hcom in pi *)
+  | `Sg of quantifier   (** hcom in sigma *)
+  | `Pos                (** fhcom, i.e. hcom in positive types *)
+  ]
+
 
 and head =
   | Lvl of int
@@ -39,6 +49,7 @@ and head =
 
 and frame =
   | FunApp of value
+  | ExtApp of dim list
   | Car
   | Cdr
 
@@ -52,9 +63,9 @@ and cell =
 
 and env = cell bwd
 
-and clo =
-  | Clo of {tm : Tm.tm; env : env}
-
+and clo = Clo of {bnd : Tm.tm Tm.bnd; env : env}
+and nclo = NClo of {bnd : Tm.tm Tm.nbnd; env : env}
+and ext_clo = ExtClo of {bnd : (Tm.tm * (Tm.tm, Tm.tm) Tm.system) Tm.nbnd; env : env}
 
 
 (** This should be the dimension equality oracle *)
@@ -108,6 +119,8 @@ end
 module type DomainPlug =
 sig
   include Domain
+
+  (** Plug applies a stack frame to an element of the domain. *)
   val plug : rel -> frame -> t -> t
 end
 
@@ -115,10 +128,12 @@ module rec Syn :
 sig
   type t = Tm.tm
   val eval : rel -> env -> t -> value
+  val eval_tm_sys : rel -> env -> (t, t) Tm.system -> value sys
 end =
 struct
   type t = Tm.tm
   let eval _ _ = failwith ""
+  let eval_tm_sys _ _ = failwith ""
 end
 
 and Dim : Domain with type t = dim =
@@ -151,9 +166,50 @@ struct
   let run _ _ = failwith ""
 
   let inst (rel : rel) clo cell : value =
-    let Clo {tm; env} = clo in
+    let Clo {bnd; env} = clo in
+    let Tm.B (_, tm) = bnd in
     Syn.eval rel (env #< cell) tm
 end
+
+and NClo :
+sig
+  include Domain with type t = nclo
+  val inst : rel -> t -> cell list -> value
+end =
+struct
+  type t = nclo
+
+  let swap _ _ = failwith ""
+  let subst _ _ = failwith ""
+  let run _ _ = failwith ""
+
+  let inst (rel : rel) nclo cells : value =
+    let NClo {bnd; env} = nclo in
+    let Tm.NB (_, tm) = bnd in
+    Syn.eval rel (env <>< cells) tm
+end
+
+and ExtClo :
+sig
+  include Domain with type t = ext_clo
+  val inst : rel -> t -> cell list -> value * value sys
+end =
+struct
+  type t = ext_clo
+
+  let swap _ _ = failwith ""
+  let subst _ _ = failwith ""
+  let run _ _ = failwith ""
+
+  let inst (rel : rel) clo cells =
+    let ExtClo {bnd; env} = clo in
+    let Tm.NB (_, (ty, sys)) = bnd in
+    let env' = env <>< cells in
+    let vty = Syn.eval rel env' ty in
+    let vsys = Syn.eval_tm_sys rel env' sys in
+    vty, vsys
+end
+
 
 and Env : Domain with type t = env =
 struct
@@ -169,8 +225,6 @@ struct
 
   module ValSys = Sys (Val)
   module AbsSys = Sys (AbsPlug (Val))
-  module VCoeTy = VKan (Abs (Quantifier))
-  module VHComTy = VKan (Quantifier)
 
   let swap _ _ = failwith ""
   let subst _ _ _ = failwith ""
@@ -188,6 +242,10 @@ struct
       let cod = Clo.run rel info.cod in
       Sg {dom; cod}
 
+    | Ext extclo ->
+      let extclo = ExtClo.run rel extclo in
+      Ext extclo
+
     | Neu info ->
       begin
         match ValSys.run rel info.sys with
@@ -202,6 +260,10 @@ struct
       let clo = Clo.run rel clo in
       Lam clo
 
+    | ExtLam nclo ->
+      let nclo = NClo.run rel nclo in
+      ExtLam nclo
+
     | Cons (v0, v1) ->
       let v0 = run rel v0 in
       let v1 = run rel v1 in
@@ -213,7 +275,7 @@ struct
         | `Equal ->
           run rel info.cap
         | _ ->
-          let ty = VCoeTy.run rel info.ty in
+          let ty = CoeShape.run rel info.ty in
           let cap = run rel info.cap in
           Coe {info with ty; cap}
       end
@@ -227,7 +289,7 @@ struct
           match AbsSys.run rel info.sys with
           | sys ->
             let cap = run rel info.cap in
-            let ty = VHComTy.run rel info.ty in
+            let ty = HComShape.run rel info.ty in
             HCom {info with ty; cap; sys}
 
           | exception (AbsSys.Triv abs) ->
@@ -235,16 +297,18 @@ struct
             hsubst rel info.r' x vx
       end
 
-
   and plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
       Clo.inst rel clo @@ Val arg
 
+    | ExtApp rs, ExtLam nclo ->
+      NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
+
     | Car, Cons (v0, _) ->
       v0
 
-    | Car, Coe {r; r'; ty = KanSg abs; cap} ->
+    | Car, Coe {r; r'; ty = `Sg abs; cap} ->
       let cap = plug rel Car cap in
       let ty =
         let Abs (xs, {dom; cod}) = abs in
@@ -284,10 +348,10 @@ struct
     let Abs (x, tyx) = abs in
     match tyx with
     | Sg quant ->
-      Coe {r; r'; ty = KanSg (Abs (x, quant)); cap}
+      Coe {r; r'; ty = `Sg (Abs (x, quant)); cap}
 
     | Pi quant ->
-      Coe {r; r'; ty = KanPi (Abs (x, quant)); cap}
+      Coe {r; r'; ty = `Pi (Abs (x, quant)); cap}
 
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
@@ -302,14 +366,51 @@ struct
     run rel' @@ subst r x v
 end
 
-and VKan : functor (X : Domain) -> Domain with type t = X.t vkan =
-  functor (X : Domain) ->
-  struct
-    type t = X.t vkan
-    let swap _ = failwith ""
-    let run _ = failwith ""
-    let subst _ = failwith ""
-  end
+and CoeShape : Domain with type t = coe_shape =
+struct
+  type t = coe_shape
+
+  module QAbs = Abs (Quantifier)
+
+  let swap pi =
+    function
+    | `Pi abs -> `Pi (QAbs.swap pi abs)
+    | `Sg abs -> `Sg (QAbs.swap pi abs)
+
+  let subst r x =
+    function
+    | `Pi abs -> `Pi (QAbs.subst r x abs)
+    | `Sg abs -> `Sg (QAbs.subst r x abs)
+
+  let run rel =
+    function
+    | `Pi abs -> `Pi (QAbs.run rel abs)
+    | `Sg abs -> `Sg (QAbs.run rel abs)
+end
+
+and HComShape : Domain with type t = hcom_shape =
+struct
+  type t = hcom_shape
+  module Q = Quantifier
+
+  let swap pi =
+    function
+    | `Pi qu -> `Pi (Q.swap pi qu)
+    | `Sg qu -> `Sg (Q.swap pi qu)
+    | `Pos -> `Pos
+
+  let subst r x =
+    function
+    | `Pi qu -> `Pi (Q.subst r x qu)
+    | `Sg qu -> `Sg (Q.subst r x qu)
+    | `Pos -> `Pos
+
+  let run rel =
+    function
+    | `Pi abs -> `Pi (Q.run rel abs)
+    | `Sg abs -> `Sg (Q.run rel abs)
+    | `Pos -> `Pos
+end
 
 and Quantifier : Domain with type t = quantifier =
 struct
@@ -345,6 +446,9 @@ struct
     | FunApp arg ->
       let arg = Val.swap pi arg in
       FunApp arg
+    | ExtApp rs ->
+      let rs = List.map (Dim.swap pi) rs in
+      ExtApp rs
     | Car | Cdr as frm ->
       frm
 
@@ -353,6 +457,9 @@ struct
     | FunApp arg ->
       let arg = Val.subst r x arg in
       FunApp arg
+    | ExtApp rs ->
+      let rs = List.map (Dim.subst r x) rs in
+      ExtApp rs
     | Car | Cdr as frm ->
       frm
 
@@ -362,12 +469,12 @@ struct
     | FunApp arg ->
       let arg = Val.run rel arg in
       FunApp arg
-    | Car | Cdr as frm ->
+    | Car | Cdr | ExtApp _ as frm->
       frm
 
   let occurs xs =
     function
-    | FunApp _ ->
+    | FunApp _ | ExtApp _ ->
       `Might
     | Car | Cdr ->
       `No
