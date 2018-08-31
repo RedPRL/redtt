@@ -32,13 +32,15 @@ and quantifier =
    cod : clo}
 
 and coe_shape =
-  [ `Pi of quantifier abs (* coe in pi *)
-  | `Sg of quantifier abs (* coe in sigma *)
+  [ `Pi of quantifier abs   (** coe in pi *)
+  | `Sg of quantifier abs   (** coe in sigma *)
+  | `Ext of ext_clo abs     (** coe in extension type *)
   ]
 
 and hcom_shape =
   [ `Pi of quantifier   (** hcom in pi *)
   | `Sg of quantifier   (** hcom in sigma *)
+  | `Ext of ext_clo     (** hcom in extension type *)
   | `Pos                (** fhcom, i.e. hcom in positive types *)
   ]
 
@@ -58,8 +60,8 @@ and neu =
    frames : frame bwd}
 
 and cell =
-  | Val of value
-  | Dim of dim
+  | Val of value Lazy.t
+  | Dim of dim Lazy.t
 
 and env = cell bwd
 
@@ -300,10 +302,24 @@ struct
   and plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
-      Clo.inst rel clo @@ Val arg
+      Clo.inst rel clo @@ Val (lazy arg)
+
+    | FunApp arg, Coe {r; r'; ty = `Pi abs; cap} ->
+      failwith ""
+
+    | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
+      failwith ""
+
 
     | ExtApp rs, ExtLam nclo ->
-      NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
+      NClo.inst rel nclo @@ List.map (fun r -> Dim (lazy r)) rs
+
+    | ExtApp rs, Coe {r; r'; ty = `Ext abs; cap} ->
+      failwith ""
+
+    | ExtApp rs, HCom {r; r'; ty = `Ext qu; cap; sys} ->
+      failwith ""
+
 
     | Car, Cons (v0, _) ->
       v0
@@ -331,14 +347,14 @@ struct
   and plug_ty rel frm ty hd =
     match ty, frm with
     | Pi {dom; cod}, FunApp arg ->
-      Clo.inst rel cod @@ Val arg
+      Clo.inst rel cod @@ Val (lazy arg)
 
     | Sg {dom; _}, Car ->
       dom
 
     | Sg {dom; cod}, Cdr ->
       let car = plug rel Car hd in
-      Clo.inst rel cod @@ Val car
+      Clo.inst rel cod @@ Val (lazy car)
 
     | _ ->
       failwith ""
@@ -352,6 +368,9 @@ struct
 
     | Pi quant ->
       Coe {r; r'; ty = `Pi (Abs (x, quant)); cap}
+
+    | Ext ext_clo ->
+      Coe {r; r'; ty = `Ext (Abs (x, ext_clo)); cap}
 
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
@@ -371,21 +390,25 @@ struct
   type t = coe_shape
 
   module QAbs = Abs (Quantifier)
+  module ECloAbs = Abs (ExtClo)
 
   let swap pi =
     function
     | `Pi abs -> `Pi (QAbs.swap pi abs)
     | `Sg abs -> `Sg (QAbs.swap pi abs)
+    | `Ext abs -> `Ext (ECloAbs.swap pi abs)
 
   let subst r x =
     function
     | `Pi abs -> `Pi (QAbs.subst r x abs)
     | `Sg abs -> `Sg (QAbs.subst r x abs)
+    | `Ext abs -> `Ext (ECloAbs.subst r x abs)
 
   let run rel =
     function
     | `Pi abs -> `Pi (QAbs.run rel abs)
     | `Sg abs -> `Sg (QAbs.run rel abs)
+    | `Ext abs -> `Ext (ECloAbs.run rel abs)
 end
 
 and HComShape : Domain with type t = hcom_shape =
@@ -397,18 +420,21 @@ struct
     function
     | `Pi qu -> `Pi (Q.swap pi qu)
     | `Sg qu -> `Sg (Q.swap pi qu)
+    | `Ext clo -> `Ext (ExtClo.swap pi clo)
     | `Pos -> `Pos
 
   let subst r x =
     function
     | `Pi qu -> `Pi (Q.subst r x qu)
     | `Sg qu -> `Sg (Q.subst r x qu)
+    | `Ext clo -> `Ext (ExtClo.subst r x clo)
     | `Pos -> `Pos
 
   let run rel =
     function
     | `Pi abs -> `Pi (Q.run rel abs)
     | `Sg abs -> `Sg (Q.run rel abs)
+    | `Ext clo -> `Ext (ExtClo.run rel clo)
     | `Pos -> `Pos
 end
 
