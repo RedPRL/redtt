@@ -1,4 +1,5 @@
 import path
+import J
 import int
 import s1
 
@@ -35,19 +36,19 @@ let encode (x : s1) (p : Path s1 base x) : s1-univ-cover x =
 
 let winding (l : Path s1 base base) : int = encode base l
 
-;let winding-loopn (n : int) : Path int (winding (loopn n)) n =
-;  elim n [
-;  | pos n ⇒
-;    elim n [
-;    | zero ⇒ refl
-;    | suc (n ⇒ loopn) ⇒ λ i → isuc (loopn i)
-;    ]
-;  | negsuc n ⇒
-;    elim n [
-;    | zero ⇒ refl
-;    | suc (n ⇒ loopn) ⇒ λ i → pred (loopn i)
-;    ]
-;  ]
+let winding-loopn (n : int) : Path int (winding (loopn n)) n =
+  elim n [
+  | pos n ⇒
+    elim n [
+    | zero ⇒ refl
+    | suc (n ⇒ loopn) ⇒ λ i → isuc (loopn i)
+    ]
+  | negsuc n ⇒
+    elim n [
+    | zero ⇒ refl
+    | suc (n ⇒ loopn) ⇒ λ i → pred (loopn i)
+    ]
+  ]
 
 let decode-square (n : int)
   : [i j] s1 [
@@ -57,27 +58,28 @@ let decode-square (n : int)
     | j=1 ⇒ loop i
     ]
   =
-  λ i j →
+  elim n [
+  | pos n ⇒ λ i j → comp 0 i (loopn (pos n) j) [ j=0 ⇒ refl | j=1 ⇒ λ i → loop i ]
+  | negsuc n ⇒
     elim n [
-    | pos n ⇒
-      comp 0 i (loopn (pos n) j) [ j=0 ⇒ refl | j=1 ⇒ λ i → loop i ]
-    | negsuc n ⇒
-      elim n [
-      | zero ⇒ comp 1 i base [ j=0 ⇒ refl | j=1 ⇒ λ i → loop i ]
-      | suc n ⇒ comp 1 i (loopn (negsuc n) j) [ j=0 ⇒ refl | j=1 ⇒ λ i → loop i ]
-      ]
+    | zero ⇒ λ i j → comp 1 i base [ j=0 ⇒ refl | j=1 ⇒ λ i → loop i ]
+    | suc n ⇒ λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 ⇒ refl | j=1 ⇒ λ i → loop i ]
     ]
+  ]
 
-;let decode (x : s1) (y : s1-univ-cover x) : Path s1 base x =
-;  elim x [
-;  | base ⇒ loopn y
-;  | loop i ⇒ λ n j → ?
-;  ]
+let decode (x : s1) : (s1-univ-cover x) → Path s1 base x =
+  elim x [
+  | base ⇒ loopn
+  | loop i ⇒ λ y j → let n : int = coe i 0 y in λ k → s1-univ-cover (loop k) in
+    comp 0 i (decode-square n i j) [
+    | j=0 ⇒ refl
+    | j=1 ⇒ refl
+    | i=1 ⇒ λ k → loopn (isuc-pred y k) j
+    ]
+  ]
 
-; let loopn-winding (x : s1) (l : Path s1 base x) : Path (Path s1 base base) (loopn (winding', l)) l =
-;   J
+let loopn-winding (l : Path s1 base base) : Path (Path s1 base base) (loopn (winding l)) l =
+  J s1 base (λ x p → Path (Path s1 base x) (decode x (encode x p)) p) refl base l
 
-; let J
-;  (A : type) (a : A)
-;  (C : (x : A) (p : Path _ a x) → type) (d : C a (λ _ → a))
-;  (x : A) (p : Path _ a x)
+let winding-equiv : Equiv (Path s1 base base) int =
+  Iso/Equiv _ _ <winding, <loopn, <winding-loopn, loopn-winding>>>
