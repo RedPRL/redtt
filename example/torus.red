@@ -21,7 +21,7 @@ let t2c (t : torus) : s1 × s1 =
   | pt ⇒ <base, base>
   | p/one i ⇒ <loop i, base>
   | p/two i ⇒ <base, loop i>
-  | square i j ⇒ refl
+  | square i j ⇒ <loop j, loop i>
   ]
 
 let c2t/base (c : s1) : torus =

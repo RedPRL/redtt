@@ -583,7 +583,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       go sp0 sp1
 
     | Snoc (_, tm0), Snoc (_, tm1) ->
-      Format.eprintf "mismatch: %a <> %a@." (Tm.pp_frame Pp.Env.emp) tm0 (Tm.pp_frame Pp.Env.emp) tm1;
+      Format.eprintf "mismatched top frames: %a <> %a@." (Tm.pp_frame Pp.Env.emp) tm0 (Tm.pp_frame Pp.Env.emp) tm1;
       failwith "mismatch"
 
     | _ ->

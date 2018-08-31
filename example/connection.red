@@ -8,6 +8,7 @@ let connection/or
    | i=0 ⇒ p j
    | j=1 ⇒ p 1
    | i=1 ⇒ p 1
+   | i=j ⇒ p i
    ]
  =
  λ i j →
@@ -37,6 +38,7 @@ let connection/and
    | i=0 ⇒ p 0
    | j=1 ⇒ p i
    | i=1 ⇒ p j
+   | i=j ⇒ p i
    ]
  =
  λ i j →

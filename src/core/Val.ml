@@ -2053,8 +2053,8 @@ struct
           Face.Indet (xi, body)
         in
         let face1 =
-          let xi = Eq.gen_const x `Dim0 in
-          let phi = I.equate (`Atom x) `Dim0 in
+          let xi = Eq.gen_const x `Dim1 in
+          let phi = I.equate (`Atom x) `Dim1 in
           Face.Indet (xi, lazy begin Value.act phi el end)
         in
         [face0; face1]
