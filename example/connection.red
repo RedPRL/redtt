@@ -103,7 +103,7 @@ let weak-connection/or
   let face : dim → dim → A =
     λ l k →
       comp 1 l (p 1) [
-      | k=1 ⇒ auto
+      | k=1 ⇒ refl
       | k=0 ⇒ p
       ]
   in
@@ -128,7 +128,7 @@ let weak-connection/or
   let face : dim → dim → A =
     λ l k →
       comp 1 l (p 1) [
-      | k=1 ⇒ auto
+      | k=1 ⇒ refl
       | k=0 ⇒ p
       ]
   in
@@ -153,7 +153,7 @@ let weak-connection/and
    let face : dim → dim → A =
      λ l k →
        comp 0 l (p 0) [
-       | k=0 ⇒ auto
+       | k=0 ⇒ refl
        | k=1 ⇒ p
        ]
    in

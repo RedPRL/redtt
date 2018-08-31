@@ -95,12 +95,12 @@ let trans/unit/l
   comp 0 1 (p 0) [
   | k=0 ⇒ λ j →
     comp 0 1 (p 0) [
-    | j=1 ⇒ λ l → comp 0 i (p 0) [ l=0 ⇒ auto | l=1 ⇒ p ]
-    | i=1 ⇒ λ l → comp 0 j (p 0) [ l=0 ⇒ auto | l=1 ⇒ p ]
-    | j=0 ⇒ auto
-    | i=0 ⇒ auto
+    | j=1 ⇒ λ l → comp 0 i (p 0) [ l=0 ⇒ refl | l=1 ⇒ p ]
+    | i=1 ⇒ λ l → comp 0 j (p 0) [ l=0 ⇒ refl | l=1 ⇒ p ]
+    | j=0 ⇒ refl
+    | i=0 ⇒ refl
     ]
-  | i=0 ⇒ auto
+  | i=0 ⇒ refl
   | i=1 ⇒ p
   ]
 
@@ -121,16 +121,16 @@ let trans/sym/r
 let trans/sym/l
   (A : type)
   (p : dim → A)
-  : Path (Path _ (p 1) (p 1)) auto (trans _ (symm _ p) p)
+  : Path (Path _ (p 1) (p 1)) refl (trans _ (symm _ p) p)
   =
   λ k i →
     comp 0 1 (symm/filler A p k i) [
     | i=0 ⇒ λ j →
       comp 0 1 (p 1) [
-      | j=0 ⇒ λ l → comp 1 k (p 1) [ l=0 ⇒ auto | l=1 ⇒ p ]
-      | k=0 ⇒ λ l → comp 1 j (p 1) [ l=0 ⇒ auto | l=1 ⇒ p ]
-      | j=1 ⇒ auto
-      | k=1 ⇒ auto
+      | j=0 ⇒ λ l → comp 1 k (p 1) [ l=0 ⇒ refl | l=1 ⇒ p ]
+      | k=0 ⇒ λ l → comp 1 j (p 1) [ l=0 ⇒ refl | l=1 ⇒ p ]
+      | j=1 ⇒ refl
+      | k=1 ⇒ refl
       ]
     | i=1 ⇒ p
     | k=0 ⇒ p

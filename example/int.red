@@ -72,12 +72,12 @@ let iplus/unit-r (n : int) : Path int (iplus n izero) n =
   elim n [
   | pos n =>
     elim n [
-    | zero => auto
+    | zero => refl
     | suc (n => n+0) => lam i -> isuc (n+0 i)
     ]
   | negsuc n =>
     elim n [
-    | zero => auto
+    | zero => refl
     | suc (n => n+0) => lam i -> pred (n+0 i)
     ]
   ]
