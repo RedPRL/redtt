@@ -778,13 +778,15 @@ struct
         in
         diag :: List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
       in
+
       make_box (Dir.act subst_r' fhcom.dir) coerced_cap @@
       force_val_sys @@
       let face =
         Face.map @@ fun sj s'j absj ->
         let phi = I.equate sj s'j in
         recovery_general phi absj (I.act (I.cmp phi subst_r') s')
-      in List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
+      in
+      List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
 
 
     | V info ->
