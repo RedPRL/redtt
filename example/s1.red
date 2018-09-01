@@ -44,3 +44,4 @@ let rotate/equiv (a : s1) : Equiv s1 s1 =
 
 let rotate/path (a : s1) : Path^1 type s1 s1 =
   UA s1 s1 (rotate/equiv a)
+  

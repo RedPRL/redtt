@@ -35,7 +35,7 @@ sig
   include Sort.S
     with type t = env
     with type 'a m = 'a
-  val emp : env
+  val emp : dim DimEnv.t -> env
   val clear_locals : env -> env
 
   (* What direction do these go? Think of the environment as a snoc list, where things are projected by counting from the *right*.

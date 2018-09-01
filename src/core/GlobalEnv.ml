@@ -148,16 +148,22 @@ let pp_twin fmt =
   | `TwinR ->
     Format.fprintf fmt "TwinR"
 
+
+let global_dims globals =
+  T.fold
+    (fun x (prm, _) tbl ->
+       match prm with
+       | `I -> T.add x (I.act (Restriction.as_action globals.rel) (`Atom x)) tbl
+       | _ -> tbl)
+    globals.table
+    T.empty
+
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
 
   let restriction = Sig.globals.rel
 
-  let global_dim x =
-    let phi = Restriction.as_action restriction in
-    let r = I.act phi @@ `Atom x in
-    (* Format.eprintf "[%a] != %a ==> %a@." Restriction.pp restriction Name.pp x I.pp r; *)
-    r
+  let global_dims = global_dims Sig.globals
 
   let lookup_datatype lbl =
     lookup_datatype lbl Sig.globals

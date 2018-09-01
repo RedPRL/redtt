@@ -256,7 +256,7 @@ struct
         cx
     in
 
-    let cx' = build_cx cx D.Env.emp const_specs rec_specs dim_specs in
+    let cx' = build_cx cx V.empty_env const_specs rec_specs dim_specs in
     traverse (elab_constr_face env dlbl desc) sys >>= fun bdry ->
     Typing.check_constr_boundary_sys cx' dlbl desc bdry;
     M.ret bdry

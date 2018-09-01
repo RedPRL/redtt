@@ -170,6 +170,8 @@ module M (Sig : Sig) : S with module Sig = Sig =
 struct
   module Sig = Sig
 
+  let empty_env = Env.emp Sig.global_dims
+
   let make_closure rho bnd =
     Clo {bnd; rho}
 
@@ -192,10 +194,11 @@ struct
           end
 
         | Tm.Var info ->
-          I.act rho.global @@ Sig.global_dim info.name
-
-        | Tm.Meta meta ->
-          I.act rho.global @@ Sig.global_dim meta.name
+          begin
+            match DimEnv.find_opt info.name rho.global with
+            | Some r -> r
+            | None -> `Atom info.name
+          end
 
         | Tm.DownX r ->
           eval_dim rho r
@@ -515,8 +518,12 @@ struct
         let el =
           lazy begin
             let phi = I.equate r r' in
-            let neu' = Neu.act phi neu in
-            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+            match force_val_sys @@ ValSys.act phi @@ ValSys.from_rigid rst_sys with
+            | `Proj v ->
+              v
+            | `Ok sys ->
+              let neu' = Neu.act phi neu in
+              make @@ Up {ty = Value.act phi ty; neu = neu'; sys}
           end
         in
         [Face.Indet (xi, el)]
@@ -560,7 +567,7 @@ struct
     let r, r' = Dir.unleash dir in
 
     let make_const_args dir =
-      multi_coe Env.emp dir (x, constr.const_specs) const_args
+      multi_coe empty_env dir (x, constr.const_specs) const_args
     in
 
     let coe_rec_arg dir _arg_spec arg =
@@ -571,7 +578,7 @@ struct
 
     let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.rec_specs rec_args in
     let intro =
-      make_intro Env.emp ~dlbl ~clbl
+      make_intro empty_env ~dlbl ~clbl
         ~const_args:(make_const_args (`Ok dir))
         ~rec_args:(make_rec_args (`Ok dir))
         ~rs
@@ -584,7 +591,7 @@ struct
       | _ ->
         (* My lord, I have no idea if this is right. ouch!! *)
         let faces =
-          eval_bterm_boundary dlbl desc Env.emp
+          eval_bterm_boundary dlbl desc empty_env
             ~const_args:(make_const_args @@ Dir.make r (`Atom x))
             ~rec_args:(make_rec_args @@ Dir.make r (`Atom x))
             ~rs
@@ -709,7 +716,7 @@ struct
        * safer to do substitution every time. *)
       let recovery_apart phi abs x_dest z_dest =
         let subst_x = I.subst x_dest x in
-        make_coe (Dir.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) abs @@
+        make_coe (Dir.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) (Abs.act subst_x abs) @@
         make_coe (Dir.make (I.act phi r) x_dest) (Abs.bind1 x @@ Abs.inst1 abs (I.act phi s')) @@
         Value.act phi el
       in
@@ -777,7 +784,8 @@ struct
         Face.map @@ fun sj s'j absj ->
         let phi = I.equate sj s'j in
         recovery_general phi absj (I.act (I.cmp phi subst_r') s')
-      in List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
+      in
+      List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
 
 
     | V info ->
@@ -855,7 +863,7 @@ struct
            * type in the semantic domain. *)
           let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.ix i in
-            let env = Env.append Env.emp [`Val b; `Val (car (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
+            let env = Env.append empty_env [`Val b; `Val (car (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
             eval env @@ Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
           in
           (* This is to generate the element in `ty0` and also
@@ -1063,11 +1071,13 @@ struct
     let cap_face =
       match Eq.from_dir dir with
       | `Ok xi ->
+        let phi = I.equate r r' in
         let el =
           lazy begin
-            let phi = I.equate r r' in
-            let neu' = Neu.act phi cap in
-            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+            match force_val_sys @@ ValSys.act phi @@ ValSys.from_rigid rst_sys with
+            | `Proj v -> v
+            | `Ok sys ->
+              make @@ Up {ty = Value.act phi ty; neu = Neu.act phi cap; sys}
           end
         in
         [Face.Indet (xi, el)]
@@ -1720,13 +1730,6 @@ struct
     | _ ->
       raise @@ E (UnleashExtError v)
 
-  and unleash_ext v =
-    match unleash v with
-    | Ext abs ->
-      abs
-    | _ ->
-      raise @@ E (UnleashExtError v)
-
   and unleash_v v =
     match unleash v with
     | V {x; ty0; ty1; equiv} ->
@@ -1876,20 +1879,13 @@ struct
       let y, ext_y = Abs.unleash1 info.abs in
       let ty_s, sys_s = unleash_ext_with ext_y ss in
       let forall_y_sys_s = ValSys.forall y sys_s in
-      begin
-        match force_val_sys forall_y_sys_s with
-        | `Proj v ->
-          v
-
-        | `Ok rsys ->
-          let correction =
-            let face = Face.map @@ fun _ _ v -> Abs.bind1 y v in
-            List.map face rsys
-          in
-          let abs = Abs.bind1 y ty_s in
-          let cap = ext_apply info.el ss in
-          rigid_com info.dir abs cap correction
-      end
+      let correction =
+        let face = Face.map @@ fun _ _ v -> Abs.bind1 y v in
+        List.map face forall_y_sys_s
+      in
+      let abs = Abs.bind1 y ty_s in
+      let cap = ext_apply info.el ss in
+      make_com (`Ok info.dir) abs cap @@ force_abs_sys correction
 
     | HCom info ->
       let ty_s, sys_s = unleash_ext_with info.ty ss in
@@ -2330,7 +2326,7 @@ struct
   module Macro =
   struct
     let equiv ty0 ty1 : value =
-      let rho = Env.append Env.emp [`Val ty1; `Val ty0] in
+      let rho = Env.append empty_env [`Val ty1; `Val ty0] in
       eval rho @@
       Tm.equiv
         (Tm.up @@ Tm.ix 0)

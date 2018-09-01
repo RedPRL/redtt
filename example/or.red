@@ -22,5 +22,3 @@ let or/elim
   sg/elim bool _ (λ _ _ → C) t
     (λ b →
       elim b [tt ⇒ m0 | ff ⇒ m1])
-
-
