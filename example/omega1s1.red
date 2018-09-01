@@ -80,7 +80,7 @@ let winding-loopn (n : int) : Path int (winding (loopn n)) n =
 ;    ]
 ;  ]
 
-; the following symmetry version avoids the bug (thanks to Evan).
+; the following symmetric version uses vproj instead of coe in V (thanks to Evan).
 
 let decode-square (n : int)
   : [i j] s1 [
