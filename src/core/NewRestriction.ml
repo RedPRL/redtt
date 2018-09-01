@@ -34,6 +34,10 @@ let equate r r' t =
    classes = IDS.union r r' t.classes;
    size = t.size + 1}
 
+let hide x t =
+  {t with classes = IDS.hide x t.classes}
+
+
 let compare r r' t = IDS.compare r r' t.classes
 
 (* poor man's tests *)

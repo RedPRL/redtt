@@ -5,6 +5,7 @@ sig
   val init : size:int -> t
   val union : I.t -> I.t -> t -> t
   val subst : I.t -> Name.t -> t -> t
+  val hide : Name.t -> t -> t
   val swap : Name.t -> Name.t -> t -> t
   val compare : I.t -> I.t -> t -> I.compare
 end
@@ -64,16 +65,16 @@ struct
     match cx, cy with
     | `Atom cx, `Atom cy ->
       if cx == cy then h else
-      let rx = get_rank cx h in
-      let ry = get_rank cy h in
-      if rx > ry then
-        {h with parent = T.set cy (`Atom cx) h.parent}
-      else if rx < ry then
-        {h with parent = T.set cx (`Atom cy) h.parent}
-      else
-        {h with
-         rank = T.set cx (rx + 1) h.rank;
-         parent = T.set cy (`Atom cx) h.parent}
+        let rx = get_rank cx h in
+        let ry = get_rank cy h in
+        if rx > ry then
+          {h with parent = T.set cy (`Atom cx) h.parent}
+        else if rx < ry then
+          {h with parent = T.set cx (`Atom cy) h.parent}
+        else
+          {h with
+           rank = T.set cx (rx + 1) h.rank;
+           parent = T.set cy (`Atom cx) h.parent}
     | `Atom cx, cy ->
       {h with parent = T.set cx cy h.parent}
     | cx, `Atom cy ->
@@ -121,9 +122,9 @@ struct
 
   let swap (x : Name.t) (y : Name.t) (h : t) =
     if x == y then h else
-    let x', h = reserve_index' x h in
-    let y', h = reserve_index' y h in
-    if x' == y' then h else
-    {h with index = T.set y x' (T.set x y' h.index)}
+      let x', h = reserve_index' x h in
+      let y', h = reserve_index' y h in
+      if x' == y' then h else
+        {h with index = T.set y x' (T.set x y' h.index)}
 
 end

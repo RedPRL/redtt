@@ -5,6 +5,8 @@ type t
 
 val emp : unit -> t
 
+val hide : atom -> t -> t
+
 (* May raise I.Inconsistent *)
 val equate : dim -> dim -> t -> t
 

@@ -2,10 +2,7 @@ open RedBasis
 open Bwd
 open BwdNotation
 
-type dim =
-  | Atom of Name.t
-  | Dim0
-  | Dim1
+type dim = I.t
 
 type 'a face = dim * dim * 'a Lazy.t
 type 'a sys = 'a face list
@@ -75,20 +72,7 @@ let flip f x y = f y x
 
 
 (** This should be the dimension equality oracle *)
-module Rel :
-sig
-  type t
-  val union : dim -> dim -> t -> t
-  val hide : Name.t bwd -> t -> t
-
-  val status : dim -> dim -> t -> [`Equal | `Apart | `Indet]
-end =
-struct
-  type t
-  let union _ _ _ = failwith ""
-  let hide _ _ = failwith ""
-  let status _ _ _ = failwith ""
-end
+module Rel = NewRestriction
 
 (** Permutations *)
 module Perm :
@@ -147,13 +131,13 @@ struct
   type t = dim
   let swap pi =
     function
-    | Dim0 | Dim1 as r -> r
-    | Atom x -> Atom (Perm.swap_name pi x)
+    | `Dim0 | `Dim1 as r -> r
+    | `Atom x -> `Atom (Perm.swap_name pi x)
 
   let subst r x =
     function
-    | Dim0 | Dim1 as r -> r
-    | Atom y when x = y -> r
+    | `Dim0 | `Dim1 as r -> r
+    | `Atom y when x = y -> r
     | r -> r
 
   let run _ r = r
@@ -278,8 +262,8 @@ struct
 
     | Coe info ->
       begin
-        match Rel.status info.r info.r' rel with
-        | `Equal ->
+        match Rel.compare info.r info.r' rel with
+        | `Same ->
           run rel info.cap
         | _ ->
           let ty = CoeShape.run rel info.ty in
@@ -289,8 +273,8 @@ struct
 
     | HCom info ->
       begin
-        match Rel.status info.r info.r' rel with
-        | `Equal ->
+        match Rel.compare info.r info.r' rel with
+        | `Same ->
           run rel info.cap
         | _ ->
           match AbsSys.run rel info.sys with
@@ -371,15 +355,15 @@ struct
       failwith ""
 
   and make_coe rel r r' abs cap =
-    match Rel.status r r' rel with
-    | `Equal ->
+    match Rel.compare r r' rel with
+    | `Same ->
       cap
     | _ ->
       rigid_coe rel r r' abs cap
 
   and make_hcom rel r r' ty cap sys =
-    match Rel.status r r' rel with
-    | `Equal ->
+    match Rel.compare r r' rel with
+    | `Same ->
       cap
     | _ ->
       match AbsSys.run rel sys with
@@ -413,7 +397,7 @@ struct
           flip Option.map (ValFace.forall x face) @@ fun (s, s', bdy) ->
           s, s',
           lazy begin
-            let rel' = Rel.union s s' rel in
+            let rel' = Rel.equate s s' rel in
             let abs = Abs (x, run rel' @@ Lazy.force bdy) in
             let cap = run rel' cap in
             make_coe rel' s s' abs cap
@@ -445,7 +429,7 @@ struct
           flip List.map sys @@ fun (s, s', abs) ->
           s, s',
           lazy begin
-            let rel' = Rel.union s s' rel in
+            let rel' = Rel.equate s s' rel in
             let Abs (x, elx) = Lazy.force abs in
             hsubst rel' r' x elx
           end
@@ -454,7 +438,7 @@ struct
           flip List.map info.sys @@ fun (s, s', ty) ->
           s, s',
           lazy begin
-            let rel' = Rel.union s s' rel in
+            let rel' = Rel.equate s s' rel in
             let cap = run rel' cap in
             let ty = run rel' @@ Lazy.force ty in
             let sys = AbsSys.run rel' sys in
@@ -469,7 +453,7 @@ struct
       failwith "TODO"
 
   and hsubst rel r x v =
-    let rel' = Rel.union r (Atom x) rel in
+    let rel' = Rel.equate r (`Atom x) rel in
     run rel' @@ subst r x v
 end
 
@@ -652,7 +636,7 @@ and Face :
     exception Dead
 
     let forall x (r, r', bdy) =
-      let sx = Atom x in
+      let sx = `Atom x in
       if r = sx || r' = sx then None else Some (r, r', bdy)
 
     let swap pi (r, r', bdy) =
@@ -664,21 +648,21 @@ and Face :
       lazy begin X.subst r x @@ Lazy.force bdy end
 
     let run rel (r, r', bdy) =
-      match Rel.status r r' rel with
+      match Rel.compare r r' rel with
       | `Apart ->
         raise Dead
-      | `Equal ->
+      | `Same ->
         let bdy' = X.run rel @@ Lazy.force bdy in
         raise @@ Triv bdy'
       | `Indet ->
         r, r',
         lazy begin
-          let rel' = Rel.union r r' rel in
+          let rel' = Rel.equate r r' rel in
           X.run rel' @@ Lazy.force bdy
         end
 
     let plug rel frm (r, r', bdy) =
-      let rel' = Rel.union r r' rel in
+      let rel' = Rel.equate r r' rel in
       r, r',
       lazy begin
         let frm' = Frame.run rel' frm in
@@ -701,7 +685,7 @@ and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
       let Abs (x, a) = abs in
       if z = x then abs else
         match r with
-        | Atom y when y = x ->
+        | `Atom y when y = x ->
           let y, pi = Perm.freshen_name x in
           let a' = X.subst r z @@ X.swap pi a in
           Abs (y, a')
@@ -712,7 +696,7 @@ and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
     let run rel abs =
       let Abs (x, a) = abs in
       (* TODO: I think the following makes sense, but let's double check. The alternative is to freshen, but it seems like we don't need to if we can un-associate these names. *)
-      let rel' = Rel.hide (Emp #< x) rel in
+      let rel' = Rel.hide x rel in
       let a' = X.run rel' a in
       Abs (x, a')
   end
@@ -731,7 +715,7 @@ and AbsPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
         Abs (x, a')
       | `Might ->
         let y, pi = Perm.freshen_name x in
-        let rel' = Rel.hide (Emp #< x) rel in
+        let rel' = Rel.hide x rel in
         let a' = X.plug rel' frm @@ X.swap pi a in
         Abs (y, a')
 
