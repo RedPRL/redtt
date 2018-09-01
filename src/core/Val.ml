@@ -515,8 +515,12 @@ struct
         let el =
           lazy begin
             let phi = I.equate r r' in
-            let neu' = Neu.act phi neu in
-            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+            match force_val_sys @@ ValSys.act phi @@ ValSys.from_rigid rst_sys with
+            | `Proj v ->
+              v
+            | `Ok sys ->
+              let neu' = Neu.act phi neu in
+              make @@ Up {ty = Value.act phi ty; neu = neu'; sys}
           end
         in
         [Face.Indet (xi, el)]
