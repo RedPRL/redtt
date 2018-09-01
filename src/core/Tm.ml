@@ -869,13 +869,21 @@ and pp_frame env fmt =
     Format.fprintf fmt "car"
   | Cdr ->
     Format.fprintf fmt "cdr"
+  | VProj _ ->
+    Format.fprintf fmt "<vproj>"
+  | Cap _ ->
+    Format.fprintf fmt "<cap>"
+  | LblCall ->
+    Format.fprintf fmt "lblcall"
+  | RestrictForce ->
+    Format.fprintf fmt "restrict-force"
+  | Prev _ ->
+    Format.fprintf fmt "<prev>"
   | Elim info ->
     Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a)@]"
       Desc.pp_data_label info.dlbl
       (pp_bnd env) info.mot
       (pp_elim_clauses env) info.clauses
-  | _ ->
-    Format.fprintf fmt "<frame>"
 
 and pp_lbl_args env fmt args =
   let pp_sep fmt () = Format.fprintf fmt " " in
