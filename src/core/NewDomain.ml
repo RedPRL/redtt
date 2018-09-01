@@ -7,7 +7,7 @@ type dim =
   | Dim0
   | Dim1
 
-type 'a face = (dim * dim) * 'a Lazy.t
+type 'a face = dim * dim * 'a Lazy.t
 type 'a sys = 'a face list
 type 'a abs = Abs of Name.t * 'a
 
@@ -54,6 +54,7 @@ and frame =
   | ExtApp of dim list
   | Car
   | Cdr
+  | NHCom of {r : dim; r' : dim; cap : value; sys : value abs sys}
 
 and neu =
   {head : head;
@@ -68,6 +69,9 @@ and env = cell bwd
 and clo = Clo of {bnd : Tm.tm Tm.bnd; env : env}
 and nclo = NClo of {bnd : Tm.tm Tm.nbnd; env : env}
 and ext_clo = ExtClo of {bnd : (Tm.tm * (Tm.tm, Tm.tm) Tm.system) Tm.nbnd; env : env}
+
+
+let flip f x y = f y x
 
 
 (** This should be the dimension equality oracle *)
@@ -167,7 +171,7 @@ struct
   let subst _ _ = failwith ""
   let run _ _ = failwith ""
 
-  let inst (rel : rel) clo cell : value =
+  let inst rel clo cell =
     let Clo {bnd; env} = clo in
     let Tm.B (_, tm) = bnd in
     Syn.eval rel (env #< cell) tm
@@ -203,7 +207,7 @@ struct
   let subst _ _ = failwith ""
   let run _ _ = failwith ""
 
-  let inst (rel : rel) clo cells =
+  let inst rel clo cells =
     let ExtClo {bnd; env} = clo in
     let Tm.NB (_, (ty, sys)) = bnd in
     let env' = env <>< cells in
@@ -226,6 +230,7 @@ struct
   type t = value
 
   module ValSys = Sys (Val)
+  module ValFace = Face (Val)
   module AbsSys = Sys (AbsPlug (Val))
 
   let swap _ _ = failwith ""
@@ -308,8 +313,10 @@ struct
       failwith ""
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
-      failwith ""
-
+      let ty = Clo.inst rel quant.cod @@ Val (lazy arg) in
+      let cap = plug rel frm cap in
+      let sys = AbsSys.plug rel frm sys in
+      rigid_hcom rel r r' ty cap sys
 
     | ExtApp rs, ExtLam nclo ->
       NClo.inst rel nclo @@ List.map (fun r -> Dim (lazy r)) rs
@@ -330,7 +337,7 @@ struct
         let Abs (xs, {dom; cod}) = abs in
         Abs (xs, dom)
       in
-      dispatch_coe rel r r' ty cap
+      rigid_coe rel r r' ty cap
 
     | Cdr, Cons (_, v1) ->
       v1
@@ -349,6 +356,10 @@ struct
     | Pi {dom; cod}, FunApp arg ->
       Clo.inst rel cod @@ Val (lazy arg)
 
+    | Ext extclo, ExtApp rs ->
+      let ty, _ = ExtClo.inst rel extclo @@ List.map (fun r -> Dim (lazy r)) rs in
+      ty
+
     | Sg {dom; _}, Car ->
       dom
 
@@ -359,8 +370,28 @@ struct
     | _ ->
       failwith ""
 
+  and make_coe rel r r' abs cap =
+    match Rel.status r r' rel with
+    | `Equal ->
+      cap
+    | _ ->
+      rigid_coe rel r r' abs cap
+
+  and make_hcom rel r r' ty cap sys =
+    match Rel.status r r' rel with
+    | `Equal ->
+      cap
+    | _ ->
+      match AbsSys.run rel sys with
+      | _ ->
+        rigid_hcom rel r r' ty cap sys
+      | exception (AbsSys.Triv abs) ->
+        let Abs (x, vx) = abs in
+        hsubst rel r' x vx
+
+
   (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
-  and dispatch_coe rel r r' abs cap =
+  and rigid_coe rel r r' abs cap =
     let Abs (x, tyx) = abs in
     match tyx with
     | Sg quant ->
@@ -369,16 +400,73 @@ struct
     | Pi quant ->
       Coe {r; r'; ty = `Pi (Abs (x, quant)); cap}
 
-    | Ext ext_clo ->
-      Coe {r; r'; ty = `Ext (Abs (x, ext_clo)); cap}
+    | Ext extclo ->
+      Coe {r; r'; ty = `Ext (Abs (x, extclo)); cap}
 
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
       let ty = hsubst rel r' x tyx in
-      let sys = [(r, r'), lazy cap] in
+      let sys =
+        let cap_face = r, r', lazy cap in
+        let old_faces =
+          flip ListUtil.filter_map info.sys @@ fun face ->
+          flip Option.map (ValFace.forall x face) @@ fun (s, s', bdy) ->
+          s, s',
+          lazy begin
+            let rel' = Rel.union s s' rel in
+            let abs = Abs (x, run rel' @@ Lazy.force bdy) in
+            let cap = run rel' cap in
+            make_coe rel' s s' abs cap
+          end
+        in
+        cap_face :: old_faces
+      in
       Neu {ty; neu; sys}
 
     | _ -> failwith ""
+
+  and rigid_hcom rel r r' ty cap sys =
+    match ty with
+    | Sg quant ->
+      HCom {r; r'; ty = `Sg quant; cap; sys}
+
+    | Pi quant ->
+      HCom {r; r'; ty = `Pi quant; cap; sys}
+
+    | Ext extclo ->
+      HCom {r; r'; ty = `Ext extclo; cap; sys}
+
+    | Neu info ->
+      let nhcom = NHCom {r; r'; cap; sys} in
+      let neu = {info.neu with frames = info.neu.frames #< nhcom} in
+      let neu_sys =
+        let cap_face = r, r', lazy cap in
+        let tube_faces =
+          flip List.map sys @@ fun (s, s', abs) ->
+          s, s',
+          lazy begin
+            let rel' = Rel.union s s' rel in
+            let Abs (x, elx) = Lazy.force abs in
+            hsubst rel' r' x elx
+          end
+        in
+        let old_faces =
+          flip List.map info.sys @@ fun (s, s', ty) ->
+          s, s',
+          lazy begin
+            let rel' = Rel.union s s' rel in
+            let cap = run rel' cap in
+            let ty = run rel' @@ Lazy.force ty in
+            let sys = AbsSys.run rel' sys in
+            make_hcom rel' r r' ty cap sys
+          end
+        in
+        cap_face :: tube_faces @ old_faces
+      in
+      Neu {ty; neu; sys = neu_sys}
+
+    | _ ->
+      failwith "TODO"
 
   and hsubst rel r x v =
     let rel' = Rel.union r (Atom x) rel in
@@ -477,6 +565,8 @@ struct
       ExtApp rs
     | Car | Cdr as frm ->
       frm
+    | NHCom _ ->
+      failwith "TODO"
 
   let subst r x =
     function
@@ -488,6 +578,8 @@ struct
       ExtApp rs
     | Car | Cdr as frm ->
       frm
+    | NHCom _ ->
+      failwith "TODO"
 
 
   let run rel =
@@ -497,10 +589,12 @@ struct
       FunApp arg
     | Car | Cdr | ExtApp _ as frm->
       frm
+    | NHCom _ ->
+      failwith "TODO"
 
   let occurs xs =
     function
-    | FunApp _ | ExtApp _ ->
+    | FunApp _ | ExtApp _ | NHCom _ ->
       `Might
     | Car | Cdr ->
       `No
@@ -512,6 +606,8 @@ and Sys :
   sig
     include DomainPlug with type t = X.t sys
     exception Triv of X.t
+
+    val forall : Name.t -> t -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -522,6 +618,8 @@ and Sys :
 
     let swap pi = List.map @@ Face.swap pi
     let subst r x = List.map @@ Face.subst r x
+
+    let forall x = ListUtil.filter_map (Face.forall x)
 
     let run rel sys =
       let run_face face =
@@ -541,6 +639,8 @@ and Face :
   sig
     include DomainPlug with type t = X.t face
 
+    val forall : Name.t -> t -> t option
+
     exception Triv of X.t
     exception Dead
   end =
@@ -551,15 +651,19 @@ and Face :
     exception Triv of X.t
     exception Dead
 
-    let swap pi ((r, r'), bdy) =
-      (Dim.swap pi r, Dim.swap pi r'),
+    let forall x (r, r', bdy) =
+      let sx = Atom x in
+      if r = sx || r' = sx then None else Some (r, r', bdy)
+
+    let swap pi (r, r', bdy) =
+      Dim.swap pi r, Dim.swap pi r',
       lazy begin X.swap pi @@ Lazy.force bdy end
 
-    let subst r x ((s, s'), bdy) =
-      (Dim.subst r x s, Dim.subst r x s'),
+    let subst r x (s, s', bdy) =
+      Dim.subst r x s, Dim.subst r x s',
       lazy begin X.subst r x @@ Lazy.force bdy end
 
-    let run rel ((r, r'), bdy) =
+    let run rel (r, r', bdy) =
       match Rel.status r r' rel with
       | `Apart ->
         raise Dead
@@ -567,15 +671,15 @@ and Face :
         let bdy' = X.run rel @@ Lazy.force bdy in
         raise @@ Triv bdy'
       | `Indet ->
-        (r, r'),
+        r, r',
         lazy begin
           let rel' = Rel.union r r' rel in
           X.run rel' @@ Lazy.force bdy
         end
 
-    let plug rel frm ((r, r'), bdy) =
+    let plug rel frm (r, r', bdy) =
       let rel' = Rel.union r r' rel in
-      (r, r'),
+      r, r',
       lazy begin
         let frm' = Frame.run rel' frm in
         X.plug rel frm' @@ Lazy.force bdy

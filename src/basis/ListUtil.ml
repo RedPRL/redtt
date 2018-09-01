@@ -39,3 +39,9 @@ let tabulate n f =
       f i :: go (i+1)
   in
   go 0
+
+let filter_map f =
+  flat_map @@ fun x ->
+  match f x with
+  | None -> []
+  | Some y -> [y]
