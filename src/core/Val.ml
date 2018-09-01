@@ -1067,11 +1067,13 @@ struct
     let cap_face =
       match Eq.from_dir dir with
       | `Ok xi ->
+        let phi = I.equate r r' in
         let el =
           lazy begin
-            let phi = I.equate r r' in
-            let neu' = Neu.act phi cap in
-            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+            match force_val_sys @@ ValSys.act phi @@ ValSys.from_rigid rst_sys with
+            | `Proj v -> v
+            | `Ok sys ->
+              make @@ Up {ty = Value.act phi ty; neu = Neu.act phi cap; sys}
           end
         in
         [Face.Indet (xi, el)]
