@@ -23,12 +23,14 @@ sig
 
   val bind : atom bwd -> el -> t
   val unleash : t -> atom bwd * el
+  val unsafe_unleash : t -> atom bwd * el
   val inst : t -> I.t bwd -> el
 
   val len : t -> int
 
   val bind1 : atom -> el -> t
   val unleash1 : t -> atom * el
+  val unsafe_unleash1 : t -> atom * el
   val inst1 : t -> I.t -> el
 
   val make1 : (atom -> el) -> t
@@ -69,6 +71,9 @@ struct
     let xs = Bwd.map (fun x -> Name.named @@ Name.name x) abs.atoms in
     xs, X.act (swap_atoms xs abs.atoms I.idn) abs.node
 
+  let unsafe_unleash abs =
+    abs.atoms, abs.node
+
 
   let bind1 x el =
     bind (Emp #< x) el
@@ -85,6 +90,15 @@ struct
       Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
       Format.eprintf "@.";
       failwith "unleash1: incorrect binding depth"
+
+  let unsafe_unleash1 abs =
+    let xs, el = unsafe_unleash abs in
+    match xs with
+    | Snoc (Emp, x) -> x, el
+    | _ ->
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
+      failwith "unsafe_unleash1: incorrect binding depth"
 
   let inst1 el r =
     inst el @@ Emp #< r

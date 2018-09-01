@@ -5,6 +5,8 @@ open Domain
 
 include ValSig
 
+let flip f x y = f y x
+
 exception StrictHComEncounteredNonConstructor
 
 
@@ -606,7 +608,7 @@ struct
     end
 
   and rigid_coe_nonstrict_data dir abs el =
-    let _, tyx = Abs.unleash1 abs in
+    let _, tyx = Abs.unsafe_unleash abs in
     match unleash tyx, unleash el with
     | Data dlbl, Intro info ->
       rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
@@ -2134,9 +2136,7 @@ struct
       make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
 
     | Coe info ->
-      let x, tyx = Abs.unleash1 info.abs in
-      let domx, _ = unleash_sg tyx in
-      let abs = Abs.bind1 x domx in
+      let abs = flip Abs.unsafe_map info.abs @@ fun v -> fst @@ unleash_sg v in
       let el = car info.el in
       rigid_coe info.dir abs el
 
