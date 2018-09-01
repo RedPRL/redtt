@@ -27,8 +27,6 @@ let shannon (A : type) (f : bool → A) : bool → A =
   | ff ⇒ f ff
   ]
 
-
-
 let shannon/path (A : type) (f : bool → A) : Path _ f (shannon A f) =
   funext _ _ f (shannon A f)
     (λ b →
@@ -36,4 +34,3 @@ let shannon/path (A : type) (f : bool → A) : Path _ f (shannon A f) =
       | tt ⇒ refl
       | ff ⇒ refl
       ])
-
