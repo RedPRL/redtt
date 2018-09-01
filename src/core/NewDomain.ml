@@ -404,7 +404,7 @@ struct
             let rel' = Rel.equate s s' rel in
             let abs = Abs (x, run rel' @@ Lazy.force bdy) in
             let cap = run rel' cap in
-            make_coe rel' s s' abs cap
+            make_coe rel' r r' abs cap
           end
         in
         cap_face :: old_faces
