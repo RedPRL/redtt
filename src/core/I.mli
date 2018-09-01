@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 type atom = Name.t
 
 type 'a f =
@@ -19,8 +21,10 @@ val idn : action
 val swap : atom -> atom -> action
 val subst : t -> atom -> action
 val cmp : action -> action -> action
-
 val equate : t -> t -> action
+
+val occurs_in_action : atom bwd -> action -> bool
+
 
 val act : action -> t -> t
 

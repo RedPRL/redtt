@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 type atom = Name.t
 
 type 'a f =
@@ -85,6 +87,20 @@ let act phi r =
   act_clock := !act_clock +. (now1 -. now0);
   r'
 
+let occurs_in_action xs =
+  let rec go =
+    function
+    | Idn ->
+      false
+    | Swap (y, z) ->
+      Bwd.mem y xs || Bwd.mem z xs
+    | Subst (`Atom y, _) ->
+      Bwd.mem y xs
+    | Subst (_, _) ->
+      false
+    | Cmp (phi0, phi1) ->
+      go phi1 || go phi0
+  in go
 
 
 

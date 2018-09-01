@@ -94,7 +94,11 @@ struct
     bind1 x @@ gen x
 
   let act phi abs =
-    let xs, node = unleash abs in
-    bind xs @@ X.act phi node
+    if I.occurs_in_action abs.atoms phi then
+      let xs = Bwd.map (fun x -> Name.named @@ Name.name x) abs.atoms in
+      let phi' = I.cmp phi @@ swap_atoms xs abs.atoms I.idn in
+      bind xs @@ X.act phi' abs.node
+    else
+      bind abs.atoms @@ X.act phi abs.node
 end
 
