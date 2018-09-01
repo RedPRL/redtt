@@ -454,7 +454,7 @@ struct
       Neu {ty; neu; sys = neu_sys}
 
     | _ ->
-      failwith "TODO"
+      raise PleaseFillIn
 
   and hsubst rel r x v =
     let rel' = Rel.equate r (`Atom x) rel in
@@ -554,7 +554,7 @@ struct
     | Car | Cdr as frm ->
       frm
     | NHCom _ ->
-      failwith "TODO"
+      raise PleaseFillIn
 
   let subst r x =
     function
@@ -567,7 +567,7 @@ struct
     | Car | Cdr as frm ->
       frm
     | NHCom _ ->
-      failwith "TODO"
+      raise PleaseFillIn
 
 
   let run rel =
@@ -578,7 +578,7 @@ struct
     | Car | Cdr | ExtApp _ as frm->
       frm
     | NHCom _ ->
-      failwith "TODO"
+      raise PleaseFillIn
 
   let occurs xs =
     function
