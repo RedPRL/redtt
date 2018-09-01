@@ -1876,20 +1876,13 @@ struct
       let y, ext_y = Abs.unleash1 info.abs in
       let ty_s, sys_s = unleash_ext_with ext_y ss in
       let forall_y_sys_s = ValSys.forall y sys_s in
-      begin
-        match force_val_sys forall_y_sys_s with
-        | `Proj v ->
-          v
-
-        | `Ok rsys ->
-          let correction =
-            let face = Face.map @@ fun _ _ v -> Abs.bind1 y v in
-            List.map face rsys
-          in
-          let abs = Abs.bind1 y ty_s in
-          let cap = ext_apply info.el ss in
-          rigid_com info.dir abs cap correction
-      end
+      let correction =
+        let face = Face.map @@ fun _ _ v -> Abs.bind1 y v in
+        List.map face forall_y_sys_s
+      in
+      let abs = Abs.bind1 y ty_s in
+      let cap = ext_apply info.el ss in
+      make_com (`Ok info.dir) abs cap @@ force_abs_sys correction
 
     | HCom info ->
       let ty_s, sys_s = unleash_ext_with info.ty ss in
