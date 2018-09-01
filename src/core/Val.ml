@@ -1726,13 +1726,6 @@ struct
     | _ ->
       raise @@ E (UnleashExtError v)
 
-  and unleash_ext v =
-    match unleash v with
-    | Ext abs ->
-      abs
-    | _ ->
-      raise @@ E (UnleashExtError v)
-
   and unleash_v v =
     match unleash v with
     | V {x; ty0; ty1; equiv} ->
