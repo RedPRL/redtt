@@ -116,6 +116,8 @@ sig
   val plug : rel -> frame -> t -> t
 end
 
+
+
 module rec Syn :
 sig
   type t = Tm.tm
@@ -298,7 +300,15 @@ struct
       Clo.inst rel clo @@ Val (lazy arg)
 
     | FunApp arg, Coe {r; r'; ty = `Pi abs; cap} ->
-      raise PleaseFillIn
+      let Abs (x, quantx) = abs in
+      let y, pi = Perm.freshen_name x in
+      let dom = Abs (x, quantx.dom) in
+      let coe_arg s = make_coe rel r' s dom arg in
+      let coe_r'y = lazy begin coe_arg @@ `Atom y end in
+      let cod_y = swap pi quantx.cod in
+      let cod_coe = Abs (y, Clo.inst rel cod_y @@ Val coe_r'y) in
+      rigid_coe rel r r' cod_coe @@
+      plug rel (FunApp (coe_arg r)) cap
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
       let ty = Clo.inst rel quant.cod @@ Val (lazy arg) in
@@ -379,7 +389,7 @@ struct
 
 
   (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
-  and rigid_coe rel r r' abs cap =
+  and rigid_coe rel r r' abs cap : value =
     let Abs (x, tyx) = abs in
     match tyx with
     | Sg quant ->
