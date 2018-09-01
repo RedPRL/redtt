@@ -74,7 +74,7 @@ let flip f x y = f y x
 
 
 (** This should be the dimension equality oracle *)
-module Rel = IDisjointSet.Make (RedBasis.PersistentTable.M)
+module Rel = NewRestriction
 
 (** Permutations *)
 module Perm :
@@ -410,7 +410,7 @@ struct
           flip Option.map (ValFace.forall x face) @@ fun (s, s', bdy) ->
           s, s',
           lazy begin
-            let rel' = Rel.union s s' rel in
+            let rel' = Rel.equate s s' rel in
             let abs = Abs (x, run rel' @@ Lazy.force bdy) in
             let cap = run rel' cap in
             make_coe rel' r r' abs cap
@@ -442,7 +442,7 @@ struct
           flip List.map sys @@ fun (s, s', abs) ->
           s, s',
           lazy begin
-            let rel' = Rel.union s s' rel in
+            let rel' = Rel.equate s s' rel in
             let Abs (x, elx) = Lazy.force abs in
             hsubst rel' r' x elx
           end
@@ -451,7 +451,7 @@ struct
           flip List.map info.sys @@ fun (s, s', ty) ->
           s, s',
           lazy begin
-            let rel' = Rel.union s s' rel in
+            let rel' = Rel.equate s s' rel in
             let cap = run rel' cap in
             let ty = run rel' @@ Lazy.force ty in
             let sys = AbsSys.run rel' sys in
@@ -670,12 +670,12 @@ and Face :
       | `Indet ->
         r, r',
         lazy begin
-          let rel' = Rel.union r r' rel in
+          let rel' = Rel.equate r r' rel in
           X.run rel' @@ Lazy.force bdy
         end
 
     let plug rel frm (r, r', bdy) =
-      let rel' = Rel.union r r' rel in
+      let rel' = Rel.equate r r' rel in
       r, r',
       lazy begin
         let frm' = Frame.run rel' frm in

@@ -8,9 +8,9 @@ sig
   val get : 'k -> ('k, 'a) t -> 'a
   val set : 'k -> 'a -> ('k, 'a) t -> ('k, 'a) t
   val remove : 'k -> ('k, 'a) t -> ('k, 'a) t
-  val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
-
   val find : 'k -> ('k, 'a) t -> 'a option
+  val fold : ('k -> 'a -> 'b -> 'b) -> ('k, 'a) t -> 'b -> 'b
+  val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
 end
 
 module M : S
