@@ -716,7 +716,6 @@ struct
        * safer to do substitution every time. *)
       let recovery_apart phi abs x_dest z_dest =
         let subst_x = I.subst x_dest x in
-
         make_coe (Dir.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) (Abs.act subst_x abs) @@
         make_coe (Dir.make (I.act phi r) x_dest) (Abs.bind1 x @@ Abs.inst1 abs (I.act phi s')) @@
         Value.act phi el
@@ -779,7 +778,6 @@ struct
         in
         diag :: List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
       in
-
       make_box (Dir.act subst_r' fhcom.dir) coerced_cap @@
       force_val_sys @@
       let face =
