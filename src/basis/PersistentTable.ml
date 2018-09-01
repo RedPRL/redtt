@@ -5,6 +5,7 @@ sig
   val init : size:int -> ('k, 'a) t
   val get : 'k -> ('k, 'a) t -> 'a
   val set : 'k -> 'a -> ('k, 'a) t -> ('k, 'a) t
+  val remove : 'k -> ('k, 'a) t -> ('k, 'a) t
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
 
   val find : 'k -> ('k, 'a) t -> 'a option
@@ -70,6 +71,18 @@ struct
     | Tbl a as n ->
       let old = Hashtbl.find_opt a k in
       Hashtbl.replace a k v;
+      let res = ref n in
+      t := Diff (k, old, res);
+      res
+    | _ ->
+      raise Fatal
+
+  let remove k t =
+    reroot t;
+    match !t with
+    | Tbl a as n ->
+      let old = Hashtbl.find_opt a k in
+      Hashtbl.remove a k;
       let res = ref n in
       t := Diff (k, old, res);
       res
