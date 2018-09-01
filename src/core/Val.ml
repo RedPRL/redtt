@@ -716,7 +716,7 @@ struct
        * safer to do substitution every time. *)
       let recovery_apart phi abs x_dest z_dest =
         let subst_x = I.subst x_dest x in
-        make_coe (Dir.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) abs @@
+        make_coe (Dir.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) (Abs.act subst_x abs) @@
         make_coe (Dir.make (I.act phi r) x_dest) (Abs.bind1 x @@ Abs.inst1 abs (I.act phi s')) @@
         Value.act phi el
       in
@@ -784,7 +784,8 @@ struct
         Face.map @@ fun sj s'j absj ->
         let phi = I.equate sj s'j in
         recovery_general phi absj (I.act (I.cmp phi subst_r') s')
-      in List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
+      in
+      List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
 
 
     | V info ->
