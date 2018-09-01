@@ -2,6 +2,8 @@ open RedBasis
 open Bwd
 open BwdNotation
 
+exception PleaseFillIn
+
 type dim = I.t
 
 type 'a face = dim * dim * 'a Lazy.t
@@ -84,9 +86,9 @@ sig
 end =
 struct
   type t
-  let freshen_name _ = failwith ""
-  let freshen_names _ = failwith ""
-  let swap_name _ = failwith ""
+  let freshen_name _ = raise PleaseFillIn
+  let freshen_names _ = raise PleaseFillIn
+  let swap_name _ = raise PleaseFillIn
 end
 
 type rel = Rel.t
@@ -122,8 +124,10 @@ sig
 end =
 struct
   type t = Tm.tm
-  let eval _ _ = failwith ""
-  let eval_tm_sys _ _ = failwith ""
+  let eval _ _ =
+    raise PleaseFillIn
+
+  let eval_tm_sys _ _ = raise PleaseFillIn
 end
 
 and Dim : Domain with type t = dim =
@@ -151,9 +155,9 @@ end =
 struct
   type t = clo
 
-  let swap _ _ = failwith ""
-  let subst _ _ = failwith ""
-  let run _ _ = failwith ""
+  let swap _ _ = raise PleaseFillIn
+  let subst _ _ = raise PleaseFillIn
+  let run _ _ = raise PleaseFillIn
 
   let inst rel clo cell =
     let Clo {bnd; env} = clo in
@@ -169,9 +173,9 @@ end =
 struct
   type t = nclo
 
-  let swap _ _ = failwith ""
-  let subst _ _ = failwith ""
-  let run _ _ = failwith ""
+  let swap _ _ = raise PleaseFillIn
+  let subst _ _ = raise PleaseFillIn
+  let run _ _ = raise PleaseFillIn
 
   let inst (rel : rel) nclo cells : value =
     let NClo {bnd; env} = nclo in
@@ -187,9 +191,9 @@ end =
 struct
   type t = ext_clo
 
-  let swap _ _ = failwith ""
-  let subst _ _ = failwith ""
-  let run _ _ = failwith ""
+  let swap _ _ = raise PleaseFillIn
+  let subst _ _ = raise PleaseFillIn
+  let run _ _ = raise PleaseFillIn
 
   let inst rel clo cells =
     let ExtClo {bnd; env} = clo in
@@ -204,9 +208,9 @@ end
 and Env : Domain with type t = env =
 struct
   type t = env
-  let swap _ _ = failwith ""
-  let subst _ _ = failwith ""
-  let run _ _ = failwith ""
+  let swap _ _ = raise PleaseFillIn
+  let subst _ _ = raise PleaseFillIn
+  let run _ _ = raise PleaseFillIn
 end
 
 and Val : DomainPlug with type t = value =
@@ -217,8 +221,8 @@ struct
   module ValFace = Face (Val)
   module AbsSys = Sys (AbsPlug (Val))
 
-  let swap _ _ = failwith ""
-  let subst _ _ _ = failwith ""
+  let swap _ _ = raise PleaseFillIn
+  let subst _ _ _ = raise PleaseFillIn
 
 
   let rec run rel =
@@ -294,7 +298,7 @@ struct
       Clo.inst rel clo @@ Val (lazy arg)
 
     | FunApp arg, Coe {r; r'; ty = `Pi abs; cap} ->
-      failwith ""
+      raise PleaseFillIn
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
       let ty = Clo.inst rel quant.cod @@ Val (lazy arg) in
@@ -306,10 +310,10 @@ struct
       NClo.inst rel nclo @@ List.map (fun r -> Dim (lazy r)) rs
 
     | ExtApp rs, Coe {r; r'; ty = `Ext abs; cap} ->
-      failwith ""
+      raise PleaseFillIn
 
     | ExtApp rs, HCom {r; r'; ty = `Ext qu; cap; sys} ->
-      failwith ""
+      raise PleaseFillIn
 
 
     | Car, Cons (v0, _) ->
@@ -333,7 +337,7 @@ struct
       Neu {ty; neu; sys}
 
     | _ ->
-      failwith ""
+      raise PleaseFillIn
 
   and plug_ty rel frm ty hd =
     match ty, frm with
@@ -352,7 +356,7 @@ struct
       Clo.inst rel cod @@ Val (lazy car)
 
     | _ ->
-      failwith ""
+      raise PleaseFillIn
 
   and make_coe rel r r' abs cap =
     match Rel.compare r r' rel with
@@ -407,7 +411,7 @@ struct
       in
       Neu {ty; neu; sys}
 
-    | _ -> failwith ""
+    | _ -> raise PleaseFillIn
 
   and rigid_hcom rel r r' ty cap sys =
     match ty with
@@ -513,18 +517,18 @@ end
 and Quantifier : Domain with type t = quantifier =
 struct
   type t = quantifier
-  let swap _ = failwith ""
-  let subst _ = failwith ""
-  let run _ = failwith ""
+  let swap _ = raise PleaseFillIn
+  let subst _ = raise PleaseFillIn
+  let run _ = raise PleaseFillIn
 end
 
 and Neu : DomainPlug with type t = neu =
 struct
   type t = neu
 
-  let swap _ = failwith ""
-  let run _ = failwith ""
-  let subst _ = failwith ""
+  let swap _ = raise PleaseFillIn
+  let run _ = raise PleaseFillIn
+  let subst _ = raise PleaseFillIn
 
   let plug rel frm neu =
     {neu with
