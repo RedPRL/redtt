@@ -42,3 +42,5 @@ let rotate/is-equiv (a : s1) : IsEquiv s1 s1 (rotate a) =
 let rotate/equiv (a : s1) : Equiv s1 s1 =
   < rotate a , rotate/is-equiv a >
 
+let rotate/path (a : s1) : Path^1 type s1 s1 =
+  UA s1 s1 (rotate/equiv a)
