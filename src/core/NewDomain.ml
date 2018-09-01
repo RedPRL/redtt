@@ -343,8 +343,8 @@ struct
     | _, Neu info ->
       let neu = Neu.plug rel frm info.neu in
       let sys = ValSys.plug rel frm info.sys in
-      let ty = plug_ty rel frm info.ty hd in
-      Neu {ty; neu; sys}
+      let ty, sys' = plug_ty rel frm info.ty hd in
+      Neu {ty; neu; sys = sys' @ sys}
 
     | _ ->
       raise PleaseFillIn
@@ -352,18 +352,17 @@ struct
   and plug_ty rel frm ty hd =
     match ty, frm with
     | Pi {dom; cod}, FunApp arg ->
-      Clo.inst rel cod @@ Val (lazy arg)
+      Clo.inst rel cod @@ Val (lazy arg), []
 
     | Ext extclo, ExtApp rs ->
-      let ty, _ = ExtClo.inst rel extclo @@ List.map (fun r -> Dim (lazy r)) rs in
-      ty
+      ExtClo.inst rel extclo @@ List.map (fun r -> Dim (lazy r)) rs
 
     | Sg {dom; _}, Car ->
-      dom
+      dom, []
 
     | Sg {dom; cod}, Cdr ->
       let car = plug rel Car hd in
-      Clo.inst rel cod @@ Val (lazy car)
+      Clo.inst rel cod @@ Val (lazy car), []
 
     | _ ->
       raise PleaseFillIn
