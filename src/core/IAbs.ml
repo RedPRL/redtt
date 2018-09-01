@@ -21,14 +21,12 @@ sig
 
   val unsafe_map : (el -> el) -> t -> t
 
-  val unsafe_bind : atom bwd -> el -> t
   val bind : atom bwd -> el -> t
   val unleash : t -> atom bwd * el
   val inst : t -> I.t bwd -> el
 
   val len : t -> int
 
-  val unsafe_bind1 : atom -> el -> t
   val bind1 : atom -> el -> t
   val unleash1 : t -> atom * el
   val inst1 : t -> I.t -> el
@@ -65,29 +63,15 @@ struct
     X.act phi abs.node
 
   let bind atoms node =
-    let rec go ys atoms phi =
-      match atoms with
-      | Emp ->
-        {atoms = Bwd.from_list ys; node = X.act phi node}
-      | Snoc (atoms, x) ->
-        let y = Name.named @@ Name.name x in
-        go (y :: ys) atoms @@ I.cmp (I.swap x y) phi
-    in
-    go [] atoms I.idn
+    {atoms; node}
 
   let unleash abs =
     let xs = Bwd.map (fun x -> Name.named @@ Name.name x) abs.atoms in
-    xs, inst abs @@ Bwd.map (fun x -> `Atom x) xs
+    xs, X.act (swap_atoms xs abs.atoms I.idn) abs.node
 
-
-  let unsafe_bind atoms node =
-    bind atoms node
 
   let bind1 x el =
     bind (Emp #< x) el
-
-  let unsafe_bind1 x el =
-    bind1 x el
 
   let unsafe_map f abs =
     {abs with node = f abs.node}
@@ -107,7 +91,7 @@ struct
 
   let make1 gen =
     let x = Name.fresh () in
-    unsafe_bind1 x (gen x)
+    bind1 x @@ gen x
 
   let act phi abs =
     let xs, node = unleash abs in

@@ -542,7 +542,7 @@ struct
     | (_, spec) :: const_specs, arg :: args ->
       let vty = eval env spec in
       let r, r' = Dir.unleash dir in
-      let coe_hd s = make_coe (Dir.make r s) (Abs.unsafe_bind1 x vty) arg in
+      let coe_hd s = make_coe (Dir.make r s) (Abs.bind1 x vty) arg in
       let coe_tl =
         let coe_hd_x = coe_hd @@ `Atom x in
         rigid_multi_coe (Env.snoc env @@ `Val coe_hd_x) dir (x, const_specs) args
@@ -1688,14 +1688,14 @@ struct
     let Tm.NB (nms, tm) = bnd in
     let xs = Bwd.map Name.named nms in
     let rho = Env.append rho @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs in
-    Abs.unsafe_bind xs @@ eval rho tm
+    Abs.bind xs @@ eval rho tm
 
   (* CORRECT *)
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = Bwd.map Name.named nms in
     let rho = Env.append rho @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs in
-    let res = ExtAbs.unsafe_bind xs (eval rho tm, eval_tm_sys rho sys) in
+    let res = ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys) in
     res
 
   and unleash_data v =
