@@ -47,3 +47,21 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
         >
   in
   <fwd, (Iso/Equiv _ _ <fwd.0, bwd, λ a i → a, bwdfwd>).1>
+
+let pΩ (pA : ptype) : ptype =
+  < Path (pA.0) (pA.1) (pA.1)
+  , λ _ → pA.1
+  >
+
+let pΩ/map (pA, pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
+  < λ p i →
+      comp 0 1 (pf.0 (p i)) [
+      | i=0 ⇒ pf.1
+      | i=1 ⇒ pf.1
+      ]
+  , λ j i →
+      comp j 1 (pf.1 j) [
+      | i=0 ⇒ pf.1
+      | i=1 ⇒ pf.1
+      ]
+  >
