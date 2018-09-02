@@ -398,9 +398,9 @@ struct
         | `Atom y ->
           let ty0 = Value.act phi info.ty0 in
           let ty1 = Value.act phi info.ty1 in
-          let equiv = Value.act phi info.equiv in
+          let func = Value.act phi info.func in
           let neu = act phi info.neu in
-          VProj {x = y; neu; ty0; ty1; equiv}
+          VProj {x = y; neu; ty0; ty1; func}
         | _ ->
           raise TooMortal
       end

@@ -65,7 +65,7 @@ and 'a frame =
   | Cdr
   | FunApp of 'a
   | ExtApp of 'a list
-  | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; equiv : 'a}
+  | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; func : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | LblCall
   | RestrictForce

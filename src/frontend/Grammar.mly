@@ -531,7 +531,7 @@ cut:
       let hd, fs = e env in
       hd, fs #< (Tm.ExtApp (args env)) }
 
-  | LPR; VPROJ; r = tm; e = cut; ty0 = tm; ty1 = tm; equiv = tm; RPR
+  | LPR; VPROJ; r = tm; e = cut; ty0 = tm; ty1 = tm; func = tm; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< (Tm.VProj {r = r env; ty0 = ty0 env; ty1 = ty1 env; equiv = equiv env})}
+      hd, fs #< (Tm.VProj {r = r env; ty0 = ty0 env; ty1 = ty1 env; func = func env})}
