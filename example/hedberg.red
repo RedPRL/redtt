@@ -52,8 +52,8 @@ let paths-stable/to/set (A : type)
            j)
          k
     | i=1 ⇒ refl
-    | j=0 ⇒ λ k → connection/or A (cap 0) i k
-    | j=1 ⇒ λ k → connection/or A (cap 1) i k
+    | j=0 ⇒ λ k → weak-connection/or A (cap 0) i k
+    | j=1 ⇒ λ k → weak-connection/or A (cap 1) i k
     ]
 
 ; Hedberg's theorem for decidable path types

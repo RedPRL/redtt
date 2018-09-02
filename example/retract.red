@@ -22,7 +22,7 @@ let path-retract/preserves/refl (A : type) (R : A → A → type)
     ]
     =
     λ i j →
-      s x (q i) (r x (q i) (λ k → connection/and A q i k)) j
+      s x (q i) (r x (q i) (λ k → weak-connection/and A q i k)) j
   in
   let cap2 : [i j] A [
     | j=0 ⇒ x
