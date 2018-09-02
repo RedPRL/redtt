@@ -1,4 +1,5 @@
 language: c
+sudo: required
 cache:
   directories:
     - /home/travis/.opam/
