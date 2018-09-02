@@ -20,7 +20,7 @@
 %token RIGHT_ARROW RRIGHT_ARROW
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX AUTO
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
 %token IMPORT OPAQUE QUIT DEBUG NORMALIZE
 %token TYPE PRE KAN
 %token EOF
@@ -89,8 +89,8 @@ atomic_econ:
     { E.Var (a, k) }
   | a = ATOM;
     { if a = "_" then E.Hope else E.Var (a, 0) }
-  | AUTO
-    { E.Auto }
+  | REFL
+    { E.Refl }
   | n = NUMERAL;
     { E.Num n }
 

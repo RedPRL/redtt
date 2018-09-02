@@ -8,6 +8,7 @@ sig
   val pp : t Pp.t0
 end
 
+val check_ : cx -> value -> Domain.val_sys -> Tm.tm -> unit
 val check : cx -> value -> Tm.tm -> unit
 val infer : cx -> Tm.tm Tm.cmd -> value
 

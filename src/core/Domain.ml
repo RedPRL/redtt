@@ -6,14 +6,11 @@ let rec make : con -> value =
     Node {con; action = I.idn}
 
 and make_later ty =
-  let tclo = TickCloConst ty in
+  let tclo = TickCloConst (lazy ty) in
   make @@ Later tclo
 
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
   nm
-
-let nclo_names (NClo {nbnd = Tm.NB (nms, _); _}) =
-  nms
 
 let rec pp_env_cell fmt =
   function
@@ -32,12 +29,18 @@ and pp_env fmt env =
 and pp_con fmt : con -> unit =
   function
   | Up up ->
-    Format.fprintf fmt "@[<hv1>(up@ %a@ %a@ [%a])@]" pp_value up.ty pp_neu up.neu pp_val_sys up.sys
+    begin
+      match up.sys with
+      | [] ->
+        Format.fprintf fmt "@[<hv1>(up@ %a@ %a)@]" pp_value up.ty pp_neu up.neu
+      | _ ->
+        Format.fprintf fmt "@[<hv1>(up@ %a@ %a@ %a)@]" pp_value up.ty pp_neu up.neu pp_val_sys up.sys
+    end
   | Lam clo ->
     Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_clo clo
-  | ExtLam abs ->
-    Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_abs abs
-  | CoRThunk face ->
+  | ExtLam clo ->
+    Format.fprintf fmt "@[<1>(λ@ %a)@]" pp_nclo clo
+  | RestrictThunk face ->
     Format.fprintf fmt "@[<1>{%a}@]" pp_val_face face
   | Pi {dom; cod} ->
     Format.fprintf fmt "@[<1>(Π@ %a@ %a)@]" pp_value dom pp_clo cod
@@ -45,10 +48,8 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(Σ@ %a@ %a)@]" pp_value dom pp_clo cod
   | Ext abs ->
     Format.fprintf fmt "@[<1>(#@ %a)@]" pp_ext_abs abs
-  | Rst {ty; sys} ->
-    Format.fprintf fmt "@[<1>(restrict@ %a@ %a)@]" pp_value ty pp_val_sys sys
-  | CoR face ->
-    Format.fprintf fmt "@[<1>(corestrict@ %a)@]" pp_val_face face
+  | Restrict face ->
+    Format.fprintf fmt "@[<1>(restrict@ %a)@]" pp_val_face face
   | Univ {kind; lvl} ->
     Format.fprintf fmt "@[<1>(U@ %a %a)@]" Kind.pp kind Lvl.pp lvl
   | Cons (v0, v1) ->
@@ -65,8 +66,9 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<1>(hcom %a %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.ty pp_value info.cap pp_comp_sys info.sys
   | GHCom _ ->
     Format.fprintf fmt "<ghcom>"
-  | FHCom _ ->
-    Format.fprintf fmt "<fhcom>"
+  | FHCom info ->
+    let r, r' = Dir.unleash info.dir in
+    Format.fprintf fmt "@[<1>(fhcom %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.cap pp_comp_sys info.sys
   | Box info ->
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(box %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.cap pp_val_sys info.sys
@@ -112,12 +114,15 @@ and pp_value fmt value =
   if node.action = I.idn then
     pp_con fmt node.con
   else
-    Format.fprintf fmt "@[<hv1>@[<hv1>(%a)@]<%a>@]"
+    Format.fprintf fmt "@[<hv1>@[<hv1>%a@]@[<hv1><%a>@]@]"
       pp_con node.con I.pp_action node.action
 
 
 and pp_abs fmt =
   IAbs.pp pp_value fmt
+
+and pp_neu_abs fmt =
+  IAbs.pp (fun fmt (neu, _) -> pp_neu fmt neu) fmt
 
 and pp_names fmt xs =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -164,11 +169,15 @@ and pp_comp_face : type x. _ -> (x, abs) face -> unit =
 
 and pp_clo fmt (Clo clo) =
   let Tm.B (_, tm) = clo.bnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
+  Format.fprintf fmt "@[<hv1>(clo@ %a@ <:@ %a)@]" Tm.pp0 tm pp_env clo.rho
 
-and pp_nclo fmt (NClo clo) =
-  let Tm.NB (_, tm) = clo.nbnd in
-  Format.fprintf fmt "<clo %a & %a>" Tm.pp0 tm pp_env clo.rho
+and pp_nclo fmt =
+  function
+  | NClo clo ->
+    let Tm.NB (_, tm) = clo.nbnd in
+    Format.fprintf fmt "@[<hv1>(clo@ %a@ <:@ %a)@]" Tm.pp0 tm pp_env clo.rho
+  | NCloConst v ->
+    Format.fprintf fmt "@[<hv1>(clo/const@ %a)@]" pp_value (Lazy.force v)
 
 and pp_neu fmt neu =
   match neu with
@@ -192,19 +201,25 @@ and pp_neu fmt neu =
 
   | NCoeAtType info ->
     let r, r' = Dir.unleash info.dir in
-    Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_abs info.abs pp_value info.el
+    Format.fprintf fmt "@[<1>(ncoe %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_neu_abs info.abs pp_value info.el
 
   | FunApp (neu, arg) ->
     Format.fprintf fmt "@[<1>(%a@ %a)@]" pp_neu neu pp_value arg.el
 
   | ExtApp (neu, args) ->
-    Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
+    begin
+      match args with
+      | [] ->
+        Format.fprintf fmt "@[<1>(%s@ %a)@]" "@" pp_neu neu
+      | _ ->
+        Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
+    end
 
   | Car neu ->
-    Format.fprintf fmt "@[<1>(car %a)@]" pp_neu neu
+    Format.fprintf fmt "@[<hv1>(car@ %a)@]" pp_neu neu
 
   | Cdr neu ->
-    Format.fprintf fmt "@[<1>(cdr %a)@]" pp_neu neu
+    Format.fprintf fmt "@[<hv1>(cdr@ %a)@]" pp_neu neu
 
   | Var {name; _} ->
     Name.pp fmt name
@@ -213,11 +228,11 @@ and pp_neu fmt neu =
     Name.pp fmt name
 
   | Elim info ->
-    Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a@ %a)@]"
+    Format.fprintf fmt "@[<hv1>(%a.elim@ %a)@]"
       Desc.pp_data_label info.dlbl
-      pp_clo info.mot
+      (* pp_clo info.mot *)
       pp_neu info.neu
-      pp_elim_clauses info.clauses
+  (* pp_elim_clauses info.clauses *)
 
   | Cap _ ->
     Format.fprintf fmt "<cap>"
@@ -228,7 +243,7 @@ and pp_neu fmt neu =
   | LblCall neu ->
     Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
 
-  | CoRForce neu ->
+  | RestrictForce neu ->
     Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
 
   | Prev _ ->
@@ -262,24 +277,9 @@ and pp_dims fmt rs =
   let pp_sep fmt () = Format.fprintf fmt " " in
   Format.pp_print_list ~pp_sep I.pp fmt rs
 
-module type Sort = Sort.S
-
-module Value : Sort with type t = value with type 'a m = 'a =
-struct
-  type 'a m = 'a
-  type t = value
-
-  let act : I.action -> value -> value =
-    fun phi (Node node) ->
-      Node {node with action = I.cmp phi node.action}
-end
 
 exception ProjAbs of abs
 exception ProjVal of value
-
-module Abs = IAbs.M (Value)
-module ValFace = Face.M (Value)
-module AbsFace = Face.M (Abs)
 
 let force_abs_face face =
   match face with
@@ -311,7 +311,190 @@ let force_abs_sys sys =
   | ProjAbs abs ->
     `Proj abs
 
-module CompSys :
+
+
+
+
+
+module type Sort = Sort.S
+
+module rec Value : Sort with type t = value with type 'a m = 'a =
+struct
+  type 'a m = 'a
+  type t = value
+
+  let rec act : I.action -> value -> value =
+    fun phi (Node node) ->
+      try
+        if node.action = I.idn then
+          match node.con with
+          | (Data _ | Univ _) -> Node node
+          | Up {ty; neu; sys = []} ->
+            begin
+              make @@ Up {ty = act phi ty; neu = Neu.act phi neu; sys = []}
+            end
+          | _ ->
+            Node {node with action = I.cmp phi node.action}
+        else
+          Node {node with action = I.cmp phi node.action}
+      with
+      | _ ->
+        Node {node with action = I.cmp phi node.action}
+
+end
+and Neu : Sort with type t = neu with type 'a m = 'a =
+struct
+  type 'a m = 'a
+  type t = neu
+
+  exception TooMortal
+
+  let rec act phi =
+    function
+    | NHComAtType info ->
+      begin
+        match Dir.act phi info.dir, CompSys.act phi info.sys with
+        | `Ok dir, `Ok sys ->
+          let univ = Value.act phi info.univ in
+          let cap = Value.act phi info.cap in
+          let ty = act phi info.ty in
+          NHComAtType {dir; univ; ty; cap; sys}
+        | _ ->
+          raise TooMortal
+      end
+
+    | NHComAtCap info ->
+      begin
+        match Dir.act phi info.dir, CompSys.act phi info.sys with
+        | `Ok dir, `Ok sys ->
+          let ty = Value.act phi info.ty in
+          let cap = act phi info.cap in
+          NHComAtCap {dir; ty; cap; sys}
+        | _ ->
+          raise TooMortal
+      end
+
+    | NCoe info ->
+      begin
+        match Dir.act phi info.dir with
+        | `Ok dir ->
+          let abs = Abs.act phi info.abs in
+          let neu = act phi info.neu in
+          NCoe {dir; abs; neu}
+        | _ ->
+          raise TooMortal
+      end
+
+    | NCoeAtType info ->
+      begin
+        match Dir.act phi info.dir with
+        | `Ok dir ->
+          let abs = NeuAbs.act phi info.abs in
+          let el = Value.act phi info.el in
+          NCoeAtType {dir; abs; el}
+        | _ ->
+          raise TooMortal
+      end
+
+    | VProj info ->
+      begin
+        match I.act phi @@ `Atom info.x with
+        | `Atom y ->
+          let ty0 = Value.act phi info.ty0 in
+          let ty1 = Value.act phi info.ty1 in
+          let equiv = Value.act phi info.equiv in
+          let neu = act phi info.neu in
+          VProj {x = y; neu; ty0; ty1; equiv}
+        | _ ->
+          raise TooMortal
+      end
+
+    | Cap info ->
+      begin
+        match Dir.act phi info.dir, CompSys.act phi info.sys with
+        | `Ok dir, `Ok sys ->
+          let ty = Value.act phi info.ty in
+          let neu = act phi info.neu in
+          Cap {dir; ty; neu; sys}
+        | _ ->
+          raise TooMortal
+      end
+
+    | ExtApp (neu, rs) ->
+      let neu = act phi neu in
+      let rs = List.map (I.act phi) rs in
+      ExtApp (neu, rs)
+
+    | FunApp (neu, arg) ->
+      let neu = act phi neu in
+      let arg = Nf.act phi arg in
+      FunApp (neu, arg)
+
+    | Car neu ->
+      let neu = act phi neu in
+      Car neu
+
+    | Cdr neu ->
+      let neu = act phi neu in
+      Cdr neu
+
+    | Elim info ->
+      let mot = Clo.act phi info.mot in
+      let go (lbl, nclo) = lbl, NClo.act phi nclo in
+      let clauses = List.map go info.clauses in
+      let neu = act phi info.neu in
+      let params = List.map (Value.act phi) info.params in
+      Elim {dlbl = info.dlbl; params; mot; neu; clauses}
+
+    | LblCall neu ->
+      let neu = act phi neu in
+      LblCall neu
+
+    | RestrictForce neu ->
+      let neu = act phi neu in
+      RestrictForce neu
+
+    | (Lvl _ | Var _ | Meta _) as neu ->
+      neu
+
+    | Prev (tick, neu) ->
+      let neu = act phi neu in
+      Prev (tick, neu)
+
+    | Fix (tick, ty, clo) ->
+      let ty = Value.act phi ty in
+      let clo = Clo.act phi clo in
+      Fix (tick, ty, clo)
+
+    | FixLine (x, tick, ty, clo) ->
+      begin
+        match I.act phi (`Atom x) with
+        | `Atom y ->
+          let ty = Value.act phi ty in
+          let clo = Clo.act phi clo in
+          FixLine (y, tick, ty, clo)
+        | _ ->
+          raise TooMortal
+      end
+end
+
+and Nf : Sort with type t = nf with type 'a m = 'a =
+struct
+  type 'a m = 'a
+  type t = nf
+  let act phi nf =
+    let ty = Value.act phi nf.ty in
+    let el = Value.act phi nf.el in
+    {ty; el}
+end
+
+and Abs : IAbs.S with type el = value = IAbs.M (Value)
+
+and ValFace : Face.S with type body := value = Face.M (Value)
+
+and AbsFace : Face.S with type body := abs = Face.M (Abs)
+
+and CompSys :
 sig
   include Sort
     with type t = comp_sys
@@ -357,7 +540,7 @@ struct
 end
 
 (* TODO merge this with CompSys *)
-module BoxSys :
+and BoxSys :
 sig
   include Sort
     with type t = box_sys
@@ -388,7 +571,7 @@ struct
       `Proj value
 end
 
-module ValSys :
+and ValSys :
 sig
   include Sort
     with type t = val_sys
@@ -419,15 +602,18 @@ struct
     List.filter (fun f -> Face.forall x f = `Keep) sys
 end
 
-module ExtAbs : IAbs.S with type el = value * val_sys =
+and ExtAbs : IAbs.S with type el = value * val_sys =
   IAbs.M (Sort.Prod (Value) (ValSys))
 
-module Env :
+and NeuAbs : IAbs.S with type el = neu * val_sys =
+  IAbs.M (Sort.Prod (Neu) (ValSys))
+
+and Env :
 sig
   include Sort.S
     with type t = env
     with type 'a m = 'a
-  val emp : env
+  val emp : dim DimEnv.t -> env
   val clear_locals : env -> env
   val snoc : env -> env_el -> env
   val append : env -> env_el list -> env
@@ -437,7 +623,8 @@ struct
   type t = env
   type 'a m = 'a
 
-  let emp = {cells = Emp; global = I.idn}
+  let emp global =
+    {cells = Emp; global}
 
   let clear_locals rho =
     {rho with cells = Emp}
@@ -459,10 +646,10 @@ struct
 
   let act phi {cells; global} =
     {cells = Bwd.map (act_env_el phi) cells;
-     global = I.cmp phi global}
+     global = DimEnv.map (I.act phi) global}
 end
 
-module Clo : Sort with type t = clo with type 'a m = 'a =
+and Clo : Sort with type t = clo with type 'a m = 'a =
 struct
   type t = clo
   type 'a m = 'a
@@ -473,7 +660,7 @@ struct
       Clo {info with rho = Env.act phi info.rho}
 end
 
-module TickClo : Sort with type t = tick_clo with type 'a m = 'a =
+and TickClo : Sort with type t = tick_clo with type 'a m = 'a =
 struct
   type t = tick_clo
   type 'a m = 'a
@@ -483,10 +670,10 @@ struct
     | TickClo info ->
       TickClo {info with rho = Env.act phi info.rho}
     | TickCloConst v ->
-      TickCloConst (Value.act phi v)
+      TickCloConst (lazy begin Value.act phi @@ Lazy.force v end)
 end
 
-module NClo : Sort with type t = nclo with type 'a m = 'a =
+and NClo : Sort with type t = nclo with type 'a m = 'a =
 struct
   type t = nclo
   type 'a m = 'a
@@ -495,4 +682,6 @@ struct
     match clo with
     | NClo info ->
       NClo {info with rho = Env.act phi info.rho}
+    | NCloConst v ->
+      NCloConst (lazy begin Value.act phi @@ Lazy.force v end)
 end

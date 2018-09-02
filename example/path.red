@@ -42,7 +42,7 @@ let symm/filler
   =
   comp 0 j (p 0) [
   | i=0 ⇒ p
-  | i=1 ⇒ auto
+  | i=1 ⇒ refl
   ]
 
 let symm
@@ -55,7 +55,7 @@ let symm
 let symm/unit
   (A : type)
   (a : A)
-  : Path (Path _ a a) auto (symm _ (λ _ → a))
+  : Path (Path _ a a) refl (symm _ (λ _ → a))
   =
   symm/filler _ (λ _ → a)
 
@@ -67,7 +67,7 @@ let trans/filler
   : A
   =
   comp 0 j (p i) [
-  | i=0 ⇒ auto
+  | i=0 ⇒ refl
   | i=1 ⇒ q
   ]
 
@@ -86,18 +86,55 @@ let trans/unit/r
   =
   trans/filler _ p (λ _ → p 1)
 
+let trans/unit/l
+  (A : type)
+  (p : dim → A)
+  : Path (Path _ (p 0) (p 1)) p (trans _ (λ _ → p 0) p)
+  =
+  λ k i →
+  comp 0 1 (p 0) [
+  | k=0 ⇒ λ j →
+    comp 0 1 (p 0) [
+    | j=1 ⇒ λ l → comp 0 i (p 0) [ l=0 ⇒ refl | l=1 ⇒ p ]
+    | i=1 ⇒ λ l → comp 0 j (p 0) [ l=0 ⇒ refl | l=1 ⇒ p ]
+    | j=0 ⇒ refl
+    | i=0 ⇒ refl
+    ]
+  | i=0 ⇒ refl
+  | i=1 ⇒ p
+  ]
+
 ; This proof gets simpler when dead tubes are deleted!
 let trans/sym/r
   (A : type)
   (p : dim → A)
-  : Path (Path _ (p 0) (p 0)) auto (trans _ p (symm _ p))
+  : Path (Path _ (p 0) (p 0)) refl (trans _ p (symm _ p))
   =
   λ k i →
     comp 0 1 (p i) [
-    | i=0 ⇒ auto
+    | i=0 ⇒ refl
     | i=1 ⇒ symm A p
     | k=0 ⇒ symm/filler A p i
     ;| k=1 ⇒ λ j → trans/filler A p (symm A p) j i
+    ]
+
+let trans/sym/l
+  (A : type)
+  (p : dim → A)
+  : Path (Path _ (p 1) (p 1)) refl (trans _ (symm _ p) p)
+  =
+  λ k i →
+    comp 0 1 (symm/filler A p k i) [
+    | i=0 ⇒ λ j →
+      comp 0 1 (p 1) [
+      | j=0 ⇒ λ l → comp 1 k (p 1) [ l=0 ⇒ refl | l=1 ⇒ p ]
+      | k=0 ⇒ λ l → comp 1 j (p 1) [ l=0 ⇒ refl | l=1 ⇒ p ]
+      | j=1 ⇒ refl
+      | k=1 ⇒ refl
+      ]
+    | i=1 ⇒ p
+    | k=0 ⇒ p
+    ;| k=1 ⇒ λ j → trans/filler A (symm A p) p j i
     ]
 
 ; Perhaps we could parallelize this proof? ;)
@@ -109,5 +146,5 @@ let symmd
   λ i →
     comp 0 1 (p 0) in (λ j → symm/filler^1 _ A j i) [
     | i=0 ⇒ p
-    | i=1 ⇒ auto
+    | i=1 ⇒ refl
     ]

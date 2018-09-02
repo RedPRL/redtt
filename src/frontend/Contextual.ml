@@ -191,6 +191,8 @@ let get_global_env =
       GlobalEnv.ext (go_params psi) x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []})
     | Snoc (psi, (_, `R (r0, r1))) ->
       GlobalEnv.restrict r0 r1 (go_params psi)
+    | Snoc (psi, (_, `NullaryExt)) ->
+      go_params psi
     | Snoc (psi, (_, `SelfArg Desc.Self)) ->
       (* TODO: Might need to do something here!!! *)
       go_params psi
@@ -292,11 +294,12 @@ let base_cx =
   ret @@ Cx.init env
 
 
-let check ~ty tm =
+let check ~ty ?sys:(sys = []) tm =
   base_cx >>= fun lcx ->
   let vty = Cx.eval lcx ty in
+  let vsys = Cx.eval_tm_sys lcx sys in
   try
-    Typing.check lcx vty tm;
+    Typing.check_ lcx vty vsys tm;
     ret `Ok
   with
   | exn ->

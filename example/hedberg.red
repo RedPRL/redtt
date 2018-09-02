@@ -53,7 +53,7 @@ let paths-stable/to/set (A : type)
            (λ c → c (square 1))
            j)
          k
-    | i=1 ⇒ λ _ → q j
+    | i=1 ⇒ refl
     | j=0 ⇒ λ k → connection/or A (cap 0) i k
     | j=1 ⇒ λ k → connection/or A (cap 1) i k
     ]

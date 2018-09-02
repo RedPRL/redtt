@@ -185,12 +185,7 @@ let rec check_ cx ty rst tm =
       ();
     check_ext_sys cxx vcod sys
 
-  | [], D.Univ univ, T.Rst info ->
-    if univ.kind = `Pre then () else failwith "Restriction type is not Kan";
-    let ty = check_eval cx ty info.ty in
-    check_ext_sys cx ty info.sys
-
-  | [], D.Univ univ, T.CoR (tr, tr', oty) ->
+  | [], D.Univ univ, T.Restrict (tr, tr', oty) ->
     if univ.kind = `Pre then () else failwith "Co-restriction type is not known to be Kan";
     let r = check_eval_dim cx tr in
     let r' = check_eval_dim cx tr' in
@@ -222,6 +217,9 @@ let rec check_ cx ty rst tm =
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     let constr = Desc.lookup_constr clbl desc in
     check_constr cx dlbl desc.params constr data.params args
+
+  | [], D.Data dlbl, T.FHCom info ->
+    check_fhcom cx ty info.r info.r' info.cap info.sys
 
   | _, D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
     let cxx, x = Cx.ext_ty cx ~nm dom in
@@ -262,7 +260,7 @@ let rec check_ cx ty rst tm =
     let rst' = List.map (Face.map (fun _ _ el -> V.ext_apply el rs)) rst in
     check_ cxx codx (rst' @ sysx) @@ Tm.up @@ cmd' @< Tm.ExtApp trs
 
-  | _, D.CoR ty_face, T.CoRThunk (tr0, tr1, otm) ->
+  | _, D.Restrict ty_face, T.RestrictThunk (tr0, tr1, otm) ->
     let r'0 = check_eval_dim cx tr0 in
     let r'1 = check_eval_dim cx tr1 in
     begin
@@ -273,7 +271,7 @@ let rec check_ cx ty rst tm =
         begin
           match I.compare r'0 r0, I.compare r'1 r1 with
           | `Same, `Same ->
-            let rst' = List.map (Face.map (fun _ _ -> V.corestriction_force)) rst in
+            let rst' = List.map (Face.map (fun _ _ -> V.restriction_force)) rst in
             check_ cx (Lazy.force ty) rst' tm
           | _ ->
             failwith "co-restriction mismatch"
@@ -287,7 +285,7 @@ let rec check_ cx ty rst tm =
               try
                 let cx', phi = Cx.restrict cx r'0 r'1 in
                 (* is this right?? : *)
-                let rst' = List.map (Face.map (fun _ _ -> V.corestriction_force)) rst in
+                let rst' = List.map (Face.map (fun _ _ -> V.restriction_force)) rst in
                 check_ cx' (Domain.Value.act phi @@ Lazy.force ty) rst' tm
               with
               | I.Inconsistent -> ()
@@ -299,9 +297,6 @@ let rec check_ cx ty rst tm =
         Format.eprintf "@.@.type restriction didn't match thunk@.@.";
         failwith "Malformed element of co-restriction type"
     end
-
-  | _, D.Rst {ty; sys}, _ ->
-    check_ cx ty (sys @ rst) tm
 
   | [], D.Univ _, T.FHCom info ->
     check_fhcom cx ty info.r info.r' info.cap info.sys
@@ -371,7 +366,7 @@ and check_constr cx dlbl param_specs constr params tms =
       go (D.Env.snoc tyenv @@ `Val varg) cx' const_specs rec_specs dim_specs params tms
     | _ -> failwith "constructor arguments malformed"
   in
-  let env0 = D.Env.append D.Env.emp @@ List.map (fun v -> `Val v) params in
+  let env0 = D.Env.append V.empty_env @@ List.map (fun v -> `Val v) params in
   go env0 cx constr.const_specs constr.rec_specs constr.dim_specs params tms
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
@@ -602,26 +597,27 @@ and infer_spine cx hd =
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
            the constructor, and should therefore begin with the *empty* environment. *)
-        let rec build_cx cx ty_env (nms, cvs, rvs, ihvs, rs) const_specs rec_specs dim_specs =
+        let rec build_cx cx ty_env benv (nms, cvs, rvs, ihvs, rs) const_specs rec_specs dim_specs =
           match const_specs, rec_specs, dim_specs with
           | (plbl, pty) :: const_specs, _, _ ->
             let vty = V.eval ty_env pty in
             let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (D.Env.snoc ty_env @@ `Val v) (nms #< (Some plbl), cvs #< v, rvs, ihvs, rs) const_specs rec_specs dim_specs
+            build_cx cx' (D.Env.snoc ty_env @@ `Val v) (D.Env.snoc benv @@ `Val v) (nms #< (Some plbl), cvs #< v, rvs, ihvs, rs) const_specs rec_specs dim_specs
           | [], (nm, Self) :: rec_specs, _ ->
             let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
             let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih ty_env (nms #< (Some nm) #< None, cvs, rvs #< v_x, ihvs #< v_ih, rs) const_specs rec_specs dim_specs
+            build_cx cx_ih ty_env (D.Env.snoc benv @@ `Val v_x) (nms #< (Some nm) #< None, cvs, rvs #< v_x, ihvs #< v_ih, rs) const_specs rec_specs dim_specs
           | [], [], nm :: dim_specs ->
             let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
-            build_cx cx' ty_env (nms #< (Some nm), cvs, rvs, ihvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
+            build_cx cx' ty_env (D.Env.snoc benv @@ `Dim (`Atom x)) (nms #< (Some nm), cvs, rvs, ihvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
           | [], [], [] ->
-            cx, nms, Bwd.to_list cvs, Bwd.to_list rvs, ihvs, Bwd.to_list rs
+            cx, benv, nms, Bwd.to_list cvs, Bwd.to_list rvs, ihvs, Bwd.to_list rs
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let env0 = D.Env.append D.Env.emp @@ List.map (fun x -> `Val x) params in
-        let cx', nms, cvs, rvs, ihvs, rs = build_cx cx env0 (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
+        let env0 = D.Env.append V.empty_env @@ List.map (fun x -> `Val x) params in
+        (* check whether both of those should be env0, ugh *)
+        let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx env0 env0 (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 
@@ -629,7 +625,15 @@ and infer_spine cx hd =
           function
           | B.Intro intro as bterm ->
             let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) nclos in
-            let rargs = List.map (fun bt -> `Val (image_of_bterm phi bt)) intro.rec_args in
+            let rargs =
+              List.flatten @@
+              List.map
+                (fun bt ->
+                   let el = `Val (V.eval_bterm info.dlbl desc benv bterm) in
+                   let ih = `Val (image_of_bterm phi bt) in
+                   [el; ih])
+                intro.rec_args
+            in
             let cargs = List.map (fun t -> `Val (D.Value.act phi @@ Cx.eval cx' t)) intro.const_args in
             let dims = List.map (fun t -> `Dim (I.act phi @@ Cx.eval_dim cx' t)) intro.rs in (* is this right ? *)
             let cells = cargs @ rargs @ dims in
@@ -684,10 +688,10 @@ and infer_spine cx hd =
       let _, _, ty = V.unleash_lbl_ty ih.ty in
       D.{el = Cx.eval_frame cx ih.el frm; ty}
 
-    | Tm.CoRForce ->
+    | Tm.RestrictForce ->
       let ih = infer_spine cx hd sp in
       begin
-        match V.unleash_corestriction_ty ih.ty with
+        match V.unleash_restriction_ty ih.ty with
         | Face.True (_, _, ty) ->
           D.{el = Cx.eval_frame cx ih.el frm; ty = Lazy.force ty}
         | _ -> failwith "Cannot force co-restriction when it is not true!"

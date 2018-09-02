@@ -2,7 +2,6 @@ open RedBasis.Bwd
 include module type of DomainData
 
 val clo_name : clo -> string option
-val nclo_names : nclo -> string option bwd
 
 val pp_abs : Format.formatter -> abs -> unit
 val pp_ext_abs : Format.formatter -> ext_abs -> unit
@@ -36,7 +35,7 @@ sig
   include Sort.S
     with type t = env
     with type 'a m = 'a
-  val emp : env
+  val emp : dim DimEnv.t -> env
   val clear_locals : env -> env
 
   (* What direction do these go? Think of the environment as a snoc list, where things are projected by counting from the *right*.
@@ -51,6 +50,17 @@ module Value : Sort.S
   with type t = value
   with type 'a m = 'a
 
+module Neu : Sort.S
+  with type t = neu
+  with type 'a m = 'a
+
+module Nf : Sort.S
+  with type t = nf
+  with type 'a m = 'a
+
+
+module NeuAbs : IAbs.S
+  with type el = neu * val_sys
 
 module ExtAbs : IAbs.S
   with type el = value * val_sys

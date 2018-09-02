@@ -9,8 +9,8 @@ type inf_tac = (ty * tm) m
 
 exception ChkMatch
 
-(** Decompose the current goal and try to solve it automatically. *)
-val tac_auto : chk_tac
+(** Decompose the current goal and try to solve it by reflexivity automatically. *)
+val tac_refl : chk_tac
 
 (** Try to solve the current goal using the current restriction, and/or unification. *)
 val tac_hope : chk_tac

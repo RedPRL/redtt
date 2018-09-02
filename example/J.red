@@ -11,7 +11,7 @@ let J
       let h : dim → A =
         λ j →
           comp 0 j a [
-          | i=0 ⇒ auto
+          | i=0 ⇒ refl
           | i=1 ⇒ p
           ]
       in
@@ -21,14 +21,14 @@ let J
 
 let J/eq
   (A : type) (a : A)
-  (C : (x : A) (p : Path A a x) → type) (d : C a auto)
-  : Path (C a auto) (J _ _ C d _ (λ _ → a)) d
+  (C : (x : A) (p : Path A a x) → type) (d : C a refl)
+  : Path (C a refl) (J _ _ C d _ (λ _ → a)) d
   =
   let square : dim → dim → A =
     λ i j →
       comp 0 j a [
-      | i=0 ⇒ auto
-      | i=1 ⇒ auto
+      | i=0 ⇒ refl
+      | i=1 ⇒ refl
       ]
   in
   λ k →
@@ -37,9 +37,9 @@ let J/eq
         λ j →
           comp 0 j a [
           | k=0 ⇒ square i
-          | k=1 ⇒ auto
-          | i=0 ⇒ auto
-          | i=1 ⇒ auto
+          | k=1 ⇒ refl
+          | i=0 ⇒ refl
+          | i=1 ⇒ refl
           ]
       in
       C (aux 1) aux
@@ -48,5 +48,5 @@ let J/eq
       λ i →
         coe 0 i d in λ j →
           C (square j 1) (square j)
-    | k=1 ⇒ auto
+    | k=1 ⇒ refl
     end
