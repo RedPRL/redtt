@@ -11,8 +11,8 @@ let J
       let h : dim → A =
         λ j →
           comp 0 j a [
-          | i=0 ⇒ refl
-          | i=1 ⇒ p
+          | i=0 → refl
+          | i=1 → p
           ]
       in
       C (h 1) h
@@ -27,8 +27,8 @@ let J/eq
   let square : dim → dim → A =
     λ i j →
       comp 0 j a [
-      | i=0 ⇒ refl
-      | i=1 ⇒ refl
+      | i=0 → refl
+      | i=1 → refl
       ]
   in
   λ k →
@@ -36,17 +36,17 @@ let J/eq
       let aux : dim → A =
         λ j →
           comp 0 j a [
-          | k=0 ⇒ square i
-          | k=1 ⇒ refl
-          | i=0 ⇒ refl
-          | i=1 ⇒ refl
+          | k=0 → square i
+          | k=1 → refl
+          | i=0 → refl
+          | i=1 → refl
           ]
       in
       C (aux 1) aux
     with
-    | k=0 ⇒
+    | k=0 →
       λ i →
         coe 0 i d in λ j →
           C (square j 1) (square j)
-    | k=1 ⇒ refl
+    | k=1 → refl
     end

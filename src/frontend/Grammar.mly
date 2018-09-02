@@ -37,7 +37,7 @@
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
 %token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET
 %token EQUALS
-%token RIGHT_ARROW RRIGHT_ARROW
+%token RIGHT_ARROW
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
@@ -239,17 +239,17 @@ econ:
     { E.Sg ([`Ty ("_", dom)], cod) }
 
 eclause:
-  | lbl = ATOM; pbinds = list(epatbind); RRIGHT_ARROW; bdy = located(econ)
+  | lbl = ATOM; pbinds = list(epatbind); RIGHT_ARROW; bdy = located(econ)
     { lbl, pbinds, bdy }
 
 epatbind:
   | x = ATOM
     { E.PVar x }
-  | LPR; x = ATOM; RRIGHT_ARROW; ih = ATOM; RPR
+  | LPR; x = ATOM; RIGHT_ARROW; ih = ATOM; RPR
     { E.PIndVar (x, ih) }
 
 eface:
-  | r0 = located(atomic); EQUALS; r1 = located(atomic); RRIGHT_ARROW; e = located(econ)
+  | r0 = located(atomic); EQUALS; r1 = located(atomic); RIGHT_ARROW; e = located(econ)
     { r0, r1, e }
 
 

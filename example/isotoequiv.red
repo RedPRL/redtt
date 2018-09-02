@@ -23,16 +23,16 @@ let Iso/fiber-is-prop
   let sq : (_ : Fiber _ _ (I.0) b) (i j : dim) → A =
     λ fib i j →
       comp 0 j (g (fib.1 i)) [
-      | i=0 ⇒ β (fib.0)
-      | i=1 ⇒ refl
+      | i=0 → β (fib.0)
+      | i=1 → refl
       ]
   in
   λ fib0 fib1 →
     let sq2 : (i j : dim) → A =
       λ i j →
         comp 1 j (g b) [
-        | i=0 ⇒ λ k → sq fib0 k 1
-        | i=1 ⇒ λ k → sq fib1 k 1
+        | i=0 → λ k → sq fib0 k 1
+        | i=1 → λ k → sq fib1 k 1
         ]
     in
     λ i →
@@ -40,17 +40,17 @@ let Iso/fiber-is-prop
      , λ j →
         let aux : A =
           comp 1 0 (sq2 i j) [
-          | i=0 ⇒ sq fib0 j
-          | i=1 ⇒ sq fib1 j
-          | j=0 ⇒ β (sq2 i 0)
-          | j=1 ⇒ refl
+          | i=0 → sq fib0 j
+          | i=1 → sq fib1 j
+          | j=0 → β (sq2 i 0)
+          | j=1 → refl
           ]
         in
         comp 0 1 (f aux) [
-        | i=0 ⇒ α (fib0.1 j)
-        | i=1 ⇒ α (fib1.1 j)
-        | j=0 ⇒ α (f (sq2 i 0))
-        | j=1 ⇒ α b
+        | i=0 → α (fib0.1 j)
+        | i=1 → α (fib1.1 j)
+        | j=0 → α (f (sq2 i 0))
+        | j=1 → α b
         ]
      )
 

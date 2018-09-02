@@ -10,7 +10,7 @@ let sg/elim
 
 ; Needed until we have parameterized datatypes
 let or (A B : type) : type =
-  (b : bool) × elim b [tt ⇒ A | ff ⇒ B]
+  (b : bool) × elim b [tt → A | ff → B]
 
 let or/elim
   (A B : type)
@@ -21,4 +21,4 @@ let or/elim
   : C =
   sg/elim bool _ (λ _ _ → C) t
     (λ b →
-      elim b [tt ⇒ m0 | ff ⇒ m1])
+      elim b [tt → m0 | ff → m1])

@@ -19,8 +19,8 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
   in
   let bwd : pA.0 → (pmap pbool pA) = λ a →
     ( λ b → elim b [
-            | tt ⇒ a
-            | ff ⇒ pA.1
+            | tt → a
+            | ff → pA.1
             ]
     , λ i → pA.1 )
   in
@@ -30,15 +30,15 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
         =
         λ i j →
           comp 1 j (pA.1) [
-          | i=0 ⇒ refl
-          | i=1 ⇒ f.1
+          | i=0 → refl
+          | i=1 → f.1
           ]
       in
       let bwdfwd/map : (b : bool) → Path (pA.0) (bwd (fwd.0 f) .0 b) (f.0 b) =
         λ b →
           elim b [
-          | tt ⇒ refl
-          | ff ⇒ λ i → bwdfwd/pt i 0
+          | tt → refl
+          | ff → λ i → bwdfwd/pt i 0
           ]
       in
       λ i →
@@ -56,12 +56,12 @@ let pΩ (pA : ptype) : ptype =
 let pΩ/map (pA pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
   ( λ p i →
       comp 0 1 (pf.0 (p i)) [
-      | i=0 ⇒ pf.1
-      | i=1 ⇒ pf.1
+      | i=0 → pf.1
+      | i=1 → pf.1
       ]
   , λ j i →
       comp j 1 (pf.1 j) [
-      | i=0 ⇒ pf.1
-      | i=1 ⇒ pf.1
+      | i=0 → pf.1
+      | i=1 → pf.1
       ]
   )

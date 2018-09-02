@@ -11,8 +11,8 @@ let fun-to-pair (A : type) (f : bool → A) : A × A =
 let pair-to-fun (A : type) (p : A × A) : bool → A =
   λ b →
   elim b [
-  | tt ⇒ p.0
-  | ff ⇒ p.1
+  | tt → p.0
+  | ff → p.1
   ]
 
 let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
@@ -21,13 +21,13 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
     , λ fib →
       coe 1 0
         (λ i →
-          ( λ b → elim b [ tt ⇒ fib.1 i .0 | ff ⇒ fib.1 i .1 ]
+          ( λ b → elim b [ tt → fib.1 i .0 | ff → fib.1 i .1 ]
           , λ j → weak-connection/or _ (fib.1) i j
           ))
       in λ j →
         [i] (f : bool → A) × Path (A × A) (f tt, f ff) p [
-        | i=0 ⇒ (shannon/path A (fib.0) j, fib.1)
-        | i=1 ⇒ (pair-to-fun A p, refl)
+        | i=0 → (shannon/path A (fib.0) j, fib.1)
+        | i=1 → (pair-to-fun A p, refl)
         ]
     )
 
