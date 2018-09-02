@@ -117,7 +117,7 @@ let join-to-s3/push/loop (b : s1)
   | loop k ⇒ λ i j → cube i j k
   ]
 
-let join-to-s3/push (a, b : s1) : Path s3 base base =
+let join-to-s3/push (a b : s1) : Path s3 base base =
   elim a [
   | base ⇒ λ _ → base
   | loop i ⇒ λ j → join-to-s3/push/loop b i j

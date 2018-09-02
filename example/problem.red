@@ -11,15 +11,15 @@ let pΩ² (pA : ptype) : ptype = pΩ (pΩ pA)
 let pΩ³ (pA : ptype) : ptype = pΩ (pΩ² pA)
 
 let pΩ³/reflmap (pA : ptype) (B : type) (f : (pA.0) → B)
-  : pmap (pΩ³ pA) (pΩ³ < B , f (pA.1) >)
+  : pmap (pΩ³ pA) (pΩ³ (B , f (pA.1)))
   =
-  < λ c i j k → f (c i j k)
+  ( λ c i j k → f (c i j k)
   , refl
-  >
+  )
 
-let ps2 : ptype = < s2 , base >
-let ps3 : ptype = < s3 , base >
-let pjoin : ptype = < join , inl base >
+let ps2 : ptype = (s2, base)
+let ps3 : ptype = (s3, base)
+let pjoin : ptype = (join, inl base)
 
 let test0-2 : pΩ³ ps3 .0 =
   λ i j k → cube i j k
@@ -34,5 +34,5 @@ let f4 : (pΩ³ pjoin .0) → (pΩ³ ps2 .0) =
 
 let test0-4 : pΩ³ ps2 .0 = f4 test0-3
 
-;let innerpath (i,j : dim) : s1 =
+;let innerpath (i j : dim) : s1 =
 ;  coe 0 1 base in λ k → hopf (test0-4 i j k)
