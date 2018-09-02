@@ -46,7 +46,7 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
         , λ j → bwdfwd/pt i j
         )
   in
-  (fwd, (Iso/Equiv _ _ (fwd.0, bwd, λ a i → a, bwdfwd).1))
+  (fwd, Iso/Equiv _ _ (fwd.0, bwd, λ a i → a, bwdfwd) .1)
 
 let pΩ (pA : ptype) : ptype =
   ( Path (pA.0) (pA.1) (pA.1)

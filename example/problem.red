@@ -24,12 +24,12 @@ let pjoin : ptype = (join, inl base)
 let test0-2 : pΩ³ ps3 .0 =
   λ i j k → cube i j k
 
-let f3 : (pΩ³ ps3 .0) → (pΩ³ pjoin .0) =
+let f3 : pΩ³ ps3 .0 → pΩ³ pjoin .0 =
   pΩ³/reflmap ps3 join s3-to-join .0
 
 let test0-3 : pΩ³ pjoin .0 = f3 test0-2
 
-let f4 : (pΩ³ pjoin .0) → (pΩ³ ps2 .0) =
+let f4 : pΩ³ pjoin .0 → pΩ³ ps2 .0 =
   pΩ³/reflmap pjoin s2 join-to-s2 .0
 
 let test0-4 : pΩ³ ps2 .0 = f4 test0-3
