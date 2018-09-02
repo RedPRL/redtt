@@ -567,12 +567,12 @@ and infer_spine cx hd =
 
     | T.VProj info ->
       let ih = infer_spine cx hd sp in
-      let v_ty =
-        check_eval_ty cx @@
-        T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
-      in
-      Cx.check_eq_ty cx v_ty ih.ty;
-      D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty1}
+      let x, ty0, ty1, equiv = V.unleash_v ih.ty in
+      let func' = V.car equiv in
+      let func_ty = D.Value.act (I.subst `Dim0 x) @@ V.Macro.func ty0 ty1 in
+      let func = check_eval cx func_ty info.func in
+      Cx.check_eq cx ~ty:func_ty func func';
+      D.{el = Cx.eval_frame cx ih.el frm; ty = ty1}
 
     | T.Elim info ->
       let T.B (nm, mot) = info.mot in
