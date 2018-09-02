@@ -538,7 +538,6 @@ struct
       let x0 = vproj0.x in
       let x1 = vproj1.x in
       let tr = equate_atom env x0 x1 in
-      (* let func_ty = V.Macro.func vproj0.ty0 vproj0.ty1 in *)
       let phi = I.subst `Dim0 x0 in
       let func = equate env vproj0.func.ty vproj0.func.el vproj1.func.el in
       let frame = Tm.VProj {r = tr; func} in
