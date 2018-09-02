@@ -18,10 +18,10 @@ data torus where
 
 let t2c (t : torus) : s1 × s1 =
   elim t [
-  | pt ⇒ <base, base>
-  | p/one i ⇒ <loop i, base>
-  | p/two i ⇒ <base, loop i>
-  | square i j ⇒ <loop j, loop i>
+  | pt ⇒ (base, base)
+  | p/one i ⇒ (loop i, base)
+  | p/two i ⇒ (base, loop i)
+  | square i j ⇒ (loop j, loop i)
   ]
 
 let c2t/base (c : s1) : torus =
@@ -59,7 +59,7 @@ let t2c2t (t : torus) : Path torus (c2t (t2c t)) t =
   ]
 
 
-let c2t2c/transpose (c0 : s1) : (c1 : s1) → Path (s1 × s1) (t2c (c2t/transpose c0 c1)) <c0, c1> =
+let c2t2c/transpose (c0 : s1) : (c1 : s1) → Path (s1 × s1) (t2c (c2t/transpose c0 c1)) (c0, c1) =
   elim c0
   [ base ⇒ λ c1 →
     elim c1
@@ -80,11 +80,11 @@ let c2t2c (cs : s1 × s1) : Path (s1 × s1) (t2c (c2t cs)) cs =
 
 
 let torus/s1s1/iso : Iso (s1 × s1) torus =
-  < c2t
+  ( c2t
   , t2c
   , t2c2t
   , c2t2c
-  >
+  )
 
 
 let torus/s1s1/equiv : Equiv (s1 × s1) torus =

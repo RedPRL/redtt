@@ -4,7 +4,7 @@ let PathD (A : dim → type) (M : A 0) (N : A 1) : type =
   | i=1 ⇒ N
   ]
 
-let Path (A : type) (M,N : A) : type =
+let Path (A : type) (M N : A) : type =
   [i] A [
   | i=0 ⇒ M
   | i=1 ⇒ N
@@ -12,7 +12,7 @@ let Path (A : type) (M,N : A) : type =
 
 let Square
   (A : type)
-  (M,N : dim → A)
+  (M N : dim → A)
   (O : Path A (M 0) (N 0))
   (P : Path A (M 1) (N 1))
   : type
@@ -27,7 +27,7 @@ let Square
 let funext
   (A : type)
   (B : A → type)
-  (f,g : (x : A) → B x)
+  (f g : (x : A) → B x)
   (p : (x : A) → Path (B x) (f x) (g x))
   : Path ((x : A) → B x) f g
   =
@@ -37,7 +37,7 @@ let funext
 let symm/filler
   (A : type)
   (p : dim → A)
-  (j, i : dim)
+  (j i : dim)
   : A
   =
   comp 0 j (p 0) [
@@ -63,7 +63,7 @@ let trans/filler
   (A : type)
   (p : dim → A)
   (q : [i] A [ i=0 ⇒ p 1 ])
-  (j, i : dim)
+  (j i : dim)
   : A
   =
   comp 0 j (p i) [

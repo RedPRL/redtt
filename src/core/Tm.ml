@@ -786,9 +786,9 @@ and pp_cmd env fmt (hd, sp) =
     | Snoc (sp, f)->
       match f with
       | Car ->
-        Format.fprintf fmt "@[<hv1>(car@ %a)@]" (go `Car) sp
+        Format.fprintf fmt "@[<hv1>(fst %a)@]" (go `Car) sp
       | Cdr ->
-        Format.fprintf fmt "@[<hv1>(cdr@ %a)@]" (go `Car) sp
+        Format.fprintf fmt "@[<hv1>(snd %a)@]" (go `Car) sp
       | FunApp t ->
         if mode = `FunApp then
           Format.fprintf fmt "%a@ %a" (go `FunApp) sp (pp env) t

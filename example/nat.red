@@ -33,7 +33,7 @@ let plus/unit/r (n : nat) : Path nat (plus n zero) n =
   | suc (n ⇒ path/n) ⇒ λ i → suc (path/n i)
   ]
 
-let plus/assoc (n : nat) : (m, o : nat) → Path nat (plus n (plus m o)) (plus (plus n m) o) =
+let plus/assoc (n : nat) : (m o : nat) → Path nat (plus n (plus m o)) (plus (plus n m) o) =
   elim n [
   | zero ⇒ refl
   | suc (n ⇒ plus/assoc/n) ⇒ λ m o i → suc (plus/assoc/n m o i)
@@ -72,7 +72,7 @@ let nat-refl (m : nat) : NatPathCode m m =
   | suc (m' ⇒ nat-refl/m') ⇒ nat-refl/m'
   ]
 
-let nat-path/encode (m,n : nat) (p : Path nat m n)
+let nat-path/encode (m n : nat) (p : Path nat m n)
   : NatPathCode m n
   =
   coe 0 1 (nat-refl m) in λ i → NatPathCode m (p i)
@@ -82,18 +82,18 @@ let nat/discrete : discrete nat =
   elim m [
   | zero ⇒ λ n →
     elim n [
-    | zero ⇒ <tt, refl>
-    | suc n' ⇒ <ff, nat-path/encode zero (suc n')>
+    | zero ⇒ (tt, refl)
+    | suc n' ⇒ (ff, nat-path/encode zero (suc n'))
     ]
   | suc (m' ⇒ nat/discrete/m') ⇒ λ n →
     elim n [
-    | zero ⇒ <ff, nat-path/encode (suc m') zero>
+    | zero ⇒ (ff, nat-path/encode (suc m') zero)
     | suc n' ⇒
       or/elim (Path nat m' n') (neg (Path nat m' n'))
         (or (Path nat (suc m') (suc n')) (neg (Path nat (suc m') (suc n'))))
         (nat/discrete/m' n')
-        (λ l → <tt, λ i → suc (l i)>)
-        (λ r → <ff, λ p → r (λ i → nat-pred (p i))>)
+        (λ l → (tt, λ i → suc (l i)))
+        (λ r → (ff, λ p → r (λ i → nat-pred (p i))))
     ]
   ]
 
