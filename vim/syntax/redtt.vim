@@ -31,7 +31,7 @@ syn keyword redttKeyw open shut tick dim prev next dfix fix
 
 syn keyword redttDecl opaque let debug normalize import quit
 
-syn match   redttSymb '[#@`|\[\]^*×:,.∙✓□▷=⇒→<>λ]\|->'
+syn match   redttSymb '[#@`|\[\]^*×:,.∙✓□▷=⇒→()λ]\|->'
 
 syn region  redttComm start=";" end="$"
 

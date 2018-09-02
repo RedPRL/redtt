@@ -26,3 +26,16 @@ let rec map3 f xs ys zs =
     f x y z :: map3 f xs ys zs
   | _ ->
     failwith "map3: length mismatch"
+
+let rec split_last l =
+  match l with
+  | [] -> failwith "split_last: empty list"
+  | [x] -> ([], x)
+  | x :: y :: ys ->
+    let zs, z = split_last (y :: ys) in
+    x :: zs, z
+
+let split_head l =
+  match l with
+  | [] -> failwith "split_head_append: empty list"
+  | x :: xs -> x, xs

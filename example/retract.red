@@ -1,15 +1,15 @@
 import path
 import connection
 
-let Retract (A,B : type) (f : A → B) (g : B → A) : type =
+let Retract (A B : type) (f : A → B) (g : B → A) : type =
   (a : A) →
     Path A (g (f a)) a
 
 ; Adapted from https://github.com/HoTT/book/issues/718
 let path-retract/preserves/refl (A : type) (R : A → A → type)
-  (s : (x,y : A) → (R x y) → Path A x y)
-  (r : (x,y : A) → (Path A x y) → R x y)
-  (α : (x,y : A) → Retract (R x y) (Path A x y) (s x y) (r x y))
+  (s : (x y : A) → (R x y) → Path A x y)
+  (r : (x y : A) → (Path A x y) → R x y)
+  (α : (x y : A) → Retract (R x y) (Path A x y) (s x y) (r x y))
   : (x : A) → Path (Path A x x) (s x x (r x x (λ _ → x))) (λ _ → x)
   =
   λ x →
@@ -22,7 +22,7 @@ let path-retract/preserves/refl (A : type) (R : A → A → type)
     ]
     =
     λ i j →
-      s x (q i) (r x (q i) (λ k → connection/and A q i k)) j
+      s x (q i) (r x (q i) (λ k → weak-connection/and A q i k)) j
   in
   let cap2 : [i j] A [
     | j=0 ⇒ x
