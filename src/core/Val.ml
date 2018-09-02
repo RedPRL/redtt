@@ -602,7 +602,7 @@ struct
           Abs.bind1 x @@ make_coe (Dir.make (`Atom x) r') abs el
         in
         let correction = List.map fix_face faces in
-        make_fhcom (`Ok dir) intro @@ force_abs_sys correction
+        make_fhcom (`Ok (Dir.swap dir)) intro @@ force_abs_sys correction
     end
 
   and rigid_coe_nonstrict_data dir abs el =
