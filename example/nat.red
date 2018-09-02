@@ -82,18 +82,18 @@ let nat/discrete : discrete nat =
   elim m [
   | zero ⇒ λ n →
     elim n [
-    | zero ⇒ <tt, refl>
-    | suc n' ⇒ <ff, nat-path/encode zero (suc n')>
+    | zero ⇒ (tt, refl)
+    | suc n' ⇒ (ff, nat-path/encode zero (suc n'))
     ]
   | suc (m' ⇒ nat/discrete/m') ⇒ λ n →
     elim n [
-    | zero ⇒ <ff, nat-path/encode (suc m') zero>
+    | zero ⇒ (ff, nat-path/encode (suc m') zero)
     | suc n' ⇒
       or/elim (Path nat m' n') (neg (Path nat m' n'))
         (or (Path nat (suc m') (suc n')) (neg (Path nat (suc m') (suc n'))))
         (nat/discrete/m' n')
-        (λ l → <tt, λ i → suc (l i)>)
-        (λ r → <ff, λ p → r (λ i → nat-pred (p i))>)
+        (λ l → (tt, λ i → suc (l i)))
+        (λ r → (ff, λ p → r (λ i → nat-pred (p i))))
     ]
   ]
 

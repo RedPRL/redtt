@@ -36,7 +36,7 @@ let Iso/fiber-is-prop
         ]
     in
     λ i →
-     < refl
+     ( refl
      , λ j →
         let aux : A =
           comp 1 0 (sq2 i j) [
@@ -52,14 +52,14 @@ let Iso/fiber-is-prop
         | j=0 ⇒ α (f (sq2 i 0))
         | j=1 ⇒ α b
         ]
-     >
+     )
 
 
 let Iso/Equiv (A B : type) (I : Iso A B) : Equiv A B =
-  < I.0
+  ( I.0
   , λ b →
-    < <I.1.0 b, I.1.1.0 b>
+    ( (I.1.0 b, I.1.1.0 b)
     , λ fib →
-      Iso/fiber-is-prop _ _ I b fib <I.1.0 b, I.1.1.0 b>
-    >
-  >
+      Iso/fiber-is-prop _ _ I b fib (I.1.0 b, I.1.1.0 b)
+    )
+  )

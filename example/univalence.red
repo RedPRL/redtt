@@ -14,18 +14,18 @@ let RetIsContr
   (c : IsContr B)
   : IsContr A
   =
-  < g c.0,
+  ( g c.0,
     λ a i →
       comp 0 1 (g (c.1 (f a) i)) [
       | i=0 ⇒ h a
       | i=1 ⇒ refl
       ]
-  >
+  )
 
 let IdEquiv (A : type) : Equiv A A =
-  < λ a → a
+  ( λ a → a
   , λ a →
-    < <a, refl>
+    ( (a, refl)
     , λ p i →
       let aux : dim → A =
         λ j →
@@ -34,9 +34,9 @@ let IdEquiv (A : type) : Equiv A A =
         | i=1 ⇒ refl
         ]
       in
-      <aux 0, aux>
-    >
-  >
+      (aux 0, aux)
+    )
+  )
 
 let PathToEquiv
   (A B : type) (P : Path^1 type A B)
@@ -72,11 +72,11 @@ let LemSig
   : Path ((a : A) × B a) u v
   =
   λ i →
-    < P i
+    ( P i
     , let coe0 = coe 0 i u.1 in λ j → B (P j) in
       let coe1 = coe 1 i v.1 in λ j → B (P j) in
       B/prop (P i) coe0 coe1 i
-    >
+    )
 
 
 let PropSig
@@ -115,17 +115,17 @@ let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
   λ ise ise' i y →
     let a : A = (ise y).0.0 in
     let p : Path B (f a) y = (ise y).0.1 in
-    let c : (w : Fiber A B f y) → Path (Fiber A B f y) w <a,p> =
+    let c : (w : Fiber A B f y) → Path (Fiber A B f y) w (a,p) =
       (ise y).1
     in
     let a' : A = (ise' y).0.0 in
     let p' : Path B (f a') y = (ise' y).0.1 in
-    let c' : (w : Fiber A B f y) → Path (Fiber A B f y) w <a',p'> =
+    let c' : (w : Fiber A B f y) → Path (Fiber A B f y) w (a',p') =
       (ise' y).1
     in
-    < c' <a , p> i
+    ( c' (a , p) i
     , λ w →
-        let sq : PathD (λ j → Path (Fiber A B f y) w (c' <a,p> j)) (c w) (c' w) =
+        let sq : PathD (λ j → Path (Fiber A B f y) w (c' (a,p) j)) (c w) (c' w) =
           λ i j →
             comp 0 1 (connection/and (Fiber A B f y) (c' w) i j) [
             | i=0 ⇒ λ k → connection/and (Fiber A B f y) (c w) k j
@@ -135,7 +135,7 @@ let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
             ]
         in
         sq i
-    >
+    )
 
 opaque
 let EquivLemma
@@ -161,18 +161,18 @@ let SigEquivToPath
   (X : (B : type) × Equiv A B)
   : (B : type) × Path^1 type A B
   =
-  < X.0
+  ( X.0
   , UA _ X.0 X.1
-  >
+  )
 
 let SigPathToEquiv
   (A : type)
   (X : (B : type) × Path^1 type A B)
   : (B : type) × (Equiv A B)
   =
-  < X.0
+  ( X.0
   , PathToEquiv _ X.0 X.1
-  >
+  )
 
 opaque
 let UA/retract
@@ -188,9 +188,9 @@ let UA/retract/sig
   : Retract^1 _ _ (SigEquivToPath A) (SigPathToEquiv A)
   =
   λ singl i →
-    < singl.0
+    ( singl.0
     , UA/retract A singl.0 singl.1 i
-    >
+    )
 
 let UA/IdEquiv (A : type)
   : Path^1 (Path^1 type A A) (UA A A (IdEquiv A)) (λ _ → A)
@@ -202,9 +202,9 @@ let UA/IdEquiv (A : type)
 
 opaque
 let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
-  < <_, λ _ → A>
+  ( (_, λ _ → A)
   , λ X i →
-    < comp 0 1 A [
+    ( comp 0 1 A [
       | i=0 ⇒ X.1
       | i=1 ⇒ refl
       ]
@@ -213,8 +213,8 @@ let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
       | i=0 ⇒ X.1
       | i=1 ⇒ refl
       ]
-    >
-  >
+    )
+  )
 
 
 ; The following is a formulation of univalence proposed by Martin Esfstdo:
@@ -231,19 +231,19 @@ let univalence (A : type) : IsContr^1 ((B : type) × Equiv A B) =
     (IsContrPath A)
 
 let IdEquiv/connection (B : type) : Equiv B B =
-  < λ b → b
+  ( λ b → b
   , λ b →
-    < <b, refl>
-    , λ v i → <v.1 i, λ j → connection/or B v.1 i j>
-    >
-  >
+    ( (b, refl)
+    , λ v i → (v.1 i, λ j → connection/or B v.1 i j)
+    )
+  )
 
 let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
-  < <B, IdEquiv/connection B>
+  ( (B, IdEquiv/connection B)
   , λ w i →
       let VB : type = `(V i (fst w) B (snd w)) in
       let proj/B : VB → B = λ g → `(vproj i g (fst w) B (snd w)) in
-      < _
+      ( _
       , proj/B
       , λ b →
            let ctr/B : dim → B =
@@ -254,9 +254,9 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
                ]
            in
            let ctr : Fiber VB B proj/B b =
-             < `(vin i (fst (fst ((snd (snd w)) b))) (@ ctr/B 0)), ctr/B >
+             ( `(vin i (fst (fst ((snd (snd w)) b))) (@ ctr/B 0)), ctr/B )
            in
-           < ctr
+           ( ctr
            , λ v j →
                let filler : dim → B =
                  λ l →
@@ -267,9 +267,9 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
                    | j=1 ⇒ ctr/B
                    ]
                in
-               < `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))
+               ( `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))
                , filler
-               >
-           >
-      >
-  >
+               )
+           )
+      )
+  )

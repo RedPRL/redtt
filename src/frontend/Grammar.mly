@@ -115,10 +115,16 @@ atomic_econ:
     { E.Guess e }
   | spec = univ_spec
     { let k, l = spec in E.Type (k, l) }
-  | LGL; es = separated_list(COMMA, located(econ)); RGL
+  (* in theory this rule can replace the following three, but it seems there's some bug.
+  | LPR; es = separated_list(COMMA, located(econ)); RPR
     { E.Tuple es }
-  | LPR; e = located(econ); RPR
-    { e.con }
+  *)
+  | LPR; RPR
+    { E.Tuple [] }
+  | LPR; e = econ; RPR
+    { e }
+  | LPR; e = located(econ); COMMA; es = separated_nonempty_list(COMMA, located(econ)); RPR
+    { E.Tuple (e :: es) }
   | REFL
     { E.Refl }
   | n = NUMERAL;

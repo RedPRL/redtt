@@ -11,4 +11,4 @@ let unit/prop : IsProp unit =
   ]
 
 let unit/contr : IsContr unit =
-  < triv , lam a → unit/prop a triv >
+  ( triv , lam a → unit/prop a triv )

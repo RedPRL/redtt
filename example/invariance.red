@@ -6,7 +6,7 @@ import bool
 ; https://github.com/RedPRL/sml-redprl/blob/master/example/invariance.prl
 
 let fun-to-pair (A : type) (f : bool → A) : A × A =
-  <f tt , f ff>
+  (f tt , f ff)
 
 let pair-to-fun (A : type) (p : A × A) : bool → A =
   λ b →
@@ -17,29 +17,29 @@ let pair-to-fun (A : type) (p : A × A) : bool → A =
 
 let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
   λ p →
-    < <pair-to-fun A p, λ _ → p>
+    ( (pair-to-fun A p, λ _ → p)
     , λ fib →
       coe 1 0
         (λ i →
-          < λ b → elim b [ tt ⇒ (fib.1 i).0 | ff ⇒ (fib.1 i).1 ]
+          ( λ b → elim b [ tt ⇒ (fib.1 i).0 | ff ⇒ (fib.1 i).1 ]
           , λ j → connection/or _ fib.1 i j
-          >)
+          ))
       in λ j →
-        [i] (f : bool → A) × Path (A × A) <f tt, f ff> p [
-        | i=0 ⇒ <shannon/path A fib.0 j, fib.1>
-        | i=1 ⇒ <pair-to-fun A p, refl>
+        [i] (f : bool → A) × Path (A × A) (f tt, f ff) p [
+        | i=0 ⇒ (shannon/path A fib.0 j, fib.1)
+        | i=1 ⇒ (pair-to-fun A p, refl)
         ]
-    >
+    )
 
 let fun-to-pair-equiv (A : type) : Equiv (bool → A) (A × A) =
-  <fun-to-pair A, fun-to-pair-is-equiv A>
+  (fun-to-pair A, fun-to-pair-is-equiv A)
 
 let fun-eq-pair (A : type) : Path^1 type (bool → A) (A × A) =
   λ i →
     `(V i (→ (data bool) A) (× A A) (fun-to-pair-equiv A))
 
 let swap-pair (A : type) (p : A × A) : A × A =
-  <p.1, p.0>
+  (p.1, p.0)
 
 let swap-fun (A : type) : (bool → A) → bool → A =
   coe 1 0 (swap-pair A) in λ i →

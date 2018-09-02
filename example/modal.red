@@ -15,10 +15,10 @@ let later (A : ✓ → type) : type =
   (α : ✓) → A α
 
 let stream/cons (x : bool) (xs : ✓ → stream) : stream =
-  < x,
+  ( x,
     coe 1 0 xs in λ i →
       later (dfix[i] A : type in stream/F A)
-  >
+  )
 
 let stream/hd (xs : stream) : _ =
   xs.0

@@ -118,4 +118,4 @@ let loopn-winding (l : Path s1 base base) : Path (Path s1 base base) (loopn (win
   J s1 base (λ x p → Path (Path s1 base x) (decode x (encode x p)) p) refl base l
 
 let winding-equiv : Equiv (Path s1 base base) int =
-  Iso/Equiv _ _ <winding, <loopn, <winding-loopn, loopn-winding>>>
+  Iso/Equiv _ _ (winding, (loopn, (winding-loopn, loopn-winding)))
