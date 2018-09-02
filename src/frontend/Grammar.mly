@@ -19,10 +19,16 @@
   let atom_to_lost_eterm a : E.eterm =
     lost_eterm (atom_to_econ a)
 
-  let app_spine_to_econ (e, es) =
+  let atom_to_lost_frame a : E.frame =
+    E.App (atom_to_lost_eterm a)
+
+  let lost_frame e : E.frame =
+    E.App (lost_eterm e)
+
+  let spine_to_econ (e, es) =
     match es with
     | [] -> e
-    | _ -> E.Cut (lost_eterm e, Bwd.from_list (List.map (fun e -> E.App e) es))
+    | _ -> E.Cut (lost_eterm e, Bwd.from_list es)
 %}
 
 %token <int> NUMERAL
@@ -106,7 +112,7 @@ atom_econ:
   | a = ATOM; CARET; k = NUMERAL
     { E.Var (a, k) }
 
-atomic_econ:
+atomoid_econ:
   | BACKTICK; t = tm
     { E.Quo t }
   | a = HOLE_NAME;
@@ -130,51 +136,46 @@ atomic_econ:
   | n = NUMERAL;
     { E.Num n }
 
-with_projs(X):
-  | e = X
+atomic:
+  | e = atom_econ
     { e }
-  | e = located(X); ps = nonempty_list(eproj)
-    { E.Cut (e, Bwd.from_list ps) }
-
-vertebrae:
-  | e = with_projs(atom_econ)
-    { e }
-  | e = with_projs(atomic_econ)
+  | e = atomoid_econ
     { e }
 
-app_spine_as_pair:
+framoid:
+  | e = located(atomoid_econ)
+    { E.App e }
+  | p = eproj
+    { p }
+
+framic:
+  | e = located(atomic)
+    { E.App e }
+  | p = eproj
+    { p }
+
+spine:
   (* a b *)
   | atoms = nonempty_list(ATOM)
     { let head, tail = ListUtil.split_head atoms in
-      atom_to_econ head, List.map atom_to_lost_eterm tail }
-  (* a b c.0 *)
-  | atoms = nonempty_list(ATOM); ps = nonempty_list(eproj); vs = list(located(vertebrae))
-    { let atoms, last_atom = ListUtil.split_last atoms in
-      let econs = List.append (List.map atom_to_econ atoms) [E.Cut (atom_to_lost_eterm last_atom, Bwd.from_list ps)] in
-      let head_econ, middle_econs = ListUtil.split_head econs in
-      head_econ, List.append (List.map lost_eterm middle_econs) vs }
-  (* a b c^1 *)
-  | atoms = nonempty_list(ATOM); CARET; k = NUMERAL; vs = list(located(vertebrae))
+      atom_to_econ head, List.map atom_to_lost_frame tail }
+  (* a b c .0 ... *)
+  (* a b (e) ... *)
+  | atoms = nonempty_list(ATOM); p = framoid; fs = list(framic)
+    { let head, medium = ListUtil.split_head atoms in
+      atom_to_econ head, List.concat [List.map atom_to_lost_frame medium; [p]; fs] }
+  (* a b c^1 ... *)
+  | atoms = nonempty_list(ATOM); CARET; k = NUMERAL; fs = list(framic)
     { let atoms, last_atom = ListUtil.split_last atoms in
       let econs = List.append (List.map atom_to_econ atoms) [E.Var (last_atom, k)] in
       let head_econ, middle_econs = ListUtil.split_head econs in
-      head_econ, List.append (List.map lost_eterm middle_econs) vs }
-  (* a b c^1.0 *)
-  | atoms = nonempty_list(ATOM); CARET; k = NUMERAL; ps = nonempty_list(eproj); vs = list(located(vertebrae))
-    { let atoms, last_atom = ListUtil.split_last atoms in
-      let econs = List.append (List.map atom_to_econ atoms) [E.Cut (lost_eterm (E.Var (last_atom, k)), Bwd.from_list ps)] in
-      let head_econ, middle_econs = ListUtil.split_head econs in
-      head_econ, List.append (List.map lost_eterm middle_econs) vs }
-  (* a b (c.0) *)
-  | atoms = nonempty_list(ATOM); e = located(with_projs(atomic_econ)); vs = list(located(vertebrae))
-    { let head, middle = ListUtil.split_head atoms in
-      atom_to_econ head, List.concat [List.map atom_to_lost_eterm middle; [e]; vs] }
-  | e = with_projs(atomic_econ); vs = list(located(vertebrae))
-    { e, vs }
+      head_econ, List.append (List.map lost_frame middle_econs) fs }
+  | e = atomoid_econ; fs = list(framic)
+    { e, fs }
 
-app_spine_con:
-  | ap = app_spine_as_pair
-    { app_spine_to_econ ap }
+spine_con:
+  | ap = spine
+    { spine_to_econ ap }
 
 block(X):
   | WITH; x = X; END
@@ -187,7 +188,7 @@ pipe_block(X):
     { x }
 
 econ:
-  | e = app_spine_con
+  | e = spine_con
     { e }
 
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = located(econ)
@@ -213,13 +214,13 @@ econ:
   | FIX; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.FixLine {r = {con = E.Num 0; span = None}; name; ty; bdy} }
 
-  | COE; r0 = located(vertebrae); r1 = located(vertebrae); tm = located(vertebrae); IN; fam = located(econ)
+  | COE; r0 = located(atomic); r1 = located(atomic); tm = located(atomic); IN; fam = located(econ)
     { E.Coe {r = r0; r' = r1; fam; tm} }
 
-  | COMP; r0 = located(vertebrae); r1 = located(vertebrae); cap = located(vertebrae); sys = pipe_block(eface)
+  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); sys = pipe_block(eface)
     { E.HCom {r = r0; r' = r1; cap; sys}}
 
-  | COMP; r0 = located(vertebrae); r1 = located(vertebrae); cap = located(vertebrae); IN; fam = located(econ); sys = pipe_block(eface)
+  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); IN; fam = located(econ); sys = pipe_block(eface)
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = located(econ)
@@ -231,10 +232,10 @@ econ:
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = located(econ); sys = pipe_block(eface)
     { E.Ext (dims, ty, sys)}
 
-  | dom = located(app_spine_con); RIGHT_ARROW; cod = located(econ)
+  | dom = located(spine_con); RIGHT_ARROW; cod = located(econ)
     { E.Pi ([`Ty ("_", dom)], cod) }
 
-  | dom = located(app_spine_con); TIMES; cod = located(econ)
+  | dom = located(spine_con); TIMES; cod = located(econ)
     { E.Sg ([`Ty ("_", dom)], cod) }
 
 eclause:
@@ -248,7 +249,7 @@ epatbind:
     { E.PIndVar (x, ih) }
 
 eface:
-  | r0 = located(vertebrae); EQUALS; r1 = located(vertebrae); RRIGHT_ARROW; e = located(econ)
+  | r0 = located(atomic); EQUALS; r1 = located(atomic); RRIGHT_ARROW; e = located(econ)
     { r0, r1, e }
 
 

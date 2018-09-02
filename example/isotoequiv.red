@@ -13,17 +13,17 @@ let Iso (A B : type) : type =
 let Iso/fiber-is-prop
   (A B : type)
   (I : Iso A B) (b : B)
-  : IsProp (Fiber _ _ I.0 b)
+  : IsProp (Fiber _ _ (I.0) b)
   =
   let f = I.0 in
   let g = I.1.0 in
   let α = I.1.1.0 in
   let β = I.1.1.1 in
 
-  let sq : (_ : Fiber _ _ I.0 b) (i j : dim) → A =
+  let sq : (_ : Fiber _ _ (I.0) b) (i j : dim) → A =
     λ fib i j →
       comp 0 j (g (fib.1 i)) [
-      | i=0 ⇒ β fib.0
+      | i=0 ⇒ β (fib.0)
       | i=1 ⇒ refl
       ]
   in

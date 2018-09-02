@@ -14,7 +14,7 @@ let RetIsContr
   (c : IsContr B)
   : IsContr A
   =
-  ( g c.0,
+  ( g (c.0),
     λ a i →
       comp 0 1 (g (c.1 (f a) i)) [
       | i=0 ⇒ h a
@@ -68,13 +68,13 @@ let LemSig
   (A : type) (B : A → type)
   (B/prop : (a : A) → IsProp (B a))
   (u v : (a : A) × B a)
-  (P : Path A u.0 v.0)
+  (P : Path A (u.0) (v.0))
   : Path ((a : A) × B a) u v
   =
   λ i →
     ( P i
-    , let coe0 = coe 0 i u.1 in λ j → B (P j) in
-      let coe1 = coe 1 i v.1 in λ j → B (P j) in
+    , let coe0 = coe 0 i (u.1) in λ j → B (P j) in
+      let coe1 = coe 1 i (v.1) in λ j → B (P j) in
       B/prop (P i) coe0 coe1 i
     )
 
@@ -86,7 +86,7 @@ let PropSig
   : IsProp ((a : A) × B a)
   =
   λ u v →
-    LemSig A B B/prop u v (A/prop u.0 v.0)
+    LemSig A B B/prop u v (A/prop (u.0) (v.0))
 
 opaque
 let PropIsContr (A : type) : IsProp (IsContr A) =
@@ -113,15 +113,15 @@ let PropIsEquiv (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
 ; A direct proof that IsEquiv f is a prop, ported from cubicaltt to yacctt to redtt
 let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
   λ ise ise' i y →
-    let a : A = (ise y).0.0 in
-    let p : Path B (f a) y = (ise y).0.1 in
+    let a : A = ise y .0 .0 in
+    let p : Path B (f a) y = ise y .0 .1 in
     let c : (w : Fiber A B f y) → Path (Fiber A B f y) w (a,p) =
-      (ise y).1
+      ise y .1
     in
-    let a' : A = (ise' y).0.0 in
-    let p' : Path B (f a') y = (ise' y).0.1 in
+    let a' : A = ise' y .0 .0 in
+    let p' : Path B (f a') y = ise' y .0 .1 in
     let c' : (w : Fiber A B f y) → Path (Fiber A B f y) w (a',p') =
-      (ise' y).1
+      ise' y .1
     in
     ( c' (a , p) i
     , λ w →
@@ -140,7 +140,7 @@ let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
 opaque
 let EquivLemma
   (A B : type) (E0 E1 : Equiv A B)
-  (P : Path (A → B) E0.0 E1.0)
+  (P : Path (A → B) (E0.0) (E1.0))
   : Path (Equiv A B) E0 E1
   =
   LemSig (A → B) (IsEquiv A B) (PropIsEquiv A B) E0 E1 P
@@ -162,7 +162,7 @@ let SigEquivToPath
   : (B : type) × Path^1 type A B
   =
   ( X.0
-  , UA _ X.0 X.1
+  , UA _ (X.0) (X.1)
   )
 
 let SigPathToEquiv
@@ -171,7 +171,7 @@ let SigPathToEquiv
   : (B : type) × (Equiv A B)
   =
   ( X.0
-  , PathToEquiv _ X.0 X.1
+  , PathToEquiv _ (X.0) (X.1)
   )
 
 opaque
@@ -189,7 +189,7 @@ let UA/retract/sig
   =
   λ singl i →
     ( singl.0
-    , UA/retract A singl.0 singl.1 i
+    , UA/retract A (singl.0) (singl.1) i
     )
 
 let UA/IdEquiv (A : type)
@@ -234,7 +234,7 @@ let IdEquiv/connection (B : type) : Equiv B B =
   ( λ b → b
   , λ b →
     ( (b, refl)
-    , λ v i → (v.1 i, λ j → connection/or B v.1 i j)
+    , λ v i → (v.1 i, λ j → connection/or B (v.1) i j)
     )
   )
 
@@ -249,7 +249,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
            let ctr/B : dim → B =
              λ j →
                comp 1 j b [
-               | i=0 ⇒ (w.1.1 b).0.1
+               | i=0 ⇒ w.1.1 b .0 .1
                | i=1 ⇒ refl
                ]
            in
@@ -261,8 +261,8 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
                let filler : dim → B =
                  λ l →
                    comp 1 l b [
-                   | i=0 ⇒ ((w.1.1 b).1 v j).1
-                   | i=1 ⇒ λ k → connection/or B v.1 j k
+                   | i=0 ⇒ w.1.1 b .1 v j .1
+                   | i=1 ⇒ λ k → connection/or B (v.1) j k
                    | j=0 ⇒ v.1
                    | j=1 ⇒ ctr/B
                    ]

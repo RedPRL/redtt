@@ -48,7 +48,7 @@ let c2t/transpose (c : s1) : s1 → torus =
 
 
 let c2t (cs : s1 × s1) : torus =
-  c2t/transpose cs.0 cs.1
+  c2t/transpose (cs.0) (cs.1)
 
 let t2c2t (t : torus) : Path torus (c2t (t2c t)) t =
   elim t [
@@ -76,7 +76,7 @@ let c2t2c/transpose (c0 : s1) : (c1 : s1) → Path (s1 × s1) (t2c (c2t/transpos
 
 
 let c2t2c (cs : s1 × s1) : Path (s1 × s1) (t2c (c2t cs)) cs =
-  c2t2c/transpose cs.0 cs.1
+  c2t2c/transpose (cs.0) (cs.1)
 
 
 let torus/s1s1/iso : Iso (s1 × s1) torus =
