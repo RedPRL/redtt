@@ -1,5 +1,6 @@
 import path
 import s1
+import s2
 
 data s3 where
 | base
@@ -19,7 +20,6 @@ data join where
   | i=0 ⇒ inl a
   | i=1 ⇒ inr b
   ]
-
 
 ; adapted from "e" in cubicaltt:
 ; https://github.com/mortberg/cubicaltt/blob/d3afca5a744a96de4831610e76d6c4b629478362/examples/brunerie2.ctt#L298
@@ -128,4 +128,20 @@ let join-to-s3 (c : join) : s3 =
   | inl a ⇒ base
   | inr b ⇒ base
   | push a b i ⇒ join-to-s3/push a b i
+  ]
+
+; adapted from "alpha" in cubicaltt:
+; https://github.com/mortberg/cubicaltt/blob/d3afca5a744a96de4831610e76d6c4b629478362/examples/brunerie2.ctt#L322
+
+let s2/merid (a : s1) : Path s2 base base =
+  elim a [
+  | base ⇒ λ _ → base
+  | loop i ⇒ λ j → surf i j
+  ]
+
+let join-to-s2 (c : join) : s2 =
+  elim c [
+  | inl a ⇒ base
+  | inr b ⇒ base
+  | push a b i ⇒ trans s2 (s2/merid a) (s2/merid b) i
   ]
