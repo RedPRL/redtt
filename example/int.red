@@ -50,9 +50,9 @@ let isuc-pred (n : int) : Path int (isuc (pred n)) n =
   ]
 
 let isuc-equiv : Equiv int int =
-  Iso/Equiv _ _ <isuc, <pred, <isuc-pred, pred-isuc>>>
+  Iso/Equiv _ _ (isuc, (pred, (isuc-pred, pred-isuc)))
 
-let iplus (m, n : int) : int =
+let iplus (m n : int) : int =
   elim m [
   | pos m =>
     elim m [
@@ -102,7 +102,7 @@ let int-refl (x : int) : IntPathCode x x =
   | negsuc m ⇒ nat-refl m
   ]
 
-let int-path/encode (x,y : int) (p : Path int x y)
+let int-path/encode (x y : int) (p : Path int x y)
   : IntPathCode x y
   =
   coe 0 1 (int-refl x) in λ i → IntPathCode x (p i)

@@ -5,13 +5,13 @@ import ntype
 import parametric-hit
 
 let stable (A : type) : type =
-  (neg (neg A)) → A
+  neg (neg A) → A
 
 let dec (A : type) : type =
   sum A (neg A)
 
 let discrete (A : type) : type =
-  (x,y : A) → dec (Path A x y)
+  (x y : A) → dec (Path A x y)
 
 let dec/to/stable (A : type) (d : dec A) : stable A =
   elim d [
@@ -23,7 +23,7 @@ let neg/is-prop-over (A : dim → type)
   : IsPropOver (λ i → neg (A i))
   =
   λ c c' i a →
-   let f : [j] ((A j) → void) [ j=0 ⇒ c | j=1 ⇒ c' ] =
+   let f : [j] (A j → void) [ j=0 ⇒ c | j=1 ⇒ c' ] =
      elim (c (coe i 0 a in A)) []
    in
    f i a
@@ -31,7 +31,7 @@ let neg/is-prop-over (A : dim → type)
 
 ; Hedberg's theorem for stable path types
 let paths-stable/to/set (A : type)
-  (st : (x,y : A) → stable (Path A x y))
+  (st : (x y : A) → stable (Path A x y))
   : IsSet A
   =
   λ a b p q i j →
@@ -54,8 +54,8 @@ let paths-stable/to/set (A : type)
            j)
          k
     | i=1 ⇒ refl
-    | j=0 ⇒ λ k → connection/or A (cap 0) i k
-    | j=1 ⇒ λ k → connection/or A (cap 1) i k
+    | j=0 ⇒ λ k → weak-connection/or A (cap 0) i k
+    | j=1 ⇒ λ k → weak-connection/or A (cap 1) i k
     ]
 
 ; Hedberg's theorem for decidable path types
