@@ -7,6 +7,8 @@ import omega1s1
 import s2
 import s3-to-join
 
+; from https://github.com/mortberg/cubicaltt/blob/pi4s3/examples/problem.ctt
+
 let pΩ² (pA : ptype) : ptype = pΩ (pΩ pA)
 let pΩ³ (pA : ptype) : ptype = pΩ (pΩ² pA)
 
@@ -34,5 +36,6 @@ let f4 : pΩ³ pjoin .0 → pΩ³ ps2 .0 =
 
 let test0-4 : pΩ³ ps2 .0 = f4 test0-3
 
+; haven't seen this finish checking
 ;let innerpath (i j : dim) : s1 =
 ;  coe 0 1 base in λ k → hopf (test0-4 i j k)
