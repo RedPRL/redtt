@@ -50,9 +50,9 @@ let isuc-pred (n : int) : Path int (isuc (pred n)) n =
   ]
 
 let isuc-equiv : Equiv int int =
-  Iso/Equiv _ _ <isuc, <pred, <isuc-pred, pred-isuc>>>
+  Iso/Equiv _ _ (isuc, (pred, (isuc-pred, pred-isuc)))
 
-let iplus (m, n : int) : int =
+let iplus (m n : int) : int =
   elim m [
   | pos m =>
     elim m [
@@ -102,7 +102,7 @@ let int-refl (x : int) : IntPathCode x x =
   | negsuc m ⇒ nat-refl m
   ]
 
-let int-path/encode (x,y : int) (p : Path int x y)
+let int-path/encode (x y : int) (p : Path int x y)
   : IntPathCode x y
   =
   coe 0 1 (int-refl x) in λ i → IntPathCode x (p i)
@@ -119,19 +119,19 @@ let int/discrete : discrete int =
       or/elim (Path nat m n) (neg (Path nat m n))
         (or (Path int (pos m) (pos n)) (neg (Path int (pos m) (pos n))))
         (nat/discrete m n)
-        (λ l → <tt, λ i → pos (l i)>)
-        (λ r → <ff, λ p → r (λ i → int-repr (p i))>)
-    | negsuc n ⇒ <ff, int-path/encode _ _>
+        (λ l → (tt, λ i → pos (l i)))
+        (λ r → (ff, λ p → r (λ i → int-repr (p i))))
+    | negsuc n ⇒ (ff, int-path/encode _ _)
     ]
   | negsuc m ⇒ λ y →
     elim y [
-    | pos n ⇒ <ff, int-path/encode _ _>
+    | pos n ⇒ (ff, int-path/encode _ _)
     | negsuc n ⇒
       or/elim (Path nat m n) (neg (Path nat m n))
         (or (Path int (negsuc m) (negsuc n)) (neg (Path int (negsuc m) (negsuc n))))
         (nat/discrete m n)
-        (λ l → <tt, λ i → negsuc (l i)>)
-        (λ r → <ff, λ p → r (λ i → int-repr (p i))>)
+        (λ l → (tt, λ i → negsuc (l i)))
+        (λ r → (ff, λ p → r (λ i → int-repr (p i))))
     ]
   ]
 
