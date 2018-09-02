@@ -815,8 +815,6 @@ struct
             let subst_src = Value.act (I.subst src x) in
             vproj phi
               (I.act phi src)
-              ~ty0:(fun phi0 -> Value.act phi0 @@ subst_src info.ty0)
-              ~ty1:(Value.act phi @@ subst_src info.ty1)
               ~func:(fun phi0 -> Value.act phi0 @@ subst_src @@ car info.equiv)
               ~el:(Value.act phi el)
           in
@@ -940,10 +938,8 @@ struct
           let el1 =
             let cap =
               let phi = I.subst r x in
-              let ty0r = Value.act phi info.ty0 in
-              let ty1r = Value.act phi info.ty1 in
               let funcr = Value.act phi @@ car info.equiv in
-              rigid_vproj info.x ~ty0:ty0r ~ty1:ty1r ~func:funcr ~el
+              rigid_vproj info.x ~func:funcr ~el
             in
             let mode = `INCONSISTENCY_REMOVAL in
             let sys =
@@ -1199,13 +1195,13 @@ struct
           hcom phi (`Atom y) (Value.act phi ty1)
         in
         let func = car equiv in
-        let el1_cap = rigid_vproj x ~ty0 ~ty1 ~func ~el:cap in
+        let el1_cap = rigid_vproj x ~func ~el:cap in
         let el1_sys =
           let face =
             Face.map @@ fun ri r'i absi ->
             let phi = I.equate ri r'i in
             let yi, el = Abs.unleash absi in
-            Abs.bind yi @@ vproj phi (I.act phi @@ `Atom x) ~ty0:(fun phi -> Value.act phi ty0) ~ty1:ty1 ~func:(fun phi -> Value.act phi func) ~el
+            Abs.bind yi @@ vproj phi (I.act phi @@ `Atom x) ~func:(fun phi -> Value.act phi func) ~el
           in
           Option.filter_map force_abs_face [face0; face1] @ List.map face sys
         in
@@ -1514,10 +1510,8 @@ struct
       cdr vhd
     | Tm.VProj info ->
       let r = eval_dim rho info.r in
-      let ty0 phi0 = eval (Env.act phi0 rho) info.ty0 in
-      let ty1 = eval rho info.ty1 in
       let func phi0 = eval (Env.act phi0 rho) info.func in
-      vproj I.idn r ~ty0 ~ty1 ~func ~el:vhd
+      vproj I.idn r ~func ~el:vhd
     | Tm.Cap info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
@@ -2015,27 +2009,36 @@ struct
 
   (* the equation oracle `phi` is for continuations `ty0` and `equiv`
    * waiting for an updated oracle. *)
-  and vproj phi mgen ~ty0 ~ty1 ~func ~el : value =
+  and vproj phi mgen ~func ~el : value =
     match mgen with
     | `Atom x ->
       let phi0 = I.cmp (I.equate mgen `Dim0) phi in
-      rigid_vproj x ~ty0:(ty0 phi0) ~ty1 ~func:(func phi0) ~el
+      rigid_vproj x ~func:(func phi0) ~el
     | `Dim0 ->
       let func = func phi in
       apply func el
     | `Dim1 ->
       el
 
-  and rigid_vproj x ~ty0 ~ty1 ~func ~el : value =
+  and rigid_vproj x ~func ~el : value =
     match unleash el with
     | VIn info ->
       info.el1
     | Up up ->
-      let neu = VProj {x; ty0; ty1; func; neu = up.neu} in
+      let z, ty0, ty1, equiv = unleash_v up.ty in
+      let subst_0z = I.subst `Dim0 z in
+      let ty0_0z = Value.act subst_0z ty0 in
+      let ty1_0z = Value.act subst_0z ty1 in
+      let func_nf =
+        let func_ty = make_func ty0_0z ty0_0z in
+        {ty = func_ty; el = func}
+      in
+
+      let neu = VProj {x; func = func_nf; neu = up.neu} in
       let vproj_face =
         Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
-        vproj phi (I.act phi @@ `Atom x) ~ty0:(fun phi0 -> Value.act phi0 ty0) ~ty1:(Value.act phi ty1) ~func:(fun phi0 -> Value.act phi0 func) ~el:a
+        vproj phi (I.act phi @@ `Atom x) ~func:(fun phi0 -> Value.act phi0 func) ~el:a
       in
       let faces01 =
         let face0 =
@@ -2324,6 +2327,13 @@ struct
     | TickCloConst v ->
       Lazy.force v
 
+  and make_func ty0 ty1 : value =
+    let rho = Env.append empty_env [`Val ty1; `Val ty0] in
+    eval rho @@
+    Tm.arr
+      (Tm.up @@ Tm.ix 0)
+      (Tm.up @@ Tm.ix 1)
+
   module Macro =
   struct
     let equiv ty0 ty1 : value =
@@ -2333,12 +2343,8 @@ struct
         (Tm.up @@ Tm.ix 0)
         (Tm.up @@ Tm.ix 1)
 
-    let func ty0 ty1 : value =
-      let rho = Env.append empty_env [`Val ty1; `Val ty0] in
-      eval rho @@
-      Tm.arr
-        (Tm.up @@ Tm.ix 0)
-        (Tm.up @@ Tm.ix 1)
+    let func = make_func
+
   end
 
 end

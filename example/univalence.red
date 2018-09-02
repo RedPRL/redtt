@@ -242,7 +242,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
   ( (B, IdEquiv/weak-connection B)
   , λ w i →
       let VB : type = `(V i (fst w) B (snd w)) in
-      let proj/B : VB → B = λ g → `(vproj i g (fst w) B (fst (snd w))) in
+      let proj/B : VB → B = λ g → `(vproj i g (fst (snd w))) in
       ( _
       , proj/B
       , λ b →

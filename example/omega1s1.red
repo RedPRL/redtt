@@ -8,7 +8,7 @@ let UA (A B : type) (E : Equiv A B) : Path^1 type A B =
     `(V i A B E)
 
 let UAproj (A B : type) (E : Equiv A B) (i : dim) (x : UA A B E i) : B =
-  `(vproj i x A B (fst E))
+  `(vproj i x (fst E))
 
 let s1-univ-cover (x : s1) : type =
   elim x [

@@ -322,10 +322,8 @@ struct
 
     | VProj info ->
       let r = traverse_tm info.r in
-      let ty0 = traverse_tm info.ty0 in
-      let ty1 = traverse_tm info.ty1 in
       let func = traverse_tm info.func in
-      VProj {r; ty0; ty1; func}
+      VProj {r; func}
 
     | Cap info ->
       let r = traverse_tm info.r in
@@ -813,8 +811,8 @@ and pp_cmd env fmt (hd, sp) =
           (go `Elim) sp
           (pp_elim_clauses env) info.clauses
 
-      | VProj {r; ty0; ty1; func} ->
-        Format.fprintf fmt "@[<hv1>(vproj %a@ %a@ %a@ %a@ %a)@]" (pp env) r (go `VProj) sp (pp env) ty0 (pp env) ty1 (pp env) func
+      | VProj {r; func} ->
+        Format.fprintf fmt "@[<hv1>(vproj %a@ %a@ %a)@]" (pp env) r (go `VProj) sp (pp env) func
       | Cap _ ->
         (* FIXME *)
         Format.fprintf fmt "@<cap>"
@@ -1167,10 +1165,8 @@ let map_frame f =
     Elim {info with mot; clauses}
   | VProj info ->
     let r = f info.r in
-    let ty0 = f info.ty0 in
-    let ty1 = f info.ty1 in
     let func = f info.func in
-    VProj {r; ty0; ty1; func}
+    VProj {r; func}
   | Cap info ->
     let r = f info.r in
     let r' = f info.r' in

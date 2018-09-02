@@ -217,8 +217,8 @@ struct
       let phi_r0 = I.subst `Dim0 info.x in
       let tm0 = equate env (Domain.Value.act phi_r0 info.ty0) (Domain.Value.act phi_r0 el0) (Domain.Value.act phi_r0 el1) in
       let func = car info.equiv in
-      let vproj0 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~func ~el:el0 in
-      let vproj1 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~func ~el:el1 in
+      let vproj0 = rigid_vproj info.x ~func ~el:el0 in
+      let vproj1 = rigid_vproj info.x ~func ~el:el1 in
       let tm1 = equate env info.ty1 vproj0 vproj1 in
       Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
 
@@ -538,12 +538,10 @@ struct
       let x0 = vproj0.x in
       let x1 = vproj1.x in
       let tr = equate_atom env x0 x1 in
-      let ty0 = equate_ty env vproj0.ty0 vproj1.ty0 in
-      let ty1 = equate_ty env vproj0.ty1 vproj1.ty1 in
-      let func_ty = V.Macro.func vproj0.ty0 vproj0.ty1 in
+      (* let func_ty = V.Macro.func vproj0.ty0 vproj0.ty1 in *)
       let phi = I.subst `Dim0 x0 in
-      let func = equate env (Value.act phi func_ty) vproj0.func vproj1.func in
-      let frame = Tm.VProj {r = tr; ty0; ty1; func} in
+      let func = equate env vproj0.func.ty vproj0.func.el vproj1.func.el in
+      let frame = Tm.VProj {r = tr; func} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
 
     | Cap cap0, Cap cap1 ->

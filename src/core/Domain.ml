@@ -396,11 +396,9 @@ struct
       begin
         match I.act phi @@ `Atom info.x with
         | `Atom y ->
-          let ty0 = Value.act phi info.ty0 in
-          let ty1 = Value.act phi info.ty1 in
-          let func = Value.act phi info.func in
+          let func = Nf.act phi info.func in
           let neu = act phi info.neu in
-          VProj {x = y; neu; ty0; ty1; func}
+          VProj {x = y; neu; func}
         | _ ->
           raise TooMortal
       end

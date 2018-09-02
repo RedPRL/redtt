@@ -77,7 +77,7 @@ and neu =
        clauses : (Desc.con_label * nclo) list}
 
   (* Invariant: neu \in vty, vty is a V type *)
-  | VProj of {x : atom; ty0 : value; ty1 : value; func : value; neu : neu}
+  | VProj of {x : atom; func : nf; neu : neu}
   | Cap of {dir : dir; ty : value; sys : comp_sys; neu : neu}
 
   | LblCall of neu
