@@ -523,7 +523,7 @@ struct
           let intro = make_intro empty_env ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
-          let nms = Bwd.from_list @@ ListUtil.tabulate (List.length cells) @@ fun _ -> None in
+          let nms = Bwd.from_list @@ List.map (fun _ -> None) cells in
           clbl, Tm.NB (nms, tbdy)
         in
 

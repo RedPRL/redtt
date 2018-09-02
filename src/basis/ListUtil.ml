@@ -27,13 +27,6 @@ let rec map3 f xs ys zs =
   | _ ->
     failwith "map3: length mismatch"
 
-let tabulate n f =
-  let rec go i =
-    if i == n then [] else
-      f i :: go (i+1)
-  in
-  go 0
-
 let rec split_last l =
   match l with
   | [] -> failwith "split_last: empty list"
