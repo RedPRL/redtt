@@ -3,7 +3,7 @@ sudo: required
 cache:
   directories:
     - /home/travis/.opam/
-    - /home/travis/bin/opam/
+    - /home/travis/bin/
 before_install:
   # Install OPAM and OCaml
   - travis_retry wget https://raw.github.com/ocaml/opam/master/shell/opam_installer.sh -O - | sh -s "/home/travis/bin" '4.06.1'
