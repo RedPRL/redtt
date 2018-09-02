@@ -33,3 +33,16 @@ let tabulate n f =
       f i :: go (i+1)
   in
   go 0
+
+let rec split_last l =
+  match l with
+  | [] -> failwith "split_last: empty list"
+  | [x] -> ([], x)
+  | x :: y :: ys ->
+    let zs, z = split_last (y :: ys) in
+    x :: zs, z
+
+let split_head l =
+  match l with
+  | [] -> failwith "split_head_append: empty list"
+  | x :: xs -> x, xs

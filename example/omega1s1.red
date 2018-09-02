@@ -3,11 +3,11 @@ import J
 import int
 import s1
 
-let UA (A,B : type) (E : Equiv A B) : Path^1 type A B =
+let UA (A B : type) (E : Equiv A B) : Path^1 type A B =
   λ i →
     `(V i A B E)
 
-let UAproj (A,B : type) (E : Equiv A B) (i : dim) (x : UA A B E i) : B = `(vproj i x A B E)
+let UAproj (A B : type) (E : Equiv A B) (i : dim) (x : UA A B E i) : B = `(vproj i x A B E)
 
 let s1-univ-cover (x : s1) : type =
   elim x [
@@ -69,7 +69,7 @@ let winding-loopn (n : int) : Path int (winding (loopn n)) n =
 ;    ]
 ;  ]
 ;
-;let decode (x : s1) : (s1-univ-cover x) → Path s1 base x =
+;let decode (x : s1) : s1-univ-cover x → Path s1 base x =
 ;  elim x [
 ;  | base ⇒ loopn
 ;  | loop i ⇒ λ y j → let n : int = coe i 0 y in λ k → s1-univ-cover (loop k) in
@@ -99,7 +99,7 @@ let decode-square (n : int)
   | negsuc n ⇒ λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 ⇒ refl | j=1 ⇒ λ i → loop i ]
   ]
 
-let decode (x : s1) : (s1-univ-cover x) → Path s1 base x =
+let decode (x : s1) : s1-univ-cover x → Path s1 base x =
   elim x [
   | base ⇒ loopn
   | loop i ⇒ λ y j →
