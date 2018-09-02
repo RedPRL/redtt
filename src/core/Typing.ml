@@ -358,7 +358,7 @@ and check_constr cx dlbl param_specs constr params tms =
   let (module V) = Cx.evaluator cx in
   (* Tentative *)
   let vdataty = D.make @@ D.Data {dlbl; params} in
-  let rec go tyenv cx const_specs rec_specs dim_specs params tms =
+  let rec go tyenv cx' const_specs rec_specs dim_specs params tms =
     match const_specs, rec_specs, dim_specs, params, tms with
     | [], rec_specs, dim_specs, _, _->
       let tms, trs = ListUtil.split (List.length rec_specs) tms in
@@ -367,7 +367,7 @@ and check_constr cx dlbl param_specs constr params tms =
     | (lbl, ty) :: const_specs, rec_specs, dim_specs, _, tm :: tms ->
       let vty = V.eval tyenv ty in
       let varg = check_eval cx vty tm in
-      let cx' = Cx.def cx ~nm:(Some lbl) ~ty:vty ~el:varg in
+      let cx' = Cx.def cx' ~nm:(Some lbl) ~ty:vty ~el:varg in
       go (D.Env.snoc tyenv @@ `Val varg) cx' const_specs rec_specs dim_specs params tms
     | _ -> failwith "constructor arguments malformed"
   in
