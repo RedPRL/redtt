@@ -2,10 +2,11 @@ open RedBasis open Bwd open BwdNotation
 
 module Env =
 struct
-  type t = int * string bwd
+  type t = string bwd
 
-  let emp = 0, Emp
-  let var i (_, xs) =
+  let emp = Emp
+
+  let var i xs =
     try
       Bwd.nth xs i
     with
@@ -13,21 +14,14 @@ struct
       "{" ^ string_of_int i ^ "}"
   (* failwith "Pp printer: tried to resolve bound variable out of range" *)
 
-  let bind_fresh (i, xs) =
-    let x = "x" ^ string_of_int i in
-    x, (i + 1, xs #< x)
-
-  let proj (i, xs) =
+  let proj xs =
     match xs with
     | Emp -> failwith "ppenv/proj"
-    | Snoc (xs, _) -> (i - 1, xs)
+    | Snoc (xs, _) -> xs
 
-  let choose_name (i, xs) nm =
-    match nm with
-    | None | Some "_" ->
-      let x = "x" ^ string_of_int i in
-      x
-    | Some x ->
+  let choose_name xs x =
+    match x with
+    | _ ->
       let ys = Bwd.filter (fun y -> y = x) xs in
       let n = Bwd.length ys in
       if n = 0 then
@@ -35,9 +29,13 @@ struct
       else
         x ^ string_of_int n
 
-  let bind (i, xs) nm =
-    let x = choose_name (i, xs) nm in
-    x, (i + 1, xs #< x)
+  let bind xs nm =
+    let x =
+      match nm with
+      | None | Some "_" -> choose_name xs "x"
+      | Some x -> choose_name xs x
+    in
+    x, xs #< x
 
   let rec bindn env (nms : string option list) =
     match nms with
