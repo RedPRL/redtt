@@ -5,18 +5,18 @@ import univalence
 
 data s1 where
 | base
-| loop @ i [i=0 ⇒ base | i=1 ⇒ base]
+| loop @ i [i=0 → base | i=1 → base]
 
 let rotate/loop (a : s1) : Path s1 a a =
   elim a [
-  | base ⇒ λ j → loop j
-  | loop i ⇒ λ j → connection/both s1 (λ k → loop k) (λ k → loop k) i j
+  | base → λ j → loop j
+  | loop i → λ j → connection/both s1 (λ k → loop k) (λ k → loop k) i j
   ]
 
 let rotate (a : s1) : s1 → s1 =
   elim a [
-  | base ⇒ λ b → b
-  | loop i ⇒ λ b → rotate/loop b i
+  | base → λ b → b
+  | loop i → λ b → rotate/loop b i
   ]
 
 let rotate/equiv/loop : Path (Equiv s1 s1) (IdEquiv s1) (IdEquiv s1) =
@@ -35,8 +35,8 @@ let rotate/equiv/loop : Path (Equiv s1 s1) (IdEquiv s1) (IdEquiv s1) =
 
 let rotate/is-equiv (a : s1) : IsEquiv s1 s1 (rotate a) =
   elim a [
-  | base ⇒ IdEquiv s1 .1
-  | loop i ⇒ rotate/equiv/loop i .1
+  | base → IdEquiv s1 .1
+  | loop i → rotate/equiv/loop i .1
   ]
 
 let rotate/equiv (a : s1) : Equiv s1 s1 =

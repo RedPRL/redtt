@@ -6,9 +6,9 @@ data unit where
 let unit/prop : IsProp unit =
   λ a →
   elim a [
-  | triv ⇒ λ b →
-    elim b [ triv ⇒ λ _ → triv ]
+  | triv → λ b →
+    elim b [ triv → λ _ → triv ]
   ]
 
 let unit/contr : IsContr unit =
-  ( triv , lam a → unit/prop a triv )
+  ( triv , λ a → unit/prop a triv )
