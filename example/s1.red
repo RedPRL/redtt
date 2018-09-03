@@ -28,15 +28,15 @@ let rotate/equiv/loop : Path (Equiv s1 s1) (IdEquiv s1) (IdEquiv s1) =
     , PropToPropOver
       (λ j → IsEquiv s1 s1 (fwd j))
       (PropIsEquivDirect s1 s1 (λ a → a))
-      (IdEquiv s1 .1)
-      (IdEquiv s1 .1)
+      (IdEquiv s1 .snd)
+      (IdEquiv s1 .snd)
       i
     )
 
 let rotate/is-equiv (a : s1) : IsEquiv s1 s1 (rotate a) =
   elim a [
-  | base → IdEquiv s1 .1
-  | loop i → rotate/equiv/loop i .1
+  | base → IdEquiv s1 .snd
+  | loop i → rotate/equiv/loop i .snd
   ]
 
 let rotate/equiv (a : s1) : Equiv s1 s1 =

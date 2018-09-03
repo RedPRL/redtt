@@ -100,11 +100,6 @@ eproj:
     { E.Car }
   | DOT SND
     { E.Cdr }
-  | DOT; n = NUMERAL
-    { match n with
-      | 0 -> E.Car
-      | 1 -> E.Cdr
-      | _ -> failwith "Parser: invalid projection" }
 
 atom_econ:
   | a = ATOM
