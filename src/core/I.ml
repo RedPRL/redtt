@@ -1,3 +1,5 @@
+open RedBasis.Bwd
+
 type atom = Name.t
 
 type 'a f =
@@ -60,12 +62,6 @@ let equate r0 r1 =
   | `Atom _, `Atom _ ->
     Idn
 
-let act_clock = ref 0.
-
-let _ =
-  Diagnostics.on_termination @@ fun _ ->
-  Format.eprintf "[diagnostic]: spent %fs acting on dimensions@." !act_clock
-
 let rec act phi =
   function
   | (`Dim0 | `Dim1) as r -> r
@@ -78,13 +74,20 @@ let rec act phi =
     | Cmp (psi1, psi0) -> act psi1 @@ act psi0 r
     | _ -> r
 
-let act phi r =
-  let now0 = Unix.gettimeofday () in
-  let r' = act phi r in
-  let now1 = Unix.gettimeofday () in
-  act_clock := !act_clock +. (now1 -. now0);
-  r'
-
+let occurs_in_action xs =
+  let rec go =
+    function
+    | Idn ->
+      false
+    | Swap (y, z) ->
+      Bwd.mem y xs || Bwd.mem z xs
+    | Subst (`Atom y, _) ->
+      Bwd.mem y xs
+    | Subst (_, _) ->
+      false
+    | Cmp (phi0, phi1) ->
+      go phi1 || go phi0
+  in go
 
 
 

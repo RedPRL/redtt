@@ -72,7 +72,7 @@ sig
   val lbl_call : value -> value
   val restriction_force : value -> value
 
-  val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
+  val rigid_vproj : atom -> func:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> env_el list -> value
@@ -92,5 +92,6 @@ sig
 
   module Macro : sig
     val equiv : value -> value -> value
+    val func : value -> value -> value
   end
 end
