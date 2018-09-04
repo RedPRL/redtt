@@ -10,6 +10,37 @@ type bface = (tm, btm) Desc.Boundary.face
 type bsys = (tm, btm) Desc.Boundary.sys
 type data_desc = (tm, btm) Desc.desc
 
+type ('a, 'k) telescope =
+  | TNil of 'k
+  | TCons of 'a * ('a, 'k) telescope bnd
+
+
+module NewDesc =
+struct
+  type btm =
+    | Var of int
+    | Intro of
+        {clbl : string;
+         const_args : tm list;
+         rec_args : btm list;
+         rs : tm list}
+
+  type bface = tm * tm * btm
+  type bsys = bface list
+
+  type const_spec = [`Const of tm]
+  type rec_spec = [`Self]
+  type dim_spec = [`I]
+
+  type boundary_spec = bsys
+  type param_spec = [`Param of tm]
+
+  type constr = string * (const_spec, (rec_spec, (dim_spec, boundary_spec) telescope) telescope) telescope
+  type desc = (param_spec, constr list) telescope
+end
+
+
+
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
