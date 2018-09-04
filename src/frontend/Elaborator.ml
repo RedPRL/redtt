@@ -825,23 +825,25 @@ struct
     go_const_args (Tm.shift 0) constr @@ Bwd.to_list frms >>= fun args ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, args)
 
-  and elab_data env dlbl desc frms =
-    failwith "TODO"
-  (* let rec go acc param_specs frms =
-     match param_specs, frms with
-     | (_, pty) :: param_specs, E.App e :: frms ->
-      let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
-      let pty' = Tm.subst sub pty in
-      elab_chk env e {ty = pty'; sys = []} >>= fun t ->
-      go ((pty', t) :: acc) param_specs frms
-     | [], [] ->
-      M.ret @@ List.rev_map snd acc
-     | _ ->
-      failwith "elab_data: malformed parameters"
-     in
-     go [] desc.params (Bwd.to_list frms) <<@> fun params ->
-     Tm.make @@ Tm.Data {dlbl; params}
-  *)
+  and elab_data env dlbl pdesc frms =
+    let rec go sb tele frms =
+      match pdesc, frms with
+      | Tm.TNil _, [] ->
+        M.ret []
+
+      | Tm.TCons (`Param ty, Tm.B (_, tele)), E.App e :: frms ->
+        let ty = Tm.subst sb ty in
+        elab_chk env e {ty; sys = []} >>= fun tm ->
+        let sb' = Tm.dot (Tm.ann ~ty ~tm) sb in
+        go sb' tele frms
+
+      | _ ->
+        failwith "Unexpected frame in parameters of datatype"
+
+    in
+    go (Tm.shift 0) pdesc @@ Bwd.to_list frms >>= fun params ->
+    M.ret @@ Tm.make @@ Tm.Data {dlbl; params}
+
   and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (ty', cmd) ->
     M.lift (C.check ~ty @@ Tm.up cmd) >>= function
