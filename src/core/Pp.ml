@@ -2,10 +2,11 @@ open RedBasis open Bwd open BwdNotation
 
 module Env =
 struct
-  type t = int * string bwd
+  type t = string bwd
 
-  let emp = 0, Emp
-  let var i (_, xs) =
+  let emp = Emp
+
+  let var i xs =
     try
       Bwd.nth xs i
     with
@@ -13,26 +14,37 @@ struct
       "{" ^ string_of_int i ^ "}"
   (* failwith "Pp printer: tried to resolve bound variable out of range" *)
 
-  let bind_fresh (i, xs) =
-    let x = "x" ^ string_of_int i in
-    x, (i + 1, xs #< x)
-
-  let proj (i, xs) =
+  let proj xs =
     match xs with
     | Emp -> failwith "ppenv/proj"
-    | Snoc (xs, _) -> (i - 1, xs)
+    | Snoc (xs, _) -> xs
 
-  let bind (i, xs) nm =
-    match nm with
-    | None ->
-      let x = "x" ^ string_of_int i in
-      x, (i + 1, xs #< x)
-    | Some x ->
-      x, (i + 1, xs #< x)
+  let choose_name xs x =
+    match x with
+    | _ ->
+      let ys = Bwd.filter (fun y -> y = x) xs in
+      let n = Bwd.length ys in
+      if n = 0 then
+        x
+      else
+        x ^ string_of_int n
 
-  let bindn ((n, xs) : t) (nms : string option list) =
-    let xs' = List.mapi (fun i nm -> match nm with Some x -> x | None -> "x" ^ string_of_int (n + i)) nms in
-    xs', (n + List.length nms, xs <>< xs')
+  let bind xs nm =
+    let x =
+      match nm with
+      | None | Some "_" -> choose_name xs "x"
+      | Some x -> choose_name xs x
+    in
+    x, xs #< x
+
+  let rec bindn env (nms : string option list) =
+    match nms with
+    | [] ->
+      [], env
+    | nm :: nms ->
+      let x, env' = bind env nm in
+      let xs, env'' = bindn env' nms in
+      (x :: xs), env''
 end
 
 type env = Env.t

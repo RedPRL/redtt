@@ -14,11 +14,11 @@ let RetIsContr
   (c : IsContr B)
   : IsContr A
   =
-  ( g (c.0),
+  ( g (c.fst),
     λ a i →
-      comp 0 1 (g (c.1 (f a) i)) [
-      | i=0 ⇒ h a
-      | i=1 ⇒ refl
+      comp 0 1 (g (c.snd (f a) i)) [
+      | i=0 → h a
+      | i=1 → refl
       ]
   )
 
@@ -30,8 +30,8 @@ let IdEquiv (A : type) : Equiv A A =
       let aux : dim → A =
         λ j →
         comp 1 j a [
-        | i=0 ⇒ p.1
-        | i=1 ⇒ refl
+        | i=0 → p.snd
+        | i=1 → refl
         ]
       in
       (aux 0, aux)
@@ -58,23 +58,23 @@ let PropSet
   =
   λ a b p q i j →
     comp 0 1 a [
-    | j=0 ⇒ A/prop a a
-    | j=1 ⇒ A/prop a b
-    | i=0 ⇒ A/prop a (p j)
-    | i=1 ⇒ A/prop a (q j)
+    | j=0 → A/prop a a
+    | j=1 → A/prop a b
+    | i=0 → A/prop a (p j)
+    | i=1 → A/prop a (q j)
     ]
 
 let LemSig
   (A : type) (B : A → type)
   (B/prop : (a : A) → IsProp (B a))
   (u v : (a : A) × B a)
-  (P : Path A (u.0) (v.0))
+  (P : Path A (u.fst) (v.fst))
   : Path ((a : A) × B a) u v
   =
   λ i →
     ( P i
-    , let coe0 = coe 0 i (u.1) in λ j → B (P j) in
-      let coe1 = coe 1 i (v.1) in λ j → B (P j) in
+    , let coe0 = coe 0 i (u.snd) in λ j → B (P j) in
+      let coe1 = coe 1 i (v.snd) in λ j → B (P j) in
       B/prop (P i) coe0 coe1 i
     )
 
@@ -86,16 +86,16 @@ let PropSig
   : IsProp ((a : A) × B a)
   =
   λ u v →
-    LemSig A B B/prop u v (A/prop (u.0) (v.0))
+    LemSig A B B/prop u v (A/prop (u.fst) (v.fst))
 
 opaque
 let PropIsContr (A : type) : IsProp (IsContr A) =
   λ contr →
     let A/prop : IsProp A =
       λ a b i →
-        comp 1 0 (contr.1 a i) [
-        | i=0 ⇒ refl
-        | i=1 ⇒ contr.1 b
+        comp 1 0 (contr.snd a i) [
+        | i=0 → refl
+        | i=1 → contr.snd b
         ]
     in
 
@@ -113,25 +113,25 @@ let PropIsEquiv (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
 ; A direct proof that IsEquiv f is a prop, ported from cubicaltt to yacctt to redtt
 let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
   λ ise ise' i y →
-    let a : A = ise y .0 .0 in
-    let p : Path B (f a) y = ise y .0 .1 in
+    let a : A = ise y .fst .fst in
+    let p : Path B (f a) y = ise y .fst .snd in
     let c : (w : Fiber A B f y) → Path (Fiber A B f y) w (a,p) =
-      ise y .1
+      ise y .snd
     in
-    let a' : A = ise' y .0 .0 in
-    let p' : Path B (f a') y = ise' y .0 .1 in
+    let a' : A = ise' y .fst .fst in
+    let p' : Path B (f a') y = ise' y .fst .snd in
     let c' : (w : Fiber A B f y) → Path (Fiber A B f y) w (a',p') =
-      ise' y .1
+      ise' y .snd
     in
     ( c' (a , p) i
     , λ w →
         let sq : PathD (λ j → Path (Fiber A B f y) w (c' (a,p) j)) (c w) (c' w) =
           λ i j →
             comp 0 1 (weak-connection/and (Fiber A B f y) (c' w) i j) [
-            | i=0 ⇒ λ k → weak-connection/and (Fiber A B f y) (c w) k j
-            | i=1 ⇒ λ _ → c' w j
-            | j=0 ⇒ λ _ → w
-            | j=1 ⇒ λ k → c' (c w k) i
+            | i=0 → λ k → weak-connection/and (Fiber A B f y) (c w) k j
+            | i=1 → λ _ → c' w j
+            | j=0 → λ _ → w
+            | j=1 → λ k → c' (c w k) i
             ]
         in
         sq i
@@ -140,7 +140,7 @@ let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
 opaque
 let EquivLemma
   (A B : type) (E0 E1 : Equiv A B)
-  (P : Path (A → B) (E0.0) (E1.0))
+  (P : Path (A → B) (E0.fst) (E1.fst))
   : Path (Equiv A B) E0 E1
   =
   LemSig (A → B) (IsEquiv A B) (PropIsEquiv A B) E0 E1 P
@@ -151,18 +151,18 @@ let EquivLemma
 
 let UA/beta
   (A B : type) (E : Equiv A B) (a : A)
-  : Path _ (coe 0 1 a in UA _ _ E) (E.0 a)
+  : Path _ (coe 0 1 a in UA _ _ E) (E.fst a)
   =
   λ i →
-    coe i 1 (E.0 a) in refl
+    coe i 1 (E.fst a) in refl
 
 let SigEquivToPath
   (A : type)
   (X : (B : type) × Equiv A B)
   : (B : type) × Path^1 type A B
   =
-  ( X.0
-  , UA _ (X.0) (X.1)
+  ( X.fst
+  , UA _ (X.fst) (X.snd)
   )
 
 let SigPathToEquiv
@@ -170,8 +170,8 @@ let SigPathToEquiv
   (X : (B : type) × Path^1 type A B)
   : (B : type) × (Equiv A B)
   =
-  ( X.0
-  , PathToEquiv _ (X.0) (X.1)
+  ( X.fst
+  , PathToEquiv _ (X.fst) (X.snd)
   )
 
 opaque
@@ -188,8 +188,8 @@ let UA/retract/sig
   : Retract^1 _ _ (SigEquivToPath A) (SigPathToEquiv A)
   =
   λ singl i →
-    ( singl.0
-    , UA/retract A (singl.0) (singl.1) i
+    ( singl.fst
+    , UA/retract A (singl.fst) (singl.snd) i
     )
 
 let UA/IdEquiv (A : type)
@@ -205,13 +205,13 @@ let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
   ( (_, λ _ → A)
   , λ X i →
     ( comp 0 1 A [
-      | i=0 ⇒ X.1
-      | i=1 ⇒ refl
+      | i=0 → X.snd
+      | i=1 → refl
       ]
     , λ j →
       comp 0 j A [
-      | i=0 ⇒ X.1
-      | i=1 ⇒ refl
+      | i=0 → X.snd
+      | i=1 → refl
       ]
     )
   )
@@ -234,7 +234,7 @@ let IdEquiv/weak-connection (B : type) : Equiv B B =
   ( λ b → b
   , λ b →
     ( (b, refl)
-    , λ v i → (v.1 i, λ j → weak-connection/or B (v.1) i j)
+    , λ v i → (v.snd i, λ j → weak-connection/or B (v.snd) i j)
     )
   )
 
@@ -249,8 +249,8 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
            let ctr/B : dim → B =
              λ j →
                comp 1 j b [
-               | i=0 ⇒ w.1.1 b .0 .1
-               | i=1 ⇒ refl
+               | i=0 → w.snd.snd b .fst .snd
+               | i=1 → refl
                ]
            in
            let ctr : Fiber VB B proj/B b =
@@ -261,10 +261,10 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
                let filler : dim → B =
                  λ l →
                    comp 1 l b [
-                   | i=0 ⇒ w.1.1 b .1 v j .1
-                   | i=1 ⇒ λ k → weak-connection/or B (v.1) j k
-                   | j=0 ⇒ v.1
-                   | j=1 ⇒ ctr/B
+                   | i=0 → w.snd.snd b .snd v j .snd
+                   | i=1 → λ k → weak-connection/or B (v.snd) j k
+                   | j=0 → v.snd
+                   | j=1 → ctr/B
                    ]
                in
                ( `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))

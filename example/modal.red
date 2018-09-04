@@ -21,10 +21,10 @@ let stream/cons (x : bool) (xs : ✓ → stream) : stream =
   )
 
 let stream/hd (xs : stream) : _ =
-  xs.0
+  xs.fst
 
 let stream/tl (xs : stream) : ✓ → stream =
-  coe 0 1 (xs.1) in λ i →
+  coe 0 1 (xs.snd) in λ i →
     later (dfix[i] A : type in stream/F A)
 
 let tts : _ =

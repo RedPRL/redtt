@@ -13,26 +13,26 @@ let Iso (A B : type) : type =
 let Iso/fiber-is-prop
   (A B : type)
   (I : Iso A B) (b : B)
-  : IsProp (Fiber _ _ (I.0) b)
+  : IsProp (Fiber _ _ (I.fst) b)
   =
-  let f = I.0 in
-  let g = I.1.0 in
-  let α = I.1.1.0 in
-  let β = I.1.1.1 in
+  let f = I.fst in
+  let g = I.snd.fst in
+  let α = I.snd.snd.fst in
+  let β = I.snd.snd.snd in
 
-  let sq : (_ : Fiber _ _ (I.0) b) (i j : dim) → A =
+  let sq : (_ : Fiber _ _ (I.fst) b) (i j : dim) → A =
     λ fib i j →
-      comp 0 j (g (fib.1 i)) [
-      | i=0 ⇒ β (fib.0)
-      | i=1 ⇒ refl
+      comp 0 j (g (fib.snd i)) [
+      | i=0 → β (fib.fst)
+      | i=1 → refl
       ]
   in
   λ fib0 fib1 →
     let sq2 : (i j : dim) → A =
       λ i j →
         comp 1 j (g b) [
-        | i=0 ⇒ λ k → sq fib0 k 1
-        | i=1 ⇒ λ k → sq fib1 k 1
+        | i=0 → λ k → sq fib0 k 1
+        | i=1 → λ k → sq fib1 k 1
         ]
     in
     λ i →
@@ -40,26 +40,26 @@ let Iso/fiber-is-prop
      , λ j →
         let aux : A =
           comp 1 0 (sq2 i j) [
-          | i=0 ⇒ sq fib0 j
-          | i=1 ⇒ sq fib1 j
-          | j=0 ⇒ β (sq2 i 0)
-          | j=1 ⇒ refl
+          | i=0 → sq fib0 j
+          | i=1 → sq fib1 j
+          | j=0 → β (sq2 i 0)
+          | j=1 → refl
           ]
         in
         comp 0 1 (f aux) [
-        | i=0 ⇒ α (fib0.1 j)
-        | i=1 ⇒ α (fib1.1 j)
-        | j=0 ⇒ α (f (sq2 i 0))
-        | j=1 ⇒ α b
+        | i=0 → α (fib0.snd j)
+        | i=1 → α (fib1.snd j)
+        | j=0 → α (f (sq2 i 0))
+        | j=1 → α b
         ]
      )
 
 
 let Iso/Equiv (A B : type) (I : Iso A B) : Equiv A B =
-  ( I.0
+  ( I.fst
   , λ b →
-    ( (I.1.0 b, I.1.1.0 b)
+    ( (I.snd.fst b, I.snd.snd.fst b)
     , λ fib →
-      Iso/fiber-is-prop _ _ I b fib (I.1.0 b, I.1.1.0 b)
+      Iso/fiber-is-prop _ _ I b fib (I.snd.fst b, I.snd.snd.fst b)
     )
   )

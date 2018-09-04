@@ -15,15 +15,15 @@ let discrete (A : type) : type =
 
 let dec/to/stable (A : type) (d : dec A) : stable A =
   elim d [
-  | inl a ⇒ λ _ → a
-  | inr x ⇒ λ y → elim (y x) []
+  | inl a → λ _ → a
+  | inr x → λ y → elim (y x) []
   ]
 
 let neg/is-prop-over (A : dim → type)
   : IsPropOver (λ i → neg (A i))
   =
   λ c c' i a →
-   let f : [j] (A j → void) [ j=0 ⇒ c | j=1 ⇒ c' ] =
+   let f : [j] (A j → void) [ j=0 → c | j=1 → c' ] =
      elim (c (coe i 0 a in A)) []
    in
    f i a
@@ -38,24 +38,24 @@ let paths-stable/to/set (A : type)
     let square : dim → dim → A =
       λ k m →
         comp 0 k a [
-        | m=0 ⇒ p
-        | m=1 ⇒ q
+        | m=0 → p
+        | m=1 → q
         ]
     in
     let cap : dim → dim → A =
       λ k m → st (p k) (q k) (λ c → c (square k)) m
     in
     comp 0 1 (cap j i) [
-    | i=0 ⇒ λ k →
+    | i=0 → λ k →
       st (p j) (p j)
          (neg/is-prop-over (λ j → neg (Path A (p j) (p j)))
            (λ c → c (square 0))
            (λ c → c (square 1))
            j)
          k
-    | i=1 ⇒ refl
-    | j=0 ⇒ λ k → weak-connection/or A (cap 0) i k
-    | j=1 ⇒ λ k → weak-connection/or A (cap 1) i k
+    | i=1 → refl
+    | j=0 → λ k → weak-connection/or A (cap 0) i k
+    | j=1 → λ k → weak-connection/or A (cap 1) i k
     ]
 
 ; Hedberg's theorem for decidable path types
