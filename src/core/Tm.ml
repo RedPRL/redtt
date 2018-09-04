@@ -1414,14 +1414,11 @@ end
 
 module NewDesc =
 struct
-  type bface = tm * tm * tm
-  type bsys = bface list
-
   type const_spec = [`Const of tm]
   type rec_spec = [`Rec]
   type dim_spec = [`I]
 
-  type boundary_spec = bsys
+  type boundary_spec = (tm, tm) system
   type param_spec = [`Param of tm]
 
   type dim_specs = (dim_spec, boundary_spec) telescope
@@ -1431,12 +1428,12 @@ struct
   type desc = Desc of {kind : Kind.t; lvl : Lvl.t; constrs : (string * constr) list}
   type pdesc = (param_spec, desc) telescope
 
-  let bind_pdesc _ = failwith "TODO"
-  let bind_constr _ = failwith "TODO"
-  let bind_rec_specs _ = failwith "TODO"
+  let bind_pdesc _ = failwith "TODO: bind_pdesc"
+  let bind_constr _ = failwith "TODO: bind_constr"
+  let bind_rec_specs _ = failwith "TODO: bind_rec_specs"
   let bind_dim_specs x tele = B (Name.name x, tele)
 
-  let inst_pdesc _args _pdesc = failwith ""
+  let inst_pdesc _args _pdesc = failwith "TODO: inst_pdesc"
 end
 
 

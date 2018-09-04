@@ -196,7 +196,7 @@ struct
     and elab_constrs env acc ~params econstrs =
       match econstrs with
       | (clbl, econstr) :: econstrs ->
-        elab_constr env clbl econstr >>= fun constr ->
+        elab_constr env ~params clbl econstr >>= fun constr ->
         let acc' = acc #< (clbl, constr) in
         let env' =
           {env with
@@ -209,7 +209,7 @@ struct
         M.ret @@ Bwd.to_list acc
 
 
-    and elab_constr env clbl econstr =
+    and elab_constr env ~params clbl econstr =
       let rec go_const_specs econstr =
         match econstr.const_specs with
         | (nm, ety) :: const_specs ->
@@ -245,8 +245,8 @@ struct
           M.ret @@ Tm.TNil bsys
 
       and elab_boundary econstr =
-        elab_tm_sys env (failwith "") econstr.boundary >>= fun asdf ->
-        failwith "TODO"
+        let data_ty = Tm.make @@ Tm.Data {dlbl; params} in
+        elab_tm_sys env data_ty econstr.boundary
 
       in
       go_const_specs econstr

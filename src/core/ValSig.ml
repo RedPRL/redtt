@@ -46,7 +46,7 @@ sig
     -> const_args:value list
     -> rec_args:value list
     -> rs:I.t list
-    -> Tm.NewDesc.bsys
+    -> (Tm.tm, Tm.tm) Tm.system
     -> val_sys
 
   val eval_bterm_face
@@ -56,7 +56,7 @@ sig
     -> const_args:value list
     -> rec_args:value list
     -> rs:I.t list
-    -> Tm.NewDesc.bface
+    -> (Tm.tm, Tm.tm) Tm.face
     -> val_face
 
   val make_closure : env -> Tm.tm Tm.bnd -> clo

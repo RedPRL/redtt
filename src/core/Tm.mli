@@ -10,14 +10,11 @@ type ('a, 'k) telescope =
 
 module NewDesc :
 sig
-  type bface = tm * tm * tm
-  type bsys = bface list
-
   type const_spec = [`Const of tm]
   type rec_spec = [`Rec]
   type dim_spec = [`I]
 
-  type boundary_spec = bsys
+  type boundary_spec = (tm, tm) system
   type param_spec = [`Param of tm]
 
   type dim_specs = (dim_spec, boundary_spec) telescope
