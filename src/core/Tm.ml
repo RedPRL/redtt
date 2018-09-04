@@ -10,12 +10,6 @@ type bface = (tm, btm) Desc.Boundary.face
 type bsys = (tm, btm) Desc.Boundary.sys
 type data_desc = (tm, btm) Desc.desc
 
-type ('a, 'k) telescope =
-  | TNil of 'k
-  | TCons of 'a * ('a, 'k) telescope bnd
-
-
-
 
 type 'a subst =
   | Shift of int
@@ -1412,6 +1406,13 @@ struct
     hd, sp #< frm
 end
 
+
+
+type ('a, 'k) telescope =
+  | TNil of 'k
+  | TCons of 'a * ('a, 'k) telescope bnd
+
+
 module NewDesc =
 struct
   type const_spec = [`Const of tm]
@@ -1428,10 +1429,76 @@ struct
   type desc = Desc of {kind : Kind.t; lvl : Lvl.t; constrs : (string * constr) list}
   type pdesc = (param_spec, desc) telescope
 
+
+  let face_open_var k cmd (r, r', otm) =
+    open_var k cmd r, open_var k cmd r',
+    Option.map (open_var k cmd) otm
+
+  let sys_open_var k cmd =
+    List.map (face_open_var k cmd)
+
+  let face_close_var a k (r, r', otm) =
+    close_var a k r, close_var a k r',
+    Option.map (close_var a k) otm
+
+  let sys_close_var a k =
+    List.map (face_close_var a k)
+
+  let rec dim_specs_open_var k cmd : dim_specs -> dim_specs =
+    function
+    | TNil sys ->
+      TNil (sys_open_var k cmd sys)
+
+    | TCons (`I, B (nm, tele)) ->
+      TCons (`I, B (nm, dim_specs_open_var (k + 1) cmd tele))
+
+  let rec dim_specs_close_var a k : dim_specs -> dim_specs =
+    function
+    | TNil sys ->
+      TNil (sys_close_var a k sys)
+
+    | TCons (`I, B (nm, tele)) ->
+      TCons (`I, B (nm, dim_specs_close_var a (k + 1) tele))
+
+  let rec rec_specs_open_var k cmd : rec_specs -> rec_specs =
+    function
+    | TNil tele ->
+      TNil (dim_specs_open_var k cmd tele)
+
+    | TCons (`Rec, B (nm, tele)) ->
+      TCons (`Rec, B (nm, rec_specs_open_var (k + 1) cmd tele))
+
+  let rec rec_specs_close_var a k: rec_specs -> rec_specs =
+    function
+    | TNil tele ->
+      TNil (dim_specs_close_var a k tele)
+
+    | TCons (`Rec, B (nm, tele)) ->
+      TCons (`Rec, B (nm, rec_specs_close_var a (k + 1) tele))
+
+  let rec constr_open_var k cmd : constr -> constr =
+    function
+    | TNil tele ->
+      TNil (rec_specs_open_var k cmd tele)
+
+    | TCons (`Const ty, B (nm, tele)) ->
+      TCons (`Const (open_var k cmd ty), B (nm, constr_open_var (k + 1) cmd tele))
+
+  let rec constr_close_var a k : constr -> constr =
+    function
+    | TNil tele ->
+      TNil (rec_specs_close_var a k tele)
+
+    | TCons (`Const ty, B (nm, tele)) ->
+      TCons (`Const (close_var a k ty), B (nm, constr_close_var a (k + 1) tele))
+
+
   let bind_pdesc _ = failwith "TODO: bind_pdesc"
-  let bind_constr _ = failwith "TODO: bind_constr"
-  let bind_rec_specs _ = failwith "TODO: bind_rec_specs"
-  let bind_dim_specs x tele = B (Name.name x, tele)
+
+  let bind_constr x tele = B (Name.name x, constr_close_var x 0 tele)
+  let bind_rec_specs x tele = B (Name.name x, rec_specs_close_var x 0 tele)
+
+  let bind_dim_specs x tele = B (Name.name x, dim_specs_close_var x 0 tele)
 
   let inst_pdesc _args _pdesc = failwith "TODO: inst_pdesc"
 end
