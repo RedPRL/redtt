@@ -15,7 +15,7 @@ let UA (A B : type) (E : Equiv A B) : Path^1 type A B =
     `(V i A B E)
 
 let UAproj (A B : type) (E : Equiv A B)
-  : PathD (λ i → `(V i A B E) → B) (λ a → E.0 a) (λ b → b)
+  : PathD (λ i → `(V i A B E) → B) (λ a → E.fst a) (λ b → b)
   =
   λ i u →
     `(vproj i u (fst E))

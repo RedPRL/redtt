@@ -4,9 +4,9 @@ let sg/elim
   (A : type) (B : A → type) (C : (x : A) (y : B x) → type)
   (t : (x : A) × B x)
   (m : (x : A) (y : B x) → C x y)
-  : C (t.0) (t.1)
+  : C (t.fst) (t.snd)
   =
-  m (t.0) (t.1)
+  m (t.fst) (t.snd)
 
 ; Needed until we have parameterized datatypes
 let or (A B : type) : type =
