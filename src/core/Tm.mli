@@ -3,10 +3,41 @@ include module type of TmData
 
 
 type tm
-type btm = tm Desc.Boundary.term
-type bsys = (tm, btm) Desc.Boundary.sys
-type bface = (tm, btm) Desc.Boundary.face
-type data_desc = (tm, btm) Desc.desc
+
+type ('a, 'k) telescope =
+  | TNil of 'k
+  | TCons of 'a * ('a, 'k) telescope bnd
+
+module NewDesc :
+sig
+  type bface = tm * tm * tm
+  type bsys = bface list
+
+  type const_spec = [`Const of tm]
+  type rec_spec = [`Rec]
+  type dim_spec = [`I]
+
+  type boundary_spec = bsys
+  type param_spec = [`Param of tm]
+
+  type dim_specs = (dim_spec, boundary_spec) telescope
+  type rec_specs = (rec_spec, dim_specs) telescope
+  type constr = (const_spec, rec_specs) telescope
+
+  type desc = Desc of {kind : Kind.t; lvl : Lvl.t; constrs : (string * constr) list}
+  type pdesc = (param_spec, desc) telescope
+
+  val bind_pdesc : Name.t -> pdesc -> pdesc bnd
+  val bind_constr : Name.t -> constr -> constr bnd
+  val bind_rec_specs : Name.t -> rec_specs -> rec_specs bnd
+  val bind_dim_specs : Name.t -> dim_specs -> dim_specs bnd
+
+
+  val inst_pdesc : pdesc -> tm list -> desc
+end
+
+
+
 
 module Error :
 sig
@@ -97,7 +128,7 @@ val pp_sys : (tm, tm) system Pp.t
 val pp_bnd : tm bnd Pp.t
 val pp_nbnd : tm nbnd Pp.t
 
-val pp_bterm : btm Pp.t0
+(* val pp_bterm : btm Pp.t0 *)
 
 include Occurs.S with type t := tm
 

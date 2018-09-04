@@ -15,30 +15,6 @@ type ('a, 'k) telescope =
   | TCons of 'a * ('a, 'k) telescope bnd
 
 
-module NewDesc =
-struct
-  type btm =
-    | Var of int
-    | Intro of
-        {clbl : string;
-         const_args : tm list;
-         rec_args : btm list;
-         rs : tm list}
-
-  type bface = tm * tm * btm
-  type bsys = bface list
-
-  type const_spec = [`Const of tm]
-  type rec_spec = [`Self]
-  type dim_spec = [`I]
-
-  type boundary_spec = bsys
-  type param_spec = [`Param of tm]
-
-  type constr = string * (const_spec, (rec_spec, (dim_spec, boundary_spec) telescope) telescope) telescope
-  type desc = (param_spec, constr list) telescope
-end
-
 
 
 type 'a subst =
@@ -1435,6 +1411,34 @@ struct
     let hd, sp = cmd in
     hd, sp #< frm
 end
+
+module NewDesc =
+struct
+  type bface = tm * tm * tm
+  type bsys = bface list
+
+  type const_spec = [`Const of tm]
+  type rec_spec = [`Rec]
+  type dim_spec = [`I]
+
+  type boundary_spec = bsys
+  type param_spec = [`Param of tm]
+
+  type dim_specs = (dim_spec, boundary_spec) telescope
+  type rec_specs = (rec_spec, dim_specs) telescope
+  type constr = (const_spec, rec_specs) telescope
+
+  type desc = Desc of {kind : Kind.t; lvl : Lvl.t; constrs : (string * constr) list}
+  type pdesc = (param_spec, desc) telescope
+
+  let bind_pdesc _ = failwith "TODO"
+  let bind_constr _ = failwith "TODO"
+  let bind_rec_specs _ = failwith "TODO"
+  let bind_dim_specs x tele = B (Name.name x, tele)
+
+  let inst_pdesc _args _pdesc = failwith ""
+end
+
 
 module Error =
 struct

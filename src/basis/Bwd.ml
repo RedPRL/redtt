@@ -73,6 +73,16 @@ struct
       let xs' = filter f xs in
       if f x then Snoc (xs', x) else xs'
 
+
+  let rec find f =
+    function
+    | Emp ->
+      failwith "Bwd.find"
+    | Snoc (xs, x) ->
+      match f x with
+      | None -> find f xs
+      | Some y -> y
+
   let to_list xs =
     xs <>> []
 

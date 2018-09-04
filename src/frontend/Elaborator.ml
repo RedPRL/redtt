@@ -31,6 +31,9 @@ struct
   module E = ESig
   module T = Map.Make (String)
 
+  type elab_env = {names : Name.t T.t; desc_constrs : (Tm.NewDesc.constr * ty) T.t}
+  let empty_elab_env = {names = T.empty; desc_constrs = T.empty}
+
   open Refiner
 
   type mode =
@@ -61,7 +64,7 @@ struct
         end
     in
     M.lift C.ask <<@> fun psi ->
-      let renv = go_globals (ResEnv.init ()) @@ T.bindings env in
+      let renv = go_globals (ResEnv.init ()) @@ T.bindings env.names in
       go_locals renv psi
 
   let (<+>) m n =
@@ -133,7 +136,7 @@ struct
       M.unify <<@> fun _ ->
         let now1 = Unix.gettimeofday () in
         Format.printf "Defined %s (%fs).@." name (now1 -. now0);
-        T.add name alpha env
+        {env with names = T.add name alpha env.names}
 
     | E.Data (dlbl, edesc) ->
       elab_datatype env dlbl edesc >>= fun desc ->
@@ -173,215 +176,83 @@ struct
       M.ret env
 
   and elab_datatype env dlbl edesc =
-    let rec go cx acc (xs, vparams) eparams econstrs =
-      match eparams, econstrs with
-      | (lbl, epty) :: eparams, _ ->
-        let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
-        elab_chk env epty {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
-        let x = Name.named @@ Some lbl in
-        M.in_scope x (`P pty) begin
-          let acc' = Desc.{acc with params = acc.params @ [(lbl, pty)]} in
-          let vty = Cx.eval cx pty in
-          let cx', vparam = Cx.ext_ty cx ~nm:(Some lbl) vty in
-          go cx' acc' (xs #< x, vparams @ [vparam]) eparams econstrs
-        end
-
-      | [], econstr :: econstrs ->
-        elab_constr env dlbl (xs, vparams) acc econstr >>= fun constr ->
-        go cx Desc.{acc with constrs = acc.constrs @ [constr]} (xs, vparams) eparams econstrs
-
-      | [], [] -> M.ret acc
-
-    in
-    match edesc.kind with
-    | `Reg ->
-      failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
-    | _ ->
-      M.lift C.base_cx >>= fun cx ->
-      go cx Desc.{edesc with constrs = []; params = []} (Emp, []) edesc.params edesc.constrs
-
-  and elab_constr env dlbl (pxs, params) desc (clbl, constr) =
-    if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
-      failwith "Duplicate constructor in datatype";
-
+    let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
     let open Desc in
-    let elab_rec_spec (x, Self) = M.ret (x, Self) in
 
-    let rec abstract_tele xs =
-      function
-      | [] -> []
-      | (lbl, x, ty) :: const_specs ->
-        let Tm.NB (_, ty') = Tm.bindn (pxs <.> xs) ty in
-        (lbl, ty') :: abstract_tele (xs #< x) const_specs
-    in
+    let rec go_params acc edesc : Tm.NewDesc.pdesc M.m =
+      match edesc.params with
+      | (nm, ety) :: params ->
+        elab_chk env ety {ty = univ; sys = []} >>= fun ty ->
+        let x = Name.named @@ Some nm in
+        M.in_scope x (`P ty) @@ go_params (acc #< (Tm.up @@ Tm.var x)) {edesc with params} >>= fun tele ->
+        M.ret @@ Tm.TCons (`Param ty, Tm.NewDesc.bind_pdesc x tele)
 
-    let rec go acc =
-      function
       | [] ->
-        let const_specs = abstract_tele Emp @@ Bwd.to_list acc in
-        (* TODO: when self args are more complex, we'll need to abstract them over
-           the constant arguments too. *)
-        traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
+        let params = Bwd.to_list acc in
+        elab_constrs env Emp ~params edesc.constrs >>= fun constrs ->
+        let desc = Tm.NewDesc.Desc {kind = edesc.kind; lvl = edesc.lvl; constrs} in
+        M.ret @@ Tm.TNil desc
 
-        let psi =
-          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) rec_specs
-          @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dim_specs
+    and elab_constrs env acc ~params econstrs =
+      match econstrs with
+      | (clbl, econstr) :: econstrs ->
+        elab_constr env clbl econstr >>= fun constr ->
+        let acc' = acc #< (clbl, constr) in
+        let env' =
+          {env with
+           desc_constrs =
+             let data_ty = Tm.make @@ Tm.Data {dlbl; params} in
+             T.add clbl (constr, data_ty) env.desc_constrs }
         in
-        M.in_scopes psi @@
-        begin
-          elab_constr_boundary env dlbl params desc (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
-          M.ret
-            (clbl,
-             {const_specs;
-              rec_specs;
-              dim_specs = constr.dim_specs;
-              boundary})
-        end
+        elab_constrs env' acc' ~params econstrs
+      | [] ->
+        M.ret @@ Bwd.to_list acc
 
-      | (lbl, ety) :: const_specs ->
-        let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
-        elab_chk env ety {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
-        let x = Name.named @@ Some lbl in
-        M.in_scope x (`P pty) @@
-        go (acc #< (lbl, x, pty)) const_specs
+
+    and elab_constr env clbl econstr =
+      let rec go_const_specs econstr =
+        match econstr.const_specs with
+        | (nm, ety) :: const_specs ->
+          elab_chk env ety {ty = univ; sys = []} >>= fun ty ->
+          let x = Name.named @@ Some nm in
+          M.in_scope x (`P ty) @@ go_const_specs {econstr with const_specs} >>= fun tele ->
+          M.ret @@ Tm.TCons (`Const ty, Tm.NewDesc.bind_constr x tele)
+
+        | [] ->
+          go_rec_specs econstr >>= fun tele ->
+          M.ret @@ Tm.TNil tele
+
+      and go_rec_specs econstr =
+        match econstr.rec_specs with
+        | (nm, Desc.Self) :: rec_specs ->
+          let x = Name.named @@ Some nm in
+          M.in_scope x (`SelfArg Desc.Self) @@ go_rec_specs {econstr with rec_specs} >>= fun tele ->
+          M.ret @@ Tm.TCons (`Rec, Tm.NewDesc.bind_rec_specs x tele)
+
+        | [] ->
+          go_dim_specs econstr >>= fun tele ->
+          M.ret @@ Tm.TNil tele
+
+      and go_dim_specs econstr =
+        match econstr.dim_specs with
+        | nm :: dim_specs ->
+          let x = Name.named @@ Some nm in
+          M.in_scope x `I @@ go_dim_specs {econstr with dim_specs} >>= fun tele ->
+          M.ret @@ Tm.TCons (`I, Tm.NewDesc.bind_dim_specs x tele)
+
+        | [] ->
+          elab_boundary econstr >>= fun bsys ->
+          M.ret @@ Tm.TNil bsys
+
+      and elab_boundary econstr =
+        elab_tm_sys env (failwith "") econstr.boundary >>= fun asdf ->
+        failwith "TODO"
+
+      in
+      go_const_specs econstr
+
     in
-
-    go Emp constr.const_specs
-
-  and elab_constr_boundary env dlbl params desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
-    M.lift C.base_cx >>= fun cx ->
-    let (module V) = Cx.evaluator cx in
-    let module D = Domain in
-
-    let rec build_cx cx env (nms, cvs, rvs, rs) param_specs const_specs rec_specs dim_specs =
-      match param_specs, const_specs, rec_specs, dim_specs with
-      | (lbl, ty) :: param_specs, _, _, _ ->
-        let vty = V.eval env ty in
-        let cx', v = Cx.ext_ty cx ~nm:(Some lbl) vty in
-        build_cx cx' (D.Env.snoc env @@ `Val v) (nms #< (Some lbl), cvs, rvs, rs) param_specs const_specs rec_specs dim_specs
-      | [], (lbl, ty) :: const_specs, _, _ ->
-        let vty = V.eval env ty in
-        let cx', v = Cx.ext_ty cx ~nm:(Some lbl) vty in
-        build_cx cx' (D.Env.snoc env @@ `Val v) (nms #< (Some lbl), cvs #< v, rvs, rs) param_specs const_specs rec_specs dim_specs
-      | [], [], (nm, Desc.Self) :: rec_specs, _ ->
-        let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data {dlbl; params} in
-        build_cx cx_x env (nms #< (Some nm), cvs, rvs #< v_x, rs) param_specs const_specs rec_specs dim_specs
-      | [], [], [], nm :: dim_specs ->
-        let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
-        build_cx cx' env (nms #< (Some nm), cvs, rvs, rs #< (`Atom x)) param_specs const_specs rec_specs dim_specs
-      | [], [], [], [] ->
-        cx
-    in
-    (* TODO: simplify, no need for that four-tuple I think *)
-
-    let cx' = build_cx cx V.empty_env (Emp, Emp, Emp, Emp) desc.params const_specs rec_specs dim_specs in
-    traverse (elab_constr_face env dlbl desc) sys >>= fun bdry ->
-    Typing.check_constr_boundary_sys cx' dlbl desc ~params bdry;
-    M.ret bdry
-
-  and elab_constr_face env dlbl desc (er0, er1, e) =
-    elab_dim env er0 >>= fun r0 ->
-    bind_in_scope r0 >>= fun r0' ->
-    elab_dim env er1 >>= fun r1 ->
-    bind_in_scope r1 >>= fun r1' ->
-    M.in_scope (Name.fresh ()) (`R (r0, r1)) @@
-    begin
-      elab_boundary_term env dlbl desc e <<@> fun bt ->
-        r0', r1', bt
-    end
-
-  and elab_boundary_term env dlbl desc e =
-    match e.con with
-    | E.Var (nm, _) ->
-      elab_boundary_cut env dlbl desc nm Emp
-    | E.Cut ({con = E.Var (nm, _)}, spine) ->
-      elab_boundary_cut env dlbl desc nm spine
-    | _ ->
-      failwith "TODO: elaborate_boundary_term"
-
-  and boundary_resolve_name env desc name =
-    let open Desc in
-    begin
-      get_resolver env >>= fun renv ->
-      match ResEnv.get name renv with
-      | `Var x ->
-        M.lift C.ask >>= fun psi ->
-        let go (x, param) =
-          match param with
-          | `P _ -> [x]
-          | `Def _ -> [x]
-          | `I -> [x]
-          | `SelfArg _ -> [x]
-          | `Tick -> [x]
-          | `Tw _ -> []
-          | _ -> []
-        in
-        let xs = Bwd.flat_map go psi in
-        let ix = Bwd.length xs - 1 - (ListUtil.index_of (fun y -> x = y) @@ Bwd.to_list xs) in
-        M.ret @@ `Ix ix
-      | `Ix _ ->
-        failwith "impossible"
-    end
-    <+>
-    begin
-      M.ret () >>= fun _ ->
-      M.ret @@ `Constr (List.find (fun (lbl, _) -> name = lbl) desc.constrs)
-    end
-
-  and elab_boundary_cut env dlbl desc name spine =
-    boundary_resolve_name env desc name >>= function
-    | `Ix ix ->
-      begin
-        match spine with
-        | Emp ->
-          M.ret @@ Desc.Boundary.Var ix
-        | _ ->
-          failwith "elab_boundary_cut: non-empty spine not yet supported"
-      end
-
-    | `Constr (clbl, constr) ->
-      let rec go_const_specs acc ps frms =
-        match ps, frms with
-        | [], _ ->
-          M.ret (List.rev_map snd acc, frms)
-        | (_, pty) :: ps, E.App e :: frms ->
-          (* TODO: might be backwards *)
-          let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
-          let pty' = Tm.subst sub pty in
-          elab_chk env e {ty = pty'; sys = []} >>= bind_in_scope >>= fun t ->
-          go_const_specs ((pty', t) :: acc) ps frms
-        | _ ->
-          failwith "elab_intro: malformed parameters"
-      in
-
-      let rec go_args acc rec_specs frms =
-        match rec_specs, frms with
-        | [], _ ->
-          M.ret (Bwd.to_list acc, frms)
-        | (_, Desc.Self) :: rec_specs, E.App e :: frms ->
-          elab_boundary_term env dlbl desc e >>= fun bt ->
-          go_args (acc #< bt) rec_specs frms
-        | _ ->
-          failwith "todo: go_args"
-      in
-
-      let rec go_dims acc dim_specs frms =
-        match dim_specs, frms with
-        | [], [] ->
-          M.ret @@ Bwd.to_list acc
-        | _ :: dim_specs, E.App e :: frms ->
-          elab_dim env e >>= bind_in_scope >>= fun r ->
-          go_dims (acc #< r) dim_specs frms
-        | _ ->
-          failwith "Dimensions length mismatch in boundary term"
-      in
-
-      go_const_specs [] constr.const_specs @@ Bwd.to_list spine >>= fun (const_args, frms) ->
-      go_args Emp constr.rec_specs frms >>= fun (rec_args, frms) ->
-      go_dims Emp constr.dim_specs frms >>= fun rs ->
-      M.ret @@ Desc.Boundary.Intro {clbl; const_args; rec_args; rs}
-
-
+    go_params Emp edesc
 
 
   and elab_scheme env (cells, ecod) kont =
@@ -861,11 +732,7 @@ struct
           elab_mode_switch_cut env exp frms ty
           <+>
           begin
-            M.lift C.base_cx >>= fun cx ->
-            let sign = Cx.globals cx in
-            let desc = GlobalEnv.lookup_datatype data.dlbl sign in
-            let constr = Desc.lookup_constr clbl desc in
-            elab_intro env data.dlbl (desc.params, data.params) clbl constr frms
+            elab_intro env data.dlbl data.params clbl frms
           end
 
         | _ ->
@@ -890,53 +757,91 @@ struct
     | _ ->
       elab_mode_switch_cut env exp frms ty
 
-  and elab_intro env dlbl (param_specs, params) clbl constr frms =
-    (* Is this backwards? *)
-    let params' = List.map2 (fun (_, ty) tm -> ty, tm) param_specs params in
-    let rec go_const_args acc const_specs frms =
-      match const_specs, frms with
-      | [], _ ->
-        M.ret (List.rev_map snd acc, frms)
-      | (_, ty) :: const_specs, E.App e :: frms ->
-        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) (List.rev @@ params' @ acc) @@ Tm.shift 0 in
-        let ty' = Tm.subst sub ty in
-        elab_chk env e {ty = ty'; sys = []} >>= fun t ->
-        go_const_args ((ty', t) :: acc) const_specs frms
+
+  and lookup_constr env dlbl params clbl =
+    M.lift C.base_cx >>= fun cx ->
+    let sign = Cx.globals cx in
+    match GlobalEnv.lookup_datatype dlbl sign with
+    | pdesc ->
+      let Tm.NewDesc.Desc {constrs} = Tm.NewDesc.inst_pdesc pdesc params in
+      let _, constr =
+        flip List.find constrs @@ fun (clbl', _) ->
+        clbl' = clbl
+      in
+      M.ret constr
+    | exception _ ->
+      let constr, _ = T.find clbl env.desc_constrs in
+      M.ret constr
+
+
+  and elab_intro env dlbl params clbl frms =
+    lookup_constr env dlbl params clbl >>= fun constr ->
+
+    let rec go_const_args sb (tele : Tm.NewDesc.constr) frms =
+      match tele, frms with
+      | Tm.TNil tele, _ ->
+        go_rec_args sb tele frms
+
+      | Tm.TCons (`Const ty, Tm.B (_, tele)), E.App e :: frms ->
+        let ty = Tm.subst sb ty in
+        elab_chk env e {ty; sys = []} >>= fun tm ->
+        let sb' = Tm.dot (Tm.ann ~ty ~tm) sb in
+        go_const_args sb' tele frms >>= fun args ->
+        M.ret @@ tm :: args
+
       | _ ->
-        failwith "elab_intro: malformed constant arguments"
-    in
-    let rec go_rec_args rec_specs dims frms =
-      match rec_specs, dims, frms with
-      | [], [], [] ->
+        failwith "Unexpected frame in constant arguments of constructor"
+
+    and go_rec_args sb tele frms =
+      match tele, frms with
+      | Tm.TNil tele, _ ->
+        go_dim_args sb tele frms
+
+      | Tm.TCons (`Rec, Tm.B (_, tele)), E.App e :: frms ->
+        let ty = Tm.make @@ Tm.Data {dlbl; params} in
+        elab_chk env e {ty; sys = []} >>= fun tm ->
+        let sb' = Tm.dot (Tm.ann ~ty ~tm) sb in
+        go_rec_args sb' tele frms >>= fun args ->
+        M.ret @@ tm :: args
+
+      | _ ->
+        failwith "Unexpected frame in recursive arguments of constructor"
+
+    and go_dim_args sb tele frms =
+      match tele, frms with
+      | Tm.TNil _, [] ->
         M.ret []
-      | [], _ :: dims, E.App r :: frms ->
-        (fun x xs -> x :: xs) <@>> elab_dim env r <*> go_rec_args rec_specs dims frms
-      | (_, Desc.Self) :: rec_specs, dims, E.App e :: frms ->
-        let self_ty = Tm.make @@ Tm.Data {dlbl; params = params} in
-        (fun x xs -> x :: xs) <@>> elab_chk env e {ty = self_ty; sys = []} <*> go_rec_args rec_specs dims frms
+
+      | Tm.TCons (`I, Tm.B (_, tele)), E.App e :: frms ->
+        elab_dim env e >>= fun tr ->
+        let sb' = Tm.dot (Tm.DownX tr, Emp) sb in
+        go_dim_args sb' tele frms >>= fun args ->
+        M.ret @@ tr :: args
+
       | _ ->
-        failwith "todo: go_args"
+        failwith "Unexpected frame in dimension arguments of constructor"
+
     in
-    go_const_args [] constr.const_specs @@ Bwd.to_list frms >>= fun (tps, frms) ->
-    go_rec_args constr.rec_specs constr.dim_specs frms >>= fun targs ->
-    M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
+    go_const_args (Tm.shift 0) constr @@ Bwd.to_list frms >>= fun args ->
+    M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, args)
 
   and elab_data env dlbl desc frms =
-    let rec go acc param_specs frms =
-      match param_specs, frms with
-      | (_, pty) :: param_specs, E.App e :: frms ->
-        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
-        let pty' = Tm.subst sub pty in
-        elab_chk env e {ty = pty'; sys = []} >>= fun t ->
-        go ((pty', t) :: acc) param_specs frms
-      | [], [] ->
-        M.ret @@ List.rev_map snd acc
-      | _ ->
-        failwith "elab_data: malformed parameters"
-    in
-    go [] desc.params (Bwd.to_list frms) <<@> fun params ->
-      Tm.make @@ Tm.Data {dlbl; params}
-
+    failwith "TODO"
+  (* let rec go acc param_specs frms =
+     match param_specs, frms with
+     | (_, pty) :: param_specs, E.App e :: frms ->
+      let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
+      let pty' = Tm.subst sub pty in
+      elab_chk env e {ty = pty'; sys = []} >>= fun t ->
+      go ((pty', t) :: acc) param_specs frms
+     | [], [] ->
+      M.ret @@ List.rev_map snd acc
+     | _ ->
+      failwith "elab_data: malformed parameters"
+     in
+     go [] desc.params (Bwd.to_list frms) <<@> fun params ->
+     Tm.make @@ Tm.Data {dlbl; params}
+  *)
   and elab_mode_switch_cut env exp frms ty =
     elab_cut env exp frms >>= fun (ty', cmd) ->
     M.lift (C.check ~ty @@ Tm.up cmd) >>= function

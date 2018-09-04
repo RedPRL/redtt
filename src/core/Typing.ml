@@ -11,7 +11,7 @@ type cx = Cx.t
 
 open RedBasis
 open Bwd
-open BwdNotation
+(* open BwdNotation *)
 
 type cofibration = (I.t * I.t) list
 
@@ -207,16 +207,18 @@ let rec check_ cx ty rst tm =
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
   | [], D.Univ univ, T.Data data ->
-    let desc = GlobalEnv.lookup_datatype data.dlbl @@ Cx.globals cx in
-    if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
-      ()
-    else
-      failwith "Universe level/kind error"
+    failwith "TODO"
+  (* let desc = GlobalEnv.lookup_datatype data.dlbl @@ Cx.globals cx in
+     if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
+     ()
+     else
+     failwith "Universe level/kind error" *)
 
   | [], D.Data data, T.Intro (dlbl, clbl, args) when data.dlbl = dlbl ->
-    let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
-    let constr = Desc.lookup_constr clbl desc in
-    check_constr cx dlbl desc.params constr data.params args
+    failwith "TODO"
+  (* let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+     let constr = Desc.lookup_constr clbl desc in
+     check_constr cx dlbl desc.params constr data.params args *)
 
   | [], D.Data dlbl, T.FHCom info ->
     check_fhcom cx ty info.r info.r' info.cap info.sys
@@ -350,23 +352,24 @@ and check cx ty tm =
   check_ cx ty [] tm
 
 and check_constr cx dlbl param_specs constr params tms =
-  let (module V) = Cx.evaluator cx in
-  (* Tentative *)
-  let vdataty = D.make @@ D.Data {dlbl; params} in
-  let rec go tyenv const_specs rec_specs dim_specs params tms =
-    match const_specs, rec_specs, dim_specs, params, tms with
-    | [], rec_specs, dim_specs, _, _->
-      let tms, trs = ListUtil.split (List.length rec_specs) tms in
-      List.iter2 (fun (_, Desc.Self) tm -> check cx vdataty tm) rec_specs tms;
-      List.iter2 (fun _ tm -> check_dim cx tm) dim_specs trs;
-    | (lbl, ty) :: const_specs, rec_specs, dim_specs, _, tm :: tms ->
-      let vty = V.eval tyenv ty in
-      let varg = check_eval cx vty tm in
-      go (D.Env.snoc tyenv @@ `Val varg) const_specs rec_specs dim_specs params tms
-    | _ -> failwith "constructor arguments malformed"
-  in
-  let env0 = D.Env.append V.empty_env @@ List.map (fun v -> `Val v) params in
-  go env0 constr.const_specs constr.rec_specs constr.dim_specs params tms
+  failwith "TODO"
+(* let (module V) = Cx.evaluator cx in
+   (* Tentative *)
+   let vdataty = D.make @@ D.Data {dlbl; params} in
+   let rec go tyenv const_specs rec_specs dim_specs params tms =
+   match const_specs, rec_specs, dim_specs, params, tms with
+   | [], rec_specs, dim_specs, _, _->
+    let tms, trs = ListUtil.split (List.length rec_specs) tms in
+    List.iter2 (fun (_, Desc.Self) tm -> check cx vdataty tm) rec_specs tms;
+    List.iter2 (fun _ tm -> check_dim cx tm) dim_specs trs;
+   | (lbl, ty) :: const_specs, rec_specs, dim_specs, _, tm :: tms ->
+    let vty = V.eval tyenv ty in
+    let varg = check_eval cx vty tm in
+    go (D.Env.snoc tyenv @@ `Val varg) const_specs rec_specs dim_specs params tms
+   | _ -> failwith "constructor arguments malformed"
+   in
+   let env0 = D.Env.append V.empty_env @@ List.map (fun v -> `Val v) params in
+   go env0 constr.const_specs constr.rec_specs constr.dim_specs params tms *)
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
@@ -572,104 +575,105 @@ and infer_spine cx hd =
       D.{el = Cx.eval_frame cx ih.el frm; ty = ty1}
 
     | T.Elim info ->
-      let T.B (nm, mot) = info.mot in
-      let ih = infer_spine cx hd sp in
-      let mot_clo =
-        let cxx, _= Cx.ext_ty cx ~nm ih.ty in
-        check_ty cxx mot;
-        Cx.make_closure cx info.mot
-      in
+      failwith "TODO"
+    (* let T.B (nm, mot) = info.mot in
+       let ih = infer_spine cx hd sp in
+       let mot_clo =
+       let cxx, _= Cx.ext_ty cx ~nm ih.ty in
+       check_ty cxx mot;
+       Cx.make_closure cx info.mot
+       in
 
-      let desc = V.Sig.lookup_datatype info.dlbl in
-      let used_labels = Hashtbl.create 10 in
+       let desc = V.Sig.lookup_datatype info.dlbl in
+       let used_labels = Hashtbl.create 10 in
 
-      (* TODO: check params *)
-      let params = List.map (Cx.eval cx) info.params in
+       (* TODO: check params *)
+       let params = List.map (Cx.eval cx) info.params in
 
-      let check_clause nclos lbl constr =
-        let open Desc in
-        if Hashtbl.mem used_labels lbl then failwith "Duplicate case in eliminator";
-        Hashtbl.add used_labels lbl ();
+       let check_clause nclos lbl constr =
+       let open Desc in
+       if Hashtbl.mem used_labels lbl then failwith "Duplicate case in eliminator";
+       Hashtbl.add used_labels lbl ();
 
-        let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') info.clauses in
+       let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') info.clauses in
 
-        (* 'cx' is local context extended with hyps;
-           'env' is the environment for evaluating the types that comprise
-           the constructor, and should therefore begin with the *empty* environment. *)
-        let rec build_cx cx ty_env benv (nms, cvs, rvs, ihvs, rs) const_specs rec_specs dim_specs =
-          match const_specs, rec_specs, dim_specs with
-          | (plbl, pty) :: const_specs, _, _ ->
-            let vty = V.eval ty_env pty in
-            let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-            build_cx cx' (D.Env.snoc ty_env @@ `Val v) (D.Env.snoc benv @@ `Val v) (nms #< (Some plbl), cvs #< v, rvs, ihvs, rs) const_specs rec_specs dim_specs
-          | [], (nm, Self) :: rec_specs, _ ->
-            let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
-            let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
-            build_cx cx_ih ty_env (D.Env.snoc benv @@ `Val v_x) (nms #< (Some nm) #< None, cvs, rvs #< v_x, ihvs #< v_ih, rs) const_specs rec_specs dim_specs
-          | [], [], nm :: dim_specs ->
-            let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
-            build_cx cx' ty_env (D.Env.snoc benv @@ `Dim (`Atom x)) (nms #< (Some nm), cvs, rvs, ihvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
-          | [], [], [] ->
-            cx, benv, nms, Bwd.to_list cvs, Bwd.to_list rvs, ihvs, Bwd.to_list rs
-        in
-        (* Need to extend the context once for each constr.params, and then twice for
-           each constr.args (twice, because of i.h.). *)
-        let env0 = D.Env.append V.empty_env @@ List.map (fun x -> `Val x) params in
-        (* check whether both of those should be env0, ugh *)
-        let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx env0 env0 (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
-        let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
-        let ty = V.inst_clo mot_clo intro in
+       (* 'cx' is local context extended with hyps;
+         'env' is the environment for evaluating the types that comprise
+         the constructor, and should therefore begin with the *empty* environment. *)
+       let rec build_cx cx ty_env benv (nms, cvs, rvs, ihvs, rs) const_specs rec_specs dim_specs =
+        match const_specs, rec_specs, dim_specs with
+        | (plbl, pty) :: const_specs, _, _ ->
+          let vty = V.eval ty_env pty in
+          let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
+          build_cx cx' (D.Env.snoc ty_env @@ `Val v) (D.Env.snoc benv @@ `Val v) (nms #< (Some plbl), cvs #< v, rvs, ihvs, rs) const_specs rec_specs dim_specs
+        | [], (nm, Self) :: rec_specs, _ ->
+          let cx_x, v_x = Cx.ext_ty cx ~nm:(Some nm) ih.ty in
+          let cx_ih, v_ih = Cx.ext_ty cx_x ~nm:None @@ V.inst_clo mot_clo v_x in
+          build_cx cx_ih ty_env (D.Env.snoc benv @@ `Val v_x) (nms #< (Some nm) #< None, cvs, rvs #< v_x, ihvs #< v_ih, rs) const_specs rec_specs dim_specs
+        | [], [], nm :: dim_specs ->
+          let cx', x = Cx.ext_dim cx ~nm:(Some nm) in
+          build_cx cx' ty_env (D.Env.snoc benv @@ `Dim (`Atom x)) (nms #< (Some nm), cvs, rvs, ihvs, rs #< (`Atom x)) const_specs rec_specs dim_specs
+        | [], [], [] ->
+          cx, benv, nms, Bwd.to_list cvs, Bwd.to_list rvs, ihvs, Bwd.to_list rs
+       in
+       (* Need to extend the context once for each constr.params, and then twice for
+         each constr.args (twice, because of i.h.). *)
+       let env0 = D.Env.append V.empty_env @@ List.map (fun x -> `Val x) params in
+       (* check whether both of those should be env0, ugh *)
+       let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx env0 env0 (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
+       let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
+       let ty = V.inst_clo mot_clo intro in
 
-        let rec image_of_bterm phi =
-          function
-          | B.Intro intro as bterm ->
-            let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) nclos in
-            let rargs =
-              List.flatten @@
-              List.map
-                (fun bt ->
-                   let el = `Val (V.eval_bterm info.dlbl desc benv bterm) in
-                   let ih = `Val (image_of_bterm phi bt) in
-                   [el; ih])
-                intro.rec_args
-            in
-            let cargs = List.map (fun t -> `Val (D.Value.act phi @@ Cx.eval cx' t)) intro.const_args in
-            let dims = List.map (fun t -> `Dim (I.act phi @@ Cx.eval_dim cx' t)) intro.rs in (* is this right ? *)
-            let cells = cargs @ rargs @ dims in
-            V.inst_nclo nclo cells
-          | B.Var ix ->
-            (* This is so bad!! *)
-            let ix' = ix - List.length rs in
-            D.Value.act phi @@ Bwd.nth ihvs ix'
+       let rec image_of_bterm phi =
+        function
+        | B.Intro intro as bterm ->
+          let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) nclos in
+          let rargs =
+            List.flatten @@
+            List.map
+              (fun bt ->
+                 let el = `Val (V.eval_bterm info.dlbl desc benv bterm) in
+                 let ih = `Val (image_of_bterm phi bt) in
+                 [el; ih])
+              intro.rec_args
+          in
+          let cargs = List.map (fun t -> `Val (D.Value.act phi @@ Cx.eval cx' t)) intro.const_args in
+          let dims = List.map (fun t -> `Dim (I.act phi @@ Cx.eval_dim cx' t)) intro.rs in (* is this right ? *)
+          let cells = cargs @ rargs @ dims in
+          V.inst_nclo nclo cells
+        | B.Var ix ->
+          (* This is so bad!! *)
+          let ix' = ix - List.length rs in
+          D.Value.act phi @@ Bwd.nth ihvs ix'
 
-        in
+       in
 
-        let image_of_bface (tr, tr', btm) =
-          let env = Cx.env cx' in
-          let r = V.eval_dim env tr in
-          let r' = V.eval_dim env tr' in
-          D.ValFace.make I.idn r r' @@ fun phi ->
-          image_of_bterm phi btm
-        in
+       let image_of_bface (tr, tr', btm) =
+        let env = Cx.env cx' in
+        let r = V.eval_dim env tr in
+        let r' = V.eval_dim env tr' in
+        D.ValFace.make I.idn r r' @@ fun phi ->
+        image_of_bterm phi btm
+       in
 
-        let boundary = List.map image_of_bface constr.boundary in
-        check_ cx' ty boundary bdy;
-        Tm.NB (nms, bdy)
-      in
+       let boundary = List.map image_of_bface constr.boundary in
+       check_ cx' ty boundary bdy;
+       Tm.NB (nms, bdy)
+       in
 
-      let rec check_clauses acc constrs =
-        match constrs with
-        | [] ->
-          ()
-        | (lbl, constr) :: constrs ->
-          let nbnd = check_clause acc lbl constr in
-          let nclo = D.NClo {nbnd; rho = Cx.env cx} in
-          check_clauses ((lbl, nclo) :: acc) constrs
+       let rec check_clauses acc constrs =
+       match constrs with
+       | [] ->
+        ()
+       | (lbl, constr) :: constrs ->
+        let nbnd = check_clause acc lbl constr in
+        let nclo = D.NClo {nbnd; rho = Cx.env cx} in
+        check_clauses ((lbl, nclo) :: acc) constrs
 
-      in
+       in
 
-      check_clauses [] desc.constrs;
-      D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
+       check_clauses [] desc.constrs;
+       D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el} *)
 
 
     | T.Cap info ->
@@ -821,51 +825,52 @@ and check_is_equivalence cx ~ty0 ~ty1 ~equiv =
   check cx type_of_equiv equiv
 
 let check_constr_boundary_sys cx dlbl desc ~params sys =
-  let rec go sys acc =
-    match sys with
-    | [] ->
-      ()
-    | (tr0, tr1, tm) :: sys ->
-      let r0 = check_eval_dim cx tr0 in
-      let r1 = check_eval_dim cx tr1 in
-      begin
-        match I.compare r0 r1 with
-        | `Apart ->
-          go sys acc
+  failwith "TODO"
+(* let rec go sys acc =
+   match sys with
+   | [] ->
+    ()
+   | (tr0, tr1, tm) :: sys ->
+    let r0 = check_eval_dim cx tr0 in
+    let r1 = check_eval_dim cx tr1 in
+    begin
+      match I.compare r0 r1 with
+      | `Apart ->
+        go sys acc
 
-        | `Same | `Indet ->
-          begin
-            try
-              let cx', _ = Cx.restrict cx r0 r1 in
-              (* TODO: check boundary type *)
-              (* check cx' (D.Value.act phi ty) tm; *)
+      | `Same | `Indet ->
+        begin
+          try
+            let cx', _ = Cx.restrict cx r0 r1 in
+            (* TODO: check boundary type *)
+            (* check cx' (D.Value.act phi ty) tm; *)
 
-              (* Check face-face adjacency conditions *)
-              go_adj cx' acc (r0, r1, tm)
-            with
-            | I.Inconsistent -> ()
-          end;
-          go sys @@ (r0, r1, tm) :: acc
-      end
+            (* Check face-face adjacency conditions *)
+            go_adj cx' acc (r0, r1, tm)
+          with
+          | I.Inconsistent -> ()
+        end;
+        go sys @@ (r0, r1, tm) :: acc
+    end
 
-  and go_adj cx faces face =
-    match faces with
-    | [] -> ()
-    | (r'0, r'1, tm') :: faces ->
-      (* Invariant: cx should already be restricted by r0=r1 *)
-      let _r0, _r1, tm = face in
-      begin
-        try
-          let cx', phi = Cx.restrict cx r'0 r'1 in
-          let (module Q) = Cx.quoter cx' in
-          let (module V) = Cx.evaluator cx' in
-          let v = V.eval_bterm dlbl desc (Cx.env cx') tm in
-          let v' = V.eval_bterm dlbl desc (Cx.env cx') tm' in
-          let params = List.map (D.Value.act phi) params in
-          Q.equiv_boundary_value (Cx.qenv cx') dlbl desc ~params Desc.Self v v'
-        with
-        | I.Inconsistent -> ()
-      end;
-      go_adj cx faces face
-  in
-  go sys []
+   and go_adj cx faces face =
+   match faces with
+   | [] -> ()
+   | (r'0, r'1, tm') :: faces ->
+    (* Invariant: cx should already be restricted by r0=r1 *)
+    let _r0, _r1, tm = face in
+    begin
+      try
+        let cx', phi = Cx.restrict cx r'0 r'1 in
+        let (module Q) = Cx.quoter cx' in
+        let (module V) = Cx.evaluator cx' in
+        let v = V.eval_bterm dlbl desc (Cx.env cx') tm in
+        let v' = V.eval_bterm dlbl desc (Cx.env cx') tm' in
+        let params = List.map (D.Value.act phi) params in
+        Q.equiv_boundary_value (Cx.qenv cx') dlbl desc ~params Desc.Self v v'
+      with
+      | I.Inconsistent -> ()
+    end;
+    go_adj cx faces face
+   in
+   go sys [] *)

@@ -19,8 +19,8 @@ val restrict : Tm.tm -> Tm.tm -> t -> t
 val kill_from_tick : t -> Name.t -> t
 
 
-val declare_datatype : Desc.data_label -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc -> t -> t
-val lookup_datatype : Desc.data_label -> t -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+val declare_datatype : Desc.data_label -> Tm.NewDesc.pdesc -> t -> t
+val lookup_datatype : Desc.data_label -> t -> Tm.NewDesc.pdesc
 
 module T : module type of (Map.Make (Name))
 
