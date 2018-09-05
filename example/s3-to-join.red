@@ -21,69 +21,26 @@ data join where
   | i=1 → inr b
   ]
 
-; adapted from "e" in cubicaltt:
-; https://github.com/mortberg/cubicaltt/blob/d3afca5a744a96de4831610e76d6c4b629478362/examples/brunerie2.ctt#L298
+; somebody oughta check this is an equivalence!
 
 let s3-to-join (d : s3) : join =
-  ; need to make the faces of this all (inl base)
-  let step0 : [i j k] join [
-    | i=0 → inl (loop j)
-    | i=1 → inr (loop k)
-    | j=0 → push base (loop k) i
-    | j=1 → push base (loop k) i
-    | k=0 → push (loop j) base i
-    | k=1 → push (loop j) base i
+  let face/k01 : [i j m] join [
+    | i=1 → push base base m
+    | j=0 → weak-connection/and join (λ n → push base base n) i m
+    | j=1 → weak-connection/and join (λ n → push base base n) i m
+    | m=0 → inl base
+    | m=1 → push (loop j) base i
     ]
     =
-    λ i j k →
-      push (loop j) (loop k) i
-  in
-  ; like a connection, but we don't need to know all the faces
-  let filler1 : [j m] s1 [
-    | m=0 → loop j
-    | m=1 → base
-    ]
-    =
-    λ j m →
-      comp 0 j base [
-      | m=0 → λ j → loop j
-      | m=1 → λ _ → base
+    λ i j m →
+      comp 1 i (push base base m) [
+      | j=0 → λ i → weak-connection/and join (λ n → push base base n) i m
+      | j=1 → λ i → weak-connection/and join (λ n → push base base n) i m
+      | m=0 → λ _ → inl base
+      | m=1 → λ i → push (loop j) base i
       ]
   in
-  ; get rid of loops
-  let step1 : [i j k] join [
-    | i=0 → inl base
-    | i=1 → inr base
-    | j=0 → push base base i
-    | j=1 → push base base i
-    | k=0 → push base base i
-    | k=1 → push base base i
-    ]
-    =
-    λ i j k →
-      comp 0 1 (step0 i j k) [
-      | i=0 → λ m → inl (filler1 j m)
-      | i=1 → λ m → inr (filler1 k m)
-      | j=0 → λ m → push (filler1 0 m) (filler1 k m) i
-      | j=1 → λ m → push (filler1 1 m) (filler1 k m) i
-      | k=0 → λ m → push (filler1 j m) (filler1 0 m) i
-      | k=1 → λ m → push (filler1 j m) (filler1 1 m) i
-      ]
-  in
-  ; like a connection, but we don't need to know all the faces
-  let filler2 : [i m] join [
-    | m=0 → push base base i
-    | m=1 → inl base
-    ]
-    =
-    λ i m →
-      comp 0 i (inl base) [
-      | m=0 → λ i → push base base i
-      | m=1 → λ _ → inl base
-      ]
-  in
-  ; get rid of push
-  let step2 : [i j k] join [
+  let cube' : [i j k] join [
     | i=0 → inl base
     | i=1 → inl base
     | j=0 → inl base
@@ -93,18 +50,18 @@ let s3-to-join (d : s3) : join =
     ]
     =
     λ i j k →
-      comp 0 1 (step1 i j k) [
-      | i=0 → λ _ → inl base
-      | i=1 → λ m → filler2 1 m
-      | j=0 → λ m → filler2 i m
-      | j=1 → λ m → filler2 i m
-      | k=0 → λ m → filler2 i m
-      | k=1 → λ m → filler2 i m
+      comp 1 0 (push (loop j) (loop k) i) [
+      | i=0 → λ m → face/k01 0 j m
+      | i=1 → λ m → push base (loop k) m
+      | j=0 → λ m → weak-connection/and join (λ n → push base (loop k) n) i m
+      | j=1 → λ m → weak-connection/and join (λ n → push base (loop k) n) i m
+      | k=0 → λ m → face/k01 i j m
+      | k=1 → λ m → face/k01 i j m
       ]
   in
   elim d [
   | base → inl base
-  | cube i j k → step2 i j k
+  | cube i j k → cube' i j k
   ]
 
 ; inverse map
