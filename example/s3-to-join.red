@@ -39,29 +39,18 @@ let s3-to-join (d : s3) : join =
       | m=0 → λ _ → inl base
       | m=1 → λ i → push (loop j) base i
       ]
-  in
-  let cube' : [i j k] join [
-    | i=0 → inl base
-    | i=1 → inl base
-    | j=0 → inl base
-    | j=1 → inl base
-    | k=0 → inl base
-    | k=1 → inl base
-    ]
-    =
-    λ i j k →
-      comp 1 0 (push (loop j) (loop k) i) [
-      | i=0 → λ m → face/k01 0 j m
-      | i=1 → λ m → push base (loop k) m
-      | j=0 → λ m → weak-connection/and join (λ n → push base (loop k) n) i m
-      | j=1 → λ m → weak-connection/and join (λ n → push base (loop k) n) i m
-      | k=0 → λ m → face/k01 i j m
-      | k=1 → λ m → face/k01 i j m
-      ]
-  in
+ in
   elim d [
   | base → inl base
-  | cube i j k → cube' i j k
+  | cube i j k →
+    comp 1 0 (push (loop j) (loop k) i) [
+    | i=0 → λ m → face/k01 0 j m
+    | i=1 → λ m → push base (loop k) m
+    | j=0 → λ m → weak-connection/and join (λ n → push base (loop k) n) i m
+    | j=1 → λ m → weak-connection/and join (λ n → push base (loop k) n) i m
+    | k=0 → λ m → face/k01 i j m
+    | k=1 → λ m → face/k01 i j m
+    ]
   ]
 
 ; inverse map
