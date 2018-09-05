@@ -50,7 +50,7 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
 
 let pΩ (pA : ptype) : ptype =
   ( Path (pA.fst) (pA.snd) (pA.snd)
-  , λ _ → pA.snd
+  , refl
   )
 
 let pΩ/map (pA pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
@@ -65,3 +65,28 @@ let pΩ/map (pA pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
       | i=1 → pf.snd
       ]
   )
+
+let pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
+  : Path (pΩ pB .fst)
+    (pΩ/map pA pB pf .fst (λ j → trans (pA.fst) (λ i → p i) (λ i → q i) j))
+    (trans (pB.fst)
+      (λ j → pΩ/map pA pB pf .fst (λ i → p i) j)
+      (λ j → pΩ/map pA pB pf .fst (λ i → q i) j))
+=
+  let face : [i j] (pB.fst) [i=0 → pB.snd] =
+    λ i j →
+      comp 0 1 (pf .fst (comp 0 j (p i) [i=0 → refl | i=1 → q]))
+        [ i=0 → pf.snd
+        | i=1 → λ k →
+          comp 0 k (pf .fst (q j))
+          [ j=0 → pf.snd
+          | j=1 → pf.snd
+          ]
+        ]
+  in
+    λ k i →
+    comp 0 1 (face i 0) [
+    | k=0 → λ j → face i j
+    | i=0 → λ j → pB.snd
+    | i=1 → λ j → face 1 j
+    ]
