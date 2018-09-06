@@ -24,18 +24,26 @@ data join where
 ; somebody oughta check this is an equivalence!
 
 let s3-to-join (d : s3) : join =
+  ; approximate connection
+  let cnx : (i k m : dim) → join =
+    λ i k m →
+      comp 0 i (inl base) [
+      | m=0 → refl
+      | m=1 → λ i → push base (loop k) i
+      ]
+  in
   let face/k01 : [i j m] join [
-    | i=1 → push base base m
-    | j=0 → weak-connection/and join (λ n → push base base n) i m
-    | j=1 → weak-connection/and join (λ n → push base base n) i m
+    | i=1 → cnx 1 0 m
+    | j=0 → cnx i 0 m
+    | j=1 → cnx i 0 m
     | m=0 → inl base
     | m=1 → push (loop j) base i
     ]
     =
     λ i j m →
-      comp 1 i (push base base m) [
-      | j=0 → λ i → weak-connection/and join (λ n → push base base n) i m
-      | j=1 → λ i → weak-connection/and join (λ n → push base base n) i m
+      comp 1 i (cnx 1 0 m) [
+      | j=0 → λ i → cnx i 0 m
+      | j=1 → λ i → cnx i 0 m
       | m=0 → λ _ → inl base
       | m=1 → λ i → push (loop j) base i
       ]
@@ -45,9 +53,9 @@ let s3-to-join (d : s3) : join =
   | cube i j k →
     comp 1 0 (push (loop j) (loop k) i) [
     | i=0 → λ m → face/k01 0 j m
-    | i=1 → λ m → push base (loop k) m
-    | j=0 → λ m → weak-connection/and join (λ n → push base (loop k) n) i m
-    | j=1 → λ m → weak-connection/and join (λ n → push base (loop k) n) i m
+    | i=1 → λ m → cnx 1 k m
+    | j=0 → λ m → cnx i k m
+    | j=1 → λ m → cnx i k m
     | k=0 → λ m → face/k01 i j m
     | k=1 → λ m → face/k01 i j m
     ]
@@ -66,7 +74,7 @@ let join-to-s3/push/loop (b : s1)
 let join-to-s3/push (a b : s1) : Path s3 base base =
   elim a [
   | base → λ _ → base
-  | loop i → λ j → join-to-s3/push/loop b i j
+  | loop j → λ i → join-to-s3/push/loop b i j
   ]
 
 let join-to-s3 (c : join) : s3 =
