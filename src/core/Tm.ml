@@ -446,7 +446,7 @@ let make con =
 
 let unleash (Tm con) = con
 
-module OpenVarAlg (Init : sig val cmd : twin -> tm cmd val ix : int end) : Alg =
+module OpenVarAsCmdAlg (Init : sig val cmd : tm cmd val ix : int end) : Alg =
 struct
   let state = ref Init.ix
 
@@ -462,7 +462,34 @@ struct
 
   let bvar ~ih:_ ~ix ~twin =
     if ix = !state then
-      Init.cmd twin
+      Init.cmd
+    else
+      Ix (ix, twin), Emp
+
+  let fvar ~name ~twin ~ushift =
+    Var {name; twin; ushift}, Emp
+
+  let meta ~name ~ushift =
+    Meta {name; ushift}, Emp
+end
+
+module OpenVarAlg (Init : sig val name : Name.t val ix : int end) : Alg =
+struct
+  let state = ref Init.ix
+
+  let with_bindings n f =
+    let old = !state in
+    state := old + n;
+    let r = f () in
+    state := old;
+    r
+
+  let under_meta f =
+    f ()
+
+  let bvar ~ih:_ ~ix ~twin =
+    if ix = !state then
+      Var {name = Init.name; ushift = 0; twin}, Emp
     else
       Ix (ix, twin), Emp
 
@@ -501,31 +528,28 @@ struct
 end
 
 
-let close_var_clock = ref 0.
-let open_var_clock = ref 0.
-
-let _ =
-  Diagnostics.on_termination @@ fun _ ->
-  Format.eprintf "[diagnostic]: Tm spent %fs in close_var@." !close_var_clock;
-  Format.eprintf "[diagnostic]: Tm spent %fs in open_var@." !open_var_clock
-
-let open_var k cmd tm =
-  let now0 = Unix.gettimeofday () in
+let open_var_as_cmd k cmd tm =
   let module Init =
   struct
     let cmd = cmd
     let ix = k
   end
   in
+  let module T = Traverse (OpenVarAsCmdAlg (Init)) in
+  T.traverse_tm tm
+
+let open_var k x tm =
+  let module Init =
+  struct
+    let name = x
+    let ix = k
+  end
+  in
   let module T = Traverse (OpenVarAlg (Init)) in
-  let res = T.traverse_tm tm in
-  let now1 = Unix.gettimeofday () in
-  open_var_clock := !open_var_clock +. (now1 -. now0);
-  res
+  T.traverse_tm tm
 
 
 let close_var a ?twin:(twin = fun _ -> `Only) k tm =
-  let now0 = Unix.gettimeofday () in
   let module Init =
   struct
     let twin = twin
@@ -535,16 +559,14 @@ let close_var a ?twin:(twin = fun _ -> `Only) k tm =
   in
   let module T = Traverse (CloseVarAlg (Init)) in
   let res = T.traverse_tm tm in
-  let now1 = Unix.gettimeofday () in
-  close_var_clock := !close_var_clock +. (now1 -. now0);
   res
 
 let unbind (B (nm, t)) =
   let x = Name.named nm in
-  x, open_var 0 (fun _ -> var x) t
+  x, open_var 0 x t
 
 let unbind_with cmd (B (_, t)) =
-  open_var 0 (fun _ -> cmd) t
+  open_var_as_cmd 0 cmd t
 
 let unbindn (NB (nms, t)) =
   let rec go k nms xs t =
@@ -552,7 +574,7 @@ let unbindn (NB (nms, t)) =
     | Emp -> Bwd.from_list xs, t
     | Snoc (nms, nm) ->
       let x = Name.named nm in
-      go (k + 1) nms (x :: xs) @@ open_var k (fun _ -> var x) t
+      go (k + 1) nms (x :: xs) @@ open_var k x t
   in
   go 0 nms [] t
 
@@ -569,7 +591,7 @@ let unbind_ext (NB (nms, (ty, sys))) =
     | Emp -> Bwd.from_list xs, ty, sys
     | Snoc (nms, nm)  ->
       let x = Name.named nm in
-      go (k + 1) nms (x :: xs) (open_var (n - k - 1) (fun _ -> var x) ty) (map_tm_sys (open_var (n - k - 1) (fun _ -> var x)) sys)
+      go (k + 1) nms (x :: xs) (open_var (n - k - 1) x ty) (map_tm_sys (open_var (n - k - 1) x) sys)
   in
   go 0 nms [] ty sys
 
@@ -581,7 +603,7 @@ let unbind_ext_with rs ebnd =
     match rs with
     | [] -> ty, sys
     | r :: rs ->
-      go (k + 1) rs (open_var (n - k - 1) (fun _ -> r) ty) (map_tm_sys (open_var (n - k - 1) (fun _ -> r)) sys)
+      go (k + 1) rs (open_var_as_cmd (n - k - 1) r ty) (map_tm_sys (open_var_as_cmd (n - k - 1) r) sys)
   in
   if Bwd.length nms = List.length rs then
     go 0 rs ty sys
@@ -1188,8 +1210,8 @@ let rec map_ext_bnd f nbnd =
     NB (Emp, (f ty, map_tm_sys f sys))
   | NB (Snoc (nms, nm), (ty, sys)) ->
     let x = Name.named nm in
-    let tyx = open_var 0 (fun _ -> var x) ty in
-    let sysx = map_tm_sys (open_var 0 (fun _ -> var x)) sys in
+    let tyx = open_var 0 x ty in
+    let sysx = map_tm_sys (open_var 0 x) sys in
     let NB (_, (tyx', sysx')) = map_ext_bnd f (NB (nms, (tyx, sysx))) in
     NB (nms #< nm, (close_var x 0 tyx', map_tm_sys (close_var x 0) sysx'))
 
