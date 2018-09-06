@@ -395,7 +395,7 @@ let rec subst_problem sub =
     let param', sub' = subst_param sub param in
     let x, probx = unbind param prob in
     begin
-      match param with
+      match param' with
       | `P ty ->
         let sub'' = GlobalEnv.ext sub' x @@ `P ty  in
         let probx' = subst_problem sub'' probx in
