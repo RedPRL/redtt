@@ -500,7 +500,7 @@ struct
     Meta {name; ushift}, Emp
 end
 
-module CloseVarAlg (Init : sig val twin : twin -> twin val name : Name.t val ix : int end) : Alg =
+module CloseVarAlg (Init : sig val twin : twin option val name : Name.t val ix : int end) : Alg =
 struct
   let state = ref Init.ix
 
@@ -518,7 +518,7 @@ struct
 
   let fvar ~name ~twin ~ushift =
     if name = Init.name then
-      Ix (!state, Init.twin twin), Emp
+      Ix (!state, match Init.twin with None -> twin | Some twin -> twin), Emp
     else
       Var {name; twin; ushift}, Emp
 
@@ -549,7 +549,7 @@ let open_var k x tm =
   T.traverse_tm tm
 
 
-let close_var a ?twin:(twin = fun _ -> `Only) k tm =
+let close_var a ?twin:(twin = None) k tm =
   let module Init =
   struct
     let twin = twin
