@@ -397,18 +397,17 @@ let rec subst_problem sub =
     begin
       match param with
       | `P ty ->
-        let sub'' = GlobalEnv.ext sub' x @@ `P {ty; sys = []}  in
+        let sub'' = GlobalEnv.ext sub' x @@ `P ty  in
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
       | `Def (ty, tm) ->
-        let sys = [Tm.make Dim0, Tm.make Dim0, Some tm] in
-        let sub'' = GlobalEnv.ext sub' x @@ `P {ty; sys}  in
+        let sub'' = GlobalEnv.ext sub' x @@ `Def (ty, tm)  in
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
       | `Tw (ty0, ty1) ->
-        let sub'' = GlobalEnv.ext sub' x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []}) in
+        let sub'' = GlobalEnv.ext sub' x @@ `Tw (ty0, ty1) in
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')

@@ -1,6 +1,10 @@
-type 'a param =
-  [ `P of 'a
-  | `Tw of 'a * 'a
+type ty = Tm.tm
+type tm = Tm.tm
+
+type param =
+  [ `P of ty
+  | `Def of ty * tm
+  | `Tw of ty * ty
   | `Tick
   | `I
   ]
@@ -8,14 +12,12 @@ type 'a param =
 module T = Map.Make (Name)
 module StringTable = Map.Make (String)
 
-type ty = Tm.tm
-type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
 type lock_info = {constant : bool; birth : int}
 
 type t =
   {rel : Restriction.t;
    data_decls : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc StringTable.t;
-   table : (entry param * lock_info) T.t;
+   table : (param * lock_info) T.t;
    killed : int -> bool;
    under_tick : int -> bool;
    len : int}
@@ -48,11 +50,9 @@ let ext_ (sg : t) ~constant nm param : t =
 
 
 let define (sg : t) nm ~ty ~tm =
-  let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm in
-  let sys = [face] in
   let linfo = {constant = true; birth = sg.len} in
   {sg with
-   table = T.add nm (`P {ty; sys}, linfo) sg.table;
+   table = T.add nm (`Def (ty, tm), linfo) sg.table;
    len = sg.len + 1}
 
 let ext (sg : t) =
@@ -92,22 +92,18 @@ let lookup_entry sg nm tw =
   else
     match prm, tw with
     | `P a, _ -> a
+    | `Def (a, _), _ -> a
     | `Tw (a, _), `TwinL -> a
     | `Tw (_, a), `TwinR -> a
     | _ -> failwith "GlobalEnv.lookup_entry"
 
 let lookup_kind sg nm =
   let prm, _ = T.find nm sg.table in
-  match prm with
-  | `P _ -> `P ()
-  | `Tw _ -> `Tw ((), ())
-  | `I -> `I
-  | `Tick -> `Tick
+  prm
 
 
 let lookup_ty sg nm (tw : Tm.twin) =
-  let {ty; _} = lookup_entry sg nm tw in
-  ty
+  lookup_entry sg nm tw
 
 let restriction sg =
   sg.rel
@@ -180,12 +176,14 @@ struct
         failwith "GlobalEnv.M.lookup: not found"
     in
     match param, tw with
-    | `P entry, _ ->
-      entry.ty, entry.sys
-    | `Tw (entry, _), `TwinL ->
-      entry.ty, entry.sys
-    | `Tw (_, entry), `TwinR ->
-      entry.ty, entry.sys
+    | `P ty, _ ->
+      ty, []
+    | `Def (ty, tm), _ ->
+      ty, [Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm]
+    | `Tw (ty, _), `TwinL ->
+      ty, []
+    | `Tw (_, ty), `TwinR ->
+      ty, []
     | _ ->
       failwith "GlobalEnv.M.lookup: twin mismatch"
 end
