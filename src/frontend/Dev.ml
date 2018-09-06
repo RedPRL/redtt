@@ -31,7 +31,6 @@ type 'a param =
   | `Def of 'a * 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
-  | `SelfArg of 'a Desc.rec_spec
   ]
 
 type params = (Name.t * ty param) bwd
@@ -86,8 +85,6 @@ let param_open_var k x =
     `Tw (Tm.open_var k x ty0, Tm.open_var k x ty1)
   | `R (r0, r1) ->
     `R (Tm.open_var k x r0, Tm.open_var k x r1)
-  | `SelfArg Desc.Self ->
-    `SelfArg Desc.Self
 
 
 let param_close_var x k =
@@ -103,8 +100,6 @@ let param_close_var x k =
     `Tw (Tm.close_var x ~twin:(fun tw -> tw) k ty0, Tm.close_var x ~twin:(fun tw -> tw) k ty1)
   | `R (r0, r1) ->
     `R (Tm.close_var x ~twin:(fun tw -> tw) k r0, Tm.close_var x ~twin:(fun tw -> tw) k r1)
-  | `SelfArg Desc.Self ->
-    `SelfArg Desc.Self
 
 let rec prob_open_var k x tw =
   function
@@ -199,8 +194,6 @@ let pp_param fmt =
     Format.fprintf fmt "%a = %a"
       Tm.pp0 r0
       Tm.pp0 r1
-  | `SelfArg Desc.Self ->
-    Format.fprintf fmt "self"
 
 
 let pp_param_cell fmt (x, param) =
@@ -244,10 +237,6 @@ let pp_param_cell fmt (x, param) =
     Format.fprintf fmt "@[<1>%a = %a@]"
       Tm.pp0 r0
       Tm.pp0 r1
-
-  | `SelfArg Desc.Self ->
-    Format.fprintf fmt "@[<1>%a : self@]"
-      Name.pp x
 
 let rec pp_params fmt =
   function
@@ -368,7 +357,7 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
   function
-  | (`I | `NullaryExt | `Tick | `SelfArg Desc.Self) as p ->
+  | (`I | `NullaryExt | `Tick) as p ->
     p, sub
   | `KillFromTick tck ->
     `KillFromTick (subst_tm sub ~ty:univ tck), sub
@@ -411,7 +400,7 @@ let rec subst_problem sub =
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
-      | (`I | `NullaryExt | `Tick | `KillFromTick _ | `SelfArg Desc.Self) ->
+      | (`I | `NullaryExt | `Tick | `KillFromTick _) ->
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
@@ -439,7 +428,7 @@ struct
 
   let free fl =
     function
-    | (`I | `NullaryExt | `Tick | `SelfArg Desc.Self) -> Occurs.Set.empty
+    | (`I | `NullaryExt | `Tick) -> Occurs.Set.empty
     | `KillFromTick tck -> Tm.free fl tck
     | `P ty -> Tm.free fl ty
     | `Def (ty, tm) ->

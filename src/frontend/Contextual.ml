@@ -193,9 +193,6 @@ let get_global_env =
       GlobalEnv.restrict r0 r1 (go_params psi)
     | Snoc (psi, (_, `NullaryExt)) ->
       go_params psi
-    | Snoc (psi, (_, `SelfArg Desc.Self)) ->
-      (* TODO: Might need to do something here!!! *)
-      go_params psi
   in
   ask >>= fun psi ->
   ret @@ go_params psi

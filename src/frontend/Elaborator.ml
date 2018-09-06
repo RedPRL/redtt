@@ -190,6 +190,8 @@ struct
     if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
       failwith "Duplicate constructor in datatype";
 
+    let data_ty = Tm.make @@ Tm.Data dlbl in
+
     let open Desc in
     let elab_rec_spec (x, Self) = M.ret (x, Self) in
 
@@ -209,8 +211,9 @@ struct
            the parameters too. *)
         traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
 
+
         let psi =
-          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) rec_specs
+          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `P data_ty)) rec_specs
           @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dim_specs
         in
         M.in_scopes psi @@
@@ -293,7 +296,6 @@ struct
           | `P _ -> [x]
           | `Def _ -> [x]
           | `I -> [x]
-          | `SelfArg _ -> [x]
           | `Tick -> [x]
           | `Tw _ -> []
           | _ -> []
