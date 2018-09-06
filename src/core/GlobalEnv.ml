@@ -177,13 +177,13 @@ struct
     in
     match param, tw with
     | `P ty, _ ->
-      ty, []
+      ty, None
     | `Def (ty, tm), _ ->
-      ty, [Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm]
+      ty, Some tm
     | `Tw (ty, _), `TwinL ->
-      ty, []
+      ty, None
     | `Tw (_, ty), `TwinR ->
-      ty, []
+      ty, None
     | _ ->
       failwith "GlobalEnv.M.lookup: twin mismatch"
 end
