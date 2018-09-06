@@ -2,9 +2,17 @@ open RedBasis
 open RedTT_Core
 open Bwd open BwdNotation
 
+type global =
+  [ `Var of Name.t
+  | `Metavar of Name.t
+  | `Datatype of string
+  ]
+
 type resolution =
   [ `Ix of int
   | `Var of Name.t
+  | `Metavar of Name.t
+  | `Datatype of string
   ]
 
 
@@ -12,7 +20,7 @@ module T = PersistentTable.M
 
 type t =
   {locals : string option bwd;
-   globals : (string, Name.t) T.t}
+   globals : (string, global) T.t}
 
 let init () =
   {locals = Emp;
@@ -47,13 +55,25 @@ let rec get x renv =
   with
   | _ ->
     match T.find x renv.globals with
-    | Some r ->
-      `Var r
+    | Some (`Var x) ->
+      `Var x
+    | Some (`Metavar x) ->
+      `Metavar x
+    | Some (`Datatype x) ->
+      `Datatype x
     | None ->
       failwith @@ "Could not resolve variable: " ^ x
 
 
 
-let global s x renv =
+let named_var s x renv =
   {renv with
-   globals = T.set s x renv.globals}
+   globals = T.set s (`Var x) renv.globals}
+
+let named_metavar s x renv =
+  {renv with
+   globals = T.set s (`Metavar x) renv.globals}
+
+let datatype s renv =
+  {renv with
+   globals = T.set s (`Datatype s) renv.globals}

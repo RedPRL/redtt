@@ -4,14 +4,12 @@ open Dev
 
 include Monad.S
 
-val global : (GlobalEnv.t -> GlobalEnv.t) -> unit m
-
 val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
 val resolver : ResEnv.t m
-
+val declare_datatype : Desc.data_label -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc -> unit m
 
 val isolate : 'a m -> 'a m
 

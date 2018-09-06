@@ -110,7 +110,7 @@ struct
 
     | E.Data (dlbl, edesc) ->
       elab_datatype dlbl edesc >>= fun desc ->
-      M.lift @@ C.global (GlobalEnv.declare_datatype dlbl desc)
+      M.lift @@ C.declare_datatype dlbl desc
 
     | E.Debug filter ->
       let title =
@@ -273,7 +273,7 @@ struct
         let xs = Bwd.flat_map go psi in
         let ix = Bwd.length xs - 1 - (ListUtil.index_of (fun y -> x = y) @@ Bwd.to_list xs) in
         M.ret @@ `Ix ix
-      | `Ix _ ->
+      | _ ->
         failwith "impossible"
     end
     <+>
@@ -654,17 +654,27 @@ struct
   and elab_inf e : (ty * tm Tm.cmd) M.m =
     match e.con with
     | E.Var (name, ushift) ->
+      M.lift C.resolver >>= fun renv ->
       begin
-        elab_var name ushift >>= fun (a, cmd) ->
-        M.lift (C.lookup_var a `Only) <+> (M.lift (C.lookup_meta a) <<@> fst) <<@> fun ty ->
-          Tm.shift_univ ushift ty, cmd
-      end <+>
-      begin
-        M.lift C.base_cx <<@> fun cx ->
-          let sign = Cx.globals cx in
-          let _ = GlobalEnv.lookup_datatype name sign in
-          let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-          univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
+        match ResEnv.get name renv with
+        | `Var x ->
+          M.lift (C.lookup_var x `Only) <<@> fun ty ->
+            Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, Emp)
+
+        | `Metavar x ->
+          M.lift (C.lookup_meta x) <<@> fun (ty, _) ->
+            Tm.shift_univ ushift ty, (Tm.Meta {name = x; ushift}, Emp)
+
+
+        | `Datatype dlbl ->
+          M.lift C.base_cx <<@> fun cx ->
+            let sign = Cx.globals cx in
+            let _ = GlobalEnv.lookup_datatype name sign in
+            let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
+            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
+
+        | `Ix _ ->
+          failwith "elab_inf: impossible"
       end
 
     | E.Quo tmfam ->
@@ -761,7 +771,7 @@ struct
         match ResEnv.get name renv with
         | `Var a ->
           M.ret @@ Tm.up @@ Tm.var a
-        | `Ix _ ->
+        | _ ->
           failwith "elab_dim: expected locally closed"
       end
     | E.Num 0 ->

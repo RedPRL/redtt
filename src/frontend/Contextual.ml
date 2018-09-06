@@ -123,7 +123,7 @@ let update_env e =
      resenv =
        begin
          match Name.name nm with
-         | Some str -> ResEnv.global str nm st.resenv
+         | Some str -> ResEnv.named_metavar str nm st.resenv
          | None -> st.resenv
        end;
      info = Map.add nm `Rigid st.info}
@@ -133,12 +133,26 @@ let update_env e =
      resenv =
        begin
          match Name.name nm with
-         | Some str -> ResEnv.global str nm st.resenv
+         | Some str -> ResEnv.named_metavar str nm st.resenv
          | None -> st.resenv
        end;
      info = Map.add nm `Rigid st.info}
   | _ ->
     st
+
+let global f =
+  modify @@ fun cx ->
+  {cx with env = f cx.env}
+
+let declare_datatype dlbl desc =
+  modify @@ fun cx ->
+  {cx with
+   env = GlobalEnv.declare_datatype dlbl desc cx.env;
+   resenv = ResEnv.datatype dlbl cx.resenv
+  }
+
+
+
 
 let pushl e =
   modifyl (fun es -> es #< e) >>
@@ -176,10 +190,6 @@ let popl =
   | _ ->
     dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
-
-let global f =
-  modify @@ fun cx ->
-  {cx with env = f cx.env}
 
 let get_global_env =
   get >>= fun st ->
@@ -222,7 +232,7 @@ let resolver =
       begin
         match Name.name x with
         | Some str ->
-          ResEnv.global str x renv
+          ResEnv.named_var str x renv
         | None ->
           renv
       end
