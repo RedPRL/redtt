@@ -14,19 +14,19 @@ let bindn xs (env, tbl) = env <>< List.map (fun x -> Some x) xs, tbl
 let bind_opt x (env, tbl) = env #< x, tbl
 
 let rec get x (env, tbl) =
-  let rec go env =
+  let rec go env acc =
     match env with
     | Emp ->
       failwith @@ "variable not found: " ^ x
     | Snoc (ys, Some y) ->
       if x = y
-      then 0
-      else 1 + go ys
+      then acc
+      else go ys (acc + 1)
     | Snoc (ys, None) ->
-      1 + go ys
+      (go[@tailcall]) ys (acc + 1)
   in
   try
-    `Ix (go env)
+    `Ix (go env 0)
   with
   | _ ->
     match T.find x tbl with
