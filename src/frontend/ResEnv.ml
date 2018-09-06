@@ -23,7 +23,7 @@ let rec get x (env, tbl) =
       then acc
       else go ys (acc + 1)
     | Snoc (ys, None) ->
-      go ys (acc + 1)
+      (go[@tailcall]) ys (acc + 1)
   in
   try
     `Ix (go env 0)
