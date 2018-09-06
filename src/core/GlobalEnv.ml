@@ -1,7 +1,7 @@
 type ty = Tm.tm
 type tm = Tm.tm
 
-type param =
+type entry =
   [ `P of ty
   | `Def of ty * tm
   | `Tw of ty * ty
@@ -17,7 +17,7 @@ type lock_info = {constant : bool; birth : int}
 type t =
   {rel : Restriction.t;
    data_decls : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc StringTable.t;
-   table : (param * lock_info) T.t;
+   table : (entry * lock_info) T.t;
    killed : int -> bool;
    under_tick : int -> bool;
    len : int}
@@ -84,7 +84,7 @@ let kill_from_tick (sg : t) nm : t =
   with
   | _ -> sg
 
-let lookup_entry sg nm tw =
+let lookup_ty sg nm tw =
   let prm, linfo = T.find nm sg.table in
   let killed = sg.killed linfo.birth in
   if not linfo.constant && killed then
@@ -97,13 +97,9 @@ let lookup_entry sg nm tw =
     | `Tw (_, a), `TwinR -> a
     | _ -> failwith "GlobalEnv.lookup_entry"
 
-let lookup_kind sg nm =
+let lookup sg nm =
   let prm, _ = T.find nm sg.table in
   prm
-
-
-let lookup_ty sg nm (tw : Tm.twin) =
-  lookup_entry sg nm tw
 
 let restriction sg =
   sg.rel

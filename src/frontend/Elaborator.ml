@@ -83,7 +83,7 @@ struct
             | `Var alpha ->
               M.lift C.get_global_env >>= fun env ->
               begin
-                match GlobalEnv.lookup_kind env alpha with
+                match GlobalEnv.lookup env alpha with
                 | (`P _ | `Tw _ | `Def _) -> M.ret @@ `FunApp e
                 | `I -> M.ret @@ `ExtApp e
                 | `Tick -> M.ret @@ `Prev e
