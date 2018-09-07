@@ -44,7 +44,7 @@ let paths-stable/to/set (A : type)
       λ k m → st (p k) (q k) (λ c → c (square k)) m
     in
     comp 0 1 (cap j i) [
-    | i=0 → λ k →
+    | i=0 k →
       st (p j) (p j)
          (neg/is-prop-over (λ j → neg (Path A (p j) (p j)))
            (λ c → c (square 0))
@@ -52,8 +52,8 @@ let paths-stable/to/set (A : type)
            j)
          k
     | i=1 → refl
-    | j=0 → λ k → weak-connection/or A (cap 0) i k
-    | j=1 → λ k → weak-connection/or A (cap 1) i k
+    | j=0 k → weak-connection/or A (cap 0) i k
+    | j=1 k → weak-connection/or A (cap 1) i k
     ]
 
 ; Hedberg's theorem for decidable path types
