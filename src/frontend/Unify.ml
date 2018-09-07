@@ -396,48 +396,9 @@ let evaluator =
   base_cx >>= fun cx ->
   ret (cx, Cx.evaluator cx)
 
-let inst_ty_bnd bnd (rec_spec, arg) =
-  base_cx >>= fun cx ->
-  let Tm.B (nm, tm) = bnd in
-  let varg = Cx.eval cx arg in
-  let lcx = Cx.def cx ~nm ~ty:rec_spec ~el:varg in
-  ret @@ Cx.quote_ty cx @@ Cx.eval lcx tm
-
 let eval tm =
   base_cx >>= fun cx ->
   ret @@ Cx.eval cx tm
-
-
-let inst_bnd (ty_clo, tm_bnd) (rec_spec, arg) =
-  evaluator >>= fun (cx, (module V)) ->
-  let Tm.B (nm, tm) = tm_bnd in
-  let varg = Cx.eval cx arg in
-  let lcx = Cx.def cx ~nm ~ty:rec_spec ~el:varg in
-  let vty = V.inst_clo ty_clo varg in
-  ret @@ Cx.quote cx ~ty:vty @@ Cx.eval lcx tm
-
-let plug (ty, tm) frame =
-  base_cx >>= fun cx ->
-  let (module V) = Cx.evaluator cx in
-
-  match Tm.unleash tm, frame with
-  | Tm.Up cmd, _ ->
-    ret @@ Tm.up @@ cmd @< frame
-  | Tm.Lam bnd, Tm.FunApp arg ->
-    let dom, cod = V.unleash_pi ty in
-    inst_bnd (cod, bnd) (dom, arg)
-  | Tm.ExtLam _, Tm.ExtApp args ->
-    let vargs = List.map (Cx.eval_dim cx) args in
-    let ty, _ = V.unleash_ext_with ty vargs in
-    let vlam = Cx.eval cx tm in
-    ret @@ Cx.quote cx ~ty @@ V.ext_apply vlam vargs
-  | Tm.Cons (t0, _), Tm.Car ->
-    ret t0
-  | Tm.Cons (_, t1), Tm.Cdr ->
-    ret t1
-  | Tm.LblRet t, Tm.LblCall ->
-    ret t
-  | _ -> failwith "TODO: plug"
 
 
 let push_guess gm ~ty0 ~ty1 tm  =
@@ -828,14 +789,9 @@ let rec lower tele alpha ty =
         lower (tele #< (x, `P dom)) alpha codx
 
       | Some (y, ty0, z, ty1, s, (u, v)) ->
-        let tele' = tele #< (y, `P ty0) #< (z, `P ty1) in
-        in_scopes (Bwd.to_list tele') begin
-          eval @@ abstract_ty tele dom >>= fun vty ->
-          begin
-            inst_ty_bnd cod (vty, s) >>= fun cod' ->
-            ret @@ abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod'
-          end
-        end >>= fun pi_ty ->
+        let s_ty = abstract_ty tele dom in
+        let cod' = Tm.unbind_with (Tm.ann ~ty:s_ty ~tm:s) cod in
+        let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod' in
         hole `Flex tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
         define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
