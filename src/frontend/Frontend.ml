@@ -11,11 +11,11 @@ let read_from_channel file_name channel =
   let (lexbuf, tokens) = Lex.tokens ~file_name channel in
   let checkpoint = Grammar.Incremental.esig @@ Lexing.lexeme_start_p lexbuf in
   begin
-    Lwt.catch (Parse.loop lexbuf tokens @@ checkpoint) @@ fun exn ->
+    Lwt.catch (Parse.loop lexbuf tokens checkpoint) @@ fun exn ->
     Lwt_io.printlf "  raised: %s" @@ Printexc.to_string exn >>= fun _ ->
     Lwt_io.printlf "parser :: cleaning up…" >>= fun _ ->
     Lwt_io.close channel >>= fun _ ->
-    Lwt.return []
+    Lwt.fail exn
   end
 
 let read_file file_name =
@@ -23,11 +23,12 @@ let read_file file_name =
   Lwt_io.open_file ~mode:Lwt_io.Input file_name >>=
   read_from_channel file_name
 
-let execute_signature esig =
+let execute_signature dirname esig =
   let module I =
   struct
     let cache = Hashtbl.create 20
     let import f =
+      let f = Filename.concat dirname f in
       match Hashtbl.find_opt cache f with
       | None ->
         let esig = Lwt_main.run @@ read_file @@ f ^ ".red" in
@@ -52,9 +53,11 @@ let execute_signature esig =
 
 let load_file file_name =
   let open Lwt.Infix in
-  read_file file_name >>= execute_signature
+  let dirname = Filename.dirname file_name in
+  read_file file_name >>= execute_signature dirname
 
 let load_from_stdin file_name =
   let open Lwt.Infix in
+  let dirname = Filename.dirname file_name in
   read_from_channel file_name Lwt_io.stdin
-  >>= execute_signature
+  >>= execute_signature dirname
