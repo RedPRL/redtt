@@ -220,7 +220,7 @@ let tac_pair tac0 tac1 : chk_tac =
 
 let unleash_data ty =
   match Tm.unleash ty with
-  | Tm.Data dlbl -> dlbl
+  | Tm.Data data -> data.dlbl, data.params
   | _ ->
     Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
@@ -259,13 +259,14 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
       Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
     in
 
-    let dlbl = unleash_data data_ty in
-    let data_vty = D.make @@ D.Data dlbl in
 
+    let dlbl, tparams = unleash_data data_ty in
     begin
-      M.lift C.base_cx <<@> fun cx ->
-        GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
-    end >>= fun desc ->
+      M.lift C.base_cx >>= fun cx ->
+      M.ret (GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx, List.map (Cx.eval cx) tparams)
+    end >>= fun (desc, params) ->
+
+    let data_vty = D.make @@ D.Data {dlbl; params} in
 
     (* Add holes for any missing clauses *)
     let eclauses =
@@ -345,7 +346,10 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           failwith "refine_clause"
       in
 
-      let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
+      let env0 = D.Env.append V.empty_env @@ List.map (fun v -> `Val v) params in
+
+      (* check env0 here ?? *)
+      let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp env0 env0 (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
       let sub = List.fold_left (fun sub (x,_) -> Tm.dot (Tm.var x) sub) (Tm.shift 0) (Bwd.to_list psi) in
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
@@ -413,7 +417,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     in
 
     M.Util.fold_left (fun acc clause -> refine_clause acc clause <<@> fun cl -> cl :: acc) [] eclauses >>= fun clauses ->
-    M.ret @@ Tm.up @@ Tm.ann ~ty:data_ty ~tm:scrut @< Tm.Elim {dlbl; mot = bmot; clauses}
+    M.ret @@ Tm.up @@ Tm.ann ~ty:data_ty ~tm:scrut @< Tm.Elim {dlbl; params = tparams; mot = bmot; clauses}
 
 let rec tac_hope goal =
   let rec try_system sys =

@@ -116,22 +116,20 @@ let int/discrete : discrete int =
   | pos m → λ y →
     elim y [
     | pos n →
-      or/elim (Path nat m n) (neg (Path nat m n))
-        (or (Path int (pos m) (pos n)) (neg (Path int (pos m) (pos n))))
-        (nat/discrete m n)
-        (λ l → (tt, λ i → pos (l i)))
-        (λ r → (ff, λ p → r (λ i → int-repr (p i))))
-    | negsuc n → (ff, int-path/encode _ _)
+      elim (nat/discrete m n) [
+      | inl l → inl (λ i → pos (l i))
+      | inr r → inr (λ p → r (λ i → int-repr (p i)))
+      ]
+    | negsuc n → inr (int-path/encode _ _)
     ]
   | negsuc m → λ y →
     elim y [
-    | pos n → (ff, int-path/encode _ _)
+    | pos n → inr (int-path/encode _ _)
     | negsuc n →
-      or/elim (Path nat m n) (neg (Path nat m n))
-        (or (Path int (negsuc m) (negsuc n)) (neg (Path int (negsuc m) (negsuc n))))
-        (nat/discrete m n)
-        (λ l → (tt, λ i → negsuc (l i)))
-        (λ r → (ff, λ p → r (λ i → int-repr (p i))))
+      elim (nat/discrete m n) [
+      | inl l → inl (λ i → negsuc (l i))
+      | inr r → inr (λ p → r (λ i → int-repr (p i)))
+      ]
     ]
   ]
 

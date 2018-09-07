@@ -82,6 +82,7 @@ sig
     : env
     -> Desc.data_label
     -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+    -> params:value list
     -> Tm.tm Desc.rec_spec
     -> value
     -> value
@@ -238,11 +239,13 @@ struct
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi (clo_name pi0.cod) dom cod
 
-      | _, Data lbl0, Data lbl1 ->
-        if lbl0 = lbl1 then
-          Tm.make @@ Tm.Data lbl0
+      | _, Data data0, Data data1 ->
+        if data0.dlbl = data1.dlbl then
+          let desc = Sig.lookup_datatype data0.dlbl in
+          let params = equate_data_params env desc data0.params data1.params in
+          Tm.make @@ Tm.Data {dlbl = data0.dlbl; params}
         else
-          raise @@ E (ErrEquateLbl (lbl0, lbl1))
+          raise @@ E (ErrEquateLbl (data0.dlbl, data1.dlbl))
 
       | _, Later ltr0, Later ltr1 ->
         let tick = TickGen (`Lvl (None, Env.len env)) in
@@ -345,13 +348,13 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
-      | Data dlbl, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
-        let desc = V.Sig.lookup_datatype dlbl in
+      | Data data, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
+        let desc = V.Sig.lookup_datatype data.dlbl in
         let constr = Desc.lookup_constr info0.clbl desc in
-        let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
-        let rec_args = equate_constr_rec_args env dlbl constr info0.rec_args info1.rec_args in
+        let const_args = equate_constr_const_args env data.params constr info0.const_args info1.const_args in
+        let rec_args = equate_constr_rec_args env data.dlbl data.params constr info0.rec_args info1.rec_args in
         let trs = equate_dims env info0.rs info1.rs in
-        Tm.make @@ Tm.Intro (dlbl, info0.clbl, const_args @ rec_args @ trs)
+        Tm.make @@ Tm.Intro (data.dlbl, info0.clbl, const_args @ rec_args @ trs)
 
       | _ ->
         (* For more readable error messages *)
@@ -360,7 +363,7 @@ struct
         let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
 
-  and equate_constr_const_args env constr els0 els1 =
+  and equate_constr_const_args env params constr els0 els1 =
     let open Desc in
     let rec go acc venv const_specs els0 els1 =
       match const_specs, els0, els1 with
@@ -373,12 +376,29 @@ struct
       | _ ->
         failwith "equate_constr_args"
     in
-    go Emp empty_env constr.const_specs els0 els1
+    let venv0 = D.Env.append empty_env @@ List.map (fun v -> `Val v) params in
+    go Emp venv0 constr.const_specs els0 els1
 
-  and equate_constr_rec_args env dlbl constr els0 els1 =
+  and equate_data_params env desc els0 els1 =
+    let open Desc in
+    let rec go acc venv param_specs els0 els1 =
+      match param_specs, els0, els1 with
+      | [], [], [] ->
+        Bwd.to_list acc
+      | (_, ty) :: param_specs, el0 :: els0, el1 :: els1 ->
+        let vty = eval venv ty in
+        let tm = equate env vty el0 el1 in
+        go (acc #< tm) (D.Env.snoc venv @@ `Val el0) param_specs els0 els1
+      | _ ->
+        failwith "equate_data_params"
+    in
+    go Emp empty_env desc.params els0 els1
+
+
+  and equate_constr_rec_args env dlbl params constr els0 els1 =
     let open Desc in
     (* TODO: factor out *)
-    let realize_spec_ty Self = D.make @@ D.Data dlbl in
+    let realize_spec_ty Self = D.make @@ D.Data {dlbl; params} in
     ListUtil.map3 (fun (_, spec_ty) -> equate env @@ realize_spec_ty spec_ty) constr.rec_specs els0 els1
 
   and equate_neu_ env neu0 neu1 stk =
@@ -472,7 +492,7 @@ struct
     | Elim elim0, Elim elim1 ->
       if elim0.dlbl = elim1.dlbl then
         let dlbl = elim0.dlbl in
-        let data_ty = D.make @@ D.Data dlbl in
+        let data_ty = D.make @@ D.Data {dlbl; params = elim0.params} in
         let mot =
           let var = generic env data_ty in
           let env' = Env.succ env in
@@ -491,6 +511,9 @@ struct
           | Not_found ->
             failwith "Quote: elim / find_clause"
         in
+
+        let params = equate_data_params env desc elim0.params elim1.params in
+        let venv0 = D.Env.append empty_env @@ List.map (fun v -> `Val v) elim0.params in
 
         let quote_clause (clbl, constr) =
           let clause0 = find_clause clbl elim0.clauses in
@@ -516,7 +539,7 @@ struct
               | [], [], [] ->
                 qenv, Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env empty_env (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
+            build_cx env venv0 (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
           in
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
@@ -529,7 +552,7 @@ struct
         in
 
         let clauses = List.map quote_clause desc.constrs in
-        let frame = Tm.Elim {dlbl; mot; clauses} in
+        let frame = Tm.Elim {dlbl; params; mot; clauses} in
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
         failwith "Datatype mismatch"
@@ -891,17 +914,17 @@ struct
     end
 
 
-  let rec equate_boundary_value env (dlbl, desc) rec_spec el0 el1 =
+  let rec equate_boundary_value env (dlbl, desc, params) rec_spec el0 el1 =
     match rec_spec with
     | Desc.Self ->
       begin
         match unleash el0, unleash el1 with
         | D.Intro info0, D.Intro info1 when info0.clbl = info1.clbl ->
           let constr = Desc.lookup_constr info0.clbl desc in
-          let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
+          let const_args = equate_constr_const_args env params constr info0.const_args info1.const_args in
           let rec_args =
             ListUtil.map3
-              (fun (_, spec) -> equate_boundary_value env (dlbl, desc) spec)
+              (fun (_, spec) -> equate_boundary_value env (dlbl, desc, params) spec)
               constr.rec_specs
               info0.rec_args
               info1.rec_args
@@ -923,7 +946,7 @@ struct
       failwith "equate_boundary_neu"
 
 
-  let equiv_boundary_value env dlbl desc rec_spec el0 el1 =
-    ignore @@ equate_boundary_value env (dlbl, desc) rec_spec el0 el1
+  let equiv_boundary_value env dlbl desc ~params rec_spec el0 el1 =
+    ignore @@ equate_boundary_value env (dlbl, desc, params) rec_spec el0 el1
 
 end

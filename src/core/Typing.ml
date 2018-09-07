@@ -206,23 +206,20 @@ let rec check_ cx ty rst tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-  | [], D.Univ univ, T.Data dlbl ->
-    let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
-    begin
-      if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
-        ()
-      else
-        failwith "Universe level/kind error"
-    end
+  | [], D.Univ univ, T.Data data ->
+    let desc = GlobalEnv.lookup_datatype data.dlbl @@ Cx.globals cx in
+    if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
+      ()
+    else
+      failwith "Universe level/kind error"
 
-  | [], D.Data dlbl, T.Intro (dlbl', clbl, args) when dlbl = dlbl' ->
+  | [], D.Data data, T.Intro (dlbl, clbl, args) when data.dlbl = dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     let constr = Desc.lookup_constr clbl desc in
-    check_constr cx dlbl constr args;
+    check_constr cx dlbl desc.params constr data.params args
 
   | [], D.Data dlbl, T.FHCom info ->
     check_fhcom cx ty info.r info.r' info.cap info.sys
-
 
   | _, D.Pi {dom; cod}, T.Lam (T.B (nm, tm)) ->
     let cxx, x = Cx.ext_ty cx ~nm dom in
@@ -341,7 +338,6 @@ let rec check_ cx ty rst tm =
     (* TODO: right?? *)
     check_ cx' ty rst t1
 
-
   | _ :: _, _, _ ->
     let v = check_eval cx ty tm in
     check_boundary cx ty rst v
@@ -353,23 +349,24 @@ let rec check_ cx ty rst tm =
 and check cx ty tm =
   check_ cx ty [] tm
 
-
-and check_constr cx dlbl constr tms =
-  let vdataty = D.make @@ D.Data dlbl in
-  let rec go cx' const_specs rec_specs dim_specs tms =
-    match const_specs, rec_specs, dim_specs, tms with
-    | [], rec_specs, dim_specs, _ ->
+and check_constr cx dlbl param_specs constr params tms =
+  let (module V) = Cx.evaluator cx in
+  (* Tentative *)
+  let vdataty = D.make @@ D.Data {dlbl; params} in
+  let rec go tyenv const_specs rec_specs dim_specs params tms =
+    match const_specs, rec_specs, dim_specs, params, tms with
+    | [], rec_specs, dim_specs, _, _->
       let tms, trs = ListUtil.split (List.length rec_specs) tms in
       List.iter2 (fun (_, Desc.Self) tm -> check cx vdataty tm) rec_specs tms;
       List.iter2 (fun _ tm -> check_dim cx tm) dim_specs trs;
-    | (plbl, ty) :: const_specs, rec_specs, dim_specs, tm :: tms ->
-      let vty = Cx.eval cx' ty in
+    | (lbl, ty) :: const_specs, rec_specs, dim_specs, _, tm :: tms ->
+      let vty = V.eval tyenv ty in
       let varg = check_eval cx vty tm in
-      let cx' = Cx.def cx ~nm:(Some plbl) ~ty:vty ~el:varg in
-      go cx' const_specs rec_specs dim_specs tms
+      go (D.Env.snoc tyenv @@ `Val varg) const_specs rec_specs dim_specs params tms
     | _ -> failwith "constructor arguments malformed"
   in
-  go cx constr.const_specs constr.rec_specs constr.dim_specs tms
+  let env0 = D.Env.append V.empty_env @@ List.map (fun v -> `Val v) params in
+  go env0 constr.const_specs constr.rec_specs constr.dim_specs params tms
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
@@ -586,6 +583,8 @@ and infer_spine cx hd =
       let desc = V.Sig.lookup_datatype info.dlbl in
       let used_labels = Hashtbl.create 10 in
 
+      (* TODO: check params *)
+      let params = List.map (Cx.eval cx) info.params in
 
       let check_clause nclos lbl constr =
         let open Desc in
@@ -615,7 +614,9 @@ and infer_spine cx hd =
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
+        let env0 = D.Env.append V.empty_env @@ List.map (fun x -> `Val x) params in
+        (* check whether both of those should be env0, ugh *)
+        let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx env0 env0 (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 
@@ -819,7 +820,7 @@ and check_is_equivalence cx ~ty0 ~ty1 ~equiv =
   let type_of_equiv = V.Macro.equiv ty0 ty1 in
   check cx type_of_equiv equiv
 
-let check_constr_boundary_sys cx dlbl desc sys =
+let check_constr_boundary_sys cx dlbl desc ~params sys =
   let rec go sys acc =
     match sys with
     | [] ->
@@ -855,13 +856,13 @@ let check_constr_boundary_sys cx dlbl desc sys =
       let _r0, _r1, tm = face in
       begin
         try
-          let cx', _ = Cx.restrict cx r'0 r'1 in
+          let cx', phi = Cx.restrict cx r'0 r'1 in
           let (module Q) = Cx.quoter cx' in
           let (module V) = Cx.evaluator cx' in
           let v = V.eval_bterm dlbl desc (Cx.env cx') tm in
           let v' = V.eval_bterm dlbl desc (Cx.env cx') tm' in
-          (* let phi = I.cmp phi (I.equate r0 r1) in *)
-          Q.equiv_boundary_value (Cx.qenv cx') dlbl desc Desc.Self v v'
+          let params = List.map (D.Value.act phi) params in
+          Q.equiv_boundary_value (Cx.qenv cx') dlbl desc ~params Desc.Self v v'
         with
         | I.Inconsistent -> ()
       end;

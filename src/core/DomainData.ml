@@ -45,7 +45,7 @@ type con =
   | DFix of {ty : value; clo : clo}
   | DFixLine of {x : atom; ty : value; clo : clo}
 
-  | Data of Desc.data_label
+  | Data of {dlbl : Desc.data_label; params : value list}
   | Intro of
       {dlbl : Desc.data_label;
        clbl : Desc.con_label;
@@ -72,6 +72,7 @@ and neu =
 
   | Elim of
       {dlbl : Desc.data_label;
+       params : value list;
        mot : clo;
        neu : neu;
        clauses : (Desc.con_label * nclo) list}

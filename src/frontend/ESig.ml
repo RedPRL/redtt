@@ -92,5 +92,7 @@ let rec pp fmt =
     Format.fprintf fmt "<lam>"
   | Var (s, _) ->
     Format.fprintf fmt "%s" s
+  | Cut (hd, sp) ->
+    Format.fprintf fmt "<cut: %a>" pp hd.con
   | _ ->
     Format.fprintf fmt "<eterm>"

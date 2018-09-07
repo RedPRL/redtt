@@ -39,7 +39,8 @@ type ('a, 'b) constr =
 
 (** A datatype description is just a list of named constructors. *)
 type ('a, 'b) desc =
-  {kind : Kind.t;
+  {params : (string * 'a) list;
+   kind : Kind.t;
    lvl : Lvl.t;
    constrs : (con_label * ('a, 'b) constr) list}
 

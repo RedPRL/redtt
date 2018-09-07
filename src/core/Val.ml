@@ -353,8 +353,10 @@ struct
       let clo = Clo.act phi info.clo in
       make_dfix_line r ty clo
 
-    | Data lbl ->
-      make @@ Data lbl
+    | Data data ->
+      let dlbl = data.dlbl in
+      let params = List.map (Value.act phi) data.params in
+      make @@ Data {dlbl; params}
 
     | Intro info ->
       begin
@@ -561,15 +563,18 @@ struct
       args
 
   (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
-  and rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl ~const_args ~rec_args ~rs =
+  and rigid_coe_data_intro dir abs ~dlbl ~params ~clbl ~const_args ~rec_args ~rs =
     let x = Name.fresh () in
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
 
     let r, r' = Dir.unleash dir in
 
+    (* TODO: check if this is backwards *)
+    let env0 = Env.append empty_env @@ List.map (fun v -> `Val v) params in
+
     let make_const_args dir =
-      multi_coe empty_env dir (x, constr.const_specs) const_args
+      multi_coe env0 dir (x, constr.const_specs) const_args
     in
 
     let coe_rec_arg dir _arg_spec arg =
@@ -580,7 +585,8 @@ struct
 
     let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.rec_specs rec_args in
     let intro =
-      make_intro empty_env ~dlbl ~clbl
+      (* should this be [env0] or [Env.emp]? *)
+      make_intro env0 ~dlbl ~clbl
         ~const_args:(make_const_args (`Ok dir))
         ~rec_args:(make_rec_args (`Ok dir))
         ~rs
@@ -610,8 +616,8 @@ struct
   and rigid_coe_nonstrict_data dir abs el =
     let _, tyx = Abs.unsafe_unleash abs in
     match unleash tyx, unleash el with
-    | Data dlbl, Intro info ->
-      rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
+    | Data data, Intro info ->
+      rigid_coe_data_intro dir abs ~dlbl:data.dlbl ~params:data.params ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
 
     | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
@@ -667,8 +673,8 @@ struct
     | Univ _ ->
       el
 
-    | Data dlbl ->
-      let desc = Sig.lookup_datatype dlbl in
+    | Data info ->
+      let desc = Sig.lookup_datatype info.dlbl in
       if Desc.is_strict_set desc then el
       else rigid_coe_nonstrict_data dir abs el
 
@@ -972,11 +978,16 @@ struct
   (* presupposes no dimension arguments *)
   and rigid_hcom_strict_data dir ty cap sys =
     match unleash ty, unleash cap with
-    | Data dlbl, Intro info ->
+    | Data data, Intro info ->
       let peel_arg k el =
         match unleash el with
         | Intro info' ->
-          List.nth (info'.const_args @ info'.rec_args) k
+          begin
+            try
+              List.nth (info'.const_args @ info'.rec_args) k
+            with
+            | _ -> failwith "rigid_hcom_strict_data: out of range"
+          end
         | Up _ ->
           raise StrictHComEncounteredNonConstructor
         | _ ->
@@ -1004,13 +1015,13 @@ struct
           failwith "rigid_hcom_strict_data"
       in
 
-      let desc = Sig.lookup_datatype dlbl in
+      let desc = Sig.lookup_datatype data.dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
 
       let args' = make_args 0 Emp info.const_args info.rec_args constr.const_specs constr.rec_specs in
       let const_args, rec_args = ListUtil.split (List.length constr.const_specs) args' in
 
-      make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
+      make @@ Intro {dlbl = data.dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
 
     | _, Up info ->
       rigid_nhcom_up_at_cap dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
@@ -1093,21 +1104,9 @@ struct
     | Up info ->
       rigid_nhcom_up_at_type dir info.ty info.neu cap ~comp_sys:sys ~rst_sys:info.sys
 
-    | Data dlbl ->
+    | Data data ->
       (* It's too expensive to determine in advance if the system has constructors in all faces, so we just disable strict composition for now. *)
       make @@ FHCom {dir; cap; sys}
-
-    (* Note, that the following code looks like it would work, but it doesn't. The problem is that the exception gets thrown in a recursive call that is underneath a thunk,
-       so it is never caught. Generally, backtracking is not something we would support during evaluation. *)
-
-    (* let desc = Sig.lookup_datatype dlbl in
-       if Desc.is_strict_set desc then
-       try rigid_hcom_strict_data dir ty cap sys
-       with
-       | StrictHComEncounteredNonConstructor ->
-        make @@ FHCom {dir; cap; sys}
-       else
-       make @@ FHCom {dir; cap; sys} *)
 
     | Univ _ ->
       rigid_fhcom dir cap sys
@@ -1340,6 +1339,8 @@ struct
         | cell ->
           let err = UnexpectedEnvCell cell in
           raise @@ E err
+        | exception _ ->
+          failwith "eval_bterm: variable out of range"
       end
 
   and eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs =
@@ -1460,8 +1461,10 @@ struct
       let tclo = TickClo {bnd; rho} in
       make @@ Next tclo
 
-    | Tm.Data lbl ->
-      make @@ Data lbl
+    | Tm.Data data ->
+      let dlbl = data.dlbl in
+      let params = List.map (eval rho) data.params in
+      make @@ Data {dlbl; params}
 
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
@@ -1527,7 +1530,8 @@ struct
     | Tm.Elim info ->
       let mot = clo info.mot rho in
       let clauses = List.map (fun (lbl, nbnd) -> lbl, nclo nbnd rho) info.clauses in
-      elim_data info.dlbl ~mot ~scrut:vhd ~clauses
+      let params = List.map (eval rho) info.params in
+      elim_data info.dlbl ~params ~mot ~scrut:vhd ~clauses
 
 
   and eval_head rho =
@@ -1595,6 +1599,8 @@ struct
         | cell ->
           let err = UnexpectedEnvCell cell in
           raise @@ E err
+        | exception _ ->
+          failwith "eval_head: de bruijn index out of range"
       end
 
     | Tm.Var info ->
@@ -1697,7 +1703,7 @@ struct
 
   and unleash_data v =
     match unleash v with
-    | Data dlbl -> dlbl
+    | Data data -> data.dlbl, data.params
     | _ ->
       raise @@ E (UnleashDataError v)
 
@@ -2067,7 +2073,7 @@ struct
       let err = RigidVProjUnexpectedArgument el in
       raise @@ E err
 
-  and elim_data dlbl ~mot ~scrut ~clauses =
+  and elim_data dlbl ~params ~mot ~scrut ~clauses =
     let find_clause clbl =
       try
         snd @@ List.find (fun (clbl', _) -> clbl = clbl') clauses
@@ -2086,7 +2092,7 @@ struct
         | v :: cvs, _, _->
           `Val v :: go cvs rvs rs
         | [], v :: rvs, _ ->
-          let v_ih = elim_data dlbl ~mot ~scrut:v ~clauses in
+          let v_ih = elim_data dlbl ~params ~mot ~scrut:v ~clauses in
           `Val v :: `Val v_ih :: go cvs rvs rs
         | [], [], r :: rs ->
           `Dim r :: go cvs rvs rs
@@ -2096,13 +2102,13 @@ struct
       inst_nclo nclo @@ go info.const_args info.rec_args info.rs
 
     | Up up ->
-      let neu = Elim {dlbl; mot; neu = up.neu; clauses} in
+      let neu = Elim {dlbl; mot; params; neu = up.neu; clauses} in
       let mot' = inst_clo mot scrut in
       let elim_face =
         Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
-        elim_data dlbl ~mot:(Clo.act phi mot) ~scrut:a ~clauses:clauses'
+        elim_data dlbl ~params ~mot:(Clo.act phi mot) ~scrut:a ~clauses:clauses'
       in
       let elim_sys = List.map elim_face up.sys in
       make @@ Up {ty = mot'; neu; sys = elim_sys}
@@ -2114,14 +2120,14 @@ struct
         inst_clo mot @@
         make_fhcom (Dir.make r @@ `Atom y) info.cap (`Ok info.sys)
       in
-      let cap = elim_data dlbl ~mot ~scrut:info.cap ~clauses in
+      let cap = elim_data dlbl ~params ~mot ~scrut:info.cap ~clauses in
       let face =
         Face.map @@ fun r r' abs ->
         let y, ely = Abs.unleash1 abs in
         let phi = I.equate r r' in
         let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
         Abs.bind1 y @@
-        elim_data dlbl ~mot:(Clo.act phi mot) ~scrut:ely ~clauses:clauses'
+        elim_data dlbl ~params ~mot:(Clo.act phi mot) ~scrut:ely ~clauses:clauses'
       in
       let sys = List.map face info.sys in
       rigid_com info.dir tyabs cap sys

@@ -1,22 +1,23 @@
 import void
 import bool
-import or
 import connection
 import ntype
+import parametric-hit
 
 let stable (A : type) : type =
   neg (neg A) → A
 
 let dec (A : type) : type =
-  or A (neg A)
+  sum A (neg A)
 
 let discrete (A : type) : type =
   (x y : A) → dec (Path A x y)
 
 let dec/to/stable (A : type) (d : dec A) : stable A =
-  or/elim A (neg A) (stable A) d
-    (λ a _ → a)
-    (λ x y → elim (y x) [])
+  elim d [
+  | inl a → λ _ → a
+  | inr x → λ y → elim (y x) []
+  ]
 
 let neg/is-prop-over (A : dim → type)
   : IsPropOver (λ i → neg (A i))
@@ -26,6 +27,7 @@ let neg/is-prop-over (A : dim → type)
      elim (c (coe i 0 a in A)) []
    in
    f i a
+
 
 ; Hedberg's theorem for stable path types
 let paths-stable/to/set (A : type)

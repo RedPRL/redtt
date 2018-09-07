@@ -10,6 +10,37 @@ type bface = (tm, btm) Desc.Boundary.face
 type bsys = (tm, btm) Desc.Boundary.sys
 type data_desc = (tm, btm) Desc.desc
 
+type ('a, 'k) telescope =
+  | TNil of 'k
+  | TCons of 'a * ('a, 'k) telescope bnd
+
+
+module NewDesc =
+struct
+  type btm =
+    | Var of int
+    | Intro of
+        {clbl : string;
+         const_args : tm list;
+         rec_args : btm list;
+         rs : tm list}
+
+  type bface = tm * tm * btm
+  type bsys = bface list
+
+  type const_spec = [`Const of tm]
+  type rec_spec = [`Self]
+  type dim_spec = [`I]
+
+  type boundary_spec = bsys
+  type param_spec = [`Param of tm]
+
+  type constr = string * (const_spec, (rec_spec, (dim_spec, boundary_spec) telescope) telescope) telescope
+  type desc = (param_spec, constr list) telescope
+end
+
+
+
 type 'a subst =
   | Shift of int
   | Dot of 'a * 'a subst
@@ -155,8 +186,9 @@ struct
       let cmd' = traverse_cmd cmd in
       Up cmd'
 
-    | Data lbl ->
-      Data lbl
+    | Data data ->
+      let params = traverse_list traverse_tm data.params in
+      Data {data with params}
 
     | Intro (dlbl, clbl, args) ->
       let args' = traverse_list traverse_tm args in
@@ -318,7 +350,8 @@ struct
     | Elim info ->
       let mot = traverse_bnd traverse_tm info.mot in
       let clauses = List.map (fun (lbl, bnd) -> lbl, traverse_nbnd traverse_tm bnd) info.clauses in
-      Elim {info with mot; clauses}
+      let params = traverse_list traverse_tm info.params in
+      Elim {info with mot; clauses; params}
 
     | VProj info ->
       let r = traverse_tm info.r in
@@ -716,8 +749,16 @@ let rec pp env fmt =
     | Up cmd ->
       pp_cmd env fmt cmd
 
-    | Data lbl ->
-      Desc.pp_data_label fmt lbl
+    | Data data ->
+      begin
+        match data.params with
+        | [] ->
+          Desc.pp_data_label fmt data.dlbl
+        | params ->
+          Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
+            Desc.pp_data_label data.dlbl
+            (pp_terms env) params
+      end
 
     | Intro (_dlbl, clbl, args) ->
       begin
@@ -1162,7 +1203,8 @@ let map_frame f =
   | Elim info ->
     let mot = map_bnd f info.mot in
     let clauses = List.map (fun (lbl, bnd) -> lbl, map_nbnd f bnd) info.clauses in
-    Elim {info with mot; clauses}
+    let params = List.map f info.params in
+    Elim {info with mot; clauses; params}
   | VProj info ->
     let r = f info.r in
     let func = f info.func in
@@ -1198,7 +1240,7 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Dim0 | Dim1 | Data _) as con ->
+  | (Univ _ | Dim0 | Dim1) as con ->
     con
   | Cons (t0, t1) ->
     Cons (f t0, f t1)
@@ -1255,9 +1297,10 @@ let map_tmf f =
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
     Let (map_cmd f cmd, map_bnd f bnd)
+  | Data {dlbl; params} ->
+    Data {dlbl; params = List.map f params}
   | Intro (dlbl, clbl, args) ->
     Intro (dlbl, clbl, List.map f args)
-
 
 
 let rec opt_traverse f xs =

@@ -1,6 +1,6 @@
 (library
  (name RedTT_Core)
  (flags
-  (:standard -w -32-26-27-37))
+  (:standard -w -32-26-34-27-37))
  (public_name redtt_core)
  (libraries redbasis uuseg uuseg.string uutf))
