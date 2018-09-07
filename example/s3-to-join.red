@@ -28,7 +28,7 @@ data join where
 let s3-to-join/cnx (b : s1) (i m : dim) : join =
   comp 0 i (inl base) [
   | m=0 → refl
-  | m=1 → λ i → push base b i
+  | m=1 i → push base b i
   ]
 
 let s3-to-join/k01 : [i j m] join [
@@ -41,20 +41,20 @@ let s3-to-join/k01 : [i j m] join [
   =
   λ i j m →
     comp 1 i (s3-to-join/cnx base 1 m) [
-    | j=0 → λ i → s3-to-join/cnx base i m
-    | j=1 → λ i → s3-to-join/cnx base i m
-    | m=0 → λ _ → inl base
-    | m=1 → λ i → push (loop j) base i
+    | j=0 i → s3-to-join/cnx base i m
+    | j=1 i → s3-to-join/cnx base i m
+    | m=0 → refl
+    | m=1 i → push (loop j) base i
     ]
 
 let s3-to-join/cube/filler (i j k m : dim) : join =
   comp 1 m (push (loop j) (loop k) i) [
-  | i=0 → λ m → s3-to-join/k01 0 j m
-  | i=1 → λ m → s3-to-join/cnx (loop k) 1 m
-  | j=0 → λ m → s3-to-join/cnx (loop k) i m
-  | j=1 → λ m → s3-to-join/cnx (loop k) i m
-  | k=0 → λ m → s3-to-join/k01 i j m
-  | k=1 → λ m → s3-to-join/k01 i j m
+  | i=0 m → s3-to-join/k01 0 j m
+  | i=1 m → s3-to-join/cnx (loop k) 1 m
+  | j=0 m → s3-to-join/cnx (loop k) i m
+  | j=1 m → s3-to-join/cnx (loop k) i m
+  | k=0 m → s3-to-join/k01 i j m
+  | k=1 m → s3-to-join/k01 i j m
   ]
 
 let s3-to-join (d : s3) : join =
