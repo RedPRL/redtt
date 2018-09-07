@@ -128,10 +128,10 @@ let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
         let sq : PathD (λ j → Path (Fiber A B f y) w (c' (a,p) j)) (c w) (c' w) =
           λ i j →
             comp 0 1 (weak-connection/and (Fiber A B f y) (c' w) i j) [
-            | i=0 → λ k → weak-connection/and (Fiber A B f y) (c w) k j
-            | i=1 → λ _ → c' w j
-            | j=0 → λ _ → w
-            | j=1 → λ k → c' (c w k) i
+            | i=0 k → weak-connection/and (Fiber A B f y) (c w) k j
+            | i=1 _ → c' w j
+            | j=0 _ → w
+            | j=1 k → c' (c w k) i
             ]
         in
         sq i
@@ -262,7 +262,7 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
                  λ l →
                    comp 1 l b [
                    | i=0 → w.snd.snd b .snd v j .snd
-                   | i=1 → λ k → weak-connection/or B (v.snd) j k
+                   | i=1 k → weak-connection/or B (v.snd) j k
                    | j=0 → v.snd
                    | j=1 → ctr/B
                    ]

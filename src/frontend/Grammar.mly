@@ -246,6 +246,8 @@ epatbind:
 eface:
   | r0 = located(atomic); EQUALS; r1 = located(atomic); RIGHT_ARROW; e = located(econ)
     { r0, r1, e }
+  | r0 = located(atomic); EQUALS; r1 = located(atomic); xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
+    { r0, r1, eterm ($startpos(xs), $endpos(e)) (E.Lam (xs, e)) }
 
 
 escheme:

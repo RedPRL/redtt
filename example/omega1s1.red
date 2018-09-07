@@ -23,14 +23,14 @@ let loopn (n : int) : Path s1 base base =
     | zero → refl
     | suc (n → loopn) →
       ; this is trans, but let's expand the definition
-      λ i → comp 0 1 (loopn i) [ i=0 → refl | i=1 → λ j → loop j ]
+      λ i → comp 0 1 (loopn i) [ i=0 → refl | i=1 j → loop j ]
     ]
   | negsuc n →
     elim n [
     | zero →
-      λ i → comp 1 0 base [ i=0 → refl | i=1 → λ j → loop j ]
+      λ i → comp 1 0 base [ i=0 → refl | i=1 j → loop j ]
     | suc (n → loopn) →
-      λ i → comp 1 0 (loopn i) [ i=0 → refl | i=1 → λ j → loop j ]
+      λ i → comp 1 0 (loopn i) [ i=0 → refl | i=1 j → loop j ]
     ]
   ]
 
@@ -62,11 +62,11 @@ let winding-loopn (n : int) : Path int (winding (loopn n)) n =
 ;    ]
 ;  =
 ;  elim n [
-;  | pos n → λ i j → comp 0 i (loopn (pos n) j) [ j=0 → refl | j=1 → λ i → loop i ]
+;  | pos n → λ i j → comp 0 i (loopn (pos n) j) [ j=0 → refl | j=1 i → loop i ]
 ;  | negsuc n →
 ;    elim n [
-;    | zero → λ i j → comp 1 i base [ j=0 → refl | j=1 → λ i → loop i ]
-;    | suc n → λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 → refl | j=1 → λ i → loop i ]
+;    | zero → λ i j → comp 1 i base [ j=0 → refl | j=1 i → loop i ]
+;    | suc n → λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 → refl | j=1 i → loop i ]
 ;    ]
 ;  ]
 ;
@@ -77,7 +77,7 @@ let winding-loopn (n : int) : Path int (winding (loopn n)) n =
 ;    comp 0 i (decode-square n i j) [
 ;    | j=0 → refl
 ;    | j=1 → refl
-;    | i=1 → λ k → loopn (isuc-pred y k) j
+;    | i=1 k → loopn (isuc-pred y k) j
 ;    ]
 ;  ]
 
@@ -94,10 +94,10 @@ let decode-square (n : int)
   elim n [
   | pos n →
     elim n [
-    | zero → λ i j → comp 1 i base [ j=0 → refl | j=1 → λ i → loop i ]
-    | suc n → λ i j → comp 0 i (loopn (pos n) j) [ j=0 → refl | j=1 → λ i → loop i ]
+    | zero → λ i j → comp 1 i base [ j=0 → refl | j=1 i → loop i ]
+    | suc n → λ i j → comp 0 i (loopn (pos n) j) [ j=0 → refl | j=1 i → loop i ]
     ]
-  | negsuc n → λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 → refl | j=1 → λ i → loop i ]
+  | negsuc n → λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 → refl | j=1 i → loop i ]
   ]
 
 let decode (x : s1) : s1-univ-cover x → Path s1 base x =
@@ -110,7 +110,7 @@ let decode (x : s1) : s1-univ-cover x → Path s1 base x =
     comp 0 1 (decode-square n i j) [
     | j=0 → refl
     | j=1 → refl
-    | i=0 → λ k → loopn (pred-isuc y k) j
+    | i=0 k → loopn (pred-isuc y k) j
     | i=1 → refl
     ]
   ]
