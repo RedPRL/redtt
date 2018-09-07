@@ -133,24 +133,12 @@ let s3-join-s3 (d : s3) : Path s3 (join-to-s3 (s3-to-join d)) d =
   elim d [
   | base → refl
   | cube i j k → λ x →
-    let cnx/image : (i m : dim) → s3 =
-      λ i m → comp 0 i base [ m=0 → refl | m=1 → refl ]
-    in
     let cnx/filler : (i m x : dim) → s3 =
       λ i m x →
         comp 0 i base
         [ m=0 → refl
         | m=1 → refl
         | x=1 → refl
-        ]
-    in
-    let k01/image : (i m : dim) → s3 =
-      λ i m →
-        comp 1 i (cnx/image 1 m) [
-        | j=0 i → cnx/image i m
-        | j=1 i → cnx/image i m
-        | m=0 → refl
-        | m=1 → refl
         ]
     in
     let k01/filler : (i m x : dim) → s3 =
