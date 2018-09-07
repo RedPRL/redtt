@@ -441,12 +441,11 @@ let plug (ty, tm) frame =
 
 (* TODO: this sorry attempt results in things getting repeatedly evaluated *)
 let (%%) (ty, tm) frame =
+  let tm' = Tm.ann ~ty ~tm @< frame in
   base_cx >>= fun cx ->
-  let vty = Cx.eval cx ty in
-  plug (vty, tm) frame >>= fun tm' ->
-  let vty' = Typing.infer cx @@ Tm.ann ~ty ~tm @< frame in
+  let vty' = Typing.infer cx tm' in
   let ty' = Cx.quote_ty cx vty' in
-  ret (ty', tm')
+  ret (ty', Tm.up tm')
 
 
 let push_guess gm ~ty0 ~ty1 tm  =
@@ -713,29 +712,29 @@ let rigid_rigid q =
 
 let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
-  | Tm.Pi (dom0, Tm.B (nm, _)), Tm.Pi (dom1, _) ->
-    let x = Name.named nm in
-    let x_l = Tm.up @@ Tm.var ~twin:`TwinL x in
-    let x_r = Tm.up @@ Tm.var ~twin:`TwinR x in
+  | Tm.Pi (dom0, Tm.B (_, cod0)), Tm.Pi (dom1, Tm.B (_, cod1)) ->
+    let x = Name.fresh () in
+    let x_l =Tm.var ~twin:`TwinL x in
+    let x_r =Tm.var ~twin:`TwinR x in
 
-    in_scope x (`Tw (dom0, dom1))
-      begin
-        (q.ty0, q.tm0) %% Tm.FunApp x_l >>= fun (ty0, tm0) ->
-        (q.ty1, q.tm1) %% Tm.FunApp x_r >>= fun (ty1, tm1) ->
-        ret @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
-      end >>= fun prob ->
-    active prob
+    in_scope x (`Tw (dom0, dom1)) @@
+    let tm0 = Tm.up @@ Tm.ann ~ty:q.ty0 ~tm:q.tm0 @< Tm.FunApp (Tm.up x_l) in
+    let tm1 = Tm.up @@ Tm.ann ~ty:q.ty1 ~tm:q.tm1 @< Tm.FunApp (Tm.up x_r) in
+    let ty0 = Tm.let_ None x_l cod0 in
+    let ty1 = Tm.let_ None x_r cod1 in
+    active @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
 
-  | Tm.Sg (dom0, _), Tm.Sg (dom1, _) ->
-    (* Format.eprintf "Unify: @[<1>%a@]@.@." Equation.pp q ; *)
-    (q.ty0, q.tm0) %% Tm.Car >>= fun (_, car0) ->
-    (q.ty1, q.tm1) %% Tm.Car >>= fun (_, car1) ->
-    (q.ty0, q.tm0) %% Tm.Cdr >>= fun (ty_cdr0, cdr0) ->
-    (q.ty1, q.tm1) %% Tm.Cdr >>= fun (ty_cdr1, cdr1) ->
-    active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
-    let prob = Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1 in
-    (* Format.eprintf "problem: %a@.@." (Problem.pp) prob; *)
-    active @@ prob
+  | Tm.Sg (dom0, Tm.B (_, cod0)), Tm.Sg (dom1, Tm.B (_, cod1)) ->
+    let cmd0 = Tm.ann ~ty:q.ty0 ~tm:q.tm0 in
+    let cmd1 = Tm.ann ~ty:q.ty1 ~tm:q.tm1 in
+    let car0 = cmd0 @< Tm.Car in
+    let car1 = cmd1 @< Tm.Car in
+    let cdr0 = Tm.up @@ cmd0 @< Tm.Cdr in
+    let cdr1 = Tm.up @@ cmd1 @< Tm.Cdr in
+    let ty_cdr0 = Tm.let_ None car0 cod0 in
+    let ty_cdr1 = Tm.let_ None car1 cod1 in
+    active @@ Problem.eqn ~ty0:dom0 ~tm0:(Tm.up car0) ~ty1:dom1 ~tm1:(Tm.up car1) >>
+    active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
 
   | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
     let xs = Bwd.map Name.named nms0 in
@@ -916,14 +915,14 @@ let rec solver prob =
 
         | `Def (ty, tm) ->
           begin
-            (* match split_sigma Emp x ty with
-               | Some (y, ty0, z, ty1, s, _) ->
-               (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
-               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
-               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
-               | None -> *)
-            in_scope x (`Def (ty, tm)) @@
-            solver probx
+            match split_sigma Emp x ty with
+            | Some (y, ty0, z, ty1, s, _) ->
+              (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
+              solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
+              Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
+            | None ->
+              in_scope x (`Def (ty, tm)) @@
+              solver probx
           end
 
         | `Tw (ty0, ty1) ->
