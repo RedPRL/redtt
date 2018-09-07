@@ -21,12 +21,12 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
     , λ fib →
       coe 1 0
         (λ i →
-          ( λ b → elim b [ tt → fib.1 i .0 | ff → fib.1 i .1 ]
-          , λ j → weak-connection/or _ (fib.1) i j
+          ( λ b → elim b [ tt → fib.snd i .fst | ff → fib.snd i .snd ]
+          , λ j → weak-connection/or _ (fib.snd) i j
           ))
       in λ j →
         [i] (f : bool → A) × Path (A × A) (f tt, f ff) p [
-        | i=0 → (shannon/path A (fib.0) j, fib.1)
+        | i=0 → (shannon/path A (fib.fst) j, fib.snd)
         | i=1 → (pair-to-fun A p, refl)
         ]
     )
@@ -39,7 +39,7 @@ let fun-eq-pair (A : type) : Path^1 type (bool → A) (A × A) =
     `(V i (→ (data bool) A) (× A A) (fun-to-pair-equiv A))
 
 let swap-pair (A : type) (p : A × A) : A × A =
-  (p.1, p.0)
+  (p.snd, p.fst)
 
 let swap-fun (A : type) : (bool → A) → bool → A =
   coe 1 0 (swap-pair A) in λ i →
