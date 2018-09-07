@@ -94,3 +94,13 @@ let rec pp fmt =
     Format.fprintf fmt "%s" s
   | _ ->
     Format.fprintf fmt "<eterm>"
+
+let pp_edecl fmt =
+  function
+  | Import str ->
+    Format.fprintf fmt "import %s" str
+  | _ ->
+    Format.fprintf fmt "<other>"
+
+let pp_esig =
+  Pp.pp_list pp_edecl
