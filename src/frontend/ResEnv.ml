@@ -46,7 +46,7 @@ let rec get x renv =
     | Snoc (ys, Some y) ->
       if x = y
       then acc
-      else go ys (acc + 1)
+      else (go[@tailcall]) ys (acc + 1)
     | Snoc (ys, None) ->
       (go[@tailcall]) ys (acc + 1)
   in
