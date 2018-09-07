@@ -33,8 +33,9 @@ val dot : 'a -> 'a subst -> 'a subst
 val make : tm tmf -> tm
 val unleash : tm -> tm tmf
 
-val close_var : Name.t -> ?twin:(twin -> twin) -> int -> tm -> tm
-val open_var : int -> (twin -> tm cmd) -> tm -> tm
+val open_var : int -> Name.t -> tm -> tm
+val close_var : Name.t -> ?twin:twin option -> int -> tm -> tm
+val open_var_as_cmd : int -> tm cmd -> tm -> tm
 
 val bind : Name.t -> tm -> tm bnd
 val bindn : Name.t bwd -> tm -> tm nbnd

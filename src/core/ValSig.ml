@@ -8,8 +8,8 @@ sig
 
   val global_dims : dim DimEnv.t
 
-  (** Return the type and boundary of a global variable *)
-  val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
+  (** Return the type and definition of a global variable *)
+  val lookup : Name.t -> Tm.twin -> Tm.tm * Tm.tm option
 
   val lookup_datatype : Desc.data_label -> Tm.data_desc
 end

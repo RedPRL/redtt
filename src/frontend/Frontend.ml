@@ -40,7 +40,7 @@ let execute_signature esig =
   let module Elaborator = Elaborator.Make (I) in
   begin
     try
-      ignore @@ ElabMonad.run @@ ElabMonad.report @@ Elaborator.elab_sig Elaborator.T.empty esig;
+      ignore @@ ElabMonad.run @@ ElabMonad.report @@ Elaborator.elab_sig esig;
       Diagnostics.terminated ();
       Lwt.return_unit
     with

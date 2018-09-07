@@ -107,9 +107,6 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `Def _ ->
     []
-  | `SelfArg _ ->
-    (* ??? *)
-    [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `Tw _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `R _ ->
@@ -901,7 +898,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | `I | `Tick | `NullaryExt | `KillFromTick _ | `SelfArg _ as p ->
+        | `I | `Tick | `NullaryExt | `KillFromTick _ as p ->
           in_scope x p @@
           solver probx
 
@@ -941,8 +938,8 @@ let rec solver prob =
                   a representation based on having two contexts. *)
               let var_y = Tm.up @@ Tm.var y in
               let var_x = Tm.up @@ Tm.var x in
-              let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
-              let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
+              let sub_y = Subst.define (Subst.ext sub y (`P ty0)) x ~ty:ty0 ~tm:var_y in
+              let sub_x = Subst.define (Subst.ext sub x (`P ty0)) y ~ty:ty0 ~tm:var_x in
               solver @@ Problem.all x ty0 @@
               Problem.subst sub_x @@ Problem.subst sub_y probx
             | _ ->

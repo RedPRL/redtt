@@ -29,7 +29,6 @@ struct
   let flip f x y = f y x
 
   module E = ESig
-  module T = Map.Make (String)
 
   open Refiner
 
@@ -39,43 +38,18 @@ struct
 
   let univ = Tm.univ ~lvl:`Omega ~kind:`Pre
 
-  let get_resolver env =
-    let rec go_globals renv  =
-      function
-      | [] -> renv
-      | (name, x) :: env ->
-        let renvx = ResEnv.global name x renv in
-        go_globals renvx env
-    in
-    let rec go_locals renv =
-      function
-      | Emp -> renv
-      | Snoc (psi, (x, _)) ->
-        let renv = go_locals renv psi in
-        begin
-          match Name.name x with
-          | Some str ->
-            ResEnv.global str x renv
-          | None ->
-            renv
-        end
-    in
-    M.lift C.ask <<@> fun psi ->
-      let renv = go_globals (ResEnv.init ()) @@ T.bindings env in
-      go_locals renv psi
-
   let (<+>) m n =
     M.optional m >>= function
     | Some x -> M.ret x
     | None -> n
 
 
-  let kind_of_frame env =
+  let kind_of_frame =
     function
     | E.App ({con = E.Num (0 | 1)} as e) ->
       M.ret @@ `ExtApp e
     | E.App ({con = E.Var (nm, _)} as e) ->
-      get_resolver env >>= fun renv ->
+      M.lift @@ C.resolver >>= fun renv ->
       begin
         try
           begin
@@ -83,8 +57,8 @@ struct
             | `Var alpha ->
               M.lift C.get_global_env >>= fun env ->
               begin
-                match GlobalEnv.lookup_kind env alpha with
-                | (`P _ | `Tw _) -> M.ret @@ `FunApp e
+                match GlobalEnv.lookup env alpha with
+                | (`P _ | `Tw _ | `Def _) -> M.ret @@ `FunApp e
                 | `I -> M.ret @@ `ExtApp e
                 | `Tick -> M.ret @@ `Prev e
               end
@@ -104,27 +78,27 @@ struct
 
 
 
-  let rec elab_sig env =
+  let rec elab_sig =
     function
     | [] ->
-      M.ret env
+      M.ret ()
     | E.Debug f :: esig ->
-      elab_decl env @@ E.Debug f >>= fun env' ->
-      elab_sig env' esig
+      elab_decl @@ E.Debug f >>= fun _ ->
+      elab_sig esig
     | E.Quit :: _ ->
-      M.ret env
+      M.ret ()
     | dcl :: esig ->
-      elab_decl env dcl >>= fun env' ->
-      elab_sig env' esig
+      elab_decl dcl >>= fun _ ->
+      elab_sig esig
 
 
-  and elab_decl env =
+  and elab_decl =
     function
     | E.Define (name, opacity, scheme, e) ->
       let now0 = Unix.gettimeofday () in
-      elab_scheme env scheme @@ fun cod ->
+      elab_scheme scheme @@ fun cod ->
       M.unify >>
-      elab_chk env e {ty = cod; sys = []} >>= fun tm ->
+      elab_chk e {ty = cod; sys = []} >>= fun tm ->
       let alpha = Name.named @@ Some name in
 
       M.lift C.ask >>= fun psi ->
@@ -132,13 +106,11 @@ struct
       M.lift C.go_to_top >>
       M.unify <<@> fun _ ->
         let now1 = Unix.gettimeofday () in
-        Format.printf "Defined %s (%fs).@." name (now1 -. now0);
-        T.add name alpha env
+        Format.printf "Defined %s (%fs).@." name (now1 -. now0)
 
     | E.Data (dlbl, edesc) ->
-      elab_datatype env dlbl edesc >>= fun desc ->
-      M.lift @@ C.global (GlobalEnv.declare_datatype dlbl desc) >>
-      M.ret env
+      elab_datatype dlbl edesc >>= fun desc ->
+      M.lift @@ C.declare_datatype dlbl desc
 
     | E.Debug filter ->
       let title =
@@ -147,37 +119,35 @@ struct
         | `Constraints -> "Unsolved constraints:"
         | `Unsolved -> "Unsolved entries:"
       in
-      M.lift @@ C.dump_state Format.std_formatter title filter >>
-      M.ret env
+      M.lift @@ C.dump_state Format.std_formatter title filter
 
     | E.Normalize e ->
-      elab_inf env e >>= fun (ty, cmd) ->
+      elab_inf e >>= fun (ty, cmd) ->
       M.lift C.base_cx >>= fun cx ->
       let vty = Cx.eval cx ty in
       let el = Cx.eval_cmd cx cmd in
       let tm = Cx.quote cx ~ty:vty el in
-      M.emit e.span @@ M.PrintTerm {ty = ty; tm} >>
-      M.ret env
+      M.emit e.span @@ M.PrintTerm {ty = ty; tm}
 
 
     | E.Import file_name ->
       begin
         match I.import file_name with
         | `Cached ->
-          M.ret env
+          M.ret ()
         | `Elab esig ->
-          elab_sig env esig
+          elab_sig esig
       end
 
     | E.Quit ->
-      M.ret env
+      M.ret ()
 
-  and elab_datatype env dlbl edesc =
+  and elab_datatype dlbl edesc =
     let rec go acc =
       function
       | [] -> M.ret acc
       | econstr :: econstrs ->
-        elab_constr env dlbl acc econstr >>= fun constr ->
+        elab_constr dlbl acc econstr >>= fun constr ->
         go Desc.{edesc with constrs = acc.constrs @ [constr]} econstrs
     in
     match edesc.kind with
@@ -186,9 +156,11 @@ struct
     | _ ->
       go Desc.{edesc with constrs = []} edesc.constrs
 
-  and elab_constr env dlbl desc (clbl, constr) =
+  and elab_constr dlbl desc (clbl, constr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
       failwith "Duplicate constructor in datatype";
+
+    let data_ty = Tm.make @@ Tm.Data dlbl in
 
     let open Desc in
     let elab_rec_spec (x, Self) = M.ret (x, Self) in
@@ -209,13 +181,14 @@ struct
            the parameters too. *)
         traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
 
+
         let psi =
-          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `SelfArg ty)) rec_specs
+          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `P data_ty)) rec_specs
           @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dim_specs
         in
         M.in_scopes psi @@
         begin
-          elab_constr_boundary env dlbl desc (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
+          elab_constr_boundary dlbl desc (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
           M.ret
             (clbl,
              {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
@@ -227,7 +200,7 @@ struct
       | (lbl, ety) :: const_specs ->
         (* TODO: support higher universes *)
         let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
-        elab_chk env ety {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
+        elab_chk ety {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
         let x = Name.named @@ Some lbl in
         M.in_scope x (`P pty) @@
         go (acc #< (lbl, x, pty)) const_specs
@@ -235,7 +208,7 @@ struct
 
     go Emp constr.const_specs
 
-  and elab_constr_boundary env dlbl desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
+  and elab_constr_boundary dlbl desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
     M.lift C.base_cx >>= fun cx ->
     let (module V) = Cx.evaluator cx in
     let module D = Domain in
@@ -257,34 +230,34 @@ struct
     in
 
     let cx' = build_cx cx V.empty_env const_specs rec_specs dim_specs in
-    traverse (elab_constr_face env dlbl desc) sys >>= fun bdry ->
+    traverse (elab_constr_face dlbl desc) sys >>= fun bdry ->
     Typing.check_constr_boundary_sys cx' dlbl desc bdry;
     M.ret bdry
 
-  and elab_constr_face env dlbl desc (er0, er1, e) =
-    elab_dim env er0 >>= fun r0 ->
+  and elab_constr_face dlbl desc (er0, er1, e) =
+    elab_dim er0 >>= fun r0 ->
     bind_in_scope r0 >>= fun r0' ->
-    elab_dim env er1 >>= fun r1 ->
+    elab_dim er1 >>= fun r1 ->
     bind_in_scope r1 >>= fun r1' ->
     M.in_scope (Name.fresh ()) (`R (r0, r1)) @@
     begin
-      elab_boundary_term env dlbl desc e <<@> fun bt ->
+      elab_boundary_term dlbl desc e <<@> fun bt ->
         r0', r1', bt
     end
 
-  and elab_boundary_term env dlbl desc e =
+  and elab_boundary_term dlbl desc e =
     match e.con with
     | E.Var (nm, _) ->
-      elab_boundary_cut env dlbl desc nm Emp
+      elab_boundary_cut dlbl desc nm Emp
     | E.Cut ({con = E.Var (nm, _)}, spine) ->
-      elab_boundary_cut env dlbl desc nm spine
+      elab_boundary_cut dlbl desc nm spine
     | _ ->
       failwith "TODO: elaborate_boundary_term"
 
-  and boundary_resolve_name env desc name =
+  and boundary_resolve_name desc name =
     let open Desc in
     begin
-      get_resolver env >>= fun renv ->
+      M.lift C.resolver >>= fun renv ->
       match ResEnv.get name renv with
       | `Var x ->
         M.lift C.ask >>= fun psi ->
@@ -293,7 +266,6 @@ struct
           | `P _ -> [x]
           | `Def _ -> [x]
           | `I -> [x]
-          | `SelfArg _ -> [x]
           | `Tick -> [x]
           | `Tw _ -> []
           | _ -> []
@@ -301,7 +273,7 @@ struct
         let xs = Bwd.flat_map go psi in
         let ix = Bwd.length xs - 1 - (ListUtil.index_of (fun y -> x = y) @@ Bwd.to_list xs) in
         M.ret @@ `Ix ix
-      | `Ix _ ->
+      | _ ->
         failwith "impossible"
     end
     <+>
@@ -310,8 +282,8 @@ struct
       M.ret @@ `Constr (List.find (fun (lbl, _) -> name = lbl) desc.constrs)
     end
 
-  and elab_boundary_cut env dlbl desc name spine =
-    boundary_resolve_name env desc name >>= function
+  and elab_boundary_cut dlbl desc name spine =
+    boundary_resolve_name desc name >>= function
     | `Ix ix ->
       begin
         match spine with
@@ -330,7 +302,7 @@ struct
           (* TODO: might be backwards *)
           let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
           let pty' = Tm.subst sub pty in
-          elab_chk env e {ty = pty'; sys = []} >>= bind_in_scope >>= fun t ->
+          elab_chk e {ty = pty'; sys = []} >>= bind_in_scope >>= fun t ->
           go_const_specs ((pty', t) :: acc) ps frms
         | _ ->
           failwith "elab_intro: malformed parameters"
@@ -341,7 +313,7 @@ struct
         | [], _ ->
           M.ret (Bwd.to_list acc, frms)
         | (_, Desc.Self) :: rec_specs, E.App e :: frms ->
-          elab_boundary_term env dlbl desc e >>= fun bt ->
+          elab_boundary_term dlbl desc e >>= fun bt ->
           go_args (acc #< bt) rec_specs frms
         | _ ->
           failwith "todo: go_args"
@@ -352,7 +324,7 @@ struct
         | [], [] ->
           M.ret @@ Bwd.to_list acc
         | _ :: dim_specs, E.App e :: frms ->
-          elab_dim env e >>= bind_in_scope >>= fun r ->
+          elab_dim e >>= bind_in_scope >>= fun r ->
           go_dims (acc #< r) dim_specs frms
         | _ ->
           failwith "Dimensions length mismatch in boundary term"
@@ -366,14 +338,14 @@ struct
 
 
 
-  and elab_scheme env (cells, ecod) kont =
+  and elab_scheme (cells, ecod) kont =
     let rec go =
       function
       | [] ->
-        elab_chk env ecod {ty = univ; sys = []} >>=
+        elab_chk ecod {ty = univ; sys = []} >>=
         kont
       | `Ty (name, edom) :: cells ->
-        elab_chk env edom {ty = univ; sys = []} >>= normalize_ty >>= fun dom ->
+        elab_chk edom {ty = univ; sys = []} >>= normalize_ty >>= fun dom ->
         let x = Name.named @@ Some name in
         M.in_scope x (`P dom) @@
         go cells
@@ -393,7 +365,7 @@ struct
 
   (* TODO: we will be disentangling all the elaboration of concrete expressions from tactics which produce redtt proofs.
      As an example, see what we have done with tac_lambda, tac_if, etc. *)
-  and elab_chk env e : chk_tac =
+  and elab_chk e : chk_tac =
     fun goal ->
       (* TODO speed up elaboration by not normalizing, but raising ChkMatch if we don't know what to do.
          Then wrap the whole thing in tac_wrap_nf. *)
@@ -401,7 +373,7 @@ struct
       let goal = {goal with ty} in
       match goal.sys, Tm.unleash ty, e.con with
       | _, _, E.Guess e ->
-        tac_guess (elab_chk env e) goal
+        tac_guess (elab_chk e) goal
 
       | _, _, E.Hole name ->
         tac_hole ~loc:e.span ~name goal
@@ -416,41 +388,39 @@ struct
         let itac =
           match info.ty with
           | None ->
-            elab_inf env info.tm <<@> fun (let_ty, let_tm) ->
-              let_ty, Tm.up let_tm
+            elab_inf info.tm <<@> fun (let_ty, let_tm) -> let_ty, Tm.up let_tm
           | Some ety ->
-            elab_chk env ety {ty = univ; sys = []} >>= fun let_ty ->
-            elab_chk env info.tm {ty = let_ty; sys = []} <<@> fun let_tm ->
-              let_ty, let_tm
+            elab_chk ety {ty = univ; sys = []} >>= fun let_ty ->
+            elab_chk info.tm {ty = let_ty; sys = []} <<@> fun let_tm -> let_ty, let_tm
         in
-        let ctac goal = elab_chk env info.body goal in
+        let ctac goal = elab_chk info.body goal in
         tac_let info.name itac ctac goal
 
       | _, _, E.Lam (names, e) ->
-        let tac = elab_chk env e in
+        let tac = elab_chk e in
         tac_wrap_nf (tac_lambda names tac) goal
 
       | [], _, E.Quo tmfam ->
-        get_resolver env >>= fun renv ->
+        M.lift C.resolver >>= fun renv ->
         let tm = tmfam renv in
         begin
           match Tm.unleash tm with
           | Tm.Up _ ->
-            elab_up env ty {e with con = E.Quo tmfam}
+            elab_up ty {e with con = E.Quo tmfam}
           | _ ->
             M.ret @@ tmfam renv
         end
 
 
       | [], _, E.Elim {mot; scrut; clauses} ->
-        let tac_mot = Option.map (elab_chk env) mot in
-        let tac_scrut = elab_inf env scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
+        let tac_mot = Option.map elab_chk mot in
+        let tac_scrut = elab_inf scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
         let used = Hashtbl.create 10 in
         let elab_clause (lbl, pbinds, bdy) =
           if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
             begin
               Hashtbl.add used lbl ();
-              lbl, pbinds, elab_chk env bdy
+              lbl, pbinds, elab_chk bdy
             end
         in
         let clauses = List.map elab_clause clauses in
@@ -465,21 +435,21 @@ struct
           | _ -> List.map (fun x -> (x, `I)) xs
         in
         M.in_scopes ps begin
-          elab_chk env ety {ty = univ; sys = []} >>= fun tyxs ->
-          elab_tm_sys env tyxs esys <<@> fun sysxs ->
+          elab_chk ety {ty = univ; sys = []} >>= fun tyxs ->
+          elab_tm_sys tyxs esys <<@> fun sysxs ->
             let ebnd = Tm.bind_ext (Bwd.from_list xs) tyxs sysxs in
             let ext_ty = Tm.make @@ Tm.Ext ebnd in
             ext_ty
         end
 
       | [], Tm.Univ _, E.Pi ([], e) ->
-        elab_chk env e goal
+        elab_chk e goal
 
       | [], Tm.Univ _, E.Pi (`Ty (name, edom) :: etele, ecod) ->
-        elab_chk env edom {ty; sys = []} >>= fun dom ->
+        elab_chk edom {ty; sys = []} >>= fun dom ->
         let x = Name.named @@ Some name in
         M.in_scope x (`P dom) begin
-          elab_chk env {e with con = E.Pi (etele, ecod)} {ty; sys = []}
+          elab_chk {e with con = E.Pi (etele, ecod)} {ty; sys = []}
           <<@> Tm.bind x
           <<@> fun cod -> Tm.make @@ Tm.Pi (dom, cod)
         end
@@ -487,7 +457,7 @@ struct
       | [], Tm.Univ _, E.Pi (`I name :: etele, ecod) ->
         let x = Name.named @@ Some name in
         M.in_scope x `I begin
-          elab_chk env { e with con = E.Pi (etele, ecod)} {ty; sys = []}
+          elab_chk { e with con = E.Pi (etele, ecod)} {ty; sys = []}
           <<@> fun codx ->
             let ebnd = Tm.bind_ext (Emp #< x) codx [] in
             Tm.make @@ Tm.Ext ebnd
@@ -496,19 +466,19 @@ struct
       | [], Tm.Univ _, E.Pi (`Tick name :: etele, ecod) ->
         let x = Name.named @@ Some name in
         M.in_scope x `Tick begin
-          elab_chk env {e with con = E.Pi (etele, ecod)} {ty; sys = []}
+          elab_chk {e with con = E.Pi (etele, ecod)} {ty; sys = []}
           <<@> Tm.bind x
           <<@> fun bnd -> Tm.make @@ Tm.Later bnd
         end
 
       | [], Tm.Univ _, E.Sg ([], e) ->
-        elab_chk env e {ty; sys = []}
+        elab_chk e {ty; sys = []}
 
       | [], Tm.Univ _, E.Sg (`Ty (name, edom) :: etele, ecod) ->
-        elab_chk env edom {ty; sys = []} >>= fun dom ->
+        elab_chk edom {ty; sys = []} >>= fun dom ->
         let x = Name.named @@ Some name in
         M.in_scope x (`P dom) begin
-          elab_chk env {e with con = E.Sg (etele, ecod)} {ty; sys = []}
+          elab_chk {e with con = E.Sg (etele, ecod)} {ty; sys = []}
           <<@> Tm.bind x
           <<@> fun cod -> Tm.make @@ Tm.Sg (dom, cod)
         end
@@ -518,11 +488,11 @@ struct
         failwith "empty tuple"
 
       | _, _, Tuple [e] ->
-        elab_chk env e goal
+        elab_chk e goal
 
       | _, Tm.Sg (dom, cod), Tuple (e0 :: es) as etuple ->
-        let tac0 = elab_chk env e0 in
-        let tac1 = elab_chk env @@ {e with con = Tuple es} in
+        let tac0 = elab_chk e0 in
+        let tac1 = elab_chk @@ {e with con = Tuple es} in
         tac_pair tac0 tac1 goal
 
       | [], Tm.Univ info, Type (kind, lvl) ->
@@ -538,17 +508,17 @@ struct
         end
 
       | [], _, E.Cut (e, fs) ->
-        elab_chk_cut env e fs ty
+        elab_chk_cut e fs ty
 
       | [], _, E.HCom info ->
-        elab_dim env info.r >>= fun r ->
-        elab_dim env info.r' >>= fun r' ->
+        elab_dim info.r >>= fun r ->
+        elab_dim info.r' >>= fun r' ->
         let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
         begin
           M.lift @@ C.check ~ty:kan_univ ty >>= function
           | `Ok ->
-            elab_chk env info.cap {ty; sys = []} >>= fun cap ->
-            elab_hcom_sys env r ty cap info.sys <<@> fun sys ->
+            elab_chk info.cap {ty; sys = []} >>= fun cap ->
+            elab_hcom_sys r ty cap info.sys <<@> fun sys ->
               let hcom = Tm.HCom {r; r'; ty; cap; sys} in
               Tm.up (hcom, Emp)
 
@@ -557,28 +527,28 @@ struct
         end
 
       | [], _, E.Var _ ->
-        elab_chk_cut env e Emp ty
+        elab_chk_cut e Emp ty
 
       | [], _, _ ->
-        elab_up env ty e
+        elab_up ty e
 
       | _, _, _ ->
-        elab_chk env e {goal with sys = []} >>= fun tm ->
+        elab_chk e {goal with sys = []} >>= fun tm ->
         guess_restricted tm goal
 
 
-  and elab_tm_sys env ty =
+  and elab_tm_sys ty =
     let rec go acc =
       function
       | [] ->
         M.ret @@ Bwd.to_list acc
 
       | (e_r, e_r', e) :: esys ->
-        elab_dim env e_r >>= fun r ->
-        elab_dim env e_r' >>= fun r' ->
+        elab_dim e_r >>= fun r ->
+        elab_dim e_r' >>= fun r' ->
         begin
           M.under_restriction r r' begin
-            elab_chk env e {ty; sys = Bwd.to_list acc}
+            elab_chk e {ty; sys = Bwd.to_list acc}
           end
         end >>= fun obnd ->
         let face = r, r', obnd in
@@ -588,7 +558,7 @@ struct
 
 
 
-  and elab_hcom_sys env s ty cap =
+  and elab_hcom_sys s ty cap =
     let rec go acc =
       function
       | [] ->
@@ -608,11 +578,11 @@ struct
           let faces = face_cap :: faces_adj in
           Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) ty faces)
         in
-        elab_dim env e_r >>= fun r ->
-        elab_dim env e_r' >>= fun r' ->
+        elab_dim e_r >>= fun r ->
+        elab_dim e_r' >>= fun r' ->
         begin
           M.under_restriction r r' begin
-            elab_chk env e {ty = ext_ty; sys = []} >>= fun line ->
+            elab_chk e {ty = ext_ty; sys = []} >>= fun line ->
             let tmx = Tm.up @@ Tm.ann ~ty:ext_ty ~tm:line @< Tm.ExtApp [varx] in
             M.ret @@ Tm.bind x tmx
           end
@@ -622,7 +592,7 @@ struct
 
     in go Emp
 
-  and elab_com_sys env s ty_bnd cap =
+  and elab_com_sys s ty_bnd cap =
     let rec go acc =
       function
       | [] ->
@@ -643,11 +613,11 @@ struct
           let faces = face_cap :: faces_adj in
           Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) tyx faces)
         in
-        elab_dim env e_r >>= fun r ->
-        elab_dim env e_r' >>= fun r' ->
+        elab_dim e_r >>= fun r ->
+        elab_dim e_r' >>= fun r' ->
         begin
           M.under_restriction r r' begin
-            elab_chk env e {ty = ext_ty; sys = []} >>= fun line ->
+            elab_chk e {ty = ext_ty; sys = []} >>= fun line ->
             let tmx = Tm.up @@ Tm.ann ~ty:ext_ty ~tm:line @< Tm.ExtApp [varx] in
             M.ret @@ Tm.bind x tmx
           end
@@ -657,8 +627,8 @@ struct
 
     in go Emp
 
-  and elab_up env ty inf =
-    elab_inf env inf >>= fun (ty', cmd) ->
+  and elab_up ty inf =
+    elab_inf inf >>= fun (ty', cmd) ->
     M.lift (C.check ~ty @@ Tm.up cmd) >>= function
     | `Ok -> M.ret @@ Tm.up cmd
     | `Exn exn ->
@@ -670,8 +640,8 @@ struct
       | `Exn exn ->
         raise exn
 
-  and elab_var env name ushift =
-    get_resolver env <<@> fun renv ->
+  and elab_var name ushift =
+    M.lift C.resolver <<@> fun renv ->
       begin
         match ResEnv.get name renv with
         | `Var a ->
@@ -681,24 +651,34 @@ struct
       end
 
 
-  and elab_inf env e : (ty * tm Tm.cmd) M.m =
+  and elab_inf e : (ty * tm Tm.cmd) M.m =
     match e.con with
     | E.Var (name, ushift) ->
+      M.lift C.resolver >>= fun renv ->
       begin
-        elab_var env name ushift >>= fun (a, cmd) ->
-        M.lift (C.lookup_var a `Only) <+> (M.lift (C.lookup_meta a) <<@> fst) <<@> fun ty ->
-          Tm.shift_univ ushift ty, cmd
-      end <+>
-      begin
-        M.lift C.base_cx <<@> fun cx ->
-          let sign = Cx.globals cx in
-          let _ = GlobalEnv.lookup_datatype name sign in
-          let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-          univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
+        match ResEnv.get name renv with
+        | `Var x ->
+          M.lift (C.lookup_var x `Only) <<@> fun ty ->
+            Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, Emp)
+
+        | `Metavar x ->
+          M.lift (C.lookup_meta x) <<@> fun (ty, _) ->
+            Tm.shift_univ ushift ty, (Tm.Meta {name = x; ushift}, Emp)
+
+
+        | `Datatype dlbl ->
+          M.lift C.base_cx <<@> fun cx ->
+            let sign = Cx.globals cx in
+            let _ = GlobalEnv.lookup_datatype name sign in
+            let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
+            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
+
+        | `Ix _ ->
+          failwith "elab_inf: impossible"
       end
 
     | E.Quo tmfam ->
-      get_resolver env >>= fun renv ->
+      M.lift C.resolver >>= fun renv ->
       let tm = tmfam renv in
       begin
         match Tm.unleash tm with
@@ -711,67 +691,67 @@ struct
       end
 
     | E.Cut (e, fs) ->
-      elab_cut env e fs
+      elab_cut e fs
 
     | E.Coe info ->
-      elab_dim env info.r >>= fun tr ->
-      elab_dim env info.r' >>= fun tr' ->
+      elab_dim info.r >>= fun tr ->
+      elab_dim info.r' >>= fun tr' ->
       let x = Name.fresh () in
       let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
-      elab_chk env info.fam {ty = univ_fam; sys = []} >>= fun fam ->
+      elab_chk info.fam {ty = univ_fam; sys = []} >>= fun fam ->
 
       let fam_cmd = Tm.ann ~ty:univ_fam ~tm:fam in
       let fam_r = Tm.up @@ fam_cmd @< Tm.ExtApp [tr] in
       let fam_r' = Tm.up @@ fam_cmd @< Tm.ExtApp [tr'] in
-      elab_chk env info.tm {ty = fam_r; sys = []} <<@> fun tm ->
+      elab_chk info.tm {ty = fam_r; sys = []} <<@> fun tm ->
         let varx = Tm.up @@ Tm.var x in
         let tyx = Tm.up @@ Tm.ann ~ty:univ_fam ~tm:fam @< Tm.ExtApp [varx] in
         let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
         fam_r', (coe, Emp)
 
     | E.Com info ->
-      elab_dim env info.r >>= fun tr ->
-      elab_dim env info.r' >>= fun tr' ->
+      elab_dim info.r >>= fun tr ->
+      elab_dim info.r' >>= fun tr' ->
       let x = Name.fresh () in
       let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
       let univ_fam = Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) kan_univ []) in
-      elab_chk env info.fam {ty = univ_fam; sys = []} >>= fun fam ->
+      elab_chk info.fam {ty = univ_fam; sys = []} >>= fun fam ->
 
       let fam_cmd = Tm.ann ~ty:univ_fam ~tm:fam in
       let fam_r = Tm.up @@ fam_cmd @< Tm.ExtApp [tr] in
       let fam_r' = Tm.up @@ fam_cmd @< Tm.ExtApp [tr'] in
 
-      elab_chk env info.cap {ty = fam_r; sys = []} >>= fun cap ->
+      elab_chk info.cap {ty = fam_r; sys = []} >>= fun cap ->
 
       let varx = Tm.up @@ Tm.var x in
       let fam_x = Tm.up @@ fam_cmd @< Tm.ExtApp [varx] in
       let tybnd = Tm.bind x fam_x in
-      elab_com_sys env tr tybnd cap info.sys <<@> fun sys ->
+      elab_com_sys tr tybnd cap info.sys <<@> fun sys ->
         let com = Tm.Com {r = tr; r' = tr'; ty = tybnd; cap; sys} in
         fam_r', (com, Emp)
 
     | E.DFixLine info ->
-      elab_chk env info.ty {ty = univ; sys = []} >>= fun ty ->
-      elab_dim env info.r >>= fun r ->
+      elab_chk info.ty {ty = univ; sys = []} >>= fun ty ->
+      elab_dim info.r >>= fun r ->
       let wk_ty = Tm.subst (Tm.shift 1) ty in
       let ltr_ty = Tm.make @@ Tm.Later (Tm.B (None, wk_ty)) in
       let x = Name.named @@ Some info.name in
       M.in_scope x (`P ltr_ty) begin
-        elab_chk env info.bdy {ty; sys = []}
+        elab_chk info.bdy {ty; sys = []}
         <<@> Tm.bind x
         <<@> fun bdy ->
           ltr_ty, (Tm.DFix {r; ty; bdy}, Emp)
       end
 
     | E.FixLine info ->
-      elab_chk env info.ty {ty = univ; sys = []} >>= fun ty ->
-      elab_dim env info.r >>= fun r ->
+      elab_chk info.ty {ty = univ; sys = []} >>= fun ty ->
+      elab_dim info.r >>= fun r ->
       let wk_ty = Tm.subst (Tm.shift 1) ty in
       let ltr_ty = Tm.make @@ Tm.Later (Tm.B (None, wk_ty)) in
       let x = Name.named @@ Some info.name in
       M.in_scope x (`P ltr_ty) begin
-        elab_chk env info.bdy {ty; sys = []}
+        elab_chk info.bdy {ty; sys = []}
         <<@> Tm.bind x
         <<@> fun bdy ->
           let dfix = Tm.DFix {r; ty; bdy}, Emp in
@@ -783,15 +763,15 @@ struct
     | _ ->
       failwith "Can't infer"
 
-  and elab_dim env e =
+  and elab_dim e =
     match e.con with
     | E.Var (name, 0) ->
-      get_resolver env >>= fun renv ->
+      M.lift C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
         | `Var a ->
           M.ret @@ Tm.up @@ Tm.var a
-        | `Ix _ ->
+        | _ ->
           failwith "elab_dim: expected locally closed"
       end
     | E.Num 0 ->
@@ -801,16 +781,16 @@ struct
     | _ ->
       failwith "TODO: elab_dim"
 
-  and bite_from_spine env spine =
+  and bite_from_spine spine =
     match spine with
     | Emp ->
       M.ret (spine, `Done)
     | Snoc (spine, frm) ->
-      kind_of_frame env frm >>= function
+      kind_of_frame frm >>= function
       | `FunApp e ->
         M.ret (spine, `FunApp e)
       | `ExtApp dim ->
-        bite_dims_from_spine env spine <<@> fun (spine, dims) ->
+        bite_dims_from_spine spine <<@> fun (spine, dims) ->
           spine, `ExtApp (Bwd.to_list @@ dims #< dim)
       | `Prev e ->
         M.ret (spine, `Prev e)
@@ -821,13 +801,13 @@ struct
       | `Open ->
         M.ret (spine, `Open)
 
-  and bite_dims_from_spine env spine =
+  and bite_dims_from_spine spine =
     let rec go spine dims =
       match spine with
       | Emp ->
         M.ret (Emp, Bwd.from_list dims)
       | Snoc (spine, frm) ->
-        kind_of_frame env frm >>= function
+        kind_of_frame frm >>= function
         | `ExtApp dim ->
           go spine @@ dim :: dims
         | _ ->
@@ -841,7 +821,7 @@ struct
       cx, Cx.evaluator cx
 
 
-  and elab_chk_cut env exp frms ty =
+  and elab_chk_cut exp frms ty =
     match Tm.unleash ty with
     | Tm.Data dlbl ->
       begin
@@ -852,18 +832,18 @@ struct
             let sign = Cx.globals cx in
             let desc = GlobalEnv.lookup_datatype dlbl sign in
             let constr = Desc.lookup_constr clbl desc in
-            elab_intro env dlbl clbl constr frms
+            elab_intro dlbl clbl constr frms
           end
-          <+> elab_mode_switch_cut env exp frms ty
+          <+> elab_mode_switch_cut exp frms ty
 
         | _ ->
-          elab_mode_switch_cut env exp frms ty
+          elab_mode_switch_cut exp frms ty
       end
 
     | _ ->
-      elab_mode_switch_cut env exp frms ty
+      elab_mode_switch_cut exp frms ty
 
-  and elab_intro env dlbl clbl constr frms =
+  and elab_intro dlbl clbl constr frms =
     let rec go_const_args acc const_specs frms =
       match const_specs, frms with
       | [], _ ->
@@ -872,7 +852,7 @@ struct
         (* TODO: might be backwards *)
         let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
         let ty' = Tm.subst sub ty in
-        elab_chk env e {ty = ty'; sys = []} >>= fun t ->
+        elab_chk e {ty = ty'; sys = []} >>= fun t ->
         go_const_args ((ty', t) :: acc) const_specs frms
       | _ ->
         failwith "elab_intro: malformed parameters"
@@ -882,10 +862,10 @@ struct
       | [], [], [] ->
         M.ret []
       | [], _ :: dims, E.App r :: frms ->
-        (fun x xs -> x :: xs) <@>> elab_dim env r <*> go_rec_args rec_specs dims frms
+        (fun x xs -> x :: xs) <@>> elab_dim r <*> go_rec_args rec_specs dims frms
       | (_, Desc.Self) :: rec_specs, dims, E.App e :: frms ->
         let self_ty = Tm.make @@ Tm.Data dlbl in
-        (fun x xs -> x :: xs) <@>> elab_chk env e {ty = self_ty; sys = []} <*> go_rec_args rec_specs dims frms
+        (fun x xs -> x :: xs) <@>> elab_chk e {ty = self_ty; sys = []} <*> go_rec_args rec_specs dims frms
       | _ ->
         failwith "todo: go_args"
     in
@@ -893,8 +873,8 @@ struct
     go_rec_args constr.rec_specs constr.dim_specs frms >>= fun targs ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
 
-  and elab_mode_switch_cut env exp frms ty =
-    elab_cut env exp frms >>= fun (ty', cmd) ->
+  and elab_mode_switch_cut exp frms ty =
+    elab_cut exp frms >>= fun (ty', cmd) ->
     M.lift (C.check ~ty @@ Tm.up cmd) >>= function
     | `Ok ->
       M.ret @@ Tm.up cmd
@@ -909,12 +889,12 @@ struct
         Format.eprintf "raising exn@.";
         raise exn
 
-  and elab_cut env exp frms =
-    elab_cut_ env exp frms >>= fun (ty, cmd) ->
+  and elab_cut exp frms =
+    elab_cut_ exp frms >>= fun (ty, cmd) ->
     normalize_ty ty >>= fun ty ->
     M.ret (ty, cmd)
 
-  and elab_cut_ env exp frms =
+  and elab_cut_ exp frms =
     let rec unleash tm =
       match Tm.unleash tm with
       | con -> con
@@ -927,9 +907,9 @@ struct
     in
 
 
-    bite_from_spine env frms >>= function
+    bite_from_spine frms >>= function
     | _, `Done ->
-      elab_inf env exp
+      elab_inf exp
 
     | spine, `ExtApp dims ->
       let rec go dims (ty, cmd) =
@@ -943,28 +923,28 @@ struct
             let Tm.NB (nms, _) = ebnd in
             let n = Bwd.length nms in
             let dims0, dims1 = ListUtil.split n dims in
-            traverse (elab_dim env) dims0 >>= fun trs0 ->
+            traverse elab_dim dims0 >>= fun trs0 ->
             let ty, _ = Tm.unbind_ext_with (List.map (fun tr -> Tm.DownX tr, Emp) trs0) ebnd in
             go dims1 (ty, cmd @< (Tm.ExtApp trs0))
           | _ ->
             raise ChkMatch
       in
-      elab_cut env exp spine >>= go dims
+      elab_cut exp spine >>= go dims
 
     | spine, `FunApp e ->
-      elab_cut env exp spine >>= fun (ty, cmd) ->
+      elab_cut exp spine >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin
         match unleash ty with
         | Tm.Pi (dom, cod) ->
-          elab_chk env e {ty = dom; sys = []} <<@> fun arg ->
+          elab_chk e {ty = dom; sys = []} <<@> fun arg ->
             Tm.unbind_with (Tm.ann ~ty:dom ~tm:arg) cod, cmd @< Tm.FunApp arg
         | _ ->
           raise ChkMatch
       end
 
     | spine, `Car ->
-      elab_cut env exp spine >>= fun (ty, cmd) ->
+      elab_cut exp spine >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin
         match unleash ty with
@@ -976,7 +956,7 @@ struct
 
 
     | spine, `Cdr ->
-      elab_cut env exp spine >>= fun (ty, cmd) ->
+      elab_cut exp spine >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin
         match unleash ty with
@@ -988,9 +968,9 @@ struct
       end
 
     | spine, `Prev {con = E.Var (name, _)} ->
-      elab_var env name 0 >>= fun (_, tick) ->
+      elab_var name 0 >>= fun (_, tick) ->
       M.in_scope (Name.fresh ()) (`KillFromTick (Tm.up tick)) begin
-        elab_cut env exp spine
+        elab_cut exp spine
       end >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin

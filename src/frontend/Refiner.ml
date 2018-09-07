@@ -86,7 +86,6 @@ let bind_in_scope tm =
       | `P _ -> [x]
       | `Def _ -> [x]
       | `I -> [x]
-      | `SelfArg _ -> [x]
       | `Tick -> [x]
       | `Tw _ -> []
       | _ -> []

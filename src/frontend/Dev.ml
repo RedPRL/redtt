@@ -31,7 +31,6 @@ type 'a param =
   | `Def of 'a * 'a
   | `Tw of 'a * 'a
   | `R of 'a * 'a
-  | `SelfArg of 'a Desc.rec_spec
   ]
 
 type params = (Name.t * ty param) bwd
@@ -55,10 +54,10 @@ let eqn_open_var k x tw q =
   in
   let xl = Tm.var x ~twin:twl in
   let xr = Tm.var x ~twin:twr in
-  let ty0 = Tm.open_var k (fun _ -> xl) q.ty0 in
-  let ty1 = Tm.open_var k (fun _ -> xr) q.ty1 in
-  let tm0 = Tm.open_var k (fun _ -> xl) q.tm0 in
-  let tm1 = Tm.open_var k (fun _ -> xr) q.tm1 in
+  let ty0 = Tm.open_var_as_cmd k xl q.ty0 in
+  let ty1 = Tm.open_var_as_cmd k xr q.ty1 in
+  let tm0 = Tm.open_var_as_cmd k xl q.tm0 in
+  let tm1 = Tm.open_var_as_cmd k xr q.tm1 in
   {ty0; ty1; tm0; tm1}
 
 let rec eqn_close_var x tw k q =
@@ -67,52 +66,48 @@ let rec eqn_close_var x tw k q =
     | `P -> `Only, `Only
     | `Tw -> `TwinL, `TwinR
   in
-  let ty0 = Tm.close_var x ~twin:(fun _ -> twl) k q.ty0 in
-  let ty1 = Tm.close_var x ~twin:(fun _ -> twr) k q.ty1 in
-  let tm0 = Tm.close_var x ~twin:(fun _ -> twl) k q.tm0 in
-  let tm1 = Tm.close_var x ~twin:(fun _ -> twr) k q.tm1 in
+  let ty0 = Tm.close_var x ~twin:(Some twl) k q.ty0 in
+  let ty1 = Tm.close_var x ~twin:(Some twr) k q.ty1 in
+  let tm0 = Tm.close_var x ~twin:(Some twl) k q.tm0 in
+  let tm1 = Tm.close_var x ~twin:(Some twr) k q.tm1 in
   {ty0; ty1; tm0; tm1}
 
 let param_open_var k x =
   function
   | (`I | `Tick | `NullaryExt) as p -> p
   | `KillFromTick tck ->
-    `KillFromTick (Tm.open_var k (fun twin -> Tm.var x ~twin) tck)
+    `KillFromTick (Tm.open_var k x tck)
   | `P ty ->
-    `P (Tm.open_var k (fun twin -> Tm.var x ~twin) ty)
+    `P (Tm.open_var k x ty)
   | `Def (ty, tm) ->
-    `Def (Tm.open_var k (fun twin -> Tm.var x ~twin) ty, Tm.open_var k (fun twin -> Tm.var x ~twin) tm)
+    `Def (Tm.open_var k x ty, Tm.open_var k x tm)
   | `Tw (ty0, ty1) ->
-    `Tw (Tm.open_var k (fun twin -> Tm.var x ~twin) ty0, Tm.open_var k (fun twin -> Tm.var x ~twin) ty1)
+    `Tw (Tm.open_var k x ty0, Tm.open_var k x ty1)
   | `R (r0, r1) ->
-    `R (Tm.open_var k (fun twin -> Tm.var x ~twin) r0, Tm.open_var k (fun twin -> Tm.var x ~twin) r1)
-  | `SelfArg Desc.Self ->
-    `SelfArg Desc.Self
+    `R (Tm.open_var k x r0, Tm.open_var k x r1)
 
 
 let param_close_var x k =
   function
   | (`I | `Tick | `NullaryExt) as p -> p
   | `KillFromTick tck ->
-    `KillFromTick (Tm.close_var x ~twin:(fun tw -> tw) k tck)
+    `KillFromTick (Tm.close_var x k tck)
   | `P ty ->
-    `P (Tm.close_var x ~twin:(fun tw -> tw) k ty)
+    `P (Tm.close_var x k ty)
   | `Def (ty, tm) ->
-    `Def (Tm.close_var x ~twin:(fun tw -> tw) k ty, Tm.close_var x ~twin:(fun tw -> tw) k tm)
+    `Def (Tm.close_var x k ty, Tm.close_var x k tm)
   | `Tw (ty0, ty1) ->
-    `Tw (Tm.close_var x ~twin:(fun tw -> tw) k ty0, Tm.close_var x ~twin:(fun tw -> tw) k ty1)
+    `Tw (Tm.close_var x k ty0, Tm.close_var x k ty1)
   | `R (r0, r1) ->
-    `R (Tm.close_var x ~twin:(fun tw -> tw) k r0, Tm.close_var x ~twin:(fun tw -> tw) k r1)
-  | `SelfArg Desc.Self ->
-    `SelfArg Desc.Self
+    `R (Tm.close_var x k r0, Tm.close_var x k r1)
 
 let rec prob_open_var k x tw =
   function
   | Unify q ->
     Unify (eqn_open_var k x tw q)
   | Subtype q ->
-    let ty0 = Tm.open_var k (fun twin -> Tm.var x ~twin) q.ty0 in
-    let ty1 = Tm.open_var k (fun twin -> Tm.var x ~twin) q.ty1 in
+    let ty0 = Tm.open_var k x q.ty0 in
+    let ty1 = Tm.open_var k x q.ty1 in
     Subtype {ty0; ty1}
   | All (p, B (nm, prob)) ->
     All (param_open_var k x p, B (nm, prob_open_var (k + 1) x tw prob))
@@ -122,8 +117,8 @@ let rec prob_close_var x tw k =
   | Unify q ->
     Unify (eqn_close_var x tw k q)
   | Subtype q ->
-    let ty0 = Tm.close_var x ~twin:(fun tw -> tw) k q.ty0 in
-    let ty1 = Tm.close_var x ~twin:(fun tw -> tw) k q.ty1 in
+    let ty0 = Tm.close_var x k q.ty0 in
+    let ty1 = Tm.close_var x k q.ty1 in
     Subtype {ty0; ty1}
   | All (p, B (nm, prob)) ->
     All (param_close_var x k p, B (nm, prob_close_var x tw (k + 1) prob))
@@ -199,8 +194,6 @@ let pp_param fmt =
     Format.fprintf fmt "%a = %a"
       Tm.pp0 r0
       Tm.pp0 r1
-  | `SelfArg Desc.Self ->
-    Format.fprintf fmt "self"
 
 
 let pp_param_cell fmt (x, param) =
@@ -244,10 +237,6 @@ let pp_param_cell fmt (x, param) =
     Format.fprintf fmt "@[<1>%a = %a@]"
       Tm.pp0 r0
       Tm.pp0 r1
-
-  | `SelfArg Desc.Self ->
-    Format.fprintf fmt "@[<1>%a : self@]"
-      Name.pp x
 
 let rec pp_params fmt =
   function
@@ -368,7 +357,7 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
   function
-  | (`I | `NullaryExt | `Tick | `SelfArg Desc.Self) as p ->
+  | (`I | `NullaryExt | `Tick) as p ->
     p, sub
   | `KillFromTick tck ->
     `KillFromTick (subst_tm sub ~ty:univ tck), sub
@@ -395,24 +384,23 @@ let rec subst_problem sub =
     let param', sub' = subst_param sub param in
     let x, probx = unbind param prob in
     begin
-      match param with
+      match param' with
       | `P ty ->
-        let sub'' = GlobalEnv.ext sub' x @@ `P {ty; sys = []}  in
+        let sub'' = GlobalEnv.ext sub' x @@ `P ty  in
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
       | `Def (ty, tm) ->
-        let sys = [Tm.make Dim0, Tm.make Dim0, Some tm] in
-        let sub'' = GlobalEnv.ext sub' x @@ `P {ty; sys}  in
+        let sub'' = GlobalEnv.ext sub' x @@ `Def (ty, tm)  in
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
       | `Tw (ty0, ty1) ->
-        let sub'' = GlobalEnv.ext sub' x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []}) in
+        let sub'' = GlobalEnv.ext sub' x @@ `Tw (ty0, ty1) in
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
-      | (`I | `NullaryExt | `Tick | `KillFromTick _ | `SelfArg Desc.Self) ->
+      | (`I | `NullaryExt | `Tick | `KillFromTick _) ->
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
@@ -440,7 +428,7 @@ struct
 
   let free fl =
     function
-    | (`I | `NullaryExt | `Tick | `SelfArg Desc.Self) -> Occurs.Set.empty
+    | (`I | `NullaryExt | `Tick) -> Occurs.Set.empty
     | `KillFromTick tck -> Tm.free fl tck
     | `P ty -> Tm.free fl ty
     | `Def (ty, tm) ->

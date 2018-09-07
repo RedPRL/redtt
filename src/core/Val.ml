@@ -1598,18 +1598,28 @@ struct
       end
 
     | Tm.Var info ->
-      let tty, tsys = Sig.lookup info.name info.twin in
+      let tty, odef = Sig.lookup info.name info.twin in
       let rho' = Env.clear_locals rho in
-      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
-      let vty = eval rho' @@ Tm.shift_univ info.ushift tty in
-      reflect vty (Var {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
+      begin
+        match odef with
+        | Some def ->
+          eval rho' @@ Tm.shift_univ info.ushift def
+        | None ->
+          let vty = eval rho' @@ Tm.shift_univ info.ushift tty in
+          reflect vty (Var {name = info.name; twin = info.twin; ushift = info.ushift}) []
+      end
 
     | Tm.Meta {name; ushift} ->
-      let tty, tsys = Sig.lookup name `Only in
+      let tty, odef = Sig.lookup name `Only in
       let rho' = Env.clear_locals rho in
-      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
-      let vty = eval rho' @@ Tm.shift_univ ushift tty in
-      reflect vty (Meta {name; ushift}) vsys
+      begin
+        match odef with
+        | Some def ->
+          eval rho' @@ Tm.shift_univ ushift def
+        | None ->
+          let vty = eval rho' @@ Tm.shift_univ ushift tty in
+          reflect vty (Meta {name; ushift}) []
+      end
 
   and reflect ty neu sys =
     match force_val_sys sys with

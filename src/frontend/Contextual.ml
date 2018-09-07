@@ -9,8 +9,7 @@ type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 module Map = Map.Make (Name)
 
 type env = GlobalEnv.t
-type cx = {env : env; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
-
+type cx = {env : env; resenv : ResEnv.t; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
 
 let rec pp_lcx fmt =
   function
@@ -115,15 +114,45 @@ let update_env e =
   modify @@ fun st ->
   match e with
   | E (nm, ty, Hole info) ->
-    {st with env = GlobalEnv.ext_meta st.env nm @@ `P {ty; sys = []}; info = Map.add nm info st.info}
+    {st with env = GlobalEnv.ext_meta st.env nm @@ `P ty; info = Map.add nm info st.info}
   | E (nm, ty, Guess _) ->
-    {st with env = GlobalEnv.ext_meta st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
+    {st with env = GlobalEnv.ext_meta st.env nm @@ `P ty; info = Map.add nm `Rigid st.info}
   | E (nm, ty, Defn (`Transparent, t)) ->
-    {st with env = GlobalEnv.define st.env nm ty t; info = Map.add nm `Rigid st.info}
+    {st with
+     env = GlobalEnv.define st.env nm ty t;
+     resenv =
+       begin
+         match Name.name nm with
+         | Some str -> ResEnv.named_metavar str nm st.resenv
+         | None -> st.resenv
+       end;
+     info = Map.add nm `Rigid st.info}
   | E (nm, ty, Defn (`Opaque, _)) ->
-    {st with env = GlobalEnv.ext_meta st.env nm @@ `P {ty; sys = []}; info = Map.add nm `Rigid st.info}
+    {st with
+     env = GlobalEnv.ext_meta st.env nm @@ `P ty;
+     resenv =
+       begin
+         match Name.name nm with
+         | Some str -> ResEnv.named_metavar str nm st.resenv
+         | None -> st.resenv
+       end;
+     info = Map.add nm `Rigid st.info}
   | _ ->
     st
+
+let global f =
+  modify @@ fun cx ->
+  {cx with env = f cx.env}
+
+let declare_datatype dlbl desc =
+  modify @@ fun cx ->
+  {cx with
+   env = GlobalEnv.declare_datatype dlbl desc cx.env;
+   resenv = ResEnv.datatype dlbl cx.resenv
+  }
+
+
+
 
 let pushl e =
   modifyl (fun es -> es #< e) >>
@@ -134,14 +163,14 @@ let pushr e =
   update_env e
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; env = GlobalEnv.emp (); info = Map.empty; rcx = []} in
+  let _, r = m Emp {lcx = Emp; resenv = ResEnv.init (); env = GlobalEnv.emp (); info = Map.empty; rcx = []} in
   r
 
 
 let isolate (m : 'a m) : 'a m =
   fun ps st ->
     let st', a = m ps {st with lcx = Emp; rcx = []} in
-    {env = st'.env; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; info = st'.info}, a
+    {env = st'.env; resenv = st'.resenv; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; info = st'.info}, a
 
 let rec pushls es =
   match es with
@@ -162,10 +191,6 @@ let popl =
     dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
 
-let global f =
-  modify @@ fun cx ->
-  {cx with env = f cx.env}
-
 let get_global_env =
   get >>= fun st ->
   let rec go_params =
@@ -184,21 +209,38 @@ let get_global_env =
           go_params psi
       end
     | Snoc (psi, (x, `P ty)) ->
-      GlobalEnv.ext (go_params psi) x @@ `P {ty; sys = []}
+      GlobalEnv.ext (go_params psi) x @@ `P ty
     | Snoc (psi, (x, `Def (ty, tm))) ->
       GlobalEnv.define (go_params psi) x ~ty ~tm
     | Snoc (psi, (x, `Tw (ty0, ty1))) ->
-      GlobalEnv.ext (go_params psi) x @@ `Tw ({ty = ty0; sys = []}, {ty = ty1; sys = []})
+      GlobalEnv.ext (go_params psi) x @@ `Tw (ty0, ty1)
     | Snoc (psi, (_, `R (r0, r1))) ->
       GlobalEnv.restrict r0 r1 (go_params psi)
     | Snoc (psi, (_, `NullaryExt)) ->
       go_params psi
-    | Snoc (psi, (_, `SelfArg Desc.Self)) ->
-      (* TODO: Might need to do something here!!! *)
-      go_params psi
   in
   ask >>= fun psi ->
   ret @@ go_params psi
+
+
+let resolver =
+  let rec go_locals renv =
+    function
+    | Emp -> renv
+    | Snoc (psi, (x, _)) ->
+      let renv = go_locals renv psi in
+      begin
+        match Name.name x with
+        | Some str ->
+          ResEnv.named_var str x renv
+        | None ->
+          renv
+      end
+  in
+
+  get >>= fun st ->
+  ask >>= fun psi ->
+  M.ret @@ go_locals st.resenv psi
 
 
 let popr_opt =
