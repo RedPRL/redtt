@@ -36,6 +36,8 @@ let f4 : pΩ³ pjoin .fst → pΩ³ ps2 .fst =
 
 let test0-4 : pΩ³ ps2 .fst = f4 test0-3
 
-; haven't seen this finish checking
-;let innerpath (i j : dim) : s1 =
-;  coe 0 1 base in λ k → hopf (test0-4 i j k)
+let innerpath (i j : dim) : s1 =
+  coe 0 1 base in λ k → hopf (test0-4 i j k)
+
+;let problem : Path int (pos zero) (pos zero) =
+;  λ i → coe 0 1 (pos zero) in λ j → s1-univ-cover (innerpath i j)
