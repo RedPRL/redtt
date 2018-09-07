@@ -15,10 +15,10 @@ let hopf (a : s2) : type =
   elim a [
   | base → s1
   | surf i j →
-    comp 0 1 (rotate/path (loop j) i) [
-    | i=0 → refl
-    | i=1 → refl
-    | j=0 k → UA/IdEquiv s1 k i
-    | j=1 k → UA/IdEquiv s1 k i
+    comp 0 1 s1 [
+    | j=0 → UA s1 s1 (IdEquiv s1)
+    | j=1 → UA s1 s1 (IdEquiv s1)
+    | i=0 → UA s1 s1 (IdEquiv s1)
+    | i=1 → rotate/path (loop j)
     ]
   ]
