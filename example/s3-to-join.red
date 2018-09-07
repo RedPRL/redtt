@@ -141,15 +141,15 @@ let s3-join-s3 (d : s3) : Path s3 (join-to-s3 (s3-to-join d)) d =
         comp 0 i base
         [ m=0 → refl
         | m=1 → refl
-        | x=0 → λ i → cnx/image i m
+        | x=0 i → cnx/image i m
         | x=1 → refl
         ]
     in
     let k01/image : (i m : dim) → s3 =
       λ i m →
         comp 1 i (cnx/image 1 m) [
-        | j=0 → λ i → cnx/image i m
-        | j=1 → λ i → cnx/image i m
+        | j=0 i → cnx/image i m
+        | j=1 i → cnx/image i m
         | m=0 → refl
         | m=1 → refl
         ]
@@ -157,22 +157,22 @@ let s3-join-s3 (d : s3) : Path s3 (join-to-s3 (s3-to-join d)) d =
     let k01/filler : (i m x : dim) → s3 =
       λ i m x →
        comp 1 i (cnx/filler 1 m x) [
-       | j=0 → λ i → cnx/filler i m x
-       | j=1 → λ i → cnx/filler i m x
+       | j=0 i → cnx/filler i m x
+       | j=1 i → cnx/filler i m x
        | m=0 → refl
        | m=1 → refl
-       | x=0 → λ i → k01/image i m
+       | x=0 i → k01/image i m
        | x=1 → refl
        ]
     in
     comp 1 0 (cube i j k) [
-    | i=0 → λ m → k01/filler 0 m x
-    | i=1 → λ m → cnx/filler 1 m x
-    | j=0 → λ m → cnx/filler i m x
-    | j=1 → λ m → cnx/filler i m x
-    | k=0 → λ m → k01/filler i m x
-    | k=1 → λ m → k01/filler i m x
-    | x=0 → λ m → join-to-s3 (s3-to-join/cube/filler i j k m)
+    | i=0 m → k01/filler 0 m x
+    | i=1 m → cnx/filler 1 m x
+    | j=0 m → cnx/filler i m x
+    | j=1 m → cnx/filler i m x
+    | k=0 m → k01/filler i m x
+    | k=1 m → k01/filler i m x
+    | x=0 m → join-to-s3 (s3-to-join/cube/filler i j k m)
     | x=1 → refl
     ]
   ]
