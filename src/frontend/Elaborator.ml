@@ -83,12 +83,12 @@ struct
     | [] ->
       M.ret ()
     | E.Debug f :: esig ->
-      elab_decl @@ E.Debug f >>
+      elab_decl @@ E.Debug f >>= fun _ ->
       elab_sig esig
     | E.Quit :: _ ->
       M.ret ()
     | dcl :: esig ->
-      elab_decl dcl >>
+      elab_decl dcl >>= fun _ ->
       elab_sig esig
 
 
