@@ -5,27 +5,62 @@ open BwdNotation
 include TmData
 
 (* Info we will store inside the term nodes to enable optimizations *)
-module Info =
-struct
-  type t =
-    | Closed
-    | MaxIx of int
+module Info :
+sig
+  type t
+  val init : t
+  val with_ix : int -> t
+  val mergen : t list -> t
+  val bind : int -> t -> t
 
-  let bind n =
-    function
-    | Closed -> Closed
-    | MaxIx ix ->
-      let ix' = ix - n in
-      if ix' < 0 then Closed else MaxIx ix'
+  val is_locally_closed : t -> bool
+end =
+struct
+
+  module Ix =
+  struct
+    type t =
+      | Closed
+      | MaxIx of int
+
+    let bind n =
+      function
+      | Closed ->
+        Closed
+      | MaxIx ix ->
+        let ix' = ix - n in
+        if ix' < 0 then Closed else MaxIx ix'
+
+    let merge i0 i1 =
+      match i0, i1 with
+      | Closed, MaxIx ix -> i1
+      | MaxIx ix, Closed -> i0
+      | Closed, Closed -> Closed
+      | MaxIx ix0, MaxIx ix1 ->
+        MaxIx (max ix0 ix1)
+  end
+
+  type t = {ix_info : Ix.t}
+
+  let is_locally_closed info =
+    match info.ix_info with
+    | Ix.Closed -> true
+    | _ -> false
+
+  let init =
+    {ix_info = Ix.Closed}
+
+  let with_ix ix =
+    {ix_info = Ix.MaxIx ix}
+
+  let bind n info =
+    {ix_info = Ix.bind n info.ix_info}
 
   let merge i0 i1 =
-    match i0, i1 with
-    | Closed, MaxIx ix -> i1
-    | MaxIx ix, Closed -> i0
-    | Closed, Closed -> Closed
-    | MaxIx ix0, MaxIx ix1 -> MaxIx (max ix0 ix1)
+    {ix_info = Ix.merge i0.ix_info i1.ix_info}
 
-  let mergen = List.fold_left merge Closed
+  let mergen =
+    List.fold_left merge init
 end
 
 type tm = Tm of {con : tm tmf; info : Info.t}
@@ -61,7 +96,7 @@ let rec con_info =
   | FHCom {r; r'; cap; sys} ->
     Info.mergen [tm_info r; tm_info r'; tm_info cap; sys_info (bnd_info tm_info) sys]
   | Univ _ | Dim0 | Dim1 | Data _ ->
-    Info.Closed
+    Info.init
   | Pi (dom, cod) | Sg (dom, cod) ->
     Info.mergen [tm_info dom; bnd_info tm_info cod]
   | Ext bnd ->
@@ -97,9 +132,9 @@ and cmd_info cmd =
 and head_info =
   function
   | Meta _ | Var _ ->
-    Info.Closed
+    Info.init
   | Ix (i, _) ->
-    Info.MaxIx i
+    Info.with_ix i
   | Down {ty; tm} ->
     Info.mergen [tm_info ty; tm_info tm]
   | DownX tm ->
@@ -117,7 +152,7 @@ and head_info =
 and frame_info =
   function
   | Car | Cdr | LblCall | RestrictForce ->
-    Info.Closed
+    Info.init
   | FunApp t ->
     tm_info t
   | ExtApp ts ->
@@ -501,12 +536,8 @@ struct
 
   let subst = ref Init.subst
 
-  let should_traverse =
-    function
-    | Info.Closed ->
-      false
-    | _ ->
-      true
+  let should_traverse info =
+    not @@ Info.is_locally_closed info
 
   let rec lift sub =
     Dot (ix 0, Cmp (Shift 1, sub))
@@ -590,12 +621,8 @@ module OpenVarAlg (Init : sig val twin : twin option val name : Name.t val ix : 
 struct
   let state = ref Init.ix
 
-  let should_traverse =
-    function
-    | Info.Closed ->
-      false
-    | _ ->
-      true
+  let should_traverse info =
+    not @@ Info.is_locally_closed info
 
   let with_bindings n f =
     let old = !state in
