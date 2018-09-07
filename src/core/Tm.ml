@@ -784,8 +784,11 @@ and pp_head env fmt =
     Name.pp fmt info.name;
     if info.ushift > 0 then Format.fprintf fmt "^%i" info.ushift
 
+  | Meta {name; ushift} when ushift = 0 ->
+    Name.pp fmt name
+
   | Meta {name; ushift} ->
-    Format.fprintf fmt "?%a^%i"
+    Format.fprintf fmt "%a^%i"
       Name.pp name
       ushift
 
