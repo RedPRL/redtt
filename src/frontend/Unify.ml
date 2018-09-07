@@ -916,14 +916,14 @@ let rec solver prob =
 
         | `Def (ty, tm) ->
           begin
-            (* match split_sigma Emp x ty with
-               | Some (y, ty0, z, ty1, s, _) ->
-               (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
-               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
-               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
-               | None -> *)
-            in_scope x (`Def (ty, tm)) @@
-            solver probx
+            match split_sigma Emp x ty with
+            | Some (y, ty0, z, ty1, s, _) ->
+              (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
+              solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
+              Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
+            | None ->
+              in_scope x (`Def (ty, tm)) @@
+              solver probx
           end
 
         | `Tw (ty0, ty1) ->
