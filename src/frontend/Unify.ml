@@ -439,14 +439,6 @@ let plug (ty, tm) frame =
     ret t
   | _ -> failwith "TODO: plug"
 
-(* TODO: this sorry attempt results in things getting repeatedly evaluated *)
-let (%%) (ty, tm) frame =
-  let tm' = Tm.ann ~ty ~tm @< frame in
-  base_cx >>= fun cx ->
-  let vty' = Typing.infer cx tm' in
-  let ty' = Cx.quote_ty cx vty' in
-  ret (ty', Tm.up tm')
-
 
 let push_guess gm ~ty0 ~ty1 tm  =
   let alpha = Name.fresh () in
@@ -736,23 +728,22 @@ let unify q =
     active @@ Problem.eqn ~ty0:dom0 ~tm0:(Tm.up car0) ~ty1:dom1 ~tm1:(Tm.up car1) >>
     active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
 
-  | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
+  | Tm.Ext (Tm.NB (nms0, (ty0, _sys0))), Tm.Ext (Tm.NB (nms1, (ty1, _sys1))) ->
     let xs = Bwd.map Name.named nms0 in
     let xs_lst = Bwd.to_list xs in
-    let vars = List.map (fun x -> Tm.up @@ Tm.var x) xs_lst in
+    let var_cmds = List.map Tm.var xs_lst in
+    let var_tms = List.map Tm.up var_cmds in
     let psi =
       match xs_lst with
       | [] -> List.map (fun x -> (x, `I)) @@ xs_lst
       | _ -> [(Name.fresh (), `NullaryExt)]
     in
 
-    in_scopes psi
-      begin
-        (q.ty0, q.tm0) %% Tm.ExtApp vars >>= fun (ty0, tm0) ->
-        (q.ty1, q.tm1) %% Tm.ExtApp vars >>= fun (ty1, tm1) ->
-        ret @@ Problem.all_dims xs_lst @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
-      end >>= fun prob ->
-    active prob
+    let tm0 = Tm.up @@ Tm.ann ~ty:q.ty0 ~tm:q.tm0 @< Tm.ExtApp var_tms in
+    let tm1 = Tm.up @@ Tm.ann ~ty:q.ty1 ~tm:q.tm1 @< Tm.ExtApp var_tms in
+    let ty0 = Tm.unbindn_with var_cmds (Tm.NB (nms0, ty0)) in
+    let ty1 = Tm.unbindn_with var_cmds (Tm.NB (nms1, ty1)) in
+    in_scopes psi @@ active @@ Problem.all_dims xs_lst @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
 
   | _ ->
     match Tm.unleash q.tm0, Tm.unleash q.tm1 with
@@ -820,12 +811,9 @@ let rec lower tele alpha ty =
     define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
     ret true
 
-  | Tm.Sg (dom, cod) ->
+  | Tm.Sg (dom, Tm.B (nm, cod)) ->
     hole `Flex tele dom @@ fun t0 ->
-    in_scopes (Bwd.to_list tele) begin
-      eval dom >>= fun vdom ->
-      inst_ty_bnd cod (vdom, Tm.up t0)
-    end >>= fun cod' ->
+    let cod' = Tm.let_ nm t0 cod in
     hole `Flex tele cod' @@ fun t1 ->
     define tele alpha `Transparent ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true

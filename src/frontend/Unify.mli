@@ -24,4 +24,3 @@ val ambulando : unit m
 
 val eval : tm -> Domain.value m
 val inst_ty_bnd : ty Tm.bnd -> Domain.value * tm -> ty m
-val (%%) : ty * tm -> tm Tm.frame -> (ty * tm) m
