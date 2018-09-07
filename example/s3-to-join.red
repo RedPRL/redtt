@@ -141,7 +141,6 @@ let s3-join-s3 (d : s3) : Path s3 (join-to-s3 (s3-to-join d)) d =
         comp 0 i base
         [ m=0 → refl
         | m=1 → refl
-        | x=0 i → cnx/image i m
         | x=1 → refl
         ]
     in
@@ -161,7 +160,6 @@ let s3-join-s3 (d : s3) : Path s3 (join-to-s3 (s3-to-join d)) d =
        | j=1 i → cnx/filler i m x
        | m=0 → refl
        | m=1 → refl
-       | x=0 i → k01/image i m
        | x=1 → refl
        ]
     in
