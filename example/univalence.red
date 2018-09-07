@@ -73,11 +73,8 @@ let LemSig
   =
   λ i →
     ( P i
-    , let coe0 = coe 0 i (u.snd) in λ j → B (P j) in
-      let coe1 = coe 1 i (v.snd) in λ j → B (P j) in
-      B/prop (P i) coe0 coe1 i
+    , PropToPropOver (λ i → B (P i)) (B/prop (P 1)) (u.snd) (v.snd) i
     )
-
 
 let PropSig
   (A : type) (B : A → type)
@@ -125,13 +122,27 @@ let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
     in
     ( c' (a , p) i
     , λ w →
-        let sq : PathD (λ j → Path (Fiber A B f y) w (c' (a,p) j)) (c w) (c' w) =
+        let cap : (i j : dim) → Fiber A B f y =
           λ i j →
-            comp 0 1 (weak-connection/and (Fiber A B f y) (c' w) i j) [
-            | i=0 k → weak-connection/and (Fiber A B f y) (c w) k j
+            comp 1 i (c' w j) [
+            | j=0 → refl
+            | j=1 → c' w
+            ]
+        in
+        let face/i0 : (j k : dim) → Fiber A B f y =
+          λ j k →
+            comp 0 j w [
+            | k=0 → cap 0
+            | k=1 → c w
+            ]
+        in
+        let sq : PathD (λ i → Path (Fiber A B f y) w (c' (a,p) i)) (c w) (c' w) =
+          λ i j →
+            comp 0 1 (cap i j) [
+            | i=0 → face/i0 j
             | i=1 _ → c' w j
             | j=0 _ → w
-            | j=1 k → c' (c w k) i
+            | j=1 k → c' (face/i0 1 k) i
             ]
         in
         sq i
