@@ -24,9 +24,9 @@ let connection/or
   in
   comp 1 0 (p 1) [
   | i=0 → face j
-  | i=1 → λ _ → p 1
+  | i=1 _ → p 1
   | j=0 → face i
-  | j=1 → λ _ → p 1
+  | j=1 _ → p 1
   | i=j → face i
   ]
 
@@ -50,9 +50,9 @@ let connection/and
        ]
    in
    comp 0 1 (p 0) [
-   | i=0 → λ _ → p 0
+   | i=0 _ → p 0
    | i=1 → face j
-   | j=0 → λ _ → p 0
+   | j=0 _ → p 0
    | j=1 → face i
    | i=j → face i
    ]
@@ -71,14 +71,14 @@ let connection/both
     let pface : dim → dim → A =
       λ m k →
         comp 1 m (p k) [
-        | k=0 → λ _ → p 0
+        | k=0 _ → p 0
         | k=1 → p
         ]
     in
     let qface : dim → dim → A =
       λ m k →
         comp 0 m (p k) [
-        | k=0 → λ _ → p 0
+        | k=0 _ → p 0
         | k=1 → q
         ]
     in
@@ -109,9 +109,9 @@ let weak-connection/or
   in
   comp 1 0 (p 1) [
   | i=0 → face j
-  | i=1 → λ _ → p 1
+  | i=1 _ → p 1
   | j=0 → face i
-  | j=1 → λ _ → p 1
+  | j=1 _ → p 1
   ]
 
 let weak-connection/and
@@ -133,8 +133,8 @@ let weak-connection/and
        ]
    in
    comp 0 1 (p 0) [
-   | i=0 → λ _ → p 0
+   | i=0 _ → p 0
    | i=1 → face j
-   | j=0 → λ _ → p 0
+   | j=0 _ → p 0
    | j=1 → face i
    ]

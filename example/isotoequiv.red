@@ -31,8 +31,8 @@ let Iso/fiber-is-prop
     let sq2 : (i j : dim) → A =
       λ i j →
         comp 1 j (g b) [
-        | i=0 → λ k → sq fib0 k 1
-        | i=1 → λ k → sq fib1 k 1
+        | i=0 k → sq fib0 k 1
+        | i=1 k → sq fib1 k 1
         ]
     in
     λ i →

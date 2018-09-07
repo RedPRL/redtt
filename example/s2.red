@@ -18,7 +18,7 @@ let hopf (a : s2) : type =
     comp 0 1 (rotate/path (loop j) i) [
     | i=0 → refl
     | i=1 → refl
-    | j=0 → λ k → UA/IdEquiv s1 k i
-    | j=1 → λ k → UA/IdEquiv s1 k i
+    | j=0 k → UA/IdEquiv s1 k i
+    | j=1 k → UA/IdEquiv s1 k i
     ]
   ]

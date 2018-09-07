@@ -93,10 +93,10 @@ let trans/unit/l
   =
   λ k i →
   comp 0 1 (p 0) [
-  | k=0 → λ j →
+  | k=0 j →
     comp 0 1 (p 0) [
-    | j=1 → λ l → comp 0 i (p 0) [ l=0 → refl | l=1 → p ]
-    | i=1 → λ l → comp 0 j (p 0) [ l=0 → refl | l=1 → p ]
+    | j=1 l → comp 0 i (p 0) [ l=0 → refl | l=1 → p ]
+    | i=1 l → comp 0 j (p 0) [ l=0 → refl | l=1 → p ]
     | j=0 → refl
     | i=0 → refl
     ]
@@ -115,7 +115,7 @@ let trans/sym/r
     | i=0 → refl
     | i=1 → symm A p
     | k=0 → symm/filler A p i
-    ;| k=1 → λ j → trans/filler A p (symm A p) j i
+    ;| k=1 j → trans/filler A p (symm A p) j i
     ]
 
 let trans/sym/l
@@ -125,16 +125,16 @@ let trans/sym/l
   =
   λ k i →
     comp 0 1 (symm/filler A p k i) [
-    | i=0 → λ j →
+    | i=0 j →
       comp 0 1 (p 1) [
-      | j=0 → λ l → comp 1 k (p 1) [ l=0 → refl | l=1 → p ]
-      | k=0 → λ l → comp 1 j (p 1) [ l=0 → refl | l=1 → p ]
+      | j=0 l → comp 1 k (p 1) [ l=0 → refl | l=1 → p ]
+      | k=0 l → comp 1 j (p 1) [ l=0 → refl | l=1 → p ]
       | j=1 → refl
       | k=1 → refl
       ]
     | i=1 → p
     | k=0 → p
-    ;| k=1 → λ j → trans/filler A (symm A p) p j i
+    ;| k=1 j → trans/filler A (symm A p) p j i
     ]
 
 ; Perhaps we could parallelize this proof? ;)
