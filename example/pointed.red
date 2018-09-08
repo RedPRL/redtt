@@ -16,13 +16,13 @@ let pbool : ptype = (bool, ff)
 
 let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
   let fwd : pmap (p→ pbool pA) pA =
-    (λ f → f.fst tt , λ _ → pA.snd)
+    (λ f → f.fst tt , refl)
   in
 
   let bwd : pA.fst → (pmap pbool pA) =
     λ a →
-      ( λ b → elim b [ | tt → a | ff → pA.snd ]
-      , λ _ → pA.snd
+      ( λ b → elim b [ tt → a | ff → pA.snd ]
+      , refl
       )
   in
 
@@ -44,7 +44,7 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
       in
       λ i → (λ b → bwdfwd/map b i, bwdfwd/pt i)
   in
-  (fwd, Iso/Equiv _ _ (fwd.fst, bwd, λ _ → refl, bwdfwd) .snd)
+  (fwd, Iso/Equiv _ _ (fwd.fst, bwd, refl, bwdfwd) .snd)
 
 let pΩ (pA : ptype) : ptype =
   ( Path _ (pA.snd) (pA.snd)
