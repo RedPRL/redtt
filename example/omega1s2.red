@@ -107,14 +107,13 @@ let extend-by-surf (p : Path s2 base base) (i j k : dim) : s2 =
 
 let s2/decode/base (o : os2) : Path s2 base base =
   elim o [
-  | obase → λ _ → base
-  | oloop (o' → s2/decode/base/o') i → λ k →
-      extend-by-surf s2/decode/base/o' i 1 k
+  | obase → refl
+  | oloop (o' → s2/decode/base/o') i → extend-by-surf s2/decode/base/o' i 1
   ]
 
 let s2/decode (a : s2) : (S2Code a) → Path s2 base a =
   elim a [
-  | base → λ o → s2/decode/base o
+  | base → s2/decode/base
   | surf i j → λ code k →
     comp 0 1 (extend-by-surf (s2/decode/base (onegloop (S2Codeproj i j code) i)) i j k) [
     | i=0 → refl
