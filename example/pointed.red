@@ -25,14 +25,14 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
     )
   in
 
-  let bwdfwd (f : pmap pbool pA) : Path (pmap pbool pA) (bwd (fwd.fst f)) f =
+  let bwdfwd (f : pmap pbool pA) : Path _ (bwd (fwd.fst f)) f =
     let bwdfwd/pt (i j : dim) : pA.fst =
       comp 1 j (pA.snd) [
       | i=0 → refl
       | i=1 → f.snd
       ]
     in
-    let bwdfwd/map (b : bool) : Path (pA.fst) (bwd (fwd.fst f) .fst b) (f.fst b) =
+    let bwdfwd/map (b : bool) : Path _ (bwd (fwd.fst f) .fst b) (f.fst b) =
       elim b [
       | tt → refl
       | ff → λ i → bwdfwd/pt i 0
