@@ -41,12 +41,11 @@ let connection/and
    ]
  =
  λ i j →
-   let face : dim → dim → A =
-     λ l k →
-       comp 0 l (p 0) [
-       | k=0 → refl
-       | k=1 → p
-       ]
+   let face (l k : dim) : A =
+     comp 0 l (p 0) [
+     | k=0 → refl
+     | k=1 → p
+     ]
    in
    comp 0 1 (p 0) [
    | i=0 → refl
