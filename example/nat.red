@@ -17,12 +17,11 @@ let nat-pred (x : nat) : nat =
 let nat-pred/suc (x : nat) : Path nat x (nat-pred (suc x)) =
   refl
 
-let plus : nat → nat → nat =
-  λ m n →
-    elim m [
-    | zero → n
-    | suc (m → plus/m/n) → suc plus/m/n
-    ]
+let plus (m n : nat) : nat =
+  elim m [
+  | zero → n
+  | suc (m → plus/m/n) → suc plus/m/n
+  ]
 
 let plus/unit/l (n : nat) : Path nat (plus zero n) n =
   refl

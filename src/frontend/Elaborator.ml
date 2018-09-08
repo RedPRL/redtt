@@ -385,16 +385,34 @@ struct
         tac_refl goal
 
       | _, _, E.Let info ->
-        let itac =
-          match info.ty with
-          | None ->
-            elab_inf info.tm <<@> fun (let_ty, let_tm) -> let_ty, Tm.up let_tm
-          | Some ety ->
-            elab_chk ety {ty = univ; sys = []} >>= fun let_ty ->
-            elab_chk info.tm {ty = let_ty; sys = []} <<@> fun let_tm -> let_ty, let_tm
+        let cells, ecod = info.sch in
+        let rec scheme_as_ty cells =
+          match cells with
+          | [] ->
+            elab_chk ecod {ty = univ; sys = []}
+          | `Ty (name, edom) :: cells ->
+            elab_chk edom {ty = univ; sys = []} >>= normalize_ty >>= fun dom ->
+            let x = Name.named @@ Some name in
+            M.in_scope x (`P dom) (scheme_as_ty cells) <<@> fun codx ->
+              Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
+          | `Tick name :: cells ->
+            let x = Name.named @@ Some name in
+            M.in_scope x `Tick (scheme_as_ty cells) <<@> fun tyx ->
+              Tm.make @@ Tm.Later (Tm.bind x tyx)
+          | `I name :: cells ->
+            let x = Name.named @@ Some name in
+            M.in_scope x `I (scheme_as_ty cells) <<@> fun tyx ->
+              Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) tyx [])
         in
-        let ctac goal = elab_chk info.body goal in
-        tac_let info.name itac ctac goal
+
+        scheme_as_ty cells >>= fun pity ->
+        let name_of_cell = function `I nm | `Tick nm | `Ty (nm, _) -> nm in
+        let names = List.map name_of_cell cells in
+        let ctac goal = elab_chk info.tm goal in
+        let lambdas = tac_wrap_nf (tac_lambda names ctac) in
+        let inf_tac = lambdas {ty = pity; sys = []} <<@> fun ltm -> pity, ltm in
+        let body_tac = elab_chk info.body in
+        tac_let info.name inf_tac body_tac goal
 
       | _, _, E.Lam (names, e) ->
         let tac = elab_chk e in

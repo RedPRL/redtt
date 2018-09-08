@@ -189,10 +189,8 @@ econ:
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = located(econ)
     { E.Lam (xs, e) }
 
-  | LET; name = ATOM; COLON; ty = located(econ); EQUALS; tm = located(econ); IN; body = located(econ)
-    { E.Let {name; ty = Some ty; tm; body} }
-  | LET; name = ATOM; EQUALS; tm = located(econ); IN; body = located(econ)
-    { E.Let {name; ty = None; tm; body} }
+  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
+    { E.Let {name = a; sch = sch; tm; body} }
 
   | ELIM; scrut = located(econ); IN; mot = located(econ); clauses = pipe_block(eclause)
     { E.Elim {mot = Some mot; scrut; clauses} }
@@ -253,6 +251,9 @@ eface:
 escheme:
   | tele = list(etele_cell); COLON; cod = located(econ)
     { (List.flatten tele, cod) }
+
+  | tele = list(etele_cell)
+    { (List.flatten tele, eterm ($endpos(tele), $endpos(tele)) E.Hope) }
 
 etele_cell:
   | LPR; xs = nonempty_list(ATOM); COLON; ty = located(econ); RPR

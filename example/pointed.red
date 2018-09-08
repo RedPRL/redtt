@@ -19,30 +19,26 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
     (λ f → f.fst tt , refl)
   in
 
-  let bwd : pA.fst → (pmap pbool pA) =
-    λ a →
-      ( λ b → elim b [ tt → a | ff → pA.snd ]
-      , refl
-      )
+  let bwd (a : pA.fst) : pmap pbool pA =
+    ( λ b → elim b [ tt → a | ff → pA.snd ]
+    , refl
+    )
   in
 
-  let bwdfwd : (f : pmap pbool pA) → Path (pmap pbool pA) (bwd (fwd.fst f)) f =
-    λ f →
-      let bwdfwd/pt : (i j : dim) → pA.fst =
-        λ i j →
-          comp 1 j (pA.snd) [
-          | i=0 → refl
-          | i=1 → f.snd
-          ]
-      in
-      let bwdfwd/map : (b : bool) → Path (pA.fst) (bwd (fwd.fst f) .fst b) (f.fst b) =
-        λ b →
-          elim b [
-          | tt → refl
-          | ff → λ i → bwdfwd/pt i 0
-          ]
-      in
-      λ i → (λ b → bwdfwd/map b i, bwdfwd/pt i)
+  let bwdfwd (f : pmap pbool pA) : Path (pmap pbool pA) (bwd (fwd.fst f)) f =
+    let bwdfwd/pt (i j : dim) : pA.fst =
+      comp 1 j (pA.snd) [
+      | i=0 → refl
+      | i=1 → f.snd
+      ]
+    in
+    let bwdfwd/map (b : bool) : Path (pA.fst) (bwd (fwd.fst f) .fst b) (f.fst b) =
+      elim b [
+      | tt → refl
+      | ff → λ i → bwdfwd/pt i 0
+      ]
+    in
+    λ i → (λ b → bwdfwd/map b i, bwdfwd/pt i)
   in
   (fwd, Iso/Equiv _ _ (fwd.fst, bwd, refl, bwdfwd) .snd)
 
