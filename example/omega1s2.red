@@ -16,7 +16,7 @@ data os2 where
   | i=1 → y
   ]
 
-; I. the loop of self-equivalences in os2
+; I. the loop of automorphisms of os2
 
 ; for the definition of s2/decode, it is convenient to use an IdEquiv where
 ; both inverses are reflexivities
