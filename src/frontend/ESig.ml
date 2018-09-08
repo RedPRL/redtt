@@ -53,7 +53,7 @@ and econ =
 
   | Refl
 
-  | Var of string * int
+  | Var of {name : string; ushift : int}
   | Num of int
 
 and eterm = econ info
@@ -90,8 +90,8 @@ let rec pp fmt =
     Format.fprintf fmt "<hope>"
   | Lam _ ->
     Format.fprintf fmt "<lam>"
-  | Var (s, _) ->
-    Format.fprintf fmt "%s" s
+  | Var {name; _} ->
+    Format.fprintf fmt "%s" name
   | _ ->
     Format.fprintf fmt "<eterm>"
 

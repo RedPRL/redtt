@@ -48,7 +48,7 @@ struct
     function
     | E.App ({con = E.Num (0 | 1)} as e) ->
       M.ret @@ `ExtApp e
-    | E.App ({con = E.Var (nm, _)} as e) ->
+    | E.App ({con = E.Var {name = nm; _}} as e) ->
       M.lift @@ C.resolver >>= fun renv ->
       begin
         try
@@ -247,9 +247,9 @@ struct
 
   and elab_boundary_term dlbl desc e =
     match e.con with
-    | E.Var (nm, _) ->
+    | E.Var {name = nm; _} ->
       elab_boundary_cut dlbl desc nm Emp
-    | E.Cut ({con = E.Var (nm, _)}, spine) ->
+    | E.Cut ({con = E.Var {name = nm; _}}, spine) ->
       elab_boundary_cut dlbl desc nm spine
     | _ ->
       failwith "TODO: elaborate_boundary_term"
@@ -653,7 +653,7 @@ struct
 
   and elab_inf e : (ty * tm Tm.cmd) M.m =
     match e.con with
-    | E.Var (name, ushift) ->
+    | E.Var {name; ushift} ->
       M.lift C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
@@ -765,7 +765,7 @@ struct
 
   and elab_dim e =
     match e.con with
-    | E.Var (name, 0) ->
+    | E.Var {name; ushift = 0} ->
       M.lift C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
@@ -826,7 +826,7 @@ struct
     | Tm.Data dlbl ->
       begin
         match exp.con with
-        | E.Var (clbl, _) ->
+        | E.Var {name = clbl; _} ->
           begin
             M.lift C.base_cx >>= fun cx ->
             let sign = Cx.globals cx in
@@ -967,7 +967,7 @@ struct
           raise ChkMatch
       end
 
-    | spine, `Prev {con = E.Var (name, _)} ->
+    | spine, `Prev {con = E.Var {name; _}} ->
       elab_var name 0 >>= fun (_, tick) ->
       M.in_scope (Name.fresh ()) (`KillFromTick (Tm.up tick)) begin
         elab_cut exp spine

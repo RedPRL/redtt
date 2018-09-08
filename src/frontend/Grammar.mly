@@ -11,7 +11,7 @@
     E.{con; span = Some loc}
 
   let atom_to_econ a =
-    if a = "_" then E.Hope else E.Var (a, 0)
+    if a = "_" then E.Hope else E.Var {name = a; ushift = 0}
 
   let lost_eterm e : E.eterm =
     E.{con = e; span = None}
@@ -105,7 +105,7 @@ atom_econ:
   | a = ATOM
     { atom_to_econ a }
   | a = ATOM; CARET; k = NUMERAL
-    { E.Var (a, k) }
+    { E.Var {name = a; ushift = k} }
 
 atomoid_econ:
   | BACKTICK; t = tm
@@ -162,7 +162,7 @@ spine:
   (* a b c^1 ... *)
   | atoms = nonempty_list(ATOM); CARET; k = NUMERAL; fs = list(framic)
     { let atoms, last_atom = ListUtil.split_last atoms in
-      let econs = List.append (List.map atom_to_econ atoms) [E.Var (last_atom, k)] in
+      let econs = List.append (List.map atom_to_econ atoms) [E.Var {name = last_atom; ushift = k}] in
       let head_econ, middle_econs = ListUtil.split_head econs in
       head_econ, List.append (List.map lost_frame middle_econs) fs }
   | e = atomoid_econ; fs = list(framic)
