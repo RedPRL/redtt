@@ -144,7 +144,7 @@ let s2/encode-decode/base (o : os2)
   : Path os2 (s2/encode base (s2/decode base o)) o
   =
   elim o [
-  | obase → λ m → coe m 1 obase in λ _ → os2
+  | obase → refl
   | oloop (o' → s2/encode-decode/base/o') i → λ m →
     comp 0 1 (oloop (s2/encode-decode/base/o' m) i) [
     | i=0 → refl
