@@ -96,13 +96,11 @@ struct
     function
     | E.Define (name, opacity, scheme, e) ->
       let now0 = Unix.gettimeofday () in
-      elab_scheme scheme @@ fun cod ->
-      M.unify >>
-      elab_chk e {ty = cod; sys = []} >>= fun tm ->
+      elab_scheme scheme >>= fun (names, ty) ->
+      let bdy_tac = tac_wrap_nf @@ tac_lambda names @@ elab_chk e in
+      bdy_tac {ty; sys = []} >>= fun tm ->
       let alpha = Name.named @@ Some name in
-
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.define psi alpha opacity cod tm >>= fun _ ->
+      M.lift @@ U.define Emp alpha opacity ty tm >>= fun _ ->
       M.lift C.go_to_top >>
       M.unify <<@> fun _ ->
         let now1 = Unix.gettimeofday () in
@@ -338,29 +336,32 @@ struct
 
 
 
-  and elab_scheme (cells, ecod) kont =
+  and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =
+    let cells, ecod = sch in
     let rec go =
       function
       | [] ->
-        elab_chk ecod {ty = univ; sys = []} >>=
-        kont
+        elab_chk ecod {ty = univ; sys = []}
       | `Ty (name, edom) :: cells ->
         elab_chk edom {ty = univ; sys = []} >>= normalize_ty >>= fun dom ->
         let x = Name.named @@ Some name in
-        M.in_scope x (`P dom) @@
-        go cells
+        M.in_scope x (`P dom) (go cells) <<@> fun codx ->
+          Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
       | `Tick name :: cells ->
         let x = Name.named @@ Some name in
-        M.in_scope x `Tick @@
-        go cells
+        M.in_scope x `Tick (go cells) <<@> fun tyx ->
+          Tm.make @@ Tm.Later (Tm.bind x tyx)
       | `I name :: cells ->
         let x = Name.named @@ Some name in
-        M.in_scope x `I @@
-        go cells
-      | _ -> failwith "TODO: elab_scheme"
+        M.in_scope x `I (go cells) <<@> fun tyx ->
+          Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) tyx [])
     in
-    go cells
 
+    let name_of_cell = function `I nm | `Tick nm | `Ty (nm, _) -> nm in
+    let names = List.map name_of_cell cells in
+
+    go cells <<@> fun ty ->
+      names, ty
 
 
   (* TODO: we will be disentangling all the elaboration of concrete expressions from tactics which produce redtt proofs.
@@ -385,29 +386,7 @@ struct
         tac_refl goal
 
       | _, _, E.Let info ->
-        let cells, ecod = info.sch in
-        let rec scheme_as_ty cells =
-          match cells with
-          | [] ->
-            elab_chk ecod {ty = univ; sys = []}
-          | `Ty (name, edom) :: cells ->
-            elab_chk edom {ty = univ; sys = []} >>= normalize_ty >>= fun dom ->
-            let x = Name.named @@ Some name in
-            M.in_scope x (`P dom) (scheme_as_ty cells) <<@> fun codx ->
-              Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
-          | `Tick name :: cells ->
-            let x = Name.named @@ Some name in
-            M.in_scope x `Tick (scheme_as_ty cells) <<@> fun tyx ->
-              Tm.make @@ Tm.Later (Tm.bind x tyx)
-          | `I name :: cells ->
-            let x = Name.named @@ Some name in
-            M.in_scope x `I (scheme_as_ty cells) <<@> fun tyx ->
-              Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) tyx [])
-        in
-
-        scheme_as_ty cells >>= fun pity ->
-        let name_of_cell = function `I nm | `Tick nm | `Ty (nm, _) -> nm in
-        let names = List.map name_of_cell cells in
+        elab_scheme info.sch >>= fun (names, pity) ->
         let ctac goal = elab_chk info.tm goal in
         let lambdas = tac_wrap_nf (tac_lambda names ctac) in
         let inf_tac = lambdas {ty = pity; sys = []} <<@> fun ltm -> pity, ltm in
