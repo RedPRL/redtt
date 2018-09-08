@@ -50,9 +50,9 @@ let s3-to-join/k01 : [i j m] join [
 let s3-to-join/cube/filler (i j k m : dim) : join =
   comp 1 m (push (loop j) (loop k) i) [
   | i=0 m → s3-to-join/k01 0 j m
-  | i=1 m → s3-to-join/cnx (loop k) 1 m
-  | j=0 m → s3-to-join/cnx (loop k) i m
-  | j=1 m → s3-to-join/cnx (loop k) i m
+  | i=1 → s3-to-join/cnx (loop k) 1
+  | j=0 → s3-to-join/cnx (loop k) i
+  | j=1 → s3-to-join/cnx (loop k) i
   | k=0 m → s3-to-join/k01 i j m
   | k=1 m → s3-to-join/k01 i j m
   ]
@@ -69,7 +69,7 @@ let join-to-s3/push/loop (b : s1)
   : [i j] s3 [ i=0 → base | i=1 → base | j=0 → base | j=1 → base ]
   =
   elim b [
-  | base → λ i j → base
+  | base → λ _ _ → base
   | loop k → λ i j → cube i j k
   ]
 
