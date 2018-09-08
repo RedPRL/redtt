@@ -15,9 +15,9 @@ let pair-to-fun (A : type) (p : A × A) : bool → A =
   | ff → p.snd
   ]
 
-let fun-to-pair-is-equiv (A : type) : IsEquiv^1 (_ → _) _ (fun-to-pair A) =
+let fun-to-pair-is-equiv (A : type) : IsEquiv^1 _ _ (fun-to-pair A) =
   λ p →
-    ( (pair-to-fun A p, λ _ → p)
+    ( (pair-to-fun A p, refl)
     , λ fib →
       coe 1 0
         (λ i →

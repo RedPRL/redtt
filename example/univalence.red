@@ -140,8 +140,8 @@ let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
           λ i j →
             comp 0 1 (cap i j) [
             | i=0 → face/i0 j
-            | i=1 _ → c' w j
-            | j=0 _ → w
+            | i=1 → refl
+            | j=0 → refl
             | j=1 k → c' (face/i0 1 k) i
             ]
         in
@@ -154,7 +154,7 @@ let EquivLemma
   (P : Path (A → B) (E0.fst) (E1.fst))
   : Path (Equiv A B) E0 E1
   =
-  LemSig (A → B) (IsEquiv A B) (PropIsEquiv A B) E0 E1 P
+  LemSig _ (IsEquiv A B) (PropIsEquiv A B) E0 E1 P
 
 
 ; per Dan Licata, UA and UABeta suffice for full univalence:
@@ -188,7 +188,7 @@ let SigPathToEquiv
 opaque
 let UA/retract
   (A B : type)
-  : Retract^1 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
+  : Retract^1 _ _ (UA A B) (PathToEquiv A B)
   =
   λ E →
     EquivLemma _ _ (PathToEquiv _ _ (UA A B E)) E
@@ -200,20 +200,19 @@ let UA/retract/sig
   =
   λ singl i →
     ( singl.fst
-    , UA/retract A (singl.fst) (singl.snd) i
+    , UA/retract _ (singl.fst) (singl.snd) i
     )
 
 let UA/IdEquiv (A : type)
-  : Path^1 (Path^1 type A A) (UA A A (IdEquiv A)) (λ _ → A)
+  : Path^1 (Path^1 type A A) (UA A A (IdEquiv A)) refl
   =
-  trans^1 (Path^1 type A A)
+  trans^1 _
     (λ i → UA A A (coe 0 i (IdEquiv A) in λ _ → Equiv A A))
-    (path-retract/preserves/refl^1
-       type Equiv UA PathToEquiv UA/retract A)
+    (path-retract/preserves/refl^1 _ _ UA PathToEquiv UA/retract A)
 
 opaque
 let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
-  ( (_, λ _ → A)
+  ( (A, refl)
   , λ X i →
     ( comp 0 1 A [
       | i=0 → X.snd

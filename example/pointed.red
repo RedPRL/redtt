@@ -6,28 +6,29 @@ let ptype : type^1 = (A : type) × A
 let pmap (pA pB : ptype) : type =
   (f : pA.fst → pB.fst) × Path _ (f (pA.snd)) (pB.snd)
 
-let p→ (pA pB : ptype) : ptype = ( pmap pA pB, λ a → pB.snd , λ i → pB.snd )
+let p→ (pA pB : ptype) : ptype =
+  (pmap pA pB, λ _ → pB.snd, λ _ → pB.snd)
 
 let pequiv (pA pB : ptype) : type =
   (f : pmap pA pB) × IsEquiv (pA.fst) (pB.fst) (f.fst)
 
-let pbool : ptype = ( bool , ff )
+let pbool : ptype = (bool, ff)
 
 let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
   let fwd : pmap (p→ pbool pA) pA =
-    (λ f → f.fst tt , λ i → pA.snd)
+    (λ f → f.fst tt , λ _ → pA.snd)
   in
-  let bwd : pA.fst → (pmap pbool pA) = λ a →
-    ( λ b → elim b [
-            | tt → a
-            | ff → pA.snd
-            ]
-    , λ i → pA.snd )
+
+  let bwd : pA.fst → (pmap pbool pA) =
+    λ a →
+      ( λ b → elim b [ | tt → a | ff → pA.snd ]
+      , λ _ → pA.snd
+      )
   in
+
   let bwdfwd : (f : pmap pbool pA) → Path (pmap pbool pA) (bwd (fwd.fst f)) f =
     λ f →
-      let bwdfwd/pt : (i j : dim) → pA.fst
-        =
+      let bwdfwd/pt : (i j : dim) → pA.fst =
         λ i j →
           comp 1 j (pA.snd) [
           | i=0 → refl
@@ -41,15 +42,12 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
           | ff → λ i → bwdfwd/pt i 0
           ]
       in
-      λ i →
-        ( λ b → bwdfwd/map b i
-        , λ j → bwdfwd/pt i j
-        )
+      λ i → (λ b → bwdfwd/map b i, bwdfwd/pt i)
   in
-  (fwd, Iso/Equiv _ _ (fwd.fst, bwd, λ a i → a, bwdfwd) .snd)
+  (fwd, Iso/Equiv _ _ (fwd.fst, bwd, λ _ → refl, bwdfwd) .snd)
 
 let pΩ (pA : ptype) : ptype =
-  ( Path (pA.fst) (pA.snd) (pA.snd)
+  ( Path _ (pA.snd) (pA.snd)
   , refl
   )
 
@@ -68,11 +66,11 @@ let pΩ/map (pA pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
 
 let pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
   : Path (pΩ pB .fst)
-    (pΩ/map pA pB pf .fst (λ j → trans (pA.fst) (λ i → p i) (λ i → q i) j))
-    (trans (pB.fst)
-      (λ j → pΩ/map pA pB pf .fst (λ i → p i) j)
-      (λ j → pΩ/map pA pB pf .fst (λ i → q i) j))
-=
+    (pΩ/map pA pB pf .fst (trans _ p q))
+    (trans _
+     (pΩ/map pA pB pf .fst p)
+     (pΩ/map pA pB pf .fst q))
+  =
   let face : [i j] (pB.fst) [i=0 → pB.snd] =
     λ i j →
       comp 0 1 (pf .fst (comp 0 j (p i) [i=0 → refl | i=1 → q]))
