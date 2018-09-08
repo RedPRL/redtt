@@ -32,7 +32,7 @@ and econ =
   | Tuple of eterm list
   | Type of Kind.t * Lvl.t
   | Quo of (ResEnv.t -> Tm.tm)
-  | Let of {name : string; ty : eterm option; tm : eterm; body : eterm}
+  | Let of {name : string; sch : escheme; tm : eterm; body : eterm}
 
   | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
 
@@ -53,7 +53,7 @@ and econ =
 
   | Refl
 
-  | Var of string * int
+  | Var of {name : string; ushift : int}
   | Num of int
 
 and eterm = econ info
@@ -90,8 +90,8 @@ let rec pp fmt =
     Format.fprintf fmt "<hope>"
   | Lam _ ->
     Format.fprintf fmt "<lam>"
-  | Var (s, _) ->
-    Format.fprintf fmt "%s" s
+  | Var {name; _} ->
+    Format.fprintf fmt "%s" name
   | _ ->
     Format.fprintf fmt "<eterm>"
 

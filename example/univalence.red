@@ -27,8 +27,7 @@ let IdEquiv (A : type) : Equiv A A =
   , λ a →
     ( (a, refl)
     , λ p i →
-      let aux : dim → A =
-        λ j →
+      let aux (j : dim) : A =
         comp 1 j a [
         | i=0 → p.snd
         | i=1 → refl
@@ -122,26 +121,24 @@ let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
     in
     ( c' (a , p) i
     , λ w →
-        let cap : (i j : dim) → Fiber A B f y =
-          λ i j →
-            comp 1 i (c' w j) [
-            | j=0 → refl
-            | j=1 → c' w
-            ]
+        let cap (i j : dim) : Fiber A B f y =
+          comp 1 i (c' w j) [
+          | j=0 → refl
+          | j=1 → c' w
+          ]
         in
-        let face/i0 : (j k : dim) → Fiber A B f y =
-          λ j k →
-            comp 0 j w [
-            | k=0 → cap 0
-            | k=1 → c w
-            ]
+        let face/i0 (j k : dim) : Fiber A B f y =
+          comp 0 j w [
+          | k=0 → cap 0
+          | k=1 → c w
+          ]
         in
         let sq : PathD (λ i → Path (Fiber A B f y) w (c' (a,p) i)) (c w) (c' w) =
           λ i j →
             comp 0 1 (cap i j) [
             | i=0 → face/i0 j
-            | i=1 _ → c' w j
-            | j=0 _ → w
+            | i=1 → refl
+            | j=0 → refl
             | j=1 k → c' (face/i0 1 k) i
             ]
         in
@@ -154,7 +151,7 @@ let EquivLemma
   (P : Path (A → B) (E0.fst) (E1.fst))
   : Path (Equiv A B) E0 E1
   =
-  LemSig (A → B) (IsEquiv A B) (PropIsEquiv A B) E0 E1 P
+  LemSig _ (IsEquiv A B) (PropIsEquiv A B) E0 E1 P
 
 
 ; per Dan Licata, UA and UABeta suffice for full univalence:
@@ -188,7 +185,7 @@ let SigPathToEquiv
 opaque
 let UA/retract
   (A B : type)
-  : Retract^1 (Equiv A B) (Path^1 type A B) (UA A B) (PathToEquiv A B)
+  : Retract^1 _ _ (UA A B) (PathToEquiv A B)
   =
   λ E →
     EquivLemma _ _ (PathToEquiv _ _ (UA A B E)) E
@@ -200,20 +197,19 @@ let UA/retract/sig
   =
   λ singl i →
     ( singl.fst
-    , UA/retract A (singl.fst) (singl.snd) i
+    , UA/retract _ (singl.fst) (singl.snd) i
     )
 
 let UA/IdEquiv (A : type)
-  : Path^1 (Path^1 type A A) (UA A A (IdEquiv A)) (λ _ → A)
+  : Path^1 (Path^1 type A A) (UA A A (IdEquiv A)) refl
   =
-  trans^1 (Path^1 type A A)
+  trans^1 _
     (λ i → UA A A (coe 0 i (IdEquiv A) in λ _ → Equiv A A))
-    (path-retract/preserves/refl^1
-       type Equiv UA PathToEquiv UA/retract A)
+    (path-retract/preserves/refl^1 _ _ UA PathToEquiv UA/retract A)
 
 opaque
 let IsContrPath (A : type) : IsContr^1 ((B : _) × Path^1 type A B) =
-  ( (_, λ _ → A)
+  ( (A, refl)
   , λ X i →
     ( comp 0 1 A [
       | i=0 → X.snd
@@ -253,30 +249,28 @@ let univalence/alt (B : type) : IsContr^1 ((A : type) × Equiv A B) =
   ( (B, IdEquiv/weak-connection B)
   , λ w i →
       let VB : type = `(V i (fst w) B (snd w)) in
-      let proj/B : VB → B = λ g → `(vproj i g (fst (snd w))) in
+      let proj/B (g : VB) : B = `(vproj i g (fst (snd w))) in
       ( _
       , proj/B
       , λ b →
-           let ctr/B : dim → B =
-             λ j →
-               comp 1 j b [
-               | i=0 → w.snd.snd b .fst .snd
-               | i=1 → refl
-               ]
+           let ctr/B (j : dim) : B =
+             comp 1 j b [
+             | i=0 → w.snd.snd b .fst .snd
+             | i=1 → refl
+             ]
            in
            let ctr : Fiber VB B proj/B b =
-             ( `(vin i (fst (fst ((snd (snd w)) b))) (@ ctr/B 0)), ctr/B )
+             (`(vin i (fst (fst ((snd (snd w)) b))) (@ ctr/B 0)), ctr/B)
            in
            ( ctr
            , λ v j →
-               let filler : dim → B =
-                 λ l →
-                   comp 1 l b [
-                   | i=0 → w.snd.snd b .snd v j .snd
-                   | i=1 k → weak-connection/or B (v.snd) j k
-                   | j=0 → v.snd
-                   | j=1 → ctr/B
-                   ]
+               let filler (l : dim) : B =
+                 comp 1 l b [
+                 | i=0 → w.snd.snd b .snd v j .snd
+                 | i=1 k → weak-connection/or B (v.snd) j k
+                 | j=0 → v.snd
+                 | j=1 → ctr/B
+                 ]
                in
                ( `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))
                , filler

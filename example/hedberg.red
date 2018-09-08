@@ -27,22 +27,20 @@ let neg/is-prop-over (A : dim → type)
    in
    f i a
 
+
 ; Hedberg's theorem for stable path types
 let paths-stable/to/set (A : type)
   (st : (x y : A) → stable (Path A x y))
   : IsSet A
   =
   λ a b p q i j →
-    let square : dim → dim → A =
-      λ k m →
-        comp 0 k a [
-        | m=0 → p
-        | m=1 → q
-        ]
+    let square (k m : dim) : A =
+      comp 0 k a [
+      | m=0 → p
+      | m=1 → q
+      ]
     in
-    let cap : dim → dim → A =
-      λ k m → st (p k) (q k) (λ c → c (square k)) m
-    in
+    let cap (k m : dim) = st (p k) (q k) (λ c → c (square k)) m in
     comp 0 1 (cap j i) [
     | i=0 k →
       st (p j) (p j)

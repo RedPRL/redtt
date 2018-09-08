@@ -7,7 +7,7 @@ data s1 where
 | base
 | loop @ i [i=0 → base | i=1 → base]
 
-let rotate/loop (a : s1) : Path s1 a a =
+let rotate/loop (a : s1) : Path _ a a =
   elim a [
   | base → λ j → loop j
   | loop i → λ j → connection/both s1 (λ k → loop k) (λ k → loop k) i j
@@ -19,10 +19,10 @@ let rotate (a : s1) : s1 → s1 =
   | loop i → λ b → rotate/loop b i
   ]
 
-let rotate/equiv/loop : Path (Equiv s1 s1) (IdEquiv s1) (IdEquiv s1) =
+let rotate/equiv/loop : Path _ (IdEquiv s1) (IdEquiv s1) =
   λ i →
     let fwd : dim → s1 → s1 =
-      λ i a → rotate/loop a i
+      λ j a → rotate/loop a j
     in
     ( fwd i
     , PropToPropOver

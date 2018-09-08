@@ -15,18 +15,17 @@ let connection/or
   ; this is an example of something that is much nicer here than in redprl.
   ; we can define using line types all the faces of the composition at once.
   ; definitional equivalence kicks in to make this work.
-  let face : dim → dim → A =
-    λ l k →
-      comp 1 l (p 1) [
-      | k=1 → refl
-      | k=0 → p
-      ]
+  let face (l k : dim) : A =
+    comp 1 l (p 1) [
+    | k=1 → refl
+    | k=0 → p
+    ]
   in
   comp 1 0 (p 1) [
   | i=0 → face j
-  | i=1 _ → p 1
+  | i=1 → refl
   | j=0 → face i
-  | j=1 _ → p 1
+  | j=1 → refl
   | i=j → face i
   ]
 
@@ -42,17 +41,16 @@ let connection/and
    ]
  =
  λ i j →
-   let face : dim → dim → A =
-     λ l k →
-       comp 0 l (p 0) [
-       | k=0 → refl
-       | k=1 → p
-       ]
+   let face (l k : dim) : A =
+     comp 0 l (p 0) [
+     | k=0 → refl
+     | k=1 → p
+     ]
    in
    comp 0 1 (p 0) [
-   | i=0 _ → p 0
+   | i=0 → refl
    | i=1 → face j
-   | j=0 _ → p 0
+   | j=0 → refl
    | j=1 → face i
    | i=j → face i
    ]
@@ -68,19 +66,17 @@ let connection/both
     ]
   =
   λ i j →
-    let pface : dim → dim → A =
-      λ m k →
-        comp 1 m (p k) [
-        | k=0 _ → p 0
-        | k=1 → p
-        ]
+    let pface (m k : dim) : A =
+      comp 1 m (p k) [
+      | k=0 → refl
+      | k=1 → p
+      ]
     in
-    let qface : dim → dim → A =
-      λ m k →
-        comp 0 m (p k) [
-        | k=0 _ → p 0
-        | k=1 → q
-        ]
+    let qface (m k : dim) : A =
+      comp 0 m (p k) [
+      | k=0 → refl
+      | k=1 → q
+      ]
     in
     comp 0 1 (p 0) [
     | i=0 → pface j
@@ -100,18 +96,17 @@ let weak-connection/or
    ]
  =
  λ i j →
-  let face : dim → dim → A =
-    λ l k →
-      comp 1 l (p 1) [
-      | k=1 → refl
-      | k=0 → p
-      ]
+  let face (l k : dim) : A =
+    comp 1 l (p 1) [
+    | k=1 → refl
+    | k=0 → p
+    ]
   in
   comp 1 0 (p 1) [
   | i=0 → face j
-  | i=1 _ → p 1
+  | i=1 → refl
   | j=0 → face i
-  | j=1 _ → p 1
+  | j=1 → refl
   ]
 
 let weak-connection/and
@@ -125,16 +120,15 @@ let weak-connection/and
    ]
  =
  λ i j →
-   let face : dim → dim → A =
-     λ l k →
-       comp 0 l (p 0) [
-       | k=0 → refl
-       | k=1 → p
-       ]
+   let face (l k : dim) : A =
+     comp 0 l (p 0) [
+     | k=0 → refl
+     | k=1 → p
+     ]
    in
    comp 0 1 (p 0) [
-   | i=0 _ → p 0
+   | i=0 → refl
    | i=1 → face j
-   | j=0 _ → p 0
+   | j=0 → refl
    | j=1 → face i
    ]

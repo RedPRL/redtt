@@ -48,7 +48,7 @@ struct
     function
     | E.App ({con = E.Num (0 | 1)} as e) ->
       M.ret @@ `ExtApp e
-    | E.App ({con = E.Var (nm, _)} as e) ->
+    | E.App ({con = E.Var {name = nm; _}} as e) ->
       M.lift @@ C.resolver >>= fun renv ->
       begin
         try
@@ -96,13 +96,11 @@ struct
     function
     | E.Define (name, opacity, scheme, e) ->
       let now0 = Unix.gettimeofday () in
-      elab_scheme scheme @@ fun cod ->
-      M.unify >>
-      elab_chk e {ty = cod; sys = []} >>= fun tm ->
+      elab_scheme scheme >>= fun (names, ty) ->
+      let bdy_tac = tac_wrap_nf @@ tac_lambda names @@ elab_chk e in
+      bdy_tac {ty; sys = []} >>= fun tm ->
       let alpha = Name.named @@ Some name in
-
-      M.lift C.ask >>= fun psi ->
-      M.lift @@ U.define psi alpha opacity cod tm >>= fun _ ->
+      M.lift @@ U.define Emp alpha opacity ty tm >>= fun _ ->
       M.lift C.go_to_top >>
       M.unify <<@> fun _ ->
         let now1 = Unix.gettimeofday () in
@@ -247,9 +245,9 @@ struct
 
   and elab_boundary_term dlbl desc e =
     match e.con with
-    | E.Var (nm, _) ->
+    | E.Var {name = nm; _} ->
       elab_boundary_cut dlbl desc nm Emp
-    | E.Cut ({con = E.Var (nm, _)}, spine) ->
+    | E.Cut ({con = E.Var {name = nm; _}}, spine) ->
       elab_boundary_cut dlbl desc nm spine
     | _ ->
       failwith "TODO: elaborate_boundary_term"
@@ -338,29 +336,32 @@ struct
 
 
 
-  and elab_scheme (cells, ecod) kont =
+  and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =
+    let cells, ecod = sch in
     let rec go =
       function
       | [] ->
-        elab_chk ecod {ty = univ; sys = []} >>=
-        kont
+        elab_chk ecod {ty = univ; sys = []}
       | `Ty (name, edom) :: cells ->
         elab_chk edom {ty = univ; sys = []} >>= normalize_ty >>= fun dom ->
         let x = Name.named @@ Some name in
-        M.in_scope x (`P dom) @@
-        go cells
+        M.in_scope x (`P dom) (go cells) <<@> fun codx ->
+          Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
       | `Tick name :: cells ->
         let x = Name.named @@ Some name in
-        M.in_scope x `Tick @@
-        go cells
+        M.in_scope x `Tick (go cells) <<@> fun tyx ->
+          Tm.make @@ Tm.Later (Tm.bind x tyx)
       | `I name :: cells ->
         let x = Name.named @@ Some name in
-        M.in_scope x `I @@
-        go cells
-      | _ -> failwith "TODO: elab_scheme"
+        M.in_scope x `I (go cells) <<@> fun tyx ->
+          Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) tyx [])
     in
-    go cells
 
+    let name_of_cell = function `I nm | `Tick nm | `Ty (nm, _) -> nm in
+    let names = List.map name_of_cell cells in
+
+    go cells <<@> fun ty ->
+      names, ty
 
 
   (* TODO: we will be disentangling all the elaboration of concrete expressions from tactics which produce redtt proofs.
@@ -385,16 +386,12 @@ struct
         tac_refl goal
 
       | _, _, E.Let info ->
-        let itac =
-          match info.ty with
-          | None ->
-            elab_inf info.tm <<@> fun (let_ty, let_tm) -> let_ty, Tm.up let_tm
-          | Some ety ->
-            elab_chk ety {ty = univ; sys = []} >>= fun let_ty ->
-            elab_chk info.tm {ty = let_ty; sys = []} <<@> fun let_tm -> let_ty, let_tm
-        in
-        let ctac goal = elab_chk info.body goal in
-        tac_let info.name itac ctac goal
+        elab_scheme info.sch >>= fun (names, pity) ->
+        let ctac goal = elab_chk info.tm goal in
+        let lambdas = tac_wrap_nf (tac_lambda names ctac) in
+        let inf_tac = lambdas {ty = pity; sys = []} <<@> fun ltm -> pity, ltm in
+        let body_tac = elab_chk info.body in
+        tac_let info.name inf_tac body_tac goal
 
       | _, _, E.Lam (names, e) ->
         let tac = elab_chk e in
@@ -653,7 +650,7 @@ struct
 
   and elab_inf e : (ty * tm Tm.cmd) M.m =
     match e.con with
-    | E.Var (name, ushift) ->
+    | E.Var {name; ushift} ->
       M.lift C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
@@ -765,7 +762,7 @@ struct
 
   and elab_dim e =
     match e.con with
-    | E.Var (name, 0) ->
+    | E.Var {name; ushift = 0} ->
       M.lift C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
@@ -826,7 +823,7 @@ struct
     | Tm.Data dlbl ->
       begin
         match exp.con with
-        | E.Var (clbl, _) ->
+        | E.Var {name = clbl; _} ->
           begin
             M.lift C.base_cx >>= fun cx ->
             let sign = Cx.globals cx in
@@ -967,7 +964,7 @@ struct
           raise ChkMatch
       end
 
-    | spine, `Prev {con = E.Var (name, _)} ->
+    | spine, `Prev {con = E.Var {name; _}} ->
       elab_var name 0 >>= fun (_, tick) ->
       M.in_scope (Name.fresh ()) (`KillFromTick (Tm.up tick)) begin
         elab_cut exp spine

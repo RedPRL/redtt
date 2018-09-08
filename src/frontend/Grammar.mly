@@ -11,7 +11,7 @@
     E.{con; span = Some loc}
 
   let atom_to_econ a =
-    if a = "_" then E.Hope else E.Var (a, 0)
+    if a = "_" then E.Hope else E.Var {name = a; ushift = 0}
 
   let lost_eterm e : E.eterm =
     E.{con = e; span = None}
@@ -105,7 +105,7 @@ atom_econ:
   | a = ATOM
     { atom_to_econ a }
   | a = ATOM; CARET; k = NUMERAL
-    { E.Var (a, k) }
+    { E.Var {name = a; ushift = k} }
 
 atomoid_econ:
   | BACKTICK; t = tm
@@ -162,7 +162,7 @@ spine:
   (* a b c^1 ... *)
   | atoms = nonempty_list(ATOM); CARET; k = NUMERAL; fs = list(framic)
     { let atoms, last_atom = ListUtil.split_last atoms in
-      let econs = List.append (List.map atom_to_econ atoms) [E.Var (last_atom, k)] in
+      let econs = List.append (List.map atom_to_econ atoms) [E.Var {name = last_atom; ushift = k}] in
       let head_econ, middle_econs = ListUtil.split_head econs in
       head_econ, List.append (List.map lost_frame middle_econs) fs }
   | e = atomoid_econ; fs = list(framic)
@@ -189,10 +189,8 @@ econ:
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = located(econ)
     { E.Lam (xs, e) }
 
-  | LET; name = ATOM; COLON; ty = located(econ); EQUALS; tm = located(econ); IN; body = located(econ)
-    { E.Let {name; ty = Some ty; tm; body} }
-  | LET; name = ATOM; EQUALS; tm = located(econ); IN; body = located(econ)
-    { E.Let {name; ty = None; tm; body} }
+  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
+    { E.Let {name = a; sch = sch; tm; body} }
 
   | ELIM; scrut = located(econ); IN; mot = located(econ); clauses = pipe_block(eclause)
     { E.Elim {mot = Some mot; scrut; clauses} }
@@ -253,6 +251,9 @@ eface:
 escheme:
   | tele = list(etele_cell); COLON; cod = located(econ)
     { (List.flatten tele, cod) }
+
+  | tele = list(etele_cell)
+    { (List.flatten tele, eterm ($endpos(tele), $endpos(tele)) E.Hope) }
 
 etele_cell:
   | LPR; xs = nonempty_list(ATOM); COLON; ty = located(econ); RPR

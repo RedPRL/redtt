@@ -2,7 +2,7 @@ import path
 
 let J
   (A : type) (a : A)
-  (C : (x : A) (p : Path _ a x) → type) (d : C a (λ _ → a))
+  (C : (x : A) (p : Path _ a x) → type) (d : C a refl)
   (x : A) (p : Path _ a x)
   : C x p
   =

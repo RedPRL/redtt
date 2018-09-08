@@ -50,9 +50,9 @@ let s3-to-join/k01 : [i j m] join [
 let s3-to-join/cube/filler (i j k m : dim) : join =
   comp 1 m (push (loop j) (loop k) i) [
   | i=0 m → s3-to-join/k01 0 j m
-  | i=1 m → s3-to-join/cnx (loop k) 1 m
-  | j=0 m → s3-to-join/cnx (loop k) i m
-  | j=1 m → s3-to-join/cnx (loop k) i m
+  | i=1 → s3-to-join/cnx (loop k) 1
+  | j=0 → s3-to-join/cnx (loop k) i
+  | j=1 → s3-to-join/cnx (loop k) i
   | k=0 m → s3-to-join/k01 i j m
   | k=1 m → s3-to-join/k01 i j m
   ]
@@ -69,7 +69,7 @@ let join-to-s3/push/loop (b : s1)
   : [i j] s3 [ i=0 → base | i=1 → base | j=0 → base | j=1 → base ]
   =
   elim b [
-  | base → λ i j → base
+  | base → λ _ _ → base
   | loop k → λ i j → cube i j k
   ]
 
@@ -133,23 +133,21 @@ let s3-join-s3 (d : s3) : Path s3 (join-to-s3 (s3-to-join d)) d =
   elim d [
   | base → refl
   | cube i j k → λ x →
-    let cnx/filler : (i m x : dim) → s3 =
-      λ i m x →
-        comp 0 i base
-        [ m=0 → refl
-        | m=1 → refl
-        | x=1 → refl
-        ]
+    let cnx/filler (i m x : dim) : s3 =
+      comp 0 i base
+      [ m=0 → refl
+      | m=1 → refl
+      | x=1 → refl
+      ]
     in
-    let k01/filler : (i m x : dim) → s3 =
-      λ i m x →
-       comp 1 i (cnx/filler 1 m x) [
-       | j=0 i → cnx/filler i m x
-       | j=1 i → cnx/filler i m x
-       | m=0 → refl
-       | m=1 → refl
-       | x=1 → refl
-       ]
+    let k01/filler (i m x : dim) : s3 =
+      comp 1 i (cnx/filler 1 m x) [
+      | j=0 i → cnx/filler i m x
+      | j=1 i → cnx/filler i m x
+      | m=0 → refl
+      | m=1 → refl
+      | x=1 → refl
+      ]
     in
     comp 1 0 (cube i j k) [
     | i=0 m → k01/filler 0 m x

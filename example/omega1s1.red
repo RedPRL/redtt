@@ -16,7 +16,9 @@ let s1-univ-cover (x : s1) : type =
   | loop i → UA _ _ isuc-equiv i
   ]
 
-let loopn (n : int) : Path s1 base base =
+let Ω1s1 : type = Path s1 base base
+
+let loopn (n : int) : Ω1s1 =
   elim n [
   | pos n →
     elim n [
@@ -115,8 +117,11 @@ let decode (x : s1) : s1-univ-cover x → Path s1 base x =
     ]
   ]
 
-let loopn-winding (l : Path s1 base base) : Path (Path s1 base base) (loopn (winding l)) l =
+let loopn-winding (l : Ω1s1) : Path _ (loopn (winding l)) l =
   J s1 base (λ x p → Path (Path s1 base x) (decode x (encode x p)) p) refl base l
 
-let winding-equiv : Equiv (Path s1 base base) int =
+let winding/equiv : Equiv Ω1s1 int =
   Iso/Equiv _ _ (winding, (loopn, (winding-loopn, loopn-winding)))
+
+let winding/path : Path^1 _ Ω1s1 int =
+  UA Ω1s1 int winding/equiv

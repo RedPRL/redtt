@@ -81,6 +81,7 @@ let dot a sb = Dot (a, sb)
 
 type error =
   | InvalidDeBruijnIndex of int
+  | UnbindLengthMismatch of tm cmd list * tm nbnd
   | UnbindExtLengthMismatch of tm cmd list * (tm * (tm, tm) system) nbnd
 
 exception E of error
@@ -724,6 +725,7 @@ let unbindn (NB (nms, t)) =
   in
   go 0 nms [] t
 
+
 let map_tm_face f (r, r', otm) =
   f r, f r', Option.map f otm
 
@@ -760,6 +762,24 @@ let unbind_ext_with rs ebnd =
     let err = UnbindExtLengthMismatch (rs, ebnd) in
     raise @@ E err
 
+let unbindn_with cmds nbnd =
+  let NB (nms, tm) = nbnd in
+  let n = Bwd.length nms in
+
+  let rec go acc =
+    function
+    | [] ->
+      acc
+    | cmd :: cmds ->
+      go (dot cmd acc) cmds
+  in
+
+  let sb = go (shift 0) cmds in
+  if Bwd.length nms = List.length cmds then
+    subst sb tm
+  else
+    let err = UnbindLengthMismatch (cmds, nbnd) in
+    raise @@ E err
 
 let bind x tx =
   B (Name.name x, close_var x 0 tx)
@@ -1581,6 +1601,9 @@ struct
     | UnbindExtLengthMismatch (_xs, _ebnd) ->
       Format.fprintf fmt
         "Tried to unbind extension type binder with incorrect number of variables."
+    | UnbindLengthMismatch (_xs, _) ->
+      Format.fprintf fmt
+        "Tried to unbind n-ary tbinder with incorrect number of variables."
 
   let _ =
     PpExn.install_printer @@ fun fmt ->
