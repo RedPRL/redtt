@@ -57,7 +57,7 @@ let onegloop-oloop (o : os2)
 
 ; II. universal cover over s2
 
-let S2CodeSurf/filler : (m i j : dim) → type =
+let s2/Code/Surf/filler : (m i j : dim) → type =
   λ m i j →
   comp 0 m os2 [
   | i=0 → UA os2 os2 (IdEquiv/wc os2)
@@ -66,10 +66,10 @@ let S2CodeSurf/filler : (m i j : dim) → type =
   | j=1 → UA os2 os2 (oloop-equiv i)
   ]
 
-let S2CodeSurf : Path^1 (Path^1 type os2 os2) refl refl =
-  S2CodeSurf/filler 1
+let s2/Code/Surf : Path^1 (Path^1 type os2 os2) refl refl =
+  s2/Code/Surf/filler 1
 
-let S2Codeproj : [i j] (S2CodeSurf i j → os2) [
+let s2/Code/proj : [i j] (s2/Code/Surf i j → os2) [
   | i=0 → λ o → o
   | i=1 → λ o → o
   | j=0 → λ o → oloop o i
@@ -77,23 +77,23 @@ let S2Codeproj : [i j] (S2CodeSurf i j → os2) [
   ]
   =
   λ i j →
-  comp 0 1 (λ o → oloop o i) in (λ m → S2CodeSurf/filler m i j → os2) [
+  comp 0 1 (λ o → oloop o i) in (λ m → s2/Code/Surf/filler m i j → os2) [
   | i=0 → UAproj os2 os2 (IdEquiv/wc os2)
   | i=1 → UAproj os2 os2 (IdEquiv/wc os2)
   | j=0 m → λ o → oloop (UAproj os2 os2 (IdEquiv/wc os2) m o) i
   | j=1 → UAproj os2 os2 (oloop-equiv i)
   ]
 
-let S2Code (a : s2) : type =
+let s2/Code (a : s2) : type =
   elim a [
   | base → os2
-  | surf i j → S2CodeSurf i j
+  | surf i j → s2/Code/Surf i j
   ]
 
 ; III. encoding function
 
-let s2/encode (a : s2) (p : Path s2 base a) : S2Code a =
-  coe 0 1 obase in λ k → S2Code (p k)
+let s2/encode (a : s2) (p : Path s2 base a) : s2/Code a =
+  coe 0 1 obase in λ k → s2/Code (p k)
 
 ; IV. decoding function
 
@@ -111,11 +111,11 @@ let s2/decode/base (o : os2) : Path s2 base base =
   | oloop (o' → s2/decode/base/o') i → extend-by-surf s2/decode/base/o' i 1
   ]
 
-let s2/decode (a : s2) : (S2Code a) → Path s2 base a =
+let s2/decode (a : s2) : (s2/Code a) → Path s2 base a =
   elim a [
   | base → s2/decode/base
   | surf i j → λ code k →
-    comp 0 1 (extend-by-surf (s2/decode/base (onegloop (S2Codeproj i j code) i)) i j k) [
+    comp 0 1 (extend-by-surf (s2/decode/base (onegloop (s2/Code/proj i j code) i)) i j k) [
     | i=0 → refl
     | i=1 → refl
     | j=0 m → s2/decode/base (onegloop-oloop code i m) k
@@ -135,9 +135,9 @@ let s2/encode-decode/base/step (o : os2) : [i j] os2 [
   ]
   =
   λ i j →
-    S2Codeproj i j
+    s2/Code/proj i j
       (coe 0 1 obase
-        in (λ k → S2Code (extend-by-surf (s2/decode/base o) i j k)))
+        in (λ k → s2/Code (extend-by-surf (s2/decode/base o) i j k)))
 
 let s2/encode-decode/base (o : os2)
   : Path os2 (s2/encode base (s2/decode base o)) o
