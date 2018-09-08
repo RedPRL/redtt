@@ -61,7 +61,7 @@ let pΩ/map (pA pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
   )
 
 let pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
-  : Path (pΩ pB .fst)
+  : Path _
     (pΩ/map pA pB pf .fst (trans _ p q))
     (trans _
      (pΩ/map pA pB pf .fst p)
