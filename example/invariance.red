@@ -6,7 +6,7 @@ import bool
 ; https://github.com/RedPRL/sml-redprl/blob/master/example/invariance.prl
 
 let fun-to-pair (A : type) (f : bool → A) : A × A =
-  (f tt , f ff)
+  (f tt, f ff)
 
 let pair-to-fun (A : type) (p : A × A) : bool → A =
   λ b →
@@ -19,11 +19,7 @@ let fun-to-pair-is-equiv (A : type) : IsEquiv^1 _ _ (fun-to-pair A) =
   λ p →
     ( (pair-to-fun A p, refl)
     , λ fib →
-      coe 1 0
-        (λ i →
-          ( λ b → elim b [ tt → fib.snd i .fst | ff → fib.snd i .snd ]
-          , λ j → weak-connection/or _ (fib.snd) i j
-          ))
+      coe 1 0 (λ i → (pair-to-fun _ (fib.snd i), λ j → weak-connection/or _ (fib.snd) i j))
       in λ j →
         [i] (f : bool → A) × Path (A × A) (f tt, f ff) p [
         | i=0 → (shannon/path A (fib.fst) j, fib.snd)
