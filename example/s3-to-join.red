@@ -5,7 +5,7 @@ import isotoequiv
 
 data s3 where
 | base
-| cube @ i j k [ i=0 | i=1 | j=0 | j=1 | k=0 | k=1 → base]
+| cube @ i j k [i=0 | i=1 | j=0 | j=1 | k=0 | k=1 → base]
 
 data join where
 | inl [a : s1]
