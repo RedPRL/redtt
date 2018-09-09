@@ -41,7 +41,7 @@ let s3-to-join/k01 : [i j m] join [
 let s3-to-join/cube/filler (i j k m : dim) : join =
   comp 1 m (push (loop j) (loop k) i) [
   | i=1 | ∂[j] → s3-to-join/cnx (loop k) i
-  | i=0 | ∂[k] m → s3-to-join/k01 i j m
+  | (i=0 | ∂[k]) m → s3-to-join/k01 i j m
   ]
 
 let s3-to-join (d : s3) : join =
@@ -128,8 +128,8 @@ let s3-join-s3 (d : s3) : Path s3 (join-to-s3 (s3-to-join d)) d =
       ]
     in
     comp 1 0 (cube i j k) [
-    | i=1 | ∂[j] m → cnx/filler i m x
-    | i=0 | ∂[k] m → k01/filler i m x
+    | (i=1 | ∂[j]) m → cnx/filler i m x
+    | (i=0 | ∂[k]) m → k01/filler i m x
     | x=0 m → join-to-s3 (s3-to-join/cube/filler i j k m)
     | x=1 → refl
     ]
@@ -148,7 +148,7 @@ let s3-to-join/equiv : Equiv s3 join =
 
 let s2/merid (a : s1) : Path s2 base base =
   elim a [
-  | base → λ _ → base
+  | base → refl
   | loop i → λ j → surf i j
   ]
 

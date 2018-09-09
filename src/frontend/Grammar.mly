@@ -241,8 +241,16 @@ epatbind:
   | LPR; x = ATOM; RIGHT_ARROW; ih = ATOM; RPR
     { E.PIndVar (x, ih) }
 
+edimension:
+  | n = NUMERAL;
+    { E.Num n }
+  | a = ATOM
+    { atom_to_econ a }
+  | LPR; d = edimension; RPR
+    { d }
+
 eequation:
-  | r0 = located(atomic); EQUALS; r1 = located(atomic)
+  | r0 = located(edimension); EQUALS; r1 = located(edimension)
     { r0, r1 }
 
 ecofib0:
@@ -251,12 +259,15 @@ ecofib0:
 
   | BOUNDARY; LSQ; xs = nonempty_list(ATOM); RSQ;
     { let xi x =
-        let pos = ($startpos(xs), $endpos(xs)) in
+        let pos = $loc(xs) in
         let r = eterm pos @@ E.Var {name = x; ushift = 0} in
         [r, eterm pos (E.Num 0);
          r, eterm pos (E.Num 1)]
       in
       List.flatten @@ List.map xi xs }
+
+  | LPR; e = ecofib; RPR
+    { e }
 
 ecofib:
   | phi = separated_nonempty_list(PIPE, ecofib0)
@@ -265,7 +276,7 @@ ecofib:
 eface:
   | phi = ecofib; RIGHT_ARROW; e = located(econ)
     { phi, e }
-  | phi = ecofib; xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
+  | phi = ecofib0; xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
     { phi, eterm ($startpos(xs), $endpos(e)) (E.Lam (xs, e)) }
 
 

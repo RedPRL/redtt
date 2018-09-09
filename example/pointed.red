@@ -69,5 +69,5 @@ let pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
   λ k i →
     comp 0 1 (face i 0) [
     | i=0 j → pB.snd
-    | k=0 | i=1 j → face i j
+    | (k=0 | i=1) j → face i j
     ]
