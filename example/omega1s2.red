@@ -11,7 +11,7 @@ import s2
 ; loop space of s2
 data os2 where
 | obase
-| oloop (y : os2) @ i [i=0 | i=1 → y]
+| oloop (y : os2) @ i [∂[i] → y]
 
 ; I. the loop of automorphisms of os2
 
@@ -46,7 +46,7 @@ let onegloop-oloop (o : os2)
   =
   λ i j →
     comp 0 1 o [
-    | i=0 | i=1 | j=1 → refl
+    | ∂[i] | j=1 → refl
     | j=0 k → oloop-equiv i .snd (oloop o i) .snd (o, refl) k .fst
     ]
 
@@ -54,7 +54,7 @@ let onegloop-oloop (o : os2)
 
 let s2/Code/Surf/filler (m i j : dim) : type =
   comp 0 m os2 [
-  | i=0 | i=1 | j=0 → UA os2 os2 (IdEquiv/wc os2)
+  | ∂[i] | j=0 → UA os2 os2 (IdEquiv/wc os2)
   | j=1 → UA os2 os2 (oloop-equiv i)
   ]
 
@@ -63,13 +63,13 @@ let s2/Code/Surf : Path^1 (Path^1 type os2 os2) refl refl =
 
 let s2/Code/proj :
   [i j] (s2/Code/Surf i j → os2) [
-  | i=0 | i=1 | j=1 → λ o → o
+  | ∂[i] | j=1 → λ o → o
   | j=0 → λ o → oloop o i
   ]
   =
   λ i j →
   comp 0 1 (λ o → oloop o i) in (λ m → s2/Code/Surf/filler m i j → os2) [
-  | i=0 | i=1 → UAproj os2 os2 (IdEquiv/wc os2)
+  | ∂[i] → UAproj os2 os2 (IdEquiv/wc os2)
   | j=0 m → λ o → oloop (UAproj os2 os2 (IdEquiv/wc os2) m o) i
   | j=1 → UAproj os2 os2 (oloop-equiv i)
   ]
@@ -89,7 +89,7 @@ let s2/encode (a : s2) (p : Path s2 base a) : s2/Code a =
 
 let extend-by-surf (p : Path s2 base base) (i j k : dim) : s2 =
   comp 0 j (p k) [
-  | i=0 | i=1 | k=0 → refl
+  | ∂[i] | k=0 → refl
   | k=1 j → surf i j
   ]
 
@@ -104,7 +104,7 @@ let s2/decode (a : s2) : (s2/Code a) → Path s2 base a =
   | base → s2/decode/base
   | surf i j → λ code k →
     comp 0 1 (extend-by-surf (s2/decode/base (onegloop (s2/Code/proj i j code) i)) i j k) [
-    | i=0 | i=1 | k=0 | k=1 → refl
+    | ∂[i k] → refl
     | j=0 m → s2/decode/base (onegloop-oloop code i m) k
     | j=1 m → s2/decode/base (oloop-onegloop code i m) k
     ]
@@ -114,15 +114,15 @@ let s2/decode (a : s2) : (s2/Code a) → Path s2 base a =
 
 let s2/encode-decode/base/step (o : os2) :
   [i j] os2 [
-  | i=0 | i=1 → s2/encode base (s2/decode/base o)
+  | ∂[i] → s2/encode base (s2/decode/base o)
   | j=0 → oloop (s2/encode base (s2/decode/base o)) i
   | j=1 → s2/encode base (s2/decode/base (oloop o i))
   ]
   =
   λ i j →
     s2/Code/proj i j
-      (coe 0 1 obase
-        in (λ k → s2/Code (extend-by-surf (s2/decode/base o) i j k)))
+      (coe 0 1 obase in λ k →
+        s2/Code (extend-by-surf (s2/decode/base o) i j k))
 
 let s2/encode-decode/base (o : os2)
   : Path os2 (s2/encode base (s2/decode base o)) o
@@ -131,7 +131,7 @@ let s2/encode-decode/base (o : os2)
   | obase → refl
   | oloop (o' → s2/encode-decode/base/o') i → λ m →
     comp 0 1 (oloop (s2/encode-decode/base/o' m) i) [
-    | i=0 | i=1 | m=1 → refl
+    | ∂[i] | m=1 → refl
     | m=0 j → s2/encode-decode/base/step o' i j
     ]
   ]

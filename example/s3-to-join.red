@@ -5,7 +5,7 @@ import isotoequiv
 
 data s3 where
 | base
-| cube @ i j k [i=0 | i=1 | j=0 | j=1 | k=0 | k=1 → base]
+| cube @ i j k [∂[i j k] → base]
 
 data join where
 | inl [a : s1]
@@ -26,22 +26,22 @@ let s3-to-join/cnx (b : s1) (i m : dim) : join =
 
 let s3-to-join/k01 : [i j m] join [
   | i=1 → s3-to-join/cnx base 1 m
-  | j=0 | j=1 → s3-to-join/cnx base i m
+  | ∂[j] → s3-to-join/cnx base i m
   | m=0 → inl base
   | m=1 → push (loop j) base i
   ]
   =
   λ i j m →
     comp 1 i (s3-to-join/cnx base 1 m) [
-    | j=0 | j=1 i → s3-to-join/cnx base i m
+    | ∂[j] i → s3-to-join/cnx base i m
     | m=0 → refl
     | m=1 i → push (loop j) base i
     ]
 
 let s3-to-join/cube/filler (i j k m : dim) : join =
   comp 1 m (push (loop j) (loop k) i) [
-  | i=1 | j=0 | j=1 → s3-to-join/cnx (loop k) i
-  | i=0 | k=0 | k=1 m → s3-to-join/k01 i j m
+  | i=1 | ∂[j] → s3-to-join/cnx (loop k) i
+  | i=0 | ∂[k] m → s3-to-join/k01 i j m
   ]
 
 let s3-to-join (d : s3) : join =
@@ -53,7 +53,7 @@ let s3-to-join (d : s3) : join =
 ; inverse map
 
 let join-to-s3/push/loop (b : s1)
-  : [i j] s3 [ i=0 → base | i=1 → base | j=0 → base | j=1 → base ]
+  : [i j] s3 [ ∂[i j] → base ]
   =
   elim b [
   | base → λ _ _ → base
@@ -83,7 +83,7 @@ let join-s3-join/inl (a : s1) : Path join (inl base) (inl a) =
 
 let join-s3-join/push/loop (b : s1) : [i j m] join [
   | i=0 → s3-to-join/k01 0 j m
-  | i=1 | j=0 | j=1 → s3-to-join/cnx b i m
+  | i=1 | ∂[j] → s3-to-join/cnx b i m
   | m=0 → s3-to-join (join-to-s3/push/loop b i j)
   | m=1 → push (loop j) b i
   ]
@@ -123,13 +123,13 @@ let s3-join-s3 (d : s3) : Path s3 (join-to-s3 (s3-to-join d)) d =
     in
     let k01/filler (i m x : dim) : s3 =
       comp 1 i (cnx/filler 1 m x) [
-      | j=0 | j=1 i → cnx/filler i m x
-      | m=0 | m=1 | x=1 → refl
+      | ∂[j] i → cnx/filler i m x
+      | ∂[m] | x=1 → refl
       ]
     in
     comp 1 0 (cube i j k) [
-    | i=1 | j=0 | j=1 m → cnx/filler i m x
-    | i=0 | k=0 | k=1 m → k01/filler i m x
+    | i=1 | ∂[j] m → cnx/filler i m x
+    | i=0 | ∂[k] m → k01/filler i m x
     | x=0 m → join-to-s3 (s3-to-join/cube/filler i j k m)
     | x=1 → refl
     ]

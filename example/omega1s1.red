@@ -110,7 +110,7 @@ let decode (x : s1) : s1-univ-cover x → Path s1 base x =
       UAproj int int isuc-equiv i y
     in
     comp 0 1 (decode-square n i j) [
-    | j=0 | j=1 | i=1 → refl
+    | ∂[j] | i=1 → refl
     | i=0 k → loopn (pred-isuc y k) j
     ]
   ]

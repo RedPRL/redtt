@@ -116,6 +116,8 @@ rule token = parse
     { Lwt.return COMMA }
   | '.'
     { Lwt.return DOT }
+  | "∂"
+    { Lwt.return BOUNDARY }
   | ":>"
     { Lwt.return TRIANGLE_RIGHT }
   | "▷"

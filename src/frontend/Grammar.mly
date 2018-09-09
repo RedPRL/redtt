@@ -35,7 +35,7 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET
+%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BOUNDARY
 %token EQUALS
 %token RIGHT_ARROW
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
@@ -245,9 +245,22 @@ eequation:
   | r0 = located(atomic); EQUALS; r1 = located(atomic)
     { r0, r1 }
 
+ecofib0:
+  | xi = eequation
+    { [xi] }
+
+  | BOUNDARY; LSQ; xs = nonempty_list(ATOM); RSQ;
+    { let xi x =
+        let pos = ($startpos(xs), $endpos(xs)) in
+        let r = eterm pos @@ E.Var {name = x; ushift = 0} in
+        [r, eterm pos (E.Num 0);
+         r, eterm pos (E.Num 1)]
+      in
+      List.flatten @@ List.map xi xs }
+
 ecofib:
-  | eqs = separated_nonempty_list(PIPE, eequation)
-    { eqs }
+  | phi = separated_nonempty_list(PIPE, ecofib0)
+    { List.flatten phi }
 
 eface:
   | phi = ecofib; RIGHT_ARROW; e = located(econ)
