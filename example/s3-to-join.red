@@ -119,7 +119,7 @@ let s3-join-s3 (d : s3) : Path s3 (join-to-s3 (s3-to-join d)) d =
   | base → refl
   | cube i j k → λ x →
     let cnx/filler (i m x : dim) : s3 =
-      comp 0 i base [m=0 | m=1 | x=1 → refl]
+      comp 0 i base [∂[m] | x=1 → refl]
     in
     let k01/filler (i m x : dim) : s3 =
       comp 1 i (cnx/filler 1 m x) [
