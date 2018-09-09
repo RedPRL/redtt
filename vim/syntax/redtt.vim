@@ -22,7 +22,7 @@ syn region  redttEncl transparent start="\[" end="\]" contains=ALLBUT,redttBrack
 
 syn match   redttHole '?\k*'
 
-syn keyword redttKeyw boundary data intro where in with end elim
+syn keyword redttKeyw data intro where in with end elim
 syn keyword redttKeyw V fst snd coe com pair hcom comp vproj
 syn keyword redttKeyw refl restrict if lam call
 syn keyword redttKeyw pre kan U type then else
