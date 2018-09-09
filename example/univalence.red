@@ -137,8 +137,7 @@ let PropIsEquivDirect (A B : type) (f : A → B) : IsProp (IsEquiv A B f) =
           λ i j →
             comp 0 1 (cap i j) [
             | i=0 → face/i0 j
-            | i=1 → refl
-            | j=0 → refl
+            | i=1 | j=0 → refl
             | j=1 k → c' (face/i0 1 k) i
             ]
         in

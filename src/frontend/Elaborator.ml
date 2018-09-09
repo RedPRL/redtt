@@ -540,7 +540,14 @@ struct
       | [] ->
         M.ret @@ Bwd.to_list acc
 
-      | (e_r, e_r', e) :: esys ->
+      | (xis, e) :: esys ->
+        go_face acc esys e xis
+
+    and go_face acc esys e =
+      function
+      | [] ->
+        go acc esys
+      | (e_r, e_r') :: xis ->
         elab_dim e_r >>= fun r ->
         elab_dim e_r' >>= fun r' ->
         begin
@@ -549,7 +556,7 @@ struct
           end
         end >>= fun obnd ->
         let face = r, r', obnd in
-        go (acc #< face) esys
+        go_face (acc #< face) esys e xis
     in
     go Emp
 
@@ -561,7 +568,14 @@ struct
       | [] ->
         M.ret @@ Bwd.to_list acc
 
-      | (e_r, e_r', e) :: esys ->
+      | (xis, e) :: esys ->
+        go_face acc esys e xis
+
+    and go_face acc esys e =
+      function
+      | [] ->
+        go acc esys
+      | (e_r, e_r') :: xis ->
         let x = Name.fresh () in
         let varx = Tm.up @@ Tm.var x in
         let ext_ty =
@@ -585,7 +599,7 @@ struct
           end
         end >>= fun obnd ->
         let face = r, r', obnd in
-        go (acc #< face) esys
+        go_face (acc #< face) esys e xis
 
     in go Emp
 
@@ -595,7 +609,14 @@ struct
       | [] ->
         M.ret @@ Bwd.to_list acc
 
-      | (e_r, e_r', e) :: esys ->
+      | (xis, e) :: esys ->
+        go_face acc esys e xis
+
+    and go_face acc esys e =
+      function
+      | [] ->
+        go acc esys
+      | (e_r, e_r') :: xis ->
         let x = Name.fresh () in
         let varx = Tm.up @@ Tm.var x in
         let tyx = Tm.unbind_with (Tm.var x) ty_bnd in
@@ -620,7 +641,7 @@ struct
           end
         end >>= fun obnd ->
         let face = r, r', obnd in
-        go (acc #< face) esys
+        go_face (acc #< face) esys e xis
 
     in go Emp
 

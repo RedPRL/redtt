@@ -48,16 +48,8 @@ let pΩ (pA : ptype) : ptype =
   )
 
 let pΩ/map (pA pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
-  ( λ p i →
-      comp 0 1 (pf.fst (p i)) [
-      | i=0 → pf.snd
-      | i=1 → pf.snd
-      ]
-  , λ j i →
-      comp j 1 (pf.snd j) [
-      | i=0 → pf.snd
-      | i=1 → pf.snd
-      ]
+  ( λ p i → comp 0 1 (pf.fst (p i)) [i=0 | i=1 → pf.snd]
+  , λ j i → comp j 1 (pf.snd j) [i=0 | i=1 → pf.snd]
   )
 
 let pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
@@ -71,16 +63,11 @@ let pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
     λ i j →
       comp 0 1 (pf .fst (comp 0 j (p i) [i=0 → refl | i=1 → q]))
         [ i=0 → pf.snd
-        | i=1 k →
-          comp 0 k (pf .fst (q j))
-          [ j=0 → pf.snd
-          | j=1 → pf.snd
-          ]
+        | i=1 k → comp 0 k (pf .fst (q j)) [j=0 | j=1 → pf.snd]
         ]
   in
   λ k i →
     comp 0 1 (face i 0) [
-    | k=0 j → face i j
     | i=0 j → pB.snd
-    | i=1 j → face 1 j
+    | k=0 | i=1 j → face i j
     ]

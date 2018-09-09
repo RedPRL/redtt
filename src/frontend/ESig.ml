@@ -69,7 +69,7 @@ and epatbind =
 
 and esys = eface list
 
-and eface = eterm * eterm * eterm
+and eface = (eterm * eterm) list * eterm
 
 and frame =
   | App of eterm
