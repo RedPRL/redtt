@@ -52,8 +52,7 @@ let onegloop-oloop (o : os2)
 
 ; II. universal cover over s2
 
-let s2/Code/Surf/filler : (m i j : dim) → type =
-  λ m i j →
+let s2/Code/Surf/filler (m i j : dim) : type =
   comp 0 m os2 [
   | i=0 | i=1 | j=0 → UA os2 os2 (IdEquiv/wc os2)
   | j=1 → UA os2 os2 (oloop-equiv i)
@@ -62,7 +61,8 @@ let s2/Code/Surf/filler : (m i j : dim) → type =
 let s2/Code/Surf : Path^1 (Path^1 type os2 os2) refl refl =
   s2/Code/Surf/filler 1
 
-let s2/Code/proj : [i j] (s2/Code/Surf i j → os2) [
+let s2/Code/proj :
+  [i j] (s2/Code/Surf i j → os2) [
   | i=0 | i=1 | j=1 → λ o → o
   | j=0 → λ o → oloop o i
   ]
@@ -112,7 +112,8 @@ let s2/decode (a : s2) : (s2/Code a) → Path s2 base a =
 
 ; V. encode base after decode base
 
-let s2/encode-decode/base/step (o : os2) : [i j] os2 [
+let s2/encode-decode/base/step (o : os2) :
+  [i j] os2 [
   | i=0 | i=1 → s2/encode base (s2/decode/base o)
   | j=0 → oloop (s2/encode base (s2/decode/base o)) i
   | j=1 → s2/encode base (s2/decode/base (oloop o i))
