@@ -22,7 +22,7 @@ syn region  redttEncl transparent start="\[" end="\]" contains=ALLBUT,redttBrack
 
 syn match   redttHole '?\k*'
 
-syn keyword redttKeyw data intro where in with end elim
+syn keyword redttKeyw boundary data intro where in with end elim
 syn keyword redttKeyw V fst snd coe com pair hcom comp vproj
 syn keyword redttKeyw refl restrict if lam call
 syn keyword redttKeyw pre kan U type then else
@@ -31,7 +31,7 @@ syn keyword redttKeyw open shut tick dim prev next dfix fix
 
 syn keyword redttDecl opaque let debug normalize import quit
 
-syn match   redttSymb '[#@`|\[\]^*×:,.∙✓□▷=→()λ]\|->'
+syn match   redttSymb '[#@`|\[\]^*×:,.∙✓□▷=∂→()λ]\|->'
 
 syn region  redttComm start=";" end="$"
 
