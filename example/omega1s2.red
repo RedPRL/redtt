@@ -63,14 +63,14 @@ let s2/Code/Surf : Path^1 (Path^1 type os2 os2) refl refl =
 
 let s2/Code/proj :
   [i j] (s2/Code/Surf i j → os2) [
-  | ∂[i] | j=1 → λ o → o
-  | j=0 → λ o → oloop o i
+  | (∂[i] | j=1) o → o
+  | j=0 o → oloop o i
   ]
   =
   λ i j →
   comp 0 1 (λ o → oloop o i) in (λ m → s2/Code/Surf/filler m i j → os2) [
   | ∂[i] → UAproj os2 os2 (IdEquiv/wc os2)
-  | j=0 m → λ o → oloop (UAproj os2 os2 (IdEquiv/wc os2) m o) i
+  | j=0 m o → oloop (UAproj os2 os2 (IdEquiv/wc os2) m o) i
   | j=1 → UAproj os2 os2 (oloop-equiv i)
   ]
 

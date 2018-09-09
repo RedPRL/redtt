@@ -77,8 +77,7 @@ let winding-loopn (n : int) : Path int (winding (loopn n)) n =
 ;  | base → loopn
 ;  | loop i → λ y j → let n : int = coe i 0 y in λ k → s1-univ-cover (loop k) in
 ;    comp 0 i (decode-square n i j) [
-;    | j=0 → refl
-;    | j=1 → refl
+;    | ∂[j] → refl
 ;    | i=1 k → loopn (isuc-pred y k) j
 ;    ]
 ;  ]
