@@ -40,10 +40,8 @@ let s3-to-join/k01 : [i j m] join [
 
 let s3-to-join/cube/filler (i j k m : dim) : join =
   comp 1 m (push (loop j) (loop k) i) [
-  | i=0 m → s3-to-join/k01 0 j m
-  | i=1 → s3-to-join/cnx (loop k) 1
-  | j=0 | j=1 → s3-to-join/cnx (loop k) i
-  | k=0 | k=1 m → s3-to-join/k01 i j m
+  | i=1 | j=0 | j=1 → s3-to-join/cnx (loop k) i
+  | i=0 | k=0 | k=1 m → s3-to-join/k01 i j m
   ]
 
 let s3-to-join (d : s3) : join =
@@ -85,8 +83,7 @@ let join-s3-join/inl (a : s1) : Path join (inl base) (inl a) =
 
 let join-s3-join/push/loop (b : s1) : [i j m] join [
   | i=0 → s3-to-join/k01 0 j m
-  | i=1 → s3-to-join/cnx b 1 m
-  | j=0 | j=1 → s3-to-join/cnx b i m
+  | i=1 | j=0 | j=1 → s3-to-join/cnx b i m
   | m=0 → s3-to-join (join-to-s3/push/loop b i j)
   | m=1 → push (loop j) b i
   ]
