@@ -4,11 +4,9 @@ let connection/or
  (A : type)
  (p : dim → A)
  : [i j] A [
-   | j=0 → p i
+   | j=0 | i=j → p i
    | i=0 → p j
-   | j=1 → p 1
-   | i=1 → p 1
-   | i=j → p i
+   | j=1 | i=1 → p 1
    ]
  =
  λ i j →
@@ -23,21 +21,17 @@ let connection/or
   in
   comp 1 0 (p 1) [
   | i=0 → face j
-  | i=1 → refl
-  | j=0 → face i
-  | j=1 → refl
-  | i=j → face i
+  | i=1 | j=1 → refl
+  | j=0 | i=j → face i
   ]
 
 let connection/and
  (A : type)
  (p : dim → A)
  : [i j] A [
-   | j=0 → p 0
-   | i=0 → p 0
-   | j=1 → p i
+   | j=0 | i=0 → p 0
+   | j=1 | i=j → p i
    | i=1 → p j
-   | i=j → p i
    ]
  =
  λ i j →
@@ -48,11 +42,9 @@ let connection/and
      ]
    in
    comp 0 1 (p 0) [
-   | i=0 → refl
+   | i=0 | j=0 → refl
    | i=1 → face j
-   | j=0 → refl
-   | j=1 → face i
-   | i=j → face i
+   | j=1 | i=j → face i
    ]
 
 let connection/both
@@ -91,8 +83,7 @@ let weak-connection/or
  : [i j] A [
    | j=0 → p i
    | i=0 → p j
-   | j=1 → p 1
-   | i=1 → p 1
+   | j=1 | i=1 → p 1
    ]
  =
  λ i j →
@@ -104,17 +95,15 @@ let weak-connection/or
   in
   comp 1 0 (p 1) [
   | i=0 → face j
-  | i=1 → refl
+  | i=1 | j=1 → refl
   | j=0 → face i
-  | j=1 → refl
   ]
 
 let weak-connection/and
  (A : type)
  (p : dim → A)
  : [i j] A [
-   | j=0 → p 0
-   | i=0 → p 0
+   | j=0 | i=0 → p 0
    | j=1 → p i
    | i=1 → p j
    ]
@@ -127,8 +116,7 @@ let weak-connection/and
      ]
    in
    comp 0 1 (p 0) [
-   | i=0 → refl
+   | i=0 | j=0 → refl
    | i=1 → face j
-   | j=0 → refl
    | j=1 → face i
    ]

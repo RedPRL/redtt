@@ -241,11 +241,19 @@ epatbind:
   | LPR; x = ATOM; RIGHT_ARROW; ih = ATOM; RPR
     { E.PIndVar (x, ih) }
 
+eequation:
+  | r0 = located(atomic); EQUALS; r1 = located(atomic)
+    { r0, r1 }
+
+ecofib:
+  | eqs = separated_nonempty_list(PIPE, eequation)
+    { eqs }
+
 eface:
-  | r0 = located(atomic); EQUALS; r1 = located(atomic); RIGHT_ARROW; e = located(econ)
-    { r0, r1, e }
-  | r0 = located(atomic); EQUALS; r1 = located(atomic); xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
-    { r0, r1, eterm ($startpos(xs), $endpos(e)) (E.Lam (xs, e)) }
+  | phi = ecofib; RIGHT_ARROW; e = located(econ)
+    { phi, e }
+  | phi = ecofib; xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
+    { phi, eterm ($startpos(xs), $endpos(e)) (E.Lam (xs, e)) }
 
 
 escheme:
@@ -275,6 +283,12 @@ desc_constr:
   extent = desc_extent
   { fun dlbl ->
     let dim_specs, boundary = extent in
+    let boundary =
+      List.flatten @@
+        List.map
+          (fun (phi, e) -> List.map (fun (r, r') -> r, r', e) phi)
+          boundary
+    in
     clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dim_specs; boundary} }
 
 desc_extent:
