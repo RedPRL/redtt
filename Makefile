@@ -2,7 +2,7 @@ OPAM=opam
 EXEC=${OPAM} config exec
 DUNE=${EXEC} dune --
 
-.PHONY: all build clean test top
+.PHONY: all build clean top
 
 all: build
 
@@ -23,9 +23,6 @@ examples:
 
 install:
 	${OPAM} reinstall redtt
-
-test:
-	@${DUNE} build @runtest
 
 top:
 	@${DUNE} utop src/core
