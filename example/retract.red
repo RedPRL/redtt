@@ -27,12 +27,12 @@ let path-retract/preserves/refl (A : type) (R : A → A → type)
   let cap2 : [i j] A [
     | j=0 → x
     | j=1 → q i
-    | i=0 | i=1 → q j
+    | ∂[i] → q j
     ]
     =
     λ i j →
       comp 0 1 (cap1 i j) [
-      | j=0 | j=1 | i=0 → refl
+      | ∂[j] | i=0 → refl
       | i=1 k → s x x (α x x (r x x refl) k) j
       ]
   in

@@ -97,8 +97,7 @@ let trans/unit/l
     comp 0 1 (p 0) [
     | j=1 l → comp 0 i (p 0) [ l=0 → refl | l=1 → p ]
     | i=1 l → comp 0 j (p 0) [ l=0 → refl | l=1 → p ]
-    | j=0 → refl
-    | i=0 → refl
+    | j=0 | i=0 → refl
     ]
   | i=0 → refl
   | i=1 → p
@@ -129,8 +128,7 @@ let trans/sym/l
       comp 0 1 (p 1) [
       | j=0 l → comp 1 k (p 1) [ l=0 → refl | l=1 → p ]
       | k=0 l → comp 1 j (p 1) [ l=0 → refl | l=1 → p ]
-      | j=1 → refl
-      | k=1 → refl
+      | j=1 | k=1 → refl
       ]
     | i=1 → p
     | k=0 → p

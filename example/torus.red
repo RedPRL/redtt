@@ -7,11 +7,11 @@ import isotoequiv
 
 data torus where
 | pt
-| p/one @ i [i=0 | i=1 → pt]
-| p/two @ i [i=0 | i=1 → pt]
+| p/one @ i [∂[i] → pt]
+| p/two @ i [∂[i] → pt]
 | square @ i j
-  [ i=0 | i=1 → p/one j
-  | j=0 | j=1 → p/two i
+  [ ∂[i] → p/one j
+  | ∂[j] → p/two i
   ]
 
 let t2c (t : torus) : s1 × s1 =

@@ -77,8 +77,7 @@ let winding-loopn (n : int) : Path int (winding (loopn n)) n =
 ;  | base → loopn
 ;  | loop i → λ y j → let n : int = coe i 0 y in λ k → s1-univ-cover (loop k) in
 ;    comp 0 i (decode-square n i j) [
-;    | j=0 → refl
-;    | j=1 → refl
+;    | ∂[j] → refl
 ;    | i=1 k → loopn (isuc-pred y k) j
 ;    ]
 ;  ]
@@ -110,7 +109,7 @@ let decode (x : s1) : s1-univ-cover x → Path s1 base x =
       UAproj int int isuc-equiv i y
     in
     comp 0 1 (decode-square n i j) [
-    | j=0 | j=1 | i=1 → refl
+    | ∂[j] | i=1 → refl
     | i=0 k → loopn (pred-isuc y k) j
     ]
   ]
