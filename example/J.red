@@ -2,7 +2,7 @@ import path
 
 let J
   (A : type) (a : A)
-  (C : (x : A) (p : Path _ a x) → type) (d : C a (λ _ → a))
+  (C : (x : A) (p : Path _ a x) → type) (d : C a refl)
   (x : A) (p : Path _ a x)
   : C x p
   =
@@ -11,8 +11,8 @@ let J
       let h : dim → A =
         λ j →
           comp 0 j a [
-          | i=0 ⇒ refl
-          | i=1 ⇒ p
+          | i=0 → refl
+          | i=1 → p
           ]
       in
       C (h 1) h
@@ -22,13 +22,12 @@ let J
 let J/eq
   (A : type) (a : A)
   (C : (x : A) (p : Path A a x) → type) (d : C a refl)
-  : Path (C a refl) (J _ _ C d _ (λ _ → a)) d
+  : Path (C a refl) (J _ _ C d a refl) d
   =
   let square : dim → dim → A =
     λ i j →
       comp 0 j a [
-      | i=0 ⇒ refl
-      | i=1 ⇒ refl
+      | ∂[i] → refl
       ]
   in
   λ k →
@@ -36,17 +35,15 @@ let J/eq
       let aux : dim → A =
         λ j →
           comp 0 j a [
-          | k=0 ⇒ square i
-          | k=1 ⇒ refl
-          | i=0 ⇒ refl
-          | i=1 ⇒ refl
+          | k=0 → square i
+          | k=1 | ∂[i] → refl
           ]
       in
       C (aux 1) aux
     with
-    | k=0 ⇒
+    | k=0 →
       λ i →
         coe 0 i d in λ j →
           C (square j 1) (square j)
-    | k=1 ⇒ refl
+    | k=1 → refl
     end

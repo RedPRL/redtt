@@ -71,10 +71,10 @@ let loop lexbuf tokens =
       | I.HandlingError env ->
         begin match I.top env with
           | None ->
-            Lwt.return []
+            Lwt.fail_with "[parser] parsing failed"
           | Some element ->
             Lwt.bind (Message.render @@ Element.handle lexbuf element) @@ fun _ ->
-            Lwt.return []
+            Lwt.fail_with "[parser] parsing failed"
         end
 
       | I.InputNeeded _env ->

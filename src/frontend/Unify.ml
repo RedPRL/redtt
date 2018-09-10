@@ -107,9 +107,6 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `Def _ ->
     []
-  | `SelfArg _ ->
-    (* ??? *)
-    [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `Tw _ ->
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `R _ ->
@@ -399,57 +396,9 @@ let evaluator =
   base_cx >>= fun cx ->
   ret (cx, Cx.evaluator cx)
 
-let inst_ty_bnd bnd (rec_spec, arg) =
-  base_cx >>= fun cx ->
-  let Tm.B (nm, tm) = bnd in
-  let varg = Cx.eval cx arg in
-  let lcx = Cx.def cx ~nm ~ty:rec_spec ~el:varg in
-  ret @@ Cx.quote_ty cx @@ Cx.eval lcx tm
-
 let eval tm =
   base_cx >>= fun cx ->
   ret @@ Cx.eval cx tm
-
-
-let inst_bnd (ty_clo, tm_bnd) (rec_spec, arg) =
-  evaluator >>= fun (cx, (module V)) ->
-  let Tm.B (nm, tm) = tm_bnd in
-  let varg = Cx.eval cx arg in
-  let lcx = Cx.def cx ~nm ~ty:rec_spec ~el:varg in
-  let vty = V.inst_clo ty_clo varg in
-  ret @@ Cx.quote cx ~ty:vty @@ Cx.eval lcx tm
-
-let plug (ty, tm) frame =
-  base_cx >>= fun cx ->
-  let (module V) = Cx.evaluator cx in
-
-  match Tm.unleash tm, frame with
-  | Tm.Up cmd, _ ->
-    ret @@ Tm.up @@ cmd @< frame
-  | Tm.Lam bnd, Tm.FunApp arg ->
-    let dom, cod = V.unleash_pi ty in
-    inst_bnd (cod, bnd) (dom, arg)
-  | Tm.ExtLam _, Tm.ExtApp args ->
-    let vargs = List.map (Cx.eval_dim cx) args in
-    let ty, _ = V.unleash_ext_with ty vargs in
-    let vlam = Cx.eval cx tm in
-    ret @@ Cx.quote cx ~ty @@ V.ext_apply vlam vargs
-  | Tm.Cons (t0, _), Tm.Car ->
-    ret t0
-  | Tm.Cons (_, t1), Tm.Cdr ->
-    ret t1
-  | Tm.LblRet t, Tm.LblCall ->
-    ret t
-  | _ -> failwith "TODO: plug"
-
-(* TODO: this sorry attempt results in things getting repeatedly evaluated *)
-let (%%) (ty, tm) frame =
-  base_cx >>= fun cx ->
-  let vty = Cx.eval cx ty in
-  plug (vty, tm) frame >>= fun tm' ->
-  let vty' = Typing.infer cx @@ Tm.ann ~ty ~tm @< frame in
-  let ty' = Cx.quote_ty cx vty' in
-  ret (ty', tm')
 
 
 let push_guess gm ~ty0 ~ty1 tm  =
@@ -716,47 +665,46 @@ let rigid_rigid q =
 
 let unify q =
   match Tm.unleash q.ty0, Tm.unleash q.ty1 with
-  | Tm.Pi (dom0, Tm.B (nm, _)), Tm.Pi (dom1, _) ->
-    let x = Name.named nm in
-    let x_l = Tm.up @@ Tm.var ~twin:`TwinL x in
-    let x_r = Tm.up @@ Tm.var ~twin:`TwinR x in
+  | Tm.Pi (dom0, Tm.B (_, cod0)), Tm.Pi (dom1, Tm.B (_, cod1)) ->
+    let x = Name.fresh () in
+    let x_l =Tm.var ~twin:`TwinL x in
+    let x_r =Tm.var ~twin:`TwinR x in
 
-    in_scope x (`Tw (dom0, dom1))
-      begin
-        (q.ty0, q.tm0) %% Tm.FunApp x_l >>= fun (ty0, tm0) ->
-        (q.ty1, q.tm1) %% Tm.FunApp x_r >>= fun (ty1, tm1) ->
-        ret @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
-      end >>= fun prob ->
-    active prob
+    in_scope x (`Tw (dom0, dom1)) @@
+    let tm0 = Tm.up @@ Tm.ann ~ty:q.ty0 ~tm:q.tm0 @< Tm.FunApp (Tm.up x_l) in
+    let tm1 = Tm.up @@ Tm.ann ~ty:q.ty1 ~tm:q.tm1 @< Tm.FunApp (Tm.up x_r) in
+    let ty0 = Tm.let_ None x_l cod0 in
+    let ty1 = Tm.let_ None x_r cod1 in
+    active @@ Problem.all_twins x dom0 dom1 @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
 
-  | Tm.Sg (dom0, _), Tm.Sg (dom1, _) ->
-    (* Format.eprintf "Unify: @[<1>%a@]@.@." Equation.pp q ; *)
-    (q.ty0, q.tm0) %% Tm.Car >>= fun (_, car0) ->
-    (q.ty1, q.tm1) %% Tm.Car >>= fun (_, car1) ->
-    (q.ty0, q.tm0) %% Tm.Cdr >>= fun (ty_cdr0, cdr0) ->
-    (q.ty1, q.tm1) %% Tm.Cdr >>= fun (ty_cdr1, cdr1) ->
-    active @@ Problem.eqn ~ty0:dom0 ~tm0:car0 ~ty1:dom1 ~tm1:car1 >>
-    let prob = Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1 in
-    (* Format.eprintf "problem: %a@.@." (Problem.pp) prob; *)
-    active @@ prob
+  | Tm.Sg (dom0, Tm.B (_, cod0)), Tm.Sg (dom1, Tm.B (_, cod1)) ->
+    let cmd0 = Tm.ann ~ty:q.ty0 ~tm:q.tm0 in
+    let cmd1 = Tm.ann ~ty:q.ty1 ~tm:q.tm1 in
+    let car0 = cmd0 @< Tm.Car in
+    let car1 = cmd1 @< Tm.Car in
+    let cdr0 = Tm.up @@ cmd0 @< Tm.Cdr in
+    let cdr1 = Tm.up @@ cmd1 @< Tm.Cdr in
+    let ty_cdr0 = Tm.let_ None car0 cod0 in
+    let ty_cdr1 = Tm.let_ None car1 cod1 in
+    active @@ Problem.eqn ~ty0:dom0 ~tm0:(Tm.up car0) ~ty1:dom1 ~tm1:(Tm.up car1) >>
+    active @@ Problem.eqn ~ty0:ty_cdr0 ~tm0:cdr0 ~ty1:ty_cdr1 ~tm1:cdr1
 
-  | Tm.Ext (Tm.NB (nms0, (_ty0, _sys0))), Tm.Ext (Tm.NB (_nms1, (_ty1, _sys1))) ->
+  | Tm.Ext (Tm.NB (nms0, (ty0, _sys0))), Tm.Ext (Tm.NB (nms1, (ty1, _sys1))) ->
     let xs = Bwd.map Name.named nms0 in
     let xs_lst = Bwd.to_list xs in
-    let vars = List.map (fun x -> Tm.up @@ Tm.var x) xs_lst in
+    let var_cmds = List.map Tm.var xs_lst in
+    let var_tms = List.map Tm.up var_cmds in
     let psi =
       match xs_lst with
       | [] -> List.map (fun x -> (x, `I)) @@ xs_lst
       | _ -> [(Name.fresh (), `NullaryExt)]
     in
 
-    in_scopes psi
-      begin
-        (q.ty0, q.tm0) %% Tm.ExtApp vars >>= fun (ty0, tm0) ->
-        (q.ty1, q.tm1) %% Tm.ExtApp vars >>= fun (ty1, tm1) ->
-        ret @@ Problem.all_dims xs_lst @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
-      end >>= fun prob ->
-    active prob
+    let tm0 = Tm.up @@ Tm.ann ~ty:q.ty0 ~tm:q.tm0 @< Tm.ExtApp var_tms in
+    let tm1 = Tm.up @@ Tm.ann ~ty:q.ty1 ~tm:q.tm1 @< Tm.ExtApp var_tms in
+    let ty0 = Tm.unbindn_with var_cmds (Tm.NB (nms0, ty0)) in
+    let ty1 = Tm.unbindn_with var_cmds (Tm.NB (nms1, ty1)) in
+    in_scopes psi @@ active @@ Problem.all_dims xs_lst @@ Problem.eqn ~ty0 ~tm0 ~ty1 ~tm1
 
   | _ ->
     match Tm.unleash q.tm0, Tm.unleash q.tm1 with
@@ -824,12 +772,9 @@ let rec lower tele alpha ty =
     define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
     ret true
 
-  | Tm.Sg (dom, cod) ->
+  | Tm.Sg (dom, Tm.B (nm, cod)) ->
     hole `Flex tele dom @@ fun t0 ->
-    in_scopes (Bwd.to_list tele) begin
-      eval dom >>= fun vdom ->
-      inst_ty_bnd cod (vdom, Tm.up t0)
-    end >>= fun cod' ->
+    let cod' = Tm.let_ nm t0 cod in
     hole `Flex tele cod' @@ fun t1 ->
     define tele alpha `Transparent ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
@@ -844,14 +789,9 @@ let rec lower tele alpha ty =
         lower (tele #< (x, `P dom)) alpha codx
 
       | Some (y, ty0, z, ty1, s, (u, v)) ->
-        let tele' = tele #< (y, `P ty0) #< (z, `P ty1) in
-        in_scopes (Bwd.to_list tele') begin
-          eval @@ abstract_ty tele dom >>= fun vty ->
-          begin
-            inst_ty_bnd cod (vty, s) >>= fun cod' ->
-            ret @@ abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod'
-          end
-        end >>= fun pi_ty ->
+        let s_ty = abstract_ty tele dom in
+        let cod' = Tm.unbind_with (Tm.ann ~ty:s_ty ~tm:s) cod in
+        let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod' in
         hole `Flex tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
         define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
@@ -901,7 +841,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | `I | `Tick | `NullaryExt | `KillFromTick _ | `SelfArg _ as p ->
+        | `I | `Tick | `NullaryExt | `KillFromTick _ as p ->
           in_scope x p @@
           solver probx
 
@@ -919,14 +859,14 @@ let rec solver prob =
 
         | `Def (ty, tm) ->
           begin
-            (* match split_sigma Emp x ty with
-               | Some (y, ty0, z, ty1, s, _) ->
-               (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
-               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
-               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
-               | None -> *)
-            in_scope x (`Def (ty, tm)) @@
-            solver probx
+            match split_sigma Emp x ty with
+            | Some (y, ty0, z, ty1, s, _) ->
+              (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
+              solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
+              Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
+            | None ->
+              in_scope x (`Def (ty, tm)) @@
+              solver probx
           end
 
         | `Tw (ty0, ty1) ->
@@ -941,8 +881,8 @@ let rec solver prob =
                   a representation based on having two contexts. *)
               let var_y = Tm.up @@ Tm.var y in
               let var_x = Tm.up @@ Tm.var x in
-              let sub_y = Subst.define (Subst.ext sub y (`P {ty = ty0; sys = []})) x ~ty:ty0 ~tm:var_y in
-              let sub_x = Subst.define (Subst.ext sub x (`P {ty = ty0; sys = []})) y ~ty:ty0 ~tm:var_x in
+              let sub_y = Subst.define (Subst.ext sub y (`P ty0)) x ~ty:ty0 ~tm:var_y in
+              let sub_x = Subst.define (Subst.ext sub x (`P ty0)) y ~ty:ty0 ~tm:var_x in
               solver @@ Problem.all x ty0 @@
               Problem.subst sub_x @@ Problem.subst sub_y probx
             | _ ->

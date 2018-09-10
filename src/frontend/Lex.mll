@@ -116,6 +116,8 @@ rule token = parse
     { Lwt.return COMMA }
   | '.'
     { Lwt.return DOT }
+  | "∂"
+    { Lwt.return BOUNDARY }
   | ":>"
     { Lwt.return TRIANGLE_RIGHT }
   | "▷"
@@ -124,10 +126,6 @@ rule token = parse
     { Lwt.return EQUALS }
   | "->"
     { Lwt.return RIGHT_ARROW }
-  | "⇒"
-    { Lwt.return RRIGHT_ARROW }
-  | "=>"
-    { Lwt.return RRIGHT_ARROW }
   | "→"
     { Lwt.return RIGHT_ARROW }
   | "<"
@@ -135,6 +133,8 @@ rule token = parse
   | ">"
     { Lwt.return RGL }
   | "λ"
+    { Lwt.return LAM }
+  | "\\"
     { Lwt.return LAM }
   | line_ending
     { new_line lexbuf; token lexbuf }

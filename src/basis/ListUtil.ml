@@ -33,6 +33,7 @@ let rec map3 f xs ys zs =
   | _ ->
     failwith "map3: length mismatch"
 
+(* TODO: remove *)
 let tabulate n f =
   let rec go i =
     if i == n then [] else
@@ -45,3 +46,16 @@ let filter_map f =
   match f x with
   | None -> []
   | Some y -> [y]
+
+let rec split_last l =
+  match l with
+  | [] -> failwith "split_last: empty list"
+  | [x] -> ([], x)
+  | x :: y :: ys ->
+    let zs, z = split_last (y :: ys) in
+    x :: zs, z
+
+let split_head l =
+  match l with
+  | [] -> failwith "split_head_append: empty list"
+  | x :: xs -> x, xs

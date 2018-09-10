@@ -5,7 +5,6 @@ sig
   val var : int -> t -> string
   val bind : t -> string option -> string * t
   val bindn : t -> string option list -> string list * t
-  val bind_fresh : t -> string * t
 
   val proj : t -> t
 end

@@ -1,4 +1,5 @@
 open RedBasis.Bwd
+module DimEnv = Map.Make (Name)
 
 type atom = I.atom
 type dir = Dir.t
@@ -76,7 +77,7 @@ and neu =
        clauses : (Desc.con_label * nclo) list}
 
   (* Invariant: neu \in vty, vty is a V type *)
-  | VProj of {x : atom; ty0 : value; ty1 : value; equiv : value; neu : neu}
+  | VProj of {x : atom; func : nf; neu : neu}
   | Cap of {dir : dir; ty : value; sys : comp_sys; neu : neu}
 
   | LblCall of neu
@@ -118,4 +119,4 @@ and neu_abs = (neu * val_sys) IAbs.abs
 and value = Node of {con : con; action : I.action}
 
 and env_el = [`Val of value | `Dim of I.t | `Tick of tick]
-and env = {cells : env_el bwd; global : I.action}
+and env = {cells : env_el bwd; global : dim DimEnv.t}

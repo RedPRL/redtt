@@ -1,6 +1,10 @@
-type 'a param =
-  [ `P of 'a
-  | `Tw of 'a * 'a
+type ty = Tm.tm
+type tm = Tm.tm
+
+type entry =
+  [ `P of ty
+  | `Def of ty * tm
+  | `Tw of ty * ty
   | `Tick
   | `I
   ]
@@ -8,14 +12,12 @@ type 'a param =
 module T = Map.Make (Name)
 module StringTable = Map.Make (String)
 
-type ty = Tm.tm
-type entry = {ty : ty; sys : (Tm.tm, Tm.tm) Tm.system}
 type lock_info = {constant : bool; birth : int}
 
 type t =
   {rel : Restriction.t;
    data_decls : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc StringTable.t;
-   table : (entry param * lock_info) T.t;
+   table : (entry * lock_info) T.t;
    killed : int -> bool;
    under_tick : int -> bool;
    len : int}
@@ -48,11 +50,9 @@ let ext_ (sg : t) ~constant nm param : t =
 
 
 let define (sg : t) nm ~ty ~tm =
-  let face = Tm.make Tm.Dim0, Tm.make Tm.Dim0, Some tm in
-  let sys = [face] in
   let linfo = {constant = true; birth = sg.len} in
   {sg with
-   table = T.add nm (`P {ty; sys}, linfo) sg.table;
+   table = T.add nm (`Def (ty, tm), linfo) sg.table;
    len = sg.len + 1}
 
 let ext (sg : t) =
@@ -84,7 +84,7 @@ let kill_from_tick (sg : t) nm : t =
   with
   | _ -> sg
 
-let lookup_entry sg nm tw =
+let lookup_ty sg nm tw =
   let prm, linfo = T.find nm sg.table in
   let killed = sg.killed linfo.birth in
   if not linfo.constant && killed then
@@ -92,22 +92,14 @@ let lookup_entry sg nm tw =
   else
     match prm, tw with
     | `P a, _ -> a
+    | `Def (a, _), _ -> a
     | `Tw (a, _), `TwinL -> a
     | `Tw (_, a), `TwinR -> a
     | _ -> failwith "GlobalEnv.lookup_entry"
 
-let lookup_kind sg nm =
+let lookup sg nm =
   let prm, _ = T.find nm sg.table in
-  match prm with
-  | `P _ -> `P ()
-  | `Tw _ -> `Tw ((), ())
-  | `I -> `I
-  | `Tick -> `Tick
-
-
-let lookup_ty sg nm (tw : Tm.twin) =
-  let {ty; _} = lookup_entry sg nm tw in
-  ty
+  prm
 
 let restriction sg =
   sg.rel
@@ -148,16 +140,22 @@ let pp_twin fmt =
   | `TwinR ->
     Format.fprintf fmt "TwinR"
 
+
+let global_dims globals =
+  T.fold
+    (fun x (prm, _) tbl ->
+       match prm with
+       | `I -> T.add x (I.act (Restriction.as_action globals.rel) (`Atom x)) tbl
+       | _ -> tbl)
+    globals.table
+    T.empty
+
 module M (Sig : sig val globals : t end) : Val.Sig =
 struct
 
   let restriction = Sig.globals.rel
 
-  let global_dim x =
-    let phi = Restriction.as_action restriction in
-    let r = I.act phi @@ `Atom x in
-    (* Format.eprintf "[%a] != %a ==> %a@." Restriction.pp restriction Name.pp x I.pp r; *)
-    r
+  let global_dims = global_dims Sig.globals
 
   let lookup_datatype lbl =
     lookup_datatype lbl Sig.globals
@@ -174,12 +172,14 @@ struct
         failwith "GlobalEnv.M.lookup: not found"
     in
     match param, tw with
-    | `P entry, _ ->
-      entry.ty, entry.sys
-    | `Tw (entry, _), `TwinL ->
-      entry.ty, entry.sys
-    | `Tw (_, entry), `TwinR ->
-      entry.ty, entry.sys
+    | `P ty, _ ->
+      ty, None
+    | `Def (ty, tm), _ ->
+      ty, Some tm
+    | `Tw (ty, _), `TwinL ->
+      ty, None
+    | `Tw (_, ty), `TwinR ->
+      ty, None
     | _ ->
       failwith "GlobalEnv.M.lookup: twin mismatch"
 end

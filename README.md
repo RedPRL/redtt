@@ -101,10 +101,10 @@ Requires `utop` (see prerequisites).
 $ make top
 ```
 
-### Tests
+### Examples
 
 ```
-$ make test
+$ make examples
 ```
 
 

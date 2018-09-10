@@ -6,10 +6,10 @@ module type Sig =
 sig
   val restriction : Restriction.t
 
-  val global_dim : I.atom -> I.t
+  val global_dims : dim DimEnv.t
 
-  (** Return the type and boundary of a global variable *)
-  val lookup : Name.t -> Tm.twin -> Tm.tm * (Tm.tm, Tm.tm) Tm.system
+  (** Return the type and definition of a global variable *)
+  val lookup : Name.t -> Tm.twin -> Tm.tm * Tm.tm option
 
   val lookup_datatype : Desc.data_label -> Tm.data_desc
 end
@@ -18,6 +18,8 @@ exception MissingElimClause of Desc.con_label
 
 module type S =
 sig
+  val empty_env : env
+
   val unleash : value -> con
 
   val reflect : value -> neu -> val_sys -> value
@@ -70,7 +72,7 @@ sig
   val lbl_call : value -> value
   val restriction_force : value -> value
 
-  val rigid_vproj : atom -> ty0:value -> ty1:value -> equiv:value -> el:value -> value
+  val rigid_vproj : atom -> func:value -> el:value -> value
 
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> env_el list -> value
@@ -81,7 +83,6 @@ sig
   val unleash_v : value -> atom * value * value * value
   val unleash_later : value -> tick_clo
   val unleash_ext_with : value -> dim list -> value * val_sys
-  val unleash_ext : value -> ext_abs
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_restriction_ty : value -> val_face
 
@@ -91,5 +92,6 @@ sig
 
   module Macro : sig
     val equiv : value -> value -> value
+    val func : value -> value -> value
   end
 end

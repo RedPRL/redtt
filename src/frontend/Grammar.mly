@@ -7,17 +7,37 @@
   module E = ESig
   module R = ResEnv
 
-  let eterm pos0 pos1 con =
-    E.{con; span = Some (pos0, pos1)}
+  let eterm loc con : E.eterm =
+    E.{con; span = Some loc}
+
+  let atom_to_econ a =
+    if a = "_" then E.Hope else E.Var {name = a; ushift = 0}
+
+  let lost_eterm e : E.eterm =
+    E.{con = e; span = None}
+
+  let atom_to_lost_eterm a : E.eterm =
+    lost_eterm (atom_to_econ a)
+
+  let atom_to_lost_frame a : E.frame =
+    E.App (atom_to_lost_eterm a)
+
+  let lost_frame e : E.frame =
+    E.App (lost_eterm e)
+
+  let spine_to_econ (e, es) =
+    match es with
+    | [] -> e
+    | _ -> E.Cut (lost_eterm e, Bwd.from_list es)
 %}
 
 %token <int> NUMERAL
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET
+%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BOUNDARY
 %token EQUALS
-%token RIGHT_ARROW RRIGHT_ARROW
+%token RIGHT_ARROW
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
@@ -29,14 +49,18 @@
 %start <ESig.esig> esig
 %%
 
+located(X):
+  | e = X
+    { eterm $loc e }
+
 edecl:
-  | LET; a = ATOM; sch = escheme; EQUALS; tm = eterm
+  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
     { E.Define (a, `Transparent, sch, tm) }
-  | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = eterm
+  | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
     { E.Define (a, `Opaque, sch, tm) }
   | DEBUG; f = debug_filter
     { E.Debug f }
-  | NORMALIZE; e = eterm
+  | NORMALIZE; e = located(econ)
     { E.Normalize e }
 
   | DATA; dlbl = ATOM;
@@ -71,45 +95,82 @@ debug_filter:
       | "constraints" -> `Constraints
       | _ -> failwith "Invalid debug filter: try 'all' or 'constraints' " }
 
-atomic_econ:
+eproj:
+  | DOT FST
+    { E.Car }
+  | DOT SND
+    { E.Cdr }
+
+atom_econ:
+  | a = ATOM
+    { atom_to_econ a }
+  | a = ATOM; CARET; k = NUMERAL
+    { E.Var {name = a; ushift = k} }
+
+atomoid_econ:
   | BACKTICK; t = tm
     { E.Quo t }
   | a = HOLE_NAME;
     { E.Hole a }
-  | HOLE_NAME; LBR; e = eterm; RBR
+  | HOLE_NAME; LBR; e = located(econ); RBR
     { E.Guess e }
   | spec = univ_spec
     { let k, l = spec in E.Type (k, l) }
-  | LGL; es = separated_list(COMMA, eterm); RGL
+  (* in theory this rule can replace the following three, but it seems there's some bug.
+  | LPR; es = separated_list(COMMA, located(econ)); RPR
     { E.Tuple es }
-  | LPR; e = eterm; RPR
-    { e.con }
-  | a = ATOM; CARET; k = NUMERAL
-    { E.Var (a, k) }
-  | a = ATOM;
-    { if a = "_" then E.Hope else E.Var (a, 0) }
+  *)
+  | LPR; RPR
+    { E.Tuple [] }
+  | LPR; e = econ; RPR
+    { e }
+  | LPR; e = located(econ); COMMA; es = separated_nonempty_list(COMMA, located(econ)); RPR
+    { E.Tuple (e :: es) }
   | REFL
     { E.Refl }
   | n = NUMERAL;
     { E.Num n }
 
-atomic_eterm:
-  | e = atomic_econ
-    { eterm $startpos $endpos e }
+atomic:
+  | e = atom_econ
+    { e }
+  | e = atomoid_econ
+    { e }
 
-eframe:
-  | e = atomic_eterm
+framoid:
+  | e = located(atomoid_econ)
     { E.App e }
-  | DOT FST
-    { E.Car }
-  | DOT SND
-    { E.Cdr }
-  | DOT; n = NUMERAL
-    { match n with
-      | 0 -> E.Car
-      | 1 -> E.Cdr
-      | _ -> failwith "Parser: invalid projection" }
+  | p = eproj
+    { p }
 
+framic:
+  | e = located(atomic)
+    { E.App e }
+  | p = eproj
+    { p }
+
+spine:
+  (* a b *)
+  | atoms = nonempty_list(ATOM)
+    { let head, tail = ListUtil.split_head atoms in
+      atom_to_econ head, List.map atom_to_lost_frame tail }
+  (* a b c .0 ... *)
+  (* a b (e) ... *)
+  | atoms = nonempty_list(ATOM); p = framoid; fs = list(framic)
+    { let head, medium = ListUtil.split_head atoms in
+      atom_to_econ head, List.concat [List.map atom_to_lost_frame medium; [p]; fs] }
+  (* a b c^1 ... *)
+  | atoms = nonempty_list(ATOM); CARET; k = NUMERAL; fs = list(framic)
+    { let atoms, last_atom = ListUtil.split_last atoms in
+      let econs = List.append (List.map atom_to_econ atoms) [E.Var {name = last_atom; ushift = k}] in
+      let head_econ, middle_econs = ListUtil.split_head econs in
+      head_econ, List.append (List.map lost_frame middle_econs) fs }
+  | e = atomoid_econ; fs = list(framic)
+    { e, fs }
+
+spine_con:
+  | ap = spine
+    { spine_to_econ ap }
 
 block(X):
   | WITH; x = X; END
@@ -122,88 +183,116 @@ pipe_block(X):
     { x }
 
 econ:
-  | e = atomic_econ
+  | e = spine_con
     { e }
-  | e = atomic_eterm; fs = nonempty_list(eframe)
-    { E.Cut (e, Bwd.from_list fs) }
-  | LAM; xs = list(ATOM); RIGHT_ARROW; e = eterm
-    { E.Lam (xs, e)   }
-  | LET; name = ATOM; COLON; ty = eterm; EQUALS; tm = eterm; IN; body = eterm
-    { E.Let {name; ty = Some ty; tm; body} }
-  | LET; name = ATOM; EQUALS; tm = eterm; IN; body = eterm
-    { E.Let {name; ty = None; tm; body} }
 
-  | ELIM; scrut = eterm; IN; mot = eterm; clauses = pipe_block(eclause)
+  | LAM; xs = list(ATOM); RIGHT_ARROW; e = located(econ)
+    { E.Lam (xs, e) }
+
+  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
+    { E.Let {name = a; sch = sch; tm; body} }
+
+  | ELIM; scrut = located(econ); IN; mot = located(econ); clauses = pipe_block(eclause)
     { E.Elim {mot = Some mot; scrut; clauses} }
-
-  | ELIM; scrut = eterm; clauses = pipe_block(eclause)
+  | ELIM; scrut = located(econ); clauses = pipe_block(eclause)
     { E.Elim {mot = None; scrut; clauses} }
 
-  | DFIX; LSQ; r = eterm; RSQ; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
+  | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }
-
-  | DFIX; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
+  | DFIX; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r = {con = E.Num 0; span = None}; name; ty; bdy} }
 
-  | FIX; LSQ; r = eterm; RSQ; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
+  | FIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.FixLine {r; name; ty; bdy} }
-
-  | FIX; name = ATOM; COLON; ty = eterm; IN; bdy = eterm
+  | FIX; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.FixLine {r = {con = E.Num 0; span = None}; name; ty; bdy} }
 
-  | COE; r0 = atomic_eterm; r1 = atomic_eterm; tm= atomic_eterm; IN; fam = eterm
+  | COE; r0 = located(atomic); r1 = located(atomic); tm = located(atomic); IN; fam = located(econ)
     { E.Coe {r = r0; r' = r1; fam; tm} }
 
-  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; sys = pipe_block(eface)
+  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); sys = pipe_block(eface)
     { E.HCom {r = r0; r' = r1; cap; sys}}
 
-  | COMP; r0 = atomic_eterm; r1 = atomic_eterm; cap = atomic_eterm; IN; fam = eterm; sys = pipe_block(eface)
+  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); IN; fam = located(econ); sys = pipe_block(eface)
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
-  | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = eterm
+  | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = located(econ)
     { E.Pi (List.flatten tele, cod) }
 
-  | tele = nonempty_list(etele_cell); TIMES; cod = eterm
+  | tele = nonempty_list(etele_cell); TIMES; cod = located(econ)
     { E.Sg (List.flatten tele, cod) }
 
-  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = eterm; sys = pipe_block(eface)
+  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = located(econ); sys = pipe_block(eface)
     { E.Ext (dims, ty, sys)}
 
-  | dom = atomic_eterm; RIGHT_ARROW; cod = eterm
+  | dom = located(spine_con); RIGHT_ARROW; cod = located(econ)
     { E.Pi ([`Ty ("_", dom)], cod) }
 
-  | dom = atomic_eterm; TIMES; cod = eterm
+  | dom = located(spine_con); TIMES; cod = located(econ)
     { E.Sg ([`Ty ("_", dom)], cod) }
 
-eterm:
-  | e = econ
-    { eterm $startpos $endpos e }
-
 eclause:
-  | lbl = ATOM; pbinds = list(epatbind); RRIGHT_ARROW; bdy = eterm
+  | lbl = ATOM; pbinds = list(epatbind); RIGHT_ARROW; bdy = located(econ)
     { lbl, pbinds, bdy }
 
 epatbind:
   | x = ATOM
     { E.PVar x }
-  | LPR; x = ATOM; RRIGHT_ARROW; ih = ATOM; RPR
+  | LPR; x = ATOM; RIGHT_ARROW; ih = ATOM; RPR
     { E.PIndVar (x, ih) }
 
+edimension:
+  | n = NUMERAL;
+    { E.Num n }
+  | a = ATOM
+    { atom_to_econ a }
+  | LPR; d = edimension; RPR
+    { d }
+
+eequation:
+  | r0 = located(edimension); EQUALS; r1 = located(edimension)
+    { r0, r1 }
+
+ecofib0:
+  | xi = eequation
+    { [xi] }
+
+  | BOUNDARY; LSQ; xs = nonempty_list(ATOM); RSQ;
+    { let xi x =
+        let pos = $loc(xs) in
+        let r = eterm pos @@ E.Var {name = x; ushift = 0} in
+        [r, eterm pos (E.Num 0);
+         r, eterm pos (E.Num 1)]
+      in
+      List.flatten @@ List.map xi xs }
+
+  | LPR; e = ecofib; RPR
+    { e }
+
+ecofib:
+  | phi = separated_nonempty_list(PIPE, ecofib0)
+    { List.flatten phi }
+
 eface:
-  | r0 = atomic_eterm; EQUALS; r1 = atomic_eterm; RRIGHT_ARROW; e = eterm
-    { r0, r1, e }
+  | phi = ecofib; RIGHT_ARROW; e = located(econ)
+    { phi, e }
+  | phi = ecofib0; xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
+    { phi, eterm ($startpos(xs), $endpos(e)) (E.Lam (xs, e)) }
 
 
 escheme:
-  | tele = list(etele_cell); COLON; cod = eterm
+  | tele = list(etele_cell); COLON; cod = located(econ)
     { (List.flatten tele, cod) }
 
+  | tele = list(etele_cell)
+    { (List.flatten tele, eterm ($endpos(tele), $endpos(tele)) E.Hope) }
+
 etele_cell:
-  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; ty = eterm; RPR
+  | LPR; xs = nonempty_list(ATOM); COLON; ty = located(econ); RPR
     { List.map (fun x -> `Ty (x, ty)) xs }
-  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; TICK; RPR
+  | LPR; xs = nonempty_list(ATOM); COLON; TICK; RPR
     { List.map (fun x -> `Tick x) xs }
-  | LPR; xs = separated_nonempty_list(COMMA, ATOM); COLON; DIM; RPR
+  | LPR; xs = nonempty_list(ATOM); COLON; DIM; RPR
     { List.map (fun x -> `I x) xs }
   | DIM
     { [`I "_"] }
@@ -218,6 +307,12 @@ desc_constr:
   extent = desc_extent
   { fun dlbl ->
     let dim_specs, boundary = extent in
+    let boundary =
+      List.flatten @@
+        List.map
+          (fun (phi, e) -> List.map (fun (r, r') -> r, r', e) phi)
+          boundary
+    in
     clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dim_specs; boundary} }
 
 desc_extent:
@@ -237,7 +332,7 @@ desc_rec_spec:
 
 %inline
 desc_const_spec:
-| LSQ; x = ATOM; COLON; ty = eterm; RSQ
+| LSQ; x = ATOM; COLON; ty = located(econ); RSQ
   { x, ty }
 
 
@@ -403,13 +498,17 @@ head:
     { fun env ->
       match R.get a env with
       | `Ix _ -> failwith "Cannot shift bound variable"
-      | `Var r -> Tm.Var {name = r; twin = `Only; ushift = k} }
+      | `Var x -> Tm.Var {name = x; twin = `Only; ushift = k}
+      | `Metavar x -> Tm.Meta {name = x; ushift = k}
+      | _ -> failwith "Expected variable name" }
 
   | a = ATOM
     { fun env ->
       match R.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
-      | `Var r -> Tm.Var {name = r; twin = `Only; ushift = 0} }
+      | `Var x -> Tm.Var {name = x; twin = `Only; ushift = 0}
+      | `Metavar x -> Tm.Meta {name = x; ushift = 0}
+      | _ -> failwith "Expected variable name" }
 
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->
@@ -472,7 +571,7 @@ cut:
       let hd, fs = e env in
       hd, fs #< (Tm.ExtApp (args env)) }
 
-  | LPR; VPROJ; r = tm; e = cut; ty0 = tm; ty1 = tm; equiv = tm; RPR
+  | LPR; VPROJ; r = tm; e = cut; func = tm; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< (Tm.VProj {r = r env; ty0 = ty0 env; ty1 = ty1 env; equiv = equiv env})}
+      hd, fs #< (Tm.VProj {r = r env; func = func env})}

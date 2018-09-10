@@ -567,12 +567,12 @@ and infer_spine cx hd =
 
     | T.VProj info ->
       let ih = infer_spine cx hd sp in
-      let v_ty =
-        check_eval_ty cx @@
-        T.make @@ T.V {r = info.r; ty0 = info.ty0; ty1 = info.ty1; equiv = info.equiv}
-      in
-      Cx.check_eq_ty cx v_ty ih.ty;
-      D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty1}
+      let x, ty0, ty1, equiv = V.unleash_v ih.ty in
+      let func' = V.car equiv in
+      let func_ty = D.Value.act (I.subst `Dim0 x) @@ V.Macro.func ty0 ty1 in
+      let func = check_eval cx func_ty info.func in
+      Cx.check_eq cx ~ty:func_ty func func';
+      D.{el = Cx.eval_frame cx ih.el frm; ty = ty1}
 
     | T.Elim info ->
       let T.B (nm, mot) = info.mot in
@@ -615,7 +615,7 @@ and infer_spine cx hd =
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx D.Env.emp D.Env.emp (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
+        let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 

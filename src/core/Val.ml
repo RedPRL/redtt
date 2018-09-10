@@ -5,6 +5,8 @@ open Domain
 
 include ValSig
 
+let flip f x y = f y x
+
 exception StrictHComEncounteredNonConstructor
 
 
@@ -170,6 +172,8 @@ module M (Sig : Sig) : S with module Sig = Sig =
 struct
   module Sig = Sig
 
+  let empty_env = Env.emp Sig.global_dims
+
   let make_closure rho bnd =
     Clo {bnd; rho}
 
@@ -192,10 +196,11 @@ struct
           end
 
         | Tm.Var info ->
-          I.act rho.global @@ Sig.global_dim info.name
-
-        | Tm.Meta meta ->
-          I.act rho.global @@ Sig.global_dim meta.name
+          begin
+            match DimEnv.find_opt info.name rho.global with
+            | Some r -> r
+            | None -> `Atom info.name
+          end
 
         | Tm.DownX r ->
           eval_dim rho r
@@ -515,8 +520,12 @@ struct
         let el =
           lazy begin
             let phi = I.equate r r' in
-            let neu' = Neu.act phi neu in
-            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+            match force_val_sys @@ ValSys.act phi @@ ValSys.from_rigid rst_sys with
+            | `Proj v ->
+              v
+            | `Ok sys ->
+              let neu' = Neu.act phi neu in
+              make @@ Up {ty = Value.act phi ty; neu = neu'; sys}
           end
         in
         [Face.Indet (xi, el)]
@@ -535,7 +544,7 @@ struct
     | (_, spec) :: const_specs, arg :: args ->
       let vty = eval env spec in
       let r, r' = Dir.unleash dir in
-      let coe_hd s = make_coe (Dir.make r s) (Abs.unsafe_bind1 x vty) arg in
+      let coe_hd s = make_coe (Dir.make r s) (Abs.bind1 x vty) arg in
       let coe_tl =
         let coe_hd_x = coe_hd @@ `Atom x in
         rigid_multi_coe (Env.snoc env @@ `Val coe_hd_x) dir (x, const_specs) args
@@ -560,7 +569,7 @@ struct
     let r, r' = Dir.unleash dir in
 
     let make_const_args dir =
-      multi_coe Env.emp dir (x, constr.const_specs) const_args
+      multi_coe empty_env dir (x, constr.const_specs) const_args
     in
 
     let coe_rec_arg dir _arg_spec arg =
@@ -571,7 +580,7 @@ struct
 
     let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.rec_specs rec_args in
     let intro =
-      make_intro Env.emp ~dlbl ~clbl
+      make_intro empty_env ~dlbl ~clbl
         ~const_args:(make_const_args (`Ok dir))
         ~rec_args:(make_rec_args (`Ok dir))
         ~rs
@@ -584,7 +593,7 @@ struct
       | _ ->
         (* My lord, I have no idea if this is right. ouch!! *)
         let faces =
-          eval_bterm_boundary dlbl desc Env.emp
+          eval_bterm_boundary dlbl desc empty_env
             ~const_args:(make_const_args @@ Dir.make r (`Atom x))
             ~rec_args:(make_rec_args @@ Dir.make r (`Atom x))
             ~rs
@@ -595,11 +604,11 @@ struct
           Abs.bind1 x @@ make_coe (Dir.make (`Atom x) r') abs el
         in
         let correction = List.map fix_face faces in
-        make_fhcom (`Ok dir) intro @@ force_abs_sys correction
+        make_fhcom (`Ok (Dir.swap dir)) intro @@ force_abs_sys correction
     end
 
   and rigid_coe_nonstrict_data dir abs el =
-    let _, tyx = Abs.unleash1 abs in
+    let _, tyx = Abs.unsafe_unleash abs in
     match unleash tyx, unleash el with
     | Data dlbl, Intro info ->
       rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
@@ -661,7 +670,8 @@ struct
     | Data dlbl ->
       let desc = Sig.lookup_datatype dlbl in
       if Desc.is_strict_set desc then el
-      else rigid_coe_nonstrict_data dir abs el
+      (* for data types without parameters, coe can be the identity *)
+      else el (*rigid_coe_nonstrict_data dir abs el*)
 
     | FHCom fhcom ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
@@ -709,7 +719,7 @@ struct
        * safer to do substitution every time. *)
       let recovery_apart phi abs x_dest z_dest =
         let subst_x = I.subst x_dest x in
-        make_coe (Dir.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) abs @@
+        make_coe (Dir.make (I.act (I.cmp subst_x phi) s') (I.act subst_x z_dest)) (Abs.act subst_x abs) @@
         make_coe (Dir.make (I.act phi r) x_dest) (Abs.bind1 x @@ Abs.inst1 abs (I.act phi s')) @@
         Value.act phi el
       in
@@ -777,7 +787,8 @@ struct
         Face.map @@ fun sj s'j absj ->
         let phi = I.equate sj s'j in
         recovery_general phi absj (I.act (I.cmp phi subst_r') s')
-      in List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
+      in
+      List.map (fun b -> face (AbsFace.act subst_r' b)) fhcom.sys
 
 
     | V info ->
@@ -807,9 +818,7 @@ struct
             let subst_src = Value.act (I.subst src x) in
             vproj phi
               (I.act phi src)
-              ~ty0:(fun phi0 -> Value.act phi0 @@ subst_src info.ty0)
-              ~ty1:(Value.act phi @@ subst_src info.ty1)
-              ~equiv:(fun phi0 -> Value.act phi0 @@ subst_src info.equiv)
+              ~func:(fun phi0 -> Value.act phi0 @@ subst_src @@ car info.equiv)
               ~el:(Value.act phi el)
           in
           (* Some helper functions to reduce typos. *)
@@ -855,7 +864,7 @@ struct
            * type in the semantic domain. *)
           let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.ix i in
-            let env = Env.append Env.emp [`Val b; `Val (car (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
+            let env = Env.append empty_env [`Val b; `Val (car (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
             eval env @@ Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
           in
           (* This is to generate the element in `ty0` and also
@@ -932,10 +941,8 @@ struct
           let el1 =
             let cap =
               let phi = I.subst r x in
-              let ty0r = Value.act phi info.ty0 in
-              let ty1r = Value.act phi info.ty1 in
-              let equivr = Value.act phi info.equiv in
-              rigid_vproj info.x ~ty0:ty0r ~ty1:ty1r ~equiv:equivr ~el
+              let funcr = Value.act phi @@ car info.equiv in
+              rigid_vproj info.x ~func:funcr ~el
             in
             let mode = `INCONSISTENCY_REMOVAL in
             let sys =
@@ -1063,11 +1070,13 @@ struct
     let cap_face =
       match Eq.from_dir dir with
       | `Ok xi ->
+        let phi = I.equate r r' in
         let el =
           lazy begin
-            let phi = I.equate r r' in
-            let neu' = Neu.act phi cap in
-            reflect (Value.act phi ty) neu' @@ ValSys.act phi @@ ValSys.from_rigid rst_sys
+            match force_val_sys @@ ValSys.act phi @@ ValSys.from_rigid rst_sys with
+            | `Proj v -> v
+            | `Ok sys ->
+              make @@ Up {ty = Value.act phi ty; neu = Neu.act phi cap; sys}
           end
         in
         [Face.Indet (xi, el)]
@@ -1188,13 +1197,14 @@ struct
           Abs.make1 @@ fun y ->
           hcom phi (`Atom y) (Value.act phi ty1)
         in
-        let el1_cap = rigid_vproj x ~ty0 ~ty1 ~equiv ~el:cap in
+        let func = car equiv in
+        let el1_cap = rigid_vproj x ~func ~el:cap in
         let el1_sys =
           let face =
             Face.map @@ fun ri r'i absi ->
             let phi = I.equate ri r'i in
             let yi, el = Abs.unleash absi in
-            Abs.bind yi @@ vproj phi (I.act phi @@ `Atom x) ~ty0:(fun phi -> Value.act phi ty0) ~ty1:ty1 ~equiv:(fun phi -> Value.act phi equiv) ~el
+            Abs.bind yi @@ vproj phi (I.act phi @@ `Atom x) ~func:(fun phi -> Value.act phi func) ~el
           in
           Option.filter_map force_abs_face [face0; face1] @ List.map face sys
         in
@@ -1503,10 +1513,8 @@ struct
       cdr vhd
     | Tm.VProj info ->
       let r = eval_dim rho info.r in
-      let ty0 phi0 = eval (Env.act phi0 rho) info.ty0 in
-      let ty1 = eval rho info.ty1 in
-      let equiv phi0 = eval (Env.act phi0 rho) info.equiv in
-      vproj I.idn r ~ty0 ~ty1 ~equiv ~el:vhd
+      let func phi0 = eval (Env.act phi0 rho) info.func in
+      vproj I.idn r ~func ~el:vhd
     | Tm.Cap info ->
       let r = eval_dim rho info.r in
       let r' = eval_dim rho info.r' in
@@ -1591,18 +1599,28 @@ struct
       end
 
     | Tm.Var info ->
-      let tty, tsys = Sig.lookup info.name info.twin in
+      let tty, odef = Sig.lookup info.name info.twin in
       let rho' = Env.clear_locals rho in
-      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ info.ushift) tsys in
-      let vty = eval rho' @@ Tm.shift_univ info.ushift tty in
-      reflect vty (Var {name = info.name; twin = info.twin; ushift = info.ushift}) vsys
+      begin
+        match odef with
+        | Some def ->
+          eval rho' @@ Tm.shift_univ info.ushift def
+        | None ->
+          let vty = eval rho' @@ Tm.shift_univ info.ushift tty in
+          reflect vty (Var {name = info.name; twin = info.twin; ushift = info.ushift}) []
+      end
 
     | Tm.Meta {name; ushift} ->
-      let tty, tsys = Sig.lookup name `Only in
+      let tty, odef = Sig.lookup name `Only in
       let rho' = Env.clear_locals rho in
-      let vsys = eval_tm_sys rho' @@ Tm.map_tm_sys (Tm.shift_univ ushift) tsys in
-      let vty = eval rho' @@ Tm.shift_univ ushift tty in
-      reflect vty (Meta {name; ushift}) vsys
+      begin
+        match odef with
+        | Some def ->
+          eval rho' @@ Tm.shift_univ ushift def
+        | None ->
+          let vty = eval rho' @@ Tm.shift_univ ushift tty in
+          reflect vty (Meta {name; ushift}) []
+      end
 
   and reflect ty neu sys =
     match force_val_sys sys with
@@ -1678,14 +1696,14 @@ struct
     let Tm.NB (nms, tm) = bnd in
     let xs = Bwd.map Name.named nms in
     let rho = Env.append rho @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs in
-    Abs.unsafe_bind xs @@ eval rho tm
+    Abs.bind xs @@ eval rho tm
 
   (* CORRECT *)
   and eval_ext_bnd rho bnd =
     let Tm.NB (nms, (tm, sys)) = bnd in
     let xs = Bwd.map Name.named nms in
     let rho = Env.append rho @@ Bwd.to_list @@ Bwd.map (fun x -> `Dim (`Atom x)) xs in
-    let res = ExtAbs.unsafe_bind xs (eval rho tm, eval_tm_sys rho sys) in
+    let res = ExtAbs.bind xs (eval rho tm, eval_tm_sys rho sys) in
     res
 
   and unleash_data v =
@@ -1717,13 +1735,6 @@ struct
     match unleash v with
     | Ext abs ->
       ExtAbs.inst abs (Bwd.from_list rs)
-    | _ ->
-      raise @@ E (UnleashExtError v)
-
-  and unleash_ext v =
-    match unleash v with
-    | Ext abs ->
-      abs
     | _ ->
       raise @@ E (UnleashExtError v)
 
@@ -1876,20 +1887,13 @@ struct
       let y, ext_y = Abs.unleash1 info.abs in
       let ty_s, sys_s = unleash_ext_with ext_y ss in
       let forall_y_sys_s = ValSys.forall y sys_s in
-      begin
-        match force_val_sys forall_y_sys_s with
-        | `Proj v ->
-          v
-
-        | `Ok rsys ->
-          let correction =
-            let face = Face.map @@ fun _ _ v -> Abs.bind1 y v in
-            List.map face rsys
-          in
-          let abs = Abs.bind1 y ty_s in
-          let cap = ext_apply info.el ss in
-          rigid_com info.dir abs cap correction
-      end
+      let correction =
+        let face = Face.map @@ fun _ _ v -> Abs.bind1 y v in
+        List.map face forall_y_sys_s
+      in
+      let abs = Abs.bind1 y ty_s in
+      let cap = ext_apply info.el ss in
+      make_com (`Ok info.dir) abs cap @@ force_abs_sys correction
 
     | HCom info ->
       let ty_s, sys_s = unleash_ext_with info.ty ss in
@@ -2018,27 +2022,36 @@ struct
 
   (* the equation oracle `phi` is for continuations `ty0` and `equiv`
    * waiting for an updated oracle. *)
-  and vproj phi mgen ~ty0 ~ty1 ~equiv ~el : value =
+  and vproj phi mgen ~func ~el : value =
     match mgen with
     | `Atom x ->
       let phi0 = I.cmp (I.equate mgen `Dim0) phi in
-      rigid_vproj x ~ty0:(ty0 phi0) ~ty1 ~equiv:(equiv phi0) ~el
+      rigid_vproj x ~func:(func phi0) ~el
     | `Dim0 ->
-      let func = car (equiv phi) in
+      let func = func phi in
       apply func el
     | `Dim1 ->
       el
 
-  and rigid_vproj x ~ty0 ~ty1 ~equiv ~el : value =
+  and rigid_vproj x ~func ~el : value =
     match unleash el with
     | VIn info ->
       info.el1
     | Up up ->
-      let neu = VProj {x; ty0; ty1; equiv; neu = up.neu} in
+      let z, ty0, ty1, equiv = unleash_v up.ty in
+      let subst_0z = I.subst `Dim0 z in
+      let ty0_0z = Value.act subst_0z ty0 in
+      let ty1_0z = Value.act subst_0z ty1 in
+      let func_nf =
+        let func_ty = make_func ty0_0z ty0_0z in
+        {ty = func_ty; el = func}
+      in
+
+      let neu = VProj {x; func = func_nf; neu = up.neu} in
       let vproj_face =
         Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
-        vproj phi (I.act phi @@ `Atom x) ~ty0:(fun phi0 -> Value.act phi0 ty0) ~ty1:(Value.act phi ty1) ~equiv:(fun phi0 -> Value.act phi0 equiv) ~el:a
+        vproj phi (I.act phi @@ `Atom x) ~func:(fun phi0 -> Value.act phi0 func) ~el:a
       in
       let faces01 =
         let face0 =
@@ -2046,7 +2059,7 @@ struct
           let phi = I.equate (`Atom x) `Dim0 in
           let body =
             lazy begin
-              let func = car (Value.act phi equiv) in
+              let func = Value.act phi func in
               apply func el
             end
           in
@@ -2138,9 +2151,7 @@ struct
       make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
 
     | Coe info ->
-      let x, tyx = Abs.unleash1 info.abs in
-      let domx, _ = unleash_sg tyx in
-      let abs = Abs.bind1 x domx in
+      let abs = flip Abs.unsafe_map info.abs @@ fun v -> fst @@ unleash_sg v in
       let el = car info.el in
       rigid_coe info.dir abs el
 
@@ -2327,14 +2338,23 @@ struct
     | TickCloConst v ->
       Lazy.force v
 
+  and make_func ty0 ty1 : value =
+    let rho = Env.append empty_env [`Val ty1; `Val ty0] in
+    eval rho @@
+    Tm.arr
+      (Tm.up @@ Tm.ix 0)
+      (Tm.up @@ Tm.ix 1)
+
   module Macro =
   struct
     let equiv ty0 ty1 : value =
-      let rho = Env.append Env.emp [`Val ty1; `Val ty0] in
+      let rho = Env.append empty_env [`Val ty1; `Val ty0] in
       eval rho @@
       Tm.equiv
         (Tm.up @@ Tm.ix 0)
         (Tm.up @@ Tm.ix 1)
+
+    let func = make_func
 
   end
 

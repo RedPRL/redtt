@@ -121,6 +121,7 @@ let lookup_constant nm tw cx =
   GlobalEnv.lookup_ty cx.sign nm tw
 
 let restrict cx r r' =
+  (* WTF is this? weird, would be nice to delete. *)
   let phi = Restriction.as_action cx.rel in
   let r = I.act phi r in
   let r' = I.act phi r' in
@@ -200,7 +201,7 @@ let check_subtype cx ty0 ty1 =
 
 let init globals =
   {sign = globals;
-   env = Domain.Env.emp;
+   env = Domain.Env.emp @@ GlobalEnv.global_dims globals;
    qenv = Quote.Env.emp;
    hyps = Emp;
    ppenv = Pp.Env.emp;

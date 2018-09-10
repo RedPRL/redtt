@@ -216,8 +216,9 @@ struct
       let tr = quote_dim env @@ `Atom info.x in
       let phi_r0 = I.subst `Dim0 info.x in
       let tm0 = equate env (Domain.Value.act phi_r0 info.ty0) (Domain.Value.act phi_r0 el0) (Domain.Value.act phi_r0 el1) in
-      let vproj0 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~equiv:info.equiv ~el:el0 in
-      let vproj1 = rigid_vproj info.x ~ty0:info.ty0 ~ty1:info.ty1 ~equiv:info.equiv ~el:el1 in
+      let func = car info.equiv in
+      let vproj0 = rigid_vproj info.x ~func ~el:el0 in
+      let vproj1 = rigid_vproj info.x ~func ~el:el1 in
       let tm1 = equate env info.ty1 vproj0 vproj1 in
       Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
 
@@ -372,7 +373,7 @@ struct
       | _ ->
         failwith "equate_constr_args"
     in
-    go Emp D.Env.emp constr.const_specs els0 els1
+    go Emp empty_env constr.const_specs els0 els1
 
   and equate_constr_rec_args env dlbl constr els0 els1 =
     let open Desc in
@@ -515,15 +516,15 @@ struct
               | [], [], [] ->
                 qenv, Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env D.Env.emp (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
+            build_cx env empty_env (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
           in
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
           let bdy1 = inst_nclo clause1 cells in
-          let intro = make_intro D.Env.emp ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
+          let intro = make_intro empty_env ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
-          let nms = Bwd.from_list @@ ListUtil.tabulate (List.length cells) @@ fun _ -> None in
+          let nms = Bwd.from_list @@ List.map (fun _ -> None) cells in
           clbl, Tm.NB (nms, tbdy)
         in
 
@@ -537,12 +538,9 @@ struct
       let x0 = vproj0.x in
       let x1 = vproj1.x in
       let tr = equate_atom env x0 x1 in
-      let ty0 = equate_ty env vproj0.ty0 vproj1.ty0 in
-      let ty1 = equate_ty env vproj0.ty1 vproj1.ty1 in
-      let equiv_ty = V.Macro.equiv vproj0.ty0 vproj0.ty1 in
       let phi = I.subst `Dim0 x0 in
-      let equiv = equate env (Value.act phi equiv_ty) vproj0.equiv vproj1.equiv in
-      let frame = Tm.VProj {r = tr; ty0; ty1; equiv} in
+      let func = equate env vproj0.func.ty vproj0.func.el vproj1.func.el in
+      let frame = Tm.VProj {r = tr; func} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
 
     | Cap cap0, Cap cap1 ->
