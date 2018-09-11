@@ -5,22 +5,22 @@ import isotoequiv
 import univalence
 import s2
 
-; a calculation of the loop space of the 2-sphere, based on
-; https://egbertrijke.com/2016/09/28/the-loop-space-of-the-2-sphere/
+-- a calculation of the loop space of the 2-sphere, based on
+-- https://egbertrijke.com/2016/09/28/the-loop-space-of-the-2-sphere/
 
-; loop space of s2
+-- loop space of s2
 data os2 where
 | obase
 | oloop (y : os2) @ i [∂[i] → y]
 
-; I. the loop of automorphisms of os2
+-- I. the loop of automorphisms of os2
 
-; for the definition of s2/decode, it is convenient to use an id-equiv where
-; both inverses are reflexivities
+-- for the definition of s2/decode, it is convenient to use an id-equiv where
+-- both inverses are reflexivities
 let id-equiv/wc : (B : type) → equiv B B = id-equiv/weak-connection
 
-; it would probably be more efficient to define this directly,
-; but we don't need it
+-- it would probably be more efficient to define this directly,
+-- but we don't need it
 let oloop-equiv : path (equiv os2 os2) (id-equiv/wc os2) (id-equiv/wc os2) =
   λ i →
     ( λ o → oloop o i
@@ -32,7 +32,7 @@ let oloop-equiv : path (equiv os2 os2) (id-equiv/wc os2) (id-equiv/wc os2) =
       i
     )
 
-; incidentally, onegloop o is homotopic to symm (λ i → oloop o i)
+-- incidentally, onegloop o is homotopic to symm (λ i → oloop o i)
 let onegloop (o : os2) : path os2 o o =
   λ i → oloop-equiv i .snd o .fst .fst
 
@@ -50,7 +50,7 @@ let onegloop-oloop (o : os2)
     | j=0 k → oloop-equiv i .snd (oloop o i) .snd (o, refl) k .fst
     ]
 
-; II. universal cover over s2
+-- II. universal cover over s2
 
 let s2/code/surf/filler (m i j : dim) : type =
   comp 0 m os2 [
@@ -80,12 +80,12 @@ let s2/code (a : s2) : type =
   | surf i j → s2/code/surf i j
   ]
 
-; III. encoding function
+-- III. encoding function
 
 let s2/encode (a : s2) (p : path s2 base a) : s2/code a =
   coe 0 1 obase in λ k → s2/code (p k)
 
-; IV. decoding function
+-- IV. decoding function
 
 let extend-by-surf (p : path s2 base base) (i j k : dim) : s2 =
   comp 0 j (p k) [
@@ -110,7 +110,7 @@ let s2/decode (a : s2) : (s2/code a) → path s2 base a =
     ]
   ]
 
-; V. encode base after decode base
+-- V. encode base after decode base
 
 let s2/encode-decode/base/step (o : os2) :
   [i j] os2 [
@@ -136,14 +136,14 @@ let s2/encode-decode/base (o : os2)
     ]
   ]
 
-; VI. decode base after encode base
+-- VI. decode base after encode base
 
 let s2/decode-encode/base (l : path s2 base base)
   : path (path s2 base base) (s2/decode base (s2/encode base l)) l
   =
   J s2 base (λ a p → path (path s2 base a) (s2/decode a (s2/encode a p)) p) refl base l
 
-; VII. characterization of the loop space
+-- VII. characterization of the loop space
 
 let s2/loop-space-equiv : equiv (path s2 base base) os2 =
   iso→equiv _ _ (s2/encode base, s2/decode base, s2/encode-decode/base, s2/decode-encode/base)

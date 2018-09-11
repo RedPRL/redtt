@@ -28,7 +28,7 @@ let neg/is-prop-over (A : dim → type)
    f i a
 
 
-; Hedberg's theorem for stable path types
+-- Hedberg's theorem for stable path types
 let paths-stable→set (A : type)
   (st : (x y : A) → stable (path A x y))
   : is-set A
@@ -53,7 +53,7 @@ let paths-stable→set (A : type)
     | ∂[j] k → weak-connection/or A (cap j) i k
     ]
 
-; Hedberg's theorem for decidable path types
+-- Hedberg's theorem for decidable path types
 let discrete→set (A : type) (d : discrete A)
   : is-set A
   =

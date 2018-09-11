@@ -1,8 +1,8 @@
 import equivalence
 
-; yacctt: https://github.com/mortberg/yacctt/blob/master/examples/prelude.ytt#L374
-; RedPRL: https://github.com/RedPRL/sml-redprl/blob/bd73932409ddc3479c8ded5ac32ae0d93d31874a/example/isotoequiv.prl
-; cubicaltt: https://github.com/mortberg/cubicaltt/blob/a331f1d355c5d2fc608a59c1cbbf016ea09d6deb/experiments/isoToEquiv.ctt
+-- yacctt: https://github.com/mortberg/yacctt/blob/master/examples/prelude.ytt#L374
+-- RedPRL: https://github.com/RedPRL/sml-redprl/blob/bd73932409ddc3479c8ded5ac32ae0d93d31874a/example/isotoequiv.prl
+-- cubicaltt: https://github.com/mortberg/cubicaltt/blob/a331f1d355c5d2fc608a59c1cbbf016ea09d6deb/experiments/isoToEquiv.ctt
 
 let iso (A B : type) : type =
   (f : A → B)

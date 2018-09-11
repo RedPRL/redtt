@@ -2,8 +2,8 @@ import connection
 import equivalence
 import bool
 
-; This is ported from some RedPRL examples by Carlo Angiuli:
-; https://github.com/RedPRL/sml-redprl/blob/master/example/invariance.prl
+-- This is ported from some RedPRL examples by Carlo Angiuli:
+-- https://github.com/RedPRL/sml-redprl/blob/master/example/invariance.prl
 
 let fun→pair (A : type) (f : bool → A) : A × A =
   (f tt, f ff)

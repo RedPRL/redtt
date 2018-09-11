@@ -18,7 +18,7 @@ let loopn (n : int) : Ω1s1 =
     elim n [
     | zero → refl
     | suc (n → loopn) →
-      ; this is trans, but let's expand the definition
+      -- this is trans, but let's expand the definition
       λ i → comp 0 1 (loopn i) [ i=0 → refl | i=1 j → loop j ]
     ]
   | negsuc n →
@@ -49,34 +49,34 @@ let winding-loopn (n : int) : path int (winding (loopn n)) n =
     ]
   ]
 
-;let decode-square (n : int)
-;  : [i j] s1 [
-;    | i=0 → loopn n j
-;    | i=1 → loopn (isuc n) j
-;    | j=0 → base
-;    | j=1 → loop i
-;    ]
-;  =
-;  elim n [
-;  | pos n → λ i j → comp 0 i (loopn (pos n) j) [ j=0 → refl | j=1 i → loop i ]
-;  | negsuc n →
-;    elim n [
-;    | zero → λ i j → comp 1 i base [ j=0 → refl | j=1 i → loop i ]
-;    | suc n → λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 → refl | j=1 i → loop i ]
-;    ]
-;  ]
-;
-;let decode (x : s1) : s1-univ-cover x → path s1 base x =
-;  elim x [
-;  | base → loopn
-;  | loop i → λ y j → let n : int = coe i 0 y in λ k → s1-univ-cover (loop k) in
-;    comp 0 i (decode-square n i j) [
-;    | ∂[j] → refl
-;    | i=1 k → loopn (isuc-pred y k) j
-;    ]
-;  ]
+--let decode-square (n : int)
+--  : [i j] s1 [
+--    | i=0 → loopn n j
+--    | i=1 → loopn (isuc n) j
+--    | j=0 → base
+--    | j=1 → loop i
+--    ]
+--  =
+--  elim n [
+--  | pos n → λ i j → comp 0 i (loopn (pos n) j) [ j=0 → refl | j=1 i → loop i ]
+--  | negsuc n →
+--    elim n [
+--    | zero → λ i j → comp 1 i base [ j=0 → refl | j=1 i → loop i ]
+--    | suc n → λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 → refl | j=1 i → loop i ]
+--    ]
+--  ]
+--
+--let decode (x : s1) : s1-univ-cover x → path s1 base x =
+--  elim x [
+--  | base → loopn
+--  | loop i → λ y j → let n : int = coe i 0 y in λ k → s1-univ-cover (loop k) in
+--    comp 0 i (decode-square n i j) [
+--    | ∂[j] → refl
+--    | i=1 k → loopn (isuc-pred y k) j
+--    ]
+--  ]
 
-; the following symmetric version uses vproj instead of coe in V (thanks to Evan).
+-- the following symmetric version uses vproj instead of coe in V (thanks to Evan).
 
 let decode-square (n : int)
   : [i j] s1 [

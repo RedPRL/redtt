@@ -4,7 +4,7 @@ import equivalence
 import connection
 import retract
 
-; the code in this file is adapted from yacctt and redprl
+-- the code in this file is adapted from yacctt and redprl
 
 let retract-is-contr
   (A B : type)
@@ -106,7 +106,7 @@ opaque
 let is-equiv/prop (A B : type) (f : A → B) : is-prop (is-equiv A B f) =
   λ e0 e1 i b → is-contr/prop (fiber A B f b) (e0 b) (e1 b) i
 
-; A direct proof that is-equiv f is a prop, ported from cubicaltt to yacctt to redtt
+-- A direct proof that is-equiv f is a prop, ported from cubicaltt to yacctt to redtt
 let is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv A B f) =
   λ ise ise' i y →
     let a : A = ise y .fst .fst in
@@ -145,8 +145,8 @@ let is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv A B f) =
     )
 
 
-; per Dan Licata, ua and ua/beta suffice for full univalence:
-; https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
+-- per Dan Licata, ua and ua/beta suffice for full univalence:
+-- https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
 
 let ua/beta
   (A B : type) (E : equiv A B) (a : A)
@@ -215,9 +215,9 @@ let path/based/contr (A : type) : is-contr^1 ((B : _) × path^1 type A B) =
   )
 
 
-; The following is a formulation of univalence proposed by Martin Esfstdo:
-; https://groups.google.com/forum/#!msg/homotopytypetheory/HfCB_b-PNEU/Ibb48LvUMeUJ
-; See also Theorem 5.8.4 of the HoTT Book.
+-- The following is a formulation of univalence proposed by Martin Esfstdo:
+-- https://groups.google.com/forum/#!msg/homotopytypetheory/HfCB_b-PNEU/Ibb48LvUMeUJ
+-- See also Theorem 5.8.4 of the HoTT Book.
 
 let univalence (A : type) : is-contr^1 ((B : type) × equiv A B) =
   retract-is-contr^1

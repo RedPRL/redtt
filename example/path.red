@@ -103,7 +103,8 @@ let trans/unit/l
   | i=1 → p
   ]
 
-; This proof gets simpler when dead tubes are deleted!
+
+-- This proof gets simpler when dead tubes are deleted!
 let trans/sym/r
   (A : type)
   (p : dim → A)
@@ -114,7 +115,7 @@ let trans/sym/r
     | i=0 → refl
     | i=1 → symm A p
     | k=0 → symm/filler A p i
-    ;| k=1 j → trans/filler A p (symm A p) j i
+    -- | k=1 j → trans/filler A p (symm A p) j i
     ]
 
 let trans/sym/l
@@ -132,10 +133,10 @@ let trans/sym/l
       ]
     | i=1 → p
     | k=0 → p
-    ;| k=1 j → trans/filler A (symm A p) p j i
+    -- | k=1 j → trans/filler A (symm A p) p j i
     ]
 
-; Perhaps we could parallelize this proof? ;)
+-- Perhaps we could parallelize this proof? ;)
 let symmd
   (A : dim → type)
   (p : (i : dim) → A i)

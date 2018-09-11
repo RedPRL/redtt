@@ -5,7 +5,7 @@ let retract (A B : type) (f : A → B) (g : B → A) : type =
   (a : A) →
     path A (g (f a)) a
 
-; Adapted from https://github.com/HoTT/book/issues/718
+-- Adapted from https://github.com/HoTT/book/issues/718
 let path-retract/preserves/refl (A : type) (R : A → A → type)
   (s : (x y : A) → R x y → path A x y)
   (r : (x y : A) → path A x y → R x y)

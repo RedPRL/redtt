@@ -19,7 +19,7 @@ let not∘not/id/pt (x : bool) : path _ (not∘not x) x =
   | ff → refl
   ]
 
-; Dedicated to Bob ;-)
+-- Dedicated to Bob ;-)
 let shannon (A : type) (f : bool → A) : bool → A =
   λ b →
   elim b [
