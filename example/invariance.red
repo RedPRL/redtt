@@ -21,10 +21,10 @@ let fun→pair-is-equiv (A : type) : is-equiv^1 _ _ (fun→pair A) =
     , λ fib →
       coe 1 0 (λ i → (pair→fun _ (fib.snd i), λ j → weak-connection/or _ (fib.snd) i j))
       in λ j →
-        [i] (f : bool → A) × path (A × A) (f tt, f ff) p [
-        | i=0 → (shannon/path A (fib.fst) j, fib.snd)
-        | i=1 → (pair→fun A p, refl)
-        ]
+        path
+          ((f : bool → A) × path (A × A) (f tt, f ff) p)
+          (shannon/path A (fib.fst) j, fib.snd)
+          (pair→fun A p, refl)
     )
 
 let fun→pair/equiv (A : type) : equiv (bool → A) (A × A) =
