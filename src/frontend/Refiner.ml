@@ -345,6 +345,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
       in
 
       let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
+
+      (* TODO: I think that 'sub' is wrong. *)
       let sub = List.fold_left (fun sub (x,_) -> Tm.dot (Tm.var x) sub) (Tm.shift 0) (Bwd.to_list psi) in
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
@@ -375,6 +377,9 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             in
             let dims = List.map (fun t -> `Dim (Cx.eval_dim cx @@ Tm.subst sub t)) intro.rs in
             let cells = cargs @ rargs @ dims in
+            Format.eprintf "image of: %a@." Tm.pp_bterm bterm;
+            Format.eprintf "const: %a@." (Pp.pp_list D.pp_env_cell) cargs;
+            Format.eprintf "instantiating: %a with %a@." Domain.pp_nclo nclo (Pp.pp_list D.pp_env_cell) cells;
             begin
               try
                 V.inst_nclo nclo cells
