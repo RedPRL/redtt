@@ -594,6 +594,8 @@ and infer_spine cx hd =
 
         let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') info.clauses in
 
+        (* Please cleanup this horrible code. *)
+
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
            the constructor, and should therefore begin with the *empty* environment. *)
@@ -632,8 +634,8 @@ and infer_spine cx hd =
                    [el; ih])
                 intro.rec_args
             in
-            let cargs = List.map (fun t -> `Val (D.Value.act phi @@ Cx.eval cx' t)) intro.const_args in
-            let dims = List.map (fun t -> `Dim (I.act phi @@ Cx.eval_dim cx' t)) intro.rs in (* is this right ? *)
+            let cargs = List.map (fun t -> `Val (D.Value.act phi @@ V.eval benv t)) intro.const_args in
+            let dims = List.map (fun t -> `Dim (I.act phi @@ V.eval_dim benv t)) intro.rs in (* is this right ? *)
             let cells = cargs @ rargs @ dims in
             V.inst_nclo nclo cells
           | B.Var ix ->
@@ -644,7 +646,7 @@ and infer_spine cx hd =
         in
 
         let image_of_bface (tr, tr', btm) =
-          let env = Cx.env cx' in
+          let env = benv in
           let r = V.eval_dim env tr in
           let r' = V.eval_dim env tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->

@@ -299,7 +299,9 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
       let constr = lookup_constr clbl desc in
-      let rec go psi env benv (tms, cargs, rargs, ihs, rs) pbinds const_specs rec_specs dims =
+
+      (* Please clean up this horrible code. *)
+      let rec go psi sub env benv (tms, cargs, rargs, ihs, rs) pbinds const_specs rec_specs dims =
         match pbinds, const_specs, rec_specs, dims with
         | ESig.PVar nm :: pbinds, (_plbl, pty) :: const_specs, _, _->
           let x = Name.named @@ Some nm in
@@ -309,7 +311,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_tm = Tm.up @@ Tm.var x in
           let env' = D.Env.snoc env @@ `Val x_el in
           let benv' = D.Env.snoc benv @@ `Val x_el in
-          go (psi #< (x, `P tty)) env' benv' (tms #< x_tm, cargs #< x_el, rargs, ihs, rs) pbinds const_specs rec_specs dims
+          let sub' = Tm.dot (Tm.var x) sub in
+          go (psi #< (x, `P tty)) sub' env' benv' (tms #< x_tm, cargs #< x_el, rargs, ihs, rs) pbinds const_specs rec_specs dims
 
         | ESig.PVar nm :: pbinds, [], (_, Self) :: rec_specs, _ ->
           let x = Name.named @@ Some nm in
@@ -318,7 +321,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let ih_ty = mot x_tm in
           let benv' = D.Env.snoc benv @@ `Val x_el in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env benv' (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
+          let sub' = Tm.dot (Tm.var x) sub in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) sub' env benv' (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
 
         | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: rec_specs, _ ->
           let x = Name.named @@ Some nm in
@@ -327,7 +331,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let ih_ty = mot x_tm in
           let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let benv' = D.Env.snoc benv @@ `Val x_el in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env benv' (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
+          let sub' = Tm.dot (Tm.var x) sub in
+          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) sub' env benv' (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
 
         | ESig.PVar nm :: pbinds, [], [], _ :: dims ->
           let x = Name.named @@ Some nm in
@@ -335,19 +340,20 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let r = `Atom x in
           let env' = D.Env.snoc env @@ `Dim r in
           let benv' = D.Env.snoc benv @@ `Dim r in
-          go (psi #< (x, `I)) env' benv' (tms #< x_tm, cargs, rargs, ihs, rs #< r) pbinds [] [] dims
+          let sub' = Tm.dot (Tm.var x) sub in
+          go (psi #< (x, `I)) sub' env' benv' (tms #< x_tm, cargs, rargs, ihs, rs #< r) pbinds [] [] dims
 
         | _, [], [], [] ->
-          psi, benv, Bwd.to_list tms, Bwd.to_list cargs, Bwd.to_list rargs, ihs, Bwd.to_list rs
+          psi, sub, benv, Bwd.to_list tms, Bwd.to_list cargs, Bwd.to_list rargs, ihs, Bwd.to_list rs
 
         | _ ->
           failwith "refine_clause"
       in
 
-      let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
+      let psi, sub, benv, tms, const_args, rec_args, ihs, rs = go Emp (Tm.shift 0) V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
 
       (* TODO: I think that 'sub' is wrong. *)
-      let sub = List.fold_left (fun sub (x,_) -> Tm.dot (Tm.var x) sub) (Tm.shift 0) (Bwd.to_list psi) in
+      (* let sub = List.fold_left (fun sub (x,_) -> Tm.dot (Tm.var x) sub) (Tm.shift 0) (Bwd.to_list psi) in *)
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
 
@@ -377,9 +383,6 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             in
             let dims = List.map (fun t -> `Dim (Cx.eval_dim cx @@ Tm.subst sub t)) intro.rs in
             let cells = cargs @ rargs @ dims in
-            Format.eprintf "image of: %a@." Tm.pp_bterm bterm;
-            Format.eprintf "const: %a@." (Pp.pp_list D.pp_env_cell) cargs;
-            Format.eprintf "instantiating: %a with %a@." Domain.pp_nclo nclo (Pp.pp_list D.pp_env_cell) cells;
             begin
               try
                 V.inst_nclo nclo cells
