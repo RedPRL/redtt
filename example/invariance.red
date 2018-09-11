@@ -40,7 +40,7 @@ let swap-fun (A : type) : (bool → A) → bool → A =
   coe 1 0 (swap-pair A) in λ i →
     fun→pair/path A i → fun→pair/path A i
 
-let swap-fun-eqn (A : type) : (f : bool → A) → path _ (swap-fun A (swap-fun A f)) f =
+let swap-fun/path (A : type) : (f : bool → A) → path _ (swap-fun A (swap-fun A f)) f =
   coe 1 0 (λ _ → refl) in λ i →
     let swapcoe =
       coe 1 i (swap-pair A) in λ j →
