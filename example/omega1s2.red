@@ -15,34 +15,34 @@ data os2 where
 
 ; I. the loop of automorphisms of os2
 
-; for the definition of s2/decode, it is convenient to use an IdEquiv where
+; for the definition of s2/decode, it is convenient to use an id-equiv where
 ; both inverses are reflexivities
-let IdEquiv/wc : (B : type) → Equiv B B = IdEquiv/weak-connection
+let id-equiv/wc : (B : type) → equiv B B = id-equiv/weak-connection
 
 ; it would probably be more efficient to define this directly,
 ; but we don't need it
-let oloop-equiv : Path (Equiv os2 os2) (IdEquiv/wc os2) (IdEquiv/wc os2) =
+let oloop-equiv : path (equiv os2 os2) (id-equiv/wc os2) (id-equiv/wc os2) =
   λ i →
     ( λ o → oloop o i
-    , PropToPropOver
-      (λ j → IsEquiv os2 os2 (λ o → oloop o j))
-      (PropIsEquivDirect os2 os2 (λ o → o))
-      (IdEquiv/wc os2 .snd)
-      (IdEquiv/wc os2 .snd)
+    , prop→prop-over
+      (λ j → is-equiv os2 os2 (λ o → oloop o j))
+      (is-equiv/prop/direct os2 os2 (λ o → o))
+      (id-equiv/wc os2 .snd)
+      (id-equiv/wc os2 .snd)
       i
     )
 
 ; incidentally, onegloop o is homotopic to symm (λ i → oloop o i)
-let onegloop (o : os2) : Path os2 o o =
+let onegloop (o : os2) : path os2 o o =
   λ i → oloop-equiv i .snd o .fst .fst
 
 let oloop-onegloop (o : os2)
-  : PathD (λ i → Path os2 (oloop (onegloop o i) i) o) refl refl
+  : pathd (λ i → path os2 (oloop (onegloop o i) i) o) refl refl
   =
   λ i → oloop-equiv i .snd o .fst .snd
 
 let onegloop-oloop (o : os2)
-  : PathD (λ i → Path os2 (onegloop (oloop o i) i) o) refl refl
+  : pathd (λ i → path os2 (onegloop (oloop o i) i) o) refl refl
   =
   λ i j →
     comp 0 1 o [
@@ -52,58 +52,58 @@ let onegloop-oloop (o : os2)
 
 ; II. universal cover over s2
 
-let s2/Code/Surf/filler (m i j : dim) : type =
+let s2/code/surf/filler (m i j : dim) : type =
   comp 0 m os2 [
-  | ∂[i] | j=0 → UA os2 os2 (IdEquiv/wc os2)
-  | j=1 → UA os2 os2 (oloop-equiv i)
+  | ∂[i] | j=0 → ua os2 os2 (id-equiv/wc os2)
+  | j=1 → ua os2 os2 (oloop-equiv i)
   ]
 
-let s2/Code/Surf : Path^1 (Path^1 type os2 os2) refl refl =
-  s2/Code/Surf/filler 1
+let s2/code/surf : path^1 (path^1 type os2 os2) refl refl =
+  s2/code/surf/filler 1
 
-let s2/Code/proj :
-  [i j] (s2/Code/Surf i j → os2) [
+let s2/code/proj :
+  [i j] (s2/code/surf i j → os2) [
   | (∂[i] | j=1) o → o
   | j=0 o → oloop o i
   ]
   =
   λ i j →
-  comp 0 1 (λ o → oloop o i) in (λ m → s2/Code/Surf/filler m i j → os2) [
-  | ∂[i] → UAproj os2 os2 (IdEquiv/wc os2)
-  | j=0 m o → oloop (UAproj os2 os2 (IdEquiv/wc os2) m o) i
-  | j=1 → UAproj os2 os2 (oloop-equiv i)
+  comp 0 1 (λ o → oloop o i) in (λ m → s2/code/surf/filler m i j → os2) [
+  | ∂[i] → ua/proj os2 os2 (id-equiv/wc os2)
+  | j=0 m o → oloop (ua/proj os2 os2 (id-equiv/wc os2) m o) i
+  | j=1 → ua/proj os2 os2 (oloop-equiv i)
   ]
 
-let s2/Code (a : s2) : type =
+let s2/code (a : s2) : type =
   elim a [
   | base → os2
-  | surf i j → s2/Code/Surf i j
+  | surf i j → s2/code/surf i j
   ]
 
 ; III. encoding function
 
-let s2/encode (a : s2) (p : Path s2 base a) : s2/Code a =
-  coe 0 1 obase in λ k → s2/Code (p k)
+let s2/encode (a : s2) (p : path s2 base a) : s2/code a =
+  coe 0 1 obase in λ k → s2/code (p k)
 
 ; IV. decoding function
 
-let extend-by-surf (p : Path s2 base base) (i j k : dim) : s2 =
+let extend-by-surf (p : path s2 base base) (i j k : dim) : s2 =
   comp 0 j (p k) [
   | ∂[i] | k=0 → refl
   | k=1 j → surf i j
   ]
 
-let s2/decode/base (o : os2) : Path s2 base base =
+let s2/decode/base (o : os2) : path s2 base base =
   elim o [
   | obase → refl
   | oloop (o' → s2/decode/base/o') i → extend-by-surf s2/decode/base/o' i 1
   ]
 
-let s2/decode (a : s2) : (s2/Code a) → Path s2 base a =
+let s2/decode (a : s2) : (s2/code a) → path s2 base a =
   elim a [
   | base → s2/decode/base
   | surf i j → λ code k →
-    comp 0 1 (extend-by-surf (s2/decode/base (onegloop (s2/Code/proj i j code) i)) i j k) [
+    comp 0 1 (extend-by-surf (s2/decode/base (onegloop (s2/code/proj i j code) i)) i j k) [
     | ∂[i k] → refl
     | j=0 m → s2/decode/base (onegloop-oloop code i m) k
     | j=1 m → s2/decode/base (oloop-onegloop code i m) k
@@ -120,12 +120,12 @@ let s2/encode-decode/base/step (o : os2) :
   ]
   =
   λ i j →
-    s2/Code/proj i j
+    s2/code/proj i j
       (coe 0 1 obase in λ k →
-        s2/Code (extend-by-surf (s2/decode/base o) i j k))
+        s2/code (extend-by-surf (s2/decode/base o) i j k))
 
 let s2/encode-decode/base (o : os2)
-  : Path os2 (s2/encode base (s2/decode base o)) o
+  : path os2 (s2/encode base (s2/decode base o)) o
   =
   elim o [
   | obase → refl
@@ -138,12 +138,12 @@ let s2/encode-decode/base (o : os2)
 
 ; VI. decode base after encode base
 
-let s2/decode-encode/base (l : Path s2 base base)
-  : Path (Path s2 base base) (s2/decode base (s2/encode base l)) l
+let s2/decode-encode/base (l : path s2 base base)
+  : path (path s2 base base) (s2/decode base (s2/encode base l)) l
   =
-  J s2 base (λ a p → Path (Path s2 base a) (s2/decode a (s2/encode a p)) p) refl base l
+  J s2 base (λ a p → path (path s2 base a) (s2/decode a (s2/encode a p)) p) refl base l
 
 ; VII. characterization of the loop space
 
-let s2/loop-space-equiv : Equiv (Path s2 base base) os2 =
-  Iso/Equiv _ _ (s2/encode base, s2/decode base, s2/encode-decode/base, s2/decode-encode/base)
+let s2/loop-space-equiv : equiv (path s2 base base) os2 =
+  iso→equiv _ _ (s2/encode base, s2/decode base, s2/encode-decode/base, s2/decode-encode/base)
