@@ -308,7 +308,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let x_tm = Tm.up @@ Tm.var x in
           let env' = D.Env.snoc env @@ `Val x_el in
-          let benv' = D.Env.snoc env @@ `Val x_el in
+          let benv' = D.Env.snoc benv @@ `Val x_el in
           go (psi #< (x, `P tty)) env' benv' (tms #< x_tm, cargs #< x_el, rargs, ihs, rs) pbinds const_specs rec_specs dims
 
         | ESig.PVar nm :: pbinds, [], (_, Self) :: rec_specs, _ ->
