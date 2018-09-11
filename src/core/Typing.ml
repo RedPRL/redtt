@@ -594,7 +594,7 @@ and infer_spine cx hd =
 
         let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') info.clauses in
 
-        (* Please cleanup this horrible code. *)
+        (* Please clean up this horrible code. *)
 
         (* 'cx' is local context extended with hyps;
            'env' is the environment for evaluating the types that comprise
@@ -646,9 +646,8 @@ and infer_spine cx hd =
         in
 
         let image_of_bface (tr, tr', btm) =
-          let env = benv in
-          let r = V.eval_dim env tr in
-          let r' = V.eval_dim env tr' in
+          let r = V.eval_dim benv tr in
+          let r' = V.eval_dim benv tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
           image_of_bterm phi btm
         in
