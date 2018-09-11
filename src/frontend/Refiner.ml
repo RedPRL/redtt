@@ -352,8 +352,6 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
 
       let psi, sub, benv, tms, const_args, rec_args, ihs, rs = go Emp (Tm.shift 0) V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
 
-      (* TODO: I think that 'sub' is wrong. *)
-      (* let sub = List.fold_left (fun sub (x,_) -> Tm.dot (Tm.var x) sub) (Tm.shift 0) (Bwd.to_list psi) in *)
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
 
