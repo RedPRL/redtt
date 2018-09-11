@@ -31,8 +31,7 @@ let fun→pair/equiv (A : type) : equiv (bool → A) (A × A) =
   (fun→pair A, fun→pair-is-equiv A)
 
 let fun→pair/path (A : type) : path^1 type (bool → A) (A × A) =
-  λ i →
-    `(V i (→ (data bool) A) (× A A) (fun→pair/equiv A))
+  ua (bool → A) (A × A) (fun→pair/equiv A)
 
 let swap-pair (A : type) (p : A × A) : A × A =
   (p.snd, p.fst)
