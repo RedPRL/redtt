@@ -1,2 +1,6 @@
-val load_file : Lwt_io.file_name -> unit Lwt.t
-val load_from_stdin : Lwt_io.file_name -> unit Lwt.t
+type options =
+  {file_name : Lwt_io.file_name;
+   line_width: int}
+
+val load_file : options -> unit Lwt.t
+val load_from_stdin : options -> unit Lwt.t
