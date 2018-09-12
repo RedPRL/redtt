@@ -279,7 +279,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             M.lift C.ask >>= fun psi ->
             let rty = Tm.refine_ty goal.ty goal.sys in
             M.lift @@ U.push_hole `Rigid psi rty  >>= fun cmd ->
-            M.emit loc @@ M.UserHole {name = Some lbl; ty = rty; tele = psi; tm = Tm.up cmd} >>
+            M.emit loc @@ M.UserHole {name = Some lbl; ty = rty; tele = psi} >>
             M.ret @@ Tm.up @@ Tm.refine_force cmd
       in
       List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
@@ -432,15 +432,21 @@ let rec tac_hope goal =
   in
   try_system goal.sys
 
-let tac_hole ~loc ~name : chk_tac =
+let inspect_goal ~loc ~name : goal -> unit M.m =
   fun goal ->
     M.lift C.ask >>= fun psi ->
     let rty = Tm.refine_ty goal.ty goal.sys in
-    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
     begin
       if name = Some "_" then M.ret () else
-        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi; tm = Tm.up cmd}
-    end >>
+        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi}
+    end
+
+let tac_hole ~loc ~name : chk_tac =
+  fun goal ->
+    inspect_goal ~loc ~name goal >>
+    M.lift C.ask >>= fun psi ->
+    let rty = Tm.refine_ty goal.ty goal.sys in
+    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
     M.ret @@ Tm.up @@ Tm.refine_force cmd
 
 let tac_guess tac : chk_tac =

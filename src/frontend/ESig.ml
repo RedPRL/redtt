@@ -26,7 +26,7 @@ and etele = ecell list
 
 and econ =
   | Guess of eterm
-  | Hole of string option
+  | Hole of string option * eterm option
   | Hope
   | Lam of string list * eterm
   | Tuple of eterm list

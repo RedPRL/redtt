@@ -127,6 +127,8 @@ rule token = parse
     { Lwt.return TIMES }
   | ':'
     { Lwt.return COLON }
+  | ';'
+    { Lwt.return SEMI }
   | ','
     { Lwt.return COMMA }
   | '.'

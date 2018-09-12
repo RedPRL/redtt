@@ -21,8 +21,7 @@ type diagnostic =
   | UserHole of
       {name : string option;
        tele : Unify.telescope;
-       ty : Tm.tm;
-       tm : Tm.tm}
+       ty : Tm.tm}
   | PrintTerm of
       {ty : Tm.tm;
        tm : Tm.tm}

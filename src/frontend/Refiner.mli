@@ -15,6 +15,9 @@ val tac_refl : chk_tac
 (** Try to solve the current goal using the current restriction, and/or unification. *)
 val tac_hope : chk_tac
 
+
+val inspect_goal : loc:location -> name:string option -> goal -> unit m
+
 (** Unleash a hole named [name]. *)
 val tac_hole : loc:location -> name:string option -> chk_tac
 

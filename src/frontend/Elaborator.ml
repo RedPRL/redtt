@@ -377,8 +377,12 @@ struct
       | _, _, E.Guess e ->
         tac_guess (elab_chk e) goal
 
-      | _, _, E.Hole name ->
+      | _, _, E.Hole (name, None) ->
         tac_hole ~loc:e.span ~name goal
+
+      | _, _, E.Hole (name, Some e') ->
+        inspect_goal ~loc:e.span ~name goal >>
+        elab_chk e' goal
 
       | _, _, E.Hope ->
         tac_hope goal
