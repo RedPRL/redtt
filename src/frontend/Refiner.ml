@@ -299,6 +299,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
       let open Desc in
       let constr = lookup_constr clbl desc in
+
+      (* Please clean up this horrible code. *)
       let rec go psi env benv (tms, cargs, rargs, ihs, rs) pbinds const_specs rec_specs dims =
         match pbinds, const_specs, rec_specs, dims with
         | ESig.PVar nm :: pbinds, (_plbl, pty) :: const_specs, _, _->
@@ -308,7 +310,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let x_tm = Tm.up @@ Tm.var x in
           let env' = D.Env.snoc env @@ `Val x_el in
-          let benv' = D.Env.snoc env @@ `Val x_el in
+          let benv' = D.Env.snoc benv @@ `Val x_el in
           go (psi #< (x, `P tty)) env' benv' (tms #< x_tm, cargs #< x_el, rargs, ihs, rs) pbinds const_specs rec_specs dims
 
         | ESig.PVar nm :: pbinds, [], (_, Self) :: rec_specs, _ ->
@@ -345,7 +347,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
       in
 
       let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
-      let sub = List.fold_left (fun sub (x,_) -> Tm.dot (Tm.var x) sub) (Tm.shift 0) (Bwd.to_list psi) in
+
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
 
@@ -361,20 +363,17 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           | B.Intro intro as bterm ->
             let nbnd : ty Tm.nbnd = snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) earlier_clauses in
             let nclo = D.NClo {nbnd; rho = Cx.env cx} in
-            let cargs = List.map (fun t -> `Val (Cx.eval cx @@ Tm.subst sub t)) intro.const_args in
+            let cargs = List.map (fun t -> `Val (V.eval benv t)) intro.const_args in
             let rargs =
-              try
-                List.flatten @@
-                List.map
-                  (fun bt ->
-                     let el = `Val (V.eval_bterm dlbl desc benv bterm) in
-                     let ih = `Val (image_of_bterm phi bt) in
-                     [el; ih])
-                  intro.rec_args
-              with
-                _ -> failwith "rargs"
+              List.flatten @@
+              List.map
+                (fun bt ->
+                   let el = `Val (V.eval_bterm dlbl desc benv bterm) in
+                   let ih = `Val (image_of_bterm phi bt) in
+                   [el; ih])
+                intro.rec_args
             in
-            let dims = List.map (fun t -> `Dim (Cx.eval_dim cx @@ Tm.subst sub t)) intro.rs in
+            let dims = List.map (fun t -> `Dim (V.eval_dim benv t)) intro.rs in
             let cells = cargs @ rargs @ dims in
             begin
               try
@@ -388,13 +387,13 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
 
           | B.Var ix ->
             let ix' = ix - List.length rs in
-            Cx.eval_cmd cx @@ Tm.var @@ Bwd.nth ihs ix'
+            V.eval_cmd benv @@ Tm.var @@ Bwd.nth ihs ix'
         in
 
         let image_of_bface (tr, tr', btm) =
           let env = Cx.env cx in
-          let r = V.eval_dim env @@ Tm.subst sub tr in
-          let r' = V.eval_dim env @@ Tm.subst sub tr' in
+          let r = V.eval_dim benv tr in
+          let r' = V.eval_dim benv tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
           image_of_bterm phi btm
         in
