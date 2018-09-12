@@ -2,7 +2,7 @@ OPAM=opam
 EXEC=${OPAM} config exec
 DUNE=${EXEC} dune --
 
-.PHONY: all build clean doc help examples install top
+.PHONY: all build clean doc help examples install reinstall top
 
 all: build
 
@@ -22,6 +22,9 @@ examples:
 	$(MAKE) -C example all
 
 install:
+	${OPAM} install redtt
+
+reinstall:
 	${OPAM} reinstall redtt
 
 top:
