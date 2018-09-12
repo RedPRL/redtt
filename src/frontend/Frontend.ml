@@ -1,6 +1,10 @@
 open RedTT_Core
 open Lexing
 
+type options =
+  {file_name : Lwt_io.file_name;
+   line_width: int}
+
 let print_position outx lexbuf =
   let pos = lexbuf.lex_curr_p in
   Format.fprintf outx "%s:%d:%d" pos.pos_fname
@@ -51,13 +55,15 @@ let execute_signature dirname esig =
       exit 1
   end
 
-let load_file file_name =
+let load_file options =
+  Format.set_margin options.line_width;
   let open Lwt.Infix in
-  let dirname = Filename.dirname file_name in
-  read_file file_name >>= execute_signature dirname
+  let dirname = Filename.dirname options.file_name in
+  read_file options.file_name >>= execute_signature dirname
 
-let load_from_stdin file_name =
+let load_from_stdin options  =
+  Format.set_margin options.line_width;
   let open Lwt.Infix in
-  let dirname = Filename.dirname file_name in
-  read_from_channel file_name Lwt_io.stdin
+  let dirname = Filename.dirname options.file_name in
+  read_from_channel options.file_name Lwt_io.stdin
   >>= execute_signature dirname

@@ -3,6 +3,22 @@ open RedTT
 
 type command = unit Lwt.t Term.t * Term.info
 
+let opt_margin =
+  let doc = "Set pretty-printing margin to $(docv) characters." in
+  Arg.(value & opt int 80 & info ["line-width"] ~docv:"WIDTH" ~doc)
+
+let opt_file_name =
+  Arg.
+    ( required
+      & pos ~rev:true 0 (some string) None
+      & info [] ~doc:"The name of the file being loaded" ~docv:"FILE"
+    )
+
+let opts_config =
+  let open Term  in
+  let make file_name line_width = Frontend.{file_name; line_width} in
+  pure make $ opt_file_name $ opt_margin
+
 let cmd_default =
   Term.
     ( ret @@ pure @@ `Help ( `Pager, None )
@@ -18,27 +34,15 @@ let cmd_help =
 
 let cmd_load_file =
   let doc = "load file" in
-  let file_name =
-    Arg.
-      ( required
-        & pos ~rev:true 0 (some string) None
-        & info [] ~doc ~docv:"FILE"
-      ) in
   Term.
-    ( pure Frontend.load_file $ file_name
+    ( pure Frontend.load_file $ opts_config
     , info "load-file" ~doc
     )
 
 let cmd_from_stdin =
   let doc = "read from stdin" in
-  let file_name =
-    Arg.
-      ( required
-        & pos ~rev:true 0 (some string) None
-        & info [] ~doc ~docv:"FILE"
-      ) in
   Term.
-    ( pure Frontend.load_from_stdin $ file_name
+    ( pure Frontend.load_from_stdin $ opts_config
     , info "from-stdin" ~doc
     )
 
