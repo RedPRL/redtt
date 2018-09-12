@@ -202,8 +202,22 @@ and face_info : type x. (x -> Info.t) -> (tm, x) face -> Info.t =
 and tm_info (Tm node) =
   node.info
 
+
 let make con =
-  Tm {con; info = con_info con}
+  let exception Make of tm tmf in
+  let compress =
+    function
+    | Up (Down {tm = Tm {con = Up (hd, sp'); _}; _}, sp) ->
+      raise @@ Make (Up (hd, sp' <.> sp))
+    | Up (Down {tm; _}, Emp) ->
+      tm
+    | con ->
+      raise @@ Make con
+  in
+  match compress con with
+  | tm -> tm
+  | exception (Make con) ->
+    Tm {con; info = con_info con}
 
 
 (* "algebras" for generic traversals of terms; the interface is imperative, because
