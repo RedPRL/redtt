@@ -35,6 +35,7 @@ and econ =
   | Let of {name : string; sch : escheme; tm : eterm; body : eterm}
 
   | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
+  | ElimFun of {clauses : eclause list}
 
   | Pi of etele * eterm
   | Sg of etele * eterm

@@ -9,8 +9,8 @@ data int where
 | pos [n : nat]
 | negsuc [n : nat]
 
-let pred (x : int) : int =
-  elim x [
+let pred : int → int =
+  λ [
   | pos n →
     elim n [
     | zero → negsuc zero
@@ -19,8 +19,8 @@ let pred (x : int) : int =
   | negsuc n → negsuc (suc n)
   ]
 
-let isuc (x : int) : int =
-  elim x [
+let isuc : int → int =
+  λ [
   | pos n → pos (suc n)
   | negsuc n →
     elim n [
@@ -29,8 +29,8 @@ let isuc (x : int) : int =
     ]
   ]
 
-let pred-isuc (n : int) : path int (pred (isuc n)) n =
-  elim n [
+let pred-isuc : (n : int) → path int (pred (isuc n)) n =
+  λ [
   | pos n → refl
   | negsuc n →
     elim n [
@@ -39,8 +39,8 @@ let pred-isuc (n : int) : path int (pred (isuc n)) n =
     ]
   ]
 
-let isuc-pred (n : int) : path int (isuc (pred n)) n =
-  elim n [
+let isuc-pred : (n : int) → path int (isuc (pred n)) n =
+  λ [
   | pos n →
     elim n [
     | zero → refl
@@ -68,8 +68,8 @@ let iplus (m n : int) : int =
 
 let izero : int = pos zero
 
-let iplus/unit-r (n : int) : path int (iplus n izero) n =
-  elim n [
+let iplus/unit-r : (n : int) → path int (iplus n izero) n =
+  λ [
   | pos n →
     elim n [
     | zero → refl
@@ -82,8 +82,8 @@ let iplus/unit-r (n : int) : path int (iplus n izero) n =
     ]
   ]
 
-let int-path/code (x : int) : int → type =
-  elim x [
+let int-path/code : int → int → type =
+  λ [
   | pos m → λ y →
     elim y [
     | pos n → nat/path/code m n
@@ -96,8 +96,8 @@ let int-path/code (x : int) : int → type =
     ]
   ]
 
-let int-refl (x : int) : int-path/code x x =
-  elim x [
+let int-refl : (x : int) → int-path/code x x =
+  λ [
   | pos m → nat-refl m
   | negsuc m → nat-refl m
   ]
@@ -107,14 +107,13 @@ let int-path/encode (x y : int) (p : path int x y)
   =
   coe 0 1 (int-refl x) in λ i → int-path/code x (p i)
 
-let int-repr (x : int) : nat =
-  elim x [ pos m → m | negsuc m → m ]
+let int-repr : int → nat =
+  λ [ pos m → m | negsuc m → m ]
 
 let int/discrete : discrete int =
-  λ x →
-  elim x [
-  | pos m → λ y →
-    elim y [
+  λ [
+  | pos m →
+    λ [
     | pos n →
       or/elim (path nat m n) (neg (path nat m n))
         (or (path int (pos m) (pos n)) (neg (path int (pos m) (pos n))))
@@ -123,8 +122,8 @@ let int/discrete : discrete int =
         (λ r → (ff, λ p → r (λ i → int-repr (p i))))
     | negsuc n → (ff, int-path/encode _ _)
     ]
-  | negsuc m → λ y →
-    elim y [
+  | negsuc m →
+    λ [
     | pos n → (ff, int-path/encode _ _)
     | negsuc n →
       or/elim (path nat m n) (neg (path nat m n))

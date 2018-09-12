@@ -125,3 +125,4 @@ let weak-connection/and
    | i=1 → face j
    | j=1 → face i
    ]
+

@@ -6,8 +6,8 @@ data s2 where
 | base
 | surf @ i j [∂[i j] → base]
 
-let hopf (a : s2) : type =
-  elim a [
+let hopf (a : s2) : s2 → type =
+  λ [
   | base → s1
   | surf i j →
     comp 0 1 s1 [

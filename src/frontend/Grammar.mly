@@ -197,6 +197,9 @@ econ:
   | ELIM; scrut = located(econ); clauses = pipe_block(eclause)
     { E.Elim {mot = None; scrut; clauses} }
 
+  | LAM; clauses = pipe_block(eclause)
+    { E.ElimFun {clauses} }
+
   | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }
   | DFIX; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)

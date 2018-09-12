@@ -44,30 +44,28 @@ let s3→join/cube/filler (i j k m : dim) : join =
   | (i=0 | ∂[k]) m → s3→join/k01 i j m
   ]
 
-let s3→join (d : s3) : join =
-  elim d [
+let s3→join : s3 → join =
+  λ [
   | base → inl base
   | cube i j k → s3→join/cube/filler i j k 0
   ]
 
 -- inverse map
 
-let join→s3/push/loop (b : s1)
-  : [i j] s3 [ ∂[i j] → base ]
-  =
-  elim b [
+let join→s3/push/loop : s1 → [i j] s3 [ ∂[i j] → base ] =
+  λ [
   | base → λ _ _ → base
   | loop k → λ i j → cube i j k
   ]
 
 let join→s3/push (a b : s1) : path s3 base base =
   elim a [
-  | base → λ _ → base
+  | base → refl
   | loop j → λ i → join→s3/push/loop b i j
   ]
 
-let join→s3 (c : join) : s3 =
-  elim c [
+let join→s3 : join → s3 =
+  λ [
   | inl a → base
   | inr b → base
   | push a b i → join→s3/push a b i
@@ -75,38 +73,41 @@ let join→s3 (c : join) : s3 =
 
 -- join-s3-join inverse homotopy
 
-let join-s3-join/inl (a : s1) : path join (inl base) (inl a) =
-  elim a [
+let join-s3-join/inl : (a : s1) → path join (inl base) (inl a) =
+  λ [
   | base → refl
   | loop j → λ m → s3→join/k01 0 j m
   ]
 
-let join-s3-join/push/loop (b : s1) : [i j m] join [
-  | i=0 → s3→join/k01 0 j m
-  | i=1 | ∂[j] → s3→join/cnx b i m
-  | m=0 → s3→join (join→s3/push/loop b i j)
-  | m=1 → push (loop j) b i
-  ]
+let join-s3-join/push/loop
+  : (b : s1) →
+    [i j m] join [
+    | i=0 → s3→join/k01 0 j m
+    | i=1 | ∂[j] → s3→join/cnx b i m
+    | m=0 → s3→join (join→s3/push/loop b i j)
+    | m=1 → push (loop j) b i
+    ]
   =
-  elim b [
+  λ [
   | base → λ i j m → s3→join/k01 i j m
   | loop k → λ i j m → s3→join/cube/filler i j k m
   ]
 
-let join-s3-join/push (a b : s1) : [i m] join [
-  | i=0 → join-s3-join/inl a m
-  | i=1 → s3→join/cnx b 1 m
-  | m=0 → s3→join (join→s3/push a b i)
-  | m=1 → push a b i
-  ]
+let join-s3-join/push (a b : s1)
+  : [i m] join [
+    | i=0 → join-s3-join/inl a m
+    | i=1 → s3→join/cnx b 1 m
+    | m=0 → s3→join (join→s3/push a b i)
+    | m=1 → push a b i
+    ]
   =
   elim a [
   | base → λ i m → s3→join/cnx b i m
   | loop j → λ i m → join-s3-join/push/loop b i j m
   ]
 
-let join-s3-join (c : join) : path join (s3→join (join→s3 c)) c =
-  elim c [
+let join-s3-join : (c : join) → path join (s3→join (join→s3 c)) c =
+  λ [
   | inl a → λ m → join-s3-join/inl a m
   | inr b → λ m → s3→join/cnx b 1 m
   | push a b i → λ m → join-s3-join/push a b i m
@@ -114,8 +115,8 @@ let join-s3-join (c : join) : path join (s3→join (join→s3 c)) c =
 
 -- s3-join-s3 inverse homotopy
 
-let s3-join-s3 (d : s3) : path s3 (join→s3 (s3→join d)) d =
-  elim d [
+let s3-join-s3 : (d : s3) → path s3 (join→s3 (s3→join d)) d =
+  λ [
   | base → refl
   | cube i j k → λ x →
     let cnx/filler (i m x : dim) : s3 =
@@ -146,14 +147,14 @@ let s3→join/equiv : equiv s3 join =
 -- adapted from "alpha" in cubicaltt:
 -- https://github.com/mortberg/cubicaltt/blob/d3afca5a744a96de4831610e76d6c4b629478362/examples/brunerie2.ctt#L322
 
-let s2/merid (a : s1) : path s2 base base =
-  elim a [
+let s2/merid : s1 → path s2 base base =
+  λ [
   | base → refl
   | loop i → λ j → surf i j
   ]
 
-let join→s2 (c : join) : s2 =
-  elim c [
+let join→s2 : join → s2 =
+  λ [
   | inl a → base
   | inr b → base
   | push a b i → trans s2 (s2/merid a) (s2/merid b) i

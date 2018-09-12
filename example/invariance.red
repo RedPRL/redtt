@@ -9,11 +9,7 @@ let fun→pair (A : type) (f : bool → A) : A × A =
   (f tt, f ff)
 
 let pair→fun (A : type) (p : A × A) : bool → A =
-  λ b →
-  elim b [
-  | tt → p.fst
-  | ff → p.snd
-  ]
+  λ [ tt → p.fst | ff → p.snd ]
 
 let fun→pair-is-equiv (A : type) : is-equiv^1 _ _ (fun→pair A) =
   λ p →
