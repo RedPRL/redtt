@@ -34,7 +34,7 @@ syn keyword redttDecl opaque let debug normalize import quit
 syn match   redttSymb '[#@`|\[\]^*×:,.∙✓□▷=∂→()λ]\|->'
 
 syn region  redttComm start="\k\@1<!--" end="$"
-syn region  redttBlockComm start="/-" end="-/" contains=redprlBlockComm
+syn region  redttBlockComm start="/-" end="-/" contains=redttBlockComm
 
 hi def link redttParenErr Error
 hi def link redttBrackErr Error
