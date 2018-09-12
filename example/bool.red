@@ -4,33 +4,18 @@ data bool where
 | tt
 | ff
 
-let not (x : bool) : bool =
-  elim x [
-  | tt → ff
-  | ff → tt
-  ]
+let not : bool → bool =
+  λ [ tt → ff | ff → tt ]
 
 let not∘not (x : bool) : _ =
   not (not x)
 
-let not∘not/id/pt (x : bool) : path _ (not∘not x) x =
-  elim x [
-  | tt → refl
-  | ff → refl
-  ]
+let not∘not/id/pt : (x : bool) → path _ (not∘not x) x =
+  λ [ tt → refl | ff → refl ]
 
 -- Dedicated to Bob ;-)
 let shannon (A : type) (f : bool → A) : bool → A =
-  λ b →
-  elim b [
-  | tt → f tt
-  | ff → f ff
-  ]
+  λ [ tt → f tt | ff → f ff ]
 
 let shannon/path (A : type) (f : bool → A) : path _ f (shannon A f) =
-  funext _ _ f (shannon A f)
-    (λ b →
-      elim b [
-      | tt → refl
-      | ff → refl
-      ])
+  funext _ _ f (shannon A f) (λ [ tt → refl | ff → refl ])

@@ -35,7 +35,7 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BOUNDARY
+%token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY
 %token EQUALS
 %token RIGHT_ARROW
 %token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
@@ -110,10 +110,13 @@ atom_econ:
 atomoid_econ:
   | BACKTICK; t = tm
     { E.Quo t }
-  | a = HOLE_NAME;
-    { E.Hole a }
+
+  | a = HOLE_NAME
+    { E.Hole (a, None) }
+
   | HOLE_NAME; LBR; e = located(econ); RBR
     { E.Guess e }
+
   | spec = univ_spec
     { let k, l = spec in E.Type (k, l) }
   (* in theory this rule can replace the following three, but it seems there's some bug.
@@ -186,6 +189,9 @@ econ:
   | e = spine_con
     { e }
 
+  | a = HOLE_NAME; SEMI; e = located(econ)
+    { E.Hole (a, Some e) }
+
   | LAM; xs = list(ATOM); RIGHT_ARROW; e = located(econ)
     { E.Lam (xs, e) }
 
@@ -196,6 +202,9 @@ econ:
     { E.Elim {mot = Some mot; scrut; clauses} }
   | ELIM; scrut = located(econ); clauses = pipe_block(eclause)
     { E.Elim {mot = None; scrut; clauses} }
+
+  | LAM; clauses = pipe_block(eclause)
+    { E.ElimFun {clauses} }
 
   | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }

@@ -97,7 +97,8 @@ struct
     | E.Define (name, opacity, scheme, e) ->
       let now0 = Unix.gettimeofday () in
       elab_scheme scheme >>= fun (names, ty) ->
-      let bdy_tac = tac_wrap_nf @@ tac_lambda names @@ elab_chk e in
+      let xs = List.map (fun nm -> Name.named @@ Some nm) names in
+      let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
       bdy_tac {ty; sys = []} >>= fun tm ->
       let alpha = Name.named @@ Some name in
       M.lift @@ U.define Emp alpha opacity ty tm >>= fun _ ->
@@ -376,8 +377,12 @@ struct
       | _, _, E.Guess e ->
         tac_guess (elab_chk e) goal
 
-      | _, _, E.Hole name ->
+      | _, _, E.Hole (name, None) ->
         tac_hole ~loc:e.span ~name goal
+
+      | _, _, E.Hole (name, Some e') ->
+        inspect_goal ~loc:e.span ~name goal >>
+        elab_chk e' goal
 
       | _, _, E.Hope ->
         tac_hope goal
@@ -388,14 +393,16 @@ struct
       | _, _, E.Let info ->
         elab_scheme info.sch >>= fun (names, pity) ->
         let ctac goal = elab_chk info.tm goal in
-        let lambdas = tac_wrap_nf (tac_lambda names ctac) in
+        let xs = List.map (fun nm -> Name.named @@ Some nm) names in
+        let lambdas = tac_wrap_nf (tac_lambda xs ctac) in
         let inf_tac = lambdas {ty = pity; sys = []} <<@> fun ltm -> pity, ltm in
         let body_tac = elab_chk info.body in
-        tac_let info.name inf_tac body_tac goal
+        tac_let (Name.named @@ Some info.name) inf_tac body_tac goal
 
       | _, _, E.Lam (names, e) ->
         let tac = elab_chk e in
-        tac_wrap_nf (tac_lambda names tac) goal
+        let xs = List.map (fun nm -> Name.named @@ Some nm) names in
+        tac_wrap_nf (tac_lambda xs tac) goal
 
       | [], _, E.Quo tmfam ->
         M.lift C.resolver >>= fun renv ->
@@ -422,6 +429,25 @@ struct
         in
         let clauses = List.map elab_clause clauses in
         tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses goal
+
+      | [], Tm.Pi (dom, _), E.ElimFun {clauses} ->
+        let x = Name.fresh () in
+        let tac_mot = None in
+        let tac_scrut = M.ret (dom, Tm.up @@ Tm.var x) in
+        let used = Hashtbl.create 10 in
+        let elab_clause (lbl, pbinds, bdy) =
+          if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
+            begin
+              Hashtbl.add used lbl ();
+              lbl, pbinds, elab_chk bdy
+            end
+        in
+        let clauses = List.map elab_clause clauses in
+        let tac_fun =
+          tac_lambda [x] @@
+          tac_elim ~loc:e.span ~tac_mot:None ~tac_scrut ~clauses
+        in
+        tac_fun goal
 
       | [], Tm.Univ _, E.Ext (names, ety, esys) ->
         let univ = ty in

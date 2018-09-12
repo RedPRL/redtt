@@ -4,16 +4,16 @@ import int
 import s1
 import equivalence
 
-let s1-univ-cover (x : s1) : type =
-  elim x [
+let s1-univ-cover : s1 → type =
+  λ [
   | base → int
   | loop i → ua _ _ isuc/equiv i
   ]
 
 let Ω1s1 : type = path s1 base base
 
-let loopn (n : int) : Ω1s1 =
-  elim n [
+let loopn : int → Ω1s1 =
+  λ [
   | pos n →
     elim n [
     | zero → refl
@@ -35,8 +35,8 @@ let encode (x : s1) (p : path s1 base x) : s1-univ-cover x =
 
 let winding (l : path s1 base base) : int = encode base l
 
-let winding-loopn (n : int) : path int (winding (loopn n)) n =
-  elim n [
+let winding-loopn : (n : int) → path int (winding (loopn n)) n =
+  λ [
   | pos n →
     elim n [
     | zero → refl
@@ -82,15 +82,16 @@ let decode (x : s1) : s1-univ-cover x → path s1 base x =
 
 -- the following symmetric version uses vproj instead of coe in V (thanks to Evan).
 
-let decode-square (n : int)
-  : [i j] s1 [
+let decode-square
+  : (n : int)
+  → [i j] s1 [
     | i=0 → loopn (pred n) j
     | i=1 → loopn n j
     | j=0 → base
     | j=1 → loop i
     ]
   =
-  elim n [
+  λ [
   | pos n →
     elim n [
     | zero → λ i j → comp 1 i base [ j=0 → refl | j=1 i → loop i ]
@@ -99,8 +100,8 @@ let decode-square (n : int)
   | negsuc n → λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 → refl | j=1 i → loop i ]
   ]
 
-let decode (x : s1) : s1-univ-cover x → path s1 base x =
-  elim x [
+let decode : (x : s1) → s1-univ-cover x → path s1 base x =
+  λ [
   | base → loopn
   | loop i → λ y j →
     let n : int = ua/proj int int isuc/equiv i y in

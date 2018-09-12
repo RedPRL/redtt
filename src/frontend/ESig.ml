@@ -26,7 +26,7 @@ and etele = ecell list
 
 and econ =
   | Guess of eterm
-  | Hole of string option
+  | Hole of string option * eterm option
   | Hope
   | Lam of string list * eterm
   | Tuple of eterm list
@@ -35,6 +35,7 @@ and econ =
   | Let of {name : string; sch : escheme; tm : eterm; body : eterm}
 
   | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
+  | ElimFun of {clauses : eclause list}
 
   | Pi of etele * eterm
   | Sg of etele * eterm

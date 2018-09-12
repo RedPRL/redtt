@@ -102,24 +102,22 @@ let tac_wrap_nf tac goal =
     tac {ty; sys = goal.sys}
 
 
-let tac_let name itac ctac =
+let tac_let x itac ctac =
   fun goal ->
     itac >>= fun (let_ty, let_tm) ->
-    let x = Name.named @@ Some name in
     M.in_scope x (`Def (let_ty, let_tm)) (ctac goal) >>= fun bdyx ->
     M.ret @@ Tm.make @@ Tm.Let (Tm.ann ~ty:let_ty ~tm:let_tm, Tm.bind x bdyx)
 
 
 let flip f x y = f y x
 
-let rec tac_lambda names tac goal =
+let rec tac_lambda xs tac goal =
   match Tm.unleash goal.ty with
   | Tm.Pi (dom, cod) ->
     begin
-      match names with
+      match xs with
       | [] -> tac goal
-      | name :: names ->
-        let x = Name.named @@ Some name in
+      | x :: xs ->
         let codx = Tm.unbind_with (Tm.var x) cod in
         let sysx =
           flip List.map goal.sys @@ fun (r, r', otm) ->
@@ -127,17 +125,16 @@ let rec tac_lambda names tac goal =
           Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.FunApp (Tm.up @@ Tm.var x)
         in
         M.in_scope x (`P dom) begin
-          tac_wrap_nf (tac_lambda names tac) {ty = codx; sys = sysx}
+          tac_wrap_nf (tac_lambda xs tac) {ty = codx; sys = sysx}
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
     end
 
   | Tm.Later cod ->
     begin
-      match names with
+      match xs with
       | [] -> tac goal
-      | name :: names ->
-        let x = Name.named @@ Some name in
+      | x :: xs ->
         let codx = Tm.unbind_with (Tm.var x) cod in
         let sysx =
           flip List.map goal.sys @@ fun (r, r', otm) ->
@@ -145,25 +142,24 @@ let rec tac_lambda names tac goal =
           Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Prev (Tm.up @@ Tm.var x)
         in
         M.in_scope x `Tick begin
-          tac_wrap_nf (tac_lambda names tac) {ty = codx; sys = sysx}
+          tac_wrap_nf (tac_lambda xs tac) {ty = codx; sys = sysx}
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Next (Tm.bind x bdyx)
     end
 
   | Tm.Ext (Tm.NB (nms, _) as ebnd) ->
     begin
-      match names with
+      match xs with
       | [] -> tac goal
       | _ ->
-        let rec bite nms lnames rnames =
-          match nms, rnames with
-          | Emp, _ -> lnames, tac_wrap_nf (tac_lambda rnames tac)
-          | Snoc (nms, _), name :: rnames ->
-            let x = Name.named @@ Some name in
-            bite nms (lnames #< x) rnames
+        let rec bite xs lxs rxs =
+          match xs, rxs with
+          | Emp, _ -> lxs, tac_wrap_nf (tac_lambda rxs tac)
+          | Snoc (nms, _), x :: rxs ->
+            bite nms (lxs #< x) rxs
           | _ -> failwith "Elab: incorrect number of binders when refining extension type"
         in
-        let xs, tac' = bite nms Emp names in
+        let xs, tac' = bite nms Emp xs in
         let xs_fwd = Bwd.to_list xs in
         let xs_tms = List.map (fun x -> Tm.var x) xs_fwd in
         let tyxs, sysxs = Tm.unbind_ext_with xs_tms ebnd in
@@ -188,7 +184,7 @@ let rec tac_lambda names tac goal =
 
   | _ ->
     begin
-      match names with
+      match xs with
       | [] -> tac goal
       | _ ->
         raise ChkMatch
@@ -283,7 +279,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             M.lift C.ask >>= fun psi ->
             let rty = Tm.refine_ty goal.ty goal.sys in
             M.lift @@ U.push_hole `Rigid psi rty  >>= fun cmd ->
-            M.emit loc @@ M.UserHole {name = Some lbl; ty = rty; tele = psi; tm = Tm.up cmd} >>
+            M.emit loc @@ M.UserHole {name = Some lbl; ty = rty; tele = psi} >>
             M.ret @@ Tm.up @@ Tm.refine_force cmd
       in
       List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
@@ -435,15 +431,21 @@ let rec tac_hope goal =
   in
   try_system goal.sys
 
-let tac_hole ~loc ~name : chk_tac =
+let inspect_goal ~loc ~name : goal -> unit M.m =
   fun goal ->
     M.lift C.ask >>= fun psi ->
     let rty = Tm.refine_ty goal.ty goal.sys in
-    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
     begin
       if name = Some "_" then M.ret () else
-        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi; tm = Tm.up cmd}
-    end >>
+        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi}
+    end
+
+let tac_hole ~loc ~name : chk_tac =
+  fun goal ->
+    inspect_goal ~loc ~name goal >>
+    M.lift C.ask >>= fun psi ->
+    let rty = Tm.refine_ty goal.ty goal.sys in
+    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
     M.ret @@ Tm.up @@ Tm.refine_force cmd
 
 let tac_guess tac : chk_tac =
@@ -460,12 +462,12 @@ let tac_refl =
   normalizing_goal @@ match_goal @@ fun goal ->
   match Tm.unleash goal.ty with
   | Tm.Ext (Tm.NB (nms, _)) ->
-    let nms' = Bwd.to_list @@ Bwd.map (function Some nm -> nm | None -> "_") nms in
-    tac_lambda nms' tac_refl
+    let xs = Bwd.to_list @@ Bwd.map Name.named nms in
+    tac_lambda xs tac_refl
 
   | Tm.Pi (dom, Tm.B (nm, _)) ->
-    let nms = [match nm with Some nm -> nm | None -> "_"] in
-    tac_lambda nms tac_refl
+    let xs = [Name.named nm] in
+    tac_lambda xs tac_refl
 
   | Tm.Sg (_, _) ->
     tac_pair tac_refl tac_refl
