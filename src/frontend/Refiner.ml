@@ -355,6 +355,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             cx, Cx.evaluator cx, Cx.quoter cx
         end >>= fun (cx, (module V), (module Q)) ->
 
+
         let rec image_of_bterm phi =
           function
           | B.Intro intro as bterm ->

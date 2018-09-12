@@ -28,7 +28,8 @@ syn keyword redttDecl let data debug normalize import quit opaque
 
 syn match   redttSymb '[#@`|^*×:,.∙✓□▷=∂→λ𝕀]\|->'
 
-syn region  redttComm start=";" end="$"
+syn region  redttComm start="\k\@1<!--" end="$"
+syn region  redttBlockComm start="/-" end="-/" contains=redttBlockComm
 
 hi def link redttParenErr Error
 hi def link redttBrackErr Error
@@ -37,5 +38,6 @@ hi def link redttKeyw Identifier
 hi def link redttDecl Statement
 hi def link redttSymb Identifier
 hi def link redttComm Comment
+hi def link redttBlockComm Comment
 
 let b:current_syntax = "redtt"

@@ -1,8 +1,8 @@
 import path
 import bool
 
-; the core constructor (prev α M) is written using application notation in
-; the surface language
+-- the core constructor (prev α M) is written using application notation in
+-- the surface language
 let stream/F (A : ✓ → type) : type =
   bool × (α : ✓) → A α
 

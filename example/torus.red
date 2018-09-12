@@ -2,8 +2,8 @@ import path
 import s1
 import isotoequiv
 
-; cubicaltt version: https://github.com/mortberg/cubicaltt/blob/master/examples/torus.ctt
-; cubical agda version: https://github.com/Saizan/cubical-demo/blob/hits-transp/examples/Cubical/Examples/Torus.agda
+-- cubicaltt version: https://github.com/mortberg/cubicaltt/blob/master/examples/torus.ctt
+-- cubical agda version: https://github.com/Saizan/cubical-demo/blob/hits-transp/examples/Cubical/Examples/Torus.agda
 
 data torus where
 | pt
@@ -48,7 +48,7 @@ let c2t/transpose (c : s1) : s1 → torus =
 let c2t (cs : s1 × s1) : torus =
   c2t/transpose (cs.fst) (cs.snd)
 
-let t2c2t (t : torus) : Path torus (c2t (t2c t)) t =
+let t2c2t (t : torus) : path torus (c2t (t2c t)) t =
   elim t [
   | pt → refl
   | p/one i → refl
@@ -57,7 +57,7 @@ let t2c2t (t : torus) : Path torus (c2t (t2c t)) t =
   ]
 
 
-let c2t2c/transpose (c0 : s1) : (c1 : s1) → Path (s1 × s1) (t2c (c2t/transpose c0 c1)) (c0, c1) =
+let c2t2c/transpose (c0 : s1) : (c1 : s1) → path (s1 × s1) (t2c (c2t/transpose c0 c1)) (c0, c1) =
   elim c0
   [ base → λ c1 →
     elim c1
@@ -73,11 +73,11 @@ let c2t2c/transpose (c0 : s1) : (c1 : s1) → Path (s1 × s1) (t2c (c2t/transpos
   ]
 
 
-let c2t2c (cs : s1 × s1) : Path (s1 × s1) (t2c (c2t cs)) cs =
+let c2t2c (cs : s1 × s1) : path (s1 × s1) (t2c (c2t cs)) cs =
   c2t2c/transpose (cs.fst) (cs.snd)
 
 
-let torus/s1s1/iso : Iso (s1 × s1) torus =
+let torus/s1s1/iso : iso (s1 × s1) torus =
   ( c2t
   , t2c
   , t2c2t
@@ -85,8 +85,8 @@ let torus/s1s1/iso : Iso (s1 × s1) torus =
   )
 
 
-let torus/s1s1/equiv : Equiv (s1 × s1) torus =
-  Iso/Equiv (s1 × s1) torus torus/s1s1/iso
+let torus/s1s1/equiv : equiv (s1 × s1) torus =
+  iso→equiv (s1 × s1) torus torus/s1s1/iso
 
-let torus/s1s1/path : Path^1 type (s1 × s1) torus =
-  UA (s1 × s1) torus torus/s1s1/equiv
+let torus/s1s1/path : path^1 type (s1 × s1) torus =
+  ua (s1 × s1) torus torus/s1s1/equiv

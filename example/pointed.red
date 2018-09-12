@@ -4,13 +4,13 @@ import isotoequiv
 let ptype : type^1 = (A : type) × A
 
 let pmap (pA pB : ptype) : type =
-  (f : pA.fst → pB.fst) × Path _ (f (pA.snd)) (pB.snd)
+  (f : pA.fst → pB.fst) × path _ (f (pA.snd)) (pB.snd)
 
 let p→ (pA pB : ptype) : ptype =
   (pmap pA pB, λ _ → pB.snd, λ _ → pB.snd)
 
 let pequiv (pA pB : ptype) : type =
-  (f : pmap pA pB) × IsEquiv (pA.fst) (pB.fst) (f.fst)
+  (f : pmap pA pB) × is-equiv (pA.fst) (pB.fst) (f.fst)
 
 let pbool : ptype = (bool, ff)
 
@@ -25,14 +25,14 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
     )
   in
 
-  let bwdfwd (f : pmap pbool pA) : Path _ (bwd (fwd.fst f)) f =
+  let bwdfwd (f : pmap pbool pA) : path _ (bwd (fwd.fst f)) f =
     let bwdfwd/pt (i j : dim) : pA.fst =
       comp 1 j (pA.snd) [
       | i=0 → refl
       | i=1 → f.snd
       ]
     in
-    let bwdfwd/map (b : bool) : Path _ (bwd (fwd.fst f) .fst b) (f.fst b) =
+    let bwdfwd/map (b : bool) : path _ (bwd (fwd.fst f) .fst b) (f.fst b) =
       elim b [
       | tt → refl
       | ff → λ i → bwdfwd/pt i 0
@@ -40,10 +40,10 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
     in
     λ i → (λ b → bwdfwd/map b i, bwdfwd/pt i)
   in
-  (fwd, Iso/Equiv _ _ (fwd.fst, bwd, refl, bwdfwd) .snd)
+  (fwd, iso→equiv _ _ (fwd.fst, bwd, refl, bwdfwd) .snd)
 
 let pΩ (pA : ptype) : ptype =
-  ( Path _ (pA.snd) (pA.snd)
+  ( path _ (pA.snd) (pA.snd)
   , refl
   )
 
@@ -53,7 +53,7 @@ let pΩ/map (pA pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
   )
 
 let pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
-  : Path _
+  : path _
     (pΩ/map pA pB pf .fst (trans _ p q))
     (trans _
      (pΩ/map pA pB pf .fst p)
