@@ -8,7 +8,7 @@ let sg/elim
   =
   m (t.fst) (t.snd)
 
-; Needed until we have parameterized datatypes
+-- Needed until we have parameterized datatypes
 let or (A B : type) : type =
   (b : bool) × elim b [tt → A | ff → B]
 

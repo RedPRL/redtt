@@ -2,8 +2,8 @@ import path
 
 let J
   (A : type) (a : A)
-  (C : (x : A) (p : Path _ a x) → type) (d : C a refl)
-  (x : A) (p : Path _ a x)
+  (C : (x : A) (p : path _ a x) → type) (d : C a refl)
+  (x : A) (p : path _ a x)
   : C x p
   =
   let ty : dim → type =
@@ -21,8 +21,8 @@ let J
 
 let J/eq
   (A : type) (a : A)
-  (C : (x : A) (p : Path A a x) → type) (d : C a refl)
-  : Path (C a refl) (J _ _ C d a refl) d
+  (C : (x : A) (p : path A a x) → type) (d : C a refl)
+  : path (C a refl) (J _ _ C d a refl) d
   =
   let square : dim → dim → A =
     λ i j →

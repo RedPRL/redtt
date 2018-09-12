@@ -7,7 +7,7 @@ data s1 where
 | base
 | loop @ i [∂[i] → base]
 
-let rotate/loop (a : s1) : Path _ a a =
+let rotate/loop (a : s1) : path _ a a =
   elim a [
   | base → λ j → loop j
   | loop i → λ j → connection/both s1 (λ k → loop k) (λ k → loop k) i j
@@ -19,28 +19,26 @@ let rotate (a : s1) : s1 → s1 =
   | loop i → λ b → rotate/loop b i
   ]
 
-let rotate/equiv/loop : Path _ (IdEquiv s1) (IdEquiv s1) =
+let rotate/equiv/loop : path _ (id-equiv s1) (id-equiv s1) =
   λ i →
-    let fwd : dim → s1 → s1 =
-      λ j a → rotate/loop a j
-    in
+    let fwd (j : dim) (a : s1) = rotate/loop a j in
     ( fwd i
-    , PropToPropOver
-      (λ j → IsEquiv s1 s1 (fwd j))
-      (PropIsEquivDirect s1 s1 (λ a → a))
-      (IdEquiv s1 .snd)
-      (IdEquiv s1 .snd)
+    , prop→prop-over
+      (λ j → is-equiv s1 s1 (fwd j))
+      (is-equiv/prop/direct s1 s1 (λ a → a))
+      (id-equiv s1 .snd)
+      (id-equiv s1 .snd)
       i
     )
 
-let rotate/is-equiv (a : s1) : IsEquiv s1 s1 (rotate a) =
+let rotate/is-equiv (a : s1) : is-equiv s1 s1 (rotate a) =
   elim a [
-  | base → IdEquiv s1 .snd
+  | base → id-equiv s1 .snd
   | loop i → rotate/equiv/loop i .snd
   ]
 
-let rotate/equiv (a : s1) : Equiv s1 s1 =
+let rotate/equiv (a : s1) : equiv s1 s1 =
   ( rotate a , rotate/is-equiv a )
 
-let rotate/path (a : s1) : Path^1 type s1 s1 =
-  UA s1 s1 (rotate/equiv a)
+let rotate/path (a : s1) : path^1 type s1 s1 =
+  ua s1 s1 (rotate/equiv a)

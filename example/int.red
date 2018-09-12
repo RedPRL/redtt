@@ -29,7 +29,7 @@ let isuc (x : int) : int =
     ]
   ]
 
-let pred-isuc (n : int) : Path int (pred (isuc n)) n =
+let pred-isuc (n : int) : path int (pred (isuc n)) n =
   elim n [
   | pos n → refl
   | negsuc n →
@@ -39,7 +39,7 @@ let pred-isuc (n : int) : Path int (pred (isuc n)) n =
     ]
   ]
 
-let isuc-pred (n : int) : Path int (isuc (pred n)) n =
+let isuc-pred (n : int) : path int (isuc (pred n)) n =
   elim n [
   | pos n →
     elim n [
@@ -49,8 +49,8 @@ let isuc-pred (n : int) : Path int (isuc (pred n)) n =
   | negsuc n → refl
   ]
 
-let isuc-equiv : Equiv int int =
-  Iso/Equiv _ _ (isuc, (pred, (isuc-pred, pred-isuc)))
+let isuc/equiv : equiv int int =
+  iso→equiv _ _ (isuc, (pred, (isuc-pred, pred-isuc)))
 
 let iplus (m n : int) : int =
   elim m [
@@ -68,7 +68,7 @@ let iplus (m n : int) : int =
 
 let izero : int = pos zero
 
-let iplus/unit-r (n : int) : Path int (iplus n izero) n =
+let iplus/unit-r (n : int) : path int (iplus n izero) n =
   elim n [
   | pos n →
     elim n [
@@ -82,30 +82,30 @@ let iplus/unit-r (n : int) : Path int (iplus n izero) n =
     ]
   ]
 
-let IntPathCode (x : int) : int → type =
+let int-path/code (x : int) : int → type =
   elim x [
   | pos m → λ y →
     elim y [
-    | pos n → NatPathCode m n
+    | pos n → nat/path/code m n
     | negsuc _ → void
     ]
   | negsuc m → λ y →
     elim y [
     | pos _ → void
-    | negsuc n → NatPathCode m n
+    | negsuc n → nat/path/code m n
     ]
   ]
 
-let int-refl (x : int) : IntPathCode x x =
+let int-refl (x : int) : int-path/code x x =
   elim x [
   | pos m → nat-refl m
   | negsuc m → nat-refl m
   ]
 
-let int-path/encode (x y : int) (p : Path int x y)
-  : IntPathCode x y
+let int-path/encode (x y : int) (p : path int x y)
+  : int-path/code x y
   =
-  coe 0 1 (int-refl x) in λ i → IntPathCode x (p i)
+  coe 0 1 (int-refl x) in λ i → int-path/code x (p i)
 
 let int-repr (x : int) : nat =
   elim x [ pos m → m | negsuc m → m ]
@@ -116,8 +116,8 @@ let int/discrete : discrete int =
   | pos m → λ y →
     elim y [
     | pos n →
-      or/elim (Path nat m n) (neg (Path nat m n))
-        (or (Path int (pos m) (pos n)) (neg (Path int (pos m) (pos n))))
+      or/elim (path nat m n) (neg (path nat m n))
+        (or (path int (pos m) (pos n)) (neg (path int (pos m) (pos n))))
         (nat/discrete m n)
         (λ l → (tt, λ i → pos (l i)))
         (λ r → (ff, λ p → r (λ i → int-repr (p i))))
@@ -127,13 +127,13 @@ let int/discrete : discrete int =
     elim y [
     | pos n → (ff, int-path/encode _ _)
     | negsuc n →
-      or/elim (Path nat m n) (neg (Path nat m n))
-        (or (Path int (negsuc m) (negsuc n)) (neg (Path int (negsuc m) (negsuc n))))
+      or/elim (path nat m n) (neg (path nat m n))
+        (or (path int (negsuc m) (negsuc n)) (neg (path int (negsuc m) (negsuc n))))
         (nat/discrete m n)
         (λ l → (tt, λ i → negsuc (l i)))
         (λ r → (ff, λ p → r (λ i → int-repr (p i))))
     ]
   ]
 
-let int/set : IsSet int =
-  discrete/to/set int int/discrete
+let int/set : is-set int =
+  discrete→set int int/discrete

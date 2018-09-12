@@ -7,7 +7,7 @@ import omega1s1
 import s2
 import s3-to-join
 
-; from https://github.com/mortberg/cubicaltt/blob/pi4s3/examples/problem.ctt
+-- from https://github.com/mortberg/cubicaltt/blob/pi4s3/examples/problem.ctt
 
 let pΩ² (pA : ptype) : ptype = pΩ (pΩ pA)
 let pΩ³ (pA : ptype) : ptype = pΩ (pΩ² pA)
@@ -27,17 +27,17 @@ let test0-2 : pΩ³ ps3 .fst =
   λ i j k → cube i j k
 
 let f3 : pΩ³ ps3 .fst → pΩ³ pjoin .fst =
-  pΩ³/reflmap ps3 join s3-to-join .fst
+  pΩ³/reflmap ps3 join s3→join .fst
 
 let test0-3 : pΩ³ pjoin .fst = f3 test0-2
 
 let f4 : pΩ³ pjoin .fst → pΩ³ ps2 .fst =
-  pΩ³/reflmap pjoin s2 join-to-s2 .fst
+  pΩ³/reflmap pjoin s2 join→s2 .fst
 
 let test0-4 : pΩ³ ps2 .fst = f4 test0-3
 
 let innerpath (i j : dim) : s1 =
   coe 0 1 base in λ k → hopf (test0-4 i j k)
 
-;let problem : Path int (pos zero) (pos zero) =
-;  λ i → coe 0 1 (pos zero) in λ j → s1-univ-cover (innerpath i j)
+--let problem : path int (pos zero) (pos zero) =
+--  λ i → coe 0 1 (pos zero) in λ j → s1-univ-cover (innerpath i j)
