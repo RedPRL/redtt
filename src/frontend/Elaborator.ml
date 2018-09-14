@@ -225,13 +225,13 @@ struct
       | (plbl, pty) :: const_specs, _, _ ->
         let vty = V.eval env pty in
         let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-        build_cx cx' (D.Env.snoc env @@ `Val v)  const_specs rec_specs dim_specs
+        build_cx cx' (D.Env.snoc env @@ `Val v) const_specs rec_specs dim_specs
       | [], (nm, Desc.Self) :: rec_specs, _ ->
         let cx_x, _ = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data dlbl in
         build_cx cx_x env  const_specs rec_specs dim_specs
       | [], [], nm :: dim_specs ->
         let cx', _ = Cx.ext_dim cx ~nm:(Some nm) in
-        build_cx cx' env  const_specs rec_specs dim_specs
+        build_cx cx' env const_specs rec_specs dim_specs
       | [], [], [] ->
         cx
     in
