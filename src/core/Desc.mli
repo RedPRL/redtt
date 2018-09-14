@@ -26,7 +26,8 @@ type 'a constr =
 type 'a desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   constrs : (con_label * 'a constr) list}
+   constrs : (con_label * 'a constr) list;
+   status : [`Complete | `Partial]}
 
 exception ConstructorNotFound of con_label
 val lookup_constr : con_label -> 'a desc -> 'a constr
