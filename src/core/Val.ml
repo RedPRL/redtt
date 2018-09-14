@@ -1258,7 +1258,7 @@ struct
               | `Proj abs -> abs
               | `Ok faces ->
                 Abs.make1 @@ fun y ->
-                make_hcom (Dir.make (I.act phi r) (`Atom y)) (Value.act phi ty) (Value.act phi cap) (`Ok (faces @ rest))
+                make_hcom (Dir.make (I.act phi r) (`Atom y)) (Value.act phi ty) (Value.act phi cap) (`Ok (faces @ rest0))
           in
           let face0 = face (`Dim0, `Dim1) in
           let face1 = face (`Dim1, `Dim0) in
