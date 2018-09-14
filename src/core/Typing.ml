@@ -583,6 +583,9 @@ and infer_spine cx hd =
       in
 
       let desc = V.Sig.lookup_datatype info.dlbl in
+
+      if desc.status = `Partial then failwith "Cannot call eliminator on partially-defined datatype";
+
       let used_labels = Hashtbl.create 10 in
 
 
