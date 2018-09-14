@@ -944,7 +944,6 @@ struct
               let funcr = Value.act phi @@ car info.equiv in
               rigid_vproj info.x ~func:funcr ~el
             in
-            let mode = `INCONSISTENCY_REMOVAL in
             let sys =
               let face0 =
                 AbsFace.gen_const I.idn info.x `Dim0 @@ fun phi ->
@@ -956,10 +955,7 @@ struct
                 Abs.bind1 x @@
                 make_coe (Dir.make (I.act phi r) (`Atom x)) (Abs.act phi abs1) (Value.act phi el)
               in
-              match mode with
-              | `OLD_SCHOOL -> Option.filter_map force_abs_face [face0; face1]
-              | `INCONSISTENCY_REMOVAL -> Option.filter_map force_abs_face [face0]
-              | `UNICORN -> raise @@ E InternalMortalityError
+              Option.filter_map force_abs_face [face0; face1]
             in
             rigid_com dir abs1 cap sys
           in
@@ -1192,11 +1188,6 @@ struct
           apply (car (Value.act phi equiv)) @@
           hcom phi (`Atom y) ty0 (* ty0 is already under `phi0` *)
         in
-        let face1 =
-          AbsFace.gen_const I.idn x `Dim1 @@ fun phi ->
-          Abs.make1 @@ fun y ->
-          hcom phi (`Atom y) (Value.act phi ty1)
-        in
         let func = car equiv in
         let el1_cap = rigid_vproj x ~func ~el:cap in
         let el1_sys =
@@ -1206,7 +1197,7 @@ struct
             let yi, el = Abs.unleash absi in
             Abs.bind yi @@ vproj phi (I.act phi @@ `Atom x) ~func:(fun phi -> Value.act phi func) ~el
           in
-          Option.filter_map force_abs_face [face0; face1] @ List.map face sys
+          Option.filter_map force_abs_face [face0] @ List.map face sys
         in
         rigid_hcom dir ty1 el1_cap el1_sys
       in
