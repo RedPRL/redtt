@@ -44,3 +44,21 @@ let s1→moebius-boundary (x : s1) : moebius-boundary =
       in
       comp 0 1 (loop-path tt i) [i=0 → refl | i=1 → loop-path ff]
   ]
+
+let s1→moebius-boundary→s1
+  : path s1 (moebius-boundary→s1 (s1→moebius-boundary base)) base =
+  refl
+
+-- there is an invalid fhcom in the middle?!
+-- ... (fhcom 0 1 (loop x) [x=0 <x1> base]) ...
+let test : dim → s1 =
+  λ i → moebius-boundary→s1 (s1→moebius-boundary (loop i))
+normalize test
+
+/-
+let double : s1 → s1 = λ x → s1→moebius-boundary x .fst
+
+import omega1s1
+
+let test0 : path int (winding (λ i → double (loopn (pos (suc zero)) i))) (pos (suc (suc zero))) = refl
+-/
