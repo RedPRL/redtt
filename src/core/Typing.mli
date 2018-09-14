@@ -15,6 +15,6 @@ val infer : cx -> Tm.tm Tm.cmd -> value
 val check_constr_boundary_sys
   : cx
   -> Desc.data_label
-  -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
-  -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys
+  -> (Tm.tm, Tm.tm) Desc.desc
+  -> (Tm.tm, Tm.tm) Tm.system
   -> unit

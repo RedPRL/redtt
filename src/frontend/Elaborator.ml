@@ -207,7 +207,7 @@ struct
 
     go Emp constr.const_specs
 
-  and elab_constr_boundary dlbl desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm Desc.Boundary.term) Desc.Boundary.sys M.m =
+  and elab_constr_boundary dlbl desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm) Tm.system M.m =
     M.lift C.base_cx >>= fun cx ->
     let (module V) = Cx.evaluator cx in
     let module D = Domain in
@@ -234,6 +234,7 @@ struct
     M.ret bdry
 
   and elab_constr_face dlbl desc (er0, er1, e) =
+    let e = Option.get_exn e in
     elab_dim er0 >>= fun r0 ->
     bind_in_scope r0 >>= fun r0' ->
     elab_dim er1 >>= fun r1 ->
@@ -241,7 +242,7 @@ struct
     M.in_scope (Name.fresh ()) (`R (r0, r1)) @@
     begin
       elab_boundary_term dlbl desc e <<@> fun bt ->
-        r0', r1', bt
+        r0', r1', Some bt
     end
 
   and elab_boundary_term dlbl desc e =
@@ -287,7 +288,7 @@ struct
       begin
         match spine with
         | Emp ->
-          M.ret @@ Desc.Boundary.Var ix
+          M.ret @@ Tm.up @@ Tm.ix ix
         | _ ->
           failwith "elab_boundary_cut: non-empty spine not yet supported"
       end
@@ -332,7 +333,7 @@ struct
       go_const_specs [] constr.const_specs @@ Bwd.to_list spine >>= fun (const_args, frms) ->
       go_args Emp constr.rec_specs frms >>= fun (rec_args, frms) ->
       go_dims Emp constr.dim_specs frms >>= fun rs ->
-      M.ret @@ Desc.Boundary.Intro {clbl; const_args; rec_args; rs}
+      M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, const_args @ rec_args @ rs)
 
 
 

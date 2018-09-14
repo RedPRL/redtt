@@ -4,8 +4,6 @@ open Bwd
 open BwdNotation
 
 module D = Domain
-module B = Desc.Boundary
-
 
 module Env :
 sig
@@ -81,7 +79,7 @@ sig
   val equiv_boundary_value
     : env
     -> Desc.data_label
-    -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
+    -> (Tm.tm, Tm.tm) Desc.desc
     -> Tm.tm Desc.rec_spec
     -> value
     -> value
@@ -907,7 +905,7 @@ struct
               info1.rec_args
           in
           let rs = equate_dims env info0.rs info1.rs in
-          B.Intro {clbl = info0.clbl; const_args; rec_args; rs = rs}
+          Tm.make @@ Tm.Intro (dlbl, info0.clbl, const_args @ rec_args @ rs)
         | D.Up info0, D.Up info1 ->
           equate_boundary_neu env info0.neu info1.neu
         | _ ->
@@ -918,7 +916,7 @@ struct
     match neu0, neu1 with
     | D.Lvl (_, lvl0), D.Lvl (_, lvl1) when lvl0 = lvl1 ->
       let ix = Env.ix_of_lvl lvl0 env in
-      B.Var ix
+      Tm.up @@ Tm.ix ix
     | _ ->
       failwith "equate_boundary_neu"
 

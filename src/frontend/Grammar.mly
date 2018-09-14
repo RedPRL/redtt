@@ -319,7 +319,7 @@ desc_constr:
     let boundary =
       List.flatten @@
         List.map
-          (fun (phi, e) -> List.map (fun (r, r') -> r, r', e) phi)
+          (fun (phi, e) -> List.map (fun (r, r') -> r, r', Some e) phi)
           boundary
     in
     clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dim_specs; boundary} }

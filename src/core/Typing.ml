@@ -1,7 +1,6 @@
 module Q = Quote
 module T = Tm
 module D = Domain
-module B = Desc.Boundary
 
 open Tm.Notation
 
@@ -621,35 +620,41 @@ and infer_spine cx hd =
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 
-        let rec image_of_bterm phi =
-          function
-          | B.Intro intro as bterm ->
-            let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) nclos in
+        let rec image_of_bterm phi tm =
+          match Tm.unleash tm with
+          | Tm.Intro (dlbl, clbl, args) ->
+            let constr = Desc.lookup_constr clbl desc in
+            let const_args, args = ListUtil.split (List.length constr.const_specs) args in
+            let rec_args, rs = ListUtil.split (List.length constr.rec_specs) args in
+            let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl', _) -> clbl' = clbl) nclos in
             let rargs =
               List.flatten @@
               List.map
                 (fun bt ->
-                   let el = `Val (V.eval_bterm info.dlbl desc benv bterm) in
+                   let el = `Val (V.eval benv tm) in
                    let ih = `Val (image_of_bterm phi bt) in
                    [el; ih])
-                intro.rec_args
+                rec_args
             in
-            let cargs = List.map (fun t -> `Val (D.Value.act phi @@ V.eval benv t)) intro.const_args in
-            let dims = List.map (fun t -> `Dim (I.act phi @@ V.eval_dim benv t)) intro.rs in (* is this right ? *)
+            let cargs = List.map (fun t -> `Val (D.Value.act phi @@ V.eval benv t)) const_args in
+            let dims = List.map (fun t -> `Dim (I.act phi @@ V.eval_dim benv t)) rs in (* is this right ? *)
             let cells = cargs @ rargs @ dims in
             V.inst_nclo nclo cells
-          | B.Var ix ->
+          | Tm.Up (Tm.Ix (ix, _), Emp) ->
             (* This is so bad!! *)
             let ix' = ix - List.length rs in
             D.Value.act phi @@ Bwd.nth ihvs ix'
+          | _ ->
+            failwith "image_of_bterm"
 
         in
 
-        let image_of_bface (tr, tr', btm) =
+        let image_of_bface (tr, tr', otm) =
           let r = V.eval_dim benv tr in
           let r' = V.eval_dim benv tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
-          image_of_bterm phi btm
+          let tm = Option.get_exn otm in
+          image_of_bterm phi tm
         in
 
         let boundary = List.map image_of_bface constr.boundary in
@@ -825,7 +830,7 @@ let check_constr_boundary_sys cx dlbl desc sys =
     match sys with
     | [] ->
       ()
-    | (tr0, tr1, tm) :: sys ->
+    | (tr0, tr1, otm) :: sys ->
       let r0 = check_eval_dim cx tr0 in
       let r1 = check_eval_dim cx tr1 in
       begin
@@ -834,6 +839,7 @@ let check_constr_boundary_sys cx dlbl desc sys =
           go sys acc
 
         | `Same | `Indet ->
+          let tm = Option.get_exn otm in
           begin
             try
               let cx', _ = Cx.restrict cx r0 r1 in
@@ -859,8 +865,8 @@ let check_constr_boundary_sys cx dlbl desc sys =
           let cx', _ = Cx.restrict cx r'0 r'1 in
           let (module Q) = Cx.quoter cx' in
           let (module V) = Cx.evaluator cx' in
-          let v = V.eval_bterm dlbl desc (Cx.env cx') tm in
-          let v' = V.eval_bterm dlbl desc (Cx.env cx') tm' in
+          let v = V.eval (Cx.env cx') tm in
+          let v' = V.eval (Cx.env cx') tm' in
           (* let phi = I.cmp phi (I.equate r0 r1) in *)
           Q.equiv_boundary_value (Cx.qenv cx') dlbl desc Desc.Self v v'
         with

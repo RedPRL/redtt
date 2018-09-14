@@ -3,7 +3,6 @@ open RedTT_Core
 open Dev open Bwd open BwdNotation
 
 module D = Domain
-module B = Desc.Boundary
 
 module M =
 struct
@@ -354,44 +353,50 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
         end >>= fun (cx, (module V), (module Q)) ->
 
 
-        let rec image_of_bterm phi =
-          function
-          | B.Intro intro as bterm ->
-            let nbnd : ty Tm.nbnd = snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) earlier_clauses in
+        let rec image_of_bterm phi tm =
+          match Tm.unleash tm with
+          | Tm.Intro (dlbl, clbl, args) ->
+            let constr = Desc.lookup_constr clbl desc in
+            let const_args, args = ListUtil.split (List.length constr.const_specs) args in
+            let rec_args, rs = ListUtil.split (List.length constr.rec_specs) args in
+            let nbnd : ty Tm.nbnd = snd @@ List.find (fun (clbl', _) -> clbl' = clbl) earlier_clauses in
             let nclo = D.NClo {nbnd; rho = Cx.env cx} in
-            let cargs = List.map (fun t -> `Val (V.eval benv t)) intro.const_args in
+            let cargs = List.map (fun t -> `Val (V.eval benv t)) const_args in
             let rargs =
               List.flatten @@
               List.map
                 (fun bt ->
-                   let el = `Val (V.eval_bterm dlbl desc benv bterm) in
+                   let el = `Val (V.eval benv tm) in
                    let ih = `Val (image_of_bterm phi bt) in
                    [el; ih])
-                intro.rec_args
+                rec_args
             in
-            let dims = List.map (fun t -> `Dim (V.eval_dim benv t)) intro.rs in
+            let dims = List.map (fun t -> `Dim (V.eval_dim benv t)) rs in
             let cells = cargs @ rargs @ dims in
             begin
               try
                 V.inst_nclo nclo cells
               with _ ->
-                Format.eprintf "%s@."  intro.clbl;
+                Format.eprintf "%s@."  clbl;
                 Format.eprintf "clo: @[%a@]@." D.pp_nclo nclo;
                 Format.eprintf "cells: @[%a@]@." (Pp.pp_list D.pp_env_cell) cells;
                 failwith "inst_clo"
             end
 
-          | B.Var ix ->
+          | Tm.Up (Tm.Ix (ix, _), Emp) ->
             let ix' = ix - List.length rs in
             V.eval_cmd benv @@ Tm.var @@ Bwd.nth ihs ix'
+
+          | _ -> failwith "image_of_bterm"
         in
 
-        let image_of_bface (tr, tr', btm) =
+        let image_of_bface (tr, tr', otm) =
           let env = Cx.env cx in
           let r = V.eval_dim benv tr in
           let r' = V.eval_dim benv tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
-          image_of_bterm phi btm
+          let tm = Option.get_exn otm in
+          image_of_bterm phi tm
         in
 
         (* What is the image of the boundary in the current fiber of the motive? *)
