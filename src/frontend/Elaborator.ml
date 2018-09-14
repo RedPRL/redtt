@@ -230,7 +230,8 @@ struct
 
     let cx' = build_cx cx V.empty_env const_specs rec_specs dim_specs in
     traverse (elab_constr_face dlbl desc) sys >>= fun bdry ->
-    Typing.check_constr_boundary_sys cx' dlbl desc bdry;
+    let data_ty = D.make @@ D.Data dlbl in
+    Typing.check_tm_sys cx' data_ty bdry;
     M.ret bdry
 
   and elab_constr_face dlbl desc (er0, er1, e) =

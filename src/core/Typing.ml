@@ -182,7 +182,7 @@ let rec check_ cx ty rst tm =
       check_extension_cofibration xs @@ cofibration_of_sys cxx sys
     else
       ();
-    check_ext_sys cxx vcod sys
+    check_tm_sys cxx vcod sys
 
   | [], D.Univ univ, T.Restrict (tr, tr', oty) ->
     if univ.kind = `Pre then () else failwith "Co-restriction type is not known to be Kan";
@@ -416,7 +416,7 @@ and check_boundary_face cx ty face el =
 
 
 
-and check_ext_sys cx ty sys =
+and check_tm_sys cx ty sys =
   let rec go sys acc =
     match sys with
     | [] ->
@@ -443,7 +443,7 @@ and check_ext_sys cx ty sys =
           go sys @@ (r0, r1, tm) :: acc
 
         | _, None ->
-          failwith "check_ext_sys"
+          failwith "check_tm_sys"
       end
 
   and go_adj cx faces face =
@@ -824,54 +824,3 @@ and check_is_equivalence cx ~ty0 ~ty1 ~equiv =
   let (module V) = Cx.evaluator cx in
   let type_of_equiv = V.Macro.equiv ty0 ty1 in
   check cx type_of_equiv equiv
-
-let check_constr_boundary_sys cx dlbl desc sys =
-  let rec go sys acc =
-    match sys with
-    | [] ->
-      ()
-    | (tr0, tr1, otm) :: sys ->
-      let r0 = check_eval_dim cx tr0 in
-      let r1 = check_eval_dim cx tr1 in
-      begin
-        match I.compare r0 r1 with
-        | `Apart ->
-          go sys acc
-
-        | `Same | `Indet ->
-          let tm = Option.get_exn otm in
-          begin
-            try
-              let cx', _ = Cx.restrict cx r0 r1 in
-              (* TODO: check boundary type *)
-              (* check cx' (D.Value.act phi ty) tm; *)
-
-              (* Check face-face adjacency conditions *)
-              go_adj cx' acc (r0, r1, tm)
-            with
-            | I.Inconsistent -> ()
-          end;
-          go sys @@ (r0, r1, tm) :: acc
-      end
-
-  and go_adj cx faces face =
-    match faces with
-    | [] -> ()
-    | (r'0, r'1, tm') :: faces ->
-      (* Invariant: cx should already be restricted by r0=r1 *)
-      let _r0, _r1, tm = face in
-      begin
-        try
-          let cx', _ = Cx.restrict cx r'0 r'1 in
-          let (module Q) = Cx.quoter cx' in
-          let (module V) = Cx.evaluator cx' in
-          let v = V.eval (Cx.env cx') tm in
-          let v' = V.eval (Cx.env cx') tm' in
-          (* let phi = I.cmp phi (I.equate r0 r1) in *)
-          Q.equiv_boundary_value (Cx.qenv cx') dlbl desc Desc.Self v v'
-        with
-        | I.Inconsistent -> ()
-      end;
-      go_adj cx faces face
-  in
-  go sys []
