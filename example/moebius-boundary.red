@@ -34,12 +34,13 @@ let moebius-boundary→s1' (x : s1) : moebius-boundary/fiber x → s1 =
 let moebius-boundary→s1 (x : moebius-boundary) : s1 =
   moebius-boundary→s1' (x .fst) (x .snd)
 
-/-
 let s1→moebius-boundary (x : s1) : moebius-boundary =
   elim x [
   | base → (base, tt)
   | loop i →
-      (comp 0 1 (loop i) [i=0 → refl | i=1 → λ j → loop j],
-       box 0 1 (vin i tt ff) [i=0 → tt | i=1 → tt])
+      let loop-path (b : bool)
+        : path moebius-boundary (base, b) (base, not b) =
+        λ i → (loop i , `(vin i b (not b)))
+      in
+      comp 0 1 (loop-path tt i) [i=0 → refl | i=1 → loop-path ff]
   ]
--/
