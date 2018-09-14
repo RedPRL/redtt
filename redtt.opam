@@ -11,7 +11,7 @@ depends: [
   "cmdliner" {= "1.0.2"}
   "uuseg" {= "11.0.0"}
   "uutf" {= "1.0.1"}
-  "dune" {build & = "1.0.0"}
+  "dune" {build & = "1.1.1"}
   "lwt" {= "4.1.0"}
   "menhir" {>= "20180703"}
 ]
