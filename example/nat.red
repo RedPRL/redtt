@@ -58,10 +58,10 @@ let nat/path/code : nat → nat → type =
     | zero → unit
     | suc _ → void
     ]
-  | suc (m' → Code/m') →
+  | suc (m' → code/m') →
     λ [
     | zero → void
-    | suc n' → Code/m' n'
+    | suc n' → code/m' n'
     ]
   ]
 
