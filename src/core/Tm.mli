@@ -3,7 +3,7 @@ include module type of TmData
 
 
 type tm
-type data_desc = (tm, tm) Desc.desc
+type data_desc = tm Desc.desc
 
 module Error :
 sig

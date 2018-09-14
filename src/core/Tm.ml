@@ -64,7 +64,7 @@ struct
 end
 
 type tm = Tm of {con : tm tmf; info : Info.t}
-type data_desc = (tm, tm) Desc.desc
+type data_desc = tm Desc.desc
 
 type 'a subst =
   | Shift of int

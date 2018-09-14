@@ -79,7 +79,7 @@ sig
   val equiv_boundary_value
     : env
     -> Desc.data_label
-    -> (Tm.tm, Tm.tm) Desc.desc
+    -> Tm.data_desc
     -> Tm.tm Desc.rec_spec
     -> value
     -> value

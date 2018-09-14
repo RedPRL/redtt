@@ -6,21 +6,21 @@ type data_label = string
 type con_label = string
 
 
-type ('a, 'b) face = 'a * 'a * 'b option
-type ('a, 'b) system = ('a, 'b) face list
+type 'a face = 'a * 'a * 'a option
+type 'a system = 'a face list
 
-type ('a, 'b) constr =
+type 'a constr =
   {const_specs : (string * 'a) list;
    rec_specs : (string * 'a rec_spec) list;
    dim_specs : string list;
-   boundary : ('a, 'b) system}
+   boundary : 'a system}
 
 
 (** A datatype description is just a list of named constructors. *)
-type ('a, 'b) desc =
+type 'a desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   constrs : (con_label * ('a, 'b) constr) list}
+   constrs : (con_label * 'a constr) list}
 
 exception ConstructorNotFound of con_label
 
