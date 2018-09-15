@@ -515,7 +515,7 @@ struct
               go qenv' venv' (cells_w_ihs #< (`Dim r)) (cells #< (`Dim r)) specs
 
             | [] ->
-              qenv, cells_w_ihs, cells
+              qenv, Bwd.to_list cells_w_ihs, Bwd.to_list cells
           in
 
           let env', cells_w_ihs, cells = go env empty_env Emp Emp Desc.(constr.specs) in
