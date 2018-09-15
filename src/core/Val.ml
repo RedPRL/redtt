@@ -1233,32 +1233,6 @@ struct
   and nclo nbnd rho =
     NClo {nbnd; rho}
 
-  and eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs =
-    List.map (eval_bterm_face dlbl desc rho ~const_args ~rec_args ~rs)
-
-  and eval_bterm_face dlbl desc rho ~const_args ~rec_args ~rs (tr0, tr1, otm) =
-    let rho' =
-      Env.append rho @@
-      (* ~~This is not backwards, FYI.~~ *)
-      (* NARRATOR VOICE: it was backwards. *)
-      List.map (fun x -> `Val x) const_args
-      @ List.map (fun x -> `Val x) rec_args
-      @ List.map (fun x -> `Dim x) rs
-    in
-    let r0 = eval_dim rho' tr0 in
-    let r1 = eval_dim rho' tr1 in
-    match Eq.make r0 r1 with
-    | `Ok xi ->
-      let tm = Option.get_exn otm in
-      let v = lazy begin Value.act (I.equate r0 r1) @@ eval rho' tm end in
-      Face.Indet (xi, v)
-    | `Apart _ ->
-      Face.False (r0, r1)
-    | `Same _ ->
-      let tm = Option.get_exn otm in
-      let v = lazy begin eval rho' tm end in
-      Face.True (r0, r1, v)
-
 
   and eval (rho : env) tm =
     match Tm.unleash tm with
