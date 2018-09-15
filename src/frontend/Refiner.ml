@@ -78,20 +78,27 @@ let guess_restricted tm goal =
 
 exception ChkMatch
 
+let bind_in_scope_ psi tm =
+  let go (x, param) =
+    match param with
+    | `P _ -> [x]
+    | `Def _ -> [x]
+    | `I -> [x]
+    | `Tick -> [x]
+    | `Tw _ -> []
+    | _ -> []
+  in
+  let xs = Bwd.flat_map go psi in
+  let Tm.NB (_, tm) = Tm.bindn xs tm in
+  tm
+
 let bind_in_scope tm =
+  M.lift C.ask <<@> fun psi -> bind_in_scope_ psi tm
+
+
+let bind_sys_in_scope sys =
   M.lift C.ask <<@> fun psi ->
-    let go (x, param) =
-      match param with
-      | `P _ -> [x]
-      | `Def _ -> [x]
-      | `I -> [x]
-      | `Tick -> [x]
-      | `Tw _ -> []
-      | _ -> []
-    in
-    let xs = Bwd.flat_map go psi in
-    let Tm.NB (_, tm) = Tm.bindn xs tm in
-    tm
+    Tm.map_tm_sys (bind_in_scope_ psi) sys
 
 let tac_wrap_nf tac goal =
   try tac goal

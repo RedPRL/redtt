@@ -188,14 +188,15 @@ struct
            the parameters too. *)
         traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
 
-
         let psi =
           List.map (fun (nm, ty) -> (Name.named @@ Some nm, `P data_ty)) rec_specs
           @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dim_specs
         in
         M.in_scopes psi @@
         begin
-          elab_constr_boundary dlbl desc (const_specs, rec_specs, constr.dim_specs) constr.boundary >>= fun boundary ->
+          let data_ty = Tm.make @@ Tm.Data dlbl in
+          let foo : (E.eterm, E.eterm) Tm.system = constr.boundary in
+          elab_tm_sys data_ty @@ List.map (fun (r, r', otm) -> [r,r'], Option.get_exn otm) constr.boundary >>= bind_sys_in_scope >>= fun boundary ->
           M.ret
             (clbl,
              {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
@@ -214,49 +215,6 @@ struct
     in
 
     go Emp constr.const_specs
-
-  and elab_constr_boundary dlbl desc (const_specs, rec_specs, dim_specs) sys : (Tm.tm, Tm.tm) Tm.system M.m =
-    M.lift C.base_cx >>= fun cx ->
-    let (module V) = Cx.evaluator cx in
-    let module D = Domain in
-
-    let rec build_cx cx env const_specs rec_specs dim_specs =
-      match const_specs, rec_specs, dim_specs with
-      | (plbl, pty) :: const_specs, _, _ ->
-        let vty = V.eval env pty in
-        let cx', v = Cx.ext_ty cx ~nm:(Some plbl) vty in
-        build_cx cx' (D.Env.snoc env @@ `Val v) const_specs rec_specs dim_specs
-      | [], (nm, Desc.Self) :: rec_specs, _ ->
-        let cx_x, _ = Cx.ext_ty cx ~nm:(Some nm) @@ D.make @@ D.Data dlbl in
-        build_cx cx_x env  const_specs rec_specs dim_specs
-      | [], [], nm :: dim_specs ->
-        let cx', _ = Cx.ext_dim cx ~nm:(Some nm) in
-        build_cx cx' env const_specs rec_specs dim_specs
-      | [], [], [] ->
-        cx
-    in
-
-    let cx' = build_cx cx V.empty_env const_specs rec_specs dim_specs in
-    traverse (elab_constr_face dlbl desc) sys >>= fun bdry ->
-    let data_ty = D.make @@ D.Data dlbl in
-    Typing.check_tm_sys cx' data_ty bdry;
-    M.ret bdry
-
-  and elab_constr_face dlbl desc (er0, er1, e) =
-    let e = Option.get_exn e in
-    elab_dim er0 >>= fun r0 ->
-    bind_in_scope r0 >>= fun r0' ->
-    elab_dim er1 >>= fun r1 ->
-    bind_in_scope r1 >>= fun r1' ->
-    M.in_scope (Name.fresh ()) (`R (r0, r1)) @@
-    begin
-      elab_boundary_term dlbl desc e <<@> fun bt ->
-        r0', r1', Some bt
-    end
-
-  and elab_boundary_term dlbl desc e =
-    let data_ty = Tm.make @@ Tm.Data dlbl in
-    elab_chk e {ty = data_ty; sys = []} >>= bind_in_scope
 
   and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =
     let cells, ecod = sch in
