@@ -505,7 +505,7 @@ struct
               let vih = generic qenv' @@ V.inst_clo elim0.mot v in
               let qenv'' = Env.succ qenv' in
               let venv' = D.Env.snoc venv @@ `Val v in
-              go qenv' venv' (cells_w_ihs <>< [`Val v; `Val vih]) (cells #< (`Val v)) specs
+              go qenv'' venv' (cells_w_ihs <>< [`Val v; `Val vih]) (cells #< (`Val v)) specs
 
             | (nm, `Dim) :: specs ->
               let x = Name.named @@ Some nm in
