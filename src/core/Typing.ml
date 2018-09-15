@@ -208,10 +208,10 @@ let rec check_ cx ty rst tm =
   | [], D.Univ univ, T.Data dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     begin
-      if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
-        ()
-      else
-        failwith "Universe level/kind error"
+      if not @@ Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
+        failwith "Universe level/kind error";
+      if desc.status = `Partial then
+        failwith "Partially declared datatype cannot not be treated as type"
     end
 
   | [], D.Data dlbl, T.Intro (dlbl', clbl, args) when dlbl = dlbl' ->
