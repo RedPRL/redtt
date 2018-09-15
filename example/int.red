@@ -6,8 +6,8 @@ import equivalence
 import isotoequiv
 
 data int where
-| pos [n : nat]
-| negsuc [n : nat]
+| pos (n : nat)
+| negsuc (n : nat)
 
 let pred : int → int =
   λ [

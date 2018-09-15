@@ -1,7 +1,6 @@
 module Q = Quote
 module T = Tm
 module D = Domain
-module B = Desc.Boundary
 
 open Tm.Notation
 
@@ -183,7 +182,7 @@ let rec check_ cx ty rst tm =
       check_extension_cofibration xs @@ cofibration_of_sys cxx sys
     else
       ();
-    check_ext_sys cxx vcod sys
+    check_tm_sys cxx vcod sys
 
   | [], D.Univ univ, T.Restrict (tr, tr', oty) ->
     if univ.kind = `Pre then () else failwith "Co-restriction type is not known to be Kan";
@@ -209,10 +208,10 @@ let rec check_ cx ty rst tm =
   | [], D.Univ univ, T.Data dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     begin
-      if Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
-        ()
-      else
-        failwith "Universe level/kind error"
+      if not @@ Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
+        failwith "Universe level/kind error";
+      if desc.status = `Partial then
+        failwith "Partially declared datatype cannot not be treated as type"
     end
 
   | [], D.Data dlbl, T.Intro (dlbl', clbl, args) when dlbl = dlbl' ->
@@ -369,7 +368,7 @@ and check_constr cx dlbl constr tms =
       go cx' const_specs rec_specs dim_specs tms
     | _ -> failwith "constructor arguments malformed"
   in
-  go cx constr.const_specs constr.rec_specs constr.dim_specs tms
+  go cx (Desc.const_specs constr) (Desc.rec_specs constr) (Desc.dim_specs constr) tms
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
@@ -417,7 +416,7 @@ and check_boundary_face cx ty face el =
 
 
 
-and check_ext_sys cx ty sys =
+and check_tm_sys cx ty sys =
   let rec go sys acc =
     match sys with
     | [] ->
@@ -444,7 +443,7 @@ and check_ext_sys cx ty sys =
           go sys @@ (r0, r1, tm) :: acc
 
         | _, None ->
-          failwith "check_ext_sys"
+          failwith "check_tm_sys"
       end
 
   and go_adj cx faces face =
@@ -584,6 +583,9 @@ and infer_spine cx hd =
       in
 
       let desc = V.Sig.lookup_datatype info.dlbl in
+
+      if desc.status = `Partial then failwith "Cannot call eliminator on partially-defined datatype";
+
       let used_labels = Hashtbl.create 10 in
 
 
@@ -617,39 +619,45 @@ and infer_spine cx hd =
         in
         (* Need to extend the context once for each constr.params, and then twice for
            each constr.args (twice, because of i.h.). *)
-        let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) constr.const_specs constr.rec_specs constr.dim_specs in
+        let cx', benv, nms, cvs, rvs, ihvs, rs = build_cx cx V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) (Desc.const_specs constr) (Desc.rec_specs constr) (Desc.dim_specs constr) in
         let intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl ~const_args:cvs ~rec_args:rvs ~rs in
         let ty = V.inst_clo mot_clo intro in
 
-        let rec image_of_bterm phi =
-          function
-          | B.Intro intro as bterm ->
-            let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) nclos in
+        let rec image_of_bterm phi tm =
+          match Tm.unleash tm with
+          | Tm.Intro (dlbl, clbl, args) ->
+            let constr = Desc.lookup_constr clbl desc in
+            let const_args, args = ListUtil.split (List.length @@ Desc.const_specs constr) args in
+            let rec_args, rs = ListUtil.split (List.length @@ Desc.rec_specs constr) args in
+            let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl', _) -> clbl' = clbl) nclos in
             let rargs =
               List.flatten @@
               List.map
                 (fun bt ->
-                   let el = `Val (V.eval_bterm info.dlbl desc benv bterm) in
+                   let el = `Val (V.eval benv tm) in
                    let ih = `Val (image_of_bterm phi bt) in
                    [el; ih])
-                intro.rec_args
+                rec_args
             in
-            let cargs = List.map (fun t -> `Val (D.Value.act phi @@ V.eval benv t)) intro.const_args in
-            let dims = List.map (fun t -> `Dim (I.act phi @@ V.eval_dim benv t)) intro.rs in (* is this right ? *)
+            let cargs = List.map (fun t -> `Val (D.Value.act phi @@ V.eval benv t)) const_args in
+            let dims = List.map (fun t -> `Dim (I.act phi @@ V.eval_dim benv t)) rs in (* is this right ? *)
             let cells = cargs @ rargs @ dims in
             V.inst_nclo nclo cells
-          | B.Var ix ->
+          | Tm.Up (Tm.Ix (ix, _), Emp) ->
             (* This is so bad!! *)
             let ix' = ix - List.length rs in
             D.Value.act phi @@ Bwd.nth ihvs ix'
+          | _ ->
+            failwith "image_of_bterm"
 
         in
 
-        let image_of_bface (tr, tr', btm) =
+        let image_of_bface (tr, tr', otm) =
           let r = V.eval_dim benv tr in
           let r' = V.eval_dim benv tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
-          image_of_bterm phi btm
+          let tm = Option.get_exn otm in
+          image_of_bterm phi tm
         in
 
         let boundary = List.map image_of_bface constr.boundary in
@@ -819,53 +827,3 @@ and check_is_equivalence cx ~ty0 ~ty1 ~equiv =
   let (module V) = Cx.evaluator cx in
   let type_of_equiv = V.Macro.equiv ty0 ty1 in
   check cx type_of_equiv equiv
-
-let check_constr_boundary_sys cx dlbl desc sys =
-  let rec go sys acc =
-    match sys with
-    | [] ->
-      ()
-    | (tr0, tr1, tm) :: sys ->
-      let r0 = check_eval_dim cx tr0 in
-      let r1 = check_eval_dim cx tr1 in
-      begin
-        match I.compare r0 r1 with
-        | `Apart ->
-          go sys acc
-
-        | `Same | `Indet ->
-          begin
-            try
-              let cx', _ = Cx.restrict cx r0 r1 in
-              (* TODO: check boundary type *)
-              (* check cx' (D.Value.act phi ty) tm; *)
-
-              (* Check face-face adjacency conditions *)
-              go_adj cx' acc (r0, r1, tm)
-            with
-            | I.Inconsistent -> ()
-          end;
-          go sys @@ (r0, r1, tm) :: acc
-      end
-
-  and go_adj cx faces face =
-    match faces with
-    | [] -> ()
-    | (r'0, r'1, tm') :: faces ->
-      (* Invariant: cx should already be restricted by r0=r1 *)
-      let _r0, _r1, tm = face in
-      begin
-        try
-          let cx', _ = Cx.restrict cx r'0 r'1 in
-          let (module Q) = Cx.quoter cx' in
-          let (module V) = Cx.evaluator cx' in
-          let v = V.eval_bterm dlbl desc (Cx.env cx') tm in
-          let v' = V.eval_bterm dlbl desc (Cx.env cx') tm' in
-          (* let phi = I.cmp phi (I.equate r0 r1) in *)
-          Q.equiv_boundary_value (Cx.qenv cx') dlbl desc Desc.Self v v'
-        with
-        | I.Inconsistent -> ()
-      end;
-      go_adj cx faces face
-  in
-  go sys []

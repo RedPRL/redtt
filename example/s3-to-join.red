@@ -5,12 +5,12 @@ import isotoequiv
 
 data s3 where
 | base
-| cube @ i j k [∂[i j k] → base]
+| cube (i j k : dim) [∂[i j k] → base]
 
 data join where
-| inl [a : s1]
-| inr [b : s1]
-| push [a : s1] [b : s1] @ i [
+| inl (a : s1)
+| inr (b : s1)
+| push (a : s1) (b : s1) (i : dim) [
   | i=0 → inl a
   | i=1 → inr b
   ]

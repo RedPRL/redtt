@@ -6,33 +6,45 @@ type data_label = string
 type con_label = string
 
 
-module Boundary =
-struct
-  type 'a term =
-    | Var of int
-    | Intro of
-        { clbl : con_label;
-          const_args : 'a list;
-          rec_args : 'a term list;
-          rs : 'a list}
-    (* TODO: fhcom, lam, app *)
+type 'a face = 'a * 'a * 'a option
+type 'a system = 'a face list
 
-  type ('a, 'b) face = 'a * 'a * 'b
-  type ('a, 'b) sys = ('a, 'b) face list
-end
+type 'a arg_spec =
+  [ `Const of 'a
+  | `Rec of 'a rec_spec
+  | `Dim
+  ]
 
-type ('a, 'b) constr =
-  {const_specs : (string * 'a) list;
-   rec_specs : (string * 'a rec_spec) list;
-   dim_specs : string list;
-   boundary : ('a, 'b) Boundary.sys}
+
+type 'a constr =
+  {specs : (string * 'a arg_spec) list;
+   boundary : 'a system}
+
+
+let flip f x y = f y x
+
+let dim_specs constr =
+  List.flatten @@ flip List.map constr.specs @@ function
+  | (x, `Dim) -> [x]
+  | _ -> []
+
+let const_specs constr =
+  List.flatten @@ flip List.map constr.specs @@ function
+  | (x, `Const ty) -> [x, ty]
+  | _ -> []
+
+let rec_specs constr =
+  List.flatten @@ flip List.map constr.specs @@ function
+  | (x, `Rec ty) -> [x, ty]
+  | _ -> []
 
 
 (** A datatype description is just a list of named constructors. *)
-type ('a, 'b) desc =
+type 'a desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   constrs : (con_label * ('a, 'b) constr) list}
+   constrs : (con_label * 'a constr) list;
+   status : [`Complete | `Partial]}
 
 exception ConstructorNotFound of con_label
 
@@ -46,7 +58,7 @@ let lookup_constr lbl desc =
 
 let is_strict_set desc =
   let constr_is_point constr =
-    match constr.dim_specs with
+    match dim_specs constr with
     | [] -> true
     | _ -> false
   in

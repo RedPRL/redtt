@@ -3,7 +3,6 @@ open RedTT_Core
 open Dev open Bwd open BwdNotation
 
 module D = Domain
-module B = Desc.Boundary
 
 module M =
 struct
@@ -79,20 +78,27 @@ let guess_restricted tm goal =
 
 exception ChkMatch
 
+let bind_in_scope_ psi tm =
+  let go (x, param) =
+    match param with
+    | `P _ -> [x]
+    | `Def _ -> [x]
+    | `I -> [x]
+    | `Tick -> [x]
+    | `Tw _ -> []
+    | _ -> []
+  in
+  let xs = Bwd.flat_map go psi in
+  let Tm.NB (_, tm) = Tm.bindn xs tm in
+  tm
+
 let bind_in_scope tm =
+  M.lift C.ask <<@> fun psi -> bind_in_scope_ psi tm
+
+
+let bind_sys_in_scope sys =
   M.lift C.ask <<@> fun psi ->
-    let go (x, param) =
-      match param with
-      | `P _ -> [x]
-      | `Def _ -> [x]
-      | `I -> [x]
-      | `Tick -> [x]
-      | `Tw _ -> []
-      | _ -> []
-    in
-    let xs = Bwd.flat_map go psi in
-    let Tm.NB (_, tm) = Tm.bindn xs tm in
-    tm
+    Tm.map_tm_sys (bind_in_scope_ psi) sys
 
 let tac_wrap_nf tac goal =
   try tac goal
@@ -271,9 +277,9 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
         | _ ->
           let constr = Desc.lookup_constr lbl desc in
           let pbinds =
-            List.map (fun (nm, _) -> ESig.PVar nm) constr.const_specs
-            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.rec_specs
-            @ List.map (fun x -> ESig.PVar x) constr.dim_specs
+            List.map (fun (nm, _) -> ESig.PVar nm) (Desc.const_specs constr)
+            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) (Desc.rec_specs constr)
+            @ List.map (fun x -> ESig.PVar x) (Desc.dim_specs constr)
           in
           lbl, pbinds, fun goal ->
             M.lift C.ask >>= fun psi ->
@@ -342,7 +348,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           failwith "refine_clause"
       in
 
-      let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
+      let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds (Desc.const_specs constr) (Desc.rec_specs constr) (Desc.dim_specs constr) in
 
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
@@ -354,44 +360,50 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
         end >>= fun (cx, (module V), (module Q)) ->
 
 
-        let rec image_of_bterm phi =
-          function
-          | B.Intro intro as bterm ->
-            let nbnd : ty Tm.nbnd = snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) earlier_clauses in
+        let rec image_of_bterm phi tm =
+          match Tm.unleash tm with
+          | Tm.Intro (dlbl, clbl, args) ->
+            let constr = Desc.lookup_constr clbl desc in
+            let const_args, args = ListUtil.split (List.length @@ Desc.const_specs constr) args in
+            let rec_args, rs = ListUtil.split (List.length @@ Desc.rec_specs constr) args in
+            let nbnd : ty Tm.nbnd = snd @@ List.find (fun (clbl', _) -> clbl' = clbl) earlier_clauses in
             let nclo = D.NClo {nbnd; rho = Cx.env cx} in
-            let cargs = List.map (fun t -> `Val (V.eval benv t)) intro.const_args in
+            let cargs = List.map (fun t -> `Val (V.eval benv t)) const_args in
             let rargs =
               List.flatten @@
               List.map
                 (fun bt ->
-                   let el = `Val (V.eval_bterm dlbl desc benv bterm) in
+                   let el = `Val (V.eval benv tm) in
                    let ih = `Val (image_of_bterm phi bt) in
                    [el; ih])
-                intro.rec_args
+                rec_args
             in
-            let dims = List.map (fun t -> `Dim (V.eval_dim benv t)) intro.rs in
+            let dims = List.map (fun t -> `Dim (V.eval_dim benv t)) rs in
             let cells = cargs @ rargs @ dims in
             begin
               try
                 V.inst_nclo nclo cells
               with _ ->
-                Format.eprintf "%s@."  intro.clbl;
+                Format.eprintf "%s@."  clbl;
                 Format.eprintf "clo: @[%a@]@." D.pp_nclo nclo;
                 Format.eprintf "cells: @[%a@]@." (Pp.pp_list D.pp_env_cell) cells;
                 failwith "inst_clo"
             end
 
-          | B.Var ix ->
+          | Tm.Up (Tm.Ix (ix, _), Emp) ->
             let ix' = ix - List.length rs in
             V.eval_cmd benv @@ Tm.var @@ Bwd.nth ihs ix'
+
+          | _ -> failwith "image_of_bterm"
         in
 
-        let image_of_bface (tr, tr', btm) =
+        let image_of_bface (tr, tr', otm) =
           let env = Cx.env cx in
           let r = V.eval_dim benv tr in
           let r' = V.eval_dim benv tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
-          image_of_bterm phi btm
+          let tm = Option.get_exn otm in
+          image_of_bterm phi tm
         in
 
         (* What is the image of the boundary in the current fiber of the motive? *)
