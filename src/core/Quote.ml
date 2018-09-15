@@ -496,7 +496,7 @@ struct
               let v = generic qenv vty in
               let venv' = D.Env.snoc venv @@ `Val v in
               let qenv' = Env.succ qenv in
-              go qenv' venv (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
+              go qenv' venv' (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
             | (_, `Rec Desc.Self) :: specs ->
               let vty = D.make @@ D.Data dlbl in
