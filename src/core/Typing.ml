@@ -10,7 +10,6 @@ type cx = Cx.t
 
 open RedBasis
 open Bwd
-open BwdNotation
 
 type cofibration = (I.t * I.t) list
 
@@ -355,20 +354,38 @@ and check cx ty tm =
 
 and check_constr cx dlbl constr tms =
   let vdataty = D.make @@ D.Data dlbl in
-  let rec go cx' const_specs rec_specs dim_specs tms =
-    match const_specs, rec_specs, dim_specs, tms with
-    | [], rec_specs, dim_specs, _ ->
-      let tms, trs = ListUtil.split (List.length rec_specs) tms in
-      List.iter2 (fun (_, Desc.Self) tm -> check cx vdataty tm) rec_specs tms;
-      List.iter2 (fun _ tm -> check_dim cx tm) dim_specs trs;
-    | (plbl, ty) :: const_specs, rec_specs, dim_specs, tm :: tms ->
-      let vty = Cx.eval cx' ty in
+  let (module V) = Cx.evaluator (Cx.clear_locals cx) in
+
+  let rec go cx tyenv specs tms =
+    match specs, tms with
+    | (lbl, `Const ty) :: specs, tm :: tms ->
+      let vty = V.eval tyenv ty in
       let varg = check_eval cx vty tm in
-      let cx' = Cx.def cx ~nm:(Some plbl) ~ty:vty ~el:varg in
-      go cx' const_specs rec_specs dim_specs tms
-    | _ -> failwith "constructor arguments malformed"
+      let cx = Cx.def cx ~nm:(Some lbl) ~ty:vty ~el:varg in
+      let tyenv = D.Env.snoc tyenv @@ `Val varg in
+      go cx tyenv specs tms
+
+    | (lbl, `Rec Desc.Self) :: specs, tm :: tms ->
+      let varg = check_eval cx vdataty tm in
+      let cx = Cx.def cx ~nm:(Some lbl) ~ty:vdataty ~el:varg in
+      let tyenv = D.Env.snoc tyenv @@ `Val varg in
+      go cx tyenv specs tms
+
+    | (lbl, `Dim) :: specs, tm :: tms ->
+      let r = check_eval_dim cx tm in
+      let cx = Cx.def_dim cx ~nm:(Some lbl) r in
+      let tyenv = D.Env.snoc tyenv @@ `Dim r in
+      go cx tyenv specs tms
+
+    | [], [] ->
+      ()
+
+    | _ ->
+      failwith "check_constr: mismatch"
+
   in
-  go cx (Desc.const_specs constr) (Desc.rec_specs constr) (Desc.dim_specs constr) tms
+
+  go cx V.empty_env constr.specs tms
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
@@ -590,10 +607,9 @@ and infer_spine cx hd =
 
 
       let check_clause nclos lbl constr =
-        let open Desc in
         if Hashtbl.mem used_labels lbl then failwith "Duplicate case in eliminator";
         Hashtbl.add used_labels lbl ();
-
+        (*
         let _, Tm.NB (_, bdy) = List.find (fun (lbl', _) -> lbl = lbl') info.clauses in
 
         (* Please clean up this horrible code. *)
@@ -662,7 +678,9 @@ and infer_spine cx hd =
 
         let boundary = List.map image_of_bface constr.boundary in
         check_ cx' ty boundary bdy;
-        Tm.NB (nms, bdy)
+        Tm.NB (nms, bdy) *)
+
+        failwith "TODO/HIT"
       in
 
       let rec check_clauses acc constrs =
