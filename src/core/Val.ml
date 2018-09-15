@@ -853,7 +853,8 @@ struct
               in
               let face1 =
                 AbsFace.make phi (I.act phi r') `Dim1 @@ fun phi ->
-                Abs.make1 @@ fun _ -> Value.act phi el in
+                Abs.make1 @@ fun _ -> Value.act phi el
+              in
               [face0; face1]
             in
             make_hcom (Dir.make `Dim1 (`Atom y)) ty cap msys
@@ -928,7 +929,7 @@ struct
             AbsFace.make I.idn r' `Dim0 @@ fun phi ->
             Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) [`Atom w]
           in
-          let el1 = make_hcom (Dir.make `Dim1 `Dim0) info.ty1 (base I.idn r r') @@
+          let el1 = make_hcom (Dir.make `Dim1 r') info.ty1 (base I.idn r r') @@
             force_abs_sys [face0; face1; face_diag; face_front]
           in
           make_vin I.idn r' el0 el1
