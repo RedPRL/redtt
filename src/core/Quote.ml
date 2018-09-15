@@ -75,15 +75,6 @@ sig
   val subtype : env -> value -> value -> unit
 
   val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit
-
-  val equiv_boundary_value
-    : env
-    -> Desc.data_label
-    -> Tm.data_desc
-    -> Tm.tm Desc.rec_spec
-    -> value
-    -> value
-    -> unit
 end
 
 
@@ -886,41 +877,5 @@ struct
         Format.eprintf "Unexpected error in subtyping: %s@." (Printexc.to_string exn);
         raise exn
     end
-
-
-  let rec equate_boundary_value env (dlbl, desc) rec_spec el0 el1 =
-    match rec_spec with
-    | Desc.Self ->
-      begin
-        match unleash el0, unleash el1 with
-        | D.Intro info0, D.Intro info1 when info0.clbl = info1.clbl ->
-          let constr = Desc.lookup_constr info0.clbl desc in
-          let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
-          let rec_args =
-            ListUtil.map3
-              (fun (_, spec) -> equate_boundary_value env (dlbl, desc) spec)
-              (Desc.rec_specs constr)
-              info0.rec_args
-              info1.rec_args
-          in
-          let rs = equate_dims env info0.rs info1.rs in
-          Tm.make @@ Tm.Intro (dlbl, info0.clbl, const_args @ rec_args @ rs)
-        | D.Up info0, D.Up info1 ->
-          equate_boundary_neu env info0.neu info1.neu
-        | _ ->
-          failwith "equate_boundary_value"
-      end
-
-  and equate_boundary_neu env neu0 neu1 =
-    match neu0, neu1 with
-    | D.Lvl (_, lvl0), D.Lvl (_, lvl1) when lvl0 = lvl1 ->
-      let ix = Env.ix_of_lvl lvl0 env in
-      Tm.up @@ Tm.ix ix
-    | _ ->
-      failwith "equate_boundary_neu"
-
-
-  let equiv_boundary_value env dlbl desc rec_spec el0 el1 =
-    ignore @@ equate_boundary_value env (dlbl, desc) rec_spec el0 el1
 
 end

@@ -38,14 +38,6 @@ sig
 
   val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit
 
-  val equiv_boundary_value
-    : env
-    -> Desc.data_label
-    -> Tm.data_desc
-    -> Tm.tm Desc.rec_spec
-    -> value
-    -> value
-    -> unit
 end
 
 module M (V : Val.S) : S
