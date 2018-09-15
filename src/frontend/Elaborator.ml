@@ -194,7 +194,6 @@ struct
         M.in_scopes psi @@
         begin
           let data_ty = Tm.make @@ Tm.Data dlbl in
-          let foo : (E.eterm, E.eterm) Tm.system = constr.boundary in
           elab_tm_sys data_ty @@ List.map (fun (r, r', otm) -> [r,r'], Option.get_exn otm) constr.boundary >>= bind_sys_in_scope >>= fun boundary ->
           M.ret
             (clbl,
