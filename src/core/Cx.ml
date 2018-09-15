@@ -194,6 +194,10 @@ let check_eq_ty cx el0 el1 =
   let (module Q) = quoter cx in
   Q.equiv_ty cx.qenv el0 el1
 
+let check_eq_dim cx r0 r1 =
+  let (module Q) = quoter cx in
+  Q.equiv_dim cx.qenv r0 r1
+
 let check_subtype cx ty0 ty1 =
   let (module Q) = quoter cx in
   Q.subtype cx.qenv ty0 ty1

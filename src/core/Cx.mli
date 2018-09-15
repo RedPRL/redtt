@@ -50,6 +50,7 @@ val quote : t -> ty:value -> value -> Tm.tm
 val quote_ty : t -> value -> Tm.tm
 val quote_dim : t -> I.t -> Tm.tm
 val check_eq_ty : t -> value -> value -> unit
+val check_eq_dim : t -> I.t -> I.t -> unit
 
 val evaluator : t -> (module Val.S)
 val quoter : t -> (module Quote.S)

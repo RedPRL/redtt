@@ -34,6 +34,7 @@ sig
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
+  val equiv_dim : env -> I.t -> I.t -> unit
   val subtype : env -> value -> value -> unit
 
   val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit

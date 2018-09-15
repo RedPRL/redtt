@@ -17,6 +17,7 @@ type cofibration = (I.t * I.t) list
 type error =
   | ExpectedDimension of cx * Tm.tm
   | ExpectedTick of cx * Tm.tm
+  | UnequalDimensions of I.t * I.t
 
 exception E of error
 
@@ -35,6 +36,10 @@ struct
       Format.fprintf fmt
         "Expected tick, but got %a."
         (Tm.pp (Cx.ppenv cx)) tm
+    | UnequalDimensions (i0, i1) ->
+      Format.fprintf fmt
+        "Unequal dimensions: %a /= %a"
+        I.pp i0 I.pp i1
 
 end
 
