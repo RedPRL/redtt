@@ -1,13 +1,10 @@
 open RedBasis
 open Bwd
-open BwdNotation
 open Domain
 
 include ValSig
 
 let flip f x y = f y x
-
-exception StrictHComEncounteredNonConstructor
 
 
 type error =
@@ -970,57 +967,6 @@ struct
       let err = RigidCoeUnexpectedArgument abs in
       raise @@ E err
 
-  (* presupposes no dimension arguments *)
-  and rigid_hcom_strict_data dir ty cap sys =
-    match unleash ty, unleash cap with
-    | Data dlbl, Intro info ->
-      let peel_arg k el =
-        match unleash el with
-        | Intro info' ->
-          List.nth (info'.const_args @ info'.rec_args) k
-        | Up _ ->
-          raise StrictHComEncounteredNonConstructor
-        | _ ->
-          Format.eprintf "Very bad: %a@." pp_value el;
-          failwith "rigid_hcom_strict_data: peel_arg"
-      in
-
-      let peel_face k =
-        Face.map @@ fun _ _ ->
-        Abs.unsafe_map (peel_arg k)
-      in
-
-      let peel_sys k sys = List.map (peel_face k) sys in
-
-      let rec make_args i acc cvs rvs const_specs rec_specs =
-        match cvs, rvs, const_specs, rec_specs with
-        | el :: cvs, _, _ :: const_specs, _ ->
-          make_args (i + 1) (acc #< el) cvs rvs const_specs rec_specs
-        | [], el :: rvs, [], (_, Desc.Self) :: rec_specs ->
-          let hcom = rigid_hcom dir ty el (peel_sys i sys) in
-          make_args (i + 1) (acc #< hcom) cvs rvs const_specs rec_specs
-        | [], [], [], []->
-          Bwd.to_list acc
-        | _ ->
-          failwith "rigid_hcom_strict_data"
-      in
-
-      let desc = Sig.lookup_datatype dlbl in
-      let constr = Desc.lookup_constr info.clbl desc in
-
-      let const_specs = Desc.const_specs constr in
-
-      let args' = make_args 0 Emp info.const_args info.rec_args const_specs (Desc.rec_specs constr) in
-      let const_args, rec_args = ListUtil.split (List.length const_specs) args' in
-
-      make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
-
-    | _, Up info ->
-      rigid_nhcom_up_at_cap dir info.ty info.neu ~comp_sys:sys ~rst_sys:info.sys
-
-    | _ ->
-      raise @@ E (RigidHComUnexpectedArgument cap)
-
 
   and rigid_nhcom_up_at_type dir univ ty cap ~comp_sys ~rst_sys =
     let neu = NHComAtType {dir; univ; ty; cap; sys = comp_sys} in
@@ -1099,18 +1045,6 @@ struct
     | Data dlbl ->
       (* It's too expensive to determine in advance if the system has constructors in all faces, so we just disable strict composition for now. *)
       make @@ FHCom {dir; cap; sys}
-
-    (* Note, that the following code looks like it would work, but it doesn't. The problem is that the exception gets thrown in a recursive call that is underneath a thunk,
-       so it is never caught. Generally, backtracking is not something we would support during evaluation. *)
-
-    (* let desc = Sig.lookup_datatype dlbl in
-       if Desc.is_strict_set desc then
-       try rigid_hcom_strict_data dir ty cap sys
-       with
-       | StrictHComEncounteredNonConstructor ->
-        make @@ FHCom {dir; cap; sys}
-       else
-       make @@ FHCom {dir; cap; sys} *)
 
     | Univ _ ->
       rigid_fhcom dir cap sys
