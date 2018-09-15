@@ -359,7 +359,6 @@ struct
         raise @@ E err
 
   and equate_constr_const_args env constr els0 els1 =
-    let open Desc in
     let rec go acc venv const_specs els0 els1 =
       match const_specs, els0, els1 with
       | [], [], [] ->
@@ -371,13 +370,13 @@ struct
       | _ ->
         failwith "equate_constr_args"
     in
-    go Emp empty_env constr.const_specs els0 els1
+    go Emp empty_env (Desc.const_specs constr) els0 els1
 
   and equate_constr_rec_args env dlbl constr els0 els1 =
     let open Desc in
     (* TODO: factor out *)
     let realize_spec_ty Self = D.make @@ D.Data dlbl in
-    ListUtil.map3 (fun (_, spec_ty) -> equate env @@ realize_spec_ty spec_ty) constr.rec_specs els0 els1
+    ListUtil.map3 (fun (_, spec_ty) -> equate env @@ realize_spec_ty spec_ty) (Desc.rec_specs constr) els0 els1
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
@@ -514,7 +513,7 @@ struct
               | [], [], [] ->
                 qenv, Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
             in
-            build_cx env empty_env (Emp, Emp, Emp) Emp constr.const_specs constr.rec_specs constr.dim_specs
+            build_cx env empty_env (Emp, Emp, Emp) Emp (Desc.const_specs constr) (Desc.rec_specs constr) (Desc.dim_specs constr)
           in
           let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
           let bdy0 = inst_nclo clause0 cells in
@@ -900,7 +899,7 @@ struct
           let rec_args =
             ListUtil.map3
               (fun (_, spec) -> equate_boundary_value env (dlbl, desc) spec)
-              constr.rec_specs
+              (Desc.rec_specs constr)
               info0.rec_args
               info1.rec_args
           in

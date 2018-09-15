@@ -5,7 +5,7 @@ import univalence
 
 data s1 where
 | base
-| loop @ i [∂[i] → base]
+| loop (i : dim) [∂[i] → base]
 
 let rotate/loop : (a : s1) → path _ a a =
   λ [

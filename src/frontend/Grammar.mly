@@ -66,14 +66,13 @@ edecl:
   | DATA; dlbl = ATOM;
     univ_spec = option(preceded(COLON, univ_spec));
     WHERE; option(PIPE);
-    constrs = separated_list(PIPE, desc_constr)
-    { let desc = List.map (fun constr -> constr dlbl) constrs in
-      let kind, lvl =
+    constrs = separated_list(PIPE, econstr)
+    { let kind, lvl =
         match univ_spec with
         | Some (k, l) -> k, l
         | None -> `Kan, `Const 0
       in
-      E.Data (dlbl, {constrs = desc; kind; lvl; status = `Complete}) }
+      E.Data (dlbl, E.EDesc {constrs; kind; lvl}) }
 
   | IMPORT; a = ATOM
     { E.Import a }
@@ -309,40 +308,11 @@ etele_cell:
     { [`Tick "_"] }
 
 
-desc_constr:
+econstr:
 | clbl = ATOM;
-  const_specs = loption(nonempty_list(desc_const_spec));
-  rec_specs = loption(nonempty_list(desc_rec_spec));
-  extent = desc_extent
-  { fun dlbl ->
-    let dim_specs, boundary = extent in
-    let boundary =
-      List.flatten @@
-        List.map
-          (fun (phi, e) -> List.map (fun (r, r') -> r, r', Some e) phi)
-          boundary
-    in
-    clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dim_specs; boundary} }
-
-desc_extent:
-  | AT;
-    dims = list(ATOM);
-    boundary = pipe_block(eface)
-    { dims, boundary }
-  | { [], [] }
-
-
-
-%inline
-desc_rec_spec:
-| LPR; x = ATOM; COLON; self = ATOM; RPR
-  { fun name ->
-      if name = self then (x, Desc.Self) else failwith ("Expected " ^ name ^ " but got " ^ self)}
-
-%inline
-desc_const_spec:
-| LSQ; x = ATOM; COLON; ty = located(econ); RSQ
-  { x, ty }
+  specs = list(etele_cell)
+  boundary = loption(pipe_block(eface))
+  { clbl, E.EConstr {specs = List.flatten specs; boundary} }
 
 
 

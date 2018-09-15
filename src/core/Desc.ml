@@ -9,11 +9,34 @@ type con_label = string
 type 'a face = 'a * 'a * 'a option
 type 'a system = 'a face list
 
+type 'a arg_spec =
+  [ `Const of 'a
+  | `Rec of 'a rec_spec
+  | `Dim
+  ]
+
+
 type 'a constr =
-  {const_specs : (string * 'a) list;
-   rec_specs : (string * 'a rec_spec) list;
-   dim_specs : string list;
+  {specs : (string * 'a arg_spec) list;
    boundary : 'a system}
+
+
+let flip f x y = f y x
+
+let dim_specs constr =
+  List.flatten @@ flip List.map constr.specs @@ function
+  | (x, `Dim) -> [x]
+  | _ -> []
+
+let const_specs constr =
+  List.flatten @@ flip List.map constr.specs @@ function
+  | (x, `Const ty) -> [x, ty]
+  | _ -> []
+
+let rec_specs constr =
+  List.flatten @@ flip List.map constr.specs @@ function
+  | (x, `Rec ty) -> [x, ty]
+  | _ -> []
 
 
 (** A datatype description is just a list of named constructors. *)
@@ -35,7 +58,7 @@ let lookup_constr lbl desc =
 
 let is_strict_set desc =
   let constr_is_point constr =
-    match constr.dim_specs with
+    match dim_specs constr with
     | [] -> true
     | _ -> false
   in

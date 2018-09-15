@@ -569,7 +569,7 @@ struct
     let r, r' = Dir.unleash dir in
 
     let make_const_args dir =
-      multi_coe empty_env dir (x, constr.const_specs) const_args
+      multi_coe empty_env dir (x, Desc.const_specs constr) const_args
     in
 
     let coe_rec_arg dir _arg_spec arg =
@@ -578,7 +578,7 @@ struct
       make_coe dir abs arg
     in
 
-    let make_rec_args dir = List.map2 (coe_rec_arg dir) constr.rec_specs rec_args in
+    let make_rec_args dir = List.map2 (coe_rec_arg dir) (Desc.rec_specs constr) rec_args in
     let intro =
       make_intro empty_env ~dlbl ~clbl
         ~const_args:(make_const_args (`Ok dir))
@@ -1008,8 +1008,10 @@ struct
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr info.clbl desc in
 
-      let args' = make_args 0 Emp info.const_args info.rec_args constr.const_specs constr.rec_specs in
-      let const_args, rec_args = ListUtil.split (List.length constr.const_specs) args' in
+      let const_specs = Desc.const_specs constr in
+
+      let args' = make_args 0 Emp info.const_args info.rec_args const_specs (Desc.rec_specs constr) in
+      let const_args, rec_args = ListUtil.split (List.length const_specs) args' in
 
       make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs = []; sys = []}
 
@@ -1444,8 +1446,8 @@ struct
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr clbl desc in
-      let tconst_args, args = ListUtil.split (List.length constr.const_specs) args in
-      let trec_args, trs = ListUtil.split (List.length constr.rec_specs) args in
+      let tconst_args, args = ListUtil.split (List.length @@ Desc.const_specs constr) args in
+      let trec_args, trs = ListUtil.split (List.length @@ Desc.rec_specs constr) args in
       let const_args = List.map (eval rho) tconst_args in
       let rec_args = List.map (eval rho) trec_args in
       let rs = List.map (eval_dim rho) trs in

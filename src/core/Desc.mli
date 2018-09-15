@@ -10,16 +10,20 @@ type con_label = string
 type 'a face = 'a * 'a * 'a option
 type 'a system = 'a face list
 
-(** A data constructor is a list of parameters (non-recursive arguments) and recursive arguments,
-    and dimensions.
+type 'a arg_spec =
+  [ `Const of 'a
+  | `Rec of 'a rec_spec
+  | `Dim
+  ]
 
-    When we generalized to indexed inductive types, the parameters will become {e bound} in the
-    arguments. TODO: rename [args] to [rec_args]. *)
+
 type 'a constr =
-  {const_specs : (string * 'a) list;
-   rec_specs : (string * 'a rec_spec) list;
-   dim_specs : string list;
+  {specs : (string * 'a arg_spec) list;
    boundary : 'a system}
+
+val dim_specs : 'a constr -> string list
+val const_specs : 'a constr -> (string * 'a) list
+val rec_specs : 'a constr -> (string * 'a rec_spec) list
 
 
 (** A datatype description is just a list of named constructors. *)

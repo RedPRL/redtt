@@ -4,7 +4,7 @@ import univalence
 
 data s2 where
 | base
-| surf @ i j [∂[i j] → base]
+| surf (i j : dim) [∂[i j] → base]
 
 let hopf : s2 → type =
   λ [

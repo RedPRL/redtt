@@ -277,9 +277,9 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
         | _ ->
           let constr = Desc.lookup_constr lbl desc in
           let pbinds =
-            List.map (fun (nm, _) -> ESig.PVar nm) constr.const_specs
-            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.rec_specs
-            @ List.map (fun x -> ESig.PVar x) constr.dim_specs
+            List.map (fun (nm, _) -> ESig.PVar nm) (Desc.const_specs constr)
+            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) (Desc.rec_specs constr)
+            @ List.map (fun x -> ESig.PVar x) (Desc.dim_specs constr)
           in
           lbl, pbinds, fun goal ->
             M.lift C.ask >>= fun psi ->
@@ -348,7 +348,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           failwith "refine_clause"
       in
 
-      let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
+      let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds (Desc.const_specs constr) (Desc.rec_specs constr) (Desc.dim_specs constr) in
 
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
       let clause_ty = mot intro in
@@ -364,8 +364,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           match Tm.unleash tm with
           | Tm.Intro (dlbl, clbl, args) ->
             let constr = Desc.lookup_constr clbl desc in
-            let const_args, args = ListUtil.split (List.length constr.const_specs) args in
-            let rec_args, rs = ListUtil.split (List.length constr.rec_specs) args in
+            let const_args, args = ListUtil.split (List.length @@ Desc.const_specs constr) args in
+            let rec_args, rs = ListUtil.split (List.length @@ Desc.rec_specs constr) args in
             let nbnd : ty Tm.nbnd = snd @@ List.find (fun (clbl', _) -> clbl' = clbl) earlier_clauses in
             let nclo = D.NClo {nbnd; rho = Cx.env cx} in
             let cargs = List.map (fun t -> `Val (V.eval benv t)) const_args in
