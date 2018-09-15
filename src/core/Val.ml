@@ -357,10 +357,8 @@ struct
       begin
         match force_val_sys @@ ValSys.act phi @@ ValSys.from_rigid info.sys with
         | `Ok sys ->
-          let const_args = List.map (Value.act phi) info.const_args in
-          let rec_args = List.map (Value.act phi) info.rec_args in
-          let rs = List.map (I.act phi) info.rs in
-          make @@ Intro {info with const_args; rec_args; rs; sys}
+          let args = List.map (Env.act_env_el phi) info.args in
+          make @@ Intro {info with args}
         | `Proj v ->
           v
       end
@@ -534,67 +532,48 @@ struct
     make @@ Up {ty; neu = ncoe; sys = ncoe_sys}
 
   (* TODO: check that this is right *)
-  and rigid_multi_coe env dir (x, const_specs) args =
-    match const_specs, args with
+  and rigid_multi_coe env data_abs dir (x, specs) args =
+    match specs, args with
     | [], [] ->
       []
-    | (_, spec) :: const_specs, arg :: args ->
+    | (_, `Const spec) :: specs, `Val arg :: args ->
       let vty = eval env spec in
       let r, r' = Dir.unleash dir in
       let coe_hd s = make_coe (Dir.make r s) (Abs.bind1 x vty) arg in
       let coe_tl =
         let coe_hd_x = coe_hd @@ `Atom x in
-        rigid_multi_coe (Env.snoc env @@ `Val coe_hd_x) dir (x, const_specs) args
+        rigid_multi_coe (Env.snoc env @@ `Val coe_hd_x) data_abs dir (x, specs) args
       in
-      coe_hd r' :: coe_tl
+      `Val (coe_hd r') :: coe_tl
     | _ ->
       failwith "rigid_multi_coe: length mismatch"
 
-  and multi_coe env mdir (x, const_specs) args =
+  and multi_coe env data_abs mdir (x, specs) args =
     match mdir with
     | `Ok dir ->
-      rigid_multi_coe env dir (x, const_specs) args
+      rigid_multi_coe env data_abs dir (x, specs) args
     | `Same _ ->
       args
 
   (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
-  and rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl ~const_args ~rec_args ~rs =
+  and rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl args =
     let x = Name.fresh () in
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
 
     let r, r' = Dir.unleash dir in
 
-    let make_const_args dir =
-      multi_coe empty_env dir (x, Desc.const_specs constr) const_args
-    in
-
-    let coe_rec_arg dir _arg_spec arg =
-      (* TODO: when we add more recursive argument types, please fix!!! Change this to coerce in the
-         realization of the "argument spec". *)
-      make_coe dir abs arg
-    in
-
-    let make_rec_args dir = List.map2 (coe_rec_arg dir) (Desc.rec_specs constr) rec_args in
-    let intro =
-      make_intro empty_env ~dlbl ~clbl
-        ~const_args:(make_const_args (`Ok dir))
-        ~rec_args:(make_rec_args (`Ok dir))
-        ~rs
-    in
+    let args_in_dir dir = multi_coe empty_env abs dir (x, constr.specs) args in
+    let intro = make_intro empty_env ~dlbl ~clbl @@ args_in_dir @@ `Ok dir in
 
     begin
       match constr.boundary with
       | [] ->
         intro
       | _ ->
-        (* My lord, I have no idea if this is right. ouch!! *)
         let faces =
-          eval_bterm_boundary dlbl desc empty_env
-            ~const_args:(make_const_args @@ Dir.make r (`Atom x))
-            ~rec_args:(make_rec_args @@ Dir.make r (`Atom x))
-            ~rs
-            constr.boundary
+          let rho = Env.append empty_env @@ args_in_dir @@ Dir.make r (`Atom x) in
+          eval_tm_sys rho constr.boundary
         in
         let fix_face =
           Face.map @@ fun _ _ el ->
@@ -608,7 +587,7 @@ struct
     let _, tyx = Abs.unsafe_unleash abs in
     match unleash tyx, unleash el with
     | Data dlbl, Intro info ->
-      rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl:info.clbl ~const_args:info.const_args ~rec_args:info.rec_args ~rs:info.rs
+      rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl:info.clbl info.args
 
     | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
@@ -1380,20 +1359,28 @@ struct
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr clbl desc in
-      let tconst_args, args = ListUtil.split (List.length @@ Desc.const_specs constr) args in
-      let trec_args, trs = ListUtil.split (List.length @@ Desc.rec_specs constr) args in
-      let const_args = List.map (eval rho) tconst_args in
-      let rec_args = List.map (eval rho) trec_args in
-      let rs = List.map (eval_dim rho) trs in
-      make_intro (Env.clear_locals rho) ~dlbl ~clbl ~const_args ~rec_args ~rs
+      let rec go args specs =
+        match args, specs with
+        | arg :: args, (_, (`Const _ | `Rec _)) :: specs ->
+          let v = eval rho arg in
+          `Val v :: go args specs
+        | arg :: args, (_, `Dim) :: specs ->
+          let r = eval_dim rho arg in
+          `Dim r :: go args specs
+        | [], [] ->
+          []
+        | _ ->
+          failwith "eval/intro: length mismatch"
+      in
+      make_intro (Env.clear_locals rho) ~dlbl ~clbl @@ go args constr.specs
 
-  and make_intro rho ~dlbl ~clbl ~const_args ~rec_args ~rs =
+  and make_intro rho ~dlbl ~clbl (args : env_el list) : value =
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
-    let sys = eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs constr.boundary in
+    let sys = eval_tm_sys (Env.append rho args) constr.boundary in
     match force_val_sys sys with
     | `Ok sys ->
-      make @@ Intro {dlbl; clbl; const_args; rec_args; rs; sys}
+      make @@ Intro {dlbl; clbl; args; sys}
     | `Proj v ->
       v
 
@@ -2004,20 +1991,25 @@ struct
     | Intro info ->
       let nclo = find_clause info.clbl in
 
-      (* Clean this up with some kind of a state type for the traversal maybe. Barf! *)
-      let rec go cvs rvs rs =
-        match cvs, rvs, rs with
-        | v :: cvs, _, _->
-          `Val v :: go cvs rvs rs
-        | [], v :: rvs, _ ->
+      let desc = Sig.lookup_datatype dlbl in
+      let constr = Desc.lookup_constr info.clbl desc in
+
+      let rec go args specs =
+        match args, specs with
+        | cell :: args , (_, `Const _) :: specs ->
+          cell :: go args specs
+        | `Val v :: args, (_, `Rec _) :: specs ->
           let v_ih = elim_data dlbl ~mot ~scrut:v ~clauses in
-          `Val v :: `Val v_ih :: go cvs rvs rs
-        | [], [], r :: rs ->
-          `Dim r :: go cvs rvs rs
-        | [], [], [] ->
+          `Val v :: `Val v_ih :: go args specs
+        | cell :: args, (_, `Dim) :: specs ->
+          cell :: go args specs
+        | [], [] ->
           []
+        | _ ->
+          failwith "elim_data: length mismatch"
       in
-      inst_nclo nclo @@ go info.const_args info.rec_args info.rs
+
+      inst_nclo nclo @@ go info.args constr.specs
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in
