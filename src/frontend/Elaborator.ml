@@ -184,13 +184,12 @@ struct
       function
       | [] ->
         let const_specs = abstract_tele Emp @@ Bwd.to_list acc in
-        (* TODO: when self args are more complex, we'll need to abstract them over
-           the parameters too. *)
         traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
 
         let psi =
-          List.map (fun (nm, ty) -> (Name.named @@ Some nm, `P data_ty)) rec_specs
-          @ List.map (fun nm -> (Name.named @@ Some nm, `I)) constr.dim_specs
+          List.map (fun (nm, ty) -> Name.named @@ Some nm, `P ty) const_specs
+          @ List.map (fun (nm, ty) -> Name.named @@ Some nm, `P data_ty) rec_specs
+          @ List.map (fun nm -> Name.named @@ Some nm, `I) constr.dim_specs
         in
         M.in_scopes psi @@
         begin
