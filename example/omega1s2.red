@@ -11,7 +11,7 @@ import s2
 -- loop space of s2
 data os2 where
 | obase
-| oloop (y : os2) @ i [∂[i] → y]
+| oloop (y : os2) (i : dim) [∂[i] → y]
 
 -- I. the loop of automorphisms of os2
 

@@ -141,7 +141,7 @@ struct
     | E.Quit ->
       M.ret ()
 
-  and elab_datatype dlbl edesc =
+  and elab_datatype dlbl (E.EDesc edesc) =
     let rec go tdesc =
       function
       | [] ->
@@ -155,7 +155,7 @@ struct
         go tdesc econstrs
     in
 
-    let tdesc = Desc.{edesc with constrs = []; status = `Partial} in
+    let tdesc = Desc.{constrs = []; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
     M.lift @@ C.declare_datatype dlbl tdesc >>= fun _ ->
     match edesc.kind with
     | `Reg ->
@@ -163,7 +163,7 @@ struct
     | _ ->
       go tdesc edesc.constrs
 
-  and elab_constr dlbl desc (clbl, constr) =
+  and elab_constr dlbl desc (clbl, E.EConstr econstr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
       failwith "Duplicate constructor in datatype";
 
@@ -175,44 +175,48 @@ struct
     let rec abstract_tele xs (ps : _ list) =
       match ps with
       | [] -> []
-      | (lbl, x, p) :: ps ->
+      | (lbl, x, `Const p) :: ps ->
         let Tm.NB (_, p') = Tm.bindn xs p in
-        (lbl, p') :: abstract_tele (xs #< x) ps
+        (lbl, `Const p') :: abstract_tele (xs #< x) ps
+      | (lbl, x, `Rec p) :: ps ->
+        (* TODO: update, when we add more recursive argument types *)
+        (lbl, `Rec p) :: abstract_tele (xs #< x) ps
+      | (lbl, x, `Dim) :: ps ->
+        (lbl, `Dim) :: abstract_tele (xs #< x) ps
     in
+
 
     let rec go acc =
       function
       | [] ->
-        let const_specs = abstract_tele Emp @@ Bwd.to_list acc in
-        traverse elab_rec_spec constr.rec_specs >>= fun rec_specs ->
+        let specs = abstract_tele Emp @@ Bwd.to_list acc in
+        elab_tm_sys data_ty econstr.boundary >>= bind_sys_in_scope >>= fun boundary ->
+        let constr = Desc.{specs; boundary} in
+        M.ret (clbl, constr)
 
-        let psi =
-          List.map (fun (nm, ty) -> Name.named @@ Some nm, `P ty) const_specs
-          @ List.map (fun (nm, ty) -> Name.named @@ Some nm, `P data_ty) rec_specs
-          @ List.map (fun nm -> Name.named @@ Some nm, `I) constr.dim_specs
-        in
-        M.in_scopes psi @@
+      | `Ty (nm, ety) :: args ->
         begin
-          let data_ty = Tm.make @@ Tm.Data dlbl in
-          elab_tm_sys data_ty @@ List.map (fun (r, r', otm) -> [r,r'], Option.get_exn otm) constr.boundary >>= bind_sys_in_scope >>= fun boundary ->
-          M.ret
-            (clbl,
-             {const_specs = abstract_tele Emp @@ Bwd.to_list acc;
-              rec_specs;
-              dim_specs = constr.dim_specs;
-              boundary})
+          match E.(ety.con) with
+          | E.Var var when var.name = dlbl ->
+            let x = Name.named @@ Some nm in
+            M.in_scope x (`P data_ty) @@ go (acc #< (nm, x, `Rec Self)) args
+
+          | _ ->
+            let x = Name.named @@ Some nm in
+            let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
+            elab_chk ety {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
+            M.in_scope x (`P pty) @@ go (acc #< (nm, x, `Const pty)) args
         end
 
-      | (lbl, ety) :: const_specs ->
-        (* TODO: support higher universes *)
-        let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
-        elab_chk ety {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
-        let x = Name.named @@ Some lbl in
-        M.in_scope x (`P pty) @@
-        go (acc #< (lbl, x, pty)) const_specs
+      | `I nm :: args ->
+        let x = Name.named @@ Some nm in
+        M.in_scope x `I @@ go (acc #< (nm, x, `Dim)) args
+
+      | `Tick _ :: args ->
+        failwith "Tick in HIT constructor argument not yet supported"
     in
 
-    go Emp constr.const_specs
+    go Emp @@ econstr.specs
 
   and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =
     let cells, ecod = sch in
@@ -790,8 +794,8 @@ struct
       | _ ->
         failwith "todo: go_args"
     in
-    go_const_args [] constr.const_specs @@ Bwd.to_list frms >>= fun (tps, frms) ->
-    go_rec_args constr.rec_specs constr.dim_specs frms >>= fun targs ->
+    go_const_args [] (Desc.const_specs constr) @@ Bwd.to_list frms >>= fun (tps, frms) ->
+    go_rec_args (Desc.rec_specs constr) (Desc.dim_specs constr) frms >>= fun targs ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
 
   and elab_mode_switch_cut exp frms ty =
