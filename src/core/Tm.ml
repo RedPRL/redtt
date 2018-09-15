@@ -64,11 +64,7 @@ struct
 end
 
 type tm = Tm of {con : tm tmf; info : Info.t}
-
-type btm = tm Desc.Boundary.term
-type bface = (tm, btm) Desc.Boundary.face
-type bsys = (tm, btm) Desc.Boundary.sys
-type data_desc = (tm, btm) Desc.desc
+type data_desc = tm Desc.desc
 
 type 'a subst =
   | Shift of int
@@ -1586,14 +1582,6 @@ let rec shift_univ k tm =
       make @@ map_tmf (shift_univ k) tmf
 
 let pp0 fmt tm = pp Pp.Env.emp fmt @@ eta_contract tm
-
-let rec pp_bterm fmt =
-  let module B = Desc.Boundary in
-  function
-  | B.Var ix ->
-    Format.fprintf fmt "#%i" ix
-  | B.Intro intro ->
-    Format.fprintf fmt "<intro: %s | %a | %a | %a>" intro.clbl (Pp.pp_list pp0) intro.const_args (Pp.pp_list pp_bterm) intro.rec_args (Pp.pp_list pp0) intro.rs
 
 
 module Notation =

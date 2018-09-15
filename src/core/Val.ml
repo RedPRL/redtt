@@ -1318,35 +1318,10 @@ struct
   and nclo nbnd rho =
     NClo {nbnd; rho}
 
-  and eval_bterm dlbl desc (rho : env) btm =
-    match btm with
-    | B.Intro info ->
-      let constr = Desc.lookup_constr info.clbl desc in
-      let const_args = List.map (eval rho) info.const_args in
-      let rec_args = List.map (eval_bterm dlbl desc rho) info.rec_args in
-      let rs = List.map (eval_dim rho) info.rs in
-      let sys = eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs constr.boundary in
-      begin
-        match force_val_sys sys with
-        | `Proj v ->
-          v
-        | `Ok sys ->
-          make @@ Intro {dlbl; clbl = info.clbl; const_args; rec_args; rs; sys}
-      end
-
-    | B.Var ix ->
-      begin
-        match Bwd.nth rho.cells ix with
-        | `Val v -> v
-        | cell ->
-          let err = UnexpectedEnvCell cell in
-          raise @@ E err
-      end
-
   and eval_bterm_boundary dlbl desc rho ~const_args ~rec_args ~rs =
     List.map (eval_bterm_face dlbl desc rho ~const_args ~rec_args ~rs)
 
-  and eval_bterm_face dlbl desc rho ~const_args ~rec_args ~rs (tr0, tr1, btm) =
+  and eval_bterm_face dlbl desc rho ~const_args ~rec_args ~rs (tr0, tr1, otm) =
     let rho' =
       Env.append rho @@
       (* ~~This is not backwards, FYI.~~ *)
@@ -1359,12 +1334,14 @@ struct
     let r1 = eval_dim rho' tr1 in
     match Eq.make r0 r1 with
     | `Ok xi ->
-      let v = lazy begin Value.act (I.equate r0 r1) @@ eval_bterm dlbl desc rho' btm end in
+      let tm = Option.get_exn otm in
+      let v = lazy begin Value.act (I.equate r0 r1) @@ eval rho' tm end in
       Face.Indet (xi, v)
     | `Apart _ ->
       Face.False (r0, r1)
     | `Same _ ->
-      let v = lazy begin eval_bterm dlbl desc rho' btm end in
+      let tm = Option.get_exn otm in
+      let v = lazy begin eval rho' tm end in
       Face.True (r0, r1, v)
 
 

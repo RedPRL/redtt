@@ -98,9 +98,6 @@ and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
   | NCloConst of value Lazy.t
 
-and bclo =
-  | BClo of {len : int; btm : Tm.tm Desc.Boundary.term; rho : env}
-
 and tick_clo =
   | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}
   | TickCloConst of value Lazy.t

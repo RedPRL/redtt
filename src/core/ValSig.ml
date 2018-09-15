@@ -1,7 +1,5 @@
 open Domain
 
-module B = Desc.Boundary
-
 module type Sig =
 sig
   val restriction : Restriction.t
@@ -31,33 +29,6 @@ sig
   val eval_dim : env -> Tm.tm -> I.t
   val eval_tick : env -> Tm.tm -> tick
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
-
-  val eval_bterm
-    : Desc.data_label
-    -> Tm.data_desc
-    -> env
-    -> Tm.btm
-    -> value
-
-  val eval_bterm_boundary
-    : Desc.data_label
-    -> Tm.data_desc
-    -> env
-    -> const_args:value list
-    -> rec_args:value list
-    -> rs:I.t list
-    -> Tm.bsys
-    -> val_sys
-
-  val eval_bterm_face
-    : Desc.data_label
-    -> Tm.data_desc
-    -> env
-    -> const_args:value list
-    -> rec_args:value list
-    -> rs:I.t list
-    -> Tm.bface
-    -> val_face
 
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 

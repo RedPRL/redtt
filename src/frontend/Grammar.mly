@@ -73,7 +73,7 @@ edecl:
         | Some (k, l) -> k, l
         | None -> `Kan, `Const 0
       in
-      E.Data (dlbl, {constrs = desc; kind; lvl}) }
+      E.Data (dlbl, {constrs = desc; kind; lvl; status = `Complete}) }
 
   | IMPORT; a = ATOM
     { E.Import a }
@@ -319,7 +319,7 @@ desc_constr:
     let boundary =
       List.flatten @@
         List.map
-          (fun (phi, e) -> List.map (fun (r, r') -> r, r', e) phi)
+          (fun (phi, e) -> List.map (fun (r, r') -> r, r', Some e) phi)
           boundary
     in
     clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dim_specs; boundary} }

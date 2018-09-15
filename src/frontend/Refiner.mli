@@ -55,4 +55,5 @@ val guess_restricted : tm -> chk_tac
 
 
 val normalize_ty : ty -> ty m
+val bind_sys_in_scope : (tm, tm) Tm.system -> (tm, tm) Tm.system m
 val bind_in_scope : tm -> tm m
