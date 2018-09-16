@@ -226,6 +226,23 @@ let unleash_data ty =
     Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
 
+let inspect_goal ~loc ~name : goal -> unit M.m =
+  fun goal ->
+    M.lift C.ask >>= fun psi ->
+    let rty = Tm.refine_ty goal.ty goal.sys in
+    begin
+      if name = Some "_" then M.ret () else
+        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi}
+    end
+
+let tac_hole ~loc ~name : chk_tac =
+  fun goal ->
+    inspect_goal ~loc ~name goal >>
+    M.lift C.ask >>= fun psi ->
+    let rty = Tm.refine_ty goal.ty goal.sys in
+    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
+    M.ret @@ Tm.up @@ Tm.refine_force cmd
+
 let guess_motive scrut ty =
   match Tm.unleash scrut with
   | Tm.Up (Tm.Var var, Emp) ->
@@ -246,6 +263,47 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
       @< Tm.FunApp (Tm.up @@ Tm.ix 0)
     in
     M.ret @@ Tm.B (None, Tm.up @@ motx)
+
+let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
+  fun goal ->
+    tac_scrut >>= fun (data_ty, scrut) ->
+    normalize_ty data_ty >>= fun data_ty ->
+    make_motive ~data_ty ~scrut ~tac_mot ~ty:goal.ty >>= fun bmot ->
+
+    let mot arg =
+      let Tm.B (_, motx) = bmot in
+      let arg' = Tm.ann ~ty:data_ty ~tm:arg in
+      Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
+    in
+
+    let dlbl = unleash_data data_ty in
+    let data_vty = D.make @@ D.Data dlbl in
+
+    begin
+      M.lift C.base_cx <<@> fun cx ->
+        GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
+    end >>= fun desc ->
+
+    if desc.status = `Partial then failwith "Cannot call eliminator on partially-defined datatype";
+
+    let eclauses =
+      let find_clause lbl =
+        try
+          List.find (fun (lbl', _, _) -> lbl = lbl') clauses
+        with
+        | Not_found ->
+          let constr = Desc.lookup_constr lbl desc in
+          let pbinds =
+            flip List.map constr.specs @@ function
+            | nm, (`Const _ | `Dim) -> ESig.PVar nm
+            | nm, `Rec _ -> ESig.PIndVar (nm, nm ^ "/ih")
+          in
+          lbl, pbinds, tac_hole loc
+      in
+      List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
+    in
+
+    failwith ""
 
 let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun goal ->
@@ -442,23 +500,6 @@ let rec tac_hope goal =
       try_system sys
   in
   try_system goal.sys
-
-let inspect_goal ~loc ~name : goal -> unit M.m =
-  fun goal ->
-    M.lift C.ask >>= fun psi ->
-    let rty = Tm.refine_ty goal.ty goal.sys in
-    begin
-      if name = Some "_" then M.ret () else
-        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi}
-    end
-
-let tac_hole ~loc ~name : chk_tac =
-  fun goal ->
-    inspect_goal ~loc ~name goal >>
-    M.lift C.ask >>= fun psi ->
-    let rty = Tm.refine_ty goal.ty goal.sys in
-    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
-    M.ret @@ Tm.up @@ Tm.refine_force cmd
 
 let tac_guess tac : chk_tac =
   fun goal ->
