@@ -551,11 +551,13 @@ and infer cx (hd, sp) =
   let D.{ty; _} = infer_spine cx hd sp in
   ty
 
-and infer_spine cx hd =
+and infer_spine cx hd sp =
   let (module V) = Cx.evaluator cx in
-  function
+  match sp with
   | Emp ->
-    D.{el = Cx.eval_head cx hd; ty = infer_head cx hd}
+    let vhd = Cx.eval_head cx hd in
+    let ty = infer_head cx hd in
+    D.{el = vhd; ty}
 
   | Snoc (sp, frm) ->
     match frm with
