@@ -829,7 +829,8 @@ struct
               in
               let face1 =
                 AbsFace.make phi (I.act phi r') `Dim1 @@ fun phi ->
-                Abs.make1 @@ fun _ -> Value.act phi el in
+                Abs.make1 @@ fun _ -> Value.act phi el
+              in
               [face0; face1]
             in
             make_hcom (Dir.make `Dim1 (`Atom y)) ty cap msys
@@ -904,7 +905,7 @@ struct
             AbsFace.make I.idn r' `Dim0 @@ fun phi ->
             Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) [`Atom w]
           in
-          let el1 = make_hcom (Dir.make `Dim1 `Dim0) info.ty1 (base I.idn r r') @@
+          let el1 = make_hcom (Dir.make `Dim1 r') info.ty1 (base I.idn r r') @@
             force_abs_sys [face0; face1; face_diag; face_front]
           in
           make_vin I.idn r' el0 el1
@@ -920,7 +921,6 @@ struct
               let funcr = Value.act phi @@ car info.equiv in
               rigid_vproj info.x ~func:funcr ~el
             in
-            let mode = `INCONSISTENCY_REMOVAL in
             let sys =
               let face0 =
                 AbsFace.gen_const I.idn info.x `Dim0 @@ fun phi ->
@@ -932,10 +932,7 @@ struct
                 Abs.bind1 x @@
                 make_coe (Dir.make (I.act phi r) (`Atom x)) (Abs.act phi abs1) (Value.act phi el)
               in
-              match mode with
-              | `OLD_SCHOOL -> Option.filter_map force_abs_face [face0; face1]
-              | `INCONSISTENCY_REMOVAL -> Option.filter_map force_abs_face [face0]
-              | `UNICORN -> raise @@ E InternalMortalityError
+              Option.filter_map force_abs_face [face0; face1]
             in
             rigid_com dir abs1 cap sys
           in
@@ -1107,11 +1104,6 @@ struct
           apply (car (Value.act phi equiv)) @@
           hcom phi (`Atom y) ty0 (* ty0 is already under `phi0` *)
         in
-        let face1 =
-          AbsFace.gen_const I.idn x `Dim1 @@ fun phi ->
-          Abs.make1 @@ fun y ->
-          hcom phi (`Atom y) (Value.act phi ty1)
-        in
         let func = car equiv in
         let el1_cap = rigid_vproj x ~func ~el:cap in
         let el1_sys =
@@ -1121,7 +1113,7 @@ struct
             let yi, el = Abs.unleash absi in
             Abs.bind yi @@ vproj phi (I.act phi @@ `Atom x) ~func:(fun phi -> Value.act phi func) ~el
           in
-          Option.filter_map force_abs_face [face0; face1] @ List.map face sys
+          Option.filter_map force_abs_face [face0] @ List.map face sys
         in
         rigid_hcom dir ty1 el1_cap el1_sys
       in
@@ -1173,7 +1165,7 @@ struct
               | `Proj abs -> abs
               | `Ok faces ->
                 Abs.make1 @@ fun y ->
-                make_hcom (Dir.make (I.act phi r) (`Atom y)) (Value.act phi ty) (Value.act phi cap) (`Ok (faces @ rest))
+                make_hcom (Dir.make (I.act phi r) (`Atom y)) (Value.act phi ty) (Value.act phi cap) (`Ok (faces @ rest0))
           in
           let face0 = face (`Dim0, `Dim1) in
           let face1 = face (`Dim1, `Dim0) in
