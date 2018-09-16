@@ -45,6 +45,7 @@ val tac_elim
   -> tac_mot:chk_tac option
   -> tac_scrut:inf_tac
   -> clauses:(Desc.con_label * ESig.epatbind list * chk_tac) list
+  -> default:chk_tac option
   -> chk_tac
 
 (** Introduce a let-binding. *)

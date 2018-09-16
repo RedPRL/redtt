@@ -297,7 +297,7 @@ struct
         end
 
 
-      | [], _, E.Elim {mot; scrut; clauses} ->
+      | [], _, E.Elim {mot; scrut; clauses; default} ->
         let tac_mot = Option.map elab_chk mot in
         let tac_scrut = elab_inf scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
         let used = Hashtbl.create 10 in
@@ -309,9 +309,10 @@ struct
             end
         in
         let clauses = List.map elab_clause clauses in
-        tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses goal
+        let default = Option.map elab_chk default in
+        tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses ~default goal
 
-      | [], Tm.Pi (dom, _), E.ElimFun {clauses} ->
+      | [], Tm.Pi (dom, _), E.ElimFun {clauses; default} ->
         let x = Name.fresh () in
         let tac_mot = None in
         let tac_scrut = M.ret (dom, Tm.up @@ Tm.var x) in
@@ -324,9 +325,10 @@ struct
             end
         in
         let clauses = List.map elab_clause clauses in
+        let default = Option.map elab_chk default in
         let tac_fun =
           tac_lambda [x] @@
-          tac_elim ~loc:e.span ~tac_mot:None ~tac_scrut ~clauses
+          tac_elim ~loc:e.span ~tac_mot:None ~tac_scrut ~clauses ~default
         in
         tac_fun goal
 

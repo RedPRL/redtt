@@ -268,7 +268,7 @@ let lookup_datatype dlbl =
   M.lift C.base_cx <<@> fun cx ->
     GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
 
-let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
+let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
   fun goal ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
@@ -299,7 +299,10 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             | nm, (`Const _ | `Dim) -> ESig.PVar nm
             | nm, `Rec _ -> ESig.PIndVar (nm, nm ^ "/ih")
           in
-          lbl, pbinds, tac_hole ~loc ~name:(Some lbl)
+          lbl, pbinds,
+          match default with
+          | None -> tac_hole ~loc ~name:(Some lbl)
+          | Some tac -> tac
       in
       List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
     in

@@ -46,8 +46,8 @@ and econ =
   | Quo of (ResEnv.t -> Tm.tm)
   | Let of {name : string; sch : escheme; tm : eterm; body : eterm}
 
-  | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
-  | ElimFun of {clauses : eclause list}
+  | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list; default : eterm option}
+  | ElimFun of {clauses : eclause list; default : eterm option}
 
   | Pi of etele * eterm
   | Sg of etele * eterm

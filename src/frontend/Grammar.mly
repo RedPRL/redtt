@@ -197,13 +197,13 @@ econ:
   | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
     { E.Let {name = a; sch = sch; tm; body} }
 
-  | ELIM; scrut = located(econ); IN; mot = located(econ); clauses = pipe_block(eclause)
-    { E.Elim {mot = Some mot; scrut; clauses} }
-  | ELIM; scrut = located(econ); clauses = pipe_block(eclause)
-    { E.Elim {mot = None; scrut; clauses} }
+  | ELIM; scrut = located(econ); mot = option(preceded(IN,located(econ))); body = eclauses_with_default
+    { let clauses, default = body in
+      E.Elim {mot; scrut; clauses; default} }
 
-  | LAM; clauses = pipe_block(eclause)
-    { E.ElimFun {clauses} }
+  | LAM; body = eclauses_with_default
+    { let clauses, default = body in
+      E.ElimFun {clauses; default} }
 
   | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }
@@ -242,6 +242,13 @@ econ:
 eclause:
   | lbl = ATOM; pbinds = list(epatbind); RIGHT_ARROW; bdy = located(econ)
     { lbl, pbinds, bdy }
+
+eclauses_with_default:
+  | cls = pipe_block(eclause)
+    { match ListUtil.split_last cls with
+      | cls, ("_", [], bdy) -> cls, Some bdy
+      | _ -> cls, None
+      | exception _ -> cls, None }
 
 epatbind:
   | x = ATOM
