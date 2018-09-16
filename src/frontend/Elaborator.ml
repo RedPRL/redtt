@@ -769,34 +769,45 @@ struct
       elab_mode_switch_cut exp frms ty
 
   and elab_intro dlbl clbl constr frms =
-    let rec go_const_args acc const_specs frms =
-      match const_specs, frms with
-      | [], _ ->
-        M.ret (List.rev_map snd acc, frms)
-      | (_, ty) :: const_specs, E.App e :: frms ->
-        (* TODO: might be backwards *)
-        let sub = List.fold_right (fun (ty,tm) sub -> Tm.dot (Tm.ann ~ty ~tm) sub) acc @@ Tm.shift 0 in
-        let ty' = Tm.subst sub ty in
-        elab_chk e {ty = ty'; sys = []} >>= fun t ->
-        go_const_args ((ty', t) :: acc) const_specs frms
+    let elab_arg sub spec frm =
+      match spec, frm with
+      | `Const ty, E.App e ->
+        let ty = Tm.subst sub ty in
+        elab_chk e {ty; sys = []} >>= fun tm ->
+        let sub = Tm.dot (Tm.ann ~ty ~tm) sub in
+        M.ret (sub, tm)
+
+      | `Rec Desc.Self, E.App e ->
+        let ty = Tm.make @@ Tm.Data dlbl in
+        elab_chk e {ty; sys = []} >>= fun tm ->
+        let sub = Tm.dot (Tm.ann ~ty ~tm) sub in
+        M.ret (sub, tm)
+
+      | `Dim, E.App e ->
+        elab_dim e >>= fun r ->
+        let sub = Tm.dot (Tm.DownX r, Emp) sub in
+        M.ret (sub, r)
+
       | _ ->
-        failwith "elab_intro: malformed parameters"
+        failwith "elab_intro: unexpected frame"
     in
-    let rec go_rec_args rec_specs dims frms =
-      match rec_specs, dims, frms with
-      | [], [], [] ->
+
+    let rec go sub specs frms =
+      match specs, frms with
+      | (_, spec) :: specs, frm :: frms ->
+        elab_arg sub spec frm >>= fun (sub, tm) ->
+        go sub specs frms >>= fun tms ->
+        M.ret (tm :: tms)
+
+      | [], [] ->
         M.ret []
-      | [], _ :: dims, E.App r :: frms ->
-        (fun x xs -> x :: xs) <@>> elab_dim r <*> go_rec_args rec_specs dims frms
-      | (_, Desc.Self) :: rec_specs, dims, E.App e :: frms ->
-        let self_ty = Tm.make @@ Tm.Data dlbl in
-        (fun x xs -> x :: xs) <@>> elab_chk e {ty = self_ty; sys = []} <*> go_rec_args rec_specs dims frms
+
       | _ ->
-        failwith "todo: go_args"
+        failwith "elab_intro: mismatch"
     in
-    go_const_args [] (Desc.const_specs constr) @@ Bwd.to_list frms >>= fun (tps, frms) ->
-    go_rec_args (Desc.rec_specs constr) (Desc.dim_specs constr) frms >>= fun targs ->
-    M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tps @ targs)
+
+    go (Tm.shift 0) constr.specs (Bwd.to_list frms) >>= fun tms ->
+    M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tms)
 
   and elab_mode_switch_cut exp frms ty =
     elab_cut exp frms >>= fun (ty', cmd) ->
