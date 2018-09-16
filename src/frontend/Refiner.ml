@@ -268,7 +268,7 @@ let lookup_datatype dlbl =
   M.lift C.base_cx <<@> fun cx ->
     GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
 
-let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
+let rec tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
   fun goal ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
@@ -296,8 +296,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let constr = Desc.lookup_constr lbl desc in
           let pbinds =
             flip List.map constr.specs @@ function
-            | nm, (`Const _ | `Dim) -> `Bind (`Var nm)
-            | nm, `Rec _ -> `BindIH (`Var nm, `Var (nm ^ "/ih"))
+            | nm, (`Const _ | `Dim) -> `Bind (`Var (`User nm))
+            | nm, `Rec _ -> `BindIH (`Var (`User nm), `Var (`User (nm ^ "/ih")))
           in
           lbl, pbinds,
           match default with
@@ -319,14 +319,20 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           V.empty_env
       end >>= fun empty_env ->
 
-      let rec prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs =
+      let name_of =
+        function
+        | `User a -> Name.named @@ Some a
+        | `Gen x -> x
+      in
+
+      let rec prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs =
         begin
           M.lift C.base_cx <<@> fun cx ->
             cx, Cx.evaluator cx, Cx.quoter cx
         end >>= fun (cx, (module V), (module Q)) ->
         match pbinds, specs with
         | `Bind (`Var nm) :: pbinds, (_, `Const ty) :: specs ->
-          let x = Name.named @@ Some nm in
+          let x = name_of nm in
           let vty = V.eval tyenv ty in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
@@ -336,10 +342,10 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let env_only_ihs = D.Env.snoc env_only_ihs @@ `Val x_el in
           let intro_args = intro_args #< x_tm in
           M.in_scope x (`P tty) @@
-          prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
 
         | `Bind (`Var nm) :: pbinds, (_, `Dim) :: specs ->
-          let x = Name.named @@ Some nm in
+          let x = name_of nm in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = `Atom x in
           let psi = psi #< (x, `I) in
@@ -347,16 +353,11 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let env_only_ihs = D.Env.snoc env_only_ihs @@ `Dim x_el in
           let intro_args = intro_args #< x_tm in
           M.in_scope x `I @@
-          prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
 
-        | pat :: pbinds, (_, `Rec Desc.Self) :: specs ->
-          let x, x_ih =
-            match pat with
-            | `Bind (`Var nm) ->
-              Name.named @@ Some nm, Name.fresh ()
-            | `BindIH (`Var nm, `Var nm_ih) ->
-              Name.named @@ Some nm, Name.named @@ Some nm_ih
-          in
+        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, (_, `Rec Desc.Self) :: specs ->
+          let x = name_of nm in
+          let x_ih = name_of nm_ih in
           let vty = data_vty in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
@@ -373,17 +374,56 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
             let env_only_ihs = D.Env.snoc env_only_ihs @@ `Val ih_el in
             let intro_args = intro_args #< x_tm in
             M.in_scope x_ih (`P ih_ty) @@
-            prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs
+            prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
           end
 
+        | `Bind p :: pbinds, ((_, `Rec _) :: _ as specs) ->
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (p, `Var (`Gen (Name.fresh ()))) :: pbinds) specs
+
+        | `Bind `Wildcard :: pbinds, ((_, spec) :: _ as specs) ->
+          let x = Name.fresh () in
+          let kont_tac ktac tac =
+            ktac @@
+            let vty =
+              match spec with
+              | `Const ty -> V.eval tyenv ty
+              | `Rec Desc.Self -> data_vty
+              | _ -> failwith "unexpected wildcard pattern"
+            in
+            let ty = Q.quote_ty Quote.Env.emp vty in
+            let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x) in
+            tac_elim ~loc ~tac_mot:None ~tac_scrut ~clauses:[] ~default:(Some tac)
+          in
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`Bind (`Var (`Gen x)) :: pbinds) specs
+
+        | `BindIH (`Wildcard, p) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
+          let x = Name.fresh () in
+          let kont_tac ktac tac =
+            ktac @@
+            let ty = data_ty in
+            let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x) in
+            tac_elim ~loc ~tac_mot:None ~tac_scrut ~clauses:[] ~default:(Some tac)
+          in
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var (`Gen x), p) :: pbinds) specs
+
+        | `BindIH (`Var y, `Wildcard) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
+          let x_ih = Name.fresh () in
+          let kont_tac ktac tac =
+            ktac @@
+            let ty = mot @@ Tm.up @@ Tm.var x_ih in
+            let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x_ih) in
+            tac_elim ~loc ~tac_mot:None ~tac_scrut ~clauses:[] ~default:(Some tac)
+          in
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var y, `Var (`Gen x_ih)) :: pbinds) specs
+
         | [], [] ->
-          M.ret (Bwd.to_list psi, tyenv, Bwd.to_list intro_args, env_only_ihs)
+          M.ret (Bwd.to_list psi, tyenv, Bwd.to_list intro_args, env_only_ihs, kont_tac)
 
         | _ ->
           failwith "prepare_clause: mismatch"
       in
 
-      prepare_clause (Emp, empty_env, Emp, empty_env) pbinds constr.specs >>= fun (psi, env, intro_args, env_only_ihs) ->
+      prepare_clause (Emp, empty_env, Emp, empty_env, fun tac -> tac) pbinds constr.specs >>= fun (psi, env, intro_args, env_only_ihs, kont_tac) ->
 
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, intro_args) in
       let clause_ty = mot intro in
@@ -438,8 +478,9 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           Q.quote_val_sys (Cx.qenv cx) vty val_sys
         in
 
+
         (* We run the clause tactic with the goal type restricted by the boundary above *)
-        clause_tac {ty = clause_ty; sys = tsys} <<@> fun bdy ->
+        kont_tac (fun tac -> tac) clause_tac {ty = clause_ty; sys = tsys} <<@> fun bdy ->
           clbl, Tm.bindn (Bwd.map fst @@ Bwd.from_list psi) bdy
       end
     in

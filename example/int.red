@@ -31,14 +31,14 @@ let isuc : int → int =
 
 let pred-isuc : (n : int) → path int (pred (isuc n)) n =
   λ [
-  | pos n → refl
-  | negsuc n → elim n [ * → refl ]
+  | pos _ → refl
+  | negsuc * → refl
   ]
 
 let isuc-pred : (n : int) → path int (isuc (pred n)) n =
   λ [
-  | pos n → elim n [ * → refl ]
-  | negsuc n → refl
+  | pos * → refl
+  | negsuc _ → refl
   ]
 
 let isuc/equiv : equiv int int =

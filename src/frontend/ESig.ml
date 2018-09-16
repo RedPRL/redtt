@@ -82,7 +82,9 @@ and 'a epatbind =
   ]
 
 and einvpat =
-  [ `Var of string ]
+  [ `Var of [`User of string | `Gen of Name.t]
+  | `Wildcard
+  ]
 
 and esys = eface list
 

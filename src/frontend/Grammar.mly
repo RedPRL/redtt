@@ -259,7 +259,9 @@ epatbind:
 
 einvpat:
   | x = ATOM
-    { `Var x }
+    { `Var (`User x) }
+  | AST
+    { `Wildcard }
 
 edimension:
   | n = NUMERAL;
