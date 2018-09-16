@@ -60,10 +60,6 @@ let s1→moebius-boundary : s1 → moebius-boundary =
   | loop i → s1→moebius-boundary/loop/filler i 1
   ]
 
-let s1→moebius-boundary→s1/base :
-  path s1 (moebius-boundary→s1 (s1→moebius-boundary base)) base =
-  refl
-
 opaque let s1→moebius-boundary→s1/loop :
   [i j] s1 [
   | ∂[i] → base
