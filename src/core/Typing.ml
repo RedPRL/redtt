@@ -358,36 +358,28 @@ and check_constr cx dlbl (constr : Tm.tm Desc.constr) tms =
   let (module V) = Cx.evaluator (Cx.clear_locals cx) in
 
 
-  let rec go tyenv specs tms =
-    match specs, tms with
-    | (lbl, `Const ty) :: specs, tm :: tms ->
+  let check_argument tyenv spec tm =
+    match spec with
+    | `Const ty ->
       let vty = V.eval tyenv ty in
-      let varg = check_eval cx vty tm in
-      (* let cx = Cx.def cx ~nm:(Some lbl) ~ty:vty ~el:varg in *)
-      let tyenv = D.Env.snoc tyenv @@ `Val varg in
-      go tyenv specs tms
-
-    | (lbl, `Rec Desc.Self) :: specs, tm :: tms ->
-      let varg = check_eval cx vdataty tm in
-      (* let cx = Cx.def cx ~nm:(Some lbl) ~ty:vdataty ~el:varg in *)
-      let tyenv = D.Env.snoc tyenv @@ `Val varg in
-      go tyenv specs tms
-
-    | (lbl, `Dim) :: specs, tm :: tms ->
+      let el = check_eval cx vty tm in
+      D.Env.snoc tyenv @@ `Val el
+    | `Rec Desc.Self ->
+      let el = check_eval cx vdataty tm in
+      D.Env.snoc tyenv @@ `Val el
+    | `Dim ->
       let r = check_eval_dim cx tm in
-      (* let cx = Cx.def_dim cx ~nm:(Some lbl) r in *)
-      let tyenv = D.Env.snoc tyenv @@ `Dim r in
-      go tyenv specs tms
-
-    | [], [] ->
-      ()
-
-    | _ ->
-      failwith "check_constr: mismatch"
-
+      D.Env.snoc tyenv @@ `Dim r
   in
 
-  go V.empty_env constr.specs tms
+  let _ : D.env =
+    List.fold_right2
+      (fun (_, spec) tm tyenv -> check_argument tyenv spec tm)
+      constr.specs
+      tms
+      V.empty_env
+  in
+  ()
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
