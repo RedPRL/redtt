@@ -2204,7 +2204,8 @@ struct
   and inst_nclo nclo vargs : value =
     match nclo with
     | NClo info ->
-      let Tm.NB (_, tm) = info.nbnd in
+      let Tm.NB (nms, tm) = info.nbnd in
+      if Bwd.length nms != List.length vargs then failwith "inst_nclo: incorrect length";
       eval (Env.append info.rho vargs) tm
     | NCloConst v ->
       Lazy.force v
