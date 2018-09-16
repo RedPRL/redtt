@@ -446,7 +446,8 @@ and check_box cx tydir tycap tysys tr tr' tcap tsys =
     match faces with
     | [] -> ()
     | (ri'0, ri'1, el') :: faces ->
-      (* Invariant: cx and ty should already be restricted by r0=r1 *)
+      (* Invariant: cx, ty and el should already be restricted by ri0=ri1,
+       * and el' should already be restricted by ri'0=ri'1. *)
       begin
         try
           let phi' =
