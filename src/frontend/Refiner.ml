@@ -264,24 +264,24 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
     in
     M.ret @@ Tm.B (None, Tm.up @@ motx)
 
-let tac_elim_new ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
+let lookup_datatype dlbl =
+  M.lift C.base_cx <<@> fun cx ->
+    GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
+
+let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun goal ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
+
     make_motive ~data_ty ~scrut ~tac_mot ~ty:goal.ty >>= fun bmot ->
 
     let mot arg = Tm.unbind_with (Tm.ann ~ty:data_ty ~tm:arg) bmot in
-
     let dlbl = unleash_data data_ty in
     let data_vty = D.make @@ D.Data dlbl in
 
-    begin
-      M.lift C.base_cx <<@> fun cx ->
-        GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
-    end >>= fun desc ->
+    lookup_datatype dlbl >>= fun desc ->
 
-    if desc.status = `Partial then failwith "Cannot call eliminator on partially-defined datatype";
-
+    (* Add holes for any missing clauses *)
     let eclauses =
       let find_clause lbl =
         try
@@ -294,65 +294,19 @@ let tac_elim_new ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
             | nm, (`Const _ | `Dim) -> ESig.PVar nm
             | nm, `Rec _ -> ESig.PIndVar (nm, nm ^ "/ih")
           in
-          lbl, pbinds, tac_hole loc
+          lbl, pbinds, tac_hole ~loc ~name:(Some lbl)
       in
       List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
     in
-
-    failwith ""
-
-let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
-  fun goal ->
-    tac_scrut >>= fun (data_ty, scrut) ->
-    normalize_ty data_ty >>= fun data_ty ->
-
-    make_motive ~data_ty ~scrut ~tac_mot ~ty:goal.ty >>= fun bmot ->
-
-    let mot arg =
-      let Tm.B (_, motx) = bmot in
-      let arg' = Tm.ann ~ty:data_ty ~tm:arg in
-      Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
-    in
-
-    let dlbl = unleash_data data_ty in
-    let data_vty = D.make @@ D.Data dlbl in
-
-    begin
-      M.lift C.base_cx <<@> fun cx ->
-        GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
-    end >>= fun desc ->
-
-    (* Add holes for any missing clauses *)
-    let eclauses =
-      let find_clause lbl =
-        try
-          List.find (fun (lbl', _, _) -> lbl = lbl') clauses
-        with
-        | _ ->
-          let constr = Desc.lookup_constr lbl desc in
-          let pbinds =
-            List.map (fun (nm, _) -> ESig.PVar nm) (Desc.const_specs constr)
-            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) (Desc.rec_specs constr)
-            @ List.map (fun x -> ESig.PVar x) (Desc.dim_specs constr)
-          in
-          lbl, pbinds, fun goal ->
-            M.lift C.ask >>= fun psi ->
-            let rty = Tm.refine_ty goal.ty goal.sys in
-            M.lift @@ U.push_hole `Rigid psi rty  >>= fun cmd ->
-            M.emit loc @@ M.UserHole {name = Some lbl; ty = rty; tele = psi} >>
-            M.ret @@ Tm.up @@ Tm.refine_force cmd
-      in
-      List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
-    in
-
-    begin
-      M.lift C.base_cx <<@> fun cx ->
-        Cx.evaluator cx, Cx.quoter cx
-    end >>= fun ((module V), (module Q)) ->
-
 
     (* TODO: factor this out into another tactic. *)
-    let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
+    let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac))  : (Desc.con_label * tm Tm.nbnd) M.m =
+
+      begin
+        M.lift C.base_cx <<@> fun cx ->
+          Cx.evaluator cx, Cx.quoter cx
+      end >>= fun ((module V), (module Q)) ->
+
       let open Desc in
       let constr = lookup_constr clbl desc in
 
