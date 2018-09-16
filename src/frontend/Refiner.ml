@@ -264,17 +264,13 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
     in
     M.ret @@ Tm.B (None, Tm.up @@ motx)
 
-let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
+let tac_elim_new ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
   fun goal ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
     make_motive ~data_ty ~scrut ~tac_mot ~ty:goal.ty >>= fun bmot ->
 
-    let mot arg =
-      let Tm.B (_, motx) = bmot in
-      let arg' = Tm.ann ~ty:data_ty ~tm:arg in
-      Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
-    in
+    let mot arg = Tm.unbind_with (Tm.ann ~ty:data_ty ~tm:arg) bmot in
 
     let dlbl = unleash_data data_ty in
     let data_vty = D.make @@ D.Data dlbl in
