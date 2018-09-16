@@ -44,6 +44,8 @@ sig
 
   val snoc : env -> env_el -> env
   val append : env -> env_el list -> env
+
+  val act_env_el : I.action -> env_el -> env_el
 end
 
 module Value : Sort.S

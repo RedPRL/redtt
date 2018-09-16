@@ -213,7 +213,13 @@ let make con =
   match compress con with
   | tm -> tm
   | exception (Make con) ->
-    Tm {con; info = con_info con}
+    match con with
+    | Up (Ix (ix, _), _) when ix < 0->
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
+      failwith "NEGATIVE DE BRUIJN!!!"
+    | _ ->
+      Tm {con; info = con_info con}
 
 
 (* "algebras" for generic traversals of terms; the interface is imperative, because

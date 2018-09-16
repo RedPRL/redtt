@@ -28,16 +28,6 @@ let dim_specs constr =
   | (x, `Dim) -> [x]
   | _ -> []
 
-let const_specs constr =
-  List.flatten @@ flip List.map constr.specs @@ function
-  | (x, `Const ty) -> [x, ty]
-  | _ -> []
-
-let rec_specs constr =
-  List.flatten @@ flip List.map constr.specs @@ function
-  | (x, `Rec ty) -> [x, ty]
-  | _ -> []
-
 
 (** A datatype description is just a list of named constructors. *)
 type 'a desc =

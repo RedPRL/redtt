@@ -21,9 +21,12 @@ let rec pp_env_cell fmt =
   | `Tick _ ->
     Format.fprintf fmt "<tick>"
 
+and pp_env_cells fmt cells =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep pp_env_cell fmt cells
+
 and pp_env fmt env =
-  let pp_sep fmt () = Format.fprintf fmt ", " in
-  Format.pp_print_list ~pp_sep pp_env_cell fmt (Bwd.to_list env.cells)
+  pp_env_cells fmt @@ Bwd.to_list env.cells
 
 
 and pp_con fmt : con -> unit =
@@ -98,11 +101,9 @@ and pp_con fmt : con -> unit =
   | Data lbl ->
     Uuseg_string.pp_utf_8 fmt lbl
   | Intro info ->
-    Format.fprintf fmt "@[<hv1>(%a %a %a %a)@]"
+    Format.fprintf fmt "@[<hv1>(%a %a)@]"
       Uuseg_string.pp_utf_8 info.clbl
-      pp_values info.const_args
-      pp_values info.rec_args
-      pp_dims info.rs
+      pp_env_cells info.args
 
 
 and pp_value fmt value =
