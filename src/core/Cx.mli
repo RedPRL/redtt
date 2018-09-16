@@ -22,6 +22,7 @@ val ext_tick : t -> nm:string option -> t * Domain.tick
 val restrict : t -> I.t -> I.t -> t * I.action
 
 val def : t -> nm:string option -> ty:value -> el:value -> t
+val def_dim : t -> nm:string option -> I.t -> t
 
 
 

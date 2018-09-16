@@ -338,10 +338,8 @@ struct
       | Data dlbl, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
         let desc = V.Sig.lookup_datatype dlbl in
         let constr = Desc.lookup_constr info0.clbl desc in
-        let const_args = equate_constr_const_args env constr info0.const_args info1.const_args in
-        let rec_args = equate_constr_rec_args env dlbl constr info0.rec_args info1.rec_args in
-        let trs = equate_dims env info0.rs info1.rs in
-        Tm.make @@ Tm.Intro (dlbl, info0.clbl, const_args @ rec_args @ trs)
+        let tms = equate_constr_args env dlbl constr info0.args info1.args in
+        Tm.make @@ Tm.Intro (dlbl, info0.clbl, tms)
 
       | _ ->
         (* For more readable error messages *)
@@ -350,25 +348,31 @@ struct
         let err = ErrEquateNf {env; ty; el0; el1} in
         raise @@ E err
 
-  and equate_constr_const_args env constr els0 els1 =
-    let rec go acc venv const_specs els0 els1 =
-      match const_specs, els0, els1 with
-      | [], [], [] ->
-        Bwd.to_list acc
-      | (_, ty) :: const_specs, el0 :: els0, el1 :: els1 ->
+  and equate_constr_args env dlbl constr cells0 cells1 =
+    let rec go acc venv specs cells0 cells1 =
+      match specs, cells0, cells1 with
+      | (_, `Const ty) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
         let vty = eval venv ty in
         let tm0 = equate env vty el0 el1 in
-        go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) const_specs els0 els1
-      | _ ->
-        failwith "equate_constr_args"
-    in
-    go Emp empty_env (Desc.const_specs constr) els0 els1
+        go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
 
-  and equate_constr_rec_args env dlbl constr els0 els1 =
-    let open Desc in
-    (* TODO: factor out *)
-    let realize_spec_ty Self = D.make @@ D.Data dlbl in
-    ListUtil.map3 (fun (_, spec_ty) -> equate env @@ realize_spec_ty spec_ty) (Desc.rec_specs constr) els0 els1
+      | (_, `Rec Desc.Self) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
+        let vty = D.make @@ D.Data dlbl in
+        let tm0 = equate env vty el0 el1 in
+        go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
+
+      | (_, `Dim) :: specs, `Dim r0 :: cells0, `Dim r1 :: cells1 ->
+        let tr = equate_dim env r0 r1 in
+        go (acc #< tr) (D.Env.snoc venv @@ `Dim r0) specs cells0 cells1
+
+      | [], [], [] ->
+        Bwd.to_list acc
+
+      | _ ->
+        failwith "equate_constr_args: argument mismatch"
+    in
+
+    go Emp empty_env constr.specs cells0 cells1
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
@@ -484,36 +488,45 @@ struct
         let quote_clause (clbl, constr) =
           let clause0 = find_clause clbl elim0.clauses in
           let clause1 = find_clause clbl elim1.clauses in
-          let env', vs, cvs, rvs, rs =
-            let open Desc in
-            let rec build_cx qenv env (vs, cvs, rvs) rs const_specs rec_specs dim_specs =
-              match const_specs, rec_specs, dim_specs with
-              | (_, pty) :: const_specs, _, _ ->
-                let vty = V.eval env pty in
-                let v = generic qenv vty in
-                let env' = D.Env.snoc env @@ `Val v in
-                build_cx (Env.succ qenv) env' (vs #< v, cvs #< v, rvs) rs const_specs rec_specs dim_specs
-              | [], (_, Self) :: rec_specs, _ ->
-                let vx = generic qenv data_ty in
-                let qenv' = Env.succ qenv in
-                let vih = generic qenv' @@ V.inst_clo elim0.mot vx in
-                build_cx (Env.succ qenv') env (vs #< vx #< vih, cvs, rvs #< vx) rs const_specs rec_specs dim_specs
-              | [], [], nm :: dim_specs ->
-                let x = Name.named @@ Some nm in
-                let qenv' = Env.abs qenv [x] in
-                build_cx qenv' env (vs, cvs, rvs) (rs #< (`Atom x)) const_specs rec_specs dim_specs
-              | [], [], [] ->
-                qenv, Bwd.to_list vs, Bwd.to_list cvs, Bwd.to_list rvs, Bwd.to_list rs
-            in
-            build_cx env empty_env (Emp, Emp, Emp) Emp (Desc.const_specs constr) (Desc.rec_specs constr) (Desc.dim_specs constr)
+
+
+          let rec go qenv venv cells_w_ihs cells specs =
+            match specs with
+            | (_, `Const ty) :: specs ->
+              let vty = V.eval venv ty in
+              let v = generic qenv vty in
+              let venv' = D.Env.snoc venv @@ `Val v in
+              let qenv' = Env.succ qenv in
+              go qenv' venv' (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
+
+            | (_, `Rec Desc.Self) :: specs ->
+              let vty = D.make @@ D.Data dlbl in
+              let v = generic qenv vty in
+              let qenv' = Env.succ qenv in
+              let vih = generic qenv' @@ V.inst_clo elim0.mot v in
+              let qenv'' = Env.succ qenv' in
+              let venv' = D.Env.snoc venv @@ `Val v in
+              go qenv'' venv' (cells_w_ihs <>< [`Val v; `Val vih]) (cells #< (`Val v)) specs
+
+            | (nm, `Dim) :: specs ->
+              let x = Name.named @@ Some nm in
+              let r = `Atom x in
+              let qenv' = Env.abs qenv [x] in
+              let venv' = D.Env.snoc venv @@ `Dim r in
+              go qenv' venv' (cells_w_ihs #< (`Dim r)) (cells #< (`Dim r)) specs
+
+            | [] ->
+              qenv, Bwd.to_list cells_w_ihs, Bwd.to_list cells
           in
-          let cells = List.map (fun x -> `Val x) vs @ List.map (fun x -> `Dim x) rs in
-          let bdy0 = inst_nclo clause0 cells in
-          let bdy1 = inst_nclo clause1 cells in
-          let intro = make_intro empty_env ~dlbl ~clbl ~const_args:cvs ~rec_args:rvs ~rs in
+
+          let env', cells_w_ihs, cells = go env empty_env Emp Emp Desc.(constr.specs) in
+
+          let bdy0 = inst_nclo clause0 cells_w_ihs in
+          let bdy1 = inst_nclo clause1 cells_w_ihs in
+          let intro = make_intro empty_env ~dlbl ~clbl cells in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
-          let nms = Bwd.from_list @@ List.map (fun _ -> None) cells in
+          let nms = Bwd.from_list @@ List.map (fun _ -> None) cells_w_ihs in
           clbl, Tm.NB (nms, tbdy)
         in
 

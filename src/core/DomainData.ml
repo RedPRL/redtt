@@ -49,9 +49,7 @@ type con =
   | Intro of
       {dlbl : Desc.data_label;
        clbl : Desc.con_label;
-       const_args : value list;
-       rec_args : value list;
-       rs : dim list;
+       args : env_el list;
        sys : rigid_val_sys}
 
 and neu =
