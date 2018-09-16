@@ -275,7 +275,12 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
 
     make_motive ~data_ty ~scrut ~tac_mot ~ty:goal.ty >>= fun bmot ->
 
-    let mot arg = Tm.unbind_with (Tm.ann ~ty:data_ty ~tm:arg) bmot in
+    let mot arg =
+      let Tm.B (_, motx) = bmot in
+      let arg' = Tm.ann ~ty:data_ty ~tm:arg in
+      Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
+    in
+
     let dlbl = unleash_data data_ty in
     let data_vty = D.make @@ D.Data dlbl in
 
@@ -302,15 +307,20 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     (* TODO: factor this out into another tactic. *)
     let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac))  : (Desc.con_label * tm Tm.nbnd) M.m =
 
-      begin
-        M.lift C.base_cx <<@> fun cx ->
-          Cx.evaluator cx, Cx.quoter cx
-      end >>= fun ((module V), (module Q)) ->
-
       let open Desc in
       let constr = lookup_constr clbl desc in
 
+      begin
+        M.lift C.base_cx <<@> fun cx ->
+          let (module V) = Cx.evaluator cx in
+          V.empty_env
+      end >>= fun empty_env ->
+
       let rec prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs =
+        begin
+          M.lift C.base_cx <<@> fun cx ->
+            cx, Cx.evaluator cx, Cx.quoter cx
+        end >>= fun (cx, (module V), (module Q)) ->
         match pbinds, specs with
         | ESig.PVar nm :: pbinds, (_, `Const ty) :: specs ->
           let x = Name.named @@ Some nm in
@@ -320,7 +330,9 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let tty = Q.quote_ty Quote.Env.emp vty in
           let psi = psi #< (x, `P tty) in
           let tyenv = D.Env.snoc tyenv @@ `Val x_el in
+          let env_only_ihs = D.Env.snoc env_only_ihs @@ `Val x_el in
           let intro_args = intro_args #< x_tm in
+          M.in_scope x (`P tty) @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs
 
         | ESig.PVar nm :: pbinds, (_, `Dim) :: specs ->
@@ -329,7 +341,9 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_el = `Atom x in
           let psi = psi #< (x, `I) in
           let tyenv = D.Env.snoc tyenv @@ `Dim x_el in
+          let env_only_ihs = D.Env.snoc env_only_ihs @@ `Dim x_el in
           let intro_args = intro_args #< x_tm in
+          M.in_scope x `I @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs
 
         | pat :: pbinds, (_, `Rec Desc.Self) :: specs ->
@@ -345,29 +359,37 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let tty = Q.quote_ty Quote.Env.emp vty in
           let ih_ty = mot x_tm in
-          let psi = psi <>< [x, `P tty; x_ih, `P ih_ty] in
-          let tyenv = D.Env.snoc tyenv @@ `Val x_el in
-          let intro_args = intro_args #< x_tm in
-          prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs
+
+          M.in_scope x (`P data_ty) begin
+            M.lift C.base_cx >>= fun cx ->
+            let ih_vty = Cx.eval cx ih_ty in
+
+            let ih_el = V.reflect ih_vty (D.Var {name = x_ih; twin = `Only; ushift = 0}) [] in
+            let psi = psi <>< [x, `P tty; x_ih, `P ih_ty] in
+            let tyenv = D.Env.snoc tyenv @@ `Val x_el in
+            let env_only_ihs = D.Env.snoc env_only_ihs @@ `Val ih_el in
+            let intro_args = intro_args #< x_tm in
+            M.in_scope x_ih (`P ih_ty) @@
+            prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs
+          end
 
         | [], [] ->
-          psi, tyenv, Bwd.to_list intro_args, env_only_ihs
+          M.ret (Bwd.to_list psi, tyenv, Bwd.to_list intro_args, env_only_ihs)
 
         | _ ->
           failwith "prepare_clause: mismatch"
       in
 
-      let psi, env, intro_args, env_only_ihs = prepare_clause (Emp, V.empty_env, Emp, V.empty_env) pbinds constr.specs in
+      prepare_clause (Emp, empty_env, Emp, empty_env) pbinds constr.specs >>= fun (psi, env, intro_args, env_only_ihs) ->
 
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, intro_args) in
       let clause_ty = mot intro in
 
-      M.in_scopes (Bwd.to_list psi) begin
+      M.in_scopes psi begin
         begin
           M.lift C.base_cx <<@> fun cx ->
             cx, Cx.evaluator cx, Cx.quoter cx
         end >>= fun (cx, (module V), (module Q)) ->
-
 
         let rec image_of_bterm phi tm =
           let benv = env in
@@ -413,7 +435,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
 
         (* We run the clause tactic with the goal type restricted by the boundary above *)
         clause_tac {ty = clause_ty; sys = tsys} <<@> fun bdy ->
-          clbl, Tm.bindn (Bwd.map fst psi) bdy
+          clbl, Tm.bindn (Bwd.map fst @@ Bwd.from_list psi) bdy
       end
     in
 
