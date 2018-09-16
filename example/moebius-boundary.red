@@ -78,13 +78,8 @@ opaque let s1→moebius-boundary→s1/loop :
     | j=1 → refl
     ]
 
-quit
-
 /-
   This will force re-typechecking `box`, but why?
-
-  We have not implemented the code to check `box` against `fhcom` types,
-  which will probably be fixed in this PR, but why does it matter here?
 -/
 let s1→moebius-boundary→s1 (x : s1) :
   path s1 (moebius-boundary→s1 (s1→moebius-boundary x)) x =
