@@ -385,6 +385,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, intro_args) in
       let clause_ty = mot intro in
 
+      M.lift C.base_cx >>= fun outer_cx ->
+
       M.in_scopes psi begin
         begin
           M.lift C.base_cx <<@> fun cx ->
@@ -397,7 +399,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           | Tm.Intro (_, clbl, args) ->
             let constr = Desc.lookup_constr clbl desc in
             let nbnd = snd @@ List.find (fun (clbl', _) -> clbl = clbl') earlier_clauses in
-            let nclo : D.nclo = D.NClo.act phi @@ D.NClo {rho = env_only_ihs; nbnd} in
+            let nclo : D.nclo = D.NClo.act phi @@ D.NClo {rho = Cx.env outer_cx; nbnd} in
             let rec go specs tms =
               match specs, tms with
               | (_, `Const ty) :: specs, tm :: tms ->
