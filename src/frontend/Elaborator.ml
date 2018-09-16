@@ -297,35 +297,17 @@ struct
         end
 
 
-      | [], _, E.Elim {mot; scrut; clauses; default} ->
+      | [], _, E.Elim {mot; scrut; clauses} ->
         let tac_mot = Option.map elab_chk mot in
         let tac_scrut = elab_inf scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
-        let used = Hashtbl.create 10 in
-        let elab_clause (lbl, pbinds, bdy) =
-          if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
-            begin
-              Hashtbl.add used lbl ();
-              lbl, pbinds, elab_chk bdy
-            end
-        in
-        let clauses = List.map elab_clause clauses in
-        let default = Option.map elab_chk default in
+        let clauses, default = elab_elim_clauses clauses in
         tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses ~default goal
 
-      | [], Tm.Pi (dom, _), E.ElimFun {clauses; default} ->
+      | [], Tm.Pi (dom, _), E.ElimFun {clauses} ->
         let x = Name.fresh () in
         let tac_mot = None in
         let tac_scrut = M.ret (dom, Tm.up @@ Tm.var x) in
-        let used = Hashtbl.create 10 in
-        let elab_clause (lbl, pbinds, bdy) =
-          if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
-            begin
-              Hashtbl.add used lbl ();
-              lbl, pbinds, elab_chk bdy
-            end
-        in
-        let clauses = List.map elab_clause clauses in
-        let default = Option.map elab_chk default in
+        let clauses, default = elab_elim_clauses clauses in
         let tac_fun =
           tac_lambda [x] @@
           tac_elim ~loc:e.span ~tac_mot:None ~tac_scrut ~clauses ~default
@@ -470,6 +452,26 @@ struct
     go Emp
 
 
+  and elab_elim_clauses clauses =
+    let used = Hashtbl.create 10 in
+    let tac_clauses =
+      flip ListUtil.filter_map clauses @@ function
+      | `Con (lbl, pbinds, bdy) ->
+        if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
+          begin
+            Hashtbl.add used lbl ();
+            Some (lbl, pbinds, elab_chk bdy)
+          end
+      | `All bdy ->
+        None
+    in
+    let tac_default =
+      flip ListUtil.find_map_opt clauses @@ function
+      | `All bdy -> Some (elab_chk bdy)
+      | _ -> None
+    in
+
+    tac_clauses, tac_default
 
   and elab_hcom_sys s ty cap =
     let rec go acc =

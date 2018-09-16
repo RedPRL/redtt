@@ -122,7 +122,7 @@ rule token = parse
   | '^'
     { Lwt.return CARET }
   | '*'
-    { Lwt.return TIMES }
+    { Lwt.return AST }
   | "×"
     { Lwt.return TIMES }
   | ':'

@@ -49,11 +49,11 @@ let c2t (cs : s1 × s1) : torus =
   c2t/transpose (cs.fst) (cs.snd)
 
 let t2c2t : (t : torus) → path torus (c2t (t2c t)) t =
-  λ [ _ → refl ]
+  λ [ * → refl ]
 
 
 let c2t2c/transpose : (c0 c1 : s1) → path (s1 × s1) (t2c (c2t/transpose c0 c1)) (c0, c1) =
-  λ [ _ → λ [ _ → refl ] ]
+  λ [ * → λ [ * → refl ] ]
 
 let c2t2c (cs : s1 × s1) : path (s1 × s1) (t2c (c2t cs)) cs =
   c2t2c/transpose (cs.fst) (cs.snd)

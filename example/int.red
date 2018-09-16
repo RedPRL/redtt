@@ -32,12 +32,12 @@ let isuc : int → int =
 let pred-isuc : (n : int) → path int (pred (isuc n)) n =
   λ [
   | pos n → refl
-  | negsuc n → elim n [ _ → refl ]
+  | negsuc n → elim n [ * → refl ]
   ]
 
 let isuc-pred : (n : int) → path int (isuc (pred n)) n =
   λ [
-  | pos n → elim n [ _ → refl ]
+  | pos n → elim n [ * → refl ]
   | negsuc n → refl
   ]
 

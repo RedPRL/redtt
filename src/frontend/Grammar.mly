@@ -38,7 +38,7 @@
 %token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY
 %token EQUALS
 %token RIGHT_ARROW
-%token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
+%token TIMES AST HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
 %token IMPORT OPAQUE QUIT DEBUG NORMALIZE
@@ -174,6 +174,7 @@ spine_con:
   | ap = spine
     { spine_to_econ ap }
 
+%inline
 block(X):
   | WITH; x = X; END
     { x }
@@ -183,6 +184,13 @@ block(X):
 pipe_block(X):
   | x = block(preceded(option(PIPE), separated_list(PIPE, X)))
     { x }
+
+%inline
+times_or_ast:
+  | TIMES
+    {}
+  | AST
+    {}
 
 econ:
   | e = spine_con
@@ -197,13 +205,11 @@ econ:
   | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
     { E.Let {name = a; sch = sch; tm; body} }
 
-  | ELIM; scrut = located(econ); mot = option(preceded(IN,located(econ))); body = eclauses_with_default
-    { let clauses, default = body in
-      E.Elim {mot; scrut; clauses; default} }
+  | ELIM; scrut = located(econ); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
+    { E.Elim {mot; scrut; clauses} }
 
-  | LAM; body = eclauses_with_default
-    { let clauses, default = body in
-      E.ElimFun {clauses; default} }
+  | LAM; clauses = pipe_block(eclause)
+    { E.ElimFun {clauses} }
 
   | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }
@@ -227,7 +233,7 @@ econ:
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = located(econ)
     { E.Pi (List.flatten tele, cod) }
 
-  | tele = nonempty_list(etele_cell); TIMES; cod = located(econ)
+  | tele = nonempty_list(etele_cell); times_or_ast; cod = located(econ)
     { E.Sg (List.flatten tele, cod) }
 
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = located(econ); sys = pipe_block(eface)
@@ -236,19 +242,14 @@ econ:
   | dom = located(spine_con); RIGHT_ARROW; cod = located(econ)
     { E.Pi ([`Ty ("_", dom)], cod) }
 
-  | dom = located(spine_con); TIMES; cod = located(econ)
+  | dom = located(spine_con); times_or_ast; cod = located(econ)
     { E.Sg ([`Ty ("_", dom)], cod) }
 
 eclause:
   | lbl = ATOM; pbinds = list(epatbind); RIGHT_ARROW; bdy = located(econ)
-    { lbl, pbinds, bdy }
-
-eclauses_with_default:
-  | cls = pipe_block(eclause)
-    { match ListUtil.split_last cls with
-      | cls, ("_", [], bdy) -> cls, Some bdy
-      | _ -> cls, None
-      | exception _ -> cls, None }
+    { `Con (lbl, pbinds, bdy) }
+  | AST RIGHT_ARROW; bdy = located(econ)
+    { `All bdy }
 
 epatbind:
   | x = ATOM
@@ -432,7 +433,7 @@ tm:
     { fun env ->
       pi_from_tele (Some ($startpos, $endpos)) @@ tele env }
 
-  | LPR; TIMES; tele = tele; RPR
+  | LPR; times_or_ast; tele = tele; RPR
     { fun env ->
       sg_from_tele (Some ($startpos, $endpos)) @@ tele env }
 
