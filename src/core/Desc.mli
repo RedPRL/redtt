@@ -21,10 +21,6 @@ type 'a constr =
   {specs : (string * 'a arg_spec) list;
    boundary : 'a system}
 
-val dim_specs : 'a constr -> string list
-val const_specs : 'a constr -> (string * 'a) list
-val rec_specs : 'a constr -> (string * 'a rec_spec) list
-
 
 (** A datatype description is just a list of named constructors. *)
 type 'a desc =
