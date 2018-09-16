@@ -72,13 +72,17 @@ and econ =
 and eterm = econ info
 
 and eclause =
-  [ `Con of Desc.con_label * epatbind list * eterm
+  [ `Con of Desc.con_label * einvpat epatbind list * eterm
   | `All of eterm
   ]
 
-and epatbind =
-  | PVar of string
-  | PIndVar of string * string
+and 'a epatbind =
+  [ `Bind of 'a
+  | `BindIH of 'a * 'a
+  ]
+
+and einvpat =
+  [ `Var of string ]
 
 and esys = eface list
 

@@ -44,7 +44,7 @@ val tac_elim
   : loc:location
   -> tac_mot:chk_tac option
   -> tac_scrut:inf_tac
-  -> clauses:(Desc.con_label * ESig.epatbind list * chk_tac) list
+  -> clauses:(Desc.con_label * ESig.einvpat ESig.epatbind list * chk_tac) list
   -> default:chk_tac option
   -> chk_tac
 

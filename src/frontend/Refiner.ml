@@ -296,8 +296,8 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let constr = Desc.lookup_constr lbl desc in
           let pbinds =
             flip List.map constr.specs @@ function
-            | nm, (`Const _ | `Dim) -> ESig.PVar nm
-            | nm, `Rec _ -> ESig.PIndVar (nm, nm ^ "/ih")
+            | nm, (`Const _ | `Dim) -> `Bind (`Var nm)
+            | nm, `Rec _ -> `BindIH (`Var nm, `Var (nm ^ "/ih"))
           in
           lbl, pbinds,
           match default with
@@ -325,7 +325,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
             cx, Cx.evaluator cx, Cx.quoter cx
         end >>= fun (cx, (module V), (module Q)) ->
         match pbinds, specs with
-        | ESig.PVar nm :: pbinds, (_, `Const ty) :: specs ->
+        | `Bind (`Var nm) :: pbinds, (_, `Const ty) :: specs ->
           let x = Name.named @@ Some nm in
           let vty = V.eval tyenv ty in
           let x_tm = Tm.up @@ Tm.var x in
@@ -338,7 +338,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           M.in_scope x (`P tty) @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs) pbinds specs
 
-        | ESig.PVar nm :: pbinds, (_, `Dim) :: specs ->
+        | `Bind (`Var nm) :: pbinds, (_, `Dim) :: specs ->
           let x = Name.named @@ Some nm in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = `Atom x in
@@ -352,9 +352,9 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
         | pat :: pbinds, (_, `Rec Desc.Self) :: specs ->
           let x, x_ih =
             match pat with
-            | PVar nm ->
+            | `Bind (`Var nm) ->
               Name.named @@ Some nm, Name.fresh ()
-            | PIndVar (nm, nm_ih) ->
+            | `BindIH (`Var nm, `Var nm_ih) ->
               Name.named @@ Some nm, Name.named @@ Some nm_ih
           in
           let vty = data_vty in

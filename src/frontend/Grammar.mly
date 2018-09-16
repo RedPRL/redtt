@@ -252,10 +252,14 @@ eclause:
     { `All bdy }
 
 epatbind:
+  | x = einvpat
+    { `Bind x }
+  | LPR; x = einvpat; RIGHT_ARROW; ih = einvpat; RPR
+    { `BindIH (x, ih) }
+
+einvpat:
   | x = ATOM
-    { E.PVar x }
-  | LPR; x = ATOM; RIGHT_ARROW; ih = ATOM; RPR
-    { E.PIndVar (x, ih) }
+    { `Var x }
 
 edimension:
   | n = NUMERAL;
