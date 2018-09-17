@@ -268,7 +268,15 @@ let lookup_datatype dlbl =
   M.lift C.base_cx <<@> fun cx ->
     GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
 
-let rec tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
+let rec tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk_tac =
+  match_goal @@ fun goal ->
+  match invpat with
+  | `Var var ->
+    body
+  | `Wildcard ->
+    tac_elim ~loc ~tac_mot:None ~tac_scrut ~clauses:[] ~default:(Some body)
+
+and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
   fun goal ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
@@ -380,7 +388,7 @@ let rec tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
         | `Bind p :: pbinds, ((_, `Rec _) :: _ as specs) ->
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (p, `Var (`Gen (Name.fresh ()))) :: pbinds) specs
 
-        | `Bind `Wildcard :: pbinds, ((_, spec) :: _ as specs) ->
+        | `Bind inv :: pbinds, ((_, spec) :: _ as specs) ->
           let x = Name.fresh () in
           let kont_tac ktac tac =
             ktac @@
@@ -391,30 +399,29 @@ let rec tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
               | _ -> failwith "unexpected wildcard pattern"
             in
             let ty = Q.quote_ty Quote.Env.emp vty in
-            let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x) in
-            tac_elim ~loc ~tac_mot:None ~tac_scrut ~clauses:[] ~default:(Some tac)
+            tac_inversion ~loc ~tac_scrut inv tac
           in
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`Bind (`Var (`Gen x)) :: pbinds) specs
 
-        | `BindIH (`Wildcard, p) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
-          let x = Name.fresh () in
-          let kont_tac ktac tac =
-            ktac @@
-            let ty = data_ty in
-            let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x) in
-            tac_elim ~loc ~tac_mot:None ~tac_scrut ~clauses:[] ~default:(Some tac)
-          in
-          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var (`Gen x), p) :: pbinds) specs
-
-        | `BindIH (`Var y, `Wildcard) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
+        | `BindIH (`Var y, inv) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
           let x_ih = Name.fresh () in
           let kont_tac ktac tac =
             ktac @@
             let ty = mot @@ Tm.up @@ Tm.var x_ih in
             let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x_ih) in
-            tac_elim ~loc ~tac_mot:None ~tac_scrut ~clauses:[] ~default:(Some tac)
+            tac_inversion ~loc ~tac_scrut inv tac
           in
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var y, `Var (`Gen x_ih)) :: pbinds) specs
+
+        | `BindIH (inv, p) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
+          let x = Name.fresh () in
+          let kont_tac ktac tac =
+            ktac @@
+            let ty = data_ty in
+            let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x) in
+            tac_inversion ~loc ~tac_scrut inv tac
+          in
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var (`Gen x), p) :: pbinds) specs
 
         | [], [] ->
           M.ret (Bwd.to_list psi, tyenv, Bwd.to_list intro_args, env_only_ihs, kont_tac)
