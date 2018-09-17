@@ -67,9 +67,8 @@ let join→s3/push (a b : s1) : path s3 base base =
 
 let join→s3 : join → s3 =
   elim [
-  | inl a → base
-  | inr b → base
   | push a b i → join→s3/push a b i
+  | * → base
   ]
 
 -- join-s3-join inverse homotopy
@@ -157,7 +156,6 @@ let s2/merid : s1 → path s2 base base =
 
 let join→s2 : join → s2 =
   elim [
-  | inl a → base
-  | inr b → base
   | push a b i → trans s2 (s2/merid a) (s2/merid b) i
+  | * → base
   ]
