@@ -815,26 +815,6 @@ struct
             AbsFace.make I.idn r `Dim0 @@ fun phi ->
             Abs.make1 @@ fun _ -> base0 phi (I.act phi r')
           in
-          (* The face for r=1. This more optimized version is used
-           * in [Y], [F] and [R1] but not [SVO]. *)
-          let face1 =
-            AbsFace.make I.idn r `Dim1 @@ fun phi ->
-            Abs.make1 @@ fun y ->
-            let ty = Value.act phi @@ subst_r' info.ty1 in
-            let cap = base1 phi (I.act phi r') in
-            let msys = force_abs_sys @@
-              let face0 =
-                AbsFace.make phi (I.act phi r') `Dim0 @@ fun phi ->
-                Abs.make1 @@ fun z -> ext_apply (cdr (fiber0 phi cap)) [`Atom z]
-              in
-              let face1 =
-                AbsFace.make phi (I.act phi r') `Dim1 @@ fun phi ->
-                Abs.make1 @@ fun _ -> Value.act phi el
-              in
-              [face0; face1]
-            in
-            make_hcom (Dir.make `Dim1 (`Atom y)) ty cap msys
-          in
           (* This is the type of the fiber, and is used for
            * simplifying the generating code for the front face
            * (r'=0). It is using the evaluator to generate the
@@ -907,7 +887,7 @@ struct
             Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) [`Atom w]
           in
           let el1 = make_hcom (Dir.make `Dim1 r') info.ty1 (base I.idn r r') @@
-            force_abs_sys [face0; face1; face_diag; face_front]
+            force_abs_sys [face0; face_diag; face_front]
           in
           make_vin I.idn r' el0 el1
 
