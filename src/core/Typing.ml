@@ -131,17 +131,15 @@ let check_valid_cofibration ?xs:(xs = None) cofib =
         | `Apart -> go eqns
         | `Indet ->
           match r, r' with
-          | `Dim0, `Dim1 -> go eqns
-          | `Dim1, `Dim0 -> go eqns
-          | `Dim0, `Dim0 -> true
-          | `Dim1, `Dim1 -> true
-          | `Atom x, `Dim0 ->
+          | `Dim0, `Dim1 | `Dim1, `Dim0 -> go eqns
+          | `Dim0, `Dim0 | `Dim1, `Dim1 -> true
+          | `Atom x, `Dim0 | `Dim0, `Atom x ->
             if Hashtbl.mem ones x then true else
               begin
                 Hashtbl.add zeros x ();
                 go eqns
               end
-          | `Atom x, `Dim1 ->
+          | `Atom x, `Dim1 | `Dim1, `Atom x ->
             if Hashtbl.mem zeros x then true else
               begin
                 Hashtbl.add ones x ();
@@ -149,8 +147,6 @@ let check_valid_cofibration ?xs:(xs = None) cofib =
               end
           | `Atom x, `Atom y ->
             x = y || go eqns
-          | _, _ ->
-            go @@ (r', r) :: eqns
       end
   in
   if go cofib then () else failwith "check_valid_cofibration"
@@ -481,10 +477,10 @@ and check_box cx tydir tycap tysys tr tr' tcap tsys =
 
 and check_fhcom cx ty tr tr' tcap tsys =
   let r = check_eval_dim cx tr in
-  check_dim cx tr';
+  let r' = check_eval_dim cx tr' in
   let cxx, x = Cx.ext_dim cx ~nm:None in
   let cap = check_eval cx ty tcap in
-  check_valid_cofibration @@ cofibration_of_sys cx tsys;
+  check_valid_cofibration @@ (r, r') :: cofibration_of_sys cx tsys;
   check_comp_sys cx r (cxx, x, ty) cap tsys
 
 and check_boundary cx ty sys el =
@@ -856,17 +852,17 @@ and infer_head cx =
     let vtyx = check_eval_ty cxx ty in
     let vtyr = D.Value.act (I.subst r x) vtyx in
     let cap = check_eval cx vtyr info.cap in
-    check_valid_cofibration @@ cofibration_of_sys cx info.sys;
+    check_valid_cofibration @@ (r, r') :: cofibration_of_sys cx info.sys;
     check_comp_sys cx r (cxx, x, vtyx) cap info.sys;
     D.Value.act (I.subst r' x) vtyx
 
   | T.HCom info ->
     let r = check_eval_dim cx info.r in
-    check_dim cx info.r';
+    let r' = check_eval_dim cx info.r' in
     let cxx, x = Cx.ext_dim cx ~nm:None in
     let vty = check_eval_ty cx info.ty in
     let cap = check_eval cx vty info.cap in
-    check_valid_cofibration @@ cofibration_of_sys cx info.sys;
+    check_valid_cofibration @@ (r, r') :: cofibration_of_sys cx info.sys;
     check_comp_sys cx r (cxx, x, vty) cap info.sys;
     vty
 
