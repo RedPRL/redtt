@@ -22,12 +22,6 @@ let t2c : torus → s1 × s1 =
   | square i j → (loop j, loop i)
   ]
 
-let c2t/base : s1 → torus =
-  elim [
-  | base → pt
-  | loop i → p/two i
-  ]
-
 let c2t : (s1 × s1) → torus =
   λ [,] →                   -- now the goal is s1 → s1 → torus
   elim [                    -- now the goal is s1 → torus
