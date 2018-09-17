@@ -859,18 +859,19 @@ struct
             (* The implementation used in [F] and [R1]. *)
             | `SPLIT_COERCION ->
               begin
-                match r with
+                let rphi = I.act phi r in
+                match rphi with
                 | `Dim0 -> fiber_at_face0 phi (* r=0 *)
                 | `Dim1 -> fiber0 phi (base1 phi `Dim0) (* r=1 *)
-                | `Atom r_atom ->
+                | `Atom rphi_atom ->
                   (* XXX This needs to be updated with the new Thought. *)
                   (* coercion to the diagonal *)
                   let path_in_fiber0_ty =
                     contr0 phi @@
-                    make_coe (Dir.make `Dim0 (I.act phi r)) (Abs.bind1 r_atom (fiber0_ty phi (base phi (I.act phi r) `Dim0))) @@
+                    make_coe (Dir.make `Dim0 rphi) (Abs.bind1 rphi_atom (fiber0_ty phi (base phi rphi `Dim0))) @@
                     (* the fiber *)
                     make_cons
-                      (Value.act (I.cmp phi (I.subst `Dim0 r_atom)) el,
+                      (Value.act (I.cmp phi (I.subst `Dim0 rphi_atom)) el,
                        make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
                   in
                   ext_apply path_in_fiber0_ty [r]
