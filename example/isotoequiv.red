@@ -50,10 +50,5 @@ let iso/fiber/prop
 
 
 let iso→equiv (A B : type) (I : iso A B) : equiv A B =
-  ( I.fst
-  , λ b →
-    ( (I.snd.fst b, I.snd.snd.fst b)
-    , λ fib →
-      iso/fiber/prop _ _ I b fib (I.snd.fst b, I.snd.snd.fst b)
-    )
-  )
+  let (f, g, α, β) = I in
+  (f , λ b → ((g b, α b), λ fib → iso/fiber/prop _ _ I b fib (g b, α b)))
