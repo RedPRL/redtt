@@ -122,20 +122,20 @@ let check_valid_cofibration ?xs:(xs = None) cofib =
 
   let rec go_axioms changed eqns remainings =
     match eqns with
-    | [] -> go_axioms_restart changed remainings
+    | [] -> (go_axioms_restart[@tailcall]) changed remainings
     | (x, y) :: eqns ->
       match lookup x, lookup y with
       | `Dim0, `Dim1 | `Dim1, `Dim0 ->
-        go_axioms changed eqns remainings
+        (go_axioms[@tailcall]) changed eqns remainings
       | `Dim0, `Dim0 | `Dim1, `Dim1 -> true
       | `Atom x, `Dim0 | `Dim0, `Atom x ->
         Hashtbl.add assignment x `Dim1;
-        go_axioms true eqns remainings
+        (go_axioms[@tailcall]) true eqns remainings
       | `Atom x, `Dim1 | `Dim1, `Atom x ->
         Hashtbl.add assignment x `Dim0;
-        go_axioms true eqns remainings
+        (go_axioms[@tailcall]) true eqns remainings
       | `Atom x, `Atom y ->
-        go_axioms changed eqns ((x,y) :: remainings)
+        (go_axioms[@tailcall]) changed eqns ((x,y) :: remainings)
   and go_axioms_restart changed remainings =
     match remainings, changed with
     | [], _ -> false
@@ -143,7 +143,7 @@ let check_valid_cofibration ?xs:(xs = None) cofib =
     | (x, y) :: remainings, _ ->
       Hashtbl.add assignment x `Dim0;
       Hashtbl.add assignment y `Dim1;
-      go_axioms false remainings []
+      (go_axioms[@tailcall]) false remainings []
   in
 
   let rec go changed eqns remainings =
@@ -154,16 +154,16 @@ let check_valid_cofibration ?xs:(xs = None) cofib =
       check_dim_scope xs r';
       match I.bind r lookup, I.bind r' lookup with
       | `Dim0, `Dim1 | `Dim1, `Dim0 ->
-        go changed eqns remainings
+        (go[@tailcall]) changed eqns remainings
       | `Dim0, `Dim0 | `Dim1, `Dim1 -> true
       | `Atom x, `Dim0 | `Dim0, `Atom x ->
         Hashtbl.add assignment x `Dim1;
-        go true eqns remainings
+        (go[@tailcall]) true eqns remainings
       | `Atom x, `Dim1 | `Dim1, `Atom x ->
         Hashtbl.add assignment x `Dim0;
-        go true eqns remainings
+        (go[@tailcall]) true eqns remainings
       | `Atom x, `Atom y ->
-        x = y || go changed eqns ((x,y) :: remainings)
+        x = y || (go[@tailcall]) changed eqns ((x,y) :: remainings)
   in
   if go false cofib [] then () else failwith "check_valid_cofibration"
 
