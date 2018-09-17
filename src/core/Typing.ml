@@ -151,9 +151,9 @@ let check_valid_cofibration ?xs:(xs = None) cofib =
 
   (* this is similar to `go_atoms` but handles a list of equations.
    * it also does scope checking. `remainings` are pairs of atoms
-   * that would be handled by go_atoms.
+   * that would be handled by `go_atoms`.
    *
-   * `go` does the first pass and `go_atoms` takes care the rest. *)
+   * `go` does the first pass and `go_atoms` takes care of the rest. *)
   let rec go changed eqns remainings =
     match eqns with
     | [] -> go_atoms_restart changed remainings
