@@ -117,39 +117,58 @@ let check_dim_scope oxs r =
     | _ -> ()
 
 let check_valid_cofibration ?xs:(xs = None) cofib =
-  let zeros = Hashtbl.create 20 in
-  let ones = Hashtbl.create 20 in
-  let rec go eqns =
+  let assignment = Hashtbl.create 20 in
+  let lookup x : I.t = try Hashtbl.find assignment x with Not_found -> `Atom x in
+
+  let rec go_axioms changed eqns remainings =
     match eqns with
-    | [] -> false
+    | [] -> go_axioms_restart changed remainings
+    | (x, y) :: eqns ->
+      match lookup x, lookup y with
+      | `Dim0, `Dim1 | `Dim1, `Dim0 ->
+        go_axioms changed eqns remainings
+      | `Dim0, `Dim0 | `Dim1, `Dim1 -> true
+      | `Atom x, `Dim0 | `Dim0, `Atom x ->
+        Hashtbl.add assignment x `Dim1;
+        go_axioms true eqns remainings
+      | `Atom x, `Dim1 | `Dim1, `Atom x ->
+        Hashtbl.add assignment x `Dim0;
+        go_axioms true eqns remainings
+      | `Atom x, `Atom y ->
+        go_axioms changed eqns ((x,y) :: remainings)
+  and go_axioms_restart changed remainings =
+    match remainings, changed with
+    | [], _ -> false
+    | _, true -> go_axioms false remainings []
+    | (x, y) :: remainings, _ ->
+      Hashtbl.add assignment x `Dim0;
+      Hashtbl.add assignment y `Dim1;
+      go_axioms false remainings []
+  in
+
+  let rec go changed eqns remainings =
+    match eqns with
+    | [] -> go_axioms_restart changed remainings
     | (r, r') :: eqns ->
       check_dim_scope xs r;
       check_dim_scope xs r';
-      begin
-        match I.compare r r' with
-        | `Same -> true
-        | `Apart -> go eqns
-        | `Indet ->
-          match r, r' with
-          | `Dim0, `Dim1 | `Dim1, `Dim0 -> go eqns
-          | `Dim0, `Dim0 | `Dim1, `Dim1 -> true
-          | `Atom x, `Dim0 | `Dim0, `Atom x ->
-            if Hashtbl.mem ones x then true else
-              begin
-                Hashtbl.replace zeros x ();
-                go eqns
-              end
-          | `Atom x, `Dim1 | `Dim1, `Atom x ->
-            if Hashtbl.mem zeros x then true else
-              begin
-                Hashtbl.replace ones x ();
-                go eqns
-              end
-          | `Atom x, `Atom y ->
-            x = y || go eqns
-      end
+      match I.bind r lookup, I.bind r' lookup with
+      | `Dim0, `Dim1 | `Dim1, `Dim0 ->
+        go changed eqns remainings
+      | `Dim0, `Dim0 | `Dim1, `Dim1 -> true
+      | `Atom x, `Dim0 | `Dim0, `Atom x ->
+        Hashtbl.add assignment x `Dim1;
+        go true eqns remainings
+      | `Atom x, `Dim1 | `Dim1, `Atom x ->
+        Hashtbl.add assignment x `Dim0;
+        go true eqns remainings
+      | `Atom x, `Atom y ->
+        x = y || go changed eqns ((x,y) :: remainings)
   in
-  if go cofib then () else failwith "check_valid_cofibration"
+  if go false cofib [] then () else failwith "check_valid_cofibration"
+
+let check_comp_cofibration dir cofib =
+  check_valid_cofibration (dir :: cofib)
 
 let check_extension_cofibration xs cofib =
   match cofib with
@@ -398,6 +417,7 @@ and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
     in
     List.map face sys
 
+(* XXX the following code smells! *)
 and check_box cx tydir tycap tysys tr tr' tcap tsys =
   let raiseError () =
     let ty = D.make @@ D.FHCom {dir=tydir; cap=tycap; sys=tysys} in
@@ -480,7 +500,7 @@ and check_fhcom cx ty tr tr' tcap tsys =
   let r' = check_eval_dim cx tr' in
   let cxx, x = Cx.ext_dim cx ~nm:None in
   let cap = check_eval cx ty tcap in
-  check_valid_cofibration @@ (r, r') :: cofibration_of_sys cx tsys;
+  check_comp_cofibration (r, r') @@ cofibration_of_sys cx tsys;
   check_comp_sys cx r (cxx, x, ty) cap tsys
 
 and check_boundary cx ty sys el =
@@ -852,7 +872,7 @@ and infer_head cx =
     let vtyx = check_eval_ty cxx ty in
     let vtyr = D.Value.act (I.subst r x) vtyx in
     let cap = check_eval cx vtyr info.cap in
-    check_valid_cofibration @@ (r, r') :: cofibration_of_sys cx info.sys;
+    check_comp_cofibration (r, r') @@ cofibration_of_sys cx info.sys;
     check_comp_sys cx r (cxx, x, vtyx) cap info.sys;
     D.Value.act (I.subst r' x) vtyx
 
@@ -862,7 +882,7 @@ and infer_head cx =
     let cxx, x = Cx.ext_dim cx ~nm:None in
     let vty = check_eval_ty cx info.ty in
     let cap = check_eval cx vty info.cap in
-    check_valid_cofibration @@ (r, r') :: cofibration_of_sys cx info.sys;
+    check_comp_cofibration (r, r') @@ cofibration_of_sys cx info.sys;
     check_comp_sys cx r (cxx, x, vty) cap info.sys;
     vty
 
