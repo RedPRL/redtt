@@ -107,24 +107,21 @@ let is-equiv/prop (A B : type) (f : A → B) : is-prop (is-equiv A B f) =
   λ e0 e1 i b → is-contr/prop (fiber A B f b) (e0 b) (e1 b) i
 
 -- A direct proof that is-equiv f is a prop, ported from cubicaltt to yacctt to redtt
-let is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv A B f) =
+let is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv _ _ f) =
   λ ise ise' i y →
-    let a : A = ise y .fst .fst in
-    let p : path B (f a) y = ise y .fst .snd in
-    let c : (w : fiber A B f y) → path (fiber A B f y) w (a,p) =
-      ise y .snd
-    in
-    let a' : A = ise' y .fst .fst in
-    let p' : path B (f a') y = ise' y .fst .snd in
-    let c' : (w : fiber A B f y) → path (fiber A B f y) w (a',p') =
-      ise' y .snd
+    let a = ise y .fst .fst in
+    let p = ise y .fst .snd in
+    let c = ise y .snd in
+    let a' = ise' y .fst .fst in
+    let p' = ise' y .fst .snd in
+    let c' = ise' y .snd
     in
     ( c' (a , p) i
     , λ w →
-        let cap (i j : dim) : fiber A B f y =
-          comp 1 i (c' w j) [
-          | j=0 → refl
-          | j=1 → c' w
+        let cap (j k : dim) : fiber A B f y =
+          comp 1 j (c' w k) [
+          | k=0 → refl
+          | k=1 → c' w
           ]
         in
         let face/i0 (j k : dim) : fiber A B f y =
@@ -133,15 +130,12 @@ let is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv A B f) =
           | k=1 → c w
           ]
         in
-        let sq : pathd (λ i → path (fiber A B f y) w (c' (a,p) i)) (c w) (c' w) =
-          λ i j →
-            comp 0 1 (cap i j) [
-            | i=0 → face/i0 j
-            | i=1 | j=0 → refl
-            | j=1 k → c' (face/i0 1 k) i
-            ]
-        in
-        sq i
+        λ j →
+          comp 0 1 (cap i j) [
+          | i=0 → face/i0 j
+          | i=1 | j=0 → refl
+          | j=1 k → c' (face/i0 1 k) i
+          ]
     )
 
 
@@ -167,7 +161,7 @@ let equiv→path/based
 let path→equiv/based
   (A : type)
   (X : (B : type) × path^1 type A B)
-  : (B : type) × (equiv A B)
+  : (B : type) × equiv A B
   =
   ( X.fst
   , path→equiv _ (X.fst) (X.snd)
@@ -191,15 +185,13 @@ let ua/retract/sig
     , ua/retract _ (singl.fst) (singl.snd) i
     )
 
-let ua/id-equiv (A : type)
-  : path^1 (path^1 type A A) (ua A A (id-equiv A)) refl
-  =
+let ua/id-equiv (A : type) : path^1 _ (ua _ _ (id-equiv A)) refl =
   trans^1 _
     (λ i → ua A A (coe 0 i (id-equiv A) in λ _ → equiv A A))
     (path-retract/preserves/refl^1 _ _ ua path→equiv ua/retract A)
 
 opaque
-let path/based/contr (A : type) : is-contr^1 ((B : _) × path^1 type A B) =
+let path/based/contr (A : type) : is-contr^1 ((B : _) × path^1 _ A B) =
   ( (A, refl)
   , λ X i →
     ( comp 0 1 A [
