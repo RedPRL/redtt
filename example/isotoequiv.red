@@ -16,7 +16,7 @@ let iso/fiber/prop
   : is-prop (fiber _ _ (I.fst) b)
   =
   let (f, g, α, β) = I in
-  let sq (fib : fiber _ _ (I.fst) b) (i j : dim) : A =
+  let sq (fib : fiber _ _ f b) (i j : dim) : A =
     comp 0 j (g (fib.snd i)) [
     | i=0 → β (fib.fst)
     | i=1 → refl
