@@ -44,6 +44,8 @@ sig
   val restriction_force : value -> value
 
   val rigid_vproj : atom -> func:value -> el:value -> value
+  val rigid_coe : dir -> abs -> value -> value
+  val make_coe : dir Dir.m -> abs -> value -> value
 
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> env_el list -> value

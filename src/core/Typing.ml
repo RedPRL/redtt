@@ -17,6 +17,8 @@ type cofibration = (I.t * I.t) list
 type error =
   | ExpectedDimension of cx * Tm.tm
   | ExpectedTick of cx * Tm.tm
+  | UnequalDimensions of I.t * I.t
+  | TypeError of value * (cx * Tm.tm)
 
 exception E of error
 
@@ -35,6 +37,14 @@ struct
       Format.fprintf fmt
         "Expected tick, but got %a."
         (Tm.pp (Cx.ppenv cx)) tm
+    | UnequalDimensions (i0, i1) ->
+      Format.fprintf fmt
+        "Unequal dimensions: %a /= %a"
+        I.pp i0 I.pp i1
+    | TypeError (ty, (cx, tm)) ->
+      Format.fprintf fmt
+        "Unable to show %a is of type %a."
+        (Tm.pp (Cx.ppenv cx)) tm D.pp_value ty
 
 end
 
@@ -329,6 +339,9 @@ let rec check_ cx ty rst tm =
         failwith "v/vin dimension mismatch"
     end;
 
+  | [], D.FHCom tyinfo, T.Box tinfo ->
+    check_box cx tyinfo.dir tyinfo.cap tyinfo.sys tinfo.r tinfo.r' tinfo.cap tinfo.sys
+
   | [], _, T.Up tm ->
     let ty' = infer cx tm in
     Cx.check_subtype cx ty' ty
@@ -346,8 +359,7 @@ let rec check_ cx ty rst tm =
     check_boundary cx ty rst v
 
   | [], _, _ ->
-    (* Format.eprintf "Failed to check term %a@." (Tm.pp (CxUtil.ppenv cx)) tm; *)
-    failwith "Type error"
+    raise @@ E (TypeError (ty, (cx, tm)))
 
 and check cx ty tm =
   check_ cx ty [] tm
@@ -390,6 +402,83 @@ and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
     in
     List.map face sys
 
+and check_box cx tydir tycap tysys tr tr' tcap tsys =
+  let raiseError () =
+    let ty = D.make @@ D.FHCom {dir=tydir; cap=tycap; sys=tysys} in
+    let tm = Tm.make @@ Tm.Box {r=tr; r'=tr'; cap=tcap; sys=tsys} in
+    raise @@ E (TypeError (ty, (cx, tm)))
+  in
+  let tyr, tyr' = Dir.unleash tydir in
+  let r = check_eval_dim cx tr in
+  Cx.check_eq_dim cx tyr r;
+  let r' = check_eval_dim cx tr' in
+  Cx.check_eq_dim cx tyr' r';
+  let cap = check_eval cx tycap tcap in
+  let rec go tysys tsys acc =
+    match tsys with
+    | [] -> if tysys = [] then () else raiseError ()
+    | (tri0, tri1, otm) :: tsys ->
+      let ri0 = check_eval_dim cx tri0 in
+      let ri1 = check_eval_dim cx tri1 in
+      match tysys, I.compare ri0 ri1, otm with
+      | _, `Apart, _ ->
+        (* skipping false boundaries without consuming `tysys`. *)
+        go tysys tsys acc
+
+      | _, `Same, _ ->
+        raiseError ()
+
+      | (Face.Indet (p, tyabs) :: tysys), `Indet, Some tm ->
+        let tyri0, tyri1 = Eq.unleash p in
+        Cx.check_eq_dim cx tyri0 ri0;
+        Cx.check_eq_dim cx tyri1 ri1;
+
+        begin
+          try
+            let cx, phi = Cx.restrict cx ri0 ri1 in
+            let (module V) = Cx.evaluator cx in
+            let tyabs = Lazy.force tyabs in
+            let ty_r' = D.Abs.inst1 tyabs tyr' in
+            let el = check_eval cx ty_r' tm in
+            Cx.check_eq cx ~ty:(D.Value.act phi tycap)
+              (D.Value.act phi cap)
+              (V.make_coe (Dir.act phi (Dir.swap tydir)) tyabs el);
+
+            (* Check face-face adjacency conditions *)
+            go_adj cx ty_r' acc (ri0, ri1, el);
+            go tysys tsys @@ (ri0, ri1, el) :: acc
+          with
+        | I.Inconsistent -> raiseError ()
+        end
+      | _ ->
+        raiseError ()
+
+  and go_adj cx ty faces (ri0, ri1, el) : unit =
+    match faces with
+    | [] -> ()
+    | (ri'0, ri'1, el') :: faces ->
+      (* Invariant: cx, ty and el should already be restricted by ri0=ri1,
+       * and el' should already be restricted by ri'0=ri'1. *)
+      begin
+        try
+          let phi' =
+            let ri0 = I.act (I.equate ri'0 ri'1) ri0 in
+            let ri1 = I.act (I.equate ri'0 ri'1) ri1 in
+            I.equate ri0 ri1
+          in
+          let cx, phi =
+            let ri'0 = I.act (I.equate ri0 ri1) ri'0 in
+            let ri'1 = I.act (I.equate ri0 ri1) ri'1 in
+            Cx.restrict cx ri'0 ri'1
+          in
+          Cx.check_eq cx ~ty:(D.Value.act phi ty) (D.Value.act phi el) (D.Value.act phi' el')
+        with
+        | I.Inconsistent -> ()
+      end;
+      go_adj cx ty faces (ri0, ri1, el)
+  in
+  go tysys tsys []
+
 and check_fhcom cx ty tr tr' tcap tsys =
   let r = check_eval_dim cx tr in
   check_dim cx tr';
@@ -424,8 +513,6 @@ and check_boundary_face cx ty face el =
     with
     | I.Inconsistent ->
       ()
-
-
 
 and check_tm_sys cx ty sys =
   let rec go sys acc =

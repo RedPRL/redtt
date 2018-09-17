@@ -72,6 +72,7 @@ sig
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
+  val equiv_dim : env -> I.t -> I.t -> unit
   val subtype : env -> value -> value -> unit
 
   val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit
@@ -766,6 +767,9 @@ struct
 
   let equiv_ty env ty0 ty1 =
     ignore @@ equate_ty env ty0 ty1
+
+  let equiv_dim env r0 r1 =
+    ignore @@ equate_dim env r0 r1
 
   let quote_ty env ty =
     equate_ty env ty ty
