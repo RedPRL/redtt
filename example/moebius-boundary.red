@@ -9,7 +9,7 @@ let not/path : path^1 type bool bool =
   ua _ _ not/equiv
 
 let moebius-boundary/fiber : s1 → type =
-  λ [
+  elim [
   | base → bool
   | loop i → not/path i
   ]
@@ -17,7 +17,7 @@ let moebius-boundary/fiber : s1 → type =
 let moebius-boundary : type = (x : s1) × moebius-boundary/fiber x
 
 let moebius-boundary→s1/loop-base (i : dim) : bool → s1 =
-  λ [ tt → loop i | ff → base ]
+  elim [ tt → loop i | ff → base ]
 
 let moebius-boundary→s1/commuting :
   (y : bool) →
@@ -25,7 +25,7 @@ let moebius-boundary→s1/commuting :
     (moebius-boundary→s1/loop-base 0 y)
     (moebius-boundary→s1/loop-base 1 (coe 0 1 y in not/path))
   =
-  λ [ tt → refl | ff → refl ]
+  elim [ tt → refl | ff → refl ]
 
 let moebius-boundary→s1/loop/filler (i j : dim) (y : not/path i) : s1 =
   let z : bool = coe i 1 y in not/path
@@ -36,7 +36,7 @@ let moebius-boundary→s1/loop/filler (i j : dim) (y : not/path i) : s1 =
   ]
 
 let moebius-boundary→s1' : (x : s1) → moebius-boundary/fiber x → s1 =
-  λ [
+  elim [
   | base → moebius-boundary→s1/loop-base 0
   | loop i → moebius-boundary→s1/loop/filler i 0
   ]
@@ -55,7 +55,7 @@ let s1→moebius-boundary/loop/filler (i j : dim) : moebius-boundary =
   comp 0 j (loop-path ff i) [i=0 → refl | i=1 → loop-path tt]
 
 let s1→moebius-boundary : s1 → moebius-boundary =
-  λ [
+  elim [
   | base → s1→moebius-boundary/base
   | loop i → s1→moebius-boundary/loop/filler i 1
   ]
@@ -81,7 +81,7 @@ opaque let s1→moebius-boundary→s1/loop :
 let s1→moebius-boundary→s1 :
   (x : s1) → path s1 (moebius-boundary→s1 (s1→moebius-boundary x)) x
   =
-  λ [
+  elim [
   | base → refl
   | loop i → λ j → s1→moebius-boundary→s1/loop i j
   ]
