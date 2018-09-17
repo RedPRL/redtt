@@ -50,6 +50,7 @@ val tac_elim
 
 (** Introduce a let-binding. *)
 val tac_let : Name.t -> inf_tac -> chk_tac -> chk_tac
+val tac_inv_let : ESig.einvpat -> inf_tac -> chk_tac -> chk_tac
 
 (** Try to solve a goal with a term, unifying it against the ambient restriction. *)
 val guess_restricted : tm -> chk_tac
@@ -58,3 +59,5 @@ val guess_restricted : tm -> chk_tac
 val normalize_ty : ty -> ty m
 val bind_sys_in_scope : (tm, tm) Tm.system -> (tm, tm) Tm.system m
 val bind_in_scope : tm -> tm m
+
+val name_of : [`User of string | `Gen of Name.t] -> Name.t

@@ -44,7 +44,7 @@ and econ =
   | Tuple of eterm list
   | Type of Kind.t * Lvl.t
   | Quo of (ResEnv.t -> Tm.tm)
-  | Let of {name : string; sch : escheme; tm : eterm; body : eterm}
+  | Let of {pat : einvpat; sch : escheme; tm : eterm; body : eterm}
 
   | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
   | ElimFun of {clauses : eclause list}

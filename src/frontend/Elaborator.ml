@@ -278,7 +278,15 @@ struct
         let lambdas = tac_wrap_nf (tac_lambda ps ctac) in
         let inf_tac = lambdas {ty = pity; sys = []} <<@> fun ltm -> pity, ltm in
         let body_tac = elab_chk info.body in
-        tac_let (Name.named @@ Some info.name) inf_tac body_tac goal
+        begin
+          match info.pat, names with
+          | `Var nm, _ ->
+            tac_let (name_of nm) inf_tac body_tac goal
+          | pat, [] ->
+            tac_inv_let pat inf_tac body_tac goal
+          | _ ->
+            failwith "Unsupported destructuring let-binding"
+        end
 
       | _, _, E.Lam (ps, e) ->
         let tac = elab_chk e in

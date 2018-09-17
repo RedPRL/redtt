@@ -202,8 +202,8 @@ econ:
   | LAM; xs = list(einvpat); RIGHT_ARROW; e = located(econ)
     { E.Lam (xs, e) }
 
-  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
-    { E.Let {name = a; sch = sch; tm; body} }
+  | LET; pat = einvpat; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
+    { E.Let {pat; sch = sch; tm; body} }
 
   | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
     { match scrut with

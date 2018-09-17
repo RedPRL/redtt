@@ -127,6 +127,7 @@ let tac_let x itac ctac =
     M.ret @@ Tm.make @@ Tm.Let (Tm.ann ~ty:let_ty ~tm:let_tm, Tm.bind x bdyx)
 
 
+
 let flip f x y = f y x
 
 let tac_pair tac0 tac1 : chk_tac =
@@ -360,7 +361,6 @@ and tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk
     tac_inversion ~loc ~tac_scrut:(tac_of_cmd cmd1) inv1 @@
     body
 
-
   | `Split ->
     split_sigma ~tac_scrut @@ fun cmd0 cmd1 ->
     generalize ~tac_scrut:(tac_of_cmd cmd1) @@ fun _ ->
@@ -372,6 +372,26 @@ and tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk
     tac_inversion ~loc ~tac_scrut:(tac_of_cmd cmd0) inv @@
     generalize ~tac_scrut:(tac_of_cmd cmd1) @@ fun _ ->
     body
+
+and tac_inv_let p itac ctac =
+  match p with
+  | `Var nm ->
+    let x = name_of nm in
+    tac_let x itac ctac
+  | `Wildcard ->
+    tac_elim ~loc:None ~tac_mot:None ~tac_scrut:itac ~clauses:[] ~default:(Some ctac)
+  | `SplitAs (inv0, inv1) ->
+    let itac0 =
+      itac >>= fun (ty, tm) ->
+      tac_of_cmd @@ Tm.ann ~ty ~tm @< Tm.Car
+    in
+    let itac1 =
+      itac >>= fun (ty, tm) ->
+      tac_of_cmd @@ Tm.ann ~ty ~tm @< Tm.Cdr
+    in
+    tac_inv_let inv0 itac0 @@ tac_inv_let inv1 itac1 @@ ctac
+  | _ ->
+    failwith "tac_inv_let: not supported"
 
 and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
   fun goal ->
