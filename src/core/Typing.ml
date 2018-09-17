@@ -177,8 +177,10 @@ let check_valid_cofibration ?xs:(xs = None) cofib =
   in
   if go false cofib [] then () else failwith "check_valid_cofibration"
 
-let check_comp_cofibration dir cofib =
-  check_valid_cofibration (dir :: cofib)
+let check_comp_cofibration _dir cofib =
+  (* this might work, but needs more research:
+   * check_valid_cofibration (dir :: cofib) *)
+  check_valid_cofibration cofib
 
 let check_extension_cofibration xs cofib =
   match cofib with
