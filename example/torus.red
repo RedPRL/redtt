@@ -29,14 +29,13 @@ let c2t/base : s1 → torus =
   ]
 
 let c2t : (s1 × s1) → torus =
-  λ [,] →
-  elim [
+  λ [,] →                   -- now the goal is s1 → s1 → torus
+  elim [                    -- now the goal is s1 → torus
   | base →
     elim [
     | base → pt
     | loop j → p/two j
     ]
-
   | loop i →
     elim [
     | base → p/one i
@@ -45,9 +44,11 @@ let c2t : (s1 × s1) → torus =
   ]
 
 let t2c2t : (t : torus) → path torus (c2t (t2c t)) t =
+  -- wildcard patterns call the elimination tactic, with the rhs in all cases
   λ * → refl
 
 let c2t2c : (cs : s1 × s1) → path (s1 × s1) (t2c (c2t cs)) cs =
+  -- combination of wildcard pattern with sigma type inversion pattern
   λ (*, *) → refl
 
 let torus/s1s1/iso : iso (s1 × s1) torus =
