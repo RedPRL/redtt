@@ -136,13 +136,13 @@ let check_valid_cofibration ?xs:(xs = None) cofib =
           | `Atom x, `Dim0 | `Dim0, `Atom x ->
             if Hashtbl.mem ones x then true else
               begin
-                Hashtbl.add zeros x ();
+                Hashtbl.replace zeros x ();
                 go eqns
               end
           | `Atom x, `Dim1 | `Dim1, `Atom x ->
             if Hashtbl.mem zeros x then true else
               begin
-                Hashtbl.add ones x ();
+                Hashtbl.replace ones x ();
                 go eqns
               end
           | `Atom x, `Atom y ->
