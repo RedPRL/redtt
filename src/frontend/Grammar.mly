@@ -262,7 +262,7 @@ einvpat:
   | AST
     { `Wildcard }
   | LPR; xs = separated_nonempty_list(COMMA, einvpat) RPR
-    { let x, xs = ListUtil.split_head xs in
+    { let xs, x = ListUtil.split_last xs in
       List.fold_right (fun x xs -> `SplitAs (x, xs)) xs x }
   | LSQ; x = einvpat; COMMA; RSQ
     { `Bite x }
