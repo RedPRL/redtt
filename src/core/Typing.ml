@@ -142,7 +142,7 @@ let check_valid_cofibration ?xs:(xs = None) cofib =
     match remainings, changed with
     | [], _ -> false (* we managed to make everything false! *)
     | _, true -> go_atoms false remainings [] (* it is possible that the coloring is not propagated properly *)
-    | (x, y) :: remainings, _ ->
+    | (x, y) :: remainings, false ->
       (* the coloring is saturated; pick a random edge and color it! *)
       Hashtbl.add assignment x `Dim0;
       Hashtbl.add assignment y `Dim1;
