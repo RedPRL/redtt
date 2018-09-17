@@ -20,7 +20,7 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
   in
 
   let bwd (a : pA.fst) : pmap pbool pA =
-    ( λ [ tt → a | ff → pA.snd ]
+    ( elim [ tt → a | ff → pA.snd ]
     , refl
     )
   in
@@ -33,7 +33,7 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
       ]
     in
     let bwdfwd/map : (b : bool) → path _ (bwd (fwd.fst f) .fst b) (f.fst b) =
-      λ [
+      elim [
       | tt → refl
       | ff → λ i → bwdfwd/pt i 0
       ]

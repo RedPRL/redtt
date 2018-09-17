@@ -34,7 +34,7 @@ val match_goal : (goal -> chk_tac) -> chk_tac
 val tac_wrap_nf : chk_tac -> chk_tac
 
 (** Multi-introduction tactic *)
-val tac_lambda : Name.t list -> chk_tac -> chk_tac
+val tac_lambda : ESig.einvpat list -> chk_tac -> chk_tac
 
 (** Introduce a sigma type *)
 val tac_pair : chk_tac -> chk_tac -> chk_tac

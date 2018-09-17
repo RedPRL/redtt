@@ -10,7 +10,7 @@ data int where
 | negsuc (n : nat)
 
 let pred : int → int =
-  λ [
+  elim [
   | pos n →
     elim n [
     | zero → negsuc zero
@@ -20,7 +20,7 @@ let pred : int → int =
   ]
 
 let isuc : int → int =
-  λ [
+  elim [
   | pos n → pos (suc n)
   | negsuc n →
     elim n [
@@ -30,13 +30,13 @@ let isuc : int → int =
   ]
 
 let pred-isuc : (n : int) → path int (pred (isuc n)) n =
-  λ [
+  elim [
   | pos _ → refl
   | negsuc * → refl
   ]
 
 let isuc-pred : (n : int) → path int (isuc (pred n)) n =
-  λ [
+  elim [
   | pos * → refl
   | negsuc _ → refl
   ]
@@ -61,7 +61,7 @@ let iplus (m n : int) : int =
 let izero : int = pos zero
 
 let iplus/unit-r : (n : int) → path int (iplus n izero) n =
-  λ [
+  elim [
   | pos n →
     elim n [
     | zero → refl
@@ -75,7 +75,7 @@ let iplus/unit-r : (n : int) → path int (iplus n izero) n =
   ]
 
 let int-path/code : int → int → type =
-  λ [
+  elim [
   | pos m → λ y →
     elim y [
     | pos n → nat/path/code m n
@@ -89,7 +89,7 @@ let int-path/code : int → int → type =
   ]
 
 let int-refl : (x : int) → int-path/code x x =
-  λ [
+  elim [
   | pos m → nat-refl m
   | negsuc m → nat-refl m
   ]
@@ -100,12 +100,12 @@ let int-path/encode (x y : int) (p : path int x y)
   coe 0 1 (int-refl x) in λ i → int-path/code x (p i)
 
 let int-repr : int → nat =
-  λ [ pos m → m | negsuc m → m ]
+  elim [ pos m → m | negsuc m → m ]
 
 let int/discrete : discrete int =
-  λ [
+  elim [
   | pos m →
-    λ [
+    elim [
     | pos n →
       or/elim (path nat m n) (neg (path nat m n))
         (or (path int (pos m) (pos n)) (neg (path int (pos m) (pos n))))
@@ -115,7 +115,7 @@ let int/discrete : discrete int =
     | negsuc n → (ff, int-path/encode _ _)
     ]
   | negsuc m →
-    λ [
+    elim [
     | pos n → (ff, int-path/encode _ _)
     | negsuc n →
       or/elim (path nat m n) (neg (path nat m n))

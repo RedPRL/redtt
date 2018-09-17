@@ -40,7 +40,7 @@ and econ =
   | Guess of eterm
   | Hole of string option * eterm option
   | Hope
-  | Lam of string list * eterm
+  | Lam of einvpat list * eterm
   | Tuple of eterm list
   | Type of Kind.t * Lvl.t
   | Quo of (ResEnv.t -> Tm.tm)
@@ -83,6 +83,9 @@ and 'a epatbind =
 
 and einvpat =
   [ `Var of [`User of string | `Gen of Name.t]
+  | `SplitAs of einvpat * einvpat
+  | `Split
+  | `Bite of einvpat
   | `Wildcard
   ]
 

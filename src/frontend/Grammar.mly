@@ -199,17 +199,16 @@ econ:
   | a = HOLE_NAME; SEMI; e = located(econ)
     { E.Hole (a, Some e) }
 
-  | LAM; xs = list(ATOM); RIGHT_ARROW; e = located(econ)
+  | LAM; xs = list(einvpat); RIGHT_ARROW; e = located(econ)
     { E.Lam (xs, e) }
 
   | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
     { E.Let {name = a; sch = sch; tm; body} }
 
-  | ELIM; scrut = located(econ); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
-    { E.Elim {mot; scrut; clauses} }
-
-  | LAM; clauses = pipe_block(eclause)
-    { E.ElimFun {clauses} }
+  | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
+    { match scrut with
+    | Some scrut -> E.Elim {mot; scrut; clauses}
+    | None -> E.ElimFun {clauses} }
 
   | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }
@@ -262,6 +261,13 @@ einvpat:
     { `Var (`User x) }
   | AST
     { `Wildcard }
+  | LPR; xs = separated_nonempty_list(COMMA, einvpat) RPR
+    { let x, xs = ListUtil.split_head xs in
+      List.fold_right (fun x xs -> `SplitAs (x, xs)) xs x }
+  | LSQ; x = einvpat; COMMA; RSQ
+    { `Bite x }
+  | LSQ; COMMA; RSQ
+    { `Split }
 
 edimension:
   | n = NUMERAL;
@@ -299,7 +305,7 @@ eface:
   | phi = ecofib; RIGHT_ARROW; e = located(econ)
     { phi, e }
   | phi = ecofib0; xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
-    { phi, eterm ($startpos(xs), $endpos(e)) (E.Lam (xs, e)) }
+    { phi, eterm ($startpos(xs), $endpos(e)) (E.Lam (List.map (fun x -> `Var (`User x)) xs, e)) }
 
 
 escheme:

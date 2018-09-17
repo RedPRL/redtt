@@ -97,7 +97,7 @@ struct
     | E.Define (name, opacity, scheme, e) ->
       let now0 = Unix.gettimeofday () in
       elab_scheme scheme >>= fun (names, ty) ->
-      let xs = List.map (fun nm -> Name.named @@ Some nm) names in
+      let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
       let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
       bdy_tac {ty; sys = []} >>= fun tm ->
       let alpha = Name.named @@ Some name in
@@ -274,16 +274,15 @@ struct
       | _, _, E.Let info ->
         elab_scheme info.sch >>= fun (names, pity) ->
         let ctac goal = elab_chk info.tm goal in
-        let xs = List.map (fun nm -> Name.named @@ Some nm) names in
-        let lambdas = tac_wrap_nf (tac_lambda xs ctac) in
+        let ps = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
+        let lambdas = tac_wrap_nf (tac_lambda ps ctac) in
         let inf_tac = lambdas {ty = pity; sys = []} <<@> fun ltm -> pity, ltm in
         let body_tac = elab_chk info.body in
         tac_let (Name.named @@ Some info.name) inf_tac body_tac goal
 
-      | _, _, E.Lam (names, e) ->
+      | _, _, E.Lam (ps, e) ->
         let tac = elab_chk e in
-        let xs = List.map (fun nm -> Name.named @@ Some nm) names in
-        tac_wrap_nf (tac_lambda xs tac) goal
+        tac_wrap_nf (tac_lambda ps tac) goal
 
       | [], _, E.Quo tmfam ->
         M.lift C.resolver >>= fun renv ->
@@ -309,7 +308,7 @@ struct
         let tac_scrut = M.ret (dom, Tm.up @@ Tm.var x) in
         let clauses, default = elab_elim_clauses clauses in
         let tac_fun =
-          tac_lambda [x] @@
+          tac_lambda [`Var (`Gen x)] @@
           tac_elim ~loc:e.span ~tac_mot:None ~tac_scrut ~clauses ~default
         in
         tac_fun goal

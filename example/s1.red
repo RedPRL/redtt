@@ -8,13 +8,13 @@ data s1 where
 | loop (i : dim) [∂[i] → base]
 
 let rotate/loop : (a : s1) → path _ a a =
-  λ [
+  elim [
   | base → λ j → loop j
   | loop i → λ j → connection/both s1 (λ k → loop k) (λ k → loop k) i j
   ]
 
 let rotate : s1 → s1 → s1 =
-  λ [
+  elim [
   | base → λ b → b
   | loop i → λ b → rotate/loop b i
   ]
@@ -32,7 +32,7 @@ let rotate/equiv/loop : path _ (id-equiv s1) (id-equiv s1) =
     )
 
 let rotate/is-equiv : (a : s1) → is-equiv s1 s1 (rotate a) =
-  λ [
+  elim [
   | base → id-equiv s1 .snd
   | loop i → rotate/equiv/loop i .snd
   ]

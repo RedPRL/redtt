@@ -15,7 +15,7 @@ data torus where
   ]
 
 let t2c : torus → s1 × s1 =
-  λ [
+  elim [
   | pt → (base, base)
   | p/one i → (loop i, base)
   | p/two i → (base, loop i)
@@ -23,41 +23,32 @@ let t2c : torus → s1 × s1 =
   ]
 
 let c2t/base : s1 → torus =
-  λ [
+  elim [
   | base → pt
   | loop i → p/two i
   ]
 
-let c2t/transpose : s1 → s1 → torus =
-  λ [
+let c2t : (s1 × s1) → torus =
+  λ [,] →
+  elim [
   | base →
-    λ [
+    elim [
     | base → pt
     | loop j → p/two j
     ]
 
   | loop i →
-    λ [
+    elim [
     | base → p/one i
     | loop j → square j i
     ]
   ]
 
-
-
-let c2t (cs : s1 × s1) : torus =
-  c2t/transpose (cs.fst) (cs.snd)
-
 let t2c2t : (t : torus) → path torus (c2t (t2c t)) t =
-  λ [ * → refl ]
+  λ * → refl
 
-
-let c2t2c/transpose : (c0 c1 : s1) → path (s1 × s1) (t2c (c2t/transpose c0 c1)) (c0, c1) =
-  λ [ * → λ [ * → refl ] ]
-
-let c2t2c (cs : s1 × s1) : path (s1 × s1) (t2c (c2t cs)) cs =
-  c2t2c/transpose (cs.fst) (cs.snd)
-
+let c2t2c : (cs : s1 × s1) → path (s1 × s1) (t2c (c2t cs)) cs =
+  λ (*, *) → refl
 
 let torus/s1s1/iso : iso (s1 × s1) torus =
   ( c2t
