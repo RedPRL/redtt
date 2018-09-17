@@ -103,7 +103,7 @@ let join-s3-join/push
     | m=1 → push a b i
     ]
   =
-  λ [
+  elim [
   | base → λ b i m → s3→join/cnx b i m
   | loop j → λ b i m → join-s3-join/push/loop b i j m
   ]
