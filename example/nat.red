@@ -8,7 +8,7 @@ data nat where
 | suc (x : nat)
 
 let nat-pred : nat → nat =
-  λ [
+  elim [
   | zero → zero
   | suc n → n
   ]
@@ -27,46 +27,46 @@ let plus/unit/l (n : nat) : path nat (plus zero n) n =
   refl
 
 let plus/unit/r : (n : nat) → path nat (plus n zero) n =
-  λ [
+  elim [
   | zero → refl
   | suc (n → path/n) → λ i → suc (path/n i)
   ]
 
 let plus/assoc : (n m o : nat) → path nat (plus n (plus m o)) (plus (plus n m) o) =
-  λ [
+  elim [
   | zero → refl
   | suc (n → plus/assoc/n) → λ m o i → suc (plus/assoc/n m o i)
   ]
 
 let plus/suc/r : (n m : nat) → path nat (plus n (suc m)) (suc (plus n m)) =
-  λ [
+  elim [
   | zero → refl
   | suc (n → plus/n/suc/r) → λ m i → suc (plus/n/suc/r m i)
   ]
 
 
 let plus/comm : (m n : nat) → path nat (plus n m) (plus m n) =
-  λ [
+  elim [
   | zero → plus/unit/r
   | suc (m → plus/comm/m) → λ n → trans _ (plus/suc/r n m) (λ i → suc (plus/comm/m n i))
   ]
 
 let nat/path/code : nat → nat → type =
-  λ [
+  elim [
   | zero →
-    λ [
+    elim [
     | zero → unit
     | suc _ → void
     ]
   | suc (m' → code/m') →
-    λ [
+    elim [
     | zero → void
     | suc n' → code/m' n'
     ]
   ]
 
 let nat-refl : (m : nat) → nat/path/code m m =
-  λ [
+  elim [
   | zero → triv
   | suc (m' → nat-refl/m') → nat-refl/m'
   ]
@@ -77,14 +77,14 @@ let nat-path/encode (m n : nat) (p : path nat m n)
   coe 0 1 (nat-refl m) in λ i → nat/path/code m (p i)
 
 let nat/discrete : discrete nat =
-  λ [
+  elim [
   | zero →
-    λ [
+    elim [
     | zero → (tt, refl)
     | suc n' → (ff, nat-path/encode zero (suc n'))
     ]
   | suc (m' → nat/discrete/m') →
-    λ [
+    elim [
     | zero → (ff, nat-path/encode (suc m') zero)
     | suc n' →
       or/elim (path nat m' n') (neg (path nat m' n'))

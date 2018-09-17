@@ -39,3 +39,20 @@ let split_head l =
   match l with
   | [] -> failwith "split_head_append: empty list"
   | x :: xs -> x, xs
+
+
+let rec filter_map f xs =
+  match xs with
+  | [] -> []
+  | x :: xs ->
+    match f x with
+    | Some y -> y :: filter_map f xs
+    | None -> filter_map f xs
+
+let rec find_map_opt f xs =
+  match xs with
+  | [] -> None
+  | x :: xs ->
+    match f x with
+    | Some y -> Some y
+    | None -> find_map_opt f xs

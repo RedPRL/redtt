@@ -97,7 +97,7 @@ struct
     | E.Define (name, opacity, scheme, e) ->
       let now0 = Unix.gettimeofday () in
       elab_scheme scheme >>= fun (names, ty) ->
-      let xs = List.map (fun nm -> Name.named @@ Some nm) names in
+      let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
       let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
       bdy_tac {ty; sys = []} >>= fun tm ->
       let alpha = Name.named @@ Some name in
@@ -274,16 +274,23 @@ struct
       | _, _, E.Let info ->
         elab_scheme info.sch >>= fun (names, pity) ->
         let ctac goal = elab_chk info.tm goal in
-        let xs = List.map (fun nm -> Name.named @@ Some nm) names in
-        let lambdas = tac_wrap_nf (tac_lambda xs ctac) in
+        let ps = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
+        let lambdas = tac_wrap_nf (tac_lambda ps ctac) in
         let inf_tac = lambdas {ty = pity; sys = []} <<@> fun ltm -> pity, ltm in
         let body_tac = elab_chk info.body in
-        tac_let (Name.named @@ Some info.name) inf_tac body_tac goal
+        begin
+          match info.pat, names with
+          | `Var nm, _ ->
+            tac_let (name_of nm) inf_tac body_tac goal
+          | pat, [] ->
+            tac_inv_let pat inf_tac body_tac goal
+          | _ ->
+            failwith "Unsupported destructuring let-binding"
+        end
 
-      | _, _, E.Lam (names, e) ->
+      | _, _, E.Lam (ps, e) ->
         let tac = elab_chk e in
-        let xs = List.map (fun nm -> Name.named @@ Some nm) names in
-        tac_wrap_nf (tac_lambda xs tac) goal
+        tac_wrap_nf (tac_lambda ps tac) goal
 
       | [], _, E.Quo tmfam ->
         M.lift C.resolver >>= fun renv ->
@@ -300,33 +307,17 @@ struct
       | [], _, E.Elim {mot; scrut; clauses} ->
         let tac_mot = Option.map elab_chk mot in
         let tac_scrut = elab_inf scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
-        let used = Hashtbl.create 10 in
-        let elab_clause (lbl, pbinds, bdy) =
-          if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
-            begin
-              Hashtbl.add used lbl ();
-              lbl, pbinds, elab_chk bdy
-            end
-        in
-        let clauses = List.map elab_clause clauses in
-        tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses goal
+        let clauses, default = elab_elim_clauses clauses in
+        tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses ~default goal
 
       | [], Tm.Pi (dom, _), E.ElimFun {clauses} ->
         let x = Name.fresh () in
         let tac_mot = None in
         let tac_scrut = M.ret (dom, Tm.up @@ Tm.var x) in
-        let used = Hashtbl.create 10 in
-        let elab_clause (lbl, pbinds, bdy) =
-          if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
-            begin
-              Hashtbl.add used lbl ();
-              lbl, pbinds, elab_chk bdy
-            end
-        in
-        let clauses = List.map elab_clause clauses in
+        let clauses, default = elab_elim_clauses clauses in
         let tac_fun =
-          tac_lambda [x] @@
-          tac_elim ~loc:e.span ~tac_mot:None ~tac_scrut ~clauses
+          tac_lambda [`Var (`Gen x)] @@
+          tac_elim ~loc:e.span ~tac_mot:None ~tac_scrut ~clauses ~default
         in
         tac_fun goal
 
@@ -468,6 +459,26 @@ struct
     go Emp
 
 
+  and elab_elim_clauses clauses =
+    let used = Hashtbl.create 10 in
+    let tac_clauses =
+      flip ListUtil.filter_map clauses @@ function
+      | `Con (lbl, pbinds, bdy) ->
+        if Hashtbl.mem used lbl then failwith "Duplicate clause in elimination" else
+          begin
+            Hashtbl.add used lbl ();
+            Some (lbl, pbinds, elab_chk bdy)
+          end
+      | `All bdy ->
+        None
+    in
+    let tac_default =
+      flip ListUtil.find_map_opt clauses @@ function
+      | `All bdy -> Some (elab_chk bdy)
+      | _ -> None
+    in
+
+    tac_clauses, tac_default
 
   and elab_hcom_sys s ty cap =
     let rec go acc =

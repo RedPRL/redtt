@@ -6,4 +6,4 @@ let neg (A : type) : type =
   A → void
 
 let void/prop : is-prop void =
-  λ []
+  elim []

@@ -15,12 +15,8 @@ let iso/fiber/prop
   (I : iso A B) (b : B)
   : is-prop (fiber _ _ (I.fst) b)
   =
-  let f = I.fst in
-  let g = I.snd.fst in
-  let α = I.snd.snd.fst in
-  let β = I.snd.snd.snd in
-
-  let sq (fib : fiber _ _ (I.fst) b) (i j : dim) : A =
+  let (f, g, α, β) = I in
+  let sq (fib : fiber _ _ f b) (i j : dim) : A =
     comp 0 j (g (fib.snd i)) [
     | i=0 → β (fib.fst)
     | i=1 → refl
@@ -54,10 +50,5 @@ let iso/fiber/prop
 
 
 let iso→equiv (A B : type) (I : iso A B) : equiv A B =
-  ( I.fst
-  , λ b →
-    ( (I.snd.fst b, I.snd.snd.fst b)
-    , λ fib →
-      iso/fiber/prop _ _ I b fib (I.snd.fst b, I.snd.snd.fst b)
-    )
-  )
+  let (f, g, α, β) = I in
+  (f , λ b → ((g b, α b), λ fib → iso/fiber/prop _ _ I b fib (g b, α b)))

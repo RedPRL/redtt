@@ -7,7 +7,7 @@ data s2 where
 | surf (i j : dim) [∂[i j] → base]
 
 let hopf : s2 → type =
-  λ [
+  elim [
   | base → s1
   | surf i j →
     comp 0 1 s1 [

@@ -124,10 +124,8 @@ let s2/encode-decode/base/step (o : os2) :
       (coe 0 1 obase in λ k →
         s2/code (extend-by-surf (s2/decode/base o) i j k))
 
-let s2/encode-decode/base (o : os2)
-  : path os2 (s2/encode base (s2/decode base o)) o
-  =
-  elim o [
+let s2/encode-decode/base : (o : os2) → path os2 (s2/encode base (s2/decode base o)) o =
+  elim [
   | obase → refl
   | oloop (o' → s2/encode-decode/base/o') i → λ m →
     comp 0 1 (oloop (s2/encode-decode/base/o' m) i) [
@@ -138,10 +136,11 @@ let s2/encode-decode/base (o : os2)
 
 -- VI. decode base after encode base
 
-let s2/decode-encode/base (l : path s2 base base)
-  : path (path s2 base base) (s2/decode base (s2/encode base l)) l
+let s2/decode-encode/base
+  : (l : path s2 base base)
+  → path (path s2 base base) (s2/decode base (s2/encode base l)) l
   =
-  J s2 base (λ a p → path (path s2 base a) (s2/decode a (s2/encode a p)) p) refl base l
+  J s2 base (λ a p → path (path s2 base a) (s2/decode a (s2/encode a p)) p) refl base
 
 -- VII. characterization of the loop space
 
