@@ -344,8 +344,12 @@ and generalize ~tac_scrut tac_body : chk_tac =
 and tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk_tac =
   match_goal @@ fun goal ->
   match invpat with
-  | `Var _ ->
-    body
+  | `Var nm ->
+    fun goal ->
+      tac_scrut >>= fun (_, tm) ->
+      let x = name_of nm in
+      if tm = Tm.up (Tm.var x) then body goal else
+        tac_let x tac_scrut body goal
 
   | `Wildcard ->
     tac_elim ~loc ~tac_mot:None ~tac_scrut ~clauses:[] ~default:(Some body)
@@ -355,6 +359,7 @@ and tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk
     tac_inversion ~loc ~tac_scrut:(tac_of_cmd cmd0) inv0 @@
     tac_inversion ~loc ~tac_scrut:(tac_of_cmd cmd1) inv1 @@
     body
+
 
   | `Split ->
     split_sigma ~tac_scrut @@ fun cmd0 cmd1 ->
@@ -366,11 +371,7 @@ and tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk
     split_sigma ~tac_scrut @@ fun cmd0 cmd1 ->
     tac_inversion ~loc ~tac_scrut:(tac_of_cmd cmd0) inv @@
     generalize ~tac_scrut:(tac_of_cmd cmd1) @@ fun _ ->
-    match inv with
-    | `Var nm ->
-      tac_let (name_of nm) (tac_of_cmd cmd0) body
-    | _ ->
-      body
+    body
 
 and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
   fun goal ->
