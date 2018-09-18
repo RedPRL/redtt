@@ -234,8 +234,11 @@ and pp_neu fmt neu =
   | Cap _ ->
     Format.fprintf fmt "<cap>"
 
-  | VProj _ ->
-    Format.fprintf fmt "<vproj>"
+  | VProj info ->
+    Format.fprintf fmt "@[<hv1>(vproj %a@ %a@ %a)@]"
+      Name.pp info.x
+      pp_neu info.neu
+      pp_nf info.func
 
   | LblCall neu ->
     Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
@@ -395,7 +398,7 @@ struct
           raise TooMortal
       end
 
-    | VProj info ->
+    | VProj info as neu ->
       begin
         match I.act phi @@ `Atom info.x with
         | `Atom y ->
@@ -404,6 +407,8 @@ struct
           VProj {x = y; neu; func}
         | _ ->
           Format.eprintf "mortal: vproj@.";
+          Format.eprintf "neu: %a@." pp_neu neu;
+
           raise TooMortal
       end
 
