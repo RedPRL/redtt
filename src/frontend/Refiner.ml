@@ -306,11 +306,11 @@ and split_sigma ~tac_scrut (tac_body : tm Tm.cmd -> tm Tm.cmd -> chk_tac) : chk_
     match Tm.unleash sigma_ty with
     | Tm.Sg (dom, cod) ->
       guess_motive scrut goal.ty >>= fun bmot ->
-      let mot_x0x1 = Tm.unbind_with (Tm.ann ~ty:sigma_ty ~tm:(Tm.make @@ Tm.Cons (Tm.up @@ Tm.var x0, Tm.up @@ Tm.var x1))) bmot in
+      let pair = Tm.cons (Tm.up @@ Tm.var x0) (Tm.up @@ Tm.var x1) in
+      let mot_x0x1 = Tm.unbind_with (Tm.ann ~ty:sigma_ty ~tm:pair) bmot in
       let codx0 = Tm.unbind_with (Tm.var x0) cod in
       let fun_ty = Tm.make @@ Tm.Pi (dom, Tm.bind x0 @@ Tm.make @@ Tm.Pi (codx0, Tm.bind x1 @@ mot_x0x1)) in
-      tac_lambda [`Var (`Gen x0); `Var (`Gen x1)] (tac_body (Tm.var x0) (Tm.var x1)) {ty = fun_ty; sys = []} >>= fun fun_tm ->
-      M.ret (fun_ty, fun_tm)
+      tac_down ~ty:fun_ty @@ tac_lambda [`Var (`Gen x0); `Var (`Gen x1)] (tac_body (Tm.var x0) (Tm.var x1))
     | _ ->
       failwith "split_sigma"
   in
@@ -324,6 +324,11 @@ and split_sigma ~tac_scrut (tac_body : tm Tm.cmd -> tm Tm.cmd -> chk_tac) : chk_
   in
   tac_let xfun tac_fun tac_bdy
 
+
+and tac_down ~ty (ctac : chk_tac) : inf_tac =
+  ctac {ty; sys = []} >>= fun tm ->
+  M.ret (ty, tm)
+
 and tac_generalize ~tac_scrut tac_body : chk_tac =
   match_goal @@ fun goal ->
   let xfun = Name.fresh () in
@@ -331,8 +336,7 @@ and tac_generalize ~tac_scrut tac_body : chk_tac =
     tac_scrut >>= fun (ty_scrut, tm_scrut) ->
     guess_motive tm_scrut goal.ty >>= fun bmot ->
     let fun_ty = Tm.make @@ Tm.Pi (ty_scrut, bmot) in
-    tac_body {ty = fun_ty; sys = []} >>= fun fun_tm ->
-    M.ret (fun_ty, fun_tm)
+    tac_down ~ty:fun_ty tac_body
   in
   let tac_bdy =
     fun _ ->
