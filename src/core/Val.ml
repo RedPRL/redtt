@@ -797,24 +797,29 @@ struct
               ~func:(fun phi0 -> Value.act phi0 @@ subst_src @@ car info.equiv)
               ~el:(Value.act phi el)
           in
+
           (* Some helper functions to reduce typos. *)
           let base0 phi dest = base phi `Dim0 dest in
           let base1 phi dest = base phi `Dim1 dest in
           let fiber0 phi b = car @@ apply (cdr (Value.act phi equiv0)) b in
+
           (* This gives a path from the fiber `fib` to `fiber0 b`
            * where `b` is calculated from `fib` as
            * `ext_apply (cdr fib) [`Dim1]` directly. *)
           let contr0 phi fib = apply (cdr @@ apply (cdr (Value.act phi equiv0)) (ext_apply (cdr fib) [`Dim1])) fib in
+
           (* The diagonal face for r=r'. *)
           let face_diag =
             AbsFace.make_from_dir I.idn dir @@ fun phi ->
             Abs.make1 @@ fun _ -> base phi (I.act phi r) (I.act phi r')
           in
+
           (* The face for r=0. *)
           let face0 =
             AbsFace.make I.idn r `Dim0 @@ fun phi ->
             Abs.make1 @@ fun _ -> base0 phi (I.act phi r')
           in
+
           (* This is the type of the fiber, and is used for
            * simplifying the generating code for the front face
            * (r'=0). It is using the evaluator to generate the
@@ -824,6 +829,7 @@ struct
             let env = Env.append empty_env [`Val b; `Val (car (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
             eval env @@ Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
           in
+
           (* This is to generate the element in `ty0` and also
            * the face for r'=0. This is `O` in [F]. *)
           let fixer_fiber phi =
@@ -834,7 +840,9 @@ struct
                 (Value.act phi el,
                  make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
             in
+
             let mode = `UNIFORM_HCOM in (* how should we switch this? *)
+
             match mode with
             (* The implementation used in [F] and [R1]. *)
             | `SPLIT_COERCION ->
@@ -874,21 +882,19 @@ struct
             | `UNICORN ->
               raise @@ E InternalMortalityError
           in
-          let el0 phi0 =
-            try
-              car (fixer_fiber phi0)
-            with
-            | exn ->
-              (* Format.eprintf "Not immortal enough: %a@." pp_value (fixer_fiber phi0); *)
-              raise exn
-          in
+
+          let el0 phi0 = car (fixer_fiber phi0) in
+
           let face_front =
             AbsFace.make I.idn r' `Dim0 @@ fun phi ->
             Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) [`Atom w]
           in
-          let el1 = make_hcom (Dir.make `Dim1 r') info.ty1 (base I.idn r r') @@
+
+          let el1 =
+            make_hcom (Dir.make `Dim1 r') info.ty1 (base I.idn r r') @@
             force_abs_sys [face0; face_diag; face_front]
           in
+
           make_vin I.idn r' el0 el1
 
         | false ->
