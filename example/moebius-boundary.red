@@ -16,33 +16,31 @@ let moebius-boundary/fiber : s1 → type =
 
 let moebius-boundary : type = (x : s1) × moebius-boundary/fiber x
 
-let moebius-boundary→s1/loop-base (i : dim) : bool → s1 =
+let loop-or-base (i : dim) : bool → s1 =
   elim [ tt → loop i | ff → base ]
 
-let moebius-boundary→s1/commuting :
+let loop-or-base/commuting :
   (y : bool) →
   path _
-    (moebius-boundary→s1/loop-base 0 y)
-    (moebius-boundary→s1/loop-base 1 (coe 0 1 y in not/path))
+    (loop-or-base 0 y)
+    (loop-or-base 0 (coe 0 1 y in not/path))
   =
   elim [ tt → refl | ff → refl ]
 
 let moebius-boundary→s1/loop/filler (i j : dim) (y : not/path i) : s1 =
   let z : bool = coe i 1 y in not/path
   in
-  comp 1 j (moebius-boundary→s1/loop-base i z) [
-  | i=0 → moebius-boundary→s1/commuting y
+  comp 1 j (loop-or-base i z) [
+  | i=0 → loop-or-base/commuting y
   | i=1 → refl
   ]
 
-let moebius-boundary→s1' : (x : s1) → moebius-boundary/fiber x → s1 =
+let moebius-boundary→s1 : moebius-boundary → s1 =
+  λ [,] →
   elim [
-  | base → moebius-boundary→s1/loop-base 0
+  | base → elim [ tt → base | ff → base ]
   | loop i → moebius-boundary→s1/loop/filler i 0
   ]
-
-let moebius-boundary→s1 (x : moebius-boundary) : s1 =
-  moebius-boundary→s1' (x .fst) (x .snd)
 
 let s1→moebius-boundary/base : moebius-boundary =
   (base, ff)
@@ -60,10 +58,27 @@ let s1→moebius-boundary : s1 → moebius-boundary =
   | loop i → s1→moebius-boundary/loop/filler i 1
   ]
 
-opaque let s1→moebius-boundary→s1/loop :
+/-
+let moebius-boundary→s1→moebius-boundary :
+  (x : moebius-boundary) → path _ (s1→moebius-boundary (moebius-boundary→s1 x)) x
+  =
+  λ [,] →
+  elim [
+  | base →
+    elim [
+    | tt → loop-path ff
+    | ff → refl
+    ]
+  | loop i → ?
+  ]
+
+quit
+-/
+
+let s1→moebius-boundary→s1/loop :
   [i j] s1 [
   | ∂[i] → base
-  | j=0 → moebius-boundary→s1 (s1→moebius-boundary/loop/filler i 1)
+  | j=0 → moebius-boundary→s1 (s1→moebius-boundary (loop i))
   | j=1 → loop i
   ]
   =
@@ -86,24 +101,14 @@ let s1→moebius-boundary→s1 :
   | loop i → λ j → s1→moebius-boundary→s1/loop i j
   ]
 
-quit
-
--- there is an invalid fhcom in the middle?!
--- ... (fhcom 0 1 (loop x) [x=0 <x1> base]) ...
-let test : dim → moebius-boundary =
-  λ i → s1→moebius-boundary (loop i)
---normalize test
-
--- there is an invalid fhcom in the middle?!
--- ... (fhcom 0 1 (loop x) [x=0 <x1> base]) ...
-let test1 : dim → s1 =
-  λ i → moebius-boundary→s1 (s1→moebius-boundary (loop i))
--- normalize test1
-
 /-
 let double : s1 → s1 = λ x → s1→moebius-boundary x .fst
 
 import omega1s1
 
-let test0 : path int (winding (λ i → double (loopn (pos (suc zero)) i))) (pos (suc (suc zero))) = refl
+let test0 :
+  path int
+    (winding (λ i → double (loopn (pos (suc zero)) i)))
+    (pos (suc (suc zero))) =
+  refl
 -/
