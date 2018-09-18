@@ -1907,7 +1907,7 @@ struct
           let body =
             lazy begin
               let func = Value.act phi func in
-              apply func el
+              apply func @@ Value.act phi el
             end
           in
           Face.Indet (xi, body)
