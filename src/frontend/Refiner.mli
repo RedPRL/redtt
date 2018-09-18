@@ -48,6 +48,11 @@ val tac_elim
   -> default:chk_tac option
   -> chk_tac
 
+val tac_generalize
+  : tac_scrut:inf_tac
+  -> chk_tac
+  -> chk_tac
+
 (** Introduce a let-binding. *)
 val tac_let : Name.t -> inf_tac -> chk_tac -> chk_tac
 val tac_inv_let : ESig.einvpat -> inf_tac -> chk_tac -> chk_tac
