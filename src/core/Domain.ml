@@ -353,12 +353,12 @@ struct
     function
     | NHComAtType info ->
       begin
-        match Dir.act phi info.dir, CompSys.act phi info.sys with
-        | `Ok dir, `Ok sys ->
+        match Dir.act phi info.dir, force_val_sys @@ ValSys.act phi (ValSys.from_rigid info.ty_sys), CompSys.act phi info.sys with
+        | `Ok dir, `Ok ty_sys, `Ok sys ->
           let univ = Value.act phi info.univ in
           let cap = Value.act phi info.cap in
           let ty = act phi info.ty in
-          NHComAtType {dir; univ; ty; cap; sys}
+          NHComAtType {dir; univ; ty; ty_sys; cap; sys}
         | _ ->
           raise TooMortal
       end

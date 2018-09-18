@@ -932,7 +932,7 @@ struct
 
 
   and rigid_nhcom_up_at_type dir univ ty cap ~comp_sys ~rst_sys =
-    let neu = NHComAtType {dir; univ; ty; cap; sys = comp_sys} in
+    let neu = NHComAtType {dir; univ; ty; ty_sys = rst_sys; cap; sys = comp_sys} in
     let hcom_face r r' ty =
       let phi = I.equate r r' in
       let dir_phi = Dir.act phi dir in
