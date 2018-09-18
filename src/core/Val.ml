@@ -1907,21 +1907,13 @@ struct
         vproj phi (I.act phi @@ `Atom x) ~func:(fun phi0 -> Value.act phi0 func) ~el:a
       in
       let faces01 =
-        let face0 =
-          let xi = Eq.gen_const x `Dim0 in
-          let phi = I.equate (`Atom x) `Dim0 in
-          let body =
-            lazy begin
-              let func = Value.act phi func in
-              apply func @@ Value.act phi el
-            end
-          in
-          Face.Indet (xi, body)
+        let face0  =
+          ValFace.gen_const I.idn x `Dim0 @@ fun phi ->
+          apply (Value.act phi func) @@ Value.act phi el
         in
         let face1 =
-          let xi = Eq.gen_const x `Dim1 in
-          let phi = I.equate (`Atom x) `Dim1 in
-          Face.Indet (xi, lazy begin Value.act phi el end)
+          ValFace.gen_const I.idn x `Dim1 @@ fun phi ->
+          Value.act phi el
         in
         [face0; face1]
       in
