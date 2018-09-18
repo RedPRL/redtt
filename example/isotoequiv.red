@@ -16,38 +16,36 @@ let iso/fiber/prop-over
   : is-prop-over (λ i → fiber _ _ (I.fst) (b i))
   =
   let (f, g, α, β) = I in
-  let sq (b : B) (fib : fiber _ _ f b) (i j : dim) : A =
-    comp 0 j (g (fib.snd i)) [
-    | i=0 → β (fib.fst)
-    | i=1 → refl
+  let sq (b : B) (fib : fiber _ _ f b) (j k : dim) : A =
+    comp k j (β (fib.fst) k) [
+    | k=1 → refl
+    | k=0 j → g (fib.snd j)
     ]
   in
   λ fib0 fib1 →
-    let sq2 (i j : dim) : A =
-      comp 1 j (g (b i)) [
-      | i=0 k → sq (b 0) fib0 k 1
-      | i=1 k → sq (b 1) fib1 k 1
+    let sq2 (i k : dim) : A =
+      comp 0 k (g (b i)) [
+      | i=0 → sq (b 0) fib0 1
+      | i=1 → sq (b 1) fib1 1
       ]
     in
     λ i →
      ( refl
      , λ j →
         let aux : A =
-          comp 1 0 (sq2 i j) [
+          comp j 0 (β (sq2 i 1) j) [
+          | j=1 → sq2 i
           | i=0 → sq (b 0) fib0 j
           | i=1 → sq (b 1) fib1 j
-          | j=0 → β (sq2 i 0)
-          | j=1 → refl
           ]
         in
         comp 0 1 (f aux) [
         | i=0 → α (fib0.snd j)
         | i=1 → α (fib1.snd j)
-        | j=0 → α (f (sq2 i 0))
+        | j=0 → α (f (sq2 i 1))
         | j=1 → α (b i)
         ]
      )
-
 
 let iso→equiv (A B : type) (I : iso A B) : equiv A B =
   let (f, g, α, β) = I in
