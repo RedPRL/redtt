@@ -379,6 +379,7 @@ struct
           let neu = act phi info.neu in
           NCoe {dir; abs; neu}
         | _ ->
+          Format.eprintf "mortal: ncoe@.";
           raise TooMortal
       end
 
@@ -390,6 +391,7 @@ struct
           let el = Value.act phi info.el in
           NCoeAtType {dir; abs; el}
         | _ ->
+          Format.eprintf "mortal: ncoe-at-type@.";
           raise TooMortal
       end
 
@@ -401,6 +403,7 @@ struct
           let neu = act phi info.neu in
           VProj {x = y; neu; func}
         | _ ->
+          Format.eprintf "mortal: vproj@.";
           raise TooMortal
       end
 
