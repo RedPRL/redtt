@@ -7,16 +7,16 @@ import equivalence
 let iso (A B : type) : type =
   (f : A → B)
   × (g : B → A)
-  × (α : (b : _) → path _ (f (g b)) b)
+  × ((b : _) → path _ (f (g b)) b)
   × (a : _) → path _ (g (f a)) a
 
-let iso/fiber/prop
+let iso/fiber/prop-over
   (A B : type)
-  (I : iso A B) (b : B)
-  : is-prop (fiber _ _ (I.fst) b)
+  (I : iso A B) (b : dim → B)
+  : is-prop-over (λ i → fiber _ _ (I.fst) (b i))
   =
   let (f, g, α, β) = I in
-  let sq (fib : fiber _ _ f b) (i j : dim) : A =
+  let sq (b : B) (fib : fiber _ _ f b) (i j : dim) : A =
     comp 0 j (g (fib.snd i)) [
     | i=0 → β (fib.fst)
     | i=1 → refl
@@ -24,9 +24,9 @@ let iso/fiber/prop
   in
   λ fib0 fib1 →
     let sq2 (i j : dim) : A =
-      comp 1 j (g b) [
-      | i=0 k → sq fib0 k 1
-      | i=1 k → sq fib1 k 1
+      comp 1 j (g (b i)) [
+      | i=0 k → sq (b 0) fib0 k 1
+      | i=1 k → sq (b 1) fib1 k 1
       ]
     in
     λ i →
@@ -34,8 +34,8 @@ let iso/fiber/prop
      , λ j →
         let aux : A =
           comp 1 0 (sq2 i j) [
-          | i=0 → sq fib0 j
-          | i=1 → sq fib1 j
+          | i=0 → sq (b 0) fib0 j
+          | i=1 → sq (b 1) fib1 j
           | j=0 → β (sq2 i 0)
           | j=1 → refl
           ]
@@ -44,11 +44,11 @@ let iso/fiber/prop
         | i=0 → α (fib0.snd j)
         | i=1 → α (fib1.snd j)
         | j=0 → α (f (sq2 i 0))
-        | j=1 → α b
+        | j=1 → α (b i)
         ]
      )
 
 
 let iso→equiv (A B : type) (I : iso A B) : equiv A B =
   let (f, g, α, β) = I in
-  (f , λ b → ((g b, α b), λ fib → iso/fiber/prop _ _ I b fib (g b, α b)))
+  (f , λ b → ((g b, α b), λ fib → iso/fiber/prop-over _ _ I (λ _ → b) fib (g b, α b)))
