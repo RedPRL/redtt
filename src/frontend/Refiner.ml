@@ -324,15 +324,14 @@ and split_sigma ~tac_scrut (tac_body : tm Tm.cmd -> tm Tm.cmd -> chk_tac) : chk_
   in
   tac_let xfun tac_fun tac_bdy
 
-and generalize ~tac_scrut tac_body : chk_tac =
+and tac_generalize ~tac_scrut tac_body : chk_tac =
   match_goal @@ fun goal ->
   let xfun = Name.fresh () in
-  let xarg = Name.fresh () in
   let tac_fun =
     tac_scrut >>= fun (ty_scrut, tm_scrut) ->
     guess_motive tm_scrut goal.ty >>= fun bmot ->
     let fun_ty = Tm.make @@ Tm.Pi (ty_scrut, bmot) in
-    tac_body (Tm.var xarg) {ty = fun_ty; sys = []} >>= fun fun_tm ->
+    tac_body {ty = fun_ty; sys = []} >>= fun fun_tm ->
     M.ret (fun_ty, fun_tm)
   in
   let tac_bdy =
@@ -363,14 +362,14 @@ and tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk
 
   | `Split ->
     split_sigma ~tac_scrut @@ fun cmd0 cmd1 ->
-    generalize ~tac_scrut:(tac_of_cmd cmd1) @@ fun _ ->
-    generalize ~tac_scrut:(tac_of_cmd cmd0) @@ fun _ ->
+    tac_generalize ~tac_scrut:(tac_of_cmd cmd1) @@
+    tac_generalize ~tac_scrut:(tac_of_cmd cmd0) @@
     body
 
   | `Bite inv ->
     split_sigma ~tac_scrut @@ fun cmd0 cmd1 ->
     tac_inversion ~loc ~tac_scrut:(tac_of_cmd cmd0) inv @@
-    generalize ~tac_scrut:(tac_of_cmd cmd1) @@ fun _ ->
+    tac_generalize ~tac_scrut:(tac_of_cmd cmd1) @@
     body
 
 and tac_inv_let p itac ctac =
