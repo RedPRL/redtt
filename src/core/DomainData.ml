@@ -57,7 +57,7 @@ and neu =
   | Var of {name : Name.t; twin : Tm.twin; ushift : int}
   | Meta of {name : Name.t; ushift : int}
 
-  | NHComAtType of {dir : dir; univ : value; ty : neu; cap : value; sys : comp_sys}
+  | NHComAtType of {dir : dir; univ : value; ty : neu; ty_sys : rigid_val_sys; cap : value; sys : comp_sys}
   | NHComAtCap of {dir : dir; ty : value; cap : neu; sys : comp_sys}
   | NCoe of {dir : dir; abs : abs; neu : neu}
 
