@@ -397,7 +397,7 @@ struct
       let tr, tr' = equate_dir env info0.dir info1.dir in
       let _ = equate_ty env info0.univ info1.univ in
       let ty = equate_neu env info0.ty info1.ty in
-      let ty_val = make @@ Up {ty = info0.univ; neu = info0.ty; sys = []} in
+      let ty_val = make @@ Up {ty = info0.univ; neu = info0.ty; sys = info0.ty_sys} in
       let cap = equate env ty_val info0.cap info1.cap in
       let sys = equate_comp_sys env ty_val info0.sys info1.sys in
       Tm.HCom {r = tr; r' = tr'; ty = Tm.up ty; cap; sys}, Bwd.from_list stk

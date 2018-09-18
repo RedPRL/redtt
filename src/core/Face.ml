@@ -41,7 +41,7 @@ sig
   val make : I.action -> I.t -> I.t -> (I.action -> body) -> [`Any] t
 
   (* convenience function for generating faces x = ε *)
-  val gen_const : I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> body) -> [`Any] t
+  val gen_const : I.action -> I.atom -> [`Dim0 | `Dim1] -> (I.action -> body) -> 'a t
 
   val act : I.action -> 'x t -> [`Any] t
 end

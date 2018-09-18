@@ -234,8 +234,11 @@ and pp_neu fmt neu =
   | Cap _ ->
     Format.fprintf fmt "<cap>"
 
-  | VProj _ ->
-    Format.fprintf fmt "<vproj>"
+  | VProj info ->
+    Format.fprintf fmt "@[<hv1>(vproj %a@ %a@ %a)@]"
+      Name.pp info.x
+      pp_neu info.neu
+      pp_nf info.func
 
   | LblCall neu ->
     Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
@@ -350,12 +353,12 @@ struct
     function
     | NHComAtType info ->
       begin
-        match Dir.act phi info.dir, CompSys.act phi info.sys with
-        | `Ok dir, `Ok sys ->
+        match Dir.act phi info.dir, force_val_sys @@ ValSys.act phi (ValSys.from_rigid info.ty_sys), CompSys.act phi info.sys with
+        | `Ok dir, `Ok ty_sys, `Ok sys ->
           let univ = Value.act phi info.univ in
           let cap = Value.act phi info.cap in
           let ty = act phi info.ty in
-          NHComAtType {dir; univ; ty; cap; sys}
+          NHComAtType {dir; univ; ty; ty_sys; cap; sys}
         | _ ->
           raise TooMortal
       end
@@ -379,6 +382,7 @@ struct
           let neu = act phi info.neu in
           NCoe {dir; abs; neu}
         | _ ->
+          Format.eprintf "mortal: ncoe@.";
           raise TooMortal
       end
 
@@ -390,10 +394,11 @@ struct
           let el = Value.act phi info.el in
           NCoeAtType {dir; abs; el}
         | _ ->
+          Format.eprintf "mortal: ncoe-at-type@.";
           raise TooMortal
       end
 
-    | VProj info ->
+    | VProj info as neu ->
       begin
         match I.act phi @@ `Atom info.x with
         | `Atom y ->
@@ -401,6 +406,9 @@ struct
           let neu = act phi info.neu in
           VProj {x = y; neu; func}
         | _ ->
+          Format.eprintf "mortal: vproj@.";
+          Format.eprintf "neu: %a@." pp_neu neu;
+
           raise TooMortal
       end
 
