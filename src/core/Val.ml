@@ -891,7 +891,7 @@ struct
           in
 
           let el1 =
-            make_hcom (Dir.make `Dim1 r') info.ty1 (base I.idn r r') @@
+            make_hcom (Dir.make `Dim1 r') (Value.act (I.subst r' x) info.ty1) (base I.idn r r') @@
             force_abs_sys [face0; face_diag; face_front]
           in
 
