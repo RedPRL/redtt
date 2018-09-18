@@ -210,10 +210,10 @@ let rec tac_lambda (ps : ESig.einvpat list) tac goal =
       match ps with
       | [] -> tac goal
       | p :: ps ->
-        let x =
+        let x, p =
           match p with
-          | `Var nm -> name_of nm
-          | _ -> Name.fresh ()
+          | `Var nm -> let x = name_of nm in x, `Var (`Gen x)
+          | _ -> Name.fresh (), p
         in
 
         let codx = Tm.unbind_with (Tm.var x) cod in

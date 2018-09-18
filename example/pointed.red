@@ -7,7 +7,7 @@ let pmap (pA pB : ptype) : type =
   (f : pA.fst → pB.fst) × path _ (f (pA.snd)) (pB.snd)
 
 let p→ (pA pB : ptype) : ptype =
-  (pmap pA pB, λ _ → pB.snd, λ _ → pB.snd)
+  (pmap pA pB, λ _ → pB.snd, refl)
 
 let pequiv (pA pB : ptype) : type =
   (f : pmap pA pB) × is-equiv (pA.fst) (pB.fst) (f.fst)
