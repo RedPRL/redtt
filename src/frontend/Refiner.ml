@@ -310,7 +310,7 @@ and split_sigma ~tac_scrut (tac_body : tm Tm.cmd -> tm Tm.cmd -> chk_tac) : chk_
       let mot_x0x1 = Tm.unbind_with (Tm.ann ~ty:sigma_ty ~tm:pair) bmot in
       let codx0 = Tm.unbind_with (Tm.var x0) cod in
       let fun_ty = Tm.make @@ Tm.Pi (dom, Tm.bind x0 @@ Tm.make @@ Tm.Pi (codx0, Tm.bind x1 @@ mot_x0x1)) in
-      tac_down ~ty:fun_ty @@ tac_lambda [`Var (`Gen x0); `Var (`Gen x1)] (tac_body (Tm.var x0) (Tm.var x1))
+      tac_down ~ty:fun_ty @@ tac_lambda [`Var (`Gen x0); `Var (`Gen x1)] @@ tac_body (Tm.var x0) (Tm.var x1)
     | _ ->
       failwith "split_sigma"
   in
