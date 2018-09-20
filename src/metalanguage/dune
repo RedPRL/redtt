@@ -1,0 +1,6 @@
+(library
+ (name RedML)
+ (flags
+  (:standard -w -32-26-27-37))
+ (public_name redml)
+ (libraries redbasis redtt_core uuseg uuseg.string uutf))
