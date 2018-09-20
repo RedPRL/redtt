@@ -19,7 +19,7 @@ type error =
   | ApplyUnexpectedCube of value
   | RecursorUnexpectedArgument of string * value
   | SigmaProjUnexpectedArgument of string * value
-  | RigidVProjUnexpectedArgument of value
+  | RigidVProjUnexpectedArgument of atom * value
   | RigidCapUnexpectedArgument of value
   | LblCallUnexpectedArgument of value
   | UnexpectedDimensionTerm of Tm.tm
@@ -75,10 +75,10 @@ struct
       Format.fprintf fmt
         "Unexpected argument to Sigma type projection %s:@ %a."
         proj pp_value v
-    | RigidVProjUnexpectedArgument v ->
+    | RigidVProjUnexpectedArgument (x, v) ->
       Format.fprintf fmt
-        "Unexpected argument to rigid vproj:@ %a."
-        pp_value v
+        "Unexpected argument to rigid vproj over dimension %a:@ %a."
+        Name.pp x pp_value v
     | RigidCapUnexpectedArgument v ->
       Format.fprintf fmt
         "Unexpected argument to rigid cap:@ %a."
@@ -1920,7 +1920,7 @@ struct
       let vproj_sys = faces01 @ List.map vproj_face up.sys in
       make @@ Up {ty = ty1; neu; sys = vproj_sys}
     | _ ->
-      let err = RigidVProjUnexpectedArgument el in
+      let err = RigidVProjUnexpectedArgument (x, el) in
       raise @@ E err
 
   and elim_data dlbl ~mot ~scrut ~clauses =
