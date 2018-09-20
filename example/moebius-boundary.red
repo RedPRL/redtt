@@ -58,6 +58,32 @@ let s1→moebius-boundary : s1 → moebius-boundary =
   | loop i → s1→moebius-boundary/loop/filler i 1
   ]
 
+let moebius-boundary→s1→moebius-boundary/base :
+  (b : bool) →
+  path moebius-boundary
+    (s1→moebius-boundary (moebius-boundary→s1 (base, b)))
+    (base, b)
+  =
+  elim [
+  | tt → loop-path ff
+  | ff → refl
+  ]
+
+-- this gives restriction subtyping errors
+let moebius-boundary→s1→moebius-boundary/loop' (i : dim) :
+  (y : not/path i) →
+  path moebius-boundary
+    (s1→moebius-boundary (moebius-boundary→s1 (loop i, y)))
+    (loop i, y)
+  =
+  coe 1 i moebius-boundary→s1→moebius-boundary/base in
+  λ i →
+    (y : not/path i) →
+    path moebius-boundary
+      (s1→moebius-boundary (moebius-boundary→s1 (loop i, y)))
+      (loop i, y)
+
+
 /-
 let moebius-boundary→s1→moebius-boundary :
   (x : moebius-boundary) → path _ (s1→moebius-boundary (moebius-boundary→s1 x)) x
@@ -71,8 +97,6 @@ let moebius-boundary→s1→moebius-boundary :
     ]
   | loop i → ?
   ]
-
-quit
 -/
 
 let s1→moebius-boundary→s1/loop :
