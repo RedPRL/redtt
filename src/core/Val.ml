@@ -852,17 +852,14 @@ struct
                 | `Dim0 -> fiber_at_face0 phi (* r=0 *)
                 | `Dim1 -> fiber0 phi (base1 phi `Dim0) (* r=1 *)
                 | `Atom rphi_atom ->
-                  (* XXX This needs to be updated with the new Thought. *)
                   (* coercion to the diagonal *)
                   let path_in_fiber0_ty =
                     contr0 phi @@
                     make_coe (Dir.make `Dim0 rphi) (Abs.bind1 rphi_atom (fiber0_ty phi (base phi rphi `Dim0))) @@
                     (* the fiber *)
-                    make_cons
-                      (Value.act (I.cmp phi (I.subst `Dim0 rphi_atom)) el,
-                       make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
+                    fiber_at_face0 (I.cmp (I.subst `Dim0 rphi_atom) phi)
                   in
-                  ext_apply path_in_fiber0_ty [r]
+                  ext_apply path_in_fiber0_ty [rphi]
               end
             (* The implementation used in [Y]. *)
             | `UNIFORM_HCOM ->
