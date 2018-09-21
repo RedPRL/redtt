@@ -163,4 +163,8 @@ let is_strict_set desc =
     | [] -> true
     | _ -> false
   in
-  List.fold_right (fun (_, constr) r -> constr_is_point constr && r) (constrs desc) true
+  match desc.body with
+  | TNil constrs ->
+    List.fold_right (fun (_, constr) r -> constr_is_point constr && r) constrs true
+  | _ ->
+    false
