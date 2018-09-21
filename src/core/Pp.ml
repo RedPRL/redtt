@@ -19,16 +19,22 @@ struct
     | Emp -> failwith "ppenv/proj"
     | Snoc (xs, _) -> xs
 
-  let choose_name xs x =
-    match x with
-    | _ ->
-      let ys = Bwd.filter (fun y -> y = x) xs in
-      let n = Bwd.length ys in
-      if n = 0 then
-        x
-      else
-        x ^ string_of_int n
+  let number_to_subscript n =
+    let formatted = string_of_int n in
+    let lookup : int -> string = List.nth ["₀";"₁";"₂";"₃";"₄";"₅";"₆";"₇";"₈";"₉"] in
+    String.concat "" @@
+      List.init (String.length formatted) @@
+      fun n -> lookup (Char.code (String.get formatted n) - Char.code '0')
 
+  let rec rename xs x i =
+    let suffix = number_to_subscript i in
+    let new_x = x ^ suffix in
+    if Bwd.mem new_x xs then (rename [@tailcall]) xs x (i + 1) else new_x
+
+  let choose_name xs x =
+    if Bwd.mem x xs then rename xs x 1 else x
+
+  (* FIXME what if there is a datatype called "x"? *)
   let bind xs nm =
     let x =
       match nm with
