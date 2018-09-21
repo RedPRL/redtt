@@ -563,17 +563,19 @@ struct
 
     let r, r' = Dir.unleash dir in
 
-    let args_in_dir dir = multi_coe empty_env abs dir (x, constr.specs) args in
+    let args_in_dir dir = multi_coe empty_env abs dir (x, Desc.Constr.specs constr) args in
     let intro = make_intro empty_env ~dlbl ~clbl @@ args_in_dir @@ `Ok dir in
 
+    let boundary = Desc.Constr.boundary constr in
+
     begin
-      match constr.boundary with
+      match boundary with
       | [] ->
         intro
       | _ ->
         let faces =
           let rho = Env.append empty_env @@ args_in_dir @@ Dir.make r (`Atom x) in
-          eval_tm_sys rho constr.boundary
+          eval_tm_sys rho boundary
         in
         let fix_face =
           Face.map @@ fun _ _ el ->
@@ -1325,12 +1327,12 @@ struct
         | _ ->
           failwith "eval/intro: length mismatch"
       in
-      make_intro (Env.clear_locals rho) ~dlbl ~clbl @@ go args constr.specs
+      make_intro (Env.clear_locals rho) ~dlbl ~clbl @@ go args @@ Desc.Constr.specs constr
 
   and make_intro rho ~dlbl ~clbl (args : env_el list) : value =
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl desc in
-    let sys = eval_tm_sys (Env.append rho args) constr.boundary in
+    let sys = eval_tm_sys (Env.append rho args) @@ Desc.Constr.boundary constr in
     match force_val_sys sys with
     | `Ok sys ->
       make @@ Intro {dlbl; clbl; args; sys}
@@ -1954,7 +1956,7 @@ struct
           failwith "elim_data: length mismatch"
       in
 
-      inst_nclo nclo @@ go info.args constr.specs
+      inst_nclo nclo @@ go info.args @@ Desc.Constr.specs constr
 
     | Up up ->
       let neu = Elim {dlbl; mot; neu = up.neu; clauses} in

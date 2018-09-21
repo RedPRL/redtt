@@ -9,10 +9,34 @@ type arg_spec =
   | `Dim
   ]
 
+type ('a, 'e) telescope =
+  | TNil of 'e
+  | TCons of 'a * ('a, 'e) telescope Tm.bnd
 
-type constr =
-  {specs : (string * arg_spec) list;
-   boundary : (tm, tm) system}
+
+type constr = (arg_spec, (tm, tm) system) telescope
+
+module Constr =
+struct
+  type t = constr
+
+  let open_var _ _ = failwith "TODO"
+  let close_var _ _ = failwith "TODO"
+  let bind _ _ = failwith "TODO"
+
+  let rec specs =
+    function
+    | TNil _ -> []
+    | TCons (spec, Tm.B (nm, constr)) ->
+      (nm, spec) :: specs constr
+
+  let rec boundary =
+    function
+    | TNil sys -> sys
+    | TCons (_, Tm.B (_, constr)) ->
+      boundary constr
+
+end
 
 type desc =
   {kind : Kind.t;
@@ -22,12 +46,16 @@ type desc =
    status : [`Complete | `Partial]}
 
 
+
 let flip f x y = f y x
 
-let dim_specs constr =
-  List.flatten @@ flip List.map constr.specs @@ function
-  | (x, `Dim) -> [x]
-  | _ -> []
+let rec dim_specs constr =
+  match constr with
+  | TNil _ -> []
+  | TCons (spec, Tm.B (nm, constr)) ->
+    match spec with
+    | `Dim -> nm :: dim_specs constr
+    | _ -> dim_specs constr
 
 
 exception ConstructorNotFound of string

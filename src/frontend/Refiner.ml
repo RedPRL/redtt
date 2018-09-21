@@ -423,9 +423,10 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
         | Not_found ->
           let constr = Desc.lookup_constr lbl desc in
           let pbinds =
-            flip List.map constr.specs @@ function
-            | nm, (`Const _ | `Dim) -> `Bind (`Var (`User nm))
-            | nm, `Rec _ -> `BindIH (`Var (`User nm), `Var (`User (nm ^ "/ih")))
+            flip List.map (Desc.Constr.specs constr) @@ function
+            | Some nm, (`Const _ | `Dim) -> `Bind (`Var (`User nm))
+            | Some nm, `Rec _ -> `BindIH (`Var (`User nm), `Var (`User (nm ^ "/ih")))
+            | None, _ -> `Bind (`Var (`User "_"))
           in
           lbl, pbinds,
           match default with
@@ -453,7 +454,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
             cx, Cx.evaluator cx, Cx.quoter cx
         end >>= fun (cx, (module V), (module Q)) ->
         match pbinds, specs with
-        | `Bind (`Var nm) :: pbinds, (_, `Const ty) :: specs ->
+        | `Bind (`Var nm) :: pbinds, Desc.TCons (`Const ty, Tm.B (_, specs)) ->
           let x = name_of nm in
           let vty = V.eval tyenv ty in
           let x_tm = Tm.up @@ Tm.var x in
@@ -466,7 +467,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           M.in_scope x (`P tty) @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
 
-        | `Bind (`Var nm) :: pbinds, (_, `Dim) :: specs ->
+        | `Bind (`Var nm) :: pbinds, Desc.TCons (`Dim, Tm.B (_, specs)) ->
           let x = name_of nm in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = `Atom x in
@@ -477,7 +478,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           M.in_scope x `I @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
 
-        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, (_, `Rec Desc.Self) :: specs ->
+        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, Desc.TCons (`Rec Desc.Self, Tm.B (_, specs)) ->
           let x = name_of nm in
           let x_ih = name_of nm_ih in
           let vty = data_vty in
@@ -499,10 +500,10 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
             prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
           end
 
-        | `Bind p :: pbinds, ((_, `Rec _) :: _ as specs) ->
+        | `Bind p :: pbinds, (Desc.TCons (`Rec _, _) as specs) ->
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (p, `Var (`Gen (Name.fresh ()))) :: pbinds) specs
 
-        | `Bind inv :: pbinds, ((_, spec) :: _ as specs) ->
+        | `Bind inv :: pbinds, (Desc.TCons (spec, _) as specs) ->
           let x = Name.fresh () in
           let kont_tac tac =
             kont_tac @@
@@ -519,7 +520,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           in
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`Bind (`Var (`Gen x)) :: pbinds) specs
 
-        | `BindIH (`Var y, inv) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
+        | `BindIH (`Var y, inv) :: pbinds, (Desc.TCons (`Rec Desc.Self, _) as specs) ->
           let x_ih = Name.fresh () in
           let kont_tac tac =
             kont_tac @@
@@ -529,7 +530,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           in
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var y, `Var (`Gen x_ih)) :: pbinds) specs
 
-        | `BindIH (inv, p) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
+        | `BindIH (inv, p) :: pbinds, (Desc.TCons (`Rec Desc.Self, _) as specs) ->
           let x = Name.fresh () in
           let kont_tac tac =
             kont_tac @@
@@ -539,14 +540,14 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           in
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var (`Gen x), p) :: pbinds) specs
 
-        | [], [] ->
+        | [], Desc.TNil _ ->
           M.ret (Bwd.to_list psi, tyenv, Bwd.to_list intro_args, env_only_ihs, kont_tac)
 
         | _ ->
           failwith "prepare_clause: mismatch"
       in
 
-      prepare_clause (Emp, empty_env, Emp, empty_env, fun tac -> tac) pbinds constr.specs >>= fun (psi, env, intro_args, env_only_ihs, kont_tac) ->
+      prepare_clause (Emp, empty_env, Emp, empty_env, fun tac -> tac) pbinds constr >>= fun (psi, env, intro_args, env_only_ihs, kont_tac) ->
 
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, intro_args) in
       let clause_ty = mot intro in
@@ -568,19 +569,18 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
             let nclo : D.nclo = D.NClo.act phi @@ D.NClo {rho = Cx.env outer_cx; nbnd} in
             let rec go specs tms =
               match specs, tms with
-              | (_, `Const ty) :: specs, tm :: tms ->
+              | Desc.TCons (`Const ty, Tm.B (_, specs)), tm :: tms ->
                 `Val (D.Value.act phi @@ V.eval benv tm) :: go specs tms
-              | (_, `Rec Desc.Self) :: specs, tm :: tms ->
+              | Desc.TCons (`Rec Desc.Self, Tm.B (_, specs)), tm :: tms ->
                 `Val (D.Value.act phi @@ V.eval benv tm) :: `Val (image_of_bterm phi tm) :: go specs tms
-              | (_, `Dim) :: specs, tm :: tms ->
+              | Desc.TCons (`Dim, Tm.B (_, specs)), tm :: tms ->
                 `Dim (I.act phi @@ V.eval_dim benv tm) :: go specs tms
-              | [], [] ->
+              | Desc.TNil _, [] ->
                 []
               | _ ->
-                Format.eprintf "Tm: %a@." Tm.pp0 tm;
                 failwith "image_of_bterm"
             in
-            V.inst_nclo nclo @@ go constr.specs args
+            V.inst_nclo nclo @@ go constr args
           | _ ->
             D.Value.act phi @@ V.eval env_only_ihs tm
 
@@ -596,7 +596,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
 
         (* What is the image of the boundary in the current fiber of the motive? *)
         let tsys =
-          let val_sys = List.map image_of_bface constr.boundary in
+          let val_sys = List.map image_of_bface @@ Desc.Constr.boundary constr in
           let vty = Cx.eval cx clause_ty in
           Q.quote_val_sys (Cx.qenv cx) vty val_sys
         in

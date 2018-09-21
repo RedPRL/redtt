@@ -192,37 +192,38 @@ struct
     in
 
 
-    let rec go acc =
+    let rec go =
       function
       | [] ->
-        let specs = abstract_tele Emp @@ Bwd.to_list acc in
-        elab_tm_sys data_ty econstr.boundary >>= bind_sys_in_scope >>= fun boundary ->
-        let constr = Desc.{specs; boundary} in
-        M.ret (clbl, constr)
+        elab_tm_sys data_ty econstr.boundary <<@> fun boundary ->
+          Desc.TNil boundary
 
       | `Ty (nm, ety) :: args ->
         begin
           match E.(ety.con) with
           | E.Var var when var.name = dlbl ->
             let x = Name.named @@ Some nm in
-            M.in_scope x (`P data_ty) @@ go (acc #< (nm, x, `Rec Self)) args
-
+            M.in_scope x (`P data_ty) (go args) <<@> fun constr ->
+              Desc.TCons (`Rec Self, Desc.Constr.bind x constr)
           | _ ->
             let x = Name.named @@ Some nm in
             let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
-            elab_chk ety {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
-            M.in_scope x (`P pty) @@ go (acc #< (nm, x, `Const pty)) args
+            elab_chk ety {ty = univ; sys = []} >>= fun pty ->
+            M.in_scope x (`P pty) (go args) <<@> fun constr ->
+              Desc.TCons (`Const pty, Desc.Constr.bind x constr)
         end
 
       | `I nm :: args ->
         let x = Name.named @@ Some nm in
-        M.in_scope x `I @@ go (acc #< (nm, x, `Dim)) args
+        M.in_scope x `I (go args) <<@> fun constr ->
+          Desc.TCons (`Dim, Desc.Constr.bind x constr)
 
       | `Tick _ :: args ->
         failwith "Tick in HIT constructor argument not yet supported"
+
     in
 
-    go Emp @@ econstr.specs
+    go econstr.specs <<@> fun constr -> clbl, constr
 
 
   and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =
@@ -824,7 +825,7 @@ struct
         failwith "elab_intro: mismatch"
     in
 
-    go (Tm.shift 0) constr.specs (Bwd.to_list frms) >>= fun tms ->
+    go (Tm.shift 0) (Desc.Constr.specs constr) (Bwd.to_list frms) >>= fun tms ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tms)
 
   and elab_mode_switch_cut exp frms ty =

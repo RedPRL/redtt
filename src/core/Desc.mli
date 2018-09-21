@@ -12,9 +12,19 @@ type arg_spec =
   ]
 
 
-type constr =
-  {specs : (string * arg_spec) list;
-   boundary : (tm, tm) system}
+type ('a, 'e) telescope =
+  | TNil of 'e
+  | TCons of 'a * ('a, 'e) telescope Tm.bnd
+
+type constr = (arg_spec, (tm, tm) system) telescope
+
+module Constr :
+sig
+  include LocallyNameless.S with type t = constr
+  val specs : t -> (string option * arg_spec) list
+  val boundary : t -> (tm, tm) system
+end
+
 
 type desc =
   {kind : Kind.t;

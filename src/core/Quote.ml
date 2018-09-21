@@ -372,7 +372,7 @@ struct
         failwith "equate_constr_args: argument mismatch"
     in
 
-    go Emp empty_env constr.specs cells0 cells1
+    go Emp empty_env (Desc.Constr.specs constr) cells0 cells1
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
@@ -509,7 +509,7 @@ struct
               go qenv'' venv' (cells_w_ihs <>< [`Val v; `Val vih]) (cells #< (`Val v)) specs
 
             | (nm, `Dim) :: specs ->
-              let x = Name.named @@ Some nm in
+              let x = Name.named nm in
               let r = `Atom x in
               let qenv' = Env.abs qenv [x] in
               let venv' = D.Env.snoc venv @@ `Dim r in
@@ -519,7 +519,7 @@ struct
               qenv, Bwd.to_list cells_w_ihs, Bwd.to_list cells
           in
 
-          let env', cells_w_ihs, cells = go env empty_env Emp Emp Desc.(constr.specs) in
+          let env', cells_w_ihs, cells = go env empty_env Emp Emp @@ Desc.Constr.specs constr in
 
           let bdy0 = inst_nclo clause0 cells_w_ihs in
           let bdy1 = inst_nclo clause1 cells_w_ihs in

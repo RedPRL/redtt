@@ -414,7 +414,7 @@ and check_constr cx dlbl constr tms =
   let _ : D.env =
     List.fold_right2
       (fun (_, spec) tm tyenv -> check_argument tyenv spec tm)
-      constr.specs
+      (Desc.Constr.specs constr)
       tms
       V.empty_env
   in
@@ -726,21 +726,21 @@ and infer_spine cx hd sp =
           match specs with
           | (lbl, `Const ty) :: specs ->
             let vty = V.eval venv ty in
-            let cx, v = Cx.ext_ty cx ~nm:(Some lbl) vty in
+            let cx, v = Cx.ext_ty cx ~nm:lbl vty in
             let venv = D.Env.snoc venv @@ `Val v in
             go cx venv (cells_only_ihs #< (`Val v)) (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
           | (lbl, `Rec Desc.Self) :: specs ->
             let vty = D.make @@ D.Data info.dlbl in
-            let cx, v = Cx.ext_ty cx ~nm:(Some lbl) vty in
+            let cx, v = Cx.ext_ty cx ~nm:lbl vty in
             let cx_ih, v_ih = Cx.ext_ty cx ~nm:None @@ V.inst_clo mot_clo v in
             let venv = D.Env.snoc venv @@ `Val v in
             go cx_ih venv (cells_only_ihs #< (`Val v_ih)) (cells_w_ihs <>< [`Val v; `Val v_ih]) (cells #< (`Val v)) specs
 
           | (lbl, `Dim) :: specs ->
-            let x = Name.named @@ Some lbl in
+            let x = Name.named lbl in
             let r = `Atom x in
-            let cx = Cx.def_dim cx ~nm:(Some lbl) r in
+            let cx = Cx.def_dim cx ~nm:lbl r in
             let venv = D.Env.snoc venv @@ `Dim r in
             go cx venv (cells_only_ihs #< (`Dim r)) (cells_w_ihs #< (`Dim r)) (cells #< (`Dim r)) specs
 
@@ -748,7 +748,7 @@ and infer_spine cx hd sp =
             cx, Bwd.to_list cells_only_ihs, Bwd.to_list cells_w_ihs, Bwd.to_list cells
         in
 
-        let cx', cells_only_ihs, cells_w_ihs, cells = go cx V.empty_env Emp Emp Emp Desc.(constr.specs) in
+        let cx', cells_only_ihs, cells_w_ihs, cells = go cx V.empty_env Emp Emp Emp @@ Desc.Constr.specs constr in
         let generic_intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl cells in
 
         (* maybe wrong *)
@@ -770,10 +770,9 @@ and infer_spine cx hd sp =
               | [], [] ->
                 []
               | _ ->
-                Format.eprintf "Tm: %a@." Tm.pp0 tm;
                 failwith "image_of_bterm"
             in
-            V.inst_nclo nclo @@ go constr.specs args
+            V.inst_nclo nclo @@ go (Desc.Constr.specs constr) args
           | _ ->
             D.Value.act phi @@ V.eval (D.Env.append V.empty_env cells_only_ihs) tm
 
@@ -790,7 +789,7 @@ and infer_spine cx hd sp =
 
         let ty = V.inst_clo mot_clo generic_intro in
 
-        let boundary = List.map image_of_bface constr.boundary in
+        let boundary = List.map image_of_bface @@ Desc.Constr.boundary constr in
         check_ cx' ty boundary bdy;
 
         let nms = Bwd.map (fun _ -> None) @@ Bwd.from_list cells_w_ihs in
