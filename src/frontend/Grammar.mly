@@ -64,6 +64,7 @@ edecl:
     { E.Normalize e }
 
   | DATA; dlbl = ATOM;
+    params = list(etele_cell);
     univ_spec = option(preceded(COLON, univ_spec));
     WHERE; option(PIPE);
     constrs = separated_list(PIPE, econstr)
@@ -72,7 +73,8 @@ edecl:
         | Some (k, l) -> k, l
         | None -> `Kan, `Const 0
       in
-      E.Data (dlbl, E.EDesc {constrs; kind; lvl}) }
+      let params = List.flatten params in
+      E.Data (dlbl, E.EDesc {params; constrs; kind; lvl}) }
 
   | IMPORT; a = ATOM
     { E.Import a }

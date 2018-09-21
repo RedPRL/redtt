@@ -18,6 +18,7 @@ and edesc =
     EDesc of
       {kind : Kind.t;
        lvl : Lvl.t;
+       params : ecell list;
        constrs : (string * econstr) list}
 
 and econstr =

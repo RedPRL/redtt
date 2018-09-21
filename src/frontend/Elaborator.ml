@@ -142,7 +142,7 @@ struct
       M.ret ()
 
   and elab_datatype dlbl (E.EDesc edesc) =
-    let rec go tdesc =
+    let rec elab_constrs tdesc =
       function
       | [] ->
         let tdesc = Desc.{tdesc with status = `Complete} in
@@ -152,7 +152,7 @@ struct
         elab_constr dlbl tdesc econstr >>= fun constr ->
         let tdesc = Desc.{tdesc with constrs = tdesc.constrs @ [constr]} in
         M.lift @@ C.declare_datatype dlbl tdesc >>
-        go tdesc econstrs
+        elab_constrs tdesc econstrs
     in
 
     let tdesc = Desc.{params = []; constrs = []; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
@@ -161,7 +161,7 @@ struct
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
     | _ ->
-      go tdesc edesc.constrs
+      elab_constrs tdesc edesc.constrs
 
   and elab_constr dlbl desc (clbl, E.EConstr econstr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
