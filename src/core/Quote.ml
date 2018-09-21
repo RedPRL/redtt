@@ -84,6 +84,7 @@ type error =
   | UnequalNf of {env : Env.t; ty : value; el0 : value; el1 : value}
   | UnequalNeu of {env : Env.t; neu0 : neu; neu1 : neu}
   | UnequalLbl of string * string
+  | UnequalDim of I.t * I.t
 
 let pp_error fmt =
   function
@@ -104,6 +105,12 @@ let pp_error fmt =
       Uuseg_string.pp_utf_8 lbl0
       Uuseg_string.pp_utf_8 "≠"
       Uuseg_string.pp_utf_8 lbl1
+
+  | UnequalDim (r0, r1) ->
+    Format.fprintf fmt "@[<hv>Dimensions@ %a@ %a@ %a@]"
+      I.pp r0
+      Uuseg_string.pp_utf_8 "≠"
+      I.pp r1
 
 exception E of error
 
@@ -712,7 +719,7 @@ struct
          Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
-      failwith "equate_dim: dimensions did not match"
+      raise @@ E (UnequalDim (r, r'))
 
 
   and equate_dim3 env (r : I.t) (r' : I.t) (r'' : I.t) =
