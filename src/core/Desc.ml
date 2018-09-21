@@ -38,11 +38,12 @@ struct
 
 end
 
+type desc_body = (string * constr) list
+
 type desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   params : (string * tm) list;
-   constrs : (string * constr) list;
+   constrs : desc_body; (* TODO: wrap in telescope ! *)
    status : [`Complete | `Partial]}
 
 
@@ -74,7 +75,7 @@ let is_strict_set desc =
     | [] -> true
     | _ -> false
   in
-  desc.params = [] && List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc.constrs true
+  List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc.constrs true
 
 let pp_string = Uuseg_string.pp_utf_8
 let pp_string = Uuseg_string.pp_utf_8

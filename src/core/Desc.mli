@@ -26,11 +26,12 @@ sig
 end
 
 
+type desc_body = (string * constr) list
+
 type desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   params : (string * tm) list;
-   constrs : (string * constr) list;
+   constrs : desc_body;
    status : [`Complete | `Partial]}
 
 
