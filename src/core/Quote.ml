@@ -490,14 +490,14 @@ struct
           let clause1 = find_clause clbl elim1.clauses in
 
 
-          let rec go qenv venv cells_w_ihs cells specs =
+          let rec go qenv tyenv cells_w_ihs cells specs =
             match specs with
             | (_, `Const ty) :: specs ->
-              let vty = V.eval venv ty in
+              let vty = V.eval tyenv ty in
               let v = generic qenv vty in
-              let venv' = D.Env.snoc venv @@ `Val v in
+              let tyenv' = D.Env.snoc tyenv @@ `Val v in
               let qenv' = Env.succ qenv in
-              go qenv' venv' (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
+              go qenv' tyenv' (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
             | (_, `Rec Desc.Self) :: specs ->
               let vty = D.make @@ D.Data dlbl in
@@ -505,15 +505,15 @@ struct
               let qenv' = Env.succ qenv in
               let vih = generic qenv' @@ V.inst_clo elim0.mot v in
               let qenv'' = Env.succ qenv' in
-              let venv' = D.Env.snoc venv @@ `Val v in
-              go qenv'' venv' (cells_w_ihs <>< [`Val v; `Val vih]) (cells #< (`Val v)) specs
+              let tyenv' = D.Env.snoc tyenv @@ `Val v in
+              go qenv'' tyenv' (cells_w_ihs <>< [`Val v; `Val vih]) (cells #< (`Val v)) specs
 
             | (nm, `Dim) :: specs ->
               let x = Name.named nm in
               let r = `Atom x in
               let qenv' = Env.abs qenv [x] in
-              let venv' = D.Env.snoc venv @@ `Dim r in
-              go qenv' venv' (cells_w_ihs #< (`Dim r)) (cells #< (`Dim r)) specs
+              let tyenv' = D.Env.snoc tyenv @@ `Dim r in
+              go qenv' tyenv' (cells_w_ihs #< (`Dim r)) (cells #< (`Dim r)) specs
 
             | [] ->
               qenv, Bwd.to_list cells_w_ihs, Bwd.to_list cells

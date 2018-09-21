@@ -27,7 +27,7 @@ sig
   val boundary : t -> (tm, tm) system
 end
 
-
+(* type param = tm *)
 type desc_body = (string * constr) list
 
 type desc =
