@@ -1,3 +1,4 @@
+open RedBasis
 open Tm
 
 type rec_spec =
@@ -13,6 +14,36 @@ type ('a, 'e) telescope =
   | TNil of 'e
   | TCons of 'a * ('a, 'e) telescope Tm.bnd
 
+
+module Telescope (B : LocallyNameless.S) (E : LocallyNameless.S) :
+sig
+  include LocallyNameless.S with type t = (B.t, E.t) telescope
+  val bind : Name.t -> t -> t bnd
+end =
+struct
+  type t = (B.t, E.t) telescope
+
+  let rec open_var i a =
+    function
+    | TNil e ->
+      TNil (E.open_var i a e)
+    | TCons (b, Tm.B (nm, tele)) ->
+      let b = B.open_var i a b in
+      let tele = open_var (i + 1) a tele in
+      TCons (b, Tm.B (nm, tele))
+
+  let rec close_var a i =
+    function
+    | TNil e ->
+      TNil (E.close_var a i e)
+    | TCons (b, Tm.B (nm, tele)) ->
+      let b = B.close_var a i b in
+      let tele = close_var a (i + 1) tele in
+      TCons (b, Tm.B (nm, tele))
+
+  let bind x tele =
+    Tm.B (Name.name x, close_var x 0 tele)
+end
 
 type constr = (arg_spec, (tm, tm) system) telescope
 
@@ -33,32 +64,23 @@ struct
     | `Dim -> `Dim
 end
 
+module Face : LocallyNameless.S with type t = (tm, tm) face =
+struct
+  type t = (tm, tm) face
+
+  let open_var i a (t0, t1, ot) =
+    Tm.open_var i a t0, Tm.open_var i a t1, Option.map (Tm.open_var i a) ot
+
+  let close_var a i (t0, t1, ot) =
+    Tm.close_var a i t0, Tm.close_var a i t1, Option.map (Tm.close_var a i) ot
+end
+
+module Boundary = LocallyNameless.List (Face)
+
 module Constr =
 struct
-  type t = constr
-
-  let rec open_var i a =
-    function
-    | TNil sys ->
-      let sys = Tm.map_tm_sys (Tm.open_var i a) sys in
-      TNil sys
-    | TCons (spec, Tm.B (nm, constr)) ->
-      let spec = ArgSpec.open_var i a spec in
-      let constr = open_var (i + 1) a constr in
-      TCons (spec, Tm.B (nm, constr))
-
-  let rec close_var a i =
-    function
-    | TNil sys ->
-      let sys = Tm.map_tm_sys (Tm.close_var a i) sys in
-      TNil sys
-    | TCons (spec, Tm.B (nm, constr)) ->
-      let spec = ArgSpec.close_var a i spec in
-      let constr = close_var a (i + 1) constr in
-      TCons (spec, Tm.B (nm, constr))
-
-  let bind x constr =
-    Tm.B (Name.name x, close_var x 0 constr)
+  module ConstrLN = Telescope (ArgSpec) (Boundary)
+  include ConstrLN
 
   let rec specs =
     function
