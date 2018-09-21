@@ -19,7 +19,7 @@ type error =
   | ApplyUnexpectedCube of value
   | RecursorUnexpectedArgument of string * value
   | SigmaProjUnexpectedArgument of string * value
-  | RigidVProjUnexpectedArgument of value
+  | RigidVProjUnexpectedArgument of atom * value
   | RigidCapUnexpectedArgument of value
   | LblCallUnexpectedArgument of value
   | UnexpectedDimensionTerm of Tm.tm
@@ -75,10 +75,10 @@ struct
       Format.fprintf fmt
         "Unexpected argument to Sigma type projection %s:@ %a."
         proj pp_value v
-    | RigidVProjUnexpectedArgument v ->
+    | RigidVProjUnexpectedArgument (x, v) ->
       Format.fprintf fmt
-        "Unexpected argument to rigid vproj:@ %a."
-        pp_value v
+        "Unexpected argument to rigid vproj over dimension %a:@ %a."
+        Name.pp x pp_value v
     | RigidCapUnexpectedArgument v ->
       Format.fprintf fmt
         "Unexpected argument to rigid cap:@ %a."
@@ -768,10 +768,10 @@ struct
 
 
     | V info ->
-      (* [F]: favonia 11.00100100001111110110101010001000100001011.
-       * [SVO]: Part III (airport).
-       * [R1]: RedPRL I ddcc4ce72b1880671d842ede6b50adbee94935b5.
-       * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
+      (* Note that the algorithm in Part III cannot be used here
+       * because we are working with open terms. *)
+
+      (* [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
 
       (* Some helper functions to reduce typos. *)
       let r, r' = Dir.unleash dir in
@@ -835,52 +835,26 @@ struct
           let fixer_fiber phi =
             (* Turns out `fiber_at_face0` will be
              * used for multiple times. *)
+            let rphi = I.act phi r in
             let fiber_at_face0 phi =
               make_cons
                 (Value.act phi el,
                  make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
             in
 
-            let mode = `UNIFORM_HCOM in (* how should we switch this? *)
-
-            match mode with
-            (* The implementation used in [F] and [R1]. *)
-            | `SPLIT_COERCION ->
-              begin
-                let rphi = I.act phi r in
-                match rphi with
-                | `Dim0 -> fiber_at_face0 phi (* r=0 *)
-                | `Dim1 -> fiber0 phi (base1 phi `Dim0) (* r=1 *)
-                | `Atom rphi_atom ->
-                  (* XXX This needs to be updated with the new Thought. *)
-                  (* coercion to the diagonal *)
-                  let path_in_fiber0_ty =
-                    contr0 phi @@
-                    make_coe (Dir.make `Dim0 rphi) (Abs.bind1 rphi_atom (fiber0_ty phi (base phi rphi `Dim0))) @@
-                    (* the fiber *)
-                    make_cons
-                      (Value.act (I.cmp phi (I.subst `Dim0 rphi_atom)) el,
-                       make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
-                  in
-                  ext_apply path_in_fiber0_ty [r]
-              end
             (* The implementation used in [Y]. *)
-            | `UNIFORM_HCOM ->
-              (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
-              make_hcom (Dir.make `Dim1 `Dim0) (fiber0_ty phi (base phi (I.act phi r) `Dim0)) (fiber0 phi (base phi (I.act phi r) `Dim0)) @@
-              force_abs_sys @@
-              let face0 =
-                AbsFace.make phi (I.act phi r) `Dim0 @@ fun phi ->
-                Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) [`Atom w]
-              in
-              let face1 =
-                AbsFace.make phi (I.act phi r) `Dim1 @@ fun phi ->
-                Abs.make1 @@ fun _ -> fiber0 phi (base1 phi `Dim0)
-              in
-              [face0; face1]
-            (* Something magical under development. *)
-            | `UNICORN ->
-              raise @@ E InternalMortalityError
+            (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
+            make_hcom (Dir.make `Dim1 `Dim0) (fiber0_ty phi (base phi rphi `Dim0)) (fiber0 phi (base phi rphi `Dim0)) @@
+            force_abs_sys @@
+            let face0 =
+              AbsFace.make phi rphi `Dim0 @@ fun phi ->
+              Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) [`Atom w]
+            in
+            let face1 =
+              AbsFace.make phi rphi `Dim1 @@ fun phi ->
+              Abs.make1 @@ fun _ -> fiber0 phi (base1 phi `Dim0)
+            in
+            [face0; face1]
           in
 
           let el0 phi0 = car (fixer_fiber phi0) in
@@ -1920,7 +1894,7 @@ struct
       let vproj_sys = faces01 @ List.map vproj_face up.sys in
       make @@ Up {ty = ty1; neu; sys = vproj_sys}
     | _ ->
-      let err = RigidVProjUnexpectedArgument el in
+      let err = RigidVProjUnexpectedArgument (x, el) in
       raise @@ E err
 
   and elim_data dlbl ~mot ~scrut ~clauses =

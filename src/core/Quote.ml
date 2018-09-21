@@ -81,29 +81,36 @@ end
 
 
 type error =
-  | ErrEquateNf of {env : Env.t; ty : value; el0 : value; el1 : value}
-  | ErrEquateNeu of {env : Env.t; neu0 : neu; neu1 : neu}
-  | ErrEquateLbl of string * string
+  | UnequalNf of {env : Env.t; ty : value; el0 : value; el1 : value}
+  | UnequalNeu of {env : Env.t; neu0 : neu; neu1 : neu}
+  | UnequalLbl of string * string
+  | UnequalDim of I.t * I.t
 
 let pp_error fmt =
   function
-  | ErrEquateNf {ty; el0; el1; _} ->
+  | UnequalNf {ty; el0; el1; _} ->
     Format.fprintf fmt "@[<hv>%a@ %a %a@ : %a@]"
       Domain.pp_value el0
       Uuseg_string.pp_utf_8 "≠"
       Domain.pp_value el1 Domain.pp_value ty
 
-  | ErrEquateNeu {neu0; neu1; _} ->
+  | UnequalNeu {neu0; neu1; _} ->
     Format.fprintf fmt "@[<hv>%a@ %a@ %a@]"
       Domain.pp_neu neu0
       Uuseg_string.pp_utf_8 "≠"
       Domain.pp_neu neu1
 
-  | ErrEquateLbl (lbl0, lbl1) ->
+  | UnequalLbl (lbl0, lbl1) ->
     Format.fprintf fmt "@[<hv>%a@ %a@ %a@]"
       Uuseg_string.pp_utf_8 lbl0
       Uuseg_string.pp_utf_8 "≠"
       Uuseg_string.pp_utf_8 lbl1
+
+  | UnequalDim (r0, r1) ->
+    Format.fprintf fmt "@[<hv>Dimensions@ %a@ %a@ %a@]"
+      I.pp r0
+      Uuseg_string.pp_utf_8 "≠"
+      I.pp r1
 
 exception E of error
 
@@ -232,7 +239,7 @@ struct
         if lbl0 = lbl1 then
           Tm.make @@ Tm.Data lbl0
         else
-          raise @@ E (ErrEquateLbl (lbl0, lbl1))
+          raise @@ E (UnequalLbl (lbl0, lbl1))
 
       | _, Later ltr0, Later ltr1 ->
         let tick = TickGen (`Lvl (None, Env.len env)) in
@@ -345,7 +352,7 @@ struct
         (* For more readable error messages *)
         let el0 = D.make @@ V.unleash el0 in
         let el1 = D.make @@ V.unleash el1 in
-        let err = ErrEquateNf {env; ty; el0; el1} in
+        let err = UnequalNf {env; ty; el0; el1} in
         raise @@ E err
 
   and equate_constr_args env dlbl constr cells0 cells1 =
@@ -564,7 +571,7 @@ struct
       equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
 
     | _ ->
-      let err = ErrEquateNeu {env; neu0; neu1} in
+      let err = UnequalNeu {env; neu0; neu1} in
       raise @@ E err
 
   and equate_neu env neu0 neu1 =
@@ -712,7 +719,7 @@ struct
          Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
          Format.eprintf "@.";
          Format.eprintf "Dimension mismatch: %a <> %a@." I.pp r I.pp r'; *)
-      failwith "equate_dim: dimensions did not match"
+      raise @@ E (UnequalDim (r, r'))
 
 
   and equate_dim3 env (r : I.t) (r' : I.t) (r'' : I.t) =

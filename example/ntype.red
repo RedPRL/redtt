@@ -3,6 +3,11 @@ import path
 let is-contr (C : type) : type =
   (c : _) × (c' : _) → path C c' c
 
+/-
+let is-param-contr-over (A : type) (B : A → type) : type =
+  (c : (a : _) → B a) × (a : dim → A) (c' : B (a 0)) → pathd (λ i → B (a i)) c' (c (a 1))
+-/
+
 let is-prop (C : type) : type =
   (c c' : _)
   → path C c c'

@@ -23,7 +23,11 @@ let name i =
 let to_string i =
   match Hashtbl.find names i with
   | Some x -> x
-  | None -> "_" ^ string_of_int i
+  | None -> "%" ^ string_of_int i
 
 let pp fmt i =
-  Uuseg_string.pp_utf_8 fmt (to_string i)
+  match Hashtbl.find names i with
+  | Some x ->
+    Format.fprintf fmt "%a%s%i" Uuseg_string.pp_utf_8 x "%" i
+  | None ->
+    Format.fprintf fmt "%s%i" "%" i
