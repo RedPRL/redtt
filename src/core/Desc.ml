@@ -74,16 +74,34 @@ struct
 
 end
 
-type desc_body = (string * constr) list
+type constrs = (string * constr) list
+type param = tm
 
 type desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   constrs : desc_body; (* TODO: wrap in telescope ! *)
+   body : (param, constrs) telescope;
    status : [`Complete | `Partial]}
 
 
-let constrs desc = desc.constrs
+let constrs desc =
+  let rec go =
+    function
+    | TNil cs -> cs
+    | TCons (_, Tm.B (_, body)) ->
+      go body
+  in
+  go desc.body
+
+let add_constr desc constr =
+  let rec go =
+    function
+    | TNil cs ->
+      TNil (cs @ [constr])
+    | TCons (prm, Tm.B (nm, desc')) ->
+      TCons (prm, Tm.B (nm, go desc'))
+  in
+  {desc with body = go desc.body}
 
 let flip f x y = f y x
 

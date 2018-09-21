@@ -150,12 +150,12 @@ struct
         M.ret tdesc
       | econstr :: econstrs ->
         elab_constr dlbl tdesc econstr >>= fun constr ->
-        let tdesc = Desc.{tdesc with constrs = tdesc.constrs @ [constr]} in
+        let tdesc = Desc.add_constr tdesc constr in
         M.lift @@ C.declare_datatype dlbl tdesc >>
         elab_constrs tdesc econstrs
     in
 
-    let tdesc = Desc.{constrs = []; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
+    let tdesc = Desc.{body = Desc.TNil []; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
     M.lift @@ C.declare_datatype dlbl tdesc >>= fun _ ->
     match edesc.kind with
     | `Reg ->

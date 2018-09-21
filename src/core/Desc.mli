@@ -27,16 +27,17 @@ sig
   val boundary : t -> (tm, tm) system
 end
 
-(* type param = tm *)
-type desc_body = (string * constr) list
+type param = tm
+type constrs = (string * constr) list
 
 type desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   constrs : desc_body;
+   body : (param, constrs) telescope;
    status : [`Complete | `Partial]}
 
-val constrs : desc -> desc_body
+val constrs : desc -> constrs
+val add_constr : desc -> string * constr -> desc
 
 
 exception ConstructorNotFound of string
