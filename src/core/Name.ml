@@ -26,4 +26,4 @@ let to_string i =
   | None -> "_" ^ string_of_int i
 
 let pp fmt i =
-  Uuseg_string.pp_utf_8 fmt (to_string i);
+  Uuseg_string.pp_utf_8 fmt (to_string i)
