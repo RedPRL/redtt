@@ -1,7 +1,5 @@
 include Map.OrderedType
 
-val const : string -> t
-
 val named : string option -> t
 val fresh : unit -> t
 
