@@ -22,7 +22,7 @@ let name i =
 
 let to_string i =
   match Hashtbl.find names i with
-  | Some x -> x ^ "_" ^ string_of_int i
+  | Some x -> x
   | None -> "_" ^ string_of_int i
 
 let pp fmt i =
