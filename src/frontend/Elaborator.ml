@@ -142,6 +142,12 @@ struct
       M.ret ()
 
   and elab_datatype dlbl (E.EDesc edesc) =
+    (* TODO: params.
+
+       One idea that might work is to have the intermediate states of the datatype not have parameters, and then only at
+       the end unleash the parameters. In case it's not clear later, the thing I'm trying to get right is the
+       binding structure.
+    *)
     let rec elab_constrs tdesc =
       function
       | [] ->
