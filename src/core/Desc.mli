@@ -21,6 +21,8 @@ type constr = (arg_spec, (tm, tm) system) telescope
 module Constr :
 sig
   include LocallyNameless.S with type t = constr
+  val bind : Name.t -> t -> t TmData.bnd
+
   val specs : t -> (string option * arg_spec) list
   val boundary : t -> (tm, tm) system
 end
