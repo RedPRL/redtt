@@ -1,21 +1,25 @@
-type 'a rec_spec =
+open Tm
+
+type rec_spec =
   | Self
 
-
-
-type 'a face = 'a * 'a * 'a option
-type 'a system = 'a face list
-
-type 'a arg_spec =
-  [ `Const of 'a
-  | `Rec of 'a rec_spec
+type arg_spec =
+  [ `Const of tm
+  | `Rec of rec_spec
   | `Dim
   ]
 
 
-type 'a constr =
-  {specs : (string * 'a arg_spec) list;
-   boundary : 'a system}
+type constr =
+  {specs : (string * arg_spec) list;
+   boundary : (tm, tm) system}
+
+type desc =
+  {kind : Kind.t;
+   lvl : Lvl.t;
+   params : (string * tm) list;
+   constrs : (string * constr) list;
+   status : [`Complete | `Partial]}
 
 
 let flip f x y = f y x
@@ -25,14 +29,6 @@ let dim_specs constr =
   | (x, `Dim) -> [x]
   | _ -> []
 
-
-(** A datatype description is just a list of named constructors. *)
-type 'a desc =
-  {kind : Kind.t;
-   lvl : Lvl.t;
-   params : (string * 'a) list;
-   constrs : (string * 'a constr) list;
-   status : [`Complete | `Partial]}
 
 exception ConstructorNotFound of string
 

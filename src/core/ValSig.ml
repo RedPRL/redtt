@@ -9,7 +9,7 @@ sig
   (** Return the type and definition of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * Tm.tm option
 
-  val lookup_datatype : string -> Tm.data_desc
+  val lookup_datatype : string -> Desc.desc
 end
 
 exception MissingElimClause of string

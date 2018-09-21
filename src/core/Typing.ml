@@ -392,7 +392,7 @@ and check cx ty tm =
   check_ cx ty [] tm
 
 
-and check_constr cx dlbl (constr : Tm.tm Desc.constr) tms =
+and check_constr cx dlbl constr tms =
   let vdataty = D.make @@ D.Data dlbl in
   let (module V) = Cx.evaluator (Cx.clear_locals cx) in
 
@@ -476,7 +476,7 @@ and check_box cx tydir tycap tysys tr tr' tcap tsys =
             go_adj cx ty_r' acc (ri0, ri1, el);
             go tysys tsys @@ (ri0, ri1, el) :: acc
           with
-        | I.Inconsistent -> raiseError ()
+          | I.Inconsistent -> raiseError ()
         end
       | _ ->
         raiseError ()

@@ -1,33 +1,31 @@
+open Tm
+
 (** Recursive argument types; currently this includes only [Self]; in the future, this will be extended with an indexed
     version of [Self], as well a formal function type. *)
-type 'a rec_spec =
+type rec_spec =
   | Self
 
-type 'a face = 'a * 'a * 'a option
-type 'a system = 'a face list
-
-type 'a arg_spec =
-  [ `Const of 'a
-  | `Rec of 'a rec_spec
+type arg_spec =
+  [ `Const of tm
+  | `Rec of rec_spec
   | `Dim
   ]
 
 
-type 'a constr =
-  {specs : (string * 'a arg_spec) list;
-   boundary : 'a system}
+type constr =
+  {specs : (string * arg_spec) list;
+   boundary : (tm, tm) system}
 
-
-(** A datatype description is just a list of named constructors. *)
-type 'a desc =
+type desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   params : (string * 'a) list;
-   constrs : (string * 'a constr) list;
+   params : (string * tm) list;
+   constrs : (string * constr) list;
    status : [`Complete | `Partial]}
 
+
 exception ConstructorNotFound of string
-val lookup_constr : string -> 'a desc -> 'a constr
+val lookup_constr : string -> desc -> constr
 
 (** Returns 'yes' if the description specifies strictly no higher dimensional structure, like the natural numbers. *)
-val is_strict_set : 'a desc -> bool
+val is_strict_set : desc -> bool

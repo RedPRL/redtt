@@ -9,7 +9,7 @@ val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
 val resolver : ResEnv.t m
-val declare_datatype : string -> Tm.data_desc -> unit m
+val declare_datatype : string -> Desc.desc -> unit m
 
 val isolate : 'a m -> 'a m
 
