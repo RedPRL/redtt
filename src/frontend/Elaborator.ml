@@ -155,7 +155,7 @@ struct
         go tdesc econstrs
     in
 
-    let tdesc = Desc.{constrs = []; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
+    let tdesc = Desc.{params = []; constrs = []; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
     M.lift @@ C.declare_datatype dlbl tdesc >>= fun _ ->
     match edesc.kind with
     | `Reg ->

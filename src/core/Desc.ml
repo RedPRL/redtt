@@ -33,6 +33,7 @@ let dim_specs constr =
 type 'a desc =
   {kind : Kind.t;
    lvl : Lvl.t;
+   params : (string * 'a) list;
    constrs : (con_label * 'a constr) list;
    status : [`Complete | `Partial]}
 
@@ -52,7 +53,7 @@ let is_strict_set desc =
     | [] -> true
     | _ -> false
   in
-  List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc.constrs true
+  desc.params = [] && List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc.constrs true
 
 let pp_data_label = Uuseg_string.pp_utf_8
 let pp_con_label = Uuseg_string.pp_utf_8

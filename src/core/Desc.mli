@@ -26,6 +26,7 @@ type 'a constr =
 type 'a desc =
   {kind : Kind.t;
    lvl : Lvl.t;
+   params : (string * 'a) list;
    constrs : (con_label * 'a constr) list;
    status : [`Complete | `Partial]}
 
