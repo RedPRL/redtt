@@ -51,6 +51,8 @@ let iso→equiv (A B : type) (I : iso A B) : equiv A B =
   let (f, g, α, β) = I in
   (f , λ b → ((g b, α b), λ fib → iso/fiber/prop-over _ _ I (λ _ → b) fib (g b, α b)))
 
+/-
 let iso→equiv-over (A B : type) (I : iso A B) : equiv-over A B =
   let (f, g, α, β) = I in
   (f , (λ b → (g b, α b), λ b fib → iso/fiber/prop-over _ _ I b fib (g (b 1), α (b 1))))
+-/

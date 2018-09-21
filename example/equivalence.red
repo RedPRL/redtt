@@ -7,14 +7,18 @@ let fiber (A B : type) (f : A → B) (b : B) : type =
 let is-equiv (A B : type) (f : A → B) : type =
   (b : B) → is-contr (fiber _ _ f b)
 
+/-
 let is-equiv-over (A B : type) (f : A → B) : type =
   is-param-contr-over _ (fiber _ _ f)
+-/
 
 let equiv (A B : type) : type =
   (f : A → B) × is-equiv _ _ f
 
+/-
 let equiv-over (A B : type) : type =
   (f : A → B) × is-equiv-over _ _ f
+-/
 
 let ua (A B : type) (E : equiv A B) : path^1 type A B =
   λ i →
