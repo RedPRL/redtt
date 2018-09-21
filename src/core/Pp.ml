@@ -19,7 +19,7 @@ struct
     | Emp -> failwith "ppenv/proj"
     | Snoc (xs, _) -> xs
 
-  let number_to_subscript n =
+  let nat_to_suffix n =
     let formatted = string_of_int n in
     let lookup : int -> string = List.nth ["₀";"₁";"₂";"₃";"₄";"₅";"₆";"₇";"₈";"₉"] in
     String.concat "" @@
@@ -27,7 +27,7 @@ struct
       fun n -> lookup (Char.code (String.get formatted n) - Char.code '0')
 
   let rec rename xs x i =
-    let suffix = number_to_subscript i in
+    let suffix = nat_to_suffix i in
     let new_x = x ^ suffix in
     if Bwd.mem new_x xs then (rename [@tailcall]) xs x (i + 1) else new_x
 
