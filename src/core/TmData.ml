@@ -42,8 +42,8 @@ type 'a tmf =
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
-  | Data of Desc.data_label
-  | Intro of Desc.data_label * Desc.con_label * 'a list
+  | Data of string
+  | Intro of string * string * 'a list
 
 
 and 'a head =
@@ -71,7 +71,7 @@ and 'a frame =
   | RestrictForce
   | Prev of 'a
 
-  | Elim of {dlbl : Desc.data_label; mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
+  | Elim of {dlbl : string; mot : 'a bnd; clauses : (string * 'a nbnd) list}
 
 and 'a spine = 'a frame bwd
 and 'a cmd = 'a head * 'a spine

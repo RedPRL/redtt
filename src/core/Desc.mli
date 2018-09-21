@@ -3,10 +3,6 @@
 type 'a rec_spec =
   | Self
 
-(* TODO: abstract *)
-type data_label = string
-type con_label = string
-
 type 'a face = 'a * 'a * 'a option
 type 'a system = 'a face list
 
@@ -27,15 +23,11 @@ type 'a desc =
   {kind : Kind.t;
    lvl : Lvl.t;
    params : (string * 'a) list;
-   constrs : (con_label * 'a constr) list;
+   constrs : (string * 'a constr) list;
    status : [`Complete | `Partial]}
 
-exception ConstructorNotFound of con_label
-val lookup_constr : con_label -> 'a desc -> 'a constr
+exception ConstructorNotFound of string
+val lookup_constr : string -> 'a desc -> 'a constr
 
 (** Returns 'yes' if the description specifies strictly no higher dimensional structure, like the natural numbers. *)
 val is_strict_set : 'a desc -> bool
-
-
-val pp_data_label : data_label Pp.t0
-val pp_con_label : con_label Pp.t0

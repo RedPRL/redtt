@@ -226,7 +226,7 @@ and pp_neu fmt neu =
 
   | Elim info ->
     Format.fprintf fmt "@[<hv1>(%a.elim@ %a)@]"
-      Desc.pp_data_label info.dlbl
+      Uuseg_string.pp_utf_8 info.dlbl
       (* pp_clo info.mot *)
       pp_neu info.neu
   (* pp_elim_clauses info.clauses *)

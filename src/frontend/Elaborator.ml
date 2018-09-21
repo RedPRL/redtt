@@ -142,6 +142,10 @@ struct
       M.ret ()
 
   and elab_datatype dlbl (E.EDesc edesc) =
+    let rec elab_params acc ecells =
+      failwith ""
+    in
+
     let rec elab_constrs tdesc =
       function
       | [] ->
@@ -155,7 +159,9 @@ struct
         elab_constrs tdesc econstrs
     in
 
+    elab_params Emp edesc.params >>= fun psi ->
     let tdesc = Desc.{params = []; constrs = []; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
+    M.in_scopes psi @@
     M.lift @@ C.declare_datatype dlbl tdesc >>= fun _ ->
     match edesc.kind with
     | `Reg ->
@@ -217,6 +223,7 @@ struct
     in
 
     go Emp @@ econstr.specs
+
 
   and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =
     let cells, ecod = sch in

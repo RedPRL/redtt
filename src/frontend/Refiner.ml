@@ -436,7 +436,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
     in
 
     (* TODO: factor this out into another tactic. *)
-    let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac))  : (Desc.con_label * tm Tm.nbnd) M.m =
+    let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac))  : (string * tm Tm.nbnd) M.m =
 
       let open Desc in
       let constr = lookup_constr clbl desc in

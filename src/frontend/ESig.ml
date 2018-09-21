@@ -73,7 +73,7 @@ and econ =
 and eterm = econ info
 
 and eclause =
-  [ `Con of Desc.con_label * einvpat epatbind list * eterm
+  [ `Con of string * einvpat epatbind list * eterm
   | `All of eterm
   ]
 

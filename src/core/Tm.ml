@@ -923,16 +923,16 @@ let rec pp env fmt =
       pp_cmd env fmt cmd
 
     | Data lbl ->
-      Desc.pp_data_label fmt lbl
+      Uuseg_string.pp_utf_8 fmt lbl
 
     | Intro (_dlbl, clbl, args) ->
       begin
         match args with
         | [] ->
-          Desc.pp_con_label fmt clbl
+          Uuseg_string.pp_utf_8 fmt clbl
         | _ ->
           Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
-            Desc.pp_con_label clbl
+            Uuseg_string.pp_utf_8 clbl
             (pp_terms env) args
       end
 
@@ -1014,7 +1014,7 @@ and pp_cmd env fmt (hd, sp) =
         let x_mot, env_mot = Pp.Env.bind env nm_mot in
         (* TODO *)
         Format.fprintf fmt "@[<hv1>(%a.elim@ [%a] %a@ %a@ %a)@]"
-          Desc.pp_data_label info.dlbl
+          Uuseg_string.pp_utf_8 info.dlbl
           Uuseg_string.pp_utf_8 x_mot
           (pp env_mot) mot
           (go `Elim) sp
@@ -1040,7 +1040,7 @@ and pp_elim_clauses env fmt clauses =
 
 and pp_elim_clause env fmt (clbl, nbnd) =
   Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
-    Desc.pp_con_label clbl
+    Uuseg_string.pp_utf_8 clbl
     (pp_nbnd env) nbnd
 
 and pp_nbnd env fmt nbnd =
@@ -1088,7 +1088,7 @@ and pp_frame env fmt =
     Format.fprintf fmt "<prev>"
   | Elim info ->
     Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a)@]"
-      Desc.pp_data_label info.dlbl
+      Uuseg_string.pp_utf_8 info.dlbl
       (pp_bnd env) info.mot
       (pp_elim_clauses env) info.clauses
 

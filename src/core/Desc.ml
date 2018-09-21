@@ -2,9 +2,6 @@ type 'a rec_spec =
   | Self
 
 
-type data_label = string
-type con_label = string
-
 
 type 'a face = 'a * 'a * 'a option
 type 'a system = 'a face list
@@ -34,10 +31,10 @@ type 'a desc =
   {kind : Kind.t;
    lvl : Lvl.t;
    params : (string * 'a) list;
-   constrs : (con_label * 'a constr) list;
+   constrs : (string * 'a constr) list;
    status : [`Complete | `Partial]}
 
-exception ConstructorNotFound of con_label
+exception ConstructorNotFound of string
 
 let lookup_constr lbl desc =
   try
@@ -55,5 +52,5 @@ let is_strict_set desc =
   in
   desc.params = [] && List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc.constrs true
 
-let pp_data_label = Uuseg_string.pp_utf_8
-let pp_con_label = Uuseg_string.pp_utf_8
+let pp_string = Uuseg_string.pp_utf_8
+let pp_string = Uuseg_string.pp_utf_8
