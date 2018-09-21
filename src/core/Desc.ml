@@ -96,14 +96,25 @@ struct
 
 end
 
-type constrs = (string * constr) list
 type param = tm
+type constrs = (string * constr) list
+type body = (param, constrs) telescope
 
 type desc =
   {kind : Kind.t;
    lvl : Lvl.t;
    body : (param, constrs) telescope;
    status : [`Complete | `Partial]}
+
+module Param : LocallyNameless.S with type t = tm =
+struct
+  type t = tm
+  let open_var i a = Tm.open_var i a
+  let close_var i a = Tm.close_var i a
+end
+
+module LabeledConstr = LocallyNameless.Pair (LocallyNameless.Const (struct type t = string end)) (Constr)
+module Body = Telescope (Param) (LocallyNameless.List (LabeledConstr))
 
 
 let constrs desc =

@@ -21,7 +21,7 @@ type constr = (arg_spec, (tm, tm) system) telescope
 module Constr :
 sig
   include LocallyNameless.S with type t = constr
-  val bind : Name.t -> t -> t TmData.bnd
+  val bind : Name.t -> t -> t Tm.bnd
 
   val specs : t -> (string option * arg_spec) list
   val boundary : t -> (tm, tm) system
@@ -29,11 +29,18 @@ end
 
 type param = tm
 type constrs = (string * constr) list
+type body = (param, constrs) telescope
+
+module Body :
+sig
+  include LocallyNameless.S with type t = body
+  val bind : Name.t -> t -> t Tm.bnd
+end
 
 type desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   body : (param, constrs) telescope;
+   body : body;
    status : [`Complete | `Partial]}
 
 val constrs : desc -> constrs
