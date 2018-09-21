@@ -83,6 +83,7 @@ type desc =
    status : [`Complete | `Partial]}
 
 
+let constrs desc = desc.constrs
 
 let flip f x y = f y x
 
@@ -99,7 +100,7 @@ exception ConstructorNotFound of string
 
 let lookup_constr lbl desc =
   try
-    let _, constr = List.find (fun (lbl', _) -> lbl' = lbl) desc.constrs in
+    let _, constr = List.find (fun (lbl', _) -> lbl' = lbl) @@ constrs desc in
     constr
   with
   | _ ->
@@ -111,7 +112,4 @@ let is_strict_set desc =
     | [] -> true
     | _ -> false
   in
-  List.fold_right (fun (_, constr) r -> constr_is_point constr && r) desc.constrs true
-
-let pp_string = Uuseg_string.pp_utf_8
-let pp_string = Uuseg_string.pp_utf_8
+  List.fold_right (fun (_, constr) r -> constr_is_point constr && r) (constrs desc) true

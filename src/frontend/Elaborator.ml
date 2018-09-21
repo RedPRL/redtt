@@ -164,7 +164,7 @@ struct
       elab_constrs tdesc edesc.constrs
 
   and elab_constr dlbl desc (clbl, E.EConstr econstr) =
-    if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
+    if List.exists (fun (lbl, _) -> clbl = lbl) @@ Desc.constrs desc then
       failwith "Duplicate constructor in datatype";
 
     let data_ty = Tm.make @@ Tm.Data dlbl in

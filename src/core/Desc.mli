@@ -36,6 +36,8 @@ type desc =
    constrs : desc_body;
    status : [`Complete | `Partial]}
 
+val constrs : desc -> desc_body
+
 
 exception ConstructorNotFound of string
 val lookup_constr : string -> desc -> constr

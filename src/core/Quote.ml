@@ -530,7 +530,7 @@ struct
           clbl, Tm.NB (nms, tbdy)
         in
 
-        let clauses = List.map quote_clause desc.constrs in
+        let clauses = List.map quote_clause (Desc.constrs desc) in
         let frame = Tm.Elim {dlbl; mot; clauses} in
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
