@@ -107,75 +107,54 @@ and check_tick_cmd cx =
   | _ ->
     failwith "check_dim_cmd"
 
-let check_dim_scope oxs x =
-  match oxs with
-  | None -> ()
-  | Some xs ->
-    if List.exists (fun y -> x = y) xs then () else failwith "Bad dimension scope"
+let check_dim_scope xs =
+  function
+  | `Dim0 -> ()
+  | `Dim1 -> ()
+  | `Atom x -> if List.mem x xs then () else failwith "Bad dimension scope"
 
-(* This is checking whether everything is in scope (if xs = Some xs')
- * and whether cofib is valid (forming a non-bipartite graph). *)
-let check_valid_cofibration ?xs:(xs = None) cofib =
+(* This is checking whether cofib is valid (forming a non-bipartite graph). *)
+let check_valid_cofibration (cofib : (I.t * I.t) list) =
   (* the idea is to find an evil assignment (coloring) to make everything false *)
-  let assignment = Hashtbl.create 20 in
-  let lookup x : I.t = try Hashtbl.find assignment x with Not_found -> `Atom x in
-
-  (* this only handles a list of pairs of atoms. *)
-  let rec go_atoms changed eqns remainings =
-    match eqns with
-    | [] -> (go_atoms_restart[@tailcall]) changed remainings
-    | (x, y) :: eqns ->
-      match lookup x, lookup y with
-      | `Dim0, `Dim1 | `Dim1, `Dim0 ->
-        (go_atoms[@tailcall]) changed eqns remainings
-      | `Dim0, `Dim0 | `Dim1, `Dim1 -> true (* non-bipartite *)
-      | `Atom x, `Dim0 | `Dim0, `Atom x ->
-        Hashtbl.add assignment x `Dim1;
-        (go_atoms[@tailcall]) true eqns remainings
-      | `Atom x, `Dim1 | `Dim1, `Atom x ->
-        Hashtbl.add assignment x `Dim0;
-        (go_atoms[@tailcall]) true eqns remainings
-      | `Atom x, `Atom y ->
-        (* the invariant (from `go`) is that x != y. *)
-        (go_atoms[@tailcall]) changed eqns ((x,y) :: remainings)
-  and go_atoms_restart changed remainings =
-    match remainings, changed with
-    | [], _ -> false (* we managed to make everything false! *)
-    | _, true -> go_atoms false remainings [] (* it is possible that the coloring is not propagated properly *)
-    | (x, y) :: remainings, false ->
-      (* the coloring is saturated; pick a random edge and color it! *)
-      Hashtbl.add assignment x `Dim0;
-      Hashtbl.add assignment y `Dim1;
-      (go_atoms[@tailcall]) false remainings []
+  let assignment = Hashtbl.create 10 in
+  let adjacency = Hashtbl.create 20 in
+  let rec color x b =
+    Hashtbl.add assignment x b;
+    let neighbors = Hashtbl.find_all adjacency x in
+    let notb = not b in
+    List.exists (fun y -> check_color y notb) neighbors
+  and check_color x b =
+    match Hashtbl.find_opt assignment x with
+    | Some b' -> b' != b (* non-bipartite! *)
+    | None -> color x b
   in
-
-  (* this is similar to `go_atoms` but handles a list of equations.
-   * it also does scope checking. `remainings` are pairs of atoms
-   * that would be handled by `go_atoms`.
-   *
-   * `go` does the first pass and `go_atoms` takes care of the rest. *)
-  let rec go changed eqns remainings =
+  let lookup_dim =
+    function
+    | `Dim0 -> `Assigned false
+    | `Dim1 -> `Assigned true
+    | `Atom x ->
+      match Hashtbl.find_opt assignment x with
+      | Some b -> `Assigned b
+      | None -> `Atom x
+  in
+  let rec go eqns atoms_to_check =
     match eqns with
-    | [] -> go_atoms_restart changed remainings
+    | [] -> List.exists (fun x -> not (Hashtbl.mem assignment x) && color x true) atoms_to_check
     | (r, r') :: eqns ->
-      match I.bind r lookup, I.bind r' lookup with
-      | `Dim0, `Dim1 | `Dim1, `Dim0 ->
-        (go[@tailcall]) changed eqns remainings
-      | `Dim0, `Dim0 | `Dim1, `Dim1 -> true
-      | `Atom x, `Dim0 | `Dim0, `Atom x ->
-        check_dim_scope xs x;
-        Hashtbl.add assignment x `Dim1;
-        (go[@tailcall]) true eqns remainings
-      | `Atom x, `Dim1 | `Dim1, `Atom x ->
-        check_dim_scope xs x;
-        Hashtbl.add assignment x `Dim0;
-        (go[@tailcall]) true eqns remainings
+      match lookup_dim r, lookup_dim r' with
+      | `Assigned b, `Assigned b' ->
+        b = b' || (go[@tailcall]) eqns atoms_to_check
+      | `Atom x, `Assigned b | `Assigned b, `Atom x ->
+        color x (not b) || (go[@tailcall]) eqns atoms_to_check
       | `Atom x, `Atom y ->
-        check_dim_scope xs x;
-        check_dim_scope xs y;
-        x = y || (go[@tailcall]) changed eqns ((x,y) :: remainings)
+        x = y ||
+        begin
+          Hashtbl.add adjacency x y;
+          Hashtbl.add adjacency y x;
+          (go[@tailcall]) eqns (x :: atoms_to_check)
+        end
   in
-  if go false cofib [] then () else failwith "check_valid_cofibration"
+  if go cofib [] then () else failwith "check_valid_cofibration"
 
 let check_comp_cofibration _dir cofib =
   (* this might work, but needs more research:
@@ -186,7 +165,8 @@ let check_extension_cofibration xs cofib =
   match cofib with
   | [] -> ()
   | _ ->
-    check_valid_cofibration ~xs:(Some xs) cofib
+    List.iter (fun (r, r') -> check_dim_scope xs r; check_dim_scope xs r') cofib;
+    check_valid_cofibration cofib
 
 let rec check_ cx ty rst tm =
   let (module V) = Cx.evaluator cx in
