@@ -211,13 +211,35 @@ struct
 
     | V info ->
       let tr = quote_dim env @@ `Atom info.x in
-      let phi_r0 = I.subst `Dim0 info.x in
+      let phi_r0 = I.equate `Dim0 (`Atom info.x) in
       let tm0 = equate env (Domain.Value.act phi_r0 info.ty0) (Domain.Value.act phi_r0 el0) (Domain.Value.act phi_r0 el1) in
       let func = car info.equiv in
       let vproj0 = rigid_vproj info.x ~func ~el:el0 in
       let vproj1 = rigid_vproj info.x ~func ~el:el1 in
       let tm1 = equate env info.ty1 vproj0 vproj1 in
       Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
+
+    | FHCom info ->
+      let s, s' = Dir.unleash info.dir in
+      let ts, ts' = quote_dim env s, quote_dim env s'
+      in
+      let tcap =
+        let cap0 = rigid_cap info.dir info.cap info.sys el0 in
+        let cap1 = rigid_cap info.dir info.cap info.sys el1 in
+        equate env info.cap cap0 cap1
+      in
+      let tsys =
+        let quote_boundary : rigid_abs_face -> _ = function
+          | Face.Indet (p, abs) ->
+            let ri, ri' = Eq.unleash p in
+            let phi = I.equate ri ri' in
+            let tri, tri' = quote_dim env ri, quote_dim env ri' in
+            let b = equate env (Abs.inst1 (Lazy.force abs) s') (Value.act phi el0) (Value.act phi el1) in
+            tri, tri', Some b
+        in
+        List.map quote_boundary info.sys
+      in
+      Tm.make @@ Tm.Box {r = ts; r' = ts'; cap = tcap; sys = tsys}
 
     | tycon ->
       match tycon, unleash el0, unleash el1 with
@@ -279,13 +301,6 @@ struct
         let equiv_ty = V.Macro.equiv info0.ty0 info1.ty1 in
         let equiv = equate env equiv_ty info0.equiv info1.equiv in
         Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
-
-      | FHCom fhcom, Box info0, Box info1 ->
-        let _, s' = Dir.unleash fhcom.dir in
-        let tr, tr' = equate_dir3 env fhcom.dir info0.dir info1.dir in
-        let tcap = equate env fhcom.cap info0.cap info1.cap in
-        let tsys = equate_box_sys env s' fhcom.sys info0.sys info1.sys in
-        Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
 
       | _, LblTy info0, LblTy info1 ->
         if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
@@ -599,19 +614,6 @@ struct
     | Invalid_argument _ ->
       failwith "equate_cmop_sys length mismatch"
 
-  and equate_box_sys env s' sys_ty sys0 sys1 =
-    let rec map3 f xs ys zs  =
-      match xs, ys, zs with
-      | [], [], [] -> []
-      | (x::xs), (y::ys), (z::zs) -> f x y z :: map3 f xs ys zs
-      | _ -> raise (Invalid_argument "map3")
-    in
-    try
-      map3 (equate_box_boundary env s') sys_ty sys0 sys1
-    with
-    | Invalid_argument _ ->
-      failwith "equate_cmop_sys length mismatch"
-
 
   and equate_val_face env ty face0 face1 =
     match face0, face1 with
@@ -643,13 +645,6 @@ struct
       let tr, tr' = equate_eq env p0 p1 in
       let bnd = equate_val_abs env (Value.act phi ty) (Lazy.force abs0) (Lazy.force abs1) in
       tr, tr', Some bnd
-
-  and equate_box_boundary env s' ty bdry0 bdry1 =
-    match ty, bdry0, bdry1 with
-    | Face.Indet (p_ty, abs), Face.Indet (p0, b0), Face.Indet (p1, b1) ->
-      let tr, tr' = equate_eq3 env p_ty p0 p1 in
-      let b = equate env (Abs.inst1 (Lazy.force abs) s') (Lazy.force b0) (Lazy.force b1) in
-      tr, tr', Some b
 
   and equate_val_abs env ty abs0 abs1 =
     let x, v0x = Abs.unleash1 abs0 in
