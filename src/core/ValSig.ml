@@ -44,6 +44,7 @@ sig
   val restriction_force : value -> value
 
   val rigid_vproj : atom -> func:value -> el:value -> value
+  val rigid_cap : dir -> value -> comp_sys -> value -> value
   val rigid_coe : dir -> abs -> value -> value
   val make_coe : dir Dir.m -> abs -> value -> value
 
