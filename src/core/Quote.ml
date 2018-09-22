@@ -221,24 +221,22 @@ struct
 
     | FHCom info ->
       let s, s' = Dir.unleash info.dir in
-      let ts, ts' = quote_dim env s, quote_dim env s'
+      let ts, ts' = quote_dim env s, quote_dim env s' in
+
+      let cap0 = rigid_cap info.dir info.cap info.sys el0 in
+      let cap1 = rigid_cap info.dir info.cap info.sys el1 in
+      let tcap = equate env info.cap cap0 cap1 in
+
+      let quote_boundary : rigid_abs_face -> (Tm.tm, Tm.tm) Tm.face = function
+        | Face.Indet (p, abs) ->
+          let ri, ri' = Eq.unleash p in
+          let phi = I.equate ri ri' in
+          let tri, tri' = quote_dim env ri, quote_dim env ri' in
+          let b = equate env (Abs.inst1 (Lazy.force abs) s') (Value.act phi el0) (Value.act phi el1) in
+          tri, tri', Some b
       in
-      let tcap =
-        let cap0 = rigid_cap info.dir info.cap info.sys el0 in
-        let cap1 = rigid_cap info.dir info.cap info.sys el1 in
-        equate env info.cap cap0 cap1
-      in
-      let tsys =
-        let quote_boundary : rigid_abs_face -> _ = function
-          | Face.Indet (p, abs) ->
-            let ri, ri' = Eq.unleash p in
-            let phi = I.equate ri ri' in
-            let tri, tri' = quote_dim env ri, quote_dim env ri' in
-            let b = equate env (Abs.inst1 (Lazy.force abs) s') (Value.act phi el0) (Value.act phi el1) in
-            tri, tri', Some b
-        in
-        List.map quote_boundary info.sys
-      in
+      let tsys = List.map quote_boundary info.sys in
+
       Tm.make @@ Tm.Box {r = ts; r' = ts'; cap = tcap; sys = tsys}
 
     | tycon ->
