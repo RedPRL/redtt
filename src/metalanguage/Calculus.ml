@@ -12,10 +12,12 @@ type term =
   | MuThunk of Name.t * cmd
 
   | Tuple of term record
-  | Split of Name.t record * cmd
+  | Split of var record * cmd
 
   | Choose of term labeled
   | Case of (Name.t * cmd) record
+
+  | Atom of string
 
   | Tp
 
@@ -36,21 +38,22 @@ let pp_tuple pp fmt tuple =
   Format.pp_print_list ~pp_sep pp_cell fmt tuple
 
 
+let pp_var fmt =
+  function
+  | `Pos x ->
+    Format.fprintf fmt "%a+" Name.pp x
+  | `Neg alpha ->
+    Format.fprintf fmt "%a-" Name.pp alpha
+
 let rec pp_term fmt =
   function
-  | Var (`Neg x | `Pos x) ->
-    Name.pp fmt x
-  | Mu (`Neg alpha, cmd) ->
+  | Var var ->
+    pp_var fmt var
+  | Mu (var, cmd) ->
     Format.fprintf fmt
-      "@[<hv1>(%a- [%a]@ %a)@]"
+      "@[<hv1>(%a [%a]@ %a)@]"
       pp_mu ()
-      Name.pp alpha
-      pp_cmd cmd
-  | Mu (`Pos x, cmd) ->
-    Format.fprintf fmt
-      "@[<hv1>(%a+ [%a]@ %a)@]"
-      pp_mu ()
-      Name.pp x
+      pp_var var
       pp_cmd cmd
   | MuTp cmd ->
     Format.fprintf fmt
@@ -63,21 +66,21 @@ let rec pp_term fmt =
       pp_term t
   | MuThunk (x, cmd) ->
     Format.fprintf fmt
-      "@[<hv1>(%a {%a}@ %a)@]"
+      "@[<hv1>(%a {%a-}@ %a)@]"
       pp_mu ()
       Name.pp x
       pp_cmd cmd
   | Split (xs, cmd) ->
     Format.fprintf fmt
       "@[<hv1>(split @[%a@]@ %a)@]"
-      (pp_tuple Name.pp) xs
+      (pp_tuple pp_var) xs
       pp_cmd cmd
   | Tuple tuple ->
     Format.fprintf fmt
       "@[<hv1>(%a)@]"
       (pp_tuple pp_term) tuple
   | Choose (lbl, term) ->
-    Format.fprintf fmt "@[<hv1>%a@ %a@]"
+    Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
       Uuseg_string.pp_utf_8 lbl
       pp_term term
   | Case branches ->
@@ -89,6 +92,9 @@ let rec pp_term fmt =
     Format.fprintf fmt "@[<hv1>(case@ %a)@]"
       (pp_tuple pp_branch) branches
 
+  | Atom str ->
+    Format.fprintf fmt "'%a" Uuseg_string.pp_utf_8 str
+
   | Tp ->
     Format.fprintf fmt "tp"
 
@@ -98,35 +104,55 @@ and pp_cmd fmt (tm0, tm1) =
     pp_term tm0
     pp_term tm1
 
+let is_neg_term =
+  function
+  | Var (`Neg _) | Split _ | MuThunk _ | Mu (`Pos _, _) | Tp -> true
+  | _ -> false
+
+let is_pos_term =
+  function
+  | Var (`Pos _) | Atom _ | Choose _ | Tuple _ | Thunk _ | Mu (`Neg _, _) | MuTp _ -> true
+  | _ -> false
+
+let is_pos_value =
+  function
+  | Var (`Pos _) | Atom _ | Choose _ | Tuple _ | Thunk _ -> true
+  | _ -> false
 
 
 module Macro =
 struct
   let pmu nm f =
     let x = Name.named @@ Some nm in
-    Mu (`Pos x, f x)
+    Mu (`Pos x, f (`Pos x))
 
   let nmu nm f =
     let x = Name.named @@ Some nm in
-    Mu (`Neg x, f x)
+    Mu (`Neg x, f (`Neg x))
 
   let app_ctx t u =
-    let alpha = Name.fresh () in
-    let x = Name.fresh () in
+    assert (is_pos_term t);
+    assert (is_neg_term u);
+    let alpha = Name.named @@ Some "app_ctx/alpha" in
+    let x = Name.named @@ Some "app_ctx/x" in
     let pair = Tuple ["in", Var (`Pos x); "out", u] in
-    let cmd = t, Mu (`Pos x, (Var (`Neg alpha), pair)) in
+    let cmd = t, Mu (`Pos x, (pair, Var (`Neg alpha))) in
     MuThunk (alpha, cmd)
 
   let app t u =
-    let alpha = Name.fresh () in
+    assert (is_pos_term t);
+    assert (is_pos_term u);
+    let alpha = Name.named @@ Some "app/alpha" in
     let cmd = t, app_ctx u (Var (`Neg alpha)) in
     Mu (`Neg alpha, cmd)
 
   let lambda nm f =
     let x = Name.named @@ Some nm in
-    let alpha = Name.fresh () in
-    let binders = ["in", x; "out", alpha] in
-    let cmd = f x, Var (`Neg alpha) in
+    let alpha = Name.named @@ Some "lambda/alpha" in
+    let binders = ["in", `Pos x; "out", `Neg alpha] in
+    let bdy = f (`Pos x) in
+    assert (is_pos_term bdy);
+    let cmd = bdy, Var (`Neg alpha) in
     Thunk (Split (binders, cmd))
 
   let pair t0 t1 =
@@ -137,23 +163,55 @@ struct
     let cmd1 = t1, Mu (`Pos y, cmd2) in
     let cmd0 = t0, Mu (`Pos x, cmd1) in
     Mu (`Neg alpha, cmd0)
+
+  let query t =
+    let alpha = Name.fresh () in
+    Mu (`Neg alpha, (t, Tp))
+
+  let reset t =
+    MuTp (t, Tp)
+
+  let shift t =
+    assert (is_pos_term t);
+    nmu "alpha/shift" @@ fun alpha ->
+    let func =
+      lambda "x/shift" @@ fun x ->
+      MuTp (Var x, Var alpha)
+    in
+    let tm = app t func in
+    tm, Tp
+
+  let abort t =
+    nmu "_" @@ fun _ ->
+    t, Tp
+
+  let read =
+    lambda "_" @@ fun _ ->
+    shift @@
+    lambda "k" @@ fun k ->
+    lambda "s" @@ fun s ->
+    app (app (Var k) (Var s)) (Var s)
+
+  let write =
+    lambda "s" @@ fun s ->
+    shift @@
+    lambda "k" @@ fun k ->
+    lambda "s" @@ fun _ ->
+    app (app (Var k) (Tuple [])) (Var s)
+
+
+  let let_ t f =
+    let func =
+      lambda "x" @@ fun x ->
+      f (Var x)
+    in
+    app func t
+
+  let and_then t0 t1 =
+    let_ t0 @@ fun _ ->
+    t1
+
 end
-
-
-let is_neg_term =
-  function
-  | Var (`Neg _) | Split _ | MuThunk _ | Mu (`Pos _, _) | Tp -> true
-  | _ -> false
-
-let is_pos_term =
-  function
-  | Var (`Pos _) | Tuple _ | Thunk _ | Mu (`Neg _, _) | MuTp _ -> true
-  | _ -> false
-
-let is_pos_value =
-  function
-  | Var (`Pos _) | Tuple _ | Thunk _ -> true
-  | _ -> false
 
 
 (* The basic environment machine from Curien-Herbelin 2000. *)
@@ -194,7 +252,10 @@ struct
 
   let polarity tm =
     if is_neg_term tm then `Neg else if is_pos_term tm then `Pos else
-      failwith "Internal error: polarity"
+      begin
+        Format.eprintf "Shit: %a@." pp_term tm;
+        failwith "Internal error: polarity"
+      end
 
   let orient (state : state) : state =
     let clo0, clo1, stk = state in
@@ -230,7 +291,7 @@ struct
       clo0, clo, stk
 
     | Tuple tuple, Split (xs, cmd), _ ->
-      let alg env (lbl, x) =
+      let alg env (lbl, (`Pos x | `Neg x))  =
         let term = List.assoc lbl tuple in
         Env.add x (Clo (term, env0)) env
       in
@@ -265,7 +326,7 @@ struct
     | Var (`Neg alpha) ->
       begin
         try crush @@ Env.find alpha env with
-        | Not_found -> Var (`Pos alpha)
+        | Not_found -> Var (`Neg alpha)
       end
     | Tuple tuple ->
       let tuple = List.map (fun (lbl, tm) -> lbl, subst env tm) tuple in
@@ -287,6 +348,8 @@ struct
     | Case branches ->
       let branches = List.map (fun (lbl, (x, cmd)) -> lbl, (x, subst_cmd env cmd)) branches in
       Case branches
+    | Atom lbl ->
+      Atom lbl
 
   and subst_cmd env (tm0, tm1) =
     subst env tm0, subst env tm1
@@ -314,6 +377,7 @@ struct
 
   let rec debug : state -> state =
     fun state ->
+      let state = orient state in
       Format.eprintf "State: %a@." pp_cmd (unload state);
       match step state with
       | state ->
@@ -325,15 +389,28 @@ end
 
 
 
+let run_state script =
+  let open Macro in
+  let func =
+    reset @@
+    let_ script @@ fun result ->
+    lambda "_" @@ fun _ ->
+    result
+  in
+  app func @@ Atom "init"
+
+
+
 let example_cmd =
   let open Macro in
+  let (>>) = and_then in
   let null = Tuple [] in
-  let f =
-    lambda "x" @@ fun x ->
-    lambda "y" @@ fun y ->
-    pair (Var (`Pos x)) (Var (`Pos y))
+  let script =
+    app write (Atom "it") >>
+    (pair (Atom "taste") @@
+     app read null)
   in
-  app (app f null) null, Tp
+  run_state script, Tp
 
 let test () =
   ignore @@ Machine.debug @@ Machine.load example_cmd
