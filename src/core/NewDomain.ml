@@ -61,7 +61,7 @@ and neu =
 
 and cell =
   | Val of value Lazy.t
-  | Dim of dim Lazy.t
+  | Dim of dim
 
 and env = cell bwd
 
@@ -325,12 +325,12 @@ struct
       rigid_hcom rel r r' ty cap sys
 
     | ExtApp rs, ExtLam nclo ->
-      NClo.inst rel nclo @@ List.map (fun r -> Dim (lazy r)) rs
+      NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
 
 
     | ExtApp ss, Coe {r; r'; ty = `Ext abs; cap} ->
       let Abs (y, extclo_y) = abs in
-      let ty_ss, sys_ss = ExtClo.inst rel extclo_y @@ List.map (fun x -> Dim (lazy x)) ss in
+      let ty_ss, sys_ss = ExtClo.inst rel extclo_y @@ List.map (fun x -> Dim x) ss in
       let sys_ss' = ValSys.forall y sys_ss in
       raise PleaseFillIn
 
@@ -367,7 +367,7 @@ struct
       Clo.inst rel cod @@ Val (lazy arg), []
 
     | Ext extclo, ExtApp rs ->
-      ExtClo.inst rel extclo @@ List.map (fun r -> Dim (lazy r)) rs
+      ExtClo.inst rel extclo @@ List.map (fun r -> Dim r) rs
 
     | Sg {dom; _}, Car ->
       dom, []
