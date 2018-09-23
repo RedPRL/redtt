@@ -38,8 +38,8 @@ sig
 
   val elim_data : Desc.data_label -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
 
-  val car : value -> value
-  val cdr : value -> value
+  val do_fst : value -> value
+  val do_snd : value -> value
   val lbl_call : value -> value
   val restriction_force : value -> value
 

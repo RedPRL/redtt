@@ -273,8 +273,8 @@ let rec check_ cx ty rst tm =
     check_ cxx vty rst' tm
 
   | _, D.Sg {dom; cod}, T.Cons (t0, t1) ->
-    let rst0 = List.map (Face.map (fun _ _ -> V.car)) rst in
-    let rst1 = List.map (Face.map (fun _ _ -> V.cdr)) rst in
+    let rst0 = List.map (Face.map (fun _ _ -> V.do_fst)) rst in
+    let rst1 = List.map (Face.map (fun _ _ -> V.do_snd)) rst in
     let v = check_eval_ cx dom rst0 t0 in
     let vcod = V.inst_clo cod v in
     check_ cx vcod rst1 t1
@@ -361,7 +361,7 @@ let rec check_ cx ty rst tm =
         let cx', phi = Cx.restrict cx (`Atom vty.x) `Dim0 in
         let el0 = check_eval cx' vty.ty0 vin.tm0 in
         let el1 = check_eval cx vty.ty1 vin.tm1 in
-        Cx.check_eq cx' ~ty:(D.Value.act phi vty.ty1) (V.apply (V.car vty.equiv) el0) @@ D.Value.act phi el1
+        Cx.check_eq cx' ~ty:(D.Value.act phi vty.ty1) (V.apply (V.do_fst vty.equiv) el0) @@ D.Value.act phi el1
       | _ ->
         failwith "v/vin dimension mismatch"
     end;
@@ -476,7 +476,7 @@ and check_box cx tydir tycap tysys tr tr' tcap tsys =
             go_adj cx ty_r' acc (ri0, ri1, el);
             go tysys tsys @@ (ri0, ri1, el) :: acc
           with
-        | I.Inconsistent -> raiseError ()
+          | I.Inconsistent -> raiseError ()
         end
       | _ ->
         raiseError ()
@@ -669,16 +669,16 @@ and infer_spine cx hd sp =
 
   | Snoc (sp, frm) ->
     match frm with
-    | T.Car ->
+    | T.Fst ->
       let ih = infer_spine cx hd sp in
       let dom, _ = V.unleash_sg ih.ty in
-      D.{el = V.car ih.el; ty = dom}
+      D.{el = V.do_fst ih.el; ty = dom}
 
-    | T.Cdr ->
+    | T.Snd ->
       let ih = infer_spine cx hd sp in
       let _, cod = V.unleash_sg ih.ty in
-      let car = V.car ih.el in
-      D.{el = V.cdr ih.el; ty = V.inst_clo cod car}
+      let car = V.do_fst ih.el in
+      D.{el = V.do_snd ih.el; ty = V.inst_clo cod car}
 
     | T.FunApp t ->
       let ih = infer_spine cx hd sp in
@@ -695,7 +695,7 @@ and infer_spine cx hd sp =
     | T.VProj info ->
       let ih = infer_spine cx hd sp in
       let x, ty0, ty1, equiv = V.unleash_v ih.ty in
-      let func' = V.car equiv in
+      let func' = V.do_fst equiv in
       let func_ty = D.Value.act (I.subst `Dim0 x) @@ V.Macro.func ty0 ty1 in
       let func = check_eval cx func_ty info.func in
       Cx.check_eq cx ~ty:func_ty func func';

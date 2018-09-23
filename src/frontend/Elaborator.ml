@@ -69,10 +69,10 @@ struct
       end
     | E.App e ->
       M.ret @@ `FunApp e
-    | E.Car ->
-      M.ret `Car
-    | E.Cdr ->
-      M.ret `Cdr
+    | E.Fst ->
+      M.ret `Fst
+    | E.Snd ->
+      M.ret `Snd
     | E.Open ->
       M.ret `Open
 
@@ -730,10 +730,10 @@ struct
           spine, `ExtApp (Bwd.to_list @@ dims #< dim)
       | `Prev e ->
         M.ret (spine, `Prev e)
-      | `Car ->
-        M.ret (spine, `Car)
-      | `Cdr ->
-        M.ret (spine, `Cdr)
+      | `Fst ->
+        M.ret (spine, `Fst)
+      | `Snd ->
+        M.ret (spine, `Snd)
       | `Open ->
         M.ret (spine, `Open)
 
@@ -890,26 +890,26 @@ struct
           raise ChkMatch
       end
 
-    | spine, `Car ->
+    | spine, `Fst ->
       elab_cut exp spine >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin
         match unleash ty with
         | Tm.Sg (dom, _) ->
-          M.ret (dom, cmd @< Tm.Car)
+          M.ret (dom, cmd @< Tm.Fst)
         | _ ->
           raise ChkMatch
       end
 
 
-    | spine, `Cdr ->
+    | spine, `Snd ->
       elab_cut exp spine >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin
         match unleash ty with
         | Tm.Sg (_dom, cod) ->
-          let cod' = Tm.unbind_with (cmd @< Tm.Car) cod in
-          M.ret (cod', cmd @< Tm.Cdr)
+          let cod' = Tm.unbind_with (cmd @< Tm.Fst) cod in
+          M.ret (cod', cmd @< Tm.Snd)
         | _ ->
           raise ChkMatch
       end

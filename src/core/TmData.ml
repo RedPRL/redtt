@@ -61,8 +61,8 @@ and 'a head =
 
 
 and 'a frame =
-  | Car
-  | Cdr
+  | Fst
+  | Snd
   | FunApp of 'a
   | ExtApp of 'a list
   | VProj of {r : 'a; func : 'a}

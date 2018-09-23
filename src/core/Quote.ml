@@ -145,11 +145,11 @@ struct
       Tm.lam (clo_name cod) @@ equate (Env.succ env) vcod app0 app1
 
     | Sg {dom; cod} ->
-      let el00 = car el0 in
-      let el10 = car el1 in
+      let el00 = do_fst el0 in
+      let el10 = do_fst el1 in
       let q0 = equate env dom el00 el10 in
       let vcod = inst_clo cod el00 in
-      let q1 = equate env vcod (cdr el0) (cdr el1) in
+      let q1 = equate env vcod (do_snd el0) (do_snd el1) in
       Tm.cons q0 q1
 
     | Ext abs ->
@@ -206,7 +206,7 @@ struct
       let tr = quote_dim env @@ `Atom info.x in
       let phi_r0 = I.subst `Dim0 info.x in
       let tm0 = equate env (Domain.Value.act phi_r0 info.ty0) (Domain.Value.act phi_r0 el0) (Domain.Value.act phi_r0 el1) in
-      let func = car info.equiv in
+      let func = do_fst info.equiv in
       let vproj0 = rigid_vproj info.x ~func ~el:el0 in
       let vproj1 = rigid_vproj info.x ~func ~el:el1 in
       let tm1 = equate env info.ty1 vproj0 vproj1 in
@@ -448,11 +448,11 @@ struct
       let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
       Tm.DFix {r; ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
 
-    | Car neu0, Car neu1 ->
-      equate_neu_ env neu0 neu1 @@ Tm.Car :: stk
+    | Fst neu0, Fst neu1 ->
+      equate_neu_ env neu0 neu1 @@ Tm.Fst :: stk
 
-    | Cdr neu0, Cdr neu1 ->
-      equate_neu_ env neu0 neu1 @@ Tm.Cdr :: stk
+    | Snd neu0, Snd neu1 ->
+      equate_neu_ env neu0 neu1 @@ Tm.Snd :: stk
 
     | FunApp (neu0, nf0), FunApp (neu1, nf1) ->
       let t = equate env nf0.ty nf0.el nf1.el in
@@ -796,14 +796,14 @@ struct
       fancy_subtype (Env.succ env) vcod0 sys0 vcod1 sys1
 
     | Sg sg0, Sg sg1 ->
-      let sys00 = map_sys (fun _ _ -> car) sys0 in
-      let sys10 = map_sys (fun _ _ -> car) sys1 in
+      let sys00 = map_sys (fun _ _ -> do_fst) sys0 in
+      let sys10 = map_sys (fun _ _ -> do_fst) sys1 in
       fancy_subtype env sg0.dom sys00 sg1.dom sys10;
       let var = generic env sg0.dom in
       let vcod0 = inst_clo sg0.cod var in
       let vcod1 = inst_clo sg1.cod var in
-      let sys01 = map_sys (fun _ _ -> cdr) sys0 in
-      let sys11 = map_sys (fun _ _ -> cdr) sys1 in
+      let sys01 = map_sys (fun _ _ -> do_snd) sys0 in
+      let sys11 = map_sys (fun _ _ -> do_snd) sys1 in
       fancy_subtype (Env.succ env) vcod0 sys01 vcod1 sys11
 
     | Later ltr0, Later ltr1 ->

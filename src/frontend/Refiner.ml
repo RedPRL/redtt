@@ -137,12 +137,12 @@ let tac_pair tac0 tac1 : chk_tac =
       let sys0 =
         flip List.map goal.sys @@ fun (r, r', otm) ->
         r, r', flip Option.map otm @@ fun tm ->
-        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Car
+        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Fst
       in
       let sys1 =
         flip List.map goal.sys @@ fun (r, r', otm) ->
         r, r', flip Option.map otm @@ fun tm ->
-        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Cdr
+        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Snd
       in
       tac0 {ty = dom; sys = sys0} >>= fun tm0 ->
       let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
@@ -318,8 +318,8 @@ and split_sigma ~tac_scrut (tac_body : tm Tm.cmd -> tm Tm.cmd -> chk_tac) : chk_
     fun _ ->
       tac_scrut >>= fun (scrut_ty, scrut_tm) ->
       let scrut_cmd = Tm.ann ~ty:scrut_ty ~tm:scrut_tm in
-      let pi0 = Tm.up @@ scrut_cmd @< Tm.Car in
-      let pi1 = Tm.up @@ scrut_cmd @< Tm.Cdr in
+      let pi0 = Tm.up @@ scrut_cmd @< Tm.Fst in
+      let pi1 = Tm.up @@ scrut_cmd @< Tm.Snd in
       M.ret @@ Tm.up @@ (Tm.var xfun @< Tm.FunApp pi0) @< Tm.FunApp pi1
   in
   tac_let xfun tac_fun tac_bdy
@@ -386,11 +386,11 @@ and tac_inv_let p itac ctac =
   | `SplitAs (inv0, inv1) ->
     let itac0 =
       itac >>= fun (ty, tm) ->
-      tac_of_cmd @@ Tm.ann ~ty ~tm @< Tm.Car
+      tac_of_cmd @@ Tm.ann ~ty ~tm @< Tm.Fst
     in
     let itac1 =
       itac >>= fun (ty, tm) ->
-      tac_of_cmd @@ Tm.ann ~ty ~tm @< Tm.Cdr
+      tac_of_cmd @@ Tm.ann ~ty ~tm @< Tm.Snd
     in
     tac_inv_let inv0 itac0 @@ tac_inv_let inv1 itac1 @@ ctac
   | _ ->

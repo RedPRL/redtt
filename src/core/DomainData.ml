@@ -65,8 +65,8 @@ and neu =
 
   | FunApp of neu * nf
   | ExtApp of neu * dim list
-  | Car of neu
-  | Cdr of neu
+  | Fst of neu
+  | Snd of neu
 
   | Elim of
       {dlbl : Desc.data_label;

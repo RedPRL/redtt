@@ -96,9 +96,9 @@ debug_filter:
 
 eproj:
   | DOT FST
-    { E.Car }
+    { E.Fst }
   | DOT SND
-    { E.Cdr }
+    { E.Snd }
 
 atom_econ:
   | a = ATOM
@@ -542,12 +542,12 @@ cut:
   | LPR; FST; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< Tm.Car }
+      hd, fs #< Tm.Fst }
 
   | LPR; SND; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< Tm.Cdr }
+      hd, fs #< Tm.Snd }
 
   | LPR; CALL; e = cut; RPR
     { fun env ->
