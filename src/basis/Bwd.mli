@@ -16,7 +16,6 @@ end
 module Bwd :
 sig
   val nth : 'a bwd -> int -> 'a
-  val rev : 'a bwd -> 'a bwd
   val length : 'a bwd -> int
   val mem : 'a -> 'a bwd -> bool
   val map : ('a -> 'b) -> 'a bwd -> 'b bwd

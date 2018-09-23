@@ -81,5 +81,7 @@ struct
   let from_list xs =
     Emp <>< xs
 
-  let rev xs = from_list @@ List.rev @@ to_list xs
+  (* favonia: the following is considered ILL-TYPED!
+   *
+   * let rev xs = from_list @@ List.rev @@ to_list xs *)
 end
