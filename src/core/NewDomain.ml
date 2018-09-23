@@ -413,12 +413,19 @@ struct
           flip ListUtil.filter_map info.sys @@ fun face ->
           flip Option.map (ValFace.forall x face) @@ fun (s, s', bdy) ->
           s, s',
-          lazy begin
-            let rel' = Rel.equate s s' rel in
-            let abs = Abs (x, run rel' @@ Lazy.force bdy) in
-            let cap = run rel' cap in
-            make_coe rel' r r' abs cap
-          end
+          (* favonia: maybe the following should be inside lazy? dunno *)
+          match Rel.equate s s' rel with
+          | `Changed rel' ->
+            lazy begin
+              let abs = Abs (x, run rel' @@ Lazy.force bdy) in
+              let cap = run rel' cap in
+              make_coe rel' r r' abs cap
+            end
+          | `Same ->
+            lazy begin
+              let abs = Abs (x, Lazy.force bdy) in
+              make_coe rel r r' abs cap
+            end
         in
         cap_face :: old_faces
       in
@@ -446,7 +453,7 @@ struct
           flip List.map sys @@ fun (s, s', abs) ->
           s, s',
           lazy begin
-            let rel' = Rel.equate s s' rel in
+            let rel' = Rel.equate' s s' rel in
             let Abs (x, elx) = Lazy.force abs in
             hsubst rel' r' x elx
           end
@@ -454,13 +461,19 @@ struct
         let old_faces =
           flip List.map info.sys @@ fun (s, s', ty) ->
           s, s',
-          lazy begin
-            let rel' = Rel.equate s s' rel in
-            let cap = run rel' cap in
-            let ty = run rel' @@ Lazy.force ty in
-            let sys = AbsSys.run rel' sys in
-            make_hcom rel' r r' ty cap sys
-          end
+          match Rel.equate s s' rel with
+          | `Changed rel' ->
+            lazy begin
+              let cap = run rel' cap in
+              let ty = run rel' @@ Lazy.force ty in
+              let sys = AbsSys.run rel' sys in
+              make_hcom rel' r r' ty cap sys
+            end
+          | `Same ->
+            lazy begin
+              let ty = Lazy.force ty in
+              make_hcom rel r r' ty cap sys
+            end
         in
         cap_face :: tube_faces @ old_faces
       in
@@ -470,7 +483,7 @@ struct
       raise PleaseFillIn
 
   and hsubst rel r x v =
-    let rel' = Rel.subst r x rel in
+    let rel' = Rel.subst' r x rel in
     run rel' @@ subst r x v
 end
 
@@ -665,21 +678,22 @@ and Face :
       lazy begin X.subst r x @@ Lazy.force bdy end
 
     let run rel (r, r', bdy) =
-      match Rel.compare r r' rel with
-      | `Apart ->
-        raise Dead
-      | `Same ->
-        let bdy' = X.run rel @@ Lazy.force bdy in
-        raise @@ Triv bdy'
-      | `Indet ->
-        r, r',
-        lazy begin
-          let rel' = Rel.equate r r' rel in
-          X.run rel' @@ Lazy.force bdy
-        end
+      try
+        match Rel.equate r r' rel with
+        | `Same ->
+          let bdy' = X.run rel @@ Lazy.force bdy in
+          raise @@ Triv bdy'
+        | `Changed rel' ->
+          r, r',
+          lazy begin
+            let rel' = Rel.equate' r r' rel in
+            X.run rel' @@ Lazy.force bdy
+          end
+      with
+      | I.Inconsistent -> raise Dead
 
     let plug rel frm (r, r', bdy) =
-      let rel' = Rel.equate r r' rel in
+      let rel' = Rel.equate' r r' rel in
       r, r',
       lazy begin
         let frm' = Frame.run rel' frm in
@@ -713,7 +727,7 @@ and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
     let run rel abs =
       let Abs (x, a) = abs in
       (* TODO: I think the following makes sense, but let's double check. The alternative is to freshen, but it seems like we don't need to if we can un-associate these names. *)
-      let rel' = Rel.hide x rel in
+      let rel' = Rel.hide' x rel in
       let a' = X.run rel' a in
       Abs (x, a')
   end
@@ -732,7 +746,7 @@ and AbsPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
         Abs (x, a')
       | `Might ->
         let y, pi = Perm.freshen_name x in
-        let rel' = Rel.hide x rel in
+        let rel' = Rel.hide' x rel in
         let a' = X.plug rel' frm @@ X.swap pi a in
         Abs (y, a')
 

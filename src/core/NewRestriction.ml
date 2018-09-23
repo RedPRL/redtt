@@ -12,6 +12,12 @@ type t =
    rank : (int, int) T.t;
    mutable parent : (int, cls) T.t}
 
+type 'a m = [`Changed of 'a | `Same]
+
+let get_m h = function
+  | `Changed h -> h
+  | `Same -> h
+
 let emp () =
   let size = 100 in
   {index = T.init ~size;
@@ -58,25 +64,26 @@ let union_aux (x : cls) (y : cls) (h : t) =
   let cy = find y h in
   match cx, cy with
   | `Atom cx, `Atom cy ->
-    if cx == cy then h else
+    if cx == cy then `Same else
     let rx = get_rank cx h in
     let ry = get_rank cy h in
     if rx > ry then
-      {h with parent = T.set cy (`Atom cx) h.parent}
+      `Changed {h with parent = T.set cy (`Atom cx) h.parent}
     else if rx < ry then
-      {h with parent = T.set cx (`Atom cy) h.parent}
+      `Changed {h with parent = T.set cx (`Atom cy) h.parent}
     else
+      `Changed
       {h with
        rank = T.set cx (rx + 1) h.rank;
        parent = T.set cy (`Atom cx) h.parent}
   | `Atom cx, cy ->
-    {h with parent = T.set cx cy h.parent}
+    `Changed {h with parent = T.set cx cy h.parent}
   | cx, `Atom cy ->
-    {h with parent = T.set cy cx h.parent}
+    `Changed {h with parent = T.set cy cx h.parent}
   | cx, cy ->
-    if cx == cy then h else raise I.Inconsistent
+    if cx == cy then `Same else raise I.Inconsistent
 
-let reserve_index' (x : atom) (h : t) : int * t =
+let reserve_index_aux (x : atom) (h : t) : int * t =
   try
     T.get x h.index, h
   with
@@ -85,7 +92,7 @@ let reserve_index' (x : atom) (h : t) : int * t =
 
 let reserve_index (x : dim) (h : t) : cls * t =
   match x with
-  | `Atom x -> let x, h = reserve_index' x h in `Atom x, h
+  | `Atom x -> let x, h = reserve_index_aux x h in `Atom x, h
   | `Dim0 -> `Dim0, h
   | `Dim1 -> `Dim1, h
 
@@ -121,19 +128,39 @@ let compare x y (h : t) =
     | _, `Atom _ -> `Indet
     | x, y -> if x = y then `Same else `Apart
 
-let hide (x : atom) (h : t) =
+let in_index (x : atom) (h : t) =
+  T.mem x h.index
+
+let hide_aux (x : atom) (h : t) =
   {h with index = T.remove x h.index}
+
+let hide (x : atom) (h : t) =
+  if in_index x h then
+    `Changed (hide_aux x h)
+  else
+    `Same
+
+let hide' (x : atom) (h : t) =
+  get_m h (hide x h)
 
 let equate = union
 
+let equate' x y h =
+  get_m h @@ equate x y h
+
 let subst (r : dim) (x : atom) (h : t) =
-  hide x (union (`Atom x) r h)
+  if in_index x h then
+    hide x (equate' (`Atom x) r h)
+  else
+    `Same
+
+let subst' r x h =
+  get_m h @@ subst r x h
 
 let swap (x : atom) (y : atom) (h : t) =
   if x == y then h else
-  let x', h = reserve_index' x h in
-  let y', h = reserve_index' y h in
-  if x' == y' then h else
+  let x', h = reserve_index_aux x h in
+  let y', h = reserve_index_aux y h in
   {h with index = T.set y x' (T.set x y' h.index)}
 
 
@@ -158,13 +185,13 @@ let pp fmt h =
 let _  =
   try
     let x = `Atom (Name.named (Some "i")) in
-    let rst = equate x `Dim1 @@ emp () in
-    let rst = equate x `Dim0 rst in
+    let rst = equate' x `Dim1 @@ emp () in
+    let rst = equate' x `Dim0 rst in
     failwith "Test failed"
   with
   | I.Inconsistent -> ()
 
 let _ =
   let x = `Atom (Name.named (Some "i")) in
-  let rst = equate x `Dim0 @@ emp () in
+  let rst = equate' x `Dim0 @@ emp () in
   assert (compare x `Dim0 rst == `Same)
