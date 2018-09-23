@@ -6,6 +6,7 @@ type var = [`Neg of Name.t | `Pos of Name.t]
 type term =
   | Var of var
   | Mu of var * cmd
+  | MuTp of cmd
 
   | Thunk of term
   | MuThunk of Name.t * cmd
@@ -50,6 +51,11 @@ let rec pp_term fmt =
       "@[<hv1>(%a+ [%a]@ %a)@]"
       pp_mu ()
       Name.pp x
+      pp_cmd cmd
+  | MuTp cmd ->
+    Format.fprintf fmt
+      "@[<hv1>(%a<tp>@ %a)@]"
+      pp_mu ()
       pp_cmd cmd
   | Thunk t ->
     Format.fprintf fmt
@@ -141,7 +147,7 @@ let is_neg_term =
 
 let is_pos_term =
   function
-  | Var (`Pos _) | Tuple _ | Thunk _ | Mu (`Neg _, _) -> true
+  | Var (`Pos _) | Tuple _ | Thunk _ | Mu (`Neg _, _) | MuTp _ -> true
   | _ -> false
 
 let is_pos_value =
@@ -158,15 +164,16 @@ struct
   type env = closure Env.t
   and closure = Clo of term * env
 
-  type state = closure * closure
+  type state = closure * closure * closure list
 
-  let clo_cmd env (tm0, tm1) =
-    Clo (tm0, env), Clo (tm1, env)
+  let clo_cmd env (tm0, tm1) stk =
+    Clo (tm0, env), Clo (tm1, env), stk
 
   let load : cmd -> state =
     fun (tm0, tm1) ->
       Clo (tm0, Env.empty),
-      Clo (tm1, Env.empty)
+      Clo (tm1, Env.empty),
+      []
 
   exception Final
 
@@ -190,12 +197,12 @@ struct
       failwith "Internal error: polarity"
 
   let orient (state : state) : state =
-    let clo0, clo1 = state in
+    let clo0, clo1, stk = state in
     let Clo (tm0, _) = clo0 in
     let Clo (tm1, _) = clo1 in
     match polarity tm0, polarity tm1 with
-    | `Neg, `Pos -> clo1, clo0
-    | `Pos, `Neg -> clo0, clo1
+    | `Neg, `Pos -> clo1, clo0, stk
+    | `Pos, `Neg -> clo0, clo1, stk
     | _ ->
       Format.eprintf "tm0: %a@." pp_term tm0;
       Format.eprintf "tm1: %a@." pp_term tm1;
@@ -204,41 +211,41 @@ struct
 
 
   let step (state : state) : state =
-    let Clo (tm0, env0), Clo (tm1, env1) = orient state in
-    match tm0, tm1 with
-    | Mu (`Neg alpha, cmd), _ ->
-      let env = Env.add alpha (Clo (tm1, env1)) env0 in
-      clo_cmd env cmd
+    let clo0, clo1, stk = orient state in
+    let Clo (tm0, env0) = clo0 in
+    let Clo (tm1, env1) = clo1 in
+    match tm0, tm1, stk with
+    | Mu (`Neg alpha, cmd), _, _ ->
+      let env = Env.add alpha clo1 env0 in
+      clo_cmd env cmd stk
 
-    | _, Mu (`Pos x, cmd) when is_pos_value tm0 ->
-      let env = Env.add x (Clo (tm0, env0)) env1 in
-      clo_cmd env cmd
+    | _, Mu (`Pos x, cmd), _ when is_pos_value tm0 ->
+      let env = Env.add x clo0 env1 in
+      clo_cmd env cmd stk
 
-    | Tuple tuple, Split (xs, cmd) ->
+    | MuTp cmd, _, _ ->
+      clo_cmd env0 cmd @@ clo1 :: stk
+
+    | _, Tp, clo :: stk when is_pos_value tm0 ->
+      clo0, clo, stk
+
+    | Tuple tuple, Split (xs, cmd), _ ->
       let alg env (lbl, x) =
         let term = List.assoc lbl tuple in
         Env.add x (Clo (term, env0)) env
       in
       let env = List.fold_left alg env1 xs in
-      clo_cmd env cmd
+      clo_cmd env cmd stk
 
-    | Split (xs, cmd), Tuple tuple ->
-      let alg env (lbl, x) =
-        let term = List.assoc lbl tuple in
-        Env.add x (Clo (term, env1)) env
-      in
-      let env = List.fold_left alg env0 xs in
-      clo_cmd env cmd
-
-    | Thunk term, MuThunk (alpha, cmd) ->
+    | Thunk term, MuThunk (alpha, cmd), _ ->
       let env = Env.add alpha (Clo (term, env0)) env1 in
-      clo_cmd env cmd
+      clo_cmd env cmd stk
 
-    | Var (`Pos x), _ ->
-      Env.find x env0, Clo (tm1, env1)
+    | Var (`Pos x), _, _ ->
+      Env.find x env0, clo1, stk
 
-    | _, Var (`Neg alpha) ->
-      Clo (tm0, env0), Env.find alpha env1
+    | _, Var (`Neg alpha), _ ->
+      clo0, Env.find alpha env1, stk
 
     | _ ->
       raise Final
@@ -267,6 +274,8 @@ struct
       Tp
     | Mu (x, cmd) ->
       Mu (x, subst_cmd env cmd)
+    | MuTp cmd ->
+      MuTp (subst_cmd env cmd)
     | Thunk tm ->
       Thunk (subst env tm)
     | MuThunk (x, cmd) ->
@@ -283,8 +292,18 @@ struct
     subst env tm0, subst env tm1
 
 
-  let unload (clo0, clo1) =
-    crush clo0, crush clo1
+  and unload ((clo0 : closure), (clo1 : closure), stk) =
+    let tm0 = crush clo0 in
+    let tm1 = crush clo1 in
+    let tms = List.map crush stk in
+    let rec go cmd =
+      function
+      | [] -> cmd
+      | tm :: tms ->
+        let cmd' = MuTp cmd, tm in
+        go cmd' tms
+    in
+    go (tm0, tm1) tms
 
 
   let rec execute : state -> state =
