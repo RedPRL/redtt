@@ -2,82 +2,50 @@ import path
 import s1
 import isotoequiv
 
-; cubicaltt version: https://github.com/mortberg/cubicaltt/blob/master/examples/torus.ctt
-; cubical agda version: https://github.com/Saizan/cubical-demo/blob/hits-transp/examples/Cubical/Examples/Torus.agda
+-- cubicaltt version: https://github.com/mortberg/cubicaltt/blob/master/examples/torus.ctt
+-- cubical agda version: https://github.com/Saizan/cubical-demo/blob/hits-transp/examples/Cubical/Examples/Torus.agda
 
 data torus where
 | pt
-| p/one @ i [∂[i] → pt]
-| p/two @ i [∂[i] → pt]
-| square @ i j
+| p/one (i : dim) [∂[i] → pt]
+| p/two (i : dim) [∂[i] → pt]
+| square (i j : dim)
   [ ∂[i] → p/one j
   | ∂[j] → p/two i
   ]
 
-let t2c (t : torus) : s1 × s1 =
-  elim t [
+let t2c : torus → s1 × s1 =
+  elim [
   | pt → (base, base)
   | p/one i → (loop i, base)
   | p/two i → (base, loop i)
   | square i j → (loop j, loop i)
   ]
 
-let c2t/base (c : s1) : torus =
-  elim c [
-  | base → pt
-  | loop i → p/two i
-  ]
-
-let c2t/transpose (c : s1) : s1 → torus =
-  elim c [
-  | base → λ c' →
-    elim c' [
+let c2t : (s1 × s1) → torus =
+  λ [,] →                   -- now the goal is s1 → s1 → torus
+  elim [                    -- now the goal is s1 → torus
+  | base →
+    elim [
     | base → pt
     | loop j → p/two j
     ]
-
-  | loop i → λ c' →
-    elim c' [
+  | loop i →
+    elim [
     | base → p/one i
     | loop j → square j i
     ]
   ]
 
+let t2c2t : (t : torus) → path torus (c2t (t2c t)) t =
+  -- wildcard patterns call the elimination tactic, with the rhs in all cases
+  λ * → refl
 
+let c2t2c : (cs : s1 × s1) → path (s1 × s1) (t2c (c2t cs)) cs =
+  -- combination of wildcard pattern with sigma type inversion pattern
+  λ (*, *) → refl
 
-let c2t (cs : s1 × s1) : torus =
-  c2t/transpose (cs.fst) (cs.snd)
-
-let t2c2t (t : torus) : Path torus (c2t (t2c t)) t =
-  elim t [
-  | pt → refl
-  | p/one i → refl
-  | p/two i → refl
-  | square i j → refl
-  ]
-
-
-let c2t2c/transpose (c0 : s1) : (c1 : s1) → Path (s1 × s1) (t2c (c2t/transpose c0 c1)) (c0, c1) =
-  elim c0
-  [ base → λ c1 →
-    elim c1
-    [ base → refl
-    | loop j → refl
-    ]
-
-  | loop i → λ c1 →
-    elim c1
-    [ base → refl
-    | loop j → refl
-    ]
-  ]
-
-
-let c2t2c (cs : s1 × s1) : Path (s1 × s1) (t2c (c2t cs)) cs =
-  c2t2c/transpose (cs.fst) (cs.snd)
-
-
-let torus/s1s1/iso : Iso (s1 × s1) torus =
+let torus/s1s1/iso : iso (s1 × s1) torus =
   ( c2t
   , t2c
   , t2c2t
@@ -85,8 +53,8 @@ let torus/s1s1/iso : Iso (s1 × s1) torus =
   )
 
 
-let torus/s1s1/equiv : Equiv (s1 × s1) torus =
-  Iso/Equiv (s1 × s1) torus torus/s1s1/iso
+let torus/s1s1/equiv : equiv (s1 × s1) torus =
+  iso→equiv (s1 × s1) torus torus/s1s1/iso
 
-let torus/s1s1/path : Path^1 type (s1 × s1) torus =
-  UA (s1 × s1) torus torus/s1s1/equiv
+let torus/s1s1/path : path^1 type (s1 × s1) torus =
+  ua (s1 × s1) torus torus/s1s1/equiv

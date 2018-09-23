@@ -10,8 +10,7 @@ type diagnostic =
   | UserHole of
       {name : string option;
        tele : U.telescope;
-       ty : Tm.tm;
-       tm : Tm.tm}
+       ty : Tm.tm}
   | PrintTerm of
       {ty : Tm.tm;
        tm : Tm.tm}
@@ -81,7 +80,7 @@ let print_diagnostic =
     Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
     C.ret ()
 
-  | (loc, UserHole {name; tele; ty; _}) ->
+  | (loc, UserHole {name; tele; ty}) ->
     C.local (fun _ -> tele) @@
     begin
       C.bind C.base_cx @@ fun cx ->

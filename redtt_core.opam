@@ -8,9 +8,9 @@ bug-reports: "https://github.com/jonsterlign/redtt/issues"
 license: "MIT"
 dev-repo: "https://github.com/jonsterling/redtt"
 build: [
-  ["jbuilder" "build" "--only-packages" name
+  ["dune" "build" "--only-packages" name
    "--root" "." "-j" jobs "@install"]
 ]
 depends: [
 ]
-available: ocaml-version >= "4.06.1"
+available: ocaml-version >= "4.07.0"

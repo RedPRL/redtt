@@ -32,6 +32,8 @@ struct
   let rec nth xs i =
     match xs with
     | Emp ->
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
       failwith "Bwd.nth"
     | Snoc (_, x) when i = 0 -> x
     | Snoc (xs, _) -> nth xs @@ i - 1

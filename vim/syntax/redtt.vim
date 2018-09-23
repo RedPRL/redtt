@@ -1,10 +1,7 @@
 " vim-redtt syntax
 " Language:     redtt
 " Author:       Carlo Angiuli
-" Last Change:  2018 July 3
-
-" Move this file to ~/.vim/syntax/ and add the following line to your .vimrc:
-"   au BufNewFile,BufRead *.red setf redtt
+" Last Change:  2018 September 11
 
 if exists("b:current_syntax")
   finish
@@ -13,27 +10,26 @@ endif
 setlocal iskeyword=a-z,A-Z,48-57,-,',/
 
 syn sync minlines=50
+syn sync maxlines=1000
 
 syn match   redttParenErr ')'
 syn match   redttBrackErr ']'
 
-syn region  redttEncl transparent start="(" end=")" contains=ALLBUT,redttParenErr
-syn region  redttEncl transparent start="\[" end="\]" contains=ALLBUT,redttBrackErr
+syn region  redttEncl transparent matchgroup=redttSymb start="(" end=")" contains=ALLBUT,redttParenErr
+syn region  redttEncl transparent matchgroup=redttSymb start="\[" end="\]" contains=ALLBUT,redttBrackErr
 
 syn match   redttHole '?\k*'
 
-syn keyword redttKeyw data intro where in with end elim
-syn keyword redttKeyw V fst snd coe com pair hcom comp vproj
-syn keyword redttKeyw refl restrict if lam call
-syn keyword redttKeyw pre kan U type then else
-syn keyword redttKeyw open shut tick dim prev next dfix fix
+syn keyword redttKeyw V in with where end tick dim elim fst snd coe com pair
+syn keyword redttKeyw hcom comp vproj vin lam next prev dfix fix call refl pre
+syn keyword redttKeyw kan U type
 
+syn keyword redttDecl let data debug normalize import quit opaque
 
-syn keyword redttDecl opaque let debug normalize import quit
+syn match   redttSymb '[#@`|^*×:,.∙✓□▷=∂→λ𝕀]\|->'
 
-syn match   redttSymb '[#@`|\[\]^*×:,.∙✓□▷=∂→()λ]\|->'
-
-syn region  redttComm start=";" end="$"
+syn region  redttComm start="\k\@1<!--" end="$"
+syn region  redttBlockComm start="/-" end="-/" contains=redttBlockComm
 
 hi def link redttParenErr Error
 hi def link redttBrackErr Error
@@ -42,5 +38,6 @@ hi def link redttKeyw Identifier
 hi def link redttDecl Statement
 hi def link redttSymb Identifier
 hi def link redttComm Comment
+hi def link redttBlockComm Comment
 
 let b:current_syntax = "redtt"

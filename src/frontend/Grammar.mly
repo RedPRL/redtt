@@ -35,10 +35,10 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON TRIANGLE_RIGHT COMMA DOT PIPE CARET BOUNDARY
+%token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY
 %token EQUALS
 %token RIGHT_ARROW
-%token TIMES HASH AT BACKTICK IN WITH WHERE END DATA INTRO
+%token TIMES AST HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
 %token IMPORT OPAQUE QUIT DEBUG NORMALIZE
@@ -66,14 +66,13 @@ edecl:
   | DATA; dlbl = ATOM;
     univ_spec = option(preceded(COLON, univ_spec));
     WHERE; option(PIPE);
-    constrs = separated_list(PIPE, desc_constr)
-    { let desc = List.map (fun constr -> constr dlbl) constrs in
-      let kind, lvl =
+    constrs = separated_list(PIPE, econstr)
+    { let kind, lvl =
         match univ_spec with
         | Some (k, l) -> k, l
         | None -> `Kan, `Const 0
       in
-      E.Data (dlbl, {constrs = desc; kind; lvl}) }
+      E.Data (dlbl, E.EDesc {constrs; kind; lvl}) }
 
   | IMPORT; a = ATOM
     { E.Import a }
@@ -97,9 +96,9 @@ debug_filter:
 
 eproj:
   | DOT FST
-    { E.Car }
+    { E.Fst }
   | DOT SND
-    { E.Cdr }
+    { E.Snd }
 
 atom_econ:
   | a = ATOM
@@ -110,10 +109,13 @@ atom_econ:
 atomoid_econ:
   | BACKTICK; t = tm
     { E.Quo t }
-  | a = HOLE_NAME;
-    { E.Hole a }
+
+  | a = HOLE_NAME
+    { E.Hole (a, None) }
+
   | HOLE_NAME; LBR; e = located(econ); RBR
     { E.Guess e }
+
   | spec = univ_spec
     { let k, l = spec in E.Type (k, l) }
   (* in theory this rule can replace the following three, but it seems there's some bug.
@@ -172,6 +174,7 @@ spine_con:
   | ap = spine
     { spine_to_econ ap }
 
+%inline
 block(X):
   | WITH; x = X; END
     { x }
@@ -182,20 +185,30 @@ pipe_block(X):
   | x = block(preceded(option(PIPE), separated_list(PIPE, X)))
     { x }
 
+%inline
+times_or_ast:
+  | TIMES
+    {}
+  | AST
+    {}
+
 econ:
   | e = spine_con
     { e }
 
-  | LAM; xs = list(ATOM); RIGHT_ARROW; e = located(econ)
+  | a = HOLE_NAME; SEMI; e = located(econ)
+    { E.Hole (a, Some e) }
+
+  | LAM; xs = list(einvpat); RIGHT_ARROW; e = located(econ)
     { E.Lam (xs, e) }
 
-  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
-    { E.Let {name = a; sch = sch; tm; body} }
+  | LET; pat = einvpat; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
+    { E.Let {pat; sch = sch; tm; body} }
 
-  | ELIM; scrut = located(econ); IN; mot = located(econ); clauses = pipe_block(eclause)
-    { E.Elim {mot = Some mot; scrut; clauses} }
-  | ELIM; scrut = located(econ); clauses = pipe_block(eclause)
-    { E.Elim {mot = None; scrut; clauses} }
+  | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
+    { match scrut with
+    | Some scrut -> E.Elim {mot; scrut; clauses}
+    | None -> E.ElimFun {clauses} }
 
   | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }
@@ -219,7 +232,7 @@ econ:
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = located(econ)
     { E.Pi (List.flatten tele, cod) }
 
-  | tele = nonempty_list(etele_cell); TIMES; cod = located(econ)
+  | tele = nonempty_list(etele_cell); times_or_ast; cod = located(econ)
     { E.Sg (List.flatten tele, cod) }
 
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = located(econ); sys = pipe_block(eface)
@@ -228,18 +241,33 @@ econ:
   | dom = located(spine_con); RIGHT_ARROW; cod = located(econ)
     { E.Pi ([`Ty ("_", dom)], cod) }
 
-  | dom = located(spine_con); TIMES; cod = located(econ)
+  | dom = located(spine_con); times_or_ast; cod = located(econ)
     { E.Sg ([`Ty ("_", dom)], cod) }
 
 eclause:
   | lbl = ATOM; pbinds = list(epatbind); RIGHT_ARROW; bdy = located(econ)
-    { lbl, pbinds, bdy }
+    { `Con (lbl, pbinds, bdy) }
+  | AST RIGHT_ARROW; bdy = located(econ)
+    { `All bdy }
 
 epatbind:
+  | x = einvpat
+    { `Bind x }
+  | LPR; x = einvpat; RIGHT_ARROW; ih = einvpat; RPR
+    { `BindIH (x, ih) }
+
+einvpat:
   | x = ATOM
-    { E.PVar x }
-  | LPR; x = ATOM; RIGHT_ARROW; ih = ATOM; RPR
-    { E.PIndVar (x, ih) }
+    { `Var (`User x) }
+  | AST
+    { `Wildcard }
+  | LPR; xs = separated_nonempty_list(COMMA, einvpat) RPR
+    { let xs, x = ListUtil.split_last xs in
+      List.fold_right (fun x xs -> `SplitAs (x, xs)) xs x }
+  | LSQ; x = einvpat; COMMA; RSQ
+    { `Bite x }
+  | LSQ; COMMA; RSQ
+    { `Split }
 
 edimension:
   | n = NUMERAL;
@@ -277,7 +305,7 @@ eface:
   | phi = ecofib; RIGHT_ARROW; e = located(econ)
     { phi, e }
   | phi = ecofib0; xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
-    { phi, eterm ($startpos(xs), $endpos(e)) (E.Lam (xs, e)) }
+    { phi, eterm ($startpos(xs), $endpos(e)) (E.Lam (List.map (fun x -> `Var (`User x)) xs, e)) }
 
 
 escheme:
@@ -300,40 +328,11 @@ etele_cell:
     { [`Tick "_"] }
 
 
-desc_constr:
+econstr:
 | clbl = ATOM;
-  const_specs = loption(nonempty_list(desc_const_spec));
-  rec_specs = loption(nonempty_list(desc_rec_spec));
-  extent = desc_extent
-  { fun dlbl ->
-    let dim_specs, boundary = extent in
-    let boundary =
-      List.flatten @@
-        List.map
-          (fun (phi, e) -> List.map (fun (r, r') -> r, r', e) phi)
-          boundary
-    in
-    clbl, Desc.{const_specs; rec_specs = List.map (fun spec -> spec dlbl) rec_specs; dim_specs; boundary} }
-
-desc_extent:
-  | AT;
-    dims = list(ATOM);
-    boundary = pipe_block(eface)
-    { dims, boundary }
-  | { [], [] }
-
-
-
-%inline
-desc_rec_spec:
-| LPR; x = ATOM; COLON; self = ATOM; RPR
-  { fun name ->
-      if name = self then (x, Desc.Self) else failwith ("Expected " ^ name ^ " but got " ^ self)}
-
-%inline
-desc_const_spec:
-| LSQ; x = ATOM; COLON; ty = located(econ); RSQ
-  { x, ty }
+  specs = list(etele_cell)
+  boundary = loption(pipe_block(eface))
+  { clbl, E.EConstr {specs = List.flatten specs; boundary} }
 
 
 
@@ -446,7 +445,7 @@ tm:
     { fun env ->
       pi_from_tele (Some ($startpos, $endpos)) @@ tele env }
 
-  | LPR; TIMES; tele = tele; RPR
+  | LPR; times_or_ast; tele = tele; RPR
     { fun env ->
       sg_from_tele (Some ($startpos, $endpos)) @@ tele env }
 
@@ -543,12 +542,12 @@ cut:
   | LPR; FST; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< Tm.Car }
+      hd, fs #< Tm.Fst }
 
   | LPR; SND; e = cut; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< Tm.Cdr }
+      hd, fs #< Tm.Snd }
 
   | LPR; CALL; e = cut; RPR
     { fun env ->

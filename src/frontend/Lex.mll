@@ -22,6 +22,19 @@ module Make (R : SOURCE) : LEXER = struct
     List.iter (fun (k, v) -> Hashtbl.add table k v) elems;
     table
 
+
+  module BlockComment =
+  struct
+    let depth = ref 0
+
+    let push () =
+      depth := !depth + 1
+
+    let pop () =
+      depth := !depth - 1;
+      if !depth = 0 then `Token else `Comment
+  end
+
   let keywords =
     make_table 0 [
       ("V", V);
@@ -82,8 +95,10 @@ refill {refill_handler}
 rule token = parse
   | number
     { Lwt.return (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
-  | ';'
-    {comment lexbuf}
+  | "--"
+    { line_comment lexbuf }
+  | "/-"
+    { BlockComment.push (); block_comment lexbuf }
   | '('
     { Lwt.return LPR }
   | ')'
@@ -107,11 +122,13 @@ rule token = parse
   | '^'
     { Lwt.return CARET }
   | '*'
-    { Lwt.return TIMES }
+    { Lwt.return AST }
   | "×"
     { Lwt.return TIMES }
   | ':'
     { Lwt.return COLON }
+  | ';'
+    { Lwt.return SEMI }
   | ','
     { Lwt.return COMMA }
   | '.'
@@ -164,13 +181,25 @@ rule token = parse
       end
     }
   | _
-    { Lwt_io.printlf "Unexpected char: %s" (lexeme lexbuf) >>= fun _ -> token lexbuf }
+    { Lwt_io.printlf "Unexpected char: %s" (lexeme lexbuf) >>= fun _ -> failwith "Lexing error" }
 
-and comment = parse
+and line_comment = parse
   | line_ending
     { new_line lexbuf; token lexbuf }
   | _
-    { comment lexbuf }
+    { line_comment lexbuf }
+
+and block_comment = parse
+  | "/-"
+    { BlockComment.push ();
+      block_comment lexbuf
+    }
+  | "-/"
+    { match BlockComment.pop () with
+      | `Token -> token lexbuf
+      | `Comment -> block_comment lexbuf }
+  | _
+    { block_comment lexbuf }
 
 {
 end (* LEXER *)

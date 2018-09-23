@@ -1,7 +1,5 @@
 open Domain
 
-module B = Desc.Boundary
-
 module type Sig =
 sig
   val restriction : Restriction.t
@@ -32,33 +30,6 @@ sig
   val eval_tick : env -> Tm.tm -> tick
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
-  val eval_bterm
-    : Desc.data_label
-    -> Tm.data_desc
-    -> env
-    -> Tm.btm
-    -> value
-
-  val eval_bterm_boundary
-    : Desc.data_label
-    -> Tm.data_desc
-    -> env
-    -> const_args:value list
-    -> rec_args:value list
-    -> rs:I.t list
-    -> Tm.bsys
-    -> val_sys
-
-  val eval_bterm_face
-    : Desc.data_label
-    -> Tm.data_desc
-    -> env
-    -> const_args:value list
-    -> rec_args:value list
-    -> rs:I.t list
-    -> Tm.bface
-    -> val_face
-
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
   val apply : value -> value -> value
@@ -67,12 +38,15 @@ sig
 
   val elim_data : Desc.data_label -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
 
-  val car : value -> value
-  val cdr : value -> value
+  val do_fst : value -> value
+  val do_snd : value -> value
   val lbl_call : value -> value
   val restriction_force : value -> value
 
   val rigid_vproj : atom -> func:value -> el:value -> value
+  val rigid_cap : dir -> value -> comp_sys -> value -> value
+  val rigid_coe : dir -> abs -> value -> value
+  val make_coe : dir Dir.m -> abs -> value -> value
 
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> env_el list -> value
@@ -86,7 +60,7 @@ sig
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_restriction_ty : value -> val_face
 
-  val make_intro : env -> dlbl:Desc.data_label -> clbl:Desc.con_label -> const_args:value list -> rec_args:value list -> rs:dim list -> value
+  val make_intro : env -> dlbl:Desc.data_label -> clbl:Desc.con_label -> env_el list -> value
 
   module Sig : Sig
 

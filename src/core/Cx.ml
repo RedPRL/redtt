@@ -94,6 +94,13 @@ let ext_dim cx ~nm =
    ppenv = snd @@ Pp.Env.bind cx.ppenv nm},
   x
 
+let def_dim cx ~nm r =
+  {cx with
+   env = Domain.Env.snoc cx.env @@ `Dim r;
+   hyps = cx.hyps #< {classifier = `I; locked = false; killed = false};
+   qenv = Quote.Env.succ cx.qenv;
+   ppenv = snd @@ Pp.Env.bind cx.ppenv nm}
+
 let ext_dims cx ~nms =
   let xs = List.map Name.named nms in
   let rs = List.map (fun x -> `Atom x) xs in
@@ -193,6 +200,10 @@ let check_eq cx ~ty el0 el1 =
 let check_eq_ty cx el0 el1 =
   let (module Q) = quoter cx in
   Q.equiv_ty cx.qenv el0 el1
+
+let check_eq_dim cx r0 r1 =
+  let (module Q) = quoter cx in
+  Q.equiv_dim cx.qenv r0 r1
 
 let check_subtype cx ty0 ty1 =
   let (module Q) = quoter cx in

@@ -49,9 +49,7 @@ type con =
   | Intro of
       {dlbl : Desc.data_label;
        clbl : Desc.con_label;
-       const_args : value list;
-       rec_args : value list;
-       rs : dim list;
+       args : env_el list;
        sys : rigid_val_sys}
 
 and neu =
@@ -59,7 +57,7 @@ and neu =
   | Var of {name : Name.t; twin : Tm.twin; ushift : int}
   | Meta of {name : Name.t; ushift : int}
 
-  | NHComAtType of {dir : dir; univ : value; ty : neu; cap : value; sys : comp_sys}
+  | NHComAtType of {dir : dir; univ : value; ty : neu; ty_sys : rigid_val_sys; cap : value; sys : comp_sys}
   | NHComAtCap of {dir : dir; ty : value; cap : neu; sys : comp_sys}
   | NCoe of {dir : dir; abs : abs; neu : neu}
 
@@ -67,8 +65,8 @@ and neu =
 
   | FunApp of neu * nf
   | ExtApp of neu * dim list
-  | Car of neu
-  | Cdr of neu
+  | Fst of neu
+  | Snd of neu
 
   | Elim of
       {dlbl : Desc.data_label;
@@ -97,9 +95,6 @@ and clo =
 and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
   | NCloConst of value Lazy.t
-
-and bclo =
-  | BClo of {len : int; btm : Tm.tm Desc.Boundary.term; rho : env}
 
 and tick_clo =
   | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}

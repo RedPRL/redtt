@@ -7,11 +7,23 @@ type 'a info =
 
 type edecl =
   | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
-  | Data of string * (eterm, eterm) Desc.desc
+  | Data of string * edesc
   | Debug of [ `All | `Constraints | `Unsolved ]
   | Normalize of eterm
   | Import of string
   | Quit
+
+
+and edesc =
+    EDesc of
+      {kind : Kind.t;
+       lvl : Lvl.t;
+       constrs : (string * econstr) list}
+
+and econstr =
+    EConstr of
+      {specs : ecell list;
+       boundary : esys}
 
 and escheme =
   etele * eterm
@@ -26,15 +38,16 @@ and etele = ecell list
 
 and econ =
   | Guess of eterm
-  | Hole of string option
+  | Hole of string option * eterm option
   | Hope
-  | Lam of string list * eterm
+  | Lam of einvpat list * eterm
   | Tuple of eterm list
   | Type of Kind.t * Lvl.t
   | Quo of (ResEnv.t -> Tm.tm)
-  | Let of {name : string; sch : escheme; tm : eterm; body : eterm}
+  | Let of {pat : einvpat; sch : escheme; tm : eterm; body : eterm}
 
   | Elim of {mot : eterm option; scrut : eterm; clauses : eclause list}
+  | ElimFun of {clauses : eclause list}
 
   | Pi of etele * eterm
   | Sg of etele * eterm
@@ -59,13 +72,22 @@ and econ =
 and eterm = econ info
 
 and eclause =
-  Desc.con_label
-  * epatbind list
-  * eterm
+  [ `Con of Desc.con_label * einvpat epatbind list * eterm
+  | `All of eterm
+  ]
 
-and epatbind =
-  | PVar of string
-  | PIndVar of string * string
+and 'a epatbind =
+  [ `Bind of 'a
+  | `BindIH of 'a * 'a
+  ]
+
+and einvpat =
+  [ `Var of [`User of string | `Gen of Name.t]
+  | `SplitAs of einvpat * einvpat
+  | `Split
+  | `Bite of einvpat
+  | `Wildcard
+  ]
 
 and esys = eface list
 
@@ -73,8 +95,8 @@ and eface = (eterm * eterm) list * eterm
 
 and frame =
   | App of eterm
-  | Car
-  | Cdr
+  | Fst
+  | Snd
   | Open
 
 

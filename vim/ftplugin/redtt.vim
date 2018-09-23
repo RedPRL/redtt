@@ -32,7 +32,8 @@ function! CheckBuffer(...)
   wincmd p
 
   let s:job = job_start(g:redtt_path .
-    \' from-stdin ' . bufname('%'), {
+    \' from-stdin ' . bufname('%') .
+    \' --line-width ' . s:EditWidth(), {
     \'in_io': 'buffer', 'in_buf': bufnr('%'),
     \'in_bot': exists('a:1') ? a:1 : line('$'),
     \'out_io': 'buffer', 'out_name': 'redtt', 'out_msg': 0,
@@ -47,6 +48,29 @@ function! s:InitBuffer()
   set buftype=nofile
   set syntax=redtt
   set noswapfile
+endfunction
+
+function! s:EditWidth()
+  execute bufwinnr('redtt') . 'wincmd w'
+
+  let l:width = winwidth(winnr())
+  if (has('linebreak') && (&number || &relativenumber))
+    let l:width -= &numberwidth
+  endif
+  if (has('folding'))
+    let l:width -= &foldcolumn
+  endif
+  if (has('signs'))
+    redir => l:signs
+    silent execute 'sign place buffer=' . bufnr('%')
+    redir END
+    if (&signcolumn == "yes" || len(split(l:signs, "\n")) > 2)
+      let l:width -= 2
+    endif
+  endif
+
+  wincmd p
+  return l:width
 endfunction
 
 function! s:CloseBuffer()

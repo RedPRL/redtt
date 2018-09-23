@@ -34,18 +34,11 @@ sig
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
+  val equiv_dim : env -> I.t -> I.t -> unit
   val subtype : env -> value -> value -> unit
 
   val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit
 
-  val equiv_boundary_value
-    : env
-    -> Desc.data_label
-    -> (Tm.tm, Tm.tm Desc.Boundary.term) Desc.desc
-    -> Tm.tm Desc.rec_spec
-    -> value
-    -> value
-    -> unit
 end
 
 module M (V : Val.S) : S

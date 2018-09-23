@@ -1,24 +1,12 @@
 import bool
 
-let sg/elim
-  (A : type) (B : A → type) (C : (x : A) (y : B x) → type)
-  (t : (x : A) × B x)
-  (m : (x : A) (y : B x) → C x y)
-  : C (t.fst) (t.snd)
-  =
-  m (t.fst) (t.snd)
-
-; Needed until we have parameterized datatypes
+-- Needed until we have parameterized datatypes
 let or (A B : type) : type =
   (b : bool) × elim b [tt → A | ff → B]
 
-let or/elim
-  (A B : type)
-  (C : type)
-  (t : or A B)
-  (m0 : A → C)
-  (m1 : B → C)
-  : C =
-  sg/elim bool _ (λ _ _ → C) t
-    (λ b →
-      elim b [tt → m0 | ff → m1])
+let or/elim (A B : type) (C : type) : (t : or A B) (m0 : A → C) (m1 : B → C) → C =
+  λ [,] →
+  elim [
+  | tt → λ x m0 _ → m0 x
+  | ff → λ x _ m1 → m1 x
+  ]

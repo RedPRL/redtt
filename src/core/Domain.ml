@@ -21,9 +21,12 @@ let rec pp_env_cell fmt =
   | `Tick _ ->
     Format.fprintf fmt "<tick>"
 
+and pp_env_cells fmt cells =
+  let pp_sep fmt () = Format.fprintf fmt " " in
+  Format.pp_print_list ~pp_sep pp_env_cell fmt cells
+
 and pp_env fmt env =
-  let pp_sep fmt () = Format.fprintf fmt ", " in
-  Format.pp_print_list ~pp_sep pp_env_cell fmt (Bwd.to_list env.cells)
+  pp_env_cells fmt @@ Bwd.to_list env.cells
 
 
 and pp_con fmt : con -> unit =
@@ -98,11 +101,9 @@ and pp_con fmt : con -> unit =
   | Data lbl ->
     Uuseg_string.pp_utf_8 fmt lbl
   | Intro info ->
-    Format.fprintf fmt "@[<hv1>(%a %a %a %a)@]"
+    Format.fprintf fmt "@[<hv1>(%a %a)@]"
       Uuseg_string.pp_utf_8 info.clbl
-      pp_values info.const_args
-      pp_values info.rec_args
-      pp_dims info.rs
+      pp_env_cells info.args
 
 
 and pp_value fmt value =
@@ -211,11 +212,11 @@ and pp_neu fmt neu =
         Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
     end
 
-  | Car neu ->
-    Format.fprintf fmt "@[<hv1>(car@ %a)@]" pp_neu neu
+  | Fst neu ->
+    Format.fprintf fmt "@[<hv1>(fst@ %a)@]" pp_neu neu
 
-  | Cdr neu ->
-    Format.fprintf fmt "@[<hv1>(cdr@ %a)@]" pp_neu neu
+  | Snd neu ->
+    Format.fprintf fmt "@[<hv1>(snd@ %a)@]" pp_neu neu
 
   | Var {name; _} ->
     Name.pp fmt name
@@ -233,8 +234,11 @@ and pp_neu fmt neu =
   | Cap _ ->
     Format.fprintf fmt "<cap>"
 
-  | VProj _ ->
-    Format.fprintf fmt "<vproj>"
+  | VProj info ->
+    Format.fprintf fmt "@[<hv1>(vproj %a@ %a@ %a)@]"
+      Name.pp info.x
+      pp_neu info.neu
+      pp_nf info.func
 
   | LblCall neu ->
     Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
@@ -349,12 +353,12 @@ struct
     function
     | NHComAtType info ->
       begin
-        match Dir.act phi info.dir, CompSys.act phi info.sys with
-        | `Ok dir, `Ok sys ->
+        match Dir.act phi info.dir, force_val_sys @@ ValSys.act phi (ValSys.from_rigid info.ty_sys), CompSys.act phi info.sys with
+        | `Ok dir, `Ok ty_sys, `Ok sys ->
           let univ = Value.act phi info.univ in
           let cap = Value.act phi info.cap in
           let ty = act phi info.ty in
-          NHComAtType {dir; univ; ty; cap; sys}
+          NHComAtType {dir; univ; ty; ty_sys; cap; sys}
         | _ ->
           raise TooMortal
       end
@@ -378,6 +382,7 @@ struct
           let neu = act phi info.neu in
           NCoe {dir; abs; neu}
         | _ ->
+          Format.eprintf "mortal: ncoe@.";
           raise TooMortal
       end
 
@@ -389,10 +394,11 @@ struct
           let el = Value.act phi info.el in
           NCoeAtType {dir; abs; el}
         | _ ->
+          Format.eprintf "mortal: ncoe-at-type@.";
           raise TooMortal
       end
 
-    | VProj info ->
+    | VProj info as neu ->
       begin
         match I.act phi @@ `Atom info.x with
         | `Atom y ->
@@ -400,6 +406,9 @@ struct
           let neu = act phi info.neu in
           VProj {x = y; neu; func}
         | _ ->
+          Format.eprintf "mortal: vproj@.";
+          Format.eprintf "neu: %a@." pp_neu neu;
+
           raise TooMortal
       end
 
@@ -424,13 +433,13 @@ struct
       let arg = Nf.act phi arg in
       FunApp (neu, arg)
 
-    | Car neu ->
+    | Fst neu ->
       let neu = act phi neu in
-      Car neu
+      Fst neu
 
-    | Cdr neu ->
+    | Snd neu ->
       let neu = act phi neu in
-      Cdr neu
+      Snd neu
 
     | Elim info ->
       let mot = Clo.act phi info.mot in

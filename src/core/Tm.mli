@@ -3,10 +3,7 @@ include module type of TmData
 
 
 type tm
-type btm = tm Desc.Boundary.term
-type bsys = (tm, btm) Desc.Boundary.sys
-type bface = (tm, btm) Desc.Boundary.face
-type data_desc = (tm, btm) Desc.desc
+type data_desc = tm Desc.desc
 
 module Error :
 sig
@@ -95,8 +92,6 @@ val pp_spine : tm spine Pp.t
 val pp_sys : (tm, tm) system Pp.t
 val pp_bnd : tm bnd Pp.t
 val pp_nbnd : tm nbnd Pp.t
-
-val pp_bterm : btm Pp.t0
 
 include Occurs.S with type t := tm
 

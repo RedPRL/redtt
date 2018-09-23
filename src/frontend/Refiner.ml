@@ -3,7 +3,6 @@ open RedTT_Core
 open Dev open Bwd open BwdNotation
 
 module D = Domain
-module B = Desc.Boundary
 
 module M =
 struct
@@ -38,6 +37,12 @@ let normalize_ty ty =
   let now1 = Unix.gettimeofday () in
   normalization_clock := !normalization_clock +. (now1 -. now0);
   M.ret ty
+
+let name_of =
+  function
+  | `User a -> Name.named @@ Some a
+  | `Gen x -> x
+
 
 let normalizing_goal tac goal =
   normalize_ty goal.ty >>= fun ty ->
@@ -79,20 +84,27 @@ let guess_restricted tm goal =
 
 exception ChkMatch
 
+let bind_in_scope_ psi tm =
+  let go (x, param) =
+    match param with
+    | `P _ -> [x]
+    | `Def _ -> [x]
+    | `I -> [x]
+    | `Tick -> [x]
+    | `Tw _ -> []
+    | _ -> []
+  in
+  let xs = Bwd.flat_map go psi in
+  let Tm.NB (_, tm) = Tm.bindn xs tm in
+  tm
+
 let bind_in_scope tm =
+  M.lift C.ask <<@> fun psi -> bind_in_scope_ psi tm
+
+
+let bind_sys_in_scope sys =
   M.lift C.ask <<@> fun psi ->
-    let go (x, param) =
-      match param with
-      | `P _ -> [x]
-      | `Def _ -> [x]
-      | `I -> [x]
-      | `Tick -> [x]
-      | `Tw _ -> []
-      | _ -> []
-    in
-    let xs = Bwd.flat_map go psi in
-    let Tm.NB (_, tm) = Tm.bindn xs tm in
-    tm
+    Tm.map_tm_sys (bind_in_scope_ psi) sys
 
 let tac_wrap_nf tac goal =
   try tac goal
@@ -101,25 +113,109 @@ let tac_wrap_nf tac goal =
     normalize_ty goal.ty >>= fun ty ->
     tac {ty; sys = goal.sys}
 
+let tac_of_cmd cmd =
+  M.lift @@ C.base_cx >>= fun cx ->
+  let vty = Typing.infer cx cmd in
+  let ty = Cx.quote_ty cx vty in
+  M.ret (ty, Tm.up cmd)
 
-let tac_let name itac ctac =
+
+let tac_let x itac ctac =
   fun goal ->
     itac >>= fun (let_ty, let_tm) ->
-    let x = Name.named @@ Some name in
     M.in_scope x (`Def (let_ty, let_tm)) (ctac goal) >>= fun bdyx ->
     M.ret @@ Tm.make @@ Tm.Let (Tm.ann ~ty:let_ty ~tm:let_tm, Tm.bind x bdyx)
 
 
+
 let flip f x y = f y x
 
-let rec tac_lambda names tac goal =
+let tac_pair tac0 tac1 : chk_tac =
+  fun goal ->
+    match Tm.unleash goal.ty with
+    | Tm.Sg (dom, cod) ->
+      let sys0 =
+        flip List.map goal.sys @@ fun (r, r', otm) ->
+        r, r', flip Option.map otm @@ fun tm ->
+        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Fst
+      in
+      let sys1 =
+        flip List.map goal.sys @@ fun (r, r', otm) ->
+        r, r', flip Option.map otm @@ fun tm ->
+        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Snd
+      in
+      tac0 {ty = dom; sys = sys0} >>= fun tm0 ->
+      let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
+      let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
+      tac1 {ty = cod'; sys = sys1} >>= fun tm1 ->
+      M.ret @@ Tm.cons tm0 tm1
+
+    | _ ->
+      raise ChkMatch
+
+let unleash_data ty =
+  match Tm.unleash ty with
+  | Tm.Data dlbl -> dlbl
+  | _ ->
+    Format.eprintf "Dang: %a@." Tm.pp0 ty;
+    failwith "Expected datatype"
+
+let inspect_goal ~loc ~name : goal -> unit M.m =
+  fun goal ->
+    M.lift C.ask >>= fun psi ->
+    let rty = Tm.refine_ty goal.ty goal.sys in
+    begin
+      if name = Some "_" then M.ret () else
+        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi}
+    end
+
+let tac_hole ~loc ~name : chk_tac =
+  fun goal ->
+    inspect_goal ~loc ~name goal >>
+    M.lift C.ask >>= fun psi ->
+    let rty = Tm.refine_ty goal.ty goal.sys in
+    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
+    M.ret @@ Tm.up @@ Tm.refine_force cmd
+
+let guess_motive scrut ty =
+  match Tm.unleash scrut with
+  | Tm.Up (Tm.Var var, Emp) ->
+    M.ret @@ Tm.bind var.name ty
+  | _ ->
+    M.ret @@ Tm.bind (Name.fresh ()) ty
+
+let lookup_datatype dlbl =
+  M.lift C.base_cx <<@> fun cx ->
+    GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
+
+let make_motive ~data_ty ~tac_mot ~scrut ~ty =
+  match tac_mot with
+  | None ->
+    guess_motive scrut ty
+  | Some tac_mot ->
+    let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
+    let mot_ty = Tm.pi None data_ty univ in
+    tac_mot {ty = mot_ty; sys = []} >>= fun mot ->
+    let motx =
+      Tm.ann ~ty:(Tm.subst (Tm.shift 1) mot_ty) ~tm:(Tm.subst (Tm.shift 1) mot)
+      @< Tm.FunApp (Tm.up @@ Tm.ix 0)
+    in
+    M.ret @@ Tm.B (None, Tm.up @@ motx)
+
+
+let rec tac_lambda (ps : ESig.einvpat list) tac goal =
   match Tm.unleash goal.ty with
   | Tm.Pi (dom, cod) ->
     begin
-      match names with
+      match ps with
       | [] -> tac goal
-      | name :: names ->
-        let x = Name.named @@ Some name in
+      | p :: ps ->
+        let x, p =
+          match p with
+          | `Var nm -> let x = name_of nm in x, `Var (`Gen x)
+          | _ -> Name.fresh (), p
+        in
+
         let codx = Tm.unbind_with (Tm.var x) cod in
         let sysx =
           flip List.map goal.sys @@ fun (r, r', otm) ->
@@ -127,17 +223,21 @@ let rec tac_lambda names tac goal =
           Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.FunApp (Tm.up @@ Tm.var x)
         in
         M.in_scope x (`P dom) begin
-          tac_wrap_nf (tac_lambda names tac) {ty = codx; sys = sysx}
+          let tac : chk_tac =
+            tac_inversion ~loc:None ~tac_scrut:(tac_of_cmd @@ Tm.var x) p @@
+            tac_wrap_nf (tac_lambda ps tac)
+          in
+          tac {ty = codx; sys = sysx}
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
     end
 
   | Tm.Later cod ->
     begin
-      match names with
+      match ps with
       | [] -> tac goal
-      | name :: names ->
-        let x = Name.named @@ Some name in
+      | `Var nm :: ps ->
+        let x = name_of nm in
         let codx = Tm.unbind_with (Tm.var x) cod in
         let sysx =
           flip List.map goal.sys @@ fun (r, r', otm) ->
@@ -145,25 +245,26 @@ let rec tac_lambda names tac goal =
           Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Prev (Tm.up @@ Tm.var x)
         in
         M.in_scope x `Tick begin
-          tac_wrap_nf (tac_lambda names tac) {ty = codx; sys = sysx}
+          tac_wrap_nf (tac_lambda ps tac) {ty = codx; sys = sysx}
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Next (Tm.bind x bdyx)
+      | _ ->
+        failwith "TODO"
     end
 
   | Tm.Ext (Tm.NB (nms, _) as ebnd) ->
     begin
-      match names with
+      match ps with
       | [] -> tac goal
       | _ ->
-        let rec bite nms lnames rnames =
-          match nms, rnames with
-          | Emp, _ -> lnames, tac_wrap_nf (tac_lambda rnames tac)
-          | Snoc (nms, _), name :: rnames ->
-            let x = Name.named @@ Some name in
-            bite nms (lnames #< x) rnames
+        let rec bite xs lxs rps =
+          match xs, rps with
+          | Emp, _ -> lxs, tac_wrap_nf (tac_lambda rps tac)
+          | Snoc (nms, _), `Var x :: rps ->
+            bite nms (lxs #< (name_of x)) rps
           | _ -> failwith "Elab: incorrect number of binders when refining extension type"
         in
-        let xs, tac' = bite nms Emp names in
+        let xs, tac' = bite nms Emp ps in
         let xs_fwd = Bwd.to_list xs in
         let xs_tms = List.map (fun x -> Tm.var x) xs_fwd in
         let tyxs, sysxs = Tm.unbind_ext_with xs_tms ebnd in
@@ -188,64 +289,114 @@ let rec tac_lambda names tac goal =
 
   | _ ->
     begin
-      match names with
+      match ps with
       | [] -> tac goal
       | _ ->
         raise ChkMatch
     end
 
-let tac_pair tac0 tac1 : chk_tac =
-  fun goal ->
-    match Tm.unleash goal.ty with
+and split_sigma ~tac_scrut (tac_body : tm Tm.cmd -> tm Tm.cmd -> chk_tac) : chk_tac =
+  match_goal @@ fun goal ->
+  let xfun = Name.fresh () in
+  let x0 = Name.fresh () in
+  let x1 = Name.fresh () in
+  let tac_fun =
+    tac_scrut >>= fun (sigma_ty, scrut) ->
+    normalize_ty sigma_ty >>= fun sigma_ty ->
+    match Tm.unleash sigma_ty with
     | Tm.Sg (dom, cod) ->
-      let sys0 =
-        flip List.map goal.sys @@ fun (r, r', otm) ->
-        r, r', flip Option.map otm @@ fun tm ->
-        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Car
-      in
-      let sys1 =
-        flip List.map goal.sys @@ fun (r, r', otm) ->
-        r, r', flip Option.map otm @@ fun tm ->
-        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Cdr
-      in
-      tac0 {ty = dom; sys = sys0} >>= fun tm0 ->
-      let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
-      let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
-      tac1 {ty = cod'; sys = sys1} >>= fun tm1 ->
-      M.ret @@ Tm.cons tm0 tm1
-
+      guess_motive scrut goal.ty >>= fun bmot ->
+      let pair = Tm.cons (Tm.up @@ Tm.var x0) (Tm.up @@ Tm.var x1) in
+      let mot_x0x1 = Tm.unbind_with (Tm.ann ~ty:sigma_ty ~tm:pair) bmot in
+      let codx0 = Tm.unbind_with (Tm.var x0) cod in
+      let fun_ty = Tm.make @@ Tm.Pi (dom, Tm.bind x0 @@ Tm.make @@ Tm.Pi (codx0, Tm.bind x1 @@ mot_x0x1)) in
+      tac_down ~ty:fun_ty @@ tac_lambda [`Var (`Gen x0); `Var (`Gen x1)] @@ tac_body (Tm.var x0) (Tm.var x1)
     | _ ->
-      raise ChkMatch
+      failwith "split_sigma"
+  in
+  let tac_bdy =
+    fun _ ->
+      tac_scrut >>= fun (scrut_ty, scrut_tm) ->
+      let scrut_cmd = Tm.ann ~ty:scrut_ty ~tm:scrut_tm in
+      let pi0 = Tm.up @@ scrut_cmd @< Tm.Fst in
+      let pi1 = Tm.up @@ scrut_cmd @< Tm.Snd in
+      M.ret @@ Tm.up @@ (Tm.var xfun @< Tm.FunApp pi0) @< Tm.FunApp pi1
+  in
+  tac_let xfun tac_fun tac_bdy
 
-let unleash_data ty =
-  match Tm.unleash ty with
-  | Tm.Data dlbl -> dlbl
-  | _ ->
-    Format.eprintf "Dang: %a@." Tm.pp0 ty;
-    failwith "Expected datatype"
 
-let guess_motive scrut ty =
-  match Tm.unleash scrut with
-  | Tm.Up (Tm.Var var, Emp) ->
-    M.ret @@ Tm.bind var.name ty
-  | _ ->
-    M.ret @@ Tm.bind (Name.fresh ()) ty
+and tac_down ~ty (ctac : chk_tac) : inf_tac =
+  ctac {ty; sys = []} >>= fun tm ->
+  M.ret (ty, tm)
 
-let make_motive ~data_ty ~tac_mot ~scrut ~ty =
-  match tac_mot with
-  | None ->
-    guess_motive scrut ty
-  | Some tac_mot ->
-    let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
-    let mot_ty = Tm.pi None data_ty univ in
-    tac_mot {ty = mot_ty; sys = []} >>= fun mot ->
-    let motx =
-      Tm.ann ~ty:(Tm.subst (Tm.shift 1) mot_ty) ~tm:(Tm.subst (Tm.shift 1) mot)
-      @< Tm.FunApp (Tm.up @@ Tm.ix 0)
+and tac_generalize ~tac_scrut tac_body : chk_tac =
+  match_goal @@ fun goal ->
+  let xfun = Name.fresh () in
+  let tac_fun =
+    tac_scrut >>= fun (ty_scrut, tm_scrut) ->
+    guess_motive tm_scrut goal.ty >>= fun bmot ->
+    let fun_ty = Tm.make @@ Tm.Pi (ty_scrut, bmot) in
+    tac_down ~ty:fun_ty tac_body
+  in
+  let tac_bdy =
+    fun _ ->
+      tac_scrut >>= fun (scrut_ty, scrut_tm) ->
+      M.ret @@ Tm.up @@ (Tm.var xfun @< Tm.FunApp scrut_tm)
+  in
+  tac_let xfun tac_fun tac_bdy
+
+and tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk_tac =
+  match_goal @@ fun goal ->
+  match invpat with
+  | `Var nm ->
+    fun goal ->
+      tac_scrut >>= fun (_, tm) ->
+      let x = name_of nm in
+      if tm = Tm.up (Tm.var x) then body goal else
+        tac_let x tac_scrut body goal
+
+  | `Wildcard ->
+    tac_elim ~loc ~tac_mot:None ~tac_scrut ~clauses:[] ~default:(Some body)
+
+  | `SplitAs (inv0, inv1) ->
+    split_sigma ~tac_scrut @@ fun cmd0 cmd1 ->
+    tac_inversion ~loc ~tac_scrut:(tac_of_cmd cmd0) inv0 @@
+    tac_inversion ~loc ~tac_scrut:(tac_of_cmd cmd1) inv1 @@
+    body
+
+  | `Split ->
+    split_sigma ~tac_scrut @@ fun cmd0 cmd1 ->
+    tac_generalize ~tac_scrut:(tac_of_cmd cmd1) @@
+    tac_generalize ~tac_scrut:(tac_of_cmd cmd0) @@
+    body
+
+  | `Bite inv ->
+    split_sigma ~tac_scrut @@ fun cmd0 cmd1 ->
+    tac_inversion ~loc ~tac_scrut:(tac_of_cmd cmd0) inv @@
+    tac_generalize ~tac_scrut:(tac_of_cmd cmd1) @@
+    body
+
+and tac_inv_let p itac ctac =
+  match p with
+  | `Var nm ->
+    let x = name_of nm in
+    tac_let x itac ctac
+  | `Wildcard ->
+    tac_elim ~loc:None ~tac_mot:None ~tac_scrut:itac ~clauses:[] ~default:(Some ctac)
+  | `SplitAs (inv0, inv1) ->
+    let itac0 =
+      itac >>= fun (ty, tm) ->
+      tac_of_cmd @@ Tm.ann ~ty ~tm @< Tm.Fst
     in
-    M.ret @@ Tm.B (None, Tm.up @@ motx)
+    let itac1 =
+      itac >>= fun (ty, tm) ->
+      tac_of_cmd @@ Tm.ann ~ty ~tm @< Tm.Snd
+    in
+    tac_inv_let inv0 itac0 @@ tac_inv_let inv1 itac1 @@ ctac
+  | _ ->
+    failwith "tac_inv_let: not supported"
 
-let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
+and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
   fun goal ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
@@ -261,10 +412,7 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
     let dlbl = unleash_data data_ty in
     let data_vty = D.make @@ D.Data dlbl in
 
-    begin
-      M.lift C.base_cx <<@> fun cx ->
-        GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
-    end >>= fun desc ->
+    lookup_datatype dlbl >>= fun desc ->
 
     (* Add holes for any missing clauses *)
     let eclauses =
@@ -272,130 +420,178 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
         try
           List.find (fun (lbl', _, _) -> lbl = lbl') clauses
         with
-        | _ ->
+        | Not_found ->
           let constr = Desc.lookup_constr lbl desc in
           let pbinds =
-            List.map (fun (nm, _) -> ESig.PVar nm) constr.const_specs
-            @ List.mapi (fun i _ -> let x = "x" ^ string_of_int i in ESig.PIndVar (x, x ^ "/ih")) constr.rec_specs
-            @ List.map (fun x -> ESig.PVar x) constr.dim_specs
+            flip List.map constr.specs @@ function
+            | nm, (`Const _ | `Dim) -> `Bind (`Var (`User nm))
+            | nm, `Rec _ -> `BindIH (`Var (`User nm), `Var (`User (nm ^ "/ih")))
           in
-          lbl, pbinds, fun goal ->
-            M.lift C.ask >>= fun psi ->
-            let rty = Tm.refine_ty goal.ty goal.sys in
-            M.lift @@ U.push_hole `Rigid psi rty  >>= fun cmd ->
-            M.emit loc @@ M.UserHole {name = Some lbl; ty = rty; tele = psi; tm = Tm.up cmd} >>
-            M.ret @@ Tm.up @@ Tm.refine_force cmd
+          lbl, pbinds,
+          match default with
+          | None -> tac_hole ~loc ~name:(Some lbl)
+          | Some tac -> tac
       in
       List.map (fun (lbl, _) -> find_clause lbl) desc.constrs
     in
 
-    begin
-      M.lift C.base_cx <<@> fun cx ->
-        Cx.evaluator cx, Cx.quoter cx
-    end >>= fun ((module V), (module Q)) ->
-
-
     (* TODO: factor this out into another tactic. *)
-    let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac)) =
+    let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac))  : (Desc.con_label * tm Tm.nbnd) M.m =
+
       let open Desc in
       let constr = lookup_constr clbl desc in
-      let rec go psi env benv (tms, cargs, rargs, ihs, rs) pbinds const_specs rec_specs dims =
-        match pbinds, const_specs, rec_specs, dims with
-        | ESig.PVar nm :: pbinds, (_plbl, pty) :: const_specs, _, _->
-          let x = Name.named @@ Some nm in
-          let vty = V.eval env pty in
-          let tty = Q.quote_ty Quote.Env.emp vty in
+
+      begin
+        M.lift C.base_cx <<@> fun cx ->
+          let (module V) = Cx.evaluator cx in
+          V.empty_env
+      end >>= fun empty_env ->
+
+      let rec prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs =
+        begin
+          M.lift C.base_cx <<@> fun cx ->
+            cx, Cx.evaluator cx, Cx.quoter cx
+        end >>= fun (cx, (module V), (module Q)) ->
+        match pbinds, specs with
+        | `Bind (`Var nm) :: pbinds, (_, `Const ty) :: specs ->
+          let x = name_of nm in
+          let vty = V.eval tyenv ty in
+          let x_tm = Tm.up @@ Tm.var x in
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
-          let x_tm = Tm.up @@ Tm.var x in
-          let env' = D.Env.snoc env @@ `Val x_el in
-          let benv' = D.Env.snoc env @@ `Val x_el in
-          go (psi #< (x, `P tty)) env' benv' (tms #< x_tm, cargs #< x_el, rargs, ihs, rs) pbinds const_specs rec_specs dims
+          let tty = Q.quote_ty Quote.Env.emp vty in
+          let psi = psi #< (x, `P tty) in
+          let tyenv = D.Env.snoc tyenv @@ `Val x_el in
+          let env_only_ihs = D.Env.snoc env_only_ihs @@ `Val x_el in
+          let intro_args = intro_args #< x_tm in
+          M.in_scope x (`P tty) @@
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
 
-        | ESig.PVar nm :: pbinds, [], (_, Self) :: rec_specs, _ ->
-          let x = Name.named @@ Some nm in
+        | `Bind (`Var nm) :: pbinds, (_, `Dim) :: specs ->
+          let x = name_of nm in
+          let x_tm = Tm.up @@ Tm.var x in
+          let x_el = `Atom x in
+          let psi = psi #< (x, `I) in
+          let tyenv = D.Env.snoc tyenv @@ `Dim x_el in
+          let env_only_ihs = D.Env.snoc env_only_ihs @@ `Dim x_el in
+          let intro_args = intro_args #< x_tm in
+          M.in_scope x `I @@
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
+
+        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, (_, `Rec Desc.Self) :: specs ->
+          let x = name_of nm in
+          let x_ih = name_of nm_ih in
+          let vty = data_vty in
+          let x_tm = Tm.up @@ Tm.var x in
+          let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
+          let tty = Q.quote_ty Quote.Env.emp vty in
+          let ih_ty = mot x_tm in
+
+          M.in_scope x (`P data_ty) begin
+            M.lift C.base_cx >>= fun cx ->
+            let ih_vty = Cx.eval cx ih_ty in
+
+            let ih_el = V.reflect ih_vty (D.Var {name = x_ih; twin = `Only; ushift = 0}) [] in
+            let psi = psi <>< [x, `P tty; x_ih, `P ih_ty] in
+            let tyenv = D.Env.snoc tyenv @@ `Val x_el in
+            let env_only_ihs = D.Env.snoc env_only_ihs @@ `Val ih_el in
+            let intro_args = intro_args #< x_tm in
+            M.in_scope x_ih (`P ih_ty) @@
+            prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
+          end
+
+        | `Bind p :: pbinds, ((_, `Rec _) :: _ as specs) ->
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (p, `Var (`Gen (Name.fresh ()))) :: pbinds) specs
+
+        | `Bind inv :: pbinds, ((_, spec) :: _ as specs) ->
+          let x = Name.fresh () in
+          let kont_tac tac =
+            kont_tac @@
+            let vty =
+              match spec with
+              | `Const ty -> V.eval tyenv ty
+              | `Rec Desc.Self -> data_vty
+              | _ -> failwith "unexpected wildcard pattern"
+            in
+
+            let ty = Q.quote_ty Quote.Env.emp vty in
+            let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x) in
+            tac_inversion ~loc ~tac_scrut inv tac
+          in
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`Bind (`Var (`Gen x)) :: pbinds) specs
+
+        | `BindIH (`Var y, inv) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
           let x_ih = Name.fresh () in
-          let x_tm = Tm.up @@ Tm.var x in
-          let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
-          let ih_ty = mot x_tm in
-          let benv' = D.Env.snoc benv @@ `Val x_el in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env benv' (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
+          let kont_tac tac =
+            kont_tac @@
+            let ty = mot @@ Tm.up @@ Tm.var x_ih in
+            let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x_ih) in
+            tac_inversion ~loc ~tac_scrut inv tac
+          in
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var y, `Var (`Gen x_ih)) :: pbinds) specs
 
-        | ESig.PIndVar (nm, nm_ih) :: pbinds, [], (_, Self) :: rec_specs, _ ->
-          let x = Name.named @@ Some nm in
-          let x_ih = Name.named @@ Some nm_ih in
-          let x_tm = Tm.up @@ Tm.var x in
-          let ih_ty = mot x_tm in
-          let x_el = V.reflect data_vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
-          let benv' = D.Env.snoc benv @@ `Val x_el in
-          go (psi #< (x, `P data_ty) #< (x_ih, `P ih_ty)) env benv' (tms #< x_tm, cargs, rargs #< x_el, ihs #< x_ih, rs) pbinds const_specs rec_specs dims
+        | `BindIH (inv, p) :: pbinds, ((_, `Rec Desc.Self) :: _ as specs) ->
+          let x = Name.fresh () in
+          let kont_tac tac =
+            kont_tac @@
+            let ty = data_ty in
+            let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x) in
+            tac_inversion ~loc ~tac_scrut inv tac
+          in
+          prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var (`Gen x), p) :: pbinds) specs
 
-        | ESig.PVar nm :: pbinds, [], [], _ :: dims ->
-          let x = Name.named @@ Some nm in
-          let x_tm = Tm.up @@ Tm.var x in
-          let r = `Atom x in
-          let env' = D.Env.snoc env @@ `Dim r in
-          let benv' = D.Env.snoc benv @@ `Dim r in
-          go (psi #< (x, `I)) env' benv' (tms #< x_tm, cargs, rargs, ihs, rs #< r) pbinds [] [] dims
-
-        | _, [], [], [] ->
-          psi, benv, Bwd.to_list tms, Bwd.to_list cargs, Bwd.to_list rargs, ihs, Bwd.to_list rs
+        | [], [] ->
+          M.ret (Bwd.to_list psi, tyenv, Bwd.to_list intro_args, env_only_ihs, kont_tac)
 
         | _ ->
-          failwith "refine_clause"
+          failwith "prepare_clause: mismatch"
       in
 
-      let psi, benv, tms, const_args, rec_args, ihs, rs = go Emp V.empty_env V.empty_env (Emp, Emp, Emp, Emp, Emp) pbinds constr.const_specs constr.rec_specs constr.dim_specs in
-      let sub = List.fold_left (fun sub (x,_) -> Tm.dot (Tm.var x) sub) (Tm.shift 0) (Bwd.to_list psi) in
-      let intro = Tm.make @@ Tm.Intro (dlbl, clbl, tms) in
+      prepare_clause (Emp, empty_env, Emp, empty_env, fun tac -> tac) pbinds constr.specs >>= fun (psi, env, intro_args, env_only_ihs, kont_tac) ->
+
+      let intro = Tm.make @@ Tm.Intro (dlbl, clbl, intro_args) in
       let clause_ty = mot intro in
 
-      M.in_scopes (Bwd.to_list psi) begin
+      M.lift C.base_cx >>= fun outer_cx ->
+
+      M.in_scopes psi begin
         begin
           M.lift C.base_cx <<@> fun cx ->
             cx, Cx.evaluator cx, Cx.quoter cx
         end >>= fun (cx, (module V), (module Q)) ->
 
-        let rec image_of_bterm phi =
-          function
-          | B.Intro intro as bterm ->
-            let nbnd : ty Tm.nbnd = snd @@ List.find (fun (clbl, _) -> clbl = intro.clbl) earlier_clauses in
-            let nclo = D.NClo {nbnd; rho = Cx.env cx} in
-            let cargs = List.map (fun t -> `Val (Cx.eval cx @@ Tm.subst sub t)) intro.const_args in
-            let rargs =
-              try
-                List.flatten @@
-                List.map
-                  (fun bt ->
-                     let el = `Val (V.eval_bterm dlbl desc benv bterm) in
-                     let ih = `Val (image_of_bterm phi bt) in
-                     [el; ih])
-                  intro.rec_args
-              with
-                _ -> failwith "rargs"
+        let rec image_of_bterm phi tm =
+          let benv = env in
+          match Tm.unleash tm with
+          | Tm.Intro (_, clbl, args) ->
+            let constr = Desc.lookup_constr clbl desc in
+            let nbnd = snd @@ List.find (fun (clbl', _) -> clbl = clbl') earlier_clauses in
+            let nclo : D.nclo = D.NClo.act phi @@ D.NClo {rho = Cx.env outer_cx; nbnd} in
+            let rec go specs tms =
+              match specs, tms with
+              | (_, `Const ty) :: specs, tm :: tms ->
+                `Val (D.Value.act phi @@ V.eval benv tm) :: go specs tms
+              | (_, `Rec Desc.Self) :: specs, tm :: tms ->
+                `Val (D.Value.act phi @@ V.eval benv tm) :: `Val (image_of_bterm phi tm) :: go specs tms
+              | (_, `Dim) :: specs, tm :: tms ->
+                `Dim (I.act phi @@ V.eval_dim benv tm) :: go specs tms
+              | [], [] ->
+                []
+              | _ ->
+                Format.eprintf "Tm: %a@." Tm.pp0 tm;
+                failwith "image_of_bterm"
             in
-            let dims = List.map (fun t -> `Dim (Cx.eval_dim cx @@ Tm.subst sub t)) intro.rs in
-            let cells = cargs @ rargs @ dims in
-            begin
-              try
-                V.inst_nclo nclo cells
-              with _ ->
-                Format.eprintf "%s@."  intro.clbl;
-                Format.eprintf "clo: @[%a@]@." D.pp_nclo nclo;
-                Format.eprintf "cells: @[%a@]@." (Pp.pp_list D.pp_env_cell) cells;
-                failwith "inst_clo"
-            end
+            V.inst_nclo nclo @@ go constr.specs args
+          | _ ->
+            D.Value.act phi @@ V.eval env_only_ihs tm
 
-          | B.Var ix ->
-            let ix' = ix - List.length rs in
-            Cx.eval_cmd cx @@ Tm.var @@ Bwd.nth ihs ix'
         in
 
-        let image_of_bface (tr, tr', btm) =
-          let env = Cx.env cx in
-          let r = V.eval_dim env @@ Tm.subst sub tr in
-          let r' = V.eval_dim env @@ Tm.subst sub tr' in
+        let image_of_bface (tr, tr', otm) =
+          let r = V.eval_dim env tr in
+          let r' = V.eval_dim env tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
-          image_of_bterm phi btm
+          let tm = Option.get_exn otm in
+          image_of_bterm phi tm
         in
 
         (* What is the image of the boundary in the current fiber of the motive? *)
@@ -405,9 +601,10 @@ let tac_elim ~loc ~tac_mot ~tac_scrut ~clauses : chk_tac =
           Q.quote_val_sys (Cx.qenv cx) vty val_sys
         in
 
+
         (* We run the clause tactic with the goal type restricted by the boundary above *)
-        clause_tac {ty = clause_ty; sys = tsys} <<@> fun bdy ->
-          clbl, Tm.bindn (Bwd.map fst psi) bdy
+        kont_tac clause_tac {ty = clause_ty; sys = tsys} <<@> fun bdy ->
+          clbl, Tm.bindn (Bwd.map fst @@ Bwd.from_list psi) bdy
       end
     in
 
@@ -435,17 +632,6 @@ let rec tac_hope goal =
   in
   try_system goal.sys
 
-let tac_hole ~loc ~name : chk_tac =
-  fun goal ->
-    M.lift C.ask >>= fun psi ->
-    let rty = Tm.refine_ty goal.ty goal.sys in
-    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
-    begin
-      if name = Some "_" then M.ret () else
-        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi; tm = Tm.up cmd}
-    end >>
-    M.ret @@ Tm.up @@ Tm.refine_force cmd
-
 let tac_guess tac : chk_tac =
   fun goal ->
     tac {goal with sys = []} >>= fun tm ->
@@ -460,12 +646,12 @@ let tac_refl =
   normalizing_goal @@ match_goal @@ fun goal ->
   match Tm.unleash goal.ty with
   | Tm.Ext (Tm.NB (nms, _)) ->
-    let nms' = Bwd.to_list @@ Bwd.map (function Some nm -> nm | None -> "_") nms in
-    tac_lambda nms' tac_refl
+    let xs = Bwd.to_list @@ Bwd.map (fun x -> `Var (`Gen (Name.named x))) nms in
+    tac_lambda xs tac_refl
 
   | Tm.Pi (dom, Tm.B (nm, _)) ->
-    let nms = [match nm with Some nm -> nm | None -> "_"] in
-    tac_lambda nms tac_refl
+    let xs = [`Var (`Gen (Name.named nm))] in
+    tac_lambda xs tac_refl
 
   | Tm.Sg (_, _) ->
     tac_pair tac_refl tac_refl

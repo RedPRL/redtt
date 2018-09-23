@@ -11,9 +11,10 @@ let connection/or
    ]
  =
  λ i j →
-  ; this is an example of something that is much nicer here than in redprl.
-  ; we can define using line types all the faces of the composition at once.
-  ; definitional equivalence kicks in to make this work.
+  /- this is an example of something that is much nicer here than in redprl.
+     we can define using line types all the faces of the composition at once.
+     definitional equivalence kicks in to make this work.
+  -/
   let face (l k : dim) : A =
     comp 1 l (p 1) [
     | k=1 → refl
@@ -124,3 +125,4 @@ let weak-connection/and
    | i=1 → face j
    | j=1 → face i
    ]
+
