@@ -85,10 +85,18 @@ sig
   val swap_name : t -> Name.t -> Name.t
 end =
 struct
-  type t
-  let freshen_name _ = raise PleaseFillIn
-  let freshen_names _ = raise PleaseFillIn
-  let swap_name _ = raise PleaseFillIn
+  type t = (Name.t * Name.t) list (* favonia: a demonstration of my laziness *)
+  let mimic x = Name.named (Name.name x)
+  let freshen_name x =
+    let x' = mimic x in x', [(x, x')]
+  let rec freshen_names = function
+    | Emp -> Emp, []
+    | Snoc (xs, x) ->
+      let xs', perm = freshen_names xs in
+      let x' = mimic x in
+      Snoc (xs', x'), (x, x') :: perm
+  let swap_name perm x =
+    try List.assoc x perm with Not_found -> x
 end
 
 type rel = Rel.t
