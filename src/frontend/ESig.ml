@@ -96,8 +96,8 @@ and eface = (eterm * eterm) list * eterm
 
 and frame =
   | App of eterm
-  | Car
-  | Cdr
+  | Fst
+  | Snd
   | Open
 
 

@@ -38,12 +38,13 @@ sig
 
   val elim_data : string -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
 
-  val car : value -> value
-  val cdr : value -> value
+  val do_fst : value -> value
+  val do_snd : value -> value
   val lbl_call : value -> value
   val restriction_force : value -> value
 
   val rigid_vproj : atom -> func:value -> el:value -> value
+  val rigid_cap : dir -> value -> comp_sys -> value -> value
   val rigid_coe : dir -> abs -> value -> value
   val make_coe : dir Dir.m -> abs -> value -> value
 

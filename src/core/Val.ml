@@ -19,7 +19,7 @@ type error =
   | ApplyUnexpectedCube of value
   | RecursorUnexpectedArgument of string * value
   | SigmaProjUnexpectedArgument of string * value
-  | RigidVProjUnexpectedArgument of value
+  | RigidVProjUnexpectedArgument of atom * value
   | RigidCapUnexpectedArgument of value
   | LblCallUnexpectedArgument of value
   | UnexpectedDimensionTerm of Tm.tm
@@ -75,10 +75,10 @@ struct
       Format.fprintf fmt
         "Unexpected argument to Sigma type projection %s:@ %a."
         proj pp_value v
-    | RigidVProjUnexpectedArgument v ->
+    | RigidVProjUnexpectedArgument (x, v) ->
       Format.fprintf fmt
-        "Unexpected argument to rigid vproj:@ %a."
-        pp_value v
+        "Unexpected argument to rigid vproj over dimension %a:@ %a."
+        Name.pp x pp_value v
     | RigidCapUnexpectedArgument v ->
       Format.fprintf fmt
         "Unexpected argument to rigid cap:@ %a."
@@ -770,10 +770,10 @@ struct
 
 
     | V info ->
-      (* [F]: favonia 11.00100100001111110110101010001000100001011.
-       * [SVO]: Part III (airport).
-       * [R1]: RedPRL I ddcc4ce72b1880671d842ede6b50adbee94935b5.
-       * [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
+      (* Note that the algorithm in Part III cannot be used here
+       * because we are working with open terms. *)
+
+      (* [Y]: yacctt 073694948042342d55cea64a42d2076365800ee4. *)
 
       (* Some helper functions to reduce typos. *)
       let r, r' = Dir.unleash dir in
@@ -796,19 +796,19 @@ struct
             let subst_src = Value.act (I.subst src x) in
             vproj phi
               (I.act phi src)
-              ~func:(fun phi0 -> Value.act phi0 @@ subst_src @@ car info.equiv)
+              ~func:(fun phi0 -> Value.act phi0 @@ subst_src @@ do_fst info.equiv)
               ~el:(Value.act phi el)
           in
 
           (* Some helper functions to reduce typos. *)
           let base0 phi dest = base phi `Dim0 dest in
           let base1 phi dest = base phi `Dim1 dest in
-          let fiber0 phi b = car @@ apply (cdr (Value.act phi equiv0)) b in
+          let fiber0 phi b = do_fst @@ apply (do_snd (Value.act phi equiv0)) b in
 
           (* This gives a path from the fiber `fib` to `fiber0 b`
            * where `b` is calculated from `fib` as
-           * `ext_apply (cdr fib) [`Dim1]` directly. *)
-          let contr0 phi fib = apply (cdr @@ apply (cdr (Value.act phi equiv0)) (ext_apply (cdr fib) [`Dim1])) fib in
+           * `ext_apply (do_snd fib) [`Dim1]` directly. *)
+          let contr0 phi fib = apply (do_snd @@ apply (do_snd (Value.act phi equiv0)) (ext_apply (do_snd fib) [`Dim1])) fib in
 
           (* The diagonal face for r=r'. *)
           let face_diag =
@@ -828,7 +828,7 @@ struct
            * type in the semantic domain. *)
           let fiber0_ty phi b =
             let var i = Tm.up @@ Tm.ix i in
-            let env = Env.append empty_env [`Val b; `Val (car (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
+            let env = Env.append empty_env [`Val b; `Val (do_fst (Value.act phi equiv0)); `Val (Value.act phi ty10); `Val (Value.act phi ty00)] in
             eval env @@ Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
           in
 
@@ -837,59 +837,33 @@ struct
           let fixer_fiber phi =
             (* Turns out `fiber_at_face0` will be
              * used for multiple times. *)
+            let rphi = I.act phi r in
             let fiber_at_face0 phi =
               make_cons
                 (Value.act phi el,
                  make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
             in
 
-            let mode = `UNIFORM_HCOM in (* how should we switch this? *)
-
-            match mode with
-            (* The implementation used in [F] and [R1]. *)
-            | `SPLIT_COERCION ->
-              begin
-                let rphi = I.act phi r in
-                match rphi with
-                | `Dim0 -> fiber_at_face0 phi (* r=0 *)
-                | `Dim1 -> fiber0 phi (base1 phi `Dim0) (* r=1 *)
-                | `Atom rphi_atom ->
-                  (* XXX This needs to be updated with the new Thought. *)
-                  (* coercion to the diagonal *)
-                  let path_in_fiber0_ty =
-                    contr0 phi @@
-                    make_coe (Dir.make `Dim0 rphi) (Abs.bind1 rphi_atom (fiber0_ty phi (base phi rphi `Dim0))) @@
-                    (* the fiber *)
-                    make_cons
-                      (Value.act (I.cmp phi (I.subst `Dim0 rphi_atom)) el,
-                       make @@ ExtLam (NCloConst (lazy begin base0 phi `Dim0 end)))
-                  in
-                  ext_apply path_in_fiber0_ty [r]
-              end
             (* The implementation used in [Y]. *)
-            | `UNIFORM_HCOM ->
-              (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
-              make_hcom (Dir.make `Dim1 `Dim0) (fiber0_ty phi (base phi (I.act phi r) `Dim0)) (fiber0 phi (base phi (I.act phi r) `Dim0)) @@
-              force_abs_sys @@
-              let face0 =
-                AbsFace.make phi (I.act phi r) `Dim0 @@ fun phi ->
-                Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) [`Atom w]
-              in
-              let face1 =
-                AbsFace.make phi (I.act phi r) `Dim1 @@ fun phi ->
-                Abs.make1 @@ fun _ -> fiber0 phi (base1 phi `Dim0)
-              in
-              [face0; face1]
-            (* Something magical under development. *)
-            | `UNICORN ->
-              raise @@ E InternalMortalityError
+            (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
+            make_hcom (Dir.make `Dim1 `Dim0) (fiber0_ty phi (base phi rphi `Dim0)) (fiber0 phi (base phi rphi `Dim0)) @@
+            force_abs_sys @@
+            let face0 =
+              AbsFace.make phi rphi `Dim0 @@ fun phi ->
+              Abs.make1 @@ fun w -> ext_apply (contr0 phi (fiber_at_face0 phi)) [`Atom w]
+            in
+            let face1 =
+              AbsFace.make phi rphi `Dim1 @@ fun phi ->
+              Abs.make1 @@ fun _ -> fiber0 phi (base1 phi `Dim0)
+            in
+            [face0; face1]
           in
 
-          let el0 phi0 = car (fixer_fiber phi0) in
+          let el0 phi0 = do_fst (fixer_fiber phi0) in
 
           let face_front =
             AbsFace.make I.idn r' `Dim0 @@ fun phi ->
-            Abs.make1 @@ fun w -> ext_apply (cdr (fixer_fiber phi)) [`Atom w]
+            Abs.make1 @@ fun w -> ext_apply (do_snd (fixer_fiber phi)) [`Atom w]
           in
 
           let el1 =
@@ -907,13 +881,13 @@ struct
           let el1 =
             let cap =
               let phi = I.subst r x in
-              let funcr = Value.act phi @@ car info.equiv in
+              let funcr = Value.act phi @@ do_fst info.equiv in
               rigid_vproj info.x ~func:funcr ~el
             in
             let sys =
               let face0 =
                 AbsFace.gen_const I.idn info.x `Dim0 @@ fun phi ->
-                Abs.bind1 x @@ apply (car info.equiv) @@
+                Abs.bind1 x @@ apply (do_fst info.equiv) @@
                 make_coe (Dir.make (I.act phi r) (`Atom x)) (Abs.act phi abs0) (Value.act phi el)
               in
               let face1 =
@@ -1090,10 +1064,10 @@ struct
         let face0 =
           AbsFace.gen_const I.idn x `Dim0 @@ fun phi ->
           Abs.make1 @@ fun y ->
-          apply (car (Value.act phi equiv)) @@
+          apply (do_fst (Value.act phi equiv)) @@
           hcom phi (`Atom y) ty0 (* ty0 is already under `phi0` *)
         in
-        let func = car equiv in
+        let func = do_fst equiv in
         let el1_cap = rigid_vproj x ~func ~el:cap in
         let el1_sys =
           let face =
@@ -1362,10 +1336,10 @@ struct
     | Tm.ExtApp ts ->
       let rs = List.map (eval_dim rho) ts in
       ext_apply vhd rs
-    | Tm.Car ->
-      car vhd
-    | Tm.Cdr ->
-      cdr vhd
+    | Tm.Fst ->
+      do_fst vhd
+    | Tm.Snd ->
+      do_snd vhd
     | Tm.VProj info ->
       let r = eval_dim rho info.r in
       let func phi0 = eval (Env.act phi0 rho) info.func in
@@ -1922,7 +1896,7 @@ struct
       let vproj_sys = faces01 @ List.map vproj_face up.sys in
       make @@ Up {ty = ty1; neu; sys = vproj_sys}
     | _ ->
-      let err = RigidVProjUnexpectedArgument el in
+      let err = RigidVProjUnexpectedArgument (x, el) in
       raise @@ E err
 
   and elim_data dlbl ~mot ~scrut ~clauses =
@@ -1992,54 +1966,54 @@ struct
     | _ ->
       raise @@ E (RecursorUnexpectedArgument ("data type", scrut))
 
-  and car v =
+  and do_fst v =
     match unleash v with
     | Cons (v0, _) ->
       v0
 
     | Up info ->
       let dom, _ = unleash_sg info.ty in
-      let car_sys = List.map (Face.map (fun _ _ -> car)) info.sys in
-      make @@ Up {ty = dom; neu = Car info.neu; sys = car_sys}
+      let fst_sys = List.map (Face.map (fun _ _ -> do_fst)) info.sys in
+      make @@ Up {ty = dom; neu = Fst info.neu; sys = fst_sys}
 
     | Coe info ->
       let abs = flip Abs.unsafe_map info.abs @@ fun v -> fst @@ unleash_sg v in
-      let el = car info.el in
+      let el = do_fst info.el in
       rigid_coe info.dir abs el
 
     | HCom info ->
       let dom, _ = unleash_sg info.ty in
-      let cap = car info.cap in
+      let cap = do_fst info.cap in
       let face =
         Face.map @@ fun _ _ ->
-        Abs.unsafe_map car
+        Abs.unsafe_map do_fst
       in
       let sys = List.map face info.sys in
       rigid_hcom info.dir dom cap sys
 
     | GHCom info ->
       let dom, _ = unleash_sg info.ty in
-      let cap = car info.cap in
+      let cap = do_fst info.cap in
       let face =
         Face.map @@ fun _ _ ->
-        Abs.unsafe_map car
+        Abs.unsafe_map do_fst
       in
       let sys = List.map face info.sys in
       rigid_ghcom info.dir dom cap sys
 
     | _ ->
-      raise @@ E (SigmaProjUnexpectedArgument ("car", v))
+      raise @@ E (SigmaProjUnexpectedArgument ("do_fst", v))
 
-  and cdr v =
+  and do_snd v =
     match unleash v with
     | Cons (_, v1) ->
       v1
 
     | Up info ->
       let _, cod = unleash_sg info.ty in
-      let cdr_sys = List.map (Face.map (fun _ _ -> cdr)) info.sys in
-      let cod_car = inst_clo cod @@ car v in
-      make @@ Up {ty = cod_car; neu = Cdr info.neu; sys = cdr_sys}
+      let snd_sys = List.map (Face.map (fun _ _ -> do_snd)) info.sys in
+      let cod_car = inst_clo cod @@ do_fst v in
+      make @@ Up {ty = cod_car; neu = Snd info.neu; sys = snd_sys}
 
     | Coe info ->
       let abs =
@@ -2050,11 +2024,11 @@ struct
           make_coe
             (Dir.make r (`Atom x))
             (Abs.bind1 x domx)
-            (car info.el)
+            (do_fst info.el)
         in
         Abs.bind1 x @@ inst_clo codx coerx
       in
-      let el = cdr info.el in
+      let el = do_snd info.el in
       rigid_coe info.dir abs el
 
     | HCom info ->
@@ -2065,7 +2039,7 @@ struct
         let msys =
           let face =
             Face.map @@ fun _ _ ->
-            Abs.unsafe_map car
+            Abs.unsafe_map do_fst
           in
           `Ok (List.map face info.sys)
         in
@@ -2073,16 +2047,16 @@ struct
           make_hcom
             (Dir.make r (`Atom z))
             dom
-            (car info.cap)
+            (do_fst info.cap)
             msys
         in
         inst_clo cod hcom
       in
-      let cap = cdr info.cap in
+      let cap = do_snd info.cap in
       let sys =
         let face =
           Face.map @@ fun _ _ ->
-          Abs.unsafe_map cdr
+          Abs.unsafe_map do_snd
         in
         List.map face info.sys
       in
@@ -2096,7 +2070,7 @@ struct
         let msys =
           let face =
             Face.map @@ fun _ _ ->
-            Abs.unsafe_map car
+            Abs.unsafe_map do_fst
           in
           `Ok (List.map face info.sys)
         in
@@ -2104,23 +2078,23 @@ struct
           make_ghcom
             (Dir.make r (`Atom z))
             dom
-            (car info.cap)
+            (do_fst info.cap)
             msys
         in
         inst_clo cod hcom
       in
-      let cap = cdr info.cap in
+      let cap = do_snd info.cap in
       let sys =
         let face =
           Face.map @@ fun _ _ ->
-          Abs.unsafe_map cdr
+          Abs.unsafe_map do_snd
         in
         List.map face info.sys
       in
       rigid_gcom info.dir abs cap sys
 
     | _ ->
-      raise @@ E (SigmaProjUnexpectedArgument ("cdr", v))
+      raise @@ E (SigmaProjUnexpectedArgument ("do_snd", v))
 
   and make_cap mdir ty msys el : value =
     match mdir with

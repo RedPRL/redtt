@@ -212,11 +212,11 @@ and pp_neu fmt neu =
         Format.fprintf fmt "@[<1>(%s@ %a@ %a)@]" "@" pp_neu neu pp_dims args
     end
 
-  | Car neu ->
-    Format.fprintf fmt "@[<hv1>(car@ %a)@]" pp_neu neu
+  | Fst neu ->
+    Format.fprintf fmt "@[<hv1>(fst@ %a)@]" pp_neu neu
 
-  | Cdr neu ->
-    Format.fprintf fmt "@[<hv1>(cdr@ %a)@]" pp_neu neu
+  | Snd neu ->
+    Format.fprintf fmt "@[<hv1>(snd@ %a)@]" pp_neu neu
 
   | Var {name; _} ->
     Name.pp fmt name
@@ -433,13 +433,13 @@ struct
       let arg = Nf.act phi arg in
       FunApp (neu, arg)
 
-    | Car neu ->
+    | Fst neu ->
       let neu = act phi neu in
-      Car neu
+      Fst neu
 
-    | Cdr neu ->
+    | Snd neu ->
       let neu = act phi neu in
-      Cdr neu
+      Snd neu
 
     | Elim info ->
       let mot = Clo.act phi info.mot in

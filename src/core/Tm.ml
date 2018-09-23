@@ -147,7 +147,7 @@ and head_info =
 
 and frame_info =
   function
-  | Car | Cdr | LblCall | RestrictForce ->
+  | Fst | Snd | LblCall | RestrictForce ->
     Info.init
   | FunApp t ->
     tm_info t
@@ -497,7 +497,7 @@ struct
 
   and traverse_frame =
     function
-    | (Car | Cdr | LblCall | RestrictForce as frm) ->
+    | (Fst | Snd | LblCall | RestrictForce as frm) ->
       frm
 
     | FunApp t ->
@@ -991,10 +991,10 @@ and pp_cmd env fmt (hd, sp) =
     | Emp -> pp_head env fmt hd
     | Snoc (sp, f)->
       match f with
-      | Car ->
-        Format.fprintf fmt "@[<hv1>(fst %a)@]" (go `Car) sp
-      | Cdr ->
-        Format.fprintf fmt "@[<hv1>(snd %a)@]" (go `Car) sp
+      | Fst ->
+        Format.fprintf fmt "@[<hv1>(fst %a)@]" (go `Fst) sp
+      | Snd ->
+        Format.fprintf fmt "@[<hv1>(snd %a)@]" (go `Fst) sp
       | FunApp t ->
         if mode = `FunApp then
           Format.fprintf fmt "%a@ %a" (go `FunApp) sp (pp env) t
@@ -1071,9 +1071,9 @@ and pp_frame env fmt =
     Format.fprintf fmt "@[<hv1>(app %a)@]" (pp env) t
   | ExtApp ts ->
     Format.fprintf fmt "@[<hv1>(ext-app %a)@]" (pp_terms env) ts
-  | Car ->
+  | Fst ->
     Format.fprintf fmt "car"
-  | Cdr ->
+  | Snd ->
     Format.fprintf fmt "cdr"
   | VProj _ ->
     Format.fprintf fmt "<vproj>"
@@ -1152,10 +1152,10 @@ let ann ~ty ~tm =
   Down {ty; tm}, Emp
 
 let car (hd, sp) =
-  hd, sp #< Car
+  hd, sp #< Fst
 
 let cdr (hd, sp) =
-  hd, sp #< Cdr
+  hd, sp #< Snd
 
 let lam nm t = make @@ Lam (B (nm, t))
 let ext_lam nms t = make @@ ExtLam (NB (nms, t))
@@ -1363,7 +1363,7 @@ let map_head f =
 
 let map_frame f =
   function
-  | (Car | Cdr | LblCall | RestrictForce) as frm ->
+  | (Fst | Snd | LblCall | RestrictForce) as frm ->
     frm
   | FunApp t ->
     FunApp (f t)
@@ -1556,7 +1556,7 @@ let rec eta_contract t =
     let tm1' = eta_contract tm1 in
     begin
       match unleash tm0', unleash tm1' with
-      | Up (hd0, Snoc (sp0, Car)), Up (hd1, Snoc (sp1, Cdr))
+      | Up (hd0, Snoc (sp0, Fst)), Up (hd1, Snoc (sp1, Snd))
         when
           hd0 = hd1 && sp0 = sp1
         ->

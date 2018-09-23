@@ -207,7 +207,7 @@ let path/based/contr (A : type) : is-contr^1 ((B : _) × path^1 _ A B) =
   )
 
 
--- The following is a formulation of univalence proposed by Martin Esfstdo:
+-- The following is a formulation of univalence proposed by Martin Escardo:
 -- https://groups.google.com/forum/#!msg/homotopytypetheory/HfCB_b-PNEU/Ibb48LvUMeUJ
 -- See also Theorem 5.8.4 of the HoTT Book.
 
