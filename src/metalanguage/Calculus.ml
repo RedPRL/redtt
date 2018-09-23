@@ -398,8 +398,8 @@ let example_cmd =
   let null = Tuple [] in
   let script =
     write (Atom "it") >>
-    (pair (Atom "taste") @@
-     app read null)
+    pair (Atom "taste") @@
+    app read null
   in
   run_state script, Tp
 
