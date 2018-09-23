@@ -16,7 +16,7 @@ type term =
   | Choose of term labeled
   | Case of (Name.t * cmd) record
 
-  | Stop
+  | Tp
 
 and 'a labeled = string * 'a
 and 'a record = 'a labeled list
@@ -39,9 +39,15 @@ let rec pp_term fmt =
   function
   | Var (`Neg x | `Pos x) ->
     Name.pp fmt x
-  | Mu ((`Neg x | `Pos x), cmd) ->
+  | Mu (`Neg alpha, cmd) ->
     Format.fprintf fmt
-      "@[<hv1>(%a [%a]@ %a)@]"
+      "@[<hv1>(%a- [%a]@ %a)@]"
+      pp_mu ()
+      Name.pp alpha
+      pp_cmd cmd
+  | Mu (`Pos x, cmd) ->
+    Format.fprintf fmt
+      "@[<hv1>(%a+ [%a]@ %a)@]"
       pp_mu ()
       Name.pp x
       pp_cmd cmd
@@ -51,7 +57,8 @@ let rec pp_term fmt =
       pp_term t
   | MuThunk (x, cmd) ->
     Format.fprintf fmt
-      "@[<hv1>(MuThunk {%a}@ %a)@]"
+      "@[<hv1>(%a {%a}@ %a)@]"
+      pp_mu ()
       Name.pp x
       pp_cmd cmd
   | Split (xs, cmd) ->
@@ -76,8 +83,8 @@ let rec pp_term fmt =
     Format.fprintf fmt "@[<hv1>(case@ %a)@]"
       (pp_tuple pp_branch) branches
 
-  | Stop ->
-    Format.fprintf fmt "stop"
+  | Tp ->
+    Format.fprintf fmt "tp"
 
 and pp_cmd fmt (tm0, tm1) =
   Format.fprintf fmt
@@ -129,7 +136,12 @@ end
 
 let is_neg_term =
   function
-  | Var (`Neg _) | Split _ | MuThunk _ | Mu (`Neg _, _) | Stop -> true
+  | Var (`Neg _) | Split _ | MuThunk _ | Mu (`Pos _, _) | Tp -> true
+  | _ -> false
+
+let is_pos_term =
+  function
+  | Var (`Pos _) | Tuple _ | Thunk _ | Mu (`Neg _, _) -> true
   | _ -> false
 
 let is_pos_value =
@@ -147,6 +159,7 @@ struct
   and closure = Clo of term * env
 
   type state = closure * closure
+
   let clo_cmd env (tm0, tm1) =
     Clo (tm0, env), Clo (tm1, env)
 
@@ -157,45 +170,78 @@ struct
 
   exception Final
 
-  let step : state -> state =
-    fun (Clo (tm0, env0), Clo (tm1, env1)) ->
-      match tm0, tm1 with
-      | Mu (`Neg alpha, cmd), _ when is_neg_term tm1 ->
-        let env = Env.add alpha (Clo (tm1, env1)) env0 in
-        clo_cmd env cmd
+  let rec pp_clo fmt =
+    function
+    | Clo (tm, env) ->
+      let cells = Env.bindings env in
+      let pp_cell fmt (x, clo) =
+        Format.fprintf fmt "%a -> %a" Name.pp x pp_clo clo
+      in
+      pp_term fmt tm
 
-      | _, Mu (`Pos x, cmd) when is_pos_value tm0 ->
-        let env = Env.add x (Clo (tm0, env0)) env1 in
-        clo_cmd env cmd
+  let pp_state fmt (clo0, clo1) =
+    Format.fprintf fmt "@[<hv1>(cut@ %a@ %a)@]"
+      pp_clo clo0
+      pp_clo clo1
 
-      | Tuple tuple, Split (xs, cmd) ->
-        let alg env (lbl, x) =
-          let term = List.assoc lbl tuple in
-          Env.add x (Clo (term, env0)) env
-        in
-        let env = List.fold_left alg env1 xs in
-        clo_cmd env cmd
 
-      | Split (xs, cmd), Tuple tuple ->
-        let alg env (lbl, x) =
-          let term = List.assoc lbl tuple in
-          Env.add x (Clo (term, env1)) env
-        in
-        let env = List.fold_left alg env0 xs in
-        clo_cmd env cmd
+  let polarity tm =
+    if is_neg_term tm then `Neg else if is_pos_term tm then `Pos else
+      failwith "Internal error: polarity"
 
-      | Thunk term, MuThunk (alpha, cmd) ->
-        let env = Env.add alpha (Clo (term, env0)) env1 in
-        clo_cmd env cmd
+  let orient (state : state) : state =
+    let clo0, clo1 = state in
+    let Clo (tm0, _) = clo0 in
+    let Clo (tm1, _) = clo1 in
+    match polarity tm0, polarity tm1 with
+    | `Neg, `Pos -> clo1, clo0
+    | `Pos, `Neg -> clo0, clo1
+    | _ ->
+      Format.eprintf "tm0: %a@." pp_term tm0;
+      Format.eprintf "tm1: %a@." pp_term tm1;
+      failwith "orient"
 
-      | Var (`Pos x | `Neg x), _ ->
-        Env.find x env0, Clo (tm1, env1)
 
-      | _, Var (`Pos x | `Neg x) ->
-        Clo (tm0, env0), Env.find x env1
 
-      | _ ->
-        raise Final
+  let step (state : state) : state =
+    let Clo (tm0, env0), Clo (tm1, env1) = orient state in
+    match tm0, tm1 with
+    | Mu (`Neg alpha, cmd), _ ->
+      let env = Env.add alpha (Clo (tm1, env1)) env0 in
+      clo_cmd env cmd
+
+    | _, Mu (`Pos x, cmd) when is_pos_value tm0 ->
+      let env = Env.add x (Clo (tm0, env0)) env1 in
+      clo_cmd env cmd
+
+    | Tuple tuple, Split (xs, cmd) ->
+      let alg env (lbl, x) =
+        let term = List.assoc lbl tuple in
+        Env.add x (Clo (term, env0)) env
+      in
+      let env = List.fold_left alg env1 xs in
+      clo_cmd env cmd
+
+    | Split (xs, cmd), Tuple tuple ->
+      let alg env (lbl, x) =
+        let term = List.assoc lbl tuple in
+        Env.add x (Clo (term, env1)) env
+      in
+      let env = List.fold_left alg env0 xs in
+      clo_cmd env cmd
+
+    | Thunk term, MuThunk (alpha, cmd) ->
+      let env = Env.add alpha (Clo (term, env0)) env1 in
+      clo_cmd env cmd
+
+    | Var (`Pos x), _ ->
+      Env.find x env0, Clo (tm1, env1)
+
+    | _, Var (`Neg alpha) ->
+      Clo (tm0, env0), Env.find alpha env1
+
+    | _ ->
+      raise Final
 
   let rec crush =
     function
@@ -217,8 +263,8 @@ struct
     | Tuple tuple ->
       let tuple = List.map (fun (lbl, tm) -> lbl, subst env tm) tuple in
       Tuple tuple
-    | Stop ->
-      Stop
+    | Tp ->
+      Tp
     | Mu (x, cmd) ->
       Mu (x, subst_cmd env cmd)
     | Thunk tm ->
@@ -240,20 +286,6 @@ struct
   let unload (clo0, clo1) =
     crush clo0, crush clo1
 
-
-  let rec pp_clo fmt =
-    function
-    | Clo (tm, env) ->
-      let cells = Env.bindings env in
-      let pp_cell fmt (x, clo) =
-        Format.fprintf fmt "%a -> %a" Name.pp x pp_clo clo
-      in
-      pp_term fmt tm
-
-  let pp_state fmt (clo0, clo1) =
-    Format.fprintf fmt "@[<hv1>(cut@ %a@ %a)@]"
-      pp_clo clo0
-      pp_clo clo1
 
   let rec execute : state -> state =
     fun state ->
@@ -282,7 +314,7 @@ let example_cmd =
     lambda "y" @@ fun y ->
     pair (Var (`Pos x)) (Var (`Pos y))
   in
-  app (app f null) null, Stop
+  app (app f null) null, Tp
 
 let test () =
   ignore @@ Machine.debug @@ Machine.load example_cmd
