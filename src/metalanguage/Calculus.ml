@@ -171,33 +171,24 @@ struct
   let reset t =
     MuTp (t, Tp)
 
-  let shift t =
-    assert (is_pos_term t);
+  let shift k =
     nmu "alpha/shift" @@ fun alpha ->
-    let func =
-      lambda "x/shift" @@ fun x ->
-      MuTp (Var x, Var alpha)
+    let tm =
+      k @@ fun x ->
+      MuTp (x, Var alpha)
     in
-    let tm = app t func in
     tm, Tp
-
-  let abort t =
-    nmu "_" @@ fun _ ->
-    t, Tp
 
   let read =
     lambda "_" @@ fun _ ->
-    shift @@
-    lambda "k" @@ fun k ->
+    shift @@ fun k ->
     lambda "s" @@ fun s ->
-    app (app (Var k) (Var s)) (Var s)
+    app (k (Var s)) (Var s)
 
-  let write =
-    lambda "s" @@ fun s ->
-    shift @@
-    lambda "k" @@ fun k ->
+  let write s =
+    shift @@ fun k ->
     lambda "s" @@ fun _ ->
-    app (app (Var k) (Tuple [])) (Var s)
+    app (k (Tuple [])) s
 
 
   let let_ t f =
@@ -406,7 +397,7 @@ let example_cmd =
   let (>>) = and_then in
   let null = Tuple [] in
   let script =
-    app write (Atom "it") >>
+    write (Atom "it") >>
     (pair (Atom "taste") @@
      app read null)
   in
