@@ -293,6 +293,7 @@ sig
 end =
 struct
   module Val = DelayedPlug (Con)
+  module LazyVal = DelayedPlug (LazyPlug (Con))
   module ConSys = Sys (Con)
   module ConFace = Face (Con)
   module AbsSys = Sys (AbsPlug (Con))
@@ -465,35 +466,25 @@ struct
       Coe {r; r'; ty = `Ext (Abs (x, extclo)); cap}
 
     | Neu info ->
-      raise PleaseFillIn
-      (*
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
       let ty = Val.hsubst r' x rel tyx in
       let sys =
-        let cap_face = r, r', Delay.make (lazy cap) in
+        let cap_face = r, r', Delay.make @@ lazy begin Val.out cap end in
         let old_faces =
           flip ListUtil.filter_map info.sys @@ fun face ->
           flip Option.map (ConFace.forall x face) @@ fun (s, s', bdy) ->
           s, s',
           Delay.make @@
-          (* favonia: maybe the following should be inside lazy? dunno *)
-          match Rel.equate s s' rel with
-          | `Changed rel' ->
-            lazy begin
-              let abs = Abs (x, Val.run rel' @@ Val.force bdy) in
-              let cap = Val.run rel' cap in
-              make_coe rel' r r' abs cap
-            end
-          | `Same ->
-            lazy begin
-              let abs = Abs (x, Val.force bdy) in
-              make_coe rel r r' abs cap
-            end
+          lazy begin
+            let rel' = Rel.equate' s s' rel in
+            let abs = Abs (x, Delay.make @@ Lazy.force @@ LazyVal.run_then_out rel' bdy) in
+            let cap = Val.run rel' cap in
+            make_coe rel' r r' abs cap
+          end
         in
         cap_face :: old_faces
       in
       Neu {ty; neu; sys}
-      *)
 
     | _ -> raise PleaseFillIn
 
