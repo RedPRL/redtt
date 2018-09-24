@@ -261,25 +261,27 @@ struct
       failwith "orient"
 
 
+  type step_kind = [`Real | `Subst]
 
-  let step (state : state) : state =
+
+  let step (state : state) : step_kind * state =
     let clo0, clo1, stk = orient state in
     let Clo (tm0, env0) = clo0 in
     let Clo (tm1, env1) = clo1 in
     match tm0, tm1, stk with
     | Mu (`Neg alpha, cmd), _, _ ->
       let env = Env.add alpha clo1 env0 in
-      clo_cmd env cmd stk
+      `Real, clo_cmd env cmd stk
 
     | _, Mu (`Pos x, cmd), _ when is_pos_value tm0 ->
       let env = Env.add x clo0 env1 in
-      clo_cmd env cmd stk
+      `Real, clo_cmd env cmd stk
 
     | MuTp cmd, _, _ ->
-      clo_cmd env0 cmd @@ clo1 :: stk
+      `Real, clo_cmd env0 cmd @@ clo1 :: stk
 
     | _, Tp, clo :: stk when is_pos_value tm0 ->
-      clo0, clo, stk
+      `Real, (clo0, clo, stk)
 
     | Tuple tuple, Split (xs, cmd), _ ->
       let alg env (lbl, (`Pos x | `Neg x))  =
@@ -287,17 +289,17 @@ struct
         Env.add x (Clo (term, env0)) env
       in
       let env = List.fold_left alg env1 xs in
-      clo_cmd env cmd stk
+      `Real, clo_cmd env cmd stk
 
     | Thunk term, MuThunk (alpha, cmd), _ ->
       let env = Env.add alpha (Clo (term, env0)) env1 in
-      clo_cmd env cmd stk
+      `Real, clo_cmd env cmd stk
 
     | Var (`Pos x), _, _ ->
-      Env.find x env0, clo1, stk
+      `Subst, (Env.find x env0, clo1, stk)
 
     | _, Var (`Neg alpha), _ ->
-      clo0, Env.find alpha env1, stk
+      `Subst, (clo0, Env.find alpha env1, stk)
 
     | _ ->
       raise Final
@@ -363,15 +365,17 @@ struct
   let rec execute : state -> state =
     fun state ->
       match step state with
-      | state -> execute state
+      | _, state -> execute state
       | exception Final -> state
 
   let rec debug : state -> state =
     fun state ->
       let state = orient state in
-      Format.eprintf "State: %a@." pp_cmd (unload state);
       match step state with
-      | state ->
+      | `Real, state ->
+        Format.eprintf "State: %a@." pp_cmd (unload state);
+        debug state
+      | _, state ->
         debug state
       | exception Final ->
         Format.eprintf "Final: %a@." pp_cmd (unload state);
