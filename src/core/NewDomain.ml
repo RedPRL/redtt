@@ -6,7 +6,43 @@ exception PleaseFillIn
 
 type dim = I.t
 
-type 'a face = dim * dim * 'a Lazy.t
+(** The dimension equality oracle *)
+module Rel = NewRestriction
+type rel = Rel.t
+
+(* this module provides the data type to hold an optional rel to
+ * facilitate the dropping of `run phi1` in `run phi2 @@ run phi1 a`. *)
+module Delay :
+sig
+  type 'a t (* no need to generalize rel to 'b for now *)
+  val make : 'a -> 'a t
+  val make' : rel option -> 'a -> 'a t
+  val with_rel : rel -> 'a t -> 'a t
+  val out : (rel -> 'a -> 'a) -> 'a t -> 'a
+  val fold : (rel option -> 'a -> 'b) -> 'a t -> 'b
+end =
+struct
+  type 'a delayed_record =
+    {rel : rel option;
+     data : 'a}
+
+  type 'a t = 'a delayed_record ref
+
+  let make' r d = ref {data = d; rel = r}
+
+  let make d = make' None d
+
+  let with_rel r v = ref {data = !v.data; rel = Some r}
+
+  let out f v =
+    match !v.rel with
+    | Some r -> let d = f r !v.data in v := {data = d; rel = None}; d
+    | None -> !v.data
+
+  let fold f v = f !v.rel !v.data
+end
+
+type 'a face = dim * dim * 'a Lazy.t Delay.t
 type 'a sys = 'a face list
 type 'a abs = Abs of Name.t * 'a
 
@@ -14,7 +50,7 @@ type 'a abs = Abs of Name.t * 'a
     A prevalue can be judged to be a value with respect to a restriction / dimension
     theory. I think we will not write code that checks that something is a value, but instead
     make this involved in the pre-and-post- conditions of the semantic operations. *)
-type value =
+type con =
   | Pi of quantifier
   | Sg of quantifier
   | Ext of ext_clo
@@ -23,8 +59,11 @@ type value =
   | ExtLam of nclo
   | Cons of value * value
   | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value}
-  | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : value abs sys}
-  | Neu of {ty : value; neu : neu; sys : value sys}
+  | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys}
+  | Neu of {ty : value; neu : neu; sys : con sys}
+
+and value = con Delay.t
+and lazy_value = con Lazy.t Delay.t
 
 and quantifier =
   {dom : value;
@@ -53,14 +92,14 @@ and frame =
   | ExtApp of dim list
   | Car
   | Cdr
-  | NHCom of {r : dim; r' : dim; cap : value; sys : value abs sys}
+  | NHCom of {r : dim; r' : dim; cap : value; sys : con abs sys}
 
 and neu =
   {head : head;
    frames : frame bwd}
 
 and cell =
-  | Val of value Lazy.t
+  | Val of lazy_value
   | Dim of dim
 
 and env = cell bwd
@@ -71,10 +110,6 @@ and ext_clo = ExtClo of {bnd : (Tm.tm * (Tm.tm, Tm.tm) Tm.system) Tm.nbnd; env :
 
 
 let flip f x y = f y x
-
-
-(** This should be the dimension equality oracle *)
-module Rel = NewRestriction
 
 (** Permutations *)
 module Perm :
@@ -99,7 +134,6 @@ struct
     try List.assoc x perm with Not_found -> x
 end
 
-type rel = Rel.t
 type perm = Perm.t
 
 module type Domain =
@@ -114,6 +148,9 @@ sig
 
   (** [run] brings the element underneath the restriction Ξ. *)
   val run : rel -> t -> t
+
+  (** [subst_then_run] is semantically [subst] followed by [run], but may be more optimized *)
+  val subst_then_run : rel -> dim -> Name.t -> t -> t
 end
 
 module type DomainPlug =
@@ -124,13 +161,25 @@ sig
   val plug : rel -> frame -> t -> t
 end
 
+module type DelayedDomainPlug =
+functor (X : DomainPlug) ->
+sig
+  include DomainPlug with type t = X.t Delay.t
 
+  (* undo Delay.make *)
+  val out : t -> X.t
+
+  (* convenience functions that are hopefully self-explanatory *)
+  val hsubst : dim -> Name.t -> rel -> t -> t
+  val subst_then_run_then_out : rel -> dim -> Name.t -> t -> X.t
+  val run_then_out : rel -> t -> X.t
+end
 
 module rec Syn :
 sig
   type t = Tm.tm
-  val eval : rel -> env -> t -> value
-  val eval_tm_sys : rel -> env -> (t, t) Tm.system -> value sys
+  val eval : rel -> env -> t -> con
+  val eval_tm_sys : rel -> env -> (t, t) Tm.system -> con sys
 end =
 struct
   type t = Tm.tm
@@ -155,12 +204,15 @@ struct
     | r -> r
 
   let run _ r = r
+
+  let subst_then_run _ r x =
+    subst r x
 end
 
 and Clo :
 sig
   include Domain with type t = clo
-  val inst : rel -> t -> cell -> value
+  val inst : rel -> t -> cell -> con
 end =
 struct
   type t = clo
@@ -168,6 +220,7 @@ struct
   let swap _ _ = raise PleaseFillIn
   let subst _ _ = raise PleaseFillIn
   let run _ _ = raise PleaseFillIn
+  let subst_then_run _ _ _ _ = raise PleaseFillIn
 
   let inst rel clo cell =
     let Clo {bnd; env} = clo in
@@ -178,7 +231,7 @@ end
 and NClo :
 sig
   include Domain with type t = nclo
-  val inst : rel -> t -> cell list -> value
+  val inst : rel -> t -> cell list -> con
 end =
 struct
   type t = nclo
@@ -186,8 +239,9 @@ struct
   let swap _ _ = raise PleaseFillIn
   let subst _ _ = raise PleaseFillIn
   let run _ _ = raise PleaseFillIn
+  let subst_then_run _ _ _ _ = raise PleaseFillIn
 
-  let inst (rel : rel) nclo cells : value =
+  let inst (rel : rel) nclo cells : con =
     let NClo {bnd; env} = nclo in
     let Tm.NB (_, tm) = bnd in
     Syn.eval rel (env <>< cells) tm
@@ -196,7 +250,8 @@ end
 and ExtClo :
 sig
   include Domain with type t = ext_clo
-  val inst : rel -> t -> cell list -> value * value sys
+  val inst : rel -> t -> cell list -> con * con sys
+  val inst' : rel -> t -> cell list -> value * con sys
 end =
 struct
   type t = ext_clo
@@ -204,6 +259,7 @@ struct
   let swap _ _ = raise PleaseFillIn
   let subst _ _ = raise PleaseFillIn
   let run _ _ = raise PleaseFillIn
+  let subst_then_run _ _ _ _ = raise PleaseFillIn
 
   let inst rel clo cells =
     let ExtClo {bnd; env} = clo in
@@ -212,38 +268,50 @@ struct
     let vty = Syn.eval rel env' ty in
     let vsys = Syn.eval_tm_sys rel env' sys in
     vty, vsys
+
+  let inst' rel clo cells =
+    let vty, vsys = inst rel clo cells in
+    Delay.make vty, vsys
 end
 
 
-and Env : Domain with type t = env =
+and Env :
+sig
+  include Domain with type t = env
+end =
 struct
   type t = env
   let swap _ _ = raise PleaseFillIn
   let subst _ _ = raise PleaseFillIn
   let run _ _ = raise PleaseFillIn
+  let subst_then_run _ _ = raise PleaseFillIn
 end
 
-and Val : DomainPlug with type t = value =
+and Con :
+sig
+  include DomainPlug with type t = con
+end =
 struct
-  type t = value
+  module Val = DelayedPlug (Con)
+  module ConSys = Sys (Con)
+  module ConFace = Face (Con)
+  module AbsSys = Sys (AbsPlug (Con))
 
-  module ValSys = Sys (Val)
-  module ValFace = Face (Val)
-  module AbsSys = Sys (AbsPlug (Val))
-
+  type t = con
   let swap _ _ = raise PleaseFillIn
-  let subst _ _ _ = raise PleaseFillIn
-
+  let subst _ _ = raise PleaseFillIn
+  let plug _ _ _ = raise PleaseFillIn
+  let subst_then_run _ _ _ _ = raise PleaseFillIn
 
   let rec run rel =
     function
     | Pi info ->
-      let dom = run rel info.dom in
+      let dom = Val.run rel info.dom in
       let cod = Clo.run rel info.cod in
       Pi {dom; cod}
 
     | Sg info ->
-      let dom = run rel info.dom in
+      let dom = Val.run rel info.dom in
       let cod = Clo.run rel info.cod in
       Sg {dom; cod}
 
@@ -253,12 +321,13 @@ struct
 
     | Neu info ->
       begin
-        match ValSys.run rel info.sys with
+        match ConSys.run rel info.sys with
         | sys ->
           let neu = Neu.run rel info.neu in
-          let ty = run rel info.ty in
+          let ty = Val.run rel info.ty in
           Neu {ty; neu; sys}
-        | exception ValSys.Triv v -> v
+        | exception ConSys.Triv v ->
+          v
       end
 
     | Lam clo ->
@@ -270,18 +339,18 @@ struct
       ExtLam nclo
 
     | Cons (v0, v1) ->
-      let v0 = run rel v0 in
-      let v1 = run rel v1 in
+      let v0 = Val.run rel v0 in
+      let v1 = Val.run rel v1 in
       Cons (v0, v1)
 
     | Coe info ->
       begin
         match Rel.compare info.r info.r' rel with
         | `Same ->
-          run rel info.cap
+          Val.run_then_out rel info.cap
         | _ ->
           let ty = CoeShape.run rel info.ty in
-          let cap = run rel info.cap in
+          let cap = Val.run rel info.cap in
           Coe {info with ty; cap}
       end
 
@@ -289,60 +358,61 @@ struct
       begin
         match Rel.compare info.r info.r' rel with
         | `Same ->
-          run rel info.cap
+          Val.run_then_out rel info.cap
         | _ ->
           match AbsSys.run rel info.sys with
           | sys ->
-            let cap = run rel info.cap in
+            let cap = Val.run rel info.cap in
             let ty = HComShape.run rel info.ty in
             HCom {info with ty; cap; sys}
 
           | exception (AbsSys.Triv abs) ->
             let Abs (x, vx) = abs in
-            hsubst rel info.r' x vx
+            hsubst info.r' x rel vx
       end
 
   and plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
-      Clo.inst rel clo @@ Val (lazy arg)
+      Clo.inst rel clo @@ Val (Delay.make @@ lazy begin Val.out arg end)
 
     | FunApp arg, Coe {r; r'; ty = `Pi abs; cap} ->
       let Abs (x, quantx) = abs in
       let y, pi = Perm.freshen_name x in
       let dom = Abs (x, quantx.dom) in
       let coe_arg s = make_coe rel r' s dom arg in
-      let coe_r'y = lazy begin coe_arg @@ `Atom y end in
+      let coe_r'y = Delay.make @@ lazy begin coe_arg @@ `Atom y end in
       let cod_y = swap pi quantx.cod in
-      let cod_coe = Abs (y, Clo.inst rel cod_y @@ Val coe_r'y) in
+      let cod_coe = Abs (y, Delay.make @@ Clo.inst rel cod_y @@ Val coe_r'y) in
       rigid_coe rel r r' cod_coe @@
-      plug rel (FunApp (coe_arg r)) cap
+      Val.plug rel (FunApp (Delay.make @@ coe_arg r)) cap
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
-      let ty = Clo.inst rel quant.cod @@ Val (lazy arg) in
-      let cap = plug rel frm cap in
+      let ty = Clo.inst rel quant.cod @@ Val (Delay.make @@ lazy begin Val.out arg end) in
+      let cap = Val.plug rel frm cap in
       let sys = AbsSys.plug rel frm sys in
       rigid_hcom rel r r' ty cap sys
 
     | ExtApp rs, ExtLam nclo ->
       NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
 
-
     | ExtApp ss, Coe {r; r'; ty = `Ext abs; cap} ->
       let Abs (y, extclo_y) = abs in
       let ty_ss, sys_ss = ExtClo.inst rel extclo_y @@ List.map (fun x -> Dim x) ss in
-      let sys_ss' = ValSys.forall y sys_ss in
+      (* favonia: I commented out the following line because I'm not sure whether
+       * the best interface should be values or cons.
+       *
+       * let sys_ss' = ValSys.forall y sys_ss in *)
       raise PleaseFillIn
 
     | ExtApp rs, HCom {r; r'; ty = `Ext qu; cap; sys} ->
       raise PleaseFillIn
 
-
     | Car, Cons (v0, _) ->
-      v0
+      Val.out v0
 
     | Car, Coe {r; r'; ty = `Sg abs; cap} ->
-      let cap = plug rel Car cap in
+      let cap = Val.plug rel Car cap in
       let ty =
         let Abs (xs, {dom; cod}) = abs in
         Abs (xs, dom)
@@ -350,59 +420,41 @@ struct
       rigid_coe rel r r' ty cap
 
     | Cdr, Cons (_, v1) ->
-      v1
+      Val.out v1
 
     | _, Neu info ->
       let neu = Neu.plug rel frm info.neu in
-      let sys = ValSys.plug rel frm info.sys in
+      let sys = ConSys.plug rel frm info.sys in
       let ty, sys' = plug_ty rel frm info.ty hd in
       Neu {ty; neu; sys = sys' @ sys}
 
     | _ ->
       raise PleaseFillIn
 
-  and plug_ty rel frm ty hd =
-    match ty, frm with
-    | Pi {dom; cod}, FunApp arg ->
-      Clo.inst rel cod @@ Val (lazy arg), []
-
-    | Ext extclo, ExtApp rs ->
-      ExtClo.inst rel extclo @@ List.map (fun r -> Dim r) rs
-
-    | Sg {dom; _}, Car ->
-      dom, []
-
-    | Sg {dom; cod}, Cdr ->
-      let car = plug rel Car hd in
-      Clo.inst rel cod @@ Val (lazy car), []
-
-    | _ ->
-      raise PleaseFillIn
-
-  and make_coe rel r r' abs cap =
+  and make_coe rel r r' (abs : value abs) (cap : value) =
     match Rel.compare r r' rel with
     | `Same ->
-      cap
+      Val.out cap
     | _ ->
       rigid_coe rel r r' abs cap
 
   and make_hcom rel r r' ty cap sys =
     match Rel.compare r r' rel with
     | `Same ->
-      cap
+      Val.out cap
     | _ ->
       match AbsSys.run rel sys with
       | _ ->
         rigid_hcom rel r r' ty cap sys
       | exception (AbsSys.Triv abs) ->
         let Abs (x, vx) = abs in
-        hsubst rel r' x vx
+        hsubst r' x rel vx
 
 
   (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
-  and rigid_coe rel r r' abs cap : value =
+  and rigid_coe rel r r' abs cap : con =
     let Abs (x, tyx) = abs in
-    match tyx with
+    match Val.out tyx with
     | Sg quant ->
       Coe {r; r'; ty = `Sg (Abs (x, quant)); cap}
 
@@ -413,35 +465,39 @@ struct
       Coe {r; r'; ty = `Ext (Abs (x, extclo)); cap}
 
     | Neu info ->
+      raise PleaseFillIn
+      (*
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
-      let ty = hsubst rel r' x tyx in
+      let ty = Val.hsubst r' x rel tyx in
       let sys =
-        let cap_face = r, r', lazy cap in
+        let cap_face = r, r', Delay.make (lazy cap) in
         let old_faces =
           flip ListUtil.filter_map info.sys @@ fun face ->
-          flip Option.map (ValFace.forall x face) @@ fun (s, s', bdy) ->
+          flip Option.map (ConFace.forall x face) @@ fun (s, s', bdy) ->
           s, s',
+          Delay.make @@
           (* favonia: maybe the following should be inside lazy? dunno *)
           match Rel.equate s s' rel with
           | `Changed rel' ->
             lazy begin
-              let abs = Abs (x, run rel' @@ Lazy.force bdy) in
-              let cap = run rel' cap in
+              let abs = Abs (x, Val.run rel' @@ Val.force bdy) in
+              let cap = Val.run rel' cap in
               make_coe rel' r r' abs cap
             end
           | `Same ->
             lazy begin
-              let abs = Abs (x, Lazy.force bdy) in
+              let abs = Abs (x, Val.force bdy) in
               make_coe rel r r' abs cap
             end
         in
         cap_face :: old_faces
       in
       Neu {ty; neu; sys}
+      *)
 
     | _ -> raise PleaseFillIn
 
-  and rigid_hcom rel r r' ty cap sys =
+  and rigid_hcom rel r r' (ty : t) cap sys =
     match ty with
     | Sg quant ->
       HCom {r; r'; ty = `Sg quant; cap; sys}
@@ -453,6 +509,8 @@ struct
       HCom {r; r'; ty = `Ext extclo; cap; sys}
 
     | Neu info ->
+      raise PleaseFillIn
+      (*
       let nhcom = NHCom {r; r'; cap; sys} in
       let neu = {info.neu with frames = info.neu.frames #< nhcom} in
       let neu_sys =
@@ -486,13 +544,32 @@ struct
         cap_face :: tube_faces @ old_faces
       in
       Neu {ty; neu; sys = neu_sys}
+      *)
 
     | _ ->
       raise PleaseFillIn
 
-  and hsubst rel r x v =
+  and plug_ty rel frm ty hd =
+    match Val.out ty, frm with
+    | Pi {dom; cod}, FunApp arg ->
+      Delay.make @@ Clo.inst rel cod @@ Val (Delay.make @@ lazy begin Val.out arg end), []
+
+    | Ext extclo, ExtApp rs ->
+      ExtClo.inst' rel extclo @@ List.map (fun r -> Dim r) rs
+
+    | Sg {dom; _}, Car ->
+      dom, []
+
+    | Sg {dom; cod}, Cdr ->
+      let car = lazy begin plug rel Car hd end in
+      Delay.make @@ Clo.inst rel cod @@ Val (Delay.make car), []
+
+    | _ ->
+      raise PleaseFillIn
+
+  and hsubst r x rel c =
     let rel' = Rel.subst' r x rel in
-    run rel' @@ subst r x v
+    subst_then_run rel' r x c
 end
 
 and CoeShape : Domain with type t = coe_shape =
@@ -519,6 +596,12 @@ struct
     | `Pi abs -> `Pi (QAbs.run rel abs)
     | `Sg abs -> `Sg (QAbs.run rel abs)
     | `Ext abs -> `Ext (ECloAbs.run rel abs)
+
+  let subst_then_run rel r x =
+    function
+    | `Pi abs -> `Pi (QAbs.subst_then_run rel r x abs)
+    | `Sg abs -> `Sg (QAbs.subst_then_run rel r x abs)
+    | `Ext abs -> `Ext (ECloAbs.subst_then_run rel r x abs)
 end
 
 and HComShape : Domain with type t = hcom_shape =
@@ -546,6 +629,13 @@ struct
     | `Sg abs -> `Sg (Q.run rel abs)
     | `Ext clo -> `Ext (ExtClo.run rel clo)
     | `Pos -> `Pos
+
+  let subst_then_run rel r x =
+    function
+    | `Pi abs -> `Pi (Q.subst_then_run rel r x abs)
+    | `Sg abs -> `Sg (Q.subst_then_run rel r x abs)
+    | `Ext clo -> `Ext (ExtClo.subst_then_run rel r x clo)
+    | `Pos -> `Pos
 end
 
 and Quantifier : Domain with type t = quantifier =
@@ -554,6 +644,7 @@ struct
   let swap _ = raise PleaseFillIn
   let subst _ = raise PleaseFillIn
   let run _ = raise PleaseFillIn
+  let subst_then_run _ = raise PleaseFillIn
 end
 
 and Neu : DomainPlug with type t = neu =
@@ -563,6 +654,7 @@ struct
   let swap _ = raise PleaseFillIn
   let run _ = raise PleaseFillIn
   let subst _ = raise PleaseFillIn
+  let subst_then_run _ = raise PleaseFillIn
 
   let plug rel frm neu =
     {neu with
@@ -575,6 +667,9 @@ sig
   val occurs : Name.t bwd -> frame -> [`No | `Might]
 end =
 struct
+  module Val = DelayedPlug (Con)
+  module LazyCon = LazyPlug (Con)
+
   type t = frame
 
   let swap pi =
@@ -603,13 +698,25 @@ struct
     | NHCom _ ->
       raise PleaseFillIn
 
-
   let run rel =
     function
     | FunApp arg ->
       let arg = Val.run rel arg in
       FunApp arg
-    | Car | Cdr | ExtApp _ as frm->
+    | Car | Cdr | ExtApp _ as frm ->
+      frm
+    | NHCom _ ->
+      raise PleaseFillIn
+
+  let subst_then_run rel r x =
+    function
+    | FunApp arg ->
+      let arg = Val.subst_then_run rel r x arg in
+      FunApp arg
+    | ExtApp rs as frm ->
+      let rs = List.map (Dim.subst r x) rs in
+      ExtApp rs
+    | Car | Cdr as frm ->
       frm
     | NHCom _ ->
       raise PleaseFillIn
@@ -652,6 +759,15 @@ and Sys :
       in
       ListUtil.flat_map run_face sys
 
+    let subst_then_run rel r x sys =
+      let run_face face =
+        try [Face.subst_then_run rel r x face]
+        with
+        | Face.Dead -> []
+        | Face.Triv bdy -> raise @@ Triv bdy
+      in
+      ListUtil.flat_map run_face sys
+
     let plug rel frm sys =
       List.map (Face.plug rel frm) sys
   end
@@ -668,6 +784,8 @@ and Face :
   end =
   functor (X : DomainPlug) ->
   struct
+    module DelayedLazyX = DelayedPlug (LazyPlug (X))
+
     type t = X.t face
 
     exception Triv of X.t
@@ -679,34 +797,39 @@ and Face :
 
     let swap pi (r, r', bdy) =
       Dim.swap pi r, Dim.swap pi r',
-      lazy begin X.swap pi @@ Lazy.force bdy end
+      DelayedLazyX.swap pi bdy
 
     let subst r x (s, s', bdy) =
       Dim.subst r x s, Dim.subst r x s',
-      lazy begin X.subst r x @@ Lazy.force bdy end
+      DelayedLazyX.subst r x bdy
 
     let run rel (r, r', bdy) =
-      try
-        match Rel.equate r r' rel with
-        | `Same ->
-          let bdy' = X.run rel @@ Lazy.force bdy in
-          raise @@ Triv bdy'
-        | `Changed rel' ->
-          r, r',
-          lazy begin
-            let rel' = Rel.equate' r r' rel in
-            X.run rel' @@ Lazy.force bdy
-          end
-      with
-      | I.Inconsistent -> raise Dead
+      match Rel.equate r r' rel with
+      | `Same ->
+        let bdy' = Lazy.force @@ DelayedLazyX.run_then_out rel bdy in
+        raise @@ Triv bdy'
+      | `Changed rel' ->
+        r, r',
+        DelayedLazyX.run rel' bdy
+      | exception I.Inconsistent -> raise Dead
+
+    let subst_then_run rel r x (s, s', bdy) =
+      let s = Dim.subst r x s in
+      let s' = Dim.subst r x s' in
+      match Rel.equate s s' rel with
+      | `Same ->
+        let bdy' = Lazy.force @@ DelayedLazyX.subst_then_run_then_out rel r x bdy in
+        raise @@ Triv bdy'
+      | `Changed rel' ->
+        s, s',
+        DelayedLazyX.subst_then_run rel' r x bdy
+      | exception I.Inconsistent -> raise Dead
 
     let plug rel frm (r, r', bdy) =
       let rel' = Rel.equate' r r' rel in
       r, r',
-      lazy begin
-        let frm' = Frame.run rel' frm in
-        X.plug rel frm' @@ Lazy.force bdy
-      end
+      let frm' = Frame.run rel' frm in
+      DelayedLazyX.plug rel frm' bdy
   end
 
 and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
@@ -738,6 +861,10 @@ and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
       let rel' = Rel.hide' x rel in
       let a' = X.run rel' a in
       Abs (x, a')
+
+    (* XXX optimize this! *)
+    let subst_then_run rel r x a =
+      run rel @@ subst r x a
   end
 
 and AbsPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
@@ -758,4 +885,41 @@ and AbsPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
         let a' = X.plug rel' frm @@ X.swap pi a in
         Abs (y, a')
 
+  end
+
+and DelayedPlug : DelayedDomainPlug =
+  functor (X : DomainPlug) ->
+  struct
+    type t = X.t Delay.t
+
+    let swap _ = raise PleaseFillIn
+    let subst _ = raise PleaseFillIn
+    let run _ = raise PleaseFillIn
+    let subst_then_run _ = raise PleaseFillIn
+    let plug _ = raise PleaseFillIn
+
+    let force =
+      Delay.fold @@ fun r d -> Delay.make' r (Lazy.force d)
+
+    let out = Delay.out X.run
+
+    let hsubst r x rel v = raise PleaseFillIn
+    (*
+      let rel' = Rel.subst' r x rel in
+      subst_then_run rel' r x v
+    *)
+    let subst_then_run_then_out _ = raise PleaseFillIn
+    let run_then_out rel _ = raise PleaseFillIn
+  end
+
+and LazyPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t Lazy.t =
+  functor (X : DomainPlug) ->
+  struct
+    type t = X.t Lazy.t
+
+    let swap _ _ = raise PleaseFillIn
+    let subst _ _ _ = raise PleaseFillIn
+    let run _ _ = raise PleaseFillIn
+    let subst_then_run _ _ _ = raise PleaseFillIn
+    let plug _ _ _ = raise PleaseFillIn
   end
