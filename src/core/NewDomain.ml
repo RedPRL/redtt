@@ -11,14 +11,27 @@ module Rel = NewRestriction
 type rel = Rel.t
 
 (* this module provides the data type to hold an optional rel to
- * facilitate the dropping of `run phi1` in `run phi2 @@ run phi1 a`. *)
+ * facilitate the dropping of `run phi1` in `run phi2 @@ run phi1 a`.
+ *
+ * the inner datatype is mutable in order to remember the result. *)
 module Delay :
 sig
-  type 'a t (* no need to generalize rel to 'b for now *)
+  type 'a t
   val make : 'a -> 'a t
   val make' : rel option -> 'a -> 'a t
+
+  (* this is a brutal API to get the raw data out. *)
+  val drop_rel : 'a t -> 'a
+
+  (* this is a convenience function to create a new delayed X.run
+   * with a new rel. *)
   val with_rel : rel -> 'a t -> 'a t
+
+  (* this is to force the result. the first argument is intended
+   * to be X.run where X is some structure implementing Domain. *)
   val out : (rel -> 'a -> 'a) -> 'a t -> 'a
+
+  (* this is to break down the inner structure *)
   val fold : (rel option -> 'a -> 'b) -> 'a t -> 'b
 end =
 struct
@@ -32,7 +45,9 @@ struct
 
   let make d = make' None d
 
-  let with_rel r v = ref {data = !v.data; rel = Some r}
+  let drop_rel v = !v.data
+
+  let with_rel r v = make' (Some r) (drop_rel v)
 
   let out f v =
     match !v.rel with
