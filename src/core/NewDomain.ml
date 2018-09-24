@@ -558,7 +558,8 @@ struct
   and plug_ty rel frm ty hd =
     match Val.out ty, frm with
     | Pi {dom; cod}, FunApp arg ->
-      Delay.make @@ Clo.inst rel cod @@ Val (Delay.make @@ lazy begin Val.out arg end), []
+      let arg = lazy begin Val.out arg end in
+      Delay.make @@ Clo.inst rel cod @@ Val (Delay.make arg), []
 
     | Ext extclo, ExtApp rs ->
       ExtClo.inst' rel extclo @@ List.map (fun r -> Dim r) rs
