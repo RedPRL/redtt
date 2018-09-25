@@ -133,6 +133,7 @@ sig
   val freshen_name : Name.t -> Name.t * t
   val freshen_names : Name.t bwd -> Name.t bwd * t
   val swap_name : t -> Name.t -> Name.t
+  val fold : (Name.t -> Name.t -> 'a -> 'a) -> t -> 'a -> 'a
 end =
 struct
   type t = (Name.t * Name.t) list (* favonia: a demonstration of my laziness *)
@@ -147,6 +148,7 @@ struct
       Snoc (xs', x'), (x, x') :: perm
   let swap_name perm x =
     try List.assoc x perm with Not_found -> x
+  let fold f = List.fold_right (fun (x, x') a -> f x x' a)
 end
 
 type perm = Perm.t
@@ -903,14 +905,16 @@ and DelayedPlug : DelayedDomainPlug =
   struct
     type t = X.t Delay.t
 
-    let swap _ = raise PleaseFillIn
-    let subst _ = raise PleaseFillIn
-    let run _ = raise PleaseFillIn
-    let subst_then_run _ = raise PleaseFillIn
+    let swap pi = Delay.fold @@ fun rel v ->
+      Delay.make' (Option.map (Perm.fold Rel.swap pi) rel) (X.swap pi v)
+    let subst r x = Delay.fold @@ fun rel v ->
+      Delay.make' (Option.map (Rel.subst' r x) rel) (X.subst r x v)
+    let run rel v = Delay.with_rel rel v
+    let subst_then_run rel r x v = Delay.make' (Some rel) (X.subst r x (Delay.drop_rel v))
     let plug _ = raise PleaseFillIn
 
     let out = Delay.out X.run
-    let run_then_out rel _ = raise PleaseFillIn
+    let run_then_out rel v = X.run rel (Delay.drop_rel v)
   end
 
 and LazyPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t Lazy.t =
