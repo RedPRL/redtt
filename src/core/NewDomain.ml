@@ -489,8 +489,7 @@ struct
       let sys =
         let cap_face = r, r', Delay.make @@ lazy begin Val.out cap end in
         let old_faces =
-          flip ListUtil.filter_map info.sys @@ fun face ->
-          flip Option.map (ConFace.forall x face) @@ fun (s, s', bdy) ->
+          ConSys.forall_map x info.sys @@ fun (s, s', bdy) ->
           s, s',
           Delay.make @@
           lazy begin
@@ -750,6 +749,9 @@ and Sys :
     exception Triv of X.t
 
     val forall : Name.t -> t -> t
+
+    (* convenience function *)
+    val forall_map : Name.t -> t -> (X.t face -> 'b) -> 'b list
   end =
   functor (X : DomainPlug) ->
   struct
@@ -783,6 +785,9 @@ and Sys :
 
     let plug rel frm sys =
       List.map (Face.plug rel frm) sys
+
+    let forall_map x sys f =
+      ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
   end
 
 and Face :
