@@ -158,10 +158,10 @@ let subst' r x h =
   get_m h @@ subst r x h
 
 let swap (x : atom) (y : atom) (h : t) =
-  if x == y then h else
-  let x', h = reserve_index_aux x h in
-  let y', h = reserve_index_aux y h in
-  {h with index = T.set y x' (T.set x y' h.index)}
+  match T.find x h.index, T.find y h.index with
+  | None, None -> h
+  | Some idx, Some idy when idx = idy -> h
+  | oidx, oidy -> {h with index = T.set_opt y oidx (T.set_opt x oidy h.index)}
 
 
 let pp_cls fmt =

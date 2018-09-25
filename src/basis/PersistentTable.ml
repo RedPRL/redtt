@@ -7,6 +7,7 @@ sig
   val set : 'k -> 'a -> ('k, 'a) t -> ('k, 'a) t
   val mem : 'k -> ('k, 'a) t -> bool
   val remove : 'k -> ('k, 'a) t -> ('k, 'a) t
+  val set_opt : 'k -> 'a option -> ('k, 'a) t -> ('k, 'a) t
   val find : 'k -> ('k, 'a) t -> 'a option
   val fold : ('k-> 'a -> 'b -> 'b) -> ('k, 'a) t -> 'b -> 'b
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
@@ -24,7 +25,7 @@ struct
   let init ~size =
     ref @@ Tbl (Hashtbl.create size)
 
-  let set_opt tbl k ov =
+  let raw_set_opt tbl k ov =
     match ov with
     | None -> Hashtbl.remove tbl k
     | Some v -> Hashtbl.replace tbl k v
@@ -39,7 +40,7 @@ struct
         match !t' with
         | Tbl a as n ->
           let ov' = Hashtbl.find_opt a k in
-          set_opt a k ov;
+          raw_set_opt a k ov;
           t := n;
           t' := Diff (k, ov', t)
         | _ ->
@@ -103,6 +104,11 @@ struct
       res
     | _ ->
       raise Fatal
+
+  let set_opt k ov t =
+    match ov with
+    | None -> remove k t
+    | Some v -> set k v t
 
   let fold f t e =
     reroot t;
