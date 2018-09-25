@@ -184,9 +184,7 @@ sig
   (* undo Delay.make *)
   val out : t -> X.t
 
-  (* convenience functions that are hopefully self-explanatory *)
-  val hsubst : dim -> Name.t -> rel -> t -> t
-  val subst_then_run_then_out : rel -> dim -> Name.t -> t -> X.t
+  (* a convenience function that is hopefully self-explanatory *)
   val run_then_out : rel -> t -> X.t
 end
 
@@ -315,9 +313,12 @@ struct
 
   type t = con
   let swap _ _ = raise PleaseFillIn
-  let subst _ _ = raise PleaseFillIn
+  let subst _ _ _ = raise PleaseFillIn
   let plug _ _ _ = raise PleaseFillIn
-  let subst_then_run _ _ _ _ = raise PleaseFillIn
+
+  let val_hsubst r x rel v =
+    let rel' = Rel.subst' r x rel in
+    Val.subst_then_run rel' r x v
 
   let rec run rel =
     function
@@ -482,7 +483,7 @@ struct
 
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
-      let ty = Val.hsubst r' x rel tyx in
+      let ty = val_hsubst r' x (Rel.hide' x rel) tyx in
       let sys =
         let cap_face = r, r', Delay.make @@ lazy begin Val.out cap end in
         let old_faces =
@@ -492,7 +493,7 @@ struct
           Delay.make @@
           lazy begin
             let rel' = Rel.equate' s s' rel in
-            let abs = Abs (x, Delay.make @@ Lazy.force @@ LazyVal.run_then_out rel' bdy) in
+            let abs = Abs (x, Delay.make @@ run (Rel.hide' x rel') @@ Lazy.force @@ Delay.drop_rel bdy) in
             let cap = Val.run rel' cap in
             make_coe rel' r r' abs cap
           end
@@ -577,6 +578,9 @@ struct
   and hsubst r x rel c =
     let rel' = Rel.subst' r x rel in
     subst_then_run rel' r x c
+
+  and subst_then_run rel r x c =
+    run rel @@ subst r x c
 end
 
 and CoeShape : Domain with type t = coe_shape =
@@ -813,7 +817,7 @@ and Face :
     let run rel (r, r', bdy) =
       match Rel.equate r r' rel with
       | `Same ->
-        let bdy' = Lazy.force @@ DelayedLazyX.run_then_out rel bdy in
+        let bdy' = X.run rel (Lazy.force @@ Delay.drop_rel bdy) in
         raise @@ Triv bdy'
       | `Changed rel' ->
         r, r',
@@ -825,7 +829,7 @@ and Face :
       let s' = Dim.subst r x s' in
       match Rel.equate s s' rel with
       | `Same ->
-        let bdy' = Lazy.force @@ DelayedLazyX.subst_then_run_then_out rel r x bdy in
+        let bdy' = X.subst_then_run rel r x (Lazy.force @@ Delay.drop_rel bdy) in
         raise @@ Triv bdy'
       | `Changed rel' ->
         s, s',
@@ -905,17 +909,7 @@ and DelayedPlug : DelayedDomainPlug =
     let subst_then_run _ = raise PleaseFillIn
     let plug _ = raise PleaseFillIn
 
-    let force =
-      Delay.fold @@ fun r d -> Delay.make' r (Lazy.force d)
-
     let out = Delay.out X.run
-
-    let hsubst r x rel v = raise PleaseFillIn
-    (*
-      let rel' = Rel.subst' r x rel in
-      subst_then_run rel' r x v
-    *)
-    let subst_then_run_then_out _ = raise PleaseFillIn
     let run_then_out rel _ = raise PleaseFillIn
   end
 
@@ -924,9 +918,9 @@ and LazyPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t Lazy.t =
   struct
     type t = X.t Lazy.t
 
-    let swap _ _ = raise PleaseFillIn
-    let subst _ _ _ = raise PleaseFillIn
-    let run _ _ = raise PleaseFillIn
-    let subst_then_run _ _ _ = raise PleaseFillIn
-    let plug _ _ _ = raise PleaseFillIn
+    let swap pi v = lazy begin X.swap pi (Lazy.force v) end
+    let subst r x v = lazy begin X.subst r x (Lazy.force v) end
+    let run rel v = lazy begin X.run rel (Lazy.force v) end
+    let subst_then_run rel r x v = lazy begin X.subst_then_run rel r x (Lazy.force v) end
+    let plug rel frm v = lazy begin X.plug rel frm (Lazy.force v) end
   end
