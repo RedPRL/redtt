@@ -3,6 +3,7 @@ open Bwd
 open BwdNotation
 
 exception PleaseFillIn
+exception PleaseRaiseProperError
 
 type dim = I.t
 
@@ -104,8 +105,8 @@ and head =
 and frame =
   | FunApp of value
   | ExtApp of dim list
-  | Car
-  | Cdr
+  | Fst
+  | Snd
   | NHCom of {r : dim; r' : dim; cap : value; sys : con abs sys}
 
 and neu =
@@ -212,9 +213,10 @@ struct
       begin
         match Bwd.nth env i with
         | Dim r -> r
-        | _ -> raise PleaseFillIn
+        | _ -> raise PleaseRaiseProperError
       end
-    | _ -> raise PleaseFillIn
+    | Tm.Up (Tm.Var _, Emp) -> raise PleaseFillIn
+    | _ -> raise PleaseRaiseProperError
 
   let rec eval rel env t =
     match Tm.unleash t with
@@ -256,10 +258,16 @@ struct
     | Emp -> vhd
     | Snoc (sp, frm) ->
       let v = eval_spine rel env vhd sp in
-      eval_frame rel env vhd frm
+      let frm = eval_frame rel env frm in
+      Con.plug rel frm vhd
 
-  and eval_frame rel env v frm =
-    raise PleaseFillIn
+  and eval_frame rel env =
+    function
+    | Tm.Fst -> Fst
+    | Tm.Snd -> Snd
+    | Tm.FunApp t -> FunApp (Delay.make @@ eval rel env t)
+    | Tm.ExtApp l -> ExtApp (List.map (eval_dim env) l)
+    | _ -> raise PleaseFillIn
 
   and eval_bnd rel env =
     function
@@ -292,7 +300,7 @@ struct
       begin
         match Bwd.nth env i with
         | Val v -> Lazy.force @@ LazyValue.unleash v
-        | _ -> raise PleaseFillIn
+        | _ -> raise PleaseRaiseProperError
       end
 
     | _ -> raise PleaseFillIn
@@ -520,18 +528,18 @@ struct
     | ExtApp rs, HCom {r; r'; ty = `Ext qu; cap; sys} ->
       raise PleaseFillIn
 
-    | Car, Cons (v0, _) ->
+    | Fst, Cons (v0, _) ->
       Val.unleash v0
 
-    | Car, Coe {r; r'; ty = `Sg abs; cap} ->
-      let cap = Val.plug rel Car cap in
+    | Fst, Coe {r; r'; ty = `Sg abs; cap} ->
+      let cap = Val.plug rel Fst cap in
       let ty =
         let Abs (xs, {dom; cod}) = abs in
         Abs (xs, dom)
       in
       rigid_coe rel r r' ty cap
 
-    | Cdr, Cons (_, v1) ->
+    | Snd, Cons (_, v1) ->
       Val.unleash v1
 
     | _, Neu info ->
@@ -646,11 +654,11 @@ struct
     | Ext extclo, ExtApp rs ->
       ExtClo.inst' rel extclo @@ List.map (fun r -> Dim r) rs
 
-    | Sg {dom; _}, Car ->
+    | Sg {dom; _}, Fst ->
       dom, []
 
-    | Sg {dom; cod}, Cdr ->
-      let car = lazy begin plug rel Car hd end in
+    | Sg {dom; cod}, Snd ->
+      let car = lazy begin plug rel Fst hd end in
       Delay.make @@ Clo.inst rel cod @@ Val (Delay.make car), []
 
     | _ ->
@@ -771,7 +779,7 @@ struct
     | ExtApp rs ->
       let rs = List.map (Dim.swap pi) rs in
       ExtApp rs
-    | Car | Cdr as frm ->
+    | Fst | Snd as frm ->
       frm
     | NHCom _ ->
       raise PleaseFillIn
@@ -784,7 +792,7 @@ struct
     | ExtApp rs ->
       let rs = List.map (Dim.subst r x) rs in
       ExtApp rs
-    | Car | Cdr as frm ->
+    | Fst | Snd as frm ->
       frm
     | NHCom _ ->
       raise PleaseFillIn
@@ -794,7 +802,7 @@ struct
     | FunApp arg ->
       let arg = Val.run rel arg in
       FunApp arg
-    | Car | Cdr | ExtApp _ as frm ->
+    | Fst | Snd | ExtApp _ as frm ->
       frm
     | NHCom _ ->
       raise PleaseFillIn
@@ -807,7 +815,7 @@ struct
     | ExtApp rs as frm ->
       let rs = List.map (Dim.subst r x) rs in
       ExtApp rs
-    | Car | Cdr as frm ->
+    | Fst | Snd as frm ->
       frm
     | NHCom _ ->
       raise PleaseFillIn
@@ -816,7 +824,7 @@ struct
     function
     | FunApp _ | ExtApp _ | NHCom _ ->
       `Might
-    | Car | Cdr ->
+    | Fst | Snd ->
       `No
 end
 
