@@ -96,7 +96,7 @@ let rec abstract_ty (gm : telescope) cod =
   | _ ->
     failwith "abstract_ty"
 
-let telescope_to_spine : telescope -> tm Tm.spine =
+let telescope_to_spine_ : telescope -> tm Tm.frame bwd =
   Bwd.flat_map @@ fun (x, param) ->
   match param with
   | `I ->
@@ -115,6 +115,9 @@ let telescope_to_spine : telescope -> tm Tm.spine =
     [Tm.Prev (Tm.up @@ Tm.var x)]
   | `KillFromTick _ ->
     []
+
+let telescope_to_spine (tele : telescope) : tm Tm.spine =
+  Bwd.to_list (telescope_to_spine_ tele)
 
 let push_hole tag gm ty =
   let alpha = Name.fresh () in
@@ -159,21 +162,21 @@ let rec opt_traverse f xs =
 
 let to_var t =
   match Tm.unleash @@ Tm.eta_contract t with
-  | Tm.Up (Tm.Var {name; _}, Emp) ->
+  | Tm.Up (Tm.Var {name; _}, []) ->
     Some name
   | _ ->
     (* Format.eprintf "to_var: %a@.@." (Tm.pp Pp.Env.emp) t; *)
     None
 
 
-let rec spine_to_tele sp =
+let rec spine_to_tele_ sp =
   match sp with
   | Emp -> Some Emp
   | Snoc (sp, Tm.FunApp t) ->
     begin
       match to_var t with
       | Some x ->
-        Option.map (fun xs -> xs #< (x, `P ())) @@ spine_to_tele sp
+        Option.map (fun xs -> xs #< (x, `P ())) @@ spine_to_tele_ sp
       | None ->
         None
     end
@@ -181,11 +184,14 @@ let rec spine_to_tele sp =
     begin
       match opt_traverse to_var ts with
       | Some xs ->
-        Option.map (fun ys -> ys <>< match xs with [] -> [(Name.fresh (), `NullaryExt)] | _ -> List.map (fun x -> (x, `I)) xs) @@ spine_to_tele sp
+        Option.map (fun ys -> ys <>< match xs with [] -> [(Name.fresh (), `NullaryExt)] | _ -> List.map (fun x -> (x, `I)) xs) @@ spine_to_tele_ sp
       | None ->
         None
     end
   | _ -> None
+
+let spine_to_tele sp =
+  spine_to_tele_ (Bwd.from_list sp)
 
 let linear_on t tele =
   let fvs = Tm.free `Vars t in
@@ -366,12 +372,12 @@ let flex_flex_same q =
   let sp1 = q.tm1 in
   lookup_meta alpha >>= fun (ty_alpha, _) ->
   let tele, cod = telescope ty_alpha in
-  match intersect tele sp0 sp1 with
+  match intersect tele (Bwd.from_list sp0) (Bwd.from_list sp1) with
   | Some tele' ->
     let f (hd, sp) =
       abstract_tm tele @@
       let sp' = telescope_to_spine tele in
-      Tm.up (hd, sp <.> sp')
+      Tm.up (hd, sp @ sp')
     in
     instantiate (alpha, abstract_ty tele' cod, f)
   | None ->
@@ -511,8 +517,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       evaluator >>= fun (cx, (module V)) ->
       let _, cod0 = V.unleash_sg ty0 in
       let _, cod1 = V.unleash_sg ty1 in
-      let cod0 = V.inst_clo cod0 @@ Cx.eval_cmd cx (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0 #< Tm.Fst) in
-      let cod1 = V.inst_clo cod1 @@ Cx.eval_cmd cx (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 #< Tm.Fst) in
+      let cod0 = V.inst_clo cod0 @@ Cx.eval_cmd cx (Tm.Var {name = x0; twin = tw0; ushift = 0}, sp0 <>> [Tm.Fst]) in
+      let cod1 = V.inst_clo cod1 @@ Cx.eval_cmd cx (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 <>> [Tm.Fst]) in
       ret (cod0, cod1)
 
     | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
@@ -536,10 +542,10 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       failwith "mismatch"
 
     | _ ->
-      raise @@ E (SpineMismatch (sp0,sp1))
+      raise @@ E (SpineMismatch (Bwd.to_list sp0, Bwd.to_list sp1))
 
   in
-  go sp0 sp1
+  go (Bwd.from_list sp0) (Bwd.from_list sp1)
 
 let approx_sys ty0 sys0 ty1 sys1 =
   base_cx >>= fun cx ->
@@ -751,8 +757,8 @@ let rec split_sigma tele x ty =
       , z
       , abstract_ty tele cody
       , abstract_tm tele @@ Tm.cons (Tm.up ytm) (Tm.up ztm)
-      , ( abstract_tm tele @@ Tm.up (Tm.Var {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Fst)
-        , abstract_tm tele @@ Tm.up (Tm.Var {name = x; twin = `Only; ushift = 0}, sp_tele #< Tm.Snd)
+      , ( abstract_tm tele @@ Tm.up @@ (Tm.Var {name = x; twin = `Only; ushift = 0}, sp_tele) @< Tm.Fst
+        , abstract_tm tele @@ Tm.up @@ (Tm.Var {name = x; twin = `Only; ushift = 0}, sp_tele) @< Tm.Snd
         )
       )
 
@@ -793,7 +799,7 @@ let rec lower tele alpha ty =
         let cod' = Tm.unbind_with (Tm.ann ~ty:s_ty ~tm:s) cod in
         let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod' in
         hole `Flex tele pi_ty @@ fun (whd, wsp) ->
-        let bdy = Tm.up (whd, wsp #< (Tm.FunApp u) #< (Tm.FunApp v)) in
+        let bdy = Tm.up ((whd, wsp) @<+ [Tm.FunApp u; Tm.FunApp v]) in
         define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
         ret true
     end

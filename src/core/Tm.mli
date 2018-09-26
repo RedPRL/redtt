@@ -56,8 +56,6 @@ val ann : ty:tm -> tm:tm -> tm cmd
 
 val ix : ?twin:twin -> int -> tm cmd
 val var : ?twin:twin -> Name.t -> tm cmd
-val car : tm cmd -> tm cmd
-val cdr : tm cmd -> tm cmd
 val let_ : string option -> tm cmd -> tm -> tm
 
 val lam : string option -> tm -> tm
@@ -103,5 +101,6 @@ end
 
 module Notation :
 sig
+  val (@<+) : 'a cmd -> 'a frame list -> 'a cmd
   val (@<) : 'a cmd -> 'a frame -> 'a cmd
 end

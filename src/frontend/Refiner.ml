@@ -179,7 +179,7 @@ let tac_hole ~loc ~name : chk_tac =
 
 let guess_motive scrut ty =
   match Tm.unleash scrut with
-  | Tm.Up (Tm.Var var, Emp) ->
+  | Tm.Up (Tm.Var var, []) ->
     M.ret @@ Tm.bind var.name ty
   | _ ->
     M.ret @@ Tm.bind (Name.fresh ()) ty

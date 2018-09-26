@@ -73,5 +73,5 @@ and 'a frame =
 
   | Elim of {dlbl : Desc.data_label; mot : 'a bnd; clauses : (Desc.con_label * 'a nbnd) list}
 
-and 'a spine = 'a frame bwd
+and 'a spine = 'a frame list
 and 'a cmd = 'a head * 'a spine

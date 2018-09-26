@@ -61,7 +61,7 @@ let rec check_dim cx tr =
 
 and check_dim_cmd cx =
   function
-  | hd, Emp ->
+  | hd, [] ->
     begin
       match hd with
       | Tm.Ix (ix, _) ->
@@ -89,7 +89,7 @@ let rec check_tick cx tr =
 
 and check_tick_cmd cx =
   function
-  | hd, Emp ->
+  | hd, [] ->
     begin
       match hd with
       | Tm.Ix (ix, _) ->
@@ -639,7 +639,7 @@ and infer cx (hd, sp) =
   let D.{ty; _} = infer_spine cx hd sp in
   ty
 
-and infer_spine cx hd sp =
+and infer_spine_ cx hd sp =
   let (module V) = Cx.evaluator cx in
   match sp with
   | Emp ->
@@ -650,30 +650,30 @@ and infer_spine cx hd sp =
   | Snoc (sp, frm) ->
     match frm with
     | T.Fst ->
-      let ih = infer_spine cx hd sp in
+      let ih = infer_spine_ cx hd sp in
       let dom, _ = V.unleash_sg ih.ty in
       D.{el = V.do_fst ih.el; ty = dom}
 
     | T.Snd ->
-      let ih = infer_spine cx hd sp in
+      let ih = infer_spine_ cx hd sp in
       let _, cod = V.unleash_sg ih.ty in
       let car = V.do_fst ih.el in
       D.{el = V.do_snd ih.el; ty = V.inst_clo cod car}
 
     | T.FunApp t ->
-      let ih = infer_spine cx hd sp in
+      let ih = infer_spine_ cx hd sp in
       let dom, cod = V.unleash_pi ih.ty in
       let v = check_eval cx dom t in
       D.{el = V.apply ih.el v; ty = V.inst_clo cod v}
 
     | T.ExtApp ts ->
-      let ih = infer_spine cx hd sp in
+      let ih = infer_spine_ cx hd sp in
       let rs = List.map (check_eval_dim cx) ts in
       let ty, _ = V.unleash_ext_with ih.ty rs in
       D.{el = V.ext_apply ih.el rs; ty}
 
     | T.VProj info ->
-      let ih = infer_spine cx hd sp in
+      let ih = infer_spine_ cx hd sp in
       let x, ty0, ty1, equiv = V.unleash_v ih.ty in
       let func' = V.do_fst equiv in
       let func_ty = D.Value.act (I.subst `Dim0 x) @@ V.Macro.func ty0 ty1 in
@@ -683,7 +683,7 @@ and infer_spine cx hd sp =
 
     | T.Elim info ->
       let T.B (nm, mot) = info.mot in
-      let ih = infer_spine cx hd sp in
+      let ih = infer_spine_ cx hd sp in
       let mot_clo =
         let cxx, _= Cx.ext_ty cx ~nm ih.ty in
         check_ty cxx mot;
@@ -798,18 +798,18 @@ and infer_spine cx hd sp =
         check_eval_ty cx @@
         T.make @@ T.FHCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
       in
-      let ih = infer_spine cx hd sp in
+      let ih = infer_spine_ cx hd sp in
       Cx.check_eq_ty cx fhcom_ty ih.ty;
       D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty}
 
 
     | T.LblCall ->
-      let ih = infer_spine cx hd sp in
+      let ih = infer_spine_ cx hd sp in
       let _, _, ty = V.unleash_lbl_ty ih.ty in
       D.{el = Cx.eval_frame cx ih.el frm; ty}
 
     | Tm.RestrictForce ->
-      let ih = infer_spine cx hd sp in
+      let ih = infer_spine_ cx hd sp in
       begin
         match V.unleash_restriction_ty ih.ty with
         | Face.True (_, _, ty) ->
@@ -824,10 +824,13 @@ and infer_spine cx hd sp =
         match vtick with
         | D.TickGen tgen ->
           let cx' = Cx.kill_from_tick cx tgen in
-          let ih = infer_spine cx' hd sp in
+          let ih = infer_spine_ cx' hd sp in
           let tclo = V.unleash_later ih.ty in
           D.{el = V.prev vtick ih.el; ty = V.inst_tick_clo tclo vtick}
       end
+
+and infer_spine cx hd sp =
+  infer_spine_ cx hd @@ Bwd.from_list sp
 
 and infer_head cx =
   function
