@@ -29,7 +29,7 @@ sig
 
   (* this is to force the result. the first argument is intended
    * to be X.run where X is some structure implementing Domain. *)
-  val out : (rel -> 'a -> 'a) -> 'a t -> 'a
+  val unleash : (rel -> 'a -> 'a) -> 'a t -> 'a
 
   (* this is to break down the inner structure *)
   val fold : (rel option -> 'a -> 'b) -> 'a t -> 'b
@@ -49,7 +49,7 @@ struct
 
   let with_rel r v = make' (Some r) (drop_rel v)
 
-  let out f v =
+  let unleash f v =
     match !v.rel with
     | Some r -> let d = f r !v.data in v := {data = d; rel = None}; d
     | None -> !v.data
@@ -183,7 +183,7 @@ sig
   include DomainPlug with type t = X.t Delay.t
 
   (* undo Delay.make *)
-  val out : t -> X.t
+  val unleash : t -> X.t
 
   (* a convenience function that is hopefully self-explanatory *)
   val run_then_out : rel -> t -> X.t
@@ -389,7 +389,7 @@ struct
   and plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
-      Clo.inst rel clo @@ Val (Delay.make @@ lazy begin Val.out arg end)
+      Clo.inst rel clo @@ Val (Delay.make @@ lazy begin Val.unleash arg end)
 
     | FunApp arg, Coe {r; r'; ty = `Pi abs; cap} ->
       let Abs (x, quantx) = abs in
@@ -403,7 +403,7 @@ struct
       Val.plug rel (FunApp (Delay.make @@ coe_arg r)) cap
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
-      let ty = Clo.inst rel quant.cod @@ Val (Delay.make @@ lazy begin Val.out arg end) in
+      let ty = Clo.inst rel quant.cod @@ Val (Delay.make @@ lazy begin Val.unleash arg end) in
       let cap = Val.plug rel frm cap in
       let sys = ConAbsSys.plug rel frm sys in
       rigid_hcom rel r r' ty cap sys
@@ -421,7 +421,7 @@ struct
       raise PleaseFillIn
 
     | Car, Cons (v0, _) ->
-      Val.out v0
+      Val.unleash v0
 
     | Car, Coe {r; r'; ty = `Sg abs; cap} ->
       let cap = Val.plug rel Car cap in
@@ -432,7 +432,7 @@ struct
       rigid_coe rel r r' ty cap
 
     | Cdr, Cons (_, v1) ->
-      Val.out v1
+      Val.unleash v1
 
     | _, Neu info ->
       let neu = Neu.plug rel frm info.neu in
@@ -446,14 +446,14 @@ struct
   and make_coe rel r r' (abs : value abs) (cap : value) =
     match Rel.compare r r' rel with
     | `Same ->
-      Val.out cap
+      Val.unleash cap
     | _ ->
       rigid_coe rel r r' abs cap
 
   and make_hcom rel r r' ty cap sys =
     match Rel.compare r r' rel with
     | `Same ->
-      Val.out cap
+      Val.unleash cap
     | _ ->
       match ConAbsSys.run rel sys with
       | _ ->
@@ -466,7 +466,7 @@ struct
   (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
   and rigid_coe rel r r' abs cap : con =
     let Abs (x, tyx) = abs in
-    match Val.out tyx with
+    match Val.unleash tyx with
     | Sg quant ->
       Coe {r; r'; ty = `Sg (Abs (x, quant)); cap}
 
@@ -480,7 +480,7 @@ struct
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
       let ty = Val.subst_then_run (Rel.hide' x rel) r x tyx in
       let sys =
-        let cap_face = r, r', Delay.make @@ lazy begin Val.out cap end in
+        let cap_face = r, r', Delay.make @@ lazy begin Val.unleash cap end in
         let old_faces =
           ConSys.foreach_forall x info.sys @@ ConFace.map_run @@ fun (s, s', bdy) ->
           lazy begin
@@ -511,7 +511,7 @@ struct
       let nhcom = NHCom {r; r'; cap; sys} in
       let neu = {info.neu with frames = info.neu.frames #< nhcom} in
       let neu_sys =
-        let cap_face = r, r', Delay.make @@ lazy begin Val.out cap end in
+        let cap_face = r, r', Delay.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
           ListUtil.foreach sys @@ ConAbsFace.map_run @@ fun (s, s', abs) ->
           lazy begin
@@ -538,9 +538,9 @@ struct
       raise PleaseFillIn
 
   and plug_ty rel frm ty hd =
-    match Val.out ty, frm with
+    match Val.unleash ty, frm with
     | Pi {dom; cod}, FunApp arg ->
-      let arg = lazy begin Val.out arg end in
+      let arg = lazy begin Val.unleash arg end in
       Delay.make @@ Clo.inst rel cod @@ Val (Delay.make arg), []
 
     | Ext extclo, ExtApp rs ->
@@ -895,7 +895,7 @@ and DelayedPlug : DelayedDomainPlug =
   struct
     type t = X.t Delay.t
 
-    let out = Delay.out X.run
+    let unleash = Delay.unleash X.run
 
     let swap pi = Delay.fold @@ fun rel v ->
       Delay.make' (Option.map (Perm.fold Rel.swap pi) rel) (X.swap pi v)
@@ -904,8 +904,8 @@ and DelayedPlug : DelayedDomainPlug =
     let run rel v = Delay.with_rel rel v
     let subst_then_run rel r x v = Delay.make' (Some rel) (X.subst r x (Delay.drop_rel v))
 
-    (* it is safe to `out v` here, but maybe we can do `Delay.drop_rel v`? *)
-    let plug rel frm v = Delay.make @@ X.plug rel frm (out v)
+    (* it is safe to `unleash v` here, but maybe we can do `Delay.drop_rel v`? *)
+    let plug rel frm v = Delay.make @@ X.plug rel frm (unleash v)
 
     let run_then_out rel v = X.run rel (Delay.drop_rel v)
   end
