@@ -306,11 +306,11 @@ sig
   include DomainPlug with type t = con
 end =
 struct
-  module Val = DelayedPlug (Con)
-  module LazyVal = DelayedPlug (LazyPlug (Con))
   module ConSys = Sys (Con)
   module ConFace = Face (Con)
-  module AbsSys = Sys (AbsPlug (Con))
+  module ConAbsSys = Sys (AbsPlug (Con))
+  module Val = DelayedPlug (Con)
+  module ValAbs = Abs (Val)
 
   type t = con
   let swap _ _ = raise PleaseFillIn
@@ -374,13 +374,13 @@ struct
         | `Same ->
           Val.run_then_out rel info.cap
         | _ ->
-          match AbsSys.run rel info.sys with
+          match ConAbsSys.run rel info.sys with
           | sys ->
             let cap = Val.run rel info.cap in
             let ty = HComShape.run rel info.ty in
             HCom {info with ty; cap; sys}
 
-          | exception (AbsSys.Triv abs) ->
+          | exception (ConAbsSys.Triv abs) ->
             let Abs (x, vx) = abs in
             hsubst info.r' x rel vx
       end
@@ -404,7 +404,7 @@ struct
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
       let ty = Clo.inst rel quant.cod @@ Val (Delay.make @@ lazy begin Val.out arg end) in
       let cap = Val.plug rel frm cap in
-      let sys = AbsSys.plug rel frm sys in
+      let sys = ConAbsSys.plug rel frm sys in
       rigid_hcom rel r r' ty cap sys
 
     | ExtApp rs, ExtLam nclo ->
@@ -457,10 +457,10 @@ struct
     | `Same ->
       Val.out cap
     | _ ->
-      match AbsSys.run rel sys with
+      match ConAbsSys.run rel sys with
       | _ ->
         rigid_hcom rel r r' ty cap sys
-      | exception (AbsSys.Triv abs) ->
+      | exception (ConAbsSys.Triv abs) ->
         let Abs (x, vx) = abs in
         hsubst r' x rel vx
 
@@ -484,12 +484,10 @@ struct
       let sys =
         let cap_face = r, r', Delay.make @@ lazy begin Val.out cap end in
         let old_faces =
-          ConSys.forall_map x info.sys @@ fun (s, s', bdy) ->
-          s, s',
-          Delay.make @@
+          ConSys.forall_map x info.sys @@ ConFace.map_run @@ fun (s, s', bdy) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
-            let abs = Abs (x, Delay.make @@ run (Rel.hide' x rel') @@ Lazy.force @@ Delay.drop_rel bdy) in
+            let abs = ValAbs.run rel' @@ Abs (x, Delay.make @@ Lazy.force bdy) in
             let cap = Val.run rel' cap in
             make_coe rel' r r' abs cap
           end
@@ -790,10 +788,13 @@ and Face :
   sig
     include DomainPlug with type t = X.t face
 
-    val forall : Name.t -> t -> t option
-
     exception Triv of X.t
     exception Dead
+
+    val forall : Name.t -> t -> t option
+
+    (* a map that is suitable for hooking up `run` *)
+    val map_run : (I.t * I.t * X.t Lazy.t -> X.t Lazy.t) -> t -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -807,6 +808,9 @@ and Face :
     let forall x (r, r', bdy) =
       let sx = `Atom x in
       if r = sx || r' = sx then None else Some (r, r', bdy)
+
+    let map_run f (r, r', bdy) =
+      (r, r', Delay.make @@ f (r, r', Delay.drop_rel bdy))
 
     let swap pi (r, r', bdy) =
       Dim.swap pi r, Dim.swap pi r',
