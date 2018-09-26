@@ -660,7 +660,6 @@ sig
 end =
 struct
   module Val = DelayedPlug (Con)
-  module LazyCon = LazyPlug (Con)
 
   type t = frame
 
