@@ -311,7 +311,7 @@ struct
   module ConAbsFace = Face (AbsPlug (Con))
   module ConAbsSys = Sys (AbsPlug (Con))
   module Val = DelayedPlug (Con)
-  module ValAbs = Abs (Val)
+  module ValAbs = AbsPlug (Val)
 
   type t = con
   let swap _ _ = raise PleaseFillIn
@@ -896,15 +896,18 @@ and DelayedPlug : DelayedDomainPlug =
   struct
     type t = X.t Delay.t
 
+    let out = Delay.out X.run
+
     let swap pi = Delay.fold @@ fun rel v ->
       Delay.make' (Option.map (Perm.fold Rel.swap pi) rel) (X.swap pi v)
     let subst r x = Delay.fold @@ fun rel v ->
       Delay.make' (Option.map (Rel.subst' r x) rel) (X.subst r x v)
     let run rel v = Delay.with_rel rel v
     let subst_then_run rel r x v = Delay.make' (Some rel) (X.subst r x (Delay.drop_rel v))
-    let plug _ = raise PleaseFillIn
 
-    let out = Delay.out X.run
+    (* it is safe to `out v` here, but maybe we can do `Delay.drop_rel v`? *)
+    let plug rel frm v = Delay.make @@ X.plug rel frm (out v)
+
     let run_then_out rel v = X.run rel (Delay.drop_rel v)
   end
 
