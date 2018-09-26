@@ -496,7 +496,7 @@ struct
 
     | _ -> raise PleaseFillIn
 
-  and rigid_hcom rel r r' (ty : t) cap sys =
+  and rigid_hcom rel r r' (ty : con) cap sys =
     match ty with
     | Sg quant ->
       HCom {r; r'; ty = `Sg quant; cap; sys}
@@ -780,7 +780,7 @@ and Face :
     val forall : Name.t -> t -> t option
 
     (* a map for hooking up `run` *)
-    val map_run : (I.t * I.t * X.t Lazy.t -> 'a Lazy.t) -> t -> 'a face
+    val map_run : (dim * dim * X.t Lazy.t -> 'a Lazy.t) -> t -> 'a face
   end =
   functor (X : DomainPlug) ->
   struct
