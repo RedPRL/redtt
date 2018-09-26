@@ -192,13 +192,58 @@ end
 module rec Syn :
 sig
   type t = Tm.tm
+  exception Triv of con
   val eval : rel -> env -> t -> con
+  val eval_dim : env -> t -> dim
   val eval_tm_sys : rel -> env -> (t, t) Tm.system -> con sys
 end =
 struct
   type t = Tm.tm
-  let eval _ _ =
-    raise PleaseFillIn
+
+  exception Triv of con
+
+  let eval_dim env t =
+    match Tm.unleash t with
+    | Tm.Dim0 -> `Dim0
+    | Tm.Dim1 -> `Dim1
+    | Tm.Up (Tm.Ix (i, _), Emp) ->
+      begin
+        match Bwd.nth env i with
+        | Dim r -> r
+        | _ -> raise PleaseFillIn
+      end
+    | _ -> raise PleaseFillIn
+
+  let rec eval rel env t =
+    match Tm.unleash t with
+    | Tm.Pi (dom, cod) ->
+      let dom = Delay.make @@ eval rel env dom in
+      let cod = Clo {bnd = cod; env} in
+      Pi {dom; cod}
+
+    | Tm.Sg (dom, cod) ->
+      let dom = Delay.make @@ eval rel env dom in
+      let cod = Clo {bnd = cod; env} in
+      Sg {dom; cod}
+
+    | Tm.Ext bnd ->
+      Ext (ExtClo {bnd; env})
+
+    | Tm.Lam bnd ->
+      Lam (Clo {bnd; env})
+
+    | Tm.ExtLam bnd ->
+      ExtLam (NClo {bnd; env})
+
+    | Tm.Cons (t0, t1) ->
+      let v0 = Delay.make @@ eval rel env t0 in
+      let v1 = Delay.make @@ eval rel env t1 in
+      Cons (v0, v1)
+
+    | Tm.Up cmd ->
+      raise PleaseFillIn
+
+    | _ -> raise PleaseFillIn
 
   let eval_tm_sys _ _ = raise PleaseFillIn
 end
@@ -304,6 +349,7 @@ end
 and Con :
 sig
   include DomainPlug with type t = con
+  val make_hcom : rel -> dim -> dim -> ty:con -> cap:value -> sys:con abs sys -> con
 end =
 struct
   module ConSys = Sys (Con)
@@ -450,7 +496,7 @@ struct
     | _ ->
       rigid_coe rel r r' abs cap
 
-  and make_hcom rel r r' ty cap sys =
+  and make_hcom rel r r' ~ty ~cap ~sys =
     match Rel.compare r r' rel with
     | `Same ->
       Val.unleash cap
@@ -527,7 +573,7 @@ struct
             let cap = Val.run rel' cap in
             let ty = run rel' @@ Lazy.force ty in
             let sys = ConAbsSys.run rel' sys in
-            make_hcom rel' r r' ty cap sys
+            make_hcom rel' r r' ~ty ~cap ~sys
           end
         in
         cap_face :: tube_faces @ old_faces
