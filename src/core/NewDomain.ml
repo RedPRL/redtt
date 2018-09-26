@@ -308,6 +308,7 @@ end =
 struct
   module ConSys = Sys (Con)
   module ConFace = Face (Con)
+  module ConAbsFace = Face (AbsPlug (Con))
   module ConAbsSys = Sys (AbsPlug (Con))
   module Val = DelayedPlug (Con)
   module ValAbs = Abs (Val)
@@ -484,7 +485,7 @@ struct
       let sys =
         let cap_face = r, r', Delay.make @@ lazy begin Val.out cap end in
         let old_faces =
-          ConSys.forall_map x info.sys @@ ConFace.map_run @@ fun (s, s', bdy) ->
+          ConSys.foreach_forall x info.sys @@ ConFace.map_run @@ fun (s, s', bdy) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             let abs = ValAbs.run rel' @@ Abs (x, Delay.make @@ Lazy.force bdy) in
@@ -510,42 +511,31 @@ struct
       HCom {r; r'; ty = `Ext extclo; cap; sys}
 
     | Neu info ->
-      raise PleaseFillIn
-      (*
       let nhcom = NHCom {r; r'; cap; sys} in
       let neu = {info.neu with frames = info.neu.frames #< nhcom} in
       let neu_sys =
-        let cap_face = r, r', lazy cap in
+        let cap_face = r, r', Delay.make @@ lazy begin Val.out cap end in
         let tube_faces =
-          flip List.map sys @@ fun (s, s', abs) ->
-          s, s',
+          ListUtil.foreach sys @@ ConAbsFace.map_run @@ fun (s, s', abs) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             let Abs (x, elx) = Lazy.force abs in
-            hsubst rel' r' x elx
+            hsubst r' x rel' elx
           end
         in
         let old_faces =
-          flip List.map info.sys @@ fun (s, s', ty) ->
-          s, s',
-          match Rel.equate s s' rel with
-          | `Changed rel' ->
-            lazy begin
-              let cap = run rel' cap in
-              let ty = run rel' @@ Lazy.force ty in
-              let sys = AbsSys.run rel' sys in
-              make_hcom rel' r r' ty cap sys
-            end
-          | `Same ->
-            lazy begin
-              let ty = Lazy.force ty in
-              make_hcom rel r r' ty cap sys
-            end
+          ListUtil.foreach info.sys @@ ConFace.map_run @@ fun (s, s', ty) ->
+          lazy begin
+            let rel' = Rel.equate' s s' rel in
+            let cap = Val.run rel' cap in
+            let ty = run rel' @@ Lazy.force ty in
+            let sys = ConAbsSys.run rel' sys in
+            make_hcom rel' r r' ty cap sys
+          end
         in
         cap_face :: tube_faces @ old_faces
       in
-      Neu {ty; neu; sys = neu_sys}
-      *)
+      Neu {ty = Delay.make ty; neu; sys = neu_sys}
 
     | _ ->
       raise PleaseFillIn
@@ -744,7 +734,7 @@ and Sys :
     val forall : Name.t -> t -> t
 
     (* convenience function *)
-    val forall_map : Name.t -> t -> (X.t face -> 'b) -> 'b list
+    val foreach_forall : Name.t -> t -> (X.t face -> 'b) -> 'b list
   end =
   functor (X : DomainPlug) ->
   struct
@@ -779,7 +769,7 @@ and Sys :
     let plug rel frm sys =
       List.map (Face.plug rel frm) sys
 
-    let forall_map x sys f =
+    let foreach_forall x sys f =
       ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
   end
 
@@ -793,8 +783,8 @@ and Face :
 
     val forall : Name.t -> t -> t option
 
-    (* a map that is suitable for hooking up `run` *)
-    val map_run : (I.t * I.t * X.t Lazy.t -> X.t Lazy.t) -> t -> t
+    (* a map for hooking up `run` *)
+    val map_run : (I.t * I.t * X.t Lazy.t -> 'a Lazy.t) -> t -> 'a face
   end =
   functor (X : DomainPlug) ->
   struct

@@ -53,3 +53,5 @@ let rec find_map_opt f xs =
     match f x with
     | Some y -> Some y
     | None -> find_map_opt f xs
+
+let foreach l f = List.map f l
