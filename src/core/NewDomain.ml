@@ -202,6 +202,8 @@ struct
 
   exception Triv of con
 
+  module LazyValue = DelayedPlug (LazyPlug (Con))
+
   let eval_dim env t =
     match Tm.unleash t with
     | Tm.Dim0 -> `Dim0
@@ -240,12 +242,63 @@ struct
       let v1 = Delay.make @@ eval rel env t1 in
       Cons (v0, v1)
 
-    | Tm.Up cmd ->
-      raise PleaseFillIn
+    | Tm.Up (hd, spine) ->
+      eval_cmd rel env hd spine
 
     | _ -> raise PleaseFillIn
 
-  let eval_tm_sys _ _ = raise PleaseFillIn
+  and eval_cmd rel env hd sp =
+    let vhd = eval_head rel env hd in
+    eval_spine rel env vhd sp
+
+  and eval_spine rel env vhd =
+    function
+    | Emp -> vhd
+    | Snoc (sp, frm) ->
+      let v = eval_spine rel env vhd sp in
+      eval_frame rel env vhd frm
+
+  and eval_frame rel env v frm =
+    raise PleaseFillIn
+
+  and eval_bnd rel env =
+    function
+    | Tm.B (nm, tm) ->
+      let x = Name.named nm in
+      let env = Snoc (env, Dim (`Atom x)) in
+      Abs (x, Delay.make @@ eval rel env tm)
+
+  and eval_head rel env =
+    function
+    | Tm.Down info ->
+      eval rel env info.tm
+
+    | Tm.Coe info ->
+      let r = eval_dim env info.r in
+      let r' = eval_dim env info.r' in
+      let abs = eval_bnd rel env info.ty  in
+      let cap = Delay.make @@ eval rel env info.tm in
+      Con.make_coe rel r r' ~abs ~cap
+
+    | Tm.HCom info ->
+      let r = eval_dim env info.r in
+      let r' = eval_dim env info.r' in
+      let ty = eval rel env info.ty in
+      let cap = Delay.make @@ eval rel env info.cap in
+      let sys = eval_bnd_sys rel env info.sys in
+      Con.make_hcom rel r r' ~ty ~cap ~sys
+
+    | Tm.Ix (i, _) ->
+      begin
+        match Bwd.nth env i with
+        | Val v -> Lazy.force @@ LazyValue.unleash v
+        | _ -> raise PleaseFillIn
+      end
+
+    | _ -> raise PleaseFillIn
+
+  and eval_bnd_sys _ _ = raise PleaseFillIn
+  and eval_tm_sys _ _ = raise PleaseFillIn
 end
 
 and Dim : Domain with type t = dim =
@@ -349,6 +402,7 @@ end
 and Con :
 sig
   include DomainPlug with type t = con
+  val make_coe : rel -> dim -> dim -> abs:value abs -> cap:value -> con
   val make_hcom : rel -> dim -> dim -> ty:con -> cap:value -> sys:con abs sys -> con
 end =
 struct
@@ -441,7 +495,7 @@ struct
       let Abs (x, quantx) = abs in
       let y, pi = Perm.freshen_name x in
       let dom = Abs (x, quantx.dom) in
-      let coe_arg s = make_coe rel r' s dom arg in
+      let coe_arg s = make_coe rel r' s ~abs:dom ~cap:arg in
       let coe_r'y = Delay.make @@ lazy begin coe_arg @@ `Atom y end in
       let cod_y = swap pi quantx.cod in
       let cod_coe = Abs (y, Delay.make @@ Clo.inst rel cod_y @@ Val coe_r'y) in
@@ -489,7 +543,7 @@ struct
     | _ ->
       raise PleaseFillIn
 
-  and make_coe rel r r' (abs : value abs) (cap : value) =
+  and make_coe rel r r' ~abs ~cap =
     match Rel.compare r r' rel with
     | `Same ->
       Val.unleash cap
@@ -533,7 +587,7 @@ struct
             let rel' = Rel.equate' s s' rel in
             let abs = ValAbs.run rel' @@ Abs (x, Delay.make @@ Lazy.force bdy) in
             let cap = Val.run rel' cap in
-            make_coe rel' r r' abs cap
+            make_coe rel' r r' ~abs ~cap
           end
         in
         cap_face :: old_faces
