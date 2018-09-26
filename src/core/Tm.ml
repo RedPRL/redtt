@@ -1606,11 +1606,9 @@ let pp0 fmt tm = pp Pp.Env.emp fmt @@ eta_contract tm
 
 module Notation =
 struct
-  let (@<+) cmd frms =
-    let hd, sp = cmd in
-    hd, sp @ frms
   let (@<) cmd frm =
-    cmd @<+ [frm]
+    let hd, sp = cmd in
+    hd, sp @ [frm]
 end
 
 module Error =

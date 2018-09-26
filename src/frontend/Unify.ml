@@ -799,7 +799,7 @@ let rec lower tele alpha ty =
         let cod' = Tm.unbind_with (Tm.ann ~ty:s_ty ~tm:s) cod in
         let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod' in
         hole `Flex tele pi_ty @@ fun (whd, wsp) ->
-        let bdy = Tm.up ((whd, wsp) @<+ [Tm.FunApp u; Tm.FunApp v]) in
+        let bdy = Tm.up (whd, wsp @ [Tm.FunApp u; Tm.FunApp v]) in
         define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
         ret true
     end

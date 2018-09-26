@@ -101,6 +101,5 @@ end
 
 module Notation :
 sig
-  val (@<+) : 'a cmd -> 'a frame list -> 'a cmd
   val (@<) : 'a cmd -> 'a frame -> 'a cmd
 end
