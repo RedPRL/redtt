@@ -486,7 +486,6 @@ struct
         let xs' = traverse_list f xs in
         x' :: xs'
 
-
   and traverse_frame =
     function
     | (Fst | Snd | LblCall | RestrictForce as frm) ->
