@@ -78,7 +78,6 @@ type con =
   | Neu of {ty : value; neu : neu; sys : con sys}
 
 and value = con Delay.t
-and lazy_value = con Lazy.t Delay.t
 
 and quantifier =
   {dom : value;
@@ -114,7 +113,7 @@ and neu =
    frames : frame bwd}
 
 and cell =
-  | Val of lazy_value
+  | Val of con Lazy.t Delay.t
   | Dim of dim
 
 and env = cell bwd
@@ -318,10 +317,6 @@ struct
   let subst _ _ _ = raise PleaseFillIn
   let plug _ _ _ = raise PleaseFillIn
 
-  let val_hsubst r x rel v =
-    let rel' = Rel.subst' r x rel in
-    Val.subst_then_run rel' r x v
-
   let rec run rel =
     function
     | Pi info ->
@@ -485,7 +480,7 @@ struct
 
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
-      let ty = val_hsubst r' x (Rel.hide' x rel) tyx in
+      let ty = Val.subst_then_run (Rel.hide' x rel) r x tyx in
       let sys =
         let cap_face = r, r', Delay.make @@ lazy begin Val.out cap end in
         let old_faces =
