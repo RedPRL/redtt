@@ -414,10 +414,7 @@ struct
     | ExtApp ss, Coe {r; r'; ty = `Ext abs; cap} ->
       let Abs (y, extclo_y) = abs in
       let ty_ss, sys_ss = ExtClo.inst rel extclo_y @@ List.map (fun x -> Dim x) ss in
-      (* favonia: I commented out the following line because I'm not sure whether
-       * the best interface should be values or cons.
-       *
-       * let sys_ss' = ValSys.forall y sys_ss in *)
+      let sys_ss' = ConSys.forall y sys_ss in
       raise PleaseFillIn
 
     | ExtApp rs, HCom {r; r'; ty = `Ext qu; cap; sys} ->
