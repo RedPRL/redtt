@@ -604,8 +604,53 @@ struct
          neu = Neu.swap pi info.neu;
          sys = ConSys.swap pi info.sys}
 
-  let subst _ _ _ = raise PleaseFillIn
-  let plug _ _ _ = raise PleaseFillIn
+  let subst r x =
+    function
+    | Pi quant ->
+      let quant = Quantifier.subst r x quant in
+      Pi quant
+
+    | Sg quant ->
+      let quant = Quantifier.subst r x quant in
+      Sg quant
+
+    | Ext extclo ->
+      let extclo = ExtClo.subst r x extclo in
+      Ext extclo
+
+    | Lam clo ->
+      let clo = Clo.subst r x clo in
+      Lam clo
+
+    | ExtLam nclo ->
+      let nclo = NClo.subst r x nclo in
+      ExtLam nclo
+
+    | Cons (v0, v1) ->
+      let v0 = Val.subst r x v0 in
+      let v1 = Val.subst r x v1 in
+      Cons (v0, v1)
+
+    | Coe info ->
+      Coe
+        {r = Dim.subst r x info.r;
+         r' = Dim.subst r x info.r';
+         ty = CoeShape.subst r x info.ty;
+         cap = Val.subst r x info.cap}
+
+    | HCom info ->
+      HCom
+        {r = Dim.subst r x info.r;
+         r' = Dim.subst r x info.r';
+         ty = HComShape.subst r x info.ty;
+         cap = Val.subst r x info.cap;
+         sys = ConAbsSys.subst r x info.sys}
+
+    | Neu info ->
+      Neu
+        {ty = Val.subst r x info.ty;
+         neu = Neu.subst r x info.neu;
+         sys = ConSys.subst r x info.sys}
 
   let rec run rel =
     function
