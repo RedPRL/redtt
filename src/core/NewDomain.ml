@@ -211,7 +211,7 @@ struct
     | Tm.Dim1 -> `Dim1
     | Tm.Up (Tm.Ix (i, _), Emp) ->
       begin
-        match Env.lookup_cell i env with
+        match Env.lookup_cell_by_index i env with
         | Dim r -> r
         | _ -> raise PleaseRaiseProperError
       end
@@ -299,7 +299,7 @@ struct
 
     | Tm.Ix (i, _) ->
       begin
-        match Env.lookup_cell i env with
+        match Env.lookup_cell_by_index i env with
         | Val v -> Lazy.force @@ LazyValue.unleash v
         | _ -> raise PleaseRaiseProperError
       end
@@ -403,7 +403,7 @@ sig
   val emp : unit -> env
   val extend_cell : cell -> env -> env
   val extend_cells : cell list -> env -> env
-  val lookup_cell : int -> env -> cell
+  val lookup_cell_by_index : int -> env -> cell
   val index_of_level : env -> int -> int
   val level_of_index : env -> int -> int
 end =
@@ -416,7 +416,7 @@ struct
 
   let emp () = {cells = Emp; n_minus_one = -1}
 
-  let lookup_cell i {cells; _} = Bwd.nth cells i
+  let lookup_cell_by_index i {cells; _} = Bwd.nth cells i
 
   let extend_cells cells env =
     {cells = env.cells <>< cells;
