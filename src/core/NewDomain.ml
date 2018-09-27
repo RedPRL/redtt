@@ -117,7 +117,7 @@ and cell =
   | Val of con Lazy.t Delay.t
   | Dim of dim
 
-and env = cell bwd
+and env = {cells : cell bwd; n_minus_one : int}
 
 and clo = Clo of {bnd : Tm.tm Tm.bnd; env : env}
 and nclo = NClo of {bnd : Tm.tm Tm.nbnd; env : env}
@@ -205,17 +205,18 @@ struct
 
   module LazyValue = DelayedPlug (LazyPlug (Con))
 
-  let eval_dim env t =
+  let rec eval_dim env t =
     match Tm.unleash t with
     | Tm.Dim0 -> `Dim0
     | Tm.Dim1 -> `Dim1
     | Tm.Up (Tm.Ix (i, _), Emp) ->
       begin
-        match Bwd.nth env i with
+        match Env.lookup_cell i env with
         | Dim r -> r
         | _ -> raise PleaseRaiseProperError
       end
     | Tm.Up (Tm.Var _, Emp) -> raise PleaseFillIn
+    | Tm.Up (Tm.DownX r, Emp) -> eval_dim env r
     | _ -> raise PleaseRaiseProperError
 
   let rec eval rel env t =
@@ -273,7 +274,7 @@ struct
     function
     | Tm.B (nm, tm) ->
       let x = Name.named nm in
-      let env = Snoc (env, Dim (`Atom x)) in
+      let env = Env.extend_cell (Dim (`Atom x)) env in
       Abs (x, Delay.make @@ eval rel env tm)
 
   and eval_head rel env =
@@ -298,7 +299,7 @@ struct
 
     | Tm.Ix (i, _) ->
       begin
-        match Bwd.nth env i with
+        match Env.lookup_cell i env with
         | Val v -> Lazy.force @@ LazyValue.unleash v
         | _ -> raise PleaseRaiseProperError
       end
@@ -345,7 +346,7 @@ struct
   let inst rel clo cell =
     let Clo {bnd; env} = clo in
     let Tm.B (_, tm) = bnd in
-    Syn.eval rel (env #< cell) tm
+    Syn.eval rel (Env.extend_cell cell env) tm
 end
 
 and NClo :
@@ -364,7 +365,7 @@ struct
   let inst (rel : rel) nclo cells : con =
     let NClo {bnd; env} = nclo in
     let Tm.NB (_, tm) = bnd in
-    Syn.eval rel (env <>< cells) tm
+    Syn.eval rel (Env.extend_cells cells env) tm
 end
 
 and ExtClo :
@@ -384,7 +385,7 @@ struct
   let inst rel clo cells =
     let ExtClo {bnd; env} = clo in
     let Tm.NB (_, (ty, sys)) = bnd in
-    let env' = env <>< cells in
+    let env' = Env.extend_cells cells env in
     let vty = Syn.eval rel env' ty in
     let vsys = Syn.eval_tm_sys rel env' sys in
     vty, vsys
@@ -398,6 +399,13 @@ end
 and Env :
 sig
   include Domain with type t = env
+
+  val emp : unit -> env
+  val extend_cell : cell -> env -> env
+  val extend_cells : cell list -> env -> env
+  val lookup_cell : int -> env -> cell
+  val index_of_level : env -> int -> int
+  val level_of_index : env -> int -> int
 end =
 struct
   type t = env
@@ -405,6 +413,20 @@ struct
   let subst _ _ = raise PleaseFillIn
   let run _ _ = raise PleaseFillIn
   let subst_then_run _ _ = raise PleaseFillIn
+
+  let emp () = {cells = Emp; n_minus_one = -1}
+
+  let lookup_cell i {cells; _} = Bwd.nth cells i
+
+  let extend_cells cells env =
+    {cells = env.cells <>< cells;
+     n_minus_one = env.n_minus_one + List.length cells}
+
+  let extend_cell cell env =
+    extend_cells [cell] env
+
+  let index_of_level {n_minus_one; _} i = n_minus_one - i
+  let level_of_index {n_minus_one; _} i = n_minus_one - i
 end
 
 and Con :
