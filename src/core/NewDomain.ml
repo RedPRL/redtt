@@ -506,15 +506,13 @@ struct
 
   let rec run rel =
     function
-    | Pi info ->
-      let dom = Val.run rel info.dom in
-      let cod = Clo.run rel info.cod in
-      Pi {dom; cod}
+    | Pi quant ->
+      let quant = Quantifier.run rel quant in
+      Pi quant
 
-    | Sg info ->
-      let dom = Val.run rel info.dom in
-      let cod = Clo.run rel info.cod in
-      Sg {dom; cod}
+    | Sg quant ->
+      let quant = Quantifier.run rel quant in
+      Sg quant
 
     | Ext extclo ->
       let extclo = ExtClo.run rel extclo in
@@ -821,10 +819,23 @@ end
 and Quantifier : Domain with type t = quantifier =
 struct
   type t = quantifier
-  let swap _ = raise PleaseFillIn
-  let subst _ = raise PleaseFillIn
-  let run _ = raise PleaseFillIn
-  let subst_then_run _ = raise PleaseFillIn
+
+  let swap pi {dom; cod} =
+    let dom = Val.swap pi dom in
+    let cod = Clo.swap pi cod in
+    {dom; cod}
+  let subst r x {dom; cod} =
+    let dom = Val.subst r x dom in
+    let cod = Clo.subst r x cod in
+    {dom; cod}
+  let run rel {dom; cod} =
+    let dom = Val.run rel dom in
+    let cod = Clo.run rel cod in
+    {dom; cod}
+  let subst_then_run rel r x {dom; cod} =
+    let dom = Val.subst_then_run rel r x dom in
+    let cod = Clo.subst_then_run rel r x cod in
+    {dom; cod}
 end
 
 and Neu : DomainPlug with type t = neu =
@@ -839,6 +850,16 @@ struct
   let plug rel frm neu =
     {neu with
      frames = neu.frames #< frm}
+end
+
+and Head : Domain with type t = head =
+struct
+  type t = head
+
+  let swap _ = raise PleaseFillIn
+  let run _ = raise PleaseFillIn
+  let subst _ = raise PleaseFillIn
+  let subst_then_run _ = raise PleaseFillIn
 end
 
 and Frame :
