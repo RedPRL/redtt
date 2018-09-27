@@ -181,15 +181,15 @@ sig
 end
 
 module type DelayedDomainPlug =
-functor (X : DomainPlug) ->
 sig
-  include DomainPlug with type t = X.t Delay.t
+  type u
+  include DomainPlug with type t = u Delay.t
 
   (* undo Delay.make *)
-  val unleash : t -> X.t
+  val unleash : t -> u
 
   (* a convenience function that is hopefully self-explanatory and more optimized *)
-  val run_then_unleash : rel -> t -> X.t
+  val run_then_unleash : rel -> t -> u
 end
 
 module rec Syn :
@@ -497,7 +497,6 @@ struct
   module ConFace = Face (Con)
   module ConAbsFace = Face (AbsPlug (Con))
   module ConAbsSys = Sys (AbsPlug (Con))
-  module Val = DelayedPlug (Con)
   module ValAbs = AbsPlug (Val)
 
   type t = con
@@ -751,6 +750,8 @@ struct
     run rel @@ subst r x c
 end
 
+and Val : DelayedDomainPlug with type u = con = DelayedPlug (Con)
+
 and CoeShape : Domain with type t = coe_shape =
 struct
   type t = coe_shape
@@ -846,8 +847,6 @@ sig
   val occurs : Name.t bwd -> frame -> [`No | `Might]
 end =
 struct
-  module Val = DelayedPlug (Con)
-
   type t = frame
 
   let swap pi =
@@ -1077,9 +1076,10 @@ and AbsPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
 
   end
 
-and DelayedPlug : DelayedDomainPlug =
+and DelayedPlug : functor (X : DomainPlug) -> DelayedDomainPlug with type u = X.t =
   functor (X : DomainPlug) ->
   struct
+    type u = X.t
     type t = X.t Delay.t
 
     let unleash = Delay.unleash X.run
