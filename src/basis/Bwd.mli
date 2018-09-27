@@ -18,6 +18,7 @@ sig
   val nth : 'a bwd -> int -> 'a
   val length : 'a bwd -> int
   val mem : 'a -> 'a bwd -> bool
+  val exists : ('a -> bool) -> 'a bwd -> bool
   val map : ('a -> 'b) -> 'a bwd -> 'b bwd
   val mapi : (int -> 'a -> 'b) -> 'a bwd -> 'b bwd
   val flat_map : ('a -> 'b list) -> 'a bwd -> 'b bwd

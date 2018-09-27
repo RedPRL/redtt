@@ -900,8 +900,13 @@ struct
 
   let occurs xs =
     function
-    | FunApp _ | ExtApp _ | NHCom _ ->
+    | FunApp _ | NHCom _ ->
       `Might
+    | ExtApp dims ->
+      if Bwd.exists (fun x -> List.mem (`Atom x) dims) xs then
+        `Might
+      else
+        `No
     | Fst | Snd ->
       `No
 end

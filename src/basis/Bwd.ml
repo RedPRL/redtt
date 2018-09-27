@@ -44,6 +44,12 @@ struct
     | Snoc (xs, x) ->
       if a = x then true else mem a xs
 
+  let rec exists p xs =
+    match xs with
+    | Emp -> false
+    | Snoc (xs, x) ->
+      if p x then true else exists p xs
+
   let rec length =
     function
     | Emp -> 0
