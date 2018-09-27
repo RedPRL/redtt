@@ -4,6 +4,8 @@ open BwdNotation
 
 exception PleaseFillIn
 exception PleaseRaiseProperError
+exception CanJonHelpMe
+exception CanFavoniaHelpMe
 
 type dim = I.t
 
@@ -215,42 +217,76 @@ struct
         | Dim r -> r
         | _ -> raise PleaseRaiseProperError
       end
-    | Tm.Up (Tm.Var _, Emp) -> raise PleaseFillIn
+    | Tm.Up (Tm.Var {name; _}, Emp) -> `Atom name
     | Tm.Up (Tm.DownX r, Emp) -> eval_dim env r
     | _ -> raise PleaseRaiseProperError
 
   let rec eval rel env t =
     match Tm.unleash t with
+    | Tm.Up cmd ->
+      eval_cmd rel env cmd
+
+    | Tm.Let (c, Tm.B (_, t)) ->
+      let v = lazy begin eval_cmd rel env c end in
+      eval rel (Env.extend_cell env @@ Val (Delay.make v)) t
+
     | Tm.Pi (dom, cod) ->
       let dom = Delay.make @@ eval rel env dom in
       let cod = Clo {bnd = cod; env} in
       Pi {dom; cod}
+    | Tm.Lam bnd ->
+      Lam (Clo {bnd; env})
 
     | Tm.Sg (dom, cod) ->
       let dom = Delay.make @@ eval rel env dom in
       let cod = Clo {bnd = cod; env} in
       Sg {dom; cod}
-
-    | Tm.Ext bnd ->
-      Ext (ExtClo {bnd; env})
-
-    | Tm.Lam bnd ->
-      Lam (Clo {bnd; env})
-
-    | Tm.ExtLam bnd ->
-      ExtLam (NClo {bnd; env})
-
     | Tm.Cons (t0, t1) ->
       let v0 = Delay.make @@ eval rel env t0 in
       let v1 = Delay.make @@ eval rel env t1 in
       Cons (v0, v1)
 
-    | Tm.Up (hd, spine) ->
-      eval_cmd rel env hd spine
+    | Tm.Ext bnd ->
+      Ext (ExtClo {bnd; env})
+    | Tm.ExtLam bnd ->
+      ExtLam (NClo {bnd; env})
+    | Tm.Dim0 | Tm.Dim1 ->
+      raise PleaseRaiseProperError
 
-    | _ -> raise PleaseFillIn
+    | Tm.Restrict _ ->
+      raise PleaseFillIn
+    | Tm.RestrictThunk _ ->
+      raise PleaseFillIn
 
-  and eval_cmd rel env hd sp =
+    | Tm.Univ _ ->
+      raise PleaseFillIn
+
+    | Tm.V _ ->
+      raise PleaseFillIn
+    | Tm.VIn _ ->
+      raise PleaseFillIn
+
+    | Tm.FHCom _ ->
+      raise PleaseFillIn
+    | Tm.Box _ ->
+      raise PleaseFillIn
+
+    | Tm.LblTy _ ->
+      raise PleaseFillIn
+    | Tm.LblRet _ ->
+      raise PleaseFillIn
+
+    | Tm.Later _ ->
+      raise PleaseFillIn
+    | Tm.Next _ ->
+      raise PleaseFillIn
+
+    | Tm.Data _ ->
+      raise PleaseFillIn
+    | Tm.Intro _ ->
+      raise PleaseFillIn
+
+  and eval_cmd rel env (hd, sp) =
     let vhd = eval_head rel env hd in
     eval_spine rel env vhd sp
 
@@ -274,13 +310,15 @@ struct
     function
     | Tm.B (nm, tm) ->
       let x = Name.named nm in
-      let env = Env.extend_cell (Dim (`Atom x)) env in
+      let env = Env.extend_cell env @@ Dim (`Atom x) in
       Abs (x, Delay.make @@ eval rel env tm)
 
   and eval_head rel env =
     function
     | Tm.Down info ->
       eval rel env info.tm
+
+    | Tm.DownX _ -> raise CanJonHelpMe
 
     | Tm.Coe info ->
       let r = eval_dim env info.r in
@@ -297,6 +335,10 @@ struct
       let sys = eval_bnd_sys rel env info.sys in
       Con.make_hcom rel r r' ~ty ~cap ~sys
 
+    | Tm.Com _ -> raise PleaseFillIn
+    | Tm.GHCom _ -> raise PleaseFillIn
+    | Tm.GCom _ -> raise PleaseFillIn
+
     | Tm.Ix (i, _) ->
       begin
         match Env.lookup_cell_by_index i env with
@@ -304,7 +346,10 @@ struct
         | _ -> raise PleaseRaiseProperError
       end
 
-    | _ -> raise PleaseFillIn
+    | Tm.Var _ -> raise PleaseFillIn
+    | Tm.Meta _ -> raise PleaseFillIn
+
+    | Tm.DFix _ -> raise CanJonHelpMe
 
   and eval_bnd_sys _ _ = raise PleaseFillIn
   and eval_tm_sys _ _ = raise PleaseFillIn
@@ -338,15 +383,19 @@ end =
 struct
   type t = clo
 
-  let swap _ _ = raise PleaseFillIn
-  let subst _ _ = raise PleaseFillIn
-  let run _ _ = raise PleaseFillIn
-  let subst_then_run _ _ _ _ = raise PleaseFillIn
+  let swap pi (Clo clo) =
+    Clo {clo with env = Env.swap pi clo.env}
+  let subst r x (Clo clo) =
+    Clo {clo with env = Env.subst r x clo.env}
+  let run rel (Clo clo) =
+    Clo {clo with env = Env.run rel clo.env}
+  let subst_then_run rel r x (Clo clo) =
+    Clo {clo with env = Env.subst_then_run rel r x clo.env}
 
   let inst rel clo cell =
     let Clo {bnd; env} = clo in
     let Tm.B (_, tm) = bnd in
-    Syn.eval rel (Env.extend_cell cell env) tm
+    Syn.eval rel (Env.extend_cell env cell) tm
 end
 
 and NClo :
@@ -357,15 +406,19 @@ end =
 struct
   type t = nclo
 
-  let swap _ _ = raise PleaseFillIn
-  let subst _ _ = raise PleaseFillIn
-  let run _ _ = raise PleaseFillIn
-  let subst_then_run _ _ _ _ = raise PleaseFillIn
+  let swap pi (NClo nclo) =
+    NClo {nclo with env = Env.swap pi nclo.env}
+  let subst r x (NClo nclo) =
+    NClo {nclo with env = Env.subst r x nclo.env}
+  let run rel (NClo nclo) =
+    NClo {nclo with env = Env.run rel nclo.env}
+  let subst_then_run rel r x (NClo nclo) =
+    NClo {nclo with env = Env.subst_then_run rel r x nclo.env}
 
   let inst (rel : rel) nclo cells : con =
     let NClo {bnd; env} = nclo in
     let Tm.NB (_, tm) = bnd in
-    Syn.eval rel (Env.extend_cells cells env) tm
+    Syn.eval rel (Env.extend_cells env cells) tm
 end
 
 and ExtClo :
@@ -377,15 +430,19 @@ end =
 struct
   type t = ext_clo
 
-  let swap _ _ = raise PleaseFillIn
-  let subst _ _ = raise PleaseFillIn
-  let run _ _ = raise PleaseFillIn
-  let subst_then_run _ _ _ _ = raise PleaseFillIn
+  let swap pi (ExtClo clo) =
+    ExtClo {clo with env = Env.swap pi clo.env}
+  let subst r x (ExtClo clo) =
+    ExtClo {clo with env = Env.subst r x clo.env}
+  let run rel (ExtClo clo) =
+    ExtClo {clo with env = Env.run rel clo.env}
+  let subst_then_run rel r x (ExtClo clo) =
+    ExtClo {clo with env = Env.subst_then_run rel r x clo.env}
 
   let inst rel clo cells =
     let ExtClo {bnd; env} = clo in
     let Tm.NB (_, (ty, sys)) = bnd in
-    let env' = Env.extend_cells cells env in
+    let env' = Env.extend_cells env cells in
     let vty = Syn.eval rel env' ty in
     let vsys = Syn.eval_tm_sys rel env' sys in
     vty, vsys
@@ -401,8 +458,8 @@ sig
   include Domain with type t = env
 
   val emp : unit -> env
-  val extend_cell : cell -> env -> env
-  val extend_cells : cell list -> env -> env
+  val extend_cell : env -> cell -> env
+  val extend_cells : env -> cell list -> env
   val lookup_cell_by_index : int -> env -> cell
   val index_of_level : env -> int -> int
   val level_of_index : env -> int -> int
@@ -418,12 +475,12 @@ struct
 
   let lookup_cell_by_index i {cells; _} = Bwd.nth cells i
 
-  let extend_cells cells env =
+  let extend_cells env cells =
     {cells = env.cells <>< cells;
      n_minus_one = env.n_minus_one + List.length cells}
 
-  let extend_cell cell env =
-    extend_cells [cell] env
+  let extend_cell env cell =
+    extend_cells env [cell]
 
   let index_of_level {n_minus_one; _} i = n_minus_one - i
   let level_of_index {n_minus_one; _} i = n_minus_one - i
