@@ -555,7 +555,55 @@ struct
   module ValAbs = DelayedAbsPlug (Con)
 
   type t = con
-  let swap _ _ = raise PleaseFillIn
+
+  let swap pi =
+    function
+    | Pi quant ->
+      let quant = Quantifier.swap pi quant in
+      Pi quant
+
+    | Sg quant ->
+      let quant = Quantifier.swap pi quant in
+      Sg quant
+
+    | Ext extclo ->
+      let extclo = ExtClo.swap pi extclo in
+      Ext extclo
+
+    | Lam clo ->
+      let clo = Clo.swap pi clo in
+      Lam clo
+
+    | ExtLam nclo ->
+      let nclo = NClo.swap pi nclo in
+      ExtLam nclo
+
+    | Cons (v0, v1) ->
+      let v0 = Val.swap pi v0 in
+      let v1 = Val.swap pi v1 in
+      Cons (v0, v1)
+
+    | Coe info ->
+      Coe
+        {r = Dim.swap pi info.r;
+         r' = Dim.swap pi info.r';
+         ty = CoeShape.swap pi info.ty;
+         cap = Val.swap pi info.cap}
+
+    | HCom info ->
+      HCom
+        {r = Dim.swap pi info.r;
+         r' = Dim.swap pi info.r';
+         ty = HComShape.swap pi info.ty;
+         cap = Val.swap pi info.cap;
+         sys = ConAbsSys.swap pi info.sys}
+
+    | Neu info ->
+      Neu
+        {ty = Val.swap pi info.ty;
+         neu = Neu.swap pi info.neu;
+         sys = ConSys.swap pi info.sys}
+
   let subst _ _ _ = raise PleaseFillIn
   let plug _ _ _ = raise PleaseFillIn
 
@@ -636,7 +684,7 @@ struct
       let dom = ValAbs.unleash @@ Abs (x, quantx.dom) in
       let coe_arg s = make_coe rel r' s ~abs:dom ~cap:arg in
       let coe_r'y = Delayed.make @@ lazy begin coe_arg @@ `Atom y end in
-      let cod_y = swap pi quantx.cod in
+      let cod_y = Clo.swap pi quantx.cod in
 
       let abs = Abs (y, Clo.inst rel cod_y @@ Val coe_r'y) in
       let cap = Val.plug rel (FunApp (Delayed.make @@ coe_arg r)) cap in
