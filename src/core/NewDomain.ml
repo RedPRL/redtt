@@ -186,8 +186,8 @@ sig
   (* undo Delay.make *)
   val unleash : t -> X.t
 
-  (* a convenience function that is hopefully self-explanatory *)
-  val run_then_out : rel -> t -> X.t
+  (* a convenience function that is hopefully self-explanatory and more optimized *)
+  val run_then_unleash : rel -> t -> X.t
 end
 
 module rec Syn :
@@ -470,7 +470,7 @@ struct
       begin
         match Rel.compare info.r info.r' rel with
         | `Same ->
-          Val.run_then_out rel info.cap
+          Val.run_then_unleash rel info.cap
         | _ ->
           let ty = CoeShape.run rel info.ty in
           let cap = Val.run rel info.cap in
@@ -481,7 +481,7 @@ struct
       begin
         match Rel.compare info.r info.r' rel with
         | `Same ->
-          Val.run_then_out rel info.cap
+          Val.run_then_unleash rel info.cap
         | _ ->
           match ConAbsSys.run rel info.sys with
           | sys ->
@@ -1015,7 +1015,7 @@ and DelayedPlug : DelayedDomainPlug =
     (* it is safe to `unleash v` here, but maybe we can do `Delay.drop_rel v`? *)
     let plug rel frm v = Delay.make @@ X.plug rel frm (unleash v)
 
-    let run_then_out rel v = X.run rel (Delay.drop_rel v)
+    let run_then_unleash rel v = X.run rel (Delay.drop_rel v)
   end
 
 and LazyPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t Lazy.t =
