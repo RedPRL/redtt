@@ -740,7 +740,8 @@ struct
       in
       Neu {ty; neu; sys}
 
-    | _ -> raise PleaseFillIn
+    | _ ->
+      raise PleaseFillIn
 
   and rigid_hcom rel r r' ~(ty:con) ~cap ~sys =
     match ty with
@@ -907,10 +908,18 @@ and Neu : DomainPlug with type t = neu =
 struct
   type t = neu
 
-  let swap _ = raise PleaseFillIn
-  let run _ = raise PleaseFillIn
-  let subst _ = raise PleaseFillIn
-  let subst_then_run _ = raise PleaseFillIn
+  let swap pi neu =
+    {head = Head.swap pi neu.head;
+     frames = Bwd.map (Frame.swap pi) neu.frames}
+  let run rel neu =
+    {head = Head.run rel neu.head;
+     frames = Bwd.map (Frame.run rel) neu.frames}
+  let subst r x neu =
+    {head = Head.subst r x neu.head;
+     frames = Bwd.map (Frame.subst r x) neu.frames}
+  let subst_then_run rel r x neu =
+    {head = Head.subst_then_run rel r x neu.head;
+     frames = Bwd.map (Frame.subst_then_run rel r x) neu.frames}
 
   let plug rel frm neu =
     {neu with
