@@ -543,7 +543,7 @@ struct
 
     | ExtApp ss, Coe {r; r'; ty = `Ext abs; cap} ->
       let Abs (y, extclo_y) = abs in
-      let ty_ss, sys_ss = ExtClo.inst rel extclo_y @@ List.map (fun x -> Dim x) ss in
+      let ty_ss, sys_ss = ExtClo.inst (Rel.hide' y rel) extclo_y @@ List.map (fun x -> Dim x) ss in
       let sys_ss' = ConSys.forall y sys_ss in
       raise PleaseFillIn
 
