@@ -544,7 +544,9 @@ end
 and Con :
 sig
   include DomainPlug with type t = con
+  (* invariant: abs and cap are rel-values *)
   val make_coe : rel -> dim -> dim -> abs:con abs -> cap:value -> con
+  (* invariant: ty, cap and sys are rel-values *)
   val make_hcom : rel -> dim -> dim -> ty:con -> cap:value -> sys:con abs sys -> con
 end =
 struct
@@ -821,7 +823,7 @@ struct
       let sys =
         let cap_face = r, r', Delayed.make @@ lazy begin Val.unleash cap end in
         let old_faces =
-          ConSys.foreach_forall x info.sys @@ ConFace.map_run @@ fun (s, s', bdy) ->
+          ConSys.forall_then_foreach x info.sys @@ ConFace.gen_run @@ fun (s, s', bdy) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             let abs = ValAbs.run_then_unleash rel' @@ Abs (x, Delayed.make @@ Lazy.force bdy) in
@@ -853,7 +855,7 @@ struct
       let neu_sys =
         let cap_face = r, r', Delayed.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
-          ListUtil.foreach sys @@ ConAbsFace.map_run @@ fun (s, s', abs) ->
+          ConSys.foreach_gen_run sys @@ fun (s, s', abs) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             let Abs (x, elx) = Lazy.force abs in
@@ -861,7 +863,7 @@ struct
           end
         in
         let old_faces =
-          ListUtil.foreach info.sys @@ ConFace.map_run @@ fun (s, s', ty) ->
+          ConSys.foreach_gen_run info.sys @@ fun (s, s', ty) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             let cap = Val.run rel' cap in
@@ -1160,8 +1162,14 @@ and Sys :
 
     val forall : Name.t -> t -> t
 
-    (* convenience function *)
-    val foreach_forall : Name.t -> t -> (X.t face -> 'b) -> 'b list
+    (* convenience functions which could be more efficient *)
+
+    (* forall_then_foreach x sys f = List.foreach (forall x sys) f *)
+    val forall_then_foreach : Name.t -> t -> (X.t face -> 'b) -> 'b list
+    (* foreach_gen_run sys f = List.foreach sys (Face.gen_run f) *)
+    val foreach_gen_run : 'a sys -> (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> t
+    (* run_then_foreach_run rel sys f = foreach_gen_run (run rel sys) f *)
+    val run_then_foreach_gen_run : rel -> 'a sys -> (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -1177,27 +1185,36 @@ and Sys :
 
     let run rel sys =
       let run_face face =
-        try [Face.run rel face]
+        try Some (Face.run rel face)
         with
-        | Face.Dead -> []
+        | Face.Dead -> None
         | Face.Triv bdy -> raise @@ Triv bdy
       in
-      ListUtil.flat_map run_face sys
+      ListUtil.filter_map run_face sys
 
     let subst_then_run rel r x sys =
       let run_face face =
-        try [Face.subst_then_run rel r x face]
+        try Some (Face.subst_then_run rel r x face)
         with
-        | Face.Dead -> []
+        | Face.Dead -> None
         | Face.Triv bdy -> raise @@ Triv bdy
       in
-      ListUtil.flat_map run_face sys
+      ListUtil.filter_map run_face sys
 
     let plug rel frm sys =
       List.map (Face.plug rel frm) sys
 
-    let foreach_forall x sys f =
+    let forall_then_foreach x sys f =
       ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
+    let foreach_gen_run sys f = ListUtil.foreach sys (Face.gen_run f)
+    let run_then_foreach_gen_run rel sys f =
+      let run_face face =
+        try Some (Face.run_then_gen_run f rel face)
+        with
+        | Face.Dead -> None
+        | Face.Triv bdy -> raise @@ Triv bdy
+      in
+      ListUtil.filter_map run_face sys
   end
 
 and Face :
@@ -1210,8 +1227,13 @@ and Face :
 
     val forall : Name.t -> t -> t option
 
-    (* a map for hooking up `run` *)
-    val map_run : (dim * dim * X.t Lazy.t -> 'a Lazy.t) -> t -> 'a face
+    (* a generator for hooking up `run`, assuming the provided function
+     * will then sufficiently restrict the body. the body fed into the externally
+     * function might be less restricted then the previous runs suggest. *)
+    val gen_run : (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> 'a face -> t
+
+    (* run_then_gen_run f rel face = gen_run f (run rel face) *)
+    val run_then_gen_run : (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> rel -> 'a face -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -1221,13 +1243,6 @@ and Face :
 
     exception Triv of X.t
     exception Dead
-
-    let forall x (r, r', bdy) =
-      let sx = `Atom x in
-      if r = sx || r' = sx then None else Some (r, r', bdy)
-
-    let map_run f (r, r', bdy) =
-      (r, r', Delayed.make @@ f (r, r', Delayed.drop_rel bdy))
 
     let swap pi (r, r', bdy) =
       Dim.swap pi r, Dim.swap pi r',
@@ -1264,6 +1279,23 @@ and Face :
       r, r',
       let frm' = Frame.run rel' frm in
       DelayedLazyX.plug rel frm' bdy
+
+    let forall x (r, r', bdy) =
+      let sx = `Atom x in
+      if r = sx || r' = sx then None else Some (r, r', bdy)
+
+    let gen_run f (r, r', bdy) =
+      (r, r', Delayed.make @@ f (r, r', Delayed.drop_rel bdy))
+
+    let run_then_gen_run f rel (r, r', bdy) =
+      match Rel.compare r r' rel with
+      | `Same ->
+        let bdy' = Lazy.force (f (r, r', Delayed.drop_rel bdy)) in
+        raise @@ Triv bdy'
+      | `Indet ->
+        r, r',
+        Delayed.make @@ f (r, r', Delayed.drop_rel bdy)
+      | `Apart -> raise Dead
   end
 
 and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
