@@ -330,7 +330,7 @@ struct
     | Tm.Down info ->
       eval rel env info.tm
 
-    | Tm.DownX _ -> raise CanJonHelpMe
+    | Tm.DownX _ -> raise PleaseRaiseProperError
 
     | Tm.Coe info ->
       let r = eval_dim env info.r in
@@ -347,7 +347,14 @@ struct
       let sys = eval_bnd_sys rel env info.sys in
       Con.make_hcom rel r r' ~ty ~cap ~sys
 
-    | Tm.Com _ -> raise PleaseFillIn
+    | Tm.Com info ->
+      let r = eval_dim env info.r in
+      let r' = eval_dim env info.r' in
+      let abs = eval_bnd rel env info.ty in
+      let cap = Val.make @@ eval rel env info.cap in
+      let sys = eval_bnd_sys rel env info.sys in
+      Con.make_com rel r r' ~abs ~cap ~sys
+
     | Tm.GHCom _ -> raise PleaseFillIn
     | Tm.GCom _ -> raise PleaseFillIn
 
@@ -558,6 +565,9 @@ sig
 
   (** invariant: ty, cap and sys are rel-values, but dir and sys might not be rigid *)
   val make_hcom : rel -> dim -> dim -> ty:con -> cap:value -> sys:con abs sys -> con
+
+  (** invariant: abs, cap and sys are rel-values, but dir and sys might not be rigid *)
+  val make_com : rel -> dim -> dim -> abs:con abs -> cap:value -> sys:con abs sys -> con
 end =
 struct
   module ConAbs = AbsPlug (Con)
