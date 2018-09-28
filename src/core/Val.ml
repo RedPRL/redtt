@@ -180,7 +180,7 @@ struct
       `Dim0
     | Tm.Dim1 ->
       `Dim1
-    | Tm.Up (hd, Emp) ->
+    | Tm.Up (hd, []) ->
       begin
         match hd with
         | Tm.Ix (i, _) ->
@@ -212,7 +212,7 @@ struct
 
   let eval_tick rho tm =
     match Tm.unleash tm with
-    | Tm.Up (hd, Emp) ->
+    | Tm.Up (hd, []) ->
       begin
         match hd with
         | Tm.Ix (i, _) ->
@@ -1313,7 +1313,7 @@ struct
 
   and eval_cmd rho (hd, sp) =
     let vhd = eval_head rho hd in
-    eval_stack rho vhd @@ Bwd.to_list sp
+    eval_stack rho vhd sp
 
   and eval_stack rho vhd =
     function

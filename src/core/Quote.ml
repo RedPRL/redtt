@@ -327,7 +327,7 @@ struct
             let ty = equate_ty env hcom0.ty hcom1.ty in
             let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
             let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
-            Tm.up (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, Emp)
+            Tm.up (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, [])
           with
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
@@ -341,7 +341,7 @@ struct
           Abs.inst1 coe0.abs r
         in
         let tm = equate env tyr coe0.el coe1.el in
-        Tm.up (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Emp)
+        Tm.up (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, [])
 
       | _, GHCom ghcom0, GHCom ghcom1 ->
         begin
@@ -350,7 +350,7 @@ struct
             let ty = equate_ty env ghcom0.ty ghcom1.ty in
             let cap = equate env ghcom0.ty ghcom0.cap ghcom1.cap in
             let sys = equate_comp_sys env ghcom0.ty ghcom0.sys ghcom1.sys in
-            Tm.up (Tm.GHCom {r = tr; r' = tr'; ty; cap; sys}, Emp)
+            Tm.up (Tm.GHCom {r = tr; r' = tr'; ty; cap; sys}, [])
           with
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
@@ -399,17 +399,17 @@ struct
     | Lvl (_, l0), Lvl (_, l1) ->
       if l0 = l1 then
         (* TODO: twin *)
-        Tm.Ix (Env.ix_of_lvl l0 env, `Only), Bwd.from_list stk
+        Tm.Ix (Env.ix_of_lvl l0 env, `Only), stk
       else
         failwith @@ "equate_neu: expected equal de bruijn levels, but got " ^ string_of_int l0 ^ " and " ^ string_of_int l1
     | Var info0, Var info1 ->
       if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
-        Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift}, Bwd.from_list stk
+        Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift}, stk
       else
         failwith "global variable name mismatch"
     | Meta meta0, Meta meta1 ->
       if meta0.name = meta1.name && meta0.ushift = meta1.ushift then
-        Tm.Meta {name = meta0.name; ushift = meta0.ushift}, Bwd.from_list stk
+        Tm.Meta {name = meta0.name; ushift = meta0.ushift}, stk
       else
         failwith "global variable name mismatch"
 
@@ -420,21 +420,21 @@ struct
       let ty_val = make @@ Up {ty = info0.univ; neu = info0.ty; sys = info0.ty_sys} in
       let cap = equate env ty_val info0.cap info1.cap in
       let sys = equate_comp_sys env ty_val info0.sys info1.sys in
-      Tm.HCom {r = tr; r' = tr'; ty = Tm.up ty; cap; sys}, Bwd.from_list stk
+      Tm.HCom {r = tr; r' = tr'; ty = Tm.up ty; cap; sys}, stk
 
     | NHComAtCap info0, NHComAtCap info1 ->
       let tr, tr' = equate_dir env info0.dir info1.dir in
       let ty = equate_ty env info0.ty info1.ty in
       let cap = equate_neu env info0.cap info1.cap in
       let sys = equate_comp_sys env info0.ty info0.sys info1.sys in
-      Tm.HCom {r = tr; r' = tr'; ty; cap = Tm.up cap; sys}, Bwd.from_list stk
+      Tm.HCom {r = tr; r' = tr'; ty; cap = Tm.up cap; sys}, stk
 
     | NCoe info0, NCoe info1 ->
       let tr, tr' = equate_dir env info0.dir info1.dir in
       let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
       let bnd = equate_val_abs env univ info0.abs info1.abs in
       let tm = equate_neu env info0.neu info1.neu in
-      Tm.Coe {r = tr; r' = tr'; ty = bnd; tm = Tm.up tm}, Bwd.from_list stk
+      Tm.Coe {r = tr; r' = tr'; ty = bnd; tm = Tm.up tm}, stk
 
     | NCoeAtType info0, NCoeAtType info1 ->
       let tr, tr' = equate_dir env info0.dir info1.dir in
@@ -444,7 +444,7 @@ struct
       let neu_ty_r, sys_ty_r = NeuAbs.inst1 info0.abs r in
       let ty_r = reflect univ neu_ty_r sys_ty_r in
       let tm = equate env ty_r info0.el info1.el in
-      Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, Bwd.from_list stk
+      Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, stk
 
 
     | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
@@ -455,7 +455,7 @@ struct
       let el1 = inst_clo clo1 var in
       let bdy = equate (Env.succ env) ty0 el0 el1 in
       let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
-      Tm.DFix {r = Tm.make Tm.Dim0; ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
+      Tm.DFix {r = Tm.make Tm.Dim0; ty; bdy = Tm.B (None, bdy)}, Tm.Prev tick :: stk
 
     | FixLine (x0, tgen0, ty0, clo0), FixLine (x1, tgen1, ty1, clo1) ->
       let r = equate_atom env x0 x1 in
@@ -466,7 +466,7 @@ struct
       let el1 = inst_clo clo1 var in
       let bdy = equate (Env.succ env) ty0 el0 el1 in
       let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
-      Tm.DFix {r; ty; bdy = Tm.B (None, bdy)}, Bwd.from_list @@ Tm.Prev tick :: stk
+      Tm.DFix {r; ty; bdy = Tm.B (None, bdy)}, Tm.Prev tick :: stk
 
     | Fst neu0, Fst neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Fst :: stk
