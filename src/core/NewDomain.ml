@@ -875,7 +875,7 @@ struct
       let sys =
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let old_faces =
-          ConSys.forall_then_foreach x info.sys @@ ConFace.gen_run @@ fun (s, s', bdy) ->
+          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
@@ -907,14 +907,14 @@ struct
       let neu_sys =
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
-          ConSys.foreach_gen_run sys @@ fun (s, s', abs) ->
+          ConSys.foreach_gen sys @@ fun (s, s', abs) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             ConAbs.inst rel' (Lazy.force abs) r'
           end
         in
         let old_faces =
-          ConSys.foreach_gen_run info.sys @@ fun (s, s', ty) ->
+          ConSys.foreach_gen info.sys @@ fun (s, s', ty) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             let ty = run rel' @@ Lazy.force ty in
@@ -933,7 +933,7 @@ struct
   and expand_rigid_com rel r r' ~abs ~cap ~sys =
     let ty = ConAbs.inst rel abs r' in
     let cap = Val.make @@ make_coe rel r' r ~abs ~cap in
-    let sys = ConAbsSys.foreach_gen_run sys @@ fun (r, r', face) ->
+    let sys = ConAbsSys.foreach_gen sys @@ fun (r, r', face) ->
       lazy begin
         let rel' = Rel.equate r r' in
         let Abs (y, body_y) = Lazy.force face in
@@ -962,14 +962,14 @@ struct
       let neu_sys =
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
-          ConSys.foreach_gen_run sys @@ fun (s, s', abs) ->
+          ConSys.foreach_gen sys @@ fun (s, s', abs) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             ConAbs.inst rel' (Lazy.force abs) r'
           end
         in
         let old_faces =
-          ConSys.forall_then_foreach x info.sys @@ ConFace.gen_run @@ fun (s, s', bdy) ->
+          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
             let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
@@ -1313,8 +1313,8 @@ and Sys :
     (** forall_then_foreach x sys f = List.foreach (forall x sys) f *)
     val forall_then_foreach : Name.t -> t -> (X.t face -> 'b) -> 'b list
 
-    (** foreach_gen_run sys f = List.foreach sys (Face.gen_run f) *)
-    val foreach_gen_run : 'a sys -> (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> t
+    (** foreach_gen sys f = List.foreach sys (Face.gen f) *)
+    val foreach_gen : 'a sys -> (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -1350,7 +1350,7 @@ and Sys :
 
     let forall_then_foreach x sys f =
       ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
-    let foreach_gen_run sys f = ListUtil.foreach sys (Face.gen_run f)
+    let foreach_gen sys f = ListUtil.foreach sys (Face.gen f)
 
     let force rel sys =
       let force_face face =
@@ -1387,8 +1387,9 @@ and Face :
 
     (* a generator for hooking up `run`, assuming the provided function
      * will then sufficiently restrict the body. the body fed into the externally
-     * function might be less restricted then the previous runs suggest. *)
-    val gen_run : (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> 'a face -> t
+     * function might be less restricted then the previous run or the cobifration
+     * suggests. *)
+    val gen : (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> 'a face -> t
 
     (** some convenience functions which could be more efficient *)
 
@@ -1454,7 +1455,7 @@ and Face :
       let sx = `Atom x in
       if r = sx || r' = sx then None else Some (r, r', bdy)
 
-    let gen_run f (r, r', bdy) =
+    let gen f (r, r', bdy) =
       (r, r', Delayed.make @@ f (r, r', Delayed.drop_rel bdy))
 
     let run_then_force rel (r, r', bdy) =
