@@ -23,7 +23,8 @@ sig
   val make : 'a -> 'a t
   val make' : rel option -> 'a -> 'a t
 
-  (* this is a brutal API to get the raw data out. *)
+  (* this is a brutal API to get the raw data out. the caller has
+   * the responsibility to apply proper restrictions. *)
   val drop_rel : 'a t -> 'a
 
   (* this is a convenience function to create a new delayed X.run
@@ -34,7 +35,8 @@ sig
    * to be X.run where X is some structure implementing Domain. *)
   val unleash : (rel -> 'a -> 'a) -> 'a t -> 'a
 
-  (* this is to break down the inner structure *)
+  (* this is to expose the inner structure. the caller has
+   * the responsibility to apply proper restrictions. *)
   val fold : (rel option -> 'a -> 'b) -> 'a t -> 'b
 end =
 struct
@@ -186,7 +188,10 @@ sig
   include DomainPlug
   (* type t is intended to be the delayed version of type u *)
 
-  (* undo Delayed.make *)
+  (* create a delayed run *)
+  val make : u -> t
+
+  (* undo make *)
   val unleash : t -> u
 
   (* a convenience function that is hopefully self-explanatory and more optimized *)
@@ -207,7 +212,8 @@ struct
 
   exception Triv of con
 
-  module LazyValue = DelayedPlug (LazyPlug (Con))
+  module LazyVal = DelayedPlug (LazyPlug (Con))
+  module LazyValAbs = DelayedPlug (LazyPlug (AbsPlug (Con)))
 
   let rec eval_dim env t =
     match Tm.unleash t with
@@ -223,8 +229,6 @@ struct
     | Tm.Up (Tm.DownX r, []) -> eval_dim env r
     | _ -> raise PleaseRaiseProperError
 
-  let delay_abs (Abs (x, c)) = Abs (x, Delayed.make c)
-
   let rec eval rel env t =
     match Tm.unleash t with
     | Tm.Up cmd ->
@@ -232,22 +236,22 @@ struct
 
     | Tm.Let (c, Tm.B (_, t)) ->
       let v = lazy begin eval_cmd rel env c end in
-      eval rel (Env.extend_cell env @@ Val (Delayed.make v)) t
+      eval rel (Env.extend_cell env @@ Val (LazyVal.make v)) t
 
     | Tm.Pi (dom, cod) ->
-      let dom = Delayed.make @@ eval rel env dom in
+      let dom = Val.make @@ eval rel env dom in
       let cod = Clo {bnd = cod; env} in
       Pi {dom; cod}
     | Tm.Lam bnd ->
       Lam (Clo {bnd; env})
 
     | Tm.Sg (dom, cod) ->
-      let dom = Delayed.make @@ eval rel env dom in
+      let dom = Val.make @@ eval rel env dom in
       let cod = Clo {bnd = cod; env} in
       Sg {dom; cod}
     | Tm.Cons (t0, t1) ->
-      let v0 = Delayed.make @@ eval rel env t0 in
-      let v1 = Delayed.make @@ eval rel env t1 in
+      let v0 = Val.make @@ eval rel env t0 in
+      let v1 = Val.make @@ eval rel env t1 in
       Cons (v0, v1)
 
     | Tm.Ext bnd ->
@@ -306,7 +310,7 @@ struct
     function
     | Tm.Fst -> Fst
     | Tm.Snd -> Snd
-    | Tm.FunApp t -> FunApp (Delayed.make @@ eval rel env t)
+    | Tm.FunApp t -> FunApp (Val.make @@ eval rel env t)
     | Tm.ExtApp l -> ExtApp (List.map (eval_dim env) l)
     | _ -> raise PleaseFillIn
 
@@ -328,14 +332,14 @@ struct
       let r = eval_dim env info.r in
       let r' = eval_dim env info.r' in
       let abs = eval_bnd rel env info.ty  in
-      let cap = Delayed.make @@ eval rel env info.tm in
+      let cap = Val.make @@ eval rel env info.tm in
       Con.make_coe rel r r' ~abs ~cap
 
     | Tm.HCom info ->
       let r = eval_dim env info.r in
       let r' = eval_dim env info.r' in
       let ty = eval rel env info.ty in
-      let cap = Delayed.make @@ eval rel env info.cap in
+      let cap = Val.make @@ eval rel env info.cap in
       let sys = eval_bnd_sys rel env info.sys in
       Con.make_hcom rel r r' ~ty ~cap ~sys
 
@@ -346,7 +350,7 @@ struct
     | Tm.Ix (i, _) ->
       begin
         match Env.lookup_cell_by_index i env with
-        | Val v -> Lazy.force @@ LazyValue.unleash v
+        | Val v -> Lazy.force @@ LazyVal.unleash v
         | _ -> raise PleaseRaiseProperError
       end
 
@@ -361,7 +365,7 @@ struct
       let r = eval_dim env tr in
       let r' = eval_dim env tr' in
       let abs = lazy begin eval_bnd rel env bnd end in
-      (r, r', Delayed.make abs)
+      (r, r', LazyValAbs.make abs)
     | None -> raise PleaseRaiseProperError
 
   and eval_bnd_sys rel env =
@@ -373,7 +377,7 @@ struct
       let r = eval_dim env tr in
       let r' = eval_dim env tr' in
       let v = lazy begin eval rel env tm end in
-      (r, r', Delayed.make v)
+      (r, r', LazyVal.make v)
     | None -> raise PleaseRaiseProperError
 
   and eval_tm_sys rel env =
@@ -474,7 +478,7 @@ struct
 
   let inst' rel clo cells =
     let vty, vsys = inst rel clo cells in
-    Delayed.make vty, vsys
+    Val.make vty, vsys
 end
 
 and Cell : Domain with type t = cell =
@@ -556,6 +560,7 @@ struct
   module ConAbsFace = Face (AbsPlug (Con))
   module ConAbsSys = Sys (AbsPlug (Con))
   module ValAbs = DelayedAbsPlug (Con)
+  module LazyVal = DelayedPlug (LazyPlug (Con))
 
   type t = con
 
@@ -723,22 +728,22 @@ struct
   and plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
-      Clo.inst rel clo @@ Val (Delayed.make @@ lazy begin Val.unleash arg end)
+      Clo.inst rel clo @@ Val (LazyVal.make @@ lazy begin Val.unleash arg end)
 
     | FunApp arg, Coe {r; r'; ty = `Pi abs; cap} ->
       let Abs (x, quantx) = abs in
       let y, pi = Perm.freshen_name x in
       let dom = ValAbs.unleash @@ Abs (x, quantx.dom) in
       let coe_arg s = make_coe rel r' s ~abs:dom ~cap:arg in
-      let coe_r'y = Delayed.make @@ lazy begin coe_arg @@ `Atom y end in
+      let coe_r'y = LazyVal.make @@ lazy begin coe_arg @@ `Atom y end in
       let cod_y = Clo.swap pi quantx.cod in
 
       let abs = Abs (y, Clo.inst rel cod_y @@ Val coe_r'y) in
-      let cap = Val.plug rel (FunApp (Delayed.make @@ coe_arg r)) cap in
+      let cap = Val.plug rel (FunApp (Val.make @@ coe_arg r)) cap in
       rigid_coe rel r r' ~abs ~cap
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
-      let ty = Clo.inst rel quant.cod @@ Val (Delayed.make @@ lazy begin Val.unleash arg end) in
+      let ty = Clo.inst rel quant.cod @@ Val (LazyVal.make @@ lazy begin Val.unleash arg end) in
       let cap = Val.plug rel frm cap in
       let sys = ConAbsSys.plug rel frm sys in
       rigid_hcom rel r r' ~ty ~cap ~sys
@@ -818,14 +823,14 @@ struct
 
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
-      let ty = Delayed.make @@ ConAbs.inst rel abs r' in
+      let ty = ValAbs.inst rel (Abs (x, Val.make tyx)) r' in
       let sys =
-        let cap_face = r, r', Delayed.make @@ lazy begin Val.unleash cap end in
+        let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let old_faces =
           ConSys.forall_then_foreach x info.sys @@ ConFace.gen_run @@ fun (s, s', bdy) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
-            let abs = ValAbs.run_then_unleash rel' @@ Abs (x, Delayed.make @@ Lazy.force bdy) in
+            let abs = ValAbs.run_then_unleash rel' @@ Abs (x, Val.make @@ Lazy.force bdy) in
             let cap = Val.run rel' cap in
             make_coe rel' r r' ~abs ~cap
           end
@@ -837,7 +842,7 @@ struct
     | _ ->
       raise PleaseFillIn
 
-  and rigid_hcom rel r r' ~(ty:con) ~cap ~sys =
+  and rigid_hcom rel r r' ~ty ~cap ~sys =
     match ty with
     | Sg quant ->
       HCom {r; r'; ty = `Sg quant; cap; sys}
@@ -872,16 +877,17 @@ struct
         in
         cap_face :: tube_faces @ old_faces
       in
-      Neu {ty = Delayed.make ty; neu; sys = neu_sys}
+      Neu {ty = Val.make ty; neu; sys = neu_sys}
 
     | _ ->
       raise PleaseFillIn
+
 
   and plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
     | Pi {dom; cod}, FunApp arg ->
       let arg = lazy begin Val.unleash arg end in
-      Delayed.make @@ Clo.inst rel cod @@ Val (Delayed.make arg), []
+      Val.make @@ Clo.inst rel cod @@ Val (LazyVal.make arg), []
 
     | Ext extclo, ExtApp rs ->
       ExtClo.inst' rel extclo @@ List.map (fun r -> Dim r) rs
@@ -891,7 +897,7 @@ struct
 
     | Sg {dom; cod}, Snd ->
       let car = lazy begin plug rel Fst hd end in
-      Delayed.make @@ Clo.inst rel cod @@ Val (Delayed.make car), []
+      Val.make @@ Clo.inst rel cod @@ Val (LazyVal.make car), []
 
     | _ ->
       raise PleaseFillIn
@@ -1353,6 +1359,7 @@ and DelayedAbsPlug : functor (X : DomainPlug) ->
 
     module DelayedX = DelayedPlug(X)
 
+    let make (Abs (x, v)) = Abs (x, DelayedX.make v)
     let unleash (Abs (x, v)) = Abs (x, DelayedX.unleash v)
 
     let run_then_unleash rel (Abs (x, v)) =
@@ -1367,6 +1374,7 @@ and DelayedPlug : functor (X : DomainPlug) ->
     type u = X.t
     type t = X.t Delayed.t
 
+    let make = Delayed.make
     let unleash = Delayed.unleash X.run
 
     let swap pi = Delayed.fold @@ fun rel v ->
