@@ -80,6 +80,7 @@ type con =
   | Cons of value * value
   | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value}
   | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys}
+  | Com of {r : dim; r' : dim; ty : coe_shape; cap : value; sys : con abs sys}
   | Neu of {ty : value; neu : neu; sys : con sys}
 
 and value = con Delayed.t
@@ -94,6 +95,8 @@ and coe_shape =
   | `Ext of ext_clo abs     (** coe in extension type *)
   ]
 
+and com_shape = coe_shape
+
 and hcom_shape =
   [ `Pi of quantifier   (** hcom in pi *)
   | `Sg of quantifier   (** hcom in sigma *)
@@ -105,6 +108,7 @@ and hcom_shape =
 and head =
   | Lvl of int
   | NCoe of {r : dim; r' : dim; ty : neu abs; cap : value}
+  | NCom of {r : dim; r' : dim; ty : neu abs; cap : value; sys : con abs sys}
 
 and frame =
   | FunApp of value
@@ -608,6 +612,14 @@ struct
          cap = Val.swap pi info.cap;
          sys = ConAbsSys.swap pi info.sys}
 
+    | Com info ->
+      Com
+        {r = Dim.swap pi info.r;
+         r' = Dim.swap pi info.r';
+         ty = ComShape.swap pi info.ty;
+         cap = Val.swap pi info.cap;
+         sys = ConAbsSys.swap pi info.sys}
+
     | Neu info ->
       Neu
         {ty = Val.swap pi info.ty;
@@ -653,6 +665,14 @@ struct
         {r = Dim.subst r x info.r;
          r' = Dim.subst r x info.r';
          ty = HComShape.subst r x info.ty;
+         cap = Val.subst r x info.cap;
+         sys = ConAbsSys.subst r x info.sys}
+
+    | Com info ->
+      Com
+        {r = Dim.subst r x info.r;
+         r' = Dim.subst r x info.r';
+         ty = ComShape.subst r x info.ty;
          cap = Val.subst r x info.cap;
          sys = ConAbsSys.subst r x info.sys}
 
@@ -722,6 +742,22 @@ struct
             let cap = Val.run rel info.cap in
             let ty = HComShape.run rel info.ty in
             HCom {info with ty; cap; sys}
+
+          | exception ConAbsSys.Triv abs ->
+            ConAbs.inst rel abs info.r'
+      end
+
+    | Com info ->
+      begin
+        match Rel.compare info.r info.r' rel with
+        | `Same ->
+          Val.run_then_unleash rel info.cap
+        | _ ->
+          match ConAbsSys.run_then_force rel info.sys with
+          | sys ->
+            let cap = Val.run rel info.cap in
+            let ty = ComShape.run rel info.ty in
+            Com {info with ty; cap; sys}
 
           | exception ConAbsSys.Triv abs ->
             ConAbs.inst rel abs info.r'
@@ -809,6 +845,16 @@ struct
       | exception ConAbsSys.Triv abs ->
         ConAbs.inst rel abs r'
 
+  and make_com rel r r' ~abs ~cap ~sys =
+    match Rel.compare r r' rel with
+    | `Same ->
+      Val.unleash cap
+    | _ ->
+      match ConAbsSys.force rel sys with
+      | _ ->
+        rigid_com rel r r' ~abs ~cap ~sys
+      | exception ConAbsSys.Triv abs ->
+        ConAbs.inst rel abs r'
 
   (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
   and rigid_coe rel r r' ~abs ~cap : con =
@@ -825,7 +871,7 @@ struct
 
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
-      let ty = ValAbs.inst rel (Abs (x, Val.make tyx)) r' in
+      let ty = ValAbs.inst rel (ValAbs.make abs) r' in
       let sys =
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let old_faces =
@@ -871,8 +917,8 @@ struct
           ConSys.foreach_gen_run info.sys @@ fun (s, s', ty) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
-            let cap = Val.run rel' cap in
             let ty = run rel' @@ Lazy.force ty in
+            let cap = Val.run rel' cap in
             let sys = ConAbsSys.run rel' sys in
             make_hcom rel' r r' ~ty ~cap ~sys
           end
@@ -880,6 +926,66 @@ struct
         cap_face :: tube_faces @ old_faces
       in
       Neu {ty = Val.make ty; neu; sys = neu_sys}
+
+    | _ ->
+      raise PleaseFillIn
+
+  and expand_rigid_com rel r r' ~abs ~cap ~sys =
+    let ty = ConAbs.inst rel abs r' in
+    let cap = Val.make @@ make_coe rel r' r ~abs ~cap in
+    let sys = ConAbsSys.foreach_gen_run sys @@ fun (r, r', face) ->
+      lazy begin
+        let rel' = Rel.equate r r' in
+        let Abs (y, body_y) = Lazy.force face in
+        let z, pi = Perm.freshen_name y in
+        let cap = Val.make @@ Con.swap pi body_y in
+        Abs (z, make_coe rel r' (`Atom z) ~abs ~cap)
+      end
+    in
+    rigid_hcom rel r r' ~ty ~cap ~sys
+
+  and rigid_com rel r r' ~abs ~cap ~sys =
+    let Abs (x, tyx) = abs in
+    match tyx with
+    | Sg quant ->
+      Com {r; r'; ty = `Sg (Abs (x, quant)); cap; sys}
+
+    | Pi quant ->
+      Com {r; r'; ty = `Pi (Abs (x, quant)); cap; sys}
+
+    | Ext extclo ->
+      Com {r; r'; ty = `Ext (Abs (x, extclo)); cap; sys}
+
+    | Neu info ->
+      let neu = {head = NCom {r; r'; ty = Abs (x, info.neu); cap; sys}; frames = Emp} in
+      let ty = ValAbs.inst rel (ValAbs.make abs) r' in
+      let neu_sys =
+        let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
+        let tube_faces =
+          ConSys.foreach_gen_run sys @@ fun (s, s', abs) ->
+          lazy begin
+            let rel' = Rel.equate' s s' rel in
+            ConAbs.inst rel' (Lazy.force abs) r'
+          end
+        in
+        let old_faces =
+          ConSys.forall_then_foreach x info.sys @@ ConFace.gen_run @@ fun (s, s', bdy) ->
+          lazy begin
+            let rel' = Rel.equate' s s' rel in
+            let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
+            let cap = Val.run rel' cap in
+            let sys = ConAbsSys.run rel' sys in
+            make_com rel' r r' ~abs ~cap ~sys
+          end
+        in
+        cap_face :: tube_faces @ old_faces
+      in
+      Neu {ty; neu; sys = neu_sys}
+
+    (* the following is for positive types, but we do not
+     * have any yet!
+     *
+     * | _ -> expand_rigid_com rel r r' ~abs ~cap ~sys *)
 
     | _ ->
       raise PleaseFillIn
@@ -979,6 +1085,8 @@ struct
     | `Pos -> `Pos
 end
 
+and ComShape : Domain with type t = com_shape = CoeShape
+
 and Quantifier : Domain with type t = quantifier =
 struct
   type t = quantifier
@@ -1028,6 +1136,7 @@ struct
   type t = head
 
   module NeuAbs = Abs (Neu)
+  module ConAbsSys = Sys (AbsPlug (Con))
 
   let swap pi =
     function
@@ -1038,6 +1147,13 @@ struct
          r' = Dim.swap pi info.r';
          ty = NeuAbs.swap pi info.ty;
          cap = Val.swap pi info.cap}
+    | NCom info ->
+      NCom
+        {r = Dim.swap pi info.r;
+         r' = Dim.swap pi info.r';
+         ty = NeuAbs.swap pi info.ty;
+         cap = Val.swap pi info.cap;
+         sys = ConAbsSys.swap pi info.sys}
   let run rel =
     function
     | Lvl _ as h -> h
@@ -1047,6 +1163,13 @@ struct
          r' = Dim.run rel info.r';
          ty = NeuAbs.run rel info.ty;
          cap = Val.run rel info.cap}
+    | NCom info ->
+      NCom
+        {r = Dim.run rel info.r;
+         r' = Dim.run rel info.r';
+         ty = NeuAbs.run rel info.ty;
+         cap = Val.run rel info.cap;
+         sys = ConAbsSys.run rel info.sys}
   let subst r x =
     function
     | Lvl _ as h -> h
@@ -1056,6 +1179,13 @@ struct
          r' = Dim.subst r x info.r';
          ty = NeuAbs.subst r x info.ty;
          cap = Val.subst r x info.cap}
+    | NCom info ->
+      NCom
+        {r = Dim.subst r x info.r;
+         r' = Dim.subst r x info.r';
+         ty = NeuAbs.subst r x info.ty;
+         cap = Val.subst r x info.cap;
+         sys = ConAbsSys.subst r x info.sys}
   let subst_then_run rel r x =
     function
     | Lvl _ as h -> h
@@ -1065,6 +1195,13 @@ struct
          r' = Dim.subst_then_run rel r x info.r';
          ty = NeuAbs.subst_then_run rel r x info.ty;
          cap = Val.subst_then_run rel r x info.cap}
+    | NCom info ->
+      NCom
+        {r = Dim.subst_then_run rel r x info.r;
+         r' = Dim.subst_then_run rel r x info.r';
+         ty = NeuAbs.subst_then_run rel r x info.ty;
+         cap = Val.subst_then_run rel r x info.cap;
+         sys = ConAbsSys.subst_then_run rel r x info.sys}
 end
 
 and Frame :
