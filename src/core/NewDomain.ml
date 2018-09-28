@@ -213,14 +213,14 @@ struct
     match Tm.unleash t with
     | Tm.Dim0 -> `Dim0
     | Tm.Dim1 -> `Dim1
-    | Tm.Up (Tm.Ix (i, _), Emp) ->
+    | Tm.Up (Tm.Ix (i, _), []) ->
       begin
         match Env.lookup_cell_by_index i env with
         | Dim r -> r
         | _ -> raise PleaseRaiseProperError
       end
-    | Tm.Up (Tm.Var {name; _}, Emp) -> `Atom name
-    | Tm.Up (Tm.DownX r, Emp) -> eval_dim env r
+    | Tm.Up (Tm.Var {name; _}, []) -> `Atom name
+    | Tm.Up (Tm.DownX r, []) -> eval_dim env r
     | _ -> raise PleaseRaiseProperError
 
   let delay_abs (Abs (x, c)) = Abs (x, Delayed.make c)
@@ -296,11 +296,11 @@ struct
 
   and eval_spine rel env vhd =
     function
-    | Emp -> vhd
-    | Snoc (sp, frm) ->
-      let v = eval_spine rel env vhd sp in
+    | [] -> vhd
+    | frm :: sp ->
       let frm = eval_frame rel env frm in
-      Con.plug rel frm vhd
+      let vhd = Con.plug rel frm vhd in
+      eval_spine rel env vhd sp
 
   and eval_frame rel env =
     function
