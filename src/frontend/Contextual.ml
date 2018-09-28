@@ -203,7 +203,7 @@ let get_global_env =
     | Snoc (psi, (_, `KillFromTick tck)) ->
       begin
         match Tm.unleash tck with
-        | Tm.Up (Tm.Var info, Emp) ->
+        | Tm.Up (Tm.Var info, []) ->
           GlobalEnv.kill_from_tick (go_params psi) info.name
         | _ ->
           go_params psi

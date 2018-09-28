@@ -1,5 +1,4 @@
 open RedTT_Core
-open RedBasis.Bwd
 
 type 'a info =
   {con : 'a;
@@ -62,7 +61,7 @@ and econ =
   | DFixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
   | FixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
 
-  | Cut of eterm * frame bwd
+  | Cut of eterm * frame list
 
   | Refl
 
