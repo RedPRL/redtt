@@ -550,6 +550,7 @@ sig
   val make_hcom : rel -> dim -> dim -> ty:con -> cap:value -> sys:con abs sys -> con
 end =
 struct
+  module ConAbs = AbsPlug (Con)
   module ConSys = Sys (Con)
   module ConFace = Face (Con)
   module ConAbsFace = Face (AbsPlug (Con))
@@ -716,8 +717,7 @@ struct
             HCom {info with ty; cap; sys}
 
           | exception (ConAbsSys.Triv abs) ->
-            let Abs (x, vx) = abs in
-            hsubst info.r' x rel vx
+            ConAbs.inst rel abs info.r'
       end
 
   and plug rel frm hd =
@@ -800,8 +800,7 @@ struct
       | _ ->
         rigid_hcom rel r r' ~ty ~cap ~sys
       | exception (ConAbsSys.Triv abs) ->
-        let Abs (x, vx) = abs in
-        hsubst r' x rel vx
+        ConAbs.inst rel abs r'
 
 
   (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
@@ -819,7 +818,7 @@ struct
 
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
-      let ty = Delayed.make' (Some (Rel.hide' x rel)) (subst r' x tyx) in
+      let ty = Delayed.make @@ ConAbs.inst rel abs r' in
       let sys =
         let cap_face = r, r', Delayed.make @@ lazy begin Val.unleash cap end in
         let old_faces =
@@ -858,8 +857,7 @@ struct
           ConSys.foreach_gen_run sys @@ fun (s, s', abs) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
-            let Abs (x, elx) = Lazy.force abs in
-            hsubst r' x rel' elx
+            ConAbs.inst rel' (Lazy.force abs) r'
           end
         in
         let old_faces =
@@ -897,10 +895,6 @@ struct
 
     | _ ->
       raise PleaseFillIn
-
-  and hsubst r x rel c =
-    let rel' = Rel.subst' r x rel in
-    subst_then_run rel' r x c
 
   and subst_then_run rel r x c =
     run rel @@ subst r x c
@@ -1275,7 +1269,12 @@ and Face :
       (r, r', Delayed.make @@ f (r, r', Delayed.drop_rel bdy))
   end
 
-and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
+and Abs : functor (X : Domain) ->
+  sig
+    include Domain with type t = X.t abs
+    val inst : rel -> t -> dim -> X.t
+  end
+  =
   functor (X : Domain) ->
   struct
     type t = X.t abs
@@ -1308,9 +1307,18 @@ and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
     (* XXX optimize this! *)
     let subst_then_run rel r x a =
       run rel @@ subst r x a
+
+    let inst rel abs r =
+      let Abs (x, a) = abs in
+      X.subst_then_run (Rel.hide' x rel) r x a
   end
 
-and AbsPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
+and AbsPlug : functor (X : DomainPlug) ->
+  sig
+    include DomainPlug with type t = X.t abs
+    val inst : rel -> t -> dim -> X.t
+  end
+  =
   functor (X : DomainPlug) ->
   struct
     module M = Abs(X)
@@ -1330,7 +1338,12 @@ and AbsPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t abs =
   end
 
 and DelayedAbsPlug : functor (X : DomainPlug) ->
-  DelayedDomainPlug with type u = X.t abs and type t = X.t Delayed.t abs
+  sig
+    include DelayedDomainPlug
+      with type u = X.t abs
+      and type t = X.t Delayed.t abs
+    val inst : rel -> t -> dim -> X.t Delayed.t
+  end
   =
   functor (X : DomainPlug) ->
   struct
