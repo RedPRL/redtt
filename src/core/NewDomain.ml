@@ -1168,8 +1168,6 @@ and Sys :
     val forall_then_foreach : Name.t -> t -> (X.t face -> 'b) -> 'b list
     (* foreach_gen_run sys f = List.foreach sys (Face.gen_run f) *)
     val foreach_gen_run : 'a sys -> (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> t
-    (* run_then_foreach_run rel sys f = foreach_gen_run (run rel sys) f *)
-    val run_then_foreach_gen_run : rel -> 'a sys -> (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -1207,14 +1205,6 @@ and Sys :
     let forall_then_foreach x sys f =
       ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
     let foreach_gen_run sys f = ListUtil.foreach sys (Face.gen_run f)
-    let run_then_foreach_gen_run rel sys f =
-      let run_face face =
-        try Some (Face.run_then_gen_run f rel face)
-        with
-        | Face.Dead -> None
-        | Face.Triv bdy -> raise @@ Triv bdy
-      in
-      ListUtil.filter_map run_face sys
   end
 
 and Face :
@@ -1231,9 +1221,6 @@ and Face :
      * will then sufficiently restrict the body. the body fed into the externally
      * function might be less restricted then the previous runs suggest. *)
     val gen_run : (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> 'a face -> t
-
-    (* run_then_gen_run f rel face = gen_run f (run rel face) *)
-    val run_then_gen_run : (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> rel -> 'a face -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -1286,16 +1273,6 @@ and Face :
 
     let gen_run f (r, r', bdy) =
       (r, r', Delayed.make @@ f (r, r', Delayed.drop_rel bdy))
-
-    let run_then_gen_run f rel (r, r', bdy) =
-      match Rel.compare r r' rel with
-      | `Same ->
-        let bdy' = Lazy.force (f (r, r', Delayed.drop_rel bdy)) in
-        raise @@ Triv bdy'
-      | `Indet ->
-        r, r',
-        Delayed.make @@ f (r, r', Delayed.drop_rel bdy)
-      | `Apart -> raise Dead
   end
 
 and Abs : functor (X : Domain) -> Domain with type t = X.t abs =
