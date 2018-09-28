@@ -548,9 +548,11 @@ end
 and Con :
 sig
   include DomainPlug with type t = con
-  (* invariant: abs and cap are rel-values *)
+
+  (** invariant: abs and cap are rel-values, but dir might not be rigid *)
   val make_coe : rel -> dim -> dim -> abs:con abs -> cap:value -> con
-  (* invariant: ty, cap and sys are rel-values *)
+
+  (** invariant: ty, cap and sys are rel-values, but dir and sys might not be rigid *)
   val make_hcom : rel -> dim -> dim -> ty:con -> cap:value -> sys:con abs sys -> con
 end =
 struct
@@ -676,7 +678,7 @@ struct
 
     | Neu info ->
       begin
-        match ConSys.run rel info.sys with
+        match ConSys.run_then_force rel info.sys with
         | sys ->
           let neu = Neu.run rel info.neu in
           let ty = Val.run rel info.ty in
@@ -715,13 +717,13 @@ struct
         | `Same ->
           Val.run_then_unleash rel info.cap
         | _ ->
-          match ConAbsSys.run rel info.sys with
+          match ConAbsSys.run_then_force rel info.sys with
           | sys ->
             let cap = Val.run rel info.cap in
             let ty = HComShape.run rel info.ty in
             HCom {info with ty; cap; sys}
 
-          | exception (ConAbsSys.Triv abs) ->
+          | exception ConAbsSys.Triv abs ->
             ConAbs.inst rel abs info.r'
       end
 
@@ -801,10 +803,10 @@ struct
     | `Same ->
       Val.unleash cap
     | _ ->
-      match ConAbsSys.run rel sys with
+      match ConAbsSys.run_then_force rel sys with
       | _ ->
         rigid_hcom rel r r' ~ty ~cap ~sys
-      | exception (ConAbsSys.Triv abs) ->
+      | exception ConAbsSys.Triv abs ->
         ConAbs.inst rel abs r'
 
 
@@ -830,7 +832,7 @@ struct
           ConSys.forall_then_foreach x info.sys @@ ConFace.gen_run @@ fun (s, s', bdy) ->
           lazy begin
             let rel' = Rel.equate' s s' rel in
-            let abs = ValAbs.run_then_unleash rel' @@ Abs (x, Val.make @@ Lazy.force bdy) in
+            let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
             let cap = Val.run rel' cap in
             make_coe rel' r r' ~abs ~cap
           end
@@ -857,7 +859,7 @@ struct
       let nhcom = NHCom {r; r'; cap; sys} in
       let neu = {info.neu with frames = info.neu.frames #< nhcom} in
       let neu_sys =
-        let cap_face = r, r', Delayed.make @@ lazy begin Val.unleash cap end in
+        let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
           ConSys.foreach_gen_run sys @@ fun (s, s', abs) ->
           lazy begin
@@ -1160,13 +1162,21 @@ and Sys :
     include DomainPlug with type t = X.t sys
     exception Triv of X.t
 
+    (** this is to force rigidity of a system *)
+    val force : rel -> t -> t
+
+    (** this is to remove all faces depending on a particular variable *)
     val forall : Name.t -> t -> t
 
-    (* convenience functions which could be more efficient *)
+    (** some convenience functions which could be more efficient *)
 
-    (* forall_then_foreach x sys f = List.foreach (forall x sys) f *)
+    (** run_then_force rel sys = force (run rel sys) *)
+    val run_then_force : rel -> t -> t
+
+    (** forall_then_foreach x sys f = List.foreach (forall x sys) f *)
     val forall_then_foreach : Name.t -> t -> (X.t face -> 'b) -> 'b list
-    (* foreach_gen_run sys f = List.foreach sys (Face.gen_run f) *)
+
+    (** foreach_gen_run sys f = List.foreach sys (Face.gen_run f) *)
     val foreach_gen_run : 'a sys -> (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> t
   end =
   functor (X : DomainPlug) ->
@@ -1186,7 +1196,6 @@ and Sys :
         try Some (Face.run rel face)
         with
         | Face.Dead -> None
-        | Face.Triv bdy -> raise @@ Triv bdy
       in
       ListUtil.filter_map run_face sys
 
@@ -1205,6 +1214,24 @@ and Sys :
     let forall_then_foreach x sys f =
       ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
     let foreach_gen_run sys f = ListUtil.foreach sys (Face.gen_run f)
+
+    let force rel sys =
+      let force_face face =
+        try Some (Face.force rel face)
+        with
+        | Face.Dead -> None
+        | Face.Triv bdy -> raise @@ Triv bdy
+      in
+      ListUtil.filter_map force_face sys
+
+    let run_then_force rel sys =
+      let run_then_force_face face =
+        try Some (Face.run_then_force rel face)
+        with
+        | Face.Dead -> None
+        | Face.Triv bdy -> raise @@ Triv bdy
+      in
+      ListUtil.filter_map run_then_force_face sys
   end
 
 and Face :
@@ -1215,12 +1242,21 @@ and Face :
     exception Triv of X.t
     exception Dead
 
+    (** this is to force rigidity of a system *)
+    val force : rel -> t -> t
+
+    (** this is to remove all faces depending on a particular variable *)
     val forall : Name.t -> t -> t option
 
     (* a generator for hooking up `run`, assuming the provided function
      * will then sufficiently restrict the body. the body fed into the externally
      * function might be less restricted then the previous runs suggest. *)
     val gen_run : (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> 'a face -> t
+
+    (** some convenience functions which could be more efficient *)
+
+    (** run_then_force rel face = force (run rel face) *)
+    val run_then_force : rel -> t -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -1235,19 +1271,19 @@ and Face :
       Dim.swap pi r, Dim.swap pi r',
       DelayedLazyX.swap pi bdy
 
-    let subst r x (s, s', bdy) =
-      Dim.subst r x s, Dim.subst r x s',
-      DelayedLazyX.subst r x bdy
-
     let run rel (r, r', bdy) =
       match Rel.equate r r' rel with
       | `Same ->
-        let bdy' = X.run rel (Lazy.force @@ Delayed.drop_rel bdy) in
-        raise @@ Triv bdy'
+        r, r',
+        DelayedLazyX.run rel bdy
       | `Changed rel' ->
         r, r',
         DelayedLazyX.run rel' bdy
       | exception I.Inconsistent -> raise Dead
+
+    let subst r x (s, s', bdy) =
+      Dim.subst r x s, Dim.subst r x s',
+      DelayedLazyX.subst r x bdy
 
     let subst_then_run rel r x (s, s', bdy) =
       let s = Dim.subst r x s in
@@ -1267,12 +1303,32 @@ and Face :
       let frm' = Frame.run rel' frm in
       DelayedLazyX.plug rel frm' bdy
 
+    let force rel ((r, r', bdy) as face) =
+      match Rel.compare r r' rel with
+      | `Same ->
+        let bdy' = Lazy.force @@ DelayedLazyX.unleash bdy in
+        raise @@ Triv bdy'
+      | `Apart ->
+        raise Dead
+      | `Indet ->
+        face
+
     let forall x (r, r', bdy) =
       let sx = `Atom x in
       if r = sx || r' = sx then None else Some (r, r', bdy)
 
     let gen_run f (r, r', bdy) =
       (r, r', Delayed.make @@ f (r, r', Delayed.drop_rel bdy))
+
+    let run_then_force rel (r, r', bdy) =
+      match Rel.equate r r' rel with
+      | `Same ->
+        let bdy' = X.run rel (Lazy.force @@ Delayed.drop_rel bdy) in
+        raise @@ Triv bdy'
+      | `Changed rel' ->
+        r, r',
+        DelayedLazyX.run rel' bdy
+      | exception I.Inconsistent -> raise Dead
   end
 
 and Abs : functor (X : Domain) ->
