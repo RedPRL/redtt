@@ -192,17 +192,23 @@ end
 
 module type DelayedDomainPlug =
 sig
+  (** type t is intended to be the delayed version of type u *)
   type u
   include DomainPlug
-  (* type t is intended to be the delayed version of type u *)
 
-  (* create a delayed run *)
+  (** create a delayed run *)
   val make : u -> t
 
-  (* undo make *)
+  (** force the run created by [make] *)
   val unleash : t -> u
 
-  (* a convenience function that is hopefully self-explanatory and more optimized *)
+  (** cancel the run (drop the held rel). the caller has the
+      responsibility to apply proper restrictions. *)
+  val drop_rel : t -> u
+
+  (** some convenience function that might be more optimized *)
+
+  (** run_then_unleash rel x = run rel (unleash x) *)
   val run_then_unleash : rel -> t -> u
 end
 
@@ -1541,7 +1547,7 @@ and Face :
       let s' = Dim.subst r x s' in
       match Rel.equate s s' rel with
       | `Same ->
-        let bdy' = X.subst_then_run rel r x (Lazy.force @@ Delayed.drop_rel bdy) in
+        let bdy' = X.subst_then_run rel r x (Lazy.force @@ DelayedLazyX.drop_rel bdy) in
         raise @@ Triv bdy'
       | `Changed rel' ->
         s, s',
@@ -1574,7 +1580,7 @@ and Face :
     let run_then_force rel (r, r', bdy) =
       match Rel.equate r r' rel with
       | `Same ->
-        let bdy' = X.run rel (Lazy.force @@ Delayed.drop_rel bdy) in
+        let bdy' = X.run rel (Lazy.force @@ DelayedLazyX.drop_rel bdy) in
         raise @@ Triv bdy'
       | `Changed rel' ->
         r, r',
@@ -1668,6 +1674,7 @@ and DelayedAbsPlug : functor (X : DomainPlug) ->
 
     let make (Abs (x, v)) = Abs (x, DelayedX.make v)
     let unleash (Abs (x, v)) = Abs (x, DelayedX.unleash v)
+    let drop_rel (Abs (x, v)) = Abs (x, DelayedX.drop_rel v)
 
     let run_then_unleash rel (Abs (x, v)) =
       Abs (x, DelayedX.run_then_unleash (Rel.hide' x rel) v)
@@ -1683,6 +1690,7 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let make = Delayed.make
     let unleash = Delayed.unleash X.run
+    let drop_rel = Delayed.drop_rel
 
     let swap pi = Delayed.fold @@ fun rel v ->
       Delayed.make' (Option.map (Perm.fold Rel.swap pi) rel) (X.swap pi v)
