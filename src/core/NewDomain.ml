@@ -79,8 +79,8 @@ type con =
   | Cons of value * value
   | ExtLam of nclo
 
-  | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value}
   | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys}
+  | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value}
   | Com of {r : dim; r' : dim; ty : coe_shape; cap : value; sys : con abs sys}
 
   | Univ of {kind : Kind.t; lvl : Lvl.t}
@@ -336,13 +336,6 @@ struct
 
     | Tm.DownX _ -> raise PleaseRaiseProperError
 
-    | Tm.Coe info ->
-      let r = eval_dim env info.r in
-      let r' = eval_dim env info.r' in
-      let abs = eval_bnd rel env info.ty  in
-      let cap = Val.make @@ eval rel env info.tm in
-      Con.make_coe rel r r' ~abs ~cap
-
     | Tm.HCom info ->
       let r = eval_dim env info.r in
       let r' = eval_dim env info.r' in
@@ -350,6 +343,13 @@ struct
       let cap = Val.make @@ eval rel env info.cap in
       let sys = eval_bnd_sys rel env info.sys in
       Con.make_hcom rel r r' ~ty ~cap ~sys
+
+    | Tm.Coe info ->
+      let r = eval_dim env info.r in
+      let r' = eval_dim env info.r' in
+      let abs = eval_bnd rel env info.ty  in
+      let cap = Val.make @@ eval rel env info.tm in
+      Con.make_coe rel r r' ~abs ~cap
 
     | Tm.Com info ->
       let r = eval_dim env info.r in
@@ -805,8 +805,25 @@ struct
     | ExtApp rs, ExtLam nclo ->
       NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
 
-    | ExtApp rs, HCom {r; r'; ty = `Ext qu; cap; sys} ->
-      raise PleaseFillIn
+    | ExtApp rs as frm, HCom {r; r'; ty = `Ext extclo; cap; sys} ->
+      let ty, ext_sys =
+        let dim_cells = List.map (fun x -> Dim x) rs in
+        ExtClo.inst rel extclo dim_cells
+      in
+      begin
+        match ConSys.force rel ext_sys with
+        | ext_sys ->
+          let cap = Val.plug rel frm cap in
+          let ext_sys = ConAbsSys.foreach_gen ext_sys @@
+            fun (r, r', bdy) ->
+              let x = Name.fresh () in
+              Abs (x, Lazy.force bdy)
+          in
+          let comp_sys = ConAbsSys.plug rel frm sys in
+          let sys = ext_sys @ comp_sys in
+          rigid_hcom rel r r' ~ty ~cap ~sys
+        | exception ConSys.Triv c -> c
+      end
 
     | ExtApp ss, Coe {r; r'; ty = `Ext abs; cap} ->
       let Abs (y, extclo_y) = abs in
@@ -936,12 +953,10 @@ struct
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let old_faces =
           ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
-          lazy begin
             let rel' = Rel.equate' s s' rel in
             let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
             let cap = Val.run rel' cap in
             make_coe rel' r r' ~abs ~cap
-          end
         in
         cap_face :: old_faces
       in
@@ -974,20 +989,16 @@ struct
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
           ConSys.foreach_gen sys @@ fun (s, s', abs) ->
-          lazy begin
             let rel' = Rel.equate' s s' rel in
             ConAbs.inst rel' (Lazy.force abs) r'
-          end
         in
         let old_faces =
           ConSys.foreach_gen info.sys @@ fun (s, s', ty) ->
-          lazy begin
             let rel' = Rel.equate' s s' rel in
             let ty = run rel' @@ Lazy.force ty in
             let cap = Val.run rel' cap in
             let sys = ConAbsSys.run rel' sys in
             make_hcom rel' r r' ~ty ~cap ~sys
-          end
         in
         cap_face :: tube_faces @ old_faces
       in
@@ -999,14 +1010,13 @@ struct
   and expand_rigid_com rel r r' ~abs ~cap ~sys =
     let ty = ConAbs.inst rel abs r' in
     let cap = Val.make @@ make_coe rel r' r ~abs ~cap in
-    let sys = ConAbsSys.foreach_gen sys @@ fun (r, r', face) ->
-      lazy begin
+    let sys =
+      ConAbsSys.foreach_gen sys @@ fun (r, r', face) ->
         let rel' = Rel.equate r r' in
         let Abs (y, body_y) = Lazy.force face in
         let z, pi = Perm.freshen_name y in
         let cap = Val.make @@ Con.swap pi body_y in
         Abs (z, make_coe rel r' (`Atom z) ~abs ~cap)
-      end
     in
     rigid_hcom rel r r' ~ty ~cap ~sys
 
@@ -1029,20 +1039,16 @@ struct
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
           ConSys.foreach_gen sys @@ fun (s, s', abs) ->
-          lazy begin
             let rel' = Rel.equate' s s' rel in
             ConAbs.inst rel' (Lazy.force abs) r'
-          end
         in
         let old_faces =
           ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
-          lazy begin
             let rel' = Rel.equate' s s' rel in
             let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
             let cap = Val.run rel' cap in
             let sys = ConAbsSys.run rel' sys in
             make_com rel' r r' ~abs ~cap ~sys
-          end
         in
         cap_face :: tube_faces @ old_faces
       in
@@ -1387,7 +1393,7 @@ and Sys :
     val forall_then_foreach : Name.t -> t -> (X.t face -> 'b) -> 'b list
 
     (** foreach_gen sys f = List.foreach sys (Face.gen f) *)
-    val foreach_gen : 'a sys -> (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> t
+    val foreach_gen : 'a sys -> (dim * dim * 'a Lazy.t -> X.t) -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -1421,10 +1427,6 @@ and Sys :
     let plug rel frm sys =
       List.map (Face.plug rel frm) sys
 
-    let forall_then_foreach x sys f =
-      ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
-    let foreach_gen sys f = ListUtil.foreach sys (Face.gen f)
-
     let force rel sys =
       let force_face face =
         try Some (Face.force rel face)
@@ -1442,6 +1444,11 @@ and Sys :
         | Face.Triv bdy -> raise @@ Triv bdy
       in
       ListUtil.filter_map run_then_force_face sys
+
+    let forall_then_foreach x sys f =
+      ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
+
+    let foreach_gen sys f = ListUtil.foreach sys (Face.gen f)
   end
 
 and Face :
@@ -1461,8 +1468,10 @@ and Face :
     (* a generator for hooking up `run`, assuming the provided function
      * will then sufficiently restrict the body. the body fed into the externally
      * function might be less restricted then the previous run or the cobifration
-     * suggests. *)
-    val gen : (dim * dim * 'a Lazy.t -> X.t Lazy.t) -> 'a face -> t
+     * suggests.
+     *
+     * Note that this will not force the generated face. *)
+    val gen : (dim * dim * 'a Lazy.t -> X.t) -> 'a face -> t
 
     (** some convenience functions which could be more efficient *)
 
@@ -1529,7 +1538,7 @@ and Face :
       if r = sx || r' = sx then None else Some (r, r', bdy)
 
     let gen f (r, r', bdy) =
-      (r, r', Delayed.make @@ f (r, r', Delayed.drop_rel bdy))
+      r, r', DelayedLazyX.make @@ lazy begin f (r, r', Delayed.drop_rel bdy) end
 
     let run_then_force rel (r, r', bdy) =
       match Rel.equate r r' rel with
