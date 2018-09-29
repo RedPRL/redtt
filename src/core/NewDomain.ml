@@ -469,7 +469,6 @@ and ExtClo :
 sig
   include Domain with type t = ext_clo
   val inst : rel -> t -> cell list -> con * con sys
-  val inst' : rel -> t -> cell list -> value * con sys
 end =
 struct
   type t = ext_clo
@@ -490,10 +489,6 @@ struct
     let vty = Syn.eval rel env' ty in
     let vsys = Syn.eval_tm_sys rel env' sys in
     vty, vsys
-
-  let inst' rel clo cells =
-    let vty, vsys = inst rel clo cells in
-    Val.make vty, vsys
 end
 
 and Cell : Domain with type t = cell =
@@ -881,7 +876,7 @@ struct
       let neu = Neu.plug rel frm info.neu in
       let sys = ConSys.plug rel frm info.sys in
       let ty, sys' = plug_ty rel frm info.ty hd in
-      Neu {ty; neu; sys = sys' @ sys}
+      Neu {ty = Val.make ty; neu; sys = sys' @ sys}
 
     | _ ->
       raise PleaseRaiseProperError
@@ -1065,21 +1060,21 @@ struct
     match Val.unleash ty, frm with
     | Pi {dom; cod}, FunApp arg ->
       let arg = lazy begin Val.unleash arg end in
-      Val.make @@ Clo.inst rel cod @@ Val (LazyVal.make arg), []
+      Clo.inst rel cod @@ Val (LazyVal.make arg), []
 
     | Pi _, _ -> raise PleaseRaiseProperError
 
     | Ext extclo, ExtApp rs ->
-      ExtClo.inst' rel extclo @@ List.map (fun r -> Dim r) rs
+      ExtClo.inst rel extclo @@ List.map (fun r -> Dim r) rs
 
     | Ext _, _ -> raise PleaseRaiseProperError
 
     | Sg {dom; _}, Fst ->
-      dom, []
+      Val.unleash dom, []
 
-    | Sg {dom; cod}, Snd ->
-      let car = lazy begin plug rel Fst hd end in
-      Val.make @@ Clo.inst rel cod @@ Val (LazyVal.make car), []
+    | Sg {cod; _}, Snd ->
+      let fst = LazyVal.make @@ lazy begin plug rel Fst hd end in
+      Clo.inst rel cod @@ Val fst, []
 
     | Sg _, _ -> raise PleaseRaiseProperError
 
