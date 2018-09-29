@@ -57,28 +57,28 @@ let rank_index (x : int) h =
     0
 
 let union_cls (x : cls) (y : cls) (h : t) =
-  let cx = find_cls x h in
-  let cy = find_cls y h in
-  match cx, cy with
-  | `Atom cx, `Atom cy ->
-    if cx == cy then `Same else
-    let rx = rank_index cx h in
-    let ry = rank_index cy h in
+  let clsx = find_cls x h in
+  let clsy = find_cls y h in
+  match clsx, clsy with
+  | `Dim0, `Dim0 | `Dim1, `Dim1 -> `Same
+  | `Dim0, `Dim1 | `Dim1, `Dim0 -> raise I.Inconsistent
+  | `Atom clsx, `Atom clsy ->
+    if clsx == clsy then `Same else
+    let rx = rank_index clsx h in
+    let ry = rank_index clsy h in
     if rx > ry then
-      `Changed {h with parent = T.set cy (`Atom cx) h.parent}
+      `Changed {h with parent = T.set clsy (`Atom clsx) h.parent}
     else if rx < ry then
-      `Changed {h with parent = T.set cx (`Atom cy) h.parent}
+      `Changed {h with parent = T.set clsx (`Atom clsy) h.parent}
     else
       `Changed
       {h with
-       rank = T.set cx (rx + 1) h.rank;
-       parent = T.set cy (`Atom cx) h.parent}
-  | `Atom cx, cy ->
-    `Changed {h with parent = T.set cx cy h.parent}
-  | cx, `Atom cy ->
-    `Changed {h with parent = T.set cy cx h.parent}
-  | cx, cy ->
-    if cx == cy then `Same else raise I.Inconsistent
+       rank = T.set clsx (rx + 1) h.rank;
+       parent = T.set clsy (`Atom clsx) h.parent}
+  | `Atom clsx, clsy ->
+    `Changed {h with parent = T.set clsx clsy h.parent}
+  | clsx, `Atom clsy ->
+    `Changed {h with parent = T.set clsy clsx h.parent}
 
 let reserve_atom (x : atom) (h : t) : int * t =
   try
@@ -98,14 +98,14 @@ let union (x : dim) (y : dim) h =
   let y, h = reserve y h in
   union_cls x y h
 
-let query_atom (x : atom) (index : (atom, int) T.t) : [`Ok of cls | `Owned] =
+let query_atom (x : atom) (index : (atom, int) T.t) : [`Ok of cls | `Owned of atom] =
   try
     `Ok (`Atom (T.get x index))
   with
   _ ->
-    `Owned
+    `Owned x
 
-let query (x : dim) (index : (atom, int) T.t) : [`Ok of cls | `Owned] =
+let query (x : dim) (index : (atom, int) T.t) : [`Ok of cls | `Owned of atom] =
   match x with
   | `Atom x -> query_atom x index
   | `Dim0 -> `Ok `Dim0
@@ -113,17 +113,18 @@ let query (x : dim) (index : (atom, int) T.t) : [`Ok of cls | `Owned] =
 
 let compare x y (h : t) =
   match query x h.index, query y h.index with
-  | `Owned, `Owned ->
+  | `Owned x, `Owned y ->
     if x == y then `Same else `Indet
-  | `Owned, `Ok _ -> `Indet
-  | `Ok _, `Owned -> `Indet
+  | `Owned _, `Ok _ -> `Indet
+  | `Ok _, `Owned _ -> `Indet
   | `Ok x, `Ok y ->
     match find_cls x h, find_cls y h with
+    | `Dim0, `Dim0 | `Dim1, `Dim1 -> `Same
+    | `Dim0, `Dim1 | `Dim1, `Dim0 -> `Apart
     | `Atom x, `Atom y ->
       if x == y then `Same else `Indet
     | `Atom _, _ -> `Indet
     | _, `Atom _ -> `Indet
-    | x, y -> if x = y then `Same else `Apart
 
 let mem_atom (x : atom) index =
   T.mem x index
@@ -165,21 +166,6 @@ let swap (x : atom) (y : atom) (h : t) =
   | None, None -> h
   | Some idx, Some idy when idx = idy -> h
   | oidx, oidy -> {h with index = T.set_opt y oidx (T.set_opt x oidy h.index)}
-
-let split x (h : t) case0 case1 case_atom =
-  match x with
-  | `Dim0 -> case0 ()
-  | `Dim1 -> case1 ()
-  | `Atom x ->
-    match query_atom x h.index with
-    | `Owned -> case_atom x
-    | `Ok `Dim0 -> case0 ()
-    | `Ok `Dim1 -> case1 ()
-    | `Ok (`Atom i) ->
-      match find_index i h with
-      | `Dim0 -> case0 ()
-      | `Dim1 -> case1 ()
-      | `Atom _ -> case_atom x
 
 
 let pp_cls fmt =
