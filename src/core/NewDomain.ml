@@ -85,6 +85,9 @@ type con =
 
   | Univ of {kind : Kind.t; lvl : Lvl.t}
 
+  | V of {r : dim; ty0 : value; ty1 : value; equiv : value}
+  | VIn of {r : dim; el0 : value; el1 : value}
+
   | Neu of {ty : value; neu : neu; sys : con sys}
 
 and value = con Delayed.t
@@ -118,10 +121,11 @@ and head =
 
 and frame =
   | FunApp of value
-  | ExtApp of dim list
   | Fst
   | Snd
+  | ExtApp of dim list
   | NHCom of {r : dim; r' : dim; cap : value; sys : con abs sys}
+  | VProj of {r : dim; func : value}
 
 and neu =
   {head : head;
@@ -188,7 +192,9 @@ module type DomainPlug =
 sig
   include Domain
 
-  (** Plug applies a stack frame to an element of the domain. *)
+  (** [plug] applies a stack frame to an element of the domain.
+
+      the invariant is that the frame and the plugee are all rel-rigid. *)
   val plug : rel -> frame -> t -> t
 end
 
@@ -210,8 +216,11 @@ sig
 
   (** some convenience function that might be more optimized *)
 
-  (** run_then_unleash rel x = run rel (unleash x) *)
+  (** run_then_unleash rel x = unleash (run rel x) *)
   val run_then_unleash : rel -> t -> u
+
+  (** plug_then_unleash rel frm x = unleash (plug rel frm x) *)
+  val plug_then_unleash : rel -> frame -> t -> u
 end
 
 module rec Syn :
@@ -628,6 +637,12 @@ sig
 
   (** invariant: cap and sys are rel-values, but dir and sys might not be rigid *)
   val make_fhcom : rel -> dim -> dim -> cap:value -> sys:con abs sys -> con
+
+  (** invariant: ty1 is a rel-value, ty0 and equiv give {rel,r=0}-values, but r:dim might not be rigid *)
+  val make_v : rel -> dim -> ty0:(rel -> value) -> ty1:value -> equiv:(rel -> value) -> con
+
+  (** invariant: el1 is a rel-value, el0 gives a {rel,r=0}-value, but r:dim might not be rigid *)
+  val make_vin : rel -> dim -> el0:(rel -> value) -> el1:value -> con
 end =
 struct
   module ConAbs = AbsPlug (Con)
@@ -692,6 +707,19 @@ struct
 
     | Univ _ as con -> con
 
+    | V {r; ty0; ty1; equiv} ->
+      V
+        {r = Dim.swap pi r;
+         ty0 = Val.swap pi ty0;
+         ty1 = Val.swap pi ty1;
+         equiv = Val.swap pi equiv}
+
+    | VIn {r; el0; el1} ->
+      VIn
+        {r = Dim.swap pi r;
+         el0 = Val.swap pi el0;
+         el1 = Val.swap pi el1}
+
     | Neu info ->
       Neu
         {ty = Val.swap pi info.ty;
@@ -749,6 +777,19 @@ struct
          sys = ConAbsSys.subst r x info.sys}
 
     | Univ _ as con -> con
+
+    | V info ->
+      V
+        {r = Dim.subst r x info.r;
+         ty0 = Val.subst r x info.ty0;
+         ty1 = Val.subst r x info.ty1;
+         equiv = Val.subst r x info.equiv}
+
+    | VIn info ->
+      VIn
+        {r = Dim.subst r x info.r;
+         el0 = Val.subst r x info.el0;
+         el1 = Val.subst r x info.el1}
 
     | Neu info ->
       Neu
@@ -828,6 +869,17 @@ struct
 
     | Univ _ as con -> con
 
+    | V {r; ty0; ty1; equiv} ->
+      let ty0 rel0 = Val.run rel0 ty0 in
+      let ty1 = Val.run rel ty1 in
+      let equiv rel0 = Val.run rel0 equiv in
+      make_v rel r ~ty0 ~ty1 ~equiv
+
+    | VIn {r; el0; el1} ->
+      let el0 rel0 = Val.run rel0 el0 in
+      let el1 = Val.run rel el1 in
+      make_vin rel r ~el0 ~el1
+
     | Neu info ->
       begin
         match ConSys.run_then_force rel info.sys with
@@ -862,48 +914,6 @@ struct
         Abs (y, Clo.inst rel cod_y @@ Val coe_r'y) in
       let cap = Val.plug rel (FunApp (Val.make @@ coe_arg r)) cap in
       rigid_coe rel r r' ~abs ~cap
-
-    | ExtApp rs, ExtLam nclo ->
-      NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
-
-    | ExtApp rs as frm, HCom {r; r'; ty = `Ext extclo; cap; sys} ->
-      let ty, ext_sys =
-        let dim_cells = List.map (fun x -> Dim x) rs in
-        ExtClo.inst rel extclo dim_cells
-      in
-      begin
-        match ConSys.force rel ext_sys with
-        | ext_sys ->
-          let cap = Val.plug rel frm cap in
-          let ext_sys = ConAbsSys.foreach_gen ext_sys @@
-            fun (r, r', bdy) ->
-            let x = Name.fresh () in
-            Abs (x, Lazy.force bdy)
-          in
-          let comp_sys = ConAbsSys.plug rel frm sys in
-          let sys = ext_sys @ comp_sys in
-          rigid_hcom rel r r' ~ty ~cap ~sys
-        | exception ConSys.Triv c -> c
-      end
-
-    | ExtApp rs as frm, Coe {r; r'; ty = `Ext (Abs (x, extclo_x)); cap} ->
-      let y, pi = Perm.freshen_name x in
-      let extclo_y = ExtClo.swap pi extclo_x in
-      let ty_y, sys_y =
-        let dim_cells = List.map (fun x -> Dim x) rs in
-        ExtClo.inst rel extclo_y dim_cells
-      in
-      begin
-        match ConSys.force rel sys_y with
-        | sys_y ->
-          let abs = Abs (y, ty_y) in
-          let cap = Val.plug rel frm cap in
-          let sys = ConAbsSys.foreach_gen sys_y @@
-            fun (r, r', bdy_y) -> Abs (y, Lazy.force bdy_y)
-          in
-          rigid_com rel r r' ~abs ~cap ~sys
-        | exception ConSys.Triv c -> c
-      end
 
     | Fst, Cons (v0, _) ->
       Val.unleash v0
@@ -960,14 +970,96 @@ struct
       let cap = Val.plug rel Snd cap in
       rigid_coe rel r r' ~abs ~cap
 
+    | ExtApp rs, ExtLam nclo ->
+      NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
+
+    | ExtApp rs as frm, HCom {r; r'; ty = `Ext extclo; cap; sys} ->
+      let ty, ext_sys =
+        let dim_cells = List.map (fun x -> Dim x) rs in
+        ExtClo.inst rel extclo dim_cells
+      in
+      begin
+        match ConSys.force rel ext_sys with
+        | ext_sys ->
+          let cap = Val.plug rel frm cap in
+          let ext_sys = ConAbsSys.foreach_gen ext_sys @@
+            fun (r, r', bdy) ->
+            let x = Name.fresh () in
+            Abs (x, Lazy.force bdy)
+          in
+          let comp_sys = ConAbsSys.plug rel frm sys in
+          let sys = ext_sys @ comp_sys in
+          rigid_hcom rel r r' ~ty ~cap ~sys
+        | exception ConSys.Triv c -> c
+      end
+
+    | ExtApp rs as frm, Coe {r; r'; ty = `Ext (Abs (x, extclo_x)); cap} ->
+      let y, rel_y, extclo_y =
+        match Frame.occur x frm with
+        | `No ->
+          x, Rel.hide' x rel, extclo_x
+        | `Might ->
+          let y, pi = Perm.freshen_name x in
+          let extclo_y = ExtClo.swap pi extclo_x in
+          y, rel, extclo_y
+      in
+      let ty_y, sys_y =
+        let dim_cells = List.map (fun x -> Dim x) rs in
+        ExtClo.inst rel_y extclo_y dim_cells
+      in
+      begin
+        match ConSys.force rel sys_y with
+        | sys_y ->
+          let abs = Abs (y, ty_y) in
+          let cap = Val.plug rel frm cap in
+          let sys = ConAbsSys.foreach_gen sys_y @@
+            fun (r, r', bdy_y) -> Abs (y, Lazy.force bdy_y)
+          in
+          rigid_com rel r r' ~abs ~cap ~sys
+        | exception ConSys.Triv c_y ->
+          subst_then_run rel r' y c_y
+      end
+
     | NHCom {r; r'; cap; sys}, con ->
       rigid_hcom rel r r' ~ty:con ~cap ~sys
 
-    | (FunApp _ | ExtApp _ | Fst | Snd), Neu info ->
+    | VProj {r; func}, con ->
+      rigid_vproj rel r ~el:con ~func
+
+    | (FunApp _ | Fst | Snd | ExtApp _), Neu info ->
       let neu = Neu.plug rel frm info.neu in
       let sys = ConSys.plug rel frm info.sys in
       let ty, sys' = plug_ty rel frm info.ty hd in
       Neu {ty = Val.make ty; neu; sys = sys' @ sys}
+
+    | FunApp _, _ -> raise PleaseRaiseProperError
+    | Fst, _ -> raise PleaseRaiseProperError
+    | Snd, _ -> raise PleaseRaiseProperError
+    | ExtApp _, _ -> raise PleaseRaiseProperError
+
+  and plug_ty rel frm ty hd =
+    match Val.unleash ty, frm with
+    | Pi {dom; cod}, FunApp arg ->
+      let arg = lazy begin Val.unleash arg end in
+      Clo.inst rel cod @@ Val (LazyVal.make arg), []
+
+    | Pi _, _ -> raise PleaseRaiseProperError
+
+    | Sg {dom; _}, Fst ->
+      Val.unleash dom, []
+
+    | Sg {cod; _}, Snd ->
+      let fst = LazyVal.make @@ lazy begin plug rel Fst hd end in
+      Clo.inst rel cod @@ Val fst, []
+
+    | Sg _, _ -> raise PleaseRaiseProperError
+
+    | Ext extclo, ExtApp rs ->
+      ExtClo.inst rel extclo @@ List.map (fun r -> Dim r) rs
+
+    | Ext _, _ -> raise PleaseRaiseProperError
+
+    | HCom {ty = `Pos; _}, _ -> raise PleaseFillIn
 
     | _ ->
       raise PleaseRaiseProperError
@@ -1011,6 +1103,26 @@ struct
         HCom {r; r'; ty = `Pos; cap; sys}
       | exception ConAbsSys.Triv abs ->
         ConAbs.inst rel abs r'
+
+  and make_v rel r ~ty0 ~ty1 ~equiv =
+    match Rel.equate r `Dim0 rel with
+    | `Same -> Val.unleash @@ ty0 rel
+    | exception I.Inconsistent -> Val.unleash ty1
+    | `Changed rel0 ->
+      V {r; ty0 = ty0 rel0; ty1; equiv = equiv rel0}
+
+  and make_vin rel r ~el0 ~el1 =
+    match Rel.equate r `Dim0 rel with
+    | `Same -> Val.unleash @@ el0 rel
+    | exception I.Inconsistent -> Val.unleash el1
+    | `Changed rel0 ->
+      VIn {r; el0 = el0 rel0; el1}
+
+  and make_vproj rel r ~el ~func =
+    match Rel.compare r `Dim0 rel with
+    | `Same -> Val.plug_then_unleash rel (FunApp (Val.make el)) func
+    | `Apart -> el
+    | `Indet -> rigid_vproj rel r ~el ~func
 
   and rigid_hcom rel r r' ~ty ~cap ~sys =
     match ty with
@@ -1073,6 +1185,9 @@ struct
     | HCom {ty = `Pos; _} ->
       raise CanFavoniaHelpMe
 
+    | V _ ->
+      raise CanFavoniaHelpMe
+
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
       let ty = ValAbs.inst rel (ValAbs.make abs) r' in
@@ -1098,10 +1213,16 @@ struct
     let sys =
       ConAbsSys.foreach_gen sys @@ fun (r, r', face) ->
       let rel' = Rel.equate r r' in
-      let Abs (y, body_y) = Lazy.force face in
-      let z, pi = Perm.freshen_name y in
-      let cap = Val.make @@ Con.swap pi body_y in
-      Abs (z, make_coe rel r' (`Atom z) ~abs ~cap)
+      let Abs (y, bdy_y) = Lazy.force face in
+      let z, rel_z, bdy_z =
+        let Abs (w, ty_w) = abs in
+        if y = w && I.absent y r' then
+          y, Rel.hide' y rel, bdy_y
+        else
+          let z, pi = Perm.freshen_name y in
+          z, rel, Con.swap pi bdy_y
+      in
+      Abs (z, make_coe rel_z r' (`Atom z) ~abs ~cap:(Val.make bdy_z))
     in
     rigid_hcom rel r r' ~ty ~cap ~sys
 
@@ -1143,33 +1264,19 @@ struct
 
     | HCom {ty = `Pos; _} -> expand_rigid_com rel r r' ~abs ~cap ~sys
 
+    | V _ ->
+      raise CanFavoniaHelpMe
+
     | _ ->
       raise PleaseRaiseProperError
 
+  and rigid_vproj rel r ~el ~func =
+    match el with
+    | VIn {el1; _} ->
+      Val.unleash el1
 
-  and plug_ty rel frm ty hd =
-    match Val.unleash ty, frm with
-    | Pi {dom; cod}, FunApp arg ->
-      let arg = lazy begin Val.unleash arg end in
-      Clo.inst rel cod @@ Val (LazyVal.make arg), []
-
-    | Pi _, _ -> raise PleaseRaiseProperError
-
-    | Ext extclo, ExtApp rs ->
-      ExtClo.inst rel extclo @@ List.map (fun r -> Dim r) rs
-
-    | Ext _, _ -> raise PleaseRaiseProperError
-
-    | Sg {dom; _}, Fst ->
-      Val.unleash dom, []
-
-    | Sg {cod; _}, Snd ->
-      let fst = LazyVal.make @@ lazy begin plug rel Fst hd end in
-      Clo.inst rel cod @@ Val fst, []
-
-    | Sg _, _ -> raise PleaseRaiseProperError
-
-    | HCom {ty = `Pos; _}, _ -> raise PleaseFillIn
+    | Neu _ ->
+      raise PleaseFillIn
 
     | _ ->
       raise PleaseRaiseProperError
@@ -1374,6 +1481,7 @@ end
 and Frame :
 sig
   include Domain with type t = frame
+  val occur : Name.t -> frame -> [`No | `Might]
   val occurs : Name.t bwd -> frame -> [`No | `Might]
 end =
 struct
@@ -1397,6 +1505,10 @@ struct
          r' = Dim.swap pi info.r';
          cap = Val.swap pi info.cap;
          sys = ConAbsSys.swap pi info.sys}
+    | VProj info ->
+      VProj
+        {r = Dim.swap pi info.r;
+         func = Val.swap pi info.func}
 
   let subst r x =
     function
@@ -1414,6 +1526,10 @@ struct
          r' = Dim.subst r x info.r';
          cap = Val.subst r x info.cap;
          sys = ConAbsSys.subst r x info.sys}
+    | VProj info ->
+      VProj
+        {r = Dim.subst r x info.r;
+         func = Val.subst r x info.func}
 
   let run rel =
     function
@@ -1428,6 +1544,10 @@ struct
          r' = Dim.run rel info.r';
          cap = Val.run rel info.cap;
          sys = ConAbsSys.run rel info.sys}
+    | VProj info ->
+      VProj
+        {r = Dim.run rel info.r;
+         func = Val.run rel info.func}
 
   let subst_then_run rel r x =
     function
@@ -1445,18 +1565,24 @@ struct
          r' = Dim.subst_then_run rel r x info.r';
          cap = Val.subst_then_run rel r x info.cap;
          sys = ConAbsSys.subst_then_run rel r x info.sys}
+    | VProj info ->
+      VProj
+        {r = Dim.subst_then_run rel r x info.r;
+         func = Val.subst_then_run rel r x info.func}
 
   let occurs xs =
     function
-    | FunApp _ | NHCom _ ->
+    | FunApp _ | NHCom _ | VProj _ ->
       `Might
     | ExtApp dims ->
-      if Bwd.exists (fun x -> List.mem (`Atom x) dims) xs then
-        `Might
-      else
+      if Bwd.for_all (fun x -> List.for_all (I.absent x) dims) xs then
         `No
+      else
+        `Might
     | Fst | Snd ->
       `No
+
+  let occur x = occurs (Emp #< x)
 end
 
 
@@ -1656,31 +1782,31 @@ end
       Abs (x', a')
 
     let subst r z abs =
-      let Abs (x, a) = abs in
-      if z = x then abs else
-        match r with
-        | `Atom y when y = x ->
-          let y, pi = Perm.freshen_name x in
-          let a' = X.subst r z @@ X.swap pi a in
-          Abs (y, a')
-        | _ ->
-          let a' = X.subst r z a in
-          Abs (x, a')
+      let Abs (x, a_x) = abs in
+      if z = x then
+        abs
+      else if I.absent x r then
+        let a_x = X.subst r z a_x in
+        Abs (x, a_x)
+      else
+        let y, pi = Perm.freshen_name x in
+        let a_y = X.subst r z @@ X.swap pi a_x in
+        Abs (y, a_y)
 
     let run rel abs =
-      let Abs (x, a) = abs in
-      (* TODO: I think the following makes sense, but let's double check. The alternative is to freshen, but it seems like we don't need to if we can un-associate these names. *)
-      let rel' = Rel.hide' x rel in
-      let a' = X.run rel' a in
-      Abs (x, a')
+      let Abs (x, a_x) = abs in
+      let rel_x = Rel.hide' x rel in
+      let a_x = X.run rel_x a_x in
+      Abs (x, a_x)
 
     (* XXX optimize this! *)
     let subst_then_run rel r x a =
       run rel @@ subst r x a
 
     let inst rel abs r =
-      let Abs (x, a) = abs in
-      X.subst_then_run (Rel.hide' x rel) r x a
+      let Abs (x, a_x) = abs in
+      let rel_x = Rel.hide' x rel in
+      X.subst_then_run rel_x r x a_x
   end
 
 and AbsPlug : functor (X : DomainPlug) ->
@@ -1695,16 +1821,17 @@ end
     include M
 
     let plug rel frm abs =
-      let Abs (x, a) = abs in
-      match Frame.occurs (Emp #< x) frm with
+      let Abs (x, a_x) = abs in
+      match Frame.occur x frm with
       | `No ->
-        let a' = X.plug rel frm a in
-        Abs (x, a')
+        let rel_x = Rel.hide' x rel in
+        let a_x = X.plug rel_x frm a_x in
+        Abs (x, a_x)
       | `Might ->
         let y, pi = Perm.freshen_name x in
-        let rel' = Rel.hide' x rel in
-        let a' = X.plug rel' frm @@ X.swap pi a in
-        Abs (y, a')
+        let rel_y = rel in
+        let a_y = X.plug rel_y frm @@ X.swap pi a_x in
+        Abs (y, a_y)
   end
 
 and DelayedAbsPlug : functor (X : DomainPlug) ->
@@ -1727,8 +1854,12 @@ end
     let unleash (Abs (x, v)) = Abs (x, DelayedX.unleash v)
     let drop_rel (Abs (x, v)) = Abs (x, DelayedX.drop_rel v)
 
-    let run_then_unleash rel (Abs (x, v)) =
-      Abs (x, DelayedX.run_then_unleash (Rel.hide' x rel) v)
+    let run_then_unleash rel (Abs (x, v_x)) =
+      let rel_x = Rel.hide' x rel in
+      Abs (x, DelayedX.run_then_unleash rel_x v_x)
+    let plug_then_unleash rel frm (Abs (x, v_x)) =
+      let rel_x = Rel.hide' x rel in
+      Abs (x, DelayedX.plug_then_unleash rel_x frm v_x)
   end
 
 and DelayedPlug : functor (X : DomainPlug) ->
@@ -1754,6 +1885,7 @@ and DelayedPlug : functor (X : DomainPlug) ->
     let plug rel frm v = Delayed.make @@ X.plug rel frm (unleash v)
 
     let run_then_unleash rel v = X.run rel (Delayed.drop_rel v)
+    let plug_then_unleash rel frm v = X.plug rel frm (unleash v) (* can we do `Delayed.drop_rel v` here? *)
   end
 
 and LazyPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t Lazy.t =

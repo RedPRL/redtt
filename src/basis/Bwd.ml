@@ -42,13 +42,19 @@ struct
     match xs with
     | Emp -> false
     | Snoc (xs, x) ->
-      if a = x then true else mem a xs
+      a = x || (mem[@tailcall]) a xs
 
   let rec exists p xs =
     match xs with
     | Emp -> false
     | Snoc (xs, x) ->
-      if p x then true else exists p xs
+      p x || (exists[@tailcall]) p xs
+
+  let rec for_all p xs =
+    match xs with
+    | Emp -> true
+    | Snoc (xs, x) ->
+      p x && (for_all[@tailcall]) p xs
 
   let rec length =
     function
