@@ -129,7 +129,7 @@ and cell =
   | Val of con Lazy.t Delayed.t
   | Dim of dim
 
-and env = {cells : cell bwd; n_minus_one : int}
+and env = {globals : GlobalEnv.t; cells : cell bwd; n_minus_one : int}
 
 and clo = Clo of {bnd : Tm.tm Tm.bnd; env : env}
 and nclo = NClo of {bnd : Tm.tm Tm.nbnd; env : env}
@@ -550,12 +550,13 @@ struct
   let subst_then_run rel r x env =
     {env with cells = Bwd.map (Cell.subst_then_run rel r x) env.cells}
 
-  let emp () = {cells = Emp; n_minus_one = -1}
+  let emp () = {globals = GlobalEnv.emp (); cells = Emp; n_minus_one = -1}
 
   let lookup_cell_by_index i {cells; _} = Bwd.nth cells i
 
   let extend_cells env cells =
-    {cells = env.cells <>< cells;
+    {env with
+     cells = env.cells <>< cells;
      n_minus_one = env.n_minus_one + List.length cells}
 
   let extend_cell env cell =
@@ -829,8 +830,8 @@ struct
           let cap = Val.plug rel frm cap in
           let ext_sys = ConAbsSys.foreach_gen ext_sys @@
             fun (r, r', bdy) ->
-              let x = Name.fresh () in
-              Abs (x, Lazy.force bdy)
+            let x = Name.fresh () in
+            Abs (x, Lazy.force bdy)
           in
           let comp_sys = ConAbsSys.plug rel frm sys in
           let sys = ext_sys @ comp_sys in
@@ -988,16 +989,16 @@ struct
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
           ConSys.foreach_gen sys @@ fun (s, s', abs) ->
-            let rel' = Rel.equate' s s' rel in
-            ConAbs.inst rel' (Lazy.force abs) r'
+          let rel' = Rel.equate' s s' rel in
+          ConAbs.inst rel' (Lazy.force abs) r'
         in
         let old_faces =
           ConSys.foreach_gen info.sys @@ fun (s, s', ty) ->
-            let rel' = Rel.equate' s s' rel in
-            let ty = run rel' @@ Lazy.force ty in
-            let cap = Val.run rel' cap in
-            let sys = ConAbsSys.run rel' sys in
-            make_hcom rel' r r' ~ty ~cap ~sys
+          let rel' = Rel.equate' s s' rel in
+          let ty = run rel' @@ Lazy.force ty in
+          let cap = Val.run rel' cap in
+          let sys = ConAbsSys.run rel' sys in
+          make_hcom rel' r r' ~ty ~cap ~sys
         in
         cap_face :: tube_faces @ old_faces
       in
@@ -1032,10 +1033,10 @@ struct
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let old_faces =
           ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
-            let rel' = Rel.equate' s s' rel in
-            let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
-            let cap = Val.run rel' cap in
-            make_coe rel' r r' ~abs ~cap
+          let rel' = Rel.equate' s s' rel in
+          let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
+          let cap = Val.run rel' cap in
+          make_coe rel' r r' ~abs ~cap
         in
         cap_face :: old_faces
       in
@@ -1049,11 +1050,11 @@ struct
     let cap = Val.make @@ make_coe rel r' r ~abs ~cap in
     let sys =
       ConAbsSys.foreach_gen sys @@ fun (r, r', face) ->
-        let rel' = Rel.equate r r' in
-        let Abs (y, body_y) = Lazy.force face in
-        let z, pi = Perm.freshen_name y in
-        let cap = Val.make @@ Con.swap pi body_y in
-        Abs (z, make_coe rel r' (`Atom z) ~abs ~cap)
+      let rel' = Rel.equate r r' in
+      let Abs (y, body_y) = Lazy.force face in
+      let z, pi = Perm.freshen_name y in
+      let cap = Val.make @@ Con.swap pi body_y in
+      Abs (z, make_coe rel r' (`Atom z) ~abs ~cap)
     in
     rigid_hcom rel r r' ~ty ~cap ~sys
 
@@ -1076,16 +1077,16 @@ struct
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
           ConSys.foreach_gen sys @@ fun (s, s', abs) ->
-            let rel' = Rel.equate' s s' rel in
-            ConAbs.inst rel' (Lazy.force abs) r'
+          let rel' = Rel.equate' s s' rel in
+          ConAbs.inst rel' (Lazy.force abs) r'
         in
         let old_faces =
           ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
-            let rel' = Rel.equate' s s' rel in
-            let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
-            let cap = Val.run rel' cap in
-            let sys = ConAbsSys.run rel' sys in
-            make_com rel' r r' ~abs ~cap ~sys
+          let rel' = Rel.equate' s s' rel in
+          let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
+          let cap = Val.run rel' cap in
+          let sys = ConAbsSys.run rel' sys in
+          make_com rel' r r' ~abs ~cap ~sys
         in
         cap_face :: tube_faces @ old_faces
       in
@@ -1132,7 +1133,7 @@ end
 
 and Val : DelayedDomainPlug
   with type u = con
-  and type t = con Delayed.t
+   and type t = con Delayed.t
   = DelayedPlug (Con)
 
 and CoeShape : Domain with type t = coe_shape =
@@ -1589,10 +1590,10 @@ and Face :
   end
 
 and Abs : functor (X : Domain) ->
-  sig
-    include Domain with type t = X.t abs
-    val inst : rel -> t -> dim -> X.t
-  end
+sig
+  include Domain with type t = X.t abs
+  val inst : rel -> t -> dim -> X.t
+end
   =
   functor (X : Domain) ->
   struct
@@ -1633,10 +1634,10 @@ and Abs : functor (X : Domain) ->
   end
 
 and AbsPlug : functor (X : DomainPlug) ->
-  sig
-    include DomainPlug with type t = X.t abs
-    val inst : rel -> t -> dim -> X.t
-  end
+sig
+  include DomainPlug with type t = X.t abs
+  val inst : rel -> t -> dim -> X.t
+end
   =
   functor (X : DomainPlug) ->
   struct
@@ -1657,12 +1658,12 @@ and AbsPlug : functor (X : DomainPlug) ->
   end
 
 and DelayedAbsPlug : functor (X : DomainPlug) ->
-  sig
-    include DelayedDomainPlug
-      with type u = X.t abs
-      and type t = X.t Delayed.t abs
-    val inst : rel -> t -> dim -> X.t Delayed.t
-  end
+sig
+  include DelayedDomainPlug
+    with type u = X.t abs
+     and type t = X.t Delayed.t abs
+  val inst : rel -> t -> dim -> X.t Delayed.t
+end
   =
   functor (X : DomainPlug) ->
   struct
