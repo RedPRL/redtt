@@ -535,6 +535,8 @@ sig
   val lookup_cell_by_index : int -> env -> cell
   val index_of_level : env -> int -> int
   val level_of_index : env -> int -> int
+
+  val clear_locals : env -> env
 end =
 struct
   type t = env
@@ -564,6 +566,8 @@ struct
 
   let index_of_level {n_minus_one; _} i = n_minus_one - i
   let level_of_index {n_minus_one; _} i = n_minus_one - i
+  let clear_locals env =
+    {globals = env.globals; cells = Emp; n_minus_one = -1}
 end
 
 and Con :
