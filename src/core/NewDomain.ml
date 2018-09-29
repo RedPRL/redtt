@@ -275,15 +275,19 @@ struct
       raise PleaseFillIn
 
     | Tm.Univ {kind; lvl} ->
-        Univ {kind; lvl}
+      Univ {kind; lvl}
 
     | Tm.V _ ->
       raise PleaseFillIn
     | Tm.VIn _ ->
       raise PleaseFillIn
 
-    | Tm.FHCom _ ->
-      raise PleaseFillIn
+    | Tm.FHCom info ->
+      let r = eval_dim env info.r in
+      let r' = eval_dim env info.r' in
+      let cap = Val.make @@ eval rel env info.cap in
+      let sys = eval_bnd_sys rel env info.sys in
+      Con.make_fhcom rel r r' ~cap ~sys
     | Tm.Box _ ->
       raise PleaseFillIn
 
@@ -293,14 +297,14 @@ struct
       raise PleaseFillIn
 
     | Tm.Later _ ->
-      raise PleaseFillIn
+      raise CanJonHelpMe
     | Tm.Next _ ->
-      raise PleaseFillIn
+      raise CanJonHelpMe
 
     | Tm.Data _ ->
-      raise PleaseFillIn
+      raise CanJonHelpMe
     | Tm.Intro _ ->
-      raise PleaseFillIn
+      raise CanJonHelpMe
 
   and eval_cmd rel env (hd, sp) =
     let vhd = eval_head rel env hd in
@@ -369,8 +373,8 @@ struct
         | _ -> raise PleaseRaiseProperError
       end
 
-    | Tm.Var _ -> raise PleaseFillIn
-    | Tm.Meta _ -> raise PleaseFillIn
+    | Tm.Var _ -> raise CanJonHelpMe
+    | Tm.Meta _ -> raise CanJonHelpMe
 
     | Tm.DFix _ -> raise CanJonHelpMe
 
@@ -567,6 +571,9 @@ sig
 
   (** invariant: abs, cap and sys are rel-values, but dir and sys might not be rigid *)
   val make_com : rel -> dim -> dim -> abs:con abs -> cap:value -> sys:con abs sys -> con
+
+  (** invariant: cap and sys are rel-values, but dir and sys might not be rigid *)
+  val make_fhcom : rel -> dim -> dim -> cap:value -> sys:con abs sys -> con
 end =
 struct
   module ConAbs = AbsPlug (Con)
@@ -825,11 +832,24 @@ struct
         | exception ConSys.Triv c -> c
       end
 
-    | ExtApp ss, Coe {r; r'; ty = `Ext abs; cap} ->
-      let Abs (y, extclo_y) = abs in
-      let ty_ss, sys_ss = ExtClo.inst (Rel.hide' y rel) extclo_y @@ List.map (fun x -> Dim x) ss in
-      let sys_ss' = ConSys.forall y sys_ss in
-      raise PleaseFillIn
+    | ExtApp rs as frm, Coe {r; r'; ty = `Ext (Abs (x, extclo_x)); cap} ->
+      let y, pi = Perm.freshen_name x in
+      let extclo_y = ExtClo.swap pi extclo_x in
+      let ty_y, sys_y =
+        let dim_cells = List.map (fun x -> Dim x) rs in
+        ExtClo.inst rel extclo_y dim_cells
+      in
+      begin
+        match ConSys.force rel sys_y with
+        | sys_y ->
+          let abs = Abs (y, ty_y) in
+          let cap = Val.plug rel frm cap in
+          let sys = ConAbsSys.foreach_gen sys_y @@
+            fun (r, r', bdy_y) -> Abs (y, Lazy.force bdy_y)
+          in
+          rigid_com rel r r' ~abs ~cap ~sys
+        | exception ConSys.Triv c -> c
+      end
 
     | Fst, Cons (v0, _) ->
       Val.unleash v0
@@ -927,43 +947,16 @@ struct
       | exception ConAbsSys.Triv abs ->
         ConAbs.inst rel abs r'
 
-  (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
-  and rigid_coe rel r r' ~abs ~cap : con =
-    let Abs (x, tyx) = abs in
-    match tyx with
-    | Sg quant ->
-      Coe {r; r'; ty = `Sg (Abs (x, quant)); cap}
-
-    | Pi quant ->
-      Coe {r; r'; ty = `Pi (Abs (x, quant)); cap}
-
-    | Ext extclo ->
-      Coe {r; r'; ty = `Ext (Abs (x, extclo)); cap}
-
-    | Univ _ ->
+  and make_fhcom rel r r' ~cap ~sys =
+    match Rel.compare r r' rel with
+    | `Same ->
       Val.unleash cap
-
-    | HCom {ty = `Pos; _} ->
-      raise CanFavoniaHelpMe
-
-    | Neu info ->
-      let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
-      let ty = ValAbs.inst rel (ValAbs.make abs) r' in
-      let sys =
-        let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
-        let old_faces =
-          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
-            let rel' = Rel.equate' s s' rel in
-            let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
-            let cap = Val.run rel' cap in
-            make_coe rel' r r' ~abs ~cap
-        in
-        cap_face :: old_faces
-      in
-      Neu {ty; neu; sys}
-
     | _ ->
-      raise PleaseFillIn
+      match ConAbsSys.run_then_force rel sys with
+      | _ ->
+        HCom {r; r'; ty = `Pos; cap; sys}
+      | exception ConAbsSys.Triv abs ->
+        ConAbs.inst rel abs r'
 
   and rigid_hcom rel r r' ~ty ~cap ~sys =
     match ty with
@@ -1005,7 +998,45 @@ struct
       Neu {ty = Val.make ty; neu; sys = neu_sys}
 
     | _ ->
-      raise PleaseFillIn
+      raise PleaseRaiseProperError
+
+  (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
+  and rigid_coe rel r r' ~abs ~cap : con =
+    let Abs (x, tyx) = abs in
+    match tyx with
+    | Sg quant ->
+      Coe {r; r'; ty = `Sg (Abs (x, quant)); cap}
+
+    | Pi quant ->
+      Coe {r; r'; ty = `Pi (Abs (x, quant)); cap}
+
+    | Ext extclo ->
+      Coe {r; r'; ty = `Ext (Abs (x, extclo)); cap}
+
+    | Univ _ ->
+      Val.unleash cap
+
+    | HCom {ty = `Pos; _} ->
+      raise CanFavoniaHelpMe
+
+    | Neu info ->
+      let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
+      let ty = ValAbs.inst rel (ValAbs.make abs) r' in
+      let sys =
+        let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
+        let old_faces =
+          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
+            let rel' = Rel.equate' s s' rel in
+            let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
+            let cap = Val.run rel' cap in
+            make_coe rel' r r' ~abs ~cap
+        in
+        cap_face :: old_faces
+      in
+      Neu {ty; neu; sys}
+
+    | _ ->
+      raise PleaseRaiseProperError
 
   and expand_rigid_com rel r r' ~abs ~cap ~sys =
     let ty = ConAbs.inst rel abs r' in
@@ -1059,7 +1090,7 @@ struct
     | HCom {ty = `Pos; _} -> expand_rigid_com rel r r' ~abs ~cap ~sys
 
     | _ ->
-      raise PleaseFillIn
+      raise PleaseRaiseProperError
 
 
   and plug_ty rel frm ty hd =
@@ -1087,7 +1118,7 @@ struct
     | HCom {ty = `Pos; _}, _ -> raise PleaseFillIn
 
     | _ ->
-      raise PleaseFillIn
+      raise PleaseRaiseProperError
 
   and subst_then_run rel r x c =
     run rel @@ subst r x c
