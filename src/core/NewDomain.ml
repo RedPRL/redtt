@@ -111,6 +111,8 @@ and hcom_shape =
 
 and head =
   | Lvl of int
+  | Var of {name : Name.t; twin : Tm.twin; ushift : int}
+  | Meta of {name : Name.t; ushift : int}
   | NCoe of {r : dim; r' : dim; ty : neu abs; cap : value}
   | NCom of {r : dim; r' : dim; ty : neu abs; cap : value; sys : con abs sys}
 
@@ -379,8 +381,49 @@ struct
         | _ -> raise PleaseRaiseProperError
       end
 
-    | Tm.Var _ -> raise CanJonHelpMe
-    | Tm.Meta _ -> raise CanJonHelpMe
+    | Tm.Var info ->
+      let globals = env.globals in
+      let entry = GlobalEnv.lookup globals info.name in
+      let env' = Env.clear_locals env in
+      let ty, odef =
+        match entry, info.twin with
+        | `Def (ty, def), _ -> ty, Some def
+        | `P ty, _ -> ty, None
+        | `Tw (ty, _), `TwinL -> ty, None
+        | `Tw (_, ty), `TwinR -> ty, None
+        | _ -> raise PleaseRaiseProperError
+      in
+      begin
+        match odef with
+        | Some def ->
+          eval rel env' @@ Tm.shift_univ info.ushift def
+        | None ->
+          let vty = eval rel env' @@ Tm.shift_univ info.ushift ty in
+          let var = Var {name = info.name; twin = info.twin; ushift = info.ushift} in
+          let neu = {head = var; frames = Emp} in
+          Neu {neu; ty = Delayed.make vty; sys = []}
+      end
+
+    | Tm.Meta info ->
+      let globals = env.globals in
+      let entry = GlobalEnv.lookup globals info.name in
+      let env' = Env.clear_locals env in
+      let ty, odef =
+        match entry with
+        | `Def (ty, def) -> ty, Some def
+        | `P ty -> ty, None
+        | _ -> raise PleaseRaiseProperError
+      in
+      begin
+        match odef with
+        | Some def ->
+          eval rel env' @@ Tm.shift_univ info.ushift def
+        | None ->
+          let vty = eval rel env' @@ Tm.shift_univ info.ushift ty in
+          let var = Meta {name = info.name; ushift = info.ushift} in
+          let neu = {head = var; frames = Emp} in
+          Neu {neu; ty = Delayed.make vty; sys = []}
+      end
 
     | Tm.DFix _ -> raise CanJonHelpMe
 
@@ -1261,7 +1304,7 @@ struct
 
   let swap pi =
     function
-    | Lvl _ as h -> h
+    | Lvl _ | Var _ | Meta _ as h -> h
     | NCoe info ->
       NCoe
         {r = Dim.swap pi info.r;
@@ -1275,9 +1318,10 @@ struct
          ty = NeuAbs.swap pi info.ty;
          cap = Val.swap pi info.cap;
          sys = ConAbsSys.swap pi info.sys}
+
   let run rel =
     function
-    | Lvl _ as h -> h
+    | Lvl _ | Var _ | Meta _ as h -> h
     | NCoe info ->
       NCoe
         {r = Dim.run rel info.r;
@@ -1291,9 +1335,10 @@ struct
          ty = NeuAbs.run rel info.ty;
          cap = Val.run rel info.cap;
          sys = ConAbsSys.run rel info.sys}
+
   let subst r x =
     function
-    | Lvl _ as h -> h
+    | Lvl _ | Var _ | Meta _ as h -> h
     | NCoe info ->
       NCoe
         {r = Dim.subst r x info.r;
@@ -1307,9 +1352,10 @@ struct
          ty = NeuAbs.subst r x info.ty;
          cap = Val.subst r x info.cap;
          sys = ConAbsSys.subst r x info.sys}
+
   let subst_then_run rel r x =
     function
-    | Lvl _ as h -> h
+    | Lvl _ | Var _ | Meta _ as h -> h
     | NCoe info ->
       NCoe
         {r = Dim.subst_then_run rel r x info.r;
