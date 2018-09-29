@@ -76,11 +76,15 @@ type con =
   | Ext of ext_clo
 
   | Lam of clo
-  | ExtLam of nclo
   | Cons of value * value
+  | ExtLam of nclo
+
   | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value}
   | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys}
   | Com of {r : dim; r' : dim; ty : coe_shape; cap : value; sys : con abs sys}
+
+  | Univ of {kind : Kind.t; lvl : Lvl.t}
+
   | Neu of {ty : value; neu : neu; sys : con sys}
 
 and value = con Delayed.t
@@ -270,8 +274,8 @@ struct
     | Tm.RestrictThunk _ ->
       raise PleaseFillIn
 
-    | Tm.Univ _ ->
-      raise PleaseFillIn
+    | Tm.Univ {kind; lvl} ->
+        Univ {kind; lvl}
 
     | Tm.V _ ->
       raise PleaseFillIn
@@ -598,14 +602,14 @@ struct
       let clo = Clo.swap pi clo in
       Lam clo
 
-    | ExtLam nclo ->
-      let nclo = NClo.swap pi nclo in
-      ExtLam nclo
-
     | Cons (v0, v1) ->
       let v0 = Val.swap pi v0 in
       let v1 = Val.swap pi v1 in
       Cons (v0, v1)
+
+    | ExtLam nclo ->
+      let nclo = NClo.swap pi nclo in
+      ExtLam nclo
 
     | Coe info ->
       Coe
@@ -629,6 +633,8 @@ struct
          ty = ComShape.swap pi info.ty;
          cap = Val.swap pi info.cap;
          sys = ConAbsSys.swap pi info.sys}
+
+    | Univ _ as con -> con
 
     | Neu info ->
       Neu
@@ -654,14 +660,14 @@ struct
       let clo = Clo.subst r x clo in
       Lam clo
 
-    | ExtLam nclo ->
-      let nclo = NClo.subst r x nclo in
-      ExtLam nclo
-
     | Cons (v0, v1) ->
       let v0 = Val.subst r x v0 in
       let v1 = Val.subst r x v1 in
       Cons (v0, v1)
+
+    | ExtLam nclo ->
+      let nclo = NClo.subst r x nclo in
+      ExtLam nclo
 
     | Coe info ->
       Coe
@@ -686,6 +692,8 @@ struct
          cap = Val.subst r x info.cap;
          sys = ConAbsSys.subst r x info.sys}
 
+    | Univ _ as con -> con
+
     | Neu info ->
       Neu
         {ty = Val.subst r x info.ty;
@@ -706,29 +714,18 @@ struct
       let extclo = ExtClo.run rel extclo in
       Ext extclo
 
-    | Neu info ->
-      begin
-        match ConSys.run_then_force rel info.sys with
-        | sys ->
-          let neu = Neu.run rel info.neu in
-          let ty = Val.run rel info.ty in
-          Neu {ty; neu; sys}
-        | exception ConSys.Triv v ->
-          v
-      end
-
     | Lam clo ->
       let clo = Clo.run rel clo in
       Lam clo
-
-    | ExtLam nclo ->
-      let nclo = NClo.run rel nclo in
-      ExtLam nclo
 
     | Cons (v0, v1) ->
       let v0 = Val.run rel v0 in
       let v1 = Val.run rel v1 in
       Cons (v0, v1)
+
+    | ExtLam nclo ->
+      let nclo = NClo.run rel nclo in
+      ExtLam nclo
 
     | Coe info ->
       begin
@@ -773,22 +770,24 @@ struct
             ConAbs.inst rel abs info.r'
       end
 
+    | Univ _ as con -> con
+
+    | Neu info ->
+      begin
+        match ConSys.run_then_force rel info.sys with
+        | sys ->
+          let neu = Neu.run rel info.neu in
+          let ty = Val.run rel info.ty in
+          Neu {ty; neu; sys}
+        | exception ConSys.Triv v ->
+          v
+      end
+
+
   and plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
       Clo.inst rel clo @@ Val (LazyVal.make @@ lazy begin Val.unleash arg end)
-
-    | FunApp arg, Coe {r; r'; ty = `Pi abs; cap} ->
-      let Abs (x, quantx) = abs in
-      let y, pi = Perm.freshen_name x in
-      let dom = ValAbs.unleash @@ Abs (x, quantx.dom) in
-      let coe_arg s = make_coe rel r' s ~abs:dom ~cap:arg in
-      let coe_r'y = LazyVal.make @@ lazy begin coe_arg @@ `Atom y end in
-      let cod_y = Clo.swap pi quantx.cod in
-
-      let abs = Abs (y, Clo.inst rel cod_y @@ Val coe_r'y) in
-      let cap = Val.plug rel (FunApp (Val.make @@ coe_arg r)) cap in
-      rigid_coe rel r r' ~abs ~cap
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
       let ty = Clo.inst rel quant.cod @@ Val (LazyVal.make @@ lazy begin Val.unleash arg end) in
@@ -796,8 +795,23 @@ struct
       let sys = ConAbsSys.plug rel frm sys in
       rigid_hcom rel r r' ~ty ~cap ~sys
 
+    | FunApp arg, Coe {r; r'; ty = `Pi abs; cap} ->
+      let Abs (x, quantx) = abs in
+      let y, pi = Perm.freshen_name x in
+      let dom = ValAbs.unleash @@ Abs (x, quantx.dom) in
+      let coe_arg s = make_coe rel r' s ~abs:dom ~cap:arg in
+      let abs =
+        let cod_y = Clo.swap pi quantx.cod in
+        let coe_r'y = LazyVal.make @@ lazy begin coe_arg @@ `Atom y end in
+        Abs (y, Clo.inst rel cod_y @@ Val coe_r'y) in
+      let cap = Val.plug rel (FunApp (Val.make @@ coe_arg r)) cap in
+      rigid_coe rel r r' ~abs ~cap
+
     | ExtApp rs, ExtLam nclo ->
       NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
+
+    | ExtApp rs, HCom {r; r'; ty = `Ext qu; cap; sys} ->
+      raise PleaseFillIn
 
     | ExtApp ss, Coe {r; r'; ty = `Ext abs; cap} ->
       let Abs (y, extclo_y) = abs in
@@ -805,37 +819,72 @@ struct
       let sys_ss' = ConSys.forall y sys_ss in
       raise PleaseFillIn
 
-    | ExtApp rs, HCom {r; r'; ty = `Ext qu; cap; sys} ->
-      raise PleaseFillIn
-
     | Fst, Cons (v0, _) ->
       Val.unleash v0
+
+    | Fst, HCom {r; r'; ty = `Sg {dom; _}; cap; sys} ->
+      let ty = Val.unleash dom in
+      let cap = Val.plug rel Fst cap in
+      let sys = ConAbsSys.plug rel Fst sys in
+      rigid_hcom rel r r' ~ty ~cap ~sys
 
     | Fst, Coe {r; r'; ty = `Sg abs; cap} ->
       let cap = Val.plug rel Fst cap in
       let abs =
-        let Abs (xs, {dom; cod}) = abs in
-        Abs (xs, Val.unleash dom)
+        let Abs (x, {dom; _}) = abs in
+        Abs (x, Val.unleash dom)
       in
       rigid_coe rel r r' ~abs ~cap
 
     | Snd, Cons (_, v1) ->
       Val.unleash v1
 
-    | Snd, Coe {r; r'; ty = `Sg abs; cap} ->
-      raise PleaseFillIn
+    | Snd, HCom {r; r'; ty = `Sg {dom; cod}; cap; sys} ->
+      let abs =
+        let y = Name.fresh () in
+        let hcom_ry_fst = LazyVal.make @@
+          lazy begin
+            let ty = Val.unleash dom in
+            let cap = Val.plug rel Fst cap in
+            let sys = ConAbsSys.plug rel Fst sys in
+            rigid_hcom rel r (`Atom y) ~ty ~cap ~sys
+          end
+        in
+        let cod_hcom_ry_fst = Clo.inst rel cod @@ Val hcom_ry_fst in
+        Abs (y, cod_hcom_ry_fst)
+      in
+      let cap = Val.plug rel Snd cap in
+      let sys = ConAbsSys.plug rel Snd sys in
+      rigid_com rel r r' ~abs ~cap ~sys
+
+    | Snd, Coe {r; r'; ty = `Sg (Abs (x, {dom = dom_x; cod = cod_x})); cap} ->
+      let abs =
+        let y, pi = Perm.freshen_name x in
+        let coe_ry_fst = LazyVal.make @@
+          lazy begin
+            let abs = ValAbs.unleash @@ Abs (x, dom_x) in
+            let cap = Val.plug rel Fst cap in
+            rigid_coe rel r (`Atom y) ~abs ~cap
+          end
+        in
+        let cod_y = Clo.swap pi cod_x in
+        let cod_y_coe_ry_fst = Clo.inst rel cod_y @@ Val coe_ry_fst in
+        Abs (y, cod_y_coe_ry_fst)
+      in
+      let cap = Val.plug rel Snd cap in
+      rigid_coe rel r r' ~abs ~cap
 
     | NHCom {r; r'; cap; sys}, con ->
       rigid_hcom rel r r' ~ty:con ~cap ~sys
 
-    | _, Neu info ->
+    | (FunApp _ | ExtApp _ | Fst | Snd), Neu info ->
       let neu = Neu.plug rel frm info.neu in
       let sys = ConSys.plug rel frm info.sys in
       let ty, sys' = plug_ty rel frm info.ty hd in
       Neu {ty; neu; sys = sys' @ sys}
 
     | _ ->
-      raise PleaseFillIn
+      raise PleaseRaiseProperError
 
   and make_coe rel r r' ~abs ~cap =
     match Rel.compare r r' rel with
@@ -879,6 +928,12 @@ struct
     | Ext extclo ->
       Coe {r; r'; ty = `Ext (Abs (x, extclo)); cap}
 
+    | Univ _ ->
+      Val.unleash cap
+
+    | HCom {ty = `Pos; _} ->
+      raise CanFavoniaHelpMe
+
     | Neu info ->
       let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
       let ty = ValAbs.inst rel (ValAbs.make abs) r' in
@@ -910,6 +965,12 @@ struct
 
     | Ext extclo ->
       HCom {r; r'; ty = `Ext extclo; cap; sys}
+
+    | Univ _ ->
+      HCom {r; r'; ty = `Pos; cap; sys}
+
+    | HCom {ty = `Pos; _} ->
+      raise CanFavoniaHelpMe
 
     | Neu info ->
       let nhcom = NHCom {r; r'; cap; sys} in
@@ -992,10 +1053,9 @@ struct
       in
       Neu {ty; neu; sys = neu_sys}
 
-    (* the following is for positive types, but we do not
-     * have any yet!
-     *
-     * | _ -> expand_rigid_com rel r r' ~abs ~cap ~sys *)
+    | Univ _ as ty -> rigid_hcom rel r r' ~ty ~cap ~sys
+
+    | HCom {ty = `Pos; _} -> expand_rigid_com rel r r' ~abs ~cap ~sys
 
     | _ ->
       raise PleaseFillIn
@@ -1007,8 +1067,12 @@ struct
       let arg = lazy begin Val.unleash arg end in
       Val.make @@ Clo.inst rel cod @@ Val (LazyVal.make arg), []
 
+    | Pi _, _ -> raise PleaseRaiseProperError
+
     | Ext extclo, ExtApp rs ->
       ExtClo.inst' rel extclo @@ List.map (fun r -> Dim r) rs
+
+    | Ext _, _ -> raise PleaseRaiseProperError
 
     | Sg {dom; _}, Fst ->
       dom, []
@@ -1016,6 +1080,10 @@ struct
     | Sg {dom; cod}, Snd ->
       let car = lazy begin plug rel Fst hd end in
       Val.make @@ Clo.inst rel cod @@ Val (LazyVal.make car), []
+
+    | Sg _, _ -> raise PleaseRaiseProperError
+
+    | HCom {ty = `Pos; _}, _ -> raise PleaseFillIn
 
     | _ ->
       raise PleaseFillIn
