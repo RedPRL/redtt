@@ -17,6 +17,7 @@ val compare : dim -> dim -> t -> I.compare
 val equate' : dim -> dim -> t -> t
 val hide' : atom -> t -> t
 val subst' : dim -> atom -> t -> t
+val split : dim -> t -> (unit -> 'a) -> (unit -> 'a) -> (atom -> 'a) -> 'a
 
 (* pretty printer *)
 val pp : Format.formatter -> t -> unit

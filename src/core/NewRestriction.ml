@@ -25,48 +25,45 @@ let emp () =
    rank = T.init ~size;
    parent = T.init ~size}
 
-let rec find_aux (x : int) (f : (int, cls) T.t) : (int, cls) T.t * cls =
-  try
-    let fx = T.get x f in
-    match T.get x f with
-    | `Atom fx' as fx ->
-      if fx' == x then
-        f, fx
+let find_index (x : int) (h : t) : cls =
+  let rec go x (parent : (int, cls) T.t) : (int, cls) T.t * cls =
+    match T.get x parent with
+    | `Atom x_parent' as x_parent ->
+      if x_parent' == x then
+        parent, x_parent
       else
-        let f, cx = find_aux fx' f in
-        let f = T.set x cx f in
-        f, cx
-    | fx -> f, fx
-  with
-  | _ ->
-    let f = T.set x (`Atom x) f in
-    f, `Atom x
+        let parent, cls = go x_parent' parent in
+        let parent = T.set x cls parent in
+        parent, cls
+    | cls -> parent, cls
+    | exception Not_found ->
+      let parent = T.set x (`Atom x) parent in
+      parent, `Atom x
+  in
+  let parent, cls = go x h.parent in
+  h.parent <- parent;
+  cls
 
-let find' (x : int) (h : t) : cls =
-  let f, cx = find_aux x h.parent in
-  h.parent <- f;
-  cx
-
-let find (x : cls) (h : t) : cls =
+let find_cls (x : cls) (h : t) : cls =
   match x with
-  | `Atom x -> find' x h
+  | `Atom x -> find_index x h
   | c -> c
 
-let get_rank cx h =
+let rank_index (x : int) h =
   try
-    T.get cx h.rank
+    T.get x h.rank
   with
   | _ ->
     0
 
-let union_aux (x : cls) (y : cls) (h : t) =
-  let cx = find x h in
-  let cy = find y h in
+let union_cls (x : cls) (y : cls) (h : t) =
+  let cx = find_cls x h in
+  let cy = find_cls y h in
   match cx, cy with
   | `Atom cx, `Atom cy ->
     if cx == cy then `Same else
-    let rx = get_rank cx h in
-    let ry = get_rank cy h in
+    let rx = rank_index cx h in
+    let ry = rank_index cy h in
     if rx > ry then
       `Changed {h with parent = T.set cy (`Atom cx) h.parent}
     else if rx < ry then
@@ -83,65 +80,68 @@ let union_aux (x : cls) (y : cls) (h : t) =
   | cx, cy ->
     if cx == cy then `Same else raise I.Inconsistent
 
-let reserve_index_aux (x : atom) (h : t) : int * t =
+let reserve_atom (x : atom) (h : t) : int * t =
   try
     T.get x h.index, h
   with
   | _ ->
     h.next, {h with index = T.set x h.next h.index; next = h.next + 1}
 
-let reserve_index (x : dim) (h : t) : cls * t =
+let reserve (x : dim) (h : t) : cls * t =
   match x with
-  | `Atom x -> let x, h = reserve_index_aux x h in `Atom x, h
+  | `Atom x -> let x, h = reserve_atom x h in `Atom x, h
   | `Dim0 -> `Dim0, h
   | `Dim1 -> `Dim1, h
 
 let union (x : dim) (y : dim) h =
-  let x, h = reserve_index x h in
-  let y, h = reserve_index y h in
-  union_aux x y h
+  let x, h = reserve x h in
+  let y, h = reserve y h in
+  union_cls x y h
 
-let query_index x (index : (atom, int) T.t) : [`Ok of cls | `Owned] =
+let query_atom (x : atom) (index : (atom, int) T.t) : [`Ok of cls | `Owned] =
+  try
+    `Ok (`Atom (T.get x index))
+  with
+  _ ->
+    `Owned
+
+let query (x : dim) (index : (atom, int) T.t) : [`Ok of cls | `Owned] =
   match x with
-  | `Atom x ->
-    begin
-      try
-        `Ok (`Atom (T.get x index))
-      with
-      _ ->
-        `Owned
-    end
+  | `Atom x -> query_atom x index
   | `Dim0 -> `Ok `Dim0
   | `Dim1 -> `Ok `Dim1
 
 let compare x y (h : t) =
-  match query_index x h.index, query_index y h.index with
+  match query x h.index, query y h.index with
   | `Owned, `Owned ->
     if x == y then `Same else `Indet
   | `Owned, `Ok _ -> `Indet
   | `Ok _, `Owned -> `Indet
   | `Ok x, `Ok y ->
-    match find x h, find y h with
+    match find_cls x h, find_cls y h with
     | `Atom x, `Atom y ->
       if x == y then `Same else `Indet
     | `Atom _, _ -> `Indet
     | _, `Atom _ -> `Indet
     | x, y -> if x = y then `Same else `Apart
 
-let in_index (x : atom) (h : t) =
-  T.mem x h.index
+let mem_atom (x : atom) index =
+  T.mem x index
 
 let hide_aux (x : atom) (h : t) =
   {h with index = T.remove x h.index}
 
 let hide (x : atom) (h : t) =
-  if in_index x h then
+  if mem_atom x h.index then
     `Changed (hide_aux x h)
   else
     `Same
 
 let hide' (x : atom) (h : t) =
-  get_m h (hide x h)
+  if mem_atom x h.index then
+    hide_aux x h
+  else
+    h
 
 let equate = union
 
@@ -149,19 +149,37 @@ let equate' x y h =
   get_m h @@ equate x y h
 
 let subst (r : dim) (x : atom) (h : t) =
-  if in_index x h then
-    hide x (equate' (`Atom x) r h)
+  if mem_atom x h.index then
+    `Changed (hide_aux x (equate' (`Atom x) r h))
   else
     `Same
 
 let subst' r x h =
-  get_m h @@ subst r x h
+  if mem_atom x h.index then
+    hide_aux x (equate' (`Atom x) r h)
+  else
+    h
 
 let swap (x : atom) (y : atom) (h : t) =
   match T.find x h.index, T.find y h.index with
   | None, None -> h
   | Some idx, Some idy when idx = idy -> h
   | oidx, oidy -> {h with index = T.set_opt y oidx (T.set_opt x oidy h.index)}
+
+let split x (h : t) case0 case1 case_atom =
+  match x with
+  | `Dim0 -> case0 ()
+  | `Dim1 -> case1 ()
+  | `Atom x ->
+    match query_atom x h.index with
+    | `Owned -> case_atom x
+    | `Ok `Dim0 -> case0 ()
+    | `Ok `Dim1 -> case1 ()
+    | `Ok (`Atom i) ->
+      match find_index i h with
+      | `Dim0 -> case0 ()
+      | `Dim1 -> case1 ()
+      | `Atom _ -> case_atom x
 
 
 let pp_cls fmt =
@@ -178,7 +196,7 @@ let pp_parent fmt (x, cls) =
 
 let pp fmt h =
   let comma fmt () = Format.fprintf fmt "," in
-  let l = T.fold (fun x i l -> (x, find' i h) :: l) h.index [] in
+  let l = T.fold (fun x i l -> (x, find_index i h) :: l) h.index [] in
   Format.pp_print_list ~pp_sep:comma pp_parent fmt l
 
 (* poor man's tests *)
