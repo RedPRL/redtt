@@ -93,8 +93,7 @@ struct
       let cod_x = Clo.inst rel cod (Val (LazyVal.make @@ lazy x)) in
       let bdy0_x = Con.plug rel (FunApp (Val.make x)) el0 in
       let bdy1_x = Con.plug rel (FunApp (Val.make x)) el1 in
-      let bdy_x = equate_nf qenv_x rel cod_x bdy0_x bdy1_x
-      in
+      let bdy_x = equate_nf qenv_x rel cod_x bdy0_x bdy1_x in
       Tm.lam (Clo.name cod) bdy_x
 
     | Sg {dom; cod} ->
