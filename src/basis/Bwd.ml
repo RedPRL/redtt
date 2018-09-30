@@ -87,6 +87,12 @@ struct
       let xs' = filter f xs in
       if f x then Snoc (xs', x) else xs'
 
+  let rec fold_left f e =
+    function
+    | Emp -> e
+    | Snoc (xs, x) ->
+      f (fold_left f e xs) x
+
   let to_list xs =
     xs <>> []
 

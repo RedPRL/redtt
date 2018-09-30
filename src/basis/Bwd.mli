@@ -24,6 +24,7 @@ sig
   val mapi : (int -> 'a -> 'b) -> 'a bwd -> 'b bwd
   val flat_map : ('a -> 'b list) -> 'a bwd -> 'b bwd
   val filter : ('a -> bool) -> 'a bwd -> 'a bwd
+  val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b bwd -> 'a
   val to_list : 'a bwd -> 'a list
   val from_list : 'a list -> 'a bwd
 end

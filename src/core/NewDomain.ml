@@ -142,8 +142,6 @@ and nclo = NClo of {bnd : Tm.tm Tm.nbnd; env : env}
 and ext_clo = ExtClo of {bnd : (Tm.tm * (Tm.tm, Tm.tm) Tm.system) Tm.nbnd; env : env}
 
 
-let flip f x y = f y x
-
 (** Permutations *)
 module Perm :
 sig
