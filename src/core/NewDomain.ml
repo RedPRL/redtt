@@ -324,16 +324,11 @@ struct
       raise CanJonHelpMe
 
   and eval_cmd rel env (hd, sp) =
-    let vhd = eval_head rel env hd in
-    eval_spine rel env vhd sp
-
-  and eval_spine rel env vhd =
-    function
-    | [] -> vhd
-    | frm :: sp ->
+    let folder hd frm =
       let frm = eval_frame rel env frm in
-      let vhd = Con.plug rel frm vhd in
-      eval_spine rel env vhd sp
+      Con.plug rel frm hd
+    in
+    List.fold_left folder (eval_head rel env hd) sp
 
   and eval_frame rel env =
     function
@@ -581,7 +576,7 @@ and Env :
 sig
   include Domain with type t = env
 
-  val emp : unit -> env
+  val emp : unit -> env (* shouldn't this take a GlobalEnv.t? *)
   val extend_cell : env -> cell -> env
   val extend_cells : env -> cell list -> env
   val lookup_cell_by_index : int -> env -> cell
