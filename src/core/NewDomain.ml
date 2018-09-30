@@ -152,18 +152,24 @@ sig
   val fold : (Name.t -> Name.t -> 'a -> 'a) -> t -> 'a -> 'a
 end =
 struct
-  type t = (Name.t * Name.t) list (* favonia: a demonstration of my laziness *)
+  (* favonia: this is a demonstration of my laziness *)
+  type t = (Name.t * Name.t) list
+  
   let mimic x = Name.named (Name.name x)
+  
   let freshen_name x =
     let x' = mimic x in x', [(x, x')]
+  
   let rec freshen_names = function
     | Emp -> Emp, []
     | Snoc (xs, x) ->
       let xs', perm = freshen_names xs in
       let x' = mimic x in
       Snoc (xs', x'), (x, x') :: perm
+  
   let swap_name perm x =
     try List.assoc x perm with Not_found -> x
+  
   let fold f = List.fold_right (fun (x, x') a -> f x x' a)
 end
 
@@ -234,8 +240,6 @@ struct
   type t = Tm.tm
 
   exception Triv of con
-
-  module LazyValAbs = DelayedPlug (LazyPlug (AbsPlug (Con)))
 
   let rec eval_dim env t =
     match Tm.unleash t with
@@ -456,6 +460,7 @@ end
 and Dim : Domain with type t = dim =
 struct
   type t = dim
+
   let swap pi =
     function
     | `Dim0 | `Dim1 as r -> r
@@ -484,10 +489,13 @@ struct
 
   let swap pi (Clo clo) =
     Clo {clo with env = Env.swap pi clo.env}
+
   let subst r x (Clo clo) =
     Clo {clo with env = Env.subst r x clo.env}
+
   let run rel (Clo clo) =
     Clo {clo with env = Env.run rel clo.env}
+
   let subst_then_run rel r x (Clo clo) =
     Clo {clo with env = Env.subst_then_run rel r x clo.env}
 
@@ -510,10 +518,13 @@ struct
 
   let swap pi (NClo nclo) =
     NClo {nclo with env = Env.swap pi nclo.env}
+
   let subst r x (NClo nclo) =
     NClo {nclo with env = Env.subst r x nclo.env}
+
   let run rel (NClo nclo) =
     NClo {nclo with env = Env.run rel nclo.env}
+
   let subst_then_run rel r x (NClo nclo) =
     NClo {nclo with env = Env.subst_then_run rel r x nclo.env}
 
@@ -530,16 +541,20 @@ sig
   include Domain with type t = ext_clo
   val names : t -> string option bwd
   val inst : rel -> t -> cell list -> con * con sys
+  val inst_then_fst : rel -> t -> cell list -> con
 end =
 struct
   type t = ext_clo
 
   let swap pi (ExtClo clo) =
     ExtClo {clo with env = Env.swap pi clo.env}
+
   let subst r x (ExtClo clo) =
     ExtClo {clo with env = Env.subst r x clo.env}
+
   let run rel (ExtClo clo) =
     ExtClo {clo with env = Env.run rel clo.env}
+
   let subst_then_run rel r x (ExtClo clo) =
     ExtClo {clo with env = Env.subst_then_run rel r x clo.env}
 
@@ -552,6 +567,12 @@ struct
     let vty = Syn.eval rel env' ty in
     let vsys = Syn.eval_tm_sys rel env' sys in
     vty, vsys
+
+  let inst_then_fst rel clo cells =
+    let ExtClo {bnd; env} = clo in
+    let Tm.NB (_, (ty, _)) = bnd in
+    let env' = Env.extend_cells env cells in
+    Syn.eval rel env' ty
 end
 
 and Cell : Domain with type t = cell =
@@ -562,14 +583,17 @@ struct
     function
     | Dim d -> Dim (Dim.swap pi d)
     | Val v -> Val (LazyVal.swap pi v)
+
   let subst r x =
     function
     | Dim d -> Dim (Dim.subst r x d)
     | Val v -> Val (LazyVal.subst r x v)
+
   let run rel =
     function
     | Dim _ as c -> c
     | Val v -> Val (LazyVal.run rel v)
+
   let subst_then_run rel r x =
     function
     | Dim d -> Dim (Dim.subst_then_run rel r x d)
@@ -592,10 +616,13 @@ struct
 
   let swap pi env =
     {env with cells = Bwd.map (Cell.swap pi) env.cells}
+
   let subst r x env =
     {env with cells = Bwd.map (Cell.subst r x) env.cells}
+
   let run rel env =
     {env with cells = Bwd.map (Cell.run rel) env.cells}
+
   let subst_then_run rel r x env =
     {env with cells = Bwd.map (Cell.subst_then_run rel r x) env.cells}
 
@@ -1287,6 +1314,11 @@ and LazyVal : DelayedDomainPlug
    and type t = con Lazy.t Delayed.t
   = DelayedPlug (LazyPlug (Con))
 
+and LazyValAbs : DelayedDomainPlug
+  with type u = con abs Lazy.t
+   and type t = con abs Lazy.t Delayed.t
+  = DelayedPlug (LazyPlug (AbsPlug (Con)))
+
 and CoeShape : Domain with type t = coe_shape =
 struct
   type t = coe_shape
@@ -1363,14 +1395,17 @@ struct
     let dom = Val.swap pi dom in
     let cod = Clo.swap pi cod in
     {dom; cod}
+
   let subst r x {dom; cod} =
     let dom = Val.subst r x dom in
     let cod = Clo.subst r x cod in
     {dom; cod}
+
   let run rel {dom; cod} =
     let dom = Val.run rel dom in
     let cod = Clo.run rel cod in
     {dom; cod}
+
   let subst_then_run rel r x {dom; cod} =
     let dom = Val.subst_then_run rel r x dom in
     let cod = Clo.subst_then_run rel r x cod in
@@ -1384,12 +1419,15 @@ struct
   let swap pi neu =
     {head = Head.swap pi neu.head;
      frames = Bwd.map (Frame.swap pi) neu.frames}
+
   let run rel neu =
     {head = Head.run rel neu.head;
      frames = Bwd.map (Frame.run rel) neu.frames}
+
   let subst r x neu =
     {head = Head.subst r x neu.head;
      frames = Bwd.map (Frame.subst r x) neu.frames}
+
   let subst_then_run rel r x neu =
     {head = Head.subst_then_run rel r x neu.head;
      frames = Bwd.map (Frame.subst_then_run rel r x) neu.frames}
@@ -1614,6 +1652,7 @@ and Sys :
     exception Triv of X.t
 
     let swap pi = List.map @@ Face.swap pi
+
     let subst r x = List.map @@ Face.subst r x
 
     let forall x = ListUtil.filter_map (Face.forall x)
@@ -1765,6 +1804,8 @@ and Face :
 and Abs : functor (X : Domain) ->
 sig
   include Domain with type t = X.t abs
+
+  (** inst will give a rel-value *)
   val inst : rel -> t -> dim -> X.t
 end
   =
@@ -1848,12 +1889,15 @@ end
     module DelayedX = DelayedPlug(X)
 
     let make (Abs (x, v)) = Abs (x, DelayedX.make v)
+
     let unleash (Abs (x, v)) = Abs (x, DelayedX.unleash v)
+
     let drop_rel (Abs (x, v)) = Abs (x, DelayedX.drop_rel v)
 
     let run_then_unleash rel (Abs (x, v_x)) =
       let rel_x = Rel.hide' x rel in
       Abs (x, DelayedX.run_then_unleash rel_x v_x)
+
     let plug_then_unleash rel frm (Abs (x, v_x)) =
       let rel_x = Rel.hide' x rel in
       Abs (x, DelayedX.plug_then_unleash rel_x frm v_x)
@@ -1868,21 +1912,28 @@ and DelayedPlug : functor (X : DomainPlug) ->
     type t = X.t Delayed.t
 
     let make = Delayed.make
+
     let unleash = Delayed.unleash X.run
+
     let drop_rel = Delayed.drop_rel
 
     let swap pi = Delayed.fold @@ fun rel v ->
       Delayed.make' (Option.map (Perm.fold Rel.swap pi) rel) (X.swap pi v)
+
     let subst r x = Delayed.fold @@ fun rel v ->
       Delayed.make' (Option.map (Rel.subst' r x) rel) (X.subst r x v)
+
     let run rel v = Delayed.with_rel rel v
+
     let subst_then_run rel r x v = Delayed.make' (Some rel) (X.subst r x (Delayed.drop_rel v))
 
     (* it is safe to `unleash v` here, but maybe we can do `Delayed.drop_rel v`? *)
     let plug rel frm v = Delayed.make @@ X.plug rel frm (unleash v)
 
     let run_then_unleash rel v = X.run rel (Delayed.drop_rel v)
-    let plug_then_unleash rel frm v = X.plug rel frm (unleash v) (* can we do `Delayed.drop_rel v` here? *)
+
+    (* can we do `Delayed.drop_rel v` here? *)
+    let plug_then_unleash rel frm v = X.plug rel frm (unleash v) 
   end
 
 and LazyPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t Lazy.t =
@@ -1891,8 +1942,12 @@ and LazyPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t Lazy.t =
     type t = X.t Lazy.t
 
     let swap pi v = lazy begin X.swap pi (Lazy.force v) end
+
     let subst r x v = lazy begin X.subst r x (Lazy.force v) end
+
     let run rel v = lazy begin X.run rel (Lazy.force v) end
+
     let subst_then_run rel r x v = lazy begin X.subst_then_run rel r x (Lazy.force v) end
+
     let plug rel frm v = lazy begin X.plug rel frm (Lazy.force v) end
   end
