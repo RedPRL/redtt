@@ -235,7 +235,6 @@ struct
 
   exception Triv of con
 
-  module LazyVal = DelayedPlug (LazyPlug (Con))
   module LazyValAbs = DelayedPlug (LazyPlug (AbsPlug (Con)))
 
   let rec eval_dim env t =
@@ -550,24 +549,22 @@ and Cell : Domain with type t = cell =
 struct
   type t = cell
 
-  module LazyValue = DelayedPlug (LazyPlug (Con))
-
   let swap pi =
     function
     | Dim d -> Dim (Dim.swap pi d)
-    | Val v -> Val (LazyValue.swap pi v)
+    | Val v -> Val (LazyVal.swap pi v)
   let subst r x =
     function
     | Dim d -> Dim (Dim.subst r x d)
-    | Val v -> Val (LazyValue.subst r x v)
+    | Val v -> Val (LazyVal.subst r x v)
   let run rel =
     function
     | Dim _ as c -> c
-    | Val v -> Val (LazyValue.run rel v)
+    | Val v -> Val (LazyVal.run rel v)
   let subst_then_run rel r x =
     function
     | Dim d -> Dim (Dim.subst_then_run rel r x d)
-    | Val v -> Val (LazyValue.subst_then_run rel r x v)
+    | Val v -> Val (LazyVal.subst_then_run rel r x v)
 end
 
 and Env :
@@ -583,8 +580,6 @@ sig
 end =
 struct
   type t = env
-
-  module LazyValue = DelayedPlug (LazyPlug (Con))
 
   let swap pi env =
     {env with cells = Bwd.map (Cell.swap pi) env.cells}
@@ -638,7 +633,6 @@ struct
   module ConAbsFace = Face (AbsPlug (Con))
   module ConAbsSys = Sys (AbsPlug (Con))
   module ValAbs = DelayedAbsPlug (Con)
-  module LazyVal = DelayedPlug (LazyPlug (Con))
 
   type t = con
 
@@ -1278,6 +1272,11 @@ and Val : DelayedDomainPlug
   with type u = con
    and type t = con Delayed.t
   = DelayedPlug (Con)
+
+and LazyVal : DelayedDomainPlug
+  with type u = con Lazy.t
+   and type t = con Lazy.t Delayed.t
+  = DelayedPlug (LazyPlug (Con))
 
 and CoeShape : Domain with type t = coe_shape =
 struct
