@@ -117,6 +117,9 @@ struct
       let bdy_xs = equate_nf qenv_xs rel ty_xs bdy0_xs bdy1_xs in
       Tm.ext_lam nms bdy_xs
 
+    | HCom ({ty = `Pos; _} as hcom) ->
+      raise PleaseFillIn
+
     | Univ _ -> equate_ty qenv rel el0 el1
 
     | _ -> raise PleaseFillIn
@@ -158,13 +161,44 @@ struct
       let sys_xs = equate_nf_sys qenv_xs rel ty0_xs sys0_xs sys1_xs in
       Tm.make @@ Tm.Ext (Tm.NB (nms, (ty_xs, sys_xs)))
 
+    | HCom ({ty = `Pos; _} as hcom0), HCom ({ty = `Pos; _} as hcom1) ->
+      let r = equate_dim qenv rel hcom0.r hcom1.r in
+      let r' = equate_dim qenv rel hcom0.r' hcom1.r' in
+      let cap = equate_ty qenv rel (Val.unleash hcom0.cap) (Val.unleash hcom1.cap) in
+      let sys = equate_ty_sys qenv rel hcom0.sys hcom1.sys in
+      Tm.make @@ Tm.FHCom {r; r'; cap; sys}
+
     | Univ univ0, Univ univ1 ->
-        if univ0.kind = univ1.kind && univ0.lvl = univ1.lvl then
-          Tm.univ ~kind:univ0.kind ~lvl:univ0.lvl
-        else
-          raise PleaseRaiseProperError
+      if univ0.kind = univ1.kind && univ0.lvl = univ1.lvl then
+        Tm.univ ~kind:univ0.kind ~lvl:univ0.lvl
+      else
+        raise PleaseRaiseProperError
 
     | _ -> raise PleaseFillIn
+
+  and equate_ty_abs qenv rel abs0 abs1 =
+    let nm = let Abs (x, _) = abs0 in Name.name x in
+    let x = Name.named nm in
+    let qenv_x = QEnv.abs1 x qenv in
+    let bdy0_x = ConAbs.inst rel abs0 (`Atom x) in
+    let bdy1_x = ConAbs.inst rel abs1 (`Atom x) in
+    let bdy_x = equate_ty qenv_x rel bdy0_x bdy1_x in
+    Tm.B (nm, bdy_x)
+
+  and equate_ty_face qenv rel (r0, r'0, abs0) (r1, r'1, abs1) =
+    let r = equate_dim qenv rel r0 r1 in
+    let r' = equate_dim qenv rel r'0 r'1 in
+    let rel = Rel.equate' r0 r'0 rel in
+    let lazy abs0 = LazyValAbs.unleash abs0 in
+    let lazy abs1 = LazyValAbs.unleash abs1 in
+    r, r', Some (equate_ty_abs qenv rel abs0 abs1)
+
+  and equate_ty_sys qenv rel sys0 sys1 =
+    try
+      List.map2 (equate_ty_face qenv rel) sys0 sys1
+    with
+    | Invalid_argument _ ->
+      raise PleaseRaiseProperError (* mismatched lengths *)
 
   and equate_abs qenv rel ty abs0 abs1 =
     let nm = let Abs (x, _) = abs0 in Name.name x in
