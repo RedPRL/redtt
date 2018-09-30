@@ -58,19 +58,19 @@ sig
   val equate_nf : qenv -> rel -> con -> con -> con -> Tm.tm
   val equate_neu : qenv -> rel -> neu -> neu -> Tm.tm Tm.cmd
   val equate_ty : qenv -> rel -> con -> con -> Tm.tm
-  val equate_val_sys : qenv -> rel -> value -> value sys -> value sys -> (Tm.tm, Tm.tm) Tm.system
+  val equate_nf_sys : qenv -> rel -> con -> con sys -> con sys -> (Tm.tm, Tm.tm) Tm.system
 
-  val subtype : qenv -> rel -> value -> value -> unit
+  val subtype : qenv -> rel -> con -> con -> unit
 end =
 struct
   let ignore _ = ()
 
-  let fresh_with_sys qenv ty sys =
+  let extend_with_sys qenv ty sys =
     let lvl, qenv = QEnv.extend qenv in
     let neu = {head = Lvl lvl; frames = Emp} in
-    Neu {ty = Val.make ty; neu; sys}, qenv
+    Neu {ty; neu; sys}, qenv
 
-  let fresh qenv ty = fresh_with_sys qenv ty []
+  let extend qenv ty = extend_with_sys qenv ty []
 
   let quote_dim qenv =
     function
@@ -89,21 +89,42 @@ struct
   let rec equate_nf qenv rel ty el0 el1 =
     match ty with
     | Pi {dom; cod} ->
-      let x, qenv_x = fresh qenv ty in
-      let cod_x = Clo.inst rel cod (Val (LazyVal.make @@ lazy x)) in
-      let bdy0_x = Con.plug rel (FunApp (Val.make x)) el0 in
-      let bdy1_x = Con.plug rel (FunApp (Val.make x)) el1 in
-      let bdy_x = equate_nf qenv_x rel cod_x bdy0_x bdy1_x in
-      (* TODO preserve names in evaluators *)
+      let x, qenv_x = extend qenv dom in
+      let bdy_x =
+        let cod_x = Clo.inst rel cod (Val (LazyVal.make @@ lazy x)) in
+        let bdy0_x = Con.plug rel (FunApp (Val.make x)) el0 in
+        let bdy1_x = Con.plug rel (FunApp (Val.make x)) el1 in
+        equate_nf qenv_x rel cod_x bdy0_x bdy1_x
+      in
+      (* TODO preserve names during evaluation *)
       Tm.lam None bdy_x
-   
+
+    | Univ _ -> equate_ty qenv rel el0 el1
+
     | _ -> raise PleaseFillIn
 
   and equate_neu _ = raise PleaseFillIn
 
-  and equate_ty _ = raise PleaseFillIn
+  and equate_ty qenv rel ty0 ty1 =
+    match ty0, ty1 with
+    | Pi info0, Pi info1 ->
+      let dom =
+        let dom0 = Val.unleash info0.dom in
+        let dom1 = Val.unleash info1.dom in
+        equate_ty qenv rel dom0 dom1
+      in
+      let x, qenv_x = extend qenv info0.dom in
+      let cod_x =
+        let cod0_x = Clo.inst rel info0.cod (Val (LazyVal.make @@ lazy x)) in
+        let cod1_x = Clo.inst rel info1.cod (Val (LazyVal.make @@ lazy x)) in
+        equate_ty qenv_x rel cod0_x cod1_x
+      in
+      (* TODO preserve names during evaluation *)
+      Tm.pi None dom cod_x
 
-  and equate_val_sys _ = raise PleaseFillIn
+    | _ -> raise PleaseFillIn
+
+  and equate_nf_sys _ = raise PleaseFillIn
 
   and subtype qenv rel ty0 ty1 =
     ignore @@ equate_ty qenv rel ty0 ty1;
