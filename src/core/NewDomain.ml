@@ -666,8 +666,8 @@ struct
   module ConAbs = AbsPlug (Con)
   module ConSys = Sys (Con)
   module ConFace = Face (Con)
-  module ConAbsFace = Face (AbsPlug (Con))
-  module ConAbsSys = Sys (AbsPlug (Con))
+  module ConAbsFace = Face (ConAbs)
+  module ConAbsSys = Sys (ConAbs)
   module ValAbs = DelayedAbsPlug (Con)
 
   type t = con
@@ -1000,9 +1000,9 @@ struct
         | ext_sys ->
           let cap = Val.plug rel frm cap in
           let ext_sys = ConAbsSys.foreach_gen ext_sys @@
-            fun (r, r', bdy) ->
+            fun (r, r', lazy bdy) ->
             let x = Name.fresh () in
-            Abs (x, Lazy.force bdy)
+            Abs (x, bdy)
           in
           let comp_sys = ConAbsSys.plug rel frm sys in
           let sys = ext_sys @ comp_sys in
@@ -1030,7 +1030,7 @@ struct
           let abs = Abs (y, ty_y) in
           let cap = Val.plug rel frm cap in
           let sys = ConAbsSys.foreach_gen sys_y @@
-            fun (r, r', bdy_y) -> Abs (y, Lazy.force bdy_y)
+            fun (r, r', lazy bdy_y) -> Abs (y, bdy_y)
           in
           rigid_com rel r r' ~abs ~cap ~sys
         | exception ConSys.Triv c_y ->
@@ -1164,14 +1164,14 @@ struct
       let neu_sys =
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
-          ConSys.foreach_gen sys @@ fun (s, s', abs) ->
+          ConSys.foreach_gen sys @@ fun (s, s', lazy abs) ->
           let rel' = Rel.equate' s s' rel in
-          ConAbs.inst rel' (Lazy.force abs) r'
+          ConAbs.inst rel' abs r'
         in
         let old_faces =
-          ConSys.foreach_gen info.sys @@ fun (s, s', ty) ->
+          ConSys.foreach_gen info.sys @@ fun (s, s', lazy ty) ->
           let rel' = Rel.equate' s s' rel in
-          let ty = run rel' @@ Lazy.force ty in
+          let ty = run rel' ty in
           let cap = Val.run rel' cap in
           let sys = ConAbsSys.run rel' sys in
           make_hcom rel' r r' ~ty ~cap ~sys
@@ -1211,9 +1211,9 @@ struct
       let sys =
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let old_faces =
-          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
+          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', lazy bdy) ->
           let rel' = Rel.equate' s s' rel in
-          let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
+          let abs = ConAbs.run rel' @@ Abs (x, bdy) in
           let cap = Val.run rel' cap in
           make_coe rel' r r' ~abs ~cap
         in
@@ -1231,7 +1231,7 @@ struct
       let Abs (bound_var_of_abs, _) = abs in
       ConAbsSys.foreach_gen sys @@ fun (r, r', face) ->
       let rel' = Rel.equate r r' in
-      let Abs (y, bdy_y) = Lazy.force face in
+      let lazy (Abs (y, bdy_y)) = face in
       let z, rel_z, bdy_z =
         (* it might sound weird that y could be the same as bound_var_of_abs,
          * but this happens a lot in the coe of the extension types. *)
@@ -1263,14 +1263,14 @@ struct
       let neu_sys =
         let cap_face = r, r', LazyVal.make @@ lazy begin Val.unleash cap end in
         let tube_faces =
-          ConSys.foreach_gen sys @@ fun (s, s', abs) ->
+          ConSys.foreach_gen sys @@ fun (s, s', lazy abs) ->
           let rel' = Rel.equate' s s' rel in
-          ConAbs.inst rel' (Lazy.force abs) r'
+          ConAbs.inst rel' abs r'
         in
         let old_faces =
-          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
+          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', lazy bdy) ->
           let rel' = Rel.equate' s s' rel in
-          let abs = ConAbs.run rel' @@ Abs (x, Lazy.force bdy) in
+          let abs = ConAbs.run rel' @@ Abs (x, bdy) in
           let cap = Val.run rel' cap in
           let sys = ConAbsSys.run rel' sys in
           make_com rel' r r' ~abs ~cap ~sys
@@ -1776,7 +1776,7 @@ and Face :
     let force rel ((r, r', bdy) as face) =
       match Rel.compare r r' rel with
       | `Same ->
-        let bdy' = Lazy.force @@ DelayedLazyX.unleash bdy in
+        let lazy bdy' = DelayedLazyX.unleash bdy in
         raise @@ Triv bdy'
       | `Apart ->
         raise Dead
@@ -1951,3 +1951,5 @@ and LazyPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t Lazy.t =
 
     let plug rel frm v = lazy begin X.plug rel frm (Lazy.force v) end
   end
+
+module ConAbs = AbsPlug (Con)
