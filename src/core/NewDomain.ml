@@ -476,6 +476,7 @@ end
 and Clo :
 sig
   include Domain with type t = clo
+  val name : t -> string option
   val inst : rel -> t -> cell -> con
 end =
 struct
@@ -490,6 +491,8 @@ struct
   let subst_then_run rel r x (Clo clo) =
     Clo {clo with env = Env.subst_then_run rel r x clo.env}
 
+  let name (Clo {bnd = Tm.B (nm, _); _}) = nm
+
   let inst rel clo cell =
     let Clo {bnd; env} = clo in
     let Tm.B (_, tm) = bnd in
@@ -499,6 +502,7 @@ end
 and NClo :
 sig
   include Domain with type t = nclo
+  val names : t -> string option bwd
   val inst : rel -> t -> cell list -> con
 end =
 struct
@@ -513,6 +517,8 @@ struct
   let subst_then_run rel r x (NClo nclo) =
     NClo {nclo with env = Env.subst_then_run rel r x nclo.env}
 
+  let names (NClo {bnd = Tm.NB (nms, _); _}) = nms
+
   let inst (rel : rel) nclo cells : con =
     let NClo {bnd; env} = nclo in
     let Tm.NB (_, tm) = bnd in
@@ -522,6 +528,7 @@ end
 and ExtClo :
 sig
   include Domain with type t = ext_clo
+  val names : t -> string option bwd
   val inst : rel -> t -> cell list -> con * con sys
 end =
 struct
@@ -535,6 +542,8 @@ struct
     ExtClo {clo with env = Env.run rel clo.env}
   let subst_then_run rel r x (ExtClo clo) =
     ExtClo {clo with env = Env.subst_then_run rel r x clo.env}
+
+  let names (ExtClo {bnd = Tm.NB (nms, _); _}) = nms
 
   let inst rel clo cells =
     let ExtClo {bnd; env} = clo in

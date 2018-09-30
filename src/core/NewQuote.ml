@@ -90,14 +90,24 @@ struct
     match ty with
     | Pi {dom; cod} ->
       let x, qenv_x = extend qenv dom in
-      let bdy_x =
-        let cod_x = Clo.inst rel cod (Val (LazyVal.make @@ lazy x)) in
-        let bdy0_x = Con.plug rel (FunApp (Val.make x)) el0 in
-        let bdy1_x = Con.plug rel (FunApp (Val.make x)) el1 in
-        equate_nf qenv_x rel cod_x bdy0_x bdy1_x
+      let cod_x = Clo.inst rel cod (Val (LazyVal.make @@ lazy x)) in
+      let bdy0_x = Con.plug rel (FunApp (Val.make x)) el0 in
+      let bdy1_x = Con.plug rel (FunApp (Val.make x)) el1 in
+      let bdy_x = equate_nf qenv_x rel cod_x bdy0_x bdy1_x
       in
-      (* TODO preserve names during evaluation *)
-      Tm.lam None bdy_x
+      Tm.lam (Clo.name cod) bdy_x
+
+    | Sg {dom; cod} ->
+      let fst0 = Con.plug rel Fst el0 in
+      let fst1 = Con.plug rel Fst el1 in
+      let fst = equate_nf qenv rel (Val.unleash dom) fst0 fst1 in
+      let cod = Clo.inst rel cod (Val (LazyVal.make @@ lazy fst0)) in
+      let snd0 = Con.plug rel Snd el0 in
+      let snd1 = Con.plug rel Snd el1 in
+      let snd = equate_nf qenv rel cod snd0 snd1 in
+      Tm.cons fst snd
+
+    | Ext extclo -> raise PleaseFillIn
 
     | Univ _ -> equate_ty qenv rel el0 el1
 
@@ -108,19 +118,24 @@ struct
   and equate_ty qenv rel ty0 ty1 =
     match ty0, ty1 with
     | Pi info0, Pi info1 ->
-      let dom =
-        let dom0 = Val.unleash info0.dom in
-        let dom1 = Val.unleash info1.dom in
-        equate_ty qenv rel dom0 dom1
-      in
+      let dom0 = Val.unleash info0.dom in
+      let dom1 = Val.unleash info1.dom in
+      let dom = equate_ty qenv rel dom0 dom1 in
       let x, qenv_x = extend qenv info0.dom in
-      let cod_x =
-        let cod0_x = Clo.inst rel info0.cod (Val (LazyVal.make @@ lazy x)) in
-        let cod1_x = Clo.inst rel info1.cod (Val (LazyVal.make @@ lazy x)) in
-        equate_ty qenv_x rel cod0_x cod1_x
-      in
-      (* TODO preserve names during evaluation *)
-      Tm.pi None dom cod_x
+      let cod0_x = Clo.inst rel info0.cod (Val (LazyVal.make @@ lazy x)) in
+      let cod1_x = Clo.inst rel info1.cod (Val (LazyVal.make @@ lazy x)) in
+      let cod_x = equate_ty qenv_x rel cod0_x cod1_x in
+      Tm.pi (Clo.name info0.cod) dom cod_x
+
+    | Sg info0, Sg info1 ->
+      let dom0 = Val.unleash info0.dom in
+      let dom1 = Val.unleash info1.dom in
+      let dom = equate_ty qenv rel dom0 dom1 in
+      let x, qenv_x = extend qenv info0.dom in
+      let cod0_x = Clo.inst rel info0.cod (Val (LazyVal.make @@ lazy x)) in
+      let cod1_x = Clo.inst rel info1.cod (Val (LazyVal.make @@ lazy x)) in
+      let cod_x = equate_ty qenv_x rel cod0_x cod1_x in
+      Tm.sg (Clo.name info0.cod) dom cod_x
 
     | _ -> raise PleaseFillIn
 
