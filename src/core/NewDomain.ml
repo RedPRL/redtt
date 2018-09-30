@@ -574,7 +574,7 @@ and Env :
 sig
   include Domain with type t = env
 
-  val emp : unit -> env (* shouldn't this take a GlobalEnv.t? *)
+  val init : GlobalEnv.t -> env (* shouldn't this take a GlobalEnv.t? *)
   val extend_cell : env -> cell -> env
   val extend_cells : env -> cell list -> env
   val lookup_cell_by_index : int -> env -> cell
@@ -595,13 +595,12 @@ struct
   let subst_then_run rel r x env =
     {env with cells = Bwd.map (Cell.subst_then_run rel r x) env.cells}
 
-  let emp () = {globals = GlobalEnv.emp (); cells = Emp}
+  let init globals = {globals = globals; cells = Emp}
 
   let lookup_cell_by_index i {cells; _} = Bwd.nth cells i
 
   let extend_cells env cells =
-    {env with
-     cells = env.cells <>< cells}
+    {env with cells = env.cells <>< cells}
 
   let extend_cell env cell =
     extend_cells env [cell]
@@ -983,7 +982,7 @@ struct
 
     | ExtApp rs as frm, Coe {r; r'; ty = `Ext (Abs (x, extclo_x)); cap} ->
       let y, rel_y, extclo_y =
-        match Frame.occur x frm with
+        match Frame.occur1 x frm with
         | `No ->
           x, Rel.hide' x rel, extclo_x
         | `Might ->
@@ -1471,8 +1470,8 @@ end
 and Frame :
 sig
   include Domain with type t = frame
-  val occur : Name.t -> frame -> [`No | `Might]
-  val occurs : Name.t bwd -> frame -> [`No | `Might]
+  val occur1 : Name.t -> frame -> [`No | `Might]
+  val occur : Name.t bwd -> frame -> [`No | `Might]
 end =
 struct
   type t = frame
@@ -1560,7 +1559,7 @@ struct
         {r = Dim.subst_then_run rel r x info.r;
          func = Val.subst_then_run rel r x info.func}
 
-  let occurs xs =
+  let occur xs =
     function
     | FunApp _ | NHCom _ | VProj _ ->
       `Might
@@ -1572,7 +1571,7 @@ struct
     | Fst | Snd ->
       `No
 
-  let occur x = occurs (Emp #< x)
+  let occur1 x = occur (Emp #< x)
 end
 
 
@@ -1812,7 +1811,7 @@ end
 
     let plug rel frm abs =
       let Abs (x, a_x) = abs in
-      match Frame.occur x frm with
+      match Frame.occur1 x frm with
       | `No ->
         let rel_x = Rel.hide' x rel in
         let a_x = X.plug rel_x frm a_x in
