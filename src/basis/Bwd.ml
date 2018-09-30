@@ -93,6 +93,13 @@ struct
     | Snoc (xs, x) ->
       f (fold_left f e xs) x
 
+  let rec fold_right f l e =
+    match l with
+    | Emp -> e
+    | Snoc (l, x) ->
+      let e = f x e in
+      (fold_right[@tailcall]) f l e
+
   let to_list xs =
     xs <>> []
 

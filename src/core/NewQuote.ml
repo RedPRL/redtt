@@ -106,7 +106,16 @@ struct
       let snd = equate_nf qenv rel cod snd0 snd1 in
       Tm.cons fst snd
 
-    | Ext extclo -> raise PleaseFillIn
+    | Ext extclo ->
+      let nms = ExtClo.names extclo in
+      let xs = Bwd.map Name.named nms in
+      let qenv_xs = QEnv.abs xs qenv in
+      let rs = Bwd.fold_right (fun x rs -> `Atom x :: rs) xs [] in
+      let ty_xs = ExtClo.inst_then_fst rel extclo (List.map (fun r -> Dim r) rs) in
+      let bdy0_xs = Con.plug rel (ExtApp rs) el0 in
+      let bdy1_xs = Con.plug rel (ExtApp rs) el1 in
+      let bdy_xs = equate_nf qenv_xs rel ty_xs bdy0_xs bdy1_xs in
+      Tm.ext_lam nms bdy_xs
 
     | Univ _ -> equate_ty qenv rel el0 el1
 
@@ -116,29 +125,79 @@ struct
 
   and equate_ty qenv rel ty0 ty1 =
     match ty0, ty1 with
-    | Pi info0, Pi info1 ->
-      let dom0 = Val.unleash info0.dom in
-      let dom1 = Val.unleash info1.dom in
+    | Pi pi0, Pi pi1 ->
+      let dom0 = Val.unleash pi0.dom in
+      let dom1 = Val.unleash pi1.dom in
       let dom = equate_ty qenv rel dom0 dom1 in
-      let x, qenv_x = extend qenv info0.dom in
-      let cod0_x = Clo.inst rel info0.cod (Val (LazyVal.make @@ lazy x)) in
-      let cod1_x = Clo.inst rel info1.cod (Val (LazyVal.make @@ lazy x)) in
+      let x, qenv_x = extend qenv pi0.dom in
+      let lazyx = LazyVal.make @@ lazy x in
+      let cod0_x = Clo.inst rel pi0.cod (Val lazyx) in
+      let cod1_x = Clo.inst rel pi1.cod (Val lazyx) in
       let cod_x = equate_ty qenv_x rel cod0_x cod1_x in
-      Tm.pi (Clo.name info0.cod) dom cod_x
+      Tm.pi (Clo.name pi0.cod) dom cod_x
 
-    | Sg info0, Sg info1 ->
-      let dom0 = Val.unleash info0.dom in
-      let dom1 = Val.unleash info1.dom in
+    | Sg sg0, Sg sg1 ->
+      let dom0 = Val.unleash sg0.dom in
+      let dom1 = Val.unleash sg1.dom in
       let dom = equate_ty qenv rel dom0 dom1 in
-      let x, qenv_x = extend qenv info0.dom in
-      let cod0_x = Clo.inst rel info0.cod (Val (LazyVal.make @@ lazy x)) in
-      let cod1_x = Clo.inst rel info1.cod (Val (LazyVal.make @@ lazy x)) in
+      let x, qenv_x = extend qenv sg0.dom in
+      let lazyx = LazyVal.make @@ lazy x in
+      let cod0_x = Clo.inst rel sg0.cod (Val lazyx) in
+      let cod1_x = Clo.inst rel sg1.cod (Val lazyx) in
       let cod_x = equate_ty qenv_x rel cod0_x cod1_x in
-      Tm.sg (Clo.name info0.cod) dom cod_x
+      Tm.sg (Clo.name sg0.cod) dom cod_x
+
+    | Ext extclo0, Ext extclo1 ->
+      let nms = ExtClo.names extclo0 in
+      let xs = Bwd.map Name.named nms in
+      let qenv_xs = QEnv.abs xs qenv in
+      let cells = Bwd.fold_right (fun x rs -> Dim (`Atom x) :: rs) xs [] in
+      let ty0_xs, sys0_xs = ExtClo.inst rel extclo0 cells in
+      let ty1_xs, sys1_xs = ExtClo.inst rel extclo1 cells in
+      let ty_xs = equate_ty qenv_xs rel ty0_xs ty1_xs in
+      let sys_xs = equate_nf_sys qenv_xs rel ty0_xs sys0_xs sys1_xs in
+      Tm.make @@ Tm.Ext (Tm.NB (nms, (ty_xs, sys_xs)))
 
     | _ -> raise PleaseFillIn
 
-  and equate_nf_sys _ = raise PleaseFillIn
+  and equate_abs qenv rel ty abs0 abs1 =
+    let nm = let Abs (x, _) = abs0 in Name.name x in
+    let x = Name.named nm in
+    let qenv_x = QEnv.abs1 x qenv in
+    let bdy0_x = ConAbs.inst rel abs0 (`Atom x) in
+    let bdy1_x = ConAbs.inst rel abs1 (`Atom x) in
+    let bdy_x = equate_nf qenv_x rel ty bdy0_x bdy1_x in
+    Tm.B (nm, bdy_x)
+
+  and equate_abs_face qenv rel ty (r0, r'0, abs0) (r1, r'1, abs1) =
+    let r = equate_dim qenv rel r0 r1 in
+    let r' = equate_dim qenv rel r'0 r'1 in
+    let rel = Rel.equate' r0 r'0 rel in
+    let lazy abs0 = LazyValAbs.unleash abs0 in
+    let lazy abs1 = LazyValAbs.unleash abs1 in
+    r, r', Some (equate_abs qenv rel ty abs0 abs1)
+
+  and equate_abs_sys qenv rel ty sys0 sys1 =
+    try
+      List.map2 (equate_abs_face qenv rel ty) sys0 sys1
+    with
+    | Invalid_argument _ ->
+      raise PleaseRaiseProperError (* mismatched lengths *)
+
+  and equate_nf_face qenv rel ty (r0, r'0, bdy0) (r1, r'1, bdy1) =
+    let r = equate_dim qenv rel r0 r1 in
+    let r' = equate_dim qenv rel r'0 r'1 in
+    let rel = Rel.equate' r0 r'0 rel in
+    let lazy bdy0 = LazyVal.unleash bdy0 in
+    let lazy bdy1 = LazyVal.unleash bdy1 in
+    r, r', Some (equate_nf qenv rel ty bdy0 bdy1)
+
+  and equate_nf_sys qenv rel ty sys0 sys1 =
+    try
+      List.map2 (equate_nf_face qenv rel ty) sys0 sys1
+    with
+    | Invalid_argument _ ->
+      raise PleaseRaiseProperError (* mismatched lengths *)
 
   and subtype qenv rel ty0 ty1 =
     ignore @@ equate_ty qenv rel ty0 ty1;
