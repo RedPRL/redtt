@@ -135,7 +135,7 @@ and cell =
   | Val of con Lazy.t Delayed.t
   | Dim of dim
 
-and env = {globals : GlobalEnv.t; cells : cell bwd; n_minus_one : int}
+and env = {globals : GlobalEnv.t; cells : cell bwd}
 
 and clo = Clo of {bnd : Tm.tm Tm.bnd; env : env}
 and nclo = NClo of {bnd : Tm.tm Tm.nbnd; env : env}
@@ -585,8 +585,6 @@ sig
   val extend_cell : env -> cell -> env
   val extend_cells : env -> cell list -> env
   val lookup_cell_by_index : int -> env -> cell
-  val index_of_level : env -> int -> int
-  val level_of_index : env -> int -> int
 
   val clear_locals : env -> env
 end =
@@ -604,22 +602,19 @@ struct
   let subst_then_run rel r x env =
     {env with cells = Bwd.map (Cell.subst_then_run rel r x) env.cells}
 
-  let emp () = {globals = GlobalEnv.emp (); cells = Emp; n_minus_one = -1}
+  let emp () = {globals = GlobalEnv.emp (); cells = Emp}
 
   let lookup_cell_by_index i {cells; _} = Bwd.nth cells i
 
   let extend_cells env cells =
     {env with
-     cells = env.cells <>< cells;
-     n_minus_one = env.n_minus_one + List.length cells}
+     cells = env.cells <>< cells}
 
   let extend_cell env cell =
     extend_cells env [cell]
 
-  let index_of_level {n_minus_one; _} i = n_minus_one - i
-  let level_of_index {n_minus_one; _} i = n_minus_one - i
   let clear_locals env =
-    {globals = env.globals; cells = Emp; n_minus_one = -1}
+    {globals = env.globals; cells = Emp}
 end
 
 and Con :
