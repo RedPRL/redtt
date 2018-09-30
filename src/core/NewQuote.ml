@@ -158,6 +158,12 @@ struct
       let sys_xs = equate_nf_sys qenv_xs rel ty0_xs sys0_xs sys1_xs in
       Tm.make @@ Tm.Ext (Tm.NB (nms, (ty_xs, sys_xs)))
 
+    | Univ univ0, Univ univ1 ->
+        if univ0.kind = univ1.kind && univ0.lvl = univ1.lvl then
+          Tm.univ ~kind:univ0.kind ~lvl:univ0.lvl
+        else
+          raise PleaseRaiseProperError
+
     | _ -> raise PleaseFillIn
 
   and equate_abs qenv rel ty abs0 abs1 =
