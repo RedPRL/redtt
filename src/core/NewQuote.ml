@@ -87,68 +87,73 @@ struct
     | _ -> raise PleaseRaiseProperError
 
   let rec equate_nf qenv rel ty el0 el1 =
-    match ty with
-    | Pi {dom; cod} ->
-      let x, qenv_x = extend qenv dom in
-      let cod_x = Clo.inst rel cod (Val (LazyVal.make @@ lazy x)) in
-      let bdy0_x = Con.plug rel (FunApp (Val.make x)) el0 in
-      let bdy1_x = Con.plug rel (FunApp (Val.make x)) el1 in
-      let bdy_x = equate_nf qenv_x rel cod_x bdy0_x bdy1_x in
-      Tm.lam (Clo.name cod) bdy_x
+    match el0, el1 with
+    | Neu neu0, Neu neu1 ->
+      Tm.up @@ equate_neu qenv rel neu0.neu neu1.neu
+    | _ ->
+      match ty with
+      | Pi {dom; cod} ->
+        let x, qenv_x = extend qenv dom in
+        let cod_x = Clo.inst rel cod (Val (LazyVal.make @@ lazy x)) in
+        let bdy0_x = Con.plug rel (FunApp (Val.make x)) el0 in
+        let bdy1_x = Con.plug rel (FunApp (Val.make x)) el1 in
+        let bdy_x = equate_nf qenv_x rel cod_x bdy0_x bdy1_x in
+        Tm.lam (Clo.name cod) bdy_x
 
-    | Sg {dom; cod} ->
-      let fst0 = Con.plug rel Fst el0 in
-      let fst1 = Con.plug rel Fst el1 in
-      let fst = equate_nf qenv rel (Val.unleash dom) fst0 fst1 in
-      let cod = Clo.inst rel cod (Val (LazyVal.make @@ lazy fst0)) in
-      let snd0 = Con.plug rel Snd el0 in
-      let snd1 = Con.plug rel Snd el1 in
-      let snd = equate_nf qenv rel cod snd0 snd1 in
-      Tm.cons fst snd
+      | Sg {dom; cod} ->
+        let fst0 = Con.plug rel Fst el0 in
+        let fst1 = Con.plug rel Fst el1 in
+        let fst = equate_nf qenv rel (Val.unleash dom) fst0 fst1 in
+        let cod = Clo.inst rel cod (Val (LazyVal.make @@ lazy fst0)) in
+        let snd0 = Con.plug rel Snd el0 in
+        let snd1 = Con.plug rel Snd el1 in
+        let snd = equate_nf qenv rel cod snd0 snd1 in
+        Tm.cons fst snd
 
-    | Ext extclo ->
-      let nms = ExtClo.names extclo in
-      let xs = Bwd.map Name.named nms in
-      let qenv_xs = QEnv.abs xs qenv in
-      let rs = Bwd.fold_right (fun x rs -> `Atom x :: rs) xs [] in
-      let ty_xs = ExtClo.inst_then_fst rel extclo (List.map (fun r -> Dim r) rs) in
-      let bdy0_xs = Con.plug rel (ExtApp rs) el0 in
-      let bdy1_xs = Con.plug rel (ExtApp rs) el1 in
-      let bdy_xs = equate_nf qenv_xs rel ty_xs bdy0_xs bdy1_xs in
-      Tm.ext_lam nms bdy_xs
+      | Ext extclo ->
+        let nms = ExtClo.names extclo in
+        let xs = Bwd.map Name.named nms in
+        let qenv_xs = QEnv.abs xs qenv in
+        let rs = Bwd.fold_right (fun x rs -> `Atom x :: rs) xs [] in
+        let ty_xs = ExtClo.inst_then_fst rel extclo (List.map (fun r -> Dim r) rs) in
+        let bdy0_xs = Con.plug rel (ExtApp rs) el0 in
+        let bdy1_xs = Con.plug rel (ExtApp rs) el1 in
+        let bdy_xs = equate_nf qenv_xs rel ty_xs bdy0_xs bdy1_xs in
+        Tm.ext_lam nms bdy_xs
 
-    | HCom ({ty = `Pos; _} as hcom) ->
-      raise PleaseFillIn
+      | HCom ({ty = `Pos; _} as hcom) ->
+        raise PleaseFillIn
 
-    | Univ _ -> equate_ty qenv rel el0 el1
+      | Univ _ -> equate_ty qenv rel el0 el1
 
-    | _ -> raise PleaseFillIn
+      | _ -> raise PleaseFillIn
 
   and equate_neu _ = raise PleaseFillIn
 
+  and equate_ty_clo qenv rel dom clo0 clo1 =
+    let x, qenv_x = extend qenv dom in
+    let lazyx = LazyVal.make @@ lazy x in
+    let clo0_x = Clo.inst rel clo0 (Val lazyx) in
+    let clo1_x = Clo.inst rel clo1 (Val lazyx) in
+    equate_ty qenv_x rel clo0_x clo1_x
+
+  and equate_ty_quantifier qenv rel quant0 quant1 =
+    let dom = equate_ty qenv rel (Val.unleash quant0.dom) (Val.unleash quant1.dom) in
+    let cod = equate_ty_clo qenv rel quant0.dom quant0.cod quant1.cod in
+    dom, (Clo.name quant0.cod, cod)
+
   and equate_ty qenv rel ty0 ty1 =
     match ty0, ty1 with
+    | Neu neu0, Neu neu1 ->
+      Tm.up @@ equate_neu qenv rel neu0.neu neu1.neu
+
     | Pi pi0, Pi pi1 ->
-      let dom0 = Val.unleash pi0.dom in
-      let dom1 = Val.unleash pi1.dom in
-      let dom = equate_ty qenv rel dom0 dom1 in
-      let x, qenv_x = extend qenv pi0.dom in
-      let lazyx = LazyVal.make @@ lazy x in
-      let cod0_x = Clo.inst rel pi0.cod (Val lazyx) in
-      let cod1_x = Clo.inst rel pi1.cod (Val lazyx) in
-      let cod_x = equate_ty qenv_x rel cod0_x cod1_x in
-      Tm.pi (Clo.name pi0.cod) dom cod_x
+      let dom, (nm, cod) = equate_ty_quantifier qenv rel pi0 pi1 in
+      Tm.pi nm dom cod
 
     | Sg sg0, Sg sg1 ->
-      let dom0 = Val.unleash sg0.dom in
-      let dom1 = Val.unleash sg1.dom in
-      let dom = equate_ty qenv rel dom0 dom1 in
-      let x, qenv_x = extend qenv sg0.dom in
-      let lazyx = LazyVal.make @@ lazy x in
-      let cod0_x = Clo.inst rel sg0.cod (Val lazyx) in
-      let cod1_x = Clo.inst rel sg1.cod (Val lazyx) in
-      let cod_x = equate_ty qenv_x rel cod0_x cod1_x in
-      Tm.sg (Clo.name sg0.cod) dom cod_x
+      let dom, (nm, cod) = equate_ty_quantifier qenv rel sg0 sg1 in
+      Tm.sg nm dom cod
 
     | Ext extclo0, Ext extclo1 ->
       let nms = ExtClo.names extclo0 in
