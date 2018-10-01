@@ -437,6 +437,8 @@ struct
     | Some bnd ->
       let r = eval_dim env tr in
       let r' = eval_dim env tr' in
+      let rel = Rel.equate r r' rel in
+      let env = Env.run rel env in
       let abs = lazy begin eval_bnd rel env bnd end in
       (r, r', LazyValAbs.make abs)
     | None -> raise PleaseRaiseProperError
@@ -449,6 +451,7 @@ struct
     | Some tm ->
       let r = eval_dim env tr in
       let r' = eval_dim env tr' in
+      let rel = Rel.equate r r' rel in
       let env = Env.run rel env in
       let v = lazy begin eval rel env tm end in
       (r, r', LazyVal.make v)
