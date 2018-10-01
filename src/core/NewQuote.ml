@@ -170,7 +170,7 @@ struct
       let r = equate_dim qenv rel hcom0.r hcom1.r in
       let r' = equate_dim qenv rel hcom0.r' hcom1.r' in
       let cap = equate_ty qenv rel (Val.unleash hcom0.cap) (Val.unleash hcom1.cap) in
-      let sys = equate_ty_sys qenv rel hcom0.sys hcom1.sys in
+      let sys = equate_ty_abs_sys qenv rel hcom0.sys hcom1.sys in
       Tm.make @@ Tm.FHCom {r; r'; cap; sys}
 
     | Univ univ0, Univ univ1 ->
@@ -181,30 +181,6 @@ struct
 
     | _ -> raise PleaseFillIn
 
-  and equate_ty_abs qenv rel abs0 abs1 =
-    let nm = let Abs (x, _) = abs0 in Name.name x in
-    let x = Name.named nm in
-    let qenv_x = QEnv.abs1 x qenv in
-    let bdy0_x = ConAbs.inst rel abs0 (`Atom x) in
-    let bdy1_x = ConAbs.inst rel abs1 (`Atom x) in
-    let bdy_x = equate_ty qenv_x rel bdy0_x bdy1_x in
-    Tm.B (nm, bdy_x)
-
-  and equate_ty_face qenv rel (r0, r'0, abs0) (r1, r'1, abs1) =
-    let r = equate_dim qenv rel r0 r1 in
-    let r' = equate_dim qenv rel r'0 r'1 in
-    let rel = Rel.equate' r0 r'0 rel in
-    let lazy abs0 = LazyValAbs.unleash abs0 in
-    let lazy abs1 = LazyValAbs.unleash abs1 in
-    r, r', Some (equate_ty_abs qenv rel abs0 abs1)
-
-  and equate_ty_sys qenv rel sys0 sys1 =
-    try
-      List.map2 (equate_ty_face qenv rel) sys0 sys1
-    with
-    | Invalid_argument _ ->
-      raise PleaseRaiseProperError (* mismatched lengths *)
-
   and equate_abs qenv rel ty abs0 abs1 =
     let nm = let Abs (x, _) = abs0 in Name.name x in
     let x = Name.named nm in
@@ -214,6 +190,23 @@ struct
     let bdy_x = equate_nf qenv_x rel ty bdy0_x bdy1_x in
     Tm.B (nm, bdy_x)
 
+  and equate_ty_abs qenv rel abs0 abs1 =
+    let nm = let Abs (x, _) = abs0 in Name.name x in
+    let x = Name.named nm in
+    let qenv_x = QEnv.abs1 x qenv in
+    let bdy0_x = ConAbs.inst rel abs0 (`Atom x) in
+    let bdy1_x = ConAbs.inst rel abs1 (`Atom x) in
+    let bdy_x = equate_ty qenv_x rel bdy0_x bdy1_x in
+    Tm.B (nm, bdy_x)
+
+  and equate_ty_abs_face qenv rel (r0, r'0, abs0) (r1, r'1, abs1) =
+    let r = equate_dim qenv rel r0 r1 in
+    let r' = equate_dim qenv rel r'0 r'1 in
+    let rel = Rel.equate' r0 r'0 rel in
+    let lazy abs0 = LazyValAbs.unleash abs0 in
+    let lazy abs1 = LazyValAbs.unleash abs1 in
+    r, r', Some (equate_ty_abs qenv rel abs0 abs1)
+
   and equate_abs_face qenv rel ty (r0, r'0, abs0) (r1, r'1, abs1) =
     let r = equate_dim qenv rel r0 r1 in
     let r' = equate_dim qenv rel r'0 r'1 in
@@ -221,13 +214,6 @@ struct
     let lazy abs0 = LazyValAbs.unleash abs0 in
     let lazy abs1 = LazyValAbs.unleash abs1 in
     r, r', Some (equate_abs qenv rel ty abs0 abs1)
-
-  and equate_abs_sys qenv rel ty sys0 sys1 =
-    try
-      List.map2 (equate_abs_face qenv rel ty) sys0 sys1
-    with
-    | Invalid_argument _ ->
-      raise PleaseRaiseProperError (* mismatched lengths *)
 
   and equate_nf_face qenv rel ty (r0, r'0, bdy0) (r1, r'1, bdy1) =
     let r = equate_dim qenv rel r0 r1 in
@@ -237,12 +223,17 @@ struct
     let lazy bdy1 = LazyVal.unleash bdy1 in
     r, r', Some (equate_nf qenv rel ty bdy0 bdy1)
 
-  and equate_nf_sys qenv rel ty sys0 sys1 =
+  and equate_sys_wrapper : 'a 'b. ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b list =
+    fun face_equater sys0 sys1 ->
     try
-      List.map2 (equate_nf_face qenv rel ty) sys0 sys1
+      List.map2 face_equater sys0 sys1
     with
     | Invalid_argument _ ->
       raise PleaseRaiseProperError (* mismatched lengths *)
+
+  and equate_abs_sys qenv rel ty = equate_sys_wrapper (equate_abs_face qenv rel ty)
+  and equate_ty_abs_sys qenv rel = equate_sys_wrapper (equate_ty_abs_face qenv rel)
+  and equate_nf_sys qenv rel ty = equate_sys_wrapper (equate_nf_face qenv rel ty)
 
   and subtype qenv rel ty0 ty1 =
     ignore @@ equate_ty qenv rel ty0 ty1;
