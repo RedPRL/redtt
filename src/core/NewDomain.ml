@@ -1303,8 +1303,51 @@ struct
     | _ ->
       raise PleaseRaiseProperError
 
-  and subst_then_run rel r x c =
-    run rel @@ subst r x c
+  and subst_then_run rel r x =
+    function
+    | Pi quant ->
+      let quant = Quantifier.subst_then_run rel r x quant in
+      Pi quant
+
+    | Sg quant ->
+      let quant = Quantifier.subst_then_run rel r x quant in
+      Sg quant
+
+    | Ext extclo ->
+      let extclo = ExtClo.subst_then_run rel r x extclo in
+      Ext extclo
+
+    | Lam clo ->
+      let clo = Clo.subst_then_run rel r x clo in
+      Lam clo
+
+    | Cons (v0, v1) ->
+      let v0 = Val.subst_then_run rel r x v0 in
+      let v1 = Val.subst_then_run rel r x v1 in
+      Cons (v0, v1)
+
+    | ExtLam nclo ->
+      let nclo = NClo.subst_then_run rel r x nclo in
+      ExtLam nclo
+
+    | (Coe _ | HCom _ | Com _) as c ->
+      run rel @@ subst r x c (* too complicated *)
+
+    | Univ _ as con -> con
+
+    | V info ->
+      let ty0 rel0 = Val.subst_then_run rel0 r x info.ty0 in
+      let ty1 = Val.subst_then_run rel r x info.ty1 in
+      let equiv rel0 = Val.subst_then_run rel0 r x info.equiv in
+      make_v rel (Dim.subst r x info.r) ~ty0 ~ty1 ~equiv
+
+    | VIn info ->
+      let el0 rel0 = Val.run rel0 info.el0 in
+      let el1 = Val.run rel info.el1 in
+      make_vin rel (Dim.subst r x info.r) ~el0 ~el1
+
+    | Neu _ as c ->
+      run rel @@ subst r x c (* XXX favonia is lazy! *)
 end
 
 and Val : DelayedDomainPlug
@@ -1850,9 +1893,21 @@ end
       let a_x = X.run rel_x a_x in
       Abs (x, a_x)
 
-    (* XXX optimize this! *)
-    let subst_then_run rel r x a =
-      run rel @@ subst r x a
+    let subst_then_run rel r z abs =
+      let Abs (x, a_x) = abs in
+      if z = x then
+        let rel_x = Rel.hide' x rel in
+        let a_x = X.run rel_x a_x in
+        Abs (x, a_x)
+      else if I.absent x r then
+        let rel_x = Rel.hide' x rel in
+        let a_x = X.subst_then_run rel_x r z a_x in
+        Abs (x, a_x)
+      else
+        let y, pi = Perm.freshen_name x in
+        let rel_y = rel in
+        let a_y = X.subst_then_run rel_y r z @@ X.swap pi a_x in
+        Abs (y, a_y)
 
     let inst rel abs r =
       let Abs (x, a_x) = abs in
