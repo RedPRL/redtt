@@ -952,7 +952,8 @@ struct
       let abs =
         let cod_y = Clo.swap pi quantx.cod in
         let coe_r'y = LazyVal.make @@ lazy begin coe_arg @@ `Atom y end in
-        Abs (y, Clo.inst rel cod_y @@ Val coe_r'y) in
+        Abs (y, Clo.inst rel cod_y @@ Val coe_r'y)
+      in
       let cap = Val.plug rel (FunApp (Val.make @@ coe_arg r)) cap in
       rigid_coe rel r r' ~abs ~cap
 
@@ -1985,10 +1986,12 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let drop_rel = Delayed.drop_rel
 
-    let swap pi = Delayed.fold @@ fun rel v ->
+    let swap pi =
+      Delayed.fold @@ fun rel v ->
       Delayed.make' (Option.map (Perm.fold Rel.swap pi) rel) (X.swap pi v)
 
-    let subst r x = Delayed.fold @@ fun rel v ->
+    let subst r x =
+      Delayed.fold @@ fun rel v ->
       Delayed.make' (Option.map (Rel.subst' r x) rel) (X.subst r x v)
 
     let run rel v = Delayed.with_rel rel v
