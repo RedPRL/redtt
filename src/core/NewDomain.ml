@@ -154,22 +154,22 @@ end =
 struct
   (* favonia: this is a demonstration of my laziness *)
   type t = (Name.t * Name.t) list
-  
+
   let mimic x = Name.named (Name.name x)
-  
+
   let freshen_name x =
     let x' = mimic x in x', [(x, x')]
-  
+
   let rec freshen_names = function
     | Emp -> Emp, []
     | Snoc (xs, x) ->
       let xs', perm = freshen_names xs in
       let x' = mimic x in
       Snoc (xs', x'), (x, x') :: perm
-  
+
   let swap_name perm x =
     try List.assoc x perm with Not_found -> x
-  
+
   let fold f = List.fold_right (fun (x, x') a -> f x x' a)
 end
 
@@ -2001,7 +2001,7 @@ and DelayedPlug : functor (X : DomainPlug) ->
     let run_then_unleash rel v = X.run rel (Delayed.drop_rel v)
 
     (* Is there some world where we can do [Delayed.drop_rel v] here? *)
-    let plug_then_unleash rel frm v = X.plug rel frm (unleash v) 
+    let plug_then_unleash rel frm v = X.plug rel frm (unleash v)
   end
 
 and LazyPlug : functor (X : DomainPlug) -> DomainPlug with type t = X.t Lazy.t =
