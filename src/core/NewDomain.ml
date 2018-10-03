@@ -1397,7 +1397,7 @@ struct
       raise CanFavoniaHelpMe
 
     | V _ ->
-      raise PleaseFillIn
+      raise CanFavoniaHelpMe
 
     | Neu info ->
       let neu = DelayedNeu.make
@@ -1860,7 +1860,12 @@ struct
       VProj
         {r = Dim.swap pi info.r;
          func = Val.swap pi info.func}
-    | Cap _ -> raise PleaseFillIn
+    | Cap info ->
+      Cap
+        {r = Dim.swap pi info.r;
+         r' = Dim.swap pi info.r';
+         ty = Val.swap pi info.ty;
+         sys = ConAbsSys.swap pi info.sys}
 
   let subst r x =
     function
@@ -1878,7 +1883,12 @@ struct
       VProj
         {r = Dim.subst r x info.r;
          func = Val.subst r x info.func}
-    | Cap _ -> raise PleaseFillIn
+    | Cap info ->
+      Cap
+        {r = Dim.subst r x info.r;
+         r' = Dim.subst r x info.r';
+         ty = Val.subst r x info.ty;
+         sys = ConAbsSys.subst r x info.sys}
 
   let run rel =
     function
@@ -1891,7 +1901,12 @@ struct
       VProj
         {r = Dim.run rel info.r;
          func = Val.run rel info.func}
-    | Cap _ -> raise PleaseFillIn
+    | Cap info ->
+      Cap
+        {r = Dim.run rel info.r;
+         r' = Dim.run rel info.r';
+         ty = Val.run rel info.ty;
+         sys = ConAbsSys.run rel info.sys}
 
   let occur xs =
     function
