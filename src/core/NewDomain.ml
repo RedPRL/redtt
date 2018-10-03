@@ -1274,10 +1274,21 @@ struct
       make_hcom rel r r' ~ty:con ~cap ~sys
 
     | VProj {r; func}, con ->
-      make_vproj rel r ~el:con ~func
+      begin
+        match Rel.compare r `Dim0 rel with
+        | `Same -> Val.plug_then_unleash rel (FunApp (Val.make con)) func
+        | `Apart -> con
+        | `Indet -> rigid_vproj rel r ~el:con ~func
+      end
 
     | Cap {r; r'; ty; sys}, con ->
-      make_cap rel r r' ~ty ~sys ~el:con
+      begin
+        match ConAbsSys.force rel sys with
+        | sys ->
+          rigid_cap rel r r' ~ty ~sys ~el:con
+        | exception ConAbsSys.Triv abs ->
+          make_coe rel r' r ~abs ~cap:(Val.make con)
+      end
 
     (* These frames are easy because they are always rigid. *)
     | (FunApp _ | Fst | Snd | ExtApp _ | RestrictForce), Neu info ->
@@ -1384,19 +1395,6 @@ struct
     | exception I.Inconsistent -> Val.unleash el1
     | `Changed rel0 ->
       VIn {r; el0 = el0 rel0; el1}
-
-  and make_vproj rel r ~el ~func =
-    match Rel.compare r `Dim0 rel with
-    | `Same -> Val.plug_then_unleash rel (FunApp (Val.make el)) func
-    | `Apart -> el
-    | `Indet -> rigid_vproj rel r ~el ~func
-
-  and make_cap rel r r' ~ty ~sys ~el =
-    match ConAbsSys.force rel sys with
-    | sys ->
-      rigid_cap rel r r' ~ty ~sys ~el
-    | exception ConAbsSys.Triv abs ->
-      make_coe rel r' r ~abs ~cap:(Val.make el)
 
   and make_fhcom rel r r' ~cap ~sys =
     match Rel.compare r r' rel with
