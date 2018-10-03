@@ -247,10 +247,10 @@ sig
   (** [subst_then_run_then_unleash rel r x v = unleash (subst_then_run rel r x v)]. *)
   val subst_then_run_then_unleash : rel -> dim -> Name.t -> t -> u
 
-  (** [make_then_run rel v = run rel (make v) *)
+  (** [make_then_run rel v = run rel (make v)]. *)
   val make_then_run : rel -> u -> t
 
-  (** [make_then_subst_then_run rel r x v = subst_then_run rel r x (make v) *)
+  (** [make_then_subst_then_run rel r x v = subst_then_run rel r x (make v)]. *)
   val make_then_subst_then_run : rel -> dim -> Name.t -> u -> t
 end
 
