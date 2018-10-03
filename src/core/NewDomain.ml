@@ -23,20 +23,22 @@ sig
   val make : 'a -> 'a t
   val make' : rel option -> 'a -> 'a t
 
-  (* this is a brutal API to get the raw data out. the caller has
-   * the responsibility to apply proper restrictions. *)
+  (** [drop_rel] is a brutal API to get the raw datum out. The caller has
+      the responsibility to apply proper restrictions. *)
   val drop_rel : 'a t -> 'a
 
-  (* this is a convenience function to create a new delayed X.run
-   * with a new rel. *)
+  (* [with_rel] is a convenience function to create a new delayed [X.run]
+     with a new rel. *)
   val with_rel : rel -> 'a t -> 'a t
 
-  (* this is to force the result. the first argument is intended
-   * to be X.run where X is some structure implementing Domain. *)
+  (* [unleash] forces the result. The first argument is intended
+     to be [X.run] where [X] is some structure implementing [Domain]. *)
   val unleash : (rel -> 'a -> 'a) -> 'a t -> 'a
 
-  (* this is to expose the inner structure. the caller has
-   * the responsibility to apply proper restrictions. *)
+  (* [fold] exposes the inner structure. The caller has
+     the responsibility to apply proper restrictions.
+
+     [drop_rel = fold (fun _ v -> v)] *)
   val fold : (rel option -> 'a -> 'b) -> 'a t -> 'b
 end =
 struct
@@ -229,6 +231,9 @@ sig
 
   (** [unleash] forces the run created by [make]. *)
   val unleash : t -> u
+
+  (** [drop_rel] gets the underlying unrestricted raw datum. *)
+  val drop_rel : t -> u
 
   (** Some convenience function that might be more optimized: *)
 
@@ -538,6 +543,8 @@ and Clo :
 sig
   include Domain with type t = clo
   val name : t -> string option
+
+  (** [inst] will give a [rel]-value. The input [cell] must be values. *)
   val inst : rel -> t -> cell -> con
 end =
 struct
@@ -568,6 +575,8 @@ and NClo :
 sig
   include Domain with type t = nclo
   val names : t -> string option bwd
+
+  (** [inst] will give a [rel]-value. The input [cell] must be values. *)
   val inst : rel -> t -> cell list -> con
 end =
 struct
@@ -598,7 +607,11 @@ and ExtClo :
 sig
   include Domain with type t = ext_clo
   val names : t -> string option bwd
+
+  (** [inst] will give a [rel]-value. The input [cell] must be values. *)
   val inst : rel -> t -> cell list -> con * con sys
+
+  (** [inst_then_fst rel clo cells = fst (inst rel cl cells)] *)
   val inst_then_fst : rel -> t -> cell list -> con
 end =
 struct
@@ -1174,7 +1187,7 @@ struct
         | ext_sys ->
           let cap = Val.plug rel frm cap in
           let ext_sys = ConAbsSys.foreach_gen ext_sys @@
-            fun (r, r', lazy bdy) -> Abs (Name.fresh (), bdy)
+            fun (r, r', bdy) -> Abs (Name.fresh (), bdy)
           in
           let comp_sys = ConAbsSys.plug rel frm sys in
           let sys = ext_sys @ comp_sys in
@@ -1202,7 +1215,7 @@ struct
           let abs = Abs (y, ty_y) in
           let cap = Val.plug rel frm cap in
           let sys = ConAbsSys.foreach_gen sys_y @@
-            fun (r, r', lazy bdy_y) -> Abs (y, bdy_y)
+            fun (r, r', bdy_y) -> Abs (y, bdy_y)
           in
           rigid_com rel r r' ~abs ~cap ~sys
         | exception ConSys.Triv c_y ->
@@ -1286,7 +1299,15 @@ struct
         ConAbs.inst rel abs r'
 
   and make_ghcom rel r r' ~ty ~cap ~sys =
-    raise PleaseFillIn
+    match Rel.compare r r' rel with
+    | `Same ->
+      Val.unleash cap
+    | _ ->
+      match ConAbsSys.force rel sys with
+      | _ ->
+        rigid_ghcom rel r r' ~ty ~cap ~sys
+      | exception ConAbsSys.Triv abs ->
+        ConAbs.inst rel abs r'
 
   and make_gcom rel r r' ~ty ~cap ~sys =
     raise PleaseFillIn
@@ -1358,7 +1379,7 @@ struct
       let neu_sys =
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
         let tube_faces =
-          ConSys.foreach_gen sys @@ fun (s, s', lazy abs) ->
+          ConSys.foreach_gen sys @@ fun (s, s', abs) ->
           let rel' = Rel.equate' s s' rel in
           ConAbs.inst rel' abs r'
         in
@@ -1398,7 +1419,7 @@ struct
       let sys =
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
         let old_faces =
-          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', lazy bdy) ->
+          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
           let rel' = Rel.equate' s s' rel in
           let abs = ConAbs.run rel' @@ Abs (x, bdy) in
           let cap = Val.run rel' cap in
@@ -1418,7 +1439,7 @@ struct
       let Abs (bound_var_of_abs, _) = abs in
       ConAbsSys.foreach_gen sys @@ fun (r, r', face) ->
       let rel' = Rel.equate r r' in
-      let lazy (Abs (y, bdy_y)) = face in
+      let Abs (y, bdy_y) = face in
       let z, rel_z, bdy_z =
         (* it might sound weird that y could be the same as bound_var_of_abs,
          * but this happens a lot in the coe of the extension types. *)
@@ -1452,6 +1473,61 @@ struct
     | HCom {ty = `Pos; _} -> expand_rigid_com rel r r' ~abs ~cap ~sys
 
     | Neu _ -> expand_rigid_com rel r r' ~abs ~cap ~sys (* really too complicated *)
+
+    | _ ->
+      raise PleaseRaiseProperError
+
+  and expand_rigid_ghcom rel s s' ~ty ~cap ~sys =
+    match sys with
+    | [] -> Val.unleash cap
+    | (r, r', abs) :: rest ->
+      let make_abs gen = LazyValAbs.make_from_lazy @@ lazy begin let y = Name.fresh () in Abs (y, gen @@ `Atom y) end in
+      let face rel0 (dim0, dim1) r' = (* [dim0] and [dim1] will be swapped to generate the symmetric case. *)
+        let bdy00 rel00 r' = ConAbs.inst rel00 (LazyValAbs.drop_rel abs) r' in
+        let bdy01 rel01 r' =
+          make_ghcom rel01 r r' ~ty:(Con.run rel01 ty) ~cap:(Val.run rel01 cap) ~sys:(ConAbsSys.run rel01 rest)
+        in
+        match Rel.equate r' dim0 rel0 with
+        | `Same -> bdy00 rel0 r'
+        | exception I.Inconsistent -> bdy01 rel0 r'
+        | `Changed rel00 ->
+          let rel01 = Rel.equate' r' dim1 rel0 in
+          let ty = Con.run rel0 ty in
+          let cap = Val.run rel0 cap in
+          let sys =
+            (r', dim0, LazyValAbs.run rel00 abs) ::
+            (r', dim1, make_abs @@ bdy01 rel01) ::
+            ConAbsSys.run rel0 rest
+          in
+          make_hcom rel0 r r' ~ty ~cap ~sys
+      in
+      match Rel.equate r `Dim0 rel with
+      | `Same -> face rel (`Dim0, `Dim1) r'
+      | exception I.Inconsistent -> face rel (`Dim1, `Dim0) r'
+      | `Changed rel0 ->
+        let rel1 = Rel.equate' r `Dim1 rel in
+        let sys =
+          (r, `Dim0, make_abs @@ face rel0 @@ (`Dim0, `Dim1)) ::
+          (r, `Dim1, make_abs @@ face rel1 @@ (`Dim1, `Dim0)) :: rest
+        in
+        make_hcom rel r r' ~ty ~cap ~sys
+
+  and rigid_ghcom rel r r' ~ty ~cap ~sys =
+    match ty with
+    | Sg quant ->
+      GHCom {r; r'; ty = `Sg quant; cap; sys}
+
+    | Pi quant ->
+      GHCom {r; r'; ty = `Pi quant; cap; sys}
+
+    | Ext extclo ->
+      GHCom {r; r'; ty = `Ext extclo; cap; sys}
+
+    | Univ _ | HCom {ty = `Pos; _} | V _ ->
+      expand_rigid_ghcom rel r r' ~ty ~cap ~sys
+
+    | Neu _ ->
+      expand_rigid_ghcom rel r r' ~ty ~cap ~sys
 
     | _ ->
       raise PleaseRaiseProperError
@@ -1855,7 +1931,7 @@ and Sys :
     val forall_then_foreach : Name.t -> t -> (X.t face -> 'b) -> 'b list
 
     (** foreach_gen sys f = List.foreach sys (Face.gen f) *)
-    val foreach_gen : 'a sys -> (dim * dim * 'a Lazy.t -> X.t) -> t
+    val foreach_gen : 'a sys -> (dim * dim * 'a -> X.t) -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -1933,7 +2009,7 @@ and Face :
         will then sufficiently restrict the body. the body fed into the externally
         function might be less restricted then the previous run or the cobifration
         suggests. {e Note that this will not force the generated face.} *)
-    val gen : (dim * dim * 'a Lazy.t -> X.t) -> 'a face -> t
+    val gen : (dim * dim * 'a -> X.t) -> 'a face -> t
 
     (** Some convenience functions which could be more efficient: *)
 
@@ -2001,7 +2077,7 @@ and Face :
       if r = sx || r' = sx then None else Some (r, r', bdy)
 
     let gen f (r, r', bdy) =
-      r, r', DelayedLazyX.make_from_lazy @@ lazy begin f (r, r', Delayed.drop_rel bdy) end
+      r, r', DelayedLazyX.make_from_lazy @@ lazy begin f (r, r', Lazy.force @@ Delayed.drop_rel bdy) end
 
     let run_then_force rel (r, r', bdy) =
       match Rel.equate r r' rel with
@@ -2029,7 +2105,7 @@ and Abs : functor (X : Domain) ->
 sig
   include Domain with type t = X.t abs
 
-  (** [inst] will give a [rel]-value *)
+  (** [inst] will give a [rel]-value. The inputs can be non-values. *)
   val inst : rel -> t -> dim -> X.t
 end
   =
@@ -2086,6 +2162,8 @@ end
 and AbsPlug : functor (X : DomainPlug) ->
 sig
   include DomainPlug with type t = X.t abs
+
+  (** [inst] will give a [rel]-value. The inputs can be non-values. *)
   val inst : rel -> t -> dim -> X.t
 end
   =
@@ -2113,6 +2191,8 @@ sig
   include DelayedDomainPlug
     with type u = X.t abs
      and type t = X.t Delayed.t abs
+
+  (** [inst] will give a [rel]-value. The inputs can be non-values. *)
   val inst : rel -> t -> dim -> X.t Delayed.t
 end
   =
@@ -2129,6 +2209,8 @@ end
     let make_from_lazy (lazy v) = make v
 
     let unleash (Abs (x, a)) = Abs (x, DelayedX.unleash a)
+
+    let drop_rel (Abs (x, a)) = Abs (x, DelayedX.drop_rel a)
 
     let run_then_unleash rel (Abs (x, a_x)) =
       let rel_x = Rel.hide' x rel in
@@ -2186,6 +2268,8 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let unleash = Delayed.unleash X.run
 
+    let drop_rel = Delayed.drop_rel
+
     let swap pi =
       Delayed.fold @@ fun rel v ->
       Delayed.make' (Option.map (Perm.fold Rel.swap pi) rel) (X.swap pi v)
@@ -2212,12 +2296,7 @@ and DelayedPlug : functor (X : DomainPlug) ->
   end
 
 and DelayedLazyPlug : functor (X : DomainPlug) ->
-  sig
-    include DelayedDomainPlug
-      with type u = X.t
-       and type t = X.t Lazy.t Delayed.t
-    val make_from_lazy : u Lazy.t -> t
-  end =
+  DelayedDomainPlug with type u = X.t and type t = X.t Lazy.t Delayed.t =
   functor (X : DomainPlug) ->
   struct
     type u = X.t
@@ -2228,6 +2307,8 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
     let make_from_lazy = Delayed.make
 
     let unleash v = Lazy.force @@ Delayed.unleash (fun rel v -> lazy begin X.run rel (Lazy.force v) end) v
+
+    let drop_rel v = Lazy.force (Delayed.drop_rel v)
 
     let swap pi =
       Delayed.fold @@ fun rel v ->
@@ -2245,8 +2326,6 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
       lazy begin X.subst r x (Lazy.force (Delayed.drop_rel v)) end
 
     let plug rel frm v = Delayed.make @@ lazy begin X.plug rel frm (unleash v) end
-
-    let drop_rel v = Lazy.force (Delayed.drop_rel v)
 
     let run_then_unleash rel v = X.run rel (drop_rel v)
 
