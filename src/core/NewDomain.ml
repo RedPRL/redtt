@@ -1309,8 +1309,16 @@ struct
       | exception ConAbsSys.Triv abs ->
         ConAbs.inst rel abs r'
 
-  and make_gcom rel r r' ~ty ~cap ~sys =
-    raise PleaseFillIn
+  and make_gcom rel r r' ~abs ~cap ~sys =
+    match Rel.compare r r' rel with
+    | `Same ->
+      Val.unleash cap
+    | _ ->
+      match ConAbsSys.force rel sys with
+      | _ ->
+        rigid_gcom rel r r' ~abs ~cap ~sys
+      | exception ConAbsSys.Triv abs ->
+        ConAbs.inst rel abs r'
 
   and make_v rel r ~ty0 ~ty1 ~equiv =
     match Rel.equate r `Dim0 rel with
@@ -1467,10 +1475,7 @@ struct
 
     | Univ _ as ty -> rigid_hcom rel r r' ~ty ~cap ~sys
 
-    | V _ ->
-      raise CanFavoniaHelpMe
-
-    | HCom {ty = `Pos; _} -> expand_rigid_com rel r r' ~abs ~cap ~sys
+    | V _ | HCom {ty = `Pos; _} -> expand_rigid_com rel r r' ~abs ~cap ~sys
 
     | Neu _ -> expand_rigid_com rel r r' ~abs ~cap ~sys (* really too complicated *)
 
@@ -1528,6 +1533,48 @@ struct
 
     | Neu _ ->
       expand_rigid_ghcom rel r r' ~ty ~cap ~sys
+
+    | _ ->
+      raise PleaseRaiseProperError
+
+  and expand_rigid_gcom rel r r' ~abs ~cap ~sys =
+    let ty = ConAbs.inst rel abs r' in
+    let cap = Val.make @@ make_coe rel r r' ~abs ~cap in
+    let sys =
+      let Abs (bound_var_of_abs, _) = abs in
+      ConAbsSys.foreach_gen sys @@ fun (r, r', face) ->
+      let rel' = Rel.equate r r' in
+      let Abs (y, bdy_y) = face in
+      let z, rel_z, bdy_z =
+        (* it might sound weird that y could be the same as bound_var_of_abs,
+         * but this happens a lot in the coe of the extension types. *)
+        if y = bound_var_of_abs && I.absent y r' then
+          y, Rel.hide' y rel, bdy_y
+        else
+          let z, pi = Perm.freshen_name y in
+          z, rel, Con.swap pi bdy_y
+      in
+      Abs (z, make_coe rel_z r' (`Atom z) ~abs ~cap:(Val.make bdy_z))
+    in
+    rigid_ghcom rel r r' ~ty ~cap ~sys
+
+  and rigid_gcom rel r r' ~abs ~cap ~sys =
+    let Abs (x, tyx) = abs in
+    match tyx with
+    | Sg quant ->
+      GCom {r; r'; ty = `Sg (Abs (x, quant)); cap; sys}
+
+    | Pi quant ->
+      GCom {r; r'; ty = `Pi (Abs (x, quant)); cap; sys}
+
+    | Ext extclo ->
+      GCom {r; r'; ty = `Ext (Abs (x, extclo)); cap; sys}
+
+    | Univ _ as ty -> expand_rigid_ghcom rel r r' ~ty ~cap ~sys
+
+    | V _ | HCom {ty = `Pos; _} -> expand_rigid_gcom rel r r' ~abs ~cap ~sys
+
+    | Neu _ -> expand_rigid_gcom rel r r' ~abs ~cap ~sys (* really too complicated *)
 
     | _ ->
       raise PleaseRaiseProperError
