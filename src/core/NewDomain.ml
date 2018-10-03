@@ -2010,7 +2010,6 @@ struct
 
   let occur1 x = occur (Emp #< x)
 
-  exception Triv of con
   let force rel frm ~hd =
     match frm with
     | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce ->
