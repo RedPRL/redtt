@@ -209,14 +209,6 @@ sig
   val plug : rel -> frame -> t -> t
 end
 
-module type DelayDomainPlug =
-sig
-  include Domain
-
-  (** [plug] applies a possibly-non-rigid value frame to a value to obtain another value. *)
-  val plug : rel -> frame -> t -> t
-end
-
 module type DelayedDomainPlug =
 sig
   (** The type [t] is intended to be the delayed version of the type [u]. *)
