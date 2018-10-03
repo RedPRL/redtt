@@ -94,7 +94,7 @@ struct
       match ty with
       | Pi {dom; cod} ->
         let x, qenv_x = extend qenv dom in
-        let cod_x = Clo.inst rel cod (Val (LazyVal.make @@ lazy x)) in
+        let cod_x = Clo.inst rel cod (Val (LazyVal.make x)) in
         let bdy0_x = Con.plug rel (FunApp (Val.make x)) el0 in
         let bdy1_x = Con.plug rel (FunApp (Val.make x)) el1 in
         let bdy_x = equate_nf qenv_x rel cod_x bdy0_x bdy1_x in
@@ -104,7 +104,7 @@ struct
         let fst0 = Con.plug rel Fst el0 in
         let fst1 = Con.plug rel Fst el1 in
         let fst = equate_nf qenv rel (Val.unleash dom) fst0 fst1 in
-        let cod = Clo.inst rel cod (Val (LazyVal.make @@ lazy fst0)) in
+        let cod = Clo.inst rel cod (Val (LazyVal.make fst0)) in
         let snd0 = Con.plug rel Snd el0 in
         let snd1 = Con.plug rel Snd el1 in
         let snd = equate_nf qenv rel cod snd0 snd1 in
@@ -132,7 +132,7 @@ struct
 
   and equate_ty_clo qenv rel dom clo0 clo1 =
     let x, qenv_x = extend qenv dom in
-    let lazyx = LazyVal.make @@ lazy x in
+    let lazyx = LazyVal.make x in
     let clo0_x = Clo.inst rel clo0 (Val lazyx) in
     let clo1_x = Clo.inst rel clo1 (Val lazyx) in
     equate_ty qenv_x rel clo0_x clo1_x
@@ -203,24 +203,24 @@ struct
     let r = equate_dim qenv rel r0 r1 in
     let r' = equate_dim qenv rel r'0 r'1 in
     let rel = Rel.equate' r0 r'0 rel in
-    let lazy abs0 = LazyValAbs.unleash abs0 in
-    let lazy abs1 = LazyValAbs.unleash abs1 in
+    let abs0 = LazyValAbs.unleash abs0 in
+    let abs1 = LazyValAbs.unleash abs1 in
     r, r', Some (equate_ty_abs qenv rel abs0 abs1)
 
   and equate_abs_face qenv rel ty (r0, r'0, abs0) (r1, r'1, abs1) =
     let r = equate_dim qenv rel r0 r1 in
     let r' = equate_dim qenv rel r'0 r'1 in
     let rel = Rel.equate' r0 r'0 rel in
-    let lazy abs0 = LazyValAbs.unleash abs0 in
-    let lazy abs1 = LazyValAbs.unleash abs1 in
+    let abs0 = LazyValAbs.unleash abs0 in
+    let abs1 = LazyValAbs.unleash abs1 in
     r, r', Some (equate_abs qenv rel ty abs0 abs1)
 
   and equate_nf_face qenv rel ty (r0, r'0, bdy0) (r1, r'1, bdy1) =
     let r = equate_dim qenv rel r0 r1 in
     let r' = equate_dim qenv rel r'0 r'1 in
     let rel = Rel.equate' r0 r'0 rel in
-    let lazy bdy0 = LazyVal.unleash bdy0 in
-    let lazy bdy1 = LazyVal.unleash bdy1 in
+    let bdy0 = LazyVal.unleash bdy0 in
+    let bdy1 = LazyVal.unleash bdy1 in
     r, r', Some (equate_nf qenv rel ty bdy0 bdy1)
 
   and equate_sys_wrapper : 'a 'b. ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b list =
