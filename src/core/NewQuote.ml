@@ -67,8 +67,8 @@ struct
 
   let extend_with_sys qenv ty sys =
     let lvl, qenv = QEnv.extend qenv in
-    let neu = DelayedNeu.make {head = Lvl lvl; frames = Emp} in
-    Neu {ty; neu; sys}, qenv
+    let neu = {neu = DelayedNeu.make {head = Lvl lvl; frames = Emp}; sys} in
+    Neu {ty; neu}, qenv
 
   let extend qenv ty = extend_with_sys qenv ty []
 
@@ -89,7 +89,7 @@ struct
   let rec equate_nf qenv rel ty el0 el1 =
     match el0, el1 with
     | Neu neu0, Neu neu1 ->
-      Tm.up @@ equate_neu qenv rel (DelayedNeu.unleash neu0.neu) (DelayedNeu.unleash neu1.neu)
+      Tm.up @@ equate_neu qenv rel (DelayedNeu.unleash neu0.neu.neu) (DelayedNeu.unleash neu1.neu.neu)
     | _ ->
       match ty with
       | Pi {dom; cod} ->
@@ -145,7 +145,7 @@ struct
   and equate_ty qenv rel ty0 ty1 =
     match ty0, ty1 with
     | Neu neu0, Neu neu1 ->
-      Tm.up @@ equate_neu qenv rel (DelayedNeu.unleash neu0.neu) (DelayedNeu.unleash neu1.neu)
+      Tm.up @@ equate_neu qenv rel (DelayedNeu.unleash neu0.neu.neu) (DelayedNeu.unleash neu1.neu.neu)
 
     | Pi pi0, Pi pi1 ->
       let dom, (nm, cod) = equate_ty_quantifier qenv rel pi0 pi1 in

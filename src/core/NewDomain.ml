@@ -99,9 +99,11 @@ type con =
 
   | Box of {r : dim; r' : dim; cap : value; sys : con sys}
 
-  | Neu of {ty : value; neu : neu Delayed.t; sys : con sys}
+  | Neu of {ty : value; neu : neutroid}
 
 and value = con Delayed.t
+
+and neutroid = {neu : neu Delayed.t; sys : con sys}
 
 and quantifier =
   {dom : value;
@@ -127,7 +129,8 @@ and head =
   | Lvl of int
   | Var of {name : Name.t; twin : Tm.twin; ushift : int}
   | Meta of {name : Name.t; ushift : int}
-  | NCoe of {r : dim; r' : dim; ty : neu abs; cap : value}
+  | NCoe of {r : dim; r' : dim; ty : neutroid abs; cap : value}
+  | NHCom of {r : dim; r' : dim; ty : neutroid; cap : value; sys : con abs sys}
 
 and frame =
   | FunApp of value
@@ -135,7 +138,6 @@ and frame =
   | Snd
   | ExtApp of dim list
   | RestrictForce
-  | NHCom of {r : dim; r' : dim; cap : value; sys : con abs sys}
   | VProj of {r : dim; func : value}
   | Cap of {r : dim; r' : dim; ty : value; sys : con abs sys}
 
@@ -483,8 +485,8 @@ struct
         | None ->
           let vty = eval rel env' @@ Tm.shift_univ info.ushift ty in
           let var = Var {name = info.name; twin = info.twin; ushift = info.ushift} in
-          let neu = DelayedNeu.make {head = var; frames = Emp} in
-          Neu {neu; ty = Val.make vty; sys = []}
+          let neu = {neu = DelayedNeu.make {head = var; frames = Emp}; sys = []} in
+          Neu {ty = Val.make vty; neu}
       end
 
     | Tm.Meta info ->
@@ -504,8 +506,8 @@ struct
         | None ->
           let vty = eval rel env' @@ Tm.shift_univ info.ushift ty in
           let var = Meta {name = info.name; ushift = info.ushift} in
-          let neu = DelayedNeu.make {head = var; frames = Emp} in
-          Neu {neu; ty = Val.make vty; sys = []}
+          let neu = {neu = DelayedNeu.make {head = var; frames = Emp}; sys = []} in
+          Neu {ty = Val.make vty; neu}
       end
 
     | Tm.DFix _ -> raise CanJonHelpMe
@@ -855,8 +857,7 @@ struct
     | Neu info ->
       Neu
         {ty = Val.swap pi info.ty;
-         neu = DelayedNeu.swap pi info.neu;
-         sys = ConSys.swap pi info.sys}
+         neu = Neutroid.swap pi info.neu}
 
   let subst r x =
     function
@@ -957,8 +958,7 @@ struct
     | Neu info ->
       Neu
         {ty = Val.subst r x info.ty;
-         neu = DelayedNeu.subst r x info.neu;
-         sys = ConSys.subst r x info.sys}
+         neu = Neutroid.subst r x info.neu}
 
   let rec run rel =
     function
@@ -1105,11 +1105,10 @@ struct
 
     | Neu info ->
       begin
-        match ConSys.run_then_force rel info.sys with
-        | sys ->
-          let neu = DelayedNeu.run rel info.neu in
+        match Neutroid.run_then_force rel info.neu with
+        | neu ->
           let ty = Val.run rel info.ty in
-          Neu {ty; neu; sys}
+          Neu {ty; neu}
         | exception ConSys.Triv v ->
           v
       end
@@ -1240,9 +1239,6 @@ struct
         | _ -> raise PleaseRaiseProperError
       end
 
-    | NHCom {r; r'; cap; sys}, con ->
-      make_hcom rel r r' ~ty:con ~cap ~sys
-
     | VProj _, VIn {el1; _} ->
       Val.unleash el1
 
@@ -1251,10 +1247,9 @@ struct
 
     (* These frames are easy because they are always rigid. *)
     | (FunApp _ | Fst | Snd | ExtApp _ | RestrictForce | VProj _ | Cap _), Neu info ->
-      let neu = DelayedNeu.plug rel frm info.neu in
-      let sys = ConSys.plug rel frm info.sys in
-      let ty, sys' = plug_ty rel frm info.ty hd in
-      Neu {ty = Val.make ty; neu; sys = sys' @ sys}
+      let neu = Neutroid.plug rel frm info.neu in
+      let ty, sys = plug_ty rel frm info.ty hd in
+      Neu {ty = Val.make ty; neu = {neu with sys = sys @ neu.sys}}
 
     | FunApp _, _ -> raise PleaseRaiseProperError
     | Fst, _ -> raise PleaseRaiseProperError
@@ -1405,8 +1400,10 @@ struct
       raise PleaseFillIn
 
     | Neu info ->
-      let nhcom = NHCom {r; r'; cap; sys} in
-      let neu = DelayedNeu.plug rel nhcom info.neu in
+      let neu = DelayedNeu.make
+        {head = NHCom {r; r'; ty = info.neu; cap; sys};
+         frames = Emp}
+      in
       let neu_sys =
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
         let tube_faces =
@@ -1414,10 +1411,17 @@ struct
           let rel' = Rel.equate' s s' rel in
           ConAbs.inst rel' abs r'
         in
-        let old_faces = ConSys.plug rel nhcom info.sys in
+        let old_faces =
+          ListUtil.foreach info.neu.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
+          let rel' = Rel.equate' s s' rel in
+          let ty = run rel' bdy in
+          let cap = Val.run rel' cap in
+          let sys = ConAbsSys.run rel' sys in
+          make_hcom rel' r r' ~ty ~cap ~sys
+        in
         cap_face :: tube_faces @ old_faces
       in
-      Neu {ty = Val.make ty; neu; sys = neu_sys}
+      Neu {ty = Val.make ty; neu = {neu; sys = neu_sys}}
 
     | _ ->
       raise PleaseRaiseProperError
@@ -1445,12 +1449,15 @@ struct
       raise CanFavoniaHelpMe
 
     | Neu info ->
-      let neu = DelayedNeu.make {head = NCoe {r; r'; ty = Abs (x, DelayedNeu.unleash info.neu); cap}; frames = Emp} in
+      let neu = DelayedNeu.make
+        {head = NCoe {r; r'; ty = Abs (x, info.neu); cap};
+         frames = Emp}
+      in
       let ty = Val.make_then_run rel (Con.subst r' x tyx) in
       let sys =
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
         let old_faces =
-          ListUtil.foreach (ConSys.forall x info.sys) @@ ConFace.gen @@ fun (s, s', bdy) ->
+          ListUtil.foreach (ConSys.forall x info.neu.sys) @@ ConFace.gen @@ fun (s, s', bdy) ->
           let rel' = Rel.equate' s s' rel in
           let abs = ConAbs.run rel' @@ Abs (x, bdy) in
           let cap = Val.run rel' cap in
@@ -1458,7 +1465,7 @@ struct
         in
         cap_face :: old_faces
       in
-      Neu {ty; neu; sys}
+      Neu {ty; neu = {neu; sys}}
 
     | _ ->
       raise PleaseRaiseProperError
@@ -1718,6 +1725,42 @@ struct
      frames = neu.frames #< frm}
 end
 
+and Neutroid :
+sig
+  include DomainPlug with type t = neutroid
+
+  exception Triv of con
+  val run_then_force : rel -> t -> t
+end =
+struct
+  type t = neutroid
+
+  module ConSys = Sys (Con)
+
+  let swap pi {neu; sys} =
+    {neu = DelayedNeu.swap pi neu;
+     sys = ConSys.swap pi sys}
+
+  let run rel {neu; sys} =
+    {neu = DelayedNeu.run rel neu;
+     sys = ConSys.run rel sys}
+
+  let subst r x {neu; sys} =
+    {neu = DelayedNeu.subst r x neu;
+     sys = ConSys.subst r x sys}
+
+  let plug rel frm {neu; sys} =
+    {neu = DelayedNeu.plug rel frm neu;
+     sys = ConSys.plug rel frm sys}
+
+  exception Triv = ConSys.Triv
+  let run_then_force rel {neu; sys} =
+    (* the system is forced first *)
+    let sys = ConSys.run_then_force rel sys in
+    let nue = DelayedNeu.run rel neu in
+    {neu; sys}
+end
+
 and DelayedNeu : DelayedDomainPlug with type u = neu and type t = neu Delayed.t =
   DelayedPlug (Neu)
 
@@ -1726,7 +1769,7 @@ and Head : Domain with type t = head =
 struct
   type t = head
 
-  module NeuAbs = Abs (Neu)
+  module NeutroidAbs = Abs (Neutroid)
   module ConAbsSys = Sys (AbsPlug (Con))
 
   let swap pi =
@@ -1736,8 +1779,15 @@ struct
       NCoe
         {r = Dim.swap pi info.r;
          r' = Dim.swap pi info.r';
-         ty = NeuAbs.swap pi info.ty;
+         ty = NeutroidAbs.swap pi info.ty;
          cap = Val.swap pi info.cap}
+    | NHCom info ->
+      NHCom
+        {r = Dim.swap pi info.r;
+         r' = Dim.swap pi info.r';
+         ty = Neutroid.swap pi info.ty;
+         cap = Val.swap pi info.cap;
+         sys = ConAbsSys.swap pi info.sys}
 
   let run rel =
     function
@@ -1746,8 +1796,15 @@ struct
       NCoe
         {r = Dim.run rel info.r;
          r' = Dim.run rel info.r';
-         ty = NeuAbs.run rel info.ty;
+         ty = NeutroidAbs.run rel info.ty;
          cap = Val.run rel info.cap}
+    | NHCom info ->
+      NHCom
+        {r = Dim.run rel info.r;
+         r' = Dim.run rel info.r';
+         ty = Neutroid.run rel info.ty;
+         cap = Val.run rel info.cap;
+         sys = ConAbsSys.run rel info.sys}
 
   let subst r x =
     function
@@ -1756,8 +1813,15 @@ struct
       NCoe
         {r = Dim.subst r x info.r;
          r' = Dim.subst r x info.r';
-         ty = NeuAbs.subst r x info.ty;
+         ty = NeutroidAbs.subst r x info.ty;
          cap = Val.subst r x info.cap}
+    | NHCom info ->
+      NHCom
+        {r = Dim.subst r x info.r;
+         r' = Dim.subst r x info.r';
+         ty = Neutroid.subst r x info.ty;
+         cap = Val.subst r x info.cap;
+         sys = ConAbsSys.subst r x info.sys}
 end
 
 (** A [frame] is a value if its components are. It itself might not be rigid. *)
@@ -1768,7 +1832,10 @@ sig
   val occur1 : Name.t -> frame -> [`No | `Might]
   val occur : Name.t bwd -> frame -> [`No | `Might]
 
-  (* OCaml compiler is not happy about [exception Triv of con] *)
+  (* OCaml compiler is not happy about [exception Triv of con]
+   * because of the lack of safe modules in the cycle
+   * Frame -> Sys -> Face -> Frame. Therefore we were using
+   * {[[`Rigid of t | `Triv of con]]} below. *)
   val force : rel -> t -> hd:con -> [`Rigid of t | `Triv of con]
 end =
 struct
@@ -1789,12 +1856,6 @@ struct
       ExtApp rs
     | RestrictForce ->
       RestrictForce
-    | NHCom info ->
-      NHCom
-        {r = Dim.swap pi info.r;
-         r' = Dim.swap pi info.r';
-         cap = Val.swap pi info.cap;
-         sys = ConAbsSys.swap pi info.sys}
     | VProj info ->
       VProj
         {r = Dim.swap pi info.r;
@@ -1813,12 +1874,6 @@ struct
       ExtApp rs
     | RestrictForce ->
       RestrictForce
-    | NHCom info ->
-      NHCom
-        {r = Dim.subst r x info.r;
-         r' = Dim.subst r x info.r';
-         cap = Val.subst r x info.cap;
-         sys = ConAbsSys.subst r x info.sys}
     | VProj info ->
       VProj
         {r = Dim.subst r x info.r;
@@ -1832,12 +1887,6 @@ struct
       FunApp arg
     | Fst | Snd | ExtApp _ | RestrictForce as frm ->
       frm
-    | NHCom info ->
-      NHCom
-        {r = Dim.run rel info.r;
-         r' = Dim.run rel info.r';
-         cap = Val.run rel info.cap;
-         sys = ConAbsSys.run rel info.sys}
     | VProj info ->
       VProj
         {r = Dim.run rel info.r;
@@ -1846,7 +1895,7 @@ struct
 
   let occur xs =
     function
-    | FunApp _ | NHCom _ | VProj _ | Cap _ ->
+    | FunApp _ | VProj _ | Cap _ ->
       `Might
     | Fst | Snd | RestrictForce ->
       `No
@@ -1862,18 +1911,6 @@ struct
     match frm with
     | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce ->
       `Rigid frm
-    | NHCom {r; r'; cap; sys} ->
-      begin
-        match Rel.compare r r' rel with
-        | `Same ->
-          `Triv (Val.unleash cap)
-        | _ ->
-          match ConAbsSys.force rel sys with
-          | _ ->
-            `Rigid frm
-          | exception ConAbsSys.Triv abs ->
-            `Triv (ConAbs.inst rel abs r')
-      end
     | VProj {r; func} ->
       begin
         match Rel.compare r `Dim0 rel with
@@ -1923,7 +1960,7 @@ and Sys :
     type t = X.t sys
     module Face = Face (X)
 
-    exception Triv of X.t
+    exception Triv = Face.Triv
 
     let swap pi = List.map @@ Face.swap pi
 
@@ -1951,8 +1988,6 @@ and Sys :
       in
       ListUtil.filter_map force_face sys
 
-    let run_then_force rel sys = force rel (run rel sys)
-    (*
     let run_then_force rel sys =
       let run_then_force_face face =
         try Some (Face.run_then_force rel face)
@@ -1961,7 +1996,6 @@ and Sys :
         | Face.Triv bdy -> raise @@ Triv bdy
       in
       ListUtil.filter_map run_then_force_face sys
-    *)
 
     let foreach_gen sys f = ListUtil.foreach sys (Face.gen f)
   end
