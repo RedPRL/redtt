@@ -389,9 +389,29 @@ struct
   and eval_frame rel env =
     function
     | Tm.Fst -> Fst
+
     | Tm.Snd -> Snd
-    | Tm.FunApp t -> FunApp (Val.make @@ eval rel env t)
-    | Tm.ExtApp l -> ExtApp (List.map (eval_dim env) l)
+
+    | Tm.FunApp t ->
+      let v = Val.make @@ eval rel env t in
+      FunApp v
+
+    | Tm.ExtApp trs ->
+      let rs = List.map (eval_dim env) trs in
+      ExtApp rs
+
+    | Tm.VProj info ->
+      VProj
+        {r = eval_dim env info.r;
+         func = Val.make @@ eval rel env info.func}
+
+    | Tm.Cap info ->
+      Cap
+        {r = eval_dim env info.r;
+         r' = eval_dim env info.r';
+         ty = Val.make @@ eval rel env info.ty;
+         sys = eval_bnd_sys rel env info.sys}
+
     | _ -> raise PleaseFillIn
 
   and eval_bnd rel env =
