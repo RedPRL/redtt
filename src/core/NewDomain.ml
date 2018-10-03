@@ -197,7 +197,7 @@ sig
   (** [run] brings the prevalue underneath the restriction Ξ. *)
   val run : rel -> t -> t
 
-  (** [subst_then_run] is semantically [subst] followed by [run], but may be more optimized *)
+  (** [subst_then_run rel r x v = run rel (subst r x v)]. *)
   val subst_then_run : rel -> dim -> Name.t -> t -> t
 end
 
