@@ -196,9 +196,6 @@ sig
 
   (** [run] brings the prevalue underneath the restriction Ξ. *)
   val run : rel -> t -> t
-
-  (** [subst_then_run rel r x v = run rel (subst r x v)]. *)
-  val subst_then_run : rel -> dim -> Name.t -> t -> t
 end
 
 module type DomainPlug =
@@ -588,9 +585,6 @@ struct
   let run rel (Clo clo) =
     Clo {clo with env = Env.run rel clo.env}
 
-  let subst_then_run rel r x (Clo clo) =
-    Clo {clo with env = Env.subst_then_run rel r x clo.env}
-
   let name (Clo {bnd = Tm.B (nm, _); _}) = nm
 
   let inst rel clo cell =
@@ -619,9 +613,6 @@ struct
 
   let run rel (NClo nclo) =
     NClo {nclo with env = Env.run rel nclo.env}
-
-  let subst_then_run rel r x (NClo nclo) =
-    NClo {nclo with env = Env.subst_then_run rel r x nclo.env}
 
   let names (NClo {bnd = Tm.NB (nms, _); _}) = nms
 
@@ -654,9 +645,6 @@ struct
 
   let run rel (ExtClo clo) =
     ExtClo {clo with env = Env.run rel clo.env}
-
-  let subst_then_run rel r x (ExtClo clo) =
-    ExtClo {clo with env = Env.subst_then_run rel r x clo.env}
 
   let names (ExtClo {bnd = Tm.NB (nms, _); _}) = nms
 
@@ -694,11 +682,6 @@ struct
     function
     | Dim _ as c -> c
     | Val v -> Val (LazyVal.run rel v)
-
-  let subst_then_run rel r x =
-    function
-    | Dim d -> Dim (Dim.subst_then_run rel r x d)
-    | Val v -> Val (LazyVal.subst_then_run rel r x v)
 end
 
 (** An environment is a value if every cell of it is. *)
@@ -724,9 +707,6 @@ struct
 
   let run rel env =
     {env with cells = Bwd.map (Cell.run rel) env.cells}
-
-  let subst_then_run rel r x env =
-    {env with cells = Bwd.map (Cell.subst_then_run rel r x) env.cells}
 
   let init globals = {globals = globals; cells = Emp}
 
@@ -1256,7 +1236,7 @@ struct
           in
           rigid_com rel r r' ~abs ~cap ~sys
         | exception ConSys.Triv c_y ->
-          subst_then_run rel r' y c_y
+          run rel @@ subst r' y c_y
       end
 
     | RestrictForce, RestrictThunk (r, r', v) ->
@@ -1736,12 +1716,6 @@ struct
     | `Pi abs -> `Pi (QAbs.run rel abs)
     | `Sg abs -> `Sg (QAbs.run rel abs)
     | `Ext abs -> `Ext (ECloAbs.run rel abs)
-
-  let subst_then_run rel r x =
-    function
-    | `Pi abs -> `Pi (QAbs.subst_then_run rel r x abs)
-    | `Sg abs -> `Sg (QAbs.subst_then_run rel r x abs)
-    | `Ext abs -> `Ext (ECloAbs.subst_then_run rel r x abs)
 end
 
 (** A [hcom_shape] is a value when its component is. *)
@@ -1770,13 +1744,6 @@ struct
     | `Sg abs -> `Sg (Q.run rel abs)
     | `Ext clo -> `Ext (ExtClo.run rel clo)
     | `Pos -> `Pos
-
-  let subst_then_run rel r x =
-    function
-    | `Pi abs -> `Pi (Q.subst_then_run rel r x abs)
-    | `Sg abs -> `Sg (Q.subst_then_run rel r x abs)
-    | `Ext clo -> `Ext (ExtClo.subst_then_run rel r x clo)
-    | `Pos -> `Pos
 end
 
 and ComShape : Domain with type t = com_shape = CoeShape
@@ -1800,11 +1767,6 @@ struct
     let dom = Val.run rel dom in
     let cod = Clo.run rel cod in
     {dom; cod}
-
-  let subst_then_run rel r x {dom; cod} =
-    let dom = Val.subst_then_run rel r x dom in
-    let cod = Clo.subst_then_run rel r x cod in
-    {dom; cod}
 end
 
 (** A [neu] is a value if its head and frames are. *)
@@ -1823,10 +1785,6 @@ struct
   let subst r x neu =
     {head = Head.subst r x neu.head;
      frames = Bwd.map (Frame.subst r x) neu.frames}
-
-  let subst_then_run rel r x neu =
-    {head = Head.subst_then_run rel r x neu.head;
-     frames = Bwd.map (Frame.subst_then_run rel r x) neu.frames}
 
   let plug rel frm neu =
     {neu with
@@ -1873,16 +1831,6 @@ struct
          r' = Dim.subst r x info.r';
          ty = NeuAbs.subst r x info.ty;
          cap = Val.subst r x info.cap}
-
-  let subst_then_run rel r x =
-    function
-    | Lvl _ | Var _ | Meta _ as h -> h
-    | NCoe info ->
-      NCoe
-        {r = Dim.subst_then_run rel r x info.r;
-         r' = Dim.subst_then_run rel r x info.r';
-         ty = NeuAbs.subst_then_run rel r x info.ty;
-         cap = Val.subst_then_run rel r x info.cap}
 end
 
 (** A [frame] is a value if its components are. It itself might not be rigid. *)
@@ -2314,7 +2262,7 @@ end
     let inst rel abs r =
       let Abs (x, a_x) = abs in
       let rel_x = Rel.hide' x rel in
-      X.subst_then_run rel_x r x a_x
+      X.run rel_x @@ X.subst r x a_x
   end
 
 and AbsPlug : functor (X : DomainPlug) ->
@@ -2378,9 +2326,9 @@ end
       let rel_x = Rel.hide' x rel in
       Abs (x, DelayedX.plug_then_unleash rel_x frm a_x)
 
-    let subst_then_run_then_unleash rel r x abs = unleash (subst_then_run rel r x abs)
+    let subst_then_run_then_unleash rel r x abs = unleash (run rel @@ subst r x abs)
     let make_then_run rel abs = run rel (make abs)
-    let make_then_subst_then_run rel r x abs = subst_then_run rel r x (make abs)
+    let make_then_subst_then_run rel r x abs = run rel @@ subst r x (make abs)
     (* XXX optimization undone
     let subst_then_run_then_unleash rel r z (Abs (x, a_x)) =
       if z = x then
@@ -2453,7 +2401,7 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let plug_then_unleash rel frm v = X.plug rel frm (unleash v)
 
-    let subst_then_run_then_unleash rel r x v = X.subst_then_run rel r x (Delayed.drop_rel v)
+    let subst_then_run_then_unleash rel r x v = X.run rel @@ X.subst r x (Delayed.drop_rel v)
 
     let make_then_subst_then_run rel r x v = make_then_run rel @@ X.subst r x v
   end
@@ -2494,7 +2442,7 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
 
     let plug_then_unleash rel frm v = X.plug rel frm (unleash v)
 
-    let subst_then_run_then_unleash rel r x v = X.subst_then_run rel r x (drop_rel v)
+    let subst_then_run_then_unleash rel r x v = X.run rel @@ X.subst r x (drop_rel v)
 
     let make_then_subst_then_run rel r x v = Delayed.make' (Some rel) @@ lazy begin X.subst r x v end
   end
