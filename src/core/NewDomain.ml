@@ -2018,7 +2018,7 @@ struct
       begin
         match Rel.compare r r' rel with
         | `Same ->
-          raise @@ Triv (Val.unleash cap)
+          `Triv (Val.unleash cap)
         | _ ->
           match ConAbsSys.force rel sys with
           | _ ->
