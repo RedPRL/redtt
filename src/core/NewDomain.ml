@@ -431,8 +431,21 @@ struct
       let sys = eval_bnd_sys rel env info.sys in
       Con.make_com rel r r' ~abs ~cap ~sys
 
-    | Tm.GHCom _ -> raise PleaseFillIn
-    | Tm.GCom _ -> raise PleaseFillIn
+    | Tm.GHCom info ->
+      let r = eval_dim env info.r in
+      let r' = eval_dim env info.r' in
+      let ty = eval rel env info.ty in
+      let cap = Val.make @@ eval rel env info.cap in
+      let sys = eval_bnd_sys rel env info.sys in
+      Con.make_ghcom rel r r' ~ty ~cap ~sys
+
+    | Tm.GCom info ->
+      let r = eval_dim env info.r in
+      let r' = eval_dim env info.r' in
+      let abs = eval_bnd rel env info.ty in
+      let cap = Val.make @@ eval rel env info.cap in
+      let sys = eval_bnd_sys rel env info.sys in
+      Con.make_gcom rel r r' ~abs ~cap ~sys
 
     | Tm.Ix (i, _) ->
       begin
@@ -725,6 +738,12 @@ sig
 
   (** invariant: abs, cap and sys are [rel]-values, but dir and sys might not be rigid *)
   val make_com : rel -> dim -> dim -> abs:con abs -> cap:value -> sys:con abs sys -> con
+
+  (** invariant: ty, cap and sys are [rel]-values, but dir and sys might not be rigid *)
+  val make_ghcom : rel -> dim -> dim -> ty:con -> cap:value -> sys:con abs sys -> con
+
+  (** invariant: abs, cap and sys are [rel]-values, but dir and sys might not be rigid *)
+  val make_gcom : rel -> dim -> dim -> abs:con abs -> cap:value -> sys:con abs sys -> con
 
   (** invariant: ty1 is a [rel]-value, ty0 and equiv give {rel,r=0}-values, but r:dim might not be rigid *)
   val make_v : rel -> dim -> ty0:(rel -> value) -> ty1:value -> equiv:(rel -> value) -> con
