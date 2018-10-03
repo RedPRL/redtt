@@ -20,7 +20,10 @@ type rel = Rel.t
 module Delayed :
 sig
   type 'a t
+
   val make : 'a -> 'a t
+
+  (** [make v = make' None v] *)
   val make' : rel option -> 'a -> 'a t
 
   (** [drop_rel] is a brutal API to get the raw datum out. The caller has
