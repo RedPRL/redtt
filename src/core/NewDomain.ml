@@ -1140,8 +1140,12 @@ struct
           v
       end
 
-
   and plug rel frm hd =
+    match Frame.force rel frm ~hd with
+    | `Rigid frm -> rigid_plug rel frm hd
+    | `Triv c -> c
+
+  and rigid_plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
       Clo.inst rel clo @@ Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash arg end)
@@ -1265,25 +1269,14 @@ struct
     | NHCom {r; r'; cap; sys}, con ->
       make_hcom rel r r' ~ty:con ~cap ~sys
 
-    | VProj {r; func}, con ->
-      begin
-        match Rel.compare r `Dim0 rel with
-        | `Same -> Val.plug_then_unleash rel (FunApp (Val.make con)) func
-        | `Apart -> con
-        | `Indet -> rigid_vproj rel r ~el:con ~func
-      end
+    | VProj _, VIn {el1; _} ->
+      Val.unleash el1
 
-    | Cap {r; r'; ty; sys}, con ->
-      begin
-        match ConAbsSys.force rel sys with
-        | sys ->
-          rigid_cap rel r r' ~ty ~sys ~el:con
-        | exception ConAbsSys.Triv abs ->
-          make_coe rel r' r ~abs ~cap:(Val.make con)
-      end
+    | Cap _, Box {cap; _} ->
+      Val.unleash cap
 
     (* These frames are easy because they are always rigid. *)
-    | (FunApp _ | Fst | Snd | ExtApp _ | RestrictForce), Neu info ->
+    | (FunApp _ | Fst | Snd | ExtApp _ | RestrictForce | VProj _ | Cap _), Neu info ->
       let neu = DelayedNeu.plug rel frm info.neu in
       let sys = ConSys.plug rel frm info.sys in
       let ty, sys' = plug_ty rel frm info.ty hd in
@@ -1294,6 +1287,8 @@ struct
     | Snd, _ -> raise PleaseRaiseProperError
     | ExtApp _, _ -> raise PleaseRaiseProperError
     | RestrictForce, _ -> raise PleaseRaiseProperError
+    | VProj _, _ -> raise PleaseRaiseProperError
+    | Cap _, _ -> raise PleaseRaiseProperError
 
   and plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
@@ -1319,6 +1314,12 @@ struct
 
     | Restrict (r, r', ty), RestrictForce ->
       LazyVal.unleash ty, [(r, r', LazyVal.make hd)]
+
+    | V {ty1; _}, VProj _ ->
+      Val.unleash ty1, []
+
+    | HCom {ty = `Pos; cap; _}, Cap _ ->
+      Val.unleash cap, []
 
     | _ ->
       raise PleaseRaiseProperError
@@ -1627,28 +1628,6 @@ struct
     | _ ->
       raise PleaseRaiseProperError
 
-  and rigid_vproj rel r ~el ~func =
-    match el with
-    | VIn {el1; _} ->
-      Val.unleash el1
-
-    | Neu _ ->
-      raise PleaseFillIn
-
-    | _ ->
-      raise PleaseRaiseProperError
-
-  and rigid_cap rel r r' ~ty ~sys ~el =
-    match el with
-    | Box {cap; _} ->
-      Val.unleash cap
-
-    | Neu _ ->
-      raise PleaseFillIn
-
-    | _ ->
-      raise PleaseRaiseProperError
-
   and subst_then_run rel r x v = run rel @@ subst r x v
   (* XXX optimization undone
   and subst_then_run rel r x =
@@ -1910,12 +1889,17 @@ end
 and Frame :
 sig
   include Domain with type t = frame
+
   val occur1 : Name.t -> frame -> [`No | `Might]
   val occur : Name.t bwd -> frame -> [`No | `Might]
+
+  (* OCaml compiler is not happy about [exception Triv of con] *)
+  val force : rel -> t -> hd:con -> [`Rigid of t | `Triv of con]
 end =
 struct
   type t = frame
 
+  module ConAbs = AbsPlug (Con)
   module ConAbsSys = Sys (AbsPlug (Con))
 
   let swap pi =
@@ -2025,6 +2009,43 @@ struct
         `Might
 
   let occur1 x = occur (Emp #< x)
+
+  exception Triv of con
+  let force rel frm ~hd =
+    match frm with
+    | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce ->
+      `Rigid frm
+    | NHCom {r; r'; cap; sys} ->
+      begin
+        match Rel.compare r r' rel with
+        | `Same ->
+          raise @@ Triv (Val.unleash cap)
+        | _ ->
+          match ConAbsSys.force rel sys with
+          | _ ->
+            `Rigid frm
+          | exception ConAbsSys.Triv abs ->
+            `Triv (ConAbs.inst rel abs r')
+      end
+    | VProj {r; func} ->
+      begin
+        match Rel.compare r `Dim0 rel with
+        | `Same -> `Triv (Val.plug_then_unleash rel (FunApp (Val.make hd)) func)
+        | `Apart -> `Triv hd
+        | `Indet -> `Rigid frm
+      end
+    | Cap {r; r'; ty; sys} ->
+      begin
+        match Rel.compare r r' rel with
+        | `Same ->
+          `Triv hd
+        | _ ->
+          match ConAbsSys.force rel sys with
+          | sys -> `Rigid frm
+          | exception ConAbsSys.Triv abs ->
+            `Triv (Con.make_coe rel r' r ~abs ~cap:(Val.make hd))
+      end
+
 end
 
 (** A [sys] is a value if its elements are. It itself might not be rigid.
