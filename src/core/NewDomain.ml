@@ -133,7 +133,7 @@ and frame =
   | ExtApp of dim list
   | NHCom of {r : dim; r' : dim; cap : value; sys : con abs sys}
   | VProj of {r : dim; func : value}
-  | Cap of {r : dim; r' : dim; cap : value; sys : con abs sys}
+  | Cap of {r : dim; r' : dim; ty : value; sys : con abs sys}
 
 and neu =
   {head : head;
@@ -1247,7 +1247,8 @@ struct
     | VProj {r; func}, con ->
       make_vproj rel r ~el:con ~func
 
-    | Cap _, _ -> raise PleaseFillIn
+    | Cap {r; r'; ty; sys}, con ->
+      make_cap rel r r' ~ty ~sys ~el:con
 
     (* These frames are easy because they are always rigid. *)
     | (FunApp _ | Fst | Snd | ExtApp _), Neu info ->
@@ -1358,6 +1359,13 @@ struct
     | `Same -> Val.plug_then_unleash rel (FunApp (Val.make el)) func
     | `Apart -> el
     | `Indet -> rigid_vproj rel r ~el ~func
+
+  and make_cap rel r r' ~ty ~sys ~el =
+    match ConAbsSys.force rel sys with
+    | sys ->
+      rigid_cap rel r r' ~ty ~sys ~el
+    | exception ConAbsSys.Triv abs ->
+      make_coe rel r' r ~abs ~cap:(Val.make el)
 
   and make_fhcom rel r r' ~cap ~sys =
     match Rel.compare r r' rel with
@@ -1602,6 +1610,17 @@ struct
     match el with
     | VIn {el1; _} ->
       Val.unleash el1
+
+    | Neu _ ->
+      raise PleaseFillIn
+
+    | _ ->
+      raise PleaseRaiseProperError
+
+  and rigid_cap rel r r' ~ty ~sys ~el =
+    match el with
+    | Box {cap; _} ->
+      Val.unleash cap
 
     | Neu _ ->
       raise PleaseFillIn
