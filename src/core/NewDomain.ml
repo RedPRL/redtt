@@ -131,6 +131,7 @@ and frame =
   | Fst
   | Snd
   | ExtApp of dim list
+  | RestrictForce
   | NHCom of {r : dim; r' : dim; cap : value; sys : con abs sys}
   | VProj of {r : dim; func : value}
   | Cap of {r : dim; r' : dim; ty : value; sys : con abs sys}
@@ -399,6 +400,9 @@ struct
     | Tm.ExtApp trs ->
       let rs = List.map (eval_dim env) trs in
       ExtApp rs
+
+    | Tm.RestrictForce ->
+      RestrictForce
 
     | Tm.VProj info ->
       VProj
@@ -1006,9 +1010,8 @@ struct
 
     | Restrict face ->
       begin
-        match ConFace.run_then_force rel face with
+        match ConFace.run rel face with
         | face -> Restrict face
-        | exception ConFace.Triv c -> c
         | exception ConFace.Dead -> raise PleaseRaiseProperError
       end
 
@@ -1027,9 +1030,8 @@ struct
 
     | RestrictThunk face ->
       begin
-        match ConFace.run_then_force rel face with
+        match ConFace.run rel face with
         | face -> RestrictThunk face
-        | exception ConFace.Triv c -> c
         | exception ConFace.Dead -> raise PleaseRaiseProperError
       end
 
@@ -1261,6 +1263,13 @@ struct
           subst_then_run rel r' y c_y
       end
 
+    | RestrictForce, RestrictThunk (r, r', v) ->
+      begin
+        match Rel.compare r r' rel with
+        | `Same -> LazyVal.unleash v
+        | _ -> raise PleaseRaiseProperError
+      end
+
     | NHCom {r; r'; cap; sys}, con ->
       make_hcom rel r r' ~ty:con ~cap ~sys
 
@@ -1271,7 +1280,7 @@ struct
       make_cap rel r r' ~ty ~sys ~el:con
 
     (* These frames are easy because they are always rigid. *)
-    | (FunApp _ | Fst | Snd | ExtApp _), Neu info ->
+    | (FunApp _ | Fst | Snd | ExtApp _ | RestrictForce), Neu info ->
       let neu = Neu.plug rel frm info.neu in
       let sys = ConSys.plug rel frm info.sys in
       let ty, sys' = plug_ty rel frm info.ty hd in
@@ -1281,6 +1290,7 @@ struct
     | Fst, _ -> raise PleaseRaiseProperError
     | Snd, _ -> raise PleaseRaiseProperError
     | ExtApp _, _ -> raise PleaseRaiseProperError
+    | RestrictForce, _ -> raise PleaseRaiseProperError
 
   and plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
@@ -1304,7 +1314,8 @@ struct
 
     | Ext _, _ -> raise PleaseRaiseProperError
 
-    | HCom {ty = `Pos; _}, _ -> raise PleaseFillIn
+    | Restrict (r, r', ty), RestrictForce ->
+      LazyVal.unleash ty, [(r, r', LazyVal.make hd)]
 
     | _ ->
       raise PleaseRaiseProperError
@@ -1916,11 +1927,13 @@ struct
     | FunApp arg ->
       let arg = Val.swap pi arg in
       FunApp arg
+    | Fst | Snd as frm ->
+      frm
     | ExtApp rs ->
       let rs = List.map (Dim.swap pi) rs in
       ExtApp rs
-    | Fst | Snd as frm ->
-      frm
+    | RestrictForce ->
+      RestrictForce
     | NHCom info ->
       NHCom
         {r = Dim.swap pi info.r;
@@ -1938,11 +1951,13 @@ struct
     | FunApp arg ->
       let arg = Val.subst r x arg in
       FunApp arg
+    | Fst | Snd as frm ->
+      frm
     | ExtApp rs ->
       let rs = List.map (Dim.subst r x) rs in
       ExtApp rs
-    | Fst | Snd as frm ->
-      frm
+    | RestrictForce ->
+      RestrictForce
     | NHCom info ->
       NHCom
         {r = Dim.subst r x info.r;
@@ -1960,7 +1975,7 @@ struct
     | FunApp arg ->
       let arg = Val.run rel arg in
       FunApp arg
-    | Fst | Snd | ExtApp _ as frm ->
+    | Fst | Snd | ExtApp _ | RestrictForce as frm ->
       frm
     | NHCom info ->
       NHCom
@@ -1980,11 +1995,13 @@ struct
     | FunApp arg ->
       let arg = Val.subst_then_run rel r x arg in
       FunApp arg
+    | Fst | Snd as frm ->
+      frm
     | ExtApp rs as frm ->
       let rs = List.map (Dim.subst r x) rs in
       ExtApp rs
-    | Fst | Snd as frm ->
-      frm
+    | RestrictForce ->
+      RestrictForce
     | NHCom info ->
       NHCom
         {r = Dim.subst_then_run rel r x info.r;
@@ -2001,13 +2018,13 @@ struct
     function
     | FunApp _ | NHCom _ | VProj _ | Cap _ ->
       `Might
+    | Fst | Snd | RestrictForce ->
+      `No
     | ExtApp dims ->
       if Bwd.for_all (fun x -> List.for_all (I.absent x) dims) xs then
         `No
       else
         `Might
-    | Fst | Snd ->
-      `No
 
   let occur1 x = occur (Emp #< x)
 end
