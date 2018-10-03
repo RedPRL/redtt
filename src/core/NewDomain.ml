@@ -1649,6 +1649,8 @@ struct
     | _ ->
       raise PleaseRaiseProperError
 
+  and subst_then_run rel r x v = run rel @@ subst r x v
+  (* XXX optimization undone
   and subst_then_run rel r x =
     function
     | Pi quant ->
@@ -1712,6 +1714,7 @@ struct
 
     | Neu _ as c ->
       run rel @@ subst r x c (* XXX favonia is lazy! *)
+  *)
 end
 
 and Val : DelayedDomainPlug
@@ -1982,7 +1985,8 @@ struct
          func = Val.run rel info.func}
     | Cap _ -> raise PleaseFillIn
 
-
+  let subst_then_run rel r x v = run rel @@ subst r x v
+  (* XXX optimization undone
   let subst_then_run rel r x =
     function
     | FunApp arg ->
@@ -2006,6 +2010,7 @@ struct
         {r = Dim.subst_then_run rel r x info.r;
          func = Val.subst_then_run rel r x info.func}
     | Cap _ -> raise PleaseFillIn
+  *)
 
   let occur xs =
     function
@@ -2039,13 +2044,13 @@ and Sys :
 
     (** some convenience functions which could be more efficient *)
 
-    (** run_then_force rel sys = force (run rel sys) *)
+    (** [run_then_force rel sys = force rel (run rel sys)] *)
     val run_then_force : rel -> t -> t
 
-    (** forall_then_foreach x sys f = List.foreach (forall x sys) f *)
+    (** [forall_then_foreach x sys f = ListUtil.foreach (forall x sys) f] *)
     val forall_then_foreach : Name.t -> t -> (X.t face -> 'b) -> 'b list
 
-    (** foreach_gen sys f = List.foreach sys (Face.gen f) *)
+    (** [foreach_gen sys f = ListUtil.foreach sys (Face.gen f)] *)
     val foreach_gen : 'a sys -> (dim * dim * 'a -> X.t) -> t
   end =
   functor (X : DomainPlug) ->
@@ -2069,6 +2074,8 @@ and Sys :
       in
       ListUtil.filter_map run_face sys
 
+    let subst_then_run rel r x sys = run rel @@ subst r x sys
+    (* XXX optimization undone
     let subst_then_run rel r x sys =
       let run_face face =
         try Some (Face.subst_then_run rel r x face)
@@ -2077,6 +2084,7 @@ and Sys :
         | Face.Triv bdy -> raise @@ Triv bdy
       in
       ListUtil.filter_map run_face sys
+    *)
 
     let plug rel frm sys =
       List.map (Face.plug rel frm) sys
@@ -2090,6 +2098,10 @@ and Sys :
       in
       ListUtil.filter_map force_face sys
 
+    let run_then_force rel sys = force rel (run rel sys)
+    let forall_then_foreach x sys f = ListUtil.foreach (forall x sys) f
+    let foreach_gen sys f = ListUtil.foreach sys (Face.gen f)
+    (*
     let run_then_force rel sys =
       let run_then_force_face face =
         try Some (Face.run_then_force rel face)
@@ -2103,6 +2115,7 @@ and Sys :
       ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
 
     let foreach_gen sys f = ListUtil.foreach sys (Face.gen f)
+    *)
   end
 
 (** A [face] is a value if its elements are. It itself might not be rigid. *)
@@ -2161,6 +2174,8 @@ and Face :
       Dim.subst r x s, Dim.subst r x s',
       DelayedLazyX.subst r x bdy
 
+    let subst_then_run rel r x v = run rel @@ subst r x v
+    (* XXX optimization undone
     let subst_then_run rel r x (s, s', bdy) =
       let s = Dim.subst r x s in
       let s' = Dim.subst r x s' in
@@ -2171,6 +2186,7 @@ and Face :
         s, s',
         DelayedLazyX.subst_then_run rel' r x bdy
       | exception I.Inconsistent -> raise Dead
+    *)
 
     let plug rel frm (r, r', bdy) =
       let rel' = Rel.equate' r r' rel in
@@ -2194,6 +2210,9 @@ and Face :
     let gen f (r, r', bdy) =
       r, r', DelayedLazyX.make_from_lazy @@ lazy begin f (r, r', Lazy.force @@ Delayed.drop_rel bdy) end
 
+    let run_then_force rel v = force rel (run rel v)
+    let subst_then_run_then_force rel r x sys = run rel @@ subst r x sys
+    (* XXX optimization undone
     let run_then_force rel (r, r', bdy) =
       match Rel.equate r r' rel with
       | `Same ->
@@ -2213,6 +2232,7 @@ and Face :
         s, s',
         DelayedLazyX.subst_then_run rel' r x bdy
       | exception I.Inconsistent -> raise Dead
+    *)
   end
 
 (** [Abs (x, a)] is a [rel]-value if [a] is a [(Rel.hide' x rel)]-value. *)
@@ -2252,6 +2272,8 @@ end
       let a_x = X.run rel_x a_x in
       Abs (x, a_x)
 
+    let subst_then_run rel r z abs = run rel @@ subst r z abs
+    (* XXX optimization undone
     let subst_then_run rel r z abs =
       let Abs (x, a_x) = abs in
       if z = x then
@@ -2267,6 +2289,7 @@ end
         let rel_y = rel in
         let a_y = X.subst_then_run rel_y r z @@ X.swap pi a_x in
         Abs (y, a_y)
+    *)
 
     let inst rel abs r =
       let Abs (x, a_x) = abs in
@@ -2335,6 +2358,10 @@ end
       let rel_x = Rel.hide' x rel in
       Abs (x, DelayedX.plug_then_unleash rel_x frm a_x)
 
+    let subst_then_run_then_unleash rel r x abs = unleash (subst_then_run rel r x abs)
+    let make_then_run rel abs = run rel (make abs)
+    let make_then_subst_then_run rel r x abs = subst_then_run rel r x (make abs)
+    (* XXX optimization undone
     let subst_then_run_then_unleash rel r z (Abs (x, a_x)) =
       if z = x then
         let rel_x = Rel.hide' x rel in
@@ -2367,6 +2394,7 @@ end
         let rel_y = rel in
         let a_y = DelayedX.make_then_subst_then_run rel_y r z @@ X.swap pi a_x in
         Abs (y, a_y)
+    *)
   end
 
 and DelayedPlug : functor (X : DomainPlug) ->
