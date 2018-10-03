@@ -233,14 +233,8 @@ sig
   (** [plug_then_unleash rel frm x = unleash (plug rel frm x)]. *)
   val plug_then_unleash : rel -> frame -> t -> u
 
-  (** [subst_then_run_then_unleash rel r x v = unleash (subst_then_run rel r x v)]. *)
-  val subst_then_run_then_unleash : rel -> dim -> Name.t -> t -> u
-
   (** [make_then_run rel v = run rel (make v)]. *)
   val make_then_run : rel -> u -> t
-
-  (** [make_then_subst_then_run rel r x v = subst_then_run rel r x (make v)]. *)
-  val make_then_subst_then_run : rel -> dim -> Name.t -> u -> t
 end
 
 module rec Syn :
@@ -559,9 +553,6 @@ struct
     | r -> r
 
   let run _ r = r
-
-  let subst_then_run _ r x =
-    subst r x
 end
 
 (** A prevalue in [clo] is a value if its environment is a value. *)
@@ -1452,7 +1443,7 @@ struct
 
     | Neu info ->
       let neu = DelayedNeu.make {head = NCoe {r; r'; ty = Abs (x, DelayedNeu.unleash info.neu); cap}; frames = Emp} in
-      let ty = Val.make_then_subst_then_run rel r' x tyx in
+      let ty = Val.make_then_run rel (Con.subst r' x tyx) in
       let sys =
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
         let old_faces =
@@ -1607,73 +1598,6 @@ struct
 
     | _ ->
       raise PleaseRaiseProperError
-
-  and subst_then_run rel r x v = run rel @@ subst r x v
-  (* XXX optimization undone
-  and subst_then_run rel r x =
-    function
-    | Pi quant ->
-      let quant = Quantifier.subst_then_run rel r x quant in
-      Pi quant
-
-    | Sg quant ->
-      let quant = Quantifier.subst_then_run rel r x quant in
-      Sg quant
-
-    | Ext extclo ->
-      let extclo = ExtClo.subst_then_run rel r x extclo in
-      Ext extclo
-
-    | Restrict face ->
-      begin
-        match ConFace.subst_then_run_then_force rel r x face with
-        | face -> Restrict face
-        | exception ConFace.Triv c -> c
-        | exception ConFace.Dead -> raise PleaseRaiseProperError
-      end
-
-    | Lam clo ->
-      let clo = Clo.subst_then_run rel r x clo in
-      Lam clo
-
-    | Cons (v0, v1) ->
-      let v0 = Val.subst_then_run rel r x v0 in
-      let v1 = Val.subst_then_run rel r x v1 in
-      Cons (v0, v1)
-
-    | ExtLam nclo ->
-      let nclo = NClo.subst_then_run rel r x nclo in
-      ExtLam nclo
-
-    | RestrictThunk face ->
-      begin
-        match ConFace.subst_then_run_then_force rel r x face with
-        | face -> RestrictThunk face
-        | exception ConFace.Triv c -> c
-        | exception ConFace.Dead -> raise PleaseRaiseProperError
-      end
-
-    | (Coe _ | HCom _ | Com _ | GHCom _ | GCom _) as c ->
-      run rel @@ subst r x c (* too complicated *)
-
-    | Univ _ as con -> con
-
-    | V info ->
-      let ty0 rel0 = Val.subst_then_run rel0 r x info.ty0 in
-      let ty1 = Val.subst_then_run rel r x info.ty1 in
-      let equiv rel0 = Val.subst_then_run rel0 r x info.equiv in
-      make_v rel (Dim.subst r x info.r) ~ty0 ~ty1 ~equiv
-
-    | VIn info ->
-      let el0 rel0 = Val.run rel0 info.el0 in
-      let el1 = Val.run rel info.el1 in
-      make_vin rel (Dim.subst r x info.r) ~el0 ~el1
-
-    | Box _ as c -> run rel @@ subst r x c (* XXX favonia is lazy! *)
-
-    | Neu _ as c ->
-      run rel @@ subst r x c (* XXX favonia is lazy! *)
-  *)
 end
 
 and Val : DelayedDomainPlug
@@ -1917,33 +1841,6 @@ struct
          func = Val.run rel info.func}
     | Cap _ -> raise PleaseFillIn
 
-  let subst_then_run rel r x v = run rel @@ subst r x v
-  (* XXX optimization undone
-  let subst_then_run rel r x =
-    function
-    | FunApp arg ->
-      let arg = Val.subst_then_run rel r x arg in
-      FunApp arg
-    | Fst | Snd as frm ->
-      frm
-    | ExtApp rs as frm ->
-      let rs = List.map (Dim.subst r x) rs in
-      ExtApp rs
-    | RestrictForce ->
-      RestrictForce
-    | NHCom info ->
-      NHCom
-        {r = Dim.subst_then_run rel r x info.r;
-         r' = Dim.subst_then_run rel r x info.r';
-         cap = Val.subst_then_run rel r x info.cap;
-         sys = ConAbsSys.subst_then_run rel r x info.sys}
-    | VProj info ->
-      VProj
-        {r = Dim.subst_then_run rel r x info.r;
-         func = Val.subst_then_run rel r x info.func}
-    | Cap _ -> raise PleaseFillIn
-  *)
-
   let occur xs =
     function
     | FunApp _ | NHCom _ | VProj _ | Cap _ ->
@@ -2042,18 +1939,6 @@ and Sys :
       in
       ListUtil.filter_map run_face sys
 
-    let subst_then_run rel r x sys = run rel @@ subst r x sys
-    (* XXX optimization undone
-    let subst_then_run rel r x sys =
-      let run_face face =
-        try Some (Face.subst_then_run rel r x face)
-        with
-        | Face.Dead -> None
-        | Face.Triv bdy -> raise @@ Triv bdy
-      in
-      ListUtil.filter_map run_face sys
-    *)
-
     let plug rel frm sys =
       List.map (Face.plug rel frm) sys
 
@@ -2111,9 +1996,6 @@ and Face :
 
     (** [run_then_force rel face = force (run rel face)] *)
     val run_then_force : rel -> t -> t
-
-    (** [subst_then_run_then_force rel r x face = force (subst_then_run rel r x face)] *)
-    val subst_then_run_then_force : rel -> dim -> Name.t -> t -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -2142,20 +2024,6 @@ and Face :
       Dim.subst r x s, Dim.subst r x s',
       DelayedLazyX.subst r x bdy
 
-    let subst_then_run rel r x v = run rel @@ subst r x v
-    (* XXX optimization undone
-    let subst_then_run rel r x (s, s', bdy) =
-      let s = Dim.subst r x s in
-      let s' = Dim.subst r x s' in
-      match Rel.equate s s' rel with
-      | `Same ->
-        raise @@ Triv (DelayedLazyX.subst_then_run_then_unleash rel r x bdy)
-      | `Changed rel' ->
-        s, s',
-        DelayedLazyX.subst_then_run rel' r x bdy
-      | exception I.Inconsistent -> raise Dead
-    *)
-
     let plug rel frm (r, r', bdy) =
       let rel' = Rel.equate' r r' rel in
       r, r',
@@ -2179,28 +2047,6 @@ and Face :
       r, r', DelayedLazyX.make_from_lazy @@ lazy begin f (r, r', Lazy.force @@ Delayed.drop_rel bdy) end
 
     let run_then_force rel v = force rel (run rel v)
-    let subst_then_run_then_force rel r x sys = run rel @@ subst r x sys
-    (* XXX optimization undone
-    let run_then_force rel (r, r', bdy) =
-      match Rel.equate r r' rel with
-      | `Same ->
-        raise @@ Triv (DelayedLazyX.run_then_unleash rel bdy)
-      | `Changed rel' ->
-        r, r',
-        DelayedLazyX.run rel' bdy
-      | exception I.Inconsistent -> raise Dead
-
-    let subst_then_run_then_force rel r x (s, s', bdy) =
-      let s = Dim.subst r x s in
-      let s' = Dim.subst r x s' in
-      match Rel.equate s s' rel with
-      | `Same ->
-        raise @@ Triv (DelayedLazyX.subst_then_run_then_unleash rel r x bdy)
-      | `Changed rel' ->
-        s, s',
-        DelayedLazyX.subst_then_run rel' r x bdy
-      | exception I.Inconsistent -> raise Dead
-    *)
   end
 
 (** [Abs (x, a)] is a [rel]-value if [a] is a [(Rel.hide' x rel)]-value. *)
@@ -2239,25 +2085,6 @@ end
       let rel_x = Rel.hide' x rel in
       let a_x = X.run rel_x a_x in
       Abs (x, a_x)
-
-    let subst_then_run rel r z abs = run rel @@ subst r z abs
-    (* XXX optimization undone
-    let subst_then_run rel r z abs =
-      let Abs (x, a_x) = abs in
-      if z = x then
-        let rel_x = Rel.hide' x rel in
-        let a_x = X.run rel_x a_x in
-        Abs (x, a_x)
-      else if I.absent x r then
-        let rel_x = Rel.hide' x rel in
-        let a_x = X.subst_then_run rel_x r z a_x in
-        Abs (x, a_x)
-      else
-        let y, pi = Perm.freshen_name x in
-        let rel_y = rel in
-        let a_y = X.subst_then_run rel_y r z @@ X.swap pi a_x in
-        Abs (y, a_y)
-    *)
 
     let inst rel abs r =
       let Abs (x, a_x) = abs in
@@ -2326,43 +2153,7 @@ end
       let rel_x = Rel.hide' x rel in
       Abs (x, DelayedX.plug_then_unleash rel_x frm a_x)
 
-    let subst_then_run_then_unleash rel r x abs = unleash (run rel @@ subst r x abs)
     let make_then_run rel abs = run rel (make abs)
-    let make_then_subst_then_run rel r x abs = run rel @@ subst r x (make abs)
-    (* XXX optimization undone
-    let subst_then_run_then_unleash rel r z (Abs (x, a_x)) =
-      if z = x then
-        let rel_x = Rel.hide' x rel in
-        let a_x = DelayedX.run_then_unleash rel_x a_x in
-        Abs (x, a_x)
-      else if I.absent x r then
-        let rel_x = Rel.hide' x rel in
-        let a_x = DelayedX.subst_then_run_then_unleash rel_x r z a_x in
-        Abs (x, a_x)
-      else
-        let y, pi = Perm.freshen_name x in
-        let rel_y = rel in
-        let a_y = DelayedX.subst_then_run_then_unleash rel_y r z @@ DelayedX.swap pi a_x in
-        Abs (y, a_y)
-
-    let make_then_run rel (Abs (x, a_x)) =
-      Abs (x, DelayedX.make_then_run (Rel.hide' x rel) a_x)
-
-    let make_then_subst_then_run rel r z (Abs (x, a_x)) =
-      if z = x then
-        let rel_x = Rel.hide' x rel in
-        let a_x = DelayedX.make_then_run rel_x a_x in
-        Abs (x, a_x)
-      else if I.absent x r then
-        let rel_x = Rel.hide' x rel in
-        let a_x = DelayedX.make_then_subst_then_run rel_x r z a_x in
-        Abs (x, a_x)
-      else
-        let y, pi = Perm.freshen_name x in
-        let rel_y = rel in
-        let a_y = DelayedX.make_then_subst_then_run rel_y r z @@ X.swap pi a_x in
-        Abs (y, a_y)
-    *)
   end
 
 and DelayedPlug : functor (X : DomainPlug) ->
@@ -2393,17 +2184,11 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let make_then_run rel = Delayed.make' (Some rel)
 
-    let subst_then_run rel r x v = make_then_run rel @@ X.subst r x (Delayed.drop_rel v)
-
     let plug rel frm v = Delayed.make @@ X.plug rel frm (unleash v)
 
     let run_then_unleash rel v = X.run rel (Delayed.drop_rel v)
 
     let plug_then_unleash rel frm v = X.plug rel frm (unleash v)
-
-    let subst_then_run_then_unleash rel r x v = X.run rel @@ X.subst r x (Delayed.drop_rel v)
-
-    let make_then_subst_then_run rel r x v = make_then_run rel @@ X.subst r x v
   end
 
 and DelayedLazyPlug : functor (X : DomainPlug) ->
@@ -2433,18 +2218,11 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
 
     let make_then_run rel v = Delayed.make' (Some rel) (lazy v)
 
-    let subst_then_run rel r x v = Delayed.make' (Some rel) @@
-      lazy begin X.subst r x (Lazy.force (Delayed.drop_rel v)) end
-
     let plug rel frm v = Delayed.make @@ lazy begin X.plug rel frm (unleash v) end
 
     let run_then_unleash rel v = X.run rel (drop_rel v)
 
     let plug_then_unleash rel frm v = X.plug rel frm (unleash v)
-
-    let subst_then_run_then_unleash rel r x v = X.run rel @@ X.subst r x (drop_rel v)
-
-    let make_then_subst_then_run rel r x v = Delayed.make' (Some rel) @@ lazy begin X.subst r x v end
   end
 
 module ConAbs = AbsPlug (Con)
