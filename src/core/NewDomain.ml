@@ -96,7 +96,7 @@ type con =
 
   | Box of {r : dim; r' : dim; cap : value; sys : con sys}
 
-  | Neu of {ty : value; neu : neu; sys : con sys}
+  | Neu of {ty : value; neu : neu Delayed.t; sys : con sys}
 
 and value = con Delayed.t
 
@@ -497,7 +497,7 @@ struct
         | None ->
           let vty = eval rel env' @@ Tm.shift_univ info.ushift ty in
           let var = Var {name = info.name; twin = info.twin; ushift = info.ushift} in
-          let neu = {head = var; frames = Emp} in
+          let neu = DelayedNeu.make {head = var; frames = Emp} in
           Neu {neu; ty = Val.make vty; sys = []}
       end
 
@@ -518,7 +518,7 @@ struct
         | None ->
           let vty = eval rel env' @@ Tm.shift_univ info.ushift ty in
           let var = Meta {name = info.name; ushift = info.ushift} in
-          let neu = {head = var; frames = Emp} in
+          let neu = DelayedNeu.make {head = var; frames = Emp} in
           Neu {neu; ty = Val.make vty; sys = []}
       end
 
@@ -889,7 +889,7 @@ struct
     | Neu info ->
       Neu
         {ty = Val.swap pi info.ty;
-         neu = Neu.swap pi info.neu;
+         neu = DelayedNeu.swap pi info.neu;
          sys = ConSys.swap pi info.sys}
 
   let subst r x =
@@ -991,7 +991,7 @@ struct
     | Neu info ->
       Neu
         {ty = Val.subst r x info.ty;
-         neu = Neu.subst r x info.neu;
+         neu = DelayedNeu.subst r x info.neu;
          sys = ConSys.subst r x info.sys}
 
   let rec run rel =
@@ -1141,7 +1141,7 @@ struct
       begin
         match ConSys.run_then_force rel info.sys with
         | sys ->
-          let neu = Neu.run rel info.neu in
+          let neu = DelayedNeu.run rel info.neu in
           let ty = Val.run rel info.ty in
           Neu {ty; neu; sys}
         | exception ConSys.Triv v ->
@@ -1292,7 +1292,7 @@ struct
 
     (* These frames are easy because they are always rigid. *)
     | (FunApp _ | Fst | Snd | ExtApp _ | RestrictForce), Neu info ->
-      let neu = Neu.plug rel frm info.neu in
+      let neu = DelayedNeu.plug rel frm info.neu in
       let sys = ConSys.plug rel frm info.sys in
       let ty, sys' = plug_ty rel frm info.ty hd in
       Neu {ty = Val.make ty; neu; sys = sys' @ sys}
@@ -1439,7 +1439,7 @@ struct
 
     | Neu info ->
       let nhcom = NHCom {r; r'; cap; sys} in
-      let neu = Neu.plug rel nhcom info.neu in
+      let neu = DelayedNeu.plug rel nhcom info.neu in
       let neu_sys =
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
         let tube_faces =
@@ -1478,7 +1478,7 @@ struct
       raise CanFavoniaHelpMe
 
     | Neu info ->
-      let neu = {head = NCoe {r; r'; ty = Abs (x, info.neu); cap}; frames = Emp} in
+      let neu = DelayedNeu.make {head = NCoe {r; r'; ty = Abs (x, DelayedNeu.unleash info.neu); cap}; frames = Emp} in
       let ty = Val.make_then_subst_then_run rel r' x tyx in
       let sys =
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
@@ -1858,6 +1858,9 @@ struct
     {neu with
      frames = neu.frames #< frm}
 end
+
+and DelayedNeu : DelayedDomainPlug with type u = neu and type t = neu Delayed.t =
+  DelayedPlug (Neu)
 
 (** A [head] is a value if its components are. It itself might not be rigid. *)
 and Head : Domain with type t = head =
