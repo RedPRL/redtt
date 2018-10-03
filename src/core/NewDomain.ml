@@ -1450,7 +1450,7 @@ struct
       let sys =
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
         let old_faces =
-          ConSys.forall_then_foreach x info.sys @@ ConFace.gen @@ fun (s, s', bdy) ->
+          ListUtil.foreach (ConSys.forall x info.sys) @@ ConFace.gen @@ fun (s, s', bdy) ->
           let rel' = Rel.equate' s s' rel in
           let abs = ConAbs.run rel' @@ Abs (x, bdy) in
           let cap = Val.run rel' cap in
@@ -1915,9 +1915,6 @@ and Sys :
     (** [run_then_force rel sys = force rel (run rel sys)] *)
     val run_then_force : rel -> t -> t
 
-    (** [forall_then_foreach x sys f = ListUtil.foreach (forall x sys) f] *)
-    val forall_then_foreach : Name.t -> t -> (X.t face -> 'b) -> 'b list
-
     (** [foreach_gen sys f = ListUtil.foreach sys (Face.gen f)] *)
     val foreach_gen : 'a sys -> (dim * dim * 'a -> X.t) -> t
   end =
@@ -1955,8 +1952,6 @@ and Sys :
       ListUtil.filter_map force_face sys
 
     let run_then_force rel sys = force rel (run rel sys)
-    let forall_then_foreach x sys f = ListUtil.foreach (forall x sys) f
-    let foreach_gen sys f = ListUtil.foreach sys (Face.gen f)
     (*
     let run_then_force rel sys =
       let run_then_force_face face =
@@ -1966,12 +1961,9 @@ and Sys :
         | Face.Triv bdy -> raise @@ Triv bdy
       in
       ListUtil.filter_map run_then_force_face sys
-
-    let forall_then_foreach x sys f =
-      ListUtil.filter_map (fun face -> Option.map f (Face.forall x face)) sys
+    *)
 
     let foreach_gen sys f = ListUtil.foreach sys (Face.gen f)
-    *)
   end
 
 (** A [face] is a value if its elements are. It itself might not be rigid. *)
