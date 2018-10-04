@@ -1,3 +1,4 @@
 (library
  (name RedBasis)
- (public_name redbasis))
+ (public_name redbasis)
+ (package redtt))
