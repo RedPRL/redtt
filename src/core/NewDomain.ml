@@ -79,12 +79,12 @@ type con =
   | Pi of quantifier
   | Sg of quantifier
   | Ext of ext_clo
-  | Restrict of con face (* is a value when rigid *)
+  | Restrict of con face (* is a value even if the face is not rigid *)
 
   | Lam of clo
   | Cons of value * value
   | ExtLam of nclo
-  | RestrictThunk of con face (* is a value when rigid *)
+  | RestrictThunk of con face (* is a value even if the face is not rigid *)
 
   | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value} (* is a value when (r,r') is rigid *)
   | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
