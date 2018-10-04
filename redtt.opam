@@ -16,5 +16,5 @@ depends: [
   "menhir" {>= "20180703"}
 ]
 build: [
-  ["dune" "build" "@install" "-p" name "-j" jobs "@install"]
+  ["dune" "build" "-p" name "@install" "-j" jobs]
 ]
