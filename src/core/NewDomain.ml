@@ -1433,6 +1433,7 @@ struct
       VIn {r; el0; el1}
 
     | HCom ({r = s; r' = s'; ty = `Pos; _} as fhcom) ->
+      (* [F]: favonia 11.00100100001111110110101010001000100001011. *)
 
       (* The algorithm is based on the Anders' alternative hcom in [F]. *)
 
@@ -1538,7 +1539,7 @@ struct
         | false ->
           let el0 = Val.make @@ make_coe rel0 r r' ~abs:abs0 ~cap:(Val.run rel0 cap) in
           let el1 = Val.make @@
-            let cap = Val.plug rel ~rigid:true (Frame.subst r x vproj_frame_x) cap in
+            let cap = Val.plug rel ~rigid:true (Frame.run rel @@ Frame.subst r x vproj_frame_x) cap in
             let sys =
               let face0 =
                 info.r, `Dim0,
@@ -1656,7 +1657,7 @@ struct
 
           let el1 = Val.make @@
             make_hcom rel `Dim1 r'
-              ~ty:(Val.unleash @@ Val.subst r' x info.ty1)
+              ~ty:(Val.run_then_unleash rel @@ Val.subst r' x info.ty1)
               ~cap:(Val.make base) ~sys:[face0; face_diag; face_front]
           in
           make_vin rel r' ~el0 ~el1
