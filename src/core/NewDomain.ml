@@ -1507,8 +1507,6 @@ struct
           VIn {r = info.r; el0; el1}
       end
 
-
-
     | Neu info ->
       let neu = DelayedNeu.make
         {head = NCoe {r; r'; ty = Abs (x, info.neu); cap};
