@@ -2,5 +2,5 @@
  (name RedTT_Core)
  (flags
   (:standard -w -32-26-27-37))
- (public_name redtt_core)
- (libraries redbasis uuseg uuseg.string uutf))
+ (public_name redtt.core)
+ (libraries redtt.basis uuseg uuseg.string uutf))
