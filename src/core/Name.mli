@@ -1,5 +1,7 @@
 include Map.OrderedType
 
+val set_debug_mode : bool -> unit
+
 val named : string option -> t
 val fresh : unit -> t
 

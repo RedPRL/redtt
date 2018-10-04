@@ -3,7 +3,8 @@ open Lexing
 
 type options =
   {file_name : Lwt_io.file_name;
-   line_width: int}
+   line_width: int;
+   debug_mode: bool}
 
 let print_position outx lexbuf =
   let pos = lexbuf.lex_curr_p in
@@ -55,14 +56,18 @@ let execute_signature dirname esig =
       exit 1
   end
 
-let load_file options =
+let set_options options =
   Format.set_margin options.line_width;
+  Name.set_debug_mode options.debug_mode
+
+let load_file options =
+  set_options options;
   let open Lwt.Infix in
   let dirname = Filename.dirname options.file_name in
   read_file options.file_name >>= execute_signature dirname
 
 let load_from_stdin options  =
-  Format.set_margin options.line_width;
+  set_options options;
   let open Lwt.Infix in
   let dirname = Filename.dirname options.file_name in
   read_from_channel options.file_name Lwt_io.stdin
