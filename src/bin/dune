@@ -1,7 +1,7 @@
 (executables
  (names main)
  (ocamlopt_flags (:standard -p))
- (libraries cmdliner lwt.unix redtt))
+ (libraries cmdliner lwt.unix redbasis redtt))
 
 (install
  (section bin)

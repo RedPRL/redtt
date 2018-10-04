@@ -19,5 +19,4 @@
   uuseg
   uuseg.string
   uutf
-  menhirLib)
- (package redtt))
+  menhirLib))
