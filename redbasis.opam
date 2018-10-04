@@ -9,7 +9,7 @@ license: "MIT"
 dev-repo: "git://github.com/jonsterling/redtt.git"
 build: [
   ["dune" "build" "--only-packages" name "-p" name
-   "--root" "." "-j" jobs "@install"]
+   "-j" jobs "@install"]
 ]
 depends: [
   "ocaml" {>= "4.07.0"}
