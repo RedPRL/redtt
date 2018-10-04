@@ -71,6 +71,7 @@ val times : tm -> tm -> tm
 
 (* non-dependent path *)
 val path : tm -> tm -> tm -> tm
+val refl : tm -> tm
 val is_contr : tm -> tm
 val fiber : ty0:tm -> ty1:tm -> f:tm -> x:tm -> tm
 val equiv : tm -> tm -> tm

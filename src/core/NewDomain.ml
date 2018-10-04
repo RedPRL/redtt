@@ -101,6 +101,8 @@ type con =
 
   | Neu of {ty : value; neu : neutroid} (* is a value when neu is rigid *)
 
+  | FortyTwo (* a dummy filler to signal that something might be terribly wrong *)
+
 and value = con Delayed.t
 
 and neutroid = {neu : neu Delayed.t; sys : con sys} (* is a value when sys and thus neu (by invariants) are rigid *)
@@ -686,6 +688,8 @@ sig
   include Domain with type t = env
 
   val init : GlobalEnv.t -> env (* shouldn't this take a GlobalEnv.t? *)
+
+  val init_isolated : cell list -> env
   val extend_cell : env -> cell -> env
   val extend_cells : env -> cell list -> env
   val lookup_cell_by_index : int -> env -> cell
@@ -705,6 +709,8 @@ struct
     {env with cells = Bwd.map (Cell.run rel) env.cells}
 
   let init globals = {globals = globals; cells = Emp}
+
+  let init_isolated cells = {globals = GlobalEnv.emp (); cells = Bwd.from_list cells}
 
   let lookup_cell_by_index i {cells; _} = Bwd.nth cells i
 
@@ -859,6 +865,9 @@ struct
         {ty = Val.swap pi info.ty;
          neu = Neutroid.swap pi info.neu}
 
+    | FortyTwo ->
+      FortyTwo
+
   let subst r x =
     function
     | Pi quant ->
@@ -959,6 +968,9 @@ struct
       Neu
         {ty = Val.subst r x info.ty;
          neu = Neutroid.subst r x info.neu}
+
+    | FortyTwo ->
+      FortyTwo
 
   let rec run rel =
     function
@@ -1112,6 +1124,9 @@ struct
         | exception ConSys.Triv v ->
           v
       end
+
+    | FortyTwo ->
+      FortyTwo
 
   and plug rel ?(rigid=false) frm hd =
     if rigid then
@@ -1471,20 +1486,15 @@ struct
 
     | V info ->
       let atom_info_r = match info.r with `Atom x -> x | _ -> raise PleaseRaiseProperError in
-      let abs0 = Abs (x, Val.unleash info.ty0) in
-      let abs1 = Abs (x, Val.unleash info.ty1) in
-      let subst_x0 = Val.subst `Dim0 x in
-      let ty0_x0 = subst_x0 info.ty0 in
-      let ty1_x0 = subst_x0 info.ty1 in
-      let equiv_x0 = subst_x0 info.equiv in
       begin
+        let rel0 = Rel.equate' info.r `Dim0 rel in
+        let rel1 = Rel.equate' info.r `Dim1 rel in
+        let abs0 = Abs (x, Val.unleash info.ty0) in
+        let abs1 = Abs (x, Val.unleash info.ty1) in
+        let func_x = Val.plug rel0 ~rigid:true Fst info.equiv in
+        let vproj_x = VProj {r = info.r; func = func_x} in
         match atom_info_r = x with
-        | true -> raise CanFavoniaHelpMe
         | false ->
-          let rel0 = Rel.equate' info.r `Dim0 rel in
-          let rel1 = Rel.equate' info.r `Dim1 rel in
-          let func_x = Val.plug rel0 ~rigid:true Fst info.equiv in
-          let vproj_x = VProj {r = info.r; func = func_x} in
           let el0 = Val.make @@ make_coe rel0 r r' ~abs:abs0 ~cap:(Val.run rel0 cap) in
           let el1 = Val.make @@
             let cap = Val.plug rel ~rigid:true (Frame.subst r x vproj_x) cap in
@@ -1505,6 +1515,110 @@ struct
             rigid_com rel r r' ~abs:abs1 ~cap ~sys
           in
           VIn {r = info.r; el0; el1}
+
+        | true ->
+          (* `base` is the cap of the hcom in ty1. *)
+          let base = (* under rel *)
+            let vproj_xr = Frame.run rel @@ Frame.subst r x vproj_x in
+            make_coe rel r r' ~abs:abs1 ~cap:(Val.plug rel vproj_xr cap)
+          in
+
+          (* The diagonal face for r=r'. *)
+          let face_diag =
+            r, r',
+            LazyValAbs.bind1 @@ fun _ ->
+            let rel = Rel.equate' r r' rel in Con.run rel base
+          in
+
+          (* The face for r=0. *)
+          let face0 =
+            r, `Dim0,
+            LazyValAbs.bind1 @@ fun _ ->
+            let rel = Rel.equate' r `Dim0 rel in Con.run rel base
+          in
+
+          (* This is to generate the element in `ty0` and also the face for r'=0. *)
+          let fixer_fiber rel = Val.make @@ (* rel |= r'=0 *)
+
+            (* the cleaned-up components under r'=0 *)
+            let ty0_x0 = Val.run_then_unleash rel @@ Val.subst `Dim0 x info.ty0 in
+            let ty1_x0 = Val.run_then_unleash rel @@ Val.subst `Dim0 x info.ty1 in
+            let equiv_x0 = Val.run rel @@ Val.subst `Dim0 x info.equiv in
+            let base = Con.run rel base in
+
+            (* the equivalence proof under r'=0 *)
+            let is_equiv_x0 = Val.plug rel ~rigid:true Snd equiv_x0 in
+
+            let fiber0 =
+              Val.plug rel ~rigid:true Fst @@
+              Val.plug rel ~rigid:true (FunApp (Val.make base)) @@
+              is_equiv_x0
+            in
+
+            (* the type of the fiber at r'=0. *)
+            let fiber0_ty =
+              let func_x0 = Val.plug_then_unleash rel ~rigid:true Fst equiv_x0 in
+              let env = Env.init_isolated
+                [Val (LazyVal.make base);
+                 Val (LazyVal.make func_x0);
+                 Val (LazyVal.make ty1_x0);
+                 Val (LazyVal.make ty0_x0)]
+              in
+              let var i = Tm.up @@ Tm.ix i in
+              Syn.eval rel env @@ Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
+            in
+
+            (* this gives a path from the fiber [fib] to [fiber0 b] at r=r'=0,
+             * where [b] is calculated from [fib] as {[ext_apply (do_snd fib) [`Dim1]]}. *)
+            let contr_path_at_r0 rel = (* value under r=r'=0 *)
+              let b = Con.run rel base in
+              let fib = Val.make @@
+                let lazy_fa = lazy begin Con.run rel base end in
+                let env = Env.init_isolated [Val (LazyVal.make b)] in
+                let var i = Tm.up @@ Tm.ix i in
+                Cons (Val.run rel cap, Val.make @@ Syn.eval rel env (Tm.refl (var 0)))
+              in
+              Val.plug rel ~rigid:true (FunApp fib) @@
+              Val.plug rel ~rigid:true Snd @@
+              Val.plug rel ~rigid:true (FunApp (Val.make b)) @@
+              is_equiv_x0
+            in
+
+            let sys =
+              let face0 =
+                r, `Dim0,
+                LazyValAbs.bind1 @@ fun w ->
+                let rel = Rel.equate' r `Dim0 rel in
+                Val.plug_then_unleash rel ~rigid:true (ExtApp [w]) (contr_path_at_r0 rel)
+              in
+              let face1 =
+                r, `Dim1,
+                LazyValAbs.bind1 @@ fun _ ->
+                let rel = Rel.equate' r `Dim1 rel in
+                Val.run_then_unleash rel fiber0
+              in
+              [face0; face1]
+            in
+            (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
+            make_hcom rel `Dim1 `Dim0 ~ty:fiber0_ty ~cap:fiber0 ~sys
+          in
+
+          let el0 rel_r'0 = Val.plug rel_r'0 ~rigid:true Fst (fixer_fiber rel_r'0) in
+
+          let face_front =
+            r', `Dim0,
+            LazyValAbs.bind1 @@ fun w ->
+            let rel = Rel.equate' r' `Dim0 rel in
+            Val.plug_then_unleash rel ~rigid:true (ExtApp [w]) @@
+            Val.plug rel ~rigid:true Snd (fixer_fiber rel)
+          in
+
+          let el1 = Val.make @@
+            make_hcom rel `Dim1 r'
+              ~ty:(Val.unleash @@ Val.subst r' x info.ty1)
+              ~cap:(Val.make base) ~sys:[face0; face_diag; face_front]
+          in
+          make_vin rel r' ~el0 ~el1
       end
 
     | Neu info ->
@@ -1975,7 +2089,7 @@ struct
       let func =
         match Rel.equate' r `Dim0 rel with
         | rel -> Val.run rel info.func
-        | exception I.Inconsistent -> info.func
+        | exception I.Inconsistent -> Val.make FortyTwo
       in
       VProj {r; func}
     | Cap info ->
