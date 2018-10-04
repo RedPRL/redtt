@@ -15,7 +15,7 @@ let opt_file_name =
     )
 
 let opt_debug =
-  let doc = "Execute in debug mode" in
+  let doc = "Execute in debug mode." in
   Arg.(value & flag & info ["d"; "debug"] ~doc)
 
 let opts_config =
