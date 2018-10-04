@@ -423,14 +423,14 @@ struct
             elab_chk info.cap {ty; sys = []} >>= fun cap ->
             elab_hcom_sys r ty cap info.sys <<@> fun sys ->
               let hcom = Tm.HCom {r; r'; ty; cap; sys} in
-              Tm.up (hcom, Emp)
+              Tm.up (hcom, [])
 
           | `Exn exn ->
             raise exn
         end
 
       | [], _, E.Var _ ->
-        elab_chk_cut e Emp ty
+        elab_chk_cut e [] ty
 
       | [], _, _ ->
         elab_up ty e
@@ -589,7 +589,7 @@ struct
       begin
         match ResEnv.get name renv with
         | `Var a ->
-          a, (Tm.Var {name = a; twin = `Only; ushift}, Emp)
+          a, (Tm.Var {name = a; twin = `Only; ushift}, [])
         | _ ->
           failwith "elab_var: expected locally closed"
       end
@@ -603,11 +603,11 @@ struct
         match ResEnv.get name renv with
         | `Var x ->
           M.lift (C.lookup_var x `Only) <<@> fun ty ->
-            Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, Emp)
+            Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, [])
 
         | `Metavar x ->
           M.lift (C.lookup_meta x) <<@> fun (ty, _) ->
-            Tm.shift_univ ushift ty, (Tm.Meta {name = x; ushift}, Emp)
+            Tm.shift_univ ushift ty, (Tm.Meta {name = x; ushift}, [])
 
 
         | `Datatype dlbl ->
@@ -652,7 +652,7 @@ struct
         let varx = Tm.up @@ Tm.var x in
         let tyx = Tm.up @@ Tm.ann ~ty:univ_fam ~tm:fam @< Tm.ExtApp [varx] in
         let coe = Tm.Coe {r = tr; r' = tr'; ty = Tm.bind x tyx; tm} in
-        fam_r', (coe, Emp)
+        fam_r', (coe, [])
 
     | E.Com info ->
       elab_dim info.r >>= fun tr ->
@@ -673,7 +673,7 @@ struct
       let tybnd = Tm.bind x fam_x in
       elab_com_sys tr tybnd cap info.sys <<@> fun sys ->
         let com = Tm.Com {r = tr; r' = tr'; ty = tybnd; cap; sys} in
-        fam_r', (com, Emp)
+        fam_r', (com, [])
 
     | E.DFixLine info ->
       elab_chk info.ty {ty = univ; sys = []} >>= fun ty ->
@@ -685,7 +685,7 @@ struct
         elab_chk info.bdy {ty; sys = []}
         <<@> Tm.bind x
         <<@> fun bdy ->
-          ltr_ty, (Tm.DFix {r; ty; bdy}, Emp)
+          ltr_ty, (Tm.DFix {r; ty; bdy}, [])
       end
 
     | E.FixLine info ->
@@ -698,7 +698,7 @@ struct
         elab_chk info.bdy {ty; sys = []}
         <<@> Tm.bind x
         <<@> fun bdy ->
-          let dfix = Tm.DFix {r; ty; bdy}, Emp in
+          let dfix = Tm.DFix {r; ty; bdy}, [] in
           let Tm.B (_, bdy') = bdy in
           let fix = Tm.subst (Tm.dot dfix @@ Tm.shift 0) bdy' in
           ty, Tm.ann ~tm:fix ~ty
@@ -804,7 +804,7 @@ struct
 
       | `Dim, E.App e ->
         elab_dim e >>= fun r ->
-        let sub = Tm.dot (Tm.DownX r, Emp) sub in
+        let sub = Tm.dot (Tm.DownX r, []) sub in
         M.ret (sub, r)
 
       | _ ->
@@ -825,7 +825,7 @@ struct
         failwith "elab_intro: mismatch"
     in
 
-    go (Tm.shift 0) (Desc.Constr.specs constr) (Bwd.to_list frms) >>= fun tms ->
+    go (Tm.shift 0) (Desc.Constr.specs constr) frms >>= fun tms ->
     M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tms)
 
   and elab_mode_switch_cut exp frms ty =
@@ -845,11 +845,14 @@ struct
         raise exn
 
   and elab_cut exp frms =
-    elab_cut_ exp frms >>= fun (ty, cmd) ->
+    elab_cut_bwd exp (Bwd.from_list frms)
+
+  and elab_cut_bwd exp frms =
+    elab_cut_bwd_ exp frms >>= fun (ty, cmd) ->
     normalize_ty ty >>= fun ty ->
     M.ret (ty, cmd)
 
-  and elab_cut_ exp frms =
+  and elab_cut_bwd_ exp frms =
     let rec unleash tm =
       match Tm.unleash tm with
       | con -> con
@@ -879,15 +882,15 @@ struct
             let n = Bwd.length nms in
             let dims0, dims1 = ListUtil.split n dims in
             traverse elab_dim dims0 >>= fun trs0 ->
-            let ty, _ = Tm.unbind_ext_with (List.map (fun tr -> Tm.DownX tr, Emp) trs0) ebnd in
+            let ty, _ = Tm.unbind_ext_with (List.map (fun tr -> Tm.DownX tr, []) trs0) ebnd in
             go dims1 (ty, cmd @< (Tm.ExtApp trs0))
           | _ ->
             raise ChkMatch
       in
-      elab_cut exp spine >>= go dims
+      elab_cut_bwd exp spine >>= go dims
 
     | spine, `FunApp e ->
-      elab_cut exp spine >>= fun (ty, cmd) ->
+      elab_cut_bwd exp spine >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin
         match unleash ty with
@@ -899,7 +902,7 @@ struct
       end
 
     | spine, `Fst ->
-      elab_cut exp spine >>= fun (ty, cmd) ->
+      elab_cut_bwd exp spine >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin
         match unleash ty with
@@ -911,7 +914,7 @@ struct
 
 
     | spine, `Snd ->
-      elab_cut exp spine >>= fun (ty, cmd) ->
+      elab_cut_bwd exp spine >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin
         match unleash ty with
@@ -925,7 +928,7 @@ struct
     | spine, `Prev {con = E.Var {name; _}} ->
       elab_var name 0 >>= fun (_, tick) ->
       M.in_scope (Name.fresh ()) (`KillFromTick (Tm.up tick)) begin
-        elab_cut exp spine
+        elab_cut_bwd exp spine
       end >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
       begin

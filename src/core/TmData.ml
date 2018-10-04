@@ -73,5 +73,5 @@ and 'a frame =
 
   | Elim of {dlbl : string; mot : 'a bnd; clauses : (string * 'a nbnd) list}
 
-and 'a spine = 'a frame bwd
+and 'a spine = 'a frame list
 and 'a cmd = 'a head * 'a spine

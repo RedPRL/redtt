@@ -28,7 +28,7 @@
   let spine_to_econ (e, es) =
     match es with
     | [] -> e
-    | _ -> E.Cut (lost_eterm e, Bwd.from_list es)
+    | _ -> E.Cut (lost_eterm e, es)
 %}
 
 %token <int> NUMERAL
@@ -534,7 +534,8 @@ head:
 cmd:
   | c = cut
     { fun env ->
-      c env }
+      let hd, sp = c env in
+      hd, Bwd.to_list sp }
 
 cut:
   | hd = head

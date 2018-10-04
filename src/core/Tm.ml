@@ -82,10 +82,10 @@ type error =
 exception E of error
 
 let ix ?twin:(tw = `Only) i =
-  Ix (i, tw), Emp
+  Ix (i, tw), []
 
 let var ?twin:(tw = `Only) a =
-  Var {name = a; twin = tw; ushift = 0}, Emp
+  Var {name = a; twin = tw; ushift = 0}, []
 
 let rec con_info =
   function
@@ -123,7 +123,7 @@ let rec con_info =
     Info.mergen @@ List.map tm_info ts
 
 and cmd_info cmd =
-  pair_info head_info (bwd_info frame_info) cmd
+  pair_info head_info (list_info frame_info) cmd
 
 and head_info =
   function
@@ -163,9 +163,9 @@ and frame_info =
     let clause_info (_, nbnd) = nbnd_info tm_info nbnd in
     Info.mergen @@ bnd_info tm_info mot :: List.map clause_info clauses
 
-and bwd_info : type x. (x -> Info.t) -> x bwd -> Info.t =
+and list_info : type x. (x -> Info.t) -> x list -> Info.t =
   fun f xs ->
-    Info.mergen @@ Bwd.to_list @@ Bwd.map f xs
+    Info.mergen @@ List.map f xs
 
 and pair_info : type x y. (x -> Info.t) -> (y -> Info.t) -> x * y -> Info.t =
   fun f g (a, b) ->
@@ -203,8 +203,8 @@ let make con =
   let compress =
     function
     | Up (Down {tm = Tm {con = Up (hd, sp'); _}; _}, sp) ->
-      raise @@ Make (Up (hd, sp' <.> sp))
-    | Up (Down {tm; _}, Emp) ->
+      raise @@ Make (Up (hd, sp' @ sp))
+    | Up (Down {tm; _}, []) ->
       tm
     | con ->
       raise @@ Make con
@@ -365,10 +365,10 @@ struct
       | _ ->
         traverse_spine sp
     in
-    hd', sp' <.> sp''
+    hd', sp' @ sp''
 
   and traverse_spine sp =
-    traverse_bwd traverse_frame sp
+    traverse_list traverse_frame sp
 
   and traverse_head =
     function
@@ -384,16 +384,16 @@ struct
     | Down info ->
       let ty = traverse_tm info.ty in
       let tm = traverse_tm info.tm in
-      Down {ty; tm}, Emp
+      Down {ty; tm}, []
 
     | DownX r ->
-      DownX (traverse_tm r), Emp
+      DownX (traverse_tm r), []
 
     | DFix info ->
       let r = traverse_tm info.r in
       let ty = traverse_tm info.ty in
       let bdy = traverse_bnd traverse_tm info.bdy in
-      DFix {r; ty; bdy}, Emp
+      DFix {r; ty; bdy}, []
 
     | Coe info ->
       let r = traverse_tm info.r in
@@ -401,7 +401,7 @@ struct
       let ty = traverse_bnd traverse_tm info.ty in
       let tm = traverse_tm info.tm in
       let coe = Coe {r; r'; ty; tm} in
-      coe, Emp
+      coe, []
 
     | HCom info ->
       let r = traverse_tm info.r in
@@ -410,7 +410,7 @@ struct
       let cap = traverse_tm info.cap in
       let sys = traverse_list traverse_bface info.sys in
       let hcom = HCom {r; r'; ty; cap; sys} in
-      hcom, Emp
+      hcom, []
 
     | GHCom info ->
       let r = traverse_tm info.r in
@@ -419,7 +419,7 @@ struct
       let cap = traverse_tm info.cap in
       let sys = traverse_list traverse_bface info.sys in
       let hcom = GHCom {r; r'; ty; cap; sys} in
-      hcom, Emp
+      hcom, []
 
     | Com info ->
       let r = traverse_tm info.r in
@@ -428,7 +428,7 @@ struct
       let cap = traverse_tm info.cap in
       let sys = traverse_list traverse_bface info.sys in
       let com = Com {r; r'; ty; cap; sys} in
-      com, Emp
+      com, []
 
     | GCom info ->
       let r = traverse_tm info.r in
@@ -437,7 +437,7 @@ struct
       let cap = traverse_tm info.cap in
       let sys = traverse_list traverse_bface info.sys in
       let com = GCom {r; r'; ty; cap; sys} in
-      com, Emp
+      com, []
 
   and traverse_bnd : 'a. ('a -> 'b) -> 'a bnd -> 'b bnd =
     fun f (B (nm, tm)) ->
@@ -484,16 +484,6 @@ struct
         let x' = f x in
         let xs' = traverse_list f xs in
         x' :: xs'
-
-  and traverse_bwd : 'a 'b. ('a -> 'b) -> 'a bwd -> 'b bwd =
-    fun f ->
-      function
-      | Emp -> Emp
-      | Snoc (xs, x) ->
-        let xs' = traverse_bwd f xs in
-        let x' = f x in
-        Snoc (xs', x')
-
 
   and traverse_frame =
     function
@@ -575,7 +565,7 @@ struct
   let rec bvar ~ih ~ix ~twin =
     match !subst, ix with
     | Shift n, _ ->
-      Ix (ix + n, twin), Emp
+      Ix (ix + n, twin), []
 
     | Dot (cmd, _), 0 ->
       cmd
@@ -615,9 +605,9 @@ struct
       cmp_subst ih sub sub'
 
   let fvar ~name ~twin ~ushift =
-    Var {name; twin; ushift}, Emp
+    Var {name; twin; ushift}, []
   let meta ~name ~ushift =
-    Meta {name; ushift}, Emp
+    Meta {name; ushift}, []
 end
 
 let subst sub tm =
@@ -657,15 +647,15 @@ struct
         | None -> twin
         | Some twin -> twin
       in
-      Var {name = Init.name; ushift = 0; twin}, Emp
+      Var {name = Init.name; ushift = 0; twin}, []
     else
-      Ix (ix, twin), Emp
+      Ix (ix, twin), []
 
   let fvar ~name ~twin ~ushift =
-    Var {name; twin; ushift}, Emp
+    Var {name; twin; ushift}, []
 
   let meta ~name ~ushift =
-    Meta {name; ushift}, Emp
+    Meta {name; ushift}, []
 end
 
 module CloseVarAlg (Init : sig val twin : twin option val name : Name.t val ix : int end) : Alg =
@@ -684,17 +674,17 @@ struct
     r
 
   let bvar ~ih:_ ~ix ~twin =
-    Ix (ix, twin), Emp
+    Ix (ix, twin), []
 
   let fvar ~name ~twin ~ushift =
     if name = Init.name then
-      Ix (!state, match Init.twin with None -> twin | Some twin -> twin), Emp
+      Ix (!state, match Init.twin with None -> twin | Some twin -> twin), []
     else
-      Var {name; twin; ushift}, Emp
+      Var {name; twin; ushift}, []
 
 
   let meta ~name ~ushift =
-    Meta {name; ushift}, Emp
+    Meta {name; ushift}, []
 end
 
 
@@ -1031,7 +1021,7 @@ and pp_cmd env fmt (hd, sp) =
       | Prev tick ->
         Format.fprintf fmt "@[<hv1>(prev %a@ %a)@]" (pp env) tick (go `Prev) sp
   in
-  go `Start fmt sp
+  go `Start fmt (Bwd.from_list sp)
 
 and pp_elim_clauses env fmt clauses =
   let pp_sep fmt () = Format.fprintf fmt "@ " in
@@ -1056,14 +1046,17 @@ and pp_bnd env fmt nbnd =
   let x, env' = Pp.Env.bind env nm in
   Format.fprintf fmt "@[<hv1>[%s]@ %a@]" x (pp env') tm
 
-and pp_spine env fmt sp =
+and pp_spine_ env fmt sp =
   match sp with
   | Emp ->
     Format.fprintf fmt "[]"
   | Snoc (sp, f) ->
     Format.fprintf fmt "%a. %a"
-      (pp_spine env) sp
+      (pp_spine_ env) sp
       (pp_frame env) f
+
+and pp_spine env fmt sp =
+  pp_spine_ env fmt (Bwd.from_list sp)
 
 and pp_frame env fmt =
   function
@@ -1149,13 +1142,7 @@ and pp_bface env fmt face =
 let up cmd = make @@ Up cmd
 
 let ann ~ty ~tm =
-  Down {ty; tm}, Emp
-
-let car (hd, sp) =
-  hd, sp #< Fst
-
-let cdr (hd, sp) =
-  hd, sp #< Snd
+  Down {ty; tm}, []
 
 let lam nm t = make @@ Lam (B (nm, t))
 let ext_lam nms t = make @@ ExtLam (NB (nms, t))
@@ -1185,7 +1172,7 @@ let fiber ~ty0 ~ty1 ~f ~x =
   sg (Some "ix") ty0 @@
   let app =
     Down {tm = subst (Shift 1) f; ty = arr ty0 ty1},
-    (Emp #< (FunApp (up (ix 0))))
+    [FunApp (up (ix 0))]
   in
   path
     (subst (Shift 1) ty1)
@@ -1221,7 +1208,7 @@ let refine_thunk tm =
   make @@ ExtLam (NB (Emp, tm))
 
 let refine_force (hd, sp) =
-  hd, sp #< (ExtApp [])
+  hd, sp @ [ExtApp []]
 
 
 module OccursAlg (Init : sig val fl : Occurs.flavor end) :
@@ -1254,21 +1241,21 @@ struct
 
 
   let bvar ~ih:_ ~ix ~twin =
-    Ix (ix, twin), Emp
+    Ix (ix, twin), []
 
   let fvar ~name ~twin ~ushift =
     begin
       if fl = `Vars || (fl = `RigVars && !srigid) then
         insert name
     end;
-    Var {name; twin; ushift}, Emp
+    Var {name; twin; ushift}, []
 
   let meta ~name ~ushift =
     begin
       if fl = `Metas then
         insert name
     end;
-    Meta {name; ushift}, Emp
+    Meta {name; ushift}, []
 end
 
 
@@ -1388,7 +1375,7 @@ let map_frame f =
     Prev tick
 
 let map_spine f =
-  Bwd.map @@ map_frame f
+  List.map @@ map_frame f
 
 
 (* TODO: clean up: this is catastrophically bad *)
@@ -1481,7 +1468,7 @@ let rec opt_traverse f xs =
 
 let as_plain_var t =
   match unleash t with
-  | Up (Var {name; _}, Emp) ->
+  | Up (Var {name; _}, []) ->
     Some name
   | _ ->
     None
@@ -1494,18 +1481,25 @@ let rec eta_contract t =
     let tm'y = eta_contract tmy in
     begin
       match unleash tm'y with
-      | Up (hd, Snoc (sp, FunApp arg)) ->
+      | Up (hd, (_ :: _ as sp)) ->
         begin
-          match as_plain_var arg with
-          | Some y'
-            when
-              y = y'
-              && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
-            ->
-            up (hd, sp)
+          match ListUtil.split_last sp with
+          | sp, FunApp arg ->
+            begin
+              match as_plain_var arg with
+              | Some y'
+              when
+                y = y'
+                && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
+              ->
+              up (hd, sp)
+              | _ ->
+                make @@ Lam (bind y tm'y)
+            end
           | _ ->
             make @@ Lam (bind y tm'y)
         end
+
       | _ ->
         make @@ Lam (bind y tm'y)
     end
@@ -1515,18 +1509,25 @@ let rec eta_contract t =
     let tm'y = eta_contract tmy in
     begin
       match unleash tm'y with
-      | Up (hd, Snoc (sp, Prev arg)) ->
+      | Up (hd, (_ :: _ as sp)) ->
         begin
-          match as_plain_var arg with
-          | Some y'
-            when
-              y = y'
-              && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
-            ->
-            up (hd, sp)
+          match ListUtil.split_last sp with
+          | sp, Prev arg ->
+            begin
+              match as_plain_var arg with
+              | Some y'
+                when
+                  y = y'
+                  && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
+                ->
+                up (hd, sp)
+              | _ ->
+                make @@ Next (bind y tm'y)
+            end
           | _ ->
             make @@ Next (bind y tm'y)
         end
+
       | _ ->
         make @@ Next (bind y tm'y)
     end
@@ -1536,17 +1537,24 @@ let rec eta_contract t =
     let tm'ys = eta_contract tmys in
     begin
       match unleash tm'ys with
-      | Up (hd, Snoc (sp, ExtApp args)) ->
+      | Up (hd, (_ :: _ as sp)) ->
         begin
-          match opt_traverse as_plain_var args with
-          | Some y's
-            when Bwd.to_list ys = y's
-            (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)
-            ->
-            up (hd, sp)
+          match ListUtil.split_last sp with
+          | sp, ExtApp args ->
+            begin
+              match opt_traverse as_plain_var args with
+              | Some y's
+                when Bwd.to_list ys = y's
+                (* TODO: && not @@ Occurs.Set.mem 'ys' @@ Tm.Sp.free `Vars sp *)
+                ->
+                up (hd, sp)
+              | _ ->
+                make @@ ExtLam (bindn ys tm'ys)
+            end
           | _ ->
             make @@ ExtLam (bindn ys tm'ys)
         end
+
       | _ ->
         make @@ ExtLam (bindn ys tm'ys)
     end
@@ -1556,11 +1564,17 @@ let rec eta_contract t =
     let tm1' = eta_contract tm1 in
     begin
       match unleash tm0', unleash tm1' with
-      | Up (hd0, Snoc (sp0, Fst)), Up (hd1, Snoc (sp1, Snd))
-        when
-          hd0 = hd1 && sp0 = sp1
-        ->
-        up (hd0, sp0)
+      | Up (hd0, (_ :: _ as sp0)), Up (hd1, (_ :: _ as sp1)) ->
+        begin
+          match ListUtil.split_last sp0, ListUtil.split_last sp1 with
+          | (sp0, Fst), (sp1, Snd)
+            when
+              hd0 = hd1 && sp0 = sp1
+            ->
+            up (hd0, sp0)
+          | _ ->
+            make @@ Cons (tm0', tm1')
+        end
 
       | _ ->
         make @@ Cons (tm0', tm1')
@@ -1593,7 +1607,7 @@ module Notation =
 struct
   let (@<) cmd frm =
     let hd, sp = cmd in
-    hd, sp #< frm
+    hd, sp @ [frm]
 end
 
 module Error =
