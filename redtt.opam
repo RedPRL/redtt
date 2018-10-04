@@ -16,5 +16,6 @@ depends: [
   "menhir" {>= "20180703"}
 ]
 build: [
-  [make]
+  ["dune" "build" "--only-packages" name "-p" name
+   "--root" "." "-j" jobs "@install"]
 ]
