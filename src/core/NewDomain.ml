@@ -1393,10 +1393,30 @@ struct
     | Univ _ ->
       HCom {r; r'; ty = `Pos; cap; sys}
 
-    | HCom {ty = `Pos; _} ->
-      raise CanFavoniaHelpMe
+    | V info ->
+      let rel0 = Rel.equate' r `Dim0 rel in
+      let func = Val.plug rel0 Fst info.equiv in
+      let vproj = VProj {r; func} in
 
-    | V _ ->
+      let hcom0 r' = make_hcom rel0 r r' ~ty:(Val.unleash info.ty0) ~cap:(Val.run rel0 cap) ~sys:(ConAbsSys.run rel0 sys) in
+      let el0 = Val.make @@ hcom0 r' in
+      let el1 = Val.make @@
+        let cap = Val.plug rel vproj cap in
+        let face0 =
+          r, `Dim0,
+          lazy begin
+            let y = Name.fresh () in
+            let arg0 = FunApp (Val.make @@ hcom0 @@ `Atom y) in
+            let bdy_y = Val.plug rel0 arg0 func in
+            Abs (y, bdy_y)
+          end
+        in
+        let sys = ConAbsSys.plug rel vproj sys in
+        rigid_hcom rel r r' ~ty:(Val.unleash info.ty1) ~cap ~sys
+      in
+      VIn {r; el0; el1}
+
+    | HCom {ty = `Pos; _} ->
       raise CanFavoniaHelpMe
 
     | Neu info ->
@@ -1898,9 +1918,13 @@ struct
     | Fst | Snd | ExtApp _ | RestrictForce as frm ->
       frm
     | VProj info ->
-      VProj
-        {r = Dim.run rel info.r;
-         func = Val.run rel info.func}
+      let r = Dim.run rel info.r in
+      let func =
+        match Rel.equate' r `Dim0 rel with
+        | rel -> Val.run rel info.func
+        | exception I.Inconsistent -> info.func
+      in
+      VProj {r; func}
     | Cap info ->
       Cap
         {r = Dim.run rel info.r;

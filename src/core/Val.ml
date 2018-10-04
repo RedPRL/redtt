@@ -1059,14 +1059,13 @@ struct
       in
       let el1 =
         let hcom phi x_dest ty = make_hcom (Dir.make (I.act phi r) x_dest) ty (Value.act phi cap) (CompSys.act phi sys) in
+        let func = do_fst equiv in
+        let el1_cap = rigid_vproj x ~func ~el:cap in
         let face0 =
           AbsFace.gen_const I.idn x `Dim0 @@ fun phi ->
           Abs.make1 @@ fun y ->
-          apply (do_fst (Value.act phi equiv)) @@
-          hcom phi (`Atom y) ty0 (* ty0 is already under `phi0` *)
+          apply func @@ hcom phi (`Atom y) ty0 (* ty0 is already under `phi0` *)
         in
-        let func = do_fst equiv in
-        let el1_cap = rigid_vproj x ~func ~el:cap in
         let el1_sys =
           let face =
             Face.map @@ fun ri r'i absi ->
