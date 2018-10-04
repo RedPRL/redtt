@@ -79,31 +79,31 @@ type con =
   | Pi of quantifier
   | Sg of quantifier
   | Ext of ext_clo
-  | Restrict of con face
+  | Restrict of con face (* is a value when rigid *)
 
   | Lam of clo
   | Cons of value * value
   | ExtLam of nclo
-  | RestrictThunk of con face
+  | RestrictThunk of con face (* is a value when rigid *)
 
-  | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value} (* is a value when rigid *)
-  | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys} (* is a value when rigid *)
-  | Com of {r : dim; r' : dim; ty : coe_shape; cap : value; sys : con abs sys} (* is a value when rigid *)
-  | GHCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys} (* is a value when rigid *)
-  | GCom of {r : dim; r' : dim; ty : coe_shape; cap : value; sys : con abs sys} (* is a value when rigid *)
+  | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value} (* is a value when (r,r') is rigid *)
+  | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
+  | Com of {r : dim; r' : dim; ty : coe_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
+  | GHCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
+  | GCom of {r : dim; r' : dim; ty : coe_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
 
   | Univ of {kind : Kind.t; lvl : Lvl.t}
 
-  | V of {r : dim; ty0 : value; ty1 : value; equiv : value}
-  | VIn of {r : dim; el0 : value; el1 : value}
+  | V of {r : dim; ty0 : value; ty1 : value; equiv : value} (* is a value when r is an atom *)
+  | VIn of {r : dim; el0 : value; el1 : value} (* is a value when r is an atom *)
 
-  | Box of {r : dim; r' : dim; cap : value; sys : con sys}
+  | Box of {r : dim; r' : dim; cap : value; sys : con sys} (* is a value when (r,r') and sys are rigid *)
 
-  | Neu of {ty : value; neu : neutroid}
+  | Neu of {ty : value; neu : neutroid} (* is a value when neu is rigid *)
 
 and value = con Delayed.t
 
-and neutroid = {neu : neu Delayed.t; sys : con sys}
+and neutroid = {neu : neu Delayed.t; sys : con sys} (* is a value when sys and thus neu (by invariants) are rigid *)
 
 and quantifier =
   {dom : value;
@@ -138,8 +138,8 @@ and frame =
   | Snd
   | ExtApp of dim list
   | RestrictForce
-  | VProj of {r : dim; func : value}
-  | Cap of {r : dim; r' : dim; ty : value; sys : con abs sys}
+  | VProj of {r : dim; func : value} (* rigid when r is an atom *)
+  | Cap of {r : dim; r' : dim; ty : value; sys : con abs sys} (* rigid when (r,r') and sys are rigid *)
 
 and neu =
   {head : head;
@@ -208,7 +208,7 @@ sig
   include Domain
 
   (** [plug] applies a possibly-non-rigid value frame to a value to obtain another value. *)
-  val plug : rel -> frame -> t -> t
+  val plug : rel -> ?rigid:bool -> frame -> t -> t
 end
 
 module type DelayedDomainPlug =
@@ -236,7 +236,7 @@ sig
   val run_then_unleash : rel -> t -> u
 
   (** [plug_then_unleash rel frm x = unleash (plug rel frm x)]. *)
-  val plug_then_unleash : rel -> frame -> t -> u
+  val plug_then_unleash : rel -> ?rigid:bool -> frame -> t -> u
 
   (** [make_then_run rel v = run rel (make v)]. *)
   val make_then_run : rel -> u -> t
@@ -1105,7 +1105,7 @@ struct
 
     | Neu info ->
       begin
-        match Neutroid.run_then_force rel info.neu with
+        match Neutroid.run rel info.neu with
         | neu ->
           let ty = Val.run rel info.ty in
           Neu {ty; neu}
@@ -1113,10 +1113,13 @@ struct
           v
       end
 
-  and plug rel frm hd =
-    match Frame.force rel frm ~hd with
-    | `Rigid frm -> rigid_plug rel frm hd
-    | `Triv c -> c
+  and plug rel ?(rigid=false) frm hd =
+    if rigid then
+      rigid_plug rel frm hd
+    else
+      match Frame.force rel frm ~hd with
+      | `Rigid frm -> rigid_plug rel frm hd
+      | `Triv c -> c
 
   and rigid_plug rel frm hd =
     match frm, hd with
@@ -1125,8 +1128,8 @@ struct
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
       let ty = Clo.inst rel quant.cod @@ Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash arg end) in
-      let cap = Val.plug rel frm cap in
-      let sys = ConAbsSys.plug rel frm sys in
+      let cap = Val.plug rel ~rigid:true frm cap in
+      let sys = ConAbsSys.plug rel ~rigid:true frm sys in
       rigid_hcom rel r r' ~ty ~cap ~sys
 
     | FunApp arg, Coe {r; r'; ty = `Pi abs; cap} ->
@@ -1139,7 +1142,7 @@ struct
         let coe_r'y = LazyVal.make_from_lazy @@ lazy begin coe_arg @@ `Atom y end in
         Abs (y, Clo.inst rel cod_y @@ Val coe_r'y)
       in
-      let cap = Val.plug rel (FunApp (Val.make @@ coe_arg r)) cap in
+      let cap = Val.plug rel ~rigid:true (FunApp (Val.make @@ coe_arg r)) cap in
       rigid_coe rel r r' ~abs ~cap
 
     | Fst, Cons (v0, _) ->
@@ -1147,12 +1150,12 @@ struct
 
     | Fst, HCom {r; r'; ty = `Sg {dom; _}; cap; sys} ->
       let ty = Val.unleash dom in
-      let cap = Val.plug rel Fst cap in
-      let sys = ConAbsSys.plug rel Fst sys in
+      let cap = Val.plug rel ~rigid:true Fst cap in
+      let sys = ConAbsSys.plug rel ~rigid:true Fst sys in
       rigid_hcom rel r r' ~ty ~cap ~sys
 
     | Fst, Coe {r; r'; ty = `Sg abs; cap} ->
-      let cap = Val.plug rel Fst cap in
+      let cap = Val.plug rel ~rigid:true Fst cap in
       let abs =
         let Abs (x, {dom; _}) = abs in
         Abs (x, Val.unleash dom)
@@ -1165,23 +1168,23 @@ struct
     | Snd, HCom ({r; r'; ty = `Sg {dom; cod}; cap; sys} as hcom) ->
       let abs =
         let y = Name.fresh () in
-        let hcom_ry_fst = LazyVal.make_from_lazy @@ lazy begin plug rel Fst (HCom {hcom with r' = `Atom y}) end in
+        let hcom_ry_fst = LazyVal.make_from_lazy @@ lazy begin plug rel ~rigid:true Fst (HCom {hcom with r' = `Atom y}) end in
         let cod_hcom_ry_fst = Clo.inst rel cod @@ Val hcom_ry_fst in
         Abs (y, cod_hcom_ry_fst)
       in
-      let cap = Val.plug rel Snd cap in
-      let sys = ConAbsSys.plug rel Snd sys in
+      let cap = Val.plug rel ~rigid:true Snd cap in
+      let sys = ConAbsSys.plug rel ~rigid:true Snd sys in
       rigid_com rel r r' ~abs ~cap ~sys
 
     | Snd, Coe ({r; r'; ty = `Sg (Abs (x, {dom = dom_x; cod = cod_x})); cap} as coe) ->
       let abs =
         let y, pi = Perm.freshen_name x in
-        let coe_ry_fst = LazyVal.make_from_lazy @@ lazy begin plug rel Fst (Coe {coe with r' = `Atom y}) end in
+        let coe_ry_fst = LazyVal.make_from_lazy @@ lazy begin plug rel ~rigid:true Fst (Coe {coe with r' = `Atom y}) end in
         let cod_y = Clo.swap pi cod_x in
         let cod_y_coe_ry_fst = Clo.inst rel cod_y @@ Val coe_ry_fst in
         Abs (y, cod_y_coe_ry_fst)
       in
-      let cap = Val.plug rel Snd cap in
+      let cap = Val.plug rel ~rigid:true Snd cap in
       rigid_coe rel r r' ~abs ~cap
 
     | ExtApp rs, ExtLam nclo ->
@@ -1195,11 +1198,11 @@ struct
       begin
         match ConSys.force rel ext_sys with
         | ext_sys ->
-          let cap = Val.plug rel frm cap in
+          let cap = Val.plug rel ~rigid:true frm cap in
           let ext_sys = ConAbsSys.foreach_gen ext_sys @@
             fun (r, r', bdy) -> Abs (Name.fresh (), bdy)
           in
-          let comp_sys = ConAbsSys.plug rel frm sys in
+          let comp_sys = ConAbsSys.plug rel ~rigid:true frm sys in
           let sys = ext_sys @ comp_sys in
           rigid_hcom rel r r' ~ty ~cap ~sys
         | exception ConSys.Triv c -> c
@@ -1223,7 +1226,7 @@ struct
         match ConSys.force rel sys_y with
         | sys_y ->
           let abs = Abs (y, ty_y) in
-          let cap = Val.plug rel frm cap in
+          let cap = Val.plug rel ~rigid:true frm cap in
           let sys = ConAbsSys.foreach_gen sys_y @@
             fun (r, r', bdy_y) -> Abs (y, bdy_y)
           in
@@ -1245,10 +1248,9 @@ struct
     | Cap _, Box {cap; _} ->
       Val.unleash cap
 
-    (* These frames are easy because they are always rigid. *)
-    | (FunApp _ | Fst | Snd | ExtApp _ | RestrictForce | VProj _ | Cap _), Neu info ->
-      let neu = Neutroid.plug rel frm info.neu in
-      let ty, sys = plug_ty rel frm info.ty hd in
+    | _, Neu info ->
+      let neu = Neutroid.plug rel ~rigid:true frm info.neu in
+      let ty, sys = rigid_plug_ty rel frm info.ty hd in
       Neu {ty = Val.make ty; neu = {neu with sys = sys @ neu.sys}}
 
     | FunApp _, _ -> raise PleaseRaiseProperError
@@ -1259,7 +1261,7 @@ struct
     | VProj _, _ -> raise PleaseRaiseProperError
     | Cap _, _ -> raise PleaseRaiseProperError
 
-  and plug_ty rel frm ty hd =
+  and rigid_plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
     | Pi {dom; cod}, FunApp arg ->
       let arg = lazy begin Val.unleash arg end in
@@ -1271,7 +1273,7 @@ struct
       Val.unleash dom, []
 
     | Sg {cod; _}, Snd ->
-      let fst = lazy begin plug rel Fst hd end in
+      let fst = lazy begin plug rel ~rigid:true Fst hd end in
       Clo.inst rel cod @@ Val (LazyVal.make_from_lazy fst), []
 
     | Sg _, _ -> raise PleaseRaiseProperError
@@ -1395,23 +1397,23 @@ struct
 
     | V info ->
       let rel0 = Rel.equate' r `Dim0 rel in
-      let func = Val.plug rel0 Fst info.equiv in
+      let func = Val.plug rel0 ~rigid:true Fst info.equiv in
       let vproj = VProj {r; func} in
 
       let hcom0 r' = make_hcom rel0 r r' ~ty:(Val.unleash info.ty0) ~cap:(Val.run rel0 cap) ~sys:(ConAbsSys.run rel0 sys) in
       let el0 = Val.make @@ hcom0 r' in
       let el1 = Val.make @@
-        let cap = Val.plug rel vproj cap in
+        let cap = Val.plug rel ~rigid:true vproj cap in
         let face0 =
           r, `Dim0,
           lazy begin
             let y = Name.fresh () in
             let arg0 = FunApp (Val.make @@ hcom0 @@ `Atom y) in
-            let bdy_y = Val.plug rel0 arg0 func in
+            let bdy_y = Val.plug rel0 ~rigid:true arg0 func in
             Abs (y, bdy_y)
           end
         in
-        let sys = ConAbsSys.plug rel vproj sys in
+        let sys = ConAbsSys.plug rel ~rigid:true vproj sys in
         rigid_hcom rel r r' ~ty:(Val.unleash info.ty1) ~cap ~sys
       in
       VIn {r; el0; el1}
@@ -1723,7 +1725,7 @@ struct
     {dom; cod}
 end
 
-(** A [neu] is a value if its head and frames are. *)
+(** A [neu] is a value if its head and frames are rigid values. *)
 and Neu : DomainPlug with type t = neu =
 struct
   type t = neu
@@ -1740,51 +1742,56 @@ struct
     {head = Head.subst r x neu.head;
      frames = Bwd.map (Frame.subst r x) neu.frames}
 
-  let plug rel frm neu =
-    {neu with
-     frames = neu.frames #< frm}
+  let plug rel ?(rigid=false) frm neu =
+    if rigid then
+      {neu with
+       frames = neu.frames #< frm}
+    else
+      raise PleaseRaiseProperError
 end
 
+(* A [neutroid] is a value if everything is rigid. *)
 and Neutroid :
 sig
   include DomainPlug with type t = neutroid
 
   exception Triv of con
-  val run_then_force : rel -> t -> t
 end =
 struct
   type t = neutroid
 
   module ConSys = Sys (Con)
+  exception Triv = ConSys.Triv
 
   let swap pi {neu; sys} =
     {neu = DelayedNeu.swap pi neu;
      sys = ConSys.swap pi sys}
 
   let run rel {neu; sys} =
-    {neu = DelayedNeu.run rel neu;
-     sys = ConSys.run rel sys}
+    (* The system needs to be forced first. The invariant is that
+     * if [sys] is rigid, it is safe to run neu *)
+    let sys = ConSys.run_then_force rel sys in
+    let neu = DelayedNeu.run rel neu in
+    {neu; sys}
 
   let subst r x {neu; sys} =
     {neu = DelayedNeu.subst r x neu;
      sys = ConSys.subst r x sys}
 
-  let plug rel frm {neu; sys} =
-    {neu = DelayedNeu.plug rel frm neu;
-     sys = ConSys.plug rel frm sys}
-
-  exception Triv = ConSys.Triv
-  let run_then_force rel {neu; sys} =
-    (* the system is forced first *)
-    let sys = ConSys.run_then_force rel sys in
-    let nue = DelayedNeu.run rel neu in
-    {neu; sys}
+  let plug rel ?(rigid=false) frm {neu; sys} =
+    if rigid then
+      {neu = DelayedNeu.plug ~rigid rel frm neu;
+       sys = ConSys.plug ~rigid rel frm sys}
+    else
+      raise PleaseRaiseProperError
 end
 
 and DelayedNeu : DelayedDomainPlug with type u = neu and type t = neu Delayed.t =
   DelayedPlug (Neu)
 
-(** A [head] is a value if its components are. It itself might not be rigid. *)
+(** A [head] is a value if its components are rigid values.
+
+   [Head.plug] assumes the input frame is rigid. *)
 and Head : Domain with type t = head =
 struct
   type t = head
@@ -2015,8 +2022,8 @@ and Sys :
       in
       ListUtil.filter_map run_face sys
 
-    let plug rel frm sys =
-      List.map (Face.plug rel frm) sys
+    let plug rel ?(rigid=false) frm sys =
+      List.map (Face.plug rel ~rigid frm) sys
 
     let force rel sys =
       let force_face face =
@@ -2092,11 +2099,15 @@ and Face :
       Dim.subst r x s, Dim.subst r x s',
       DelayedLazyX.subst r x bdy
 
-    let plug rel frm (r, r', bdy) =
-      let rel' = Rel.equate' r r' rel in
-      r, r',
-      let frm' = Frame.run rel' frm in
-      DelayedLazyX.plug rel frm' bdy
+    let plug rel ?(rigid=false) frm (r, r', bdy) =
+      match Rel.equate r r' rel with
+      | `Same ->
+        r, r',
+        DelayedLazyX.plug rel ~rigid frm bdy
+      | `Changed rel' ->
+        r, r',
+        let frm' = Frame.run rel' frm in
+        DelayedLazyX.plug rel' frm' bdy
 
     let force rel ((r, r', bdy) as face) =
       match Rel.compare r r' rel with
@@ -2173,7 +2184,7 @@ end
     module M = Abs(X)
     include M
 
-    let plug rel frm abs =
+    let plug rel ?(rigid=false) frm abs =
       let Abs (x, a_x) = abs in
       match Frame.occur1 x frm with
       | `No ->
@@ -2217,9 +2228,8 @@ end
       let rel_x = Rel.hide' x rel in
       Abs (x, DelayedX.run_then_unleash rel_x a_x)
 
-    let plug_then_unleash rel frm (Abs (x, a_x)) =
-      let rel_x = Rel.hide' x rel in
-      Abs (x, DelayedX.plug_then_unleash rel_x frm a_x)
+    let plug_then_unleash rel ?(rigid=false) frm v =
+      unleash @@ plug rel ~rigid frm v
 
     let make_then_run rel abs = run rel (make abs)
   end
@@ -2252,11 +2262,11 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let make_then_run rel = Delayed.make' (Some rel)
 
-    let plug rel frm v = Delayed.make @@ X.plug rel frm (unleash v)
+    let plug rel ?(rigid=false) frm v = Delayed.make @@ X.plug rel ~rigid frm (unleash v)
 
     let run_then_unleash rel v = X.run rel (Delayed.drop_rel v)
 
-    let plug_then_unleash rel frm v = X.plug rel frm (unleash v)
+    let plug_then_unleash rel ?(rigid=false) frm v = X.plug rel ~rigid frm (unleash v)
   end
 
 and DelayedLazyPlug : functor (X : DomainPlug) ->
@@ -2286,11 +2296,11 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
 
     let make_then_run rel v = Delayed.make' (Some rel) (lazy v)
 
-    let plug rel frm v = Delayed.make @@ lazy begin X.plug rel frm (unleash v) end
+    let plug rel ?(rigid=false) frm v = Delayed.make @@ lazy begin X.plug rel ~rigid frm (unleash v) end
 
     let run_then_unleash rel v = X.run rel (drop_rel v)
 
-    let plug_then_unleash rel frm v = X.plug rel frm (unleash v)
+    let plug_then_unleash rel ?(rigid=false) frm v = X.plug rel ~rigid frm (unleash v)
   end
 
 module ConAbs = AbsPlug (Con)
