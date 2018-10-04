@@ -4,7 +4,7 @@ cache:
     - /home/travis/.opam/
 before_install:
   # Install OPAM and OCaml
-  - travis_retry wget https://raw.github.com/ocaml/opam/master/shell/opam_installer.sh -O - | sh -s "/home/travis/bin" '4.07.0'
+  - travis_retry wget https://raw.github.com/ocaml/opam/master/shell/install.sh -O - | sh -s "/home/travis/bin" '4.07.0'
   - opam --version
   - eval $(opam config env)
 install:
