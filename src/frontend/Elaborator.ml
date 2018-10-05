@@ -777,20 +777,28 @@ struct
 
   and elab_chk_cut exp frms ty =
     match Tm.unleash ty with
-    | Tm.Data info ->
-      let dlbl = info.lbl in
+    | Tm.Data data ->
+      let dlbl = data.lbl in
       begin
         match exp.con with
         | E.Var {name; _} ->
+          M.lift C.base_cx >>= fun cx ->
+          let sign = Cx.globals cx in
           begin
-            M.lift C.base_cx >>= fun cx ->
-            let sign = Cx.globals cx in
-            let desc = GlobalEnv.lookup_datatype dlbl sign in
-            let _ = failwith "TODO: intsantiate datatype with params" in
-            let constr = Desc.lookup_constr name desc in
-            elab_intro dlbl info.params name constr frms
+            match GlobalEnv.lookup_datatype dlbl sign with
+            | desc ->
+              let constrs = Desc.Body.instance data.params desc.body in
+              begin
+                match Desc.lookup_constr name constrs with
+                | constr ->
+                  elab_intro dlbl data.params name constr frms
+                | exception _ ->
+                  elab_mode_switch_cut exp frms ty
+              end
+
+            | exception _ ->
+              elab_mode_switch_cut exp frms ty
           end
-          <+> elab_mode_switch_cut exp frms ty
 
         | _ ->
           elab_mode_switch_cut exp frms ty

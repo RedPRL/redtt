@@ -67,6 +67,7 @@ sig
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
   val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
+  val quote_data_params : env -> string -> Desc.body -> env_el list -> Tm.tm list
 
   val quote_dim : env -> I.t -> Tm.tm
 
@@ -360,7 +361,8 @@ struct
 
       | Data data, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
         let desc = V.Sig.lookup_datatype data.lbl in
-        let constr = Desc.lookup_constr info0.clbl desc in
+        let params = equate_data_params env data.lbl desc.body data.params data.params in
+        let constr = Desc.lookup_constr info0.clbl @@ Desc.Body.instance params desc.body in
         let tms = equate_constr_args env data.lbl data.params constr info0.args info1.args in
         Tm.make @@ Tm.Intro (data.lbl, info0.clbl, tms)
 
@@ -371,22 +373,25 @@ struct
         let err = UnequalNf {env; ty; el0; el1} in
         raise @@ E err
 
-  and equate_data_params env dlbl tele vs0 vs1 =
-    let rec go acc tyenv tele vs0 vs1 =
-      match tele, vs0, vs1 with
+  and quote_data_params env dlbl tele cells =
+    equate_data_params env dlbl tele cells cells
+
+  and equate_data_params env dlbl tele cells0 cells1 =
+    let rec go acc tyenv tele cells0 cells1 =
+      match tele, cells0, cells1 with
       | Desc.TNil _, [], [] ->
         Bwd.to_list acc
 
-      | Desc.TCons (ty, Tm.B (_, tele)), `Val v0 :: vs0, `Val v1 :: vs1 ->
+      | Desc.TCons (ty, Tm.B (_, tele)), `Val v0 :: cells0, `Val v1 :: cells1 ->
         let vty = V.eval tyenv ty in
         let tm = equate env vty v0 v1 in
         let tyenv = D.Env.snoc tyenv (`Val v0) in
-        go (acc #< tm) tyenv tele vs0 vs1
+        go (acc #< tm) tyenv tele cells0 cells1
 
       | _ ->
         failwith "equate_data_params: length mismatch"
     in
-    go Emp empty_env tele vs0 vs1
+    go Emp empty_env tele cells0 cells1
 
   and equate_constr_args env dlbl params constr cells0 cells1 =
     let rec go acc venv specs cells0 cells1 =

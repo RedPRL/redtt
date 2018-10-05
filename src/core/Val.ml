@@ -534,17 +534,17 @@ struct
     make @@ Up {ty; neu = ncoe; sys = ncoe_sys}
 
   (* TODO: check that this is right *)
-  and rigid_multi_coe env data_abs dir (x, specs) args =
+  and rigid_multi_coe tyenv data_abs dir (x, specs) args =
     match specs, args with
     | [], [] ->
       []
     | (_, `Const spec) :: specs, `Val arg :: args ->
-      let vty = eval env spec in
+      let vty = eval tyenv spec in
       let r, r' = Dir.unleash dir in
       let coe_hd s = make_coe (Dir.make r s) (Abs.bind1 x vty) arg in
       let coe_tl =
         let coe_hd_x = coe_hd @@ `Atom x in
-        rigid_multi_coe (Env.snoc env @@ `Val coe_hd_x) data_abs dir (x, specs) args
+        rigid_multi_coe (Env.snoc tyenv @@ `Val coe_hd_x) data_abs dir (x, specs) args
       in
       `Val (coe_hd r') :: coe_tl
     | _ ->
@@ -561,10 +561,11 @@ struct
   and rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl args =
     let x = Name.fresh () in
     let desc = Sig.lookup_datatype dlbl in
-    let constr = Desc.lookup_constr clbl desc in
+    let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
 
     let r, r' = Dir.unleash dir in
 
+    (* HIT TODO: empty_env must have the parameters added to it!!! *)
     let args_in_dir dir = multi_coe empty_env abs dir (x, Desc.Constr.specs constr) args in
     let intro = make_intro empty_env ~dlbl ~clbl @@ args_in_dir @@ `Ok dir in
 
@@ -1290,7 +1291,8 @@ struct
 
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
-      let constr = Desc.lookup_constr clbl desc in
+      (* HIT TODO: constr *)
+      let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
       let rec go args specs =
         match args, specs with
         | arg :: args, (_, (`Const _ | `Rec _)) :: specs ->
@@ -1308,7 +1310,8 @@ struct
 
   and make_intro rho ~dlbl ~clbl (args : env_el list) : value =
     let desc = Sig.lookup_datatype dlbl in
-    let constr = Desc.lookup_constr clbl desc in
+    (* HIT TODO: constr *)
+    let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
     let sys = eval_tm_sys (Env.append rho args) @@ Desc.Constr.boundary constr in
     match force_val_sys sys with
     | `Ok sys ->
@@ -1917,7 +1920,7 @@ struct
       let nclo = find_clause info.clbl in
 
       let desc = Sig.lookup_datatype dlbl in
-      let constr = Desc.lookup_constr info.clbl desc in
+      let constr = Desc.lookup_constr info.clbl @@ Desc.constrs desc in
 
       let rec go args specs =
         match args, specs with

@@ -36,6 +36,7 @@ sig
   include LocallyNameless.S with type t = body
   val bind : Name.t -> t -> t Tm.bnd
   val unbind_with : Tm.tm Tm.cmd -> t Tm.bnd -> t
+  val instance : Tm.tm list -> t -> constrs
 end
 
 type desc =
@@ -51,7 +52,7 @@ val add_constr : desc -> string * constr -> desc
 
 
 exception ConstructorNotFound of string
-val lookup_constr : string -> desc -> constr
+val lookup_constr : string -> constrs -> constr
 
 (** Returns 'yes' if the description specifies strictly no higher dimensional structure, like the natural numbers. *)
 val is_strict_set : desc -> bool

@@ -418,6 +418,8 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
 
     lookup_datatype dlbl >>= fun desc ->
 
+    let constrs = Desc.Body.instance params desc.body in
+
     (* Add holes for any missing clauses *)
     let eclauses =
       let find_clause lbl =
@@ -425,7 +427,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           List.find (fun (lbl', _, _) -> lbl = lbl') clauses
         with
         | Not_found ->
-          let constr = Desc.lookup_constr lbl desc in
+          let constr = Desc.lookup_constr lbl constrs in
           let pbinds =
             flip List.map (Desc.Constr.specs constr) @@ function
             | Some nm, (`Const _ | `Dim) -> `Bind (`Var (`User nm))
@@ -443,8 +445,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
     (* TODO: factor this out into another tactic. *)
     let refine_clause earlier_clauses (clbl, pbinds, (clause_tac : chk_tac))  : (string * tm Tm.nbnd) M.m =
 
-      let open Desc in
-      let constr = lookup_constr clbl desc in
+      let constr = Desc.lookup_constr clbl constrs in
 
       begin
         M.lift C.base_cx <<@> fun cx ->
@@ -568,7 +569,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let benv = env in
           match Tm.unleash tm with
           | Tm.Intro (_, clbl, args) ->
-            let constr = Desc.lookup_constr clbl desc in
+            let constr = Desc.lookup_constr clbl constrs in
             let nbnd = snd @@ List.find (fun (clbl', _) -> clbl = clbl') earlier_clauses in
             let nclo : D.nclo = D.NClo.act phi @@ D.NClo {rho = Cx.env outer_cx; nbnd} in
             let rec go specs tms =

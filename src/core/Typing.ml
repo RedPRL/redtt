@@ -234,8 +234,15 @@ let rec check_ cx ty rst tm =
 
   | [], D.Data data, T.Intro (dlbl, clbl, args) when data.lbl = dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
-    let constr = Desc.lookup_constr clbl desc in
-    check_constr cx dlbl data.params constr args;
+    let data_ty = Cx.quote_ty cx ty in
+    begin
+      match T.unleash data_ty with
+      | Tm.Data {params; _} ->
+        let constr = Desc.lookup_constr clbl @@ Desc.Body.instance params desc.body in
+        check_constr cx dlbl data.params constr args;
+      | _ ->
+        failwith "impossible"
+    end
 
   | [], D.Data dlbl, T.FHCom info ->
     check_fhcom cx ty info.r info.r' info.cap info.sys
@@ -711,6 +718,7 @@ and infer_spine_ cx hd sp =
       in
 
       let desc = V.Sig.lookup_datatype info.dlbl in
+      let constrs = Desc.Body.instance info.params desc.body in
 
       if desc.status = `Partial then failwith "Cannot call eliminator on partially-defined datatype";
 
@@ -757,7 +765,7 @@ and infer_spine_ cx hd sp =
           let benv = D.Env.append V.empty_env cells in
           match Tm.unleash tm with
           | Tm.Intro (_, clbl, args) ->
-            let constr = Desc.lookup_constr clbl desc in
+            let constr = Desc.lookup_constr clbl constrs in
             let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl', _) -> clbl' = clbl) nclos in
             let rec go specs tms =
               match specs, tms with

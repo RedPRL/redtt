@@ -20,6 +20,7 @@ sig
   include LocallyNameless.S with type t = (B.t, E.t) telescope
   val bind : Name.t -> t -> t bnd
   val unbind_with : Tm.tm Tm.cmd -> t bnd -> t
+  val unbind_all : Tm.tm Tm.cmd list -> t -> E.t
 end =
 struct
   type t = (B.t, E.t) telescope
@@ -56,6 +57,15 @@ struct
 
   let unbind_with cmd (Tm.B (_, tele)) =
     subst (Tm.dot cmd (Tm.shift 0)) tele
+
+  let rec unbind_all cmds tele =
+    match cmds, tele with
+    | [], TNil e -> e
+    | cmd :: cmds, TCons (_, btele) ->
+      let tele = unbind_with cmd btele in
+      unbind_all cmds tele
+    | _ ->
+      failwith "Telescope.unbind_all: length mismatch"
 end
 
 type constr = (arg_spec, (tm, tm) system) telescope
@@ -137,7 +147,25 @@ struct
 end
 
 module LabeledConstr = LocallyNameless.Pair (LocallyNameless.Const (struct type t = string end)) (Constr)
-module Body = Telescope (Param) (LocallyNameless.List (LabeledConstr))
+
+module Body =
+struct
+  module M = Telescope (Param) (LocallyNameless.List (LabeledConstr))
+  include M
+
+  let rec instance tms tele =
+    match tms, tele with
+    | [], TNil e ->
+      e
+
+    | tm :: tms, TCons (ty, btele) ->
+      let cmd = Tm.ann ~ty ~tm in
+      let tele = unbind_with cmd btele in
+      instance tms tele
+
+    | _ ->
+      failwith "Desc.Body.instance: length mismatch"
+end
 
 
 let constrs desc =
@@ -172,9 +200,9 @@ let rec dim_specs constr =
 
 exception ConstructorNotFound of string
 
-let lookup_constr lbl desc =
+let lookup_constr lbl constrs =
   try
-    let _, constr = List.find (fun (lbl', _) -> lbl' = lbl) @@ constrs desc in
+    let _, constr = List.find (fun (lbl', _) -> lbl' = lbl) constrs in
     constr
   with
   | _ ->

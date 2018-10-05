@@ -29,6 +29,7 @@ sig
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
   val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
+  val quote_data_params : env -> string -> Desc.body -> env_el list -> Tm.tm list
 
   val quote_dim : env -> I.t -> Tm.tm
 
