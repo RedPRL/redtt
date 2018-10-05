@@ -564,11 +564,11 @@ struct
               qenv, Bwd.to_list cells_w_ihs, Bwd.to_list cells
           in
 
-          let env', cells_w_ihs, cells = go env empty_env Emp Emp @@ Desc.Constr.specs constr in
+          let env', cells_w_ihs, cells = go env (D.Env.append empty_env elim0.params) Emp Emp @@ Desc.Constr.specs constr in
 
           let bdy0 = inst_nclo clause0 cells_w_ihs in
           let bdy1 = inst_nclo clause1 cells_w_ihs in
-          let intro = make_intro empty_env ~dlbl ~clbl cells in
+          let intro = make_intro empty_env ~dlbl ~params:elim0.params ~clbl cells in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           let nms = Bwd.from_list @@ List.map (fun _ -> None) cells_w_ihs in

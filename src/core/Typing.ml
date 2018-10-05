@@ -756,8 +756,8 @@ and infer_spine_ cx hd sp =
             cx, Bwd.to_list cells_only_ihs, Bwd.to_list cells_w_ihs, Bwd.to_list cells
         in
 
-        let cx', cells_only_ihs, cells_w_ihs, cells = go cx V.empty_env Emp Emp Emp @@ Desc.Constr.specs constr in
-        let generic_intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl cells in
+        let cx', cells_only_ihs, cells_w_ihs, cells = go cx (D.Env.append V.empty_env vparams) Emp Emp Emp @@ Desc.Constr.specs constr in
+        let generic_intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~params:vparams ~clbl:lbl cells in
 
         (* maybe wrong *)
 

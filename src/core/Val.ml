@@ -558,16 +558,15 @@ struct
       args
 
   (* Figure 8 of Part IV: https://arxiv.org/abs/1801.01568v3; specialized to non-indexed HITs. *)
-  and rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl args =
+  and rigid_coe_nonstrict_data_intro dir abs ~dlbl ~params ~clbl args =
     let x = Name.fresh () in
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
 
     let r, r' = Dir.unleash dir in
 
-    (* HIT TODO: empty_env must have the parameters added to it!!! *)
-    let args_in_dir dir = multi_coe empty_env abs dir (x, Desc.Constr.specs constr) args in
-    let intro = make_intro empty_env ~dlbl ~clbl @@ args_in_dir @@ `Ok dir in
+    let args_in_dir dir = multi_coe (Env.append empty_env params) abs dir (x, Desc.Constr.specs constr) args in
+    let intro = make_intro empty_env ~dlbl ~params ~clbl @@ args_in_dir @@ `Ok dir in
 
     let boundary = Desc.Constr.boundary constr in
 
@@ -592,7 +591,7 @@ struct
     let _, tyx = Abs.unsafe_unleash abs in
     match unleash tyx, unleash el with
     | Data data, Intro info ->
-      rigid_coe_nonstrict_data_intro dir abs ~dlbl:data.lbl ~clbl:info.clbl info.args
+      rigid_coe_nonstrict_data_intro dir abs ~dlbl:data.lbl ~params:data.params ~clbl:info.clbl info.args
 
     | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
@@ -1291,7 +1290,6 @@ struct
 
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
-      (* HIT TODO: constr *)
       let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
       let rec go args specs =
         match args, specs with
@@ -1306,13 +1304,12 @@ struct
         | _ ->
           failwith "eval/intro: length mismatch"
       in
-      make_intro (Env.clear_locals rho) ~dlbl ~clbl @@ go args @@ Desc.Constr.specs constr
+      make_intro (Env.clear_locals rho) ~dlbl ~params:(failwith "TODO: params!!!") ~clbl @@ go args @@ Desc.Constr.specs constr
 
-  and make_intro rho ~dlbl ~clbl (args : env_el list) : value =
+  and make_intro rho ~dlbl ~params ~clbl (args : env_el list) : value =
     let desc = Sig.lookup_datatype dlbl in
-    (* HIT TODO: constr *)
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
-    let sys = eval_tm_sys (Env.append rho args) @@ Desc.Constr.boundary constr in
+    let sys = eval_tm_sys (Env.append rho (params @ args)) @@ Desc.Constr.boundary constr in
     match force_val_sys sys with
     | `Ok sys ->
       make @@ Intro {dlbl; clbl; args; sys}

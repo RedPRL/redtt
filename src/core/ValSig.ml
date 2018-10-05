@@ -60,7 +60,7 @@ sig
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_restriction_ty : value -> val_face
 
-  val make_intro : env -> dlbl:string -> clbl:string -> env_el list -> value
+  val make_intro : env -> dlbl:string -> params:env_el list -> clbl:string -> env_el list -> value
 
   module Sig : Sig
 
