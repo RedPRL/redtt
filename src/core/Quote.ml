@@ -366,7 +366,6 @@ struct
         let params = equate_data_params env data.lbl desc.body data.params data.params in
         let constr = Desc.lookup_constr info0.clbl @@ Desc.Body.instance params desc.body in
         let tms = equate_constr_args env data.lbl data.params constr info0.args info1.args in
-        Format.eprintf "quote_intro: %a@." (Pp.pp_list Tm.pp0) params;
         Tm.make @@ Tm.Intro (data.lbl, info0.clbl, params, tms)
 
       | _ ->
