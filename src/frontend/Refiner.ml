@@ -554,7 +554,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
 
       prepare_clause (Emp, empty_env, Emp, empty_env, fun tac -> tac) pbinds constr >>= fun (psi, env, intro_args, env_only_ihs, kont_tac) ->
 
-      let intro = Tm.make @@ Tm.Intro (dlbl, clbl, intro_args) in
+      let intro = Tm.make @@ Tm.Intro (dlbl, clbl, params, intro_args) in
       let clause_ty = mot intro in
 
       M.lift C.base_cx >>= fun outer_cx ->
@@ -568,7 +568,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
         let rec image_of_bterm phi tm =
           let benv = env in
           match Tm.unleash tm with
-          | Tm.Intro (_, clbl, args) ->
+          | Tm.Intro (_, clbl, _, args) ->
             let constr = Desc.lookup_constr clbl constrs in
             let nbnd = snd @@ List.find (fun (clbl', _) -> clbl = clbl') earlier_clauses in
             let nclo : D.nclo = D.NClo.act phi @@ D.NClo {rho = Cx.env outer_cx; nbnd} in

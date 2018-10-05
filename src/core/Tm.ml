@@ -121,8 +121,8 @@ let rec con_info =
     cmd_info cmd
   | Let (cmd, bnd) ->
     Info.mergen [cmd_info cmd; bnd_info tm_info bnd]
-  | Intro (_, _, ts) ->
-    Info.mergen @@ List.map tm_info ts
+  | Intro (_, _, params, args) ->
+    Info.mergen @@ List.map tm_info @@ params @ args
 
 and cmd_info cmd =
   pair_info head_info (list_info frame_info) cmd
@@ -354,9 +354,10 @@ struct
       let params = traverse_list traverse_tm info.params in
       Data {info with params}
 
-    | Intro (dlbl, clbl, args) ->
+    | Intro (dlbl, clbl, params, args) ->
+      let params' = traverse_list traverse_tm params in
       let args' = traverse_list traverse_tm args in
-      Intro (dlbl, clbl, args')
+      Intro (dlbl, clbl, params', args')
 
 
   and traverse_cmd (hd, sp) =
@@ -925,7 +926,7 @@ let rec pp env fmt =
             (pp_terms env) params
       end
 
-    | Intro (_dlbl, clbl, args) ->
+    | Intro (_dlbl, clbl, _params, args) ->
       begin
         match args with
         | [] ->
@@ -1468,8 +1469,8 @@ let map_tmf f =
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
     Let (map_cmd f cmd, map_bnd f bnd)
-  | Intro (dlbl, clbl, args) ->
-    Intro (dlbl, clbl, List.map f args)
+  | Intro (dlbl, clbl, params, args) ->
+    Intro (dlbl, clbl, List.map f params, List.map f args)
 
 
 

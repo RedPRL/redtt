@@ -866,7 +866,7 @@ struct
     in
 
     go (Tm.shift 0) (Desc.Constr.specs constr) frms >>= fun tms ->
-    M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tms)
+    M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, params, tms)
 
   and elab_mode_switch_cut exp frms ty =
     elab_cut exp frms >>= fun (ty', cmd) ->

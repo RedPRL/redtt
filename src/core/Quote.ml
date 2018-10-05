@@ -67,6 +67,7 @@ sig
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
   val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
+  val equate_data_params : env -> string -> Desc.body -> env_el list -> env_el list -> Tm.tm list
   val quote_data_params : env -> string -> Desc.body -> env_el list -> Tm.tm list
 
   val quote_dim : env -> I.t -> Tm.tm
@@ -74,6 +75,7 @@ sig
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val equiv_dim : env -> I.t -> I.t -> unit
+  val equiv_data_params : env -> string -> Desc.body -> env_el list -> env_el list -> unit
   val subtype : env -> value -> value -> unit
 
   val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit
@@ -364,7 +366,8 @@ struct
         let params = equate_data_params env data.lbl desc.body data.params data.params in
         let constr = Desc.lookup_constr info0.clbl @@ Desc.Body.instance params desc.body in
         let tms = equate_constr_args env data.lbl data.params constr info0.args info1.args in
-        Tm.make @@ Tm.Intro (data.lbl, info0.clbl, tms)
+        Format.eprintf "quote_intro: %a@." (Pp.pp_list Tm.pp0) params;
+        Tm.make @@ Tm.Intro (data.lbl, info0.clbl, params, tms)
 
       | _ ->
         (* For more readable error messages *)
@@ -794,6 +797,9 @@ struct
 
   let equiv_ty env ty0 ty1 =
     ignore @@ equate_ty env ty0 ty1
+
+  let equiv_data_params env dlbl tele cells0 cells1 =
+    ignore @@ equate_data_params env dlbl tele cells0 cells1
 
   let equiv_dim env r0 r1 =
     ignore @@ equate_dim env r0 r1

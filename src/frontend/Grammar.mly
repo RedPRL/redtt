@@ -482,7 +482,7 @@ tm:
   | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      Tm.Intro (dlbl, clbl, es env) }
+      Tm.Intro (dlbl, clbl, [], es env) }
 
   | e = cmd
     { fun env ->

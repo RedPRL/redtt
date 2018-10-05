@@ -43,7 +43,7 @@ type 'a tmf =
   | Let of 'a cmd * 'a bnd
 
   | Data of {lbl : string; params : 'a list}
-  | Intro of string * string * 'a list
+  | Intro of string * string * 'a list * 'a list (* TODO: turn this into inline record *)
 
 
 and 'a head =

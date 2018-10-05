@@ -1288,9 +1288,10 @@ struct
       let params = List.map (fun tm -> `Val (eval rho tm)) info.params in
       make @@ Data {lbl = info.lbl; params}
 
-    | Tm.Intro (dlbl, clbl, args) ->
+    | Tm.Intro (dlbl, clbl, params, args) ->
       let desc = Sig.lookup_datatype dlbl in
       let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
+      let vparams = List.map (fun tm -> `Val (eval rho tm)) params in
       let rec go args specs =
         match args, specs with
         | arg :: args, (_, (`Const _ | `Rec _)) :: specs ->
@@ -1304,7 +1305,7 @@ struct
         | _ ->
           failwith "eval/intro: length mismatch"
       in
-      make_intro (Env.clear_locals rho) ~dlbl ~params:(failwith "TODO: params!!!") ~clbl @@ go args @@ Desc.Constr.specs constr
+      make_intro (Env.clear_locals rho) ~dlbl ~params:vparams ~clbl @@ go args @@ Desc.Constr.specs constr
 
   and make_intro rho ~dlbl ~params ~clbl (args : env_el list) : value =
     let desc = Sig.lookup_datatype dlbl in

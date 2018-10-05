@@ -224,7 +224,7 @@ let rec check_ cx ty rst tm =
 
   | [], D.Univ univ, T.Data {lbl; params} ->
     let desc = GlobalEnv.lookup_datatype lbl @@ Cx.globals cx in
-    check_data_params cx desc.body params;
+    check_data_params cx lbl desc.body params;
     begin
       if not @@ Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
         failwith "Universe level/kind error";
@@ -232,17 +232,15 @@ let rec check_ cx ty rst tm =
         failwith "Partially declared datatype cannot not be treated as type"
     end
 
-  | [], D.Data data, T.Intro (dlbl, clbl, args) when data.lbl = dlbl ->
+  | [], D.Data data, T.Intro (dlbl, clbl, params, args) when data.lbl = dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+    check_data_params cx dlbl desc.body params;
+    let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) params in
+    let (module Q) = Cx.quoter cx in
+    Q.equiv_data_params (Cx.qenv cx) dlbl desc.body vparams data.params;
     let data_ty = Cx.quote_ty cx ty in
-    begin
-      match T.unleash data_ty with
-      | Tm.Data {params; _} ->
-        let constr = Desc.lookup_constr clbl @@ Desc.Body.instance params desc.body in
-        check_constr cx dlbl data.params constr args;
-      | _ ->
-        failwith "impossible"
-    end
+    let constr = Desc.lookup_constr clbl @@ Desc.Body.instance params desc.body in
+    check_constr cx dlbl data.params constr args;
 
   | [], D.Data dlbl, T.FHCom info ->
     check_fhcom cx ty info.r info.r' info.cap info.sys
@@ -376,11 +374,11 @@ let rec check_ cx ty rst tm =
   | [], _, _ ->
     raise @@ E (TypeError (ty, (cx, tm)))
 
-and check_data_params cx tele params =
+and check_data_params cx _dlbl tele params =
   let (module V) = Cx.evaluator cx in
   let rec go tyenv tele params =
     match tele, params with
-    | Desc.TNil [], [] ->
+    | Desc.TNil _, [] ->
       ()
 
     | Desc.TCons (ty, Tm.B (nm, tele)), tm :: params ->
@@ -764,7 +762,7 @@ and infer_spine_ cx hd sp =
         let rec image_of_bterm phi tm =
           let benv = D.Env.append V.empty_env cells in
           match Tm.unleash tm with
-          | Tm.Intro (_, clbl, args) ->
+          | Tm.Intro (_, clbl, params, args) ->
             let constr = Desc.lookup_constr clbl constrs in
             let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl', _) -> clbl' = clbl) nclos in
             let rec go specs tms =
