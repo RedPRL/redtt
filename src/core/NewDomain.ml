@@ -427,7 +427,7 @@ struct
       let r' = eval_dim env info.r' in
       let abs = eval_bnd rel env info.ty  in
       let cap = Val.make @@ eval rel env info.tm in
-      Con.make_coe rel r r' ~abs ~cap
+      Con.make_coe rel r r' ~abs cap
 
     | Tm.HCom info ->
       let r = eval_dim env info.r in
@@ -729,7 +729,7 @@ sig
   include DomainPlug with type t = con
 
   (** invariant: abs and cap are [rel]-values, but dir might not be rigid *)
-  val make_coe : rel -> dim -> dim -> abs:con abs -> cap:value -> con
+  val make_coe : rel -> dim -> dim -> abs:con abs -> value -> con
 
   (** invariant: ty, cap and sys are [rel]-values, but dir and sys might not be rigid *)
   val make_hcom : rel -> dim -> dim -> ty:con -> cap:value -> sys:con abs sys -> con
@@ -1151,14 +1151,14 @@ struct
       let Abs (x, quantx) = abs in
       let y, pi = Perm.freshen_name x in
       let dom = Abs (x, Val.unleash quantx.dom) in
-      let coe_arg s = make_coe rel r' s ~abs:dom ~cap:arg in
+      let coe_arg s = make_coe rel r' s ~abs:dom arg in
       let abs =
         let cod_y = Clo.swap pi quantx.cod in
         let coe_r'y = LazyVal.make_from_lazy @@ lazy begin coe_arg @@ `Atom y end in
         Abs (y, Clo.inst rel cod_y @@ Val coe_r'y)
       in
       let cap = Val.plug rel ~rigid:true (FunApp (Val.make @@ coe_arg r)) cap in
-      rigid_coe rel r r' ~abs ~cap
+      rigid_coe rel r r' ~abs cap
 
     | Fst, Cons (v0, _) ->
       Val.unleash v0
@@ -1175,7 +1175,7 @@ struct
         let Abs (x, {dom; _}) = abs in
         Abs (x, Val.unleash dom)
       in
-      rigid_coe rel r r' ~abs ~cap
+      rigid_coe rel r r' ~abs cap
 
     | Snd, Cons (_, v1) ->
       Val.unleash v1
@@ -1200,7 +1200,7 @@ struct
         Abs (y, cod_y_coe_ry_fst)
       in
       let cap = Val.plug rel ~rigid:true Snd cap in
-      rigid_coe rel r r' ~abs ~cap
+      rigid_coe rel r r' ~abs cap
 
     | ExtApp rs, ExtLam nclo ->
       NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
@@ -1310,12 +1310,12 @@ struct
     | _ ->
       raise PleaseRaiseProperError
 
-  and make_coe rel r r' ~abs ~cap =
+  and make_coe rel r r' ~abs cap =
     match Rel.compare r r' rel with
     | `Same ->
       Val.unleash cap
     | _ ->
-      rigid_coe rel r r' ~abs ~cap
+      rigid_coe rel r r' ~abs cap
 
   and make_hcom rel r r' ~ty ~cap ~sys =
     match Rel.compare r r' rel with
@@ -1511,7 +1511,7 @@ struct
       raise PleaseRaiseProperError
 
   (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
-  and rigid_coe rel r r' ~abs ~cap : con =
+  and rigid_coe rel r r' ~abs cap : con =
     let Abs (x, tyx) = abs in
     match tyx with
     | Sg quant ->
@@ -1537,20 +1537,20 @@ struct
         let vproj_frame_x = VProj {r = info.r; func = func_x} in
         match atom_info_r = x with
         | false ->
-          let el0 = Val.make @@ make_coe rel0 r r' ~abs:abs0 ~cap:(Val.run rel0 cap) in
+          let el0 = Val.make @@ make_coe rel0 r r' ~abs:abs0 @@ Val.run rel0 cap in
           let el1 = Val.make @@
             let cap = Val.plug rel ~rigid:true (Frame.run rel @@ Frame.subst r x vproj_frame_x) cap in
             let sys =
               let face0 =
                 info.r, `Dim0,
                 LazyValAbs.bind @@ fun y ->
-                let arg_y = Val.make @@ make_coe rel0 r y ~abs:(ConAbs.run rel0 abs0) ~cap:(Val.run rel0 cap) in
+                let arg_y = Val.make @@ make_coe rel0 r y ~abs:(ConAbs.run rel0 abs0) @@ Val.run rel0 cap in
                 Val.plug_then_unleash rel0 ~rigid:true (FunApp arg_y) info.equiv
               in
               let face1 =
                 info.r, `Dim1,
                 LazyValAbs.bind @@ fun y ->
-                make_coe rel1 r y ~abs:(ConAbs.run rel1 abs1) ~cap:(Val.run rel1 cap)
+                make_coe rel1 r y ~abs:(ConAbs.run rel1 abs1) @@ Val.run rel1 cap
               in
               [face0; face1]
             in
@@ -1562,7 +1562,7 @@ struct
           (* `base` is the cap of the hcom in ty1. *)
           let base = (* under rel *)
             let vproj_frame_xr = Frame.run rel @@ Frame.subst r x vproj_frame_x in
-            make_coe rel r r' ~abs:abs1 ~cap:(Val.plug rel vproj_frame_xr cap)
+            make_coe rel r r' ~abs:abs1 @@ Val.plug rel vproj_frame_xr cap
           in
 
           (* The diagonal face for r=r'. *)
@@ -1679,7 +1679,7 @@ struct
           let rel' = Rel.equate' s s' rel in
           let abs = ConAbs.run rel' @@ Abs (x, bdy) in
           let cap = Val.run rel' cap in
-          make_coe rel' r r' ~abs ~cap
+          make_coe rel' r r' ~abs cap
         in
         cap_face :: old_faces
       in
@@ -1690,7 +1690,7 @@ struct
 
   and expand_rigid_com rel r r' ~abs ~cap ~sys =
     let ty = ConAbs.inst rel abs r' in
-    let cap = Val.make @@ make_coe rel r r' ~abs ~cap in
+    let cap = Val.make @@ make_coe rel r r' ~abs cap in
     let sys =
       let Abs (bound_var_of_abs, _) = abs in
       ConAbsSys.foreach_gen sys @@ fun r r' face ->
@@ -1705,7 +1705,7 @@ struct
           let z, pi = Perm.freshen_name y in
           z, rel, Con.swap pi bdy_y
       in
-      Abs (z, make_coe rel_z r' (`Atom z) ~abs ~cap:(Val.make bdy_z))
+      Abs (z, make_coe rel_z r' (`Atom z) ~abs @@ Val.make bdy_z)
     in
     rigid_hcom rel r r' ~ty ~cap ~sys
 
@@ -1786,7 +1786,7 @@ struct
 
   and expand_rigid_gcom rel r r' ~abs ~cap ~sys =
     let ty = ConAbs.inst rel abs r' in
-    let cap = Val.make @@ make_coe rel r r' ~abs ~cap in
+    let cap = Val.make @@ make_coe rel r r' ~abs cap in
     let sys =
       let Abs (bound_var_of_abs, _) = abs in
       ConAbsSys.foreach_gen sys @@ fun r r' face ->
@@ -1801,7 +1801,7 @@ struct
           let z, pi = Perm.freshen_name y in
           z, rel, Con.swap pi bdy_y
       in
-      Abs (z, make_coe rel_z r' (`Atom z) ~abs ~cap:(Val.make bdy_z))
+      Abs (z, make_coe rel_z r' (`Atom z) ~abs @@ Val.make bdy_z)
     in
     rigid_ghcom rel r r' ~ty ~cap ~sys
 
@@ -2178,7 +2178,7 @@ struct
           match ConAbsSys.force rel sys with
           | sys -> `Rigid frm
           | exception ConAbsSys.Triv abs ->
-            `Triv (Con.make_coe rel r' r ~abs ~cap:(Val.make hd))
+            `Triv (Con.make_coe rel r' r ~abs @@ Val.make hd)
       end
 
 end
