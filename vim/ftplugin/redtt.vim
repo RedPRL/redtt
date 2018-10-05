@@ -11,6 +11,10 @@ if (!exists('g:redtt_path'))
   let g:redtt_path = 'redtt'
 endif
 
+if (!exists('g:redtt_options'))
+  let g:redtt_options = ''
+endif
+
 command! Redtt :call CheckBuffer()
 nnoremap <buffer> <LocalLeader>l :call CheckBuffer()<CR>
 nnoremap <buffer> <LocalLeader>p :call CheckBufferToCursor()<CR>
@@ -33,6 +37,7 @@ function! CheckBuffer(...)
 
   let s:job = job_start(g:redtt_path .
     \' from-stdin ' . bufname('%') .
+    \' ' . g:redtt_options .
     \' --line-width ' . s:EditWidth(), {
     \'in_io': 'buffer', 'in_buf': bufnr('%'),
     \'in_bot': exists('a:1') ? a:1 : line('$'),

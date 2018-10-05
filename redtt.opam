@@ -1,11 +1,11 @@
-opam-version: "1.2.2"
+opam-version: "2.0"
 name: "redtt"
 version: "0.0"
 maintainer: "jmsterli@cs.cmu.edu"
 authors: ["Jon Sterling" "Favonia (Kuen-Bang Hou)"]
 homepage: "https://github.com/jonsterling/tt"
-bug-reports: "https://github.com/jonsterling/tt/issues"
-dev-repo: "https://github.com/jonsterling/tt.git"
+bug-reports: "https://github.com/jonsterling/redtt/issues"
+dev-repo: "git://github.com/jonsterling/redtt.git"
 license: "Apache-2.0"
 depends: [
   "cmdliner" {= "1.0.2"}
@@ -16,5 +16,5 @@ depends: [
   "menhir" {>= "20180703"}
 ]
 build: [
-  ["make"]
+  ["dune" "build" "-p" name "@install" "-j" jobs]
 ]
