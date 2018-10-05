@@ -154,13 +154,13 @@ let equate' x y h =
   get_m h @@ equate x y h
 
 let subst (r : dim) (x : atom) (h : t) =
-  if mem_atom x h.index then
+  if mem_atom x h.index && r <> `Atom x then
     `Changed (hide_aux x (equate' (`Atom x) r h))
   else
     `Same
 
 let subst' r x h =
-  if mem_atom x h.index then
+  if mem_atom x h.index && r <> `Atom x then
     hide_aux x (equate' (`Atom x) r h)
   else
     h
