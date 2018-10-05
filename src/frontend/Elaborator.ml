@@ -629,11 +629,12 @@ struct
 
 
         | `Datatype dlbl ->
+          (* TODO: This needs to be handled like Intro now, where we can consume a whole spine... *)
           M.lift C.base_cx <<@> fun cx ->
             let sign = Cx.globals cx in
             let _ = GlobalEnv.lookup_datatype name sign in
             let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {lbl = name; params = failwith "TODO!!!"})
+            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {lbl = name; params = []})
 
         | `Ix _ ->
           failwith "elab_inf: impossible"
