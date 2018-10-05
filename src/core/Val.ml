@@ -650,8 +650,15 @@ struct
     | Data data ->
       let desc = Sig.lookup_datatype data.lbl in
       if Desc.is_strict_set desc then el
-      (* for data types without parameters, coe can be the identity *)
-      else el (*rigid_coe_nonstrict_data dir abs el*)
+      else
+        begin
+          (* for data types without parameters, coe can be the identity *)
+          match desc.body with
+          | Desc.TNil _ ->
+            el
+          | _ ->
+            rigid_coe_nonstrict_data dir abs el
+        end
 
     | FHCom fhcom ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011.
