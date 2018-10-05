@@ -98,8 +98,8 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<dfix>"
   | DFixLine _ ->
     Format.fprintf fmt "<dfix-line>"
-  | Data lbl ->
-    Uuseg_string.pp_utf_8 fmt lbl
+  | Data info ->
+    Uuseg_string.pp_utf_8 fmt info.lbl
   | Intro info ->
     Format.fprintf fmt "@[<hv1>(%a %a)@]"
       Uuseg_string.pp_utf_8 info.clbl

@@ -410,7 +410,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
     in
 
     let dlbl = unleash_data data_ty in
-    let data_vty = D.make @@ D.Data dlbl in
+    let data_vty = D.make @@ D.Data {lbl = dlbl} in
 
     lookup_datatype dlbl >>= fun desc ->
 

@@ -255,11 +255,11 @@ struct
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi (clo_name pi0.cod) dom cod
 
-      | _, Data lbl0, Data lbl1 ->
-        if lbl0 = lbl1 then
-          Tm.make @@ Tm.Data {lbl = lbl0}
+      | _, Data info0, Data info1 ->
+        if info0.lbl = info1.lbl then
+          Tm.make @@ Tm.Data {lbl = info0.lbl}
         else
-          raise @@ E (UnequalLbl (lbl0, lbl1))
+          raise @@ E (UnequalLbl (info0.lbl, info1.lbl))
 
       | _, Later ltr0, Later ltr1 ->
         let tick = TickGen (`Lvl (None, Env.len env)) in
@@ -355,11 +355,11 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
-      | Data dlbl, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
-        let desc = V.Sig.lookup_datatype dlbl in
+      | Data data, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
+        let desc = V.Sig.lookup_datatype data.lbl in
         let constr = Desc.lookup_constr info0.clbl desc in
-        let tms = equate_constr_args env dlbl constr info0.args info1.args in
-        Tm.make @@ Tm.Intro (dlbl, info0.clbl, tms)
+        let tms = equate_constr_args env data.lbl constr info0.args info1.args in
+        Tm.make @@ Tm.Intro (data.lbl, info0.clbl, tms)
 
       | _ ->
         (* For more readable error messages *)
@@ -377,7 +377,7 @@ struct
         go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
 
       | (_, `Rec Desc.Self) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
-        let vty = D.make @@ D.Data dlbl in
+        let vty = D.make @@ D.Data {lbl = dlbl} in
         let tm0 = equate env vty el0 el1 in
         go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
 
@@ -485,7 +485,7 @@ struct
     | Elim elim0, Elim elim1 ->
       if elim0.dlbl = elim1.dlbl then
         let dlbl = elim0.dlbl in
-        let data_ty = D.make @@ D.Data dlbl in
+        let data_ty = D.make @@ D.Data {lbl = dlbl} in
         let mot =
           let var = generic env data_ty in
           let env' = Env.succ env in
@@ -520,7 +520,7 @@ struct
               go qenv' tyenv' (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
             | (_, `Rec Desc.Self) :: specs ->
-              let vty = D.make @@ D.Data dlbl in
+              let vty = D.make @@ D.Data {lbl = dlbl} in
               let v = generic qenv vty in
               let qenv' = Env.succ qenv in
               let vih = generic qenv' @@ V.inst_clo elim0.mot v in

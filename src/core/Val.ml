@@ -588,8 +588,8 @@ struct
   and rigid_coe_nonstrict_data dir abs el =
     let _, tyx = Abs.unsafe_unleash abs in
     match unleash tyx, unleash el with
-    | Data dlbl, Intro info ->
-      rigid_coe_nonstrict_data_intro dir abs ~dlbl ~clbl:info.clbl info.args
+    | Data data, Intro info ->
+      rigid_coe_nonstrict_data_intro dir abs ~dlbl:data.lbl ~clbl:info.clbl info.args
 
     | Data _, Up info ->
       rigid_ncoe_up dir abs info.neu ~rst_sys:info.sys
@@ -645,8 +645,8 @@ struct
     | Univ _ ->
       el
 
-    | Data dlbl ->
-      let desc = Sig.lookup_datatype dlbl in
+    | Data data ->
+      let desc = Sig.lookup_datatype data.lbl in
       if Desc.is_strict_set desc then el
       (* for data types without parameters, coe can be the identity *)
       else el (*rigid_coe_nonstrict_data dir abs el*)
@@ -1283,7 +1283,7 @@ struct
       make @@ Next tclo
 
     | Tm.Data info ->
-      make @@ Data info.lbl
+      make @@ Data {lbl = info.lbl}
 
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
@@ -1537,7 +1537,7 @@ struct
 
   and unleash_data v =
     match unleash v with
-    | Data dlbl -> dlbl
+    | Data info -> info.lbl
     | _ ->
       raise @@ E (UnleashDataError v)
 

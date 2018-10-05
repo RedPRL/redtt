@@ -231,7 +231,7 @@ let rec check_ cx ty rst tm =
         failwith "Partially declared datatype cannot not be treated as type"
     end
 
-  | [], D.Data dlbl, T.Intro (dlbl', clbl, args) when dlbl = dlbl' ->
+  | [], D.Data data, T.Intro (dlbl, clbl, args) when data.lbl = dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     let constr = Desc.lookup_constr clbl desc in
     check_constr cx dlbl constr args;
@@ -373,7 +373,7 @@ and check cx ty tm =
 
 
 and check_constr cx dlbl constr tms =
-  let vdataty = D.make @@ D.Data dlbl in
+  let vdataty = D.make @@ D.Data {lbl = dlbl} in
   let (module V) = Cx.evaluator (Cx.clear_locals cx) in
 
 
@@ -711,7 +711,7 @@ and infer_spine_ cx hd sp =
             go cx venv (cells_only_ihs #< (`Val v)) (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
           | (lbl, `Rec Desc.Self) :: specs ->
-            let vty = D.make @@ D.Data info.dlbl in
+            let vty = D.make @@ D.Data {lbl = info.dlbl} in
             let cx, v = Cx.ext_ty cx ~nm:lbl vty in
             let cx_ih, v_ih = Cx.ext_ty cx ~nm:None @@ V.inst_clo mot_clo v in
             let venv = D.Env.snoc venv @@ `Val v in

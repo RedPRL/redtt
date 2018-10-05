@@ -45,7 +45,7 @@ type con =
   | DFix of {ty : value; clo : clo}
   | DFixLine of {x : atom; ty : value; clo : clo}
 
-  | Data of string
+  | Data of {lbl : string}
   | Intro of
       {dlbl : string;
        clbl : string;
