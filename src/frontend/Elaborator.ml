@@ -142,11 +142,26 @@ struct
       M.ret ()
 
   and elab_datatype dlbl (E.EDesc edesc) =
+    let rec elab_params : _ -> (_ * Desc.body) M.m =
+      function
+      | [] ->
+        M.ret ([], Desc.TNil [])
+      | `Ty (name, edom) :: cells ->
+        elab_chk edom {ty = univ; sys = []} >>= normalize_ty >>= fun ty ->
+        let x = Name.named @@ Some name in
+        M.in_scope x (`P ty) (elab_params cells) <<@> fun (psi, rest) ->
+          (x, `P ty) :: psi, Desc.TCons (ty, Desc.Body.bind x rest)
+      | _ ->
+        failwith "elab_params"
+    in
+
     (* TODO: params.
 
        One idea that might work is to have the intermediate states of the datatype not have parameters, and then only at
        the end unleash the parameters. In case it's not clear later, the thing I'm trying to get right is the
        binding structure.
+
+       ^^^ I'm not sure what I was talking about above (foiled by time!), but I expect I'll realize it in the process.
     *)
     let rec elab_constrs tdesc =
       function
@@ -161,7 +176,9 @@ struct
         elab_constrs tdesc econstrs
     in
 
-    let tdesc = Desc.{body = Desc.TNil []; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
+    elab_params edesc.params >>= fun (psi, tbody) ->
+    M.in_scopes psi @@
+    let tdesc = Desc.{body = tbody; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
     M.lift @@ C.declare_datatype dlbl tdesc >>= fun _ ->
     match edesc.kind with
     | `Reg ->
