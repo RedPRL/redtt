@@ -419,7 +419,7 @@ struct
         failwith "equate_constr_args: argument mismatch"
     in
 
-    go Emp empty_env (Desc.Constr.specs constr) cells0 cells1
+    go Emp (D.Env.append empty_env params) (Desc.Constr.specs constr) cells0 cells1
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with

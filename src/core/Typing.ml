@@ -420,7 +420,7 @@ and check_constr cx dlbl params constr tms =
       (fun (_, spec) tm tyenv -> check_argument tyenv spec tm)
       (Desc.Constr.specs constr)
       tms
-      V.empty_env
+      (D.Env.append V.empty_env params)
   in
   ()
 

@@ -412,9 +412,10 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
     let dlbl, params = unleash_data data_ty in
     begin
       M.lift C.base_cx >>= fun cx ->
-      M.ret @@ Cx.eval cx data_ty
+      let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) params in
+      M.ret (Cx.eval cx data_ty, vparams)
     end
-    >>= fun data_vty ->
+    >>= fun (data_vty, vparams) ->
 
     lookup_datatype dlbl >>= fun desc ->
 
@@ -552,7 +553,8 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           failwith "prepare_clause: mismatch"
       in
 
-      prepare_clause (Emp, empty_env, Emp, empty_env, fun tac -> tac) pbinds constr >>= fun (psi, env, intro_args, env_only_ihs, kont_tac) ->
+      let tyenv = D.Env.append empty_env vparams in
+      prepare_clause (Emp, tyenv, Emp, empty_env, fun tac -> tac) pbinds constr >>= fun (psi, env, intro_args, env_only_ihs, kont_tac) ->
 
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, params, intro_args) in
       let clause_ty = mot intro in
@@ -574,7 +576,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
             let nclo : D.nclo = D.NClo.act phi @@ D.NClo {rho = Cx.env outer_cx; nbnd} in
             let rec go specs tms =
               match specs, tms with
-              | Desc.TCons (`Const ty, Tm.B (_, specs)), tm :: tms ->
+              | Desc.TCons (`Const _, Tm.B (_, specs)), tm :: tms ->
                 `Val (D.Value.act phi @@ V.eval benv tm) :: go specs tms
               | Desc.TCons (`Rec Desc.Self, Tm.B (_, specs)), tm :: tms ->
                 `Val (D.Value.act phi @@ V.eval benv tm) :: `Val (image_of_bterm phi tm) :: go specs tms
