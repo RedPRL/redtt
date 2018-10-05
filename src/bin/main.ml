@@ -14,10 +14,14 @@ let opt_file_name =
       & info [] ~doc:"The name of the file being loaded" ~docv:"FILE"
     )
 
+let opt_debug =
+  let doc = "Execute in debug mode." in
+  Arg.(value & flag & info ["d"; "debug"] ~doc)
+
 let opts_config =
   let open Term  in
-  let make file_name line_width = Frontend.{file_name; line_width} in
-  pure make $ opt_file_name $ opt_margin
+  let make file_name line_width debug_mode = Frontend.{file_name; line_width; debug_mode } in
+  pure make $ opt_file_name $ opt_margin $ opt_debug
 
 let cmd_default =
   Term.
