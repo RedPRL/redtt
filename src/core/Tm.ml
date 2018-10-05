@@ -91,8 +91,10 @@ let rec con_info =
   function
   | FHCom {r; r'; cap; sys} ->
     Info.mergen [tm_info r; tm_info r'; tm_info cap; sys_info (bnd_info tm_info) sys]
-  | Univ _ | Dim0 | Dim1 | Data _ ->
+  | Univ _ | Dim0 | Dim1 ->
     Info.init
+  | Data info ->
+    Info.mergen @@ List.map tm_info info.params
   | Pi (dom, cod) | Sg (dom, cod) ->
     Info.mergen [tm_info dom; bnd_info tm_info cod]
   | Ext bnd ->
@@ -159,9 +161,9 @@ and frame_info =
     Info.mergen [tm_info r; tm_info func]
   | Prev t ->
     tm_info t
-  | Elim {dlbl; mot; clauses} ->
+  | Elim {dlbl; params; mot; clauses} ->
     let clause_info (_, nbnd) = nbnd_info tm_info nbnd in
-    Info.mergen @@ bnd_info tm_info mot :: List.map clause_info clauses
+    Info.mergen @@ bnd_info tm_info mot :: List.map clause_info clauses @ List.map tm_info params
 
 and list_info : type x. (x -> Info.t) -> x list -> Info.t =
   fun f xs ->
@@ -348,8 +350,9 @@ struct
       let cmd' = traverse_cmd cmd in
       Up cmd'
 
-    | Data {lbl} ->
-      Data {lbl}
+    | Data info ->
+      let params = traverse_list traverse_tm info.params in
+      Data {info with params}
 
     | Intro (dlbl, clbl, args) ->
       let args' = traverse_list traverse_tm args in
@@ -911,8 +914,16 @@ let rec pp env fmt =
     | Up cmd ->
       pp_cmd env fmt cmd
 
-    | Data {lbl} ->
-      Uuseg_string.pp_utf_8 fmt lbl
+    | Data {lbl; params} ->
+      begin
+        match params with
+        | [] ->
+          Uuseg_string.pp_utf_8 fmt lbl
+        | _ ->
+          Format.fprintf fmt "@[<hv1>(%a %a)@]"
+            Uuseg_string.pp_utf_8 lbl
+            (pp_terms env) params
+      end
 
     | Intro (_dlbl, clbl, args) ->
       begin
@@ -1359,7 +1370,8 @@ let map_frame f =
   | Elim info ->
     let mot = map_bnd f info.mot in
     let clauses = List.map (fun (lbl, bnd) -> lbl, map_nbnd f bnd) info.clauses in
-    Elim {info with mot; clauses}
+    let params = List.map f info.params in
+    Elim {info with mot; params; clauses}
   | VProj info ->
     let r = f info.r in
     let func = f info.func in
@@ -1395,8 +1407,12 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Dim0 | Dim1 | Data _) as con ->
+  | (Univ _ | Dim0 | Dim1) as con ->
     con
+  | Data info ->
+    let lbl = info.lbl in
+    let params = List.map f info.params in
+    Data {lbl; params}
   | Cons (t0, t1) ->
     Cons (f t0, f t1)
   | LblRet t ->

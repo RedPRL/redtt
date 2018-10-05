@@ -257,7 +257,10 @@ struct
 
       | _, Data info0, Data info1 ->
         if info0.lbl = info1.lbl then
-          Tm.make @@ Tm.Data {lbl = info0.lbl}
+          let lbl = info0.lbl in
+          let desc = Sig.lookup_datatype lbl in
+          let params = equate_data_params env lbl desc.body info0.params info1.params in
+          Tm.make @@ Tm.Data {lbl; params}
         else
           raise @@ E (UnequalLbl (info0.lbl, info1.lbl))
 
@@ -358,7 +361,7 @@ struct
       | Data data, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
         let desc = V.Sig.lookup_datatype data.lbl in
         let constr = Desc.lookup_constr info0.clbl desc in
-        let tms = equate_constr_args env data.lbl constr info0.args info1.args in
+        let tms = equate_constr_args env data.lbl data.params constr info0.args info1.args in
         Tm.make @@ Tm.Intro (data.lbl, info0.clbl, tms)
 
       | _ ->
@@ -368,7 +371,24 @@ struct
         let err = UnequalNf {env; ty; el0; el1} in
         raise @@ E err
 
-  and equate_constr_args env dlbl constr cells0 cells1 =
+  and equate_data_params env dlbl tele vs0 vs1 =
+    let rec go acc tyenv tele vs0 vs1 =
+      match tele, vs0, vs1 with
+      | Desc.TNil _, [], [] ->
+        Bwd.to_list acc
+
+      | Desc.TCons (ty, Tm.B (_, tele)), `Val v0 :: vs0, `Val v1 :: vs1 ->
+        let vty = V.eval tyenv ty in
+        let tm = equate env vty v0 v1 in
+        let tyenv = D.Env.snoc tyenv (`Val v0) in
+        go (acc #< tm) tyenv tele vs0 vs1
+
+      | _ ->
+        failwith "equate_data_params: length mismatch"
+    in
+    go Emp empty_env tele vs0 vs1
+
+  and equate_constr_args env dlbl params constr cells0 cells1 =
     let rec go acc venv specs cells0 cells1 =
       match specs, cells0, cells1 with
       | (_, `Const ty) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
@@ -377,7 +397,7 @@ struct
         go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
 
       | (_, `Rec Desc.Self) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
-        let vty = D.make @@ D.Data {lbl = dlbl} in
+        let vty = D.make @@ D.Data {lbl = dlbl; params} in
         let tm0 = equate env vty el0 el1 in
         go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
 
@@ -485,7 +505,7 @@ struct
     | Elim elim0, Elim elim1 ->
       if elim0.dlbl = elim1.dlbl then
         let dlbl = elim0.dlbl in
-        let data_ty = D.make @@ D.Data {lbl = dlbl} in
+        let data_ty = D.make @@ D.Data {lbl = dlbl; params = elim0.params} in
         let mot =
           let var = generic env data_ty in
           let env' = Env.succ env in
@@ -520,7 +540,7 @@ struct
               go qenv' tyenv' (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
             | (_, `Rec Desc.Self) :: specs ->
-              let vty = D.make @@ D.Data {lbl = dlbl} in
+              let vty = D.make @@ D.Data {lbl = dlbl; params = elim0.params} in
               let v = generic qenv vty in
               let qenv' = Env.succ qenv in
               let vih = generic qenv' @@ V.inst_clo elim0.mot v in
@@ -550,8 +570,10 @@ struct
           clbl, Tm.NB (nms, tbdy)
         in
 
+        (* Desc.constrs, fishy!! *)
         let clauses = List.map quote_clause (Desc.constrs desc) in
-        let frame = Tm.Elim {dlbl; mot; clauses} in
+        let params = equate_data_params env dlbl desc.body elim0.params elim1.params in
+        let frame = Tm.Elim {dlbl; mot; clauses; params} in
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
         failwith "Datatype mismatch"

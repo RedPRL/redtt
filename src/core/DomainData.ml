@@ -45,7 +45,8 @@ type con =
   | DFix of {ty : value; clo : clo}
   | DFixLine of {x : atom; ty : value; clo : clo}
 
-  | Data of {lbl : string}
+  | Data of {lbl : string; params : env_el list}
+
   | Intro of
       {dlbl : string;
        clbl : string;
@@ -70,6 +71,7 @@ and neu =
 
   | Elim of
       {dlbl : string;
+       params : env_el list;
        mot : clo;
        neu : neu;
        clauses : (string * nclo) list}

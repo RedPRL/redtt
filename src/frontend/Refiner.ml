@@ -155,7 +155,7 @@ let tac_pair tac0 tac1 : chk_tac =
 
 let unleash_data ty =
   match Tm.unleash ty with
-  | Tm.Data info -> info.lbl
+  | Tm.Data info -> info.lbl, info.params
   | _ ->
     Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
@@ -409,8 +409,12 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
       Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
     in
 
-    let dlbl = unleash_data data_ty in
-    let data_vty = D.make @@ D.Data {lbl = dlbl} in
+    let dlbl, params = unleash_data data_ty in
+    begin
+      M.lift C.base_cx >>= fun cx ->
+      M.ret @@ Cx.eval cx data_ty
+    end
+    >>= fun data_vty ->
 
     lookup_datatype dlbl >>= fun desc ->
 
@@ -609,7 +613,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
     in
 
     M.Util.fold_left (fun acc clause -> refine_clause acc clause <<@> fun cl -> cl :: acc) [] eclauses >>= fun clauses ->
-    M.ret @@ Tm.up @@ Tm.ann ~ty:data_ty ~tm:scrut @< Tm.Elim {dlbl; mot = bmot; clauses}
+    M.ret @@ Tm.up @@ Tm.ann ~ty:data_ty ~tm:scrut @< Tm.Elim {dlbl; params; mot = bmot; clauses}
 
 let rec tac_hope goal =
   let rec try_system sys =

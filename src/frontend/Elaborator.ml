@@ -163,17 +163,17 @@ struct
 
        ^^^ I'm not sure what I was talking about above (foiled by time!), but I expect I'll realize it in the process.
     *)
-    let rec elab_constrs tdesc =
+    let rec elab_constrs params tdesc =
       function
       | [] ->
         let tdesc = Desc.{tdesc with status = `Complete} in
         M.lift @@ C.declare_datatype dlbl tdesc >>
         M.ret tdesc
       | econstr :: econstrs ->
-        elab_constr dlbl tdesc econstr >>= fun constr ->
+        elab_constr dlbl params tdesc econstr >>= fun constr ->
         let tdesc = Desc.add_constr tdesc constr in
         M.lift @@ C.declare_datatype dlbl tdesc >>
-        elab_constrs tdesc econstrs
+        elab_constrs params tdesc econstrs
     in
 
     elab_params edesc.params >>= fun (psi, tbody) ->
@@ -184,13 +184,14 @@ struct
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
     | _ ->
-      elab_constrs tdesc edesc.constrs
+      let params = List.map (fun (x, _) -> Tm.up @@ Tm.var x) psi in
+      elab_constrs params tdesc edesc.constrs
 
-  and elab_constr dlbl desc (clbl, E.EConstr econstr) =
+  and elab_constr dlbl params desc (clbl, E.EConstr econstr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) @@ Desc.constrs desc then
       failwith "Duplicate constructor in datatype";
 
-    let data_ty = Tm.make @@ Tm.Data {lbl = dlbl} in
+    let data_ty = Tm.make @@ Tm.Data {lbl = dlbl; params} in
 
     let open Desc in
     let elab_rec_spec (x, Self) = M.ret (x, Self) in
@@ -632,7 +633,7 @@ struct
             let sign = Cx.globals cx in
             let _ = GlobalEnv.lookup_datatype name sign in
             let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {lbl = name})
+            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {lbl = name; params = failwith "TODO!!!"})
 
         | `Ix _ ->
           failwith "elab_inf: impossible"
@@ -794,7 +795,7 @@ struct
             let sign = Cx.globals cx in
             let desc = GlobalEnv.lookup_datatype dlbl sign in
             let constr = Desc.lookup_constr clbl desc in
-            elab_intro dlbl clbl constr frms
+            elab_intro dlbl info.params clbl constr frms
           end
           <+> elab_mode_switch_cut exp frms ty
 
@@ -805,7 +806,7 @@ struct
     | _ ->
       elab_mode_switch_cut exp frms ty
 
-  and elab_intro dlbl clbl constr frms =
+  and elab_intro dlbl params clbl constr frms =
     let elab_arg sub spec frm =
       match spec, frm with
       | `Const ty, E.App e ->
@@ -815,7 +816,7 @@ struct
         M.ret (sub, tm)
 
       | `Rec Desc.Self, E.App e ->
-        let ty = Tm.make @@ Tm.Data {lbl = dlbl} in
+        let ty = Tm.make @@ Tm.Data {lbl = dlbl; params} in
         elab_chk e {ty; sys = []} >>= fun tm ->
         let sub = Tm.dot (Tm.ann ~ty ~tm) sub in
         M.ret (sub, tm)

@@ -446,7 +446,8 @@ struct
       let go (lbl, nclo) = lbl, NClo.act phi nclo in
       let clauses = List.map go info.clauses in
       let neu = act phi info.neu in
-      Elim {dlbl = info.dlbl; mot; neu; clauses}
+      let params = List.map (Env.act_env_el phi) info.params in
+      Elim {dlbl = info.dlbl; params; mot; neu; clauses}
 
     | LblCall neu ->
       let neu = act phi neu in

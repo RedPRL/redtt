@@ -477,7 +477,7 @@ tm:
   | LPR; DATA; dlbl = ATOM; RPR
     { fun _ ->
       make_node $startpos $endpos @@
-      Tm.Data {lbl = dlbl} }
+      Tm.Data {lbl = dlbl; params = []} }
 
   | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->

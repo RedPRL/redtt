@@ -350,8 +350,9 @@ struct
       let clo = Clo.act phi info.clo in
       make_dfix_line r ty clo
 
-    | Data lbl ->
-      make @@ Data lbl
+    | Data info ->
+      let params = List.map (Env.act_env_el phi) info.params in
+      make @@ Data {info with params}
 
     | Intro info ->
       begin
@@ -373,7 +374,8 @@ struct
         let con = unleash node' in
         con
 
-  and make_cons (a, b) = make @@ Cons (a, b)
+  and make_cons (a, b) =
+    make @@ Cons (a, b)
   and make_dfix_line r ty clo =
     match r with
     | `Atom x ->
@@ -1283,7 +1285,8 @@ struct
       make @@ Next tclo
 
     | Tm.Data info ->
-      make @@ Data {lbl = info.lbl}
+      let params = List.map (fun tm -> `Val (eval rho tm)) info.params in
+      make @@ Data {lbl = info.lbl; params}
 
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in
@@ -1357,7 +1360,8 @@ struct
     | Tm.Elim info ->
       let mot = clo info.mot rho in
       let clauses = List.map (fun (lbl, nbnd) -> lbl, nclo nbnd rho) info.clauses in
-      elim_data info.dlbl ~mot ~scrut:vhd ~clauses
+      let params = List.map (fun tm -> `Val (eval rho tm)) info.params in
+      elim_data info.dlbl ~params ~mot ~scrut:vhd ~clauses
 
 
   and eval_head rho =
@@ -1899,7 +1903,7 @@ struct
       let err = RigidVProjUnexpectedArgument (x, el) in
       raise @@ E err
 
-  and elim_data dlbl ~mot ~scrut ~clauses =
+  and elim_data dlbl ~params ~mot ~scrut ~clauses =
     let find_clause clbl =
       try
         snd @@ List.find (fun (clbl', _) -> clbl = clbl') clauses
@@ -1920,7 +1924,7 @@ struct
         | cell :: args , (_, `Const _) :: specs ->
           cell :: go args specs
         | `Val v :: args, (_, `Rec _) :: specs ->
-          let v_ih = elim_data dlbl ~mot ~scrut:v ~clauses in
+          let v_ih = elim_data dlbl ~params ~mot ~scrut:v ~clauses in
           `Val v :: `Val v_ih :: go args specs
         | cell :: args, (_, `Dim) :: specs ->
           cell :: go args specs
@@ -1933,13 +1937,13 @@ struct
       inst_nclo nclo @@ go info.args @@ Desc.Constr.specs constr
 
     | Up up ->
-      let neu = Elim {dlbl; mot; neu = up.neu; clauses} in
+      let neu = Elim {dlbl; params; mot; neu = up.neu; clauses} in
       let mot' = inst_clo mot scrut in
       let elim_face =
         Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
-        elim_data dlbl ~mot:(Clo.act phi mot) ~scrut:a ~clauses:clauses'
+        elim_data dlbl ~params ~mot:(Clo.act phi mot) ~scrut:a ~clauses:clauses'
       in
       let elim_sys = List.map elim_face up.sys in
       make @@ Up {ty = mot'; neu; sys = elim_sys}
@@ -1951,14 +1955,15 @@ struct
         inst_clo mot @@
         make_fhcom (Dir.make r @@ `Atom y) info.cap (`Ok info.sys)
       in
-      let cap = elim_data dlbl ~mot ~scrut:info.cap ~clauses in
+      let cap = elim_data dlbl ~params ~mot ~scrut:info.cap ~clauses in
       let face =
         Face.map @@ fun r r' abs ->
         let y, ely = Abs.unleash1 abs in
         let phi = I.equate r r' in
         let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
+        let params' = List.map (Env.act_env_el phi) params in
         Abs.bind1 y @@
-        elim_data dlbl ~mot:(Clo.act phi mot) ~scrut:ely ~clauses:clauses'
+        elim_data dlbl ~params:params' ~mot:(Clo.act phi mot) ~scrut:ely ~clauses:clauses'
       in
       let sys = List.map face info.sys in
       rigid_com info.dir tyabs cap sys

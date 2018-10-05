@@ -36,7 +36,7 @@ sig
   val ext_apply : value -> dim list -> value
   val prev : tick -> value -> value
 
-  val elim_data : string -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
+  val elim_data : string -> params:env_el list -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
 
   val do_fst : value -> value
   val do_snd : value -> value

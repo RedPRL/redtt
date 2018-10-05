@@ -222,8 +222,9 @@ let rec check_ cx ty rst tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-  | [], D.Univ univ, T.Data {lbl} ->
+  | [], D.Univ univ, T.Data {lbl; params} ->
     let desc = GlobalEnv.lookup_datatype lbl @@ Cx.globals cx in
+    check_data_params cx desc.body params;
     begin
       if not @@ Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
         failwith "Universe level/kind error";
@@ -234,7 +235,7 @@ let rec check_ cx ty rst tm =
   | [], D.Data data, T.Intro (dlbl, clbl, args) when data.lbl = dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
     let constr = Desc.lookup_constr clbl desc in
-    check_constr cx dlbl constr args;
+    check_constr cx dlbl data.params constr args;
 
   | [], D.Data dlbl, T.FHCom info ->
     check_fhcom cx ty info.r info.r' info.cap info.sys
@@ -368,12 +369,30 @@ let rec check_ cx ty rst tm =
   | [], _, _ ->
     raise @@ E (TypeError (ty, (cx, tm)))
 
+and check_data_params cx tele params =
+  let (module V) = Cx.evaluator cx in
+  let rec go tyenv tele params =
+    match tele, params with
+    | Desc.TNil [], [] ->
+      ()
+
+    | Desc.TCons (ty, Tm.B (nm, tele)), tm :: params ->
+      let vty = V.eval tyenv ty in
+      let el = check_eval cx vty tm in
+      let tyenv = D.Env.snoc tyenv (`Val el) in
+      go tyenv tele params
+
+    | _ ->
+      failwith "check_data_params: length mismatch"
+  in
+  go (Cx.env cx) tele params
+
 and check cx ty tm =
   check_ cx ty [] tm
 
 
-and check_constr cx dlbl constr tms =
-  let vdataty = D.make @@ D.Data {lbl = dlbl} in
+and check_constr cx dlbl params constr tms =
+  let vdataty = D.make @@ D.Data {lbl = dlbl; params} in
   let (module V) = Cx.evaluator (Cx.clear_locals cx) in
 
 
@@ -682,6 +701,7 @@ and infer_spine_ cx hd sp =
       D.{el = Cx.eval_frame cx ih.el frm; ty = ty1}
 
     | T.Elim info ->
+      let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) info.params in
       let T.B (nm, mot) = info.mot in
       let ih = infer_spine_ cx hd sp in
       let mot_clo =
@@ -711,7 +731,7 @@ and infer_spine_ cx hd sp =
             go cx venv (cells_only_ihs #< (`Val v)) (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
           | (lbl, `Rec Desc.Self) :: specs ->
-            let vty = D.make @@ D.Data {lbl = info.dlbl} in
+            let vty = D.make @@ D.Data {lbl = info.dlbl; params = vparams} in
             let cx, v = Cx.ext_ty cx ~nm:lbl vty in
             let cx_ih, v_ih = Cx.ext_ty cx ~nm:None @@ V.inst_clo mot_clo v in
             let venv = D.Env.snoc venv @@ `Val v in

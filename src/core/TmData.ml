@@ -42,7 +42,7 @@ type 'a tmf =
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
-  | Data of {lbl : string}
+  | Data of {lbl : string; params : 'a list}
   | Intro of string * string * 'a list
 
 
@@ -71,7 +71,7 @@ and 'a frame =
   | RestrictForce
   | Prev of 'a
 
-  | Elim of {dlbl : string; mot : 'a bnd; clauses : (string * 'a nbnd) list}
+  | Elim of {dlbl : string; params : 'a list; mot : 'a bnd; clauses : (string * 'a nbnd) list}
 
 and 'a spine = 'a frame list
 and 'a cmd = 'a head * 'a spine
