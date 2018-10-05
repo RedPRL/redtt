@@ -155,14 +155,6 @@ struct
         failwith "elab_params"
     in
 
-    (* TODO: params.
-
-       One idea that might work is to have the intermediate states of the datatype not have parameters, and then only at
-       the end unleash the parameters. In case it's not clear later, the thing I'm trying to get right is the
-       binding structure.
-
-       ^^^ I'm not sure what I was talking about above (foiled by time!), but I expect I'll realize it in the process.
-    *)
     let rec elab_constrs params tdesc =
       function
       | [] ->
@@ -184,31 +176,17 @@ struct
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
     | _ ->
-      let params = List.map (fun (x, _) -> Tm.up @@ Tm.var x) psi in
-      elab_constrs params tdesc edesc.constrs
+      elab_constrs psi tdesc edesc.constrs
 
-  and elab_constr dlbl params desc (clbl, E.EConstr econstr) =
+  and elab_constr dlbl psi desc (clbl, E.EConstr econstr) =
     if List.exists (fun (lbl, _) -> clbl = lbl) @@ Desc.constrs desc then
       failwith "Duplicate constructor in datatype";
 
+    let params = List.map (fun (x, _) -> Tm.up @@ Tm.var x) psi in
     let data_ty = Tm.make @@ Tm.Data {lbl = dlbl; params} in
 
     let open Desc in
     let elab_rec_spec (x, Self) = M.ret (x, Self) in
-
-    let rec abstract_tele xs (ps : _ list) =
-      match ps with
-      | [] -> []
-      | (lbl, x, `Const p) :: ps ->
-        let Tm.NB (_, p') = Tm.bindn xs p in
-        (lbl, `Const p') :: abstract_tele (xs #< x) ps
-      | (lbl, x, `Rec p) :: ps ->
-        (* TODO: update, when we add more recursive argument types *)
-        (lbl, `Rec p) :: abstract_tele (xs #< x) ps
-      | (lbl, x, `Dim) :: ps ->
-        (lbl, `Dim) :: abstract_tele (xs #< x) ps
-    in
-
 
     let rec go =
       function
@@ -241,7 +219,15 @@ struct
 
     in
 
-    go econstr.specs <<@> fun constr -> clbl, constr
+    let rec rebind_constr n params constr =
+      match params with
+      | [] -> constr
+      | (x, _) :: params ->
+        rebind_constr (n + 1) params @@
+        Desc.Constr.close_var x n constr
+    in
+
+    go econstr.specs <<@> fun constr -> clbl, rebind_constr 0 psi constr
 
 
   and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =

@@ -45,9 +45,7 @@ type desc =
    body : body;
    status : [`Complete | `Partial]}
 
-(* once parameters are added, this function must be deleted! Using it is a bug. *)
 val constrs : desc -> constrs
-
 val add_constr : desc -> string * constr -> desc
 
 

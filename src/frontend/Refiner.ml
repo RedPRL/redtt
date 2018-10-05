@@ -439,7 +439,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           | None -> tac_hole ~loc ~name:(Some lbl)
           | Some tac -> tac
       in
-      List.map (fun (lbl, _) -> find_clause lbl) @@ Desc.constrs desc
+      List.map (fun (lbl, _) -> find_clause lbl) constrs
     in
 
     (* TODO: factor this out into another tactic. *)

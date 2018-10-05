@@ -575,9 +575,9 @@ struct
           clbl, Tm.NB (nms, tbdy)
         in
 
-        (* Desc.constrs, fishy!! *)
-        let clauses = List.map quote_clause (Desc.constrs desc) in
         let params = equate_data_params env dlbl desc.body elim0.params elim1.params in
+        let constrs = Desc.Body.instance params desc.body in
+        let clauses = List.map quote_clause constrs in
         let frame = Tm.Elim {dlbl; mot; clauses; params} in
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
