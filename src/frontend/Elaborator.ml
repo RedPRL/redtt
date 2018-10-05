@@ -190,7 +190,7 @@ struct
     if List.exists (fun (lbl, _) -> clbl = lbl) @@ Desc.constrs desc then
       failwith "Duplicate constructor in datatype";
 
-    let data_ty = Tm.make @@ Tm.Data dlbl in
+    let data_ty = Tm.make @@ Tm.Data {lbl = dlbl} in
 
     let open Desc in
     let elab_rec_spec (x, Self) = M.ret (x, Self) in
@@ -632,7 +632,7 @@ struct
             let sign = Cx.globals cx in
             let _ = GlobalEnv.lookup_datatype name sign in
             let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
+            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {lbl = name})
 
         | `Ix _ ->
           failwith "elab_inf: impossible"
@@ -784,7 +784,8 @@ struct
 
   and elab_chk_cut exp frms ty =
     match Tm.unleash ty with
-    | Tm.Data dlbl ->
+    | Tm.Data info ->
+      let dlbl = info.lbl in
       begin
         match exp.con with
         | E.Var {name = clbl; _} ->
@@ -814,7 +815,7 @@ struct
         M.ret (sub, tm)
 
       | `Rec Desc.Self, E.App e ->
-        let ty = Tm.make @@ Tm.Data dlbl in
+        let ty = Tm.make @@ Tm.Data {lbl = dlbl} in
         elab_chk e {ty; sys = []} >>= fun tm ->
         let sub = Tm.dot (Tm.ann ~ty ~tm) sub in
         M.ret (sub, tm)

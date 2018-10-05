@@ -155,7 +155,7 @@ let tac_pair tac0 tac1 : chk_tac =
 
 let unleash_data ty =
   match Tm.unleash ty with
-  | Tm.Data dlbl -> dlbl
+  | Tm.Data info -> info.lbl
   | _ ->
     Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"

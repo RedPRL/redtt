@@ -1282,8 +1282,8 @@ struct
       let tclo = TickClo {bnd; rho} in
       make @@ Next tclo
 
-    | Tm.Data lbl ->
-      make @@ Data lbl
+    | Tm.Data info ->
+      make @@ Data info.lbl
 
     | Tm.Intro (dlbl, clbl, args) ->
       let desc = Sig.lookup_datatype dlbl in

@@ -257,7 +257,7 @@ struct
 
       | _, Data lbl0, Data lbl1 ->
         if lbl0 = lbl1 then
-          Tm.make @@ Tm.Data lbl0
+          Tm.make @@ Tm.Data {lbl = lbl0}
         else
           raise @@ E (UnequalLbl (lbl0, lbl1))
 

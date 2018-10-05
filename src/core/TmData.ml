@@ -42,7 +42,7 @@ type 'a tmf =
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
-  | Data of string
+  | Data of {lbl : string}
   | Intro of string * string * 'a list
 
 

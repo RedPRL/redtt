@@ -348,8 +348,8 @@ struct
       let cmd' = traverse_cmd cmd in
       Up cmd'
 
-    | Data lbl ->
-      Data lbl
+    | Data {lbl} ->
+      Data {lbl}
 
     | Intro (dlbl, clbl, args) ->
       let args' = traverse_list traverse_tm args in
@@ -911,7 +911,7 @@ let rec pp env fmt =
     | Up cmd ->
       pp_cmd env fmt cmd
 
-    | Data lbl ->
+    | Data {lbl} ->
       Uuseg_string.pp_utf_8 fmt lbl
 
     | Intro (_dlbl, clbl, args) ->
@@ -1488,11 +1488,11 @@ let rec eta_contract t =
             begin
               match as_plain_var arg with
               | Some y'
-              when
-                y = y'
-                && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
-              ->
-              up (hd, sp)
+                when
+                  y = y'
+                  && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
+                ->
+                up (hd, sp)
               | _ ->
                 make @@ Lam (bind y tm'y)
             end
