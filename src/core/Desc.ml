@@ -19,6 +19,7 @@ module Telescope (B : LocallyNameless.S) (E : LocallyNameless.S) :
 sig
   include LocallyNameless.S with type t = (B.t, E.t) telescope
   val bind : Name.t -> t -> t bnd
+  val unbind_with : Tm.tm Tm.cmd -> t bnd -> t
 end =
 struct
   type t = (B.t, E.t) telescope
@@ -41,8 +42,20 @@ struct
       let tele = close_var a (i + 1) tele in
       TCons (b, Tm.B (nm, tele))
 
+  let rec subst sub =
+    function
+    | TNil e ->
+      TNil (E.subst sub e)
+    | TCons (b, Tm.B (nm, tele)) ->
+      let b = B.subst sub b in
+      let tele = subst (Tm.lift sub) tele in
+      TCons (b, Tm.B (nm, tele))
+
   let bind x tele =
     Tm.B (Name.name x, close_var x 0 tele)
+
+  let unbind_with cmd (Tm.B (_, tele)) =
+    subst (Tm.dot cmd (Tm.shift 0)) tele
 end
 
 type constr = (arg_spec, (tm, tm) system) telescope
@@ -62,6 +75,12 @@ struct
     | `Const tm -> `Const (Tm.close_var a i tm)
     | `Rec Self -> `Rec Self
     | `Dim -> `Dim
+
+  let subst sub =
+    function
+    | `Const tm -> `Const (Tm.subst sub tm)
+    | `Rec Self -> `Rec Self
+    | `Dim -> `Dim
 end
 
 module Face : LocallyNameless.S with type t = (tm, tm) face =
@@ -73,6 +92,9 @@ struct
 
   let close_var a i (t0, t1, ot) =
     Tm.close_var a i t0, Tm.close_var a i t1, Option.map (Tm.close_var a i) ot
+
+  let subst sub (t0, t1, ot) =
+    Tm.subst sub t0, Tm.subst sub t1, Option.map (Tm.subst sub) ot
 end
 
 module Boundary = LocallyNameless.List (Face)
@@ -111,6 +133,7 @@ struct
   type t = tm
   let open_var i a = Tm.open_var i a
   let close_var i a = Tm.close_var i a
+  let subst = Tm.subst
 end
 
 module LabeledConstr = LocallyNameless.Pair (LocallyNameless.Const (struct type t = string end)) (Constr)

@@ -627,16 +627,7 @@ struct
           M.lift (C.lookup_meta x) <<@> fun (ty, _) ->
             Tm.shift_univ ushift ty, (Tm.Meta {name = x; ushift}, [])
 
-
-        | `Datatype dlbl ->
-          (* TODO: This needs to be handled like Intro now, where we can consume a whole spine... *)
-          M.lift C.base_cx <<@> fun cx ->
-            let sign = Cx.globals cx in
-            let _ = GlobalEnv.lookup_datatype name sign in
-            let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data {lbl = name; params = []})
-
-        | `Ix _ ->
+        | _ ->
           failwith "elab_inf: impossible"
       end
 
@@ -790,13 +781,14 @@ struct
       let dlbl = info.lbl in
       begin
         match exp.con with
-        | E.Var {name = clbl; _} ->
+        | E.Var {name; _} ->
           begin
             M.lift C.base_cx >>= fun cx ->
             let sign = Cx.globals cx in
             let desc = GlobalEnv.lookup_datatype dlbl sign in
-            let constr = Desc.lookup_constr clbl desc in
-            elab_intro dlbl info.params clbl constr frms
+            let _ = failwith "TODO: intsantiate datatype with params" in
+            let constr = Desc.lookup_constr name desc in
+            elab_intro dlbl info.params name constr frms
           end
           <+> elab_mode_switch_cut exp frms ty
 
@@ -805,7 +797,41 @@ struct
       end
 
     | _ ->
-      elab_mode_switch_cut exp frms ty
+      match exp.con with
+      | E.Var {name; _} ->
+        M.lift C.resolver >>= fun renv ->
+        begin
+          match ResEnv.get name renv with
+          | `Datatype dlbl ->
+            elab_data dlbl frms
+          | _ ->
+            elab_mode_switch_cut exp frms ty
+        end
+      | _ ->
+        elab_mode_switch_cut exp frms ty
+
+
+  and elab_data dlbl frms =
+    M.lift C.base_cx >>= fun cx ->
+    let sign = Cx.globals cx in
+    let desc = GlobalEnv.lookup_datatype dlbl sign in
+
+    let rec go acc tele frms =
+      match tele, frms with
+      | Desc.TNil _, [] ->
+        let params = Bwd.to_list acc in
+        M.ret @@ Tm.make @@ Tm.Data {lbl = dlbl; params}
+
+      | Desc.TCons (pty, btele), E.App e :: frms ->
+        elab_chk e {ty = pty; sys = []} >>= fun tm ->
+        let tele = Desc.Body.unbind_with (Tm.ann ~ty:pty ~tm:tm) btele in
+        go (acc #< tm) tele frms
+
+      | _ ->
+        failwith "elab_data: length mismatch"
+
+    in
+    go Emp desc.body frms
 
   and elab_intro dlbl params clbl constr frms =
     let elab_arg sub spec frm =

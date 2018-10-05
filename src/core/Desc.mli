@@ -35,6 +35,7 @@ module Body :
 sig
   include LocallyNameless.S with type t = body
   val bind : Name.t -> t -> t Tm.bnd
+  val unbind_with : Tm.tm Tm.cmd -> t Tm.bnd -> t
 end
 
 type desc =

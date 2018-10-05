@@ -531,6 +531,14 @@ end
 
 
 
+let rec lift sub =
+  Dot (ix 0, Cmp (Shift 1, sub))
+
+and liftn n (sub : tm cmd subst) : tm cmd subst  =
+  match n with
+  | 0 -> sub
+  | _ -> liftn (n - 1) @@ lift sub
+
 
 
 
@@ -547,14 +555,6 @@ struct
 
   let should_traverse info =
     not @@ Info.is_locally_closed info
-
-  let rec lift sub =
-    Dot (ix 0, Cmp (Shift 1, sub))
-
-  and liftn n (sub : tm cmd subst) : tm cmd subst  =
-    match n with
-    | 0 -> sub
-    | _ -> liftn (n - 1) @@ lift sub
 
   let under_meta f = f ()
 
