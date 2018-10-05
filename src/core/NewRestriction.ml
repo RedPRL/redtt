@@ -10,7 +10,7 @@ type t =
   {index : (atom, int) T.t;
    next : int;
    rank : (int, int) T.t;
-   mutable parent : (int, cls) T.t}
+   parent : (int, cls) T.t}
 
 type 'a m = [`Changed of 'a | `Same]
 
@@ -25,24 +25,28 @@ let emp () =
    rank = T.init ~size;
    parent = T.init ~size}
 
-let find_index (x : int) (h : t) : cls =
-  let rec go x (parent : (int, cls) T.t) : (int, cls) T.t * cls =
+(*
+let find_index_with_compression (x : int) (h : t) : cls =
+  let rec go x (parent : (int, cls) T.t) : cls * (int, cls) T.t =
     match T.get x parent with
-    | `Atom x_parent' as x_parent ->
-      if x_parent' == x then
-        parent, x_parent
-      else
-        let parent, cls = go x_parent' parent in
-        let parent = T.set x cls parent in
-        parent, cls
-    | cls -> parent, cls
+    | `Atom x_parent as cur_cls ->
+      let cls, parent = go x_parent parent in
+      cls, if cur_cls = cls then parent else T.set x cls parent
+    | cls -> cls, parent
     | exception Not_found ->
-      let parent = T.set x (`Atom x) parent in
-      parent, `Atom x
+      `Atom x, parent
   in
-  let parent, cls = go x h.parent in
+  let cls, parent = go x h.parent in
   h.parent <- parent;
   cls
+*)
+
+(* the version without path compression *)
+let rec find_index (x : int) (h : t) : cls =
+  match T.get x h.parent with
+  | `Atom x_parent -> find_index x_parent h
+  | cls -> cls
+  | exception Not_found -> `Atom x
 
 let find_cls (x : cls) (h : t) : cls =
   match x with
