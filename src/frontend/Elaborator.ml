@@ -205,8 +205,12 @@ struct
             let x = Name.named @@ Some nm in
             let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
             elab_chk ety {ty = univ; sys = []} >>= fun pty ->
-            M.in_scope x (`P pty) (go args) <<@> fun constr ->
-              Desc.TCons (`Const pty, Desc.Constr.bind x constr)
+            M.lift @@ C.check ~ty:univ pty >>= function
+            | `Ok ->
+              M.in_scope x (`P pty) (go args) <<@> fun constr ->
+                Desc.TCons (`Const pty, Desc.Constr.bind x constr)
+            | `Exn exn ->
+              raise exn
         end
 
       | `I nm :: args ->
