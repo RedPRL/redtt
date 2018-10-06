@@ -229,3 +229,78 @@ let is_strict_set desc =
     List.fold_right (fun (_, constr) r -> constr_is_point constr && r) constrs true
   | _ ->
     false
+
+
+let pp_arg_spec ?dlbl:(dlbl="self") env fmt spec =
+  match spec with
+  | `Const tm -> Tm.pp env fmt tm
+  | `Rec Self -> Uuseg_string.pp_utf_8 fmt dlbl
+  | `Dim -> Format.fprintf fmt "dim"
+
+let pp_constr ?dlbl:(dlbl="self") =
+  let pp_nil env fmt sys =
+    match sys with
+    | [] -> ()
+    | _ -> Format.fprintf fmt "@ %a" (Tm.pp_sys env) sys
+  in
+  let pp_sep fmt tele =
+    match tele with
+    | TNil _ -> Format.fprintf fmt ""
+    | TCons _ -> Format.fprintf fmt "@ "
+  in
+  let rec pp_tele env fmt constr =
+    match constr with
+    | TNil sys -> pp_nil env fmt sys
+    | TCons(spec, Tm.B (nm, constr)) ->
+       let x, env' = Pp.Env.bind env nm in
+       Format.fprintf fmt "@[<hv1>@[<hv1>[%s : %a]@]%a%a@]"
+         x
+         (pp_arg_spec ~dlbl env) spec
+         pp_sep constr
+         (pp_tele env') constr
+  in
+  pp_tele
+
+let pp_named_constr ?dlbl:(dlbl="self") env fmt (nm, constr) =
+  let pp_sep fmt constr =
+    match constr with
+    | TNil [] -> Format.fprintf fmt ""
+    | _ -> Format.fprintf fmt "@ "
+  in
+  Format.fprintf fmt "@[<hv1>| %a%a%a@]"
+    Uuseg_string.pp_utf_8 nm
+    pp_sep constr
+    (pp_constr ~dlbl env) constr
+
+let pp_constrs ?dlbl:(dlbl="self") env fmt constrs =
+  let pp_sep fmt () = Format.fprintf fmt "@ " in
+  Format.pp_print_list ~pp_sep (pp_named_constr ~dlbl env) fmt constrs
+
+let pp_desc ?dlbl:(dlbl="self") env fmt {kind; lvl; body; status} =
+  let status_string =
+    match status with
+    | `Complete -> ""
+    | `Partial -> " partial"
+  in
+  let pp_nil env fmt constrs =
+    Format.fprintf fmt "(U %a %a) where"
+      Kind.pp kind
+      Lvl.pp lvl;
+    match constrs with
+    | [] -> ()
+    | _ -> Format.fprintf fmt "@ %a" (pp_constrs ~dlbl env) constrs
+  in
+  let rec pp_tele env fmt body =
+    match body with
+    | TNil constrs -> pp_nil env fmt constrs
+    | TCons(param, Tm.B (nm, body)) ->
+       let x, env' = Pp.Env.bind env nm in
+       Format.fprintf fmt "@[<hv1>@[<hv1>[%s : %a]@]@ %a@]"
+         x
+         (Tm.pp env) param
+         (pp_tele env') body
+  in
+  Format.fprintf fmt "@[<hv1>(data%s %a@ : %a)@]"
+    status_string
+    Uuseg_string.pp_utf_8 dlbl
+    (pp_tele env) body

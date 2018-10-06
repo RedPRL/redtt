@@ -60,3 +60,7 @@ val lookup_constr : string -> constrs -> constr
 
 (** Returns 'yes' if the description specifies strictly no higher dimensional structure, like the natural numbers. *)
 val is_strict_set : desc -> bool
+
+val pp_constr : ?dlbl:string -> constr Pp.t
+val pp_constrs : ?dlbl:string -> constrs Pp.t
+val pp_desc : ?dlbl:string -> desc Pp.t
