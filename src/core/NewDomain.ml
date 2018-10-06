@@ -165,6 +165,7 @@ sig
   val freshen_name : Name.t -> Name.t * t
   val freshen_names : Name.t bwd -> Name.t bwd * t
   val swap_name : t -> Name.t -> Name.t
+  val swap_name_opt : t -> Name.t -> Name.t option
   val fold : (Name.t -> Name.t -> 'a -> 'a) -> t -> 'a -> 'a
 end =
 struct
@@ -185,6 +186,9 @@ struct
 
   let swap_name perm x =
     try List.assoc x perm with Not_found -> x
+
+  let swap_name_opt perm x =
+    List.assoc_opt x perm
 
   let fold f = List.fold_right (fun (x, x') a -> f x x' a)
 end
@@ -2350,9 +2354,11 @@ end
 
     let swap pi abs =
       let Abs (x, a) = abs in
-      let x' = Perm.swap_name pi x in
-      let a' = X.swap pi a in
-      Abs (x', a')
+      match Perm.swap_name_opt pi x with
+      | Some _ -> abs (* (x,b) [x->y] = (x,b)*)
+      | None ->
+        let a' = X.swap pi a in
+        Abs (x, a')
 
     let subst r z abs =
       let Abs (x, a_x) = abs in
@@ -2378,8 +2384,11 @@ end
 
     let inst rel abs r =
       let Abs (x, a_x) = abs in
-      let rel_x = Rel.hide' x rel in
-      X.run rel_x @@ X.subst r x a_x
+      if r = `Atom x then
+        a_x
+      else
+        let rel_x = Rel.hide' x rel in
+        X.run rel_x @@ X.subst r x a_x
   end
 
 and AbsPlug : functor (X : DomainPlug) ->
