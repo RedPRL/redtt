@@ -219,15 +219,15 @@ struct
 
     in
 
-    let rec rebind_constr n params constr =
-      match params with
-      | [] -> constr
-      | (x, _) :: params ->
-        rebind_constr (n + 1) params @@
+    let rec rebind_constr n psi constr =
+      match psi with
+      | Emp -> constr
+      | Snoc (psi, (x, _)) ->
+        rebind_constr (n + 1) psi @@
         Desc.Constr.close_var x n constr
     in
 
-    go econstr.specs <<@> fun constr -> clbl, rebind_constr 0 psi constr
+    go econstr.specs <<@> fun constr -> clbl, rebind_constr 0 (Bwd.from_list psi) constr
 
 
   and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =
