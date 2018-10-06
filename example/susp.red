@@ -35,7 +35,5 @@ let s1→sphere1 : s1 → sphere1 =
   elim [
   | base → north
   | loop i →
-    let m0 (i : dim) : sphere1 = merid ff i in
-    let m1 (i : dim) : sphere1 = merid tt i in
-    trans _ m0 (symm _ m1) i
+    trans sphere1 (λ i → merid ff i) (symm sphere1 (λ i → merid tt i)) i
   ]
