@@ -126,6 +126,16 @@ struct
     | TCons (_, Tm.B (_, constr)) ->
       boundary constr
 
+  let pp_cell fmt =
+    function
+    | (Some lbl, `Const ty) ->
+      Format.fprintf fmt "%s : %a" lbl Tm.pp0 ty
+    | _ ->
+      Format.fprintf fmt "<cell>"
+
+  let pp fmt tele =
+    Pp.pp_list pp_cell fmt @@ specs tele
+
 end
 
 type param = tm

@@ -25,6 +25,8 @@ sig
 
   val specs : t -> (string option * arg_spec) list
   val boundary : t -> (tm, tm) system
+
+  val pp : t Pp.t0
 end
 
 type param = tm
@@ -35,7 +37,11 @@ module Body :
 sig
   include LocallyNameless.S with type t = body
   val bind : Name.t -> t -> t Tm.bnd
+
+  (** Invariant: first argument is locally closed. *)
   val unbind_with : Tm.tm Tm.cmd -> t Tm.bnd -> t
+
+  (** Invariant: first argument is locally closed. *)
   val instance : Tm.tm list -> t -> constrs
 end
 

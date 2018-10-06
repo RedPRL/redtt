@@ -239,8 +239,8 @@ let rec check_ cx ty rst tm =
     let (module Q) = Cx.quoter cx in
     Q.equiv_data_params (Cx.qenv cx) dlbl desc.body vparams data.params;
     let data_ty = Cx.quote_ty cx ty in
-    let constr = Desc.lookup_constr clbl @@ Desc.Body.instance params desc.body in
-    check_constr cx dlbl data.params constr args;
+    let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
+    check_intro cx dlbl data.params constr args;
 
   | [], D.Data dlbl, T.FHCom info ->
     check_fhcom cx ty info.r info.r' info.cap info.sys
@@ -396,7 +396,7 @@ and check cx ty tm =
   check_ cx ty [] tm
 
 
-and check_constr cx dlbl params constr tms =
+and check_intro cx dlbl params constr tms =
   let vdataty = D.make @@ D.Data {lbl = dlbl; params} in
   let (module V) = Cx.evaluator (Cx.clear_locals cx) in
 
@@ -716,7 +716,7 @@ and infer_spine_ cx hd sp =
       in
 
       let desc = V.Sig.lookup_datatype info.dlbl in
-      let constrs = Desc.Body.instance info.params desc.body in
+      let constrs = Desc.constrs desc in
 
       if desc.status = `Partial then failwith "Cannot call eliminator on partially-defined datatype";
 
@@ -767,7 +767,7 @@ and infer_spine_ cx hd sp =
             let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl', _) -> clbl' = clbl) nclos in
             let rec go specs tms =
               match specs, tms with
-              | (_, `Const ty) :: specs, tm :: tms ->
+              | (_, `Const _) :: specs, tm :: tms ->
                 `Val (D.Value.act phi @@ V.eval benv tm) :: go specs tms
               | (_, `Rec Desc.Self) :: specs, tm :: tms ->
                 `Val (D.Value.act phi @@ V.eval benv tm) :: `Val (image_of_bterm phi tm) :: go specs tms
