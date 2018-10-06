@@ -227,7 +227,8 @@ struct
         Desc.Constr.close_var x n constr
     in
 
-    go econstr.specs <<@> fun constr -> clbl, rebind_constr 0 (Bwd.from_list psi) constr
+    go econstr.specs <<@> fun constr ->
+      clbl, rebind_constr 0 (Bwd.from_list psi) constr
 
 
   and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =
