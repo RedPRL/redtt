@@ -505,7 +505,8 @@ struct
     | Elim info ->
       let mot = traverse_bnd traverse_tm info.mot in
       let clauses = List.map (fun (lbl, bnd) -> lbl, traverse_nbnd traverse_tm bnd) info.clauses in
-      Elim {info with mot; clauses}
+      let params = traverse_list traverse_tm info.params in
+      Elim {info with mot; params; clauses}
 
     | VProj info ->
       let r = traverse_tm info.r in
