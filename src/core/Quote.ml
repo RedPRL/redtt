@@ -364,8 +364,7 @@ struct
       | Data data, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
         let desc = V.Sig.lookup_datatype data.lbl in
         let params = equate_data_params env data.lbl desc.body data.params data.params in
-        (* The following code is wrong! We must not use Desc.Body.instance here, when there are local variables. *)
-        let constr = Desc.lookup_constr info0.clbl @@ Desc.Body.instance params desc.body in
+        let constr = Desc.lookup_constr info0.clbl @@ Desc.constrs desc in
         let tms = equate_constr_args env data.lbl data.params constr info0.args info1.args in
         Tm.make @@ Tm.Intro (data.lbl, info0.clbl, params, tms)
 
@@ -579,9 +578,7 @@ struct
         in
 
         let params = equate_data_params env dlbl desc.body elim0.params elim1.params in
-        (* The following code is wrong! We must not use Desc.Body.instance here, when there are local variables. *)
-        let constrs = Desc.Body.instance params desc.body in
-        let clauses = List.map quote_clause constrs in
+        let clauses = List.map quote_clause @@ Desc.constrs desc in
         let frame = Tm.Elim {dlbl; mot; clauses; params} in
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
