@@ -36,8 +36,6 @@ sig
   val ext_apply : value -> dim list -> value
   val prev : tick -> value -> value
 
-  val elim_data : string -> params:env_el list -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
-
   val do_fst : value -> value
   val do_snd : value -> value
   val lbl_call : value -> value
@@ -60,6 +58,11 @@ sig
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_restriction_ty : value -> val_face
 
+
+  val realize_rec_spec : dlbl:string -> params:env_el list -> Desc.rec_spec -> value
+  val realize_rec_spec_ih : dlbl:string -> params:env_el list -> mot:clo -> Desc.rec_spec -> value -> value
+
+  val elim_data : string -> params:env_el list -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
   val make_intro : env -> dlbl:string -> params:env_el list -> clbl:string -> env_el list -> value
 
   module Sig : Sig

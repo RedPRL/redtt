@@ -397,9 +397,7 @@ and check cx ty tm =
 
 
 and check_intro cx dlbl params constr tms =
-  let vdataty = D.make @@ D.Data {lbl = dlbl; params} in
   let (module V) = Cx.evaluator (Cx.clear_locals cx) in
-
 
   let check_argument tyenv _lbl spec tm =
     match spec with
@@ -407,8 +405,9 @@ and check_intro cx dlbl params constr tms =
       let vty = V.eval tyenv ty in
       let el = check_eval cx vty tm in
       D.Env.snoc tyenv @@ `Val el
-    | `Rec Desc.Self ->
-      let el = check_eval cx vdataty tm in
+    | `Rec rspec ->
+      let vty = V.realize_rec_spec ~dlbl ~params rspec in
+      let el = check_eval cx vty tm in
       D.Env.snoc tyenv @@ `Val el
     | `Dim ->
       let r = check_eval_dim cx tm in
@@ -736,10 +735,10 @@ and infer_spine_ cx hd sp =
             let venv = D.Env.snoc venv @@ `Val v in
             go cx venv (cells_only_ihs #< (`Val v)) (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
-          | (lbl, `Rec Desc.Self) :: specs ->
-            let vty = D.make @@ D.Data {lbl = info.dlbl; params = vparams} in
+          | (lbl, `Rec rspec) :: specs ->
+            let vty = V.realize_rec_spec ~dlbl:info.dlbl ~params:vparams rspec in
             let cx, v = Cx.ext_ty cx ~nm:lbl vty in
-            let cx_ih, v_ih = Cx.ext_ty cx ~nm:None @@ V.inst_clo mot_clo v in
+            let cx_ih, v_ih = Cx.ext_ty cx ~nm:None @@ V.realize_rec_spec_ih ~dlbl:info.dlbl ~params:vparams ~mot:mot_clo rspec v in
             let venv = D.Env.snoc venv @@ `Val v in
             go cx_ih venv (cells_only_ihs #< (`Val v_ih)) (cells_w_ihs <>< [`Val v; `Val v_ih]) (cells #< (`Val v)) specs
 

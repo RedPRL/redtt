@@ -533,6 +533,18 @@ struct
     let ncoe_sys = rr'_face @ List.map (Face.map coe_face) rst_sys in
     make @@ Up {ty; neu = ncoe; sys = ncoe_sys}
 
+
+  and realize_rec_spec ~dlbl ~params =
+    function
+    | Desc.Self ->
+      make @@ Data {lbl = dlbl; params}
+
+  and realize_rec_spec_ih ~dlbl ~params ~mot rspec scrut =
+    match rspec with
+    | Desc.Self ->
+      inst_clo mot scrut
+
+
   (* TODO: check that this is right *)
   and rigid_multi_coe tyenv data_abs dir (x, specs) args =
     match specs, args with

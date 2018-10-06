@@ -403,8 +403,8 @@ struct
         let tm0 = equate env vty el0 el1 in
         go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
 
-      | (_, `Rec Desc.Self) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
-        let vty = D.make @@ D.Data {lbl = dlbl; params} in
+      | (_, `Rec rspec) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
+        let vty = V.realize_rec_spec ~dlbl ~params rspec in
         let tm0 = equate env vty el0 el1 in
         go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
 
@@ -546,8 +546,8 @@ struct
               let qenv' = Env.succ qenv in
               go qenv' tyenv' (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
-            | (_, `Rec Desc.Self) :: specs ->
-              let vty = D.make @@ D.Data {lbl = dlbl; params = elim0.params} in
+            | (_, `Rec rspec) :: specs ->
+              let vty = V.realize_rec_spec ~dlbl ~params:elim0.params rspec in
               let v = generic qenv vty in
               let qenv' = Env.succ qenv in
               let vih = generic qenv' @@ V.inst_clo elim0.mot v in
