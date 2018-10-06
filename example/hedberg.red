@@ -13,10 +13,11 @@ let dec (A : type) : type =
 let discrete (A : type) : type =
   (x y : A) → dec (path A x y)
 
-let dec→stable (A : type) (d : dec A) : stable A =
-  or/elim A (neg A) (stable A) d
-    (λ a _ → a)
-    (λ x y → elim (y x) [])
+let dec→stable (A : type) : dec A → stable A =
+  elim [
+  | inl a → λ _ → a
+  | inr f → λ g → elim (g f) []
+  ]
 
 let neg/is-prop-over (A : dim → type)
   : is-prop-over (λ i → neg (A i))
