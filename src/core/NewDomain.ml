@@ -1410,10 +1410,10 @@ struct
     | Univ _ ->
       HCom {r; r'; ty = `Pos; cap; sys}
 
-    | V info ->
-      let rel0 = Rel.equate' r `Dim0 rel in
+    | V ({r = s; _} as info) ->
+      let rel0 = Rel.equate' s `Dim0 rel in
       let func = Val.plug rel0 ~rigid:true Fst info.equiv in
-      let vproj_frame = VProj {r; func} in
+      let vproj_frame = VProj {r = s; func} in
       let hcom0 r' = make_hcom rel0 r r' ~ty:(Val.unleash info.ty0)
         ~cap:(Val.run rel0 cap) ~sys:(ConAbsSys.run rel0 sys) in
       let el0 = Val.make @@ hcom0 r' in
@@ -1421,7 +1421,7 @@ struct
         let cap = Val.plug rel ~rigid:true vproj_frame cap in
         let sys =
           let face0 =
-            r, `Dim0,
+            s, `Dim0,
             LazyValAbs.bind @@ fun y ->
             let arg0 = FunApp (Val.make @@ hcom0 y) in
             Val.plug_then_unleash rel0 ~rigid:true arg0 func
@@ -1430,7 +1430,7 @@ struct
         in
         rigid_hcom rel r r' ~ty:(Val.unleash info.ty1) ~cap ~sys
       in
-      VIn {r; el0; el1}
+      VIn {r = s; el0; el1}
 
     | HCom ({r = s; r' = s'; ty = `Pos; _} as fhcom) ->
       (* [F]: favonia 11.00100100001111110110101010001000100001011. *)
