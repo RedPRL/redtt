@@ -401,8 +401,7 @@ and check_intro cx dlbl params constr tms =
   let (module V) = Cx.evaluator (Cx.clear_locals cx) in
 
 
-  let check_argument tyenv lbl spec tm =
-    let lbl = Option.get_exn lbl in
+  let check_argument tyenv _lbl spec tm =
     match spec with
     | `Const ty ->
       let vty = V.eval tyenv ty in
