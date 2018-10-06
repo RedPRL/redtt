@@ -189,10 +189,10 @@ let lookup_datatype dlbl =
     GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
 
 let make_motive ~data_ty ~tac_mot ~scrut ~ty =
-  match tac_mot with
-  | None ->
+  match tac_mot, ty with
+  | None, Some ty ->
     guess_motive scrut ty
-  | Some tac_mot ->
+  | Some tac_mot, _ ->
     let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
     let mot_ty = Tm.pi None data_ty univ in
     tac_mot {ty = mot_ty; sys = []} >>= fun mot ->
@@ -201,6 +201,7 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
       @< Tm.FunApp (Tm.up @@ Tm.ix 0)
     in
     M.ret @@ Tm.B (None, Tm.up @@ motx)
+  | _ -> failwith "make_motive"
 
 
 let rec tac_lambda (ps : ESig.einvpat list) tac goal =
@@ -396,12 +397,21 @@ and tac_inv_let p itac ctac =
   | _ ->
     failwith "tac_inv_let: not supported"
 
+and tac_elim_inf ~loc ~tac_mot ~tac_scrut ~clauses ~default : inf_tac =
+  tac_scrut >>= fun (data_ty, scrut) ->
+  normalize_ty data_ty >>= fun data_ty ->
+
+  make_motive ~data_ty ~scrut ~tac_mot:(Some tac_mot) ~ty:None >>= fun bmot ->
+  let goal = {ty = Tm.unbind_with (Tm.ann ~ty:data_ty ~tm:scrut) bmot; sys = []} in
+  tac_elim ~loc ~tac_mot:(Some tac_mot) ~tac_scrut ~clauses ~default goal >>= fun tm ->
+  M.ret (goal.ty, tm)
+
 and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
   fun goal ->
     tac_scrut >>= fun (data_ty, scrut) ->
     normalize_ty data_ty >>= fun data_ty ->
 
-    make_motive ~data_ty ~scrut ~tac_mot ~ty:goal.ty >>= fun bmot ->
+    make_motive ~data_ty ~scrut ~tac_mot ~ty:(Some goal.ty) >>= fun bmot ->
 
     let mot arg =
       let Tm.B (_, motx) = bmot in

@@ -118,6 +118,11 @@ atomoid_econ:
   | HOLE_NAME; LBR; e = located(econ); RBR
     { E.Guess e }
 
+  | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
+    { match scrut with
+    | Some scrut -> E.Elim {mot; scrut; clauses}
+    | None -> E.ElimFun {clauses} }
+
   | spec = univ_spec
     { let k, l = spec in E.Type (k, l) }
   (* in theory this rule can replace the following three, but it seems there's some bug.
@@ -206,11 +211,6 @@ econ:
 
   | LET; pat = einvpat; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
     { E.Let {pat; sch = sch; tm; body} }
-
-  | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
-    { match scrut with
-    | Some scrut -> E.Elim {mot; scrut; clauses}
-    | None -> E.ElimFun {clauses} }
 
   | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }

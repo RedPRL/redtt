@@ -705,7 +705,15 @@ struct
           ty, Tm.ann ~tm:fix ~ty
       end
 
+    | E.Elim {mot = Some mot; scrut; clauses} ->
+      let tac_mot = elab_chk mot in
+      let tac_scrut = elab_inf scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
+      let clauses, default = elab_elim_clauses clauses in
+      tac_elim_inf ~loc:e.span ~tac_mot ~tac_scrut ~clauses ~default <<@> fun (ty, tm) ->
+        ty, Tm.ann ~ty ~tm
+
     | _ ->
+      Format.eprintf "Elaborator error: %a@." ESig.pp e.con;
       failwith "Can't infer"
 
   and elab_dim e =

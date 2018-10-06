@@ -48,6 +48,15 @@ val tac_elim
   -> default:chk_tac option
   -> chk_tac
 
+(** Call a data elimination rule. *)
+val tac_elim_inf
+  : loc:location
+  -> tac_mot:chk_tac
+  -> tac_scrut:inf_tac
+  -> clauses:(string * ESig.einvpat ESig.epatbind list * chk_tac) list
+  -> default:chk_tac option
+  -> inf_tac
+
 val tac_generalize
   : tac_scrut:inf_tac
   -> chk_tac
