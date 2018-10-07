@@ -1449,6 +1449,10 @@ struct
         | cell ->
           let err = UnexpectedEnvCell cell in
           raise @@ E err
+        | exception exn ->
+          Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+          Format.eprintf "@.";
+          raise exn
       end
 
     | Tm.Var info ->
