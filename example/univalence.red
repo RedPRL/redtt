@@ -37,24 +37,14 @@ let id-equiv (A : type) : equiv A A =
     )
   )
 
-let path→equiv
-  (A B : type) (P : path^1 type A B)
-  : equiv A B
-  =
+let path→equiv (A B : type) (P : path^1 type A B) : equiv A B =
   coe 0 1 (id-equiv A) in λ i → equiv A (P i)
 
-let pi/prop
-  (A : type) (B : A → type)
-  (B/prop : (a : A) → is-prop (B a))
-  : is-prop ((a : A) → B a)
-  =
+let pi/prop (A : type) (B : A → type) (B/prop : (a : A) → is-prop (B a)) : is-prop ((a : A) → B a) =
   λ f g i a →
     B/prop a (f a) (g a) i
 
-let prop→set
-  (A : type) (A/prop : is-prop A)
-  : is-set A
-  =
+let prop→set (A : type) (A/prop : is-prop A) : is-set A =
   λ a b p q i j →
     comp 0 1 a [
     | j=0 → A/prop a a
@@ -95,12 +85,9 @@ let is-contr/prop (A : type) : is-prop (is-contr A) =
         ]
     in
 
-    let contr/A/prop =
-      subtype-of-prop/prop _ (λ a → (b : A) → path A b a) A/prop
-        (λ a → pi/prop A (λ b → path A b a) (λ b → prop→set _ A/prop b a))
-    in
-
-    contr/A/prop contr
+    subtype-of-prop/prop _ (λ a → (b : A) → path A b a) A/prop
+      (λ a → pi/prop A (λ b → path A b a) (λ b → prop→set _ A/prop b a))
+      contr
 
 opaque
 let is-equiv/prop (A B : type) (f : A → B) : is-prop (is-equiv A B f) =
@@ -138,44 +125,27 @@ let is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv _ _ f) =
 -- per Dan Licata, ua and ua/beta suffice for full univalence:
 -- https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
 
-let ua/beta
-  (A B : type) (E : equiv A B) (a : A)
-  : path _ (coe 0 1 a in ua _ _ E) (E.fst a)
-  =
+let ua/beta (A B : type) (E : equiv A B) (a : A) : path _ (coe 0 1 a in ua _ _ E) (E.fst a) =
   λ i →
     coe i 1 (E.fst a) in refl
 
-let equiv→path/based
-  (A : type)
-  (X : (B : type) × equiv A B)
-  : (B : type) × path^1 type A B
-  =
+let equiv→path/based (A : type) (X : (B : type) × equiv A B) : (B : type) × path^1 type A B =
   ( X.fst
   , ua _ (X.fst) (X.snd)
   )
 
-let path→equiv/based
-  (A : type)
-  (X : (B : type) × path^1 type A B)
-  : (B : type) × equiv A B
-  =
+let path→equiv/based (A : type) (X : (B : type) × path^1 type A B) : (B : type) × equiv A B =
   ( X.fst
   , path→equiv _ (X.fst) (X.snd)
   )
 
 opaque
-let ua/retract
-  (A B : type)
-  : retract^1 _ _ (ua A B) (path→equiv A B)
-  =
+let ua/retract (A B : type) : retract^1 _ _ (ua A B) (path→equiv A B) =
   λ E →
     subtype/path _ (is-equiv _ _ ) (is-equiv/prop _ _) (path→equiv _ _ (ua A B E)) E
       (λ i a → ua/beta A B E (coe 1 i a in λ _ → A) i)
 
-let ua/retract/sig
-  (A : type)
-  : retract^1 _ _ (equiv→path/based A) (path→equiv/based A)
-  =
+let ua/retract/sig (A : type) : retract^1 _ _ (equiv→path/based A) (path→equiv/based A) =
   λ singl i →
     ( singl.fst
     , ua/retract _ (singl.fst) (singl.snd) i
