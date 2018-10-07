@@ -1943,7 +1943,7 @@ struct
         match args, specs with
         | cell :: args , (_, `Const _) :: specs ->
           cell :: go args specs
-        | `Val v :: args, (_, `Rec _) :: specs ->
+        | `Val v :: args, (_, `Rec Desc.Self) :: specs ->
           let v_ih = elim_data dlbl ~params ~mot ~scrut:v ~clauses in
           `Val v :: `Val v_ih :: go args specs
         | cell :: args, (_, `Dim) :: specs ->
