@@ -759,7 +759,7 @@ and infer_spine_ cx hd sp =
         (* maybe wrong *)
 
         let rec image_of_bterm phi rspec tm =
-          let benv = D.Env.append V.empty_env cells in
+          let benv = D.Env.append V.empty_env (vparams @ cells) in
           match rspec, Tm.unleash tm with
           | Desc.Self, Tm.Intro (_, clbl, params, args) ->
             let constr = Desc.lookup_constr clbl constrs in
