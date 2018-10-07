@@ -28,6 +28,7 @@ and mlcmd =
   | MlUnleash of mlval
   | MlNormalize of eterm
   | MlImport of string
+  | MlPrint of mlval info
 
 and edesc =
     EDesc of
@@ -174,6 +175,25 @@ struct
     | Clo of mlenv * mlname * mlcmd
 
   and mlenv = (mlname, t) MlEnv.t
+
+  let rec pp fmt =
+    function
+    | DataDesc desc ->
+      Desc.pp_desc Pp.Env.emp fmt desc
+    | Term tm ->
+      Tm.pp0 fmt tm
+    | Sys sys ->
+      Tm.pp_sys Pp.Env.emp fmt sys
+    | Ref a ->
+      Name.pp fmt a
+    | Clo _ ->
+      Format.fprintf fmt "<clo>"
+    | Thunk _ ->
+      Format.fprintf fmt "<thunk>"
+    | Tuple vs ->
+      let comma fmt () = Format.fprintf fmt ", " in
+      let pp_cells = Format.pp_print_list ~pp_sep:comma pp in
+      Format.fprintf fmt "<%a>" pp_cells vs
 
   let unleash_term =
     function

@@ -7,7 +7,7 @@
   module E = RedTT_Core.ESig
   module R = ResEnv
 
-  let eterm loc con : E.eterm =
+  let locate loc con =
     E.{con; span = Some loc}
 
   let atom_to_econ a =
@@ -41,7 +41,7 @@
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE DO LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
-%token IMPORT OPAQUE QUIT DEBUG NORMALIZE META DEF
+%token IMPORT OPAQUE QUIT DEBUG NORMALIZE META DEF PRINT
 %token TYPE PRE KAN
 %token EOF
 
@@ -51,7 +51,7 @@
 
 located(X):
   | e = X
-    { eterm $loc e }
+    { locate $loc e }
 
 univ_spec:
   | TYPE; k = kind
@@ -262,9 +262,9 @@ ecofib0:
   | BOUNDARY; LSQ; xs = nonempty_list(ATOM); RSQ;
     { let xi x =
         let pos = $loc(xs) in
-        let r = eterm pos @@ E.Var {name = x; ushift = 0} in
-        [r, eterm pos (E.Num 0);
-         r, eterm pos (E.Num 1)]
+        let r = locate pos @@ E.Var {name = x; ushift = 0} in
+        [r, locate pos (E.Num 0);
+         r, locate pos (E.Num 1)]
       in
       List.flatten @@ List.map xi xs }
 
@@ -279,7 +279,7 @@ eface:
   | phi = ecofib; RIGHT_ARROW; e = located(econ)
     { phi, e }
   | phi = ecofib0; xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
-    { phi, eterm ($startpos(xs), $endpos(e)) (E.Lam (List.map (fun x -> `Var (`User x)) xs, e)) }
+    { phi, locate ($startpos(xs), $endpos(e)) (E.Lam (List.map (fun x -> `Var (`User x)) xs, e)) }
 
 
 escheme:
@@ -287,7 +287,7 @@ escheme:
     { (List.flatten tele, cod) }
 
   | tele = list(etele_cell)
-    { (List.flatten tele, eterm ($endpos(tele), $endpos(tele)) E.Hope) }
+    { (List.flatten tele, locate ($endpos(tele), $endpos(tele)) E.Hope) }
 
 etele_cell:
   | LPR; xs = nonempty_list(ATOM); COLON; ty = located(econ); RPR
@@ -314,7 +314,7 @@ mltoplevel:
   (* TODO: need to resolve this name somehow *)
     { E.MlBind (cmd, `User a, rest) }
 
-  | META; DO; c = atomic_mlcmd; rest = mltoplevel
+  | DO; c = atomic_mlcmd; rest = mltoplevel
     { E.MlBind (c, `Gen (Name.fresh ()), rest) }
 
   | opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
@@ -375,6 +375,8 @@ atomic_mlcmd:
     { c }
   | BANG; v = mlvalue
     { E.MlUnleash v }
+  | PRINT; v = located(mlvalue)
+    { E.MlPrint v }
   | v = mlvalue
     { E.MlRet v }
 

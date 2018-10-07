@@ -153,7 +153,7 @@ struct
       let el = Cx.eval_cmd cx cmd in
       let tm = Cx.quote cx ~ty:vty el in
       M.emit e.span @@ M.PrintTerm {ty = ty; tm} >>
-      M.ret @@ E.MlSem.Tuple []
+      M.ret @@ E.MlSem.Term tm
 
     | E.MlSplit (tuple, xs, cmd) ->
       begin
@@ -165,6 +165,11 @@ struct
           failwith "expected tuple"
       end
 
+    | E.MlPrint info ->
+      eval_val info.con >>= fun v ->
+      let pp fmt () = ESig.MlSem.pp fmt v in
+      Log.pp_message ~loc:info.span ~lvl:`Info pp Format.std_formatter ();
+      M.ret @@ E.MlSem.Tuple []
 
 
   and eval_val =

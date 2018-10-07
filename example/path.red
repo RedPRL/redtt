@@ -5,7 +5,7 @@ meta let foo = {
 }
 
 -- uncomment the following for a nasty surprise:
--- meta do !foo
+-- do !foo
 
 def pathd (A : dim → type) (M : A 0) (N : A 1) : type =
   [i] A i [

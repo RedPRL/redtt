@@ -39,6 +39,7 @@ module Make (R : SOURCE) : LEXER = struct
     make_table 0 [
       ("V", V);
       ("opaque", OPAQUE);
+      ("print", PRINT);
       ("meta", META);
       ("quit", QUIT);
       ("in", IN);
