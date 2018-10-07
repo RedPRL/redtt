@@ -20,6 +20,7 @@ and mlcmd =
   | MlLam of mlname * mlcmd
   | MlApp of mlcmd * mlval
   | MlElab of escheme * eterm
+  | MlDeclData of {name : string; desc : edesc}
   | MlDefine of {name : mlval; opacity : [`Opaque | `Transparent]; ty : mlval; tm : mlval}
   | MlSplit of mlval * mlname list * mlcmd
   | MlUnify

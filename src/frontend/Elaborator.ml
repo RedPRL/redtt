@@ -127,6 +127,11 @@ struct
         M.ret @@ E.MlSem.Tuple []
       end
 
+    | E.MlDeclData info ->
+      elab_datatype info.name info.desc >>= fun desc ->
+      M.lift @@ C.declare_datatype info.name desc >>
+      M.ret @@ E.MlSem.Tuple []
+
     | E.MlImport file_name ->
       begin
         match I.import file_name with
