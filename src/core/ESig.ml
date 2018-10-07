@@ -1,17 +1,32 @@
-open RedTT_Core
+open RedBasis
 
 type 'a info =
   {con : 'a;
-   span : ElabMonad.location}
+   span : Log.location}
 
-type edecl =
-  | Define of string * [ `Opaque | `Transparent ] * escheme * eterm
-  | Data of string * edesc
-  | Debug of [ `All | `Constraints | `Unsolved ]
-  | Normalize of eterm
-  | Import of string
-  | Quit
+type mlname = [`Gen of Name.t | `User of string]
 
+type mlval =
+  | MlDataDesc of Desc.desc
+  | MlTerm of Tm.tm
+  | MlSys of (Tm.tm, Tm.tm) Tm.system
+  | MlThunk of mlcmd
+  | MlVar of mlname
+  | MlRef of Name.t
+  | MlTuple of mlval list
+
+and mlcmd =
+  | MlRet of mlval
+  | MlLam of mlname * mlcmd
+  | MlApp of mlcmd * mlval
+  | MlElab of escheme * eterm
+  | MlDefine of {name : mlval; opacity : [`Opaque | `Transparent]; ty : mlval; tm : mlval}
+  | MlSplit of mlval * mlname list * mlcmd
+  | MlUnify
+  | MlBind of mlcmd * mlname * mlcmd
+  | MlUnleash of mlval
+  | MlNormalize of eterm
+  | MlImport of string
 
 and edesc =
     EDesc of
@@ -69,6 +84,9 @@ and econ =
   | Var of {name : string; ushift : int}
   | Num of int
 
+  (* To run a metalanguage tactic *)
+  | RunML of mlval
+
 and eterm = econ info
 
 and eclause =
@@ -100,11 +118,8 @@ and frame =
   | Open
 
 
-type esig =
-  edecl list
-
 (* Please fill this in. I'm just using it for debugging. *)
-let rec pp fmt =
+let pp fmt =
   function
   | Hole _ ->
     Format.fprintf fmt "<hole>"
@@ -119,10 +134,53 @@ let rec pp fmt =
 
 let pp_edecl fmt =
   function
-  | Import str ->
+  | MlImport str ->
     Format.fprintf fmt "import %s" str
   | _ ->
     Format.fprintf fmt "<other>"
 
 let pp_esig =
   Pp.pp_list pp_edecl
+
+
+
+let mlbind cmd f =
+  let x = `Gen (Name.fresh ()) in
+  MlBind (cmd, x, f (MlVar x))
+
+let mlsplit v f =
+  let x = `Gen (Name.fresh ()) in
+  let y = `Gen (Name.fresh ()) in
+  MlSplit (v, [x; y], f (MlVar x) (MlVar y))
+
+let define ~name ~opacity ~scheme ~tm =
+  mlbind (MlElab (scheme, tm)) @@ fun x ->
+  mlsplit x @@ fun ty tm ->
+  mlbind (MlDefine {name; ty; tm; opacity}) @@ fun _ ->
+  MlUnify
+
+
+module MlEnv = PersistentTable.M
+module MlSem =
+struct
+  type t =
+    | DataDesc of Desc.desc
+    | Term of Tm.tm
+    | Sys of (Tm.tm, Tm.tm) Tm.system
+    | Ref of Name.t
+    | Thunk of mlenv * mlcmd
+    | Tuple of t list
+    | Clo of mlenv * mlname * mlcmd
+
+  and mlenv = (mlname, t) MlEnv.t
+
+  let unleash_term =
+    function
+    | Term tm -> tm
+    | _ -> failwith "unleash_term"
+
+  let unleash_ref =
+    function
+    | Ref x -> x
+    | _ -> failwith "unleash_ref"
+end

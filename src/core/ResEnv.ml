@@ -1,5 +1,4 @@
 open RedBasis
-open RedTT_Core
 open Bwd open BwdNotation
 
 type global =
@@ -38,7 +37,7 @@ let bindn xs renv =
 let bind_opt x renv =
   {renv with locals = renv.locals #< x}
 
-let rec get x renv =
+let get x renv =
   let rec go ys acc =
     match ys with
     | Emp ->

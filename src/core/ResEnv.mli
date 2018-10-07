@@ -1,5 +1,3 @@
-open RedTT_Core
-
 type resolution =
   [ `Ix of int
   | `Var of Name.t
