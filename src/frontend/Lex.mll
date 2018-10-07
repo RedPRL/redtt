@@ -49,6 +49,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("✓", TICK);
       ("dim", DIM);
       ("𝕀", DIM);
+      ("⊢", RIGHT_TACK);
       ("elim", ELIM);
       ("fst", FST);
       ("snd", SND);
@@ -117,6 +118,8 @@ rule token = parse
     { Lwt.return AT }
   | '`'
     { Lwt.return BACKTICK }
+  | "!-"
+    { Lwt.return RIGHT_TACK }
   | '|'
     { Lwt.return PIPE }
   | '^'
