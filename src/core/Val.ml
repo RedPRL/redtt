@@ -1944,6 +1944,7 @@ struct
         | cell :: args , (_, `Const _) :: specs ->
           cell :: go args specs
         | `Val v :: args, (_, `Rec Desc.Self) :: specs ->
+          (* What do I do here if not Desc.Self??? *)
           let v_ih = elim_data dlbl ~params ~mot ~scrut:v ~clauses in
           `Val v :: `Val v_ih :: go args specs
         | cell :: args, (_, `Dim) :: specs ->
