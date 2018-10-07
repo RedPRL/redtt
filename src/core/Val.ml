@@ -595,7 +595,7 @@ struct
         intro
       | _ ->
         let faces =
-          let rho = Env.append empty_env @@ args_in_dir @@ Dir.make r (`Atom x) in
+          let rho = Env.append (Env.append empty_env params) @@ args_in_dir @@ Dir.make r (`Atom x) in
           eval_tm_sys rho boundary
         in
         let fix_face =
