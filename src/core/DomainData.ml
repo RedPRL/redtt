@@ -45,10 +45,11 @@ type con =
   | DFix of {ty : value; clo : clo}
   | DFixLine of {x : atom; ty : value; clo : clo}
 
-  | Data of Desc.data_label
+  | Data of {lbl : string; params : env_el list}
+
   | Intro of
-      {dlbl : Desc.data_label;
-       clbl : Desc.con_label;
+      {dlbl : string;
+       clbl : string;
        args : env_el list;
        sys : rigid_val_sys}
 
@@ -69,10 +70,11 @@ and neu =
   | Snd of neu
 
   | Elim of
-      {dlbl : Desc.data_label;
+      {dlbl : string;
+       params : env_el list;
        mot : clo;
        neu : neu;
-       clauses : (Desc.con_label * nclo) list}
+       clauses : (string * nclo) list}
 
   (* Invariant: neu \in vty, vty is a V type *)
   | VProj of {x : atom; func : nf; neu : neu}

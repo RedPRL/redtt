@@ -64,7 +64,6 @@ struct
 end
 
 type tm = Tm of {con : tm tmf; info : Info.t}
-type data_desc = tm Desc.desc
 
 type 'a subst =
   | Shift of int
@@ -92,8 +91,10 @@ let rec con_info =
   function
   | FHCom {r; r'; cap; sys} ->
     Info.mergen [tm_info r; tm_info r'; tm_info cap; sys_info (bnd_info tm_info) sys]
-  | Univ _ | Dim0 | Dim1 | Data _ ->
+  | Univ _ | Dim0 | Dim1 ->
     Info.init
+  | Data info ->
+    Info.mergen @@ List.map tm_info info.params
   | Pi (dom, cod) | Sg (dom, cod) ->
     Info.mergen [tm_info dom; bnd_info tm_info cod]
   | Ext bnd ->
@@ -120,8 +121,8 @@ let rec con_info =
     cmd_info cmd
   | Let (cmd, bnd) ->
     Info.mergen [cmd_info cmd; bnd_info tm_info bnd]
-  | Intro (_, _, ts) ->
-    Info.mergen @@ List.map tm_info ts
+  | Intro (_, _, params, args) ->
+    Info.mergen @@ List.map tm_info @@ params @ args
 
 and cmd_info cmd =
   pair_info head_info (list_info frame_info) cmd
@@ -160,9 +161,9 @@ and frame_info =
     Info.mergen [tm_info r; tm_info func]
   | Prev t ->
     tm_info t
-  | Elim {dlbl; mot; clauses} ->
+  | Elim {dlbl; params; mot; clauses} ->
     let clause_info (_, nbnd) = nbnd_info tm_info nbnd in
-    Info.mergen @@ bnd_info tm_info mot :: List.map clause_info clauses
+    Info.mergen @@ bnd_info tm_info mot :: List.map clause_info clauses @ List.map tm_info params
 
 and list_info : type x. (x -> Info.t) -> x list -> Info.t =
   fun f xs ->
@@ -349,12 +350,14 @@ struct
       let cmd' = traverse_cmd cmd in
       Up cmd'
 
-    | Data lbl ->
-      Data lbl
+    | Data info ->
+      let params = traverse_list traverse_tm info.params in
+      Data {info with params}
 
-    | Intro (dlbl, clbl, args) ->
+    | Intro (dlbl, clbl, params, args) ->
+      let params' = traverse_list traverse_tm params in
       let args' = traverse_list traverse_tm args in
-      Intro (dlbl, clbl, args')
+      Intro (dlbl, clbl, params', args')
 
 
   and traverse_cmd (hd, sp) =
@@ -502,7 +505,8 @@ struct
     | Elim info ->
       let mot = traverse_bnd traverse_tm info.mot in
       let clauses = List.map (fun (lbl, bnd) -> lbl, traverse_nbnd traverse_tm bnd) info.clauses in
-      Elim {info with mot; clauses}
+      let params = traverse_list traverse_tm info.params in
+      Elim {info with mot; params; clauses}
 
     | VProj info ->
       let r = traverse_tm info.r in
@@ -529,6 +533,14 @@ end
 
 
 
+let rec lift sub =
+  Dot (ix 0, Cmp (Shift 1, sub))
+
+and liftn n (sub : tm cmd subst) : tm cmd subst  =
+  match n with
+  | 0 -> sub
+  | _ -> liftn (n - 1) @@ lift sub
+
 
 
 
@@ -545,14 +557,6 @@ struct
 
   let should_traverse info =
     not @@ Info.is_locally_closed info
-
-  let rec lift sub =
-    Dot (ix 0, Cmp (Shift 1, sub))
-
-  and liftn n (sub : tm cmd subst) : tm cmd subst  =
-    match n with
-    | 0 -> sub
-    | _ -> liftn (n - 1) @@ lift sub
 
   let under_meta f = f ()
 
@@ -912,17 +916,25 @@ let rec pp env fmt =
     | Up cmd ->
       pp_cmd env fmt cmd
 
-    | Data lbl ->
-      Desc.pp_data_label fmt lbl
+    | Data {lbl; params} ->
+      begin
+        match params with
+        | [] ->
+          Uuseg_string.pp_utf_8 fmt lbl
+        | _ ->
+          Format.fprintf fmt "@[<hv1>(%a %a)@]"
+            Uuseg_string.pp_utf_8 lbl
+            (pp_terms env) params
+      end
 
-    | Intro (_dlbl, clbl, args) ->
+    | Intro (_dlbl, clbl, _params, args) ->
       begin
         match args with
         | [] ->
-          Desc.pp_con_label fmt clbl
+          Uuseg_string.pp_utf_8 fmt clbl
         | _ ->
           Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
-            Desc.pp_con_label clbl
+            Uuseg_string.pp_utf_8 clbl
             (pp_terms env) args
       end
 
@@ -1004,7 +1016,7 @@ and pp_cmd env fmt (hd, sp) =
         let x_mot, env_mot = Pp.Env.bind env nm_mot in
         (* TODO *)
         Format.fprintf fmt "@[<hv1>(%a.elim@ [%a] %a@ %a@ %a)@]"
-          Desc.pp_data_label info.dlbl
+          Uuseg_string.pp_utf_8 info.dlbl
           Uuseg_string.pp_utf_8 x_mot
           (pp env_mot) mot
           (go `Elim) sp
@@ -1030,7 +1042,7 @@ and pp_elim_clauses env fmt clauses =
 
 and pp_elim_clause env fmt (clbl, nbnd) =
   Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
-    Desc.pp_con_label clbl
+    Uuseg_string.pp_utf_8 clbl
     (pp_nbnd env) nbnd
 
 and pp_nbnd env fmt nbnd =
@@ -1081,7 +1093,7 @@ and pp_frame env fmt =
     Format.fprintf fmt "<prev>"
   | Elim info ->
     Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a)@]"
-      Desc.pp_data_label info.dlbl
+      Uuseg_string.pp_utf_8 info.dlbl
       (pp_bnd env) info.mot
       (pp_elim_clauses env) info.clauses
 
@@ -1364,7 +1376,8 @@ let map_frame f =
   | Elim info ->
     let mot = map_bnd f info.mot in
     let clauses = List.map (fun (lbl, bnd) -> lbl, map_nbnd f bnd) info.clauses in
-    Elim {info with mot; clauses}
+    let params = List.map f info.params in
+    Elim {info with mot; params; clauses}
   | VProj info ->
     let r = f info.r in
     let func = f info.func in
@@ -1400,8 +1413,12 @@ let map_cmd f (hd, sp) =
 
 let map_tmf f =
   function
-  | (Univ _ | Dim0 | Dim1 | Data _) as con ->
+  | (Univ _ | Dim0 | Dim1) as con ->
     con
+  | Data info ->
+    let lbl = info.lbl in
+    let params = List.map f info.params in
+    Data {lbl; params}
   | Cons (t0, t1) ->
     Cons (f t0, f t1)
   | LblRet t ->
@@ -1457,8 +1474,8 @@ let map_tmf f =
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
     Let (map_cmd f cmd, map_bnd f bnd)
-  | Intro (dlbl, clbl, args) ->
-    Intro (dlbl, clbl, List.map f args)
+  | Intro (dlbl, clbl, params, args) ->
+    Intro (dlbl, clbl, List.map f params, List.map f args)
 
 
 
@@ -1493,11 +1510,11 @@ let rec eta_contract t =
             begin
               match as_plain_var arg with
               | Some y'
-              when
-                y = y'
-                && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
-              ->
-              up (hd, sp)
+                when
+                  y = y'
+                  && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
+                ->
+                up (hd, sp)
               | _ ->
                 make @@ Lam (bind y tm'y)
             end

@@ -3,7 +3,7 @@ import connection
 
 let retract (A B : type) (f : A → B) (g : B → A) : type =
   (a : A) →
-    path A (g (f a)) a
+  path A (g (f a)) a
 
 -- Adapted from https://github.com/HoTT/book/issues/718
 let path-retract/preserves/refl (A : type) (R : A → A → type)
@@ -22,7 +22,7 @@ let path-retract/preserves/refl (A : type) (R : A → A → type)
     ]
     =
     λ i j →
-      s x (q i) (r x (q i) (λ k → weak-connection/and A q i k)) j
+    s x (q i) (r x (q i) (λ k → weak-connection/and A q i k)) j
   in
   let cap2 : [i j] A [
     | j=0 → x
@@ -31,10 +31,10 @@ let path-retract/preserves/refl (A : type) (R : A → A → type)
     ]
     =
     λ i j →
-      comp 0 1 (cap1 i j) [
-      | ∂[j] | i=0 → refl
-      | i=1 k → s x x (α x x (r x x refl) k) j
-      ]
+    comp 0 1 (cap1 i j) [
+    | ∂[j] | i=0 → refl
+    | i=1 k → s x x (α x x (r x x refl) k) j
+    ]
   in
   let face (m k : dim) : A =
     comp 0 m x [
@@ -43,8 +43,8 @@ let path-retract/preserves/refl (A : type) (R : A → A → type)
     ]
   in
   λ i j →
-    comp 0 1 (cap2 i j) [
-    | j=0 | i=0 → refl
-    | j=1 → face i
-    | i=1 → face j
-    ]
+  comp 0 1 (cap2 i j) [
+  | j=0 | i=0 → refl
+  | j=1 → face i
+  | i=1 → face j
+  ]

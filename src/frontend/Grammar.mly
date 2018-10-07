@@ -64,6 +64,7 @@ edecl:
     { E.Normalize e }
 
   | DATA; dlbl = ATOM;
+    params = list(etele_cell);
     univ_spec = option(preceded(COLON, univ_spec));
     WHERE; option(PIPE);
     constrs = separated_list(PIPE, econstr)
@@ -72,7 +73,8 @@ edecl:
         | Some (k, l) -> k, l
         | None -> `Kan, `Const 0
       in
-      E.Data (dlbl, E.EDesc {constrs; kind; lvl}) }
+      let params = List.flatten params in
+      E.Data (dlbl, E.EDesc {params; constrs; kind; lvl}) }
 
   | IMPORT; a = ATOM
     { E.Import a }
@@ -115,6 +117,11 @@ atomoid_econ:
 
   | HOLE_NAME; LBR; e = located(econ); RBR
     { E.Guess e }
+
+  | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
+    { match scrut with
+    | Some scrut -> E.Elim {mot; scrut; clauses}
+    | None -> E.ElimFun {clauses} }
 
   | spec = univ_spec
     { let k, l = spec in E.Type (k, l) }
@@ -204,11 +211,6 @@ econ:
 
   | LET; pat = einvpat; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
     { E.Let {pat; sch = sch; tm; body} }
-
-  | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
-    { match scrut with
-    | Some scrut -> E.Elim {mot; scrut; clauses}
-    | None -> E.ElimFun {clauses} }
 
   | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }
@@ -475,12 +477,12 @@ tm:
   | LPR; DATA; dlbl = ATOM; RPR
     { fun _ ->
       make_node $startpos $endpos @@
-      Tm.Data dlbl }
+      Tm.Data {lbl = dlbl; params = []} }
 
   | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      Tm.Intro (dlbl, clbl, es env) }
+      Tm.Intro (dlbl, clbl, [], es env) }
 
   | e = cmd
     { fun env ->
