@@ -25,7 +25,6 @@ let J/eq
         ]
       in
       C (aux 1) aux
-    [
-    | k=0 → λ i → coe 0 i d in λ j → C (square j 1) (square j)
+    [ k=0 → λ i → coe 0 i d in λ j → C (square j 1) (square j)
     | k=1 → refl
     ]
