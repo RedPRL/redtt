@@ -252,12 +252,12 @@ let pp_constr ?dlbl:(dlbl="self") =
     match constr with
     | TNil sys -> pp_nil env fmt sys
     | TCons(spec, Tm.B (nm, constr)) ->
-       let x, env' = Pp.Env.bind env nm in
-       Format.fprintf fmt "@[<hv1>@[<hv1>[%s : %a]@]%a%a@]"
-         x
-         (pp_arg_spec ~dlbl env) spec
-         pp_sep constr
-         (pp_tele env') constr
+      let x, env' = Pp.Env.bind env nm in
+      Format.fprintf fmt "@[<hv1>@[<hv1>[%s : %a]@]%a%a@]"
+        x
+        (pp_arg_spec ~dlbl env) spec
+        pp_sep constr
+        (pp_tele env') constr
   in
   pp_tele
 
@@ -294,11 +294,11 @@ let pp_desc ?dlbl:(dlbl="self") env fmt {kind; lvl; body; status} =
     match body with
     | TNil constrs -> pp_nil env fmt constrs
     | TCons(param, Tm.B (nm, body)) ->
-       let x, env' = Pp.Env.bind env nm in
-       Format.fprintf fmt "@[<hv1>@[<hv1>[%s : %a]@]@ %a@]"
-         x
-         (Tm.pp env) param
-         (pp_tele env') body
+      let x, env' = Pp.Env.bind env nm in
+      Format.fprintf fmt "@[<hv1>@[<hv1>[%s : %a]@]@ %a@]"
+        x
+        (Tm.pp env) param
+        (pp_tele env') body
   in
   Format.fprintf fmt "@[<hv1>(data%s %a@ : %a)@]"
     status_string
