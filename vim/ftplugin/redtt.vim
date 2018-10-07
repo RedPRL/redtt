@@ -87,4 +87,4 @@ endfunction
 
 let b:did_ftplugin = 1
 
-dig !- 8866
+digraph !- 8866
