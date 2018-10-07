@@ -95,4 +95,4 @@ let nat/discrete : discrete nat =
   ]
 
 let nat/set : is-set nat =
-  discrete→set nat nat/discrete
+ discrete→set nat nat/discrete
