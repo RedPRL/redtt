@@ -109,13 +109,9 @@ let is-equiv/prop (A B : type) (f : A → B) : is-prop (is-equiv A B f) =
 -- A direct proof that is-equiv f is a prop, ported from cubicaltt to yacctt to redtt
 let is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv _ _ f) =
   λ ise ise' i y →
-    let a = ise y .fst .fst in
-    let p = ise y .fst .snd in
-    let c = ise y .snd in
-    let a' = ise' y .fst .fst in
-    let p' = ise' y .fst .snd in
-    let c' = ise' y .snd
-    in
+    let ((a, p), c) = ise y in
+    let ((a', p'), c') = ise' y in
+
     ( c' (a , p) i
     , λ w →
         let cap (j k : dim) : fiber A B f y =
