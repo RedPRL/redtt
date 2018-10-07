@@ -1,4 +1,5 @@
 import path
+import ntype
 import connection
 import J
 import void
@@ -130,4 +131,31 @@ let list/encode-decode (A : type)
     ]
   ]
 
--- TODO: Can someone please prove that 'list' preserves hlevel?
+-- list takes sets to sets
+
+let list/set (A : type) (setA : is-set A) : is-set (list A) =
+  elim [
+  | nil →
+    elim [
+    | nil → λ p q i →
+      comp 0 1 refl [
+      | i=0 → list/decode-encode A nil nil p
+      | i=1 → list/decode-encode A nil nil q
+      ]
+    | cons _ _ → λ p → elim (list/encode A _ _ p) []
+    ]
+  | cons x (xs → list/set/xs) →
+    elim [
+    | nil → λ p → elim (list/encode A _ _ p) []
+    | cons y ys → λ p q i →
+      let (ph,pc) = list/encode A (cons x xs) (cons y ys) p in
+      let (qh,qc) = list/encode A (cons x xs) (cons y ys) q in
+      let pt = list/decode A xs ys pc in
+      let qt = list/decode A xs ys qc in
+      comp 0 1 (λ j → cons (setA x y ph qh i j) (list/set/xs ys pt qt i j)) [
+      | i=0 → list/decode-encode A (cons x xs) (cons y ys) p
+      | i=1 → list/decode-encode A (cons x xs) (cons y ys) q
+      ]
+    ]
+  ]
+
