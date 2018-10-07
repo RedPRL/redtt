@@ -222,8 +222,9 @@ let rec check_ cx ty rst tm =
     let ty1 = check_eval cx ty info.ty1 in
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
-  | [], D.Univ univ, T.Data dlbl ->
-    let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+  | [], D.Univ univ, T.Data {lbl; params} ->
+    let desc = GlobalEnv.lookup_datatype lbl @@ Cx.globals cx in
+    check_data_params cx lbl desc.body params;
     begin
       if not @@ Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
         failwith "Universe level/kind error";
@@ -231,10 +232,15 @@ let rec check_ cx ty rst tm =
         failwith "Partially declared datatype cannot not be treated as type"
     end
 
-  | [], D.Data dlbl, T.Intro (dlbl', clbl, args) when dlbl = dlbl' ->
+  | [], D.Data data, T.Intro (dlbl, clbl, params, args) when data.lbl = dlbl ->
     let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
-    let constr = Desc.lookup_constr clbl desc in
-    check_constr cx dlbl constr args;
+    check_data_params cx dlbl desc.body params;
+    let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) params in
+    let (module Q) = Cx.quoter cx in
+    Q.equiv_data_params (Cx.qenv cx) dlbl desc.body vparams data.params;
+    let data_ty = Cx.quote_ty cx ty in
+    let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
+    check_intro cx dlbl data.params constr args;
 
   | [], D.Data dlbl, T.FHCom info ->
     check_fhcom cx ty info.r info.r' info.cap info.sys
@@ -368,23 +374,40 @@ let rec check_ cx ty rst tm =
   | [], _, _ ->
     raise @@ E (TypeError (ty, (cx, tm)))
 
+and check_data_params cx _dlbl tele params =
+  let (module V) = Cx.evaluator cx in
+  let rec go tyenv tele params =
+    match tele, params with
+    | Desc.TNil _, [] ->
+      ()
+
+    | Desc.TCons (ty, Tm.B (nm, tele)), tm :: params ->
+      let vty = V.eval tyenv ty in
+      let el = check_eval cx vty tm in
+      let tyenv = D.Env.snoc tyenv (`Val el) in
+      go tyenv tele params
+
+    | _ ->
+      failwith "check_data_params: length mismatch"
+  in
+  go (Cx.env cx) tele params
+
 and check cx ty tm =
   check_ cx ty [] tm
 
 
-and check_constr cx dlbl (constr : Tm.tm Desc.constr) tms =
-  let vdataty = D.make @@ D.Data dlbl in
+and check_intro cx dlbl params constr tms =
   let (module V) = Cx.evaluator (Cx.clear_locals cx) in
 
-
-  let check_argument tyenv spec tm =
+  let check_argument tyenv _lbl spec tm =
     match spec with
     | `Const ty ->
       let vty = V.eval tyenv ty in
       let el = check_eval cx vty tm in
       D.Env.snoc tyenv @@ `Val el
-    | `Rec Desc.Self ->
-      let el = check_eval cx vdataty tm in
+    | `Rec rspec ->
+      let vty = V.realize_rec_spec ~dlbl ~params rspec in
+      let el = check_eval cx vty tm in
       D.Env.snoc tyenv @@ `Val el
     | `Dim ->
       let r = check_eval_dim cx tm in
@@ -392,11 +415,11 @@ and check_constr cx dlbl (constr : Tm.tm Desc.constr) tms =
   in
 
   let _ : D.env =
-    List.fold_right2
-      (fun (_, spec) tm tyenv -> check_argument tyenv spec tm)
-      constr.specs
+    List.fold_left2
+      (fun tyenv (lbl, spec) tm -> check_argument tyenv lbl spec tm)
+      (D.Env.append V.empty_env params)
+      (Desc.Constr.specs constr)
       tms
-      V.empty_env
   in
   ()
 
@@ -682,6 +705,7 @@ and infer_spine_ cx hd sp =
       D.{el = Cx.eval_frame cx ih.el frm; ty = ty1}
 
     | T.Elim info ->
+      let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) info.params in
       let T.B (nm, mot) = info.mot in
       let ih = infer_spine_ cx hd sp in
       let mot_clo =
@@ -691,6 +715,7 @@ and infer_spine_ cx hd sp =
       in
 
       let desc = V.Sig.lookup_datatype info.dlbl in
+      let constrs = Desc.constrs desc in
 
       if desc.status = `Partial then failwith "Cannot call eliminator on partially-defined datatype";
 
@@ -706,21 +731,21 @@ and infer_spine_ cx hd sp =
           match specs with
           | (lbl, `Const ty) :: specs ->
             let vty = V.eval venv ty in
-            let cx, v = Cx.ext_ty cx ~nm:(Some lbl) vty in
+            let cx, v = Cx.ext_ty cx ~nm:lbl vty in
             let venv = D.Env.snoc venv @@ `Val v in
             go cx venv (cells_only_ihs #< (`Val v)) (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
-          | (lbl, `Rec Desc.Self) :: specs ->
-            let vty = D.make @@ D.Data info.dlbl in
-            let cx, v = Cx.ext_ty cx ~nm:(Some lbl) vty in
-            let cx_ih, v_ih = Cx.ext_ty cx ~nm:None @@ V.inst_clo mot_clo v in
+          | (lbl, `Rec rspec) :: specs ->
+            let vty = V.realize_rec_spec ~dlbl:info.dlbl ~params:vparams rspec in
+            let cx, v = Cx.ext_ty cx ~nm:lbl vty in
+            let cx_ih, v_ih = Cx.ext_ty cx ~nm:None @@ V.realize_rec_spec_ih ~dlbl:info.dlbl ~params:vparams ~mot:mot_clo rspec v in
             let venv = D.Env.snoc venv @@ `Val v in
             go cx_ih venv (cells_only_ihs #< (`Val v_ih)) (cells_w_ihs <>< [`Val v; `Val v_ih]) (cells #< (`Val v)) specs
 
           | (lbl, `Dim) :: specs ->
-            let x = Name.named @@ Some lbl in
+            let x = Name.named lbl in
             let r = `Atom x in
-            let cx = Cx.def_dim cx ~nm:(Some lbl) r in
+            let cx = Cx.def_dim cx ~nm:lbl r in
             let venv = D.Env.snoc venv @@ `Dim r in
             go cx venv (cells_only_ihs #< (`Dim r)) (cells_w_ihs #< (`Dim r)) (cells #< (`Dim r)) specs
 
@@ -728,33 +753,32 @@ and infer_spine_ cx hd sp =
             cx, Bwd.to_list cells_only_ihs, Bwd.to_list cells_w_ihs, Bwd.to_list cells
         in
 
-        let cx', cells_only_ihs, cells_w_ihs, cells = go cx V.empty_env Emp Emp Emp Desc.(constr.specs) in
-        let generic_intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~clbl:lbl cells in
+        let cx', cells_only_ihs, cells_w_ihs, cells = go cx (D.Env.append V.empty_env vparams) Emp Emp Emp @@ Desc.Constr.specs constr in
+        let generic_intro = V.make_intro (D.Env.clear_locals @@ Cx.env cx) ~dlbl:info.dlbl ~params:vparams ~clbl:lbl cells in
 
         (* maybe wrong *)
 
-        let rec image_of_bterm phi tm =
-          let benv = D.Env.append V.empty_env cells in
-          match Tm.unleash tm with
-          | Tm.Intro (_, clbl, args) ->
-            let constr = Desc.lookup_constr clbl desc in
+        let rec image_of_bterm phi rspec tm =
+          let benv = D.Env.append V.empty_env (vparams @ cells) in
+          match rspec, Tm.unleash tm with
+          | Desc.Self, Tm.Intro (_, clbl, params, args) ->
+            let constr = Desc.lookup_constr clbl constrs in
             let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl', _) -> clbl' = clbl) nclos in
             let rec go specs tms =
               match specs, tms with
-              | (_, `Const ty) :: specs, tm :: tms ->
+              | (_, `Const _) :: specs, tm :: tms ->
                 `Val (D.Value.act phi @@ V.eval benv tm) :: go specs tms
-              | (_, `Rec Desc.Self) :: specs, tm :: tms ->
-                `Val (D.Value.act phi @@ V.eval benv tm) :: `Val (image_of_bterm phi tm) :: go specs tms
+              | (_, `Rec rspec) :: specs, tm :: tms ->
+                `Val (D.Value.act phi @@ V.eval benv tm) :: `Val (image_of_bterm phi rspec tm) :: go specs tms
               | (_, `Dim) :: specs, tm :: tms ->
                 `Dim (I.act phi @@ V.eval_dim benv tm) :: go specs tms
               | [], [] ->
                 []
               | _ ->
-                Format.eprintf "Tm: %a@." Tm.pp0 tm;
                 failwith "image_of_bterm"
             in
-            V.inst_nclo nclo @@ go constr.specs args
-          | _ ->
+            V.inst_nclo nclo @@ go (Desc.Constr.specs constr) args
+          | Desc.Self, _ ->
             D.Value.act phi @@ V.eval (D.Env.append V.empty_env cells_only_ihs) tm
 
         in
@@ -765,12 +789,12 @@ and infer_spine_ cx hd sp =
           let r' = V.eval_dim benv tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
           let tm = Option.get_exn otm in
-          image_of_bterm phi tm
+          image_of_bterm phi Desc.Self tm
         in
 
         let ty = V.inst_clo mot_clo generic_intro in
 
-        let boundary = List.map image_of_bface constr.boundary in
+        let boundary = List.map image_of_bface @@ Desc.Constr.boundary constr in
         check_ cx' ty boundary bdy;
 
         let nms = Bwd.map (fun _ -> None) @@ Bwd.from_list cells_w_ihs in
@@ -789,7 +813,7 @@ and infer_spine_ cx hd sp =
 
       in
 
-      check_clauses [] desc.constrs;
+      check_clauses [] constrs;
       D.{el = Cx.eval_frame cx ih.el frm; ty = V.inst_clo mot_clo ih.el}
 
 

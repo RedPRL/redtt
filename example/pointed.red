@@ -61,13 +61,13 @@ let pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
   =
   let face : [i j] (pB.fst) [i=0 → pB.snd] =
     λ i j →
-      comp 0 1 (pf .fst (comp 0 j (p i) [i=0 → refl | i=1 → q]))
-        [ i=0 → pf.snd
-        | i=1 k → comp 0 k (pf .fst (q j)) [∂[j] → pf.snd]
-        ]
+    comp 0 1 (pf .fst (comp 0 j (p i) [i=0 → refl | i=1 → q]))
+      [ i=0 → pf.snd
+      | i=1 k → comp 0 k (pf .fst (q j)) [∂[j] → pf.snd]
+      ]
   in
   λ k i →
-    comp 0 1 (face i 0) [
-    | i=0 j → pB.snd
-    | (k=0 | i=1) j → face i j
-    ]
+  comp 0 1 (face i 0) [
+  | i=0 j → pB.snd
+  | (k=0 | i=1) j → face i j
+  ]

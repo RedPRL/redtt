@@ -23,14 +23,14 @@ let id-equiv/wc : (B : type) → equiv B B = id-equiv/weak-connection
 -- but we don't need it
 let oloop-equiv : path (equiv os2 os2) (id-equiv/wc os2) (id-equiv/wc os2) =
   λ i →
-    ( λ o → oloop o i
-    , prop→prop-over
-      (λ j → is-equiv os2 os2 (λ o → oloop o j))
-      (is-equiv/prop/direct os2 os2 (λ o → o))
-      (id-equiv/wc os2 .snd)
-      (id-equiv/wc os2 .snd)
-      i
-    )
+  ( λ o → oloop o i
+  , prop→prop-over
+    (λ j → is-equiv os2 os2 (λ o → oloop o j))
+    (is-equiv/prop/direct os2 os2 (λ o → o))
+    (id-equiv/wc os2 .snd)
+    (id-equiv/wc os2 .snd)
+    i
+  )
 
 -- incidentally, onegloop o is homotopic to symm (λ i → oloop o i)
 let onegloop (o : os2) : path os2 o o =
@@ -45,10 +45,10 @@ let onegloop-oloop (o : os2)
   : pathd (λ i → path os2 (onegloop (oloop o i) i) o) refl refl
   =
   λ i j →
-    comp 0 1 o [
-    | ∂[i] | j=1 → refl
-    | j=0 k → oloop-equiv i .snd (oloop o i) .snd (o, refl) k .fst
-    ]
+  comp 0 1 o [
+  | ∂[i] | j=1 → refl
+  | j=0 k → oloop-equiv i .snd (oloop o i) .snd (o, refl) k .fst
+  ]
 
 -- II. universal cover over s2
 
@@ -120,9 +120,9 @@ let s2/encode-decode/base/step (o : os2) :
   ]
   =
   λ i j →
-    s2/code/proj i j
-      (coe 0 1 obase in λ k →
-        s2/code (extend-by-surf (s2/decode/base o) i j k))
+  s2/code/proj i j
+    (coe 0 1 obase in λ k →
+      s2/code (extend-by-surf (s2/decode/base o) i j k))
 
 let s2/encode-decode/base : (o : os2) → path os2 (s2/encode base (s2/decode base o)) o =
   elim [

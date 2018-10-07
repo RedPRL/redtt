@@ -27,9 +27,8 @@ and [cubicaltt](https://github.com/mortberg/cubicaltt).
   the cubical setting, we will add these, and they will live side-by-side with
   path types as they did in RedPRL.
 
-- user-defined higher inductive types (parameters, and indices not yet
-  supported)  based on the [work of Evan Cavallo and Bob
-  Harper](https://arxiv.org/abs/1801.01568)
+- user-defined (parametric) higher inductive types (indexed HITs not yet supported)
+  based on the [work of Evan Cavallo and Bob Harper](https://arxiv.org/abs/1801.01568).
 
 - experimental support for Fitch-style modal guarded recursion: ▷
 

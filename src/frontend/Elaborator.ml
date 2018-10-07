@@ -142,81 +142,97 @@ struct
       M.ret ()
 
   and elab_datatype dlbl (E.EDesc edesc) =
-    let rec go tdesc =
+    let rec elab_params : _ -> (_ * Desc.body) M.m =
+      function
+      | [] ->
+        M.ret ([], Desc.TNil [])
+      | `Ty (name, edom) :: cells ->
+        elab_chk edom {ty = univ; sys = []} >>= normalize_ty >>= fun ty ->
+        let x = Name.named @@ Some name in
+        M.in_scope x (`P ty) (elab_params cells) <<@> fun (psi, rest) ->
+          (x, `P ty) :: psi, Desc.TCons (ty, Desc.Body.bind x rest)
+      | _ ->
+        failwith "elab_params"
+    in
+
+    let rec elab_constrs params tdesc =
       function
       | [] ->
         let tdesc = Desc.{tdesc with status = `Complete} in
         M.lift @@ C.declare_datatype dlbl tdesc >>
         M.ret tdesc
       | econstr :: econstrs ->
-        elab_constr dlbl tdesc econstr >>= fun constr ->
-        let tdesc = Desc.{tdesc with constrs = tdesc.constrs @ [constr]} in
+        elab_constr dlbl params tdesc econstr >>= fun constr ->
+        let tdesc = Desc.add_constr tdesc constr in
         M.lift @@ C.declare_datatype dlbl tdesc >>
-        go tdesc econstrs
+        elab_constrs params tdesc econstrs
     in
 
-    let tdesc = Desc.{constrs = []; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
+    elab_params edesc.params >>= fun (psi, tbody) ->
+    M.in_scopes psi @@
+    let tdesc = Desc.{body = tbody; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
     M.lift @@ C.declare_datatype dlbl tdesc >>= fun _ ->
     match edesc.kind with
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
     | _ ->
-      go tdesc edesc.constrs
+      elab_constrs psi tdesc edesc.constrs
 
-  and elab_constr dlbl desc (clbl, E.EConstr econstr) =
-    if List.exists (fun (lbl, _) -> clbl = lbl) desc.constrs then
+  and elab_constr dlbl psi desc (clbl, E.EConstr econstr) =
+    if List.exists (fun (lbl, _) -> clbl = lbl) @@ Desc.constrs desc then
       failwith "Duplicate constructor in datatype";
 
-    let data_ty = Tm.make @@ Tm.Data dlbl in
+    let params = List.map (fun (x, _) -> Tm.up @@ Tm.var x) psi in
+    let data_ty = Tm.make @@ Tm.Data {lbl = dlbl; params} in
 
-    let open Desc in
-    let elab_rec_spec (x, Self) = M.ret (x, Self) in
+    let elab_rec_spec (x, Desc.Self) = M.ret (x, Desc.Self) in
 
-    let rec abstract_tele xs (ps : _ list) =
-      match ps with
-      | [] -> []
-      | (lbl, x, `Const p) :: ps ->
-        let Tm.NB (_, p') = Tm.bindn xs p in
-        (lbl, `Const p') :: abstract_tele (xs #< x) ps
-      | (lbl, x, `Rec p) :: ps ->
-        (* TODO: update, when we add more recursive argument types *)
-        (lbl, `Rec p) :: abstract_tele (xs #< x) ps
-      | (lbl, x, `Dim) :: ps ->
-        (lbl, `Dim) :: abstract_tele (xs #< x) ps
-    in
-
-
-    let rec go acc =
+    let rec go =
       function
       | [] ->
-        let specs = abstract_tele Emp @@ Bwd.to_list acc in
-        elab_tm_sys data_ty econstr.boundary >>= bind_sys_in_scope >>= fun boundary ->
-        let constr = Desc.{specs; boundary} in
-        M.ret (clbl, constr)
+        elab_tm_sys data_ty econstr.boundary <<@> fun boundary ->
+          Desc.TNil boundary
 
       | `Ty (nm, ety) :: args ->
         begin
           match E.(ety.con) with
           | E.Var var when var.name = dlbl ->
             let x = Name.named @@ Some nm in
-            M.in_scope x (`P data_ty) @@ go (acc #< (nm, x, `Rec Self)) args
-
+            M.in_scope x (`P data_ty) (go args) <<@> fun constr ->
+              Desc.TCons (`Rec Desc.Self, Desc.Constr.bind x constr)
           | _ ->
             let x = Name.named @@ Some nm in
             let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
-            elab_chk ety {ty = univ; sys = []} >>= bind_in_scope >>= fun pty ->
-            M.in_scope x (`P pty) @@ go (acc #< (nm, x, `Const pty)) args
+            elab_chk ety {ty = univ; sys = []} >>= fun pty ->
+            M.lift @@ C.check ~ty:univ pty >>= function
+            | `Ok ->
+              M.in_scope x (`P pty) (go args) <<@> fun constr ->
+                Desc.TCons (`Const pty, Desc.Constr.bind x constr)
+            | `Exn exn ->
+              raise exn
         end
 
       | `I nm :: args ->
         let x = Name.named @@ Some nm in
-        M.in_scope x `I @@ go (acc #< (nm, x, `Dim)) args
+        M.in_scope x `I (go args) <<@> fun constr ->
+          Desc.TCons (`Dim, Desc.Constr.bind x constr)
 
       | `Tick _ :: args ->
         failwith "Tick in HIT constructor argument not yet supported"
+
     in
 
-    go Emp @@ econstr.specs
+    let rec rebind_constr n psi constr =
+      match psi with
+      | Emp -> constr
+      | Snoc (psi, (x, _)) ->
+        rebind_constr (n + 1) psi @@
+        Desc.Constr.close_var x n constr
+    in
+
+    go econstr.specs <<@> fun constr ->
+      clbl, rebind_constr 0 (Bwd.from_list psi) constr
+
 
   and elab_scheme (sch : E.escheme) : (string list * Tm.tm) M.m =
     let cells, ecod = sch in
@@ -601,15 +617,7 @@ struct
           M.lift (C.lookup_meta x) <<@> fun (ty, _) ->
             Tm.shift_univ ushift ty, (Tm.Meta {name = x; ushift}, [])
 
-
-        | `Datatype dlbl ->
-          M.lift C.base_cx <<@> fun cx ->
-            let sign = Cx.globals cx in
-            let _ = GlobalEnv.lookup_datatype name sign in
-            let univ0 = Tm.univ ~kind:`Kan ~lvl:(`Const 0) in
-            univ0, Tm.ann ~ty:univ0 ~tm:(Tm.make @@ Tm.Data name)
-
-        | `Ix _ ->
+        | _ ->
           failwith "elab_inf: impossible"
       end
 
@@ -696,7 +704,15 @@ struct
           ty, Tm.ann ~tm:fix ~ty
       end
 
+    | E.Elim {mot = Some mot; scrut; clauses} ->
+      let tac_mot = elab_chk mot in
+      let tac_scrut = elab_inf scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
+      let clauses, default = elab_elim_clauses clauses in
+      tac_elim_inf ~loc:e.span ~tac_mot ~tac_scrut ~clauses ~default <<@> fun (ty, tm) ->
+        ty, Tm.ann ~ty ~tm
+
     | _ ->
+      Format.eprintf "Elaborator error: %a@." ESig.pp e.con;
       failwith "Can't infer"
 
   and elab_dim e =
@@ -759,27 +775,77 @@ struct
 
   and elab_chk_cut exp frms ty =
     match Tm.unleash ty with
-    | Tm.Data dlbl ->
+    | Tm.Data data ->
+      let dlbl = data.lbl in
       begin
         match exp.con with
-        | E.Var {name = clbl; _} ->
+        | E.Var {name; _} ->
+          M.lift C.base_cx >>= fun cx ->
+          let sign = Cx.globals cx in
           begin
-            M.lift C.base_cx >>= fun cx ->
-            let sign = Cx.globals cx in
-            let desc = GlobalEnv.lookup_datatype dlbl sign in
-            let constr = Desc.lookup_constr clbl desc in
-            elab_intro dlbl clbl constr frms
+            match GlobalEnv.lookup_datatype dlbl sign with
+            | desc ->
+              let constrs = Desc.Body.instance data.params desc.body in
+              begin
+                match Desc.lookup_constr name constrs with
+                | constr ->
+                  elab_intro dlbl data.params name constr frms
+                | exception _ ->
+                  elab_mode_switch_cut exp frms ty
+              end
+
+            | exception _ ->
+              elab_mode_switch_cut exp frms ty
           end
-          <+> elab_mode_switch_cut exp frms ty
 
         | _ ->
           elab_mode_switch_cut exp frms ty
       end
 
     | _ ->
-      elab_mode_switch_cut exp frms ty
+      match exp.con with
+      | E.Var {name; _} ->
+        M.lift C.resolver >>= fun renv ->
+        begin
+          match ResEnv.get name renv with
+          | `Datatype dlbl ->
+            elab_data dlbl frms
+          | _ ->
+            elab_mode_switch_cut exp frms ty
+        end
+      | _ ->
+        elab_mode_switch_cut exp frms ty
 
-  and elab_intro dlbl clbl constr frms =
+
+  and elab_data dlbl frms =
+    M.lift C.base_cx >>= fun cx ->
+    let sign = Cx.globals cx in
+    let desc = GlobalEnv.lookup_datatype dlbl sign in
+
+    let rec go acc tele frms =
+      match tele, frms with
+      | Desc.TNil _, [] ->
+        let params = Bwd.to_list acc in
+        M.ret @@ Tm.make @@ Tm.Data {lbl = dlbl; params}
+
+      | Desc.TCons (pty, btele), E.App e :: frms ->
+        elab_chk e {ty = pty; sys = []} >>= fun tm ->
+        let tele = Desc.Body.unbind_with (Tm.ann ~ty:pty ~tm:tm) btele in
+        go (acc #< tm) tele frms
+
+      | _ ->
+        failwith "elab_data: length mismatch"
+
+    in
+    go Emp desc.body frms
+
+
+  and realize_rspec ~dlbl ~params =
+    function
+    | Desc.Self ->
+      Tm.make @@ Tm.Data {lbl = dlbl; params}
+
+  and elab_intro dlbl params clbl constr frms =
     let elab_arg sub spec frm =
       match spec, frm with
       | `Const ty, E.App e ->
@@ -788,8 +854,8 @@ struct
         let sub = Tm.dot (Tm.ann ~ty ~tm) sub in
         M.ret (sub, tm)
 
-      | `Rec Desc.Self, E.App e ->
-        let ty = Tm.make @@ Tm.Data dlbl in
+      | `Rec rspec, E.App e ->
+        let ty = realize_rspec ~dlbl ~params rspec in
         elab_chk e {ty; sys = []} >>= fun tm ->
         let sub = Tm.dot (Tm.ann ~ty ~tm) sub in
         M.ret (sub, tm)
@@ -817,8 +883,8 @@ struct
         failwith "elab_intro: mismatch"
     in
 
-    go (Tm.shift 0) constr.specs frms >>= fun tms ->
-    M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, tms)
+    go (Tm.shift 0) (Desc.Constr.specs constr) frms >>= fun tms ->
+    M.ret @@ Tm.make @@ Tm.Intro (dlbl, clbl, params, tms)
 
   and elab_mode_switch_cut exp frms ty =
     elab_cut exp frms >>= fun (ty', cmd) ->

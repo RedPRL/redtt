@@ -21,13 +21,13 @@ let pΩ³/reflmap (pA : ptype) (B : type) (f : pA.fst → B)
 
 let ps2 : ptype = (s2, base)
 let ps3 : ptype = (s3, base)
-let pjoin : ptype = (join, inl base)
+let pjoin : ptype = (join s1 s1, inl base)
 
 let test0-2 : pΩ³ ps3 .fst =
   λ i j k → cube i j k
 
 let f3 : pΩ³ ps3 .fst → pΩ³ pjoin .fst =
-  pΩ³/reflmap ps3 join s3→join .fst
+  pΩ³/reflmap ps3 (join s1 s1) s3→join .fst
 
 let test0-3 : pΩ³ pjoin .fst = f3 test0-2
 

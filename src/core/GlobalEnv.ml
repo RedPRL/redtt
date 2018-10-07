@@ -16,7 +16,7 @@ type lock_info = {constant : bool; birth : int}
 
 type t =
   {rel : Restriction.t;
-   data_decls : Tm.data_desc StringTable.t;
+   data_decls : Desc.desc StringTable.t;
    table : (entry * lock_info) T.t;
    killed : int -> bool;
    under_tick : int -> bool;
