@@ -28,4 +28,4 @@ reinstall:
 	${OPAM} reinstall redtt
 
 top:
-	@${DUNE} utop src/core
+	@${DUNE} utop src/metalanguage
