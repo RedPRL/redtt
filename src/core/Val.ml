@@ -559,6 +559,13 @@ struct
         rigid_multi_coe (Env.snoc tyenv @@ `Val coe_hd_x) data_abs dir (x, specs) args
       in
       `Val (coe_hd r') :: coe_tl
+    | (_, `Rec Desc.Self) :: specs, `Val arg :: args ->
+      let coe_hd = rigid_coe dir data_abs arg in
+      let coe_tl = rigid_multi_coe tyenv data_abs dir (x, specs) args
+      in
+      `Val (coe_hd) :: coe_tl
+    | (_, `Dim) :: specs, `Dim s :: args ->
+      `Dim s :: rigid_multi_coe tyenv data_abs dir (x, specs) args
     | _ ->
       failwith "rigid_multi_coe: length mismatch"
 
