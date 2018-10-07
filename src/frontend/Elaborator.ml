@@ -130,7 +130,7 @@ struct
     | E.MlDeclData info ->
       elab_datatype info.name info.desc >>= fun desc ->
       M.lift @@ C.declare_datatype info.name desc >>
-      M.ret @@ E.MlSem.Tuple []
+      M.ret @@ E.MlSem.DataDesc desc
 
     | E.MlImport file_name ->
       begin

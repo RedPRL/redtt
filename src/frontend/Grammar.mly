@@ -322,19 +322,9 @@ mltoplevel:
       E.mlbind (E.define ~name ~opacity ~scheme:sch ~tm) @@ fun _ ->
       rest }
 
-  | DATA; dlbl = ATOM;
-    params = list(etele_cell);
-    univ_spec = option(preceded(COLON, univ_spec));
-    WHERE; option(PIPE);
-    constrs = separated_list(PIPE, econstr);
-    rest = mltoplevel
-    { let kind, lvl =
-        match univ_spec with
-        | Some (k, l) -> k, l
-        | None -> `Kan, `Const 0
-      in
-      let params = List.flatten params in
-      E.mlbind (E.MlDeclData {name = dlbl; desc = E.EDesc {params; constrs; kind; lvl}}) @@ fun _ ->
+  | decl = data_decl; rest = mltoplevel
+    { let name, desc = decl in
+      E.mlbind (E.MlDeclData {name; desc}) @@ fun _ ->
       rest }
 
   | IMPORT; a = ATOM; rest = mltoplevel
@@ -349,10 +339,27 @@ opacity:
   | { `Transparent }
 
 
+data_decl:
+  | DATA; dlbl = ATOM;
+    params = list(etele_cell);
+    univ_spec = option(preceded(COLON, univ_spec));
+    WHERE; option(PIPE);
+    constrs = separated_list(PIPE, econstr);
+    { let kind, lvl =
+        match univ_spec with
+        | Some (k, l) -> k, l
+        | None -> `Kan, `Const 0
+      in
+      let params = List.flatten params in
+      dlbl, E.EDesc {params; constrs; kind; lvl} }
 
 mlcmd:
   | LET; a = ATOM; EQUALS; cmd = mlcmd; IN; rest = mlcmd
     { E.MlBind (cmd, `User a, rest) }
+
+  | decl = data_decl
+    { let name, desc = decl in
+      E.MlDeclData {name; desc} }
 
   | DO; c = atomic_mlcmd; SEMI; rest = mlcmd
     { E.MlBind (c, `Gen (Name.fresh ()), rest) }
