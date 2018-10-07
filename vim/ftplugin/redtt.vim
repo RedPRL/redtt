@@ -86,3 +86,5 @@ function! s:CloseBuffer()
 endfunction
 
 let b:did_ftplugin = 1
+
+dig !- 8866
