@@ -185,8 +185,7 @@ struct
     let params = List.map (fun (x, _) -> Tm.up @@ Tm.var x) psi in
     let data_ty = Tm.make @@ Tm.Data {lbl = dlbl; params} in
 
-    let open Desc in
-    let elab_rec_spec (x, Self) = M.ret (x, Self) in
+    let elab_rec_spec (x, Desc.Self) = M.ret (x, Desc.Self) in
 
     let rec go =
       function
@@ -200,7 +199,7 @@ struct
           | E.Var var when var.name = dlbl ->
             let x = Name.named @@ Some nm in
             M.in_scope x (`P data_ty) (go args) <<@> fun constr ->
-              Desc.TCons (`Rec Self, Desc.Constr.bind x constr)
+              Desc.TCons (`Rec Desc.Self, Desc.Constr.bind x constr)
           | _ ->
             let x = Name.named @@ Some nm in
             let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
@@ -840,6 +839,12 @@ struct
     in
     go Emp desc.body frms
 
+
+  and realize_rspec ~dlbl ~params =
+    function
+    | Desc.Self ->
+      Tm.make @@ Tm.Data {lbl = dlbl; params}
+
   and elab_intro dlbl params clbl constr frms =
     let elab_arg sub spec frm =
       match spec, frm with
@@ -849,8 +854,8 @@ struct
         let sub = Tm.dot (Tm.ann ~ty ~tm) sub in
         M.ret (sub, tm)
 
-      | `Rec Desc.Self, E.App e ->
-        let ty = Tm.make @@ Tm.Data {lbl = dlbl; params} in
+      | `Rec rspec, E.App e ->
+        let ty = realize_rspec ~dlbl ~params rspec in
         elab_chk e {ty; sys = []} >>= fun tm ->
         let sub = Tm.dot (Tm.ann ~ty ~tm) sub in
         M.ret (sub, tm)

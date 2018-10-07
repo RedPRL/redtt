@@ -758,18 +758,18 @@ and infer_spine_ cx hd sp =
 
         (* maybe wrong *)
 
-        let rec image_of_bterm phi tm =
+        let rec image_of_bterm phi rspec tm =
           let benv = D.Env.append V.empty_env cells in
-          match Tm.unleash tm with
-          | Tm.Intro (_, clbl, params, args) ->
+          match rspec, Tm.unleash tm with
+          | Desc.Self, Tm.Intro (_, clbl, params, args) ->
             let constr = Desc.lookup_constr clbl constrs in
             let nclo : D.nclo = D.NClo.act phi @@ snd @@ List.find (fun (clbl', _) -> clbl' = clbl) nclos in
             let rec go specs tms =
               match specs, tms with
               | (_, `Const _) :: specs, tm :: tms ->
                 `Val (D.Value.act phi @@ V.eval benv tm) :: go specs tms
-              | (_, `Rec Desc.Self) :: specs, tm :: tms ->
-                `Val (D.Value.act phi @@ V.eval benv tm) :: `Val (image_of_bterm phi tm) :: go specs tms
+              | (_, `Rec rspec) :: specs, tm :: tms ->
+                `Val (D.Value.act phi @@ V.eval benv tm) :: `Val (image_of_bterm phi rspec tm) :: go specs tms
               | (_, `Dim) :: specs, tm :: tms ->
                 `Dim (I.act phi @@ V.eval_dim benv tm) :: go specs tms
               | [], [] ->
@@ -778,7 +778,7 @@ and infer_spine_ cx hd sp =
                 failwith "image_of_bterm"
             in
             V.inst_nclo nclo @@ go (Desc.Constr.specs constr) args
-          | _ ->
+          | Desc.Self, _ ->
             D.Value.act phi @@ V.eval (D.Env.append V.empty_env cells_only_ihs) tm
 
         in
@@ -789,7 +789,7 @@ and infer_spine_ cx hd sp =
           let r' = V.eval_dim benv tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
           let tm = Option.get_exn otm in
-          image_of_bterm phi tm
+          image_of_bterm phi Desc.Self tm
         in
 
         let ty = V.inst_clo mot_clo generic_intro in

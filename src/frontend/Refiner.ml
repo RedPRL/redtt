@@ -419,6 +419,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
       Tm.subst (Tm.dot arg' (Tm.shift 0)) motx
     in
 
+
     let dlbl, params = unleash_data data_ty in
     begin
       M.lift C.base_cx >>= fun cx ->
@@ -463,6 +464,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let (module V) = Cx.evaluator cx in
           V.empty_env
       end >>= fun empty_env ->
+      let mot_clo = D.(Clo {rho = empty_env; bnd = bmot}) in
 
       let rec prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs =
         begin
@@ -494,19 +496,18 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           M.in_scope x `I @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
 
-        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, Desc.TCons (`Rec Desc.Self, Tm.B (_, specs)) ->
+        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, Desc.TCons (`Rec rspec, Tm.B (_, specs)) ->
           let x = name_of nm in
           let x_ih = name_of nm_ih in
-          let vty = data_vty in
+          let vty = V.realize_rec_spec ~dlbl ~params:vparams rspec in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let tty = Q.quote_ty Quote.Env.emp vty in
-          let ih_ty = mot x_tm in
+          let ih_vty = V.realize_rec_spec_ih ~dlbl ~params:vparams ~mot:mot_clo rspec x_el in
+          let ih_ty = Q.quote_ty Quote.Env.emp ih_vty in
 
           M.in_scope x (`P data_ty) begin
             M.lift C.base_cx >>= fun cx ->
-            let ih_vty = Cx.eval cx ih_ty in
-
             let ih_el = V.reflect ih_vty (D.Var {name = x_ih; twin = `Only; ushift = 0}) [] in
             let psi = psi <>< [x, `P tty; x_ih, `P ih_ty] in
             let tyenv = D.Env.snoc tyenv @@ `Val x_el in
@@ -536,7 +537,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           in
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`Bind (`Var (`Gen x)) :: pbinds) specs
 
-        | `BindIH (`Var y, inv) :: pbinds, (Desc.TCons (`Rec Desc.Self, _) as specs) ->
+        | `BindIH (`Var y, inv) :: pbinds, (Desc.TCons (`Rec rspec, _) as specs) ->
           let x_ih = Name.fresh () in
           let kont_tac tac =
             kont_tac @@
@@ -546,7 +547,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           in
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) (`BindIH (`Var y, `Var (`Gen x_ih)) :: pbinds) specs
 
-        | `BindIH (inv, p) :: pbinds, (Desc.TCons (`Rec Desc.Self, _) as specs) ->
+        | `BindIH (inv, p) :: pbinds, (Desc.TCons (`Rec rspec, _) as specs) ->
           let x = Name.fresh () in
           let kont_tac tac =
             kont_tac @@
