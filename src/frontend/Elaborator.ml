@@ -5,7 +5,7 @@ open Bwd open BwdNotation
 
 module type Import =
 sig
-  val import : Lwt_io.file_name -> [`Elab of ESig.esig | `Cached]
+  val import : Lwt_io.file_name -> [`Elab of ESig.mlcmd | `Cached]
 end
 
 module Make (I : Import) =
@@ -77,69 +77,162 @@ struct
       M.ret `Open
 
 
-
-  let rec elab_sig =
+  let rec eval_cmd =
     function
-    | [] ->
-      M.ret ()
-    | E.Debug f :: esig ->
-      elab_decl @@ E.Debug f >>= fun _ ->
-      elab_sig esig
-    | E.Quit :: _ ->
-      M.ret ()
-    | dcl :: esig ->
-      elab_decl dcl >>= fun _ ->
-      elab_sig esig
+    | E.MlRet v -> eval_val v
 
+    | E.MlBind (cmd0, x, cmd1) ->
+      eval_cmd cmd0 >>= fun v0 ->
+      M.lift @@ C.modify_mlenv (E.MlEnv.set x v0) >>
+      eval_cmd cmd1
 
-  and elab_decl =
-    function
-    | E.Define (name, opacity, scheme, e) ->
-      let now0 = Unix.gettimeofday () in
+    | E.MlUnleash v ->
+      begin
+        eval_val v >>= function
+        | E.MlSem.Thunk (env, cmd) ->
+          M.lift @@ C.modify_mlenv (fun _ -> env) >>
+          eval_cmd cmd
+        | _ ->
+          failwith "eval_cmd: expected thunk"
+      end
+
+    | E.MlLam (x, c) ->
+      M.lift C.get_mlenv <<@> fun env ->
+        E.MlSem.Clo (env, x, c)
+
+    | E.MlApp (c, v) ->
+      begin
+        eval_val v >>= fun v ->
+        eval_cmd c >>= function
+        | E.MlSem.Clo (env, x, c) ->
+          M.lift @@ C.modify_mlenv (fun _ -> E.MlEnv.set x v env) >>
+          eval_cmd c
+        | _ ->
+          failwith "expected ml closure"
+      end
+
+    | E.MlElab (scheme, e) ->
       elab_scheme scheme >>= fun (names, ty) ->
       let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
       let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
       bdy_tac {ty; sys = []} >>= fun tm ->
-      let alpha = Name.named @@ Some name in
-      M.lift @@ U.define Emp alpha opacity ty tm >>= fun _ ->
+      M.ret @@ E.MlSem.Tuple [E.MlSem.Term ty; E.MlSem.Term tm]
+
+    | E.MlDefine info ->
+      begin
+        eval_val info.tm <<@> E.MlSem.unleash_term >>= fun tm ->
+        eval_val info.ty <<@> E.MlSem.unleash_term >>= fun ty ->
+        eval_val info.name <<@> E.MlSem.unleash_ref >>= fun alpha ->
+        M.lift @@ U.define Emp alpha info.opacity ty tm >>= fun _ ->
+        M.ret @@ E.MlSem.Tuple []
+      end
+
+    | E.MlImport file_name ->
+      begin
+        match I.import file_name with
+        | `Cached ->
+          M.ret @@ E.MlSem.Tuple []
+        | `Elab cmd ->
+          eval_cmd cmd
+      end
+
+    | E.MlUnify ->
       M.lift C.go_to_top >>
-      M.unify <<@> fun _ ->
-        let now1 = Unix.gettimeofday () in
-        Format.printf "Defined %s (%fs).@." name (now1 -. now0)
+      M.unify >>
+      M.ret @@ E.MlSem.Tuple []
 
-    | E.Data (dlbl, edesc) ->
-      elab_datatype dlbl edesc >>= fun desc ->
-      M.lift @@ C.declare_datatype dlbl desc
-
-    | E.Debug filter ->
-      let title =
-        match filter with
-        | `All -> "Development state:"
-        | `Constraints -> "Unsolved constraints:"
-        | `Unsolved -> "Unsolved entries:"
-      in
-      M.lift @@ C.dump_state Format.std_formatter title filter
-
-    | E.Normalize e ->
+    | E.MlNormalize e ->
       elab_inf e >>= fun (ty, cmd) ->
       M.lift C.base_cx >>= fun cx ->
       let vty = Cx.eval cx ty in
       let el = Cx.eval_cmd cx cmd in
       let tm = Cx.quote cx ~ty:vty el in
-      M.emit e.span @@ M.PrintTerm {ty = ty; tm}
+      M.emit e.span @@ M.PrintTerm {ty = ty; tm} >>
+      M.ret @@ E.MlSem.Tuple []
 
-
-    | E.Import file_name ->
+    | E.MlSplit (tuple, xs, cmd) ->
       begin
-        match I.import file_name with
-        | `Cached ->
-          M.ret ()
-        | `Elab esig ->
-          elab_sig esig
+        eval_val tuple >>= function
+        | E.MlSem.Tuple vs ->
+          M.lift @@ C.modify_mlenv (List.fold_right2 E.MlEnv.set xs vs) >>
+          eval_cmd cmd
+        | _ ->
+          failwith "expected tuple"
       end
 
-    | E.Quit ->
-      M.ret ()
+
+
+  and eval_val =
+    function
+    | E.MlDataDesc desc -> M.ret @@ E.MlSem.DataDesc desc
+    | E.MlTerm tm -> M.ret @@ E.MlSem.Term tm
+    | E.MlSys tm -> M.ret @@ E.MlSem.Sys tm
+    | E.MlVar x -> M.lift C.get_mlenv <<@> fun env -> Option.get_exn @@ E.MlEnv.find x env
+    | E.MlTuple vs -> traverse eval_val vs <<@> fun rs -> E.MlSem.Tuple rs
+    | E.MlThunk mlcmd -> M.lift C.get_mlenv <<@> fun env -> E.MlSem.Thunk (env, mlcmd)
+    | E.MlRef nm -> M.ret @@ E.MlSem.Ref nm
+
+  (* function
+     | [] ->
+     M.ret ()
+     | E.Debug f :: esig ->
+     elab_decl @@ E.Debug f >>= fun _ ->
+     elab_sig esig
+     | E.Quit :: _ ->
+     M.ret ()
+     | dcl :: esig ->
+     elab_decl dcl >>= fun _ ->
+     elab_sig esig
+
+
+     and elab_decl =
+     function
+     | E.Define (name, opacity, scheme, e) ->
+     let now0 = Unix.gettimeofday () in
+     elab_scheme scheme >>= fun (names, ty) ->
+     let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
+     let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
+     bdy_tac {ty; sys = []} >>= fun tm ->
+     let alpha = Name.named @@ Some name in
+     M.lift @@ U.define Emp alpha opacity ty tm >>= fun _ ->
+     M.lift C.go_to_top >>
+     M.unify <<@> fun _ ->
+      let now1 = Unix.gettimeofday () in
+      Format.printf "Defined %s (%fs).@." name (now1 -. now0)
+
+     | E.Data (dlbl, edesc) ->
+     elab_datatype dlbl edesc >>= fun desc ->
+     M.lift @@ C.declare_datatype dlbl desc
+
+     | E.Debug filter ->
+     let title =
+      match filter with
+      | `All -> "Development state:"
+      | `Constraints -> "Unsolved constraints:"
+      | `Unsolved -> "Unsolved entries:"
+     in
+     M.lift @@ C.dump_state Format.std_formatter title filter
+
+     | E.Normalize e ->
+     elab_inf e >>= fun (ty, cmd) ->
+     M.lift C.base_cx >>= fun cx ->
+     let vty = Cx.eval cx ty in
+     let el = Cx.eval_cmd cx cmd in
+     let tm = Cx.quote cx ~ty:vty el in
+     M.emit e.span @@ M.PrintTerm {ty = ty; tm}
+
+
+     | E.Import file_name ->
+     begin
+      match I.import file_name with
+      | `Cached ->
+        M.ret ()
+      | `Elab esig ->
+        elab_sig esig
+     end
+
+     | E.Quit ->
+     M.ret () *)
 
   and elab_datatype dlbl (E.EDesc edesc) =
     let rec elab_params : _ -> (_ * Desc.body) M.m =
@@ -271,6 +364,15 @@ struct
       normalize_ty goal.ty >>= fun ty ->
       let goal = {goal with ty} in
       match goal.sys, Tm.unleash ty, e.con with
+      | _, _, E.RunML v ->
+        let mlgoal = E.MlTuple [E.MlTerm ty; E.MlSys goal.sys] in
+        let script = E.MlApp (E.MlUnleash v, mlgoal) in
+        begin
+          eval_cmd script >>= function
+          | E.MlSem.Term tm -> M.ret tm
+          | _ -> failwith "error running ML tactic"
+        end
+
       | _, _, E.Guess e ->
         tac_guess (elab_chk e) goal
 

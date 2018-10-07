@@ -8,6 +8,9 @@ val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
+val modify_mlenv : (ESig.MlSem.mlenv -> ESig.MlSem.mlenv) -> unit m
+val get_mlenv : ESig.MlSem.mlenv m
+
 val resolver : ResEnv.t m
 val declare_datatype : string -> Desc.desc -> unit m
 

@@ -11,6 +11,7 @@ module Map = Map.Make (Name)
 type env = GlobalEnv.t
 type cx = {env : env; resenv : ResEnv.t; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
 
+
 let rec pp_lcx fmt =
   function
   | Emp ->
@@ -109,6 +110,15 @@ let modifyl f = modify @@ fun st -> {st with lcx = f st.lcx}
 let modifyr f = modify @@ fun st -> {st with rcx = f st.rcx}
 let setl l = modifyl @@ fun _ -> l
 let setr r = modifyr @@ fun _ -> r
+
+let modify_mlenv f =
+  modify @@ fun st ->
+  let mlenv = GlobalEnv.get_mlenv st.env in
+  let env = GlobalEnv.set_mlenv st.env (f mlenv) in
+  {st with env}
+
+let get_mlenv = get <<@> fun x -> GlobalEnv.get_mlenv x.env
+
 
 let update_env e =
   modify @@ fun st ->

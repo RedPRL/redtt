@@ -14,7 +14,7 @@ let print_position outx lexbuf =
 let read_from_channel file_name channel =
   let open Lwt.Infix in
   let (lexbuf, tokens) = Lex.tokens ~file_name channel in
-  let checkpoint = Grammar.Incremental.esig @@ Lexing.lexeme_start_p lexbuf in
+  let checkpoint = Grammar.Incremental.mltoplevel @@ Lexing.lexeme_start_p lexbuf in
   begin
     Lwt.catch (Parse.loop lexbuf tokens checkpoint) @@ fun exn ->
     Lwt_io.printlf "  raised: %s" @@ Printexc.to_string exn >>= fun _ ->
@@ -28,7 +28,7 @@ let read_file file_name =
   Lwt_io.open_file ~mode:Lwt_io.Input file_name >>=
   read_from_channel file_name
 
-let execute_signature dirname esig =
+let execute_signature dirname mlcmd =
   let module I =
   struct
     let cache = Hashtbl.create 20
@@ -36,9 +36,9 @@ let execute_signature dirname esig =
       let f = Filename.concat dirname f in
       match Hashtbl.find_opt cache f with
       | None ->
-        let esig = Lwt_main.run @@ read_file @@ f ^ ".red" in
-        Hashtbl.add cache f esig;
-        `Elab esig
+        let mlcmd = Lwt_main.run @@ read_file @@ f ^ ".red" in
+        Hashtbl.add cache f mlcmd;
+        `Elab mlcmd
       | Some _ ->
         `Cached
   end
@@ -46,7 +46,7 @@ let execute_signature dirname esig =
   let module Elaborator = Elaborator.Make (I) in
   begin
     try
-      ignore @@ ElabMonad.run @@ ElabMonad.report @@ Elaborator.elab_sig esig;
+      ignore @@ ElabMonad.run @@ ElabMonad.report @@ Elaborator.eval_cmd mlcmd;
       Diagnostics.terminated ();
       Lwt.return_unit
     with

@@ -21,10 +21,10 @@ syn region  redttEncl transparent matchgroup=redttSymb start="\[" end="\]" conta
 syn match   redttHole '?\k*'
 
 syn keyword redttKeyw V in with where end tick dim elim fst snd coe com pair
-syn keyword redttKeyw hcom comp vproj vin lam next prev dfix fix call refl pre
+syn keyword redttKeyw fun hcom comp vproj vin lam next prev dfix fix call refl pre
 syn keyword redttKeyw kan U type
 
-syn keyword redttDecl let data debug normalize import quit opaque
+syn keyword redttDecl meta def do let data debug normalize import quit opaque
 
 syn match   redttSymb '[#@`|^*×:,.∙✓□▷=∂→λ𝕀]\|->'
 

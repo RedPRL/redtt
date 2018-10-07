@@ -4,7 +4,7 @@
   open RedBasis
   open Bwd
   open BwdNotation
-  module E = ESig
+  module E = RedTT_Core.ESig
   module R = ResEnv
 
   let eterm loc con : E.eterm =
@@ -35,51 +35,23 @@
 %token <string> ATOM
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY
+%token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY BANG
 %token EQUALS
 %token RIGHT_ARROW
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
-%token IMPORT OPAQUE QUIT DEBUG NORMALIZE
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE DO LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
+%token IMPORT OPAQUE QUIT DEBUG NORMALIZE META DEF
 %token TYPE PRE KAN
 %token EOF
 
 
-%start <ESig.esig> esig
+%start <RedTT_Core.ESig.mlcmd> mltoplevel
 %%
 
 located(X):
   | e = X
     { eterm $loc e }
-
-edecl:
-  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
-    { E.Define (a, `Transparent, sch, tm) }
-  | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
-    { E.Define (a, `Opaque, sch, tm) }
-  | DEBUG; f = debug_filter
-    { E.Debug f }
-  | NORMALIZE; e = located(econ)
-    { E.Normalize e }
-
-  | DATA; dlbl = ATOM;
-    params = list(etele_cell);
-    univ_spec = option(preceded(COLON, univ_spec));
-    WHERE; option(PIPE);
-    constrs = separated_list(PIPE, econstr)
-    { let kind, lvl =
-        match univ_spec with
-        | Some (k, l) -> k, l
-        | None -> `Kan, `Const 0
-      in
-      let params = List.flatten params in
-      E.Data (dlbl, E.EDesc {params; constrs; kind; lvl}) }
-
-  | IMPORT; a = ATOM
-    { E.Import a }
-  | QUIT
-    { E.Quit }
 
 univ_spec:
   | TYPE; k = kind
@@ -337,15 +309,100 @@ econstr:
   { clbl, E.EConstr {specs = List.flatten specs; boundary} }
 
 
+mltoplevel:
+  | META; LET; a = ATOM; EQUALS; cmd = mlcmd; rest = mltoplevel
+  (* TODO: need to resolve this name somehow *)
+    { E.MlBind (cmd, `User a, rest) }
 
-esig:
-  | d = edecl; esig = esig
-    { d :: esig }
+  | META; DO; c = atomic_mlcmd; rest = mltoplevel
+    { E.MlBind (c, `Gen (Name.fresh ()), rest) }
+
+  | DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
+    { let name = E.MlRef (Name.named (Some a)) in
+      E.mlbind (E.define ~name ~opacity:`Transparent ~scheme:sch ~tm) @@ fun _ ->
+      rest }
+
   | EOF
-    { [] }
+    { E.MlRet (E.MlTuple []) }
 
 
 
+mlcmd:
+  | LET; a = ATOM; EQUALS; cmd = mlcmd; IN; rest = mlcmd
+    { E.MlBind (cmd, `User a, rest) }
+
+  | DO; c = atomic_mlcmd; SEMI; rest = mlcmd
+    { E.MlBind (c, `Gen (Name.fresh ()), rest) }
+
+  | DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
+    { let name = E.MlRef (Name.named (Some a)) in
+      E.define ~name ~opacity:`Transparent ~scheme:sch ~tm }
+
+  | FUN; a = ATOM; RIGHT_ARROW; c = mlcmd
+    { E.MlLam (`User a, c) }
+
+  | c = atomic_mlcmd; v = mlvalue
+    { E.MlApp (c, v) }
+
+  | c = atomic_mlcmd
+    { c }
+
+atomic_mlcmd:
+  | LPR; c = mlcmd; RPR
+    { c }
+  | BANG; v = mlvalue
+    { E.MlUnleash v }
+  | v = mlvalue
+    { E.MlRet v }
+
+
+mlvalue:
+  | LGL; vs = separated_list(COMMA, mlvalue); RGL
+    { E.MlTuple vs }
+  | LBR; c = mlcmd; RBR
+    { E.MlThunk c }
+  | a = ATOM;
+    { E.MlVar (`User a) }
+
+
+
+
+(*
+edecl:
+  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
+    { E.Define (a, `Transparent, sch, tm) }
+  | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
+    { E.Define (a, `Opaque, sch, tm) }
+  | DEBUG; f = debug_filter
+    { E.Debug f }
+  | NORMALIZE; e = located(econ)
+    { E.MlNormalize e }
+
+(*
+  | DATA; dlbl = ATOM;
+    params = list(etele_cell);
+    univ_spec = option(preceded(COLON, univ_spec));
+    WHERE; option(PIPE);
+    constrs = separated_list(PIPE, econstr)
+    { let kind, lvl =
+        match univ_spec with
+        | Some (k, l) -> k, l
+        | None -> `Kan, `Const 0
+      in
+      let params = List.flatten params in
+      E.Data (dlbl, E.EDesc {params; constrs; kind; lvl}) }
+
+*)
+
+  | IMPORT; a = ATOM
+    { E.MlImport a }
+
+    (*
+  | QUIT
+    { E.Quit }
+    *)
+
+    *)
 
 
 

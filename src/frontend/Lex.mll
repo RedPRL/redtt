@@ -39,6 +39,7 @@ module Make (R : SOURCE) : LEXER = struct
     make_table 0 [
       ("V", V);
       ("opaque", OPAQUE);
+      ("meta", META);
       ("quit", QUIT);
       ("in", IN);
       ("with", WITH);
@@ -60,6 +61,9 @@ module Make (R : SOURCE) : LEXER = struct
       ("vproj", VPROJ);
       ("vin", VIN);
       ("let", LET);
+      ("do", DO);
+      ("fun", FUN);
+      ("def", DEF);
       ("lam", LAM);
       ("next", NEXT);
       ("prev", PREV);
@@ -113,6 +117,8 @@ rule token = parse
     { Lwt.return RBR }
   | '#'
     { Lwt.return HASH }
+  | '!'
+    { Lwt.return BANG }
   | '@'
     { Lwt.return AT }
   | '`'
