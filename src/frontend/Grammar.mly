@@ -38,10 +38,10 @@
 %token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY BANG
 %token EQUALS
 %token RIGHT_ARROW
-%token TIMES AST HASH AT BACKTICK IN WITH WHERE END DATA INTRO
+%token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE DO LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
-%token IMPORT OPAQUE QUIT DEBUG NORMALIZE META DEF PRINT
+%token IMPORT OPAQUE QUIT DEBUG NORMALIZE META DEF PRINT CHECK
 %token TYPE PRE KAN
 %token EOF
 
@@ -311,21 +311,18 @@ econstr:
 
 mltoplevel:
   | META; LET; a = ATOM; EQUALS; cmd = mlcmd; rest = mltoplevel
-  (* TODO: need to resolve this name somehow *)
     { E.MlBind (cmd, `User a, rest) }
 
-  | DO; c = atomic_mlcmd; rest = mltoplevel
+  | DO; c = mlcmd; rest = mltoplevel
     { E.MlBind (c, `Gen (Name.fresh ()), rest) }
 
   | opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
     { let name = E.MlRef (Name.named (Some a)) in
-      E.mlbind (E.define ~name ~opacity ~scheme:sch ~tm) @@ fun _ ->
-      rest }
+      MlBind (E.define ~name ~opacity ~scheme:sch ~tm, `User a, rest) }
 
   | decl = data_decl; rest = mltoplevel
     { let name, desc = decl in
-      E.mlbind (E.MlDeclData {name; desc}) @@ fun _ ->
-      rest }
+      MlBind (E.MlDeclData {name; desc}, `User name, rest) }
 
   | IMPORT; a = ATOM; rest = mltoplevel
     { E.mlbind (E.MlImport a) @@ fun _ -> rest }
@@ -371,6 +368,9 @@ mlcmd:
   | FUN; a = ATOM; RIGHT_ARROW; c = mlcmd
     { E.MlLam (`User a, c) }
 
+  | CHECK; tm = mlvalue; COLON; ty = mlvalue
+    { E.MlCheck {ty; tm} }
+
   | c = atomic_mlcmd; v = mlvalue
     { E.MlApp (c, v) }
 
@@ -380,10 +380,19 @@ mlcmd:
 atomic_mlcmd:
   | LPR; c = mlcmd; RPR
     { c }
+  | BEGIN; c = mlcmd; END
+    { c }
   | BANG; v = mlvalue
     { E.MlUnleash v }
-  | PRINT; v = located(mlvalue)
-    { E.MlPrint v }
+
+  | PRINT; c = located(atomic_mlcmd)
+    { let open E in
+      mlbind c.con @@ fun x ->
+      MlPrint {c with con = x} }
+
+  | NORMALIZE; c = atomic_mlcmd
+    { E.mlbind c @@ fun x -> E.MlNormalize x }
+
   | v = mlvalue
     { E.MlRet v }
 

@@ -118,6 +118,17 @@ struct
       bdy_tac {ty; sys = []} >>= fun tm ->
       M.ret @@ E.MlSem.Tuple [E.MlSem.Term ty; E.MlSem.Term tm]
 
+    | MlCheck {ty; tm} ->
+      eval_val ty <<@> E.MlSem.unleash_term >>= fun ty ->
+      eval_val tm <<@> E.MlSem.unleash_term >>= fun tm ->
+      begin
+        M.lift @@ C.check ~ty tm >>= function
+        | `Ok ->
+          M.ret @@ E.MlSem.Term (Tm.up @@ Tm.ann ~ty ~tm)
+        | `Exn exn ->
+          raise exn
+      end
+
     | E.MlDefine info ->
       begin
         eval_val info.tm <<@> E.MlSem.unleash_term >>= fun tm ->
@@ -146,14 +157,19 @@ struct
       M.unify >>
       M.ret @@ E.MlSem.Tuple []
 
-    | E.MlNormalize e ->
-      elab_inf e >>= fun (ty, cmd) ->
-      M.lift C.base_cx >>= fun cx ->
-      let vty = Cx.eval cx ty in
-      let el = Cx.eval_cmd cx cmd in
-      let tm = Cx.quote cx ~ty:vty el in
-      M.emit e.span @@ M.PrintTerm {ty = ty; tm} >>
-      M.ret @@ E.MlSem.Term tm
+    | E.MlNormalize v ->
+      eval_val v >>= fun v ->
+      begin
+        match v with
+        | E.MlSem.Tuple [E.MlSem.Term ty; E.MlSem.Term tm] ->
+          M.lift C.base_cx >>= fun cx ->
+          let vty = Cx.eval cx ty in
+          let el = Cx.eval cx tm in
+          let tm = Cx.quote cx ~ty:vty el in
+          M.ret @@ E.MlSem.Term tm
+        | _ ->
+          failwith "normalize: expected synthesizable term"
+      end
 
     | E.MlSplit (tuple, xs, cmd) ->
       begin

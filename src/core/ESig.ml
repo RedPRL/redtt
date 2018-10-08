@@ -20,13 +20,14 @@ and mlcmd =
   | MlLam of mlname * mlcmd
   | MlApp of mlcmd * mlval
   | MlElab of escheme * eterm
+  | MlCheck of {ty : mlval; tm : mlval}
   | MlDeclData of {name : string; desc : edesc}
   | MlDefine of {name : mlval; opacity : [`Opaque | `Transparent]; ty : mlval; tm : mlval}
   | MlSplit of mlval * mlname list * mlcmd
   | MlUnify
   | MlBind of mlcmd * mlname * mlcmd
   | MlUnleash of mlval
-  | MlNormalize of eterm
+  | MlNormalize of mlval
   | MlImport of string
   | MlPrint of mlval info
 
@@ -159,7 +160,8 @@ let define ~name ~opacity ~scheme ~tm =
   mlbind (MlElab (scheme, tm)) @@ fun x ->
   mlsplit x @@ fun ty tm ->
   mlbind (MlDefine {name; ty; tm; opacity}) @@ fun _ ->
-  MlUnify
+  mlbind MlUnify @@ fun _ ->
+  MlRet x
 
 
 module MlEnv = PersistentTable.M

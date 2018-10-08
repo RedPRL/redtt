@@ -40,12 +40,14 @@ module Make (R : SOURCE) : LEXER = struct
       ("V", V);
       ("opaque", OPAQUE);
       ("print", PRINT);
+      ("check", CHECK);
       ("meta", META);
       ("quit", QUIT);
       ("in", IN);
       ("with", WITH);
       ("where", WHERE);
       ("data", DATA);
+      ("begin", BEGIN);
       ("end", END);
       ("tick", TICK);
       ("✓", TICK);
