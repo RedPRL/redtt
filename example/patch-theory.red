@@ -3,7 +3,7 @@ import univalence
 
 data patch where
 | num
-| add1 (i : dim) [∂[i] → num]
+| add1 (i : 𝕀) [∂[i] → num]
 
 def Interp : patch → type =
   elim [

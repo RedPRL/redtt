@@ -4,7 +4,7 @@ import univalence
 
 data s2 where
 | base
-| surf (i j : dim) [∂[i j] → base]
+| surf (i j : 𝕀) [∂[i j] → base]
 
 def hopf : s2 → type =
   elim [

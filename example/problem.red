@@ -36,7 +36,7 @@ def f4 : pΩ³ pjoin .fst → pΩ³ ps2 .fst =
 
 def test0-4 : pΩ³ ps2 .fst = f4 test0-3
 
-def innerpath (i j : dim) : s1 =
+def innerpath (i j : 𝕀) : s1 =
   coe 0 1 base in λ k → hopf (test0-4 i j k)
 
 --let problem : path int (pos zero) (pos zero) =

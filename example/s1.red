@@ -5,7 +5,7 @@ import univalence
 
 data s1 where
 | base
-| loop (i : dim) [∂[i] → base]
+| loop (i : 𝕀) [∂[i] → base]
 
 def rotate/loop : (a : s1) → path _ a a =
   elim [
@@ -21,7 +21,7 @@ def rotate : s1 → s1 → s1 =
 
 def rotate/equiv/loop : path _ (id-equiv s1) (id-equiv s1) =
   λ i →
-    let fwd (j : dim) (a : s1) = rotate/loop a j in
+    let fwd (j : 𝕀) (a : s1) = rotate/loop a j in
     ( fwd i
     , prop→prop-over
       (λ j → is-equiv s1 s1 (fwd j))

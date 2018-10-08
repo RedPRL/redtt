@@ -7,7 +7,7 @@ import s1
 data susp (A : type) where
 | north
 | south
-| merid (a : A) (i : dim) [
+| merid (a : A) (i : 𝕀) [
   | i=0 → north
   | i=1 → south
  ]

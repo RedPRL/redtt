@@ -6,7 +6,7 @@ import bool
 def stream/F (A : ✓ → type) : type =
   bool × (α : ✓) → A α
 
-def stream/L (i : dim) : type =
+def stream/L (i : 𝕀) : type =
   fix[i] A : type in stream/F A
 
 def stream : _ = stream/L 0

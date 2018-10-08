@@ -26,7 +26,7 @@ def pf (pA : ptype) : pequiv (p→ pbool pA) pA =
   in
 
   let bwdfwd (f : pmap pbool pA) : path _ (bwd (fwd.fst f)) f =
-    let bwdfwd/pt (i j : dim) : pA.fst =
+    let bwdfwd/pt (i j : 𝕀) : pA.fst =
       comp 1 j (pA.snd) [
       | i=0 → refl
       | i=1 → f.snd

@@ -2,7 +2,7 @@ import path
 
 data trunc (A : type) where
 | ret (a : A)
-| glue (x y : trunc) (i : dim) [
+| glue (x y : trunc) (i : 𝕀) [
   | i=0 → x
   | i=1 → y
   ]

@@ -20,7 +20,7 @@ def id-equiv (A : type) : equiv A A =
   , λ a →
     ( (a, refl)
     , λ p i →
-      let aux (j : dim) : A =
+      let aux (j : 𝕀) : A =
         comp 1 j a [
         | i=0 → p.snd
         | i=1 → refl
@@ -93,13 +93,13 @@ def is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv _ _ f) =
 
     ( c' (a , p) i
     , λ w →
-      let cap (j k : dim) : fiber A B f y =
+      let cap (j k : 𝕀) : fiber A B f y =
         comp 1 j (c' w k) [
         | k=0 → refl
         | k=1 → c' w
         ]
       in
-      let face/i0 (j k : dim) : fiber A B f y =
+      let face/i0 (j k : 𝕀) : fiber A B f y =
         comp 0 j w [
         | k=0 → cap 0
         | k=1 → c w
@@ -193,7 +193,7 @@ def univalence/alt (B : type) : is-contr^1 ((A : type) × equiv A B) =
       ( _
       , proj/B
       , λ b →
-        let ctr/B (j : dim) : B =
+        let ctr/B (j : 𝕀) : B =
           comp 1 j b [
           | i=0 → w.snd.snd b .fst .snd
           | i=1 → refl
@@ -204,7 +204,7 @@ def univalence/alt (B : type) : is-contr^1 ((A : type) × equiv A B) =
         in
         ( ctr
         , λ v j →
-          let filler (l : dim) : B =
+          let filler (l : 𝕀) : B =
             comp 1 l b [
             | i=0 → w.snd.snd b .snd v j .snd
             | i=1 k → weak-connection/or B (v.snd) j k

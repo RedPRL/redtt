@@ -86,3 +86,6 @@ function! s:CloseBuffer()
 endfunction
 
 let b:did_ftplugin = 1
+
+
+digraph II 120128

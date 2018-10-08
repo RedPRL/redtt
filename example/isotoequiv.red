@@ -12,18 +12,18 @@ def iso (A B : type) : type =
 
 def iso/fiber/prop-over
   (A B : type)
-  (I : iso A B) (b : dim → B)
+  (I : iso A B) (b : 𝕀 → B)
   : is-prop-over (λ i → fiber _ _ (I.fst) (b i))
   =
   let (f, g, α, β) = I in
-  let sq (b : B) (fib : fiber _ _ f b) (j k : dim) : A =
+  let sq (b : B) (fib : fiber _ _ f b) (j k : 𝕀) : A =
     comp k j (β (fib.fst) k) [
     | k=1 → refl
     | k=0 j → g (fib.snd j)
     ]
   in
   λ fib0 fib1 →
-    let sq2 (i k : dim) : A =
+    let sq2 (i k : 𝕀) : A =
       comp 0 k (g (b i)) [
       | i=0 → sq (b 0) fib0 1
       | i=1 → sq (b 1) fib1 1

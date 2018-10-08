@@ -36,7 +36,7 @@ def path-retract/preserves/refl (A : type) (R : A → A → type)
     | i=1 k → s x x (α x x (r x x refl) k) j
     ]
   in
-  let face (m k : dim) : A =
+  let face (m k : 𝕀) : A =
     comp 0 m x [
     | k=0 → q
     | k=1 → refl

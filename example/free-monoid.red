@@ -8,15 +8,15 @@ data F (A : type) where
 | η (a : A)
 | ☆ (s t : F)
 | ε
-| idn/r (s : F) (i : dim) [
+| idn/r (s : F) (i : 𝕀) [
   | i=0 → ☆ s ε
   | i=1 → s
   ]
-| idn/l (s : F) (i : dim) [
+| idn/l (s : F) (i : 𝕀) [
   | i=0 → ☆ ε s
   | i=1 → s
   ]
-| ass (s t u : F) (i : dim) [
+| ass (s t u : F) (i : 𝕀) [
   | i=0 → ☆ s (☆ t u)
   | i=1 → ☆ (☆ s t) u
   ]
@@ -27,7 +27,6 @@ def quote (A : type) : list A → F A =
   | cons x (xs → ih) →
     ☆ (η x) ih
   ]
-
 
 def eval (A : type) : F A → list A =
   elim [

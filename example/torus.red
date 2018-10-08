@@ -7,9 +7,9 @@ import isotoequiv
 
 data torus where
 | pt
-| p/one (i : dim) [∂[i] → pt]
-| p/two (i : dim) [∂[i] → pt]
-| square (i j : dim)
+| p/one (i : 𝕀) [∂[i] → pt]
+| p/two (i : 𝕀) [∂[i] → pt]
+| square (i j : 𝕀)
   [ ∂[i] → p/one j
   | ∂[j] → p/two i
   ]

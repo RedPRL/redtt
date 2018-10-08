@@ -11,7 +11,7 @@ import s2
 -- loop space of s2
 data os2 where
 | obase
-| oloop (y : os2) (i : dim) [∂[i] → y]
+| oloop (y : os2) (i : 𝕀) [∂[i] → y]
 
 -- I. the loop of automorphisms of os2
 
@@ -52,7 +52,7 @@ def onegloop-oloop (o : os2)
 
 -- II. universal cover over s2
 
-def s2/code/surf/filler (m i j : dim) : type =
+def s2/code/surf/filler (m i j : 𝕀) : type =
   comp 0 m os2 [
   | ∂[i] | j=0 → ua os2 os2 (id-equiv/wc os2)
   | j=1 → ua os2 os2 (oloop-equiv i)
@@ -87,7 +87,7 @@ def s2/encode (a : s2) (p : path s2 base a) : s2/code a =
 
 -- IV. decoding function
 
-def extend-by-surf (p : path s2 base base) (i j k : dim) : s2 =
+def extend-by-surf (p : path s2 base base) (i j k : 𝕀) : s2 =
   comp 0 j (p k) [
   | ∂[i] | k=0 → refl
   | k=1 j → surf i j

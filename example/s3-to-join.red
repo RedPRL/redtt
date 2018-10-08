@@ -6,12 +6,12 @@ import isotoequiv
 
 data s3 where
 | base
-| cube (i j k : dim) [∂[i j k] → base]
+| cube (i j k : 𝕀) [∂[i j k] → base]
 
 -- forward map
 
 -- pseudo-connection
-def s3→join/cnx (b : s1) (i m : dim) : join s1 s1 =
+def s3→join/cnx (b : s1) (i m : 𝕀) : join s1 s1 =
   comp 0 i (inl base) [
   | m=0 → refl
   | m=1 i → push base b i
@@ -32,7 +32,7 @@ def s3→join/k01 :
     | m=1 i → push (loop j) base i
     ]
 
-def s3→join/cube/filler (i j k m : dim) : join s1 s1 =
+def s3→join/cube/filler (i j k m : 𝕀) : join s1 s1 =
   comp 1 m (push (loop j) (loop k) i) [
   | i=1 | ∂[j] → s3→join/cnx (loop k) i
   | (i=0 | ∂[k]) m → s3→join/k01 i j m
@@ -113,10 +113,10 @@ def s3-join-s3 : (d : s3) → path _ (join→s3 (s3→join d)) d =
   elim [
   | base → refl
   | cube i j k → λ x →
-    let cnx/filler (i m x : dim) : s3 =
+    let cnx/filler (i m x : 𝕀) : s3 =
       comp 0 i base [∂[m] | x=1 → refl]
     in
-    let k01/filler (i m x : dim) : s3 =
+    let k01/filler (i m x : 𝕀) : s3 =
       comp 1 i (cnx/filler 1 m x) [
       | ∂[j] i → cnx/filler i m x
       | ∂[m] | x=1 → refl
