@@ -204,7 +204,7 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
   | _ -> failwith "make_motive"
 
 
-let rec tac_lambda (ps : ESig.einvpat list) tac goal =
+let rec tac_lambda (ps : ML.einvpat list) tac goal =
   match Tm.unleash goal.ty with
   | Tm.Pi (dom, cod) ->
     begin
@@ -346,7 +346,7 @@ and tac_generalize ~tac_scrut tac_body : chk_tac =
   in
   tac_let xfun tac_fun tac_bdy
 
-and tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk_tac =
+and tac_inversion ~loc ~tac_scrut (invpat : ML.einvpat) (body : chk_tac) : chk_tac =
   match_goal @@ fun goal ->
   match invpat with
   | `Var nm ->

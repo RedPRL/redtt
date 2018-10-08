@@ -5,7 +5,7 @@ open Bwd open BwdNotation
 
 module type Import =
 sig
-  val import : Lwt_io.file_name -> [`Elab of ESig.mlcmd | `Cached]
+  val import : Lwt_io.file_name -> [`Elab of ML.mlcmd | `Cached]
 end
 
 module Make (I : Import) =
@@ -28,7 +28,7 @@ struct
 
   let flip f x y = f y x
 
-  module E = ESig
+  module E = ML
 
   open Refiner
 
@@ -83,13 +83,13 @@ struct
 
     | E.MlBind (cmd0, x, cmd1) ->
       eval_cmd cmd0 >>= fun v0 ->
-      M.lift @@ C.modify_mlenv (E.MlEnv.set x v0) >>
+      M.lift @@ C.modify_mlenv (E.Env.set x v0) >>
       eval_cmd cmd1
 
     | E.MlUnleash v ->
       begin
         eval_val v >>= function
-        | E.MlSem.Thunk (env, cmd) ->
+        | E.Sem.Thunk (env, cmd) ->
           M.lift @@ C.modify_mlenv (fun _ -> env) >>
           eval_cmd cmd
         | _ ->
@@ -98,14 +98,14 @@ struct
 
     | E.MlLam (x, c) ->
       M.lift C.get_mlenv <<@> fun env ->
-        E.MlSem.Clo (env, x, c)
+        E.Sem.Clo (env, x, c)
 
     | E.MlApp (c, v) ->
       begin
         eval_val v >>= fun v ->
         eval_cmd c >>= function
-        | E.MlSem.Clo (env, x, c) ->
-          M.lift @@ C.modify_mlenv (fun _ -> E.MlEnv.set x v env) >>
+        | E.Sem.Clo (env, x, c) ->
+          M.lift @@ C.modify_mlenv (fun _ -> E.Env.set x v env) >>
           eval_cmd c
         | _ ->
           failwith "expected ml closure"
@@ -116,38 +116,38 @@ struct
       let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
       let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
       bdy_tac {ty; sys = []} >>= fun tm ->
-      M.ret @@ E.MlSem.Tuple [E.MlSem.Term ty; E.MlSem.Term tm]
+      M.ret @@ E.Sem.Tuple [E.Sem.Term ty; E.Sem.Term tm]
 
     | MlCheck {ty; tm} ->
-      eval_val ty <<@> E.MlSem.unleash_term >>= fun ty ->
-      eval_val tm <<@> E.MlSem.unleash_term >>= fun tm ->
+      eval_val ty <<@> E.Sem.unleash_term >>= fun ty ->
+      eval_val tm <<@> E.Sem.unleash_term >>= fun tm ->
       begin
         M.lift @@ C.check ~ty tm >>= function
         | `Ok ->
-          M.ret @@ E.MlSem.Term (Tm.up @@ Tm.ann ~ty ~tm)
+          M.ret @@ E.Sem.Term (Tm.up @@ Tm.ann ~ty ~tm)
         | `Exn exn ->
           raise exn
       end
 
     | E.MlDefine info ->
       begin
-        eval_val info.tm <<@> E.MlSem.unleash_term >>= fun tm ->
-        eval_val info.ty <<@> E.MlSem.unleash_term >>= fun ty ->
-        eval_val info.name <<@> E.MlSem.unleash_ref >>= fun alpha ->
+        eval_val info.tm <<@> E.Sem.unleash_term >>= fun tm ->
+        eval_val info.ty <<@> E.Sem.unleash_term >>= fun ty ->
+        eval_val info.name <<@> E.Sem.unleash_ref >>= fun alpha ->
         M.lift @@ U.define Emp alpha info.opacity ty tm >>= fun _ ->
-        M.ret @@ E.MlSem.Tuple []
+        M.ret @@ E.Sem.Tuple []
       end
 
     | E.MlDeclData info ->
       elab_datatype info.name info.desc >>= fun desc ->
       M.lift @@ C.declare_datatype info.name desc >>
-      M.ret @@ E.MlSem.DataDesc desc
+      M.ret @@ E.Sem.DataDesc desc
 
     | E.MlImport file_name ->
       begin
         match I.import file_name with
         | `Cached ->
-          M.ret @@ E.MlSem.Tuple []
+          M.ret @@ E.Sem.Tuple []
         | `Elab cmd ->
           eval_cmd cmd
       end
@@ -155,18 +155,18 @@ struct
     | E.MlUnify ->
       M.lift C.go_to_top >>
       M.unify >>
-      M.ret @@ E.MlSem.Tuple []
+      M.ret @@ E.Sem.Tuple []
 
     | E.MlNormalize v ->
       eval_val v >>= fun v ->
       begin
         match v with
-        | E.MlSem.Tuple [E.MlSem.Term ty; E.MlSem.Term tm] ->
+        | E.Sem.Tuple [E.Sem.Term ty; E.Sem.Term tm] ->
           M.lift C.base_cx >>= fun cx ->
           let vty = Cx.eval cx ty in
           let el = Cx.eval cx tm in
           let tm = Cx.quote cx ~ty:vty el in
-          M.ret @@ E.MlSem.Term tm
+          M.ret @@ E.Sem.Term tm
         | _ ->
           failwith "normalize: expected synthesizable term"
       end
@@ -174,8 +174,8 @@ struct
     | E.MlSplit (tuple, xs, cmd) ->
       begin
         eval_val tuple >>= function
-        | E.MlSem.Tuple vs ->
-          M.lift @@ C.modify_mlenv (List.fold_right2 E.MlEnv.set xs vs) >>
+        | E.Sem.Tuple vs ->
+          M.lift @@ C.modify_mlenv (List.fold_right2 E.Env.set xs vs) >>
           eval_cmd cmd
         | _ ->
           failwith "expected tuple"
@@ -183,32 +183,32 @@ struct
 
     | E.MlPrint info ->
       eval_val info.con >>= fun v ->
-      let pp fmt () = ESig.MlSem.pp fmt v in
+      let pp fmt () = ML.Sem.pp fmt v in
       Log.pp_message ~loc:info.span ~lvl:`Info pp Format.std_formatter ();
-      M.ret @@ E.MlSem.Tuple []
+      M.ret @@ E.Sem.Tuple []
 
 
   and eval_val =
     function
-    | E.MlDataDesc desc -> M.ret @@ E.MlSem.DataDesc desc
-    | E.MlTerm tm -> M.ret @@ E.MlSem.Term tm
-    | E.MlSys tm -> M.ret @@ E.MlSem.Sys tm
-    | E.MlVar x -> M.lift C.get_mlenv <<@> fun env -> Option.get_exn @@ E.MlEnv.find x env
-    | E.MlTuple vs -> traverse eval_val vs <<@> fun rs -> E.MlSem.Tuple rs
-    | E.MlThunk mlcmd -> M.lift C.get_mlenv <<@> fun env -> E.MlSem.Thunk (env, mlcmd)
-    | E.MlRef nm -> M.ret @@ E.MlSem.Ref nm
+    | E.MlDataDesc desc -> M.ret @@ E.Sem.DataDesc desc
+    | E.MlTerm tm -> M.ret @@ E.Sem.Term tm
+    | E.MlSys tm -> M.ret @@ E.Sem.Sys tm
+    | E.MlVar x -> M.lift C.get_mlenv <<@> fun env -> Option.get_exn @@ E.Env.find x env
+    | E.MlTuple vs -> traverse eval_val vs <<@> fun rs -> E.Sem.Tuple rs
+    | E.MlThunk mlcmd -> M.lift C.get_mlenv <<@> fun env -> E.Sem.Thunk (env, mlcmd)
+    | E.MlRef nm -> M.ret @@ E.Sem.Ref nm
 
   (* function
      | [] ->
      M.ret ()
-     | E.Debug f :: esig ->
+     | E.Debug f :: ML ->
      elab_decl @@ E.Debug f >>= fun _ ->
-     elab_sig esig
+     elab_sig ML
      | E.Quit :: _ ->
      M.ret ()
-     | dcl :: esig ->
+     | dcl :: ML ->
      elab_decl dcl >>= fun _ ->
-     elab_sig esig
+     elab_sig ML
 
 
      and elab_decl =
@@ -253,8 +253,8 @@ struct
       match I.import file_name with
       | `Cached ->
         M.ret ()
-      | `Elab esig ->
-        elab_sig esig
+      | `Elab ML ->
+        elab_sig ML
      end
 
      | E.Quit ->
@@ -395,7 +395,7 @@ struct
         let script = E.MlApp (c, mlgoal) in
         begin
           eval_cmd script >>= function
-          | E.MlSem.Term tm -> M.ret tm
+          | E.Sem.Term tm -> M.ret tm
           | _ -> failwith "error running ML tactic"
         end
 
@@ -840,7 +840,7 @@ struct
         ty, Tm.ann ~ty ~tm
 
     | _ ->
-      Format.eprintf "Elaborator error: %a@." ESig.pp e.con;
+      Format.eprintf "Elaborator error: %a@." ML.pp e.con;
       failwith "Can't infer"
 
   and elab_dim e =

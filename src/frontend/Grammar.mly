@@ -4,7 +4,7 @@
   open RedBasis
   open Bwd
   open BwdNotation
-  module E = ESig
+  module E = ML
   module R = ResEnv
 
   let locate loc con =
@@ -46,7 +46,7 @@
 %token EOF
 
 
-%start <ESig.mlcmd> mltoplevel
+%start <ML.mlcmd> mltoplevel
 %%
 
 located(X):
