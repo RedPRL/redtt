@@ -4,7 +4,7 @@ import list
 -- strict free monoid, presented as a list.
 
 -- Probably need to truncate this to get the right type
-data F (A : type) where
+data (A : type) ⊢ F where
 | η (a : A)
 | ☆ (s t : F)
 | ε

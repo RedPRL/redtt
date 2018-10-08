@@ -37,7 +37,7 @@
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR LWCR RWCR
 %token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY BANG
 %token EQUALS
-%token RIGHT_ARROW
+%token RIGHT_ARROW RIGHT_TACK
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE DO LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
@@ -52,6 +52,11 @@
 located(X):
   | e = X
     { locate $loc e }
+
+edata_params:
+  | params = nonempty_list(etele_cell); RIGHT_TACK;
+    { params }
+  | { [] }
 
 univ_spec:
   | TYPE; k = kind
@@ -343,8 +348,9 @@ opacity:
 
 
 data_decl:
-  | DATA; dlbl = ATOM;
-    params = list(etele_cell);
+  | DATA;
+    params = edata_params;
+    dlbl = ATOM;
     univ_spec = option(preceded(COLON, univ_spec));
     WHERE; option(PIPE);
     constrs = separated_list(PIPE, econstr);

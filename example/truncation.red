@@ -1,6 +1,6 @@
 import path
 
-data trunc (A : type) where
+data (A : type) ⊢ trunc where
 | ret (a : A)
 | glue (x y : trunc) (i : 𝕀) [
   | i=0 → x
