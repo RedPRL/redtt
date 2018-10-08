@@ -1,4 +1,4 @@
-data join (A B : type) where
+data (A B : type) ⊢ join where
 | inl (a : A)
 | inr (b : B)
 | push (a : A) (b : B) (i : dim) [

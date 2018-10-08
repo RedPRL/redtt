@@ -4,7 +4,7 @@ import s1
 
 -- adapted from https://github.com/mortberg/cubicaltt/blob/master/examples/susp.ctt
 
-data susp (A : type) where
+data (A : type) ⊢ susp where
 | north
 | south
 | merid (a : A) (i : dim) [

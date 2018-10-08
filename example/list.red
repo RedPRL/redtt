@@ -5,7 +5,7 @@ import J
 import void
 import unit
 
-data list (A : type) where
+data (A : type) ⊢ list where
 | nil
 | cons (x : A) (xs : list)
 

@@ -37,7 +37,7 @@
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR
 %token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY
 %token EQUALS
-%token RIGHT_ARROW
+%token RIGHT_ARROW RIGHT_TACK
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
@@ -63,8 +63,9 @@ edecl:
   | NORMALIZE; e = located(econ)
     { E.Normalize e }
 
-  | DATA; dlbl = ATOM;
-    params = list(etele_cell);
+  | DATA;
+    params = edata_params;
+    dlbl = ATOM;
     univ_spec = option(preceded(COLON, univ_spec));
     WHERE; option(PIPE);
     constrs = separated_list(PIPE, econstr)
@@ -80,6 +81,11 @@ edecl:
     { E.Import a }
   | QUIT
     { E.Quit }
+
+edata_params:
+  | params = nonempty_list(etele_cell); RIGHT_TACK;
+    { params }
+  | { [] }
 
 univ_spec:
   | TYPE; k = kind
