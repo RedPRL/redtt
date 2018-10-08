@@ -34,7 +34,7 @@
 %token <int> NUMERAL
 %token <string> ATOM
 %token <string option> HOLE_NAME
-%token LSQ RSQ LPR RPR LGL RGL LBR RBR
+%token LSQ RSQ LPR RPR LGL RGL LBR RBR LWCR RWCR
 %token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY BANG
 %token EQUALS
 %token RIGHT_ARROW
@@ -111,6 +111,9 @@ atomoid_econ:
     { E.Refl }
   | n = NUMERAL;
     { E.Num n }
+
+  | LWCR; c = mlcmd; RWCR
+    { E.RunML c }
 
 atomic:
   | e = atom_econ

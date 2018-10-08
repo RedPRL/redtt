@@ -120,6 +120,10 @@ rule token = parse
     { Lwt.return RBR }
   | '#'
     { Lwt.return HASH }
+  | "『"
+    { Lwt.return LWCR }
+  | "』"
+    { Lwt.return RWCR }
   | '!'
     { Lwt.return BANG }
   | '@'

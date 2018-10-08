@@ -88,7 +88,7 @@ and econ =
   | Num of int
 
   (* To run a metalanguage tactic *)
-  | RunML of mlval
+  | RunML of mlcmd
 
 and eterm = econ info
 

@@ -390,9 +390,9 @@ struct
       normalize_ty goal.ty >>= fun ty ->
       let goal = {goal with ty} in
       match goal.sys, Tm.unleash ty, e.con with
-      | _, _, E.RunML v ->
+      | _, _, E.RunML c ->
         let mlgoal = E.MlTuple [E.MlTerm ty; E.MlSys goal.sys] in
-        let script = E.MlApp (E.MlUnleash v, mlgoal) in
+        let script = E.MlApp (c, mlgoal) in
         begin
           eval_cmd script >>= function
           | E.MlSem.Term tm -> M.ret tm
