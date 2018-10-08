@@ -21,8 +21,7 @@ data F (A : type) where
   | i=1 → ☆ (☆ s t) u
   ]
 
-
-let quote (A : type) : list A → F A =
+def quote (A : type) : list A → F A =
   elim [
   | nil → ε
   | cons x (xs → ih) →
@@ -30,7 +29,7 @@ let quote (A : type) : list A → F A =
   ]
 
 
-let eval (A : type) : F A → list A =
+def eval (A : type) : F A → list A =
   elim [
   | η a →
     cons a nil
@@ -46,13 +45,13 @@ let eval (A : type) : F A → list A =
     append/ass A ih/s ih/t ih/u i
   ]
 
-let nbe (A : type) (s : F A) : F A =
+def nbe (A : type) (s : F A) : F A =
   quote A (eval A s)
 
 
 /-
 -- need to do some kind of gluing thing I guess
-let soundness (A : type) : (s : F A) → path _ s (nbe A s) =
+def soundness (A : type) : (s : F A) → path _ s (nbe A s) =
   elim [
 
   | ☆ (s → ih/s) (t → ih/t) →
