@@ -1,12 +1,3 @@
-meta let foo = {
-  -- this will throw an exception if you unleash it ;-)
-   let asdf = (def x : type = type) in
-   <<>, <>>
-}
-
--- uncomment the following for a nasty surprise:
--- do !foo
-
 def pathd (A : 𝕀 → type) (M : A 0) (N : A 1) : type =
   [i] A i [
   | i=0 → M
@@ -32,6 +23,7 @@ def square
   | i=0 → O j
   | i=1 → P j
   ]
+
 
 def funext
   (A : type)
@@ -63,6 +55,7 @@ def trans/filler (A : type) (p : 𝕀 → A) (q : [i] A [i=0 → p 1]) (j i : �
 
 def trans (A : type) (p : 𝕀 → A) (q : [i] A [i=0 → p 1]) : path _ (p 0) (q 1) =
   trans/filler _ p q 1
+
 
 def trans/unit/r (A : type) (p : 𝕀 → A) : path (path _ (p 0) (p 1)) p (trans _ p (λ _ → p 1)) =
   trans/filler _ p (λ _ → p 1)
