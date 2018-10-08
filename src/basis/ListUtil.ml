@@ -55,3 +55,4 @@ let rec find_map_opt f xs =
     | None -> find_map_opt f xs
 
 let foreach l f = List.map f l
+let foreach2 l0 l1 f = List.map2 f l0 l1

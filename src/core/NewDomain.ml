@@ -1663,8 +1663,201 @@ struct
           make_vin rel r' ~el0 ~el1
       end
 
-    | HCom {ty = `Pos; _} ->
-      raise CanFavoniaHelpMe
+    | HCom ({ty = `Pos; r = s_x; r' = s'_x; _} as fhcom) ->
+      (* {b F}: favonia 11.00100100001111110110101010001000100001011.
+       * {b SVO}: Part III (airport). *)
+
+      (* anti-shadowing in OCaml. lol *)
+      let coe_cap = cap in
+      let cap = () in
+      let abs = () in
+
+      (* There are two major contexts we are working in:
+
+         1. The ambient context G.
+         2. The ambient context with [x], G+x. All components in [fhcom] live in here.
+
+         Shadowing happens all the time so freshening is sometimes needed. *)
+
+      (* this lives in G *)
+      let capty_abs = Abs (x, Val.unleash fhcom.cap) in
+
+      (* this lives in G+x*)
+      let cap_frame_x = Cap
+        {r = fhcom.r;
+         r' = fhcom.r';
+         ty = fhcom.cap;
+         sys = fhcom.sys}
+      in
+
+      (* in G *)
+      let s_xr = Dim.subst r x s_x in
+      let s_xr' = Dim.subst r' x s_x in
+      let s'_xr = Dim.subst r x s'_x in
+      let s'_xr' = Dim.subst r' x s'_x in
+
+      (* This is O in {b SVO, F}, living in G.
+        
+         The purpose of O is to make sure that, when r=r', we can recover the coercee
+         after the long journey detailed below.
+        
+         @param rel this should be [Rel.equate' r r' rel]
+         @param z_dest the destination in the fhcom direction. *)
+      let origin rel z_dest =
+        let ty = Val.run_then_unleash rel @@ Val.subst r x fhcom.cap in
+        let new_cap =
+          let cap_frame_xr = Frame.run rel @@ Frame.subst r x cap_frame_x in
+          Val.plug rel cap_frame_xr @@ Val.run rel coe_cap
+        in
+        let fhcom_sys_rx = ConAbsSys.run rel @@ ConAbsSys.subst r x fhcom.sys in
+        let sys = ConAbsSys.foreach_gen fhcom_sys_rx @@ fun sj_xr s'j_xr absj_xr ->
+          let rel = Rel.equate' sj_xr s'j_xr rel in
+          ConAbs.bind @@ fun y ->
+          make_coe rel y s_xr ~abs:absj_xr @@ Val.make @@
+          make_coe rel s'_xr y ~abs:absj_xr @@ Val.run rel coe_cap
+        in
+        make_hcom rel s'_xr z_dest ~ty ~cap:new_cap ~sys
+      in
+      
+      (* This corresponds to N in {b F}, representing the coherence conditions enforced by `fhcom.sys`
+       * that are apart from `x`. Be careful! The invariant of this function is extremely tricky!
+       *
+       * This function in general lives in the context G, except the argument [abs_x].
+       *
+       * @param r'' the intended destination in the coercion direction.
+       * @param s'' the intended destination in the composition direction, under r''/x.
+       * @param abs_x a prevalue in G+x, representing the face type. It can be just a prevalue.
+       * *)
+      let recovery_apart_core rel r'' s'' (preabs_x : con abs) : con =
+        let inner_coe = Val.make @@
+          let rel_x = Rel.hide' x rel in
+          let inner_abs = Abs (x, ConAbs.inst rel_x preabs_x s'_x) in
+          make_coe rel r r'' ~abs:inner_abs @@ Val.run rel coe_cap
+        in
+        let abs_xr'' = ConAbs.run rel @@ ConAbs.subst r'' x preabs_x in
+        make_coe rel (Dim.subst r'' x s'_x) s'' ~abs:abs_xr'' inner_coe
+      in
+
+      (* This is the system of N for apart faces *)
+      let recovery_apart_sys (r'' : dim) (s'' : dim) : con sys =
+        ConSys.foreach_gen (ConAbsSys.forall x fhcom.sys) @@ fun sj s'j absj_x ->
+        let rel = Rel.equate' sj s'j rel in
+        recovery_apart_core rel r'' s'' absj_x
+      in
+
+      (* This is P in {b F, SVO}, the naive coercion of the cap part of the box within [fhcom.cap].
+       * The problem is that we do not have the boundaries of the box, and even if we have,
+       * this naive cap will not be the image of the boundaries.
+       *
+       * This lives in G. *)
+      let naively_coerced_cap = Val.make @@
+        let abs = ConAbs.run rel capty_abs in
+        let new_cap = Val.make @@ origin rel s_xr in
+        let sys =
+          let diag = ConAbsSys.forall x [
+            s_x, s'_x,
+            LazyValAbs.bind @@ fun y ->
+            let rel = Rel.equate' s_x s'_x rel in
+            make_coe rel r y ~abs:(ConAbs.run rel capty_abs) (Val.run rel coe_cap)
+            ]
+          in
+          let apart_faces =
+            let y = Name.fresh () in
+            let s_y = Dim.subst (`Atom y) x s_x in
+            ConAbsSys.foreach_gen (recovery_apart_sys (`Atom y) s_y) @@ fun _ _ bdy -> Abs (y, bdy)
+          in
+          diag @ apart_faces
+        in
+        make_gcom rel r r' ~abs ~cap:new_cap ~sys
+      in
+
+      (* This is Q in [F, SVO]. This is used to calculate the preimage of the naively coerced cap
+       * for the boundaries and the fixed cap.
+       *
+       * For equations apart from `x`, the recovery_general will coincide with recovery_apart.
+       *
+       * This lives in G and is under the substitution r'/x in general, except that [abs_x] is in G+x.
+       *
+       * @param r'' the intended destination in the coercion direction.
+       * @param s'' the intended destination in the composition direction, under r''/x.
+       * @param abs_x a prevalue in G+x, representing the face type. It can be just a prevalue. *)
+      let recovery_general_core rel s'' abs_x =
+        let abs_xr' = ConAbs.run rel @@ ConAbs.subst r' x abs_x in
+        let cap = Val.run rel naively_coerced_cap in
+        let sys =
+          let y = Name.fresh () in
+          let diag =
+            r, r',
+            LazyValAbs.make_from_lazy @@ lazy begin
+              let rel = Rel.equate' r r' rel in
+              Abs (y, recovery_apart_core rel r (`Atom y) abs_x) 
+            end
+          in
+          let apart_faces =
+            ConAbsSys.foreach_gen (recovery_apart_sys r' (`Atom y)) @@
+            fun _ _ bdy -> Abs (y, bdy)
+          in
+          diag :: apart_faces
+        in
+        make_gcom rel s_xr' s'' ~abs:abs_xr' ~cap ~sys
+      in
+
+      (* A system consisting of Q. *)
+      let recovery_general_sys rel s'' =
+        ListUtil.foreach fhcom.sys @@ fun (sj_x, s'j_x, absj_x) ->
+        (* some optimization for apart faces *)
+        if I.absent x sj_x && I.absent x s'j_x then
+          sj_x, s'j_x,
+          LazyVal.make_from_lazy @@ lazy begin
+            let rel = Rel.equate' sj_x s'j_x rel in
+            let absj_x = LazyValAbs.unleash absj_x in
+            recovery_apart_core rel r' s'' absj_x
+          end
+        else
+          let sj_xr' = Dim.subst r' x sj_x in
+          let s'j_xr' = Dim.subst r' x s'j_x in
+          sj_xr', s'j_xr',
+          LazyVal.make_from_lazy @@ lazy begin
+            let rel = Rel.equate' sj_xr' s'j_xr' rel in
+            let absj_x = LazyValAbs.unleash absj_x in
+            recovery_general_core rel s'' absj_x
+          end
+      in  
+ 
+      (* This is the "cap" part of the final request in [F, SVO].
+       *
+       * Using Q, the preimages, this is to calculate the final cap based on the naive cap.
+       *
+       * This lives in G. *)
+      let coerced_cap = Val.make @@
+        let ty = Val.run_then_unleash rel @@ Val.subst r' x fhcom.cap in
+        let cap = naively_coerced_cap in
+        let sys =
+          let diag =
+            r, r',
+            LazyValAbs.bind @@ fun w ->
+            let rel = Rel.equate' r r' rel in
+            origin rel w
+          in
+          let fhcom_sys_xr' = ConAbsSys.run rel @@ ConAbsSys.subst r' x fhcom.sys in
+          let recovery_faces =
+            let y = Name.fresh () in
+            ListUtil.foreach2 fhcom_sys_xr' (recovery_general_sys rel (`Atom y)) @@
+            fun (sj_xr', s'j_xr', absj_xr') (_, _, bdy) ->
+            sj_xr', s'j_xr',
+            LazyValAbs.make_from_lazy @@ lazy begin
+              let rel = Rel.equate' sj_xr' s'j_xr' rel in
+              let absj_xr' = LazyValAbs.unleash absj_xr' in
+              Abs (y, make_coe rel (`Atom y) s_xr' ~abs:absj_xr' (Val.make @@ LazyVal.unleash bdy))
+            end
+          in
+          diag :: recovery_faces
+        in
+        make_hcom rel s_xr' s'_xr' ~ty ~cap ~sys
+      in
+
+      (* The box, finally! *)
+      make_box rel s_xr' s'_xr' ~cap:coerced_cap ~sys:(recovery_general_sys rel s'_xr')
 
     | Neu info ->
       let neu = DelayedNeu.make
