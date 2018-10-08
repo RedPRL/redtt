@@ -6,20 +6,18 @@ This vim plugin requires Vim 8 (released September 2016).
 
 While editing a .red file, run `:Redtt` or `<LocalLeader>l` (`l` for `load`) in
 the command (normal) mode to check the current buffer and display the output in
-a separate buffer.
-
-If there are any syntax errors, the cursor will jump to the first one.
+a separate buffer. Run `<LocalLeader>p` (`p` for `partial`) to check the current
+buffer, ignoring lines below the cursor's current position.
 
 ## Setup
 
-Copy (or symlink) this directory to `~/.vim/pack/foo/start/vim-redtt`. (The
-names `foo` and `vim-redtt` don't matter.)
+This plugin is compatible with Vim 8's package system. You can (re)install it by
+running the following shell command from the current directory:
+
+    DEST=~/.vim/pack/redprl-org/start ;
+    [ -d $DEST/vim-redtt ] && rm -r $DEST/vim-redtt ;
+    mkdir -p $DEST && cp -r . $DEST/vim-redtt
 
 If `redtt` is not in your `PATH`, add the following line to your `.vimrc`:
 
     let g:redtt_path = '/path/to/redtt'
-
-If you want to recheck the current buffer with another key combination, add the
-following line to your `.vimrc`, replacing `<F5>` as appropriate:
-
-    au FileType redtt nnoremap <F5> :Redtt<CR>
