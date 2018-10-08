@@ -185,7 +185,7 @@ struct
     | Term tm ->
       Tm.pp0 fmt tm
     | Sys sys ->
-      Tm.pp_sys Pp.Env.emp fmt sys
+      Format.fprintf fmt "@[<hv1>[%a]@]" (Tm.pp_sys Pp.Env.emp) sys
     | Ref a ->
       Name.pp fmt a
     | Clo _ ->
