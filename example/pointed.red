@@ -1,20 +1,20 @@
 import bool
 import isotoequiv
 
-let ptype : type^1 = (A : type) × A
+def ptype : type^1 = (A : type) × A
 
-let pmap (pA pB : ptype) : type =
+def pmap (pA pB : ptype) : type =
   (f : pA.fst → pB.fst) × path _ (f (pA.snd)) (pB.snd)
 
-let p→ (pA pB : ptype) : ptype =
+def p→ (pA pB : ptype) : ptype =
   (pmap pA pB, λ _ → pB.snd, refl)
 
-let pequiv (pA pB : ptype) : type =
+def pequiv (pA pB : ptype) : type =
   (f : pmap pA pB) × is-equiv (pA.fst) (pB.fst) (f.fst)
 
-let pbool : ptype = (bool, ff)
+def pbool : ptype = (bool, ff)
 
-let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
+def pf (pA : ptype) : pequiv (p→ pbool pA) pA =
   let fwd : pmap (p→ pbool pA) pA =
     (λ f → f.fst tt , refl)
   in
@@ -42,17 +42,17 @@ let pf (pA : ptype) : pequiv (p→ pbool pA) pA =
   in
   (fwd, iso→equiv _ _ (fwd.fst, bwd, refl, bwdfwd) .snd)
 
-let pΩ (pA : ptype) : ptype =
+def pΩ (pA : ptype) : ptype =
   ( path _ (pA.snd) (pA.snd)
   , refl
   )
 
-let pΩ/map (pA pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
+def pΩ/map (pA pB : ptype) (pf : pmap pA pB) : pmap (pΩ pA) (pΩ pB) =
   ( λ p i → comp 0 1 (pf.fst (p i)) [∂[i] → pf.snd]
   , λ j i → comp j 1 (pf.snd j) [∂[i] → pf.snd]
   )
 
-let pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
+def pΩ/map/trans (pA pB : ptype) (pf : pmap pA pB) (p q : pΩ pA .fst)
   : path _
     (pΩ/map pA pB pf .fst (trans _ p q))
     (trans _

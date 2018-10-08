@@ -17,11 +17,11 @@ data os2 where
 
 -- for the definition of s2/decode, it is convenient to use an id-equiv where
 -- both inverses are reflexivities
-let id-equiv/wc : (B : type) → equiv B B = id-equiv/weak-connection
+def id-equiv/wc : (B : type) → equiv B B = id-equiv/weak-connection
 
 -- it would probably be more efficient to define this directly,
 -- but we don't need it
-let oloop-equiv : path (equiv os2 os2) (id-equiv/wc os2) (id-equiv/wc os2) =
+def oloop-equiv : path (equiv os2 os2) (id-equiv/wc os2) (id-equiv/wc os2) =
   λ i →
   ( λ o → oloop o i
   , prop→prop-over
@@ -33,15 +33,15 @@ let oloop-equiv : path (equiv os2 os2) (id-equiv/wc os2) (id-equiv/wc os2) =
   )
 
 -- incidentally, onegloop o is homotopic to symm (λ i → oloop o i)
-let onegloop (o : os2) : path os2 o o =
+def onegloop (o : os2) : path os2 o o =
   λ i → oloop-equiv i .snd o .fst .fst
 
-let oloop-onegloop (o : os2)
+def oloop-onegloop (o : os2)
   : pathd (λ i → path os2 (oloop (onegloop o i) i) o) refl refl
   =
   λ i → oloop-equiv i .snd o .fst .snd
 
-let onegloop-oloop (o : os2)
+def onegloop-oloop (o : os2)
   : pathd (λ i → path os2 (onegloop (oloop o i) i) o) refl refl
   =
   λ i j →
@@ -52,16 +52,16 @@ let onegloop-oloop (o : os2)
 
 -- II. universal cover over s2
 
-let s2/code/surf/filler (m i j : dim) : type =
+def s2/code/surf/filler (m i j : dim) : type =
   comp 0 m os2 [
   | ∂[i] | j=0 → ua os2 os2 (id-equiv/wc os2)
   | j=1 → ua os2 os2 (oloop-equiv i)
   ]
 
-let s2/code/surf : path^1 (path^1 type os2 os2) refl refl =
+def s2/code/surf : path^1 (path^1 type os2 os2) refl refl =
   s2/code/surf/filler 1
 
-let s2/code/proj :
+def s2/code/proj :
   [i j] (s2/code/surf i j → os2) [
   | (∂[i] | j=1) o → o
   | j=0 o → oloop o i
@@ -74,7 +74,7 @@ let s2/code/proj :
   | j=1 → ua/proj os2 os2 (oloop-equiv i)
   ]
 
-let s2/code (a : s2) : type =
+def s2/code (a : s2) : type =
   elim a [
   | base → os2
   | surf i j → s2/code/surf i j
@@ -82,24 +82,24 @@ let s2/code (a : s2) : type =
 
 -- III. encoding function
 
-let s2/encode (a : s2) (p : path s2 base a) : s2/code a =
+def s2/encode (a : s2) (p : path s2 base a) : s2/code a =
   coe 0 1 obase in λ k → s2/code (p k)
 
 -- IV. decoding function
 
-let extend-by-surf (p : path s2 base base) (i j k : dim) : s2 =
+def extend-by-surf (p : path s2 base base) (i j k : dim) : s2 =
   comp 0 j (p k) [
   | ∂[i] | k=0 → refl
   | k=1 j → surf i j
   ]
 
-let s2/decode/base (o : os2) : path s2 base base =
+def s2/decode/base (o : os2) : path s2 base base =
   elim o [
   | obase → refl
   | oloop (o' → s2/decode/base/o') i → extend-by-surf s2/decode/base/o' i 1
   ]
 
-let s2/decode (a : s2) : (s2/code a) → path s2 base a =
+def s2/decode (a : s2) : (s2/code a) → path s2 base a =
   elim a [
   | base → s2/decode/base
   | surf i j → λ code k →
@@ -112,7 +112,7 @@ let s2/decode (a : s2) : (s2/code a) → path s2 base a =
 
 -- V. encode base after decode base
 
-let s2/encode-decode/base/step (o : os2) :
+def s2/encode-decode/base/step (o : os2) :
   [i j] os2 [
   | ∂[i] → s2/encode base (s2/decode/base o)
   | j=0 → oloop (s2/encode base (s2/decode/base o)) i
@@ -124,7 +124,7 @@ let s2/encode-decode/base/step (o : os2) :
     (coe 0 1 obase in λ k →
       s2/code (extend-by-surf (s2/decode/base o) i j k))
 
-let s2/encode-decode/base : (o : os2) → path os2 (s2/encode base (s2/decode base o)) o =
+def s2/encode-decode/base : (o : os2) → path os2 (s2/encode base (s2/decode base o)) o =
   elim [
   | obase → refl
   | oloop (o' → s2/encode-decode/base/o') i → λ m →
@@ -136,7 +136,7 @@ let s2/encode-decode/base : (o : os2) → path os2 (s2/encode base (s2/decode ba
 
 -- VI. decode base after encode base
 
-let s2/decode-encode/base
+def s2/decode-encode/base
   : (l : path s2 base base)
   → path (path s2 base base) (s2/decode base (s2/encode base l)) l
   =
@@ -144,5 +144,5 @@ let s2/decode-encode/base
 
 -- VII. characterization of the loop space
 
-let s2/loop-space-equiv : equiv (path s2 base base) os2 =
+def s2/loop-space-equiv : equiv (path s2 base base) os2 =
   iso→equiv _ _ (s2/encode base, s2/decode base, s2/encode-decode/base, s2/decode-encode/base)

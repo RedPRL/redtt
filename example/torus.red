@@ -14,7 +14,7 @@ data torus where
   | ∂[j] → p/two i
   ]
 
-let t2c : torus → s1 × s1 =
+def t2c : torus → s1 × s1 =
   elim [
   | pt → (base, base)
   | p/one i → (loop i, base)
@@ -22,7 +22,7 @@ let t2c : torus → s1 × s1 =
   | square i j → (loop j, loop i)
   ]
 
-let c2t : (s1 × s1) → torus =
+def c2t : (s1 × s1) → torus =
   λ [,] →                   -- now the goal is s1 → s1 → torus
   elim [                    -- now the goal is s1 → torus
   | base →
@@ -37,15 +37,15 @@ let c2t : (s1 × s1) → torus =
     ]
   ]
 
-let t2c2t : (t : torus) → path torus (c2t (t2c t)) t =
+def t2c2t : (t : torus) → path torus (c2t (t2c t)) t =
   -- wildcard patterns call the elimination tactic, with the rhs in all cases
   λ * → refl
 
-let c2t2c : (cs : s1 × s1) → path (s1 × s1) (t2c (c2t cs)) cs =
+def c2t2c : (cs : s1 × s1) → path (s1 × s1) (t2c (c2t cs)) cs =
   -- combination of wildcard pattern with sigma type inversion pattern
   λ (*, *) → refl
 
-let torus/s1s1/iso : iso (s1 × s1) torus =
+def torus/s1s1/iso : iso (s1 × s1) torus =
   ( c2t
   , t2c
   , t2c2t
@@ -53,8 +53,8 @@ let torus/s1s1/iso : iso (s1 × s1) torus =
   )
 
 
-let torus/s1s1/equiv : equiv (s1 × s1) torus =
+def torus/s1s1/equiv : equiv (s1 × s1) torus =
   iso→equiv (s1 × s1) torus torus/s1s1/iso
 
-let torus/s1s1/path : path^1 type (s1 × s1) torus =
+def torus/s1s1/path : path^1 type (s1 × s1) torus =
   ua (s1 × s1) torus torus/s1s1/equiv

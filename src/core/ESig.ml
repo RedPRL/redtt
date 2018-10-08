@@ -193,9 +193,9 @@ struct
     | Thunk _ ->
       Format.fprintf fmt "<thunk>"
     | Tuple vs ->
-      let comma fmt () = Format.fprintf fmt ", " in
+      let comma fmt () = Format.fprintf fmt ",@ " in
       let pp_cells = Format.pp_print_list ~pp_sep:comma pp in
-      Format.fprintf fmt "<%a>" pp_cells vs
+      Format.fprintf fmt "@[<hv1><%a>@]" pp_cells vs
 
   let unleash_term =
     function

@@ -9,7 +9,7 @@ data int where
 | pos (n : nat)
 | negsuc (n : nat)
 
-let pred : int → int =
+def pred : int → int =
   elim [
   | pos n →
     elim n [
@@ -19,7 +19,7 @@ let pred : int → int =
   | negsuc n → negsuc (suc n)
   ]
 
-let isuc : int → int =
+def isuc : int → int =
   elim [
   | pos n → pos (suc n)
   | negsuc n →
@@ -29,22 +29,22 @@ let isuc : int → int =
     ]
   ]
 
-let pred-isuc : (n : int) → path int (pred (isuc n)) n =
+def pred-isuc : (n : int) → path int (pred (isuc n)) n =
   elim [
   | negsuc * → refl
   | * → refl
   ]
 
-let isuc-pred : (n : int) → path int (isuc (pred n)) n =
+def isuc-pred : (n : int) → path int (isuc (pred n)) n =
   elim [
   | pos * → refl
   | * → refl
   ]
 
-let isuc/equiv : equiv int int =
+def isuc/equiv : equiv int int =
   iso→equiv _ _ (isuc, (pred, (isuc-pred, pred-isuc)))
 
-let iplus (m n : int) : int =
+def iplus (m n : int) : int =
   elim m [
   | pos m →
     elim m [
@@ -58,9 +58,9 @@ let iplus (m n : int) : int =
     ]
   ]
 
-let izero : int = pos zero
+def izero : int = pos zero
 
-let iplus/unit-r : (n : int) → path int (iplus n izero) n =
+def iplus/unit-r : (n : int) → path int (iplus n izero) n =
   elim [
   | pos n →
     elim n [
@@ -74,7 +74,7 @@ let iplus/unit-r : (n : int) → path int (iplus n izero) n =
     ]
   ]
 
-let int-path/code : int → int → type =
+def int-path/code : int → int → type =
   elim [
   | pos m → λ y →
     elim y [
@@ -88,21 +88,21 @@ let int-path/code : int → int → type =
     ]
   ]
 
-let int-refl : (x : int) → int-path/code x x =
+def int-refl : (x : int) → int-path/code x x =
   elim [
   | pos m → nat-refl m
   | negsuc m → nat-refl m
   ]
 
-let int-path/encode (x y : int) (p : path int x y)
+def int-path/encode (x y : int) (p : path int x y)
   : int-path/code x y
   =
   coe 0 1 (int-refl x) in λ i → int-path/code x (p i)
 
-let int-repr : int → nat =
+def int-repr : int → nat =
   elim [ pos m → m | negsuc m → m ]
 
-let int/discrete : discrete int =
+def int/discrete : discrete int =
   elim [
   | pos m →
     elim [
@@ -124,5 +124,5 @@ let int/discrete : discrete int =
     ]
   ]
 
-let int/set : is-set int =
+def int/set : is-set int =
   discrete→set int int/discrete

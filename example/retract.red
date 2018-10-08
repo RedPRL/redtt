@@ -1,12 +1,12 @@
 import path
 import connection
 
-let retract (A B : type) (f : A → B) (g : B → A) : type =
+def retract (A B : type) (f : A → B) (g : B → A) : type =
   (a : A) →
   path A (g (f a)) a
 
 -- Adapted from https://github.com/HoTT/book/issues/718
-let path-retract/preserves/refl (A : type) (R : A → A → type)
+def path-retract/preserves/refl (A : type) (R : A → A → type)
   (s : (x y : A) → R x y → path A x y)
   (r : (x y : A) → path A x y → R x y)
   (α : (x y : A) → retract (R x y) (path A x y) (s x y) (r x y))

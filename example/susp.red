@@ -12,15 +12,15 @@ data susp (A : type) where
   | i=1 → south
  ]
 
-let sphere : nat → type =
+def sphere : nat → type =
   elim [
   | zero → bool
   | suc (n → sphere/n) → susp sphere/n
   ]
 
-let sphere1 : type = sphere (suc zero)
+def sphere1 : type = sphere (suc zero)
 
-let sphere1→s1 : sphere1 → s1 =
+def sphere1→s1 : sphere1 → s1 =
   elim [
   | north → base
   | south → base
@@ -31,7 +31,7 @@ let sphere1→s1 : sphere1 → s1 =
     ] i
   ]
 
-let s1→sphere1 : s1 → sphere1 =
+def s1→sphere1 : s1 → sphere1 =
   elim [
   | base → north
   | loop i →

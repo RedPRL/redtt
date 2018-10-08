@@ -1,6 +1,6 @@
 import path
 
-let J
+def J
   (A : type) (a : A)
   (C : (x : A) (p : path _ a x) → type) (d : C a refl)
   (x : A) (p : path _ a x)
@@ -10,7 +10,7 @@ let J
     let h (j : dim) : A = comp 0 j a [i=0 → refl | i=1 → p] in
     C (h 1) h
 
-let J/eq
+def J/eq
   (A : type) (a : A)
   (C : (x : A) (p : path A a x) → type) (d : C a refl)
   : path (C a refl) (J _ _ C d a refl) d

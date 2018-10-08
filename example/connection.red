@@ -1,6 +1,6 @@
 import path
 
-let connection/or
+def connection/or
   (A : type)
   (p : dim → A)
   : [i j] A [
@@ -28,7 +28,7 @@ let connection/or
   | i=j → face i
   ]
 
-let connection/and
+def connection/and
   (A : type)
   (p : dim → A)
   : [i j] A [
@@ -52,7 +52,7 @@ let connection/and
   | i=j → face i
   ]
 
-let connection/both
+def connection/both
   (A : type)
   (p : dim → A) (q : [k] A [k=0 → p 1])
   : [i j] A [
@@ -82,7 +82,7 @@ let connection/both
   | j=1 → qface i
   ]
 
-let weak-connection/or
+def weak-connection/or
   (A : type)
   (p : dim → A)
   : [i j] A [
@@ -104,7 +104,7 @@ let weak-connection/or
   | i=1 | j=1 → refl
   ]
 
-let weak-connection/and
+def weak-connection/and
   (A : type)
   (p : dim → A)
   : [i j] A [

@@ -6,7 +6,7 @@ data s2 where
 | base
 | surf (i j : dim) [∂[i j] → base]
 
-let hopf : s2 → type =
+def hopf : s2 → type =
   elim [
   | base → s1
   | surf i j →

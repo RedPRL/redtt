@@ -2,24 +2,24 @@ import bool
 import s1
 import isotoequiv
 
-let not/equiv : equiv bool bool =
+def not/equiv : equiv bool bool =
   iso→equiv _ _ (not, (not, (not∘not/id/pt, not∘not/id/pt)))
 
-let not/path : path^1 type bool bool =
+def not/path : path^1 type bool bool =
   ua _ _ not/equiv
 
-let moebius-boundary/fiber : s1 → type =
+def moebius-boundary/fiber : s1 → type =
   elim [
   | base → bool
   | loop i → not/path i
   ]
 
-let moebius-boundary : type = (x : s1) × moebius-boundary/fiber x
+def moebius-boundary : type = (x : s1) × moebius-boundary/fiber x
 
-let moebius-boundary→s1/loop-base (i : dim) : bool → s1 =
+def moebius-boundary→s1/loop-base (i : dim) : bool → s1 =
   elim [ tt → loop i | ff → base ]
 
-let moebius-boundary→s1/commuting :
+def moebius-boundary→s1/commuting :
   (y : bool) →
   path _
     (moebius-boundary→s1/loop-base 0 y)
@@ -27,7 +27,7 @@ let moebius-boundary→s1/commuting :
   =
   elim [ tt → refl | ff → refl ]
 
-let moebius-boundary→s1/loop/filler (i j : dim) (y : not/path i) : s1 =
+def moebius-boundary→s1/loop/filler (i j : dim) (y : not/path i) : s1 =
   let z : bool = coe i 1 y in not/path
   in
   comp 1 j (moebius-boundary→s1/loop-base i z) [
@@ -35,26 +35,26 @@ let moebius-boundary→s1/loop/filler (i j : dim) (y : not/path i) : s1 =
   | i=1 → refl
   ]
 
-let moebius-boundary→s1' : (x : s1) → moebius-boundary/fiber x → s1 =
+def moebius-boundary→s1' : (x : s1) → moebius-boundary/fiber x → s1 =
   elim [
   | base → moebius-boundary→s1/loop-base 0
   | loop i → moebius-boundary→s1/loop/filler i 0
   ]
 
-let moebius-boundary→s1 (x : moebius-boundary) : s1 =
+def moebius-boundary→s1 (x : moebius-boundary) : s1 =
   moebius-boundary→s1' (x .fst) (x .snd)
 
-let s1→moebius-boundary/base : moebius-boundary =
+def s1→moebius-boundary/base : moebius-boundary =
   (base, ff)
 
-let loop-path (b : bool) :
+def loop-path (b : bool) :
   path moebius-boundary (base, b) (base, not b) =
   λ i → (loop i , `(vin i b (not b)))
 
-let s1→moebius-boundary/loop/filler (i j : dim) : moebius-boundary =
+def s1→moebius-boundary/loop/filler (i j : dim) : moebius-boundary =
   comp 0 j (loop-path ff i) [i=0 → refl | i=1 → loop-path tt]
 
-let s1→moebius-boundary : s1 → moebius-boundary =
+def s1→moebius-boundary : s1 → moebius-boundary =
   elim [
   | base → s1→moebius-boundary/base
   | loop i → s1→moebius-boundary/loop/filler i 1
@@ -78,7 +78,7 @@ opaque let s1→moebius-boundary→s1/loop :
 /-
   This will force re-typechecking `box`, but why?
 -/
-let s1→moebius-boundary→s1 :
+def s1→moebius-boundary→s1 :
   (x : s1) → path s1 (moebius-boundary→s1 (s1→moebius-boundary x)) x
   =
   elim [
@@ -90,20 +90,20 @@ quit
 
 -- there is an invalid fhcom in the middle?!
 -- ... (fhcom 0 1 (loop x) [x=0 <x1> base]) ...
-let test : dim → moebius-boundary =
+def test : dim → moebius-boundary =
   λ i → s1→moebius-boundary (loop i)
 --normalize test
 
 -- there is an invalid fhcom in the middle?!
 -- ... (fhcom 0 1 (loop x) [x=0 <x1> base]) ...
-let test1 : dim → s1 =
+def test1 : dim → s1 =
   λ i → moebius-boundary→s1 (s1→moebius-boundary (loop i))
 -- normalize test1
 
 /-
-let double : s1 → s1 = λ x → s1→moebius-boundary x .fst
+def double : s1 → s1 = λ x → s1→moebius-boundary x .fst
 
 import omega1s1
 
-let test0 : path int (winding (λ i → double (loopn (pos (suc zero)) i))) (pos (suc (suc zero))) = refl
+def test0 : path int (winding (λ i → double (loopn (pos (suc zero)) i))) (pos (suc (suc zero))) = refl
 -/

@@ -4,15 +4,15 @@ import int
 import s1
 import equivalence
 
-let s1-univ-cover : s1 → type =
+def s1-univ-cover : s1 → type =
   elim [
   | base → int
   | loop i → ua _ _ isuc/equiv i
   ]
 
-let Ω1s1 : type = path s1 base base
+def Ω1s1 : type = path s1 base base
 
-let loopn : int → Ω1s1 =
+def loopn : int → Ω1s1 =
   elim [
   | pos n →
     elim n [
@@ -30,12 +30,12 @@ let loopn : int → Ω1s1 =
     ]
   ]
 
-let encode (x : s1) (p : path s1 base x) : s1-univ-cover x =
+def encode (x : s1) (p : path s1 base x) : s1-univ-cover x =
   coe 0 1 (pos zero) in λ i → s1-univ-cover (p i)
 
-let winding (l : path s1 base base) : int = encode base l
+def winding (l : path s1 base base) : int = encode base l
 
-let winding-loopn : (n : int) → path int (winding (loopn n)) n =
+def winding-loopn : (n : int) → path int (winding (loopn n)) n =
   elim [
   | pos n →
     elim n [
@@ -51,7 +51,7 @@ let winding-loopn : (n : int) → path int (winding (loopn n)) n =
 
 /-
 
-let decode-square (n : int)
+def decode-square (n : int)
   : [i j] s1 [
     | i=0 → loopn n j
     | i=1 → loopn (isuc n) j
@@ -68,7 +68,7 @@ let decode-square (n : int)
     ]
   ]
 
-let decode (x : s1) : s1-univ-cover x → path s1 base x =
+def decode (x : s1) : s1-univ-cover x → path s1 base x =
   elim x [
   | base → loopn
   | loop i → λ y j → let n : int = coe i 0 y in λ k → s1-univ-cover (loop k) in
@@ -82,7 +82,7 @@ let decode (x : s1) : s1-univ-cover x → path s1 base x =
 
 -- the following symmetric version uses vproj instead of coe in V (thanks to Evan).
 
-let decode-square
+def decode-square
   : (n : int)
   → [i j] s1 [
     | i=0 → loopn (pred n) j
@@ -100,7 +100,7 @@ let decode-square
   | negsuc n → λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 → refl | j=1 i → loop i ]
   ]
 
-let decode : (x : s1) → s1-univ-cover x → path s1 base x =
+def decode : (x : s1) → s1-univ-cover x → path s1 base x =
   elim [
   | base → loopn
   | loop i → λ y j →
@@ -111,11 +111,11 @@ let decode : (x : s1) → s1-univ-cover x → path s1 base x =
     ]
   ]
 
-let loopn-winding (l : Ω1s1) : path _ (loopn (winding l)) l =
+def loopn-winding (l : Ω1s1) : path _ (loopn (winding l)) l =
   J s1 base (λ x p → path (path s1 base x) (decode x (encode x p)) p) refl base l
 
-let winding/equiv : equiv Ω1s1 int =
+def winding/equiv : equiv Ω1s1 int =
   iso→equiv _ _ (winding, (loopn, (winding-loopn, loopn-winding)))
 
-let winding/path : path^1 _ Ω1s1 int =
+def winding/path : path^1 _ Ω1s1 int =
   ua Ω1s1 int winding/equiv

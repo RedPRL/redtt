@@ -4,13 +4,13 @@ import equivalence
 -- RedPRL: https://github.com/RedPRL/sml-redprl/blob/bd73932409ddc3479c8ded5ac32ae0d93d31874a/example/isotoequiv.prl
 -- cubicaltt: https://github.com/mortberg/cubicaltt/blob/a331f1d355c5d2fc608a59c1cbbf016ea09d6deb/experiments/isoToEquiv.ctt
 
-let iso (A B : type) : type =
+def iso (A B : type) : type =
   (f : A → B)
   × (g : B → A)
   × ((b : _) → path _ (f (g b)) b)
   × (a : _) → path _ (g (f a)) a
 
-let iso/fiber/prop-over
+def iso/fiber/prop-over
   (A B : type)
   (I : iso A B) (b : dim → B)
   : is-prop-over (λ i → fiber _ _ (I.fst) (b i))
@@ -47,12 +47,12 @@ let iso/fiber/prop-over
        ]
     )
 
-let iso→equiv (A B : type) (I : iso A B) : equiv A B =
+def iso→equiv (A B : type) (I : iso A B) : equiv A B =
   let (f, g, α, β) = I in
   (f , λ b → ((g b, α b), λ fib → iso/fiber/prop-over _ _ I (λ _ → b) fib (g b, α b)))
 
 /-
-let iso→equiv-over (A B : type) (I : iso A B) : equiv-over A B =
+def iso→equiv-over (A B : type) (I : iso A B) : equiv-over A B =
   let (f, g, α, β) = I in
   (f , (λ b → (g b, α b), λ b fib → iso/fiber/prop-over _ _ I b fib (g (b 1), α (b 1))))
 -/
