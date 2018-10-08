@@ -16,21 +16,15 @@ type lock_info = {constant : bool; birth : int}
 
 type t =
   {rel : Restriction.t;
-   mlenv : ESig.MlSem.mlenv;
    data_decls : Desc.desc StringTable.t;
    table : (entry * lock_info) T.t;
    killed : int -> bool;
    under_tick : int -> bool;
    len : int}
 
-let get_mlenv t = t.mlenv
-let set_mlenv t mlenv =
-  {t with mlenv}
-
 
 let emp () =
   {table = T.empty;
-   mlenv = ESig.MlEnv.init ~size:100;
    data_decls = StringTable.empty;
    rel = Restriction.emp ();
    killed = (fun _ -> false);

@@ -1,4 +1,5 @@
 open RedBasis
+open RedTT_Core
 
 type 'a info =
   {con : 'a;

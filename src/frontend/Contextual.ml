@@ -9,7 +9,7 @@ type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 module Map = Map.Make (Name)
 
 type env = GlobalEnv.t
-type cx = {env : env; resenv : ResEnv.t; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
+type cx = {mlenv : ESig.MlSem.mlenv; env : env; resenv : ResEnv.t; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
 
 
 let rec pp_lcx fmt =
@@ -113,11 +113,9 @@ let setr r = modifyr @@ fun _ -> r
 
 let modify_mlenv f =
   modify @@ fun st ->
-  let mlenv = GlobalEnv.get_mlenv st.env in
-  let env = GlobalEnv.set_mlenv st.env (f mlenv) in
-  {st with env}
+  {st with mlenv = f st.mlenv}
 
-let get_mlenv = get <<@> fun x -> GlobalEnv.get_mlenv x.env
+let get_mlenv = get <<@> fun st -> st.mlenv
 
 
 let update_env e =
@@ -173,14 +171,14 @@ let pushr e =
   update_env e
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; resenv = ResEnv.init (); env = GlobalEnv.emp (); info = Map.empty; rcx = []} in
+  let _, r = m Emp {lcx = Emp; resenv = ResEnv.init (); mlenv = ESig.MlEnv.init ~size:100; env = GlobalEnv.emp (); info = Map.empty; rcx = []} in
   r
 
 
 let isolate (m : 'a m) : 'a m =
   fun ps st ->
     let st', a = m ps {st with lcx = Emp; rcx = []} in
-    {env = st'.env; resenv = st'.resenv; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; info = st'.info}, a
+    {env = st'.env; mlenv = st'.mlenv; resenv = st'.resenv; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; info = st'.info}, a
 
 let rec pushls es =
   match es with

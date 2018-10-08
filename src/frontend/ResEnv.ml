@@ -1,5 +1,6 @@
 open RedBasis
 open Bwd open BwdNotation
+open RedTT_Core
 
 type global =
   [ `Var of Name.t

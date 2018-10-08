@@ -1,4 +1,3 @@
-open RedTT_Core
 include module type of Grammar
 
 module I = Grammar.MenhirInterpreter

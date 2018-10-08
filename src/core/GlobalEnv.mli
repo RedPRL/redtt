@@ -11,9 +11,6 @@ type entry =
   | `I
   ]
 
-val get_mlenv : t -> ESig.MlSem.mlenv
-val set_mlenv : t -> ESig.MlSem.mlenv -> t
-
 val emp : unit -> t
 val define : t -> Name.t -> ty:Tm.tm -> tm:Tm.tm -> t
 val ext : t -> Name.t -> entry -> t

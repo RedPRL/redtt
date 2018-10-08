@@ -1,3 +1,5 @@
+open RedTT_Core
+
 type level = [`Info | `Error | `Warn]
 
 type location = (Lexing.position * Lexing.position) option
