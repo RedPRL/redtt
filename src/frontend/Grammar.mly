@@ -327,6 +327,9 @@ mltoplevel:
   | IMPORT; a = ATOM; rest = mltoplevel
     { E.mlbind (E.MlImport a) @@ fun _ -> rest }
 
+  | QUIT; rest = mltoplevel
+    { E.MlRet (E.MlTuple []) }
+
   | EOF
     { E.MlRet (E.MlTuple []) }
 
