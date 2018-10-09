@@ -386,6 +386,9 @@ mlcmd:
   | c = atomic_mlcmd
     { c }
 
+  | DEBUG; f = debug_filter
+    { E.MlDebug f }
+
 
 atomic_mlcmd:
   | LPR; c = mlcmd; RPR
@@ -432,8 +435,6 @@ edecl:
     { E.Define (a, `Transparent, sch, tm) }
   | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
     { E.Define (a, `Opaque, sch, tm) }
-  | DEBUG; f = debug_filter
-    { E.Debug f }
   | NORMALIZE; e = located(econ)
     { E.MlNormalize e }
 

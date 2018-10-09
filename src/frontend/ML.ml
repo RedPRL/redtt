@@ -36,6 +36,7 @@ and mlcmd =
   | MlNormalize of mlval
   | MlImport of string
   | MlPrint of mlval info
+  | MlDebug of [`All | `Constraints | `Unsolved]
   | MlForeign of (semval -> mlcmd) * mlval
 
 and semcmd =

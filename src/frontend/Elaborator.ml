@@ -207,6 +207,10 @@ struct
     | E.MlForeign (foreign, input) ->
       eval_val input <<@> foreign >>= eval_cmd
 
+    | E.MlDebug filter ->
+      M.dump_state Format.std_formatter "Debug" filter >>
+      M.ret @@ E.SemRet (E.SemTuple [])
+
   and unleash_ret =
     function
     | E.SemRet v -> v
