@@ -124,9 +124,9 @@ rule token = parse
     { Lwt.return LTR }
   | "⦊"
     { Lwt.return RTR }
-  | "<|"
+  | "<:"
     { Lwt.return LTR }
-  | "|>"
+  | ":>"
     { Lwt.return RTR }
   | "«"
     { Lwt.return LLGL }
