@@ -2,7 +2,7 @@ OPAM=opam
 EXEC=${OPAM} config exec
 DUNE=${EXEC} dune --
 
-.PHONY: all build clean doc help examples install reinstall top
+.PHONY: all build clean doc help library install reinstall top
 
 all: build
 
@@ -18,8 +18,8 @@ doc:
 help:
 	@${DUNE} exec -- redtt help
 
-examples:
-	$(MAKE) -C example all
+library:
+	$(MAKE) -C library all
 
 install:
 	${OPAM} install redtt
