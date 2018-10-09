@@ -16,6 +16,7 @@ running the following shell command from the current directory:
 
     ./install.sh
 
-If `redtt` is not in your `PATH`, add the following line to your `.vimrc`:
+If the `redtt` binary is not in your `PATH`, add the following line to your
+`.vimrc`:
 
-    let g:redtt_path = '/path/to/redtt'
+    let g:redtt_path = '/path/to/the-redtt-binary'
