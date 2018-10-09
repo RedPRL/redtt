@@ -100,10 +100,10 @@ Requires `utop` (see prerequisites).
 $ make top
 ```
 
-### Examples
+### Library
 
 ```
-$ make examples
+$ make library
 ```
 
 
