@@ -34,15 +34,16 @@
 %token <int> NUMERAL
 %token <string> ATOM
 %token <string option> HOLE_NAME
-%token LSQ RSQ LPR RPR LGL RGL LBR RBR LWCR RWCR
+%token LSQ RSQ LPR RPR LGL RGL LBR RBR LTR RTR LLGL RRGL
 %token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY BANG
 %token EQUALS
 %token RIGHT_ARROW RIGHT_TACK
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM TICK
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE DO LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
-%token IMPORT OPAQUE QUIT DEBUG NORMALIZE META DEF PRINT CHECK
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
+%token IMPORT OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
+%token META
 %token EOF
 
 
@@ -117,8 +118,9 @@ atomoid_econ:
   | n = NUMERAL;
     { E.Num n }
 
-  | LWCR; c = mlcmd; RWCR
+  | LTR; c = mlcmd; RTR
     { E.RunML c }
+
 
 atomic:
   | e = atom_econ
@@ -316,31 +318,6 @@ econstr:
   boundary = loption(pipe_block(eface))
   { clbl, E.EConstr {specs = List.flatten specs; boundary} }
 
-
-mltoplevel:
-  | META; LET; a = ATOM; EQUALS; cmd = mlcmd; rest = mltoplevel
-    { E.MlBind (cmd, `User a, rest) }
-
-  | DO; c = mlcmd; rest = mltoplevel
-    { E.MlBind (c, `Gen (Name.fresh ()), rest) }
-
-  | opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
-    { let name = E.MlRef (Name.named (Some a)) in
-      MlBind (E.define ~name ~opacity ~scheme:sch ~tm, `User a, rest) }
-
-  | decl = data_decl; rest = mltoplevel
-    { let name, desc = decl in
-      MlBind (E.MlDeclData {name; desc}, `User name, rest) }
-
-  | IMPORT; a = ATOM; rest = mltoplevel
-    { E.mlbind (E.MlImport a) @@ fun _ -> rest }
-
-  | QUIT; rest = mltoplevel
-    { E.MlRet (E.MlTuple []) }
-
-  | EOF
-    { E.MlRet (E.MlTuple []) }
-
 opacity:
   | OPAQUE
     { `Opaque }
@@ -362,20 +339,37 @@ data_decl:
       let params = List.flatten params in
       dlbl, E.EDesc {params; constrs; kind; lvl} }
 
+
+mltoplevel:
+  | META; LTR; a = ATOM; EQUALS; cmd = mlcmd; RTR; rest = mltoplevel
+    { E.MlBind (cmd, `User a, rest) }
+
+  | META; LTR; c = mlcmd; RTR; rest = mltoplevel
+    { E.MlBind (c, `Gen (Name.fresh ()), rest) }
+
+  | opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
+    { let name = E.MlRef (Name.named (Some a)) in
+      MlBind (E.define ~name ~opacity ~scheme:sch ~tm, `User a, rest) }
+
+  | decl = data_decl; rest = mltoplevel
+    { let name, desc = decl in
+      MlBind (E.MlDeclData {name; desc}, `User name, rest) }
+
+  | IMPORT; a = ATOM; rest = mltoplevel
+    { E.mlbind (E.MlImport a) @@ fun _ -> rest }
+
+  | QUIT; rest = mltoplevel
+    { E.MlRet (E.MlTuple []) }
+
+  | EOF
+    { E.MlRet (E.MlTuple []) }
+
 mlcmd:
   | LET; a = ATOM; EQUALS; cmd = mlcmd; IN; rest = mlcmd
     { E.MlBind (cmd, `User a, rest) }
 
-  | decl = data_decl
-    { let name, desc = decl in
-      E.MlDeclData {name; desc} }
-
-  | DO; c = atomic_mlcmd; SEMI; rest = mlcmd
+  | c = atomic_mlcmd; SEMI; rest = mlcmd
     { E.MlBind (c, `Gen (Name.fresh ()), rest) }
-
-  | opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
-    { let name = E.MlRef (Name.named (Some a)) in
-      E.define ~name ~opacity ~scheme:sch ~tm }
 
   | FUN; a = ATOM; RIGHT_ARROW; c = mlcmd
     { E.MlLam (`User a, c) }
@@ -388,6 +382,7 @@ mlcmd:
 
   | c = atomic_mlcmd
     { c }
+
 
 atomic_mlcmd:
   | LPR; c = mlcmd; RPR
@@ -404,6 +399,14 @@ atomic_mlcmd:
 
   | NORMALIZE; c = atomic_mlcmd
     { E.mlbind c @@ fun x -> E.MlNormalize x }
+
+  | LLGL; decl = data_decl; RRGL
+    { let name, desc = decl in
+      E.MlDeclData {name; desc} }
+
+  | LLGL; opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); RRGL
+    { let name = E.MlRef (Name.named (Some a)) in
+      E.define ~name ~opacity ~scheme:sch ~tm }
 
   | v = mlvalue
     { E.MlRet v }

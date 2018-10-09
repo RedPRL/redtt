@@ -41,7 +41,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("opaque", OPAQUE);
       ("print", PRINT);
       ("check", CHECK);
-      ("meta", META);
       ("quit", QUIT);
       ("in", IN);
       ("with", WITH);
@@ -51,6 +50,7 @@ module Make (R : SOURCE) : LEXER = struct
       ("end", END);
       ("tick", TICK);
       ("✓", TICK);
+      ("meta", META);
       ("dim", DIM);
       ("𝕀", DIM);
       ("⊢", RIGHT_TACK);
@@ -65,7 +65,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("vproj", VPROJ);
       ("vin", VIN);
       ("let", LET);
-      ("do", DO);
       ("fun", FUN);
       ("def", DEF);
       ("lam", LAM);
@@ -121,10 +120,18 @@ rule token = parse
     { Lwt.return RBR }
   | '#'
     { Lwt.return HASH }
-  | "『"
-    { Lwt.return LWCR }
-  | "』"
-    { Lwt.return RWCR }
+  | "⦉"
+    { Lwt.return LTR }
+  | "⦊"
+    { Lwt.return RTR }
+  | "<|"
+    { Lwt.return LTR }
+  | "|>"
+    { Lwt.return RTR }
+  | "«"
+    { Lwt.return LLGL }
+  | "»"
+    { Lwt.return RRGL }
   | '!'
     { Lwt.return BANG }
   | '@'
