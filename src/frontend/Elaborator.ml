@@ -212,57 +212,6 @@ struct
     | E.MlString str -> M.ret @@ E.Sem.String str
     | E.MlFloat x -> M.ret @@ E.Sem.Float x
 
-  (*
-
-     and elab_decl =
-     function
-     | E.Define (name, opacity, scheme, e) ->
-     let now0 = Unix.gettimeofday () in
-     elab_scheme scheme >>= fun (names, ty) ->
-     let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
-     let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
-     bdy_tac {ty; sys = []} >>= fun tm ->
-     let alpha = Name.named @@ Some name in
-     M.lift @@ U.define Emp alpha opacity ty tm >>= fun _ ->
-     M.lift C.go_to_top >>
-     M.unify <<@> fun _ ->
-      let now1 = Unix.gettimeofday () in
-      Format.printf "Defined %s (%fs).@." name (now1 -. now0)
-
-     | E.Data (dlbl, edesc) ->
-     elab_datatype dlbl edesc >>= fun desc ->
-     M.lift @@ C.declare_datatype dlbl desc
-
-     | E.Debug filter ->
-     let title =
-      match filter with
-      | `All -> "Development state:"
-      | `Constraints -> "Unsolved constraints:"
-      | `Unsolved -> "Unsolved entries:"
-     in
-     M.lift @@ C.dump_state Format.std_formatter title filter
-
-     | E.Normalize e ->
-     elab_inf e >>= fun (ty, cmd) ->
-     M.lift C.base_cx >>= fun cx ->
-     let vty = Cx.eval cx ty in
-     let el = Cx.eval_cmd cx cmd in
-     let tm = Cx.quote cx ~ty:vty el in
-     M.emit e.span @@ M.PrintTerm {ty = ty; tm}
-
-
-     | E.Import file_name ->
-     begin
-      match I.import file_name with
-      | `Cached ->
-        M.ret ()
-      | `Elab ML ->
-        elab_sig ML
-     end
-
-     | E.Quit ->
-     M.ret () *)
-
   and elab_datatype dlbl (E.EDesc edesc) =
     let rec elab_params : _ -> (_ * Desc.body) M.m =
       function
