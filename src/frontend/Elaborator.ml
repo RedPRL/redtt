@@ -187,6 +187,18 @@ struct
       Log.pp_message ~loc:info.span ~lvl:`Info pp Format.std_formatter ();
       M.ret @@ E.Sem.Tuple []
 
+    | E.MlForeign (foreign, input) ->
+      eval_val input <<@> sem_to_prim <<@> foreign >>= eval_cmd
+
+
+  and sem_to_prim =
+    function
+    | E.Sem.Tuple vs -> E.PrimTuple (List.map sem_to_prim vs)
+    | E.Sem.String str -> E.PrimString str
+    | E.Sem.Float x -> E.PrimFloat x
+    | E.Sem.Ref a -> E.PrimRef a
+    | _ ->
+      failwith "sem_to_prim"
 
   and eval_val =
     function
@@ -197,19 +209,10 @@ struct
     | E.MlTuple vs -> traverse eval_val vs <<@> fun rs -> E.Sem.Tuple rs
     | E.MlThunk mlcmd -> M.lift C.get_mlenv <<@> fun env -> E.Sem.Thunk (env, mlcmd)
     | E.MlRef nm -> M.ret @@ E.Sem.Ref nm
+    | E.MlString str -> M.ret @@ E.Sem.String str
+    | E.MlFloat x -> M.ret @@ E.Sem.Float x
 
-  (* function
-     | [] ->
-     M.ret ()
-     | E.Debug f :: ML ->
-     elab_decl @@ E.Debug f >>= fun _ ->
-     elab_sig ML
-     | E.Quit :: _ ->
-     M.ret ()
-     | dcl :: ML ->
-     elab_decl dcl >>= fun _ ->
-     elab_sig ML
-
+  (*
 
      and elab_decl =
      function

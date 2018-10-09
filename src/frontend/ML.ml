@@ -7,6 +7,12 @@ type 'a info =
 
 type mlname = [`Gen of Name.t | `User of string]
 
+type primdata =
+  | PrimString of string
+  | PrimFloat of float
+  | PrimRef of Name.t
+  | PrimTuple of primdata list
+
 type mlval =
   | MlDataDesc of Desc.desc
   | MlTerm of Tm.tm
@@ -15,6 +21,8 @@ type mlval =
   | MlVar of mlname
   | MlRef of Name.t
   | MlTuple of mlval list
+  | MlString of string
+  | MlFloat of float
 
 and mlcmd =
   | MlRet of mlval
@@ -31,6 +39,7 @@ and mlcmd =
   | MlNormalize of mlval
   | MlImport of string
   | MlPrint of mlval info
+  | MlForeign of (primdata -> mlcmd) * mlval
 
 and edesc =
     EDesc of
@@ -157,11 +166,29 @@ let mlsplit v f =
   let y = `Gen (Name.fresh ()) in
   MlSplit (v, [x; y], f (MlVar x) (MlVar y))
 
+let ml_get_time =
+  let f _ = MlRet (MlFloat (Unix.gettimeofday ())) in
+  MlForeign (f, MlTuple [])
+
+let ml_print_bench name now0 now1 =
+  let f = function
+    | PrimTuple [PrimRef name; PrimFloat now0; PrimFloat now1] ->
+      Format.printf "Defined %a (%fs).@." Name.pp name (now1 -. now0);
+      MlRet (MlTuple [])
+    | _ ->
+      failwith "ml_print_bench"
+  in
+  MlForeign (f, MlTuple [name; now0; now1])
+
+
 let define ~name ~opacity ~scheme ~tm =
+  mlbind ml_get_time @@ fun now0 ->
   mlbind (MlElab (scheme, tm)) @@ fun x ->
   mlsplit x @@ fun ty tm ->
   mlbind (MlDefine {name; ty; tm; opacity}) @@ fun _ ->
   mlbind MlUnify @@ fun _ ->
+  mlbind ml_get_time @@ fun now1 ->
+  mlbind (ml_print_bench name now0 now1) @@ fun _ ->
   MlRet x
 
 
@@ -176,6 +203,8 @@ struct
     | Thunk of mlenv * mlcmd
     | Tuple of t list
     | Clo of mlenv * mlname * mlcmd
+    | String of string
+    | Float of float
 
   and mlenv = (mlname, t) Env.t
 
@@ -197,6 +226,10 @@ struct
       let comma fmt () = Format.fprintf fmt ",@ " in
       let pp_cells = Format.pp_print_list ~pp_sep:comma pp in
       Format.fprintf fmt "@[<hv1><%a>@]" pp_cells vs
+    | String str ->
+      Format.fprintf fmt "'%a'" Uuseg_string.pp_utf_8 str
+    | Float x ->
+      Format.fprintf fmt "%f" x
 
   let unleash_term =
     function
