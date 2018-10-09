@@ -375,8 +375,6 @@ mlcmd:
   | FUN; a = ATOM; RIGHT_ARROW; c = mlcmd
     { E.MlLam (`User a, c) }
 
-  | LLGL; e = located(econ); RRGL
-    { E.MlElab e }
 
   | CHECK; tm = mlvalue; COLON; ty = mlvalue
     { E.MlCheck {ty; tm} }
@@ -414,6 +412,9 @@ atomic_mlcmd:
   | LLGL; opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); RRGL
     { let name = E.MlRef (Name.named (Some a)) in
       E.define ~name ~opacity ~scheme:sch ~tm }
+
+  | LLGL; e = located(econ); RRGL
+    { E.MlElab e }
 
   | v = mlvalue
     { E.MlRet v }
