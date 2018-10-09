@@ -18,10 +18,12 @@ can be typed easily in the Vim mode, or replaced with ASCII equivalents:
 |------|-----------|-------|
 | 𝕀    | `C-k II`  | `dim` |
 | ⊢    | `C-k !-`  | `!-`  |
-| ⦉    | `C-k <:`  | `<:` |
-| ⦊    | `C-k :>`  | `:>` |
+| ⦉    | `C-k <:`  | `<:`  |
+| ⦊    | `C-k :>`  | `:>`  |
 | «    | `C-k <<`  | `<<`  |
 | »    | `C-k >>`  | `>>`  |
+| λ    | `C-k *l`  | `\`   |
+| →    | `C-k ->`  | `->`  |
 
 ## Setup
 
