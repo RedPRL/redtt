@@ -77,11 +77,8 @@ struct
       M.ret `Open
 
   let with_mlenv f k =
-    C.get_mlenv >>= fun env0 ->
     C.modify_mlenv f >>
-    k >>= fun x ->
-    C.modify_mlenv (fun _ -> env0) >>
-    M.ret x
+    k
 
 
   let rec eval_cmd =
@@ -192,7 +189,7 @@ struct
       begin
         eval_val tuple >>= function
         | E.SemTuple vs ->
-          C.modify_mlenv (List.fold_right2 E.Env.set xs vs) >>
+          with_mlenv (List.fold_right2 E.Env.set xs vs) @@
           eval_cmd cmd
         | _ ->
           failwith "expected tuple"
@@ -221,7 +218,20 @@ struct
     | E.MlDataDesc desc -> M.ret @@ E.SemDataDesc desc
     | E.MlTerm tm -> M.ret @@ E.SemTerm tm
     | E.MlSys tm -> M.ret @@ E.SemSys tm
-    | E.MlVar x -> C.get_mlenv <<@> fun env -> Option.get_exn @@ E.Env.find x env
+    | E.MlVar x ->
+      C.get_mlenv <<@> fun env ->
+        begin
+          match E.Env.find x env with
+          | Some v -> v
+          | None ->
+            let pp_mlname fmt =
+              function
+              | `User x -> Format.fprintf fmt "%s" x
+              | `Gen x -> Name.pp fmt x
+            in
+            Format.eprintf "Could not find ML variable: %a@." pp_mlname x;
+            failwith "ML variable not found"
+        end
     | E.MlTuple vs -> traverse eval_val vs <<@> fun rs -> E.SemTuple rs
     | E.MlThunk mlcmd -> C.get_mlenv <<@> fun env -> E.SemThunk (env, mlcmd)
     | E.MlRef nm -> M.ret @@ E.SemRef nm
