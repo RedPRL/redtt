@@ -8,8 +8,8 @@ val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
-val modify_mlenv : (ML.Sem.mlenv -> ML.Sem.mlenv) -> unit m
-val get_mlenv : ML.Sem.mlenv m
+val modify_mlenv : (ML.mlenv -> ML.mlenv) -> unit m
+val get_mlenv : ML.mlenv m
 
 val resolver : ResEnv.t m
 val declare_datatype : string -> Desc.desc -> unit m

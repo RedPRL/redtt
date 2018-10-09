@@ -341,7 +341,7 @@ data_decl:
 
 
 mltoplevel:
-  | META; LTR; a = ATOM; EQUALS; cmd = mlcmd; RTR; rest = mltoplevel
+  | META; LTR; LET; a = ATOM; EQUALS; cmd = mlcmd; RTR; rest = mltoplevel
     { E.MlBind (cmd, `User a, rest) }
 
   | META; LTR; c = mlcmd; RTR; rest = mltoplevel
@@ -373,6 +373,9 @@ mlcmd:
 
   | FUN; a = ATOM; RIGHT_ARROW; c = mlcmd
     { E.MlLam (`User a, c) }
+
+  | LLGL; e = located(econ); RRGL
+    { E.MlElab e }
 
   | CHECK; tm = mlvalue; COLON; ty = mlvalue
     { E.MlCheck {ty; tm} }

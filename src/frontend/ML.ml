@@ -5,13 +5,9 @@ type 'a info =
   {con : 'a;
    span : Log.location}
 
+module Env = PersistentTable.M
 type mlname = [`Gen of Name.t | `User of string]
 
-type primdata =
-  | PrimString of string
-  | PrimFloat of float
-  | PrimRef of Name.t
-  | PrimTuple of primdata list
 
 type mlval =
   | MlDataDesc of Desc.desc
@@ -28,7 +24,8 @@ and mlcmd =
   | MlRet of mlval
   | MlLam of mlname * mlcmd
   | MlApp of mlcmd * mlval
-  | MlElab of escheme * eterm
+  | MlElab of eterm
+  | MlElabWithScheme of escheme * eterm
   | MlCheck of {ty : mlval; tm : mlval}
   | MlDeclData of {name : string; desc : edesc}
   | MlDefine of {name : mlval; opacity : [`Opaque | `Transparent]; ty : mlval; tm : mlval}
@@ -39,7 +36,24 @@ and mlcmd =
   | MlNormalize of mlval
   | MlImport of string
   | MlPrint of mlval info
-  | MlForeign of (primdata -> mlcmd) * mlval
+  | MlForeign of (semval -> mlcmd) * mlval
+
+and semcmd =
+  | SemRet of semval
+  | SemClo of mlenv * mlname * mlcmd
+  | SemElabClo of eterm
+
+and semval =
+  | SemDataDesc of Desc.desc
+  | SemTerm of Tm.tm
+  | SemSys of (Tm.tm, Tm.tm) Tm.system
+  | SemRef of Name.t
+  | SemThunk of mlenv * mlcmd
+  | SemTuple of semval list
+  | SemString of string
+  | SemFloat of float
+
+and mlenv = (mlname, semval) Env.t
 
 and edesc =
     EDesc of
@@ -172,7 +186,7 @@ let ml_get_time =
 
 let ml_print_bench name now0 now1 =
   let f = function
-    | PrimTuple [PrimRef name; PrimFloat now0; PrimFloat now1] ->
+    | SemTuple [SemRef name; SemFloat now0; SemFloat now1] ->
       Format.printf "Defined %a (%fs).@." Name.pp name (now1 -. now0);
       MlRet (MlTuple [])
     | _ ->
@@ -183,7 +197,7 @@ let ml_print_bench name now0 now1 =
 
 let define ~name ~opacity ~scheme ~tm =
   mlbind ml_get_time @@ fun now0 ->
-  mlbind (MlElab (scheme, tm)) @@ fun x ->
+  mlbind (MlElabWithScheme (scheme, tm)) @@ fun x ->
   mlsplit x @@ fun ty tm ->
   mlbind (MlDefine {name; ty; tm; opacity}) @@ fun _ ->
   mlbind MlUnify @@ fun _ ->
@@ -192,52 +206,43 @@ let define ~name ~opacity ~scheme ~tm =
   MlRet x
 
 
-module Env = PersistentTable.M
-module Sem =
-struct
-  type t =
-    | DataDesc of Desc.desc
-    | Term of Tm.tm
-    | Sys of (Tm.tm, Tm.tm) Tm.system
-    | Ref of Name.t
-    | Thunk of mlenv * mlcmd
-    | Tuple of t list
-    | Clo of mlenv * mlname * mlcmd
-    | String of string
-    | Float of float
 
-  and mlenv = (mlname, t) Env.t
+let rec pp_semcmd fmt =
+  function
+  | SemRet v ->
+    pp_semval fmt v
+  | SemClo _ ->
+    Format.fprintf fmt "<clo>"
+  | SemElabClo _ ->
+    Format.fprintf fmt "<elab-clo>"
 
-  let rec pp fmt =
-    function
-    | DataDesc desc ->
-      Desc.pp_desc Pp.Env.emp fmt desc
-    | Term tm ->
-      Tm.pp0 fmt tm
-    | Sys sys ->
-      Format.fprintf fmt "@[<hv1>[%a]@]" (Tm.pp_sys Pp.Env.emp) sys
-    | Ref a ->
-      Name.pp fmt a
-    | Clo _ ->
-      Format.fprintf fmt "<clo>"
-    | Thunk _ ->
-      Format.fprintf fmt "<thunk>"
-    | Tuple vs ->
-      let comma fmt () = Format.fprintf fmt ",@ " in
-      let pp_cells = Format.pp_print_list ~pp_sep:comma pp in
-      Format.fprintf fmt "@[<hv1><%a>@]" pp_cells vs
-    | String str ->
-      Format.fprintf fmt "'%a'" Uuseg_string.pp_utf_8 str
-    | Float x ->
-      Format.fprintf fmt "%f" x
+and pp_semval fmt =
+  function
+  | SemDataDesc desc ->
+    Desc.pp_desc Pp.Env.emp fmt desc
+  | SemTerm tm ->
+    Tm.pp0 fmt tm
+  | SemSys sys ->
+    Format.fprintf fmt "@[<hv1>[%a]@]" (Tm.pp_sys Pp.Env.emp) sys
+  | SemRef a ->
+    Name.pp fmt a
+  | SemThunk _ ->
+    Format.fprintf fmt "<thunk>"
+  | SemTuple vs ->
+    let comma fmt () = Format.fprintf fmt ",@ " in
+    let pp_cells = Format.pp_print_list ~pp_sep:comma pp_semval in
+    Format.fprintf fmt "@[<hv1><%a>@]" pp_cells vs
+  | SemString str ->
+    Format.fprintf fmt "'%a'" Uuseg_string.pp_utf_8 str
+  | SemFloat x ->
+    Format.fprintf fmt "%f" x
 
-  let unleash_term =
-    function
-    | Term tm -> tm
-    | _ -> failwith "unleash_term"
+let unleash_term =
+  function
+  | SemTerm tm -> tm
+  | _ -> failwith "unleash_term"
 
-  let unleash_ref =
-    function
-    | Ref x -> x
-    | _ -> failwith "unleash_ref"
-end
+let unleash_ref =
+  function
+  | SemRef x -> x
+  | _ -> failwith "unleash_ref"

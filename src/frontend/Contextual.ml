@@ -9,7 +9,7 @@ type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 module Map = Map.Make (Name)
 
 type env = GlobalEnv.t
-type cx = {mlenv : ML.Sem.mlenv; env : env; resenv : ResEnv.t; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
+type cx = {mlenv : ML.mlenv; env : env; resenv : ResEnv.t; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
 
 
 let rec pp_lcx fmt =

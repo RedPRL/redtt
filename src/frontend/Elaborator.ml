@@ -76,78 +76,95 @@ struct
     | E.Open ->
       M.ret `Open
 
+  let with_mlenv f k =
+    M.lift C.get_mlenv >>= fun env0 ->
+    M.lift @@ C.modify_mlenv f >>
+    k >>= fun x ->
+    M.lift @@ C.modify_mlenv (fun _ -> env0) >>
+    M.ret x
+
 
   let rec eval_cmd =
     function
-    | E.MlRet v -> eval_val v
+    | E.MlRet v -> eval_val v <<@> fun v -> E.SemRet v
 
     | E.MlBind (cmd0, x, cmd1) ->
-      eval_cmd cmd0 >>= fun v0 ->
+      eval_cmd cmd0 <<@> unleash_ret >>= fun v0 ->
       M.lift @@ C.modify_mlenv (E.Env.set x v0) >>
       eval_cmd cmd1
 
     | E.MlUnleash v ->
       begin
         eval_val v >>= function
-        | E.Sem.Thunk (env, cmd) ->
-          M.lift @@ C.modify_mlenv (fun _ -> env) >>
-          eval_cmd cmd
+        | E.SemThunk (env, cmd) ->
+          with_mlenv (fun _ -> env) @@ eval_cmd cmd
         | _ ->
           failwith "eval_cmd: expected thunk"
       end
 
     | E.MlLam (x, c) ->
       M.lift C.get_mlenv <<@> fun env ->
-        E.Sem.Clo (env, x, c)
+        E.SemClo (env, x, c)
 
     | E.MlApp (c, v) ->
       begin
         eval_val v >>= fun v ->
         eval_cmd c >>= function
-        | E.Sem.Clo (env, x, c) ->
-          M.lift @@ C.modify_mlenv (fun _ -> E.Env.set x v env) >>
-          eval_cmd c
+        | E.SemClo (env, x, c) ->
+          with_mlenv (fun _ -> E.Env.set x v env) @@ eval_cmd c
+        | E.SemElabClo e ->
+          begin
+            match v with
+            | E.SemTuple [E.SemTerm ty; E.SemSys sys] ->
+              elab_chk e {ty; sys} >>= fun tm ->
+              M.ret @@ E.SemRet (E.SemTerm tm)
+            | _ ->
+              failwith "MlApp of ElabClo: calling convention violated"
+          end
         | _ ->
           failwith "expected ml closure"
       end
 
-    | E.MlElab (scheme, e) ->
+    | E.MlElab e ->
+      M.ret @@ E.SemElabClo e
+
+    | E.MlElabWithScheme (scheme, e) ->
       elab_scheme scheme >>= fun (names, ty) ->
       let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
       let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
       bdy_tac {ty; sys = []} >>= fun tm ->
-      M.ret @@ E.Sem.Tuple [E.Sem.Term ty; E.Sem.Term tm]
+      M.ret @@ E.SemRet (E.SemTuple [E.SemTerm ty; E.SemTerm tm])
 
     | MlCheck {ty; tm} ->
-      eval_val ty <<@> E.Sem.unleash_term >>= fun ty ->
-      eval_val tm <<@> E.Sem.unleash_term >>= fun tm ->
+      eval_val ty <<@> E.unleash_term >>= fun ty ->
+      eval_val tm <<@> E.unleash_term >>= fun tm ->
       begin
         M.lift @@ C.check ~ty tm >>= function
         | `Ok ->
-          M.ret @@ E.Sem.Term (Tm.up @@ Tm.ann ~ty ~tm)
+          M.ret @@ E.SemRet (E.SemTerm (Tm.up @@ Tm.ann ~ty ~tm))
         | `Exn exn ->
           raise exn
       end
 
     | E.MlDefine info ->
       begin
-        eval_val info.tm <<@> E.Sem.unleash_term >>= fun tm ->
-        eval_val info.ty <<@> E.Sem.unleash_term >>= fun ty ->
-        eval_val info.name <<@> E.Sem.unleash_ref >>= fun alpha ->
+        eval_val info.tm <<@> E.unleash_term >>= fun tm ->
+        eval_val info.ty <<@> E.unleash_term >>= fun ty ->
+        eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
         M.lift @@ U.define Emp alpha info.opacity ty tm >>= fun _ ->
-        M.ret @@ E.Sem.Tuple []
+        M.ret @@ E.SemRet (E.SemTuple [])
       end
 
     | E.MlDeclData info ->
       elab_datatype info.name info.desc >>= fun desc ->
       M.lift @@ C.declare_datatype info.name desc >>
-      M.ret @@ E.Sem.DataDesc desc
+      M.ret @@ E.SemRet (E.SemDataDesc desc)
 
     | E.MlImport file_name ->
       begin
         match I.import file_name with
         | `Cached ->
-          M.ret @@ E.Sem.Tuple []
+          M.ret @@ E.SemRet (E.SemTuple [])
         | `Elab cmd ->
           eval_cmd cmd
       end
@@ -155,18 +172,18 @@ struct
     | E.MlUnify ->
       M.lift C.go_to_top >>
       M.unify >>
-      M.ret @@ E.Sem.Tuple []
+      M.ret @@ E.SemRet (E.SemTuple [])
 
     | E.MlNormalize v ->
       eval_val v >>= fun v ->
       begin
         match v with
-        | E.Sem.Tuple [E.Sem.Term ty; E.Sem.Term tm] ->
+        | E.SemTuple [E.SemTerm ty; E.SemTerm tm] ->
           M.lift C.base_cx >>= fun cx ->
           let vty = Cx.eval cx ty in
           let el = Cx.eval cx tm in
           let tm = Cx.quote cx ~ty:vty el in
-          M.ret @@ E.Sem.Term tm
+          M.ret @@ E.SemRet (E.SemTerm tm)
         | _ ->
           failwith "normalize: expected synthesizable term"
       end
@@ -174,7 +191,7 @@ struct
     | E.MlSplit (tuple, xs, cmd) ->
       begin
         eval_val tuple >>= function
-        | E.Sem.Tuple vs ->
+        | E.SemTuple vs ->
           M.lift @@ C.modify_mlenv (List.fold_right2 E.Env.set xs vs) >>
           eval_cmd cmd
         | _ ->
@@ -183,34 +200,29 @@ struct
 
     | E.MlPrint info ->
       eval_val info.con >>= fun v ->
-      let pp fmt () = ML.Sem.pp fmt v in
+      let pp fmt () = ML.pp_semval fmt v in
       Log.pp_message ~loc:info.span ~lvl:`Info pp Format.std_formatter ();
-      M.ret @@ E.Sem.Tuple []
+      M.ret @@ E.SemRet (E.SemTuple [])
 
     | E.MlForeign (foreign, input) ->
-      eval_val input <<@> sem_to_prim <<@> foreign >>= eval_cmd
+      eval_val input <<@> foreign >>= eval_cmd
 
-
-  and sem_to_prim =
+  and unleash_ret =
     function
-    | E.Sem.Tuple vs -> E.PrimTuple (List.map sem_to_prim vs)
-    | E.Sem.String str -> E.PrimString str
-    | E.Sem.Float x -> E.PrimFloat x
-    | E.Sem.Ref a -> E.PrimRef a
-    | _ ->
-      failwith "sem_to_prim"
+    | E.SemRet v -> v
+    | _ -> failwith "unleash_ret"
 
   and eval_val =
     function
-    | E.MlDataDesc desc -> M.ret @@ E.Sem.DataDesc desc
-    | E.MlTerm tm -> M.ret @@ E.Sem.Term tm
-    | E.MlSys tm -> M.ret @@ E.Sem.Sys tm
+    | E.MlDataDesc desc -> M.ret @@ E.SemDataDesc desc
+    | E.MlTerm tm -> M.ret @@ E.SemTerm tm
+    | E.MlSys tm -> M.ret @@ E.SemSys tm
     | E.MlVar x -> M.lift C.get_mlenv <<@> fun env -> Option.get_exn @@ E.Env.find x env
-    | E.MlTuple vs -> traverse eval_val vs <<@> fun rs -> E.Sem.Tuple rs
-    | E.MlThunk mlcmd -> M.lift C.get_mlenv <<@> fun env -> E.Sem.Thunk (env, mlcmd)
-    | E.MlRef nm -> M.ret @@ E.Sem.Ref nm
-    | E.MlString str -> M.ret @@ E.Sem.String str
-    | E.MlFloat x -> M.ret @@ E.Sem.Float x
+    | E.MlTuple vs -> traverse eval_val vs <<@> fun rs -> E.SemTuple rs
+    | E.MlThunk mlcmd -> M.lift C.get_mlenv <<@> fun env -> E.SemThunk (env, mlcmd)
+    | E.MlRef nm -> M.ret @@ E.SemRef nm
+    | E.MlString str -> M.ret @@ E.SemString str
+    | E.MlFloat x -> M.ret @@ E.SemFloat x
 
   and elab_datatype dlbl (E.EDesc edesc) =
     let rec elab_params : _ -> (_ * Desc.body) M.m =
@@ -346,8 +358,8 @@ struct
         let mlgoal = E.MlTuple [E.MlTerm ty; E.MlSys goal.sys] in
         let script = E.MlApp (c, mlgoal) in
         begin
-          eval_cmd script >>= function
-          | E.Sem.Term tm -> M.ret tm
+          eval_cmd script <<@> unleash_ret >>= function
+          | E.SemTerm tm -> M.ret tm
           | _ -> failwith "error running ML tactic"
         end
 
