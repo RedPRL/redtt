@@ -55,10 +55,10 @@ module Q :
 sig
   val equate_dim : qenv -> rel -> I.t -> I.t -> Tm.tm
   (* favonia: whether these should take a value or con as arguments will hopefully be clear in the future. *)
-  val equate_nf : qenv -> rel -> con -> con -> con -> Tm.tm
-  val equate_neu : qenv -> rel -> neu -> neu -> Tm.tm Tm.cmd
-  val equate_ty : qenv -> rel -> con -> con -> Tm.tm
-  val equate_nf_sys : qenv -> rel -> con -> con sys -> con sys -> (Tm.tm, Tm.tm) Tm.system
+  val equate_con : qenv -> rel -> con -> con -> con -> Tm.tm
+  val equate_neu : qenv -> rel -> neu -> neu -> Tm.tm
+  val equate_tycon : qenv -> rel -> con -> con -> Tm.tm
+  val equate_con_sys : qenv -> rel -> con -> con sys -> con sys -> (Tm.tm, Tm.tm) Tm.system
 
   val subtype : qenv -> rel -> con -> con -> unit
 end =
@@ -86,28 +86,28 @@ struct
     | `Same -> quote_dim qenv r0
     | _ -> raise PleaseRaiseProperError
 
-  let rec equate_nf qenv rel ty el0 el1 =
+  let rec equate_con qenv rel ty el0 el1 =
     match el0, el1 with
     | Neu neu0, Neu neu1 ->
-      Tm.up @@ equate_neu qenv rel (DelayedNeu.unleash neu0.neu.neu) (DelayedNeu.unleash neu1.neu.neu)
+      equate_neutroid qenv rel neu0.neu neu1.neu
     | _ ->
       match ty with
       | Pi {dom; cod} ->
         let x, qenv_x = extend qenv dom in
         let cod_x = Clo.inst rel cod (Val (LazyVal.make x)) in
-        let bdy0_x = Con.plug rel (FunApp (Val.make x)) el0 in
-        let bdy1_x = Con.plug rel (FunApp (Val.make x)) el1 in
-        let bdy_x = equate_nf qenv_x rel cod_x bdy0_x bdy1_x in
+        let bdy0_x = Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el0 in
+        let bdy1_x = Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el1 in
+        let bdy_x = equate_con qenv_x rel cod_x bdy0_x bdy1_x in
         Tm.lam (Clo.name cod) bdy_x
 
       | Sg {dom; cod} ->
         let fst0 = Con.plug rel Fst el0 in
         let fst1 = Con.plug rel Fst el1 in
-        let fst = equate_nf qenv rel (Val.unleash dom) fst0 fst1 in
+        let fst = equate_con qenv rel (Val.unleash dom) fst0 fst1 in
         let cod = Clo.inst rel cod (Val (LazyVal.make fst0)) in
         let snd0 = Con.plug rel Snd el0 in
         let snd1 = Con.plug rel Snd el1 in
-        let snd = equate_nf qenv rel cod snd0 snd1 in
+        let snd = equate_con qenv rel cod snd0 snd1 in
         Tm.cons fst snd
 
       | Ext extclo ->
@@ -118,41 +118,141 @@ struct
         let ty_xs = ExtClo.inst_then_fst rel extclo (List.map (fun r -> Dim r) rs) in
         let bdy0_xs = Con.plug rel (ExtApp rs) el0 in
         let bdy1_xs = Con.plug rel (ExtApp rs) el1 in
-        let bdy_xs = equate_nf qenv_xs rel ty_xs bdy0_xs bdy1_xs in
+        let bdy_xs = equate_con qenv_xs rel ty_xs bdy0_xs bdy1_xs in
         Tm.ext_lam nms bdy_xs
 
       | HCom ({ty = `Pos; _} as hcom) ->
         raise PleaseFillIn
 
-      | Univ _ -> equate_ty qenv rel el0 el1
+      | Univ _ -> equate_tycon qenv rel el0 el1
 
       | _ -> raise PleaseFillIn
 
-  and equate_neu _ = raise PleaseFillIn
+  and equate_val qenv rel ty val0 val1 =
+    equate_con qenv rel ty (Val.unleash val0) (Val.unleash val1)
 
-  and equate_ty_clo qenv rel dom clo0 clo1 =
+  and equate_neu qenv rel neu0 neu1 =
+    let hd = equate_hd qenv rel neu0.head neu1.head in
+    let stk = Bwd.fold_right2
+      (fun f0 f1 stk -> equate_frame qenv rel f0 f1 :: stk)
+      neu0.frames neu1.frames []
+    in
+    Tm.make @@ Tm.Up (hd, stk)
+
+  and equate_neutroid qenv rel neu0 neu1 =
+    equate_neu qenv rel (DelayedNeu.unleash neu0.neu) (DelayedNeu.unleash neu1.neu)
+
+  and equate_neutroid_abs qenv rel abs0 abs1 =
+    let nm = let Abs (x, _) = abs0 in Name.name x in
+    let x = Name.named nm in
+    let qenv_x = QEnv.abs1 x qenv in
+    let bdy0_x = NeutroidAbs.inst rel abs0 (`Atom x) in
+    let bdy1_x = NeutroidAbs.inst rel abs1 (`Atom x) in
+    let bdy_x = equate_neutroid qenv_x rel bdy0_x bdy1_x in
+    Tm.B (nm, bdy_x)
+
+  and equate_hd qenv rel hd0 hd1 =
+    match hd0, hd1 with
+    | Lvl l0, Lvl l1 ->
+      if l0 = l1 then
+        Tm.Ix (QEnv.ix_of_lvl l0 qenv, raise CanJonHelpMe)
+      else
+        raise PleaseRaiseProperError
+    | Var info0, Var info1 ->
+      if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
+        raise CanJonHelpMe
+        (* Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift} *)
+      else
+        raise PleaseRaiseProperError
+    | Meta info0, Meta info1 ->
+      if info0.name = info1.name && info0.ushift = info1.ushift then
+        raise CanJonHelpMe
+        (* Tm.Meta {name = info0.name; ushift = info0.ushift} *)
+      else
+        raise PleaseRaiseProperError
+
+    | NCoe info0, NCoe info1 ->
+      let r = equate_dim qenv rel info0.r info1.r in
+      let r' = equate_dim qenv rel info0.r' info1.r' in
+      let ty = equate_neutroid_abs qenv rel info0.ty info1.ty in
+      let tm =
+        let univ = Val.make @@ Univ {kind = `Pre; lvl = `Omega} in
+        let neu = NeutroidAbs.inst rel info0.ty info0.r in
+        let ty_r = Con.run rel @@ Neu {ty = univ; neu} in
+        equate_con qenv rel ty_r (Val.unleash info0.cap) (Val.unleash info1.cap)
+      in
+      Tm.Coe {r; r'; ty; tm}
+
+    | NHCom info0, NHCom info1 ->
+      let r = equate_dim qenv rel info0.r info1.r in
+      let r' = equate_dim qenv rel info0.r' info1.r' in
+      let ty = equate_neutroid qenv rel info0.ty info1.ty in
+      let ty_val =
+        let univ = Val.make @@ Univ {kind = `Pre; lvl = `Omega} in
+        Con.run rel @@ Neu {ty = univ; neu = info0.ty}
+      in
+      let cap = equate_val qenv rel ty_val info0.cap info1.cap in
+      let sys = equate_con_abs_sys qenv rel ty_val info0.sys info1.sys in
+      Tm.HCom {r; r'; ty; cap; sys}
+
+    | _ -> raise PleaseRaiseProperError
+
+  and equate_frame qenv rel frm0 frm1 =
+    match frm0, frm1 with
+    | FunApp {ty = Some ty0; value = v0}, FunApp {ty = Some ty1; value = v1} ->
+      let _ = equate_tyval qenv rel ty0 ty1 in
+      let tm = equate_val qenv rel (Val.unleash ty0) v0 v1 in
+      Tm.FunApp tm
+
+    | Fst, Fst -> Tm.Fst
+
+    | Snd, Snd -> Tm.Snd
+
+    | ExtApp rs0, ExtApp rs1 ->
+      let rs = List.map2 (equate_dim qenv rel) rs0 rs1 in
+      Tm.ExtApp rs
+
+    | RestrictForce, RestrictForce -> Tm.RestrictForce
+
+    | VProj {r = r0; func = {ty = Some func_ty0; value = func0}},
+      VProj {r = r1; func = {ty = Some func_ty1; value = func1}} ->
+      let r = equate_dim qenv rel r0 r1 in
+      let _ = equate_tyval qenv rel func_ty0 func_ty1 in
+      let func = equate_val qenv rel (Val.unleash func_ty0) func0 func1 in
+      Tm.VProj {r; func}
+
+    | Cap info0, Cap info1 ->
+      let r = equate_dim qenv rel info0.r info1.r in
+      let r' = equate_dim qenv rel info0.r' info1.r' in
+      let ty = equate_tyval qenv rel info0.ty info1.ty in
+      let sys = equate_tycon_abs_sys qenv rel info0.sys info1.sys in
+      Tm.Cap {r; r'; ty; sys}
+
+    | _ -> raise PleaseRaiseProperError
+
+  and equate_tycon_clo qenv rel dom clo0 clo1 =
     let x, qenv_x = extend qenv dom in
     let lazyx = LazyVal.make x in
     let clo0_x = Clo.inst rel clo0 (Val lazyx) in
     let clo1_x = Clo.inst rel clo1 (Val lazyx) in
-    equate_ty qenv_x rel clo0_x clo1_x
+    equate_tycon qenv_x rel clo0_x clo1_x
 
-  and equate_ty_quantifier qenv rel quant0 quant1 =
-    let dom = equate_ty qenv rel (Val.unleash quant0.dom) (Val.unleash quant1.dom) in
-    let cod = equate_ty_clo qenv rel quant0.dom quant0.cod quant1.cod in
+  and equate_tycon_quantifier qenv rel quant0 quant1 =
+    let dom = equate_tycon qenv rel (Val.unleash quant0.dom) (Val.unleash quant1.dom) in
+    let cod = equate_tycon_clo qenv rel quant0.dom quant0.cod quant1.cod in
     dom, (Clo.name quant0.cod, cod)
 
-  and equate_ty qenv rel ty0 ty1 =
+  and equate_tycon qenv rel ty0 ty1 =
     match ty0, ty1 with
     | Neu neu0, Neu neu1 ->
-      Tm.up @@ equate_neu qenv rel (DelayedNeu.unleash neu0.neu.neu) (DelayedNeu.unleash neu1.neu.neu)
+      equate_neutroid qenv rel neu0.neu neu1.neu
 
     | Pi pi0, Pi pi1 ->
-      let dom, (nm, cod) = equate_ty_quantifier qenv rel pi0 pi1 in
+      let dom, (nm, cod) = equate_tycon_quantifier qenv rel pi0 pi1 in
       Tm.pi nm dom cod
 
     | Sg sg0, Sg sg1 ->
-      let dom, (nm, cod) = equate_ty_quantifier qenv rel sg0 sg1 in
+      let dom, (nm, cod) = equate_tycon_quantifier qenv rel sg0 sg1 in
       Tm.sg nm dom cod
 
     | Ext extclo0, Ext extclo1 ->
@@ -162,15 +262,15 @@ struct
       let cells = Bwd.fold_right (fun x rs -> Dim (`Atom x) :: rs) xs [] in
       let ty0_xs, sys0_xs = ExtClo.inst rel extclo0 cells in
       let ty1_xs, sys1_xs = ExtClo.inst rel extclo1 cells in
-      let ty_xs = equate_ty qenv_xs rel ty0_xs ty1_xs in
-      let sys_xs = equate_nf_sys qenv_xs rel ty0_xs sys0_xs sys1_xs in
+      let ty_xs = equate_tycon qenv_xs rel ty0_xs ty1_xs in
+      let sys_xs = equate_con_sys qenv_xs rel ty0_xs sys0_xs sys1_xs in
       Tm.make @@ Tm.Ext (Tm.NB (nms, (ty_xs, sys_xs)))
 
     | HCom ({ty = `Pos; _} as hcom0), HCom ({ty = `Pos; _} as hcom1) ->
       let r = equate_dim qenv rel hcom0.r hcom1.r in
       let r' = equate_dim qenv rel hcom0.r' hcom1.r' in
-      let cap = equate_ty qenv rel (Val.unleash hcom0.cap) (Val.unleash hcom1.cap) in
-      let sys = equate_ty_abs_sys qenv rel hcom0.sys hcom1.sys in
+      let cap = equate_tycon qenv rel (Val.unleash hcom0.cap) (Val.unleash hcom1.cap) in
+      let sys = equate_tycon_abs_sys qenv rel hcom0.sys hcom1.sys in
       Tm.make @@ Tm.FHCom {r; r'; cap; sys}
 
     | Univ univ0, Univ univ1 ->
@@ -181,47 +281,50 @@ struct
 
     | _ -> raise PleaseFillIn
 
-  and equate_abs qenv rel ty abs0 abs1 =
+  and equate_tyval qenv rel ty0 ty1 =
+    equate_tycon qenv rel (Val.unleash ty0) (Val.unleash ty1)
+
+  and equate_con_abs qenv rel ty abs0 abs1 =
     let nm = let Abs (x, _) = abs0 in Name.name x in
     let x = Name.named nm in
     let qenv_x = QEnv.abs1 x qenv in
     let bdy0_x = ConAbs.inst rel abs0 (`Atom x) in
     let bdy1_x = ConAbs.inst rel abs1 (`Atom x) in
-    let bdy_x = equate_nf qenv_x rel ty bdy0_x bdy1_x in
+    let bdy_x = equate_con qenv_x rel ty bdy0_x bdy1_x in
     Tm.B (nm, bdy_x)
 
-  and equate_ty_abs qenv rel abs0 abs1 =
+  and equate_tycon_abs qenv rel abs0 abs1 =
     let nm = let Abs (x, _) = abs0 in Name.name x in
     let x = Name.named nm in
     let qenv_x = QEnv.abs1 x qenv in
     let bdy0_x = ConAbs.inst rel abs0 (`Atom x) in
     let bdy1_x = ConAbs.inst rel abs1 (`Atom x) in
-    let bdy_x = equate_ty qenv_x rel bdy0_x bdy1_x in
+    let bdy_x = equate_tycon qenv_x rel bdy0_x bdy1_x in
     Tm.B (nm, bdy_x)
 
-  and equate_ty_abs_face qenv rel (r0, r'0, abs0) (r1, r'1, abs1) =
+  and equate_tycon_abs_face qenv rel (r0, r'0, abs0) (r1, r'1, abs1) =
     let r = equate_dim qenv rel r0 r1 in
     let r' = equate_dim qenv rel r'0 r'1 in
     let rel = Rel.equate' r0 r'0 rel in
     let abs0 = LazyValAbs.unleash abs0 in
     let abs1 = LazyValAbs.unleash abs1 in
-    r, r', Some (equate_ty_abs qenv rel abs0 abs1)
+    r, r', Some (equate_tycon_abs qenv rel abs0 abs1)
 
-  and equate_abs_face qenv rel ty (r0, r'0, abs0) (r1, r'1, abs1) =
+  and equate_con_abs_face qenv rel ty (r0, r'0, abs0) (r1, r'1, abs1) =
     let r = equate_dim qenv rel r0 r1 in
     let r' = equate_dim qenv rel r'0 r'1 in
     let rel = Rel.equate' r0 r'0 rel in
     let abs0 = LazyValAbs.unleash abs0 in
     let abs1 = LazyValAbs.unleash abs1 in
-    r, r', Some (equate_abs qenv rel ty abs0 abs1)
+    r, r', Some (equate_con_abs qenv rel ty abs0 abs1)
 
-  and equate_nf_face qenv rel ty (r0, r'0, bdy0) (r1, r'1, bdy1) =
+  and equate_con_face qenv rel ty (r0, r'0, bdy0) (r1, r'1, bdy1) =
     let r = equate_dim qenv rel r0 r1 in
     let r' = equate_dim qenv rel r'0 r'1 in
     let rel = Rel.equate' r0 r'0 rel in
     let bdy0 = LazyVal.unleash bdy0 in
     let bdy1 = LazyVal.unleash bdy1 in
-    r, r', Some (equate_nf qenv rel ty bdy0 bdy1)
+    r, r', Some (equate_con qenv rel ty bdy0 bdy1)
 
   and equate_sys_wrapper : 'a 'b. ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b list =
     fun face_equater sys0 sys1 ->
@@ -231,11 +334,11 @@ struct
     | Invalid_argument _ ->
       raise PleaseRaiseProperError (* mismatched lengths *)
 
-  and equate_abs_sys qenv rel ty = equate_sys_wrapper (equate_abs_face qenv rel ty)
-  and equate_ty_abs_sys qenv rel = equate_sys_wrapper (equate_ty_abs_face qenv rel)
-  and equate_nf_sys qenv rel ty = equate_sys_wrapper (equate_nf_face qenv rel ty)
+  and equate_con_abs_sys qenv rel ty = equate_sys_wrapper (equate_con_abs_face qenv rel ty)
+  and equate_tycon_abs_sys qenv rel = equate_sys_wrapper (equate_tycon_abs_face qenv rel)
+  and equate_con_sys qenv rel ty = equate_sys_wrapper (equate_con_face qenv rel ty)
 
   and subtype qenv rel ty0 ty1 =
-    ignore @@ equate_ty qenv rel ty0 ty1;
+    ignore @@ equate_tycon qenv rel ty0 ty1;
     raise CanJonHelpMe
 end

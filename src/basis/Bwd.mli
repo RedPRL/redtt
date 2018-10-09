@@ -26,6 +26,7 @@ sig
   val filter : ('a -> bool) -> 'a bwd -> 'a bwd
   val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b bwd -> 'a
   val fold_right : ('a -> 'b -> 'b) -> 'a bwd -> 'b -> 'b
+  val fold_right2 : ('a -> 'b -> 'c -> 'c) -> 'a bwd -> 'b bwd -> 'c -> 'c
   val to_list : 'a bwd -> 'a list
   val from_list : 'a list -> 'a bwd
 end

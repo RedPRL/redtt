@@ -98,6 +98,14 @@ struct
       let e = f x e in
       (fold_right[@tailcall]) f l e
 
+  let rec fold_right2 f l0 l1 e =
+    match l0, l1 with
+    | Emp, Emp -> e
+    | Snoc (l0, x0), Snoc (l1, x1) ->
+      let e = f x0 x1 e in
+      (fold_right2[@tailcall]) f l0 l1 e
+    | _ -> raise @@ Invalid_argument "Bwd.fold_right2"
+
   let to_list xs =
     xs <>> []
 

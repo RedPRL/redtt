@@ -135,13 +135,17 @@ and head =
   | NHCom of {r : dim; r' : dim; ty : neutroid; cap : value; sys : con abs sys}
 
 and frame =
-  | FunApp of value
+  | FunApp of typed_value (* annotated if ty != None *)
   | Fst
   | Snd
   | ExtApp of dim list
   | RestrictForce
-  | VProj of {r : dim; func : value} (* rigid when r is an atom *)
+  | VProj of {r : dim; func : typed_value} (* rigid when r is an atom *)
   | Cap of {r : dim; r' : dim; ty : value; sys : con abs sys} (* rigid when (r,r') and sys are rigid *)
+
+and typed_value =
+  {ty : value option;
+   value : value}
 
 and neu =
   {head : head;
@@ -385,7 +389,7 @@ struct
 
     | Tm.FunApp t ->
       let v = Val.make @@ eval rel env t in
-      FunApp v
+      FunApp (TypedVal.make v)
 
     | Tm.ExtApp trs ->
       let rs = List.map (eval_dim env) trs in
@@ -397,7 +401,7 @@ struct
     | Tm.VProj info ->
       VProj
         {r = eval_dim env info.r;
-         func = Val.make @@ eval rel env info.func}
+         func = TypedVal.make @@ Val.make @@ eval rel env info.func}
 
     | Tm.Cap info ->
       Cap
@@ -761,6 +765,7 @@ struct
   module ConAbs = AbsPlug (Con)
   module ConAbsFace = Face (ConAbs)
   module ConAbsSys = Sys (ConAbs)
+  module ValAbs = AbsPlug (Val)
 
   type t = con
 
@@ -1139,10 +1144,10 @@ struct
   and rigid_plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
-      Clo.inst rel clo @@ Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash arg end)
+      Clo.inst rel clo @@ Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash @@ TypedVal.drop_ty arg end)
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
-      let ty = Clo.inst rel quant.cod @@ Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash arg end) in
+      let ty = Clo.inst rel quant.cod @@ Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash @@ TypedVal.drop_ty arg end) in
       let cap = Val.plug rel ~rigid:true frm cap in
       let sys = ConAbsSys.plug rel ~rigid:true frm sys in
       rigid_hcom rel r r' ~ty ~cap ~sys
@@ -1151,13 +1156,13 @@ struct
       let Abs (x, quantx) = abs in
       let y, pi = Perm.freshen_name x in
       let dom = Abs (x, Val.unleash quantx.dom) in
-      let coe_arg s = make_coe rel r' s ~abs:dom arg in
+      let coe_arg s = make_coe rel r' s ~abs:dom @@ TypedVal.drop_ty arg in
       let abs =
         let cod_y = Clo.swap pi quantx.cod in
         let coe_r'y = LazyVal.make_from_lazy @@ lazy begin coe_arg @@ `Atom y end in
         Abs (y, Clo.inst rel cod_y @@ Val coe_r'y)
       in
-      let cap = Val.plug rel ~rigid:true (FunApp (Val.make @@ coe_arg r)) cap in
+      let cap = Val.plug rel ~rigid:true (FunApp (TypedVal.make @@ Val.make @@ coe_arg r)) cap in
       rigid_coe rel r r' ~abs cap
 
     | Fst, Cons (v0, _) ->
@@ -1264,8 +1269,8 @@ struct
       Val.unleash cap
 
     | _, Neu info ->
+      let frm, ty, sys = rigid_plug_ty rel frm info.ty hd in
       let neu = Neutroid.plug rel ~rigid:true frm info.neu in
-      let ty, sys = rigid_plug_ty rel frm info.ty hd in
       Neu {ty = Val.make ty; neu = {neu with sys = sys @ neu.sys}}
 
     | FunApp _, _ -> raise PleaseRaiseProperError
@@ -1279,33 +1284,42 @@ struct
   and rigid_plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
     | Pi {dom; cod}, FunApp arg ->
-      let arg = lazy begin Val.unleash arg end in
-      Clo.inst rel cod @@ Val (LazyVal.make_from_lazy arg), []
+      let lazy_arg = lazy begin Val.unleash (TypedVal.drop_ty arg) end in
+      FunApp {arg with ty = Some dom}, Clo.inst rel cod @@ Val (LazyVal.make_from_lazy lazy_arg), []
 
     | Pi _, _ -> raise PleaseRaiseProperError
 
     | Sg {dom; _}, Fst ->
-      Val.unleash dom, []
+      frm, Val.unleash dom, []
 
     | Sg {cod; _}, Snd ->
       let fst = lazy begin plug rel ~rigid:true Fst hd end in
-      Clo.inst rel cod @@ Val (LazyVal.make_from_lazy fst), []
+      frm, Clo.inst rel cod @@ Val (LazyVal.make_from_lazy fst), []
 
     | Sg _, _ -> raise PleaseRaiseProperError
 
     | Ext extclo, ExtApp rs ->
-      ExtClo.inst rel extclo @@ List.map (fun r -> Dim r) rs
+      let ty, sys = ExtClo.inst rel extclo @@ List.map (fun r -> Dim r) rs in
+      frm, ty, sys
 
     | Ext _, _ -> raise PleaseRaiseProperError
 
     | Restrict (r, r', ty), RestrictForce ->
-      LazyVal.unleash ty, [(r, r', LazyVal.make hd)]
+      frm, LazyVal.unleash ty, [(r, r', LazyVal.make hd)]
 
-    | V {ty1; _}, VProj _ ->
-      Val.unleash ty1, []
+    | V {ty0; ty1; _}, VProj info ->
+      let arr_ty = Val.make @@
+        let env = Env.init_isolated
+          [Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty0 end);
+           Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty1 end)]
+        in
+        Syn.eval rel env @@
+        Tm.arr (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
+      in
+      VProj {info with func = {info.func with ty = Some arr_ty}}, Val.unleash ty1, []
 
     | HCom {ty = `Pos; cap; _}, Cap _ ->
-      Val.unleash cap, []
+      frm, Val.unleash cap, []
 
     | _ ->
       raise PleaseRaiseProperError
@@ -1413,7 +1427,7 @@ struct
     | V ({r = s; _} as info) ->
       let rel0 = Rel.equate' s `Dim0 rel in
       let func = Val.plug rel0 ~rigid:true Fst info.equiv in
-      let vproj_frame = VProj {r = s; func} in
+      let vproj_frame = VProj {r = s; func = {ty = None; value = func}} in
       let hcom0 r' = make_hcom rel0 r r' ~ty:(Val.unleash info.ty0)
         ~cap:(Val.run rel0 cap) ~sys:(ConAbsSys.run rel0 sys) in
       let el0 = Val.make @@ hcom0 r' in
@@ -1423,7 +1437,7 @@ struct
           let face0 =
             s, `Dim0,
             LazyValAbs.bind @@ fun y ->
-            let arg0 = FunApp (Val.make @@ hcom0 y) in
+            let arg0 = FunApp {ty = None; value = Val.make @@ hcom0 y} in
             Val.plug_then_unleash rel0 ~rigid:true arg0 func
           in
           face0 :: ConAbsSys.plug rel ~rigid:true vproj_frame sys
@@ -1534,7 +1548,7 @@ struct
         let abs0 = Abs (x, Val.unleash info.ty0) in
         let abs1 = Abs (x, Val.unleash info.ty1) in
         let func_x = Val.plug rel0 ~rigid:true Fst info.equiv in
-        let vproj_frame_x = VProj {r = info.r; func = func_x} in
+        let vproj_frame_x = VProj {r = info.r; func = {ty = None; value = func_x}} in
         match atom_info_r = x with
         | false ->
           let el0 = Val.make @@ make_coe rel0 r r' ~abs:abs0 @@ Val.run rel0 cap in
@@ -1545,7 +1559,7 @@ struct
                 info.r, `Dim0,
                 LazyValAbs.bind @@ fun y ->
                 let arg_y = Val.make @@ make_coe rel0 r y ~abs:(ConAbs.run rel0 abs0) @@ Val.run rel0 cap in
-                Val.plug_then_unleash rel0 ~rigid:true (FunApp arg_y) info.equiv
+                Val.plug_then_unleash rel0 ~rigid:true (FunApp (TypedVal.make arg_y)) info.equiv
               in
               let face1 =
                 info.r, `Dim1,
@@ -1593,7 +1607,7 @@ struct
 
             let fiber0 =
               Val.plug rel ~rigid:true Fst @@
-              Val.plug rel ~rigid:true (FunApp (Val.make base)) @@
+              Val.plug rel ~rigid:true (FunApp (TypedVal.make @@ Val.make base)) @@
               is_equiv_x0
             in
 
@@ -1620,9 +1634,9 @@ struct
                 let var i = Tm.up @@ Tm.ix i in
                 Cons (Val.run rel cap, Val.make @@ Syn.eval rel env (Tm.refl (var 0)))
               in
-              Val.plug rel ~rigid:true (FunApp fib) @@
+              Val.plug rel ~rigid:true (FunApp (TypedVal.make fib)) @@
               Val.plug rel ~rigid:true Snd @@
-              Val.plug rel ~rigid:true (FunApp (Val.make b)) @@
+              Val.plug rel ~rigid:true (FunApp (TypedVal.make @@ Val.make b)) @@
               is_equiv_x0
             in
 
@@ -2249,6 +2263,32 @@ struct
          sys = ConAbsSys.subst r x info.sys}
 end
 
+and TypedVal :
+sig
+  include Domain with type t = typed_value
+  val make : value -> t
+  val drop_ty : t -> value
+end
+=
+struct
+  type t = typed_value
+
+  let swap pi {ty; value} =
+    {ty = Option.map (Val.swap pi) ty;
+     value = Val.swap pi value}
+
+  let run rel {ty; value} =
+    {ty = Option.map (Val.run rel) ty;
+     value = Val.run rel value}
+
+  let subst r x {ty; value} =
+    {ty = Option.map (Val.subst r x) ty;
+     value = Val.subst r x value}
+
+  let make v = {ty = None; value = v}
+  let drop_ty {value = v; _} = v
+end
+
 (** A [frame] value might not be rigid. *)
 and Frame :
 sig
@@ -2272,7 +2312,7 @@ struct
   let swap pi =
     function
     | FunApp arg ->
-      let arg = Val.swap pi arg in
+      let arg = TypedVal.swap pi arg in
       FunApp arg
     | Fst | Snd as frm ->
       frm
@@ -2284,7 +2324,7 @@ struct
     | VProj info ->
       VProj
         {r = Dim.swap pi info.r;
-         func = Val.swap pi info.func}
+         func = TypedVal.swap pi info.func}
     | Cap info ->
       Cap
         {r = Dim.swap pi info.r;
@@ -2295,7 +2335,7 @@ struct
   let subst r x =
     function
     | FunApp arg ->
-      let arg = Val.subst r x arg in
+      let arg = TypedVal.subst r x arg in
       FunApp arg
     | Fst | Snd as frm ->
       frm
@@ -2307,7 +2347,7 @@ struct
     | VProj info ->
       VProj
         {r = Dim.subst r x info.r;
-         func = Val.subst r x info.func}
+         func = TypedVal.subst r x info.func}
     | Cap info ->
       Cap
         {r = Dim.subst r x info.r;
@@ -2318,7 +2358,7 @@ struct
   let run rel =
     function
     | FunApp arg ->
-      let arg = Val.run rel arg in
+      let arg = TypedVal.run rel arg in
       FunApp arg
     | Fst | Snd | ExtApp _ | RestrictForce as frm ->
       frm
@@ -2326,8 +2366,8 @@ struct
       let r = Dim.run rel info.r in
       let func =
         match Rel.equate' r `Dim0 rel with
-        | rel -> Val.run rel info.func
-        | exception I.Inconsistent -> Val.make FortyTwo
+        | rel -> TypedVal.run rel info.func
+        | exception I.Inconsistent -> TypedVal.make @@ Val.make FortyTwo
       in
       VProj {r; func}
     | Cap info ->
@@ -2358,7 +2398,7 @@ struct
     | VProj {r; func} ->
       begin
         match Rel.compare r `Dim0 rel with
-        | `Same -> `Triv (Val.plug_then_unleash rel (FunApp (Val.make hd)) func)
+        | `Same -> `Triv (Val.plug_then_unleash rel (FunApp (TypedVal.make @@ Val.make hd)) (TypedVal.drop_ty func))
         | `Apart -> `Triv hd
         | `Indet -> `Rigid frm
       end
@@ -2714,3 +2754,4 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
   end
 
 module ConAbs = AbsPlug (Con)
+module NeutroidAbs = Abs (Neutroid)
