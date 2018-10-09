@@ -121,6 +121,16 @@ struct
         let bdy_xs = equate_con qenv_xs rel ty_xs bdy0_xs bdy1_xs in
         Tm.ext_lam nms bdy_xs
 
+      | V {r; ty0; ty1; equiv} ->
+        let tr = quote_dim qenv r in
+        let rel_r0 = Rel.equate' r `Dim0 rel in
+        let tm0 = equate_con qenv rel_r0 (Val.unleash ty0) (Con.run rel_r0 el0) (Con.run rel_r0 el1) in
+        let func = Val.run rel_r0 @@ Val.plug rel_r0 Fst equiv in
+        let vproj0 = Con.run rel @@ Con.plug rel (VProj {r; func = TypedVal.make func}) el0 in
+        let vproj1 = Con.run rel @@ Con.plug rel (VProj {r; func = TypedVal.make func}) el1 in
+        let tm1 = equate_con qenv rel (Val.unleash ty1) vproj0 vproj1 in
+        Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
+
       | HCom ({r; r'; ty = `Pos; cap = ty; sys} as hcom) ->
         let tr, tr' = quote_dim qenv r, quote_dim qenv r' in
         let cap0 = Con.run rel @@ Con.plug rel (Cap {r; r'; ty; sys}) el0 in
@@ -276,6 +286,20 @@ struct
       let ty_xs = equate_tycon qenv_xs rel ty0_xs ty1_xs in
       let sys_xs = equate_con_sys qenv_xs rel ty0_xs sys0_xs sys1_xs in
       Tm.make @@ Tm.Ext (Tm.NB (nms, (ty_xs, sys_xs)))
+
+    | V info0, V info1 ->
+      let rel_r0 = Rel.equate' info0.r `Dim0 rel in
+      let r = equate_dim qenv rel info0.r info1.r in
+      let ty0 = equate_tyval qenv rel_r0 info0.ty0 info0.ty1 in
+      let ty1 = equate_tyval qenv rel info0.ty1 info1.ty1 in
+      let equiv_ty =
+        let env = Env.init_isolated
+          [Val (LazyVal.make @@ Val.unleash info0.ty1);
+           Val (LazyVal.make @@ Val.unleash info0.ty0)] in
+        Syn.eval rel_r0 env @@ Tm.equiv (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
+      in
+      let equiv = equate_val qenv rel_r0 equiv_ty info0.equiv info0.equiv in
+      Tm.make @@ Tm.V {r; ty0; ty1; equiv}
 
     | HCom ({ty = `Pos; _} as hcom0), HCom ({ty = `Pos; _} as hcom1) ->
       let r = equate_dim qenv rel hcom0.r hcom1.r in
