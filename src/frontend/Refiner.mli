@@ -1,6 +1,6 @@
 open Dev
 open RedTT_Core
-open ElabMonad
+open Contextual
 
 type sys = (tm, tm) Tm.system
 type goal = {ty : ty; sys : sys}
@@ -16,10 +16,10 @@ val tac_refl : chk_tac
 val tac_hope : chk_tac
 
 
-val inspect_goal : loc:location -> name:string option -> goal -> unit m
+val inspect_goal : loc:Log.location -> name:string option -> goal -> unit m
 
 (** Unleash a hole named [name]. *)
-val tac_hole : loc:location -> name:string option -> chk_tac
+val tac_hole : loc:Log.location -> name:string option -> chk_tac
 
 (** Run the input tactic without the restriction, and then store the result
     as a guess for the current hole in the proof state. *)
@@ -41,7 +41,7 @@ val tac_pair : chk_tac -> chk_tac -> chk_tac
 
 (** Call a data elimination rule. *)
 val tac_elim
-  : loc:location
+  : loc:Log.location
   -> tac_mot:chk_tac option
   -> tac_scrut:inf_tac
   -> clauses:(string * ML.einvpat ML.epatbind list * chk_tac) list
@@ -50,7 +50,7 @@ val tac_elim
 
 (** Call a data elimination rule. *)
 val tac_elim_inf
-  : loc:location
+  : loc:Log.location
   -> tac_mot:chk_tac
   -> tac_scrut:inf_tac
   -> clauses:(string * ML.einvpat ML.epatbind list * chk_tac) list
@@ -75,3 +75,7 @@ val bind_sys_in_scope : (tm, tm) Tm.system -> (tm, tm) Tm.system m
 val bind_in_scope : tm -> tm m
 
 val name_of : [`User of string | `Gen of Name.t] -> Name.t
+
+
+
+val unify : unit m

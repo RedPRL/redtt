@@ -46,7 +46,7 @@ let execute_signature dirname mlcmd =
   let module Elaborator = Elaborator.Make (I) in
   begin
     try
-      ignore @@ ElabMonad.run @@ ElabMonad.report @@ Elaborator.eval_cmd mlcmd;
+      ignore @@ Contextual.run @@ Elaborator.eval_cmd mlcmd;
       Diagnostics.terminated ();
       Lwt.return_unit
     with
