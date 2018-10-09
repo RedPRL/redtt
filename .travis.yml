@@ -13,4 +13,4 @@ install:
   - opam pin add -y redtt .
 script:
   - make build
-  - make examples
+  - make library
