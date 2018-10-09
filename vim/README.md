@@ -12,7 +12,8 @@ buffer, ignoring lines below the cursor's current position.
 ### Typing special characters
 
 `redtt` uses several unicode characters in its concrete notation; each of these
-can be typed easily in the Vim mode, or replaced with ASCII equivalents:
+can be typed easily in the Vim mode using the `digraph` feature; alternatively,
+they replaced with ASCII equivalents.
 
 | Char | Digraph   | ASCII |
 |------|-----------|-------|
