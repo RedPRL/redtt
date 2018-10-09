@@ -73,6 +73,12 @@ struct
       let xs' = filter f xs in
       if f x then Snoc (xs', x) else xs'
 
+  let rec exists f =
+    function
+    | Emp -> false
+    | Snoc (xs, x) ->
+      if f x then true else exists f xs
+
   let to_list xs =
     xs <>> []
 

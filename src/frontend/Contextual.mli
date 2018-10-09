@@ -55,3 +55,6 @@ val base_cx : Cx.t m
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 
 val run : 'a m -> 'a
+
+
+val report_unsolved : loc:Log.location -> unit m

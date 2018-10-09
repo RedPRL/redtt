@@ -29,6 +29,7 @@ let read_file file_name =
   read_from_channel file_name
 
 let execute_signature dirname mlcmd =
+  let open ML in
   let module I =
   struct
     let cache = Hashtbl.create 20
@@ -37,8 +38,8 @@ let execute_signature dirname mlcmd =
       match Hashtbl.find_opt cache f with
       | None ->
         let mlcmd = Lwt_main.run @@ read_file @@ f ^ ".red" in
-        Hashtbl.add cache f mlcmd;
-        `Elab mlcmd
+        Hashtbl.add cache f mlcmd.con;
+        `Elab mlcmd.con
       | Some _ ->
         `Cached
   end
@@ -46,7 +47,10 @@ let execute_signature dirname mlcmd =
   let module Elaborator = Elaborator.Make (I) in
   begin
     try
-      ignore @@ Contextual.run @@ Elaborator.eval_cmd mlcmd;
+      ignore @@ Contextual.run @@ begin
+        Contextual.bind (Elaborator.eval_cmd mlcmd.con) @@ fun _ ->
+        Contextual.report_unsolved ~loc:mlcmd.span
+      end;
       Diagnostics.terminated ();
       Lwt.return_unit
     with

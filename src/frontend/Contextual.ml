@@ -409,3 +409,16 @@ let under_restriction r0 r1 m =
     with
     | I.Inconsistent ->
       ret None
+
+let get_unsolved_holes =
+  getl <<@> fun lcx ->
+    Bwd.filter Entry.is_incomplete lcx
+
+
+let report_unsolved ~loc =
+  get_unsolved_holes <<@> Bwd.length <<@> fun n ->
+    if n > 0 then
+      begin
+        let pp fmt () = Format.fprintf fmt "%i unsolved holes" n in
+        Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
+      end

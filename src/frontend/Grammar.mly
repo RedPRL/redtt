@@ -47,7 +47,7 @@
 %token EOF
 
 
-%start <ML.mlcmd> mltoplevel
+%start <ML.mlcmd ML.info> mltoplevel
 %%
 
 located(X):
@@ -342,27 +342,27 @@ data_decl:
 
 mltoplevel:
   | META; LTR; LET; a = ATOM; EQUALS; cmd = mlcmd; RTR; rest = mltoplevel
-    { E.MlBind (cmd, `User a, rest) }
+    { {rest with con = E.MlBind (cmd, `User a, rest.con)} }
 
   | META; LTR; c = mlcmd; RTR; rest = mltoplevel
-    { E.MlBind (c, `Gen (Name.fresh ()), rest) }
+    { {rest with con = E.MlBind (c, `Gen (Name.fresh ()), rest.con)} }
 
   | opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
     { let name = E.MlRef (Name.named (Some a)) in
-      MlBind (E.define ~name ~opacity ~scheme:sch ~tm, `User a, rest) }
+      {rest with con = MlBind (E.define ~name ~opacity ~scheme:sch ~tm, `User a, rest.con)} }
 
   | decl = data_decl; rest = mltoplevel
     { let name, desc = decl in
-      MlBind (E.MlDeclData {name; desc}, `User name, rest) }
+      {rest with con = MlBind (E.MlDeclData {name; desc}, `User name, rest.con)} }
 
   | IMPORT; a = ATOM; rest = mltoplevel
-    { E.mlbind (E.MlImport a) @@ fun _ -> rest }
+    { {rest with con = E.mlbind (E.MlImport a) @@ fun _ -> rest.con} }
 
   | QUIT; rest = mltoplevel
-    { E.MlRet (E.MlTuple []) }
+    { {rest with con = E.MlRet (E.MlTuple [])} }
 
-  | EOF
-    { E.MlRet (E.MlTuple []) }
+  | x = located(EOF)
+    { {x with con = E.MlRet (E.MlTuple [])} }
 
 mlcmd:
   | LET; a = ATOM; EQUALS; cmd = mlcmd; IN; rest = mlcmd
