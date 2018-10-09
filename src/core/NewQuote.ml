@@ -95,18 +95,18 @@ struct
       | Pi {dom; cod} ->
         let x, qenv_x = extend qenv dom in
         let cod_x = Clo.inst rel cod (Val (LazyVal.make x)) in
-        let bdy0_x = Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el0 in
-        let bdy1_x = Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el1 in
+        let bdy0_x = Con.run rel @@ Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el0 in
+        let bdy1_x = Con.run rel @@ Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el1 in
         let bdy_x = equate_con qenv_x rel cod_x bdy0_x bdy1_x in
         Tm.lam (Clo.name cod) bdy_x
 
       | Sg {dom; cod} ->
-        let fst0 = Con.plug rel Fst el0 in
-        let fst1 = Con.plug rel Fst el1 in
+        let fst0 = Con.run rel @@ Con.plug rel Fst el0 in
+        let fst1 = Con.run rel @@ Con.plug rel Fst el1 in
         let fst = equate_con qenv rel (Val.unleash dom) fst0 fst1 in
         let cod = Clo.inst rel cod (Val (LazyVal.make fst0)) in
-        let snd0 = Con.plug rel Snd el0 in
-        let snd1 = Con.plug rel Snd el1 in
+        let snd0 = Con.run rel @@ Con.plug rel Snd el0 in
+        let snd1 = Con.run rel @@ Con.plug rel Snd el1 in
         let snd = equate_con qenv rel cod snd0 snd1 in
         Tm.cons fst snd
 
@@ -116,13 +116,24 @@ struct
         let qenv_xs = QEnv.abs xs qenv in
         let rs = Bwd.fold_right (fun x rs -> `Atom x :: rs) xs [] in
         let ty_xs = ExtClo.inst_then_fst rel extclo (List.map (fun r -> Dim r) rs) in
-        let bdy0_xs = Con.plug rel (ExtApp rs) el0 in
-        let bdy1_xs = Con.plug rel (ExtApp rs) el1 in
+        let bdy0_xs = Con.run rel @@ Con.plug rel (ExtApp rs) el0 in
+        let bdy1_xs = Con.run rel @@ Con.plug rel (ExtApp rs) el1 in
         let bdy_xs = equate_con qenv_xs rel ty_xs bdy0_xs bdy1_xs in
         Tm.ext_lam nms bdy_xs
 
-      | HCom ({ty = `Pos; _} as hcom) ->
-        raise PleaseFillIn
+      | HCom ({r; r'; ty = `Pos; cap = ty; sys} as hcom) ->
+        let tr, tr' = quote_dim qenv r, quote_dim qenv r' in
+        let cap0 = Con.run rel @@ Con.plug rel (Cap {r; r'; ty; sys}) el0 in
+        let cap1 = Con.run rel @@ Con.plug rel (Cap {r; r'; ty; sys}) el1 in
+        let tcap = equate_con qenv rel (Val.unleash ty) cap0 cap1 in
+        let equate_boundary (ri, r'i, abs) =
+          let rel = Rel.equate' ri r'i rel in
+          let tri, tr'i = quote_dim qenv ri, quote_dim qenv r'i in
+          let b = equate_con qenv rel (ConAbs.inst rel (LazyValAbs.unleash abs) r') (Con.run rel el0) (Con.run rel el1) in
+          tri, tr'i, Some b
+        in
+        let tsys = List.map equate_boundary sys in
+        Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
 
       | Univ _ -> equate_tycon qenv rel el0 el1
 
