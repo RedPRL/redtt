@@ -72,7 +72,8 @@ debug_filter:
     { match a with
       | "all" -> `All
       | "constraints" -> `Constraints
-      | _ -> failwith "Invalid debug filter: try 'all' or 'constraints' " }
+      | "unsolved" -> `Unsolved
+      | _ -> failwith "Invalid debug filter: try 'all' or 'constraints' or 'unsolved'" }
 
 eproj:
   | DOT FST
