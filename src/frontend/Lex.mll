@@ -130,7 +130,11 @@ rule token = parse
     { Lwt.return RTR }
   | "«"
     { Lwt.return LLGL }
+  | "<<"
+    { Lwt.return LLGL }
   | "»"
+    { Lwt.return RRGL }
+  | ">>"
     { Lwt.return RRGL }
   | '!'
     { Lwt.return BANG }
