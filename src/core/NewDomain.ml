@@ -103,6 +103,9 @@ type con =
 
   | FortyTwo (* a dummy filler to signal that something might be terribly wrong *)
 
+  | Data of {lbl : string; params : cell list}
+
+
 and value = con Delayed.t
 
 and neutroid = {neu : neu Delayed.t; sys : con sys} (* is a value when sys and thus neu (by invariants) are rigid *)
@@ -363,8 +366,10 @@ struct
     | Tm.Next _ ->
       raise CanJonHelpMe
 
-    | Tm.Data _ ->
-      raise CanJonHelpMe
+    | Tm.Data info ->
+      let params = List.map (fun t -> Val (Delayed.make @@ lazy (eval rel env t))) info.params in
+      Data {lbl = info.lbl; params}
+
     | Tm.Intro _ ->
       raise CanJonHelpMe
 
@@ -864,6 +869,9 @@ struct
         {ty = Val.swap pi info.ty;
          neu = Neutroid.swap pi info.neu}
 
+    | Data info ->
+      Data {lbl = info.lbl; params = List.map (Cell.swap pi) info.params}
+
     | FortyTwo ->
       FortyTwo
 
@@ -967,6 +975,9 @@ struct
       Neu
         {ty = Val.subst r x info.ty;
          neu = Neutroid.subst r x info.neu}
+
+    | Data info ->
+      Data {lbl = info.lbl; params = List.map (Cell.subst r x) info.params}
 
     | FortyTwo ->
       FortyTwo
@@ -1123,6 +1134,9 @@ struct
         | exception ConSys.Triv v ->
           v
       end
+
+    | Data info ->
+      Data {lbl = info.lbl; params = List.map (Cell.run rel) info.params}
 
     | FortyTwo ->
       FortyTwo
