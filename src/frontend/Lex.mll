@@ -225,6 +225,8 @@ and block_comment = parse
     { match BlockComment.pop () with
       | `Token -> token lexbuf
       | `Comment -> block_comment lexbuf }
+  | line_ending
+    { new_line lexbuf; block_comment lexbuf }
   | _
     { block_comment lexbuf }
 
