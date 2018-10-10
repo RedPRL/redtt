@@ -105,7 +105,7 @@ type con =
   | FortyTwo (* a dummy filler to signal that something might be terribly wrong *)
 
   | Data of {lbl : string; params : cell list}
-  | Intro of {dlbl : string; clbl : string; args : cell list; sys : con sys}
+  | Intro of {dlbl : string; clbl : string; args : constr_cell list; sys : con sys}
 
 
 and value = con Delayed.t
@@ -160,6 +160,15 @@ and neu =
 and cell =
   | Val of con Lazy.t Delayed.t
   | Dim of dim
+
+and constr_cell =
+  [ `Const of typed_value
+  | `Rec of constr_rec_spec * value
+  | `Dim of dim
+  ]
+
+and constr_rec_spec =
+  [ `Self ]
 
 and env = {globals : GlobalEnv.t; cells : cell bwd}
 
@@ -379,14 +388,41 @@ struct
       Data {lbl = info.lbl; params}
 
     | Tm.Intro (dlbl, clbl, params, args) ->
-      let eval_as_cell t = Val (Delayed.make @@ lazy (eval rel env t)) in
-      let params = List.map eval_as_cell params in
-      let args = List.map eval_as_cell args in
       let desc = GlobalEnv.lookup_datatype dlbl env.globals in
       let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
-      let benv = Env.extend_cells (Env.init env.globals) @@ params @ args in
+      let eval_as_cell t = Val (Delayed.make @@ lazy (eval rel env t)) in
+      let params = List.map eval_as_cell params in
+      let tyenv = Env.extend_cells (Env.init env.globals) params in
+      let benv, args = eval_constr_args rel ~env ~tyenv ~constr ~args in
       let sys = eval_tm_sys rel benv @@ Desc.Constr.boundary constr in
       Con.make_intro rel ~dlbl ~clbl ~args ~sys
+
+  and eval_constr_args rel ~env ~tyenv ~constr ~args =
+    let rec go acc tyenv (tele : Desc.constr) tms =
+      match tele, tms with
+      | Desc.TNil _, [] ->
+        tyenv, Bwd.to_list acc
+      | Desc.TCons (`Const ty, Tm.B (_, tele)), tm :: tms ->
+        let vty = lazy begin eval rel tyenv ty end in
+        let el = lazy begin eval rel env tm end in
+        let typed_val = {ty = Some (Val.make_from_lazy vty); value = Val.make_from_lazy el} in
+        let acc = acc #< (`Const typed_val) in
+        let tyenv = Env.extend_cell tyenv @@ Val (Delayed.make el) in
+        go acc tyenv tele tms
+      | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), tm :: tms ->
+        let el = lazy begin eval rel env tm end in
+        let tyenv = Env.extend_cell tyenv @@ Val (Delayed.make el) in
+        let acc = acc #< (`Rec (`Self, Val.make_from_lazy el)) in
+        go acc tyenv tele tms
+      | Desc.TCons (`Dim, Tm.B (_, tele)), tm :: tms ->
+        let r = eval_dim env tm in
+        let tyenv = Env.extend_cell tyenv @@ Dim r in
+        let acc = acc #< (`Dim r) in
+        go acc tyenv tele tms
+      | _ ->
+        raise PleaseRaiseProperError
+    in
+    go Emp tyenv constr args
 
   and eval_cmd rel env (hd, sp) =
     let folder hd frm =
@@ -700,6 +736,28 @@ struct
     | Val v -> Val (LazyVal.run rel v)
 end
 
+and ConstrCell : Domain with type t = constr_cell =
+struct
+  type t = constr_cell
+  let swap pi : t -> t =
+    function
+    | `Const tv -> `Const (TypedVal.swap pi tv)
+    | `Rec (`Self, v) -> `Rec (`Self, Val.swap pi v)
+    | `Dim d -> `Dim (Dim.swap pi d)
+
+  let subst r x =
+    function
+    | `Const tv -> `Const (TypedVal.subst r x tv)
+    | `Rec (`Self, v) -> `Rec (`Self, Val.subst r x v)
+    | `Dim d -> `Dim (Dim.subst r x d)
+
+  let run rel =
+    function
+    | `Const tv -> `Const (TypedVal.run rel tv)
+    | `Rec (`Self, v) -> `Rec (`Self, Val.run rel v)
+    | `Dim _ as c -> c
+end
+
 (** An environment is a value if every cell of it is. *)
 and Env :
 sig
@@ -774,7 +832,7 @@ sig
   val make_box : rel -> dim -> dim -> cap:value -> sys:con sys -> con
 
   (** invariant: [args] is [rel]-value, but [sys] might not be rigid *)
-  val make_intro : rel -> dlbl:string -> clbl:string -> args:cell list -> sys:con sys -> con
+  val make_intro : rel -> dlbl:string -> clbl:string -> args:constr_cell list -> sys:con sys -> con
 end =
 struct
   module ConFace = Face (Con)
@@ -896,7 +954,7 @@ struct
       Intro
         {dlbl = info.dlbl;
          clbl = info.clbl;
-         args = List.map (Cell.swap pi) info.args;
+         args = List.map (ConstrCell.swap pi) info.args;
          sys = ConSys.swap pi info.sys}
 
 
@@ -1013,7 +1071,7 @@ struct
       Intro
         {dlbl = info.dlbl;
          clbl = info.clbl;
-         args = List.map (Cell.subst r x) info.args;
+         args = List.map (ConstrCell.subst r x) info.args;
          sys = ConSys.subst r x info.sys}
 
     | FortyTwo ->
@@ -1178,7 +1236,7 @@ struct
          params = List.map (Cell.run rel) info.params}
 
     | Intro info ->
-      let args = List.map (Cell.run rel) info.args in
+      let args = List.map (ConstrCell.run rel) info.args in
       let sys = ConSys.run rel info.sys in
       make_intro rel ~dlbl:info.dlbl ~clbl:info.clbl ~args ~sys
 
@@ -1320,7 +1378,7 @@ struct
     | Cap _, Box {cap; _} ->
       Val.unleash cap
 
-    | Elim _, Intro _ ->
+    | Elim elim, Intro intro ->
       raise CanJonHelpMe
 
     | Elim _, HCom {ty = `Pos; _} ->
