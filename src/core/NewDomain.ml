@@ -1,6 +1,7 @@
 open RedBasis
 open Bwd
 open BwdNotation
+open Combinators
 
 exception PleaseFillIn
 exception PleaseRaiseProperError
@@ -104,6 +105,7 @@ type con =
   | FortyTwo (* a dummy filler to signal that something might be terribly wrong *)
 
   | Data of {lbl : string; params : cell list}
+  | Intro of {dlbl : string; clbl : string; args : cell list; sys : con sys}
 
 
 and value = con Delayed.t
@@ -273,6 +275,8 @@ struct
 
   exception Triv of con
 
+  module ConSys = Sys (Con)
+
   let rec eval_dim env t =
     match Tm.unleash t with
     | Tm.Dim0 -> `Dim0
@@ -367,11 +371,20 @@ struct
       raise CanJonHelpMe
 
     | Tm.Data info ->
-      let params = List.map (fun t -> Val (Delayed.make @@ lazy (eval rel env t))) info.params in
+      let params =
+        flip List.map info.params @@ fun t ->
+        Val (Delayed.make @@ lazy (eval rel env t))
+      in
       Data {lbl = info.lbl; params}
 
-    | Tm.Intro _ ->
-      raise CanJonHelpMe
+    | Tm.Intro (dlbl, clbl, params, args) ->
+      let eval_as_cell t = Val (Delayed.make @@ lazy (eval rel env t)) in
+      let params = List.map eval_as_cell params in
+      let args = List.map eval_as_cell args in
+      let desc = GlobalEnv.lookup_datatype dlbl env.globals in
+      let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
+      let sys = eval_tm_sys rel env @@ Desc.Constr.boundary constr in
+      Con.make_intro rel ~dlbl ~clbl ~args ~sys
 
   and eval_cmd rel env (hd, sp) =
     let folder hd frm =
@@ -757,6 +770,9 @@ sig
 
   (** invariant: cap and sys are [rel]-values, but dir and sys might not be rigid *)
   val make_box : rel -> dim -> dim -> cap:value -> sys:con sys -> con
+
+  (** invariant: [args] is [rel]-value, but [sys] might not be rigid *)
+  val make_intro : rel -> dlbl:string -> clbl:string -> args:cell list -> sys:con sys -> con
 end =
 struct
   module ConFace = Face (Con)
@@ -870,7 +886,17 @@ struct
          neu = Neutroid.swap pi info.neu}
 
     | Data info ->
-      Data {lbl = info.lbl; params = List.map (Cell.swap pi) info.params}
+      Data
+        {lbl = info.lbl;
+         params = List.map (Cell.swap pi) info.params}
+
+    | Intro info ->
+      Intro
+        {dlbl = info.dlbl;
+         clbl = info.clbl;
+         args = List.map (Cell.swap pi) info.args;
+         sys = ConSys.swap pi info.sys}
+
 
     | FortyTwo ->
       FortyTwo
@@ -977,7 +1003,16 @@ struct
          neu = Neutroid.subst r x info.neu}
 
     | Data info ->
-      Data {lbl = info.lbl; params = List.map (Cell.subst r x) info.params}
+      Data
+        {lbl = info.lbl;
+         params = List.map (Cell.subst r x) info.params}
+
+    | Intro info ->
+      Intro
+        {dlbl = info.dlbl;
+         clbl = info.clbl;
+         args = List.map (Cell.subst r x) info.args;
+         sys = ConSys.subst r x info.sys}
 
     | FortyTwo ->
       FortyTwo
@@ -1136,7 +1171,14 @@ struct
       end
 
     | Data info ->
-      Data {lbl = info.lbl; params = List.map (Cell.run rel) info.params}
+      Data
+        {lbl = info.lbl;
+         params = List.map (Cell.run rel) info.params}
+
+    | Intro info ->
+      let args = List.map (Cell.run rel) info.args in
+      let sys = ConSys.run rel info.sys in
+      make_intro rel ~dlbl:info.dlbl ~clbl:info.clbl ~args ~sys
 
     | FortyTwo ->
       FortyTwo
@@ -1338,6 +1380,13 @@ struct
       Val.unleash cap
     | _ ->
       rigid_coe rel r r' ~abs cap
+
+  and make_intro rel ~dlbl ~clbl ~args ~sys =
+    match ConSys.force rel sys with
+    | sys ->
+      Intro {dlbl; clbl; args; sys}
+    | exception ConSys.Triv con ->
+      con
 
   and make_hcom rel r r' ~ty ~cap ~sys =
     match Rel.compare r r' rel with

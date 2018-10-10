@@ -1,11 +1,9 @@
 open RedBasis
 open Bwd
 open Domain
+open Combinators
 
 include ValSig
-
-let flip f x y = f y x
-
 
 type error =
   | UnexpectedEnvCell of env_el

@@ -2,6 +2,7 @@
 open RedTT_Core
 open RedBasis
 open Bwd open BwdNotation
+open Combinators
 
 module type Import =
 sig
@@ -25,8 +26,6 @@ struct
 
 
   let traverse = MonadUtil.traverse
-
-  let flip f x y = f y x
 
   module E = ML
 

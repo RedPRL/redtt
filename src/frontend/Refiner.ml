@@ -1,6 +1,7 @@
 open RedBasis
 open RedTT_Core
 open Dev open Bwd open BwdNotation
+open Combinators
 
 module D = Domain
 
@@ -130,8 +131,6 @@ let tac_let x itac ctac =
     M.ret @@ Tm.make @@ Tm.Let (Tm.ann ~ty:let_ty ~tm:let_tm, Tm.bind x bdyx)
 
 
-
-let flip f x y = f y x
 
 let tac_pair tac0 tac1 : chk_tac =
   fun goal ->
