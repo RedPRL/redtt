@@ -1576,11 +1576,9 @@ struct
     | Ext extclo ->
       HCom {r; r'; ty = `Ext extclo; cap; sys}
 
-    | Univ _ ->
+    | Univ _ | Data _ ->
       HCom {r; r'; ty = `Pos; cap; sys}
 
-    | Data _ ->
-      raise CanJonHelpMe
 
     | V ({r = s; _} as info) ->
       let rel0 = Rel.equate' s `Dim0 rel in
