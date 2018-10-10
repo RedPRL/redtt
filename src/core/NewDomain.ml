@@ -704,9 +704,9 @@ and Env :
 sig
   include Domain with type t = env
 
-  val init : GlobalEnv.t -> env (* shouldn't this take a GlobalEnv.t? *)
+  val init : GlobalEnv.t -> env
 
-  val init_isolated : cell list -> env
+  val init_isolated : cell list -> env (* Should this take GlobalEnv.t? *)
   val extend_cell : env -> cell -> env
   val extend_cells : env -> cell list -> env
   val lookup_cell_by_index : int -> env -> cell
