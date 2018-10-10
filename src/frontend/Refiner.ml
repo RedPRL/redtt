@@ -6,8 +6,8 @@ module D = Domain
 
 module M =
 struct
-  include ElabMonad
-  module Util = Monad.Util(ElabMonad)
+  include Contextual
+  module Util = Monad.Util(Contextual)
 end
 
 module C = Contextual
@@ -29,9 +29,12 @@ let _ =
   Diagnostics.on_termination @@ fun _ ->
   Format.eprintf "Refine spent %fs in normalizing types@." !normalization_clock
 
+let unify =
+  M.go_to_top >>
+  M.local (fun _ -> Emp) U.ambulando
 let normalize_ty ty =
   let now0 = Unix.gettimeofday () in
-  M.lift C.base_cx >>= fun cx ->
+  C.base_cx >>= fun cx ->
   let vty = Cx.eval cx ty in
   let ty = Cx.quote_ty cx vty in
   let now1 = Unix.gettimeofday () in
@@ -59,7 +62,7 @@ let match_goal tac =
 let guess_restricted tm goal =
   let ty = goal.ty in
   let sys = goal.sys in
-  M.lift @@ C.check ~ty ~sys tm >>= function
+  C.check ~ty ~sys tm >>= function
   | `Ok -> M.ret tm
   | _ ->
     let rec go =
@@ -69,15 +72,15 @@ let guess_restricted tm goal =
       | (r, r', Some tm') :: sys ->
         begin
           M.under_restriction r r' @@
-          M.lift @@ C.active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
+          C.active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
         end >>
         go sys
       | _ :: sys ->
         go sys
     in
     go sys >>
-    M.unify >>
-    M.lift @@ C.check ~ty ~sys tm >>= function
+    unify >>
+    C.check ~ty ~sys tm >>= function
     | `Ok -> M.ret tm
     | `Exn exn ->
       raise exn
@@ -99,11 +102,11 @@ let bind_in_scope_ psi tm =
   tm
 
 let bind_in_scope tm =
-  M.lift C.ask <<@> fun psi -> bind_in_scope_ psi tm
+  C.ask <<@> fun psi -> bind_in_scope_ psi tm
 
 
 let bind_sys_in_scope sys =
-  M.lift C.ask <<@> fun psi ->
+  C.ask <<@> fun psi ->
     Tm.map_tm_sys (bind_in_scope_ psi) sys
 
 let tac_wrap_nf tac goal =
@@ -114,7 +117,7 @@ let tac_wrap_nf tac goal =
     tac {ty; sys = goal.sys}
 
 let tac_of_cmd cmd =
-  M.lift @@ C.base_cx >>= fun cx ->
+  C.base_cx >>= fun cx ->
   let vty = Typing.infer cx cmd in
   let ty = Cx.quote_ty cx vty in
   M.ret (ty, Tm.up cmd)
@@ -160,21 +163,103 @@ let unleash_data ty =
     Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
 
+let normalize_param p =
+  let module Notation = Monad.Notation (C) in
+  let open Notation in
+
+  C.base_cx >>= fun cx ->
+  let normalize_ty ty =
+    let vty = Cx.eval cx ty in
+    Cx.quote_ty cx vty
+  in
+  match p with
+  | `P ty ->
+    C.ret @@ `P (normalize_ty ty)
+  | `Def (ty, tm) ->
+    let vty = Cx.eval cx ty in
+    let ty' = Cx.quote_ty cx vty in
+    let el = Cx.eval cx tm in
+    let tm' = Cx.quote cx ~ty:vty el in
+    C.ret @@ `Def (ty', tm')
+  | `Tw (ty0, ty1) ->
+    C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
+  | (`I | `NullaryExt | `Tick | `KillFromTick _) as p ->
+    C.ret p
+  | `R (r0, r1) ->
+    C.ret @@ `R (r0, r1)
+
+let rec normalize_tele =
+  let module Notation = Monad.Notation (C) in
+  let open Notation in
+  function
+  | [] -> C.ret []
+  | (x, p) :: tele ->
+    normalize_param p >>= fun p ->
+    C.in_scope x p (normalize_tele tele) >>= fun psi ->
+    C.ret @@ (x,p) :: psi
+
+
 let inspect_goal ~loc ~name : goal -> unit M.m =
   fun goal ->
-    M.lift C.ask >>= fun psi ->
-    let rty = Tm.refine_ty goal.ty goal.sys in
+    C.ask >>= fun tele ->
+    let ty = Tm.refine_ty goal.ty goal.sys in
     begin
       if name = Some "_" then M.ret () else
-        M.emit loc @@ M.UserHole {name; ty = rty; tele = psi}
+        C.bind C.base_cx @@ fun cx ->
+        C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
+        let vty = Cx.eval cx ty in
+        let ty = Cx.quote_ty cx vty in
+
+        let pp_restriction fmt =
+          let pp_bdy fmt =
+            function
+            | None -> Format.fprintf fmt "-"
+            | Some tm -> Tm.pp0 fmt tm
+          in
+          let pp_face fmt (r, r', otm) =
+            Format.fprintf fmt "%a = %a %a @[%a@]"
+              Tm.pp0 r
+              Tm.pp0 r'
+              Uuseg_string.pp_utf_8 "⇒"
+              pp_bdy otm
+          in
+          Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_face fmt
+        in
+
+        let pp_restricted_ty fmt (ty, sys) =
+          match sys with
+          | [] -> Tm.pp0 fmt ty
+          | _ ->
+            Format.fprintf fmt "%a@,@,with the following faces:@,@,   @[<v>%a@]"
+              Tm.pp0 ty
+              pp_restriction sys
+        in
+
+        let ty, sys =
+          match Tm.unleash ty with
+          | Tm.Ext (Tm.NB (Emp, (ty, sys))) ->
+            ty, sys
+          | _ ->
+            ty, []
+        in
+        let pp fmt () =
+          Format.fprintf fmt "@[<v>?%s:@; @[<v>%a@]@,@[<v>%a %a@]@]"
+            (match name with Some name -> name | None -> "Hole")
+            Dev.pp_params (Bwd.from_list tele)
+            Uuseg_string.pp_utf_8 "⊢"
+            pp_restricted_ty (ty, sys)
+        in
+        Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
+        C.ret ()
+        (* M.emit loc @@ M.UserHole {name; ty = rty; tele = psi} *)
     end
 
 let tac_hole ~loc ~name : chk_tac =
   fun goal ->
     inspect_goal ~loc ~name goal >>
-    M.lift C.ask >>= fun psi ->
+    C.ask >>= fun psi ->
     let rty = Tm.refine_ty goal.ty goal.sys in
-    M.lift @@ U.push_hole `Rigid psi rty >>= fun cmd ->
+    U.push_hole `Rigid psi rty >>= fun cmd ->
     M.ret @@ Tm.up @@ Tm.refine_force cmd
 
 let guess_motive scrut ty =
@@ -185,7 +270,7 @@ let guess_motive scrut ty =
     M.ret @@ Tm.bind (Name.fresh ()) ty
 
 let lookup_datatype dlbl =
-  M.lift C.base_cx <<@> fun cx ->
+  C.base_cx <<@> fun cx ->
     GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
 
 let make_motive ~data_ty ~tac_mot ~scrut ~ty =
@@ -204,7 +289,7 @@ let make_motive ~data_ty ~tac_mot ~scrut ~ty =
   | _ -> failwith "make_motive"
 
 
-let rec tac_lambda (ps : ESig.einvpat list) tac goal =
+let rec tac_lambda (ps : ML.einvpat list) tac goal =
   match Tm.unleash goal.ty with
   | Tm.Pi (dom, cod) ->
     begin
@@ -346,7 +431,7 @@ and tac_generalize ~tac_scrut tac_body : chk_tac =
   in
   tac_let xfun tac_fun tac_bdy
 
-and tac_inversion ~loc ~tac_scrut (invpat : ESig.einvpat) (body : chk_tac) : chk_tac =
+and tac_inversion ~loc ~tac_scrut (invpat : ML.einvpat) (body : chk_tac) : chk_tac =
   match_goal @@ fun goal ->
   match invpat with
   | `Var nm ->
@@ -422,7 +507,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
 
     let dlbl, params = unleash_data data_ty in
     begin
-      M.lift C.base_cx >>= fun cx ->
+      C.base_cx >>= fun cx ->
       let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) params in
       M.ret (Cx.eval cx data_ty, vparams)
     end
@@ -460,7 +545,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
       let constr = Desc.lookup_constr clbl constrs in
 
       begin
-        M.lift C.base_cx <<@> fun cx ->
+        C.base_cx <<@> fun cx ->
           let (module V) = Cx.evaluator cx in
           V.empty_env
       end >>= fun empty_env ->
@@ -468,7 +553,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
 
       let rec prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs =
         begin
-          M.lift C.base_cx <<@> fun cx ->
+          C.base_cx <<@> fun cx ->
             cx, Cx.evaluator cx, Cx.quoter cx
         end >>= fun (cx, (module V), (module Q)) ->
         match pbinds, specs with
@@ -507,7 +592,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let ih_ty = Q.quote_ty Quote.Env.emp ih_vty in
 
           M.in_scope x (`P data_ty) begin
-            M.lift C.base_cx >>= fun cx ->
+            C.base_cx >>= fun cx ->
             let ih_el = V.reflect ih_vty (D.Var {name = x_ih; twin = `Only; ushift = 0}) [] in
             let psi = psi <>< [x, `P tty; x_ih, `P ih_ty] in
             let tyenv = D.Env.snoc tyenv @@ `Val x_el in
@@ -570,11 +655,11 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, params, intro_args) in
       let clause_ty = mot intro in
 
-      M.lift C.base_cx >>= fun outer_cx ->
+      C.base_cx >>= fun outer_cx ->
 
       M.in_scopes psi begin
         begin
-          M.lift C.base_cx <<@> fun cx ->
+          C.base_cx <<@> fun cx ->
             cx, Cx.evaluator cx, Cx.quoter cx
         end >>= fun (cx, (module V), (module Q)) ->
 
@@ -633,12 +718,12 @@ let rec tac_hope goal =
   let rec try_system sys =
     match sys with
     | [] ->
-      M.lift C.ask >>= fun psi ->
+      C.ask >>= fun psi ->
       let rty = Tm.refine_ty goal.ty goal.sys in
-      M.lift @@ U.push_hole `Flex psi rty <<@> fun cmd -> Tm.up @@ Tm.refine_force cmd
+      U.push_hole `Flex psi rty <<@> fun cmd -> Tm.up @@ Tm.refine_force cmd
     | (r, r', Some tm) :: sys ->
       begin
-        M.lift @@ C.check ~ty:goal.ty ~sys:goal.sys tm >>=
+        C.check ~ty:goal.ty ~sys:goal.sys tm >>=
         function
         | `Ok ->
           M.ret tm
@@ -655,9 +740,9 @@ let tac_guess tac : chk_tac =
     tac {goal with sys = []} >>= fun tm ->
     let rty = Tm.refine_ty goal.ty goal.sys in
     let rty0 = Tm.refine_ty goal.ty [] in
-    M.lift C.ask >>= fun psi ->
-    M.lift @@ U.push_guess psi ~ty0:rty ~ty1:rty0 (Tm.refine_thunk tm) <<@> fun tm ->
-        Tm.up @@ Tm.refine_force @@ Tm.ann ~ty:rty ~tm
+    C.ask >>= fun psi ->
+    U.push_guess psi ~ty0:rty ~ty1:rty0 (Tm.refine_thunk tm) <<@> fun tm ->
+      Tm.up @@ Tm.refine_force @@ Tm.ann ~ty:rty ~tm
 
 let tac_refl =
   tac_fix @@ fun tac_refl ->

@@ -5,7 +5,7 @@ open Bwd open BwdNotation
 
 module type Import =
 sig
-  val import : Lwt_io.file_name -> [`Elab of ESig.esig | `Cached]
+  val import : Lwt_io.file_name -> [`Elab of ML.mlcmd | `Cached]
 end
 
 module Make (I : Import) =
@@ -16,7 +16,7 @@ struct
 
   open Dev
 
-  module M = ElabMonad
+  module M = C
   module MonadUtil = Monad.Util (M)
   module Notation = Monad.Notation (M)
   open Notation
@@ -28,7 +28,7 @@ struct
 
   let flip f x y = f y x
 
-  module E = ESig
+  module E = ML
 
   open Refiner
 
@@ -49,13 +49,13 @@ struct
     | E.App ({con = E.Num (0 | 1)} as e) ->
       M.ret @@ `ExtApp e
     | E.App ({con = E.Var {name = nm; _}} as e) ->
-      M.lift @@ C.resolver >>= fun renv ->
+      C.resolver >>= fun renv ->
       begin
         try
           begin
             match ResEnv.get nm renv with
             | `Var alpha ->
-              M.lift C.get_global_env >>= fun env ->
+              C.get_global_env >>= fun env ->
               begin
                 match GlobalEnv.lookup env alpha with
                 | (`P _ | `Tw _ | `Def _) -> M.ret @@ `FunApp e
@@ -76,70 +76,159 @@ struct
     | E.Open ->
       M.ret `Open
 
+  let with_mlenv f k =
+    C.get_mlenv >>= fun env0 ->
+    C.modify_mlenv f >>
+    k >>= fun x ->
+    C.modify_mlenv (fun _ -> env0) >>
+    M.ret x
 
 
-  let rec elab_sig =
+  let rec eval_cmd =
     function
-    | [] ->
-      M.ret ()
-    | E.Debug f :: esig ->
-      elab_decl @@ E.Debug f >>= fun _ ->
-      elab_sig esig
-    | E.Quit :: _ ->
-      M.ret ()
-    | dcl :: esig ->
-      elab_decl dcl >>= fun _ ->
-      elab_sig esig
+    | E.MlRet v -> eval_val v <<@> fun v -> E.SemRet v
 
+    | E.MlBind (cmd0, x, cmd1) ->
+      eval_cmd cmd0 <<@> unleash_ret >>= fun v0 ->
+      C.modify_mlenv (E.Env.set x v0) >>
+      eval_cmd cmd1
 
-  and elab_decl =
-    function
-    | E.Define (name, opacity, scheme, e) ->
-      let now0 = Unix.gettimeofday () in
+    | E.MlUnleash v ->
+      begin
+        eval_val v >>= function
+        | E.SemThunk (env, cmd) ->
+          with_mlenv (fun _ -> env) @@ eval_cmd cmd
+        | _ ->
+          failwith "eval_cmd: expected thunk"
+      end
+
+    | E.MlLam (x, c) ->
+      C.get_mlenv <<@> fun env ->
+        E.SemClo (env, x, c)
+
+    | E.MlApp (c, v) ->
+      begin
+        eval_val v >>= fun v ->
+        eval_cmd c >>= function
+        | E.SemClo (env, x, c) ->
+          with_mlenv (fun _ -> E.Env.set x v env) @@ eval_cmd c
+        | E.SemElabClo (env, e) ->
+          begin
+            match v with
+            | E.SemTuple [E.SemTerm ty; E.SemSys sys] ->
+              with_mlenv (fun _ -> env) @@
+              elab_chk e {ty; sys} >>= fun tm ->
+              M.ret @@ E.SemRet (E.SemTerm tm)
+            | _ ->
+              failwith "MlApp of ElabClo: calling convention violated"
+          end
+        | _ ->
+          failwith "expected ml closure"
+      end
+
+    | E.MlElab e ->
+      C.get_mlenv >>= fun env ->
+      M.ret @@ E.SemElabClo (env, e)
+
+    | E.MlElabWithScheme (scheme, e) ->
       elab_scheme scheme >>= fun (names, ty) ->
       let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
       let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
       bdy_tac {ty; sys = []} >>= fun tm ->
-      let alpha = Name.named @@ Some name in
-      M.lift @@ U.define Emp alpha opacity ty tm >>= fun _ ->
-      M.lift C.go_to_top >>
-      M.unify <<@> fun _ ->
-        let now1 = Unix.gettimeofday () in
-        Format.printf "Defined %s (%fs).@." name (now1 -. now0)
+      M.ret @@ E.SemRet (E.SemTuple [E.SemTerm ty; E.SemTerm tm])
 
-    | E.Data (dlbl, edesc) ->
-      elab_datatype dlbl edesc >>= fun desc ->
-      M.lift @@ C.declare_datatype dlbl desc
+    | MlCheck {ty; tm} ->
+      eval_val ty <<@> E.unleash_term >>= fun ty ->
+      eval_val tm <<@> E.unleash_term >>= fun tm ->
+      begin
+        C.check ~ty tm >>= function
+        | `Ok ->
+          M.ret @@ E.SemRet (E.SemTerm (Tm.up @@ Tm.ann ~ty ~tm))
+        | `Exn exn ->
+          raise exn
+      end
 
-    | E.Debug filter ->
-      let title =
-        match filter with
-        | `All -> "Development state:"
-        | `Constraints -> "Unsolved constraints:"
-        | `Unsolved -> "Unsolved entries:"
-      in
-      M.lift @@ C.dump_state Format.std_formatter title filter
+    | E.MlDefine info ->
+      begin
+        eval_val info.tm <<@> E.unleash_term >>= fun tm ->
+        eval_val info.ty <<@> E.unleash_term >>= fun ty ->
+        eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
+        U.define Emp alpha info.opacity ty tm >>= fun _ ->
+        M.ret @@ E.SemRet (E.SemTuple [])
+      end
 
-    | E.Normalize e ->
-      elab_inf e >>= fun (ty, cmd) ->
-      M.lift C.base_cx >>= fun cx ->
-      let vty = Cx.eval cx ty in
-      let el = Cx.eval_cmd cx cmd in
-      let tm = Cx.quote cx ~ty:vty el in
-      M.emit e.span @@ M.PrintTerm {ty = ty; tm}
+    | E.MlDeclData info ->
+      elab_datatype info.name info.desc >>= fun desc ->
+      C.declare_datatype info.name desc >>
+      M.ret @@ E.SemRet (E.SemDataDesc desc)
 
-
-    | E.Import file_name ->
+    | E.MlImport file_name ->
       begin
         match I.import file_name with
         | `Cached ->
-          M.ret ()
-        | `Elab esig ->
-          elab_sig esig
+          M.ret @@ E.SemRet (E.SemTuple [])
+        | `Elab cmd ->
+          eval_cmd cmd
       end
 
-    | E.Quit ->
-      M.ret ()
+    | E.MlUnify ->
+      C.go_to_top >>
+      Refiner.unify >>
+      M.ret @@ E.SemRet (E.SemTuple [])
+
+    | E.MlNormalize v ->
+      eval_val v >>= fun v ->
+      begin
+        match v with
+        | E.SemTuple [E.SemTerm ty; E.SemTerm tm] ->
+          C.base_cx >>= fun cx ->
+          let vty = Cx.eval cx ty in
+          let el = Cx.eval cx tm in
+          let tm = Cx.quote cx ~ty:vty el in
+          M.ret @@ E.SemRet (E.SemTerm tm)
+        | _ ->
+          failwith "normalize: expected synthesizable term"
+      end
+
+    | E.MlSplit (tuple, xs, cmd) ->
+      begin
+        eval_val tuple >>= function
+        | E.SemTuple vs ->
+          C.modify_mlenv (List.fold_right2 E.Env.set xs vs) >>
+          eval_cmd cmd
+        | _ ->
+          failwith "expected tuple"
+      end
+
+    | E.MlPrint info ->
+      eval_val info.con >>= fun v ->
+      let pp fmt () = ML.pp_semval fmt v in
+      Log.pp_message ~loc:info.span ~lvl:`Info pp Format.std_formatter ();
+      M.ret @@ E.SemRet (E.SemTuple [])
+
+    | E.MlForeign (foreign, input) ->
+      eval_val input <<@> foreign >>= eval_cmd
+
+    | E.MlDebug filter ->
+      M.dump_state Format.std_formatter "Debug" filter >>
+      M.ret @@ E.SemRet (E.SemTuple [])
+
+  and unleash_ret =
+    function
+    | E.SemRet v -> v
+    | _ -> failwith "unleash_ret"
+
+  and eval_val =
+    function
+    | E.MlDataDesc desc -> M.ret @@ E.SemDataDesc desc
+    | E.MlTerm tm -> M.ret @@ E.SemTerm tm
+    | E.MlSys tm -> M.ret @@ E.SemSys tm
+    | E.MlVar x -> C.get_mlenv <<@> fun env -> Option.get_exn @@ E.Env.find x env
+    | E.MlTuple vs -> traverse eval_val vs <<@> fun rs -> E.SemTuple rs
+    | E.MlThunk mlcmd -> C.get_mlenv <<@> fun env -> E.SemThunk (env, mlcmd)
+    | E.MlRef nm -> M.ret @@ E.SemRef nm
+    | E.MlString str -> M.ret @@ E.SemString str
+    | E.MlFloat x -> M.ret @@ E.SemFloat x
 
   and elab_datatype dlbl (E.EDesc edesc) =
     let rec elab_params : _ -> (_ * Desc.body) M.m =
@@ -159,19 +248,19 @@ struct
       function
       | [] ->
         let tdesc = Desc.{tdesc with status = `Complete} in
-        M.lift @@ C.declare_datatype dlbl tdesc >>
+        C.declare_datatype dlbl tdesc >>
         M.ret tdesc
       | econstr :: econstrs ->
         elab_constr dlbl params tdesc econstr >>= fun constr ->
         let tdesc = Desc.add_constr tdesc constr in
-        M.lift @@ C.declare_datatype dlbl tdesc >>
+        C.declare_datatype dlbl tdesc >>
         elab_constrs params tdesc econstrs
     in
 
     elab_params edesc.params >>= fun (psi, tbody) ->
     M.in_scopes psi @@
     let tdesc = Desc.{body = tbody; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
-    M.lift @@ C.declare_datatype dlbl tdesc >>= fun _ ->
+    C.declare_datatype dlbl tdesc >>= fun _ ->
     match edesc.kind with
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
@@ -204,7 +293,7 @@ struct
             let x = Name.named @@ Some nm in
             let univ = Tm.univ ~kind:desc.kind ~lvl:desc.lvl in
             elab_chk ety {ty = univ; sys = []} >>= fun pty ->
-            M.lift @@ C.check ~ty:univ pty >>= function
+            C.check ~ty:univ pty >>= function
             | `Ok ->
               M.in_scope x (`P pty) (go args) <<@> fun constr ->
                 Desc.TCons (`Const pty, Desc.Constr.bind x constr)
@@ -271,6 +360,15 @@ struct
       normalize_ty goal.ty >>= fun ty ->
       let goal = {goal with ty} in
       match goal.sys, Tm.unleash ty, e.con with
+      | _, _, E.RunML c ->
+        let mlgoal = E.MlTuple [E.MlTerm ty; E.MlSys goal.sys] in
+        let script = E.MlApp (c, mlgoal) in
+        begin
+          eval_cmd script <<@> unleash_ret >>= function
+          | E.SemTerm tm -> M.ret tm
+          | _ -> failwith "error running ML tactic"
+        end
+
       | _, _, E.Guess e ->
         tac_guess (elab_chk e) goal
 
@@ -309,7 +407,7 @@ struct
         tac_wrap_nf (tac_lambda ps tac) goal
 
       | [], _, E.Quo tmfam ->
-        M.lift C.resolver >>= fun renv ->
+        C.resolver >>= fun renv ->
         let tm = tmfam renv in
         begin
           match Tm.unleash tm with
@@ -426,7 +524,7 @@ struct
         elab_dim info.r' >>= fun r' ->
         let kan_univ = Tm.univ ~lvl:`Omega ~kind:`Kan in
         begin
-          M.lift @@ C.check ~ty:kan_univ ty >>= function
+          C.check ~ty:kan_univ ty >>= function
           | `Ok ->
             elab_chk info.cap {ty; sys = []} >>= fun cap ->
             elab_hcom_sys r ty cap info.sys <<@> fun sys ->
@@ -581,19 +679,19 @@ struct
 
   and elab_up ty inf =
     elab_inf inf >>= fun (ty', cmd) ->
-    M.lift (C.check ~ty @@ Tm.up cmd) >>= function
+    C.check ~ty @@ Tm.up cmd >>= function
     | `Ok -> M.ret @@ Tm.up cmd
     | `Exn exn ->
-      M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-      M.unify >>
-      M.lift (C.check ~ty @@ Tm.up cmd) >>= function
+      C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+      unify >>
+      C.check ~ty @@ Tm.up cmd >>= function
       | `Ok ->
         M.ret @@ Tm.up cmd
       | `Exn exn ->
         raise exn
 
   and elab_var name ushift =
-    M.lift C.resolver <<@> fun renv ->
+    C.resolver <<@> fun renv ->
       begin
         match ResEnv.get name renv with
         | `Var a ->
@@ -606,15 +704,15 @@ struct
   and elab_inf e : (ty * tm Tm.cmd) M.m =
     match e.con with
     | E.Var {name; ushift} ->
-      M.lift C.resolver >>= fun renv ->
+      C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
         | `Var x ->
-          M.lift (C.lookup_var x `Only) <<@> fun ty ->
+          C.lookup_var x `Only <<@> fun ty ->
             Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, [])
 
         | `Metavar x ->
-          M.lift (C.lookup_meta x) <<@> fun (ty, _) ->
+          C.lookup_meta x <<@> fun (ty, _) ->
             Tm.shift_univ ushift ty, (Tm.Meta {name = x; ushift}, [])
 
         | _ ->
@@ -622,12 +720,12 @@ struct
       end
 
     | E.Quo tmfam ->
-      M.lift C.resolver >>= fun renv ->
+      C.resolver >>= fun renv ->
       let tm = tmfam renv in
       begin
         match Tm.unleash tm with
         | Tm.Up cmd ->
-          M.lift C.base_cx <<@> fun cx ->
+          C.base_cx <<@> fun cx ->
             let vty = Typing.infer cx cmd in
             Cx.quote_ty cx vty, cmd
         | _ ->
@@ -712,13 +810,13 @@ struct
         ty, Tm.ann ~ty ~tm
 
     | _ ->
-      Format.eprintf "Elaborator error: %a@." ESig.pp e.con;
+      Format.eprintf "Elaborator error: %a@." ML.pp e.con;
       failwith "Can't infer"
 
   and elab_dim e =
     match e.con with
     | E.Var {name; ushift = 0} ->
-      M.lift C.resolver >>= fun renv ->
+      C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
         | `Var a ->
@@ -769,7 +867,7 @@ struct
 
 
   and evaluator =
-    M.lift C.base_cx <<@> fun cx ->
+    C.base_cx <<@> fun cx ->
       cx, Cx.evaluator cx
 
 
@@ -780,7 +878,7 @@ struct
       begin
         match exp.con with
         | E.Var {name; _} ->
-          M.lift C.base_cx >>= fun cx ->
+          C.base_cx >>= fun cx ->
           let sign = Cx.globals cx in
           begin
             match GlobalEnv.lookup_datatype dlbl sign with
@@ -805,7 +903,7 @@ struct
     | _ ->
       match exp.con with
       | E.Var {name; _} ->
-        M.lift C.resolver >>= fun renv ->
+        C.resolver >>= fun renv ->
         begin
           match ResEnv.get name renv with
           | `Datatype dlbl ->
@@ -818,7 +916,7 @@ struct
 
 
   and elab_data dlbl frms =
-    M.lift C.base_cx >>= fun cx ->
+    C.base_cx >>= fun cx ->
     let sign = Cx.globals cx in
     let desc = GlobalEnv.lookup_datatype dlbl sign in
 
@@ -888,17 +986,17 @@ struct
 
   and elab_mode_switch_cut exp frms ty =
     elab_cut exp frms >>= fun (ty', cmd) ->
-    M.lift (C.check ~ty @@ Tm.up cmd) >>= function
+    C.check ~ty @@ Tm.up cmd >>= function
     | `Ok ->
       M.ret @@ Tm.up cmd
     | `Exn exn ->
-      M.lift @@ C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-      M.unify >>
-      M.lift (C.check ~ty @@ Tm.up cmd) >>= function
+      C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
+      Refiner.unify >>
+      C.check ~ty @@ Tm.up cmd >>= function
       | `Ok ->
         M.ret @@ Tm.up cmd
       | `Exn exn ->
-        M.lift @@ C.dump_state Format.err_formatter "foo" `All >>= fun _ ->
+        C.dump_state Format.err_formatter "foo" `All >>= fun _ ->
         Format.eprintf "raising exn@.";
         raise exn
 

@@ -1,7 +1,7 @@
 " vim-redtt ftplugin
 " Language:     redtt
 " Author:       Carlo Angiuli
-" Last Change:  2018 August 13
+" Last Change:  2018 October 8
 
 if (exists("b:did_ftplugin") || !has('job'))
   finish
@@ -19,6 +19,11 @@ command! Redtt :call CheckBuffer()
 nnoremap <buffer> <LocalLeader>l :call CheckBuffer()<CR>
 nnoremap <buffer> <LocalLeader>p :call CheckBufferToCursor()<CR>
 autocmd QuitPre <buffer> call s:CloseBuffer()
+
+digraph !- 8866
+digraph II 120128
+digraph <: 10633
+digraph :> 10634
 
 " Optional argument: the last line to send to redtt (default: all).
 function! CheckBuffer(...)
@@ -79,7 +84,6 @@ function! s:EditWidth()
 endfunction
 
 function! s:CloseBuffer()
-  cclose
   if (bufexists('redtt') && !getbufvar('redtt', '&modified'))
     bdelete redtt
   endif
