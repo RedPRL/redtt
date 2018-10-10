@@ -1579,13 +1579,11 @@ struct
     | Univ _ | Data _ ->
       HCom {r; r'; ty = `Pos; cap; sys}
 
-
     | V ({r = s; _} as info) ->
       let rel0 = Rel.equate' s `Dim0 rel in
       let func = Val.plug rel0 ~rigid:true Fst info.equiv in
       let vproj_frame = VProj {r = s; func = {ty = None; value = func}} in
-      let hcom0 r' = make_hcom rel0 r r' ~ty:(Val.unleash info.ty0)
-          ~cap:(Val.run rel0 cap) ~sys:(ConAbsSys.run rel0 sys) in
+      let hcom0 r' = make_hcom rel0 r r' ~ty:(Val.unleash info.ty0) ~cap:(Val.run rel0 cap) ~sys:(ConAbsSys.run rel0 sys) in
       let el0 = Val.make @@ hcom0 r' in
       let el1 = Val.make @@
         let cap = Val.plug rel ~rigid:true vproj_frame cap in
@@ -1608,7 +1606,8 @@ struct
       (* The algorithm is based on the Anders' alternative hcom in [F]. *)
 
       (* This is essentially C_M in [F]. *)
-      let cap_frame = Cap
+      let cap_frame =
+        Cap
           {r = fhcom.r;
            r' = fhcom.r';
            ty = fhcom.cap;
@@ -1647,7 +1646,8 @@ struct
         in
         rigid_hcom rel r r' ~ty ~cap ~sys
       in
-      let sys = ConSys.foreach_gen fhcom.sys @@ fun si s'i abs ->
+      let sys =
+        ConSys.foreach_gen fhcom.sys @@ fun si s'i abs ->
         let rel = Rel.equate' si s'i rel in
         hcom_template rel r' (ConAbs.inst rel abs s')
       in
@@ -1753,7 +1753,8 @@ struct
           in
 
           (* This is to generate the element in `ty0` and also the face for r'=0. *)
-          let fixer_fiber rel = Val.make @@ (* rel |= r'=0 *)
+          let fixer_fiber rel =
+            Val.make @@ (* rel |= r'=0 *)
 
             (* the cleaned-up components under r'=0 *)
             let ty0_x0 = Val.run_then_unleash rel @@ Val.subst `Dim0 x info.ty0 in
@@ -1787,7 +1788,8 @@ struct
              * where [b] is calculated from [fib] as {[ext_apply (do_snd fib) [`Dim1]]}. *)
             let contr_path_at_r0 rel = (* value under r=r'=0 *)
               let b = Con.run rel base in
-              let fib = Val.make @@
+              let fib =
+                Val.make @@
                 let lazy_fa = lazy begin Con.run rel base end in
                 let env = Env.init_isolated [Val (LazyVal.make b)] in
                 let var i = Tm.up @@ Tm.ix i in
@@ -1883,7 +1885,8 @@ struct
           Val.plug rel cap_frame_xr @@ Val.run rel coe_cap
         in
         let fhcom_sys_rx = ConAbsSys.run rel @@ ConAbsSys.subst r x fhcom.sys in
-        let sys = ConAbsSys.foreach_gen fhcom_sys_rx @@ fun sj_xr s'j_xr absj_xr ->
+        let sys =
+          ConAbsSys.foreach_gen fhcom_sys_rx @@ fun sj_xr s'j_xr absj_xr ->
           let rel = Rel.equate' sj_xr s'j_xr rel in
           ConAbs.bind @@ fun y ->
           make_coe rel y s_xr ~abs:absj_xr @@ Val.make @@
@@ -1902,7 +1905,8 @@ struct
        * @param abs_x a prevalue in G+x, representing the face type. It can be just a prevalue.
        * *)
       let recovery_apart_core rel r'' s'' (preabs_x : con abs) : con =
-        let inner_coe = Val.make @@
+        let inner_coe =
+          Val.make @@
           let rel_x = Rel.hide' x rel in
           let inner_abs = Abs (x, ConAbs.inst rel_x preabs_x s'_x) in
           make_coe rel r r'' ~abs:inner_abs @@ Val.run rel coe_cap
@@ -1923,11 +1927,13 @@ struct
        * this naive cap will not be the image of the boundaries.
        *
        * This lives in G. *)
-      let naively_coerced_cap = Val.make @@
+      let naively_coerced_cap =
+        Val.make @@
         let abs = ConAbs.run rel capty_abs in
         let new_cap = Val.make @@ origin rel s_xr in
         let sys =
-          let diag = ConAbsSys.forall x [
+          let diag =
+            ConAbsSys.forall x [
               s_x, s'_x,
               LazyValAbs.bind @@ fun y ->
               let rel = Rel.equate' s_x s'_x rel in
