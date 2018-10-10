@@ -1674,7 +1674,8 @@ struct
       Box {r; r'; cap; sys}
 
     | Neu info ->
-      let neu = DelayedNeu.make
+      let neu =
+        DelayedNeu.make
           {head = NHCom {r; r'; ty = info.neu; cap; sys};
            frames = Emp}
       in
@@ -1711,7 +1712,7 @@ struct
       let neutroid =
         let neu =
           let head = NCoeData {r; r'; ty = abs; cap = info.neu} in
-          Delayed.make @@ {head; frames = Emp}
+          DelayedNeu.make @@ {head; frames = Emp}
         in
         let sys =
           ConSys.foreach_gen info.neu.sys @@ fun s s' el ->
