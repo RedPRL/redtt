@@ -14,7 +14,6 @@ buffer, ignoring lines below the cursor's current position.
 This plugin is compatible with Vim 8's package system. You can (re)install it by
 running the following shell command from the current directory:
 
-    chmod +x install.sh
     ./install.sh
 
 If the `redtt` binary is not in your `PATH`, add the following line to your
