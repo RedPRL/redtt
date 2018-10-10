@@ -13,7 +13,6 @@ let nat-pred : nat → nat =
   | suc n → n
   ]
 
-
 let nat-pred/suc (x : nat) : path nat x (nat-pred (suc x)) =
   refl
 

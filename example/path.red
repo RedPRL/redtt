@@ -31,8 +31,8 @@ let funext
   (p : (x : A) → path (B x) (f x) (g x))
   : path ((x : A) → B x) f g
   =
-  λ i x →
-    p _ i
+ λ i x -> p x i
+
 
 let symm/filler
   (A : type)
@@ -50,7 +50,11 @@ let symm
   (p : dim → A)
   : path A (p 1) (p 0)
   =
-  symm/filler _ p 1
+  λ i →
+  comp 0 1 (p 0) [
+  | i=0 → p
+  | i=1 → refl
+  ]
 
 let symm/unit
   (A : type)
