@@ -1400,7 +1400,7 @@ struct
           [Dim r]
       in
       let cells = ListUtil.flat_map act_on_constr_cell intro.args in
-      let nclo = raise CanJonHelpMe in
+      let nclo = find_elim_clause intro.clbl elim.clauses in
       NClo.inst rel nclo cells
 
     | Elim elim, HCom ({ty = `Pos; _} as hcom) ->
@@ -1427,6 +1427,18 @@ struct
     | VProj _, _ -> raise PleaseRaiseProperError
     | Cap _, _ -> raise PleaseRaiseProperError
     | Elim _, _ -> raise PleaseRaiseProperError
+
+  and find_elim_clause lbl clauses =
+    let f =
+      function
+      | (lbl', nclo) when lbl' = lbl -> Some nclo
+      | _ -> None
+    in
+    match ListUtil.find_map_opt f clauses with
+    | Some nclo -> nclo
+    | None -> raise PleaseRaiseProperError
+
+
 
   and rigid_plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
