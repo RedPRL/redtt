@@ -1,7 +1,7 @@
 " vim-redtt ftplugin
 " Language:     redtt
 " Author:       Carlo Angiuli
-" Last Change:  2018 August 13
+" Last Change:  2018 October 8
 
 if (exists("b:did_ftplugin") || !has('job'))
   finish
@@ -11,10 +11,19 @@ if (!exists('g:redtt_path'))
   let g:redtt_path = 'redtt'
 endif
 
+if (!exists('g:redtt_options'))
+  let g:redtt_options = ''
+endif
+
 command! Redtt :call CheckBuffer()
 nnoremap <buffer> <LocalLeader>l :call CheckBuffer()<CR>
 nnoremap <buffer> <LocalLeader>p :call CheckBufferToCursor()<CR>
 autocmd QuitPre <buffer> call s:CloseBuffer()
+
+digraph !- 8866
+digraph II 120128
+digraph <: 10633
+digraph :> 10634
 
 " Optional argument: the last line to send to redtt (default: all).
 function! CheckBuffer(...)
@@ -33,6 +42,7 @@ function! CheckBuffer(...)
 
   let s:job = job_start(g:redtt_path .
     \' from-stdin ' . bufname('%') .
+    \' ' . g:redtt_options .
     \' --line-width ' . s:EditWidth(), {
     \'in_io': 'buffer', 'in_buf': bufnr('%'),
     \'in_bot': exists('a:1') ? a:1 : line('$'),
@@ -74,7 +84,6 @@ function! s:EditWidth()
 endfunction
 
 function! s:CloseBuffer()
-  cclose
   if (bufexists('redtt') && !getbufvar('redtt', '&modified'))
     bdelete redtt
   endif

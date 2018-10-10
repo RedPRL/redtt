@@ -4,10 +4,10 @@
   open RedBasis
   open Bwd
   open BwdNotation
-  module E = ESig
+  module E = ML
   module R = ResEnv
 
-  let eterm loc con : E.eterm =
+  let locate loc con =
     E.{con; span = Some loc}
 
   let atom_to_econ a =
@@ -33,51 +33,32 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
+%token <string> STRING
 %token <string option> HOLE_NAME
-%token LSQ RSQ LPR RPR LGL RGL LBR RBR
-%token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY
+%token LSQ RSQ LPR RPR LGL RGL LBR RBR LTR RTR LLGL RRGL
+%token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY BANG
 %token EQUALS
-%token RIGHT_ARROW
-%token TIMES AST HASH AT BACKTICK IN WITH WHERE END DATA INTRO
+%token RIGHT_ARROW RIGHT_TACK
+%token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM TICK
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
-%token IMPORT OPAQUE QUIT DEBUG NORMALIZE
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
+%token IMPORT OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
+%token META
 %token EOF
 
 
-%start <ESig.esig> esig
+%start <ML.mlcmd ML.info> mltoplevel
 %%
 
 located(X):
   | e = X
-    { eterm $loc e }
+    { locate $loc e }
 
-edecl:
-  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
-    { E.Define (a, `Transparent, sch, tm) }
-  | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
-    { E.Define (a, `Opaque, sch, tm) }
-  | DEBUG; f = debug_filter
-    { E.Debug f }
-  | NORMALIZE; e = located(econ)
-    { E.Normalize e }
-
-  | DATA; dlbl = ATOM;
-    univ_spec = option(preceded(COLON, univ_spec));
-    WHERE; option(PIPE);
-    constrs = separated_list(PIPE, econstr)
-    { let kind, lvl =
-        match univ_spec with
-        | Some (k, l) -> k, l
-        | None -> `Kan, `Const 0
-      in
-      E.Data (dlbl, E.EDesc {constrs; kind; lvl}) }
-
-  | IMPORT; a = ATOM
-    { E.Import a }
-  | QUIT
-    { E.Quit }
+edata_params:
+  | params = nonempty_list(etele_cell); RIGHT_TACK;
+    { params }
+  | { [] }
 
 univ_spec:
   | TYPE; k = kind
@@ -92,7 +73,8 @@ debug_filter:
     { match a with
       | "all" -> `All
       | "constraints" -> `Constraints
-      | _ -> failwith "Invalid debug filter: try 'all' or 'constraints' " }
+      | "unsolved" -> `Unsolved
+      | _ -> failwith "Invalid debug filter: try 'all' or 'constraints' or 'unsolved'" }
 
 eproj:
   | DOT FST
@@ -116,6 +98,11 @@ atomoid_econ:
   | HOLE_NAME; LBR; e = located(econ); RBR
     { E.Guess e }
 
+  | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
+    { match scrut with
+    | Some scrut -> E.Elim {mot; scrut; clauses}
+    | None -> E.ElimFun {clauses} }
+
   | spec = univ_spec
     { let k, l = spec in E.Type (k, l) }
   (* in theory this rule can replace the following three, but it seems there's some bug.
@@ -132,6 +119,10 @@ atomoid_econ:
     { E.Refl }
   | n = NUMERAL;
     { E.Num n }
+
+  | LTR; c = mlcmd; RTR
+    { E.RunML c }
+
 
 atomic:
   | e = atom_econ
@@ -204,11 +195,6 @@ econ:
 
   | LET; pat = einvpat; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
     { E.Let {pat; sch = sch; tm; body} }
-
-  | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
-    { match scrut with
-    | Some scrut -> E.Elim {mot; scrut; clauses}
-    | None -> E.ElimFun {clauses} }
 
   | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
     { E.DFixLine {r; name; ty; bdy} }
@@ -288,9 +274,9 @@ ecofib0:
   | BOUNDARY; LSQ; xs = nonempty_list(ATOM); RSQ;
     { let xi x =
         let pos = $loc(xs) in
-        let r = eterm pos @@ E.Var {name = x; ushift = 0} in
-        [r, eterm pos (E.Num 0);
-         r, eterm pos (E.Num 1)]
+        let r = locate pos @@ E.Var {name = x; ushift = 0} in
+        [r, locate pos (E.Num 0);
+         r, locate pos (E.Num 1)]
       in
       List.flatten @@ List.map xi xs }
 
@@ -305,7 +291,7 @@ eface:
   | phi = ecofib; RIGHT_ARROW; e = located(econ)
     { phi, e }
   | phi = ecofib0; xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
-    { phi, eterm ($startpos(xs), $endpos(e)) (E.Lam (List.map (fun x -> `Var (`User x)) xs, e)) }
+    { phi, locate ($startpos(xs), $endpos(e)) (E.Lam (List.map (fun x -> `Var (`User x)) xs, e)) }
 
 
 escheme:
@@ -313,7 +299,7 @@ escheme:
     { (List.flatten tele, cod) }
 
   | tele = list(etele_cell)
-    { (List.flatten tele, eterm ($endpos(tele), $endpos(tele)) E.Hope) }
+    { (List.flatten tele, locate ($endpos(tele), $endpos(tele)) E.Hope) }
 
 etele_cell:
   | LPR; xs = nonempty_list(ATOM); COLON; ty = located(econ); RPR
@@ -334,16 +320,141 @@ econstr:
   boundary = loption(pipe_block(eface))
   { clbl, E.EConstr {specs = List.flatten specs; boundary} }
 
+opacity:
+  | OPAQUE
+    { `Opaque }
+  | { `Transparent }
 
 
-esig:
-  | d = edecl; esig = esig
-    { d :: esig }
-  | EOF
-    { [] }
+data_decl:
+  | DATA;
+    params = edata_params;
+    dlbl = ATOM;
+    univ_spec = option(preceded(COLON, univ_spec));
+    WHERE; option(PIPE);
+    constrs = separated_list(PIPE, econstr);
+    { let kind, lvl =
+        match univ_spec with
+        | Some (k, l) -> k, l
+        | None -> `Kan, `Const 0
+      in
+      let params = List.flatten params in
+      dlbl, E.EDesc {params; constrs; kind; lvl} }
+
+
+mltoplevel:
+  | META; LTR; LET; a = ATOM; EQUALS; cmd = mlcmd; RTR; rest = mltoplevel
+    { {rest with con = E.MlBind (cmd, `User a, rest.con)} }
+
+  | META; LTR; c = mlcmd; RTR; rest = mltoplevel
+    { {rest with con = E.MlBind (c, `Gen (Name.fresh ()), rest.con)} }
+
+  | opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
+    { let name = E.MlRef (Name.named (Some a)) in
+      {rest with con = MlBind (E.define ~name ~opacity ~scheme:sch ~tm, `User a, rest.con)} }
+
+  | decl = data_decl; rest = mltoplevel
+    { let name, desc = decl in
+      {rest with con = MlBind (E.MlDeclData {name; desc}, `User name, rest.con)} }
+
+  | IMPORT; a = ATOM; rest = mltoplevel
+    { {rest with con = E.mlbind (E.MlImport a) @@ fun _ -> rest.con} }
+
+  | QUIT; rest = mltoplevel
+    { {rest with con = E.MlRet (E.MlTuple [])} }
+
+  | x = located(EOF)
+    { {x with con = E.MlRet (E.MlTuple [])} }
+
+mlcmd:
+  | LET; a = ATOM; EQUALS; cmd = mlcmd; IN; rest = mlcmd
+    { E.MlBind (cmd, `User a, rest) }
+
+  | c = atomic_mlcmd; SEMI; rest = mlcmd
+    { E.MlBind (c, `Gen (Name.fresh ()), rest) }
+
+  | FUN; a = ATOM; RIGHT_ARROW; c = mlcmd
+    { E.MlLam (`User a, c) }
+
+  | CHECK; tm = mlval; COLON; ty = mlval
+    { E.MlCheck {ty; tm} }
+
+  | c = atomic_mlcmd; v = mlval
+    { E.MlApp (c, v) }
+
+  | c = atomic_mlcmd
+    { c }
+
+  | DEBUG; f = debug_filter
+    { E.MlDebug f }
+
+
+atomic_mlcmd:
+  | LPR; c = mlcmd; RPR
+    { c }
+  | BEGIN; c = mlcmd; END
+    { c }
+  | BANG; v = mlval
+    { E.MlUnleash v }
+
+  | PRINT; c = located(atomic_mlcmd)
+    { let open E in
+      mlbind c.con @@ fun x ->
+      MlPrint {c with con = x} }
+
+  | NORMALIZE; c = atomic_mlcmd
+    { E.mlbind c @@ fun x -> E.MlNormalize x }
+
+  | LLGL; decl = data_decl; RRGL
+    { let name, desc = decl in
+      E.MlDeclData {name; desc} }
+
+  | LLGL; opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); RRGL
+    { let name = E.MlRef (Name.named (Some a)) in
+      E.define ~name ~opacity ~scheme:sch ~tm }
+
+  | LLGL; e = located(econ); RRGL
+    { E.MlElab e }
+
+  | v = mlval
+    { E.MlRet v }
+
+
+mlval:
+  | LGL; vs = separated_list(COMMA, mlval); RGL
+    { E.MlTuple vs }
+  | LBR; c = mlcmd; RBR
+    { E.MlThunk c }
+  | s = STRING
+    { E.MlString s }
+  | a = ATOM;
+    { E.MlVar (`User a) }
 
 
 
+
+(*
+edecl:
+  | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
+    { E.Define (a, `Transparent, sch, tm) }
+  | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
+    { E.Define (a, `Opaque, sch, tm) }
+  | NORMALIZE; e = located(econ)
+    { E.MlNormalize e }
+
+(*
+
+*)
+
+  | IMPORT; a = ATOM
+    { E.MlImport a }
+
+    (*
+  | QUIT
+    { E.Quit }
+    *)
+
+    *)
 
 
 
@@ -475,12 +586,12 @@ tm:
   | LPR; DATA; dlbl = ATOM; RPR
     { fun _ ->
       make_node $startpos $endpos @@
-      Tm.Data dlbl }
+      Tm.Data {lbl = dlbl; params = []} }
 
   | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      Tm.Intro (dlbl, clbl, es env) }
+      Tm.Intro (dlbl, clbl, [], es env) }
 
   | e = cmd
     { fun env ->

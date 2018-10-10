@@ -14,8 +14,8 @@
   (:standard -w +a-3-4-6-9-22-26-27-30-32-39-40-41-42-44-48-60 -safe-string -short-paths -strict-formats -strict-sequence -O3 -bin-annot -unbox-closures -inlining-report))
  (libraries
   lwt.unix
-  redbasis
-  redtt_core
+  redtt.basis
+  redtt.core
   uuseg
   uuseg.string
   uutf

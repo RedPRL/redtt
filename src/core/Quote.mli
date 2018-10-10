@@ -29,12 +29,15 @@ sig
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
   val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
+  val equate_data_params : env -> string -> Desc.body -> env_el list -> env_el list -> Tm.tm list
+  val quote_data_params : env -> string -> Desc.body -> env_el list -> Tm.tm list
 
   val quote_dim : env -> I.t -> Tm.tm
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val equiv_dim : env -> I.t -> I.t -> unit
+  val equiv_data_params : env -> string -> Desc.body -> env_el list -> env_el list -> unit
   val subtype : env -> value -> value -> unit
 
   val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit

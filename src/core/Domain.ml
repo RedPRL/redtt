@@ -98,8 +98,8 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "<dfix>"
   | DFixLine _ ->
     Format.fprintf fmt "<dfix-line>"
-  | Data lbl ->
-    Uuseg_string.pp_utf_8 fmt lbl
+  | Data info ->
+    Uuseg_string.pp_utf_8 fmt info.lbl
   | Intro info ->
     Format.fprintf fmt "@[<hv1>(%a %a)@]"
       Uuseg_string.pp_utf_8 info.clbl
@@ -226,7 +226,7 @@ and pp_neu fmt neu =
 
   | Elim info ->
     Format.fprintf fmt "@[<hv1>(%a.elim@ %a)@]"
-      Desc.pp_data_label info.dlbl
+      Uuseg_string.pp_utf_8 info.dlbl
       (* pp_clo info.mot *)
       pp_neu info.neu
   (* pp_elim_clauses info.clauses *)
@@ -446,7 +446,8 @@ struct
       let go (lbl, nclo) = lbl, NClo.act phi nclo in
       let clauses = List.map go info.clauses in
       let neu = act phi info.neu in
-      Elim {dlbl = info.dlbl; mot; neu; clauses}
+      let params = List.map (Env.act_env_el phi) info.params in
+      Elim {dlbl = info.dlbl; params; mot; neu; clauses}
 
     | LblCall neu ->
       let neu = act phi neu in

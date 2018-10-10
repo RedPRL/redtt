@@ -32,8 +32,6 @@ struct
   let rec nth xs i =
     match xs with
     | Emp ->
-      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-      Format.eprintf "@.";
       failwith "Bwd.nth"
     | Snoc (_, x) when i = 0 -> x
     | Snoc (xs, _) -> nth xs @@ i - 1
@@ -74,6 +72,12 @@ struct
     | Snoc (xs, x) ->
       let xs' = filter f xs in
       if f x then Snoc (xs', x) else xs'
+
+  let rec exists f =
+    function
+    | Emp -> false
+    | Snoc (xs, x) ->
+      if f x then true else exists f xs
 
   let to_list xs =
     xs <>> []

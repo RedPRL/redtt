@@ -3,7 +3,8 @@ open Lexing
 
 type options =
   {file_name : Lwt_io.file_name;
-   line_width: int}
+   line_width: int;
+   debug_mode: bool}
 
 let print_position outx lexbuf =
   let pos = lexbuf.lex_curr_p in
@@ -13,7 +14,7 @@ let print_position outx lexbuf =
 let read_from_channel file_name channel =
   let open Lwt.Infix in
   let (lexbuf, tokens) = Lex.tokens ~file_name channel in
-  let checkpoint = Grammar.Incremental.esig @@ Lexing.lexeme_start_p lexbuf in
+  let checkpoint = Grammar.Incremental.mltoplevel @@ Lexing.lexeme_start_p lexbuf in
   begin
     Lwt.catch (Parse.loop lexbuf tokens checkpoint) @@ fun exn ->
     Lwt_io.printlf "  raised: %s" @@ Printexc.to_string exn >>= fun _ ->
@@ -27,7 +28,8 @@ let read_file file_name =
   Lwt_io.open_file ~mode:Lwt_io.Input file_name >>=
   read_from_channel file_name
 
-let execute_signature dirname esig =
+let execute_signature dirname mlcmd =
+  let open ML in
   let module I =
   struct
     let cache = Hashtbl.create 20
@@ -35,9 +37,9 @@ let execute_signature dirname esig =
       let f = Filename.concat dirname f in
       match Hashtbl.find_opt cache f with
       | None ->
-        let esig = Lwt_main.run @@ read_file @@ f ^ ".red" in
-        Hashtbl.add cache f esig;
-        `Elab esig
+        let mlcmd = Lwt_main.run @@ read_file @@ f ^ ".red" in
+        Hashtbl.add cache f mlcmd.con;
+        `Elab mlcmd.con
       | Some _ ->
         `Cached
   end
@@ -45,7 +47,10 @@ let execute_signature dirname esig =
   let module Elaborator = Elaborator.Make (I) in
   begin
     try
-      ignore @@ ElabMonad.run @@ ElabMonad.report @@ Elaborator.elab_sig esig;
+      ignore @@ Contextual.run @@ begin
+        Contextual.bind (Elaborator.eval_cmd mlcmd.con) @@ fun _ ->
+        Contextual.report_unsolved ~loc:mlcmd.span
+      end;
       Diagnostics.terminated ();
       Lwt.return_unit
     with
@@ -55,14 +60,18 @@ let execute_signature dirname esig =
       exit 1
   end
 
-let load_file options =
+let set_options options =
   Format.set_margin options.line_width;
+  Name.set_debug_mode options.debug_mode
+
+let load_file options =
+  set_options options;
   let open Lwt.Infix in
   let dirname = Filename.dirname options.file_name in
   read_file options.file_name >>= execute_signature dirname
 
 let load_from_stdin options  =
-  Format.set_margin options.line_width;
+  set_options options;
   let open Lwt.Infix in
   let dirname = Filename.dirname options.file_name in
   read_from_channel options.file_name Lwt_io.stdin

@@ -2,12 +2,15 @@ language: c
 cache:
   directories:
     - /home/travis/.opam/
+env:
+  - OCAML_VERSION=4.07 OPAM_VERSION=2.0.0
 before_install:
   # Install OPAM and OCaml
-  - travis_retry wget https://raw.github.com/ocaml/opam/master/shell/opam_installer.sh -O - | sh -s "/home/travis/bin" '4.07.0'
+  - sh <(curl -sL https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-ocaml.sh)
+  - opam --version
   - eval $(opam config env)
 install:
   - opam pin add -y redtt .
 script:
   - make build
-  - make examples
+  - make library

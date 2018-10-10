@@ -87,5 +87,11 @@ sig
 end
 
 module Decl : Occurs.S with type t = tm decl
-module Entry : DevSort with type t = entry
+
+module Entry :
+sig
+  include DevSort with type t = entry
+  val is_incomplete : t -> bool
+end
+
 module Entries : Occurs.S with type t = entry list

@@ -9,10 +9,10 @@ sig
   (** Return the type and definition of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * Tm.tm option
 
-  val lookup_datatype : Desc.data_label -> Tm.data_desc
+  val lookup_datatype : string -> Desc.desc
 end
 
-exception MissingElimClause of Desc.con_label
+exception MissingElimClause of string
 
 module type S =
 sig
@@ -36,8 +36,6 @@ sig
   val ext_apply : value -> dim list -> value
   val prev : tick -> value -> value
 
-  val elim_data : Desc.data_label -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
-
   val do_fst : value -> value
   val do_snd : value -> value
   val lbl_call : value -> value
@@ -60,7 +58,12 @@ sig
   val unleash_lbl_ty : value -> string * nf list * value
   val unleash_restriction_ty : value -> val_face
 
-  val make_intro : env -> dlbl:Desc.data_label -> clbl:Desc.con_label -> env_el list -> value
+
+  val realize_rec_spec : dlbl:string -> params:env_el list -> Desc.rec_spec -> value
+  val realize_rec_spec_ih : dlbl:string -> params:env_el list -> mot:clo -> Desc.rec_spec -> value -> value
+
+  val elim_data : string -> params:env_el list -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
+  val make_intro : dlbl:string -> params:env_el list -> clbl:string -> env_el list -> value
 
   module Sig : Sig
 

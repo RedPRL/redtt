@@ -67,12 +67,15 @@ sig
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
   val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
+  val equate_data_params : env -> string -> Desc.body -> env_el list -> env_el list -> Tm.tm list
+  val quote_data_params : env -> string -> Desc.body -> env_el list -> Tm.tm list
 
   val quote_dim : env -> I.t -> Tm.tm
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val equiv_dim : env -> I.t -> I.t -> unit
+  val equiv_data_params : env -> string -> Desc.body -> env_el list -> env_el list -> unit
   val subtype : env -> value -> value -> unit
 
   val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit
@@ -255,11 +258,14 @@ struct
         let cod = equate (Env.succ env) ty vcod0 vcod1 in
         Tm.pi (clo_name pi0.cod) dom cod
 
-      | _, Data lbl0, Data lbl1 ->
-        if lbl0 = lbl1 then
-          Tm.make @@ Tm.Data lbl0
+      | _, Data info0, Data info1 ->
+        if info0.lbl = info1.lbl then
+          let lbl = info0.lbl in
+          let desc = Sig.lookup_datatype lbl in
+          let params = equate_data_params env lbl desc.body info0.params info1.params in
+          Tm.make @@ Tm.Data {lbl; params}
         else
-          raise @@ E (UnequalLbl (lbl0, lbl1))
+          raise @@ E (UnequalLbl (info0.lbl, info1.lbl))
 
       | _, Later ltr0, Later ltr1 ->
         let tick = TickGen (`Lvl (None, Env.len env)) in
@@ -355,11 +361,12 @@ struct
           | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
         end
 
-      | Data dlbl, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
-        let desc = V.Sig.lookup_datatype dlbl in
-        let constr = Desc.lookup_constr info0.clbl desc in
-        let tms = equate_constr_args env dlbl constr info0.args info1.args in
-        Tm.make @@ Tm.Intro (dlbl, info0.clbl, tms)
+      | Data data, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
+        let desc = V.Sig.lookup_datatype data.lbl in
+        let params = equate_data_params env data.lbl desc.body data.params data.params in
+        let constr = Desc.lookup_constr info0.clbl @@ Desc.constrs desc in
+        let tms = equate_constr_args env data.lbl data.params constr info0.args info1.args in
+        Tm.make @@ Tm.Intro (data.lbl, info0.clbl, params, tms)
 
       | _ ->
         (* For more readable error messages *)
@@ -368,7 +375,27 @@ struct
         let err = UnequalNf {env; ty; el0; el1} in
         raise @@ E err
 
-  and equate_constr_args env dlbl constr cells0 cells1 =
+  and quote_data_params env dlbl tele cells =
+    equate_data_params env dlbl tele cells cells
+
+  and equate_data_params env dlbl tele cells0 cells1 =
+    let rec go acc tyenv tele cells0 cells1 =
+      match tele, cells0, cells1 with
+      | Desc.TNil _, [], [] ->
+        Bwd.to_list acc
+
+      | Desc.TCons (ty, Tm.B (_, tele)), `Val v0 :: cells0, `Val v1 :: cells1 ->
+        let vty = V.eval tyenv ty in
+        let tm = equate env vty v0 v1 in
+        let tyenv = D.Env.snoc tyenv (`Val v0) in
+        go (acc #< tm) tyenv tele cells0 cells1
+
+      | _ ->
+        failwith "equate_data_params: length mismatch"
+    in
+    go Emp empty_env tele cells0 cells1
+
+  and equate_constr_args env dlbl params constr cells0 cells1 =
     let rec go acc venv specs cells0 cells1 =
       match specs, cells0, cells1 with
       | (_, `Const ty) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
@@ -376,8 +403,8 @@ struct
         let tm0 = equate env vty el0 el1 in
         go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
 
-      | (_, `Rec Desc.Self) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
-        let vty = D.make @@ D.Data dlbl in
+      | (_, `Rec rspec) :: specs, `Val el0 :: cells0, `Val el1 :: cells1 ->
+        let vty = V.realize_rec_spec ~dlbl ~params rspec in
         let tm0 = equate env vty el0 el1 in
         go (acc #< tm0) (D.Env.snoc venv @@ `Val el0) specs cells0 cells1
 
@@ -392,7 +419,7 @@ struct
         failwith "equate_constr_args: argument mismatch"
     in
 
-    go Emp empty_env constr.specs cells0 cells1
+    go Emp (D.Env.append empty_env params) (Desc.Constr.specs constr) cells0 cells1
 
   and equate_neu_ env neu0 neu1 stk =
     match neu0, neu1 with
@@ -485,7 +512,7 @@ struct
     | Elim elim0, Elim elim1 ->
       if elim0.dlbl = elim1.dlbl then
         let dlbl = elim0.dlbl in
-        let data_ty = D.make @@ D.Data dlbl in
+        let data_ty = D.make @@ D.Data {lbl = dlbl; params = elim0.params} in
         let mot =
           let var = generic env data_ty in
           let env' = Env.succ env in
@@ -510,48 +537,49 @@ struct
           let clause1 = find_clause clbl elim1.clauses in
 
 
-          let rec go qenv venv cells_w_ihs cells specs =
+          let rec go qenv tyenv cells_w_ihs cells specs =
             match specs with
             | (_, `Const ty) :: specs ->
-              let vty = V.eval venv ty in
+              let vty = V.eval tyenv ty in
               let v = generic qenv vty in
-              let venv' = D.Env.snoc venv @@ `Val v in
+              let tyenv' = D.Env.snoc tyenv @@ `Val v in
               let qenv' = Env.succ qenv in
-              go qenv' venv' (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
+              go qenv' tyenv' (cells_w_ihs #< (`Val v)) (cells #< (`Val v)) specs
 
-            | (_, `Rec Desc.Self) :: specs ->
-              let vty = D.make @@ D.Data dlbl in
+            | (_, `Rec rspec) :: specs ->
+              let vty = V.realize_rec_spec ~dlbl ~params:elim0.params rspec in
               let v = generic qenv vty in
               let qenv' = Env.succ qenv in
               let vih = generic qenv' @@ V.inst_clo elim0.mot v in
               let qenv'' = Env.succ qenv' in
-              let venv' = D.Env.snoc venv @@ `Val v in
-              go qenv'' venv' (cells_w_ihs <>< [`Val v; `Val vih]) (cells #< (`Val v)) specs
+              let tyenv' = D.Env.snoc tyenv @@ `Val v in
+              go qenv'' tyenv' (cells_w_ihs <>< [`Val v; `Val vih]) (cells #< (`Val v)) specs
 
             | (nm, `Dim) :: specs ->
-              let x = Name.named @@ Some nm in
+              let x = Name.named nm in
               let r = `Atom x in
               let qenv' = Env.abs qenv [x] in
-              let venv' = D.Env.snoc venv @@ `Dim r in
-              go qenv' venv' (cells_w_ihs #< (`Dim r)) (cells #< (`Dim r)) specs
+              let tyenv' = D.Env.snoc tyenv @@ `Dim r in
+              go qenv' tyenv' (cells_w_ihs #< (`Dim r)) (cells #< (`Dim r)) specs
 
             | [] ->
               qenv, Bwd.to_list cells_w_ihs, Bwd.to_list cells
           in
 
-          let env', cells_w_ihs, cells = go env empty_env Emp Emp Desc.(constr.specs) in
+          let env', cells_w_ihs, cells = go env (D.Env.append empty_env elim0.params) Emp Emp @@ Desc.Constr.specs constr in
 
           let bdy0 = inst_nclo clause0 cells_w_ihs in
           let bdy1 = inst_nclo clause1 cells_w_ihs in
-          let intro = make_intro empty_env ~dlbl ~clbl cells in
+          let intro = make_intro ~dlbl ~params:elim0.params ~clbl cells in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           let nms = Bwd.from_list @@ List.map (fun _ -> None) cells_w_ihs in
           clbl, Tm.NB (nms, tbdy)
         in
 
-        let clauses = List.map quote_clause desc.constrs in
-        let frame = Tm.Elim {dlbl; mot; clauses} in
+        let params = equate_data_params env dlbl desc.body elim0.params elim1.params in
+        let clauses = List.map quote_clause @@ Desc.constrs desc in
+        let frame = Tm.Elim {dlbl; mot; clauses; params} in
         equate_neu_ env elim0.neu elim1.neu @@ frame :: stk
       else
         failwith "Datatype mismatch"
@@ -767,6 +795,9 @@ struct
 
   let equiv_ty env ty0 ty1 =
     ignore @@ equate_ty env ty0 ty1
+
+  let equiv_data_params env dlbl tele cells0 cells1 =
+    ignore @@ equate_data_params env dlbl tele cells0 cells1
 
   let equiv_dim env r0 r1 =
     ignore @@ equate_dim env r0 r1

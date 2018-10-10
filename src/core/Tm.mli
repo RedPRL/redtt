@@ -3,7 +3,6 @@ include module type of TmData
 
 
 type tm
-type data_desc = tm Desc.desc
 
 module Error :
 sig
@@ -41,6 +40,8 @@ val bind_ext : Name.t bwd -> tm -> (tm, tm) system -> (tm * (tm, tm) system) nbn
 
 val unbind_with : tm cmd -> tm bnd -> tm
 val unbindn_with : tm cmd list -> tm nbnd -> tm
+
+val lift : tm cmd subst -> tm cmd subst
 
 val subst : tm cmd subst -> tm -> tm
 val subst_cmd : tm cmd subst -> tm cmd -> tm cmd

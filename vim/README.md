@@ -6,20 +6,34 @@ This vim plugin requires Vim 8 (released September 2016).
 
 While editing a .red file, run `:Redtt` or `<LocalLeader>l` (`l` for `load`) in
 the command (normal) mode to check the current buffer and display the output in
-a separate buffer.
+a separate buffer. Run `<LocalLeader>p` (`p` for `partial`) to check the current
+buffer, ignoring lines below the cursor's current position.
 
-If there are any syntax errors, the cursor will jump to the first one.
+### Typing special characters
+
+`redtt` uses several unicode characters in its concrete notation; each of these
+can be typed easily in the Vim mode using the `digraph` feature; alternatively,
+they replaced with ASCII equivalents.
+
+| Char | Digraph   | ASCII |
+|------|-----------|-------|
+| 𝕀    | `C-k II`  | `dim` |
+| ⊢    | `C-k !-`  | `!-`  |
+| ⦉    | `C-k <:`  | `<:`  |
+| ⦊    | `C-k :>`  | `:>`  |
+| «    | `C-k <<`  | `<<`  |
+| »    | `C-k >>`  | `>>`  |
+| λ    | `C-k *l`  | `\`   |
+| →    | `C-k ->`  | `->`  |
 
 ## Setup
 
-Copy (or symlink) this directory to `~/.vim/pack/foo/start/vim-redtt`. (The
-names `foo` and `vim-redtt` don't matter.)
+This plugin is compatible with Vim 8's package system. You can (re)install it by
+running the following shell command from the current directory:
 
-If `redtt` is not in your `PATH`, add the following line to your `.vimrc`:
+    ./install.sh
 
-    let g:redtt_path = '/path/to/redtt'
+If the `redtt` binary is not in your `PATH`, add the following line to your
+`.vimrc`:
 
-If you want to recheck the current buffer with another key combination, add the
-following line to your `.vimrc`, replacing `<F5>` as appropriate:
-
-    au FileType redtt nnoremap <F5> :Redtt<CR>
+    let g:redtt_path = '/path/to/the-redtt-binary'
