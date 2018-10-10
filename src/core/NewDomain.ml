@@ -2085,7 +2085,7 @@ struct
 
     | Univ _ as ty -> rigid_hcom rel r r' ~ty ~cap ~sys
 
-    | V _ | HCom {ty = `Pos; _} -> expand_rigid_com rel r r' ~abs ~cap ~sys
+    | V _ | HCom {ty = `Pos; _} | Data _ -> expand_rigid_com rel r r' ~abs ~cap ~sys
 
     | Neu _ -> expand_rigid_com rel r r' ~abs ~cap ~sys (* really too complicated *)
 
