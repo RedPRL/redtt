@@ -1701,6 +1701,14 @@ struct
     | _ ->
       raise PleaseRaiseProperError
 
+
+  and rigid_multi_coe r r' data_abs args =
+    let Abs (x, ty) = data_abs in
+    (* Is there a way to write this code where I don't need to look up the argument specs in the signature? I hope so...
+       Otherwise, I need to thrad the global environment through too much stuff.
+    *)
+    raise CanJonHelpMe
+
   (* TODO: pass the data-info pre-extracted *)
   and rigid_coe_nonstrict_data rel r r' ~abs cap =
     let Abs (x, tyx) = abs in
