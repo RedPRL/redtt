@@ -32,10 +32,6 @@ type 'a tmf =
 
   | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
 
-  (* Labelled types from Epigram *)
-  | LblTy of {lbl : string; args : ('a * 'a) list; ty : 'a}
-  | LblRet of 'a
-
   | Later of 'a bnd
   | Next of 'a bnd
 
@@ -67,7 +63,6 @@ and 'a frame =
   | ExtApp of 'a list
   | VProj of {r : 'a; func : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
-  | LblCall
   | RestrictForce
   | Prev of 'a
 

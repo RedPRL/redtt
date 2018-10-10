@@ -38,7 +38,6 @@ sig
 
   val do_fst : value -> value
   val do_snd : value -> value
-  val lbl_call : value -> value
   val restriction_force : value -> value
 
   val rigid_vproj : atom -> func:value -> el:value -> value
@@ -55,7 +54,6 @@ sig
   val unleash_v : value -> atom * value * value * value
   val unleash_later : value -> tick_clo
   val unleash_ext_with : value -> dim list -> value * val_sys
-  val unleash_lbl_ty : value -> string * nf list * value
   val unleash_restriction_ty : value -> val_face
 
 

@@ -327,18 +327,6 @@ let rec check_ cx ty rst tm =
     check_fhcom cx ty info.r info.r' info.cap info.sys
 
 
-  | [], D.Univ _, T.LblTy info ->
-    check cx ty info.ty;
-    let go_arg (ty, tm) =
-      let vty = check_eval_ty cx ty in
-      check cx vty tm
-    in
-    List.iter go_arg info.args
-
-  | [], D.LblTy info, T.LblRet t ->
-    let rst' = List.map (Face.map (fun _ _ -> V.lbl_call)) rst in
-    check_ cx info.ty rst' t
-
   | [], D.V vty, T.VIn vin ->
     let r = check_eval_dim cx vin.r in
     begin
@@ -826,11 +814,6 @@ and infer_spine_ cx hd sp =
       Cx.check_eq_ty cx fhcom_ty ih.ty;
       D.{el = Cx.eval_frame cx ih.el frm; ty = Cx.eval cx info.ty}
 
-
-    | T.LblCall ->
-      let ih = infer_spine_ cx hd sp in
-      let _, _, ty = V.unleash_lbl_ty ih.ty in
-      D.{el = Cx.eval_frame cx ih.el frm; ty}
 
     | Tm.RestrictForce ->
       let ih = infer_spine_ cx hd sp in

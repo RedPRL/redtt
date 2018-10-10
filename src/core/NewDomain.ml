@@ -358,12 +358,6 @@ struct
       let sys = eval_tm_sys rel env info.sys in
       Con.make_box rel r r' ~cap ~sys
 
-    | Tm.LblTy _ ->
-      raise PleaseFillIn
-
-    | Tm.LblRet _ ->
-      raise PleaseFillIn
-
     | Tm.Later _ ->
       raise CanJonHelpMe
     | Tm.Next _ ->
@@ -1310,8 +1304,8 @@ struct
     | V {ty0; ty1; _}, VProj info ->
       let arr_ty = Val.make @@
         let env = Env.init_isolated
-          [Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty0 end);
-           Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty1 end)]
+            [Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty0 end);
+             Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty1 end)]
         in
         Syn.eval rel env @@
         Tm.arr (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
@@ -1429,7 +1423,7 @@ struct
       let func = Val.plug rel0 ~rigid:true Fst info.equiv in
       let vproj_frame = VProj {r = s; func = {ty = None; value = func}} in
       let hcom0 r' = make_hcom rel0 r r' ~ty:(Val.unleash info.ty0)
-        ~cap:(Val.run rel0 cap) ~sys:(ConAbsSys.run rel0 sys) in
+          ~cap:(Val.run rel0 cap) ~sys:(ConAbsSys.run rel0 sys) in
       let el0 = Val.make @@ hcom0 r' in
       let el1 = Val.make @@
         let cap = Val.plug rel ~rigid:true vproj_frame cap in
@@ -1453,10 +1447,10 @@ struct
 
       (* This is essentially C_M in [F]. *)
       let cap_frame = Cap
-        {r = fhcom.r;
-         r' = fhcom.r';
-         ty = fhcom.cap;
-         sys = fhcom.sys}
+          {r = fhcom.r;
+           r' = fhcom.r';
+           ty = fhcom.cap;
+           sys = fhcom.sys}
       in
 
       (* This serves as `O` and the diagonal face in [F]
@@ -1499,8 +1493,8 @@ struct
 
     | Neu info ->
       let neu = DelayedNeu.make
-        {head = NHCom {r; r'; ty = info.neu; cap; sys};
-         frames = Emp}
+          {head = NHCom {r; r'; ty = info.neu; cap; sys};
+           frames = Emp}
       in
       let neu_sys =
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
@@ -1615,10 +1609,10 @@ struct
             let fiber0_ty =
               let func_x0 = Val.plug_then_unleash rel ~rigid:true Fst equiv_x0 in
               let env = Env.init_isolated
-                [Val (LazyVal.make base);
-                 Val (LazyVal.make func_x0);
-                 Val (LazyVal.make ty1_x0);
-                 Val (LazyVal.make ty0_x0)]
+                  [Val (LazyVal.make base);
+                   Val (LazyVal.make func_x0);
+                   Val (LazyVal.make ty1_x0);
+                   Val (LazyVal.make ty0_x0)]
               in
               let var i = Tm.up @@ Tm.ix i in
               Syn.eval rel env @@ Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
@@ -1698,10 +1692,10 @@ struct
 
       (* this lives in G+x*)
       let cap_frame_x = Cap
-        {r = fhcom.r;
-         r' = fhcom.r';
-         ty = fhcom.cap;
-         sys = fhcom.sys}
+          {r = fhcom.r;
+           r' = fhcom.r';
+           ty = fhcom.cap;
+           sys = fhcom.sys}
       in
 
       (* in G *)
@@ -1711,10 +1705,10 @@ struct
       let s'_xr' = Dim.subst r' x s'_x in
 
       (* This is O in {b SVO, F}, living in G.
-        
+
          The purpose of O is to make sure that, when r=r', we can recover the coercee
          after the long journey detailed below.
-        
+
          @param rel this should be [Rel.equate' r r' rel]
          @param z_dest the destination in the fhcom direction. *)
       let origin rel z_dest =
@@ -1732,7 +1726,7 @@ struct
         in
         make_hcom rel s'_xr z_dest ~ty ~cap:new_cap ~sys
       in
-      
+
       (* This corresponds to N in {b F}, representing the coherence conditions enforced by `fhcom.sys`
        * that are apart from `x`. Be careful! The invariant of this function is extremely tricky!
        *
@@ -1769,10 +1763,10 @@ struct
         let new_cap = Val.make @@ origin rel s_xr in
         let sys =
           let diag = ConAbsSys.forall x [
-            s_x, s'_x,
-            LazyValAbs.bind @@ fun y ->
-            let rel = Rel.equate' s_x s'_x rel in
-            make_coe rel r y ~abs:(ConAbs.run rel capty_abs) (Val.run rel coe_cap)
+              s_x, s'_x,
+              LazyValAbs.bind @@ fun y ->
+              let rel = Rel.equate' s_x s'_x rel in
+              make_coe rel r y ~abs:(ConAbs.run rel capty_abs) (Val.run rel coe_cap)
             ]
           in
           let apart_faces =
@@ -1804,7 +1798,7 @@ struct
             r, r',
             LazyValAbs.make_from_lazy @@ lazy begin
               let rel = Rel.equate' r r' rel in
-              Abs (y, recovery_apart_core rel r (`Atom y) abs_x) 
+              Abs (y, recovery_apart_core rel r (`Atom y) abs_x)
             end
           in
           let apart_faces =
@@ -1836,8 +1830,8 @@ struct
             let absj_x = LazyValAbs.unleash absj_x in
             recovery_general_core rel s'' absj_x
           end
-      in  
- 
+      in
+
       (* This is the "cap" part of the final request in [F, SVO].
        *
        * Using Q, the preimages, this is to calculate the final cap based on the naive cap.
@@ -1875,8 +1869,8 @@ struct
 
     | Neu info ->
       let neu = DelayedNeu.make
-        {head = NCoe {r; r'; ty = Abs (x, info.neu); cap};
-         frames = Emp}
+          {head = NCoe {r; r'; ty = Abs (x, info.neu); cap};
+           frames = Emp}
       in
       let ty = Val.make_then_run rel (Con.subst r' x tyx) in
       let sys =
@@ -2045,17 +2039,17 @@ and LazyVal : DelayedDomainPlug
   = DelayedLazyPlug (Con)
 
 and LazyValAbs :
-  sig
-    include DelayedDomainPlug
-      with type u = con abs
-       and type t = con abs Lazy.t Delayed.t
-    val bind : (dim -> con) -> t
-  end =
-  struct
-    module ConAbs = AbsPlug (Con)
-    include DelayedLazyPlug (ConAbs)
-    let bind gen = make_from_lazy @@ lazy begin ConAbs.bind gen end
-  end
+sig
+  include DelayedDomainPlug
+    with type u = con abs
+     and type t = con abs Lazy.t Delayed.t
+  val bind : (dim -> con) -> t
+end =
+struct
+  module ConAbs = AbsPlug (Con)
+  include DelayedLazyPlug (ConAbs)
+  let bind gen = make_from_lazy @@ lazy begin ConAbs.bind gen end
+end
 
 (** A [coe_shape] is a value when its component is. *)
 and CoeShape : Domain with type t = coe_shape =

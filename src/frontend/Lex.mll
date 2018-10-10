@@ -72,7 +72,6 @@ module Make (R : SOURCE) : LEXER = struct
       ("prev", PREV);
       ("dfix", DFIX);
       ("fix", FIX);
-      ("call", CALL);
       ("refl", REFL);
       ("pre", PRE);
       ("kan", KAN);

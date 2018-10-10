@@ -75,21 +75,6 @@ and pp_con fmt : con -> unit =
   | Box info ->
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(box %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.cap pp_val_sys info.sys
-  | LblTy {lbl; args; ty} ->
-    begin
-      match args with
-      | [] ->
-        Format.fprintf fmt "{%a : %a}"
-          Uuseg_string.pp_utf_8 lbl
-          pp_value ty
-      | _ ->
-        Format.fprintf fmt "{%a %a : %a}"
-          Uuseg_string.pp_utf_8 lbl
-          pp_nfs args
-          pp_value ty
-    end
-  | LblRet v ->
-    Format.fprintf fmt "@[<1>(ret %a)@]" pp_value v
   | Later _clo ->
     Format.fprintf fmt "<later>"
   | Next _clo ->
@@ -239,9 +224,6 @@ and pp_neu fmt neu =
       Name.pp info.x
       pp_neu info.neu
       pp_nf info.func
-
-  | LblCall neu ->
-    Format.fprintf fmt "@[<1>(call %a)@]" pp_neu neu
 
   | RestrictForce neu ->
     Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
@@ -448,10 +430,6 @@ struct
       let neu = act phi info.neu in
       let params = List.map (Env.act_env_el phi) info.params in
       Elim {dlbl = info.dlbl; params; mot; neu; clauses}
-
-    | LblCall neu ->
-      let neu = act phi neu in
-      LblCall neu
 
     | RestrictForce neu ->
       let neu = act phi neu in
