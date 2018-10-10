@@ -104,7 +104,7 @@ type con =
 
   | FortyTwo (* a dummy filler to signal that something might be terribly wrong *)
 
-  | Data of {lbl : string; params : cell list}
+  | Data of {lbl : string; strict : bool; params : cell list}
   | Intro of {dlbl : string; clbl : string; args : constr_cell list; sys : con sys}
 
 
@@ -381,11 +381,13 @@ struct
       raise CanJonHelpMe
 
     | Tm.Data info ->
+      let desc = GlobalEnv.lookup_datatype info.lbl env.globals in
+      let strict = Desc.is_strict_set desc in
       let params =
         flip List.map info.params @@ fun t ->
         Val (Delayed.make @@ lazy (eval rel env t))
       in
-      Data {lbl = info.lbl; params}
+      Data {lbl = info.lbl; strict; params}
 
     | Tm.Intro (dlbl, clbl, params, args) ->
       let desc = GlobalEnv.lookup_datatype dlbl env.globals in
@@ -948,6 +950,7 @@ struct
     | Data info ->
       Data
         {lbl = info.lbl;
+         strict = info.strict;
          params = List.map (Cell.swap pi) info.params}
 
     | Intro info ->
@@ -1065,6 +1068,7 @@ struct
     | Data info ->
       Data
         {lbl = info.lbl;
+         strict = info.strict;
          params = List.map (Cell.subst r x) info.params}
 
     | Intro info ->
@@ -1233,6 +1237,7 @@ struct
     | Data info ->
       Data
         {lbl = info.lbl;
+         strict = info.strict;
          params = List.map (Cell.run rel) info.params}
 
     | Intro info ->
@@ -1696,7 +1701,10 @@ struct
     | Univ _ ->
       Val.unleash cap
 
-    | Data _ ->
+    | Data info when info.strict ->
+      Val.unleash cap
+
+    | Data info ->
       raise CanJonHelpMe
 
     | V info ->
