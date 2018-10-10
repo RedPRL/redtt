@@ -112,10 +112,11 @@ struct
         eval_cmd c >>= function
         | E.SemClo (env, x, c) ->
           with_mlenv (fun _ -> E.Env.set x v env) @@ eval_cmd c
-        | E.SemElabClo e ->
+        | E.SemElabClo (env, e) ->
           begin
             match v with
             | E.SemTuple [E.SemTerm ty; E.SemSys sys] ->
+              with_mlenv (fun _ -> env) @@
               elab_chk e {ty; sys} >>= fun tm ->
               M.ret @@ E.SemRet (E.SemTerm tm)
             | _ ->
@@ -126,7 +127,8 @@ struct
       end
 
     | E.MlElab e ->
-      M.ret @@ E.SemElabClo e
+      C.get_mlenv >>= fun env ->
+      M.ret @@ E.SemElabClo (env, e)
 
     | E.MlElabWithScheme (scheme, e) ->
       elab_scheme scheme >>= fun (names, ty) ->

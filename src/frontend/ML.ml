@@ -42,7 +42,7 @@ and mlcmd =
 and semcmd =
   | SemRet of semval
   | SemClo of mlenv * mlname * mlcmd
-  | SemElabClo of eterm
+  | SemElabClo of mlenv * eterm
 
 and semval =
   | SemDataDesc of Desc.desc
