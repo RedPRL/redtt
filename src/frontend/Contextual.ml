@@ -9,7 +9,8 @@ type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 module Map = Map.Make (Name)
 
 type env = GlobalEnv.t
-type cx = {env : env; resenv : ResEnv.t; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
+type cx = {mlenv : ML.mlenv; env : env; resenv : ResEnv.t; info : [`Flex | `Rigid] Map.t; lcx : lcx; rcx : rcx}
+
 
 let rec pp_lcx fmt =
   function
@@ -110,6 +111,13 @@ let modifyr f = modify @@ fun st -> {st with rcx = f st.rcx}
 let setl l = modifyl @@ fun _ -> l
 let setr r = modifyr @@ fun _ -> r
 
+let modify_mlenv f =
+  modify @@ fun st ->
+  {st with mlenv = f st.mlenv}
+
+let get_mlenv = get <<@> fun st -> st.mlenv
+
+
 let update_env e =
   modify @@ fun st ->
   match e with
@@ -163,14 +171,14 @@ let pushr e =
   update_env e
 
 let run (m : 'a m) : 'a  =
-  let _, r = m Emp {lcx = Emp; resenv = ResEnv.init (); env = GlobalEnv.emp (); info = Map.empty; rcx = []} in
+  let _, r = m Emp {lcx = Emp; resenv = ResEnv.init (); mlenv = ML.Env.init ~size:100; env = GlobalEnv.emp (); info = Map.empty; rcx = []} in
   r
 
 
 let isolate (m : 'a m) : 'a m =
   fun ps st ->
     let st', a = m ps {st with lcx = Emp; rcx = []} in
-    {env = st'.env; resenv = st'.resenv; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; info = st'.info}, a
+    {env = st'.env; mlenv = st'.mlenv; resenv = st'.resenv; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx; info = st'.info}, a
 
 let rec pushls es =
   match es with
@@ -401,3 +409,16 @@ let under_restriction r0 r1 m =
     with
     | I.Inconsistent ->
       ret None
+
+let get_unsolved_holes =
+  getl <<@> fun lcx ->
+    Bwd.filter Entry.is_incomplete lcx
+
+
+let report_unsolved ~loc =
+  get_unsolved_holes <<@> Bwd.length <<@> fun n ->
+    if n > 0 then
+      begin
+        let pp fmt () = Format.fprintf fmt "%i unsolved holes" n in
+        Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
+      end

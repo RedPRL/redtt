@@ -39,14 +39,18 @@ module Make (R : SOURCE) : LEXER = struct
     make_table 0 [
       ("V", V);
       ("opaque", OPAQUE);
+      ("print", PRINT);
+      ("check", CHECK);
       ("quit", QUIT);
       ("in", IN);
       ("with", WITH);
       ("where", WHERE);
       ("data", DATA);
+      ("begin", BEGIN);
       ("end", END);
       ("tick", TICK);
       ("✓", TICK);
+      ("meta", META);
       ("dim", DIM);
       ("𝕀", DIM);
       ("⊢", RIGHT_TACK);
@@ -61,6 +65,8 @@ module Make (R : SOURCE) : LEXER = struct
       ("vproj", VPROJ);
       ("vin", VIN);
       ("let", LET);
+      ("fun", FUN);
+      ("def", DEF);
       ("lam", LAM);
       ("next", NEXT);
       ("prev", PREV);
@@ -114,6 +120,24 @@ rule token = parse
     { Lwt.return RBR }
   | '#'
     { Lwt.return HASH }
+  | "⦉"
+    { Lwt.return LTR }
+  | "⦊"
+    { Lwt.return RTR }
+  | "<:"
+    { Lwt.return LTR }
+  | ":>"
+    { Lwt.return RTR }
+  | "«"
+    { Lwt.return LLGL }
+  | "<<"
+    { Lwt.return LLGL }
+  | "»"
+    { Lwt.return RRGL }
+  | ">>"
+    { Lwt.return RRGL }
+  | '!'
+    { Lwt.return BANG }
   | '@'
     { Lwt.return AT }
   | '`'
@@ -156,6 +180,8 @@ rule token = parse
     { Lwt.return LAM }
   | "\\"
     { Lwt.return LAM }
+  | '"'
+    { read_string (Buffer.create 17) lexbuf }
   | line_ending
     { new_line lexbuf; token lexbuf }
   | whitespace
@@ -201,8 +227,31 @@ and block_comment = parse
     { match BlockComment.pop () with
       | `Token -> token lexbuf
       | `Comment -> block_comment lexbuf }
+  | line_ending
+    { new_line lexbuf; block_comment lexbuf }
   | _
     { block_comment lexbuf }
+
+
+(* from https://v1.realworldocaml.org/v1/en/html/parsing-with-ocamllex-and-menhir.html *)
+and read_string buf =
+  parse
+  | '"'       { Lwt.return @@ STRING (Buffer.contents buf) }
+  | '\\' '/'  { Buffer.add_char buf '/'; read_string buf lexbuf }
+  | '\\' '\\' { Buffer.add_char buf '\\'; read_string buf lexbuf }
+  | '\\' 'b'  { Buffer.add_char buf '\b'; read_string buf lexbuf }
+  | '\\' 'f'  { Buffer.add_char buf '\012'; read_string buf lexbuf }
+  | '\\' 'n'  { Buffer.add_char buf '\n'; read_string buf lexbuf }
+  | '\\' 'r'  { Buffer.add_char buf '\r'; read_string buf lexbuf }
+  | '\\' 't'  { Buffer.add_char buf '\t'; read_string buf lexbuf }
+  | [^ '"' '\\']+
+    { Buffer.add_string buf (Lexing.lexeme lexbuf);
+      read_string buf lexbuf
+    }
+  | _ { failwith (("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
+  | eof { failwith ("String is not terminated") }
+
+
 
 {
 end (* LEXER *)

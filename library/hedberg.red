@@ -4,22 +4,22 @@ import or
 import connection
 import ntype
 
-let stable (A : type) : type =
+def stable (A : type) : type =
   neg (neg A) → A
 
-let dec (A : type) : type =
+def dec (A : type) : type =
   or A (neg A)
 
-let discrete (A : type) : type =
+def discrete (A : type) : type =
   (x y : A) → dec (path A x y)
 
-let dec→stable (A : type) : dec A → stable A =
+def dec→stable (A : type) : dec A → stable A =
   elim [
   | inl a → λ _ → a
   | inr f → λ g → elim (g f) []
   ]
 
-let neg/is-prop-over (A : dim → type)
+def neg/is-prop-over (A : 𝕀 → type)
   : is-prop-over (λ i → neg (A i))
   =
   λ c c' i a →
@@ -30,15 +30,15 @@ let neg/is-prop-over (A : dim → type)
 
 
 -- Hedberg's theorem for stable path types
-let paths-stable→set (A : type) (st : (x y : A) → stable (path A x y)) : is-set A =
+def paths-stable→set (A : type) (st : (x y : A) → stable (path A x y)) : is-set A =
   λ a b p q i j →
-  let square (k m : dim) : A =
+  let square (k m : 𝕀) : A =
     comp 0 k a [
     | m=0 → p
     | m=1 → q
     ]
   in
-  let cap (k m : dim) = st (p k) (q k) (λ c → c (square k)) m in
+  let cap (k m : 𝕀) = st (p k) (q k) (λ c → c (square k)) m in
   comp 0 1 (cap j i) [
   | i=0 k →
     st (p j) (p j)
@@ -52,5 +52,5 @@ let paths-stable→set (A : type) (st : (x y : A) → stable (path A x y)) : is-
   ]
 
 -- Hedberg's theorem for decidable path types
-let discrete→set (A : type) (d : discrete A) : is-set A =
+def discrete→set (A : type) (d : discrete A) : is-set A =
   paths-stable→set A (λ x y → dec→stable (path A x y) (d x y))

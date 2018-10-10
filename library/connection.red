@@ -1,8 +1,8 @@
 import path
 
-let connection/or
+def connection/or
   (A : type)
-  (p : dim → A)
+  (p : 𝕀 → A)
   : [i j] A [
     | j=0 → p i
     | i=0 → p j
@@ -15,7 +15,7 @@ let connection/or
      we can define using line types all the faces of the composition at once.
      definitional equivalence kicks in to make this work.
   -/
-  let face (l k : dim) : A =
+  let face (l k : 𝕀) : A =
     comp 1 l (p 1) [
     | k=1 → refl
     | k=0 → p
@@ -28,9 +28,9 @@ let connection/or
   | i=j → face i
   ]
 
-let connection/and
+def connection/and
   (A : type)
-  (p : dim → A)
+  (p : 𝕀 → A)
   : [i j] A [
     | j=0 | i=0 → p 0
     | j=1 → p i
@@ -39,7 +39,7 @@ let connection/and
     ]
   =
   λ i j →
-  let face (l k : dim) : A =
+  let face (l k : 𝕀) : A =
     comp 0 l (p 0) [
     | k=0 → refl
     | k=1 → p
@@ -52,9 +52,9 @@ let connection/and
   | i=j → face i
   ]
 
-let connection/both
+def connection/both
   (A : type)
-  (p : dim → A) (q : [k] A [k=0 → p 1])
+  (p : 𝕀 → A) (q : [k] A [k=0 → p 1])
   : [i j] A [
     | i=0 → p j
     | i=1 → q j
@@ -63,13 +63,13 @@ let connection/both
     ]
   =
   λ i j →
-  let pface (m k : dim) : A =
+  let pface (m k : 𝕀) : A =
     comp 1 m (p k) [
     | k=0 → refl
     | k=1 → p
     ]
   in
-  let qface (m k : dim) : A =
+  let qface (m k : 𝕀) : A =
     comp 0 m (p k) [
     | k=0 → refl
     | k=1 → q
@@ -82,9 +82,9 @@ let connection/both
   | j=1 → qface i
   ]
 
-let weak-connection/or
+def weak-connection/or
   (A : type)
-  (p : dim → A)
+  (p : 𝕀 → A)
   : [i j] A [
     | i=0 → p j
     | j=0 → p i
@@ -92,7 +92,7 @@ let weak-connection/or
     ]
   =
   λ i j →
-  let face (l k : dim) : A =
+  let face (l k : 𝕀) : A =
     comp 1 l (p 1) [
     | k=1 → refl
     | k=0 → p
@@ -104,9 +104,9 @@ let weak-connection/or
   | i=1 | j=1 → refl
   ]
 
-let weak-connection/and
+def weak-connection/and
   (A : type)
-  (p : dim → A)
+  (p : 𝕀 → A)
   : [i j] A [
     | i=0 | j=0 → p 0
     | i=1 → p j
@@ -114,7 +114,7 @@ let weak-connection/and
     ]
   =
   λ i j →
-  let face (l k : dim) : A =
+  let face (l k : 𝕀) : A =
     comp 0 l (p 0) [
     | k=0 → refl
     | k=1 → p

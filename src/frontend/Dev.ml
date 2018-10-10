@@ -450,6 +450,11 @@ struct
     | Defn (`Transparent, t) -> Tm.free fl t
     | Defn (`Opaque, _) -> Occurs.Set.empty
     | Guess {tm; _} -> Tm.free fl tm
+
+  let is_incomplete =
+    function
+    | Hole _ | Guess _ -> true
+    | Defn _ -> false
 end
 
 
@@ -510,6 +515,11 @@ struct
   type t = entry
 
   let pp = pp_entry
+
+  let is_incomplete =
+    function
+    | E (_, _, d) -> Decl.is_incomplete d
+    | Q (_, _) -> true
 
   let free fl =
     function

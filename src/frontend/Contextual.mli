@@ -8,6 +8,9 @@ val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
+val modify_mlenv : (ML.mlenv -> ML.mlenv) -> unit m
+val get_mlenv : ML.mlenv m
+
 val resolver : ResEnv.t m
 val declare_datatype : string -> Desc.desc -> unit m
 
@@ -52,3 +55,6 @@ val base_cx : Cx.t m
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 
 val run : 'a m -> 'a
+
+
+val report_unsolved : loc:Log.location -> unit m
