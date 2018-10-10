@@ -1,3 +1,8 @@
+let is_nil =
+  function
+  | [] -> true
+  | _ -> false
+
 let rec split n xs =
   match n, xs with
   | 0, _ ->

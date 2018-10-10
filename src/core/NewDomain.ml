@@ -137,6 +137,7 @@ and head =
   | Var of {name : Name.t; twin : Tm.twin; ushift : int}
   | Meta of {name : Name.t; ushift : int}
   | NCoe of {r : dim; r' : dim; ty : neutroid abs; cap : value}
+  | NCoeData of {r : dim; r' : dim; ty : con abs; cap : neutroid}
   | NHCom of {r : dim; r' : dim; ty : neutroid; cap : value; sys : con abs sys}
 
 and frame =
@@ -1685,8 +1686,34 @@ struct
     | _ ->
       raise PleaseRaiseProperError
 
+  (* TODO: pass the data-info pre-extracted *)
+  and rigid_coe_nonstrict_data rel r r' ~abs cap =
+    let Abs (x, tyx) = abs in
+    match tyx, Val.unleash cap with
+    | Data data, Intro intro ->
+      raise CanJonHelpMe
+
+    | Data data, Neu neu ->
+      raise CanJonHelpMe
+
+    | Data _, HCom info ->
+      let cap = Delayed.make @@ rigid_coe rel r r' ~abs info.cap in
+      let sys =
+        ConAbsSys.foreach_gen info.sys @@ fun s s' abs' ->
+        let rel_ss' = Rel.equate' s s' rel in
+        ConAbs.bind @@ fun y ->
+        make_coe rel_ss' r r' ~abs:(ConAbs.run rel_ss' abs) @@
+        Delayed.make @@ ConAbs.inst rel_ss' abs' y
+      in
+      make_fhcom rel info.r info.r' ~cap ~sys
+
+    | _ ->
+      raise PleaseRaiseProperError
+
+
   (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
   and rigid_coe rel r r' ~abs cap : con =
+    (* TODO: is this safe? why aren't we needing to freshen? *)
     let Abs (x, tyx) = abs in
     match tyx with
     | Sg quant ->
@@ -1701,11 +1728,11 @@ struct
     | Univ _ ->
       Val.unleash cap
 
-    | Data info when info.strict ->
+    | Data info when info.strict || ListUtil.is_nil info.params ->
       Val.unleash cap
 
     | Data info ->
-      raise CanJonHelpMe
+      rigid_coe_nonstrict_data rel r r' ~abs cap
 
     | V info ->
       let atom_info_r = match info.r with `Atom x -> x | _ -> raise PleaseRaiseProperError in
@@ -2047,7 +2074,8 @@ struct
       make_box rel s_xr' s'_xr' ~cap:coerced_cap ~sys:(recovery_general_sys rel s'_xr')
 
     | Neu info ->
-      let neu = DelayedNeu.make
+      let neu =
+        DelayedNeu.make
           {head = NCoe {r; r'; ty = Abs (x, info.neu); cap};
            frames = Emp}
       in
@@ -2382,7 +2410,8 @@ struct
   type t = head
 
   module NeutroidAbs = Abs (Neutroid)
-  module ConAbsSys = Sys (AbsPlug (Con))
+  module ConAbs = AbsPlug (Con)
+  module ConAbsSys = Sys (ConAbs)
 
   let swap pi =
     function
@@ -2393,6 +2422,13 @@ struct
          r' = Dim.swap pi info.r';
          ty = NeutroidAbs.swap pi info.ty;
          cap = Val.swap pi info.cap}
+
+    | NCoeData info ->
+      NCoeData
+        {r = Dim.swap pi info.r;
+         r' = Dim.swap pi info.r';
+         ty = ConAbs.swap pi info.ty;
+         cap = Neutroid.swap pi info.cap}
     | NHCom info ->
       NHCom
         {r = Dim.swap pi info.r;
@@ -2410,6 +2446,12 @@ struct
          r' = Dim.run rel info.r';
          ty = NeutroidAbs.run rel info.ty;
          cap = Val.run rel info.cap}
+    | NCoeData info ->
+      NCoeData
+        {r = Dim.run rel info.r;
+         r' = Dim.run rel info.r';
+         ty = ConAbs.run rel info.ty;
+         cap = Neutroid.run rel info.cap}
     | NHCom info ->
       NHCom
         {r = Dim.run rel info.r;
@@ -2427,6 +2469,12 @@ struct
          r' = Dim.subst r x info.r';
          ty = NeutroidAbs.subst r x info.ty;
          cap = Val.subst r x info.cap}
+    | NCoeData info ->
+      NCoeData
+        {r = Dim.subst r x info.r;
+         r' = Dim.subst r x info.r';
+         ty = ConAbs.subst r x info.ty;
+         cap = Neutroid.subst r x info.cap}
     | NHCom info ->
       NHCom
         {r = Dim.subst r x info.r;
