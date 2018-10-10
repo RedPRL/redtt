@@ -1460,6 +1460,9 @@ struct
     | HCom {ty = `Pos; cap; _}, Cap _ ->
       frm, Val.unleash cap, []
 
+    | Data _, Elim elim ->
+      frm, Clo.inst rel elim.mot (Val (LazyVal.make hd)), []
+
     | _ ->
       raise PleaseRaiseProperError
 
