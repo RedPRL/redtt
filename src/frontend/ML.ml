@@ -234,7 +234,7 @@ and pp_semval fmt =
     let pp_cells = Format.pp_print_list ~pp_sep:comma pp_semval in
     Format.fprintf fmt "@[<hv1><%a>@]" pp_cells vs
   | SemString str ->
-    Format.fprintf fmt "'%a'" Uuseg_string.pp_utf_8 str
+    Format.fprintf fmt "\"%a\"" Uuseg_string.pp_utf_8 str
   | SemFloat x ->
     Format.fprintf fmt "%f" x
 

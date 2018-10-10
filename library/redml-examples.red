@@ -14,6 +14,8 @@ meta ⦉
   let mytac = {
     -- Using the braces {} we have opened a thunk
 
+    print "foo! α☆β";
+
     fun tac →
     « -- inside these brackets, we are using the redtt term notation;
       -- we use the redtt tactic to introduce a sigma type, and then fill

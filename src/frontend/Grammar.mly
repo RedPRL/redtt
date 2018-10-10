@@ -33,6 +33,7 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
+%token <string> STRING
 %token <string option> HOLE_NAME
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR LTR RTR LLGL RRGL
 %token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY BANG
@@ -375,11 +376,10 @@ mlcmd:
   | FUN; a = ATOM; RIGHT_ARROW; c = mlcmd
     { E.MlLam (`User a, c) }
 
-
-  | CHECK; tm = mlvalue; COLON; ty = mlvalue
+  | CHECK; tm = mlval; COLON; ty = mlval
     { E.MlCheck {ty; tm} }
 
-  | c = atomic_mlcmd; v = mlvalue
+  | c = atomic_mlcmd; v = mlval
     { E.MlApp (c, v) }
 
   | c = atomic_mlcmd
@@ -394,7 +394,7 @@ atomic_mlcmd:
     { c }
   | BEGIN; c = mlcmd; END
     { c }
-  | BANG; v = mlvalue
+  | BANG; v = mlval
     { E.MlUnleash v }
 
   | PRINT; c = located(atomic_mlcmd)
@@ -416,15 +416,17 @@ atomic_mlcmd:
   | LLGL; e = located(econ); RRGL
     { E.MlElab e }
 
-  | v = mlvalue
+  | v = mlval
     { E.MlRet v }
 
 
-mlvalue:
-  | LGL; vs = separated_list(COMMA, mlvalue); RGL
+mlval:
+  | LGL; vs = separated_list(COMMA, mlval); RGL
     { E.MlTuple vs }
   | LBR; c = mlcmd; RBR
     { E.MlThunk c }
+  | s = STRING
+    { E.MlString s }
   | a = ATOM;
     { E.MlVar (`User a) }
 
