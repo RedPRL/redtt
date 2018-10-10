@@ -147,6 +147,7 @@ and frame =
   | RestrictForce
   | VProj of {r : dim; func : typed_value} (* rigid when r is an atom *)
   | Cap of {r : dim; r' : dim; ty : value; sys : con abs sys} (* rigid when (r,r') and sys are rigid *)
+  | Elim of {dlbl : string; params : cell list; mot : clo; clauses : (string * nclo) list}
 
 and typed_value =
   {ty : value option;
@@ -1319,6 +1320,12 @@ struct
     | Cap _, Box {cap; _} ->
       Val.unleash cap
 
+    | Elim _, Intro _ ->
+      raise CanJonHelpMe
+
+    | Elim _, HCom {ty = `Pos; _} ->
+      raise CanJonHelpMe
+
     | _, Neu info ->
       let frm, ty, sys = rigid_plug_ty rel frm info.ty hd in
       let neu = Neutroid.plug rel ~rigid:true frm info.neu in
@@ -1331,6 +1338,7 @@ struct
     | RestrictForce, _ -> raise PleaseRaiseProperError
     | VProj _, _ -> raise PleaseRaiseProperError
     | Cap _, _ -> raise PleaseRaiseProperError
+    | Elim _, _ -> raise PleaseRaiseProperError
 
   and rigid_plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
@@ -2389,6 +2397,12 @@ struct
          r' = Dim.swap pi info.r';
          ty = Val.swap pi info.ty;
          sys = ConAbsSys.swap pi info.sys}
+    | Elim info ->
+      Elim
+        {dlbl = info.dlbl;
+         params = List.map (Cell.swap pi) info.params;
+         mot = Clo.swap pi info.mot;
+         clauses = flip List.map info.clauses @@ fun (lbl, nclo) -> lbl, NClo.swap pi nclo}
 
   let subst r x =
     function
@@ -2412,6 +2426,12 @@ struct
          r' = Dim.subst r x info.r';
          ty = Val.subst r x info.ty;
          sys = ConAbsSys.subst r x info.sys}
+    | Elim info ->
+      Elim
+        {dlbl = info.dlbl;
+         params = List.map (Cell.subst r x) info.params;
+         mot = Clo.subst r x info.mot;
+         clauses = flip List.map info.clauses @@ fun (lbl, nclo) -> lbl, NClo.subst r x nclo}
 
   let run rel =
     function
@@ -2434,10 +2454,17 @@ struct
          r' = Dim.run rel info.r';
          ty = Val.run rel info.ty;
          sys = ConAbsSys.run rel info.sys}
+    | Elim info ->
+      Elim
+        {dlbl = info.dlbl;
+         params = List.map (Cell.run rel) info.params;
+         mot = Clo.run rel info.mot;
+         clauses = flip List.map info.clauses @@ fun (lbl, nclo) -> lbl, NClo.run rel nclo}
 
   let occur xs =
     function
-    | FunApp _ | VProj _ | Cap _ ->
+    (* TODO *)
+    | FunApp _ | VProj _ | Cap _ | Elim _ ->
       `Might
     | Fst | Snd | RestrictForce ->
       `No
@@ -2451,7 +2478,7 @@ struct
 
   let force rel frm ~hd =
     match frm with
-    | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce ->
+    | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce | Elim _ ->
       `Rigid frm
     | VProj {r; func} ->
       begin
