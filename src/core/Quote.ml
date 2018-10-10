@@ -570,7 +570,7 @@ struct
 
           let bdy0 = inst_nclo clause0 cells_w_ihs in
           let bdy1 = inst_nclo clause1 cells_w_ihs in
-          let intro = make_intro empty_env ~dlbl ~params:elim0.params ~clbl cells in
+          let intro = make_intro ~dlbl ~params:elim0.params ~clbl cells in
           let mot_intro = inst_clo elim0.mot intro in
           let tbdy = equate env' mot_intro bdy0 bdy1 in
           let nms = Bwd.from_list @@ List.map (fun _ -> None) cells_w_ihs in
