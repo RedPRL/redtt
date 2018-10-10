@@ -239,12 +239,15 @@ sig
   type u
   include DomainPlug
 
-  (** [make] created a delayed run. *)
+  (** [make] creates a delayed run. *)
   val make : u -> t
 
-  (** [make_from_lazy] created a delayed run from a thunk. With call-by-value we need
+  (** [make_from_lazy] creates a delayed run from a thunk. With call-by-value we need
       a separate function to pass an unevaluated expression. *)
   val make_from_lazy : u Lazy.t -> t
+
+  (** [make_from_delayed] creates a delayed run from another delayed run. *)
+  val make_from_delayed : u Delayed.t -> t
 
   (** [unleash] forces the run created by [make]. *)
   val unleash : t -> u
@@ -1260,10 +1263,10 @@ struct
   and rigid_plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
-      Clo.inst rel clo @@ Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash @@ TypedVal.drop_ty arg end)
+      Clo.inst rel clo @@ Val (LazyVal.make_from_delayed @@ TypedVal.drop_ty arg)
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
-      let ty = Clo.inst rel quant.cod @@ Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash @@ TypedVal.drop_ty arg end) in
+      let ty = Clo.inst rel quant.cod @@ Val (LazyVal.make_from_delayed @@ TypedVal.drop_ty arg) in
       let cap = Val.plug rel ~rigid:true frm cap in
       let sys = ConAbsSys.plug rel ~rigid:true frm sys in
       rigid_hcom rel r r' ~ty ~cap ~sys
@@ -1388,12 +1391,11 @@ struct
       let act_on_constr_cell : constr_cell -> _ =
         function
         | `Const tv ->
-          (* Favonia: I just want to put tv.value into there, but I'm a little owned by the types. -- JS *)
-          [Val (raise CanFavoniaHelpMe)]
+          [Val (LazyVal.make_from_delayed tv.value)]
         | `Rec (`Self, v) ->
           let v_ih = Val.plug rel ~rigid:true frm v in
-          (* Favonia: I want to put [v; v_ih] below, but I'm again owned by the types. -- JS *)
-          [Val (raise CanFavoniaHelpMe); Val (raise CanFavoniaHelpMe)]
+          [Val (LazyVal.make_from_delayed v);
+           Val (LazyVal.make_from_delayed v_ih)]
         | `Dim r ->
           [Dim r]
       in
@@ -2910,6 +2912,9 @@ end
 
     let make_from_lazy (lazy v) = make v
 
+    let make_from_delayed : X.t abs Delayed.t -> DelayedX.t abs =
+      Delayed.fold @@ fun rel (Abs (x, c_x)) -> Abs (x, Delayed.make' (Option.map (Rel.hide' x) rel) c_x)
+
     let unleash (Abs (x, a)) = Abs (x, DelayedX.unleash a)
 
     let drop_rel (Abs (x, a)) = Abs (x, DelayedX.drop_rel a)
@@ -2935,6 +2940,8 @@ and DelayedPlug : functor (X : DomainPlug) ->
     let make = Delayed.make
 
     let make_from_lazy (lazy v) = Delayed.make v
+
+    let make_from_delayed v = v
 
     let unleash = Delayed.unleash X.run
 
@@ -2966,9 +2973,13 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
     type u = X.t
     type t = X.t Lazy.t Delayed.t
 
+    module DelayedX = DelayedPlug (X)
+
     let make v = Delayed.make @@ lazy v
 
     let make_from_lazy = Delayed.make
+
+    let make_from_delayed v = Delayed.make @@ lazy begin DelayedX.unleash v end
 
     let unleash v = Lazy.force @@ Delayed.unleash (fun rel v -> lazy begin X.run rel (Lazy.force v) end) v
 
