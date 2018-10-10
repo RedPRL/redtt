@@ -383,7 +383,8 @@ struct
       let args = List.map eval_as_cell args in
       let desc = GlobalEnv.lookup_datatype dlbl env.globals in
       let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
-      let sys = eval_tm_sys rel env @@ Desc.Constr.boundary constr in
+      let benv = Env.extend_cells (Env.init env.globals) @@ params @ args in
+      let sys = eval_tm_sys rel benv @@ Desc.Constr.boundary constr in
       Con.make_intro rel ~dlbl ~clbl ~args ~sys
 
   and eval_cmd rel env (hd, sp) =
