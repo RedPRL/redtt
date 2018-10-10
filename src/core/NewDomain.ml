@@ -1379,7 +1379,21 @@ struct
       Val.unleash cap
 
     | Elim elim, Intro intro ->
-      raise CanJonHelpMe
+      let act_on_constr_cell : constr_cell -> _ =
+        function
+        | `Const tv ->
+          (* Favonia: I just want to put tv.value into there, but I'm a little owned by the types. -- JS *)
+          [Val (raise CanFavoniaHelpMe)]
+        | `Rec (`Self, v) ->
+          let v_ih = Val.plug rel ~rigid:true frm v in
+          (* Favonia: I want to put [v; v_ih] below, but I'm again owned by the types. -- JS *)
+          [Val (raise CanFavoniaHelpMe); Val (raise CanFavoniaHelpMe)]
+        | `Dim r ->
+          [Dim r]
+      in
+      let cells = ListUtil.flat_map act_on_constr_cell intro.args in
+      let nclo = raise CanJonHelpMe in
+      NClo.inst rel nclo cells
 
     | Elim _, HCom {ty = `Pos; _} ->
       raise CanJonHelpMe
