@@ -1426,7 +1426,8 @@ struct
       let lazy_arg = lazy begin Val.unleash (TypedVal.drop_ty arg) end in
       FunApp {arg with ty = Some dom}, Clo.inst rel cod @@ Val (LazyVal.make_from_lazy lazy_arg), []
 
-    | Pi _, _ -> raise PleaseRaiseProperError
+    | Pi _, _ ->
+      raise PleaseRaiseProperError
 
     | Sg {dom; _}, Fst ->
       frm, Val.unleash dom, []
@@ -1435,13 +1436,15 @@ struct
       let fst = lazy begin plug rel ~rigid:true Fst hd end in
       frm, Clo.inst rel cod @@ Val (LazyVal.make_from_lazy fst), []
 
-    | Sg _, _ -> raise PleaseRaiseProperError
+    | Sg _, _ ->
+      raise PleaseRaiseProperError
 
     | Ext extclo, ExtApp rs ->
       let ty, sys = ExtClo.inst rel extclo @@ List.map (fun r -> Dim r) rs in
       frm, ty, sys
 
-    | Ext _, _ -> raise PleaseRaiseProperError
+    | Ext _, _ ->
+      raise PleaseRaiseProperError
 
     | Restrict (r, r', ty), RestrictForce ->
       frm, LazyVal.unleash ty, [(r, r', LazyVal.make hd)]
@@ -1462,6 +1465,9 @@ struct
 
     | Data _, Elim elim ->
       frm, Clo.inst rel elim.mot (Val (LazyVal.make hd)), []
+
+    | Data _, _ ->
+      raise PleaseRaiseProperError
 
     | _ ->
       raise PleaseRaiseProperError
