@@ -1579,6 +1579,9 @@ struct
     | Univ _ ->
       HCom {r; r'; ty = `Pos; cap; sys}
 
+    | Data _ ->
+      raise CanJonHelpMe
+
     | V ({r = s; _} as info) ->
       let rel0 = Rel.equate' s `Dim0 rel in
       let func = Val.plug rel0 ~rigid:true Fst info.equiv in
@@ -1694,6 +1697,9 @@ struct
 
     | Univ _ ->
       Val.unleash cap
+
+    | Data _ ->
+      raise CanJonHelpMe
 
     | V info ->
       let atom_info_r = match info.r with `Atom x -> x | _ -> raise PleaseRaiseProperError in
