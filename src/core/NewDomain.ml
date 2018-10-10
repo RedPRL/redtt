@@ -1707,8 +1707,20 @@ struct
     | Data data, Intro intro ->
       raise CanJonHelpMe
 
-    | Data data, Neu neu ->
-      raise CanJonHelpMe
+    | Data data, Neu info ->
+      let neutroid =
+        let neu =
+          let head = NCoeData {r; r'; ty = abs; cap = info.neu} in
+          Delayed.make @@ {head; frames = Emp}
+        in
+        let sys =
+          ConSys.foreach_gen info.neu.sys @@ fun s s' el ->
+          let rel_ss' = Rel.equate' s s' rel in
+          make_coe rel_ss' r r' ~abs:(ConAbs.run rel_ss' abs) @@ Val.make el
+        in
+        {neu; sys}
+      in
+      Neu {ty = Delayed.make @@ ConAbs.inst rel abs r'; neu = neutroid}
 
     | Data _, HCom info ->
       let cap = Delayed.make @@ rigid_coe rel r r' ~abs info.cap in
