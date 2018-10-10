@@ -48,8 +48,7 @@ def le/case (m : nat) : (n : nat) → (le n (suc m)) → or (path nat n (suc m))
     elim [
     | zero → λ _ → inr triv
     | suc n' → λ p →
-      let r : or (path nat n' (suc m')) (le n' m') = c n' p in
-      elim r [
+      elim (c n' p) [
       | inl p → inl (λ i -> suc (p i))
       | inr l → inr (le/suc n' m' l)
       ]
