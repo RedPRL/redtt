@@ -1395,8 +1395,16 @@ struct
       let nclo = raise CanJonHelpMe in
       NClo.inst rel nclo cells
 
-    | Elim _, HCom {ty = `Pos; _} ->
-      raise CanJonHelpMe
+    | Elim elim, HCom ({ty = `Pos; _} as hcom) ->
+      let abs =
+        ConAbs.bind @@ fun y ->
+        Clo.inst rel elim.mot @@
+        let fhcom = lazy begin make_fhcom rel hcom.r y ~cap:hcom.cap ~sys:hcom.sys end in
+        Val (Delayed.make fhcom)
+      in
+      let cap = Val.plug rel ~rigid:true frm hcom.cap in
+      let sys = ConAbsSys.plug rel ~rigid:true frm hcom.sys in
+      rigid_com rel hcom.r hcom.r' ~abs ~cap ~sys
 
     | _, Neu info ->
       let frm, ty, sys = rigid_plug_ty rel frm info.ty hd in
