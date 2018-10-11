@@ -10,9 +10,6 @@ data (A : type) (R : A → A → type) ⊢ quotient where
   | i=1 → pt b
   ]
 
-def is-compat (A B : type) (R : A → A → type) (f : A → B) : type =
-  (a0 a1 : A) → R a0 a1 → path _ (f a0) (f a1)
-
 def prop/ext
   (A B : type)
   (A/prop : is-prop A)
@@ -46,19 +43,14 @@ def quotient/weakly-effective
   → path (quotient A R) (pt a) (pt b)
   → trunc (R a b)
   =
-  λ a →
-  let f (b : A) : type = trunc (R a b) in
-  let f/compat : is-compat^1 _ _ R f =
-    λ b0 b1 b01 →
-    let g0 (x : R a b0) : R a b1 = R/trans _ _ _ x b01 in
-    let g1 (x : R a b1) : R a b0 = R/trans _ _ _ x (R/symm _ _ b01) in
-    trunc/ext _ _ g0 g1
-  in
-  λ b p →
+  λ a b p →
     coe 0 1 (ret (R/refl a)) in λ i →
     elim (p i) [
-    | pt b → f b
+    | pt b →
+      trunc (R a b)
     | gl b0 b1 b01 i →
-      f/compat b0 b1 b01 i
+      let g0 (x : R a b0) : R a b1 = R/trans _ _ _ x b01 in
+      let g1 (x : R a b1) : R a b0 = R/trans _ _ _ x (R/symm _ _ b01) in
+      trunc/ext _ _ g0 g1 i
     ]
 
