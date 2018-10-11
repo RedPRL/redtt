@@ -1,4 +1,5 @@
 import path
+import ntype
 
 data (A : type) ⊢ trunc where
 | ret (a : A)
