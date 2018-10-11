@@ -35,7 +35,7 @@ def le/zero/implies/zero : (n : nat) → (le n zero) → path nat zero n =
 
 def le/case : (m n : nat) → (le n (suc m)) → or (path nat n (suc m)) (le n m) =
   elim [
-  | zero → 
+  | zero →
     elim [
     | zero → λ _ → inr triv
     | suc n' →
@@ -49,7 +49,7 @@ def le/case : (m n : nat) → (le n (suc m)) → or (path nat n (suc m)) (le n m
     | zero → λ _ → inr triv
     | suc n' → λ p →
       elim (c n' p) [
-      | inl p → inl (λ i -> suc (p i))
+      | inl p → inl (λ i → suc (p i))
       | inr l → inr (le/suc n' m' l)
       ]
     ]
