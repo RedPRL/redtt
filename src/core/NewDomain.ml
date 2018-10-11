@@ -1756,7 +1756,16 @@ struct
     let Abs (x, tyx) = abs in
     match tyx, Val.unleash cap with
     | Data data, Intro intro ->
-      raise CanJonHelpMe
+      let genv, constrs = data.constrs in
+      let constr = Desc.lookup_constr intro.clbl constrs in
+      let coerced_args s s' = multi_coe rel s s' abs intro.clbl intro.args in
+      let intro sys = make_intro rel ~dlbl:data.lbl ~clbl:intro.clbl ~args:(coerced_args r r') ~sys in
+      begin
+        match Desc.Constr.boundary constr with
+        | [] -> intro []
+        | _ ->
+          raise CanJonHelpMe
+      end
 
     | Data data, Neu info ->
       let neutroid =
