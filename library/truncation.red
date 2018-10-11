@@ -21,3 +21,13 @@ def trunc/bind/ret (A : type) : path _ (trunc/bind A A (λ a → ret a)) (λ x �
        λ j → glue (x/ih j) (y/ih j) i
      ])
 
+def trunc/prop (A : type) : is-prop (trunc A) =
+  λ x y i → glue x y i
+
+def trunc/map (A B : type) (f : A → B) : trunc A → trunc B =
+  elim [
+  | ret a → ret (f a)
+  | glue (x → x/ih) (y → y/ih) i →
+    glue x/ih y/ih i
+  ]
+
