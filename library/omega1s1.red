@@ -112,7 +112,7 @@ def decode : (x : s1) → s1-univ-cover x → path s1 base x =
   ]
 
 def loopn-winding (l : Ω1s1) : path _ (loopn (winding l)) l =
-  J s1 base (λ x p → path (path s1 base x) (decode x (encode x p)) p) refl base l
+  J s1 base (λ p → path (path s1 base (p 1)) (decode (p 1) (encode (p 1) p)) p) refl l
 
 def winding/equiv : equiv Ω1s1 int =
   iso→equiv _ _ (winding, (loopn, (winding-loopn, loopn-winding)))
