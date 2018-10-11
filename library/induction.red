@@ -2,7 +2,7 @@ import nat
 import path
 import unit
 
-def transport (A : type) (M N : A) (p : path A M N) (C : A → type) : C M → C N =
+def transport (A : type) (M N : A) (p : path A M N) (C : A → type) : C M →  C N =
   λ cm → coe 0 1 cm in λ i → C (p i)
 
 def le : nat → nat → type =
@@ -15,9 +15,9 @@ def le : nat → nat → type =
     ]
   ]
 
-def le/suc (n: nat) : (m : nat) → le n m → le (suc n) (suc m) =
-  elim n [
-  | zero → λ _ _ → triv
+def le/suc : (n m : nat) → le n m → le (suc n) (suc m) =
+  elim [
+  | zero → λ _ _ →  triv
   | suc n' → λ m' l → l
   ]
 
@@ -27,16 +27,16 @@ def eq/implies/le (n : nat) : le n n =
   | suc (n' → f) → f
   ]
 
-def le/zero/implies/zero (n : nat) : (le n zero) → path nat zero n =
-  elim n [
+def le/zero/implies/zero : (n : nat) →  (le n zero) → path nat zero n =
+  elim [
   | zero → λ _ → refl
   | suc n' → λ p → elim p []
   ]
 
-def le/case (m : nat) : (n : nat) → (le n (suc m)) → or (path nat n (suc m)) (le n m) =
-  elim m [
-  | zero → λ n →
-    elim n [
+def le/case : (m n : nat) →  (le n (suc m)) →  or (path nat n (suc m)) (le n m) =
+  elim [
+  | zero → 
+    elim [
     | zero → λ _ → inr triv
     | suc n' →
       elim n' [
@@ -46,7 +46,7 @@ def le/case (m : nat) : (n : nat) → (le n (suc m)) → or (path nat n (suc m))
     ]
   | suc (m' → c) →
     elim [
-    | zero → λ _ → inr triv
+    | zero → λ _ →  inr triv
     | suc n' → λ p →
       elim (c n' p) [
       | inl p → inl (λ i -> suc (p i))
@@ -69,8 +69,8 @@ def weak/implies/complete : (P : nat → type) →
   λ P weak p0 ps →
     let P' : nat → type = λ n → (k : nat) → (le k n) → P k in
     let P'0 : P' zero = λ k k/le/0 → transport nat zero k (le/zero/implies/zero k k/le/0) P p0 in
-    let f : (n : nat) → (P' n) → (P' (suc n)) =
-      λ n p'n → λ k k/le/sn →
+    let f (n : nat) (p'n : P' n) : (P' (suc n)) =
+      λ k k/le/sn →
       elim (le/case n k k/le/sn) [
       | inl p → transport nat (suc n) k (symm nat p) P (ps n p'n)
       | inr l → p'n k l
