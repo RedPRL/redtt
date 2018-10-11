@@ -3,7 +3,6 @@ import hlevel
 import equivalence
 import connection
 import retract
-import pi
 
 -- the code in this file is adapted from yacctt and redprl
 
