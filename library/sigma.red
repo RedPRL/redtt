@@ -38,9 +38,10 @@ def sigma/hlevel : (l : hlevel) (A : type) (B : A → type)
       retract/hlevel (hsuc l)
         (path ((a : A) × B a) (a,b) (a',b')) 
         ((p : path A a a') × pathd (λ i → B (p i)) b b')
-        (λ r → (λ i → r i .fst, λ i → r i .snd))
-        (λ (p,q) i → (p i, q i))
-        (λ _ → refl)
+        ( λ r → (λ i → r i .fst, λ i → r i .snd)
+        , λ (p,q) i → (p i, q i)
+        , λ _ → refl
+        )
         (l/ih (path A a a') (λ p → pathd (λ i → B (p i)) b b')
           (A/level a a') (λ p → pathd/hlevel (hsuc l) A B p (B/level a') b b'))
     ]

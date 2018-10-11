@@ -29,9 +29,10 @@ def pi/level : (l : hlevel) (A : type) (B : A → type)
       retract/hlevel (hsuc l)
         (path ((a : A) → B a) f f')
         ((a : A) → path (B a) (f a) (f' a))
-        (λ p a i → p i a)
-        (λ g i a → g a i)
-        (λ _ → refl)
+        ( λ p a i → p i a
+        , λ g i a → g a i
+        , λ _ → refl
+        )
         (l/ih A (λ a → path (B a) (f a) (f' a)) (λ a → B/level a (f a) (f' a)))
     ]
   ]
