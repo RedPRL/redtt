@@ -1,4 +1,4 @@
-import ntype
+import hlevel
 
 data unit where
 | triv
