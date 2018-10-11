@@ -1714,9 +1714,11 @@ struct
         | Desc.TNil _, [] -> []
         | Desc.TCons (`Const tty, Tm.B (_, tele)), `Const v :: args ->
           let tyx = Syn.eval rel tyenv tty in
-          (* Favonia: Below, what I want to do is what used to be (Abs.bind1 x tyx), but I don't know the preferred
-             way to do it under the new API. Should I be using bind and swap or something? Or just Abs directly? *)
-          let coe_hd s = make_coe rel r s ~abs:(raise CanFavoniaHelpMe) v in
+          let coe_hd s =
+            let x', pi = Perm.freshen_name x in
+            let tyx' = Con.swap pi tyx in
+            make_coe rel r s ~abs:(Abs (x', tyx')) v
+          in
           let coe_tl =
             let coe_hd_x = coe_hd @@ `Atom x in
             let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make coe_hd_x) in
@@ -1787,9 +1789,8 @@ struct
             ConAbsFace.gen @@ fun s s' (el : con) ->
             let rel_ss' = Rel.equate' s s' rel in
             let elx = make_coe rel_ss' (`Atom x) r' ~abs:(ConAbs.run rel_ss' abs) @@ Val.make el in
-            (* TODO: Favonia, is this actually safe? Shouldn't I be freshening? Also I feel weird
-               about all this unleash/make.*)
-            Abs (x, elx)
+            let x', pi = Perm.freshen_name x in
+            Abs (x', Con.swap pi elx)
           in
 
           let correction = List.map fix_face faces in
