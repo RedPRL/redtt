@@ -2,6 +2,7 @@ import path
 import hlevel
 import sigma
 import pi
+import hlevel-contr
 
 def fiber (A B : type) (f : A → B) (b : B) : type =
   (a : _) × path _ (f a) b
@@ -65,17 +66,8 @@ def ua/proj (A B : type) (E : equiv A B)
 -- hlevels of is-equiv and equiv
 
 opaque
-def is-contr/prop (A : type) : is-prop (is-contr A) =
-  λ A/contr →
-    let A/prop : is-prop A = raise-hlevel contr A A/contr in
-    sigma/hlevel prop _ (λ a → (b : A) → path A b a) A/prop
-      (λ a → pi/hlevel prop A (λ b → path A b a) (λ b → prop→set _ A/prop b a))
-      A/contr
-
-opaque
 def is-equiv/prop (A B : type) (f : A → B) : is-prop (is-equiv A B f) =
   λ e0 e1 i b → is-contr/prop (fiber A B f b) (e0 b) (e1 b) i
-
 
 -- A direct proof that is-equiv f is a prop, ported from cubicaltt to yacctt to redtt
 def is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv _ _ f) =
