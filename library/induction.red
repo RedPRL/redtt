@@ -2,7 +2,7 @@ import nat
 import path
 import unit
 
-def transport (A : type) (M N : A) (p : path A M N) (C : A → type) : C M →  C N =
+def transport (A : type) (M N : A) (p : path A M N) (C : A → type) : C M → C N =
   λ cm → coe 0 1 cm in λ i → C (p i)
 
 def le : nat → nat → type =
@@ -27,13 +27,13 @@ def eq/implies/le (n : nat) : le n n =
   | suc (n' → f) → f
   ]
 
-def le/zero/implies/zero : (n : nat) →  (le n zero) → path nat zero n =
+def le/zero/implies/zero : (n : nat) → (le n zero) → path nat zero n =
   elim [
   | zero → λ _ → refl
   | suc n' → λ p → elim p []
   ]
 
-def le/case : (m n : nat) →  (le n (suc m)) →  or (path nat n (suc m)) (le n m) =
+def le/case : (m n : nat) → (le n (suc m)) → or (path nat n (suc m)) (le n m) =
   elim [
   | zero → 
     elim [
@@ -46,7 +46,7 @@ def le/case : (m n : nat) →  (le n (suc m)) →  or (path nat n (suc m)) (le n
     ]
   | suc (m' → c) →
     elim [
-    | zero → λ _ →  inr triv
+    | zero → λ _ → inr triv
     | suc n' → λ p →
       elim (c n' p) [
       | inl p → inl (λ i -> suc (p i))
