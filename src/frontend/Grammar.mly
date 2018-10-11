@@ -357,8 +357,8 @@ mltoplevel:
     { let name, desc = decl in
       {rest with con = MlBind (E.MlDeclData {name; desc}, `User name, rest.con)} }
 
-  | IMPORT; a = ATOM; rest = mltoplevel
-    { {rest with con = E.mlbind (E.MlImport a) @@ fun _ -> rest.con} }
+  | IMPORT; path = separated_list(DOT, ATOM); rest = mltoplevel
+    { {rest with con = E.mlbind (E.MlImport path) @@ fun _ -> rest.con} }
 
   | QUIT; rest = mltoplevel
     { {rest with con = E.MlRet (E.MlTuple [])} }

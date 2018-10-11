@@ -5,7 +5,7 @@ open Bwd open BwdNotation
 
 module type Import =
 sig
-  val import : Lwt_io.file_name -> [`Elab of ML.mlcmd | `Cached]
+  val import : string list -> [`Elab of ML.mlcmd | `Cached]
 end
 
 module Make (I : Import) =
@@ -162,9 +162,9 @@ struct
       C.declare_datatype info.name desc >>
       M.ret @@ E.SemRet (E.SemDataDesc desc)
 
-    | E.MlImport file_name ->
+    | E.MlImport path ->
       begin
-        match I.import file_name with
+        match I.import path with
         | `Cached ->
           M.ret @@ E.SemRet (E.SemTuple [])
         | `Elab cmd ->

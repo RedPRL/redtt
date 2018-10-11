@@ -33,8 +33,8 @@ let execute_signature dirname mlcmd =
   let module I =
   struct
     let cache = Hashtbl.create 20
-    let import f =
-      let f = Filename.concat dirname f in
+    let import path =
+      let f = List.fold_left Filename.concat dirname path in
       match Hashtbl.find_opt cache f with
       | None ->
         let mlcmd = Lwt_main.run @@ read_file @@ f ^ ".red" in
