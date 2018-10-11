@@ -17,6 +17,9 @@ type rel = Rel.t
 (* this module provides the data type to hold an optional rel to
  * facilitate the dropping of `run phi1` in `run phi2 @@ run phi1 a`.
  *
+ * however, if the concrete type is known (for example [con Delayed.t]),
+ * the corresponding module (for example [Val]) should be used.
+ *
  * the inner datatype is mutable in order to remember the result. *)
 module Delayed :
 sig
@@ -391,14 +394,14 @@ struct
       let strict = Desc.is_strict_set desc in
       let params =
         flip List.map info.params @@ fun t ->
-        Val (Delayed.make @@ lazy (eval rel env t))
+        Val (LazyVal.make_from_lazy @@ lazy (eval rel env t))
       in
       Data {lbl = info.lbl; strict; params; constrs = env.globals, Desc.constrs desc}
 
     | Tm.Intro (dlbl, clbl, params, args) ->
       let desc = GlobalEnv.lookup_datatype dlbl env.globals in
       let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
-      let eval_as_cell t = Val (Delayed.make @@ lazy (eval rel env t)) in
+      let eval_as_cell t = Val (LazyVal.make_from_lazy @@ lazy (eval rel env t)) in
       let params = List.map eval_as_cell params in
       let tyenv = Env.extend_cells (Env.init env.globals) params in
       let benv, args = eval_constr_args rel ~env ~tyenv ~constr ~args in
@@ -414,11 +417,11 @@ struct
         let vty = lazy begin eval rel tyenv ty end in
         let el = lazy begin eval rel env tm end in
         let acc = acc #< (`Const (Val.make_from_lazy el)) in
-        let tyenv = Env.extend_cell tyenv @@ Val (Delayed.make el) in
+        let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_lazy el) in
         go acc tyenv tele tms
       | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), tm :: tms ->
         let el = lazy begin eval rel env tm end in
-        let tyenv = Env.extend_cell tyenv @@ Val (Delayed.make el) in
+        let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_lazy el) in
         let acc = acc #< (`Rec (`Self, Val.make_from_lazy el)) in
         go acc tyenv tele tms
       | Desc.TCons (`Dim, Tm.B (_, tele)), tm :: tms ->
@@ -1412,7 +1415,7 @@ struct
         ConAbs.bind @@ fun y ->
         Clo.inst rel elim.mot @@
         let fhcom = lazy begin make_fhcom rel hcom.r y ~cap:hcom.cap ~sys:hcom.sys end in
-        Val (Delayed.make fhcom)
+        Val (LazyVal.make_from_lazy fhcom)
       in
       let cap = Val.plug rel ~rigid:true frm hcom.cap in
       let sys = ConAbsSys.plug rel ~rigid:true frm hcom.sys in
@@ -1658,7 +1661,7 @@ struct
             ConAbs.bind @@ fun y ->
             (* XXX FIXME This is not the most efficient code because we know what [cap_frame]
              * will reduce to, but maybe we can afford this? *)
-            Con.plug rel cap_frame @@ hcom_template rel y (ConAbs.inst rel (LazyValAbs.unleash abs) s')
+            Con.plug rel cap_frame @@ hcom_template rel y (LazyValAbs.inst_then_unleash rel abs s')
           in
           let diag =
             r, r',
@@ -1673,7 +1676,7 @@ struct
       let sys =
         ConSys.foreach_gen fhcom.sys @@ fun si s'i abs ->
         let rel = Rel.equate' si s'i rel in
-        hcom_template rel r' (ConAbs.inst rel (LazyValAbs.unleash abs) s')
+        hcom_template rel r' (LazyValAbs.inst_then_unleash rel abs s')
       in
       Box {r; r'; cap; sys}
 
@@ -1688,7 +1691,7 @@ struct
         let tube_faces =
           ConSys.foreach_gen sys @@ fun s s' abs ->
           let rel' = Rel.equate' s s' rel in
-          ConAbs.inst rel' (LazyValAbs.unleash abs) r'
+          LazyValAbs.inst_then_unleash rel' abs r'
         in
         let old_faces =
           ConSys.foreach_gen info.neu.sys @@ fun s s' bdy ->
@@ -1812,16 +1815,16 @@ struct
         in
         {neu; sys}
       in
-      Neu {ty = Delayed.make @@ ConAbs.inst rel abs r'; neu = neutroid}
+      Neu {ty = Val.make @@ ConAbs.inst rel abs r'; neu = neutroid}
 
     | Data _, HCom info ->
-      let cap = Delayed.make @@ rigid_coe rel r r' ~abs info.cap in
+      let cap = Val.make @@ rigid_coe rel r r' ~abs info.cap in
       let sys =
         ConAbsSys.foreach_gen info.sys @@ fun s s' abs' ->
         let rel_ss' = Rel.equate' s s' rel in
         ConAbs.bind @@ fun y ->
         make_coe rel_ss' r r' ~abs:(ConAbs.run rel_ss' abs) @@
-        Val.make @@ ConAbs.inst rel_ss' (LazyValAbs.unleash abs') y
+        Val.make @@ LazyValAbs.inst_then_unleash rel_ss' abs' y
       in
       make_fhcom rel info.r info.r' ~cap ~sys
 
@@ -2370,11 +2373,15 @@ sig
     with type u = con abs
      and type t = con abs Lazy.t Delayed.t
   val bind : (dim -> con) -> t
+  val inst_then_unleash : rel -> t -> dim -> con
 end =
 struct
   module ConAbs = AbsPlug (Con)
   include DelayedLazyPlug (ConAbs)
+
   let bind gen = make_from_lazy @@ lazy begin ConAbs.bind gen end
+
+  let inst_then_unleash rel abs r = ConAbs.inst rel (drop_rel abs) r
 end
 
 (** A [coe_shape] is a value when its component is. *)
