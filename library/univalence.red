@@ -6,15 +6,6 @@ import retract
 
 -- the code in this file is adapted from yacctt and redprl
 
-def retract-is-contr (A B : type) (f : A → B) (g : B → A) (h : retract A B f g) (c : is-contr B) : is-contr A =
-  ( g (c.fst),
-    λ a i →
-    comp 0 1 (g (c.snd (f a) i)) [
-    | i=0 → h a
-    | i=1 → refl
-    ]
-  )
-
 def id-equiv (A : type) : equiv A A =
   ( λ a → a
   , λ a →
@@ -160,7 +151,7 @@ def path/based/contr (A : type) : is-contr^1 ((B : _) × path^1 _ A B) =
 -- See also Theorem 5.8.4 of the HoTT Book.
 
 def univalence (A : type) : is-contr^1 ((B : type) × equiv A B) =
-  retract-is-contr^1
+  retract/hlevel^1 contr
     _
     _
     (equiv→path/based A)
