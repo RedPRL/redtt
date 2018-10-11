@@ -5,23 +5,23 @@ import unit
 def le : nat → nat → type =
   elim [
   | zero → λ _ → unit
-  | suc (m' → f) →
+  | suc (m → f) →
     elim [
     | zero → void
-    | suc n' → f n'
+    | suc n → f n
     ]
   ]
 
 def le/suc : (n m : nat) → le n m → le (suc n) (suc m) =
   elim [
   | zero → λ _ _ →  triv
-  | suc n' → λ m' l → l
+  | suc _ → λ _ l → l
   ]
 
-def eq/implies/le (n : nat) : le n n =
-  elim n [
+def eq/implies/le : (n : nat) → le n n =
+  elim [
   | zero → triv
-  | suc (n' → f) → f
+  | suc (_ → f) → f
   ]
 
 def le/zero/implies/zero : (n : nat) → (le n zero) → path nat zero n =
@@ -53,18 +53,32 @@ def le/case : (m n : nat) → (le n (suc m)) → or (path nat n (suc m)) (le n m
   ]
 
 def weak/induction (P : nat → type) : type =
-  (P zero) → ((n : nat) → P n → P (suc n)) → ((n : nat) → P n)
+  P zero
+  → ((n : nat) → P n → P (suc n))
+  → (n : nat)
+  → P n
 
 def complete/induction (P : nat → type) : type =
-  (P zero) → ((n : nat) → ((k : nat) → (le k n) → P k) → P (suc n)) → ((n : nat) → P n)
+  P zero
+  → ((n : nat) → ((k : nat) → (le k n) → P k) → P (suc n))
+  → (n : nat)
+  → P n
 
-def complete/implies/weak (P : nat → type) : complete/induction P → weak/induction P =
-  λ complete p0 ps → complete p0 (λ n f → ps n (f n (eq/implies/le n)))
+def complete/implies/weak
+  (P : nat → type)
+  (complete : complete/induction P)
+  : weak/induction P
+  =
+  λ p0 ps →
+  complete p0 (λ n f → ps n (f n (eq/implies/le n)))
 
-def weak/implies/complete : (P : nat → type) →
-  ((P' : nat → type) → weak/induction P') → complete/induction P =
-  λ P weak p0 ps →
-    let P' : nat → type = λ n → (k : nat) → (le k n) → P k in
+def weak/implies/complete
+  (P : nat → type)
+  (weak : (P' : nat → type) → weak/induction P')
+  : complete/induction P
+  =
+  λ p0 ps →
+    let P' (n : nat) : type = (k : nat) → (le k n) → P k in
     let P'0 : P' zero =
       λ k k/le/0 →
       coe 0 1 p0 in λ i →
@@ -77,5 +91,6 @@ def weak/implies/complete : (P : nat → type) →
       | inr l → p'n k l
       ]
     in
-    let P'n : ((n : nat) → P' n) = (weak P') P'0 f in
+    let P'n : (n : nat) → P' n = weak P' P'0 f in
     λ n → P'n n n (eq/implies/le n)
+
