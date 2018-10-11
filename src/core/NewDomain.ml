@@ -104,7 +104,7 @@ type con =
 
   | FortyTwo (* a dummy filler to signal that something might be terribly wrong *)
 
-  | Data of {lbl : string; strict : bool; params : cell list}
+  | Data of {lbl : string; strict : bool; params : cell list; constrs : GlobalEnv.t * Desc.constrs}
   | Intro of {dlbl : string; clbl : string; args : constr_cell list; sys : con sys}
 
 
@@ -163,7 +163,7 @@ and cell =
   | Dim of dim
 
 and constr_cell =
-  [ `Const of typed_value
+  [ `Const of value
   | `Rec of constr_rec_spec * value
   | `Dim of dim
   ]
@@ -391,7 +391,7 @@ struct
         flip List.map info.params @@ fun t ->
         Val (Delayed.make @@ lazy (eval rel env t))
       in
-      Data {lbl = info.lbl; strict; params}
+      Data {lbl = info.lbl; strict; params; constrs = env.globals, Desc.constrs desc}
 
     | Tm.Intro (dlbl, clbl, params, args) ->
       let desc = GlobalEnv.lookup_datatype dlbl env.globals in
@@ -411,8 +411,7 @@ struct
       | Desc.TCons (`Const ty, Tm.B (_, tele)), tm :: tms ->
         let vty = lazy begin eval rel tyenv ty end in
         let el = lazy begin eval rel env tm end in
-        let typed_val = {ty = Some (Val.make_from_lazy vty); value = Val.make_from_lazy el} in
-        let acc = acc #< (`Const typed_val) in
+        let acc = acc #< (`Const (Val.make_from_lazy el)) in
         let tyenv = Env.extend_cell tyenv @@ Val (Delayed.make el) in
         go acc tyenv tele tms
       | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), tm :: tms ->
@@ -747,19 +746,19 @@ struct
   type t = constr_cell
   let swap pi : t -> t =
     function
-    | `Const tv -> `Const (TypedVal.swap pi tv)
+    | `Const v -> `Const (Val.swap pi v)
     | `Rec (`Self, v) -> `Rec (`Self, Val.swap pi v)
     | `Dim d -> `Dim (Dim.swap pi d)
 
   let subst r x =
     function
-    | `Const tv -> `Const (TypedVal.subst r x tv)
+    | `Const v -> `Const (Val.subst r x v)
     | `Rec (`Self, v) -> `Rec (`Self, Val.subst r x v)
     | `Dim d -> `Dim (Dim.subst r x d)
 
   let run rel =
     function
-    | `Const tv -> `Const (TypedVal.run rel tv)
+    | `Const v -> `Const (Val.run rel v)
     | `Rec (`Self, v) -> `Rec (`Self, Val.run rel v)
     | `Dim _ as c -> c
 end
@@ -955,7 +954,8 @@ struct
       Data
         {lbl = info.lbl;
          strict = info.strict;
-         params = List.map (Cell.swap pi) info.params}
+         params = List.map (Cell.swap pi) info.params;
+         constrs = info.constrs}
 
     | Intro info ->
       Intro
@@ -1073,7 +1073,8 @@ struct
       Data
         {lbl = info.lbl;
          strict = info.strict;
-         params = List.map (Cell.subst r x) info.params}
+         params = List.map (Cell.subst r x) info.params;
+         constrs = info.constrs}
 
     | Intro info ->
       Intro
@@ -1242,7 +1243,8 @@ struct
       Data
         {lbl = info.lbl;
          strict = info.strict;
-         params = List.map (Cell.run rel) info.params}
+         params = List.map (Cell.run rel) info.params;
+         constrs = info.constrs}
 
     | Intro info ->
       let args = List.map (ConstrCell.run rel) info.args in
@@ -1390,8 +1392,8 @@ struct
     | Elim elim, Intro intro ->
       let act_on_constr_cell : constr_cell -> _ =
         function
-        | `Const tv ->
-          [Val (LazyVal.make_from_delayed tv.value)]
+        | `Const v ->
+          [Val (LazyVal.make_from_delayed v)]
         | `Rec (`Self, v) ->
           let v_ih = Val.plug rel ~rigid:true frm v in
           [Val (LazyVal.make_from_delayed v);
@@ -1702,12 +1704,52 @@ struct
       raise PleaseRaiseProperError
 
 
-  and rigid_multi_coe r r' data_abs args =
-    let Abs (x, ty) = data_abs in
-    (* Is there a way to write this code where I don't need to look up the argument specs in the signature? I hope so...
-       Otherwise, I need to thrad the global environment through too much stuff.
-    *)
-    raise CanJonHelpMe
+  and rigid_multi_coe rel r r' data_abs clbl (args : constr_cell list) =
+    let Abs (x, data_tyx) = data_abs in
+    match data_tyx with
+    | Data datax ->
+
+      let rec go tyenv tele args : constr_cell list =
+        match tele, args with
+        | Desc.TNil _, [] -> []
+        | Desc.TCons (`Const tty, Tm.B (_, tele)), `Const v :: args ->
+          let tyx = Syn.eval rel tyenv tty in
+          (* Favonia: Below, what I want to do is what used to be (Abs.bind1 x tyx), but I don't know the preferred
+             way to do it under the new API. Should I be using bind and swap or something? Or just Abs directly? *)
+          let coe_hd s = make_coe rel r s ~abs:(raise CanFavoniaHelpMe) v in
+          let coe_tl =
+            let coe_hd_x = coe_hd @@ `Atom x in
+            let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make coe_hd_x) in
+            go tyenv tele args
+          in
+          `Const (Val.make @@ coe_hd r') :: coe_tl
+        | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), `Rec (`Self, v) :: args ->
+          let coe_hd = rigid_coe rel r r' ~abs:data_abs v in
+          let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make coe_hd) in
+          let coe_tl = go tyenv tele args in
+          `Rec (`Self, Val.make coe_hd) :: coe_tl
+        | Desc.TCons (`Dim, Tm.B (_, tele)), `Dim s :: args ->
+          let tyenv = Env.extend_cell tyenv @@ Dim s in
+          `Dim s :: go tyenv tele args
+        | _ ->
+          raise PleaseRaiseProperError
+
+      in
+
+      let genv, constrs = datax.constrs in
+      let constr = Desc.lookup_constr clbl constrs in
+      let tyenv = Env.extend_cells (Env.init genv) datax.params in
+      go tyenv constr args
+
+    | _ ->
+      raise PleaseRaiseProperError
+
+  and multi_coe rel r r' data_abs clbl args =
+    match Rel.equate r r' rel with
+    | `Same ->
+      args
+    | `Changed _ ->
+      rigid_multi_coe rel r r' data_abs clbl args
 
   (* TODO: pass the data-info pre-extracted *)
   and rigid_coe_nonstrict_data rel r r' ~abs cap =
