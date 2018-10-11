@@ -1751,6 +1751,12 @@ struct
     | `Changed _ ->
       rigid_multi_coe rel r r' data_abs clbl args
 
+  and constr_cell_to_cell : constr_cell -> cell =
+    function
+    | `Const v -> Val (LazyVal.make_from_delayed v)
+    | `Rec (_, v) -> Val (LazyVal.make_from_delayed v)
+    | `Dim r -> Dim r
+
   (* TODO: pass the data-info pre-extracted *)
   and rigid_coe_nonstrict_data rel r r' ~abs cap =
     let Abs (x, tyx) = abs in
@@ -1759,12 +1765,35 @@ struct
       let genv, constrs = data.constrs in
       let constr = Desc.lookup_constr intro.clbl constrs in
       let coerced_args s s' = multi_coe rel s s' abs intro.clbl intro.args in
-      let intro sys = make_intro rel ~dlbl:data.lbl ~clbl:intro.clbl ~args:(coerced_args r r') ~sys in
+      let args_rr' = coerced_args r r' in
+      let tboundary = Desc.Constr.boundary constr in
+      let env_ps = Env.extend_cells (Env.init genv) data.params in
+      let intro =
+        let benv = Env.extend_cells env_ps @@ List.map constr_cell_to_cell args_rr' in
+        let sys = Syn.eval_tm_sys rel benv tboundary in
+        make_intro rel ~dlbl:data.lbl ~clbl:intro.clbl ~args:(coerced_args r r') ~sys
+      in
       begin
-        match Desc.Constr.boundary constr with
-        | [] -> intro []
+        match tboundary with
+        | [] -> intro
         | _ ->
-          raise CanJonHelpMe
+          let faces =
+            let args_rx = coerced_args r @@ `Atom x in
+            let benv = Env.extend_cells env_ps @@ List.map constr_cell_to_cell args_rx in
+            Syn.eval_tm_sys rel benv tboundary
+          in
+
+          let fix_face =
+            ConAbsFace.gen @@ fun s s' (el : con) ->
+            let rel_ss' = Rel.equate' s s' rel in
+            let elx = make_coe rel_ss' (`Atom x) r' ~abs:(ConAbs.run rel_ss' abs) @@ Val.make el in
+            (* TODO: Favonia, is this actually safe? Shouldn't I be freshening? Also I feel weird
+               about all this unleash/make.*)
+            Abs (x, elx)
+          in
+
+          let correction = List.map fix_face faces in
+          make_fhcom rel r' r ~cap:(Delayed.make intro) ~sys:correction
       end
 
     | Data data, Neu info ->
