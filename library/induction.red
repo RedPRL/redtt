@@ -2,9 +2,6 @@ import nat
 import path
 import unit
 
-def transport (A : type) (M N : A) (p : path A M N) (C : A → type) : C M → C N =
-  λ cm → coe 0 1 cm in λ i → C (p i)
-
 def le : nat → nat → type =
   elim [
   | zero → λ _ → unit
@@ -68,11 +65,15 @@ def weak/implies/complete : (P : nat → type) →
   ((P' : nat → type) → weak/induction P') → complete/induction P =
   λ P weak p0 ps →
     let P' : nat → type = λ n → (k : nat) → (le k n) → P k in
-    let P'0 : P' zero = λ k k/le/0 → transport nat zero k (le/zero/implies/zero k k/le/0) P p0 in
+    let P'0 : P' zero =
+      λ k k/le/0 →
+      coe 0 1 p0 in λ i →
+      P (le/zero/implies/zero k k/le/0 i)
+    in
     let f (n : nat) (p'n : P' n) : (P' (suc n)) =
       λ k k/le/sn →
       elim (le/case n k k/le/sn) [
-      | inl p → transport nat (suc n) k (symm nat p) P (ps n p'n)
+      | inl p → coe 1 0 (ps n p'n) in λ i → P (p i)
       | inr l → p'n k l
       ]
     in
