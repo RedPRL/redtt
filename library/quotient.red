@@ -1,4 +1,4 @@
-import ntype
+import hlevel
 import truncation
 import equivalence
 import isotoequiv

@@ -1,5 +1,5 @@
 import path
-import ntype
+import hlevel
 
 data (A : type) ⊢ trunc where
 | ret (a : A)
