@@ -1,19 +1,6 @@
+import path
 import hlevel
 import retract
-import equivalence
-import isotoequiv
-
-def sigma/path (A : type) (B : A → type) (a : A) (b : B a) (a' : A) (b' : B a')
-  : equiv ((p : path A a a') × pathd (λ i → B (p i)) b b') (path ((a : A) × B a) (a,b) (a',b')) 
-  =
-  iso→equiv
-    ((p : path A a a') × pathd (λ i → B (p i)) b b')
-    (path ((a : A) × B a) (a,b) (a',b'))
-    ( λ (p,q) i → (p i, q i)
-    , λ r → (λ i → r i .fst, λ i → r i .snd)
-    , λ _ → refl
-    , λ _ → refl
-    )
 
 def sigma/hlevel : (l : hlevel) (A : type) (B : A → type)
   (A/level : has-hlevel l A) (B/level : (a : A) → has-hlevel l (B a))

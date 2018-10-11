@@ -66,6 +66,20 @@ def prop→hlevel : (l : hlevel) (A : type) → is-prop A → has-hlevel (hsuc l
   | hsuc (l → l/ih) → λ A A/prop → raise-hlevel (hsuc l) A (l/ih A A/prop)
   ]
 
+-- propositional type lines
+
+def is-prop-over (A : 𝕀 → type) : type =
+  (a : A 0) → (b : A 1) → pathd A a b
+
+def prop→prop-over (A : 𝕀 → type) (p : is-prop (A 1))
+  : is-prop-over A
+  =
+  λ a b i →
+    comp 0 1 (coe 0 i a in A) [
+    | i=0 → refl
+    | i=1 → p (coe 0 1 a in A) b
+    ]
+
 -- hlevel of path types
 
 def path/hlevel : (l : hlevel) (A : type)
@@ -91,15 +105,19 @@ def pathd/hlevel (l : hlevel) (A : type) (B : A → type) (p : 𝕀 → A)
           (coe 0 i b in λ j → B (p j))
           b')
 
+def path/based/contr (A : type) (a : A)
+  : is-contr ((x : _) × path _ a x) =
+  ( (a, refl)
+  , λ x i →
+    ( comp 0 1 a [
+      | i=0 → x.snd
+      | i=1 → refl
+      ]
+    , λ j →
+      comp 0 j a [
+      | i=0 → x.snd
+      | i=1 → refl
+      ]
+    )
+  )
 
-def is-prop-over (A : 𝕀 → type) : type =
-  (a : A 0) → (b : A 1) → pathd A a b
-
-def prop→prop-over (A : 𝕀 → type) (p : is-prop (A 1))
-  : is-prop-over A
-  =
-  λ a b i →
-    comp 0 1 (coe 0 i a in A) [
-    | i=0 → refl
-    | i=1 → p (coe 0 1 a in A) b
-    ]

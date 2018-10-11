@@ -1,22 +1,8 @@
 import path
 import hlevel
 import retract
-import equivalence
-import isotoequiv
 
-def pi/path (A : type) (B : A → type) (f f' : (a : A) → B a)
-  : equiv ((a : A) → path (B a) (f a) (f' a)) (path ((a : A) → B a) f f')
-  =
-  iso→equiv
-    ((a : A) → path (B a) (f a) (f' a))
-    (path ((a : A) → B a) f f')
-    ( λ g i a → g a i
-    , λ p a i → p i a
-    , λ _ → refl
-    , λ _ → refl
-    )
-
-def pi/level : (l : hlevel) (A : type) (B : A → type)
+def pi/hlevel : (l : hlevel) (A : type) (B : A → type)
   (B/level : (a : A) → has-hlevel l (B a))
   → has-hlevel l ((a : A) → B a)
   =
