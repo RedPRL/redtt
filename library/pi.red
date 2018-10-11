@@ -1,5 +1,7 @@
 import path
 import hlevel
+import retract
+import equivalence
 import isotoequiv
 
 def pi/path (A : type) (B : A → type) (f f' : (a : A) → B a)
@@ -24,10 +26,12 @@ def pi/level : (l : hlevel) (A : type) (B : A → type)
     elim l [
     | contr → λ A B B/prop f f' i a → B/prop a (f a) (f' a) i
     | hsuc (l → l/ih) → λ A B B/level f f' →
-      hlevel/transport (hsuc l)
-        ((a : A) → path (B a) (f a) (f' a))
+      retract/hlevel (hsuc l)
         (path ((a : A) → B a) f f')
-        (pi/path A B f f')
+        ((a : A) → path (B a) (f a) (f' a))
+        (λ p a i → p i a)
+        (λ g i a → g a i)
+        (λ _ → refl)
         (l/ih A (λ a → path (B a) (f a) (f' a)) (λ a → B/level a (f a) (f' a)))
     ]
   ]

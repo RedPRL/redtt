@@ -1,4 +1,5 @@
 import hlevel
+import retract
 import equivalence
 import isotoequiv
 
@@ -34,10 +35,12 @@ def sigma/hlevel : (l : hlevel) (A : type) (B : A → type)
       let A/path = A/prop a a' in
       (A/path i, prop→prop-over (λ j → B (A/path j)) (B/prop a') b b' i)
     | hsuc (l → l/ih) → λ A B A/level B/level (a,b) (a',b') →
-      hlevel/transport (hsuc l)
-        ((p : path A a a') × pathd (λ i → B (p i)) b b')
+      retract/hlevel (hsuc l)
         (path ((a : A) × B a) (a,b) (a',b')) 
-        (sigma/path A B a b a' b')
+        ((p : path A a a') × pathd (λ i → B (p i)) b b')
+        (λ r → (λ i → r i .fst, λ i → r i .snd))
+        (λ (p,q) i → (p i, q i))
+        (λ _ → refl)
         (l/ih (path A a a') (λ p → pathd (λ i → B (p i)) b b')
           (A/level a a') (λ p → pathd/hlevel (hsuc l) A B p (B/level a') b b'))
     ]
