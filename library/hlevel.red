@@ -44,8 +44,7 @@ def type/groupoid = type/of-level groupoid
 def prop→set (A : type) (A/prop : is-prop A) : is-set A =
   λ a b p q i j →
   comp 0 1 a [
-  | j=0 → A/prop a a
-  | j=1 → A/prop a b
+  | ∂[j] → A/prop a (p j)
   | i=0 → A/prop a (p j)
   | i=1 → A/prop a (q j)
   ]
