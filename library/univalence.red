@@ -1,5 +1,5 @@
 import path
-import ntype
+import hlevel
 import equivalence
 import connection
 import retract
@@ -36,15 +36,6 @@ def path→equiv (A B : type) (P : path^1 type A B) : equiv A B =
 def pi/prop (A : type) (B : A → type) (B/prop : (a : A) → is-prop (B a)) : is-prop ((a : A) → B a) =
   λ f g i a →
   B/prop a (f a) (g a) i
-
-def prop→set (A : type) (A/prop : is-prop A) : is-set A =
-  λ a b p q i j →
-  comp 0 1 a [
-  | j=0 → A/prop a a
-  | j=1 → A/prop a b
-  | i=0 → A/prop a (p j)
-  | i=1 → A/prop a (q j)
-  ]
 
 def subtype/path
   (A : type) (B : A → type)

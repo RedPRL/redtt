@@ -1,5 +1,5 @@
 import path
-import ntype
+import hlevel
 
 def fiber (A B : type) (f : A → B) (b : B) : type =
   (a : _) × path _ (f a) b
@@ -29,3 +29,12 @@ def ua/proj (A B : type) (E : equiv A B)
   =
   λ i u →
     `(vproj i u (fst E))
+
+-- equivalences preserve hlevel
+
+-- TODO: use retract instead of equiv (and don't use ua)
+def hlevel/transport (l : hlevel) (A B : type) (e : equiv A B)
+  (A/level : has-hlevel l A)
+  : has-hlevel l B
+  =
+  coe 0 1 A/level in λ i → has-hlevel l (ua A B e i)

@@ -1,5 +1,5 @@
 import path
-import ntype
+import hlevel
 import connection
 import J
 import void
