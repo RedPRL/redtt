@@ -87,138 +87,136 @@ struct
     | _ -> raise PleaseRaiseProperError
 
   let rec equate_con qenv rel ty el0 el1 =
-    match ty with
-    | Pi {dom; cod}  ->
-      let x, qenv_x = extend qenv dom in
-      let cod_x = Clo.inst rel cod (Val (LazyVal.make x)) in
-      let bdy0_x = Con.run rel @@ Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el0 in
-      let bdy1_x = Con.run rel @@ Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el1 in
-      let bdy_x = equate_con qenv_x rel cod_x bdy0_x bdy1_x in
-      Tm.lam (Clo.name cod) bdy_x
-
-    | Sg {dom; cod} ->
-      let fst0 = Con.run rel @@ Con.plug rel Fst el0 in
-      let fst1 = Con.run rel @@ Con.plug rel Fst el1 in
-      let fst = equate_con qenv rel (Val.unleash dom) fst0 fst1 in
-      let cod = Clo.inst rel cod (Val (LazyVal.make fst0)) in
-      let snd0 = Con.run rel @@ Con.plug rel Snd el0 in
-      let snd1 = Con.run rel @@ Con.plug rel Snd el1 in
-      let snd = equate_con qenv rel cod snd0 snd1 in
-      Tm.cons fst snd
-
-    | Ext extclo ->
-      let nms = ExtClo.names extclo in
-      let xs = Bwd.map Name.named nms in
-      let qenv_xs = QEnv.abs xs qenv in
-      let rs = Bwd.fold_right (fun x rs -> `Atom x :: rs) xs [] in
-      let ty_xs = ExtClo.inst_then_fst rel extclo (List.map (fun r -> Dim r) rs) in
-      let bdy0_xs = Con.run rel @@ Con.plug rel (ExtApp rs) el0 in
-      let bdy1_xs = Con.run rel @@ Con.plug rel (ExtApp rs) el1 in
-      let bdy_xs = equate_con qenv_xs rel ty_xs bdy0_xs bdy1_xs in
-      Tm.ext_lam nms bdy_xs
-
-    | Restrict face ->
-      let r, r', ty_rr' = face in
-      let tr = quote_dim qenv r in
-      let tr' = quote_dim qenv r' in
-      let rel_rr' = Rel.equate' r r' rel in
-      let force0 = Con.run rel_rr' @@ Con.plug rel_rr' RestrictForce el0 in
-      let force1 = Con.run rel_rr' @@ Con.plug rel_rr' RestrictForce el1 in
-      let bdy = equate_con qenv rel_rr' (LazyVal.unleash ty_rr') force0 force1 in
-      Tm.make @@ Tm.RestrictThunk (tr, tr', Some bdy)
-
-    | V {r; ty0; ty1; equiv} ->
-      let tr = quote_dim qenv r in
-      let rel_r0 = Rel.equate' r `Dim0 rel in
-      let tm0 = equate_con qenv rel_r0 (Val.unleash ty0) (Con.run rel_r0 el0) (Con.run rel_r0 el1) in
-      let func = Val.run rel_r0 @@ Val.plug rel_r0 Fst equiv in
-      let vproj0 = Con.run rel @@ Con.plug rel (VProj {r; func = TypedVal.make func}) el0 in
-      let vproj1 = Con.run rel @@ Con.plug rel (VProj {r; func = TypedVal.make func}) el1 in
-      let tm1 = equate_con qenv rel (Val.unleash ty1) vproj0 vproj1 in
-      Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
-
-    | HCom ({r; r'; ty = `Pos; cap = ty; sys} as hcom) ->
-      let tr, tr' = quote_dim qenv r, quote_dim qenv r' in
-      let cap0 = Con.run rel @@ Con.plug rel (Cap {r; r'; ty; sys}) el0 in
-      let cap1 = Con.run rel @@ Con.plug rel (Cap {r; r'; ty; sys}) el1 in
-      let tcap = equate_con qenv rel (Val.unleash ty) cap0 cap1 in
-      let equate_boundary (ri, r'i, abs) =
-        let rel = Rel.equate' ri r'i rel in
-        let tri, tr'i = quote_dim qenv ri, quote_dim qenv r'i in
-        let b = equate_con qenv rel (ConAbs.inst rel (LazyValAbs.unleash abs) r') (Con.run rel el0) (Con.run rel el1) in
-        tri, tr'i, Some b
-      in
-      let tsys = List.map equate_boundary sys in
-      Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
-
-    | Data data ->
-      begin
-        match el0, el1 with
-        | Intro intro0, Intro intro1 when intro0.clbl = intro1.clbl ->
-
-          let rec go acc tyenv tele args0 args1 =
-            match tele, args0, args1 with
-            | Desc.TNil _, [], [] ->
-              Bwd.to_list acc
-
-            | Desc.TCons (`Const ty, Tm.B (_, tele)), `Const v0 :: args0, `Const v1 :: args1 ->
-              let vty = Syn.eval rel tyenv ty in
-              let tm = equate_val qenv rel vty v0 v1 in
-              let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_delayed v0) in
-              go (acc #< tm) tyenv tele args0 args1
-
-            | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), `Rec (_, v0) :: args0, `Rec (_, v1) :: args1 ->
-              let vty = Data data in
-              let tm = equate_val qenv rel vty v0 v1 in
-              let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_delayed v0) in
-              go (acc #< tm) tyenv tele args0 args1
-
-            | Desc.TCons (`Dim, Tm.B (_, tele)), `Dim r0 :: args0, `Dim r1 :: args1 ->
-              let tr = equate_dim qenv rel r0 r1 in
-              let tyenv = Env.extend_cell tyenv @@ Dim r0 in
-              go (acc #< tr) tyenv tele args0 args1
-
-            | _ ->
-              (* unequal length *)
-              raise PleaseRaiseProperError
-          in
-
-          let clbl = intro0.clbl in
-          let genv, constrs = data.constrs in
-          let constr = Desc.lookup_constr clbl constrs in
-          let tyenv0 = Env.init genv in
-          let tyenv = Env.extend_cells tyenv0 data.params in
-          let args = go Emp tyenv constr intro0.args intro1.args in
-          let params =
-            let desc = GlobalEnv.lookup_datatype data.lbl genv in
-            equate_data_params qenv rel tyenv0 desc.body data.params data.params
-          in
-
-          Tm.make @@ Tm.Intro (data.lbl, clbl, failwith "params", args)
-
-        | HCom ({ty = `Pos; _} as hcom0), HCom ({ty = `Pos; _} as hcom1) ->
-          let r = equate_dim qenv rel hcom0.r hcom1.r in
-          let r' = equate_dim qenv rel hcom0.r' hcom1.r' in
-          let cap = equate_con qenv rel ty (Val.unleash hcom0.cap) (Val.unleash hcom1.cap) in
-          let sys = equate_con_abs_sys qenv rel ty hcom0.sys hcom1.sys in
-          Tm.make @@ Tm.FHCom {r; r'; cap; sys}
-
-        | Neu neu0, Neu neu1 ->
-          equate_neutroid qenv rel neu0.neu neu1.neu
-
-        | _ ->
-          raise PleaseRaiseProperError
-      end
-
-    | Univ _ ->
-      equate_tycon qenv rel el0 el1
-
-    | Neu _ ->
-      equate_in_neutral_ty qenv rel el0 el1
-
+    match el0, el1 with
+    | Neu neu0, Neu neu1 ->
+      equate_neutroid qenv rel neu0.neu neu1.neu
     | _ ->
-      (* This might be done? *)
-      raise PleaseFillIn
+      match ty with
+      | Pi {dom; cod}  ->
+        let x, qenv_x = extend qenv dom in
+        let cod_x = Clo.inst rel cod (Val (LazyVal.make x)) in
+        let bdy0_x = Con.run rel @@ Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el0 in
+        let bdy1_x = Con.run rel @@ Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el1 in
+        let bdy_x = equate_con qenv_x rel cod_x bdy0_x bdy1_x in
+        Tm.lam (Clo.name cod) bdy_x
+
+      | Sg {dom; cod} ->
+        let fst0 = Con.run rel @@ Con.plug rel Fst el0 in
+        let fst1 = Con.run rel @@ Con.plug rel Fst el1 in
+        let fst = equate_con qenv rel (Val.unleash dom) fst0 fst1 in
+        let cod = Clo.inst rel cod (Val (LazyVal.make fst0)) in
+        let snd0 = Con.run rel @@ Con.plug rel Snd el0 in
+        let snd1 = Con.run rel @@ Con.plug rel Snd el1 in
+        let snd = equate_con qenv rel cod snd0 snd1 in
+        Tm.cons fst snd
+
+      | Ext extclo ->
+        let nms = ExtClo.names extclo in
+        let xs = Bwd.map Name.named nms in
+        let qenv_xs = QEnv.abs xs qenv in
+        let rs = Bwd.fold_right (fun x rs -> `Atom x :: rs) xs [] in
+        let ty_xs = ExtClo.inst_then_fst rel extclo (List.map (fun r -> Dim r) rs) in
+        let bdy0_xs = Con.run rel @@ Con.plug rel (ExtApp rs) el0 in
+        let bdy1_xs = Con.run rel @@ Con.plug rel (ExtApp rs) el1 in
+        let bdy_xs = equate_con qenv_xs rel ty_xs bdy0_xs bdy1_xs in
+        Tm.ext_lam nms bdy_xs
+
+      | Restrict face ->
+        let r, r', ty_rr' = face in
+        let tr = quote_dim qenv r in
+        let tr' = quote_dim qenv r' in
+        let rel_rr' = Rel.equate' r r' rel in
+        let force0 = Con.run rel_rr' @@ Con.plug rel_rr' RestrictForce el0 in
+        let force1 = Con.run rel_rr' @@ Con.plug rel_rr' RestrictForce el1 in
+        let bdy = equate_con qenv rel_rr' (LazyVal.unleash ty_rr') force0 force1 in
+        Tm.make @@ Tm.RestrictThunk (tr, tr', Some bdy)
+
+      | V {r; ty0; ty1; equiv} ->
+        let tr = quote_dim qenv r in
+        let rel_r0 = Rel.equate' r `Dim0 rel in
+        let tm0 = equate_con qenv rel_r0 (Val.unleash ty0) (Con.run rel_r0 el0) (Con.run rel_r0 el1) in
+        let func = Val.run rel_r0 @@ Val.plug rel_r0 Fst equiv in
+        let vproj0 = Con.run rel @@ Con.plug rel (VProj {r; func = TypedVal.make func}) el0 in
+        let vproj1 = Con.run rel @@ Con.plug rel (VProj {r; func = TypedVal.make func}) el1 in
+        let tm1 = equate_con qenv rel (Val.unleash ty1) vproj0 vproj1 in
+        Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
+
+      | HCom ({r; r'; ty = `Pos; cap = ty; sys} as hcom) ->
+        let tr, tr' = quote_dim qenv r, quote_dim qenv r' in
+        let cap0 = Con.run rel @@ Con.plug rel (Cap {r; r'; ty; sys}) el0 in
+        let cap1 = Con.run rel @@ Con.plug rel (Cap {r; r'; ty; sys}) el1 in
+        let tcap = equate_con qenv rel (Val.unleash ty) cap0 cap1 in
+        let equate_boundary (ri, r'i, abs) =
+          let rel = Rel.equate' ri r'i rel in
+          let tri, tr'i = quote_dim qenv ri, quote_dim qenv r'i in
+          let b = equate_con qenv rel (ConAbs.inst rel (LazyValAbs.unleash abs) r') (Con.run rel el0) (Con.run rel el1) in
+          tri, tr'i, Some b
+        in
+        let tsys = List.map equate_boundary sys in
+        Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
+
+      | Data data ->
+        begin
+          match el0, el1 with
+          | Intro intro0, Intro intro1 when intro0.clbl = intro1.clbl ->
+
+            let rec go acc tyenv tele args0 args1 =
+              match tele, args0, args1 with
+              | Desc.TNil _, [], [] ->
+                Bwd.to_list acc
+
+              | Desc.TCons (`Const ty, Tm.B (_, tele)), `Const v0 :: args0, `Const v1 :: args1 ->
+                let vty = Syn.eval rel tyenv ty in
+                let tm = equate_val qenv rel vty v0 v1 in
+                let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_delayed v0) in
+                go (acc #< tm) tyenv tele args0 args1
+
+              | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), `Rec (_, v0) :: args0, `Rec (_, v1) :: args1 ->
+                let vty = Data data in
+                let tm = equate_val qenv rel vty v0 v1 in
+                let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_delayed v0) in
+                go (acc #< tm) tyenv tele args0 args1
+
+              | Desc.TCons (`Dim, Tm.B (_, tele)), `Dim r0 :: args0, `Dim r1 :: args1 ->
+                let tr = equate_dim qenv rel r0 r1 in
+                let tyenv = Env.extend_cell tyenv @@ Dim r0 in
+                go (acc #< tr) tyenv tele args0 args1
+
+              | _ ->
+                (* unequal length *)
+                raise PleaseRaiseProperError
+            in
+
+            let clbl = intro0.clbl in
+            let genv, constrs = data.constrs in
+            let constr = Desc.lookup_constr clbl constrs in
+            let tyenv0 = Env.init genv in
+            let tyenv = Env.extend_cells tyenv0 data.params in
+            let args = go Emp tyenv constr intro0.args intro1.args in
+            let params =
+              let desc = GlobalEnv.lookup_datatype data.lbl genv in
+              equate_data_params qenv rel tyenv0 desc.body data.params data.params
+            in
+
+            Tm.make @@ Tm.Intro (data.lbl, clbl, failwith "params", args)
+
+          | HCom ({ty = `Pos; _} as hcom0), HCom ({ty = `Pos; _} as hcom1) ->
+            let r = equate_dim qenv rel hcom0.r hcom1.r in
+            let r' = equate_dim qenv rel hcom0.r' hcom1.r' in
+            let cap = equate_con qenv rel ty (Val.unleash hcom0.cap) (Val.unleash hcom1.cap) in
+            let sys = equate_con_abs_sys qenv rel ty hcom0.sys hcom1.sys in
+            Tm.make @@ Tm.FHCom {r; r'; cap; sys}
+
+          | _ ->
+            raise PleaseRaiseProperError
+        end
+
+      | Univ _ ->
+        equate_tycon qenv rel el0 el1
+
+      | _ ->
+        (* This might be done? *)
+        raise PleaseFillIn
 
   and equate_data_params qenv rel tyenv tele params0 params1 =
     let rec go acc tyenv tele prms0 prms1 =
