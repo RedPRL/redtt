@@ -155,8 +155,8 @@ struct
   and equate_neu qenv rel neu0 neu1 =
     let hd = equate_hd qenv rel neu0.head neu1.head in
     let stk = Bwd.fold_right2
-      (fun f0 f1 stk -> equate_frame qenv rel f0 f1 :: stk)
-      neu0.frames neu1.frames []
+        (fun f0 f1 stk -> equate_frame qenv rel f0 f1 :: stk)
+        neu0.frames neu1.frames []
     in
     Tm.make @@ Tm.Up (hd, stk)
 
@@ -176,19 +176,17 @@ struct
     match hd0, hd1 with
     | Lvl l0, Lvl l1 ->
       if l0 = l1 then
-        Tm.Ix (QEnv.ix_of_lvl l0 qenv, raise CanJonHelpMe)
+        Tm.Ix (QEnv.ix_of_lvl l0 qenv, `Only)
       else
         raise PleaseRaiseProperError
     | Var info0, Var info1 ->
       if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
-        raise CanJonHelpMe
-        (* Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift} *)
+        Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift}
       else
         raise PleaseRaiseProperError
     | Meta info0, Meta info1 ->
       if info0.name = info1.name && info0.ushift = info1.ushift then
-        raise CanJonHelpMe
-        (* Tm.Meta {name = info0.name; ushift = info0.ushift} *)
+        Tm.Meta {name = info0.name; ushift = info0.ushift}
       else
         raise PleaseRaiseProperError
 
@@ -294,8 +292,8 @@ struct
       let ty1 = equate_tyval qenv rel info0.ty1 info1.ty1 in
       let equiv_ty =
         let env = Env.init_isolated
-          [Val (LazyVal.make @@ Val.unleash info0.ty1);
-           Val (LazyVal.make @@ Val.unleash info0.ty0)] in
+            [Val (LazyVal.make @@ Val.unleash info0.ty1);
+             Val (LazyVal.make @@ Val.unleash info0.ty0)] in
         Syn.eval rel_r0 env @@ Tm.equiv (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
       in
       let equiv = equate_val qenv rel_r0 equiv_ty info0.equiv info0.equiv in
@@ -363,11 +361,11 @@ struct
 
   and equate_sys_wrapper : 'a 'b. ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b list =
     fun face_equater sys0 sys1 ->
-    try
-      List.map2 face_equater sys0 sys1
-    with
-    | Invalid_argument _ ->
-      raise PleaseRaiseProperError (* mismatched lengths *)
+      try
+        List.map2 face_equater sys0 sys1
+      with
+      | Invalid_argument _ ->
+        raise PleaseRaiseProperError (* mismatched lengths *)
 
   and equate_con_abs_sys qenv rel ty = equate_sys_wrapper (equate_con_abs_face qenv rel ty)
   and equate_tycon_abs_sys qenv rel = equate_sys_wrapper (equate_tycon_abs_face qenv rel)
