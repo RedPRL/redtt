@@ -170,6 +170,8 @@ struct
       raise CanJonHelpMe
     | HCom ({ty = `Pos; _} as hcom0), HCom ({ty = `Pos; _} as hcom1) ->
       raise CanJonHelpMe
+    | Neu neu0, Neu neu1 ->
+      equate_neutroid qenv rel neu0.neu neu1.neu
     | _ ->
       raise PleaseRaiseProperError
 
