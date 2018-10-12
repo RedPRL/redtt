@@ -381,7 +381,8 @@ struct
       Tm.make @@ Tm.Ext (Tm.NB (nms, (ty_xs, sys_xs)))
 
     | Restrict face0, Restrict face1 ->
-      raise CanJonHelpMe
+      let face = equate_tycon_face qenv rel face0 face1 in
+      Tm.make @@ Tm.Restrict face
 
     | V info0, V info1 ->
       let rel_r0 = Rel.equate' info0.r `Dim0 rel in
@@ -468,6 +469,14 @@ struct
     let bdy0 = LazyVal.unleash bdy0 in
     let bdy1 = LazyVal.unleash bdy1 in
     r, r', Some (equate_con qenv rel ty_rr' bdy0 bdy1)
+
+  and equate_tycon_face qenv rel (r0, r'0, bdy0) (r1, r'1, bdy1) =
+    let r = equate_dim qenv rel r0 r1 in
+    let r' = equate_dim qenv rel r'0 r'1 in
+    let rel = Rel.equate' r0 r'0 rel in
+    let bdy0 = LazyVal.unleash bdy0 in
+    let bdy1 = LazyVal.unleash bdy1 in
+    r, r', Some (equate_tycon qenv rel bdy0 bdy1)
 
   and equate_sys_wrapper : 'a 'b. ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b list =
     fun face_equater sys0 sys1 ->
