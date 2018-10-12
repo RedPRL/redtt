@@ -117,8 +117,15 @@ struct
       let bdy_xs = equate_con qenv_xs rel ty_xs bdy0_xs bdy1_xs in
       Tm.ext_lam nms bdy_xs
 
-    | Restrict _ ->
-      raise CanJonHelpMe
+    | Restrict face ->
+      let r, r', ty_rr' = face in
+      let tr = quote_dim qenv r in
+      let tr' = quote_dim qenv r' in
+      let rel_rr' = Rel.equate' r r' rel in
+      let force0 = Con.run rel_rr' @@ Con.plug rel_rr' RestrictForce el0 in
+      let force1 = Con.run rel_rr' @@ Con.plug rel_rr' RestrictForce el1 in
+      let bdy = equate_con qenv rel_rr' (LazyVal.unleash ty_rr') force0 force1 in
+      Tm.make @@ Tm.RestrictThunk (tr, tr', Some bdy)
 
     | V {r; ty0; ty1; equiv} ->
       let tr = quote_dim qenv r in
