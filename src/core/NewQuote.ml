@@ -1,5 +1,5 @@
 open RedBasis
-open Bwd
+open Bwd open BwdNotation
 open NewDomain
 module Rel = NewRestriction
 
@@ -151,11 +151,50 @@ struct
       let tsys = List.map equate_boundary sys in
       Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
 
-    | Data info ->
+    | Data data ->
       begin
         match el0, el1 with
-        | Intro intro0, Intro intro1 ->
-          raise CanJonHelpMe
+        | Intro intro0, Intro intro1 when intro0.clbl = intro1.clbl ->
+
+          let rec go acc tyenv tele args0 args1 =
+            match tele, args0, args1 with
+            | Desc.TNil _, [], [] ->
+              Bwd.to_list acc
+
+            | Desc.TCons (`Const ty, Tm.B (_, tele)), `Const v0 :: args0, `Const v1 :: args1 ->
+              let vty = Syn.eval rel tyenv ty in
+              let tm = equate_val qenv rel vty v0 v1 in
+              let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_delayed v0) in
+              go (acc #< tm) tyenv tele args0 args1
+
+            | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), `Rec (_, v0) :: args0, `Rec (_, v1) :: args1 ->
+              let vty = Data data in
+              let tm = equate_val qenv rel vty v0 v1 in
+              let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_delayed v0) in
+              go (acc #< tm) tyenv tele args0 args1
+
+            | Desc.TCons (`Dim, Tm.B (_, tele)), `Dim r0 :: args0, `Dim r1 :: args1 ->
+              let tr = equate_dim qenv rel r0 r1 in
+              let tyenv = Env.extend_cell tyenv @@ Dim r0 in
+              go (acc #< tr) tyenv tele args0 args1
+
+            | _ ->
+              (* unequal length *)
+              raise PleaseRaiseProperError
+          in
+
+          let clbl = intro0.clbl in
+          let genv, constrs = data.constrs in
+          let constr = Desc.lookup_constr clbl constrs in
+          let tyenv0 = Env.init genv in
+          let tyenv = Env.extend_cells tyenv0 data.params in
+          let args = go Emp tyenv constr intro0.args intro1.args in
+          let params =
+            let desc = GlobalEnv.lookup_datatype data.lbl genv in
+            equate_data_params qenv rel tyenv0 desc.body data.params data.params
+          in
+
+          Tm.make @@ Tm.Intro (data.lbl, clbl, failwith "params", args)
 
         | HCom ({ty = `Pos; _} as hcom0), HCom ({ty = `Pos; _} as hcom1) ->
           let r = equate_dim qenv rel hcom0.r hcom1.r in
@@ -180,6 +219,23 @@ struct
     | _ ->
       (* This might be done? *)
       raise PleaseFillIn
+
+  and equate_data_params qenv rel tyenv tele params0 params1 =
+    let rec go acc tyenv tele prms0 prms1 =
+      match tele, prms0, prms1 with
+      | Desc.TNil _, [], [] ->
+        Bwd.to_list acc
+
+      | Desc.TCons (ty, Tm.B (_, tele)), Val v0 :: prms0, Val v1 :: prms1 ->
+        let vty = Syn.eval rel tyenv ty in
+        let tm = equate_con qenv rel vty (LazyVal.unleash v0) (LazyVal.unleash v1) in
+        let tyenv = Env.extend_cell tyenv @@ Val v0 in
+        go (acc #< tm) tyenv tele prms0 prms1
+
+      | _ ->
+        raise PleaseRaiseProperError
+    in
+    go Emp tyenv tele params0 params1
 
   and equate_in_neutral_ty qenv rel el0 el1 =
     match el0, el1 with
@@ -324,15 +380,20 @@ struct
       let sys_xs = equate_con_sys qenv_xs rel ty0_xs sys0_xs sys1_xs in
       Tm.make @@ Tm.Ext (Tm.NB (nms, (ty_xs, sys_xs)))
 
+    | Restrict face0, Restrict face1 ->
+      raise CanJonHelpMe
+
     | V info0, V info1 ->
       let rel_r0 = Rel.equate' info0.r `Dim0 rel in
       let r = equate_dim qenv rel info0.r info1.r in
       let ty0 = equate_tyval qenv rel_r0 info0.ty0 info0.ty1 in
       let ty1 = equate_tyval qenv rel info0.ty1 info1.ty1 in
       let equiv_ty =
-        let env = Env.init_isolated
+        let env =
+          Env.init_isolated
             [Val (LazyVal.make @@ Val.unleash info0.ty1);
-             Val (LazyVal.make @@ Val.unleash info0.ty0)] in
+             Val (LazyVal.make @@ Val.unleash info0.ty0)]
+        in
         Syn.eval rel_r0 env @@ Tm.equiv (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
       in
       let equiv = equate_val qenv rel_r0 equiv_ty info0.equiv info0.equiv in
@@ -351,7 +412,15 @@ struct
       else
         raise PleaseRaiseProperError
 
-    | _ -> raise PleaseFillIn
+    | Data data0, Data data1 when data0.lbl = data1.lbl ->
+      let genv, _ = data0.constrs in
+      let desc = GlobalEnv.lookup_datatype data0.lbl genv in
+      let tyenv = Env.init genv in
+      let params = equate_data_params qenv rel tyenv desc.body data0.params data1.params in
+      Tm.make @@ Tm.Data {lbl = data0.lbl; params}
+
+    | _ ->
+      raise PleaseRaiseProperError
 
   and equate_tyval qenv rel ty0 ty1 =
     equate_tycon qenv rel (Val.unleash ty0) (Val.unleash ty1)
