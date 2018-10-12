@@ -146,15 +146,18 @@ struct
     generic_constrained env ty []
 
   let rec equate env ty el0 el1 =
-    match unleash ty with
-    | Pi {dom; cod} ->
+    match unleash ty, unleash el0, unleash el1 with
+    | _, Up up0, Up up1 ->
+      Tm.up @@ equate_neu env up0.neu up1.neu
+
+    | Pi {dom; cod}, _, _ ->
       let var = generic env dom in
       let vcod = inst_clo cod var in
       let app0 = apply el0 var in
       let app1 = apply el1 var in
       Tm.lam (clo_name cod) @@ equate (Env.succ env) vcod app0 app1
 
-    | Sg {dom; cod} ->
+    | Sg {dom; cod}, _, _ ->
       let el00 = do_fst el0 in
       let el10 = do_fst el1 in
       let q0 = equate env dom el00 el10 in
@@ -162,7 +165,7 @@ struct
       let q1 = equate env vcod (do_snd el0) (do_snd el1) in
       Tm.cons q0 q1
 
-    | Ext abs ->
+    | Ext abs, _, _ ->
       let xs, (tyx, _) = Domain.ExtAbs.unleash abs in
       let xs_fwd = Bwd.to_list xs in
       let rs = List.map (fun x -> `Atom x) xs_fwd in
@@ -171,7 +174,7 @@ struct
       Tm.ext_lam (Bwd.map Name.name xs) @@
       equate (Env.abs env xs_fwd) tyx app0 app1
 
-    | Later ltr ->
+    | Later ltr, _, _ ->
       let tick = TickGen (`Lvl (None, Env.len env)) in
       let prev0 = prev tick el0 in
       let prev1 = prev tick el1 in
@@ -179,7 +182,7 @@ struct
       let bdy = equate (Env.succ env) ty prev0 prev1 in
       Tm.make @@ Tm.Next (Tm.B (None, bdy))
 
-    | Restrict face ->
+    | Restrict face, _, _ ->
       begin
         match face with
         | Face.False (r, r') ->
@@ -206,7 +209,7 @@ struct
           Tm.make @@ Tm.RestrictThunk (tr, tr', Some tm)
       end
 
-    | V info ->
+    | V info, _, _ ->
       let tr = quote_dim env @@ `Atom info.x in
       let phi_r0 = I.equate `Dim0 (`Atom info.x) in
       let tm0 = equate env (Domain.Value.act phi_r0 info.ty0) (Domain.Value.act phi_r0 el0) (Domain.Value.act phi_r0 el1) in
@@ -216,7 +219,7 @@ struct
       let tm1 = equate env info.ty1 vproj0 vproj1 in
       Tm.make @@ Tm.VIn {r = tr; tm0; tm1}
 
-    | FHCom info ->
+    | FHCom info, _, _ ->
       let s, s' = Dir.unleash info.dir in
       let ts, ts' = quote_dim env s, quote_dim env s' in
 
@@ -236,127 +239,122 @@ struct
 
       Tm.make @@ Tm.Box {r = ts; r' = ts'; cap = tcap; sys = tsys}
 
-    | tycon ->
-      match tycon, unleash el0, unleash el1 with
-      | _, Univ info0, Univ info1 ->
-        if info0.kind = info1.kind && info0.lvl = info1.lvl then
-          Tm.univ ~kind:info0.kind ~lvl:info0.lvl
-        else
-          failwith "Expected equal universe levels"
+    | _, Univ info0, Univ info1 ->
+      if info0.kind = info1.kind && info0.lvl = info1.lvl then
+        Tm.univ ~kind:info0.kind ~lvl:info0.lvl
+      else
+        failwith "Expected equal universe levels"
 
-      | _, Pi pi0, Pi pi1 ->
-        let dom = equate env ty pi0.dom pi1.dom in
-        let var = generic env pi0.dom in
-        let vcod0 = inst_clo pi0.cod var in
-        let vcod1 = inst_clo pi1.cod var in
-        let cod = equate (Env.succ env) ty vcod0 vcod1 in
-        Tm.pi (clo_name pi0.cod) dom cod
+    | _, Pi pi0, Pi pi1 ->
+      let dom = equate env ty pi0.dom pi1.dom in
+      let var = generic env pi0.dom in
+      let vcod0 = inst_clo pi0.cod var in
+      let vcod1 = inst_clo pi1.cod var in
+      let cod = equate (Env.succ env) ty vcod0 vcod1 in
+      Tm.pi (clo_name pi0.cod) dom cod
 
-      | _, Data info0, Data info1 ->
-        if info0.lbl = info1.lbl then
-          let lbl = info0.lbl in
-          let desc = Sig.lookup_datatype lbl in
-          let params = equate_data_params env lbl desc.body info0.params info1.params in
-          Tm.make @@ Tm.Data {lbl; params}
-        else
-          raise @@ E (UnequalLbl (info0.lbl, info1.lbl))
+    | _, Data info0, Data info1 ->
+      if info0.lbl = info1.lbl then
+        let lbl = info0.lbl in
+        let desc = Sig.lookup_datatype lbl in
+        let params = equate_data_params env lbl desc.body info0.params info1.params in
+        Tm.make @@ Tm.Data {lbl; params}
+      else
+        raise @@ E (UnequalLbl (info0.lbl, info1.lbl))
 
-      | _, Later ltr0, Later ltr1 ->
-        let tick = TickGen (`Lvl (None, Env.len env)) in
-        let vcod0 = inst_tick_clo ltr0 tick in
-        let vcod1 = inst_tick_clo ltr1 tick in
-        let cod = equate (Env.succ env) ty vcod0 vcod1 in
-        Tm.make @@ Tm.Later (Tm.B (None, cod))
+    | _, Later ltr0, Later ltr1 ->
+      let tick = TickGen (`Lvl (None, Env.len env)) in
+      let vcod0 = inst_tick_clo ltr0 tick in
+      let vcod1 = inst_tick_clo ltr1 tick in
+      let cod = equate (Env.succ env) ty vcod0 vcod1 in
+      Tm.make @@ Tm.Later (Tm.B (None, cod))
 
-      | _, Sg sg0, Sg sg1 ->
-        let dom = equate env ty sg0.dom sg1.dom in
-        let var = generic env sg0.dom in
-        let vcod0 = inst_clo sg0.cod var in
-        let vcod1 = inst_clo sg1.cod var in
-        let cod = equate (Env.succ env) ty vcod0 vcod1 in
-        Tm.sg (clo_name sg0.cod) dom cod
+    | _, Sg sg0, Sg sg1 ->
+      let dom = equate env ty sg0.dom sg1.dom in
+      let var = generic env sg0.dom in
+      let vcod0 = inst_clo sg0.cod var in
+      let vcod1 = inst_clo sg1.cod var in
+      let cod = equate (Env.succ env) ty vcod0 vcod1 in
+      Tm.sg (clo_name sg0.cod) dom cod
 
-      | _, Ext abs0, Ext abs1 ->
-        let xs, (ty0x, sys0x) = Domain.ExtAbs.unleash abs0 in
-        let xs_fwd = Bwd.to_list xs in
-        let ty1x, sys1x = Domain.ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
-        let envx = Env.abs env xs_fwd in
-        let tyx = equate envx ty ty0x ty1x in
-        let sysx = equate_val_sys envx ty0x sys0x sys1x in
-        Tm.make @@ Tm.Ext (Tm.NB (Bwd.map Name.name xs, (tyx, sysx)))
+    | _, Ext abs0, Ext abs1 ->
+      let xs, (ty0x, sys0x) = Domain.ExtAbs.unleash abs0 in
+      let xs_fwd = Bwd.to_list xs in
+      let ty1x, sys1x = Domain.ExtAbs.inst abs1 @@ Bwd.map (fun x -> `Atom x) xs in
+      let envx = Env.abs env xs_fwd in
+      let tyx = equate envx ty ty0x ty1x in
+      let sysx = equate_val_sys envx ty0x sys0x sys1x in
+      Tm.make @@ Tm.Ext (Tm.NB (Bwd.map Name.name xs, (tyx, sysx)))
 
-      | _, Restrict face0, Restrict face1 ->
-        let univ = D.make @@ Univ {lvl = `Omega; kind = `Pre} in
-        let face = equate_val_face env univ face0 face1 in
-        Tm.make @@ Tm.Restrict face
+    | _, Restrict face0, Restrict face1 ->
+      let univ = D.make @@ Univ {lvl = `Omega; kind = `Pre} in
+      let face = equate_val_face env univ face0 face1 in
+      Tm.make @@ Tm.Restrict face
 
-      | _, V info0, V info1 ->
-        let x0 = info0.x in
-        let x1 = info1.x in
-        let tr = equate_atom env x0 x1 in
-        let ty0 = equate_ty env info0.ty0 info1.ty0 in
-        let ty1 = equate_ty env info0.ty1 info1.ty1 in
-        let equiv_ty = V.Macro.equiv info0.ty0 info1.ty1 in
-        let equiv = equate env equiv_ty info0.equiv info1.equiv in
-        Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
+    | _, V info0, V info1 ->
+      let x0 = info0.x in
+      let x1 = info1.x in
+      let tr = equate_atom env x0 x1 in
+      let ty0 = equate_ty env info0.ty0 info1.ty0 in
+      let ty1 = equate_ty env info0.ty1 info1.ty1 in
+      let equiv_ty = V.Macro.equiv info0.ty0 info1.ty1 in
+      let equiv = equate env equiv_ty info0.equiv info1.equiv in
+      Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
 
-      | _, Up up0, Up up1 ->
-        Tm.up @@ equate_neu env up0.neu up1.neu
+    | _, FHCom fhcom0, FHCom fhcom1 ->
+      let tr, tr' = equate_dir env fhcom0.dir fhcom1.dir in
+      let cap = equate env ty fhcom0.cap fhcom1.cap in
+      let sys = equate_comp_sys env ty fhcom0.sys fhcom1.sys in
+      Tm.make @@ Tm.FHCom {r = tr; r' = tr'; cap; sys}
 
-      | _, FHCom fhcom0, FHCom fhcom1 ->
-        let tr, tr' = equate_dir env fhcom0.dir fhcom1.dir in
-        let cap = equate env ty fhcom0.cap fhcom1.cap in
-        let sys = equate_comp_sys env ty fhcom0.sys fhcom1.sys in
-        Tm.make @@ Tm.FHCom {r = tr; r' = tr'; cap; sys}
+    | _, HCom hcom0, HCom hcom1 ->
+      begin
+        try
+          let tr, tr' = equate_dir env hcom0.dir hcom1.dir in
+          let ty = equate_ty env hcom0.ty hcom1.ty in
+          let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
+          let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
+          Tm.up (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, [])
+        with
+        | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
+      end
 
-      | _, HCom hcom0, HCom hcom1 ->
-        begin
-          try
-            let tr, tr' = equate_dir env hcom0.dir hcom1.dir in
-            let ty = equate_ty env hcom0.ty hcom1.ty in
-            let cap = equate env hcom0.ty hcom0.cap hcom1.cap in
-            let sys = equate_comp_sys env hcom0.ty hcom0.sys hcom1.sys in
-            Tm.up (Tm.HCom {r = tr; r' = tr'; ty; cap; sys}, [])
-          with
-          | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
-        end
+    | _, Coe coe0, Coe coe1 ->
+      let tr, tr' = equate_dir env coe0.dir coe1.dir in
+      let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
+      let bnd = equate_val_abs env univ coe0.abs coe1.abs in
+      let tyr =
+        let r, _ = Dir.unleash coe0.dir in
+        Abs.inst1 coe0.abs r
+      in
+      let tm = equate env tyr coe0.el coe1.el in
+      Tm.up (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, [])
 
-      | _, Coe coe0, Coe coe1 ->
-        let tr, tr' = equate_dir env coe0.dir coe1.dir in
-        let univ = make @@ Univ {kind = `Pre; lvl = `Omega} in
-        let bnd = equate_val_abs env univ coe0.abs coe1.abs in
-        let tyr =
-          let r, _ = Dir.unleash coe0.dir in
-          Abs.inst1 coe0.abs r
-        in
-        let tm = equate env tyr coe0.el coe1.el in
-        Tm.up (Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, [])
+    | _, GHCom ghcom0, GHCom ghcom1 ->
+      begin
+        try
+          let tr, tr' = equate_dir env ghcom0.dir ghcom1.dir in
+          let ty = equate_ty env ghcom0.ty ghcom1.ty in
+          let cap = equate env ghcom0.ty ghcom0.cap ghcom1.cap in
+          let sys = equate_comp_sys env ghcom0.ty ghcom0.sys ghcom1.sys in
+          Tm.up (Tm.GHCom {r = tr; r' = tr'; ty; cap; sys}, [])
+        with
+        | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
+      end
 
-      | _, GHCom ghcom0, GHCom ghcom1 ->
-        begin
-          try
-            let tr, tr' = equate_dir env ghcom0.dir ghcom1.dir in
-            let ty = equate_ty env ghcom0.ty ghcom1.ty in
-            let cap = equate env ghcom0.ty ghcom0.cap ghcom1.cap in
-            let sys = equate_comp_sys env ghcom0.ty ghcom0.sys ghcom1.sys in
-            Tm.up (Tm.GHCom {r = tr; r' = tr'; ty; cap; sys}, [])
-          with
-          | exn -> Format.eprintf "equating: %a <> %a@." pp_value el0 pp_value el1; raise exn
-        end
+    | Data data, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
+      let desc = V.Sig.lookup_datatype data.lbl in
+      let params = equate_data_params env data.lbl desc.body data.params data.params in
+      let constr = Desc.lookup_constr info0.clbl @@ Desc.constrs desc in
+      let tms = equate_constr_args env data.lbl data.params constr info0.args info1.args in
+      Tm.make @@ Tm.Intro (data.lbl, info0.clbl, params, tms)
 
-      | Data data, Intro info0, Intro info1 when info0.clbl = info1.clbl ->
-        let desc = V.Sig.lookup_datatype data.lbl in
-        let params = equate_data_params env data.lbl desc.body data.params data.params in
-        let constr = Desc.lookup_constr info0.clbl @@ Desc.constrs desc in
-        let tms = equate_constr_args env data.lbl data.params constr info0.args info1.args in
-        Tm.make @@ Tm.Intro (data.lbl, info0.clbl, params, tms)
-
-      | _ ->
-        (* For more readable error messages *)
-        let el0 = D.make @@ V.unleash el0 in
-        let el1 = D.make @@ V.unleash el1 in
-        let err = UnequalNf {env; ty; el0; el1} in
-        raise @@ E err
+    | _ ->
+      (* For more readable error messages *)
+      let el0 = D.make @@ V.unleash el0 in
+      let el1 = D.make @@ V.unleash el1 in
+      let err = UnequalNf {env; ty; el0; el1} in
+      raise @@ E err
 
   and quote_data_params env dlbl tele cells =
     equate_data_params env dlbl tele cells cells

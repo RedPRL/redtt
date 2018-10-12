@@ -94,3 +94,8 @@ def weak/implies/complete
     let P'n : (n : nat) → P' n = weak P' P'0 f in
     λ n → P'n n n (eq/implies/le n)
 
+-- prove that a gcd exists for any m, n using complete induction
+-- examine the running code for its time complexity
+-- consider other representations of natural numbers and their associated induction princ's
+-- (0, 2n, 2n+1) doesn't help gcd, what would?
+-- understanding information flow in a proof in terms of homotopy levels, eg, and consider suppressing irrelevant information
