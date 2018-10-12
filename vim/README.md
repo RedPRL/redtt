@@ -31,10 +31,9 @@ they replaced with ASCII equivalents.
 This plugin is compatible with Vim 8's package system. You can (re)install it by
 running the following shell command from the current directory:
 
-    DEST=~/.vim/pack/redprl-org/start ;
-    [ -d $DEST/vim-redtt ] && rm -r $DEST/vim-redtt ;
-    mkdir -p $DEST && cp -r . $DEST/vim-redtt
+    ./install.sh
 
-If `redtt` is not in your `PATH`, add the following line to your `.vimrc`:
+If the `redtt` binary is not in your `PATH`, add the following line to your
+`.vimrc`:
 
-    let g:redtt_path = '/path/to/redtt'
+    let g:redtt_path = '/path/to/the-redtt-binary'

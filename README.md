@@ -32,12 +32,18 @@ and [cubicaltt](https://github.com/mortberg/cubicaltt).
 
 - experimental support for Fitch-style modal guarded recursion: ▷
 
+- RedML, a (very) rudimentary tactic language
+
 
 Features we intend to add in the near future:
 
-- user-extensible tactic language
-
 - namespacing
+
+- indexed higher inductive types
+
+- a type system for RedML
+
+- algebraic effects and handlers for RedML
 
 
 

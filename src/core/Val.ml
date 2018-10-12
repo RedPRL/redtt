@@ -543,11 +543,10 @@ struct
       `Val (coe_hd r') :: coe_tl
     | (_, `Rec Desc.Self) :: specs, `Val arg :: args ->
       let coe_hd = rigid_coe dir data_abs arg in
-      let coe_tl = rigid_multi_coe tyenv data_abs dir (x, specs) args
-      in
+      let coe_tl = rigid_multi_coe (Env.snoc tyenv @@ `Val coe_hd) data_abs dir (x, specs) args in
       `Val (coe_hd) :: coe_tl
     | (_, `Dim) :: specs, `Dim s :: args ->
-      `Dim s :: rigid_multi_coe tyenv data_abs dir (x, specs) args
+      `Dim s :: rigid_multi_coe (Env.snoc tyenv @@ `Dim s) data_abs dir (x, specs) args
     | _ ->
       failwith "rigid_multi_coe: length mismatch"
 
@@ -567,7 +566,7 @@ struct
     let r, r' = Dir.unleash dir in
 
     let args_in_dir dir = multi_coe (Env.append empty_env params) abs dir (x, Desc.Constr.specs constr) args in
-    let intro = make_intro empty_env ~dlbl ~params ~clbl @@ args_in_dir @@ `Ok dir in
+    let intro = make_intro ~dlbl ~params ~clbl @@ args_in_dir @@ `Ok dir in
 
     let boundary = Desc.Constr.boundary constr in
 
@@ -581,8 +580,9 @@ struct
           eval_tm_sys rho boundary
         in
         let fix_face =
-          Face.map @@ fun _ _ el ->
-          Abs.bind1 x @@ make_coe (Dir.make (`Atom x) r') abs el
+          Face.map @@ fun s s' el ->
+          let phi = I.equate s s' in
+          Abs.bind1 x @@ make_coe (Dir.make (`Atom x) r') (Abs.act phi abs) el
         in
         let correction = List.map fix_face faces in
         make_fhcom (`Ok (Dir.swap dir)) intro @@ force_abs_sys correction
@@ -1304,12 +1304,12 @@ struct
         | _ ->
           failwith "eval/intro: length mismatch"
       in
-      make_intro (Env.clear_locals rho) ~dlbl ~params:vparams ~clbl @@ go args @@ Desc.Constr.specs constr
+      make_intro ~dlbl ~params:vparams ~clbl @@ go args @@ Desc.Constr.specs constr
 
-  and make_intro rho ~dlbl ~params ~clbl (args : env_el list) : value =
+  and make_intro ~dlbl ~params ~clbl (args : env_el list) : value =
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
-    let sys = eval_tm_sys (Env.append rho (params @ args)) @@ Desc.Constr.boundary constr in
+    let sys = eval_tm_sys (Env.append empty_env (params @ args)) @@ Desc.Constr.boundary constr in
     match force_val_sys sys with
     | `Ok sys ->
       make @@ Intro {dlbl; clbl; args; sys}

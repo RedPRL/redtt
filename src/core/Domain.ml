@@ -310,7 +310,7 @@ struct
       try
         if node.action = I.idn then
           match node.con with
-          | (Data _ | Univ _) -> Node node
+          | Univ _ -> Node node
           | Up {ty; neu; sys = []} ->
             begin
               make @@ Up {ty = act phi ty; neu = Neu.act phi neu; sys = []}

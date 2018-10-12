@@ -134,13 +134,15 @@ def s2/encode-decode/base : (o : os2) → path os2 (s2/encode base (s2/decode ba
     ]
   ]
 
+
 -- VI. decode base after encode base
 
 def s2/decode-encode/base
-  : (l : path s2 base base)
-  → path (path s2 base base) (s2/decode base (s2/encode base l)) l
+  (l : path s2 base base)
+  : path (path s2 base base) (s2/decode base (s2/encode base l)) l
   =
-  J s2 base (λ a p → path (path s2 base a) (s2/decode a (s2/encode a p)) p) refl base
+  J s2 l (λ p → path (path s2 base (p 1)) (s2/decode (p 1) (s2/encode (p 1) p)) p) refl
+
 
 -- VII. characterization of the loop space
 

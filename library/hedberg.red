@@ -2,7 +2,7 @@ import void
 import bool
 import or
 import connection
-import ntype
+import hlevel
 
 def stable (A : type) : type =
   neg (neg A) → A

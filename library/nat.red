@@ -13,7 +13,6 @@ def nat-pred : nat → nat =
   | suc n → n
   ]
 
-
 def nat-pred/suc (x : nat) : path nat x (nat-pred (suc x)) =
   refl
 
