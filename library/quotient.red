@@ -20,10 +20,10 @@ def quotient/effective
   (R/assoc
     : (a b c d : A) (p : R a b) (q : R b c) (r : R c d)
     → path (R a d) (R/trans _ _ _ (R/trans _ _ _ p q) r) (R/trans _ _ _ p (R/trans _ _ _ q r)))
-  (R/inv-l : (a b : A) (p : R a b) → path _ (R/trans _ _ _ (R/symm _ _ p) p) (R/refl _))
-  (R/inv-r : (a b : A) (p : R a b) → path _ (R/trans _ _ _ p (R/symm _ _ p)) (R/refl _))
-  (R/idn-l : (a b : A) (p : R a b) → path _ (R/trans _ _ _ (R/refl _) p) p)
-  (R/idn-r : (a b : A) (p : R a b) → path _ (R/trans _ _ _ p (R/refl _)) p)
+  (R/inv/l : (a b : A) (p : R a b) → path _ (R/trans _ _ _ (R/symm _ _ p) p) (R/refl _))
+  (R/inv/r : (a b : A) (p : R a b) → path _ (R/trans _ _ _ p (R/symm _ _ p)) (R/refl _))
+  (R/idn/l : (a b : A) (p : R a b) → path _ (R/trans _ _ _ (R/refl _) p) p)
+  (R/idn/r : (a b : A) (p : R a b) → path _ (R/trans _ _ _ p (R/refl _)) p)
   : (a b : A)
   → retract (R a b) (path (quotient A R) (pt a) (pt b))
   =
@@ -43,15 +43,15 @@ def quotient/effective
         trans _
           (trans _
             (R/assoc a b1 b0 b1 p (R/symm b0 b1 b01) b01)
-            (λ j → R/trans a b1 b1 p (R/inv-l b0 b1 b01 j)))
-          (R/idn-r _ _ p)
+            (λ j → R/trans a b1 b1 p (R/inv/l b0 b1 b01 j)))
+          (R/idn/r _ _ p)
       in
       let α1 (p : R a b0) =
         trans _
           (trans _
             (R/assoc a b0 b1 b0 p b01 (R/symm b0 b1 b01))
-            (λ j → R/trans _ _ _ p (R/inv-r b0 b1 b01 j)))
-          (R/idn-r _ _ p)
+            (λ j → R/trans _ _ _ p (R/inv/r b0 b1 b01 j)))
+          (R/idn/r _ _ p)
       in
       ua _ _ (iso→equiv _ _ (g0, g1, α0, α1)) i
     ]
@@ -60,7 +60,7 @@ def quotient/effective
     trans
       (R a b)
       (λ i → coe i 1 (R/trans a a b (R/refl a) p) in λ _ → R a b)
-      (R/idn-l _ _ _)
+      (R/idn/l _ _ _)
   )
 
 
