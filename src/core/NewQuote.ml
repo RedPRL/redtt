@@ -318,15 +318,18 @@ struct
       let tm = equate_val qenv rel (Val.unleash ty0) v0 v1 in
       Tm.FunApp tm
 
-    | Fst, Fst -> Tm.Fst
+    | Fst, Fst ->
+      Tm.Fst
 
-    | Snd, Snd -> Tm.Snd
+    | Snd, Snd ->
+      Tm.Snd
 
     | ExtApp rs0, ExtApp rs1 ->
       let rs = List.map2 (equate_dim qenv rel) rs0 rs1 in
       Tm.ExtApp rs
 
-    | RestrictForce, RestrictForce -> Tm.RestrictForce
+    | RestrictForce, RestrictForce ->
+      Tm.RestrictForce
 
     | VProj {r = r0; func = {ty = Some func_ty0; value = func0}},
       VProj {r = r1; func = {ty = Some func_ty1; value = func1}} ->
@@ -342,7 +345,11 @@ struct
       let sys = equate_tycon_abs_sys qenv rel info0.sys info1.sys in
       Tm.Cap {r; r'; ty; sys}
 
-    | _ -> raise PleaseRaiseProperError
+    | Elim elim0, Elim elim1 ->
+      raise CanJonHelpMe
+
+    | _ ->
+      raise PleaseRaiseProperError
 
   and equate_tycon_clo qenv rel dom clo0 clo1 =
     let x, qenv_x = extend qenv dom in
