@@ -152,7 +152,7 @@ struct
       Tm.make @@ Tm.Box {r = tr; r' = tr'; cap = tcap; sys = tsys}
 
     | Data info ->
-      raise CanJonHelpMe
+      equate_in_data_ty qenv rel (info.lbl, info.params) el0 el1
 
     | Univ _ ->
       equate_tycon qenv rel el0 el1
@@ -163,6 +163,15 @@ struct
     | _ ->
       (* This might be done? *)
       raise PleaseFillIn
+
+  and equate_in_data_ty qenv rel (dlbl, params) el0 el1 =
+    match el0, el1 with
+    | Intro intro0, Intro intro1 ->
+      raise CanJonHelpMe
+    | HCom ({ty = `Pos; _} as hcom0), HCom ({ty = `Pos; _} as hcom1) ->
+      raise CanJonHelpMe
+    | _ ->
+      raise PleaseRaiseProperError
 
   and equate_in_neutral_ty qenv rel el0 el1 =
     match el0, el1 with
