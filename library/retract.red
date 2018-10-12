@@ -13,10 +13,10 @@ def path-retract/preserves-refl (A : type) (R : A → A → type)
   (ret : (x y : A) → retract (R x y) (path A x y)) (x : A)
   : path _ (ret x x .fst (ret x x .snd .fst refl)) refl
   =
-  let s : (x y : A) → R x y → path A x y = λ x y → ret x y .fst in
-  let r : (x y : A) → path A x y → R x y = λ x y → ret x y .snd .fst in
-  let α : (x y : A) (t : R x y) → path (R x y) (r x y (s x y t)) t =
-    λ x y → ret x y .snd .snd
+  let s (x y : A) : R x y → path A x y = ret x y .fst in
+  let r (x y : A) : path A x y → R x y = ret x y .snd .fst in
+  let α (x y : A) : (t : R x y) → path (R x y) (r x y (s x y t)) t =
+    ret x y .snd .snd
   in
   let q = s x x (r x x refl) in
   let cap1 : [i j] A [
