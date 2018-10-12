@@ -57,7 +57,7 @@ def ua/retract/sig (A : type) : retract^1 ((B : type) × equiv A B) ((B : type) 
 def ua/id-equiv (A : type) : path^1 _ (ua _ _ (id-equiv A)) refl =
   trans^1 _
     (λ i → ua A A (coe 0 i (id-equiv A) in λ _ → equiv A A))
-    (path-retract/preserves/refl^1 _ equiv ua/retract A)
+    (path-retract/preserves-refl^1 _ equiv ua/retract A)
 
 -- The following is a formulation of univalence proposed by Martin Escardo:
 -- https://groups.google.com/forum/#!msg/homotopytypetheory/HfCB_b-PNEU/Ibb48LvUMeUJ
