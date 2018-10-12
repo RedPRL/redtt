@@ -1765,6 +1765,8 @@ struct
     | `Dim r -> Dim r
 
   (* TODO: pass the data-info pre-extracted *)
+  (** invariant: the binder in [abs] {b must} be fresh so that we do not have to
+      hide the bound variable from [rel] or worry about shadowing. *)
   and rigid_coe_nonstrict_data rel r r' ~abs cap =
     let Abs (x, tyx) = abs in
     match tyx, Val.unleash cap with
