@@ -11,7 +11,7 @@ data (A : type) (R : A → A → type) ⊢ quotient where
   | i=1 → pt b
   ]
 
--- A quotient by a type-theoretic equivalence relation *with coherences* is strongly effective.
+-- A "quotient" by a "0-coherent groupoid" is effective
 def quotient/effective
   (A : type) (R : A → A → type)
   (R/refl : (a : A) → R a a)
