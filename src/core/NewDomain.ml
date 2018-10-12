@@ -1835,7 +1835,7 @@ struct
   (** Invariant: everything is already a value wrt. [rel], and it [r~>r'] is [rel]-rigid. *)
   and rigid_coe rel r r' ~abs cap : con =
     (* TODO: is this safe? why aren't we needing to freshen? *)
-    let Abs (x, tyx) = abs in
+    let x, tyx = ConAbs.unbind abs in
     match tyx with
     | Sg quant ->
       Coe {r; r'; ty = `Sg (Abs (x, quant)); cap}
@@ -2936,6 +2936,7 @@ sig
   include Domain with type t = X.t abs
 
   val bind : (dim -> X.t) -> t
+  val unbind : t -> Name.t * X.t
 
   (** [inst] will give a [rel]-value. The inputs can be non-values. *)
   val inst : rel -> t -> dim -> X.t
@@ -2973,6 +2974,11 @@ end
       let y = Name.fresh () in
       Abs (y, gen (`Atom y))
 
+    let unbind abs =
+      let Abs (x, a_x) = abs in
+      let x', pi = Perm.freshen_name x in
+      x', X.swap pi a_x
+
     let inst rel abs r =
       let Abs (x, a_x) = abs in
       let rel_x = Rel.hide' x rel in
@@ -2984,6 +2990,7 @@ sig
   include DomainPlug with type t = X.t abs
 
   val bind : (dim -> X.t) -> t
+  val unbind : t -> Name.t * X.t
 
   (** [inst] will give a [rel]-value. The inputs can be non-values. *)
   val inst : rel -> t -> dim -> X.t
