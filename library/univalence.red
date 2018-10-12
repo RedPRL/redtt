@@ -65,8 +65,8 @@ def ua/id-equiv (A : type) : path^1 _ (ua _ _ (id-equiv A)) refl =
 
 def univalence (A : type) : is-contr^1 ((B : type) × equiv A B) =
   retract/hlevel^1 contr
-    _
-    _
+    ((B : type) × equiv A B)
+    ((B : type) × path^1 type A B)
     (ua/retract/sig A)
     (path/based/contr^1 type A)
 
