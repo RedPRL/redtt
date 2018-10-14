@@ -420,6 +420,5 @@ let report_unsolved ~loc =
     if n > 0 then
       begin
         let pp fmt () = Format.fprintf fmt "%i unsolved holes" n in
-        Format.printf "@.@.";
         Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
       end
