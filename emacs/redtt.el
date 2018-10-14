@@ -150,7 +150,8 @@
 
 
 (defconst redtt--revolutionary-sayings
-  '("Let's Complete The System of Swedish Moderate Realism!"
+  '("Between the darkness and the dawn, a red cube rises!"
+    "Let's Complete The System of Swedish Moderate Realism!"
     "We Can Prove It!"
     "Uphold Cubical Thought!"
     "Criticize The Old World And Build A New World Using Cubical Thought As A Weapon!")
