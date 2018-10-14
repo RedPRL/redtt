@@ -1,43 +1,43 @@
 open RedTT_Core
-open Lexing
 
 type options =
-  {file_name : Lwt_io.file_name;
+  {file_name : string;
    line_width: int;
    debug_mode: bool}
 
 let print_position outx lexbuf =
+  let open Lexing in
   let pos = lexbuf.lex_curr_p in
   Format.fprintf outx "%s:%d:%d" pos.pos_fname
     pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
 
-let read_from_channel file_name channel =
-  let open Lwt.Infix in
-  let (lexbuf, tokens) = Lex.tokens ~file_name channel in
-  let checkpoint = Grammar.Incremental.mltoplevel @@ Lexing.lexeme_start_p lexbuf in
-  begin
-    Lwt.catch (Parse.loop lexbuf tokens checkpoint) @@ fun exn ->
-    Lwt_io.printlf "  raised: %s" @@ Printexc.to_string exn >>= fun _ ->
-    Lwt_io.printlf "parser :: cleaning up…" >>= fun _ ->
-    Lwt_io.close channel >>= fun _ ->
-    Lwt.fail exn
-  end
+let read_from_channel ~file_name channel =
+  let lexbuf = Lexing.from_channel channel in
+  let open Lexing in
+  lexbuf.lex_curr_p <- {lexbuf.lex_curr_p with pos_fname = file_name};
+  Grammar.mltoplevel Lex.token lexbuf
 
 let read_file file_name =
-  let open Lwt.Infix in
-  Lwt_io.open_file ~mode:Lwt_io.Input file_name >>=
-  read_from_channel file_name
+  let channel = open_in file_name in
+  try
+    let cmd = read_from_channel ~file_name channel in
+    close_in channel;
+    cmd
+  with
+  | exn ->
+    close_in channel;
+    raise exn
 
 let execute_signature dirname mlcmd =
   let open ML in
   let module I =
   struct
     let cache = Hashtbl.create 20
-    let import path =
+    let import ~path =
       let f = List.fold_left Filename.concat dirname path in
       match Hashtbl.find_opt cache f with
       | None ->
-        let mlcmd = Lwt_main.run @@ read_file @@ f ^ ".red" in
+        let mlcmd = read_file @@ f ^ ".red" in
         Hashtbl.add cache f mlcmd.con;
         `Elab mlcmd.con
       | Some _ ->
@@ -50,13 +50,10 @@ let execute_signature dirname mlcmd =
       ignore @@ Contextual.run @@ begin
         Contextual.bind (Elaborator.eval_cmd mlcmd.con) @@ fun _ ->
         Contextual.report_unsolved ~loc:mlcmd.span
-      end;
-      Diagnostics.terminated ();
-      Lwt.return_unit
+      end
     with
     | exn ->
       Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
-      Diagnostics.terminated ();
       exit 1
   end
 
@@ -64,15 +61,22 @@ let set_options options =
   Format.set_margin options.line_width;
   Name.set_debug_mode options.debug_mode
 
-let load_file options =
-  set_options options;
-  let open Lwt.Infix in
-  let dirname = Filename.dirname options.file_name in
-  read_file options.file_name >>= execute_signature dirname
+let load options source =
+  try
+    set_options options;
+    let dirname = Filename.dirname options.file_name in
+    execute_signature dirname @@
+    match source with
+    | `Stdin -> read_from_channel ~file_name:options.file_name stdin
+    | `File -> read_file options.file_name
+  with
+  | ParseError.E (posl, posr) ->
+    let loc = Some (posl, posr) in
+    let pp fmt () = Format.fprintf fmt "Parse error" in
+    Log.pp_message ~loc ~lvl:`Error pp Format.err_formatter ()
 
-let load_from_stdin options  =
-  set_options options;
-  let open Lwt.Infix in
-  let dirname = Filename.dirname options.file_name in
-  read_from_channel options.file_name Lwt_io.stdin
-  >>= execute_signature dirname
+let load_file options =
+  load options `File
+
+let load_from_stdin options =
+  load options `Stdin

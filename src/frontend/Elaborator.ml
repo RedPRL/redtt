@@ -5,7 +5,7 @@ open Bwd open BwdNotation
 
 module type Import =
 sig
-  val import : string list -> [`Elab of ML.mlcmd | `Cached]
+  val import : path:string list -> [`Elab of ML.mlcmd | `Cached]
 end
 
 module Make (I : Import) =
@@ -164,7 +164,7 @@ struct
 
     | E.MlImport path ->
       begin
-        match I.import path with
+        match I.import ~path with
         | `Cached ->
           M.ret @@ E.SemRet (E.SemTuple [])
         | `Elab cmd ->
