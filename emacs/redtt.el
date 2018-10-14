@@ -1,7 +1,7 @@
-;;; redtt.el --- Major mode for editing redtt proofs and interacting with redtt  -*- lexical-binding: t; -*-
+;;; redtt.el --- Major mode for editing redtt proofs
+;;; Homepage: http://github.com/RedPRL/redtt
 
-;; Copyright (C) 2016  Jonathan Sterling
-;; Copyright (C) 2017  Jonathan Sterling, Favonia
+
 ;; Copyright (C) 2018  The RedPRL Development Team
 
 ;; Author: Jonathan Sterling <jon@jonmsterling.com>
@@ -25,15 +25,15 @@
 ;;; Commentary:
 
 ;; This is a major mode for editing redtt developments.  The current
-;; editing features include simple syntax highlighting. There is a command to
+;; editing features include simple syntax highlighting.  There is a command to
 ;; run redtt in a compilation buffer.
-;;
-;; redtt can be obtained from https://github.com/RedPRL/redtt .
 ;;
 ;; Make sure to set the variable `redtt-command' to the location of the
 ;; redtt binary.
 
 ;;; Code:
+
+;;; -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 
@@ -97,16 +97,16 @@
 
 (defconst redtt-declaration-keywords
   '("data" "def" "meta" "normalize" "print")
-  "redtt's keywords.")
+  "Redtt's keywords.")
 
 
 (defconst redtt-expression-keywords
   '("V" "in" "with" "where" "begin" "end" "let" "tick" "dim" "elim" "fst" "snd" "coe" "com" "pair" "comp" "fun" "hcom" "vproj" "vin" "lam" "next" "prev" "dfix" "fix" "refl" "pre" "kan" "type")
-  "redtt's expression keywords.")
+  "Redtt's expression keywords.")
 
 (defconst redtt-expression-symbols
   '("->" "~>" "<~" "$" "*" "!" "@" "=" "+" "++" "=>")
-  "redtt's expression symbols.")
+  "Redtt's expression symbols.")
 
 (defvar redtt-mode-font-lock-keywords
   `(
