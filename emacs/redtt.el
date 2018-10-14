@@ -25,9 +25,8 @@
 ;;; Commentary:
 
 ;; This is a major mode for editing redtt developments.  The current
-;; editing features include simple syntax highlighting, imenu, and
-;; completion support.  Additionally, there is a command to run redtt
-;; in a compilation buffer.
+;; editing features include simple syntax highlighting. There is a command to
+;; run redtt in a compilation buffer.
 ;;
 ;; redtt can be obtained from https://github.com/RedPRL/redtt .
 ;;
