@@ -598,8 +598,9 @@ struct
           eval_tm_sys rho boundary
         in
         let fix_face =
-          Face.map @@ fun _ _ el ->
-          Abs.bind1 x @@ make_coe (Dir.make (`Atom x) r') abs el
+          Face.map @@ fun s s' el ->
+          let phi = I.equate s s' in
+          Abs.bind1 x @@ make_coe (Dir.make (`Atom x) r') (Abs.act phi abs) el
         in
         let correction = List.map fix_face faces in
         make_fhcom (`Ok (Dir.swap dir)) intro @@ force_abs_sys correction

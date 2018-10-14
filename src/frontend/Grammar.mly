@@ -142,7 +142,7 @@ framic:
   | p = eproj
     { p }
 
-spine:
+app_proj_spine:
   (* a b *)
   | atoms = nonempty_list(ATOM)
     { let head, tail = ListUtil.split_head atoms in
@@ -162,8 +162,17 @@ spine:
     { e, fs }
 
 spine_con:
-  | ap = spine
+  | ap = app_proj_spine
     { spine_to_econ ap }
+
+  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = located(econ); sys = pipe_block(eface)
+    { E.Ext (dims, ty, sys)}
+
+  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); sys = pipe_block(eface)
+    { E.HCom {r = r0; r' = r1; cap; sys}}
+
+  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); IN; fam = located(econ); sys = pipe_block(eface)
+    { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
 %inline
 block(X):
@@ -209,20 +218,11 @@ econ:
   | COE; r0 = located(atomic); r1 = located(atomic); tm = located(atomic); IN; fam = located(econ)
     { E.Coe {r = r0; r' = r1; fam; tm} }
 
-  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); sys = pipe_block(eface)
-    { E.HCom {r = r0; r' = r1; cap; sys}}
-
-  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); IN; fam = located(econ); sys = pipe_block(eface)
-    { E.Com {r = r0; r' = r1; fam; cap; sys}}
-
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = located(econ)
     { E.Pi (List.flatten tele, cod) }
 
   | tele = nonempty_list(etele_cell); times_or_ast; cod = located(econ)
     { E.Sg (List.flatten tele, cod) }
-
-  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = located(econ); sys = pipe_block(eface)
-    { E.Ext (dims, ty, sys)}
 
   | dom = located(spine_con); RIGHT_ARROW; cod = located(econ)
     { E.Pi ([`Ty ("_", dom)], cod) }

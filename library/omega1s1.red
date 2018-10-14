@@ -1,7 +1,11 @@
 import path
+import hlevel
 import J
 import int
 import s1
+import retract
+import pi
+import hlevel-contr
 import equivalence
 
 def s1-univ-cover : s1 → type =
@@ -112,10 +116,34 @@ def decode : (x : s1) → s1-univ-cover x → path s1 base x =
   ]
 
 def loopn-winding (l : Ω1s1) : path _ (loopn (winding l)) l =
-  J s1 base (λ x p → path (path s1 base x) (decode x (encode x p)) p) refl base l
+  J _ l (λ p → path (path s1 base (p 1)) (decode (p 1) (encode (p 1) p)) p) refl
 
 def winding/equiv : equiv Ω1s1 int =
   iso→equiv _ _ (winding, (loopn, (winding-loopn, loopn-winding)))
 
 def winding/path : path^1 _ Ω1s1 int =
   ua Ω1s1 int winding/equiv
+
+opaque
+def Ω1s1/set : has-hlevel set Ω1s1 =
+  retract/hlevel set Ω1s1 int (winding, loopn, loopn-winding) int/set
+
+opaque
+def s1/groupoid : is-groupoid s1 =
+  let from-base : (s : s1) → is-set (path s1 base s) =
+    elim [
+    | base → Ω1s1/set
+    | loop i →
+      prop→prop-over (λ j → is-set (path s1 base (loop j)))
+        (has-hlevel/prop set Ω1s1)
+        Ω1s1/set Ω1s1/set i
+    ]
+  in
+  elim [
+  | base → from-base
+  | loop i →
+    prop→prop-over (λ j → (s : s1) → is-set (path s1 (loop j) s))
+      (pi/hlevel prop s1 (λ s → is-set (path s1 base s))
+        (λ s → has-hlevel/prop set (path s1 base s)))
+      from-base from-base i
+  ]

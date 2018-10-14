@@ -1,5 +1,5 @@
 import path
-import ntype
+import hlevel
 import connection
 import J
 import void
@@ -93,10 +93,9 @@ def list/decode-encode/refl (A : type) (xs : list A)
 def list/decode-encode (A : type) (xs ys : list A) (q : path (list A) xs ys)
   : path (path (list A) xs ys) (list/decode A xs ys (list/encode A xs ys q)) q
   =
-  J (list A) xs
-    (λ ys q → path (path (list A) xs ys) (list/decode A xs ys (list/encode A xs ys q)) q)
+  J _ q
+    (λ q → path (path (list A) xs (q 1)) (list/decode A xs (q 1) (list/encode A xs (q 1) q)) q)
     (list/decode-encode/refl A xs)
-    ys q
 
 def list/encode/cons (A : type) (x y : A) (p : path A x y) (xs ys : list A) (q : path (list A) xs ys)
   : path (list/code A (cons x xs) (cons y ys))
