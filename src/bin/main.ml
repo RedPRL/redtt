@@ -1,7 +1,7 @@
 open Cmdliner
 open RedTT
 
-type command = unit Lwt.t Term.t * Term.info
+type command = unit Term.t * Term.info
 
 let opt_margin =
   let doc = "Set pretty-printing margin to $(docv) characters." in
@@ -60,7 +60,7 @@ let cmds : command list = [
 let main () =
   match Term.eval_choice cmd_default cmds with
   | `Error _e -> exit 1
-  | `Ok expr -> Lwt_main.run expr
+  | `Ok expr -> expr
   | _ -> exit 0
 
 let () =
