@@ -1,4 +1,4 @@
-;;; redtt.el --- Major mode for editing redtt proofs
+;;; redtt.el --- Major mode for editing redtt proofs    -*- lexical-binding: t; -*-
 ;;; Homepage: http://github.com/RedPRL/redtt
 
 
@@ -33,7 +33,6 @@
 
 ;;; Code:
 
-;;; -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 
