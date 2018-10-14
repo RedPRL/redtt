@@ -170,7 +170,7 @@
   "Major mode for editing redtt proofs.
 \\{redtt-mode-map}"
 
-  (set (make-local-variable 'comment-start) "// ")
+  (set (make-local-variable 'comment-start) "-- ")
 
   (setq font-lock-defaults '((redtt-mode-font-lock-keywords) nil nil))
 
