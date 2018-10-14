@@ -78,11 +78,11 @@
   :tag "Command for redtt"
   :options '("redtt"))
 
-(defcustom redtt-mode-hook '(redtt-display-revolutionary-saying)
+(defcustom redtt-mode-hook '(redtt-display-revolutionary-slogan)
   "Hook to be run on starting `redtt-mode'."
   :group 'redtt
   :type 'hook
-  :options '(redtt-display-revolutionary-saying))
+  :options '(redtt-display-revolutionary-slogan))
 
 (defvar redtt-mode-syntax-table
   (let ((table (make-syntax-table)))
@@ -97,16 +97,16 @@
 
 (defconst redtt-declaration-keywords
   '("data" "def" "meta" "normalize" "print")
-  "Redtt's keywords.")
+  "Declaration keywords.")
 
 
 (defconst redtt-expression-keywords
   '("V" "in" "with" "where" "begin" "end" "let" "tick" "dim" "elim" "fst" "snd" "coe" "com" "pair" "comp" "fun" "hcom" "vproj" "vin" "lam" "next" "prev" "dfix" "fix" "refl" "pre" "kan" "type")
-  "Redtt's expression keywords.")
+  "Expression keywords.")
 
 (defconst redtt-expression-symbols
-  '("->" "~>" "<~" "$" "*" "!" "@" "=" "+" "++" "=>")
-  "Redtt's expression symbols.")
+  '("->" "*" "=")
+  "Expression symbols.")
 
 (defvar redtt-mode-font-lock-keywords
   `(
@@ -148,7 +148,7 @@
       (error "Buffer has no file name"))))
 
 
-(defconst redtt--revolutionary-sayings
+(defconst redtt--revolutionary-slogans
   '("Between the darkness and the dawn, a red cube rises!"
     "Let's Complete The System of Swedish Moderate Realism!"
     "We Can Prove It!"
@@ -156,14 +156,14 @@
     "Criticize The Old World And Build A New World Using Cubical Thought As A Weapon!")
   "Words of encouragement to be displayed when redtt is initially launched.")
 
-(defun redtt-display-revolutionary-saying ()
-  "Display a revolutionary saying to hearten redtt users."
+(defun redtt-display-revolutionary-slogan ()
+  "Display a revolutionary slogan to hearten redtt users."
   (interactive)
-  (let ((revolutionary-saying
+  (let ((revolutionary-slogan
          (nth
-          (random (length redtt--revolutionary-sayings))
-          redtt--revolutionary-sayings)))
-    (message "%s" revolutionary-saying)))
+          (random (length redtt--revolutionary-slogans))
+          redtt--revolutionary-slogans)))
+    (message "%s" revolutionary-slogan)))
 
 ;;;###autoload
 (define-derived-mode redtt-mode prog-mode "redtt"
