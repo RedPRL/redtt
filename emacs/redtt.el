@@ -1,4 +1,4 @@
-;;; redprl.el --- Major mode for editing RedPRL proofs and interacting with RedPRL  -*- lexical-binding: t; -*-
+;;; redtt.el --- Major mode for editing redtt proofs and interacting with redtt  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2016  Jonathan Sterling
 ;; Copyright (C) 2017  Jonathan Sterling, Favonia
