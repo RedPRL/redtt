@@ -2,6 +2,7 @@
 
 ;; Copyright (C) 2016  Jonathan Sterling
 ;; Copyright (C) 2017  Jonathan Sterling, Favonia
+;; Copyright (C) 2018  The RedPRL Development Team
 
 ;; Author: Jonathan Sterling <jon@jonmsterling.com>
 ;; Package-Requires: ((emacs "25.3"))
@@ -149,8 +150,7 @@
 
 
 (defconst redtt--revolutionary-sayings
-  '("Maybe The Formalist Clique Isn't So Bad After All!"
-    "Let's Complete The System of Swedish Moderate Realism!"
+  '("Let's Complete The System of Swedish Moderate Realism!"
     "We Can Prove It!"
     "Uphold Cubical Thought!"
     "Criticize The Old World And Build A New World Using Cubical Thought As A Weapon!")
