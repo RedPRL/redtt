@@ -366,6 +366,9 @@ mltoplevel:
   | x = located(EOF)
     { {x with con = E.MlRet (E.MlTuple [])} }
 
+  | error
+    { raise @@ ParseError.E ($startpos, $endpos) }
+
 mlcmd:
   | LET; a = ATOM; EQUALS; cmd = mlcmd; IN; rest = mlcmd
     { E.MlBind (cmd, `User a, rest) }
