@@ -5,6 +5,7 @@ import int
 import s1
 import omega1s1
 import s2
+import join
 import s3-to-join
 
 -- from https://github.com/mortberg/cubicaltt/blob/pi4s3/examples/problem.ctt

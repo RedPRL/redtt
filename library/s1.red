@@ -1,5 +1,6 @@
 import path
 import connection
+import hlevel
 import equivalence
 import univalence
 

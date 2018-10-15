@@ -1,5 +1,7 @@
+import path
 import bool
 import s1
+import equivalence
 import isotoequiv
 
 def not/equiv : equiv bool bool =

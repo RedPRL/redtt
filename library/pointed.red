@@ -1,4 +1,6 @@
+import path
 import bool
+import equivalence
 import isotoequiv
 
 def ptype : type^1 = (A : type) × A
