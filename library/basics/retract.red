@@ -1,6 +1,4 @@
-import path
-import connection
-import hlevel
+import prelude
 
 -- Adapted from https://github.com/HoTT/book/issues/718
 def path-retract/preserves-refl (A : type) (R : A → A → type)

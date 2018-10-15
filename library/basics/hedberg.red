@@ -1,9 +1,6 @@
-import path
-import void
-import bool
-import or
-import connection
-import hlevel
+import prelude
+import data.void
+import data.or
 
 def stable (A : type) : type =
   neg (neg A) → A

@@ -1,6 +1,4 @@
-import path
-import hlevel
-import equivalence
+import prelude
 
 -- yacctt: https://github.com/mortberg/yacctt/blob/master/examples/prelude.ytt#L374
 -- RedPRL: https://github.com/RedPRL/sml-redprl/blob/bd73932409ddc3479c8ded5ac32ae0d93d31874a/example/isotoequiv.prl
