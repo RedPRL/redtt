@@ -18,7 +18,7 @@ struct
 
   let pop () =
     depth := !depth - 1;
-    if !depth = 0 then `Token else `Comment
+    if !depth = 0 then `Top else `Comment
 end
 
 let keywords =
@@ -88,9 +88,9 @@ rule token = parse
   | number
     { NUMERAL (int_of_string (Lexing.lexeme lexbuf)) }
   | "--"
-    { line_comment lexbuf }
+    { line_comment token lexbuf }
   | "/-"
-    { BlockComment.push (); block_comment lexbuf }
+    { BlockComment.push (); block_comment token lexbuf }
   | '('
     { LPR }
   | ')'
@@ -201,25 +201,25 @@ rule token = parse
       failwith "Lexing error" }
 
 
-and line_comment = parse
+and line_comment kont = parse
   | line_ending
-    { new_line lexbuf; token lexbuf }
+    { new_line lexbuf; kont lexbuf }
   | _
-    { line_comment lexbuf }
+    { line_comment kont lexbuf }
 
-and block_comment = parse
+and block_comment kont = parse
   | "/-"
     { BlockComment.push ();
-      block_comment lexbuf
+      block_comment kont lexbuf
     }
   | "-/"
     { match BlockComment.pop () with
-      | `Token -> token lexbuf
-      | `Comment -> block_comment lexbuf }
+      | `Top -> kont lexbuf
+      | `Comment -> block_comment kont lexbuf }
   | line_ending
-    { new_line lexbuf; block_comment lexbuf }
+    { new_line lexbuf; block_comment kont lexbuf }
   | _
-    { block_comment lexbuf }
+    { block_comment kont lexbuf }
 
 
 (* from https://v1.realworldocaml.org/v1/en/html/parsing-with-ocamllex-and-menhir.html *)
@@ -245,6 +245,10 @@ and read_import cells = parse
   | atom_initial atom_subsequent*
     { cells := Snoc (!cells, lexeme lexbuf);
       read_import cells lexbuf }
+  | "--"
+    { line_comment (read_import cells) lexbuf }
+  | "/-"
+    { BlockComment.push (); block_comment (read_import cells) lexbuf }
   | "."
     { read_import cells lexbuf }
   | line_ending
