@@ -2,6 +2,7 @@ import path
 import s1
 import s2
 import join
+import equivalence
 import isotoequiv
 
 data s3 where

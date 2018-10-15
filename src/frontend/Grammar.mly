@@ -42,7 +42,7 @@
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN V VPROJ VIN NEXT PREV FIX DFIX REFL
-%token IMPORT OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
+%token PUBLIC PRIVATE IMPORT OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
 %token META
 %token EOF
@@ -142,7 +142,7 @@ framic:
   | p = eproj
     { p }
 
-spine:
+app_proj_spine:
   (* a b *)
   | atoms = nonempty_list(ATOM)
     { let head, tail = ListUtil.split_head atoms in
@@ -162,8 +162,17 @@ spine:
     { e, fs }
 
 spine_con:
-  | ap = spine
+  | ap = app_proj_spine
     { spine_to_econ ap }
+
+  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = located(econ); sys = pipe_block(eface)
+    { E.Ext (dims, ty, sys)}
+
+  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); sys = pipe_block(eface)
+    { E.HCom {r = r0; r' = r1; cap; sys}}
+
+  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); IN; fam = located(econ); sys = pipe_block(eface)
+    { E.Com {r = r0; r' = r1; fam; cap; sys}}
 
 %inline
 block(X):
@@ -209,20 +218,11 @@ econ:
   | COE; r0 = located(atomic); r1 = located(atomic); tm = located(atomic); IN; fam = located(econ)
     { E.Coe {r = r0; r' = r1; fam; tm} }
 
-  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); sys = pipe_block(eface)
-    { E.HCom {r = r0; r' = r1; cap; sys}}
-
-  | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); IN; fam = located(econ); sys = pipe_block(eface)
-    { E.Com {r = r0; r' = r1; fam; cap; sys}}
-
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = located(econ)
     { E.Pi (List.flatten tele, cod) }
 
   | tele = nonempty_list(etele_cell); times_or_ast; cod = located(econ)
     { E.Sg (List.flatten tele, cod) }
-
-  | LSQ; dims = nonempty_list(ATOM); RSQ; ty = located(econ); sys = pipe_block(eface)
-    { E.Ext (dims, ty, sys)}
 
   | dom = located(spine_con); RIGHT_ARROW; cod = located(econ)
     { E.Pi ([`Ty ("_", dom)], cod) }
@@ -320,10 +320,21 @@ econstr:
   boundary = loption(pipe_block(eface))
   { clbl, E.EConstr {specs = List.flatten specs; boundary} }
 
-opacity:
+data_modifiers:
+  | PRIVATE
+    { `Private }
+  | { `Public }
+
+def_modifiers:
   | OPAQUE
-    { `Opaque }
-  | { `Transparent }
+    { `Public, `Opaque }
+  | PRIVATE
+    { `Private, `Transparent }
+  | OPAQUE PRIVATE
+    { `Private, `Opaque }
+  | PRIVATE OPAQUE
+    { `Private, `Opaque }
+  | { `Public, `Transparent }
 
 
 data_decl:
@@ -349,22 +360,29 @@ mltoplevel:
   | META; LTR; c = mlcmd; RTR; rest = mltoplevel
     { {rest with con = E.MlBind (c, `Gen (Name.fresh ()), rest.con)} }
 
-  | opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
+  | modifiers = def_modifiers; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
     { let name = E.MlRef (Name.named (Some a)) in
-      {rest with con = MlBind (E.define ~name ~opacity ~scheme:sch ~tm, `User a, rest.con)} }
+      let visibility, opacity = modifiers in
+      {rest with con = MlBind (E.define ~visibility ~name ~opacity ~scheme:sch ~tm, `User a, rest.con)} }
 
-  | decl = data_decl; rest = mltoplevel
+  | visibility = data_modifiers; decl = data_decl; rest = mltoplevel
     { let name, desc = decl in
-      {rest with con = MlBind (E.MlDeclData {name; desc}, `User name, rest.con)} }
+      {rest with con = MlBind (E.MlDeclData {visibility; name; desc}, `User name, rest.con)} }
 
-  | IMPORT; a = ATOM; rest = mltoplevel
-    { {rest with con = E.mlbind (E.MlImport a) @@ fun _ -> rest.con} }
+  | IMPORT; path = separated_nonempty_list(DOT, ATOM); rest = mltoplevel
+    { {rest with con = E.mlbind (E.MlImport (`Private, path)) @@ fun _ -> rest.con} }
+
+  | PUBLIC IMPORT; path = separated_nonempty_list(DOT, ATOM); rest = mltoplevel
+    { {rest with con = E.mlbind (E.MlImport (`Public, path)) @@ fun _ -> rest.con} }
 
   | QUIT; rest = mltoplevel
     { {rest with con = E.MlRet (E.MlTuple [])} }
 
   | x = located(EOF)
     { {x with con = E.MlRet (E.MlTuple [])} }
+
+  | error
+    { raise @@ ParseError.E ($startpos, $endpos) }
 
 mlcmd:
   | LET; a = ATOM; EQUALS; cmd = mlcmd; IN; rest = mlcmd
@@ -405,13 +423,14 @@ atomic_mlcmd:
   | NORMALIZE; c = atomic_mlcmd
     { E.mlbind c @@ fun x -> E.MlNormalize x }
 
-  | LLGL; decl = data_decl; RRGL
+  | LLGL; visibility = data_modifiers; decl = data_decl; RRGL
     { let name, desc = decl in
-      E.MlDeclData {name; desc} }
+    E.MlDeclData {visibility; name; desc} }
 
-  | LLGL; opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); RRGL
+  | LLGL; modifiers = def_modifiers; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); RRGL
     { let name = E.MlRef (Name.named (Some a)) in
-      E.define ~name ~opacity ~scheme:sch ~tm }
+      let visibility, opacity = modifiers in
+      E.define ~name ~visibility ~opacity ~scheme:sch ~tm }
 
   | LLGL; e = located(econ); RRGL
     { E.MlElab e }

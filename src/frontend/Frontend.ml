@@ -1,78 +1,103 @@
+open RedBasis
 open RedTT_Core
-open Lexing
 
 type options =
-  {file_name : Lwt_io.file_name;
+  {file_name : string;
    line_width: int;
    debug_mode: bool}
 
 let print_position outx lexbuf =
+  let open Lexing in
   let pos = lexbuf.lex_curr_p in
   Format.fprintf outx "%s:%d:%d" pos.pos_fname
     pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
 
-let read_from_channel file_name channel =
-  let open Lwt.Infix in
-  let (lexbuf, tokens) = Lex.tokens ~file_name channel in
-  let checkpoint = Grammar.Incremental.mltoplevel @@ Lexing.lexeme_start_p lexbuf in
-  begin
-    Lwt.catch (Parse.loop lexbuf tokens checkpoint) @@ fun exn ->
-    Lwt_io.printlf "  raised: %s" @@ Printexc.to_string exn >>= fun _ ->
-    Lwt_io.printlf "parser :: cleaning up…" >>= fun _ ->
-    Lwt_io.close channel >>= fun _ ->
-    Lwt.fail exn
-  end
+let read_from_channel ~file_name channel =
+  let lexbuf = Lexing.from_channel channel in
+  let open Lexing in
+  lexbuf.lex_curr_p <- {lexbuf.lex_curr_p with pos_fname = file_name};
+  Grammar.mltoplevel Lex.token lexbuf
 
 let read_file file_name =
-  let open Lwt.Infix in
-  Lwt_io.open_file ~mode:Lwt_io.Input file_name >>=
-  read_from_channel file_name
+  let channel = open_in file_name in
+  try
+    let cmd = read_from_channel ~file_name channel in
+    close_in channel;
+    cmd
+  with
+  | exn ->
+    close_in channel;
+    raise exn
 
-let execute_signature dirname mlcmd =
-  let open ML in
-  let module I =
-  struct
-    let cache = Hashtbl.create 20
-    let import f =
-      let f = Filename.concat dirname f in
-      match Hashtbl.find_opt cache f with
-      | None ->
-        let mlcmd = Lwt_main.run @@ read_file @@ f ^ ".red" in
-        Hashtbl.add cache f mlcmd.con;
-        `Elab mlcmd.con
-      | Some _ ->
-        `Cached
-  end
-  in
-  let module Elaborator = Elaborator.Make (I) in
-  begin
+module rec Importer : Elaborator.Import =
+struct
+  open ML
+  let cache = Hashtbl.create 20
+  let import ~per_process ~mlconf ~selector =
+    let f = FileRes.find_module mlconf.base_dir ~extension:(Some "red") selector in
+    let normalized_f = SysUtil.normalize_concat [] f in
+    match Hashtbl.find_opt cache normalized_f with
+    | None ->
+      Format.eprintf "@[%sChecking %s.@]@." mlconf.indent normalized_f;
+      let res, per_process =
+        let mlconf = {base_dir = Filename.dirname f; indent = " " ^ mlconf.indent} in
+        let mlcmd = read_file f in
+        Runner.execute ~per_process_opt:(Some per_process) ~mlconf ~mlcmd in
+      Hashtbl.add cache normalized_f res;
+      Format.eprintf "@[%sChecked %s.@]@." mlconf.indent normalized_f;
+      `New (res, per_process)
+    | Some res ->
+      Format.eprintf "@[%sLoaded %s.@]@." mlconf.indent normalized_f;
+      `Cached res
+end
+and Runner :
+sig
+  val execute : per_process_opt : Contextual.per_process option -> mlconf : ML.mlconf ->
+    mlcmd : ML.mlcmd ML.info -> ResEnv.t * Contextual.per_process
+end =
+struct
+  open ML
+  open Contextual
+  let execute ~per_process_opt ~mlconf ~mlcmd =
     try
-      ignore @@ Contextual.run @@ begin
-        Contextual.bind (Elaborator.eval_cmd mlcmd.con) @@ fun _ ->
-        Contextual.report_unsolved ~loc:mlcmd.span
-      end;
-      Diagnostics.terminated ();
-      Lwt.return_unit
+      run ~per_process_opt ~mlconf begin
+        bind (Elab.eval_cmd mlcmd.con) @@ fun _ ->
+        bind (report_unsolved ~loc:mlcmd.span) @@ fun _ ->
+        bind resolver @@ fun res ->
+        bind get_per_process @@ fun per_process ->
+        ret (res, per_process)
+      end
     with
     | exn ->
       Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
-      Diagnostics.terminated ();
-      exit 1
-  end
+      exit (-1)
+end
+and Elab : Elaborator.S = Elaborator.Make (Importer)
+
+let execute_signature base_dir mlcmd =
+  let mlconf : ML.mlconf = {base_dir; indent = ""} in
+  ignore @@ Runner.execute ~per_process_opt:None ~mlconf ~mlcmd
 
 let set_options options =
   Format.set_margin options.line_width;
   Name.set_debug_mode options.debug_mode
 
-let load_file options =
-  set_options options;
-  let open Lwt.Infix in
-  let dirname = Filename.dirname options.file_name in
-  read_file options.file_name >>= execute_signature dirname
+let load options source =
+  try
+    set_options options;
+    let base_dir = Filename.dirname options.file_name in
+    execute_signature base_dir @@
+    match source with
+    | `Stdin -> read_from_channel ~file_name:options.file_name stdin
+    | `File -> read_file options.file_name
+  with
+  | ParseError.E (posl, posr) ->
+    let loc = Some (posl, posr) in
+    let pp fmt () = Format.fprintf fmt "Parse error" in
+    Log.pp_message ~loc ~lvl:`Error pp Format.err_formatter ()
 
-let load_from_stdin options  =
-  set_options options;
-  let open Lwt.Infix in
-  let dirname = Filename.dirname options.file_name in
-  read_from_channel options.file_name Lwt_io.stdin
-  >>= execute_signature dirname
+let load_file options =
+  load options `File
+
+let load_from_stdin options =
+  load options `Stdin

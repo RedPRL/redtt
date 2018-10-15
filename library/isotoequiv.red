@@ -1,3 +1,5 @@
+import path
+import hlevel
 import equivalence
 
 -- yacctt: https://github.com/mortberg/yacctt/blob/master/examples/prelude.ytt#L374

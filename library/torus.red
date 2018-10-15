@@ -1,5 +1,6 @@
 import path
 import s1
+import equivalence
 import isotoequiv
 
 -- cubicaltt version: https://github.com/mortberg/cubicaltt/blob/master/examples/torus.ctt

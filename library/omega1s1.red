@@ -7,6 +7,7 @@ import retract
 import pi
 import hlevel-contr
 import equivalence
+import isotoequiv
 
 def s1-univ-cover : s1 → type =
   elim [

@@ -1,6 +1,8 @@
 import nat
 import path
 import unit
+import void
+import or
 
 def le : nat → nat → type =
   elim [

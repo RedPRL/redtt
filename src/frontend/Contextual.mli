@@ -4,15 +4,24 @@ open Dev
 
 include Monad.S
 
+type per_process
+
 val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
+
+val assert_top_level : unit m
+val init_per_process : unit -> per_process
+val get_per_process : per_process m
+val set_per_process : per_process -> unit m
 
 val modify_mlenv : (ML.mlenv -> ML.mlenv) -> unit m
 val get_mlenv : ML.mlenv m
 
 val resolver : ResEnv.t m
-val declare_datatype : string -> Desc.desc -> unit m
+val modify_top_resolver : (ResEnv.t -> ResEnv.t) -> unit m
+val declare_datatype : ResEnv.visibility -> string -> Desc.desc -> unit m
+val replace_datatype : string -> Desc.desc -> unit m
 
 val isolate : 'a m -> 'a m
 
@@ -54,7 +63,7 @@ val base_cx : Cx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 
-val run : 'a m -> 'a
+val run : per_process_opt : per_process option -> mlconf : ML.mlconf -> 'a m -> 'a
 
 
 val report_unsolved : loc:Log.location -> unit m

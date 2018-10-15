@@ -9,7 +9,7 @@ sig
   val remove : 'k -> ('k, 'a) t -> ('k, 'a) t
   val set_opt : 'k -> 'a option -> ('k, 'a) t -> ('k, 'a) t
   val find : 'k -> ('k, 'a) t -> 'a option
-  val fold : ('k-> 'a -> 'b -> 'b) -> ('k, 'a) t -> 'b -> 'b
+  val fold : ('k -> 'a -> 'b -> 'b) -> ('k, 'a) t -> 'b -> 'b
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
 end
 

@@ -5,7 +5,8 @@ type 'a info =
   {con : 'a;
    span : Log.location}
 
-module Env = PersistentTable.M
+module T = PersistentTable.M
+type mlconf = {base_dir : string; indent : string}
 type mlname = [`Gen of Name.t | `User of string]
 
 
@@ -19,6 +20,7 @@ type mlval =
   | MlTuple of mlval list
   | MlString of string
   | MlFloat of float
+  | MlConf of mlconf
 
 and mlcmd =
   | MlRet of mlval
@@ -27,17 +29,18 @@ and mlcmd =
   | MlElab of eterm
   | MlElabWithScheme of escheme * eterm
   | MlCheck of {ty : mlval; tm : mlval}
-  | MlDeclData of {name : string; desc : edesc}
-  | MlDefine of {name : mlval; opacity : [`Opaque | `Transparent]; ty : mlval; tm : mlval}
+  | MlDeclData of {visibility : ResEnv.visibility; name : string; desc : edesc}
+  | MlDefine of {visibility : ResEnv.visibility; name : mlval; opacity : [`Opaque | `Transparent]; ty : mlval; tm : mlval}
   | MlSplit of mlval * mlname list * mlcmd
   | MlUnify
   | MlBind of mlcmd * mlname * mlcmd
   | MlUnleash of mlval
   | MlNormalize of mlval
-  | MlImport of string
+  | MlImport of ResEnv.visibility * string list
   | MlPrint of mlval info
   | MlDebug of [`All | `Constraints | `Unsolved]
   | MlForeign of (semval -> mlcmd) * mlval
+  | MlGetConf
 
 and semcmd =
   | SemRet of semval
@@ -53,8 +56,11 @@ and semval =
   | SemTuple of semval list
   | SemString of string
   | SemFloat of float
+  | SemConf of mlconf
 
-and mlenv = (mlname, semval) Env.t
+and mlenv =
+  {values : (mlname, semval) T.t;
+   mlconf : mlconf}
 
 and edesc =
     EDesc of
@@ -145,6 +151,24 @@ and frame =
   | Snd
   | Open
 
+module Env :
+sig
+  type t = mlenv
+  val init : mlconf : mlconf -> t
+  val get_mlconf : t -> mlconf
+  val set : mlname -> semval -> t -> t
+  val find : mlname -> t -> semval option
+end =
+struct
+  type t = mlenv
+  
+  let init ~mlconf = {values = T.init ~size:100; mlconf}
+  
+  let get_mlconf {mlconf; _} = mlconf
+
+  let set k v e = {e with values = T.set k v e.values}
+  let find k e = T.find k e.values
+end
 
 (* Please fill this in. I'm just using it for debugging. *)
 let pp fmt =
@@ -162,8 +186,9 @@ let pp fmt =
 
 let pp_edecl fmt =
   function
-  | MlImport str ->
-    Format.fprintf fmt "import %s" str
+  | MlImport (vis, selector) ->
+    let pp_sep fmt () = Format.fprintf fmt "." in
+    Format.fprintf fmt "%a import %a" ResEnv.pp_visibility vis (Format.pp_print_list ~pp_sep Format.pp_print_string) selector
   | _ ->
     Format.fprintf fmt "<other>"
 
@@ -185,25 +210,26 @@ let ml_get_time =
   let f _ = MlRet (MlFloat (Unix.gettimeofday ())) in
   MlForeign (f, MlTuple [])
 
-let ml_print_bench name now0 now1 =
+let ml_print_bench conf name now0 now1 =
   let f = function
-    | SemTuple [SemRef name; SemFloat now0; SemFloat now1] ->
-      Format.printf "Defined %a (%fs).@." Name.pp name (now1 -. now0);
+    | SemTuple [SemConf {indent; _}; SemRef name; SemFloat now0; SemFloat now1] ->
+      Format.printf "@[%sDefined %a (%fs).@]@." indent Name.pp name (now1 -. now0);
       MlRet (MlTuple [])
     | _ ->
       failwith "ml_print_bench"
   in
-  MlForeign (f, MlTuple [name; now0; now1])
+  MlForeign (f, MlTuple [conf; name; now0; now1])
 
 
-let define ~name ~opacity ~scheme ~tm =
+let define ~visibility ~name ~opacity ~scheme ~tm =
   mlbind ml_get_time @@ fun now0 ->
   mlbind (MlElabWithScheme (scheme, tm)) @@ fun x ->
   mlsplit x @@ fun ty tm ->
-  mlbind (MlDefine {name; ty; tm; opacity}) @@ fun _ ->
+  mlbind (MlDefine {name; ty; tm; visibility; opacity}) @@ fun _ ->
   mlbind MlUnify @@ fun _ ->
   mlbind ml_get_time @@ fun now1 ->
-  mlbind (ml_print_bench name now0 now1) @@ fun _ ->
+  mlbind MlGetConf @@ fun conf ->
+  mlbind (ml_print_bench conf name now0 now1) @@ fun _ ->
   MlRet x
 
 
@@ -237,6 +263,8 @@ and pp_semval fmt =
     Format.fprintf fmt "\"%a\"" Uuseg_string.pp_utf_8 str
   | SemFloat x ->
     Format.fprintf fmt "%f" x
+  | SemConf x ->
+    Format.fprintf fmt "<mlconf>"
 
 let unleash_term =
   function

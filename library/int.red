@@ -2,8 +2,10 @@ import path
 import void
 import unit
 import nat
+import hlevel
 import equivalence
 import isotoequiv
+import hedberg
 
 data int where
 | pos (n : nat)
