@@ -249,8 +249,6 @@ and read_import cells = parse
     { read_import cells lexbuf }
   | "--"
     { line_comment (fun _ -> IMPORT (Bwd.to_list !cells)) lexbuf }
-  | whitespace "/-"
-    { BlockComment.push (); block_comment (fun _ -> IMPORT (Bwd.to_list !cells)) lexbuf }
   | "."
     { read_import cells lexbuf }
   | line_ending
