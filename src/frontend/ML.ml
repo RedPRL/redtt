@@ -36,7 +36,7 @@ and mlcmd =
   | MlBind of mlcmd * mlname * mlcmd
   | MlUnleash of mlval
   | MlNormalize of mlval
-  | MlImport of string list
+  | MlImport of ResEnv.visibility * string list
   | MlPrint of mlval info
   | MlDebug of [`All | `Constraints | `Unsolved]
   | MlForeign of (semval -> mlcmd) * mlval
@@ -186,9 +186,9 @@ let pp fmt =
 
 let pp_edecl fmt =
   function
-  | MlImport selector ->
+  | MlImport (vis, selector) ->
     let pp_sep fmt () = Format.fprintf fmt "." in
-    Format.fprintf fmt "import %a" (Format.pp_print_list ~pp_sep Format.pp_print_string) selector
+    Format.fprintf fmt "%a import %a" ResEnv.pp_visibility vis (Format.pp_print_list ~pp_sep Format.pp_print_string) selector
   | _ ->
     Format.fprintf fmt "<other>"
 

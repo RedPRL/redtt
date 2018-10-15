@@ -42,7 +42,7 @@
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
-%token IMPORT OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
+%token PUBLIC PRIVATE IMPORT OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
 %token META
 %token EOF
@@ -358,7 +358,10 @@ mltoplevel:
       {rest with con = MlBind (E.MlDeclData {name; desc}, `User name, rest.con)} }
 
   | IMPORT; path = separated_nonempty_list(DOT, ATOM); rest = mltoplevel
-    { {rest with con = E.mlbind (E.MlImport path) @@ fun _ -> rest.con} }
+    { {rest with con = E.mlbind (E.MlImport (`Private, path)) @@ fun _ -> rest.con} }
+
+  | PUBLIC IMPORT; path = separated_nonempty_list(DOT, ATOM); rest = mltoplevel
+    { {rest with con = E.mlbind (E.MlImport (`Public, path)) @@ fun _ -> rest.con} }
 
   | QUIT; rest = mltoplevel
     { {rest with con = E.MlRet (E.MlTuple [])} }

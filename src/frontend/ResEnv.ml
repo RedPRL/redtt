@@ -91,3 +91,8 @@ let import_globals ?(visibility=`Private) imported renv =
          T.set s (x, visibility) globals
      in
      T.fold merger imported.globals renv.globals}
+
+let pp_visibility fmt =
+  function
+  | `Public -> Format.fprintf fmt "public"
+  | `Private -> Format.fprintf fmt "private"

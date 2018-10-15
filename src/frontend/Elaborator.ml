@@ -164,7 +164,7 @@ struct
       C.declare_datatype info.name desc >>
       M.ret @@ E.SemRet (E.SemDataDesc desc)
 
-    | E.MlImport selector ->
+    | E.MlImport (visibility, selector) ->
       C.get_per_process >>= fun per_process ->
       C.get_mlenv <<@> E.Env.get_mlconf >>= fun mlconf ->
       begin
@@ -174,7 +174,7 @@ struct
           M.ret @@ E.SemRet (E.SemTuple [])
         | `New (res, per_process) ->
           C.set_per_process per_process >>
-          C.modify_top_resolver (ResEnv.import_globals res) >>
+          C.modify_top_resolver (ResEnv.import_globals ~visibility res) >>
           M.ret @@ E.SemRet (E.SemTuple [])
       end
 

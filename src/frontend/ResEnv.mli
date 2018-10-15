@@ -24,3 +24,5 @@ val datatype : ?visibility:visibility -> string -> t -> t
 val import_globals : ?visibility:visibility -> t -> t -> t
 
 val get : string -> t -> resolution
+
+val pp_visibility : visibility Pp.t0
