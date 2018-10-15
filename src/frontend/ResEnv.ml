@@ -15,12 +15,15 @@ type resolution =
   | `Datatype of string
   ]
 
+type visibility =
+  [ `Private | `Public ]
+
 
 module T = PersistentTable.M
 
 type t =
   {locals : string option bwd;
-   globals : (string, global) T.t}
+   globals : (string, global * visibility) T.t}
 
 let init () =
   {locals = Emp;
@@ -55,25 +58,36 @@ let get x renv =
   with
   | _ ->
     match T.find x renv.globals with
-    | Some (`Var x) ->
+    | Some (`Var x, _) ->
       `Var x
-    | Some (`Metavar x) ->
+    | Some (`Metavar x, _) ->
       `Metavar x
-    | Some (`Datatype x) ->
+    | Some (`Datatype x, _) ->
       `Datatype x
     | None ->
       failwith @@ "Could not resolve variable: " ^ x
 
 
 
-let named_var s x renv =
+let named_var ?(visibility=`Public) s x renv =
   {renv with
-   globals = T.set s (`Var x) renv.globals}
+   globals = T.set s (`Var x, visibility) renv.globals}
 
-let named_metavar s x renv =
+let named_metavar ?(visibility=`Public) s x renv =
   {renv with
-   globals = T.set s (`Metavar x) renv.globals}
+   globals = T.set s (`Metavar x, visibility) renv.globals}
 
-let datatype s renv =
+let datatype ?(visibility=`Public) s renv =
   {renv with
-   globals = T.set s (`Datatype s) renv.globals}
+   globals = T.set s (`Datatype s, visibility) renv.globals}
+
+let import_globals ?(visibility=`Private) imported renv =
+  {renv with
+   globals =
+     let merger s (x, vis) globals =
+       match vis with
+       | `Private -> globals
+       | `Public ->
+         T.set s (x, visibility) globals
+     in
+     T.fold merger imported.globals renv.globals}

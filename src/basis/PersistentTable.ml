@@ -5,9 +5,9 @@ sig
   val init : size:int -> ('k, 'a) t
   val get : 'k -> ('k, 'a) t -> 'a
   val set : 'k -> 'a -> ('k, 'a) t -> ('k, 'a) t
-  val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
-
   val find : 'k -> ('k, 'a) t -> 'a option
+  val fold : ('k -> 'a -> 'b -> 'b) -> ('k, 'a) t -> 'b -> 'b
+  val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
 end
 
 module M : S =
@@ -76,12 +76,14 @@ struct
     | _ ->
       raise Fatal
 
-  let merge t0 t1 =
-    reroot t0;
-    match !t0 with
+  let fold f t e =
+    reroot t;
+    match !t with
     | Tbl a ->
-      Hashtbl.fold set a t1
+      Hashtbl.fold f a e
     | _ ->
       raise Fatal
+
+  let merge t0 t1 = fold set t0 t1
 
 end

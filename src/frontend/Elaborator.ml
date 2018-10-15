@@ -5,10 +5,16 @@ open Bwd open BwdNotation
 
 module type Import =
 sig
-  val import : path:string list -> [`Elab of ML.mlcmd | `Cached]
+  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> selector : string list
+    -> [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
 end
 
-module Make (I : Import) =
+module type S =
+sig
+  val eval_cmd : ML.mlcmd -> ML.semcmd Contextual.m 
+end
+
+module Make (I : Import) : S =
 struct
 
   module C = Contextual
@@ -31,10 +37,6 @@ struct
   module E = ML
 
   open Refiner
-
-  type mode =
-    | Chk of ty
-    | Inf
 
   let univ = Tm.univ ~lvl:`Omega ~kind:`Pre
 
@@ -162,13 +164,18 @@ struct
       C.declare_datatype info.name desc >>
       M.ret @@ E.SemRet (E.SemDataDesc desc)
 
-    | E.MlImport path ->
+    | E.MlImport selector ->
+      C.get_per_process >>= fun per_process ->
+      C.get_mlenv <<@> E.Env.get_mlconf >>= fun mlconf ->
       begin
-        match I.import ~path with
-        | `Cached ->
+        match I.import ~per_process ~mlconf ~selector with
+        | `Cached res ->
+          C.modify_top_resolver (ResEnv.import_globals res) >>
           M.ret @@ E.SemRet (E.SemTuple [])
-        | `Elab cmd ->
-          eval_cmd cmd
+        | `New (res, per_process) ->
+          C.set_per_process per_process >>
+          C.modify_top_resolver (ResEnv.import_globals res) >>
+          M.ret @@ E.SemRet (E.SemTuple [])
       end
 
     | E.MlUnify ->
@@ -213,6 +220,9 @@ struct
       M.dump_state Format.std_formatter "Debug" filter >>
       M.ret @@ E.SemRet (E.SemTuple [])
 
+    | E.MlGetConf ->
+      C.get_mlenv <<@> E.Env.get_mlconf <<@> fun mlconf -> E.SemRet (E.SemConf mlconf)
+
   and unleash_ret =
     function
     | E.SemRet v -> v
@@ -229,6 +239,7 @@ struct
     | E.MlRef nm -> M.ret @@ E.SemRef nm
     | E.MlString str -> M.ret @@ E.SemString str
     | E.MlFloat x -> M.ret @@ E.SemFloat x
+    | E.MlConf x -> M.ret @@ E.SemConf x
 
   and elab_datatype dlbl (E.EDesc edesc) =
     let rec elab_params : _ -> (_ * Desc.body) M.m =
