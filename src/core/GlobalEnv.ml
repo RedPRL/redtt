@@ -36,6 +36,10 @@ let declare_datatype dlbl desc (sg : t) : t =
   {sg with
    data_decls = StringTable.add dlbl desc sg.data_decls}
 
+let replace_datatype dlbl desc (sg : t) : t =
+  {sg with
+   data_decls = StringTable.update dlbl (function None -> raise Not_found | Some _ -> Some desc) sg.data_decls}
+
 let lookup_datatype dlbl sg =
   try
     StringTable.find dlbl sg.data_decls

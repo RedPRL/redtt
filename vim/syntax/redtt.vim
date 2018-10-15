@@ -32,7 +32,7 @@ syn keyword redttKeyw V in with where begin end tick dim elim fst snd coe com pa
 syn keyword redttKeyw fun hcom comp vproj vin lam next prev dfix fix call refl pre
 syn keyword redttKeyw kan U type
 
-syn keyword redttDecl meta def do let data debug print normalize import quit opaque
+syn keyword redttDecl meta def do let data debug print normalize public private import quit opaque
 
 syn match   redttSymb '[#@`|^*×:,.∙✓□▷=∂→λ𝕀]\|->'
 

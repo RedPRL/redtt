@@ -65,6 +65,8 @@ let keywords =
     ("debug", DEBUG);
     ("normalize", NORMALIZE);
     ("type", TYPE);
+    ("public", PUBLIC);
+    ("private", PRIVATE);
     ("import", IMPORT);
   ]
 }

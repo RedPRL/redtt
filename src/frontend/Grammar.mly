@@ -42,7 +42,7 @@
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
-%token IMPORT OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
+%token PUBLIC PRIVATE IMPORT OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
 %token META
 %token EOF
@@ -320,10 +320,21 @@ econstr:
   boundary = loption(pipe_block(eface))
   { clbl, E.EConstr {specs = List.flatten specs; boundary} }
 
-opacity:
+data_modifiers:
+  | PRIVATE
+    { `Private }
+  | { `Public }
+
+def_modifiers:
   | OPAQUE
-    { `Opaque }
-  | { `Transparent }
+    { `Public, `Opaque }
+  | PRIVATE
+    { `Private, `Transparent }
+  | OPAQUE PRIVATE
+    { `Private, `Opaque }
+  | PRIVATE OPAQUE
+    { `Private, `Opaque }
+  | { `Public, `Transparent }
 
 
 data_decl:
@@ -349,16 +360,20 @@ mltoplevel:
   | META; LTR; c = mlcmd; RTR; rest = mltoplevel
     { {rest with con = E.MlBind (c, `Gen (Name.fresh ()), rest.con)} }
 
-  | opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
+  | modifiers = def_modifiers; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
     { let name = E.MlRef (Name.named (Some a)) in
-      {rest with con = MlBind (E.define ~name ~opacity ~scheme:sch ~tm, `User a, rest.con)} }
+      let visibility, opacity = modifiers in
+      {rest with con = MlBind (E.define ~visibility ~name ~opacity ~scheme:sch ~tm, `User a, rest.con)} }
 
-  | decl = data_decl; rest = mltoplevel
+  | visibility = data_modifiers; decl = data_decl; rest = mltoplevel
     { let name, desc = decl in
-      {rest with con = MlBind (E.MlDeclData {name; desc}, `User name, rest.con)} }
+      {rest with con = MlBind (E.MlDeclData {visibility; name; desc}, `User name, rest.con)} }
 
-  | IMPORT; a = ATOM; rest = mltoplevel
-    { {rest with con = E.mlbind (E.MlImport a) @@ fun _ -> rest.con} }
+  | IMPORT; path = separated_nonempty_list(DOT, ATOM); rest = mltoplevel
+    { {rest with con = E.mlbind (E.MlImport (`Private, path)) @@ fun _ -> rest.con} }
+
+  | PUBLIC IMPORT; path = separated_nonempty_list(DOT, ATOM); rest = mltoplevel
+    { {rest with con = E.mlbind (E.MlImport (`Public, path)) @@ fun _ -> rest.con} }
 
   | QUIT; rest = mltoplevel
     { {rest with con = E.MlRet (E.MlTuple [])} }
@@ -408,13 +423,14 @@ atomic_mlcmd:
   | NORMALIZE; c = atomic_mlcmd
     { E.mlbind c @@ fun x -> E.MlNormalize x }
 
-  | LLGL; decl = data_decl; RRGL
+  | LLGL; visibility = data_modifiers; decl = data_decl; RRGL
     { let name, desc = decl in
-      E.MlDeclData {name; desc} }
+    E.MlDeclData {visibility; name; desc} }
 
-  | LLGL; opacity = opacity; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); RRGL
+  | LLGL; modifiers = def_modifiers; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); RRGL
     { let name = E.MlRef (Name.named (Some a)) in
-      E.define ~name ~opacity ~scheme:sch ~tm }
+      let visibility, opacity = modifiers in
+      E.define ~name ~visibility ~opacity ~scheme:sch ~tm }
 
   | LLGL; e = located(econ); RRGL
     { E.MlElab e }

@@ -1,5 +1,3 @@
-import path
-
 def connection/or
   (A : type)
   (p : 𝕀 → A)

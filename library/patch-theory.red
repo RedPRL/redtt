@@ -1,4 +1,6 @@
+import path
 import int
+import equivalence
 import univalence
 
 data patch where

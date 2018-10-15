@@ -22,6 +22,7 @@ val kill_from_tick : t -> Name.t -> t
 
 
 val declare_datatype : string -> Desc.desc -> t -> t
+val replace_datatype : string -> Desc.desc -> t -> t (* [Not_found] if the datatype is not there *)
 val lookup_datatype : string -> t ->Desc.desc
 
 module T : module type of (Map.Make (Name))

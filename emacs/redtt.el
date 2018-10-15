@@ -95,7 +95,7 @@
   "Syntax table for redtt.")
 
 (defconst redtt-declaration-keywords
-  '("data" "def" "meta" "normalize" "print")
+  '("data" "opaque" "def" "meta" "normalize" "print" "public" "private" "import" "quit")
   "Declaration keywords.")
 
 
