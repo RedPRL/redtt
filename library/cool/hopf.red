@@ -1,8 +1,7 @@
-import path
-import connection
-import hlevel
-import equivalence
-import univalence
+import prelude
+import data.s1
+import data.s2
+import paths.equivalence
 
 def rotate/loop : (a : s1) → path _ a a =
   elim [
@@ -39,3 +38,13 @@ def rotate/equiv (a : s1) : equiv s1 s1 =
 
 def rotate/path (a : s1) : path^1 type s1 s1 =
   ua s1 s1 (rotate/equiv a)
+
+def hopf : s2 → type =
+  elim [
+  | base → s1
+  | surf i j →
+    comp 0 1 s1 [
+    | ∂[j] | i=0 → ua s1 s1 (id-equiv s1)
+    | i=1 → rotate/path (loop j)
+    ]
+  ]

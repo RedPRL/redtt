@@ -45,3 +45,15 @@ def sigma/hlevel : (l : hlevel) (A : type) (B : A → type)
           (A/level a a') (λ p → pathd/hlevel (hsuc l) A B p (B/level a') b b'))
     ]
   ]
+
+def subtype/path
+  (A : type) (B : A → type)
+  (B/prop : (a : A) → is-prop (B a))
+  (u v : (a : A) × B a)
+  (P : path A (u.fst) (v.fst))
+  : path ((a : A) × B a) u v
+  =
+  λ i →
+  ( P i
+  , prop→prop-over (λ i → B (P i)) (B/prop (P 1)) (u.snd) (v.snd) i
+  )

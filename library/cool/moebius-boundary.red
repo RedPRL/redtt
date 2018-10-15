@@ -1,8 +1,7 @@
-import path
-import bool
-import s1
-import equivalence
-import isotoequiv
+import prelude
+import data.bool
+import data.s1
+import basics.isotoequiv
 
 def not/equiv : equiv bool bool =
   iso→equiv _ _ (not, (not, (not∘not/id/pt, not∘not/id/pt)))

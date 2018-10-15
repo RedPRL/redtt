@@ -1,7 +1,7 @@
-import path
-import s1
-import equivalence
-import isotoequiv
+import prelude
+import data.s1
+import data.torus
+import basics.isotoequiv
 
 -- cubicaltt version: https://github.com/mortberg/cubicaltt/blob/master/examples/torus.ctt
 -- cubical agda version: https://github.com/Saizan/cubical-demo/blob/hits-transp/examples/Cubical/Examples/Torus.agda
@@ -43,7 +43,6 @@ def torus/s1s1/iso : iso (s1 × s1) torus =
   , t2c2t
   , c2t2c
   )
-
 
 def torus/s1s1/equiv : equiv (s1 × s1) torus =
   iso→equiv (s1 × s1) torus torus/s1s1/iso

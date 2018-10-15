@@ -1,7 +1,6 @@
-import path
-import bool
-import equivalence
-import isotoequiv
+import prelude
+import data.bool
+import basics.isotoequiv
 
 def ptype : type^1 = (A : type) × A
 

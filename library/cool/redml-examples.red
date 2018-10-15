@@ -1,4 +1,4 @@
-import bool
+import data.bool
 
 meta ⦉
 

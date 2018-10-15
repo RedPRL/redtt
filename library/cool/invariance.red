@@ -1,7 +1,5 @@
-import path
-import connection
-import equivalence
-import bool
+import prelude
+import data.bool
 
 -- This is ported from some RedPRL examples by Carlo Angiuli:
 -- https://github.com/RedPRL/sml-redprl/blob/master/example/invariance.prl

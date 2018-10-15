@@ -1,8 +1,6 @@
-import path
-import J
-import equivalence
-import isotoequiv
-import retract
+import prelude
+import basics.retract
+import basics.isotoequiv
 
 -- a retract of the path family is an equivalence
 

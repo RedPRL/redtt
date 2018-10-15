@@ -1,5 +1,5 @@
-import path
-import bool
+import prelude
+import data.bool
 
 -- the core constructor (prev α M) is written using application notation in
 -- the surface language

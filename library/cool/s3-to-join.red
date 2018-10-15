@@ -1,9 +1,9 @@
-import path
-import s1
-import s2
-import join
-import equivalence
-import isotoequiv
+import prelude
+import data.s1
+import data.s2
+import data.s3
+import data.join
+import basics.isotoequiv
 
 -- forward map
 

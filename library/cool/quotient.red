@@ -1,8 +1,7 @@
 import prelude
 import data.truncation
-import equivalence
-import isotoequiv
-import retract
+import data.quotient
+import basics.isotoequiv
 
 -- A "quotient" by a "0-coherent groupoid" is effective
 def quotient/effective

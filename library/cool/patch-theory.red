@@ -1,7 +1,8 @@
-import path
-import int
-import equivalence
-import univalence
+import prelude
+import data.int
+import paths.int
+import paths.equivalence
+import paths.sigma
 
 data patch where
 | num

@@ -1,8 +1,8 @@
-import nat
-import path
-import unit
-import void
-import or
+import prelude
+import data.nat
+import data.unit
+import data.void
+import data.or
 
 def le : nat → nat → type =
   elim [

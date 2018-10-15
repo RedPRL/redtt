@@ -46,4 +46,5 @@ def id-equiv/weak-connection (B : type) : equiv B B =
     )
   )
 
-
+def path→equiv (A B : type) (P : path^1 type A B) : equiv A B =
+  coe 0 1 (id-equiv A) in λ i → equiv A (P i)

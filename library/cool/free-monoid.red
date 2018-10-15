@@ -1,4 +1,4 @@
-import list
+import data.list
 
 -- In this file, we try to relate the weak free monoid on a set (presented as a HIT) to the
 -- strict free monoid, presented as a list.

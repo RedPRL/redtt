@@ -1,13 +1,9 @@
-import path
-import hlevel
-import equivalence
-import connection
-import retract
+import prelude
+import basics.retract
+import paths.sigma
+import paths.equivalence
 
 -- the code in this file is adapted from yacctt and redprl
-
-def path→equiv (A B : type) (P : path^1 type A B) : equiv A B =
-  coe 0 1 (id-equiv A) in λ i → equiv A (P i)
 
 -- per Dan Licata, ua and ua/beta suffice for full univalence:
 -- https://groups.google.com/forum/#!topic/homotopytypetheory/j2KBIvDw53s
@@ -23,18 +19,6 @@ def equiv→path/based (A : type) (X : (B : type) × equiv A B) : (B : type) × 
 def path→equiv/based (A : type) (X : (B : type) × path^1 type A B) : (B : type) × equiv A B =
   ( X.fst
   , path→equiv _ (X.fst) (X.snd)
-  )
-
-def subtype/path
-  (A : type) (B : A → type)
-  (B/prop : (a : A) → is-prop (B a))
-  (u v : (a : A) × B a)
-  (P : path A (u.fst) (v.fst))
-  : path ((a : A) × B a) u v
-  =
-  λ i →
-  ( P i
-  , prop→prop-over (λ i → B (P i)) (B/prop (P 1)) (u.snd) (v.snd) i
   )
 
 def ua/retract (A B : type) : retract^1 (equiv A B) (path^1 type A B) =
@@ -63,7 +47,7 @@ def ua/id-equiv (A : type) : path^1 _ (ua _ _ (id-equiv A)) refl =
 -- https://groups.google.com/forum/#!msg/homotopytypetheory/HfCB_b-PNEU/Ibb48LvUMeUJ
 -- See also Theorem 5.8.4 of the HoTT Book.
 
-def univalence/bad (A : type) : is-contr^1 ((B : type) × equiv A B) =
+def univalence/alt (A : type) : is-contr^1 ((B : type) × equiv A B) =
   retract/hlevel^1 contr
     ((B : type) × equiv A B)
     ((B : type) × path^1 type A B)
