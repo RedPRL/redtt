@@ -2,6 +2,12 @@ open RedBasis
 
 let redlib_name = "redlib"
 
+type selector = string list
+
+let pp_selector =
+  let pp_sep fmt () = Format.eprintf "." in
+  Format.pp_print_list ~pp_sep Format.pp_print_string
+
 let find_redlib_root (base_dir : string) : string option =
   SysUtil.protect_cwd @@ fun cur ->
   let rec go cur =
@@ -31,12 +37,16 @@ let find_module base_dir ?(extension=None) selector : string =
     local_path
   else
     match find_redlib_root base_dir with
-    | None -> raise Not_found
+    | None ->
+      Format.eprintf "@[Could not find the module@ %a@ at@ %s.@]@."
+      pp_selector selector local_path;
+      raise Not_found
     | Some new_base_dir ->
       let abs_path = SysUtil.normalize_concat [new_base_dir] module_path in
       if Sys.file_exists abs_path then
         abs_path
-      else
-        let pp_sep fmt () = Format.eprintf "." in
-        Format.eprintf "@[Could not find the module %a@]@." (Format.pp_print_list ~pp_sep Format.pp_print_string) selector;
+      else begin
+        Format.eprintf "@[Could not find the module@ %a@ at@ %s@ or@ %s.@]@."
+        pp_selector selector local_path abs_path;
         raise Not_found
+      end

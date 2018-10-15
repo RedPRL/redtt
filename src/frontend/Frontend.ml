@@ -38,16 +38,16 @@ struct
     let normalized_f = SysUtil.normalize_concat [] f in
     match Hashtbl.find_opt cache normalized_f with
     | None ->
-      Format.eprintf "@[%sChecking %s@]@." mlconf.indent normalized_f;
+      Format.eprintf "@[%sChecking %s.@]@." mlconf.indent normalized_f;
       let res, per_process =
         let mlconf = {base_dir = Filename.dirname f; indent = " " ^ mlconf.indent} in
         let mlcmd = read_file f in
         Runner.execute ~per_process_opt:(Some per_process) ~mlconf ~mlcmd in
       Hashtbl.add cache normalized_f res;
-      Format.eprintf "@[%sChecked %s@]@." mlconf.indent normalized_f;
+      Format.eprintf "@[%sChecked %s.@]@." mlconf.indent normalized_f;
       `New (res, per_process)
     | Some res ->
-      Format.eprintf "@[%sLoaded %s@]@." mlconf.indent normalized_f;
+      Format.eprintf "@[%sLoaded %s.@]@." mlconf.indent normalized_f;
       `Cached res
 end
 and Runner :
