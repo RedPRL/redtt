@@ -20,7 +20,8 @@ val get_mlenv : ML.mlenv m
 
 val resolver : ResEnv.t m
 val modify_top_resolver : (ResEnv.t -> ResEnv.t) -> unit m
-val declare_datatype : string -> Desc.desc -> unit m
+val declare_datatype : ResEnv.visibility -> string -> Desc.desc -> unit m
+val replace_datatype : string -> Desc.desc -> unit m
 
 val isolate : 'a m -> 'a m
 

@@ -69,19 +69,19 @@ let get x renv =
 
 
 
-let named_var ?(visibility=`Public) s x renv =
+let named_var ~visibility s x renv =
   {renv with
    globals = T.set s (`Var x, visibility) renv.globals}
 
-let named_metavar ?(visibility=`Public) s x renv =
+let named_metavar ~visibility s x renv =
   {renv with
    globals = T.set s (`Metavar x, visibility) renv.globals}
 
-let datatype ?(visibility=`Public) s renv =
+let datatype ~visibility s renv =
   {renv with
    globals = T.set s (`Datatype s, visibility) renv.globals}
 
-let import_globals ?(visibility=`Private) imported renv =
+let import_globals ~visibility imported renv =
   {renv with
    globals =
      let merger s (x, vis) globals =

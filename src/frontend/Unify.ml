@@ -132,7 +132,7 @@ let hole tag gm ty f =
   go_left >>
   ret r
 
-let define gm alpha opacity ~ty tm =
+let define gm alpha visibility opacity ~ty tm =
   let ty' = abstract_ty gm ty in
   let tm' = abstract_tm gm tm in
   check ~ty:ty' tm' >>= function
@@ -142,7 +142,7 @@ let define gm alpha opacity ~ty tm =
     begin
       if opacity = `Transparent then push_update alpha else ret ()
     end >>
-    pushr @@ E (alpha, ty', Defn (opacity, tm'))
+    pushr @@ E (alpha, ty', Defn (visibility, opacity, tm'))
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)
@@ -242,7 +242,7 @@ let try_invert q ty =
         ret false
       | Some t ->
         active (Unify q) >>
-        define Emp alpha `Transparent ~ty t >>
+        define Emp alpha `Private `Transparent ~ty t >>
         ret true
     end
   | _ ->
@@ -362,7 +362,7 @@ let rec instantiate (inst : instantiation) =
   popl >>= function
   | E (beta, ty', Hole `Flex) when alpha = beta ->
     hole `Flex Emp ty @@ fun cmd ->
-    define Emp beta `Transparent ~ty:ty' @@ f cmd
+    define Emp beta `Private `Transparent ~ty:ty' @@ f cmd
   | e ->
     pushr e >>
     instantiate inst
@@ -775,14 +775,14 @@ let rec lower tele alpha ty =
   match Tm.unleash ty with
   | Tm.LblTy info ->
     hole `Flex tele info.ty @@ fun t ->
-    define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
+    define tele alpha `Private `Transparent ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
     ret true
 
   | Tm.Sg (dom, Tm.B (nm, cod)) ->
     hole `Flex tele dom @@ fun t0 ->
     let cod' = Tm.let_ nm t0 cod in
     hole `Flex tele cod' @@ fun t1 ->
-    define tele alpha `Transparent ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
+    define tele alpha `Private `Transparent ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
 
 
@@ -800,7 +800,7 @@ let rec lower tele alpha ty =
         let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod' in
         hole `Flex tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp @ [Tm.FunApp u; Tm.FunApp v]) in
-        define tele alpha `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
+        define tele alpha `Private `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
         ret true
     end
 
@@ -931,7 +931,7 @@ let ambulando =
         check ~ty info.tm >>= function
         | `Ok ->
           (* Format.eprintf "solved guess %a??@." Name.pp alpha; *)
-          pushl @@ E (alpha, ty, Defn (`Transparent, info.tm)) >>
+          pushl @@ E (alpha, ty, Defn (`Private, `Transparent, info.tm)) >>
           push_update alpha >>
           loop
         | _ ->

@@ -29,8 +29,8 @@ and mlcmd =
   | MlElab of eterm
   | MlElabWithScheme of escheme * eterm
   | MlCheck of {ty : mlval; tm : mlval}
-  | MlDeclData of {name : string; desc : edesc}
-  | MlDefine of {name : mlval; opacity : [`Opaque | `Transparent]; ty : mlval; tm : mlval}
+  | MlDeclData of {visibility : ResEnv.visibility; name : string; desc : edesc}
+  | MlDefine of {visibility : ResEnv.visibility; name : mlval; opacity : [`Opaque | `Transparent]; ty : mlval; tm : mlval}
   | MlSplit of mlval * mlname list * mlcmd
   | MlUnify
   | MlBind of mlcmd * mlname * mlcmd
@@ -221,11 +221,11 @@ let ml_print_bench conf name now0 now1 =
   MlForeign (f, MlTuple [conf; name; now0; now1])
 
 
-let define ~name ~opacity ~scheme ~tm =
+let define ~visibility ~name ~opacity ~scheme ~tm =
   mlbind ml_get_time @@ fun now0 ->
   mlbind (MlElabWithScheme (scheme, tm)) @@ fun x ->
   mlsplit x @@ fun ty tm ->
-  mlbind (MlDefine {name; ty; tm; opacity}) @@ fun _ ->
+  mlbind (MlDefine {name; ty; tm; visibility; opacity}) @@ fun _ ->
   mlbind MlUnify @@ fun _ ->
   mlbind ml_get_time @@ fun now1 ->
   mlbind MlGetConf @@ fun conf ->
