@@ -2,6 +2,7 @@ import path
 import J
 import equivalence
 import isotoequiv
+import retract
 
 -- a retract of the path family is an equivalence
 
