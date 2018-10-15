@@ -1,11 +1,10 @@
-import path
-import void
-import unit
-import nat
-import hlevel
-import equivalence
-import isotoequiv
-import hedberg
+import prelude
+import data.void
+import data.nat
+import data.int
+import basics.isotoequiv
+import basics.hedberg
+import paths.nat
 
 def isuc/equiv : equiv int int =
   iso→equiv _ _ (isuc, (pred, (isuc-pred, pred-isuc)))

@@ -1,9 +1,7 @@
-import path
-import connection
-import hlevel
-import sigma
-import pi
-import hlevel-contr
+import prelude
+import paths.sigma
+import paths.pi
+import paths.hlevel
 
 -- hlevels of is-equiv and equiv
 
@@ -39,20 +37,6 @@ def is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv _ _ f) =
       ]
     )
 
-def contr-equiv (A B : type) (A/contr : is-contr A) (B/contr : is-contr B)
-  : equiv A B
-  =
-  ( λ _ → B/contr .fst
-  , λ b →
-    ( (A/contr .fst, symm B (B/contr .snd b))
-    , λ (a,p) i →
-      ( A/contr .snd a i
-      , raise-hlevel prop B (raise-hlevel contr B B/contr)
-        (B/contr .fst) b p (symm B (B/contr .snd b)) i
-      )
-    )
-  )
-
 def equiv/level : (l : hlevel) (A B : type)
   (A/level : has-hlevel l A) (B/level : has-hlevel l B)
   → has-hlevel l (equiv A B)
@@ -73,4 +57,3 @@ def equiv/level : (l : hlevel) (A B : type)
       (pi/hlevel (hsuc l) A (λ _ → B) (λ _ → B/level))
       (λ f → prop→hlevel l (is-equiv _ _ f) (is-equiv/prop/direct A B f))
   ]
-

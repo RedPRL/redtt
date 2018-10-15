@@ -1,10 +1,7 @@
-import path
-import J
-import hlevel
-import equivalence
-import isotoequiv
-import univalence
-import s2
+import prelude
+import data.s2
+import basics.isotoequiv
+import paths.equivalence
 
 -- a calculation of the loop space of the 2-sphere, based on
 -- https://egbertrijke.com/2016/09/28/the-loop-space-of-the-2-sphere/

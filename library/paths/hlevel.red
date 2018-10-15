@@ -1,7 +1,20 @@
-import path
-import hlevel
-import sigma
-import pi
+import prelude
+import paths.sigma
+import paths.pi
+
+def contr-equiv (A B : type) (A/contr : is-contr A) (B/contr : is-contr B)
+  : equiv A B
+  =
+  ( λ _ → B/contr .fst
+  , λ b →
+    ( (A/contr .fst, symm B (B/contr .snd b))
+    , λ (a,p) i →
+      ( A/contr .snd a i
+      , raise-hlevel prop B (raise-hlevel contr B B/contr)
+        (B/contr .fst) b p (symm B (B/contr .snd b)) i
+      )
+    )
+  )
 
 def is-contr/prop (A : type) : is-prop (is-contr A) =
   λ A/contr →

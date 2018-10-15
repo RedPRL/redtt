@@ -1,8 +1,8 @@
-import path
-import void
-import unit
-import hlevel
-import hedberg
+import prelude
+import data.void
+import data.unit
+import data.nat
+import basics.hedberg
 
 def nat/path/code : nat → nat → type =
   elim [
@@ -48,4 +48,4 @@ def nat/discrete : discrete nat =
   ]
 
 def nat/set : is-set nat =
- discrete→set nat nat/discrete
+  discrete→set nat nat/discrete

@@ -1,11 +1,7 @@
-import path
-import hlevel
-import connection
-import J
-import void
-import unit
-
--- encode-decode
+import prelude
+import data.void
+import data.unit
+import data.list
 
 def list/code (A : type) : list A → list A → type =
   elim [
@@ -131,4 +127,3 @@ def list/set (A : type) (setA : is-set A) : is-set (list A) =
       ]
     ]
   ]
-

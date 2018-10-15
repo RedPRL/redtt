@@ -1,13 +1,11 @@
-import path
-import hlevel
-import J
-import int
-import s1
-import retract
-import pi
-import hlevel-contr
-import equivalence
-import isotoequiv
+import prelude
+import data.s1
+import data.int
+import basics.isotoequiv
+import basics.retract
+import paths.pi
+import paths.int
+import paths.hlevel
 
 def s1-univ-cover : s1 → type =
   elim [
