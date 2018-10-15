@@ -1,5 +1,5 @@
-import path
-import connection
+import prelude.path
+import prelude.connection
 
 def is-contr (C : type) : type =
   (c : _) × (c' : _) → path C c' c
@@ -120,4 +120,3 @@ def path/based/contr (A : type) (a : A)
       ]
     )
   )
-

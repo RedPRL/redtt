@@ -2,12 +2,6 @@ import path
 import connection
 import hlevel
 
-def is-section (A B : type) (f : A → B) : type =
-  (g : B → A) × (a : A) → path A (g (f a)) a
-
-def retract (A B : type) : type =
-  (f : A → B) × is-section A B f
-
 -- Adapted from https://github.com/HoTT/book/issues/718
 def path-retract/preserves-refl (A : type) (R : A → A → type)
   (ret : (x y : A) → retract (R x y) (path A x y)) (x : A)
