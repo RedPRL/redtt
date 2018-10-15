@@ -1,5 +1,5 @@
 redtt mathematical library
-=============
+==========================
 
 This is the home of the `redtt` mathematical library.
 
