@@ -245,10 +245,12 @@ and read_import cells = parse
   | atom_initial atom_subsequent*
     { cells := Snoc (!cells, lexeme lexbuf);
       read_import cells lexbuf }
+  | whitespace
+    { read_import cells lexbuf }
   | "--"
-    { line_comment (read_import cells) lexbuf }
-  | "/-"
-    { BlockComment.push (); block_comment (read_import cells) lexbuf }
+    { line_comment (fun _ -> IMPORT (Bwd.to_list !cells)) lexbuf }
+  | whitespace "/-"
+    { BlockComment.push (); block_comment (fun _ -> IMPORT (Bwd.to_list !cells)) lexbuf }
   | "."
     { read_import cells lexbuf }
   | line_ending
@@ -257,3 +259,4 @@ and read_import cells = parse
   | eof
     { IMPORT (Bwd.to_list !cells) }
   | _ { failwith @@ "Invalid path component character: " ^ lexeme lexbuf }
+
