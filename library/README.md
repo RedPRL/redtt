@@ -1,7 +1,7 @@
-redtt library
+redtt mathematical library
 =============
 
-This directory contains various developments in redtt.
+This is the home of the `redtt` mathematical library.
 
 
 Style and conventions
