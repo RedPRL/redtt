@@ -1,6 +1,7 @@
 {
 open Grammar
 open Lexing
+open RedBasis.Bwd
 
 let make_table num elems =
   let table = Hashtbl.create num in
@@ -66,8 +67,7 @@ let keywords =
     ("normalize", NORMALIZE);
     ("type", TYPE);
     ("public", PUBLIC);
-    ("private", PRIVATE);
-    ("import", IMPORT);
+    ("private", PRIVATE)
   ]
 }
 
@@ -165,6 +165,8 @@ rule token = parse
     { LAM }
   | "\\"
     { LAM }
+  | "import" whitespace
+    { read_import (ref Emp) lexbuf }
   | '"'
     { read_string (Buffer.create 17) lexbuf }
   | line_ending
@@ -197,6 +199,7 @@ rule token = parse
   | _
     { Format.eprintf "Unexpected char: %s" (lexeme lexbuf);
       failwith "Lexing error" }
+
 
 and line_comment = parse
   | line_ending
@@ -238,3 +241,15 @@ and read_string buf =
   | eof { failwith ("String is not terminated") }
 
 
+and read_import cells = parse
+  | atom_initial atom_subsequent*
+    { cells := Snoc (!cells, lexeme lexbuf);
+      read_import cells lexbuf }
+  | "."
+    { read_import cells lexbuf }
+  | line_ending
+    { new_line lexbuf;
+      IMPORT (Bwd.to_list !cells) }
+  | eof
+    { IMPORT (Bwd.to_list !cells) }
+  | _ { failwith @@ "Invalid path component character: " ^ lexeme lexbuf }
