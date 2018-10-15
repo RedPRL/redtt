@@ -6,15 +6,6 @@ import isotoequiv
 -- cubicaltt version: https://github.com/mortberg/cubicaltt/blob/master/examples/torus.ctt
 -- cubical agda version: https://github.com/Saizan/cubical-demo/blob/hits-transp/examples/Cubical/Examples/Torus.agda
 
-data torus where
-| pt
-| p/one (i : 𝕀) [∂[i] → pt]
-| p/two (i : 𝕀) [∂[i] → pt]
-| square (i j : 𝕀)
-  [ ∂[i] → p/one j
-  | ∂[j] → p/two i
-  ]
-
 def t2c : torus → s1 × s1 =
   elim [
   | pt → (base, base)

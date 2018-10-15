@@ -1,5 +1,4 @@
-import path
-
+import prelude
 
 data bool where
 | tt

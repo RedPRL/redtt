@@ -2,10 +2,6 @@ import s1
 import equivalence
 import univalence
 
-data s2 where
-| base
-| surf (i j : 𝕀) [∂[i j] → base]
-
 def hopf : s2 → type =
   elim [
   | base → s1

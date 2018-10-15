@@ -1,16 +1,8 @@
-import path
-import hlevel
-import truncation
+import prelude
+import data.truncation
 import equivalence
 import isotoequiv
 import retract
-
-data (A : type) (R : A → A → type) ⊢ quotient where
-| pt (a : A)
-| gl (a b : A) (p : R a b) (i : 𝕀) [
-  | i=0 → pt a
-  | i=1 → pt b
-  ]
 
 -- A "quotient" by a "0-coherent groupoid" is effective
 def quotient/effective

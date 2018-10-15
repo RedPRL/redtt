@@ -4,10 +4,6 @@ import hlevel
 import equivalence
 import univalence
 
-data s1 where
-| base
-| loop (i : 𝕀) [∂[i] → base]
-
 def rotate/loop : (a : s1) → path _ a a =
   elim [
   | base → λ j → loop j

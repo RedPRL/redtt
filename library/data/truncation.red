@@ -1,5 +1,4 @@
-import path
-import hlevel
+import prelude
 
 data (A : type) ⊢ trunc where
 | ret (a : A)
@@ -31,4 +30,3 @@ def trunc/map (A B : type) (f : A → B) : trunc A → trunc B =
   | glue (x → x/ih) (y → y/ih) i →
     glue x/ih y/ih i
   ]
-
