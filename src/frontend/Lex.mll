@@ -9,18 +9,6 @@ let make_table num elems =
   table
 
 
-module BlockComment =
-struct
-  let depth = ref 0
-
-  let push () =
-    depth := !depth + 1
-
-  let pop () =
-    depth := !depth - 1;
-    if !depth = 0 then `Top else `Comment
-end
-
 let keywords =
   make_table 0 [
     ("V", V);
@@ -83,6 +71,8 @@ let atom_initial =
   [^ '0'-'9' '-' '?' '!' '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' '^' ':' ',' ';' '|' '=' '"' '`' ' ' '\t' '\n' '\r']
 let atom_subsequent =
   [^                     '(' ')' '[' ']' '{' '}' '<' '>' '.' '#' '\\' '@' '*' '^' ':' ',' ';' '|' '=' '"' ' ' '\t' '\n' '\r']
+let module_name =
+  [^ '/' '?' '!' '(' ')' '[' ']' '{' '}' '<' '>' '.' '\\' '*' ':' ',' ';' '|' '=' '"' '`' ' ' '\t' '\n' '\r' ]+
 
 rule token = parse
   | number
@@ -90,7 +80,7 @@ rule token = parse
   | "--"
     { line_comment token lexbuf }
   | "/-"
-    { BlockComment.push (); block_comment token lexbuf }
+    { block_comment token lexbuf }
   | '('
     { LPR }
   | ')'
@@ -209,13 +199,9 @@ and line_comment kont = parse
 
 and block_comment kont = parse
   | "/-"
-    { BlockComment.push ();
-      block_comment kont lexbuf
-    }
+    { block_comment (block_comment kont) lexbuf }
   | "-/"
-    { match BlockComment.pop () with
-      | `Top -> kont lexbuf
-      | `Comment -> block_comment kont lexbuf }
+    { kont lexbuf }
   | line_ending
     { new_line lexbuf; block_comment kont lexbuf }
   | _
@@ -241,16 +227,14 @@ and read_string buf =
   | eof { failwith ("String is not terminated") }
 
 
-and read_import cells = parse
-  | atom_initial atom_subsequent*
-    { cells := Snoc (!cells, lexeme lexbuf);
-      read_import cells lexbuf }
+
+and read_import_before_dot cells = parse
   | whitespace
+    { read_import_before_dot cells lexbuf }
+  | "."
     { read_import cells lexbuf }
   | "--"
     { line_comment (fun _ -> IMPORT (Bwd.to_list !cells)) lexbuf }
-  | "."
-    { read_import cells lexbuf }
   | line_ending
     { new_line lexbuf;
       IMPORT (Bwd.to_list !cells) }
@@ -258,3 +242,10 @@ and read_import cells = parse
     { IMPORT (Bwd.to_list !cells) }
   | _ { failwith @@ "Invalid path component character: " ^ lexeme lexbuf }
 
+and read_import cells = parse
+  | module_name
+    { cells := Snoc (!cells, lexeme lexbuf);
+      read_import_before_dot cells lexbuf }
+  | whitespace
+    { read_import cells lexbuf }
+  | _ { failwith @@ "Invalid path component character: " ^ lexeme lexbuf }
