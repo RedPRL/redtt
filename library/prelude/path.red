@@ -32,7 +32,7 @@ def funext
   : path ((x : A) → B x) f g
   =
   λ i x →
-    p _ i
+  p _ i
 
 def symm/filler (A : type) (p : 𝕀 → A) (j i : 𝕀) : A =
   comp 0 j (p 0) [
@@ -100,14 +100,14 @@ def trans/sym/l (A : type) (p : 𝕀 → A) : path (path _ (p 1) (p 1)) refl (tr
 -- Perhaps we could parallelize this proof? ;)
 def symmd (A : 𝕀 → type) (p : (i : 𝕀) → A i) : pathd (symm^1 _ A) (p 1) (p 0) =
   λ i →
-  comp 0 1 (p 0) in (λ j → symm/filler^1 _ A j i) [
+  comp 0 1 (p 0) in λ j → symm/filler^1 _ A j i [
   | i=0 → p
   | i=1 → refl
   ]
 
 def J (A : type) (p : 𝕀 → A) (C : [i] A [i=0 → p 0] → type) (d : C refl) : C p =
   coe 0 1 d in λ i →
-    C (λ j → comp 0 j (p 0) [i=0 → refl | i=1 → p])
+  C (λ j → comp 0 j (p 0) [i=0 → refl | i=1 → p])
 
 def J/eq
   (A : type) (a : A)
@@ -116,9 +116,9 @@ def J/eq
   =
   let square (i j : 𝕀) : A = comp 0 j a [∂[i] → refl] in
   λ k →
-    let mot (i : 𝕀) = C (λ j → comp 0 j a [k=0 → square i | k=1 | ∂[i] → refl]) in
-    comp 0 1 d in mot [
-    | k=0 → λ i → coe 0 i d in λ j → C (square j)
-    | k=1 → refl
-    ]
+  let mot (i : 𝕀) = C (λ j → comp 0 j a [k=0 → square i | k=1 | ∂[i] → refl]) in
+  comp 0 1 d in mot [
+  | k=0 → λ i → coe 0 i d in λ j → C (square j)
+  | k=1 → refl
+  ]
 

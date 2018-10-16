@@ -29,8 +29,7 @@ def moebius-boundary→s1/commuting :
   elim [ tt → refl | ff → refl ]
 
 def moebius-boundary→s1/loop/filler (i j : 𝕀) (y : not/path i) : s1 =
-  let z : bool = coe i 1 y in not/path
-  in
+  let z : bool = coe i 1 y in not/path in
   comp 1 j (moebius-boundary→s1/loop-base i z) [
   | i=0 → moebius-boundary→s1/commuting y
   | i=1 → refl
@@ -48,8 +47,7 @@ def moebius-boundary→s1 (x : moebius-boundary) : s1 =
 def s1→moebius-boundary/base : moebius-boundary =
   (base, ff)
 
-def loop-path (b : bool) :
-  path moebius-boundary (base, b) (base, not b) =
+def loop-path (b : bool) : path moebius-boundary (base, b) (base, not b) =
   λ i → (loop i , `(vin i b (not b)))
 
 def s1→moebius-boundary/loop/filler (i j : 𝕀) : moebius-boundary =

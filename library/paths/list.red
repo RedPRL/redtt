@@ -78,7 +78,7 @@ def list/encode/cons (A : type) (x y : A) (p : path A x y) (xs ys : list A) (q :
     , coe 0 i (list/refl A xs) in λ i → list/code A xs (q i)
     )
   in
-    λ i → list/code A (cons x xs) (cons (p i) (q i))
+  λ i → list/code A (cons x xs) (cons (p i) (q i))
 
 def list/encode-decode (A : type)
   : (xs ys : list A) (c : list/code A xs ys)

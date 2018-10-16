@@ -75,15 +75,15 @@ def prop→prop-over (A : 𝕀 → type) (p : is-prop (A 1))
   : is-prop-over A
   =
   λ a b i →
-    comp 0 1 (coe 0 i a in A) [
-    | i=0 → refl
-    | i=1 → p (coe 0 1 a in A) b
-    ]
+  comp 0 1 (coe 0 i a in A) [
+  | i=0 → refl
+  | i=1 → p (coe 0 1 a in A) b
+  ]
 
 -- hlevel of path types
 
-def path/hlevel : (l : hlevel) (A : type)
-  (A/level : has-hlevel (hsuc l) A) (a a' : A)
+def path/hlevel
+  : (l : hlevel) (A : type) (A/level : has-hlevel (hsuc l) A) (a a' : A)
   → has-hlevel l (path _ a a')
   =
   elim [
@@ -97,26 +97,21 @@ def pathd/hlevel (l : hlevel) (A : type) (B : A → type) (p : 𝕀 → A)
   (b : B (p 0)) (b' : B (p 1))
   : has-hlevel l (pathd (λ i → B (p i)) b b')
   =
-  coe 1 0
-    (path/hlevel l (B (p 1)) B/level (coe 0 1 b in λ j → B (p j)) b')
-    in λ i →
-      has-hlevel l
-        (pathd (λ j → weak-connection/or^1 type (λ n → B (p n)) i j)
-          (coe 0 i b in λ j → B (p j))
-          b')
+  coe 1 0 (path/hlevel l (B (p 1)) B/level (coe 0 1 b in λ j → B (p j)) b') in λ i →
+  has-hlevel l
+    (pathd (λ j → weak-connection/or^1 type (λ n → B (p n)) i j)
+      (coe 0 i b in λ j → B (p j))
+      b')
 
 def path/based/contr (A : type) (a : A)
   : is-contr ((x : _) × path _ a x) =
   ( (a, refl)
   , λ x i →
-    ( comp 0 1 a [
-      | i=0 → x.snd
-      | i=1 → refl
-      ]
-    , λ j →
+    let aux (j : dim) : A =
       comp 0 j a [
       | i=0 → x.snd
       | i=1 → refl
       ]
-    )
+    in
+    (aux 1, aux)
   )

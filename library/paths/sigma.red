@@ -3,7 +3,7 @@ import basics.isotoequiv
 import basics.retract
 
 def sigma/path (A : type) (B : A → type) (a : A) (b : B a) (a' : A) (b' : B a')
-  : equiv ((p : path A a a') × pathd (λ i → B (p i)) b b') (path ((a : A) × B a) (a,b) (a',b')) 
+  : equiv ((p : path A a a') × pathd (λ i → B (p i)) b b') (path ((a : A) × B a) (a,b) (a',b'))
   =
   iso→equiv
     ((p : path A a a') × pathd (λ i → B (p i)) b b')
@@ -35,7 +35,7 @@ def sigma/hlevel : (l : hlevel) (A : type) (B : A → type)
       (A/path i, prop→prop-over (λ j → B (A/path j)) (B/prop a') b b' i)
     | hsuc (l → l/ih) → λ A B A/level B/level (a,b) (a',b') →
       retract/hlevel (hsuc l)
-        (path ((a : A) × B a) (a,b) (a',b')) 
+        (path ((a : A) × B a) (a,b) (a',b'))
         ((p : path A a a') × pathd (λ i → B (p i)) b b')
         ( λ r → (λ i → r i .fst, λ i → r i .snd)
         , λ (p,q) i → (p i, q i)
