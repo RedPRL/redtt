@@ -2,6 +2,7 @@ import prelude
 import data.truncation
 import data.quotient
 import basics.isotoequiv
+import basics.retract
 
 -- A "quotient" by a "0-coherent groupoid" is effective
 def quotient/effective
