@@ -36,12 +36,14 @@ let keywords =
     ("pair", PAIR);
     ("hcom", HCOM);
     ("comp", COMP);
+    ("∂", BOUNDARY);
     ("vproj", VPROJ);
     ("vin", VIN);
     ("let", LET);
     ("fun", FUN);
     ("def", DEF);
     ("lam", LAM);
+    ("λ", LAM);
     ("next", NEXT);
     ("prev", PREV);
     ("dfix", DFIX);
@@ -135,8 +137,6 @@ rule token = parse
     { COMMA }
   | '.'
     { DOT }
-  | "∂"
-    { BOUNDARY }
   | ":>"
     { TRIANGLE_RIGHT }
   | "▷"
@@ -151,8 +151,6 @@ rule token = parse
     { LGL }
   | ">"
     { RGL }
-  | "λ"
-    { LAM }
   | "\\"
     { LAM }
   | "import" whitespace
