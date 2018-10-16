@@ -46,6 +46,10 @@ Features we intend to add in the near future:
 - algebraic effects and handlers for RedML
 
 
+## The `redtt` mathematical library
+
+See [library/README.md](library/README.md).
+
 
 ## Contributing Guidelines
 

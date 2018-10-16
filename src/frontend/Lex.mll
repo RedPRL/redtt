@@ -1,6 +1,7 @@
 {
 open Grammar
 open Lexing
+open RedBasis.Bwd
 
 let make_table num elems =
   let table = Hashtbl.create num in
@@ -17,7 +18,7 @@ struct
 
   let pop () =
     depth := !depth - 1;
-    if !depth = 0 then `Token else `Comment
+    if !depth = 0 then `Top else `Comment
 end
 
 let keywords =
@@ -66,8 +67,7 @@ let keywords =
     ("normalize", NORMALIZE);
     ("type", TYPE);
     ("public", PUBLIC);
-    ("private", PRIVATE);
-    ("import", IMPORT);
+    ("private", PRIVATE)
   ]
 }
 
@@ -88,9 +88,9 @@ rule token = parse
   | number
     { NUMERAL (int_of_string (Lexing.lexeme lexbuf)) }
   | "--"
-    { line_comment lexbuf }
+    { line_comment token lexbuf }
   | "/-"
-    { BlockComment.push (); block_comment lexbuf }
+    { BlockComment.push (); block_comment token lexbuf }
   | '('
     { LPR }
   | ')'
@@ -165,6 +165,8 @@ rule token = parse
     { LAM }
   | "\\"
     { LAM }
+  | "import" whitespace
+    { read_import (ref Emp) lexbuf }
   | '"'
     { read_string (Buffer.create 17) lexbuf }
   | line_ending
@@ -198,25 +200,26 @@ rule token = parse
     { Format.eprintf "Unexpected char: %s" (lexeme lexbuf);
       failwith "Lexing error" }
 
-and line_comment = parse
-  | line_ending
-    { new_line lexbuf; token lexbuf }
-  | _
-    { line_comment lexbuf }
 
-and block_comment = parse
+and line_comment kont = parse
+  | line_ending
+    { new_line lexbuf; kont lexbuf }
+  | _
+    { line_comment kont lexbuf }
+
+and block_comment kont = parse
   | "/-"
     { BlockComment.push ();
-      block_comment lexbuf
+      block_comment kont lexbuf
     }
   | "-/"
     { match BlockComment.pop () with
-      | `Token -> token lexbuf
-      | `Comment -> block_comment lexbuf }
+      | `Top -> kont lexbuf
+      | `Comment -> block_comment kont lexbuf }
   | line_ending
-    { new_line lexbuf; block_comment lexbuf }
+    { new_line lexbuf; block_comment kont lexbuf }
   | _
-    { block_comment lexbuf }
+    { block_comment kont lexbuf }
 
 
 (* from https://v1.realworldocaml.org/v1/en/html/parsing-with-ocamllex-and-menhir.html *)
@@ -237,4 +240,21 @@ and read_string buf =
   | _ { failwith (("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
   | eof { failwith ("String is not terminated") }
 
+
+and read_import cells = parse
+  | atom_initial atom_subsequent*
+    { cells := Snoc (!cells, lexeme lexbuf);
+      read_import cells lexbuf }
+  | whitespace
+    { read_import cells lexbuf }
+  | "--"
+    { line_comment (fun _ -> IMPORT (Bwd.to_list !cells)) lexbuf }
+  | "."
+    { read_import cells lexbuf }
+  | line_ending
+    { new_line lexbuf;
+      IMPORT (Bwd.to_list !cells) }
+  | eof
+    { IMPORT (Bwd.to_list !cells) }
+  | _ { failwith @@ "Invalid path component character: " ^ lexeme lexbuf }
 
