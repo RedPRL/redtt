@@ -26,7 +26,7 @@ syn region  redttEncl transparent matchgroup=redttSymb start="⦉" end="⦊" con
 syn region  redttEncl transparent matchgroup=redttSymb start="(" end=")" contains=ALLBUT,redttParenErr
 syn region  redttEncl transparent matchgroup=redttSymb start="\[" end="\]" contains=ALLBUT,redttBrackErr
 
-syn region  redttImport matchgroup=redttDecl start="^import" end="$" contains=redttComm,redttBlockComm
+syn region  redttImport matchgroup=redttDecl start="^\(public\s\+\)\=import" end="$" contains=redttComm,redttBlockComm
 
 syn match   redttHole '?\k*'
 
@@ -34,7 +34,7 @@ syn keyword redttKeyw V in with where begin end tick dim elim fst snd coe com pa
 syn keyword redttKeyw fun hcom comp vproj vin lam next prev dfix fix call refl pre
 syn keyword redttKeyw kan U type
 
-syn keyword redttDecl meta def do let data debug print normalize public private quit opaque
+syn keyword redttDecl meta def do let data debug print normalize private quit opaque
 
 syn match   redttSymb '[#@`|^*×:,.∙✓□▷=∂→λ𝕀]\|->'
 
