@@ -123,16 +123,10 @@ def list/code/hlevel (l : hlevel) (A : type) (A/level : has-hlevel (hsuc (hsuc l
 
 def list/hlevel (l : hlevel) (A : type) (A/level : has-hlevel (hsuc (hsuc l)) A)
   : has-hlevel (hsuc (hsuc l)) (list A) =
-  elim [
-  | nil → elim [
-    | nil →
-      retract/hlevel (hsuc l)
-        (path (list A) nil nil)
-        unit
-        (list/encode A nil nil, list/decode A nil nil, ?)
-        ?
-    | cons y ys → ?
-    ]
-  | cons x xs → ?
-  ]
+  λ xs ys →
+  retract/hlevel (hsuc l)
+    (path (list A) xs ys)
+    (list/code A xs ys)
+    (list/encode A xs ys, list/decode A xs ys, list/decode-encode A xs ys)
+    (list/code/hlevel l A A/level xs ys)
 
