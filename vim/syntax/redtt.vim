@@ -40,8 +40,9 @@ syn keyword redttDecl meta def do let data debug print normalize public private 
 
 syn match   redttSymb '[#@`|^*×:,.∙✓□▷=∂→λ𝕀]\|->'
 
-syn region  redttComm excludenl start="\k\@1<!--" end="$"
-syn region  redttBlockComm start="/-" end="-/" contains=redttBlockComm
+syn region  redttComm excludenl start="\k\@1<!--" end="$" contains=redttTodo
+syn region  redttBlockComm start="/-" end="-/" nextgroup=redttKeyw contains=redttBlockComm,redttTodo
+syn keyword redttTodo contained MORTAL TOUNLEASH THOUGHT POWERMOVE TASTEIT
 
 hi def link redttGuillemetsErr Error
 hi def link redttTriangleErr Error
