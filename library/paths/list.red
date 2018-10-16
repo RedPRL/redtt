@@ -2,6 +2,8 @@ import prelude
 import data.void
 import data.unit
 import data.list
+import basics.retract
+import paths.sigma
 
 def list/code (A : type) : list A → list A → type =
   elim [
@@ -100,30 +102,37 @@ def list/encode-decode (A : type)
     ]
   ]
 
--- list takes sets to sets
+-- list preserves hlevels >= set
 
-def list/set (A : type) (setA : is-set A) : is-set (list A) =
+def list/code/hlevel (l : hlevel) (A : type) (A/level : has-hlevel (hsuc (hsuc l)) A)
+  : (xs ys : list A) → has-hlevel (hsuc l) (list/code A xs ys)
+  =
   elim [
-  | nil →
-    elim [
-    | nil → λ p q i →
-      comp 0 1 refl [
-      | i=0 → list/decode-encode A nil nil p
-      | i=1 → list/decode-encode A nil nil q
-      ]
-    | cons _ _ → λ p → elim (list/encode A _ _ p) []
+  | nil → elim [
+    | nil → prop→hlevel l unit unit/prop
+    | cons y ys → prop→hlevel l void void/prop
     ]
-  | cons x (xs → list/set/xs) →
-    elim [
-    | nil → λ p → elim (list/encode A _ _ p) []
-    | cons y ys → λ p q i →
-      let (ph,pc) = list/encode A (cons x xs) (cons y ys) p in
-      let (qh,qc) = list/encode A (cons x xs) (cons y ys) q in
-      let pt = list/decode A xs ys pc in
-      let qt = list/decode A xs ys qc in
-      comp 0 1 (λ j → cons (setA x y ph qh i j) (list/set/xs ys pt qt i j)) [
-      | i=0 → list/decode-encode A (cons x xs) (cons y ys) p
-      | i=1 → list/decode-encode A (cons x xs) (cons y ys) q
-      ]
+  | cons x (xs → xs/ih) → elim [
+    | nil → prop→hlevel l void void/prop
+    | cons y ys →
+      sigma/hlevel (hsuc l) (path A x y) (λ _ → list/code A xs ys)
+        (A/level x y)
+        (λ _ → xs/ih ys)
     ]
   ]
+
+def list/hlevel (l : hlevel) (A : type) (A/level : has-hlevel (hsuc (hsuc l)) A)
+  : has-hlevel (hsuc (hsuc l)) (list A) =
+  elim [
+  | nil → elim [
+    | nil →
+      retract/hlevel (hsuc l)
+        (path (list A) nil nil)
+        unit
+        (list/encode A nil nil, list/decode A nil nil, ?)
+        ?
+    | cons y ys → ?
+    ]
+  | cons x xs → ?
+  ]
+
