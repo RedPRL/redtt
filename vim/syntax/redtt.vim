@@ -1,9 +1,7 @@
 " vim-redtt syntax
 " Language:     redtt
-" Author:       Carlo Angiuli
+" Author:       Carlo Angiuli, Favonia
 " Last Change:  2018 October 16
-"
-" Note:         slightly modified by Favonia
 
 if exists("b:current_syntax")
   finish
