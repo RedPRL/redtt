@@ -70,7 +70,7 @@ struct
     with
     | exn ->
       Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
-      exit (-1)
+      exit 1
 end
 and Elab : Elaborator.S = Elaborator.Make (Importer)
 
@@ -94,7 +94,9 @@ let load options source =
   | ParseError.E (posl, posr) ->
     let loc = Some (posl, posr) in
     let pp fmt () = Format.fprintf fmt "Parse error" in
-    Log.pp_message ~loc ~lvl:`Error pp Format.err_formatter ()
+    Log.pp_message ~loc ~lvl:`Error pp Format.err_formatter ();
+    exit 1
+
 
 let load_file options =
   load options `File

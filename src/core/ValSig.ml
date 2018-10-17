@@ -9,7 +9,7 @@ sig
   (** Return the type and definition of a global variable *)
   val lookup : Name.t -> Tm.twin -> Tm.tm * Tm.tm option
 
-  val lookup_datatype : string -> Desc.desc
+  val lookup_datatype : Name.t -> Desc.desc
 end
 
 exception MissingElimClause of string
@@ -53,11 +53,11 @@ sig
   val unleash_restriction_ty : value -> val_face
 
 
-  val realize_rec_spec : dlbl:string -> params:env_el list -> Desc.rec_spec -> value
-  val realize_rec_spec_ih : dlbl:string -> params:env_el list -> mot:clo -> Desc.rec_spec -> value -> value
+  val realize_rec_spec : dlbl:Name.t -> params:env_el list -> Desc.rec_spec -> value
+  val realize_rec_spec_ih : dlbl:Name.t -> params:env_el list -> mot:clo -> Desc.rec_spec -> value -> value
 
-  val elim_data : string -> params:env_el list -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
-  val make_intro : dlbl:string -> params:env_el list -> clbl:string -> env_el list -> value
+  val elim_data : dlbl:Name.t -> params:env_el list -> mot:clo -> scrut:value -> clauses:(string * nclo) list -> value
+  val make_intro : dlbl:Name.t -> params:env_el list -> clbl:string -> env_el list -> value
 
   module Sig : Sig
 

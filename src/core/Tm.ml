@@ -858,10 +858,10 @@ let rec pp env fmt =
       begin
         match params with
         | [] ->
-          Uuseg_string.pp_utf_8 fmt lbl
+          Name.pp fmt lbl
         | _ ->
           Format.fprintf fmt "@[<hv1>(%a %a)@]"
-            Uuseg_string.pp_utf_8 lbl
+            Name.pp lbl
             (pp_terms env) params
       end
 
@@ -950,7 +950,7 @@ and pp_cmd env fmt (hd, sp) =
         let x_mot, env_mot = Pp.Env.bind env nm_mot in
         (* TODO *)
         Format.fprintf fmt "@[<hv1>(%a.elim@ [%a] %a@ %a@ %a)@]"
-          Uuseg_string.pp_utf_8 info.dlbl
+          Name.pp info.dlbl
           Uuseg_string.pp_utf_8 x_mot
           (pp env_mot) mot
           (go `Elim) sp
@@ -1019,7 +1019,7 @@ and pp_frame env fmt =
     Format.fprintf fmt "restrict-force"
   | Elim info ->
     Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a)@]"
-      Uuseg_string.pp_utf_8 info.dlbl
+      Name.pp info.dlbl
       (pp_bnd env) info.mot
       (pp_elim_clauses env) info.clauses
 

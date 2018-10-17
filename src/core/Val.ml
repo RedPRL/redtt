@@ -1281,7 +1281,7 @@ struct
       let mot = clo info.mot rho in
       let clauses = List.map (fun (lbl, nbnd) -> lbl, nclo nbnd rho) info.clauses in
       let params = List.map (fun tm -> `Val (eval rho tm)) info.params in
-      elim_data info.dlbl ~params ~mot ~scrut:vhd ~clauses
+      elim_data ~dlbl:info.dlbl ~params ~mot ~scrut:vhd ~clauses
 
 
   and eval_head rho =
@@ -1697,7 +1697,7 @@ struct
       let err = RigidVProjUnexpectedArgument (x, el) in
       raise @@ E err
 
-  and elim_data dlbl ~params ~mot ~scrut ~clauses =
+  and elim_data ~dlbl ~params ~mot ~scrut ~clauses =
     let find_clause clbl =
       try
         snd @@ List.find (fun (clbl', _) -> clbl = clbl') clauses
@@ -1719,7 +1719,7 @@ struct
           cell :: go args specs
         | `Val v :: args, (_, `Rec Desc.Self) :: specs ->
           (* What do I do here if not Desc.Self??? *)
-          let v_ih = elim_data dlbl ~params ~mot ~scrut:v ~clauses in
+          let v_ih = elim_data ~dlbl ~params ~mot ~scrut:v ~clauses in
           `Val v :: `Val v_ih :: go args specs
         | cell :: args, (_, `Dim) :: specs ->
           cell :: go args specs
@@ -1738,7 +1738,7 @@ struct
         Face.map @@ fun r r' a ->
         let phi = I.equate r r' in
         let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
-        elim_data dlbl ~params ~mot:(Clo.act phi mot) ~scrut:a ~clauses:clauses'
+        elim_data ~dlbl ~params ~mot:(Clo.act phi mot) ~scrut:a ~clauses:clauses'
       in
       let elim_sys = List.map elim_face up.sys in
       make @@ Up {ty = mot'; neu; sys = elim_sys}
@@ -1750,7 +1750,7 @@ struct
         inst_clo mot @@
         make_fhcom (Dir.make r @@ `Atom y) info.cap (`Ok info.sys)
       in
-      let cap = elim_data dlbl ~params ~mot ~scrut:info.cap ~clauses in
+      let cap = elim_data ~dlbl ~params ~mot ~scrut:info.cap ~clauses in
       let face =
         Face.map @@ fun r r' abs ->
         let y, ely = Abs.unleash1 abs in
@@ -1758,7 +1758,7 @@ struct
         let clauses' = List.map (fun (lbl, nclo) -> lbl, NClo.act phi nclo) clauses in
         let params' = List.map (Env.act_env_el phi) params in
         Abs.bind1 y @@
-        elim_data dlbl ~params:params' ~mot:(Clo.act phi mot) ~scrut:ely ~clauses:clauses'
+        elim_data ~dlbl ~params:params' ~mot:(Clo.act phi mot) ~scrut:ely ~clauses:clauses'
       in
       let sys = List.map face info.sys in
       rigid_com info.dir tyabs cap sys

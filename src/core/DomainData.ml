@@ -32,10 +32,10 @@ type con =
 
   | Up of {ty : value; neu : neu; sys : rigid_val_sys}
 
-  | Data of {lbl : string; params : env_el list}
+  | Data of {lbl : Name.t; params : env_el list}
 
   | Intro of
-      {dlbl : string;
+      {dlbl : Name.t;
        clbl : string;
        args : env_el list;
        sys : rigid_val_sys}
@@ -57,7 +57,7 @@ and neu =
   | Snd of neu
 
   | Elim of
-      {dlbl : string;
+      {dlbl : Name.t;
        params : env_el list;
        mot : clo;
        neu : neu;

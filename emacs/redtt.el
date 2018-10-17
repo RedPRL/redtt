@@ -100,7 +100,7 @@
 
 
 (defconst redtt-expression-keywords
-  '("V" "in" "with" "where" "begin" "end" "let" "tick" "dim" "elim" "fst" "snd" "coe" "com" "pair" "comp" "fun" "hcom" "vproj" "vin" "lam" "refl" "pre" "kan" "type")
+  '("V" "in" "with" "where" "begin" "end" "let" "dim" "elim" "fst" "snd" "coe" "com" "pair" "comp" "fun" "hcom" "vproj" "vin" "lam" "refl" "pre" "kan" "type")
   "Expression keywords.")
 
 (defconst redtt-expression-symbols

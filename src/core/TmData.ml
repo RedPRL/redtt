@@ -35,8 +35,8 @@ type 'a tmf =
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
-  | Data of {lbl : string; params : 'a list}
-  | Intro of string * string * 'a list * 'a list (* TODO: turn this into inline record *)
+  | Data of {lbl : Name.t; params : 'a list}
+  | Intro of Name.t * string * 'a list * 'a list (* TODO: turn this into inline record *)
 
 
 and 'a head =
@@ -61,7 +61,7 @@ and 'a frame =
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | RestrictForce
 
-  | Elim of {dlbl : string; params : 'a list; mot : 'a bnd; clauses : (string * 'a nbnd) list}
+  | Elim of {dlbl : Name.t; params : 'a list; mot : 'a bnd; clauses : (string * 'a nbnd) list}
 
 and 'a spine = 'a frame list
 and 'a cmd = 'a head * 'a spine

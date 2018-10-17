@@ -1,10 +1,15 @@
 open RedTT_Core
 
+(** This module has two responsibilities:
+
+    1. maintain the mapping from strings to names.
+    2. keep track of items to be serialized. *)
+
 type resolution =
   [ `Ix of int
   | `Var of Name.t
   | `Metavar of Name.t
-  | `Datatype of string
+  | `Datatype of Name.t
   ]
 
 type visibility =
@@ -17,9 +22,9 @@ val bind : string -> t -> t
 val bindn : string list -> t -> t
 val bind_opt : string option -> t -> t
 
-val named_var : visibility:visibility -> string -> Name.t -> t -> t
-val named_metavar : visibility:visibility -> string -> Name.t -> t -> t
-val datatype : visibility:visibility -> string -> t -> t
+val register_var : visibility:visibility -> Name.t -> t -> t
+val register_metavar : visibility:visibility -> Name.t -> t -> t
+val register_datatype : visibility:visibility -> Name.t -> t -> t
 
 val import_globals : visibility:visibility -> t -> t -> t
 

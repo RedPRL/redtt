@@ -59,7 +59,7 @@ struct
               C.get_global_env >>= fun env ->
               begin
                 match GlobalEnv.lookup env alpha with
-                | (`P _ | `Tw _ | `Def _) -> M.ret @@ `FunApp e
+                | (`P _ | `Tw _ | `Def _ | `Data _) -> M.ret @@ `FunApp e
                 | `I -> M.ret @@ `ExtApp e
               end
             | _ ->
@@ -160,8 +160,9 @@ struct
       end
 
     | E.MlDeclData info ->
-      elab_datatype info.visibility info.name info.desc >>= fun desc ->
-      C.replace_datatype info.name desc >>
+      eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
+      elab_datatype info.visibility alpha info.desc >>= fun desc ->
+      C.replace_datatype alpha desc >>
       M.ret @@ E.SemRet (E.SemDataDesc desc)
 
     | E.MlImport (visibility, selector) ->
@@ -292,9 +293,10 @@ struct
           Desc.TNil boundary
 
       | `Ty (nm, ety) :: args ->
+        C.resolver >>= fun renv ->
         begin
           match E.(ety.con) with
-          | E.Var var when var.name = dlbl ->
+          | E.Var var when ResEnv.get var.name renv = `Datatype dlbl ->
             let x = Name.named @@ Some nm in
             M.in_scope x (`P data_ty) (go args) <<@> fun constr ->
               Desc.TCons (`Rec Desc.Self, Desc.Constr.bind x constr)
@@ -824,8 +826,6 @@ struct
       | `ExtApp dim ->
         bite_dims_from_spine spine <<@> fun (spine, dims) ->
           spine, `ExtApp (Bwd.to_list @@ dims #< dim)
-      | `Prev e ->
-        M.ret (spine, `Prev e)
       | `Fst ->
         M.ret (spine, `Fst)
       | `Snd ->
