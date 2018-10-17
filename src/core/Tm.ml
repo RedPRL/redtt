@@ -1181,6 +1181,10 @@ let path ty tm0 tm1 =
   let sys = [face0; face1] in
   make @@ Ext (NB (Emp #< None, (ty', sys)))
 
+let refl tm =
+  let tm' = subst (Shift 1) tm in
+  make @@ ExtLam (NB (Emp #< None, tm'))
+
 let fiber ~ty0 ~ty1 ~f ~x =
   sg (Some "ix") ty0 @@
   let app =

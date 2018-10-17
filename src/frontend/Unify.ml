@@ -1,5 +1,5 @@
-open RedBasis
 open RedTT_Core
+open RedBasis
 open Bwd open BwdNotation
 open Contextual
 open Dev
