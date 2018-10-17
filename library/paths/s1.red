@@ -107,7 +107,7 @@ def decode : (x : s1) → s1-univ-cover x → path s1 base x =
   elim [
   | base → loopn
   | loop i → λ y j →
-    let n : int = ua/proj int int isuc/equiv i y in
+    let n : int = y .vproj in
     comp 0 1 (decode-square n i j) [
     | ∂[j] | i=1 → refl
     | i=0 k → loopn (pred-isuc y k) j

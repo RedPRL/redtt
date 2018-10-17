@@ -5,6 +5,8 @@ let map f m =
   | Some a -> Some (f a)
   | None -> None
 
+let foreach m f = map f m
+
 let rec filter_map f =
   function
   | [] -> []

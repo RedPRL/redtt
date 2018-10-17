@@ -131,20 +131,18 @@ let tac_let x itac ctac =
 
 
 
-let flip f x y = f y x
-
 let tac_pair tac0 tac1 : chk_tac =
   fun goal ->
     match Tm.unleash goal.ty with
     | Tm.Sg (dom, cod) ->
       let sys0 =
-        flip List.map goal.sys @@ fun (r, r', otm) ->
-        r, r', flip Option.map otm @@ fun tm ->
+        ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
+        r, r', Option.foreach otm @@ fun tm ->
         Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Fst
       in
       let sys1 =
-        flip List.map goal.sys @@ fun (r, r', otm) ->
-        r, r', flip Option.map otm @@ fun tm ->
+        ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
+        r, r', Option.foreach otm @@ fun tm ->
         Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Snd
       in
       tac0 {ty = dom; sys = sys0} >>= fun tm0 ->
@@ -152,6 +150,20 @@ let tac_pair tac0 tac1 : chk_tac =
       let cod' = Tm.make @@ Tm.Let (cmd0, cod) in
       tac1 {ty = cod'; sys = sys1} >>= fun tm1 ->
       M.ret @@ Tm.cons tm0 tm1
+
+    (* FIXME this is totally wrong. we should consult the context to determine
+     * whether r = 0/1 or not. Without really checking it, vin could be given
+     * the wrong parameters from a non-rigid V type. *)
+    | Tm.V {r; ty0; ty1; equiv} ->
+      let () = match Tm.unleash r with
+        | Tm.Up (Tm.Var _, []) -> ()
+        | _ -> failwith "V is not rigid when applying the tac_pair tactic."
+      in
+      M.under_restriction r (Tm.make Tm.Dim0) @@ tac0 {ty = ty0; sys = goal.sys} <<@>
+      begin function Some tm0 -> tm0 | None -> failwith "V is not rigid when applying the tac_pair tactic." end
+      >>= fun tm0 ->
+      tac1 {ty = ty1; sys = goal.sys} >>= fun tm1 ->
+      M.ret @@ Tm.make @@ Tm.VIn {r; tm0; tm1}
 
     | _ ->
       raise ChkMatch
@@ -304,8 +316,8 @@ let rec tac_lambda (ps : ML.einvpat list) tac goal =
 
         let codx = Tm.unbind_with (Tm.var x) cod in
         let sysx =
-          flip List.map goal.sys @@ fun (r, r', otm) ->
-          r, r', flip Option.map otm @@ fun tm ->
+          ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
+          r, r', Option.foreach otm @@ fun tm ->
           Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.FunApp (Tm.up @@ Tm.var x)
         in
         M.in_scope x (`P dom) begin
@@ -326,8 +338,8 @@ let rec tac_lambda (ps : ML.einvpat list) tac goal =
         let x = name_of nm in
         let codx = Tm.unbind_with (Tm.var x) cod in
         let sysx =
-          flip List.map goal.sys @@ fun (r, r', otm) ->
-          r, r', flip Option.map otm @@ fun tm ->
+          ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
+          r, r', Option.foreach otm @@ fun tm ->
           Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Prev (Tm.up @@ Tm.var x)
         in
         M.in_scope x `Tick begin
@@ -362,8 +374,8 @@ let rec tac_lambda (ps : ML.einvpat list) tac goal =
             List.map (fun x -> (x, `I)) xs_fwd
         in
         let sys'xs =
-          flip List.map goal.sys @@ fun (r, r', otm) ->
-          r, r', flip Option.map otm @@ fun tm ->
+          ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
+          r, r', Option.foreach otm @@ fun tm ->
           Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.ExtApp (List.map Tm.up xs_tms)
         in
         M.in_scopes ps begin
@@ -526,7 +538,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
         | Not_found ->
           let constr = Desc.lookup_constr lbl constrs in
           let pbinds =
-            flip List.map (Desc.Constr.specs constr) @@ function
+            ListUtil.foreach (Desc.Constr.specs constr) @@ function
             | Some nm, (`Const _ | `Dim) -> `Bind (`Var (`User nm))
             | Some nm, `Rec _ -> `BindIH (`Var (`User nm), `Var (`User (nm ^ "/ih")))
             | None, _ -> `Bind (`Var (`User "_"))
