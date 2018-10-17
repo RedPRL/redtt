@@ -571,8 +571,6 @@ struct
           Neu {ty = Val.make vty; neu}
       end
 
-    | Tm.DFix _ -> raise CanJonHelpMe
-
   and eval_bnd_face rel env (tr, tr', bnd_opt) =
     match bnd_opt with
     | Some bnd ->
