@@ -1048,8 +1048,8 @@ and pp_frame env fmt =
     Format.fprintf fmt "car"
   | Snd ->
     Format.fprintf fmt "cdr"
-  | VProj _ ->
-    Format.fprintf fmt "<vproj>"
+  | VProj info ->
+    Format.fprintf fmt "@[<hov1>(vproj %a %a)@]" (pp env) info.r (pp env) info.func
   | Cap _ ->
     Format.fprintf fmt "<cap>"
   | RestrictForce ->

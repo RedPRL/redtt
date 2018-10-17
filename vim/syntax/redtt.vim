@@ -1,7 +1,7 @@
 " vim-redtt syntax
 " Language:     redtt
-" Author:       Carlo Angiuli
-" Last Change:  2018 September 11
+" Author:       Carlo Angiuli, Favonia
+" Last Change:  2018 October 16
 
 if exists("b:current_syntax")
   finish
@@ -26,18 +26,21 @@ syn region  redttEncl transparent matchgroup=redttSymb start="⦉" end="⦊" con
 syn region  redttEncl transparent matchgroup=redttSymb start="(" end=")" contains=ALLBUT,redttParenErr
 syn region  redttEncl transparent matchgroup=redttSymb start="\[" end="\]" contains=ALLBUT,redttBrackErr
 
+syn region  redttImport matchgroup=redttDecl start="import" end="$\|\(/-\|--\)\@="
+
 syn match   redttHole '?\k*'
 
 syn keyword redttKeyw V in with where begin end tick dim elim fst snd coe com pair
 syn keyword redttKeyw fun hcom comp vproj vin lam next prev dfix fix call refl pre
 syn keyword redttKeyw kan U type
 
-syn keyword redttDecl meta def do let data debug print normalize public private import quit opaque
+syn keyword redttDecl meta def do let data debug print normalize public private quit opaque
 
 syn match   redttSymb '[#@`|^*×:,.∙✓□▷=∂→λ𝕀]\|->'
 
-syn region  redttComm start="\k\@1<!--" end="$"
-syn region  redttBlockComm start="/-" end="-/" contains=redttBlockComm
+syn region  redttComm excludenl start="\k\@1<!--" end="$" contains=redttTodo
+syn region  redttBlockComm start="/-" end="-/" nextgroup=redttKeyw contains=redttBlockComm,redttTodo
+syn keyword redttTodo contained MORTAL TOUNLEASH THOUGHT POWERMOVE TASTEIT
 
 hi def link redttGuillemetsErr Error
 hi def link redttTriangleErr Error

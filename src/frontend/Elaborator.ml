@@ -74,6 +74,8 @@ struct
       M.ret `Fst
     | E.Snd ->
       M.ret `Snd
+    | E.VProj ->
+      M.ret `VProj
     | E.Open ->
       M.ret `Open
 
@@ -500,6 +502,16 @@ struct
           <<@> fun cod -> Tm.make @@ Tm.Sg (dom, cod)
         end
 
+      | [], Tm.Univ _, E.V info ->
+        elab_dim_con (E.Var {name = info.x; ushift = 0}) >>= fun r ->
+        elab_chk info.ty1 {ty; sys = []} >>= fun ty1 ->
+        M.under_restriction r (Tm.make Tm.Dim0) begin
+          elab_chk info.ty0 {ty; sys = []} >>= fun ty0 ->
+          elab_chk info.equiv {ty = Tm.equiv ty0 ty1; sys = []} >>= fun equiv ->
+          M.ret (Tm.make @@ Tm.V {r; ty0; ty1; equiv})
+        end <<@>
+        begin function Some tm -> tm | None -> failwith "The V type is not rigid." end
+
 
       | _, _, Tuple [] ->
         failwith "empty tuple"
@@ -507,7 +519,12 @@ struct
       | _, _, Tuple [e] ->
         elab_chk e goal
 
-      | _, Tm.Sg (dom, cod), Tuple (e0 :: es) as etuple ->
+      | _, Tm.Sg _, Tuple (e0 :: es) ->
+        let tac0 = elab_chk e0 in
+        let tac1 = elab_chk @@ {e with con = Tuple es} in
+        tac_pair tac0 tac1 goal
+
+      | _, Tm.V _, Tuple (e0 :: es) ->
         let tac0 = elab_chk e0 in
         let tac1 = elab_chk @@ {e with con = Tuple es} in
         tac_pair tac0 tac1 goal
@@ -821,8 +838,10 @@ struct
       Format.eprintf "Elaborator error: %a@." ML.pp e.con;
       failwith "Can't infer"
 
-  and elab_dim e =
-    match e.con with
+  and elab_dim {con; _} = elab_dim_con con
+
+  and elab_dim_con =
+    function
     | E.Var {name; ushift = 0} ->
       C.resolver >>= fun renv ->
       begin
@@ -856,6 +875,8 @@ struct
         M.ret (spine, `Fst)
       | `Snd ->
         M.ret (spine, `Snd)
+      | `VProj ->
+        M.ret (spine, `VProj)
       | `Open ->
         M.ret (spine, `Open)
 
@@ -1076,7 +1097,6 @@ struct
           raise ChkMatch
       end
 
-
     | spine, `Snd ->
       elab_cut_bwd exp spine >>= fun (ty, cmd) ->
       try_nf ty @@ fun ty ->
@@ -1085,6 +1105,25 @@ struct
         | Tm.Sg (_dom, cod) ->
           let cod' = Tm.unbind_with (cmd @< Tm.Fst) cod in
           M.ret (cod', cmd @< Tm.Snd)
+        | _ ->
+          raise ChkMatch
+      end
+
+    | spine, `VProj ->
+      elab_cut_bwd exp spine >>= fun (ty, cmd) ->
+      try_nf ty @@ fun ty ->
+      begin
+        match unleash ty with
+        (* FIXME this is totally wrong. we should consult the context to determine
+         * whether r = 0/1 or not. Without really checking it, vproj could be given
+         * the wrong parameters from a non-rigid V type. *)
+        | Tm.V {r; equiv; ty0; ty1; _} ->
+          let () = match Tm.unleash r with
+            | Tm.Up (Tm.Var _, []) -> ()
+            | _ -> failwith "V is not rigid when applying vproj frame."
+          in
+          let func = Tm.up @@ Tm.ann ~ty:(Tm.equiv ty0 ty1) ~tm:equiv @< Tm.Fst in
+          M.ret (ty1, cmd @< Tm.VProj {r; func})
         | _ ->
           raise ChkMatch
       end

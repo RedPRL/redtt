@@ -35,6 +35,7 @@
 %token <string> ATOM
 %token <string> STRING
 %token <string option> HOLE_NAME
+%token <string list> IMPORT
 %token LSQ RSQ LPR RPR LGL RGL LBR RBR LTR RTR LLGL RRGL
 %token COLON TRIANGLE_RIGHT COMMA SEMI DOT PIPE CARET BOUNDARY BANG
 %token EQUALS
@@ -42,7 +43,7 @@
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM TICK
 %token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN V VPROJ VIN NEXT PREV FIX DFIX REFL
-%token PUBLIC PRIVATE IMPORT OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
+%token PUBLIC PRIVATE OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
 %token META
 %token EOF
@@ -81,6 +82,8 @@ eproj:
     { E.Fst }
   | DOT SND
     { E.Snd }
+  | DOT VPROJ
+    { E.VProj }
 
 atom_econ:
   | a = ATOM
@@ -173,6 +176,9 @@ spine_con:
 
   | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); IN; fam = located(econ); sys = pipe_block(eface)
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
+
+  | V; x = ATOM; ty0 = located(atomic); ty1 = located(atomic); equiv = located(atomic)
+    { E.V {x; ty0; ty1; equiv} }
 
 %inline
 block(X):
@@ -368,12 +374,6 @@ mltoplevel:
   | visibility = data_modifiers; decl = data_decl; rest = mltoplevel
     { let name, desc = decl in
       {rest with con = MlBind (E.MlDeclData {visibility; name; desc}, `User name, rest.con)} }
-
-  | IMPORT; path = separated_nonempty_list(DOT, ATOM); rest = mltoplevel
-    { {rest with con = E.mlbind (E.MlImport (`Private, path)) @@ fun _ -> rest.con} }
-
-  | PUBLIC IMPORT; path = separated_nonempty_list(DOT, ATOM); rest = mltoplevel
-    { {rest with con = E.mlbind (E.MlImport (`Public, path)) @@ fun _ -> rest.con} }
 
   | QUIT; rest = mltoplevel
     { {rest with con = E.MlRet (E.MlTuple [])} }
