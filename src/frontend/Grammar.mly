@@ -587,14 +587,24 @@ tm:
       Tm.Cons (e0 env, e1 env) }
 
   | LPR; DATA; dlbl = ATOM; RPR
-    { fun _ ->
+    { fun env ->
       make_node $startpos $endpos @@
-      Tm.Data {lbl = Name.named (Some dlbl); params = []} }
+      match R.get dlbl env with
+      | `Datatype alpha ->
+        Tm.Data {lbl = alpha; params = []}
+      | _ ->
+        Format.eprintf "The name %s does not refer to a datatype.@." dlbl;
+        raise Not_found }
 
   | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      Tm.Intro (Name.named (Some dlbl), clbl, [], es env) }
+      match R.get dlbl env with
+      | `Datatype alpha ->
+        Tm.Intro (alpha, clbl, [], es env)
+      | _ ->
+        Format.eprintf "The name %s does not refer to a datatype.@." dlbl;
+        raise Not_found }
 
   | e = cmd
     { fun env ->
