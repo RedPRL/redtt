@@ -36,7 +36,7 @@ syn keyword redttKeyw kan U type
 
 syn keyword redttDecl meta def do let data debug print normalize public private quit opaque
 
-syn match   redttSymb '[#@`|^*×:,.∙✓□▷=∂→λ𝕀]\|->'
+syn match   redttSymb '[#@`|^*×:,.∙✓□=∂→λ𝕀]\|->'
 
 syn region  redttComm excludenl start="\k\@1<!--" end="$" contains=redttTodo
 syn region  redttBlockComm start="/-" end="-/" nextgroup=redttKeyw contains=redttBlockComm,redttTodo

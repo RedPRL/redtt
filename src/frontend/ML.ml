@@ -79,7 +79,6 @@ and escheme =
 
 and ecell =
   [ `Ty of string * eterm
-  | `Tick of string
   | `I of string
   ]
 
@@ -164,9 +163,9 @@ sig
 end =
 struct
   type t = mlenv
-  
+
   let init ~mlconf = {values = T.init ~size:100; mlconf}
-  
+
   let get_mlconf {mlconf; _} = mlconf
 
   let set k v e = {e with values = T.set k v e.values}

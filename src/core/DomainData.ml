@@ -7,12 +7,6 @@ type dim = I.t
 
 type ('x, 'a) face = ('x, 'a) Face.face
 
-type tick_gen =
-  [`Lvl of string option * int | `Global of Name.t ]
-
-type tick =
-  | TickGen of tick_gen
-
 
 type con =
   | Pi of {dom : value; cod : clo}
@@ -37,11 +31,6 @@ type con =
   | Cons of value * value
 
   | Up of {ty : value; neu : neu; sys : rigid_val_sys}
-
-  | Later of tick_clo
-  | Next of tick_clo
-  | DFix of {ty : value; clo : clo}
-  | DFixLine of {x : atom; ty : value; clo : clo}
 
   | Data of {lbl : string; params : env_el list}
 
@@ -80,10 +69,6 @@ and neu =
 
   | RestrictForce of neu
 
-  | Prev of tick * neu
-  | Fix of tick_gen * value * clo
-  | FixLine of atom * tick_gen * value * clo
-
 and nf = {ty : value; el : value}
 
 and abs = value IAbs.abs
@@ -94,10 +79,6 @@ and clo =
 and nclo =
   | NClo of {nbnd : Tm.tm Tm.nbnd; rho : env}
   | NCloConst of value Lazy.t
-
-and tick_clo =
-  | TickClo of {bnd : Tm.tm Tm.bnd; rho : env}
-  | TickCloConst of value Lazy.t
 
 and rigid_abs_face = ([`Rigid], abs) face
 and val_face = ([`Any], value) face
@@ -112,5 +93,5 @@ and neu_abs = (neu * val_sys) IAbs.abs
 
 and value = Node of {con : con; action : I.action}
 
-and env_el = [`Val of value | `Dim of I.t | `Tick of tick]
+and env_el = [`Val of value | `Dim of I.t]
 and env = {cells : env_el bwd; global : dim DimEnv.t}

@@ -16,7 +16,6 @@ type cofibration = (I.t * I.t) list
 
 type error =
   | ExpectedDimension of cx * Tm.tm
-  | ExpectedTick of cx * Tm.tm
   | UnequalDimensions of I.t * I.t
   | TypeError of value * (cx * Tm.tm)
 
@@ -32,10 +31,6 @@ struct
     | ExpectedDimension (cx, tm) ->
       Format.fprintf fmt
         "Expected dimension, but got %a."
-        (Tm.pp (Cx.ppenv cx)) tm
-    | ExpectedTick (cx, tm) ->
-      Format.fprintf fmt
-        "Expected tick, but got %a."
         (Tm.pp (Cx.ppenv cx)) tm
     | UnequalDimensions (i0, i1) ->
       Format.fprintf fmt
@@ -76,33 +71,6 @@ and check_dim_cmd cx =
       | Tm.DownX r ->
         check_dim cx r
       | _ -> failwith ""
-    end
-  | _ ->
-    failwith "check_dim_cmd"
-
-let rec check_tick cx tr =
-  match T.unleash tr with
-  | T.Up cmd ->
-    check_tick_cmd cx cmd
-  | _ ->
-    raise @@ E (ExpectedTick (cx, tr))
-
-and check_tick_cmd cx =
-  function
-  | hd, [] ->
-    begin
-      match hd with
-      | Tm.Ix (ix, _) ->
-        begin
-          match Cx.lookup ix cx with
-          | `Tick -> ()
-          | _ -> failwith "check_tick_cmd: expected dimension"
-        end
-      | Tm.Var _ ->
-        (* TODO: lookup in global context, make sure it is a dimension *)
-        ()
-      | _ ->
-        failwith ""
     end
   | _ ->
     failwith "check_dim_cmd"
@@ -188,10 +156,6 @@ let rec check_ cx ty rst tm =
     let cxx, _ = Cx.ext_ty cx ~nm vdom in
     check cxx ty cod
 
-  | [], D.Univ _, T.Later (B (nm, cod)) ->
-    let cxx, _ = Cx.ext_tick cx ~nm in
-    check cxx ty cod
-
   | [], D.Univ univ, T.Ext (NB (nms, (cod, sys))) ->
     let cxx, xs = Cx.ext_dims cx ~nms:(Bwd.to_list nms) in
     let vcod = check_eval cxx ty cod in
@@ -251,12 +215,6 @@ let rec check_ cx ty rst tm =
     let vcod = V.inst_clo cod x in
     let rst' = List.map (Face.map (fun r r' v -> V.apply v @@ D.Value.act (I.equate r r') x)) rst in
     check_ cxx vcod rst' tm
-
-  | _, D.Later tclo, T.Next (T.B (nm, tm)) ->
-    let cxx, tck = Cx.ext_tick cx ~nm in
-    let vty = V.inst_tick_clo tclo tck in
-    let rst' = List.map (Face.map (fun _ _ -> V.prev tck)) rst in
-    check_ cxx vty rst' tm
 
   | _, D.Sg {dom; cod}, T.Cons (t0, t1) ->
     let rst0 = List.map (Face.map (fun _ _ -> V.do_fst)) rst in
@@ -824,18 +782,6 @@ and infer_spine_ cx hd sp =
         | _ -> failwith "Cannot force co-restriction when it is not true!"
       end
 
-    | T.Prev tick ->
-      check_tick cx tick;
-      let vtick = Cx.eval_tick cx tick in
-      begin
-        match vtick with
-        | D.TickGen tgen ->
-          let cx' = Cx.kill_from_tick cx tgen in
-          let ih = infer_spine_ cx' hd sp in
-          let tclo = V.unleash_later ih.ty in
-          D.{el = V.prev vtick ih.el; ty = V.inst_tick_clo tclo vtick}
-      end
-
 and infer_spine cx hd sp =
   infer_spine_ cx hd @@ Bwd.from_list sp
 
@@ -849,7 +795,7 @@ and infer_head cx =
     begin
       match Cx.lookup ix cx with
       | `Ty ty -> ty
-      | (`I | `Tick) -> failwith "infer: expected type hypothesis"
+      | _ -> failwith "infer: expected type hypothesis"
     end
 
   | T.Meta {name; ushift} ->
@@ -915,16 +861,6 @@ and infer_head cx =
 
   | T.DownX _ ->
     failwith "infer_head/DownX"
-
-  | T.DFix info ->
-    check_dim cx info.r;
-    let Tm.B (nm, bdy) = info.bdy in
-    let ty = check_eval_ty cx info.ty in
-    let ltr_ty = D.make_later ty in
-    let cxx, _ = Cx.ext_ty cx ~nm ltr_ty in
-    check cxx ty bdy;
-    ltr_ty
-
 
 and check_eval cx ty tm =
   check cx ty tm;

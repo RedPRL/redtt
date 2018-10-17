@@ -32,9 +32,6 @@ type 'a tmf =
 
   | Box of {r : 'a; r' : 'a; cap : 'a; sys : ('a, 'a) system}
 
-  | Later of 'a bnd
-  | Next of 'a bnd
-
   | Up of 'a cmd
   | Let of 'a cmd * 'a bnd
 
@@ -48,7 +45,6 @@ and 'a head =
   | Ix of int * twin
   | Down of {ty : 'a; tm : 'a}
   | DownX of 'a
-  | DFix of {r : 'a; ty : 'a; bdy : 'a bnd}
   | Coe of {r : 'a; r' : 'a; ty : 'a bnd; tm : 'a}
   | HCom of {r : 'a; r' : 'a; ty : 'a; cap : 'a; sys : ('a, 'a bnd) system}
   | Com of {r : 'a; r' : 'a; ty : 'a bnd; cap : 'a; sys : ('a, 'a bnd) system}
@@ -64,7 +60,6 @@ and 'a frame =
   | VProj of {r : 'a; func : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | RestrictForce
-  | Prev of 'a
 
   | Elim of {dlbl : string; params : 'a list; mot : 'a bnd; clauses : (string * 'a nbnd) list}
 

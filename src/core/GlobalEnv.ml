@@ -5,21 +5,16 @@ type entry =
   [ `P of ty
   | `Def of ty * tm
   | `Tw of ty * ty
-  | `Tick
   | `I
   ]
 
 module T = Map.Make (Name)
 module StringTable = Map.Make (String)
 
-type lock_info = {constant : bool; birth : int}
-
 type t =
   {rel : Restriction.t;
    data_decls : Desc.desc StringTable.t;
-   table : (entry * lock_info) T.t;
-   killed : int -> bool;
-   under_tick : int -> bool;
+   table : entry T.t;
    len : int}
 
 
@@ -27,8 +22,6 @@ let emp () =
   {table = T.empty;
    data_decls = StringTable.empty;
    rel = Restriction.emp ();
-   killed = (fun _ -> false);
-   under_tick = (fun _ -> false);
    len = 0}
 
 
@@ -49,33 +42,25 @@ let lookup_datatype dlbl sg =
     Format.eprintf "@.";
     failwith ("Datatype not found: " ^ dlbl)
 
-let ext_ (sg : t) ~constant nm param : t =
-  let linfo = {constant; birth = sg.len} in
+let ext_ (sg : t) nm param : t =
   {sg with
-   table = T.add nm (param, linfo) sg.table;
+   table = T.add nm param sg.table;
    len = sg.len + 1}
 
 
 let define (sg : t) nm ~ty ~tm =
-  let linfo = {constant = true; birth = sg.len} in
   {sg with
-   table = T.add nm (`Def (ty, tm), linfo) sg.table;
+   table = T.add nm (`Def (ty, tm)) sg.table;
    len = sg.len + 1}
 
 let ext (sg : t) =
-  ext_ sg ~constant:false
+  ext_ sg
 
 let ext_meta (sg : t) =
-  ext_ sg ~constant:true
-
-let ext_tick (sg : t) nm : t =
-  let sg' = ext_ sg ~constant:false nm `Tick in
-  { sg' with
-    under_tick = fun i -> if i <= sg.len then true else sg'.under_tick i
-  }
+  ext_ sg
 
 let ext_dim (sg : t) nm : t =
-  ext_ sg ~constant:false nm `I
+  ext_ sg nm `I
 
 
 let rec index_of pred xs =
@@ -84,29 +69,17 @@ let rec index_of pred xs =
   | x :: xs ->
     if pred x then 0 else 1 + index_of pred xs
 
-let kill_from_tick (sg : t) nm : t =
-  try
-    let _, tick_linfo = T.find nm sg.table in
-    {sg with killed = fun i -> if i < sg.len && i >= tick_linfo.birth then true else sg.killed i}
-  with
-  | _ -> sg
-
 let lookup_ty sg nm tw =
-  let prm, linfo = T.find nm sg.table in
-  let killed = sg.killed linfo.birth in
-  if not linfo.constant && killed then
-    failwith "GlobalEnv.lookup_entry: not accessible (modal!!)"
-  else
-    match prm, tw with
-    | `P a, _ -> a
-    | `Def (a, _), _ -> a
-    | `Tw (a, _), `TwinL -> a
-    | `Tw (_, a), `TwinR -> a
-    | _ -> failwith "GlobalEnv.lookup_entry"
+  let prm = T.find nm sg.table in
+  match prm, tw with
+  | `P a, _ -> a
+  | `Def (a, _), _ -> a
+  | `Tw (a, _), `TwinL -> a
+  | `Tw (_, a), `TwinR -> a
+  | _ -> failwith "GlobalEnv.lookup_entry"
 
 let lookup sg nm =
-  let prm, _ = T.find nm sg.table in
-  prm
+  T.find nm sg.table
 
 let restriction sg =
   sg.rel
@@ -127,12 +100,12 @@ let restrict tr0 tr1 sg =
 
 let pp fmt sg =
   let pp_sep fmt () = Format.fprintf fmt "; " in
-  let go fmt (nm, (p, _)) =
+  let go fmt (nm, p) =
     match p with
     | `Tw _ ->
       Format.fprintf fmt "%a[twin]"
         Name.pp nm
-    | (`Tick | `I | `P _ | `Def _) ->
+    | (`I | `P _ | `Def _) ->
       Format.fprintf fmt "%a"
         Name.pp nm
   in
@@ -150,7 +123,7 @@ let pp_twin fmt =
 
 let global_dims globals =
   T.fold
-    (fun x (prm, _) tbl ->
+    (fun x prm tbl ->
        match prm with
        | `I -> T.add x (I.act (Restriction.as_action globals.rel) (`Atom x)) tbl
        | _ -> tbl)
@@ -168,7 +141,7 @@ struct
     lookup_datatype lbl Sig.globals
 
   let lookup nm tw =
-    let param, _ =
+    let param =
       try
         T.find nm Sig.globals.table
       with

@@ -12,7 +12,7 @@ end
 
 module type S =
 sig
-  val eval_cmd : ML.mlcmd -> ML.semcmd Contextual.m 
+  val eval_cmd : ML.mlcmd -> ML.semcmd Contextual.m
 end
 
 module Make (I : Import) : S =
@@ -61,7 +61,6 @@ struct
                 match GlobalEnv.lookup env alpha with
                 | (`P _ | `Tw _ | `Def _) -> M.ret @@ `FunApp e
                 | `I -> M.ret @@ `ExtApp e
-                | `Tick -> M.ret @@ `Prev e
               end
             | _ ->
               failwith "kind_of_frame"
@@ -316,9 +315,6 @@ struct
         M.in_scope x `I (go args) <<@> fun constr ->
           Desc.TCons (`Dim, Desc.Constr.bind x constr)
 
-      | `Tick _ :: args ->
-        failwith "Tick in HIT constructor argument not yet supported"
-
     in
 
     let rec rebind_constr n psi constr =
@@ -344,17 +340,13 @@ struct
         let x = Name.named @@ Some name in
         M.in_scope x (`P dom) (go cells) <<@> fun codx ->
           Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
-      | `Tick name :: cells ->
-        let x = Name.named @@ Some name in
-        M.in_scope x `Tick (go cells) <<@> fun tyx ->
-          Tm.make @@ Tm.Later (Tm.bind x tyx)
       | `I name :: cells ->
         let x = Name.named @@ Some name in
         M.in_scope x `I (go cells) <<@> fun tyx ->
           Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) tyx [])
     in
 
-    let name_of_cell = function `I nm | `Tick nm | `Ty (nm, _) -> nm in
+    let name_of_cell = function `I nm | `Ty (nm, _) -> nm in
     let names = List.map name_of_cell cells in
 
     go cells <<@> fun ty ->
@@ -480,14 +472,6 @@ struct
           <<@> fun codx ->
             let ebnd = Tm.bind_ext (Emp #< x) codx [] in
             Tm.make @@ Tm.Ext ebnd
-        end
-
-      | [], Tm.Univ _, E.Pi (`Tick name :: etele, ecod) ->
-        let x = Name.named @@ Some name in
-        M.in_scope x `Tick begin
-          elab_chk {e with con = E.Pi (etele, ecod)} {ty; sys = []}
-          <<@> Tm.bind x
-          <<@> fun bnd -> Tm.make @@ Tm.Later bnd
         end
 
       | [], Tm.Univ _, E.Sg ([], e) ->
@@ -798,35 +782,6 @@ struct
         let com = Tm.Com {r = tr; r' = tr'; ty = tybnd; cap; sys} in
         fam_r', (com, [])
 
-    | E.DFixLine info ->
-      elab_chk info.ty {ty = univ; sys = []} >>= fun ty ->
-      elab_dim info.r >>= fun r ->
-      let wk_ty = Tm.subst (Tm.shift 1) ty in
-      let ltr_ty = Tm.make @@ Tm.Later (Tm.B (None, wk_ty)) in
-      let x = Name.named @@ Some info.name in
-      M.in_scope x (`P ltr_ty) begin
-        elab_chk info.bdy {ty; sys = []}
-        <<@> Tm.bind x
-        <<@> fun bdy ->
-          ltr_ty, (Tm.DFix {r; ty; bdy}, [])
-      end
-
-    | E.FixLine info ->
-      elab_chk info.ty {ty = univ; sys = []} >>= fun ty ->
-      elab_dim info.r >>= fun r ->
-      let wk_ty = Tm.subst (Tm.shift 1) ty in
-      let ltr_ty = Tm.make @@ Tm.Later (Tm.B (None, wk_ty)) in
-      let x = Name.named @@ Some info.name in
-      M.in_scope x (`P ltr_ty) begin
-        elab_chk info.bdy {ty; sys = []}
-        <<@> Tm.bind x
-        <<@> fun bdy ->
-          let dfix = Tm.DFix {r; ty; bdy}, [] in
-          let Tm.B (_, bdy') = bdy in
-          let fix = Tm.subst (Tm.dot dfix @@ Tm.shift 0) bdy' in
-          ty, Tm.ann ~tm:fix ~ty
-      end
-
     | E.Elim {mot = Some mot; scrut; clauses} ->
       let tac_mot = elab_chk mot in
       let tac_scrut = elab_inf scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
@@ -1124,21 +1079,6 @@ struct
           in
           let func = Tm.up @@ Tm.ann ~ty:(Tm.equiv ty0 ty1) ~tm:equiv @< Tm.Fst in
           M.ret (ty1, cmd @< Tm.VProj {r; func})
-        | _ ->
-          raise ChkMatch
-      end
-
-    | spine, `Prev {con = E.Var {name; _}} ->
-      elab_var name 0 >>= fun (_, tick) ->
-      M.in_scope (Name.fresh ()) (`KillFromTick (Tm.up tick)) begin
-        elab_cut_bwd exp spine
-      end >>= fun (ty, cmd) ->
-      try_nf ty @@ fun ty ->
-      begin
-        match unleash ty with
-        | Later ltr ->
-          let ty' = Tm.unbind_with tick ltr in
-          M.ret (ty', cmd @< Tm.Prev (Tm.up tick))
         | _ ->
           raise ChkMatch
       end

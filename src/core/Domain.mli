@@ -82,10 +82,6 @@ module NClo : Sort.S
   with type 'a m = 'a
 
 
-module TickClo : Sort.S
-  with type t = tick_clo
-  with type 'a m = 'a
-
 module CompSys :
 sig
   include Sort.S
@@ -111,4 +107,3 @@ end
 
 
 val make : con -> value
-val make_later : value -> value

@@ -27,14 +27,12 @@ sig
   val eval_head : env -> Tm.tm Tm.head -> value
   val eval_frame : env -> value -> Tm.tm Tm.frame -> value
   val eval_dim : env -> Tm.tm -> I.t
-  val eval_tick : env -> Tm.tm -> tick
   val eval_tm_sys : env -> (Tm.tm, Tm.tm) Tm.system -> val_sys
 
   val make_closure : env -> Tm.tm Tm.bnd -> clo
 
   val apply : value -> value -> value
   val ext_apply : value -> dim list -> value
-  val prev : tick -> value -> value
 
   val do_fst : value -> value
   val do_snd : value -> value
@@ -47,12 +45,10 @@ sig
 
   val inst_clo : clo -> value -> value
   val inst_nclo : nclo -> env_el list -> value
-  val inst_tick_clo : tick_clo -> tick -> value
 
   val unleash_pi : value -> value * clo
   val unleash_sg : value -> value * clo
   val unleash_v : value -> atom * value * value * value
-  val unleash_later : value -> tick_clo
   val unleash_ext_with : value -> dim list -> value * val_sys
   val unleash_restriction_ty : value -> val_face
 

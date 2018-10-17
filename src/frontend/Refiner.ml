@@ -87,28 +87,6 @@ let guess_restricted tm goal =
 
 exception ChkMatch
 
-let bind_in_scope_ psi tm =
-  let go (x, param) =
-    match param with
-    | `P _ -> [x]
-    | `Def _ -> [x]
-    | `I -> [x]
-    | `Tick -> [x]
-    | `Tw _ -> []
-    | _ -> []
-  in
-  let xs = Bwd.flat_map go psi in
-  let Tm.NB (_, tm) = Tm.bindn xs tm in
-  tm
-
-let bind_in_scope tm =
-  C.ask <<@> fun psi -> bind_in_scope_ psi tm
-
-
-let bind_sys_in_scope sys =
-  C.ask <<@> fun psi ->
-    Tm.map_tm_sys (bind_in_scope_ psi) sys
-
 let tac_wrap_nf tac goal =
   try tac goal
   with
@@ -160,7 +138,7 @@ let tac_pair tac0 tac1 : chk_tac =
         | _ -> failwith "V is not rigid when applying the tac_pair tactic."
       in
       M.under_restriction r (Tm.make Tm.Dim0) @@ tac0 {ty = ty0; sys = goal.sys} <<@>
-      begin function Some tm0 -> tm0 | None -> failwith "V is not rigid when applying the tac_pair tactic." end
+                                                 begin function Some tm0 -> tm0 | None -> failwith "V is not rigid when applying the tac_pair tactic." end
       >>= fun tm0 ->
       tac1 {ty = ty1; sys = goal.sys} >>= fun tm1 ->
       M.ret @@ Tm.make @@ Tm.VIn {r; tm0; tm1}
@@ -195,7 +173,7 @@ let normalize_param p =
     C.ret @@ `Def (ty', tm')
   | `Tw (ty0, ty1) ->
     C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
-  | (`I | `NullaryExt | `Tick | `KillFromTick _) as p ->
+  | (`I | `NullaryExt) as p ->
     C.ret p
   | `R (r0, r1) ->
     C.ret @@ `R (r0, r1)
@@ -328,26 +306,6 @@ let rec tac_lambda (ps : ML.einvpat list) tac goal =
           tac {ty = codx; sys = sysx}
         end >>= fun bdyx ->
         M.ret @@ Tm.make @@ Tm.Lam (Tm.bind x bdyx)
-    end
-
-  | Tm.Later cod ->
-    begin
-      match ps with
-      | [] -> tac goal
-      | `Var nm :: ps ->
-        let x = name_of nm in
-        let codx = Tm.unbind_with (Tm.var x) cod in
-        let sysx =
-          ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
-          r, r', Option.foreach otm @@ fun tm ->
-          Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Prev (Tm.up @@ Tm.var x)
-        in
-        M.in_scope x `Tick begin
-          tac_wrap_nf (tac_lambda ps tac) {ty = codx; sys = sysx}
-        end >>= fun bdyx ->
-        M.ret @@ Tm.make @@ Tm.Next (Tm.bind x bdyx)
-      | _ ->
-        failwith "TODO"
     end
 
   | Tm.Ext (Tm.NB (nms, _) as ebnd) ->

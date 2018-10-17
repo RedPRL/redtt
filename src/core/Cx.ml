@@ -1,11 +1,7 @@
 open RedBasis open Bwd open BwdNotation
 type value = Domain.value
 
-type hyp =
-  {classifier : [`Ty of value | `I | `Tick];
-   killed : bool; (* for modal calculus *)
-   locked : bool (* for modal calculus *)
-  }
+type hyp = {classifier : [`Ty of value | `I]}
 
 let check_eq_clock = ref 0.
 
@@ -38,20 +34,6 @@ let clear_locals cx =
    ppenv = Pp.Env.emp;
    env = Domain.Env.clear_locals cx.env}
 
-let kill_from_tick cx tgen =
-  match tgen with
-  | `Lvl (_, lvl) ->
-    let i = Quote.Env.len cx.qenv - lvl - 1 in
-    let go j hyp =
-      if j <= i then
-        {hyp with killed = true}
-      else
-        hyp
-    in
-    {cx with hyps = Bwd.mapi go cx.hyps}
-  | `Global alpha ->
-    {cx with sign = GlobalEnv.kill_from_tick cx.sign alpha}
-
 let evaluator cx : (module Val.S) =
   let module Sig = struct let globals = cx.sign end in
   let module V = Val.M (GlobalEnv.M (Sig)) in
@@ -63,20 +45,10 @@ let ext cx ~nm ty sys =
   let var = V.reflect ty (Domain.Lvl (nm, n)) sys in
   {cx with
    env = Domain.Env.snoc cx.env @@ `Val var;
-   hyps = cx.hyps #< {classifier = `Ty ty; locked = false; killed = false};
+   hyps = cx.hyps #< {classifier = `Ty ty};
    qenv = Quote.Env.succ cx.qenv;
    ppenv = snd @@ Pp.Env.bind cx.ppenv nm},
   var
-
-let ext_tick cx ~nm =
-  let n = Quote.Env.len cx.qenv in
-  let tick = Domain.TickGen (`Lvl (nm, n)) in
-  {cx with
-   env = Domain.Env.snoc cx.env @@ `Tick tick;
-   hyps = cx.hyps #< {classifier = `Tick; locked = false; killed = false};
-   qenv = Quote.Env.succ cx.qenv;
-   ppenv = snd @@ Pp.Env.bind cx.ppenv nm},
-  tick
 
 let ext_ty cx ~nm ty =
   ext cx ~nm ty []
@@ -89,7 +61,7 @@ let ext_dim cx ~nm =
   let x = Name.named nm in
   {cx with
    env = Domain.Env.snoc cx.env @@ `Dim (`Atom x);
-   hyps = cx.hyps #< {classifier = `I; locked = false; killed = false};
+   hyps = cx.hyps #< {classifier = `I};
    qenv = Quote.Env.abs cx.qenv [x];
    ppenv = snd @@ Pp.Env.bind cx.ppenv nm},
   x
@@ -97,14 +69,14 @@ let ext_dim cx ~nm =
 let def_dim cx ~nm r =
   {cx with
    env = Domain.Env.snoc cx.env @@ `Dim r;
-   hyps = cx.hyps #< {classifier = `I; locked = false; killed = false};
+   hyps = cx.hyps #< {classifier = `I};
    qenv = Quote.Env.succ cx.qenv;
    ppenv = snd @@ Pp.Env.bind cx.ppenv nm}
 
 let ext_dims cx ~nms =
   let xs = List.map Name.named nms in
   let rs = List.map (fun x -> `Atom x) xs in
-  let rs_hyps = List.map (fun x -> {classifier = `I; locked = false; killed = false}) rs in
+  let rs_hyps = List.map (fun x -> {classifier = `I}) rs in
   {cx with
    env = Domain.Env.append cx.env @@ List.map (fun r -> `Dim r) rs;
    hyps = cx.hyps <>< rs_hyps;
@@ -119,10 +91,7 @@ let make_closure cx bnd =
 
 let lookup i {hyps; _} =
   let hyp = Bwd.nth hyps i in
-  if (hyp.killed || hyp.locked) && hyp.classifier != `I then
-    failwith "Hypothesis is inaccessible"
-  else
-    hyp.classifier
+  hyp.classifier
 
 let lookup_constant nm tw cx =
   GlobalEnv.lookup_ty cx.sign nm tw
@@ -135,9 +104,8 @@ let restrict cx r r' =
   let rel, phi = Restriction.equate r r' cx.rel in
   let act_ty hyp =
     match hyp.classifier with
-    | `Ty ty -> {hyp with classifier = `Ty (Domain.Value.act phi ty)}
+    | `Ty ty -> {classifier = `Ty (Domain.Value.act phi ty)}
     | `I -> hyp
-    | `Tick -> hyp
   in
   let hyps = Bwd.map act_ty cx.hyps in
   let env = Domain.Env.act phi cx.env in
@@ -169,10 +137,6 @@ let eval_head cx hd =
 let eval_dim cx tm =
   let (module V) = evaluator cx in
   V.eval_dim cx.env tm
-
-let eval_tick cx tm =
-  let (module V) = evaluator cx in
-  V.eval_tick cx.env tm
 
 let eval_tm_sys cx sys =
   let (module V) = evaluator cx in
