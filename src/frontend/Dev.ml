@@ -25,8 +25,6 @@ type ('a, 'b) equation =
 type 'a param =
   [ `I
   | `NullaryExt
-  | `Tick
-  | `KillFromTick of 'a
   | `P of 'a
   | `Def of 'a * 'a
   | `Tw of 'a * 'a
@@ -72,9 +70,7 @@ let rec eqn_close_var x tw k q =
 
 let param_open_var k x =
   function
-  | (`I | `Tick | `NullaryExt) as p -> p
-  | `KillFromTick tck ->
-    `KillFromTick (Tm.open_var k x tck)
+  | (`I | `NullaryExt) as p -> p
   | `P ty ->
     `P (Tm.open_var k x ty)
   | `Def (ty, tm) ->
@@ -87,9 +83,7 @@ let param_open_var k x =
 
 let param_close_var x k =
   function
-  | (`I | `Tick | `NullaryExt) as p -> p
-  | `KillFromTick tck ->
-    `KillFromTick (Tm.close_var x k tck)
+  | (`I | `NullaryExt) as p -> p
   | `P ty ->
     `P (Tm.close_var x k ty)
   | `Def (ty, tm) ->
@@ -175,10 +169,6 @@ let pp_param fmt =
   | `NullaryExt ->
     ()
   (* Format.fprintf fmt "dim" *)
-  | `Tick ->
-    Uuseg_string.pp_utf_8 fmt "✓"
-  | `KillFromTick _ ->
-    Format.fprintf fmt "<kill-after-tick>"
   | `P ty ->
     Tm.pp0 fmt ty
   | `Def (ty, _) -> (* TODO *)
@@ -220,16 +210,6 @@ let pp_param_cell fmt (x, param) =
 
   | `NullaryExt ->
     ()
-
-  | `Tick ->
-    Format.fprintf fmt "@[<1>%a : %a@]"
-      Name.pp x
-      Uuseg_string.pp_utf_8
-      "✓"
-
-  | `KillFromTick tck ->
-    Format.fprintf fmt "<clear-after-tick: %a>"
-      Tm.pp0 tck
 
   | `R (r0, r1) ->
     Format.fprintf fmt "@[<1>%a = %a@]"
@@ -355,10 +335,8 @@ let subst_equation sub q =
 let subst_param sub =
   let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
   function
-  | (`I | `NullaryExt | `Tick) as p ->
+  | (`I | `NullaryExt) as p ->
     p, sub
-  | `KillFromTick tck ->
-    `KillFromTick (subst_tm sub ~ty:univ tck), sub
   | `P ty ->
     `P (subst_tm sub ~ty:univ ty), sub
   | `Def (ty, tm) ->
@@ -398,7 +376,7 @@ let rec subst_problem sub =
         let probx' = subst_problem sub'' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
-      | (`I | `NullaryExt | `Tick | `KillFromTick _) ->
+      | (`I | `NullaryExt) ->
         let probx' = subst_problem sub' probx in
         let prob' = bind x param' probx' in
         All (param', prob')
@@ -426,8 +404,7 @@ struct
 
   let free fl =
     function
-    | (`I | `NullaryExt | `Tick) -> Occurs.Set.empty
-    | `KillFromTick tck -> Tm.free fl tck
+    | (`I | `NullaryExt) -> Occurs.Set.empty
     | `P ty -> Tm.free fl ty
     | `Def (ty, tm) ->
       Occurs.Set.union (Tm.free fl ty) (Tm.free fl tm)

@@ -105,7 +105,7 @@ let rec con_info =
     Info.mergen [tm_info r; tm_info ty0; tm_info ty1; tm_info equiv]
   | VIn {r; tm0; tm1} ->
     Info.mergen [tm_info r; tm_info tm0; tm_info tm1]
-  | Lam bnd | Later bnd | Next bnd ->
+  | Lam bnd ->
     bnd_info tm_info bnd
   | ExtLam nbnd ->
     nbnd_info tm_info nbnd
@@ -133,8 +133,6 @@ and head_info =
     Info.mergen [tm_info ty; tm_info tm]
   | DownX tm ->
     tm_info tm
-  | DFix {r; ty; bdy} ->
-    Info.mergen [tm_info r; tm_info ty; bnd_info tm_info bdy]
   | Coe {r; r'; ty; tm} ->
     Info.mergen [tm_info r; tm_info r'; bnd_info tm_info ty; tm_info tm]
   | HCom {r; r'; ty; cap; sys} | GHCom {r; r'; ty; cap; sys} ->
@@ -155,8 +153,6 @@ and frame_info =
     Info.mergen [tm_info r; tm_info r'; tm_info ty; sys_info (bnd_info tm_info) sys]
   | VProj {r; func} ->
     Info.mergen [tm_info r; tm_info func]
-  | Prev t ->
-    tm_info t
   | Elim {dlbl; params; mot; clauses} ->
     let clause_info (_, nbnd) = nbnd_info tm_info nbnd in
     Info.mergen @@ bnd_info tm_info mot :: List.map clause_info clauses @ List.map tm_info params
@@ -320,14 +316,6 @@ struct
       let sys = traverse_list traverse_face info.sys in
       Box {r; r'; cap; sys}
 
-    | Later bnd ->
-      let bnd' = traverse_bnd traverse_tm bnd in
-      Later bnd'
-
-    | Next bnd ->
-      let bnd' = traverse_bnd traverse_tm bnd in
-      Next bnd'
-
     | Let (cmd, bnd) ->
       let cmd' = traverse_cmd cmd in
       let bnd' = traverse_bnd traverse_tm bnd in
@@ -379,12 +367,6 @@ struct
 
     | DownX r ->
       DownX (traverse_tm r), []
-
-    | DFix info ->
-      let r = traverse_tm info.r in
-      let ty = traverse_tm info.ty in
-      let bdy = traverse_bnd traverse_tm info.bdy in
-      DFix {r; ty; bdy}, []
 
     | Coe info ->
       let r = traverse_tm info.r in
@@ -506,11 +488,6 @@ struct
       let ty = traverse_tm info.ty in
       let sys = traverse_list traverse_bface info.sys in
       Cap {r; r'; ty; sys}
-
-    | Prev tick ->
-      let tick = traverse_tm tick in
-      Prev tick
-
 end
 
 
@@ -870,14 +847,6 @@ let rec pp env fmt =
     | Box {r; r'; cap; sys} ->
       Format.fprintf fmt "@[<hv1>(box %a %a@ %a@ @[<hv>%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_sys env) sys
 
-    | Later (B (nm, t)) ->
-      let x, env' = Pp.Env.bind env nm in
-      Format.fprintf fmt "@[<hv1>(%a [%a]@ %a)@]" Uuseg_string.pp_utf_8 "▷" Uuseg_string.pp_utf_8 x (pp env') t
-
-    | Next (B (nm, t)) ->
-      let x, env' = Pp.Env.bind env nm in
-      Format.fprintf fmt "@[<hv1>(next [%a]@ %a)@]" Uuseg_string.pp_utf_8 x (pp env') t
-
     | Let (cmd, B (nm, t)) ->
       let x, env' = Pp.Env.bind env nm in
       Format.fprintf fmt "@[<hv1>(let@ @[<hv1>[%a %a]@]@ %a)@]" Uuseg_string.pp_utf_8 x (pp_cmd env) cmd (pp env') t
@@ -953,10 +922,6 @@ and pp_head env fmt =
   | DownX r ->
     pp env fmt r
 
-  | DFix {r; ty; bdy = B (nm, bdy)} ->
-    let x, env' = Pp.Env.bind env nm in
-    Format.fprintf fmt "@[<hv1>(dfix %a %a@ [%a] %a)@]" (pp env) r (pp env) ty Uuseg_string.pp_utf_8 x (pp env') bdy
-
 and pp_cmd env fmt (hd, sp) =
   let rec go mode fmt sp =
     match sp with
@@ -998,8 +963,6 @@ and pp_cmd env fmt (hd, sp) =
         Format.fprintf fmt "@<cap>"
       | RestrictForce ->
         Format.fprintf fmt "@[<hv1>(force@ %a)@]" (go `Force) sp
-      | Prev tick ->
-        Format.fprintf fmt "@[<hv1>(prev %a@ %a)@]" (pp env) tick (go `Prev) sp
   in
   go `Start fmt (Bwd.from_list sp)
 
@@ -1054,8 +1017,6 @@ and pp_frame env fmt =
     Format.fprintf fmt "<cap>"
   | RestrictForce ->
     Format.fprintf fmt "restrict-force"
-  | Prev _ ->
-    Format.fprintf fmt "<prev>"
   | Elim info ->
     Format.fprintf fmt "@[<hv1>(%a.elim@ %a@ %a)@]"
       Uuseg_string.pp_utf_8 info.dlbl
@@ -1290,11 +1251,6 @@ let map_head f =
     Down {ty; tm}
   | DownX r ->
     DownX (f r)
-  | DFix info ->
-    let r = f info.r in
-    let ty = f info.ty in
-    let bdy = map_bnd f info.bdy in
-    DFix {r; ty; bdy}
   | Coe info ->
     let r = f info.r in
     let r' = f info.r' in
@@ -1353,9 +1309,6 @@ let map_frame f =
     let ty = f info.ty in
     let sys = map_comp_sys f info.sys in
     Cap {r; r'; ty; sys}
-  | Prev tick ->
-    let tick = f tick in
-    Prev tick
 
 let map_spine f =
   List.map @@ map_frame f
@@ -1423,12 +1376,6 @@ let map_tmf f =
     let cap = f info.cap in
     let sys = map_tm_sys f info.sys in
     Box {r; r'; cap; sys}
-  | Later bnd ->
-    let bnd = map_bnd f bnd in
-    Later bnd
-  | Next bnd ->
-    let bnd = map_bnd f bnd in
-    Next bnd
   | Up cmd ->
     Up (map_cmd f cmd)
   | Let (cmd, bnd) ->
@@ -1483,34 +1430,6 @@ let rec eta_contract t =
 
       | _ ->
         make @@ Lam (bind y tm'y)
-    end
-
-  | Next bnd ->
-    let y, tmy = unbind bnd in
-    let tm'y = eta_contract tmy in
-    begin
-      match unleash tm'y with
-      | Up (hd, (_ :: _ as sp)) ->
-        begin
-          match ListUtil.split_last sp with
-          | sp, Prev arg ->
-            begin
-              match as_plain_var arg with
-              | Some y'
-                when
-                  y = y'
-                  && not @@ Occurs.Set.mem y @@ Sp.free `Vars sp
-                ->
-                up (hd, sp)
-              | _ ->
-                make @@ Next (bind y tm'y)
-            end
-          | _ ->
-            make @@ Next (bind y tm'y)
-        end
-
-      | _ ->
-        make @@ Next (bind y tm'y)
     end
 
   | ExtLam nbnd ->

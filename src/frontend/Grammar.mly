@@ -41,8 +41,8 @@
 %token EQUALS
 %token RIGHT_ARROW RIGHT_TACK
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
-%token DIM TICK
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN V VPROJ VIN NEXT PREV FIX DFIX REFL
+%token DIM
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN V VPROJ VIN REFL
 %token PUBLIC PRIVATE OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
 %token META
@@ -211,16 +211,6 @@ econ:
   | LET; pat = einvpat; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
     { E.Let {pat; sch = sch; tm; body} }
 
-  | DFIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
-    { E.DFixLine {r; name; ty; bdy} }
-  | DFIX; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
-    { E.DFixLine {r = {con = E.Num 0; span = None}; name; ty; bdy} }
-
-  | FIX; LSQ; r = located(econ); RSQ; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
-    { E.FixLine {r; name; ty; bdy} }
-  | FIX; name = ATOM; COLON; ty = located(econ); IN; bdy = located(econ)
-    { E.FixLine {r = {con = E.Num 0; span = None}; name; ty; bdy} }
-
   | COE; r0 = located(atomic); r1 = located(atomic); tm = located(atomic); IN; fam = located(econ)
     { E.Coe {r = r0; r' = r1; fam; tm} }
 
@@ -310,14 +300,10 @@ escheme:
 etele_cell:
   | LPR; xs = nonempty_list(ATOM); COLON; ty = located(econ); RPR
     { List.map (fun x -> `Ty (x, ty)) xs }
-  | LPR; xs = nonempty_list(ATOM); COLON; TICK; RPR
-    { List.map (fun x -> `Tick x) xs }
   | LPR; xs = nonempty_list(ATOM); COLON; DIM; RPR
     { List.map (fun x -> `I x) xs }
   | DIM
     { [`I "_"] }
-  | TICK
-    { [`Tick "_"] }
 
 
 econstr:
@@ -589,19 +575,9 @@ tm:
     { fun env ->
       ext_from_multibind $startpos $endpos @@ mb env }
 
-  | LPR; TRIANGLE_RIGHT; ty = bind(tm); RPR
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.Later (ty env) }
-
   | LPR; LAM; mb = multibind(tm); RPR
     { fun env ->
       lam_from_multibind (Some ($startpos, $endpos)) @@ mb env }
-
-  | LPR; NEXT; bnd = bind(tm); RPR
-    { fun env ->
-      make_node $startpos $endpos @@
-      Tm.Next (bnd env) }
 
   | LPR; PAIR; e0 = tm; e1 = tm; RPR
     { fun env ->
@@ -657,10 +633,6 @@ head:
     { fun env ->
       Tm.Coe {r = r0 env; r' = r1 env; ty = ty env; tm = tm env} }
 
-  | LPR; DFIX; r = tm; ty = tm; bdy = bind(tm); RPR
-    { fun env ->
-      Tm.DFix {r = r env; ty = ty env; bdy = bdy env} }
-
   | LPR; COLON; ty = tm; tm = tm; RPR
     { fun env ->
       Tm.Down {ty = ty env; tm = tm env} }
@@ -685,11 +657,6 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.Snd }
-
-  | LPR; PREV; t = tm; e = cut; RPR
-    { fun env ->
-      let hd, fs = e env in
-      hd, fs #< (Tm.Prev (t env)) }
 
   | LPR; e = cut; arg0 = tm; rest = elist(tm); RPR
     { fun env ->

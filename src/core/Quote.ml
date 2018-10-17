@@ -174,14 +174,6 @@ struct
       Tm.ext_lam (Bwd.map Name.name xs) @@
       equate (Env.abs env xs_fwd) tyx app0 app1
 
-    | Later ltr, _, _ ->
-      let tick = TickGen (`Lvl (None, Env.len env)) in
-      let prev0 = prev tick el0 in
-      let prev1 = prev tick el1 in
-      let ty = inst_tick_clo ltr tick in
-      let bdy = equate (Env.succ env) ty prev0 prev1 in
-      Tm.make @@ Tm.Next (Tm.B (None, bdy))
-
     | Restrict face, _, _ ->
       begin
         match face with
@@ -261,13 +253,6 @@ struct
         Tm.make @@ Tm.Data {lbl; params}
       else
         raise @@ E (UnequalLbl (info0.lbl, info1.lbl))
-
-    | _, Later ltr0, Later ltr1 ->
-      let tick = TickGen (`Lvl (None, Env.len env)) in
-      let vcod0 = inst_tick_clo ltr0 tick in
-      let vcod1 = inst_tick_clo ltr1 tick in
-      let cod = equate (Env.succ env) ty vcod0 vcod1 in
-      Tm.make @@ Tm.Later (Tm.B (None, cod))
 
     | _, Sg sg0, Sg sg1 ->
       let dom = equate env ty sg0.dom sg1.dom in
@@ -454,28 +439,6 @@ struct
       let tm = equate env ty_r info0.el info1.el in
       Tm.Coe {r = tr; r' = tr'; ty = bnd; tm}, stk
 
-
-    | Fix (tgen0, ty0, clo0), Fix (tgen1, ty1, clo1) ->
-      let ty = equate_ty env ty0 ty1 in
-      let ltr_ty = make_later ty0 in
-      let var = generic env ltr_ty in
-      let el0 = inst_clo clo0 var in
-      let el1 = inst_clo clo1 var in
-      let bdy = equate (Env.succ env) ty0 el0 el1 in
-      let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
-      Tm.DFix {r = Tm.make Tm.Dim0; ty; bdy = Tm.B (None, bdy)}, Tm.Prev tick :: stk
-
-    | FixLine (x0, tgen0, ty0, clo0), FixLine (x1, tgen1, ty1, clo1) ->
-      let r = equate_atom env x0 x1 in
-      let ty = equate_ty env ty0 ty1 in
-      let ltr_ty = make_later ty0 in
-      let var = generic env ltr_ty in
-      let el0 = inst_clo clo0 var in
-      let el1 = inst_clo clo1 var in
-      let bdy = equate (Env.succ env) ty0 el0 el1 in
-      let tick = equate_tick env (TickGen tgen0) (TickGen tgen1) in
-      Tm.DFix {r; ty; bdy = Tm.B (None, bdy)}, Tm.Prev tick :: stk
-
     | Fst neu0, Fst neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.Fst :: stk
 
@@ -584,10 +547,6 @@ struct
 
     | RestrictForce neu0, RestrictForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.RestrictForce :: stk
-
-    | Prev (tick0, neu0), Prev (tick1, neu1) ->
-      let tick = equate_tick env tick0 tick1 in
-      equate_neu_ env neu0 neu1 @@ Tm.Prev tick :: stk
 
     | _ ->
       let err = UnequalNeu {env; neu0; neu1} in
@@ -703,12 +662,6 @@ struct
     let tr' = equate_dim3 env r'0 r'1 r'2 in
     tr, tr'
 
-  and equate_tick env tick0 tick1 =
-    if tick0 = tick1 then
-      quote_tick env tick0
-    else
-      failwith "equate_tick: ticks did not match"
-
   and equate_dim env (r : I.t) (r' : I.t) =
     match I.compare r r' with
     | `Same ->
@@ -760,14 +713,6 @@ struct
       | _ ->
         Tm.up @@ Tm.var x
 
-  and quote_tick env tck =
-    match tck with
-    | TickGen (`Lvl (_, lvl)) ->
-      let ix = Env.ix_of_lvl lvl env in
-      Tm.up @@ Tm.ix ix
-    | TickGen (`Global alpha) ->
-      Tm.up @@ Tm.var alpha
-
   let equiv env ~ty el0 el1 =
     ignore @@ equate env ty el0 el1
 
@@ -814,14 +759,6 @@ struct
       let sys01 = map_sys (fun _ _ -> do_snd) sys0 in
       let sys11 = map_sys (fun _ _ -> do_snd) sys1 in
       fancy_subtype (Env.succ env) vcod0 sys01 vcod1 sys11
-
-    | Later ltr0, Later ltr1 ->
-      let tick = TickGen (`Lvl (None, Env.len env)) in
-      let vcod0 = inst_tick_clo ltr0 tick in
-      let vcod1 = inst_tick_clo ltr1 tick in
-      let sys0 = map_sys (fun _ _ -> prev tick) sys0 in
-      let sys1 = map_sys (fun _ _ -> prev tick) sys1 in
-      fancy_subtype (Env.succ env) vcod0 sys0 vcod1 sys1
 
     | Ext abs0, Ext abs1 ->
       let xs, (ty0x, sys0x) = ExtAbs.unleash abs0 in

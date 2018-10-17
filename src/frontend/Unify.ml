@@ -47,10 +47,6 @@ let rec telescope ty : telescope * ty =
     let x = Name.fresh () in
     let tel, ty = telescope ty in
     (Emp #< (x, `R (r, r'))) <.> tel, ty
-  | Tm.Later cod ->
-    let x, codx = Tm.unbind cod in
-    let tel, ty = telescope codx in
-    (Emp #< (x, `Tick)) <.> tel, ty
   | _ ->
     Emp, ty
 
@@ -61,8 +57,6 @@ let rec abstract_tm xs tm =
     abstract_tm xs @@ Tm.make @@ Tm.Lam (Tm.bind x tm)
   | Snoc (xs, (x, `Def (ty, def))) ->
     abstract_tm xs @@ Tm.unbind_with (Tm.ann ~ty ~tm:def) @@ Tm.bind x tm
-  | Snoc (xs, (x, `Tick)) ->
-    abstract_tm xs @@ Tm.make @@ Tm.Next (Tm.bind x tm)
   | Snoc (xs, (x, `I)) ->
     let bnd = Tm.NB (Emp #< None, Tm.close_var x 0 tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
@@ -71,8 +65,6 @@ let rec abstract_tm xs tm =
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
   | Snoc (xs, (_, `R (r, r'))) ->
     abstract_tm xs @@ Tm.make @@ Tm.RestrictThunk (r, r', Some tm)
-  | Snoc (xs, (_, `KillFromTick _)) ->
-    abstract_tm xs tm
   | _ ->
     failwith "abstract_tm"
 
@@ -89,10 +81,6 @@ let rec abstract_ty (gm : telescope) cod =
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) cod [])
   | Snoc (gm, (_, `NullaryExt)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.bind_ext Emp cod [])
-  | Snoc (gm, (x, `Tick)) ->
-    abstract_ty gm @@ Tm.make @@ Tm.Later (Tm.bind x cod)
-  | Snoc (gm, (_, `KillFromTick _)) ->
-    abstract_ty gm cod
   | _ ->
     failwith "abstract_ty"
 
@@ -111,10 +99,6 @@ let telescope_to_spine_ : telescope -> tm Tm.frame bwd =
     [Tm.FunApp (Tm.up @@ Tm.var x)]
   | `R _ ->
     [Tm.RestrictForce]
-  | `Tick ->
-    [Tm.Prev (Tm.up @@ Tm.var x)]
-  | `KillFromTick _ ->
-    []
 
 let telescope_to_spine (tele : telescope) : tm Tm.spine =
   Bwd.to_list (telescope_to_spine_ tele)
@@ -835,7 +819,7 @@ let rec solver prob =
     else
       begin
         match param with
-        | `I | `Tick | `NullaryExt | `KillFromTick _ as p ->
+        | `I | `NullaryExt as p ->
           in_scope x p @@
           solver probx
 
