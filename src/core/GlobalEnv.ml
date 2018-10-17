@@ -36,7 +36,7 @@ let lookup_datatype dlbl sg =
   match T.find dlbl sg.table with
   | `Data desc -> desc
   | _ ->
-    Format.eprintf "Name %a does not refer to a datatype.@." Name.pp dlbl;
+    Format.eprintf "The name %a does not refer to a datatype.@." Name.pp dlbl;
     raise Not_found
   | exception Not_found ->
     Format.eprintf "Datatype not found: %a.@." Name.pp dlbl;
