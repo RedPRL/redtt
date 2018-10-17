@@ -1,7 +1,6 @@
 open RedBasis
 open RedTT_Core
 open Dev open Bwd open BwdNotation
-open Combinators
 
 module D = Domain
 
