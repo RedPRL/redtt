@@ -140,10 +140,10 @@ let update_env e =
   match e with
   | E (nm, ty, Hole info) ->
     {st with per_process =
-      {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty; info = Map.add nm info st.per_process.info}}
+               {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty; info = Map.add nm info st.per_process.info}}
   | E (nm, ty, Guess _) ->
     {st with per_process =
-      {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty; info = Map.add nm `Rigid st.per_process.info}}
+               {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty; info = Map.add nm `Rigid st.per_process.info}}
   | E (nm, ty, Defn (visibility, `Transparent, t)) ->
     {st with
      per_process =
@@ -231,16 +231,6 @@ let get_global_env =
     | Emp -> st.per_process.env
     | Snoc (psi, (x, `I)) ->
       GlobalEnv.ext_dim (go_params psi) x
-    | Snoc (psi, (x, `Tick)) ->
-      GlobalEnv.ext_tick (go_params psi) x
-    | Snoc (psi, (_, `KillFromTick tck)) ->
-      begin
-        match Tm.unleash tck with
-        | Tm.Up (Tm.Var info, []) ->
-          GlobalEnv.kill_from_tick (go_params psi) info.name
-        | _ ->
-          go_params psi
-      end
     | Snoc (psi, (x, `P ty)) ->
       GlobalEnv.ext (go_params psi) x @@ `P ty
     | Snoc (psi, (x, `Def (ty, tm))) ->

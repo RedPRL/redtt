@@ -7,7 +7,6 @@ type entry =
   [ `P of ty
   | `Def of ty * tm
   | `Tw of ty * ty
-  | `Tick
   | `I
   ]
 
@@ -16,9 +15,7 @@ val define : t -> Name.t -> ty:Tm.tm -> tm:Tm.tm -> t
 val ext : t -> Name.t -> entry -> t
 val ext_meta : t -> Name.t -> entry -> t
 val ext_dim : t -> Name.t -> t
-val ext_tick : t -> Name.t -> t
 val restrict : Tm.tm -> Tm.tm -> t -> t
-val kill_from_tick : t -> Name.t -> t
 
 
 val declare_datatype : string -> Desc.desc -> t -> t

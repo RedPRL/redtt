@@ -22,8 +22,6 @@ let keywords =
     ("data", DATA);
     ("begin", BEGIN);
     ("end", END);
-    ("tick", TICK);
-    ("✓", TICK);
     ("meta", META);
     ("dim", DIM);
     ("𝕀", DIM);
@@ -44,10 +42,6 @@ let keywords =
     ("def", DEF);
     ("lam", LAM);
     ("λ", LAM);
-    ("next", NEXT);
-    ("prev", PREV);
-    ("dfix", DFIX);
-    ("fix", FIX);
     ("refl", REFL);
     ("pre", PRE);
     ("kan", KAN);

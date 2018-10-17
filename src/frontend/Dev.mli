@@ -25,8 +25,6 @@ type ('a, 'b) equation =
 type 'a param =
   [ `I
   | `NullaryExt
-  | `Tick
-  | `KillFromTick of 'a
   | `P of 'a
   | `Def of 'a * 'a
   | `Tw of 'a * 'a

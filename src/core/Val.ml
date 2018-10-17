@@ -8,7 +8,6 @@ include ValSig
 type error =
   | UnexpectedEnvCell of env_el
   | ExpectedDimensionTerm of Tm.tm
-  | ExpectedTickTerm of Tm.tm
   | InternalMortalityError
   | RigidCoeUnexpectedArgument of abs
   | RigidHComUnexpectedArgument of value
@@ -20,13 +19,11 @@ type error =
   | RigidVProjUnexpectedArgument of atom * value
   | RigidCapUnexpectedArgument of value
   | UnexpectedDimensionTerm of Tm.tm
-  | UnexpectedTickTerm of Tm.tm
   | UnleashDataError of value
   | UnleashPiError of value
   | UnleashSgError of value
   | UnleashExtError of value
   | UnleashVError of value
-  | UnleashLaterError of value
   | UnleashRestrictError of value
   | UnleashFHComError of value
   | ForcedUntrueRestriction of val_face
@@ -87,17 +84,9 @@ struct
       Format.fprintf fmt
         "Tried to evaluate non-dimension term %a as dimension."
         Tm.pp0 t
-    | ExpectedTickTerm t ->
-      Format.fprintf fmt
-        "Tried to evaluate non-tick term %a as dimension."
-        Tm.pp0 t
     | UnexpectedDimensionTerm t ->
       Format.fprintf fmt
         "Tried to evaluate dimension term %a as expression."
-        Tm.pp0 t
-    | UnexpectedTickTerm t ->
-      Format.fprintf fmt
-        "Tried to evaluate tick term %a as expression."
         Tm.pp0 t
     | UnleashDataError v ->
       Format.fprintf fmt
@@ -114,10 +103,6 @@ struct
     | UnleashVError v ->
       Format.fprintf fmt
         "Tried to unleash %a as V type."
-        pp_value v
-    | UnleashLaterError v ->
-      Format.fprintf fmt
-        "Tried to unleash %a as later modality."
         pp_value v
     | UnleashExtError v ->
       Format.fprintf fmt
@@ -197,31 +182,6 @@ struct
     | _ ->
       let err = ExpectedDimensionTerm tm in
       raise @@ E err
-
-  let eval_tick rho tm =
-    match Tm.unleash tm with
-    | Tm.Up (hd, []) ->
-      begin
-        match hd with
-        | Tm.Ix (i, _) ->
-          begin
-            match Bwd.nth rho.cells i with
-            | `Tick tck -> tck
-            | cell ->
-              let err = UnexpectedEnvCell cell in
-              raise @@ E err
-          end
-        | Tm.Var info ->
-          TickGen (`Global info.name)
-        | _ ->
-          let err = ExpectedTickTerm tm in
-          raise @@ E err
-      end
-    | _ ->
-      let err = ExpectedTickTerm tm in
-      raise @@ E err
-
-
 
 
   let rec act_can phi con =
@@ -315,23 +275,6 @@ struct
           make @@ Up {ty; neu; sys}
       end
 
-    | Later clo ->
-      make @@ Later (TickClo.act phi clo)
-
-    | Next clo ->
-      make @@ Next (TickClo.act phi clo)
-
-    | DFix info ->
-      let ty = Value.act phi info.ty in
-      let clo = Clo.act phi info.clo in
-      make @@ DFix {ty; clo}
-
-    | DFixLine info ->
-      let r = I.act phi @@ `Atom info.x in
-      let ty = Value.act phi info.ty in
-      let clo = Clo.act phi info.clo in
-      make_dfix_line r ty clo
-
     | Data info ->
       let params = List.map (Env.act_env_el phi) info.params in
       make @@ Data {info with params}
@@ -358,16 +301,6 @@ struct
 
   and make_cons (a, b) =
     make @@ Cons (a, b)
-  and make_dfix_line r ty clo =
-    match r with
-    | `Atom x ->
-      make @@ DFixLine {x; ty; clo}
-    | `Dim0 ->
-      make @@ DFix {ty; clo}
-    | `Dim1 ->
-      let bdy = lazy begin inst_clo clo @@ make @@ DFix {ty; clo} end in
-      let tclo = TickCloConst bdy in
-      make @@ Next tclo
 
   and make_v phi r ty0 ty1 equiv : value =
     match r with
@@ -614,7 +547,7 @@ struct
   and rigid_coe dir abs el =
     let x, tyx = Abs.unleash1 abs in
     match unleash tyx with
-    | Pi _ | Sg _ | Ext _ | Later _ ->
+    | Pi _ | Sg _ | Ext _ ->
       make @@ Coe {dir; abs; el}
 
     | Up info ->
@@ -1275,14 +1208,6 @@ struct
       let v0 = eval_cmd rho cmd in
       eval (Env.snoc rho @@ `Val v0) t
 
-    | Tm.Later bnd ->
-      let tclo = TickClo {bnd; rho} in
-      make @@ Later tclo
-
-    | Tm.Next bnd ->
-      let tclo = TickClo {bnd; rho} in
-      make @@ Next tclo
-
     | Tm.Data info ->
       let params = List.map (fun tm -> `Val (eval rho tm)) info.params in
       make @@ Data {lbl = info.lbl; params}
@@ -1352,9 +1277,6 @@ struct
       let ty = eval rho info.ty in
       let sys = eval_rigid_bnd_sys rho info.sys in
       make_cap dir ty sys vhd
-    | Tm.Prev tick ->
-      let vtick = eval_tick rho tick in
-      prev vtick vhd
     | Tm.Elim info ->
       let mot = clo info.mot rho in
       let clauses = List.map (fun (lbl, nbnd) -> lbl, nclo nbnd rho) info.clauses in
@@ -1369,12 +1291,6 @@ struct
 
     | Tm.DownX _ ->
       failwith "eval_head/DownX"
-
-    | Tm.DFix info ->
-      let r = eval_dim rho info.r in
-      let ty = eval rho info.ty in
-      let clo = clo info.bdy rho in
-      make_dfix_line r ty clo
 
     | Tm.Coe info ->
       let r = eval_dim rho info.r in
@@ -1554,12 +1470,6 @@ struct
       raise @@ E (UnleashPiError v)
 
 
-  and unleash_later v =
-    match unleash v with
-    | Later clo -> clo
-    | _ ->
-      raise @@ E (UnleashLaterError v)
-
   and unleash_sg v =
     match unleash v with
     | Sg {dom; cod} -> dom, cod
@@ -1735,102 +1645,6 @@ struct
 
     | _ ->
       raise @@ E (ApplyUnexpectedCube vext)
-
-  and prev tick el =
-    match unleash el with
-    | Next tclo ->
-      inst_tick_clo tclo tick
-    | DFix dfix ->
-      begin
-        match tick with
-        | TickGen gen ->
-          let neu = Fix (gen, dfix.ty, dfix.clo) in
-          make @@ Up {ty = dfix.ty; neu; sys = []}
-      end
-    | DFixLine dfix ->
-      begin
-        match tick with
-        | TickGen gen ->
-          let neu = FixLine (dfix.x, gen, dfix.ty, dfix.clo) in
-          let sys =
-            let face0 =
-              let xi = Eq.gen_const dfix.x `Dim0 in
-              let phi = I.equate (`Atom dfix.x) `Dim0 in
-              let body =
-                lazy begin
-                  let ty = Value.act phi dfix.ty in
-                  let clo = Clo.act phi dfix.clo in
-                  let neu = Fix (gen, ty, clo) in
-                  (* check that this is right?? *)
-                  reflect ty neu []
-                end
-              in
-              Face.Indet (xi, body)
-            in
-            let face1 =
-              let xi = Eq.gen_const dfix.x `Dim1 in
-              let phi = I.equate (`Atom dfix.x) `Dim1 in
-              let body =
-                lazy begin
-                  let ty = Value.act phi dfix.ty in
-                  let clo = Clo.act phi dfix.clo in
-                  inst_clo clo @@ make @@ DFix {ty; clo}
-                end
-              in
-              Face.Indet (xi, body)
-            in
-            [face0; face1]
-          in
-          make @@ Up {ty = dfix.ty; neu; sys}
-      end
-
-    | Up info ->
-      let tclo = unleash_later info.ty in
-      let ty = inst_tick_clo tclo tick in
-      let prev_face =
-        Face.map @@ fun _ _ a ->
-        prev tick a
-      in
-      let prev_sys = List.map prev_face info.sys in
-      make @@ Up {ty; neu = Prev (tick, info.neu); sys = prev_sys}
-
-    | Coe info ->
-      (* EXPERIMENTAL !!! *)
-      let x, tyx = Abs.unleash1 info.abs in
-      let tclox = unleash_later tyx in
-      let cod_tick = inst_tick_clo tclox tick in
-      let abs = Abs.bind1 x cod_tick in
-      let el = prev tick info.el in
-      rigid_coe info.dir abs el
-
-    | HCom info ->
-      (* EXPERIMENTAL !!! *)
-      let tclo = unleash_later info.ty in
-      let ty = inst_tick_clo tclo tick in
-      let cap = prev tick info.cap in
-      let prev_face =
-        Face.map @@ fun _ _ abs ->
-        let x, v = Abs.unleash1 abs in
-        Abs.bind1 x @@ prev tick v
-      in
-      let sys = List.map prev_face info.sys in
-      rigid_hcom info.dir ty cap sys
-
-    | GHCom info ->
-      (* EXPERIMENTAL !!! *)
-      let tclo = unleash_later info.ty in
-      let ty = inst_tick_clo tclo tick in
-      let cap = prev tick info.cap in
-      let prev_face =
-        Face.map @@ fun _ _ abs ->
-        let x, v = Abs.unleash1 abs in
-        Abs.bind1 x @@ prev tick v
-      in
-      let sys = List.map prev_face info.sys in
-      rigid_ghcom info.dir ty cap sys
-
-    | _ ->
-      failwith "prev"
 
 
   (* the equation oracle `phi` is for continuations `ty0` and `equiv`
@@ -2141,14 +1955,6 @@ struct
       if Bwd.length nms != List.length vargs then failwith "inst_nclo: incorrect length";
       eval (Env.append info.rho vargs) tm
     | NCloConst v ->
-      Lazy.force v
-
-  and inst_tick_clo clo tick =
-    match clo with
-    | TickClo info ->
-      let Tm.B (_, tm) = info.bnd in
-      eval (Env.snoc info.rho @@ `Tick tick) tm
-    | TickCloConst v ->
       Lazy.force v
 
   and make_func ty0 ty1 : value =

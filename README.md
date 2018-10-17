@@ -30,8 +30,6 @@ and [cubicaltt](https://github.com/mortberg/cubicaltt).
 - user-defined (parametric) higher inductive types (indexed HITs not yet supported)
   based on the [work of Evan Cavallo and Bob Harper](https://arxiv.org/abs/1801.01568).
 
-- experimental support for Fitch-style modal guarded recursion: ▷
-
 - RedML, a (very) rudimentary tactic language
 
 

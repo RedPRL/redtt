@@ -1,13 +1,9 @@
 open RedBasis open Bwd open BwdNotation
 include DomainData
 
-let rec make : con -> value =
+let make : con -> value =
   fun con ->
     Node {con; action = I.idn}
-
-and make_later ty =
-  let tclo = TickCloConst (lazy ty) in
-  make @@ Later tclo
 
 let clo_name (Clo {bnd = Tm.B (nm, _); _}) =
   nm
@@ -18,8 +14,6 @@ let rec pp_env_cell fmt =
     pp_value fmt v
   | `Dim r ->
     I.pp fmt r
-  | `Tick _ ->
-    Format.fprintf fmt "<tick>"
 
 and pp_env_cells fmt cells =
   let pp_sep fmt () = Format.fprintf fmt " " in
@@ -75,14 +69,6 @@ and pp_con fmt : con -> unit =
   | Box info ->
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(box %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.cap pp_val_sys info.sys
-  | Later _clo ->
-    Format.fprintf fmt "<later>"
-  | Next _clo ->
-    Format.fprintf fmt "<next>"
-  | DFix _ ->
-    Format.fprintf fmt "<dfix>"
-  | DFixLine _ ->
-    Format.fprintf fmt "<dfix-line>"
   | Data info ->
     Uuseg_string.pp_utf_8 fmt info.lbl
   | Intro info ->
@@ -227,15 +213,6 @@ and pp_neu fmt neu =
 
   | RestrictForce neu ->
     Format.fprintf fmt "@[<1>(! %a)@]" pp_neu neu
-
-  | Prev _ ->
-    Format.fprintf fmt "<prev>"
-
-  | Fix _ ->
-    Format.fprintf fmt "<fix>"
-
-  | FixLine _ ->
-    Format.fprintf fmt "<fix-line>"
 
 and pp_elim_clauses fmt clauses =
   let pp_sep fmt () = Format.fprintf fmt "@ " in
@@ -437,26 +414,6 @@ struct
 
     | (Lvl _ | Var _ | Meta _) as neu ->
       neu
-
-    | Prev (tick, neu) ->
-      let neu = act phi neu in
-      Prev (tick, neu)
-
-    | Fix (tick, ty, clo) ->
-      let ty = Value.act phi ty in
-      let clo = Clo.act phi clo in
-      Fix (tick, ty, clo)
-
-    | FixLine (x, tick, ty, clo) ->
-      begin
-        match I.act phi (`Atom x) with
-        | `Atom y ->
-          let ty = Value.act phi ty in
-          let clo = Clo.act phi clo in
-          FixLine (y, tick, ty, clo)
-        | _ ->
-          raise TooMortal
-      end
 end
 
 and Nf : Sort with type t = nf with type 'a m = 'a =
@@ -622,8 +579,6 @@ struct
       `Val (Value.act phi v)
     | `Dim x ->
       `Dim (I.act phi x)
-    | `Tick tck ->
-      `Tick tck
 
   let act phi {cells; global} =
     {cells = Bwd.map (act_env_el phi) cells;
@@ -639,19 +594,6 @@ struct
     match clo with
     | Clo info ->
       Clo {info with rho = Env.act phi info.rho}
-end
-
-and TickClo : Sort with type t = tick_clo with type 'a m = 'a =
-struct
-  type t = tick_clo
-  type 'a m = 'a
-
-  let act phi clo =
-    match clo with
-    | TickClo info ->
-      TickClo {info with rho = Env.act phi info.rho}
-    | TickCloConst v ->
-      TickCloConst (lazy begin Value.act phi @@ Lazy.force v end)
 end
 
 and NClo : Sort with type t = nclo with type 'a m = 'a =
