@@ -824,8 +824,6 @@ struct
       | `ExtApp dim ->
         bite_dims_from_spine spine <<@> fun (spine, dims) ->
           spine, `ExtApp (Bwd.to_list @@ dims #< dim)
-      | `Prev e ->
-        M.ret (spine, `Prev e)
       | `Fst ->
         M.ret (spine, `Fst)
       | `Snd ->

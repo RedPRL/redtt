@@ -107,11 +107,6 @@ and econ =
 
   | V of {x : string; ty0 : eterm; ty1 : eterm; equiv : eterm}
 
-  | Shut of eterm
-
-  | DFixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
-  | FixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
-
   | Cut of eterm * frame list
 
   | Refl
