@@ -375,6 +375,12 @@ mltoplevel:
     { let name, desc = decl in
       {rest with con = MlBind (E.MlDeclData {visibility; name; desc}, `User name, rest.con)} }
 
+  | path = IMPORT; rest = mltoplevel
+    { {rest with con = E.mlbind (E.MlImport (`Private, path)) @@ fun _ -> rest.con} }
+
+  | PUBLIC; path = IMPORT; rest = mltoplevel
+    { {rest with con = E.mlbind (E.MlImport (`Public, path)) @@ fun _ -> rest.con} }
+
   | QUIT; rest = mltoplevel
     { {rest with con = E.MlRet (E.MlTuple [])} }
 
