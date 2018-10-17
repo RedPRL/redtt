@@ -149,23 +149,13 @@ let update_env e =
      per_process =
        {env = GlobalEnv.define st.per_process.env nm ty t;
         info = Map.add nm `Rigid st.per_process.info};
-     resenv =
-       begin
-         match Name.name nm with
-         | Some str -> ResEnv.named_metavar ~visibility str nm st.resenv
-         | None -> st.resenv
-       end}
+     resenv = ResEnv.register_metavar ~visibility nm st.resenv}
   | E (nm, ty, Defn (visibility, `Opaque, _)) ->
     {st with
      per_process =
        {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty;
         info = Map.add nm `Rigid st.per_process.info};
-     resenv =
-       begin
-         match Name.name nm with
-         | Some str -> ResEnv.named_metavar ~visibility str nm st.resenv
-         | None -> st.resenv
-       end}
+     resenv = ResEnv.register_metavar ~visibility nm st.resenv}
   | _ ->
     st
 
@@ -174,8 +164,7 @@ let declare_datatype visibility dlbl desc =
   {st with
    per_process =
      {st.per_process with env = GlobalEnv.declare_datatype dlbl desc st.per_process.env};
-   resenv = ResEnv.datatype visibility dlbl st.resenv
-  }
+   resenv = ResEnv.register_datatype visibility dlbl st.resenv}
 
 let replace_datatype dlbl desc =
   modify @@ fun st ->
@@ -252,13 +241,7 @@ let resolver =
     | Emp -> renv
     | Snoc (psi, (x, _)) ->
       let renv = go_locals renv psi in
-      begin
-        match Name.name x with
-        | Some str ->
-          ResEnv.named_var `Private str x renv
-        | None ->
-          renv
-      end
+      ResEnv.register_var `Private x renv
   in
 
   get >>= fun st ->
