@@ -1,11 +1,9 @@
 open RedBasis
 open Bwd
 open Domain
+open Combinators
 
 include ValSig
-
-let flip f x y = f y x
-
 
 type error =
   | UnexpectedEnvCell of env_el
@@ -21,7 +19,6 @@ type error =
   | SigmaProjUnexpectedArgument of string * value
   | RigidVProjUnexpectedArgument of atom * value
   | RigidCapUnexpectedArgument of value
-  | LblCallUnexpectedArgument of value
   | UnexpectedDimensionTerm of Tm.tm
   | UnexpectedTickTerm of Tm.tm
   | UnleashDataError of value
@@ -31,7 +28,6 @@ type error =
   | UnleashVError of value
   | UnleashLaterError of value
   | UnleashRestrictError of value
-  | UnleashLblTyError of value
   | UnleashFHComError of value
   | ForcedUntrueRestriction of val_face
   | ForcedUnexpectedRestriction of value
@@ -82,10 +78,6 @@ struct
     | RigidCapUnexpectedArgument v ->
       Format.fprintf fmt
         "Unexpected argument to rigid cap:@ %a."
-        pp_value v
-    | LblCallUnexpectedArgument v ->
-      Format.fprintf fmt
-        "Unexpected argument to labeled type projection:@ %a."
         pp_value v
     | UnexpectedEnvCell cell ->
       Format.fprintf fmt
@@ -138,10 +130,6 @@ struct
     | UnleashFHComError v ->
       Format.fprintf fmt
         "Tried to unleash %a as formal homogeneous composition."
-        pp_value v
-    | UnleashLblTyError v ->
-      Format.fprintf fmt
-        "Tried to unleash %a as labeled type."
         pp_value v
     | ForcedUntrueRestriction face ->
       Format.fprintf fmt
@@ -315,12 +303,6 @@ struct
 
     | Cons (v0, v1) ->
       make @@ Cons (Value.act phi v0, Value.act phi v1)
-
-    | LblTy {lbl; ty; args} ->
-      make @@ LblTy {lbl; ty = Value.act phi ty; args = List.map (Nf.act phi) args}
-
-    | LblRet v ->
-      make @@ LblRet (Value.act phi v)
 
     | Up info ->
       let sys = ValSys.act phi @@ ValSys.from_rigid info.sys in
@@ -1089,14 +1071,13 @@ struct
       in
       let el1 =
         let hcom phi x_dest ty = make_hcom (Dir.make (I.act phi r) x_dest) ty (Value.act phi cap) (CompSys.act phi sys) in
+        let func = do_fst equiv in
+        let el1_cap = rigid_vproj x ~func ~el:cap in
         let face0 =
           AbsFace.gen_const I.idn x `Dim0 @@ fun phi ->
           Abs.make1 @@ fun y ->
-          apply (do_fst (Value.act phi equiv)) @@
-          hcom phi (`Atom y) ty0 (* ty0 is already under `phi0` *)
+          apply func @@ hcom phi (`Atom y) ty0 (* ty0 is already under `phi0` *)
         in
-        let func = do_fst equiv in
-        let el1_cap = rigid_vproj x ~func ~el:cap in
         let el1_sys =
           let face =
             Face.map @@ fun ri r'i absi ->
@@ -1294,14 +1275,6 @@ struct
       let v0 = eval_cmd rho cmd in
       eval (Env.snoc rho @@ `Val v0) t
 
-    | Tm.LblTy info ->
-      let ty = eval rho info.ty in
-      let args = List.map (fun (ty, tm) -> {ty = eval rho ty; el = eval rho tm}) info.args in
-      make @@ LblTy {lbl = info.lbl; ty; args}
-
-    | Tm.LblRet t ->
-      make @@ LblRet (eval rho t)
-
     | Tm.Later bnd ->
       let tclo = TickClo {bnd; rho} in
       make @@ Later tclo
@@ -1356,8 +1329,6 @@ struct
 
   and eval_frame rho vhd =
     function
-    | Tm.LblCall ->
-      lbl_call vhd
     | Tm.RestrictForce ->
       restriction_force vhd
     | Tm.FunApp t ->
@@ -1609,34 +1580,12 @@ struct
     | _ ->
       raise @@ E (UnleashVError v)
 
-  and unleash_lbl_ty v =
-    match unleash v with
-    | LblTy {lbl; args; ty} ->
-      lbl, args, ty
-    | _ ->
-      raise @@ E (UnleashLblTyError v)
-
   and unleash_restriction_ty v =
     match unleash v with
     | Restrict face ->
       face
     | _ ->
       raise @@ E (UnleashRestrictError v)
-
-  and lbl_call v =
-    match unleash v with
-    | LblRet v -> v
-    | Up info ->
-      let _, _, ty = unleash_lbl_ty info.ty in
-      let call = LblCall info.neu in
-      let call_face =
-        Face.map @@ fun _ _ a ->
-        lbl_call a
-      in
-      let call_sys = List.map call_face info.sys in
-      make @@ Up {ty; neu = call; sys = call_sys}
-    | _ ->
-      raise @@ E (LblCallUnexpectedArgument v)
 
   and restriction_force v =
     match unleash v with

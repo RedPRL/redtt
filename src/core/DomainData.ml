@@ -37,8 +37,6 @@ type con =
   | Cons of value * value
 
   | Up of {ty : value; neu : neu; sys : rigid_val_sys}
-  | LblTy of {lbl : string; args : nf list; ty : value}
-  | LblRet of value
 
   | Later of tick_clo
   | Next of tick_clo
@@ -80,7 +78,6 @@ and neu =
   | VProj of {x : atom; func : nf; neu : neu}
   | Cap of {dir : dir; ty : value; sys : comp_sys; neu : neu}
 
-  | LblCall of neu
   | RestrictForce of neu
 
   | Prev of tick * neu

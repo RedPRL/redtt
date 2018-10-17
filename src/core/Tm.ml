@@ -113,10 +113,6 @@ let rec con_info =
     Info.mergen [tm_info t0; tm_info t1]
   | Box {r; r'; cap; sys} ->
     Info.mergen [tm_info r; tm_info r'; tm_info cap; sys_info tm_info sys]
-  | LblTy {args; ty; _} ->
-    Info.mergen @@ tm_info ty :: List.map (pair_info tm_info tm_info) args
-  | LblRet t ->
-    tm_info t
   | Up cmd ->
     cmd_info cmd
   | Let (cmd, bnd) ->
@@ -149,7 +145,7 @@ and head_info =
 
 and frame_info =
   function
-  | Fst | Snd | LblCall | RestrictForce ->
+  | Fst | Snd | RestrictForce ->
     Info.init
   | FunApp t ->
     tm_info t
@@ -324,15 +320,6 @@ struct
       let sys = traverse_list traverse_face info.sys in
       Box {r; r'; cap; sys}
 
-    | LblTy info ->
-      let args = traverse_list (traverse_pair traverse_tm traverse_tm) info.args in
-      let ty = traverse_tm info.ty in
-      LblTy {info with args; ty}
-
-    | LblRet t ->
-      let t' = traverse_tm t in
-      LblRet t'
-
     | Later bnd ->
       let bnd' = traverse_bnd traverse_tm bnd in
       Later bnd'
@@ -491,7 +478,7 @@ struct
 
   and traverse_frame =
     function
-    | (Fst | Snd | LblCall | RestrictForce as frm) ->
+    | (Fst | Snd | RestrictForce as frm) ->
       frm
 
     | FunApp t ->
@@ -877,24 +864,6 @@ let rec pp env fmt =
     | FHCom {r; r'; cap; sys} ->
       Format.fprintf fmt "@[<hv1>(fhcom %a %a@ %a@ @[%a@])@]" (pp env) r (pp env) r' (pp env) cap (pp_bsys env) sys
 
-    | LblTy {lbl; args; ty} ->
-      begin
-        match args with
-        | [] ->
-          Format.fprintf fmt "@[<hv1>{%a : %a}@]"
-            Uuseg_string.pp_utf_8 lbl
-            (pp env) ty
-        | _ ->
-          Format.fprintf fmt "@[<hv1>{%a %a : %a}@]"
-            Uuseg_string.pp_utf_8 lbl
-            (pp_lbl_args env) args
-            (pp env) ty
-      end
-
-    | LblRet t ->
-      Format.fprintf fmt "@[<hv1>(ret@ %a)@]"
-        (pp env) t
-
     | Cons (tm0, tm1) ->
       Format.fprintf fmt "@[<hv1>(pair@ %a@ %a)@]" (pp env) tm0 (pp env) tm1
 
@@ -1027,8 +996,6 @@ and pp_cmd env fmt (hd, sp) =
       | Cap _ ->
         (* FIXME *)
         Format.fprintf fmt "@<cap>"
-      | LblCall ->
-        Format.fprintf fmt "@[<hv1>(call@ %a)@]" (go `Call) sp
       | RestrictForce ->
         Format.fprintf fmt "@[<hv1>(force@ %a)@]" (go `Force) sp
       | Prev tick ->
@@ -1085,8 +1052,6 @@ and pp_frame env fmt =
     Format.fprintf fmt "@[<hov1>(vproj %a %a)@]" (pp env) info.r (pp env) info.func
   | Cap _ ->
     Format.fprintf fmt "<cap>"
-  | LblCall ->
-    Format.fprintf fmt "lblcall"
   | RestrictForce ->
     Format.fprintf fmt "restrict-force"
   | Prev _ ->
@@ -1180,6 +1145,10 @@ let path ty tm0 tm1 =
   let face1 = up (ix 0), make Dim1, Some (subst (Shift 1) tm1) in
   let sys = [face0; face1] in
   make @@ Ext (NB (Emp #< None, (ty', sys)))
+
+let refl tm =
+  let tm' = subst (Shift 1) tm in
+  make @@ ExtLam (NB (Emp #< None, tm'))
 
 let fiber ~ty0 ~ty1 ~f ~x =
   sg (Some "ix") ty0 @@
@@ -1363,7 +1332,7 @@ let map_head f =
 
 let map_frame f =
   function
-  | (Fst | Snd | LblCall | RestrictForce) as frm ->
+  | (Fst | Snd | RestrictForce) as frm ->
     frm
   | FunApp t ->
     FunApp (f t)
@@ -1417,8 +1386,6 @@ let map_tmf f =
     Data {lbl; params}
   | Cons (t0, t1) ->
     Cons (f t0, f t1)
-  | LblRet t ->
-    LblRet (f t)
   | FHCom info ->
     let r = f info.r in
     let r' = f info.r' in
@@ -1456,10 +1423,6 @@ let map_tmf f =
     let cap = f info.cap in
     let sys = map_tm_sys f info.sys in
     Box {r; r'; cap; sys}
-  | LblTy info ->
-    let ty = f info.ty in
-    let args = List.map (fun (t0, t1) -> f t0, f t1) info.args in
-    LblTy {info with ty; args}
   | Later bnd ->
     let bnd = map_bnd f bnd in
     Later bnd

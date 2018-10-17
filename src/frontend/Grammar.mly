@@ -42,7 +42,7 @@
 %token RIGHT_ARROW RIGHT_TACK
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM TICK
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN CALL V VPROJ VIN NEXT PREV FIX DFIX REFL
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN V VPROJ VIN NEXT PREV FIX DFIX REFL
 %token PUBLIC PRIVATE OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
 %token META
@@ -685,11 +685,6 @@ cut:
     { fun env ->
       let hd, fs = e env in
       hd, fs #< Tm.Snd }
-
-  | LPR; CALL; e = cut; RPR
-    { fun env ->
-      let hd, fs = e env in
-      hd, fs #< Tm.LblCall }
 
   | LPR; PREV; t = tm; e = cut; RPR
     { fun env ->

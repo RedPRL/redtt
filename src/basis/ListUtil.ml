@@ -1,3 +1,8 @@
+let is_nil =
+  function
+  | [] -> true
+  | _ -> false
+
 let rec split n xs =
   match n, xs with
   | 0, _ ->
@@ -7,6 +12,12 @@ let rec split n xs =
     x :: ys, zs
   | _ ->
     failwith "ListUtil.take"
+
+let rec flat_map f xs =
+  match xs with
+  | [] -> []
+  | x :: xs ->
+    f x @ flat_map f xs
 
 let rec index_of pred xs =
   match xs with
@@ -49,3 +60,4 @@ let rec find_map_opt f xs =
     | None -> find_map_opt f xs
 
 let foreach l f = List.map f l
+let foreach2 l0 l1 f = List.map2 f l0 l1

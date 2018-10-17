@@ -197,8 +197,6 @@ let add_constr desc constr =
   in
   {desc with body = go desc.body}
 
-let flip f x y = f y x
-
 let rec dim_specs constr =
   match constr with
   | TNil _ -> []

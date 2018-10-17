@@ -40,7 +40,19 @@ struct
     match xs with
     | Emp -> false
     | Snoc (xs, x) ->
-      if a = x then true else mem a xs
+      a = x || (mem[@tailcall]) a xs
+
+  let rec exists p xs =
+    match xs with
+    | Emp -> false
+    | Snoc (xs, x) ->
+      p x || (exists[@tailcall]) p xs
+
+  let rec for_all p xs =
+    match xs with
+    | Emp -> true
+    | Snoc (xs, x) ->
+      p x && (for_all[@tailcall]) p xs
 
   let rec length =
     function
@@ -73,17 +85,33 @@ struct
       let xs' = filter f xs in
       if f x then Snoc (xs', x) else xs'
 
-  let rec exists f =
+  let rec fold_left f e =
     function
-    | Emp -> false
+    | Emp -> e
     | Snoc (xs, x) ->
-      if f x then true else exists f xs
+      f (fold_left f e xs) x
 
+  let rec fold_right f l e =
+    match l with
+    | Emp -> e
+    | Snoc (l, x) ->
+      let e = f x e in
+      (fold_right[@tailcall]) f l e
+
+  let rec fold_right2 f l0 l1 e =
+    match l0, l1 with
+    | Emp, Emp -> e
+    | Snoc (l0, x0), Snoc (l1, x1) ->
+      let e = f x0 x1 e in
+      (fold_right2[@tailcall]) f l0 l1 e
+    | _ -> raise @@ Invalid_argument "Bwd.fold_right2"
   let to_list xs =
     xs <>> []
 
   let from_list xs =
     Emp <>< xs
 
-  let rev xs = from_list @@ List.rev @@ to_list xs
+  (* favonia: the following is considered ILL-TYPED!
+   *
+   * let rev xs = from_list @@ List.rev @@ to_list xs *)
 end
