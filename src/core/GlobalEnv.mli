@@ -8,6 +8,7 @@ type entry =
   | `Def of ty * tm
   | `Tw of ty * ty
   | `I
+  | `Data of Desc.desc
   ]
 
 val emp : unit -> t
@@ -18,9 +19,9 @@ val ext_dim : t -> Name.t -> t
 val restrict : Tm.tm -> Tm.tm -> t -> t
 
 
-val declare_datatype : string -> Desc.desc -> t -> t
-val replace_datatype : string -> Desc.desc -> t -> t (* [Not_found] if the datatype is not there *)
-val lookup_datatype : string -> t ->Desc.desc
+val declare_datatype : Name.t -> Desc.desc -> t -> t
+val replace_datatype : Name.t -> Desc.desc -> t -> t (* [Not_found] if the datatype is not there *)
+val lookup_datatype : Name.t -> t -> Desc.desc
 
 module T : module type of (Map.Make (Name))
 

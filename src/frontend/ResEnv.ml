@@ -5,14 +5,14 @@ open RedTT_Core
 type global =
   [ `Var of Name.t
   | `Metavar of Name.t
-  | `Datatype of string
+  | `Datatype of Name.t
   ]
 
 type resolution =
   [ `Ix of int
   | `Var of Name.t
   | `Metavar of Name.t
-  | `Datatype of string
+  | `Datatype of Name.t
   ]
 
 type visibility =
@@ -68,18 +68,23 @@ let get x renv =
       failwith @@ "Could not resolve variable: " ^ x
 
 
-
-let named_var ~visibility s x renv =
+let set_global_ s x renv =
   {renv with
-   globals = T.set s (`Var x, visibility) renv.globals}
+   globals = T.set s x renv.globals}
 
-let named_metavar ~visibility s x renv =
-  {renv with
-   globals = T.set s (`Metavar x, visibility) renv.globals}
+let set_global nm x renv =
+  match Name.name nm with
+  | Some str -> set_global_ str x renv
+  | None -> renv
 
-let datatype ~visibility s renv =
-  {renv with
-   globals = T.set s (`Datatype s, visibility) renv.globals}
+let register_var ~visibility nm =
+  set_global nm (`Var nm, visibility)
+
+let register_metavar ~visibility nm =
+  set_global nm (`Metavar nm, visibility)
+
+let register_datatype ~visibility nm =
+  set_global nm (`Datatype nm, visibility)
 
 let import_globals ~visibility imported renv =
   {renv with

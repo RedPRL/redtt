@@ -29,7 +29,7 @@ and mlcmd =
   | MlElab of eterm
   | MlElabWithScheme of escheme * eterm
   | MlCheck of {ty : mlval; tm : mlval}
-  | MlDeclData of {visibility : ResEnv.visibility; name : string; desc : edesc}
+  | MlDeclData of {visibility : ResEnv.visibility; name : mlval; desc : edesc}
   | MlDefine of {visibility : ResEnv.visibility; name : mlval; opacity : [`Opaque | `Transparent]; ty : mlval; tm : mlval}
   | MlSplit of mlval * mlname list * mlcmd
   | MlUnify

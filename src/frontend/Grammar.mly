@@ -358,8 +358,9 @@ mltoplevel:
       {rest with con = MlBind (E.define ~visibility ~name ~opacity ~scheme:sch ~tm, `User a, rest.con)} }
 
   | visibility = data_modifiers; decl = data_decl; rest = mltoplevel
-    { let name, desc = decl in
-      {rest with con = MlBind (E.MlDeclData {visibility; name; desc}, `User name, rest.con)} }
+    { let a, desc = decl in
+      let name = E.MlRef (Name.named (Some a)) in
+      {rest with con = MlBind (E.MlDeclData {visibility; name; desc}, `User a, rest.con)} }
 
   | path = IMPORT; rest = mltoplevel
     { {rest with con = E.mlbind (E.MlImport (`Private, path)) @@ fun _ -> rest.con} }
@@ -417,7 +418,8 @@ atomic_mlcmd:
 
   | LLGL; visibility = data_modifiers; decl = data_decl; RRGL
     { let name, desc = decl in
-    E.MlDeclData {visibility; name; desc} }
+      let name = E.MlRef (Name.named (Some name)) in
+      E.MlDeclData {visibility; name; desc} }
 
   | LLGL; modifiers = def_modifiers; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); RRGL
     { let name = E.MlRef (Name.named (Some a)) in
@@ -587,12 +589,12 @@ tm:
   | LPR; DATA; dlbl = ATOM; RPR
     { fun _ ->
       make_node $startpos $endpos @@
-      Tm.Data {lbl = dlbl; params = []} }
+      Tm.Data {lbl = Name.named (Some dlbl); params = []} }
 
   | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      Tm.Intro (dlbl, clbl, [], es env) }
+      Tm.Intro (Name.named (Some dlbl), clbl, [], es env) }
 
   | e = cmd
     { fun env ->

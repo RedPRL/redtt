@@ -6,41 +6,41 @@ type entry =
   | `Def of ty * tm
   | `Tw of ty * ty
   | `I
+  | `Data of Desc.desc
   ]
 
 module T = Map.Make (Name)
-module StringTable = Map.Make (String)
 
 type t =
   {rel : Restriction.t;
-   data_decls : Desc.desc StringTable.t;
    table : entry T.t;
    len : int}
 
 
 let emp () =
   {table = T.empty;
-   data_decls = StringTable.empty;
    rel = Restriction.emp ();
    len = 0}
 
 
 let declare_datatype dlbl desc (sg : t) : t =
   {sg with
-   data_decls = StringTable.add dlbl desc sg.data_decls}
+   table = T.add dlbl (`Data desc) sg.table;
+   len = sg.len + 1}
 
 let replace_datatype dlbl desc (sg : t) : t =
   {sg with
-   data_decls = StringTable.update dlbl (function None -> raise Not_found | Some _ -> Some desc) sg.data_decls}
+   table = T.update dlbl (function Some (`Data _) -> Some (`Data desc) | _ -> raise Not_found) sg.table}
 
 let lookup_datatype dlbl sg =
-  try
-    StringTable.find dlbl sg.data_decls
-  with
+  match T.find dlbl sg.table with
+  | `Data desc -> desc
   | _ ->
-    Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-    Format.eprintf "@.";
-    failwith ("Datatype not found: " ^ dlbl)
+    Format.eprintf "Name %a does not refer to a datatype.@." Name.pp dlbl;
+    raise Not_found
+  | exception Not_found ->
+    Format.eprintf "Datatype not found: %a.@." Name.pp dlbl;
+    raise Not_found
 
 let ext_ (sg : t) nm param : t =
   {sg with
@@ -76,6 +76,7 @@ let lookup_ty sg nm tw =
   | `Def (a, _), _ -> a
   | `Tw (a, _), `TwinL -> a
   | `Tw (_, a), `TwinR -> a
+  | `Data info, _ -> Tm.univ ~kind:info.kind ~lvl:info.lvl
   | _ -> failwith "GlobalEnv.lookup_entry"
 
 let lookup sg nm =
@@ -105,7 +106,7 @@ let pp fmt sg =
     | `Tw _ ->
       Format.fprintf fmt "%a[twin]"
         Name.pp nm
-    | (`I | `P _ | `Def _) ->
+    | (`I | `P _ | `Def _ | `Data _) ->
       Format.fprintf fmt "%a"
         Name.pp nm
   in

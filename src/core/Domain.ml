@@ -70,7 +70,7 @@ and pp_con fmt : con -> unit =
     let r, r' = Dir.unleash info.dir in
     Format.fprintf fmt "@[<1>(box %a %a@ %a@ %a)@]" I.pp r I.pp r' pp_value info.cap pp_val_sys info.sys
   | Data info ->
-    Uuseg_string.pp_utf_8 fmt info.lbl
+    Name.pp fmt info.lbl
   | Intro info ->
     Format.fprintf fmt "@[<hv1>(%a %a)@]"
       Uuseg_string.pp_utf_8 info.clbl
@@ -197,7 +197,7 @@ and pp_neu fmt neu =
 
   | Elim info ->
     Format.fprintf fmt "@[<hv1>(%a.elim@ %a)@]"
-      Uuseg_string.pp_utf_8 info.dlbl
+      Name.pp info.dlbl
       (* pp_clo info.mot *)
       pp_neu info.neu
   (* pp_elim_clauses info.clauses *)

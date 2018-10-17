@@ -67,15 +67,15 @@ sig
   val quote_neu : env -> neu -> Tm.tm Tm.cmd
   val quote_ty : env -> value -> Tm.tm
   val quote_val_sys : env -> value -> val_sys -> (Tm.tm, Tm.tm) Tm.system
-  val equate_data_params : env -> string -> Desc.body -> env_el list -> env_el list -> Tm.tm list
-  val quote_data_params : env -> string -> Desc.body -> env_el list -> Tm.tm list
+  val equate_data_params : env -> Name.t -> Desc.body -> env_el list -> env_el list -> Tm.tm list
+  val quote_data_params : env -> Name.t -> Desc.body -> env_el list -> Tm.tm list
 
   val quote_dim : env -> I.t -> Tm.tm
 
   val equiv : env -> ty:value -> value -> value -> unit
   val equiv_ty : env -> value -> value -> unit
   val equiv_dim : env -> I.t -> I.t -> unit
-  val equiv_data_params : env -> string -> Desc.body -> env_el list -> env_el list -> unit
+  val equiv_data_params : env -> Name.t -> Desc.body -> env_el list -> env_el list -> unit
   val subtype : env -> value -> value -> unit
 
   val approx_restriction : env -> value -> value -> val_sys -> val_sys -> unit
@@ -86,7 +86,7 @@ end
 type error =
   | UnequalNf of {env : Env.t; ty : value; el0 : value; el1 : value}
   | UnequalNeu of {env : Env.t; neu0 : neu; neu1 : neu}
-  | UnequalLbl of string * string
+  | UnequalLbl of Name.t * Name.t
   | UnequalDim of I.t * I.t
 
 let pp_error fmt =
@@ -105,9 +105,9 @@ let pp_error fmt =
 
   | UnequalLbl (lbl0, lbl1) ->
     Format.fprintf fmt "@[<hv>%a@ %a@ %a@]"
-      Uuseg_string.pp_utf_8 lbl0
+      Name.pp lbl0
       Uuseg_string.pp_utf_8 "≠"
-      Uuseg_string.pp_utf_8 lbl1
+      Name.pp lbl1
 
   | UnequalDim (r0, r1) ->
     Format.fprintf fmt "@[<hv>Dimensions@ %a@ %a@ %a@]"
