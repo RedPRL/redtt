@@ -521,13 +521,6 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       let cod1 = V.inst_clo cod1 @@ Cx.eval_cmd cx (Tm.Var {name = x1; twin = tw1; ushift = 0}, sp1 <>> [Tm.Fst]) in
       ret (cod0, cod1)
 
-    | Snoc (sp0, Tm.LblCall), Snoc (sp1, Tm.LblCall) ->
-      go sp0 sp1 >>= fun (ty0, ty1) ->
-      evaluator >>= fun (_, (module V)) ->
-      let _, _, ty0 = V.unleash_lbl_ty ty0 in
-      let _, _, ty1 = V.unleash_lbl_ty ty1 in
-      ret (ty0, ty1)
-
 
     (* TODO: Elim *)
 
@@ -773,11 +766,6 @@ let rec split_sigma tele x ty =
 
 let rec lower tele alpha ty =
   match Tm.unleash ty with
-  | Tm.LblTy info ->
-    hole `Flex tele info.ty @@ fun t ->
-    define tele alpha `Private `Transparent ~ty @@ Tm.make @@ Tm.LblRet (Tm.up t) >>
-    ret true
-
   | Tm.Sg (dom, Tm.B (nm, cod)) ->
     hole `Flex tele dom @@ fun t0 ->
     let cod' = Tm.let_ nm t0 cod in

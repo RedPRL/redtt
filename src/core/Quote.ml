@@ -209,12 +209,6 @@ struct
           Tm.make @@ Tm.RestrictThunk (tr, tr', Some tm)
       end
 
-    | LblTy {ty; _}, _, _ ->
-      let call0 = lbl_call el0 in
-      let call1 = lbl_call el1 in
-      let qcall = equate env ty call0 call1 in
-      Tm.make @@ Tm.LblRet qcall
-
     | V info, _, _ ->
       let tr = quote_dim env @@ `Atom info.x in
       let phi_r0 = I.equate `Dim0 (`Atom info.x) in
@@ -306,17 +300,6 @@ struct
       let equiv_ty = V.Macro.equiv info0.ty0 info1.ty1 in
       let equiv = equate env equiv_ty info0.equiv info1.equiv in
       Tm.make @@ Tm.V {r = tr; ty0; ty1; equiv}
-
-    | _, LblTy info0, LblTy info1 ->
-      if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
-        let ty = equate env ty info0.ty info1.ty in
-        let go_arg (nf0, nf1) =
-          let ty = equate_ty env nf0.ty nf1.ty in
-          let tm = equate env nf0.ty nf0.el nf1.el in
-          ty, tm
-        in
-        let args = List.map go_arg @@ List.combine info0.args info1.args in
-        Tm.make @@ Tm.LblTy {lbl = info0.lbl; ty; args}
 
     | _, FHCom fhcom0, FHCom fhcom1 ->
       let tr, tr' = equate_dir env fhcom0.dir fhcom1.dir in
@@ -599,9 +582,6 @@ struct
       let frame = Tm.Cap {r = tr; r' = tr'; ty; sys} in
       equate_neu_ env cap0.neu cap1.neu @@ frame :: stk
 
-    | LblCall neu0, LblCall neu1 ->
-      equate_neu_ env neu0 neu1 @@ Tm.LblCall :: stk
-
     | RestrictForce neu0, RestrictForce neu1 ->
       equate_neu_ env neu0 neu1 @@ Tm.RestrictForce :: stk
 
@@ -859,17 +839,6 @@ struct
       let sys1' = map_sys face sys1 in
       fancy_subtype envxs ty0x (sys0x @ sys0') ty1x (sys1x @ sys1')
 
-
-    | LblTy info0, LblTy info1 ->
-      if info0.lbl != info1.lbl then failwith "Labelled type mismatch" else
-        let sys0 = map_sys (fun _ _ -> lbl_call) sys0 in
-        let sys1 = map_sys (fun _ _ -> lbl_call) sys1 in
-        fancy_subtype env info0.ty sys0 info1.ty sys1;
-        let go_arg (nf0, nf1) =
-          equiv_ty env nf0.ty nf1.ty;
-          equiv env ~ty:nf0.ty nf0.el nf1.el
-        in
-        List.iter go_arg @@ List.combine info0.args info1.args
 
     | Univ info0, Univ info1 ->
       if Kind.lte info0.kind info1.kind && Lvl.lte info0.lvl info1.lvl then
