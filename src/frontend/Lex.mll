@@ -130,10 +130,6 @@ rule token = parse
     { COMMA }
   | '.'
     { DOT }
-  | ":>"
-    { TRIANGLE_RIGHT }
-  | "▷"
-    { TRIANGLE_RIGHT }
   | '='
     { EQUALS }
   | "->"
