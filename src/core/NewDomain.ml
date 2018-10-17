@@ -384,11 +384,6 @@ struct
       let sys = eval_tm_sys rel env info.sys in
       Con.make_box rel r r' ~cap ~sys
 
-    | Tm.Later _ ->
-      raise CanJonHelpMe
-    | Tm.Next _ ->
-      raise CanJonHelpMe
-
     | Tm.Data info ->
       let desc = GlobalEnv.lookup_datatype info.lbl env.globals in
       let strict = Desc.is_strict_set desc in
