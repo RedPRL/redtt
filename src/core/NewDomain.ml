@@ -107,8 +107,8 @@ type con =
 
   | FortyTwo (* a dummy filler to signal that something might be terribly wrong *)
 
-  | Data of {lbl : string; strict : bool; params : cell list; constrs : GlobalEnv.t * Desc.constrs}
-  | Intro of {dlbl : string; clbl : string; args : constr_cell list; sys : con sys}
+  | Data of {lbl : Name.t; strict : bool; params : cell list; constrs : GlobalEnv.t * Desc.constrs}
+  | Intro of {dlbl : Name.t; clbl : string; args : constr_cell list; sys : con sys}
 
 
 and value = con Delayed.t
@@ -835,7 +835,7 @@ sig
   val make_box : rel -> dim -> dim -> cap:value -> sys:con sys -> con
 
   (** invariant: [args] is [rel]-value, but [sys] might not be rigid *)
-  val make_intro : rel -> dlbl:string -> clbl:string -> args:constr_cell list -> sys:con sys -> con
+  val make_intro : rel -> dlbl:Name.t -> clbl:string -> args:constr_cell list -> sys:con sys -> con
 end =
 struct
   module ConFace = Face (Con)
