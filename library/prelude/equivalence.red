@@ -2,16 +2,6 @@ import prelude.path
 import prelude.connection
 import prelude.hlevel
 
--- retracts
-
-def is-section (A B : type) (f : A → B) : type =
-  (g : B → A) × (a : A) → path A (g (f a)) a
-
-def retract (A B : type) : type =
-  (f : A → B) × is-section A B f
-
--- equivalences
-
 def fiber (A B : type) (f : A → B) (b : B) : type =
   (a : _) × path _ (f a) b
 

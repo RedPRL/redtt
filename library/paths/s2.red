@@ -13,20 +13,16 @@ data os2 where
 
 -- I. the loop of automorphisms of os2
 
--- for the definition of s2/decode, it is convenient to use an id-equiv where
--- both inverses are reflexivities
-def id-equiv/wc : (B : type) → equiv B B = id-equiv/weak-connection
-
 -- it would probably be more efficient to define this directly,
 -- but we don't need it
-def oloop-equiv : path (equiv os2 os2) (id-equiv/wc os2) (id-equiv/wc os2) =
+def oloop-equiv : path (equiv os2 os2) (id-equiv/weak-connection os2) (id-equiv/weak-connection os2) =
   λ i →
   ( λ o → oloop o i
   , prop→prop-over
     (λ j → is-equiv os2 os2 (λ o → oloop o j))
     (is-equiv/prop/direct os2 os2 (λ o → o))
-    (id-equiv/wc os2 .snd)
-    (id-equiv/wc os2 .snd)
+    (id-equiv/weak-connection os2 .snd)
+    (id-equiv/weak-connection os2 .snd)
     i
   )
 
@@ -52,7 +48,7 @@ def onegloop-oloop (o : os2)
 
 def s2/code/surf/filler (m i j : 𝕀) : type =
   comp 0 m os2 [
-  | ∂[i] | j=0 → ua os2 os2 (id-equiv/wc os2)
+  | ∂[i] | j=0 → ua os2 os2 (id-equiv/weak-connection os2)
   | j=1 → ua os2 os2 (oloop-equiv i)
   ]
 
@@ -143,5 +139,5 @@ def s2/decode-encode/base
 
 -- VII. characterization of the loop space
 
-def s2/loop-space-equiv : equiv (path s2 base base) os2 =
+def Ω1s2/equiv : equiv (path s2 base base) os2 =
   iso→equiv _ _ (s2/encode base, s2/decode base, s2/encode-decode/base, s2/decode-encode/base)
