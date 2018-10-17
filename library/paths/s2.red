@@ -63,9 +63,8 @@ def s2/code/proj :
   =
   λ i j →
   comp 0 1 (λ o → oloop o i) in (λ m → s2/code/surf/filler m i j → os2) [
-  | ∂[i] → ua/proj os2 os2 (id-equiv/weak-connection os2)
-  | j=0 m o → oloop (ua/proj os2 os2 (id-equiv/weak-connection os2) m o) i
-  | j=1 → ua/proj os2 os2 (oloop-equiv i)
+  | (∂[i] | j=1) _ o → o .vproj
+  | j=0 _ o → oloop (o .vproj) i
   ]
 
 def s2/code (a : s2) : type =

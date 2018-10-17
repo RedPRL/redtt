@@ -82,6 +82,8 @@ eproj:
     { E.Fst }
   | DOT SND
     { E.Snd }
+  | DOT VPROJ
+    { E.VProj }
 
 atom_econ:
   | a = ATOM
@@ -174,6 +176,9 @@ spine_con:
 
   | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); IN; fam = located(econ); sys = pipe_block(eface)
     { E.Com {r = r0; r' = r1; fam; cap; sys}}
+
+  | V; x = ATOM; ty0 = located(atomic); ty1 = located(atomic); equiv = located(atomic)
+    { E.V {x; ty0; ty1; equiv} }
 
 %inline
 block(X):

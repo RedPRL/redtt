@@ -106,6 +106,8 @@ and econ =
   | HCom of {r : eterm; r' : eterm; cap : eterm; sys : esys}
   | Com of {r : eterm; r' : eterm; fam : eterm; cap : eterm; sys : esys}
 
+  | V of {x : string; ty0 : eterm; ty1 : eterm; equiv : eterm}
+
   | Shut of eterm
 
   | DFixLine of {r : eterm; name : string; ty : eterm; bdy : eterm}
@@ -149,6 +151,7 @@ and frame =
   | App of eterm
   | Fst
   | Snd
+  | VProj
   | Open
 
 module Env :

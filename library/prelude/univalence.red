@@ -7,28 +7,22 @@ def ua (A B : type) (E : equiv A B) : path^1 type A B =
   λ i →
     `(V i A B E)
 
-def ua/proj (A B : type) (E : equiv A B)
-  : pathd (λ i → `(V i A B E) → B) (λ a → E.fst a) (λ b → b)
-  =
-  λ i u →
-    `(vproj i u (fst E))
-
 def univalence (B : type) : is-contr^1 ((A : type) × equiv A B) =
   ( (B, id-equiv/weak-connection B)
   , λ w i →
-      let VB : type = `(V i (fst w) B (snd w)) in
-      let proj/B (g : VB) : B = `(vproj i g (fst (snd w))) in
+      let VB : type = V i (w .fst) B (w .snd) in
+      let proj/B (g : VB) : B = g .vproj in
       ( _
       , proj/B
       , λ b →
         let ctr/B (j : 𝕀) : B =
           comp 1 j b [
-          | i=0 → w.snd.snd b .fst .snd
+          | i=0 → w .snd .snd b .fst .snd
           | i=1 → refl
           ]
         in
         let ctr : fiber VB B proj/B b =
-          (`(vin i (fst (fst ((snd (snd w)) b))) (@ ctr/B 0)), ctr/B)
+          ((w .snd .snd b .fst .fst, ctr/B 0), ctr/B)
         in
         ( ctr
         , λ v j →
@@ -40,6 +34,7 @@ def univalence (B : type) : is-contr^1 ((A : type) × equiv A B) =
             | j=1 → ctr/B
             ]
           in
+          -- MORTAL this should be: w.snd.snd b .snd v j .fst
           ( `(vin i (fst (@ ((snd ((snd (snd w)) b)) v) j)) (@ filler 0))
           , filler
           )
