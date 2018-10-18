@@ -319,7 +319,13 @@ struct
   and approx_pos cx (pos0 : positive) (pos1 : positive) =
     match pos0, pos1 with
     | `Dim, `Dim -> ()
+    | `El (D.Univ univ0), `El (D.Univ univ1) ->
+      if not @@ Lvl.lte univ0.lvl univ1.lvl && Kind.lte univ0.kind univ1.kind then
+        raise @@ E UniverseError
+    | `El ty0, `El ty1 ->
+      ignore @@ Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty0 ty1
     | _ ->
-      raise CanJonHelpMe
+      raise @@ E UnexpectedState
+
 
 end
