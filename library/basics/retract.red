@@ -1,5 +1,5 @@
 import prelude
-import isotoequiv
+import basics.isotoequiv
 
 def is-section (A B : type) (f : A → B) : type =
   (g : B → A) × (a : A) → path A (g (f a)) a
