@@ -1,4 +1,5 @@
-open RedBasis open Bwd
+open RedBasis open Bwd open BwdNotation
+open Combinators
 
 module D = NewDomain
 module Q = NewQuote
@@ -22,7 +23,8 @@ sig
   val venv : t -> D.Env.t
   val qenv : t -> Q.QEnv.t
 
-  val extend : t -> D.con -> t * D.con
+  val extend : t -> ?name:string option -> D.con -> t * D.con
+  val extend_dims : t -> ?names:string option list -> t * D.dim list
   val lookup : t -> ?tw:Tm.twin -> int -> classifier
 end
 
@@ -35,14 +37,17 @@ struct
      hyps : classifier bwd}
 
   let rel cx = cx.rel
-  let genv cx = D.Env.(cx.venv.globals)
+  let genv cx = cx.venv.globals
   let venv cx = cx.venv
   let qenv cx = cx.qenv
 
   let lookup cx ?(tw = `Only) ix =
     raise CanJonHelpMe
 
-  let extend _ _ =
+  let extend _ ?name _ =
+    raise CanJonHelpMe
+
+  let extend_dims _ ?names =
     raise CanJonHelpMe
 
 end
@@ -95,9 +100,32 @@ struct
       | _ ->
         raise PleaseRaiseProperError
 
-    let sys_body cx sys x =
+    let sys_body cx x sys =
       ConsSys.plug (Cx.rel cx) (D.FunApp (D.TypedVal.make (D.Val.make x))) sys
 
+  end
+
+  module Ext =
+  struct
+    let body cx xs tm =
+      match Tm.unleash tm with
+      | Tm.ExtLam (Tm.NB (_, bdy)) ->
+        bdy
+      | Tm.Up cmd ->
+        let n = List.length xs in
+        let wk = Tm.shift n in
+        let trs =
+          flip List.map xs @@ fun x ->
+          Q.Q.equate_dim (Cx.qenv cx) (Cx.rel cx) x x
+        in
+        let cmd' = Tm.subst_cmd wk cmd in
+        let frm = Tm.ExtApp trs in
+        Tm.up @@ cmd' @< frm
+      | _ ->
+        raise PleaseRaiseProperError
+
+    let sys_body cx xs sys =
+      ConsSys.plug (Cx.rel cx) (D.ExtApp xs) sys
   end
 
   let rec check cx (cls : classifier) tm =
@@ -122,12 +150,17 @@ struct
     | `Neg (D.Pi q, sys), _ ->
       let cx', x = Cx.extend cx @@ D.Val.unleash q.dom in
       let bdy = Pi.body tm in
-      let sys' = Pi.sys_body cx sys x in
+      let bdy_sys = Pi.sys_body cx x sys in
       let cod = inst_clo cx q.cod x in
-      check_of_ty cx cod sys' bdy
+      check_of_ty cx cod bdy_sys bdy
 
     | `Neg (D.Ext eclo, sys), _ ->
-      raise CanJonHelpMe
+      let names = Bwd.to_list @@ D.ExtClo.names eclo in
+      let cx', xs = Cx.extend_dims cx ~names in
+      let bdy = Ext.body cx xs tm in
+      let bdy_sys = Ext.sys_body cx xs sys in
+      let cod, cod_sys = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun x -> D.Dim x) xs in
+      check_of_ty cx cod (cod_sys @ bdy_sys) bdy
 
     | _ ->
       raise @@ E UnexpectedState
