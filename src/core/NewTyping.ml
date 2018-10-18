@@ -23,7 +23,7 @@ sig
   val qenv : t -> Q.QEnv.t
 
   val extend : t -> ?name:string option -> D.con -> t * D.con
-  val extend_dims : t -> ?names:string option list -> t * D.dim list
+  val extend_dims : t -> ?names:string option list -> t * Name.t list
   val lookup : t -> ?tw:Tm.twin -> int -> D.con
 end
 
@@ -255,9 +255,10 @@ struct
     | `Neg (D.Ext eclo, sys), _ ->
       let names = Bwd.to_list @@ D.ExtClo.names eclo in
       let cx', xs = Cx.extend_dims cx ~names in
-      let bdy = Ext.body cx xs tm in
-      let bdy_sys = Ext.sys_body cx xs sys in
-      let cod, cod_sys = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun x -> D.Dim x) xs in
+      let rs = List.map (fun x -> `Atom x) xs in
+      let bdy = Ext.body cx rs tm in
+      let bdy_sys = Ext.sys_body cx rs sys in
+      let cod, cod_sys = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun r -> D.Dim r) rs in
       check_of_ty cx cod (cod_sys @ bdy_sys) bdy
 
     | _ ->
@@ -286,8 +287,21 @@ struct
       let cx', _ = Cx.extend cx ~name vdom in
       check_ty cx' kind cod
 
+    | Tm.Ext ebnd ->
+      let Tm.NB (names, (cod, sys)) = ebnd in
+      let cx', xs = Cx.extend_dims cx ~names:(Bwd.to_list names) in
+      let lvl = check_ty cx' kind cod in
+      let vcod = eval cx' cod in
+      check_tm_sys cx' vcod sys;
+      if Kind.lte kind `Kan then
+        Cofibration.check_extension xs @@ Cofibration.from_sys cx' sys;
+      lvl
+
     | _ ->
       raise CanJonHelpMe
+
+  and check_tm_sys cx ty sys =
+    raise CanJonHelpMe
 
 
   and check_of_ty cx ty sys tm =
