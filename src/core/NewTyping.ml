@@ -348,7 +348,23 @@ struct
       check cx (`Neg (ty, sys)) tm
 
   and check_boundary cx ty sys el =
-    raise CanJonHelpMe
+    match sys with
+    | [] -> ()
+    | (r, r', el') :: sys ->
+      match Cx.restrict cx r r' with
+      | `Changed cx_rr' ->
+        let rel_rr' = Cx.rel cx_rr' in
+        let ty_rr' = D.Con.run rel_rr' ty in
+        let el_rr' = D.Con.run rel_rr' el in
+        let _ = Q.equate_con (Cx.qenv cx_rr') rel_rr' ty_rr' el_rr' @@ D.LazyVal.unleash el' in
+        check_boundary cx ty sys el
+
+      | `Same ->
+        (* Because the adjacency conditions of the system are presupposed, we only need to check this one face. *)
+        ignore @@ Q.equate_con (Cx.qenv cx) (Cx.rel cx) ty el @@ D.LazyVal.unleash el'
+
+      | exception I.Inconsistent ->
+        check_boundary cx ty sys el
 
   and synth cx cmd : positive =
     raise CanJonHelpMe
