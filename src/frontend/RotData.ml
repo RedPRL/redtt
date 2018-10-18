@@ -8,8 +8,8 @@ type visibility = ResEnv.visibility
 type dep =
   | True
   | False
-  | Redsum of {hash : string}
-  | Rotsum of {sel : selector; hash : string}
+  | Redsum of {hash : Digest.t}
+  | Rotsum of {sel : selector; hash : Digest.t}
   | Shell of {cmd : string}
 
 type datum =
