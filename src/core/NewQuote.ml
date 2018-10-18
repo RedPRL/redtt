@@ -59,8 +59,6 @@ sig
   val equate_neu : qenv -> rel -> neu -> neu -> Tm.tm
   val equate_tycon : qenv -> rel -> con -> con -> Tm.tm
   val equate_con_sys : qenv -> rel -> con -> con sys -> con sys -> (Tm.tm, Tm.tm) Tm.system
-
-  val subtype : qenv -> rel -> con -> con -> unit
 end =
 struct
   let ignore _ = ()
@@ -494,8 +492,4 @@ struct
   and equate_con_abs_sys qenv rel ty = equate_sys_wrapper (equate_con_abs_face qenv rel ty)
   and equate_tycon_abs_sys qenv rel = equate_sys_wrapper (equate_tycon_abs_face qenv rel)
   and equate_con_sys qenv rel ty = equate_sys_wrapper (equate_con_face qenv rel ty)
-
-  and subtype qenv rel ty0 ty1 =
-    ignore @@ equate_tycon qenv rel ty0 ty1;
-    raise CanJonHelpMe
 end
