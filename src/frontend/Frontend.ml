@@ -29,26 +29,36 @@ let read_file file_name =
     close_in channel;
     raise exn
 
-module rec Importer : Elaborator.Import =
+module rec Loader :
+sig
+  val load : per_process_opt : Contextual.per_process option -> mlconf : ML.mlconf -> string ->
+    [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
+  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> selector : string list ->
+    [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
+end =
 struct
   open ML
   let cache = Hashtbl.create 20
-  let import ~per_process ~mlconf ~selector =
-    let f = FileRes.find_module mlconf.base_dir ~extension:(Some "red") selector in
-    let normalized_f = SysUtil.normalize_concat [] f in
-    match Hashtbl.find_opt cache normalized_f with
+  let load ~per_process_opt ~mlconf f =
+    match Hashtbl.find_opt cache f with
     | None ->
-      Format.eprintf "@[%sChecking %s.@]@." mlconf.indent normalized_f;
+      Format.eprintf "@[%sChecking %s.@]@." mlconf.indent f;
       let res, per_process =
-        let mlconf = {base_dir = Filename.dirname f; indent = " " ^ mlconf.indent} in
         let mlcmd = read_file f in
-        Runner.execute ~per_process_opt:(Some per_process) ~mlconf ~mlcmd in
-      Hashtbl.add cache normalized_f res;
-      Format.eprintf "@[%sChecked %s.@]@." mlconf.indent normalized_f;
+        Runner.execute ~per_process_opt ~mlconf ~mlcmd in
+      Hashtbl.add cache f res;
+      Format.eprintf "@[%sChecked %s.@]@." mlconf.indent f;
       `New (res, per_process)
     | Some res ->
-      Format.eprintf "@[%sLoaded %s.@]@." mlconf.indent normalized_f;
+      Format.eprintf "@[%sLoaded %s.@]@." mlconf.indent f;
       `Cached res
+  let import ~per_process ~mlconf ~selector =
+    let f =
+      let f = FileRes.find_module mlconf.base_dir ~extension:(Some "red") selector in
+      SysUtil.normalize_concat ~dirs:[] ~rel_path:f
+    in
+    let mlconf = {base_dir = Filename.dirname f; indent = " " ^ mlconf.indent} in
+    load ~per_process_opt:(Some per_process) ~mlconf f
 end
 and Runner :
 sig
@@ -72,11 +82,7 @@ struct
       Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
       exit 1
 end
-and Elab : Elaborator.S = Elaborator.Make (Importer)
-
-let execute_signature base_dir mlcmd =
-  let mlconf : ML.mlconf = {base_dir; indent = ""} in
-  ignore @@ Runner.execute ~per_process_opt:None ~mlconf ~mlcmd
+and Elab : Elaborator.S = Elaborator.Make (Loader)
 
 let set_options options =
   Format.set_margin options.line_width;
@@ -85,11 +91,14 @@ let set_options options =
 let load options source =
   try
     set_options options;
-    let base_dir = Filename.dirname options.file_name in
-    execute_signature base_dir @@
+    let f = SysUtil.normalize_concat ~dirs:[] ~rel_path:options.file_name in
+    let mlconf : ML.mlconf = {base_dir = Filename.dirname f; indent = ""} in
     match source with
-    | `Stdin -> read_from_channel ~file_name:options.file_name stdin
-    | `File -> read_file options.file_name
+    | `Stdin ->
+      let mlcmd = read_from_channel ~file_name:f stdin in
+      ignore @@ Runner.execute ~per_process_opt:None ~mlconf ~mlcmd
+    | `File ->
+      ignore @@ Loader.load ~per_process_opt:None ~mlconf f
   with
   | ParseError.E (posl, posr) ->
     let loc = Some (posl, posr) in
