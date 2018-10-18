@@ -64,12 +64,30 @@ struct
 
   open Tm.Notation
 
-  module Negative =
+  module Sigma =
   struct
-    let split_pair tm =
+    let split tm =
       match Tm.unleash tm with
-      | Tm.Cons (tm0, tm1) -> tm0, tm1
-      | Tm.Up cmd -> Tm.up @@ cmd @< Tm.Fst, Tm.up @@ cmd @< Tm.Snd
+      | Tm.Cons (tm0, tm1) ->
+        tm0, tm1
+      | Tm.Up cmd ->
+        Tm.up @@ cmd @< Tm.Fst, Tm.up @@ cmd @< Tm.Snd
+      | _ ->
+        raise PleaseRaiseProperError
+  end
+
+  module Pi =
+  struct
+    let body tm =
+      match Tm.unleash tm with
+      | Tm.Lam (Tm.B (_, bdy)) ->
+        bdy
+      | Tm.Up cmd ->
+        let wk = Tm.shift 1 in
+        let cmd' = Tm.subst_cmd wk cmd in
+        let var = Tm.up @@ Tm.ix 0 in
+        let frm = Tm.FunApp var in
+        Tm.up @@ cmd' @< frm
       | _ ->
         raise PleaseRaiseProperError
   end
@@ -85,7 +103,7 @@ struct
 
 
     | `Neg (D.Sg q), _ ->
-      let tm0, tm1 = Negative.split_pair tm in
+      let tm0, tm1 = Sigma.split tm in
       let dom = D.Val.unleash q.dom in
       check_of_ty cx dom tm0;
       let el0 = eval cx tm0 in
@@ -93,7 +111,10 @@ struct
       check_of_ty cx cod tm1
 
     | `Neg (D.Pi q), _ ->
-      raise CanJonHelpMe
+      let cx', x = raise CanJonHelpMe in
+      let bdy = Pi.body tm in
+      let cod = inst_clo cx q.cod @@ D.Val (D.LazyVal.make x) in
+      check_of_ty cx cod bdy
 
     | _ ->
       raise @@ E UnexpectedState
