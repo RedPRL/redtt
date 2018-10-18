@@ -33,7 +33,7 @@ module rec Loader :
 sig
   val load : per_process_opt : Contextual.per_process option -> mlconf : ML.mlconf -> string ->
     [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
-  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> local_selector : FileRes.local_selector ->
+  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> selector : FileRes.selector ->
     [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
 end =
 struct
@@ -53,8 +53,8 @@ struct
     | Some res ->
       Format.eprintf "@[%sLoaded %s.@]@." mlconf.indent f;
       `Cached res
-  let import ~per_process ~mlconf ~local_selector =
-    let f = FileRes.module_to_path ~base_dir:mlconf.base_dir ~extension:(Some "red") local_selector in
+  let import ~per_process ~mlconf ~selector =
+    let f = FileRes.module_to_path ~base_dir:mlconf.base_dir ~extension:(Some "red") selector in
     let mlconf = {base_dir = Filename.dirname f; indent = " " ^ mlconf.indent} in
     load ~per_process_opt:(Some per_process) ~mlconf f
 end
@@ -93,7 +93,7 @@ let set_options options =
 let load options source =
   try
     set_options options;
-    let f = SysUtil.normalize_concat options.file_name in
+    let f = SysUtil.normalize options.file_name in
     let mlconf : ML.mlconf = {base_dir = Filename.dirname f; indent = ""} in
     match source with
     | `Stdin ->

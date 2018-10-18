@@ -13,6 +13,8 @@ type telescope = params
 
 open Tm.Notation
 
+type rigidity = [`Rigid | `Flex]
+
 type error =
   | SpineMismatch of Tm.tm Tm.spine * Tm.tm Tm.spine
 

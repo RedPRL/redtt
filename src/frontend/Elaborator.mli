@@ -1,6 +1,6 @@
 module type Import =
 sig
-  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> local_selector : FileRes.local_selector
+  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> selector : FileRes.selector
     -> [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
 end
 

@@ -6,7 +6,7 @@ let protect_cwd f =
   | ans -> Sys.chdir dir; ans
   | exception ext -> Sys.chdir dir; raise ext
 
-let normalize_concat ?(dirs=[]) path =
+let normalize ?(dirs=[]) path =
   protect_cwd @@ fun _ ->
   try
     List.iter Sys.chdir dirs;

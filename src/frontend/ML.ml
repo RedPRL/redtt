@@ -36,7 +36,7 @@ and mlcmd =
   | MlBind of mlcmd * mlname * mlcmd
   | MlUnleash of mlval
   | MlNormalize of mlval
-  | MlImport of ResEnv.visibility * FileRes.local_selector
+  | MlImport of ResEnv.visibility * FileRes.selector
   | MlPrint of mlval info
   | MlDebug of [`All | `Constraints | `Unsolved]
   | MlForeign of (semval -> mlcmd) * mlval

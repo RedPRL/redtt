@@ -15,6 +15,11 @@ let rec filter_map f =
     | Some y -> y :: filter_map f xs
     | None -> filter_map f xs
 
+let default a =
+  function
+  | None -> a
+  | Some a -> a
+
 exception WasNone
 
 let get_exn m =
