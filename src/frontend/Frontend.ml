@@ -3,8 +3,8 @@ open RedTT_Core
 
 type options =
   {file_name : string;
-   line_width: int;
-   debug_mode: bool}
+   line_width : int;
+   debug_mode : bool}
 
 let print_position outx lexbuf =
   let open Lexing in
@@ -42,7 +42,8 @@ struct
       let res, per_process =
         let mlconf = {base_dir = Filename.dirname f; indent = " " ^ mlconf.indent} in
         let mlcmd = read_file f in
-        Runner.execute ~per_process_opt:(Some per_process) ~mlconf ~mlcmd in
+        Runner.execute ~per_process_opt:(Some per_process) ~mlconf ~mlcmd
+      in
       Hashtbl.add cache normalized_f res;
       Format.eprintf "@[%sChecked %s.@]@." mlconf.indent normalized_f;
       `New (res, per_process)
@@ -52,20 +53,24 @@ struct
 end
 and Runner :
 sig
-  val execute : per_process_opt : Contextual.per_process option -> mlconf : ML.mlconf ->
-    mlcmd : ML.mlcmd ML.info -> ResEnv.t * Contextual.per_process
+  val execute
+    : per_process_opt : Contextual.per_process option
+    -> mlconf : ML.mlconf
+    -> mlcmd : ML.mlcmd ML.info
+    -> ResEnv.t * Contextual.per_process
 end =
 struct
-  open ML
-  open Contextual
+  module M = Monad.Notation (Contextual)
+  open ML open M open Contextual
+
   let execute ~per_process_opt ~mlconf ~mlcmd =
     try
       run ~per_process_opt ~mlconf begin
-        bind (Elab.eval_cmd mlcmd.con) @@ fun _ ->
-        bind (report_unsolved ~loc:mlcmd.span) @@ fun _ ->
-        bind resolver @@ fun res ->
-        bind get_per_process @@ fun per_process ->
-        ret (res, per_process)
+        Elab.eval_cmd mlcmd.con >>
+        report_unsolved ~loc:mlcmd.span >>
+        resolver >>= fun res ->
+        get_per_process <<@> fun per_process ->
+        res, per_process
       end
     with
     | exn ->
