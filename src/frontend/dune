@@ -19,4 +19,5 @@
   uuseg
   uuseg.string
   uutf
-  menhirLib))
+  menhirLib
+  yaml))
