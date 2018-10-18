@@ -4,16 +4,16 @@ open Dev
 
 include Monad.S
 
-type per_process
+type persistent_env
 
 val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
 val assert_top_level : unit m
-val init_per_process : unit -> per_process
-val get_per_process : per_process m
-val set_per_process : per_process -> unit m
+val init_persistent_env : unit -> persistent_env
+val get_persistent_env : persistent_env m
+val set_persistent_env : persistent_env -> unit m
 
 val modify_mlenv : (ML.mlenv -> ML.mlenv) -> unit m
 val get_mlenv : ML.mlenv m
@@ -63,7 +63,7 @@ val base_cx : Cx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 
-val run : per_process_opt : per_process option -> mlconf : ML.mlconf -> 'a m -> 'a
+val run : persistent_env_opt : persistent_env option -> mlconf : ML.mlconf -> 'a m -> persistent_env * 'a
 
 
 val report_unsolved : loc:Log.location -> unit m

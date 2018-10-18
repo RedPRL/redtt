@@ -6,8 +6,8 @@ open Combinators
 
 module type Import =
 sig
-  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> selector : FileRes.selector
-    -> [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
+  val import : persistent_env : Contextual.persistent_env -> mlconf : ML.mlconf -> selector : FileRes.selector
+    -> [`New of Contextual.persistent_env * ResEnv.t | `Cached of ResEnv.t]
 end
 
 module type S =
@@ -166,13 +166,13 @@ struct
       M.ret @@ E.SemRet (E.SemDataDesc desc)
 
     | E.MlImport (visibility, selector) ->
-      C.get_per_process >>= fun per_process ->
+      C.get_persistent_env >>= fun persistent_env ->
       C.get_mlenv <<@> E.Env.get_mlconf >>= fun mlconf ->
       begin
-        match I.import ~per_process ~mlconf ~selector with
+        match I.import ~persistent_env ~mlconf ~selector with
         | `Cached res -> C.ret res
-        | `New (res, per_process) ->
-          C.set_per_process per_process >> C.ret res
+        | `New (persistent_env, res) ->
+          C.set_persistent_env persistent_env >> C.ret res
       end >>= fun res ->
       C.modify_top_resolver (ResEnv.import_globals ~visibility res) >>
       M.ret @@ E.SemRet (E.SemTuple [])

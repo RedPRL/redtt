@@ -9,8 +9,8 @@ type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 module Map = Map.Make (Name)
 
 type env = GlobalEnv.t
-type per_process = {env : env; info : [`Flex | `Rigid] Map.t}
-type cx = {mlenv : ML.mlenv; resenv : ResEnv.t; per_process : per_process; lcx : lcx; rcx : rcx}
+type persistent_env = {env : env; info : [`Flex | `Rigid] Map.t}
+type cx = {mlenv : ML.mlenv; resenv : ResEnv.t; persistent_env : persistent_env; lcx : lcx; rcx : rcx}
 
 
 let rec pp_lcx fmt =
@@ -124,37 +124,37 @@ let assert_top_level =
   | Emp -> ret ()
   | _ -> failwith "Invalid operations outside of the top-level."
 
-let init_per_process () =
+let init_persistent_env () =
   {env = GlobalEnv.emp (); info = Map.empty}
 
-let get_per_process =
+let get_persistent_env =
   assert_top_level >>
-  get <<@> fun st -> st.per_process
+  get <<@> fun st -> st.persistent_env
 
-let set_per_process per_process =
+let set_persistent_env persistent_env =
   assert_top_level >>
-  modify @@ fun st -> {st with per_process}
+  modify @@ fun st -> {st with persistent_env}
 
 let update_env e =
   modify @@ fun st ->
   match e with
   | E (nm, ty, Hole info) ->
-    {st with per_process =
-               {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty; info = Map.add nm info st.per_process.info}}
+    {st with persistent_env =
+               {env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty; info = Map.add nm info st.persistent_env.info}}
   | E (nm, ty, Guess _) ->
-    {st with per_process =
-               {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty; info = Map.add nm `Rigid st.per_process.info}}
+    {st with persistent_env =
+               {env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty; info = Map.add nm `Rigid st.persistent_env.info}}
   | E (nm, ty, Defn (visibility, `Transparent, t)) ->
     {st with
-     per_process =
-       {env = GlobalEnv.define st.per_process.env nm ty t;
-        info = Map.add nm `Rigid st.per_process.info};
+     persistent_env =
+       {env = GlobalEnv.define st.persistent_env.env nm ty t;
+        info = Map.add nm `Rigid st.persistent_env.info};
      resenv = ResEnv.register_metavar ~visibility nm st.resenv}
   | E (nm, ty, Defn (visibility, `Opaque, _)) ->
     {st with
-     per_process =
-       {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty;
-        info = Map.add nm `Rigid st.per_process.info};
+     persistent_env =
+       {env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty;
+        info = Map.add nm `Rigid st.persistent_env.info};
      resenv = ResEnv.register_metavar ~visibility nm st.resenv}
   | _ ->
     st
@@ -162,15 +162,15 @@ let update_env e =
 let declare_datatype visibility dlbl desc =
   modify @@ fun st ->
   {st with
-   per_process =
-     {st.per_process with env = GlobalEnv.declare_datatype dlbl desc st.per_process.env};
+   persistent_env =
+     {st.persistent_env with env = GlobalEnv.declare_datatype dlbl desc st.persistent_env.env};
    resenv = ResEnv.register_datatype visibility dlbl st.resenv}
 
 let replace_datatype dlbl desc =
   modify @@ fun st ->
   {st with
-   per_process =
-     {st.per_process with env = GlobalEnv.replace_datatype dlbl desc st.per_process.env}}
+   persistent_env =
+     {st.persistent_env with env = GlobalEnv.replace_datatype dlbl desc st.persistent_env.env}}
 
 
 
@@ -183,16 +183,16 @@ let pushr e =
   modifyr (fun es -> `Entry e :: es) >>
   update_env e
 
-let run ~per_process_opt ~mlconf (m : 'a m) : 'a  =
-  let per_process = match per_process_opt with Some mem -> mem | None -> init_per_process () in
-  let _, r = m Emp {per_process; lcx = Emp; resenv = ResEnv.init (); mlenv = ML.Env.init ~mlconf; rcx = []} in
-  r
+let run ~persistent_env_opt ~mlconf (m : 'a m) : persistent_env * 'a  =
+  let persistent_env = match persistent_env_opt with Some mem -> mem | None -> init_persistent_env () in
+  let {persistent_env; _}, r = m Emp {persistent_env; lcx = Emp; resenv = ResEnv.init (); mlenv = ML.Env.init ~mlconf; rcx = []} in
+  persistent_env, r
 
 
 let isolate (m : 'a m) : 'a m =
   fun ps st ->
     let st', a = m ps {st with lcx = Emp; rcx = []} in
-    {per_process = st'.per_process; mlenv = st'.mlenv; resenv = st'.resenv; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx}, a
+    {persistent_env = st'.persistent_env; mlenv = st'.mlenv; resenv = st'.resenv; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx}, a
 
 let rec pushls es =
   match es with
@@ -217,7 +217,7 @@ let get_global_env =
   get >>= fun st ->
   let rec go_params =
     function
-    | Emp -> st.per_process.env
+    | Emp -> st.persistent_env.env
     | Snoc (psi, (x, `I)) ->
       GlobalEnv.ext_dim (go_params psi) x
     | Snoc (psi, (x, `P ty)) ->
@@ -262,7 +262,7 @@ let popr_opt =
         ret @@ Some e
       else
         get >>= fun st ->
-        ret @@ Some (Entry.subst st.per_process.env e)
+        ret @@ Some (Entry.subst st.persistent_env.env e)
     | `Update theta' :: rcx ->
       setr rcx >>
       go @@ Occurs.Set.union theta theta'
@@ -318,8 +318,8 @@ let lookup_var x w =
 
 let lookup_meta x =
   get >>= fun st ->
-  let ty = GlobalEnv.lookup_ty st.per_process.env x `Only in
-  let info = Map.find x st.per_process.info in
+  let ty = GlobalEnv.lookup_ty st.persistent_env.env x `Only in
+  let info = Map.find x st.persistent_env.info in
   ret (ty, info)
 
 

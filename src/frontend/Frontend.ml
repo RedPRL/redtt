@@ -31,53 +31,51 @@ let read_file file_name =
 
 module rec Loader :
 sig
-  val load : per_process_opt : Contextual.per_process option -> mlconf : ML.mlconf -> string ->
-    [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
-  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> selector : FileRes.selector ->
-    [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
+  val load : persistent_env_opt : Contextual.persistent_env option -> mlconf : ML.mlconf -> string ->
+    [`New of Contextual.persistent_env * ResEnv.t | `Cached of ResEnv.t]
+  val import : persistent_env : Contextual.persistent_env -> mlconf : ML.mlconf -> selector : FileRes.selector ->
+    [`New of Contextual.persistent_env * ResEnv.t | `Cached of ResEnv.t]
 end =
 struct
   open ML
   let cache = Hashtbl.create 20
-  let load ~per_process_opt ~mlconf f =
+  let load ~persistent_env_opt ~mlconf f =
     match Hashtbl.find_opt cache f with
     | None ->
       Format.eprintf "@[%sChecking %s.@]@." mlconf.indent f;
-      let res, per_process =
+      let persistent_env, res =
         let mlcmd = read_file f in
-        Runner.execute ~per_process_opt ~mlconf ~mlcmd
+        Runner.execute ~persistent_env_opt ~mlconf ~mlcmd
       in
       Hashtbl.add cache f res;
       Format.eprintf "@[%sChecked %s.@]@." mlconf.indent f;
-      `New (res, per_process)
+      `New (persistent_env, res)
     | Some res ->
       Format.eprintf "@[%sLoaded %s.@]@." mlconf.indent f;
       `Cached res
-  let import ~per_process ~mlconf ~selector =
+  let import ~persistent_env ~mlconf ~selector =
     let f = FileRes.module_to_path ~base_dir:mlconf.base_dir ~extension:(Some "red") selector in
     let mlconf = {base_dir = Filename.dirname f; indent = " " ^ mlconf.indent} in
-    load ~per_process_opt:(Some per_process) ~mlconf f
+    load ~persistent_env_opt:(Some persistent_env) ~mlconf f
 end
 and Runner :
 sig
   val execute
-    : per_process_opt : Contextual.per_process option
+    : persistent_env_opt : Contextual.persistent_env option
     -> mlconf : ML.mlconf
     -> mlcmd : ML.mlcmd ML.info
-    -> ResEnv.t * Contextual.per_process
+    -> Contextual.persistent_env * ResEnv.t
 end =
 struct
   module M = Monad.Notation (Contextual)
   open ML open M open Contextual
 
-  let execute ~per_process_opt ~mlconf ~mlcmd =
+  let execute ~persistent_env_opt ~mlconf ~mlcmd =
     try
-      run ~per_process_opt ~mlconf begin
+      run ~persistent_env_opt ~mlconf begin
         Elab.eval_cmd mlcmd.con >>
         report_unsolved ~loc:mlcmd.span >>
-        resolver >>= fun res ->
-        get_per_process <<@> fun per_process ->
-        res, per_process
+        resolver
       end
     with
     | exn ->
@@ -98,9 +96,9 @@ let load options source =
     match source with
     | `Stdin ->
       let mlcmd = read_from_channel ~file_name:f stdin in
-      ignore @@ Runner.execute ~per_process_opt:None ~mlconf ~mlcmd
+      ignore @@ Runner.execute ~persistent_env_opt:None ~mlconf ~mlcmd
     | `File ->
-      ignore @@ Loader.load ~per_process_opt:None ~mlconf f
+      ignore @@ Loader.load ~persistent_env_opt:None ~mlconf f
   with
   | ParseError.E (posl, posr) ->
     let loc = Some (posl, posr) in
