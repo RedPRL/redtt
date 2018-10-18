@@ -10,6 +10,7 @@ type classifier = [`Pos of positive | `Neg of D.con * D.con D.sys]
 type error =
   | ExpectedDimension
   | UnexpectedState
+  | PolarityMismatch
 
 exception E of error
 exception PleaseRaiseProperError
@@ -128,6 +129,18 @@ struct
       ConsSys.plug (Cx.rel cx) (D.ExtApp xs) sys
   end
 
+
+  let polarity =
+    function
+    | D.Pi _ | D.Sg _ | D.Ext _ ->
+      `Neg
+    | D.Univ _ | D.Data _ | D.Neu _ ->
+      `Pos
+    | _ ->
+      raise CanJonHelpMe
+
+
+
   let rec check cx (cls : classifier) tm =
     match cls, Tm.unleash tm with
     | `Pos `Dim, (Tm.Dim0 | Tm.Dim1) ->
@@ -135,7 +148,7 @@ struct
 
     | `Pos pos, Tm.Up cmd ->
       let pos' = synth cx cmd in
-      approx cx pos' pos
+      approx_pos cx pos' pos
 
 
     | `Neg (D.Sg q, sys), _ ->
@@ -165,16 +178,15 @@ struct
     | _ ->
       raise @@ E UnexpectedState
 
+
   and check_of_ty cx ty sys tm =
-    match ty with
-    | D.Pi _ | D.Sg _ | D.Ext _ ->
-      check cx (`Neg (ty, sys)) tm
-    | D.Univ _ | D.Data _ | D.Neu _ ->
+    match polarity ty with
+    | `Pos ->
       check cx (`Pos (`El ty)) tm;
       check_boundary cx ty sys @@
       eval cx tm
-    | _ ->
-      raise CanJonHelpMe
+    | `Neg ->
+      check cx (`Neg (ty, sys)) tm
 
   and check_boundary cx ty sys el =
     raise CanJonHelpMe
@@ -182,7 +194,18 @@ struct
   and synth cx cmd : positive =
     raise CanJonHelpMe
 
-  and approx cx (pos0 : positive) (pos1 : positive) =
+  and approx cx ty0 ty1 =
+    match polarity ty0, polarity ty1 with
+    | `Pos, `Pos ->
+      approx_pos cx (`El ty0) (`El ty1)
+    | `Neg, `Neg ->
+      let cx', _ = Cx.extend cx ty0 in
+      let tm = Tm.up @@ Tm.ix 0 in
+      check cx (`Neg (ty1, [])) tm
+    | _ ->
+      raise @@ E PolarityMismatch
+
+  and approx_pos cx (pos0 : positive) (pos1 : positive) =
     raise CanJonHelpMe
 
 end
