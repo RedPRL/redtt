@@ -134,6 +134,83 @@ struct
   end
 
 
+  module Cofibration :
+  sig
+    type t = (D.dim * D.dim) list
+
+    val from_sys : Cx.t -> (Tm.tm, 'a) Tm.system -> t
+
+    (** check that an extension type's cofibration is valid *)
+    val check_extension : Name.t list -> t -> unit
+  end =
+  struct
+    type t = (D.dim * D.dim) list
+
+    let from_sys cx =
+      List.map @@ fun (tr, tr', _) ->
+      let env = Cx.venv cx in
+      let r = D.Syn.eval_dim env tr in
+      let r' = D.Syn.eval_dim env tr' in
+      r, r'
+
+    (* This is checking whether cofib is valid (forming a non-bipartite graph). *)
+    let check_valid (cofib : t) =
+      (* the idea is to find an evil assignment (coloring) to make everything false *)
+      let assignment = Hashtbl.create 10 in
+      let adjacency = Hashtbl.create 20 in
+      let rec color x b =
+        Hashtbl.add assignment x b;
+        let neighbors = Hashtbl.find_all adjacency x in
+        let notb = not b in
+        List.exists (fun y -> check_color y notb) neighbors
+      and check_color x b =
+        match Hashtbl.find_opt assignment x with
+        | Some b' -> b' != b (* non-bipartite! *)
+        | None -> color x b
+      in
+      let lookup_dim =
+        function
+        | `Dim0 -> `Assigned false
+        | `Dim1 -> `Assigned true
+        | `Atom x ->
+          match Hashtbl.find_opt assignment x with
+          | Some b -> `Assigned b
+          | None -> `Atom x
+      in
+      let rec go eqns atoms_to_check =
+        match eqns with
+        | [] -> List.exists (fun x -> not (Hashtbl.mem assignment x) && color x true) atoms_to_check
+        | (r, r') :: eqns ->
+          match lookup_dim r, lookup_dim r' with
+          | `Assigned b, `Assigned b' ->
+            b = b' || (go[@tailcall]) eqns atoms_to_check
+          | `Atom x, `Assigned b | `Assigned b, `Atom x ->
+            color x (not b) || (go[@tailcall]) eqns atoms_to_check
+          | `Atom x, `Atom y ->
+            x = y ||
+            begin
+              Hashtbl.add adjacency x y;
+              Hashtbl.add adjacency y x;
+              (go[@tailcall]) eqns (x :: atoms_to_check)
+            end
+      in
+      if go cofib [] then () else failwith "Cofibration.check_valid"
+
+    let check_dim_scope xs =
+      function
+      | `Dim0 -> ()
+      | `Dim1 -> ()
+      | `Atom x -> if List.mem x xs then () else failwith "Bad dimension scope"
+
+    let check_extension xs =
+      function
+      | [] -> ()
+      | cofib ->
+        List.iter (fun (r, r') -> check_dim_scope xs r; check_dim_scope xs r') cofib;
+        check_valid cofib
+
+  end
+
   let polarity =
     function
     | D.Pi _ | D.Sg _ | D.Ext _ ->
