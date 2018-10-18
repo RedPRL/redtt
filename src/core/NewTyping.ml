@@ -1,4 +1,4 @@
-open RedBasis open Bwd open BwdNotation
+open RedBasis open Bwd
 open Combinators
 
 module D = NewDomain
@@ -117,7 +117,7 @@ struct
         let wk = Tm.shift n in
         let trs =
           flip List.map xs @@ fun x ->
-          Q.Q.equate_dim (Cx.qenv cx) (Cx.rel cx) x x
+          Q.equate_dim (Cx.qenv cx) (Cx.rel cx) x x
         in
         let cmd' = Tm.subst_cmd wk cmd in
         let frm = Tm.ExtApp trs in
