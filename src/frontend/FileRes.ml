@@ -37,7 +37,7 @@ let module_to_path ~base_dir ?(extension=None) selector =
   let base_dir = Option.default base_dir (find_redlib_root base_dir) in
   let import_path = Filename.concat base_dir module_path in
   if Sys.file_exists import_path then
-    SysUtil.normalize import_path
+    import_path
   else begin
     Format.eprintf "@[Could not find the module@ %a@ at@ %s.@]@."
     pp_selector selector import_path;
