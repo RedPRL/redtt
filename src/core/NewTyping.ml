@@ -3,14 +3,11 @@ open Combinators
 
 module D = NewDomain
 module Q = NewQuote
-
-type positive = [`Type | `El of D.con | `Dim]
-type classifier = [`Pos of positive | `Neg of D.con * D.con D.sys]
-
 type error =
   | ExpectedDimension
   | UnexpectedState
   | PolarityMismatch
+  | PredicativityError
 
 exception E of error
 exception PleaseRaiseProperError
@@ -26,7 +23,7 @@ sig
 
   val extend : t -> ?name:string option -> D.con -> t * D.con
   val extend_dims : t -> ?names:string option list -> t * D.dim list
-  val lookup : t -> ?tw:Tm.twin -> int -> classifier
+  val lookup : t -> ?tw:Tm.twin -> int -> D.con
 end
 
 module Cx : Cx  =
@@ -35,7 +32,7 @@ struct
     {rel : NewRestriction.t;
      venv : D.Env.t;
      qenv : Q.QEnv.t;
-     hyps : classifier bwd}
+     hyps : [`Dim | `Ty of D.con] bwd}
 
   let rel cx = cx.rel
   let genv cx = cx.venv.globals
@@ -53,11 +50,17 @@ struct
 
 end
 
+
 module TC :
 sig
-  val check : Cx.t -> classifier -> Tm.tm -> unit
+  val check_ty : Cx.t -> Kind.t -> Tm.tm -> Lvl.t
+  val check_of_ty : Cx.t -> D.con -> D.con D.sys -> Tm.tm -> unit
 end =
 struct
+
+  type positive = [`El of D.con | `Dim]
+  type phase = [`Pos of positive | `Neg of D.con * D.con D.sys]
+
 
   let eval cx = D.Syn.eval (Cx.rel cx) (Cx.venv cx)
   let inst_clo cx clo v = D.Clo.inst (Cx.rel cx) clo (D.Val (D.LazyVal.make v))
@@ -141,14 +144,19 @@ struct
 
 
 
-  let rec check cx (cls : classifier) tm =
-    match cls, Tm.unleash tm with
-    | `Pos `Dim, (Tm.Dim0 | Tm.Dim1) ->
-      ()
-
+  let rec check cx (phase : phase) tm =
+    match phase, Tm.unleash tm with
     | `Pos pos, Tm.Up cmd ->
       let pos' = synth cx cmd in
       approx_pos cx pos' pos
+
+    | `Pos `Dim, (Tm.Dim0 | Tm.Dim1) ->
+      ()
+
+    | `Pos (`El (D.Univ univ)), _->
+      let lvl = check_ty cx univ.kind tm in
+      if Lvl.greater lvl univ.lvl then
+        raise @@ E PredicativityError
 
 
     | `Neg (D.Sg q, sys), _ ->
@@ -178,6 +186,8 @@ struct
     | _ ->
       raise @@ E UnexpectedState
 
+  and check_ty cx kind tm : Lvl.t =
+    raise CanJonHelpMe
 
   and check_of_ty cx ty sys tm =
     match polarity ty with
