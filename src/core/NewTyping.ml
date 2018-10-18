@@ -25,6 +25,8 @@ sig
   val extend : t -> ?name:string option -> D.con -> t * D.con
   val extend_dims : t -> ?names:string option list -> t * Name.t list
   val lookup : t -> ?tw:Tm.twin -> int -> D.con
+
+  val restrict : t -> D.dim -> D.dim -> t D.Rel.m
 end
 
 module Cx : Cx  =
@@ -49,6 +51,9 @@ struct
   let extend_dims _ ?names =
     raise CanJonHelpMe
 
+  let restrict _ _ _ =
+    raise CanJonHelpMe
+
 end
 
 
@@ -64,12 +69,14 @@ struct
 
 
   let eval cx = D.Syn.eval (Cx.rel cx) (Cx.venv cx)
+  let eval_dim cx = D.Syn.eval_dim (Cx.venv cx)
+
   let inst_clo cx clo v = D.Clo.inst (Cx.rel cx) clo (D.Val (D.LazyVal.make v))
 
 
   open Tm.Notation
 
-  module ConsSys = D.Sys (D.Con)
+  module ConSys = D.Sys (D.Con)
 
 
   module Sigma =
@@ -85,8 +92,8 @@ struct
 
 
     let split_sys cx sys =
-      let sys0 = ConsSys.plug (Cx.rel cx) D.Fst sys in
-      let sys1 = ConsSys.plug (Cx.rel cx) D.Snd sys in
+      let sys0 = ConSys.plug (Cx.rel cx) D.Fst sys in
+      let sys1 = ConSys.plug (Cx.rel cx) D.Snd sys in
       sys0, sys1
   end
 
@@ -106,7 +113,7 @@ struct
         raise PleaseRaiseProperError
 
     let sys_body cx x sys =
-      ConsSys.plug (Cx.rel cx) (D.FunApp (D.TypedVal.make (D.Val.make x))) sys
+      ConSys.plug (Cx.rel cx) (D.FunApp (D.TypedVal.make (D.Val.make x))) sys
 
   end
 
@@ -130,7 +137,7 @@ struct
         raise PleaseRaiseProperError
 
     let sys_body cx xs sys =
-      ConsSys.plug (Cx.rel cx) (D.ExtApp xs) sys
+      ConSys.plug (Cx.rel cx) (D.ExtApp xs) sys
   end
 
 
@@ -149,8 +156,8 @@ struct
     let from_sys cx =
       List.map @@ fun (tr, tr', _) ->
       let env = Cx.venv cx in
-      let r = D.Syn.eval_dim env tr in
-      let r' = D.Syn.eval_dim env tr' in
+      let r = eval_dim cx tr in
+      let r' = eval_dim cx tr' in
       r, r'
 
     (* This is checking whether cofib is valid (forming a non-bipartite graph). *)
@@ -294,14 +301,41 @@ struct
       let vcod = eval cx' cod in
       check_tm_sys cx' vcod sys;
       if Kind.lte kind `Kan then
-        Cofibration.check_extension xs @@ Cofibration.from_sys cx' sys;
+        Cofibration.check_extension xs @@
+        Cofibration.from_sys cx' sys;
       lvl
 
     | _ ->
       raise CanJonHelpMe
 
   and check_tm_sys cx ty sys =
-    raise CanJonHelpMe
+    let rec loop boundary sys =
+      match sys with
+      | [] -> ()
+      | (tr, tr', otm) :: sys ->
+        check cx (`Pos `Dim) tr;
+        check cx (`Pos `Dim) tr';
+        let env = Cx.venv cx in
+        let r = eval_dim cx tr in
+        let r' = eval_dim cx tr' in
+        match Cx.restrict cx r r', otm with
+        | `Changed cx_rr', Some tm ->
+          let rel_rr' = Cx.rel cx_rr' in
+          let ty_rr' = D.Con.run rel_rr' ty in
+          let boundary_rr' = ConSys.run rel_rr' boundary in
+          check_of_ty cx_rr' ty_rr' boundary_rr' tm;
+          let el = eval cx_rr' tm in
+          loop ((r, r', D.LazyVal.make el) :: boundary) sys
+        | `Same, Some tm ->
+          check_of_ty cx ty boundary tm;
+          let el = eval cx tm in
+          loop ((r, r', D.LazyVal.make el) :: boundary) sys
+        | exception I.Inconsistent ->
+          loop boundary sys
+        | _ ->
+          raise PleaseRaiseProperError
+    in
+    loop [] sys
 
 
   and check_of_ty cx ty sys tm =
