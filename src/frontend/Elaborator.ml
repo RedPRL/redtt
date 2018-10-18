@@ -6,7 +6,7 @@ open Combinators
 
 module type Import =
 sig
-  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> selector : string list
+  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> local_selector : FileRes.local_selector
     -> [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
 end
 
@@ -165,11 +165,11 @@ struct
       C.replace_datatype alpha desc >>
       M.ret @@ E.SemRet (E.SemDataDesc desc)
 
-    | E.MlImport (visibility, selector) ->
+    | E.MlImport (visibility, local_selector) ->
       C.get_per_process >>= fun per_process ->
       C.get_mlenv <<@> E.Env.get_mlconf >>= fun mlconf ->
       begin
-        match I.import ~per_process ~mlconf ~selector with
+        match I.import ~per_process ~mlconf ~local_selector with
         | `Cached res -> C.ret res
         | `New (res, per_process) ->
           C.set_per_process per_process >> C.ret res

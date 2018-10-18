@@ -29,5 +29,7 @@ val register_datatype : visibility:visibility -> Name.t -> t -> t
 val import_globals : visibility:visibility -> t -> t -> t
 
 val get : string -> t -> resolution
+val get_from_idx : int -> t -> resolution
+val idx_of_name_opt : Name.t -> t -> int option
 
 val pp_visibility : visibility Pp.t0
