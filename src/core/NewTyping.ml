@@ -7,7 +7,8 @@ type error =
   | ExpectedDimension
   | UnexpectedState
   | PolarityMismatch
-  | PredicativityError
+  | UniverseError
+  | ExpectedType
 
 exception E of error
 exception PleaseRaiseProperError
@@ -156,8 +157,7 @@ struct
     | `Pos (`El (D.Univ univ)), _->
       let lvl = check_ty cx univ.kind tm in
       if Lvl.greater lvl univ.lvl then
-        raise @@ E PredicativityError
-
+        raise @@ E UniverseError
 
     | `Neg (D.Sg q, sys), _ ->
       let tm0, tm1 = Sigma.split tm in
@@ -186,8 +186,32 @@ struct
     | _ ->
       raise @@ E UnexpectedState
 
+  (* TODO: we can take from RedPRL the fine-grained subtraction of kinds. Let Favonia do it! *)
   and check_ty cx kind tm : Lvl.t =
-    raise CanJonHelpMe
+    match Tm.unleash tm with
+    | Tm.Up cmd ->
+      begin
+        match synth cx cmd with
+        | `El (D.Univ univ) when Kind.lte univ.kind kind ->
+          univ.lvl
+        | `El (D.Univ univ) ->
+          raise @@ E UniverseError
+        | _ ->
+          raise @@ E ExpectedType
+      end
+
+    | Tm.Univ univ ->
+      Lvl.shift 1 univ.lvl
+
+    | Tm.Pi (dom, Tm.B (name, cod)) | Tm.Sg (dom, Tm.B (name, cod)) ->
+      let lvl0 = check_ty cx kind dom in
+      let vdom = eval cx dom in
+      let cx', _ = Cx.extend cx ~name vdom in
+      check_ty cx' kind cod
+
+    | _ ->
+      raise CanJonHelpMe
+
 
   and check_of_ty cx ty sys tm =
     match polarity ty with
@@ -216,6 +240,9 @@ struct
       raise @@ E PolarityMismatch
 
   and approx_pos cx (pos0 : positive) (pos1 : positive) =
-    raise CanJonHelpMe
+    match pos0, pos1 with
+    | `Dim, `Dim -> ()
+    | _ ->
+      raise CanJonHelpMe
 
 end
