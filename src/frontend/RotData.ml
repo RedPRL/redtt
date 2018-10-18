@@ -1,3 +1,5 @@
+open RedTT_Core
+
 let version : string = "where do Thoughts come from?"
 
 type local_selector = FileRes.local_selector
@@ -12,7 +14,8 @@ type dep =
   | Shell of {cmd : string}
 
 type datum =
-  [`Down of string list | `Desc of string list ]
+  | Down of {ty : Tm.tm; tm : Tm.tm}
+  | Desc of Desc.desc
 
 type entry =
   {name : string;
