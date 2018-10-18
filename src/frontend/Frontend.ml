@@ -70,7 +70,7 @@ struct
         report_unsolved ~loc:mlcmd.span >>
         resolver >>= fun res ->
         get_per_process <<@> fun per_process ->
-          res, per_process
+        res, per_process
       end
     with
     | exn ->
