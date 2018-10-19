@@ -1,8 +1,11 @@
 open RedBasis
 
 exception Not_found = Not_found
+exception Invalid_argument = Invalid_argument
 
 let redlib_name = "redlib"
+let red_extention = ".red"
+let rot_extention = ".red"
 
 type selector = string list
 
@@ -17,32 +20,31 @@ let find_redlib_root (base_dir : string) : string option =
       Some cur
     else
       let () = Sys.chdir Filename.parent_dir_name in
-      let next = Sys.getcwd () in
-      if next = cur then
+      let up = Sys.getcwd () in
+      if up = cur then
         None
       else
-        go next
+        go up
   in
   Sys.chdir base_dir;
   go (Sys.getcwd ())
 
-let module_to_rel_path ?(extension=None) selector =
-  let without_ext = String.concat Filename.dir_sep selector in
-  match extension with
-  | None -> without_ext
-  | Some ext -> String.concat "." [without_ext; ext]
-
-let module_to_path ~base_dir ?(extension=None) selector =
-  let module_path = module_to_rel_path ~extension selector in
+let selector_to_stem ~base_dir selector =
+  let module_path = String.concat Filename.dir_sep selector in
   let base_dir = Option.default base_dir (find_redlib_root base_dir) in
-  let import_path = Filename.concat base_dir module_path in
-  if Sys.file_exists import_path then
-    import_path
-  else begin
-    Format.eprintf "@[Could not find the module@ %a@ at@ %s.@]@."
-    pp_selector selector import_path;
-    raise Not_found
-  end
+  Filename.concat base_dir module_path
+
+let selector_to_red ~base_dir selector =
+  selector_to_stem ~base_dir selector ^ red_extention
+
+let selector_to_rot ~base_dir selector =
+  selector_to_stem ~base_dir selector ^ rot_extention
+
+let red_to_stem red =
+  match String.sub red (String.length red - 4) 4 with
+  | ".red" -> String.sub red 0 @@ String.length red - 4
+  | _ -> raise @@ Invalid_argument "red_to_stem"
+  | exception Invalid_argument _ -> raise @@ Invalid_argument "red_to_stem"
 
 exception CanRudenessHelpMe
 let normalize_selector ~base_dir _ = raise CanRudenessHelpMe
