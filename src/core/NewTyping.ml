@@ -305,6 +305,9 @@ struct
     | `Pos (`El (D.Data _)), Tm.Intro _ ->
       raise CanJonHelpMe
 
+    | `Pos (`El (D.Data _)), Tm.FHCom _ ->
+      raise CanJonHelpMe
+
     | `Neg (D.Sg q, sys), _ ->
       let tm0, tm1 = Sigma.split tm in
       let sys0, sys1 = Sigma.split_sys cx sys in
@@ -404,6 +407,9 @@ struct
       raise CanJonHelpMe
 
     | Tm.Data _ ->
+      raise CanJonHelpMe
+
+    | Tm.FHCom _ ->
       raise CanJonHelpMe
 
     | _ ->
