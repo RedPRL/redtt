@@ -11,6 +11,8 @@ type error =
   | ExpectedType
   | DimensionOutOfScope
   | InvalidCofibration
+  | RestrictionTypeCofibrationMismatch
+  | ExpectedTermInFace
 
 exception E of error
 exception PleaseRaiseProperError
@@ -142,6 +144,31 @@ struct
       ConSys.plug (Cx.rel cx) (D.ExtApp xs) sys
   end
 
+  module Rst =
+  struct
+    let body cx r r' tm =
+      match Tm.unleash tm with
+      | Tm.RestrictThunk (ts, ts', otm) ->
+        let s = eval_dim cx ts in
+        let s' = eval_dim cx ts' in
+        let rel = Cx.rel cx in
+        begin
+          match D.Rel.compare r s rel, D.Rel.compare r' s' rel with
+          | `Same, `Same -> otm
+          | _ -> raise @@ E RestrictionTypeCofibrationMismatch
+        end
+
+
+      | Tm.Up cmd ->
+        Some (Tm.up @@ cmd @< Tm.RestrictForce)
+
+      | _ ->
+        raise PleaseRaiseProperError
+
+    let sys_body cx sys =
+      ConSys.plug (Cx.rel cx) D.RestrictForce sys
+  end
+
 
   module Cofibration :
   sig
@@ -216,14 +243,14 @@ struct
       function
       | [] -> ()
       | cofib ->
-        List.iter (fun (r, r') -> check_dim_scope xs r; check_dim_scope xs r') cofib;
+        List.iter (fun (r, r') -> List.iter (check_dim_scope xs) [r; r']) cofib;
         check_valid cofib
 
   end
 
   let polarity =
     function
-    | D.Pi _ | D.Sg _ | D.Ext _ ->
+    | D.Pi _ | D.Sg _ | D.Ext _ | D.Restrict _ ->
       `Neg
     | D.Univ _ | D.Data _ | D.Neu _ ->
       `Pos
@@ -280,6 +307,20 @@ struct
       let bdy_sys = Pi.sys_body cx x sys in
       let cod = inst_clo cx q.cod x in
       check_of_ty cx cod bdy_sys bdy
+
+    | `Neg (D.Restrict face, sys), _ ->
+      let r, r', ty_rr' = face in
+      begin
+        match Cx.restrict cx r r', Rst.body cx r r' tm with
+        | `Changed cx_rr', Some bdy ->
+          let sys_bdy = Rst.sys_body cx_rr' sys in
+          check_of_ty cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
+        | `Same, Some bdy ->
+          let sys_bdy = Rst.sys_body cx sys in
+          check_of_ty cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
+        | exception I.Inconsistent -> ()
+        | _ -> raise @@ E ExpectedTermInFace
+      end
 
     | `Neg (D.Ext eclo, sys), _ ->
       let names = Bwd.to_list @@ D.ExtClo.names eclo in
@@ -339,7 +380,7 @@ struct
         | exception I.Inconsistent ->
           `Const 0 (* power move *)
         | _ ->
-          raise PleaseRaiseProperError
+          raise @@ E ExpectedTermInFace
       end
 
     | _ ->
@@ -369,7 +410,7 @@ struct
         | exception I.Inconsistent ->
           loop boundary sys
         | _ ->
-          raise PleaseRaiseProperError
+          raise @@ E ExpectedTermInFace
     in
     loop [] sys
 
