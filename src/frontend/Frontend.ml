@@ -19,13 +19,13 @@ let set_options options =
 let load options source =
   try
     set_options options;
-    let f = SysUtil.normalize options.file_name in
-    let mlconf : ML.mlconf = {red_path = f; indent = ""} in
+    let stem = FileRes.red_to_stem @@ SysUtil.normalize options.file_name in
+    let mlconf : ML.mlconf = {stem; indent = ""} in
     match source with
     | `Stdin ->
-      ignore @@ Importer.M.load_stdin ~persistent_env_opt:None ~mlconf ~file_name:f
+      ignore @@ Importer.M.load_stdin ~persistent_env_opt:None ~mlconf ~stem
     | `File ->
-      ignore @@ Importer.M.load_file ~persistent_env_opt:None ~mlconf f
+      ignore @@ Importer.M.load_file ~persistent_env_opt:None ~mlconf stem
   with
   | ParseError.E (posl, posr) ->
     let loc = Some (posl, posr) in

@@ -6,7 +6,7 @@ type 'a info =
    span : Log.location}
 
 module T = PersistentTable.M
-type mlconf = {red_path : string; indent : string}
+type mlconf = {stem : string; indent : string}
 type mlname = [`Gen of Name.t | `User of string]
 
 

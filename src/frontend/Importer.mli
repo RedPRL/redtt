@@ -9,7 +9,7 @@ sig
   val load_stdin
     : persistent_env_opt : Contextual.persistent_env option
     -> mlconf : ML.mlconf
-    -> file_name : string
+    -> stem : string
     -> Contextual.persistent_env * ResEnv.t
 
   val import

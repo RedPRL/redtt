@@ -32,7 +32,7 @@ sig
   val load_stdin
     : persistent_env_opt : Contextual.persistent_env option
     -> mlconf : ML.mlconf
-    -> file_name : string
+    -> stem : string
     -> Contextual.persistent_env * ResEnv.t
     
   val import
@@ -44,31 +44,28 @@ end =
 struct
   open ML
   
-  let load_file ~persistent_env_opt ~mlconf red_path =
-    let stem = FileRes.red_to_stem red_path in
+  let load_file ~persistent_env_opt ~mlconf stem =
+    let red = FileRes.stem_to_red stem in
     match Hashtbl.find_opt cache stem with
     | None ->
-      Format.eprintf "@[%sChecking %s.@]@." mlconf.indent red_path;
-      let persistent_env, res =
-        let mlcmd = read_file red_path in
-        Runner.execute ~persistent_env_opt ~mlconf ~mlcmd
-      in
+      Format.eprintf "@[%sChecking %s.@]@." mlconf.indent red;
+      let persistent_env, res = Runner.execute ~persistent_env_opt ~mlconf ~mlcmd:(read_file red) in
       Hashtbl.add cache stem res;
-      Format.eprintf "@[%sChecked %s.@]@." mlconf.indent red_path;
+      Format.eprintf "@[%sChecked %s.@]@." mlconf.indent red;
       `New (persistent_env, res)
     | Some res ->
-      Format.eprintf "@[%sLoaded %s.@]@." mlconf.indent red_path;
+      Format.eprintf "@[%sLoaded %s.@]@." mlconf.indent stem;
       `Cached res
 
-  let load_stdin ~persistent_env_opt ~mlconf ~file_name =
-    let mlcmd = read_from_channel ~file_name stdin in
+  let load_stdin ~persistent_env_opt ~mlconf ~stem =
+    let mlcmd = read_from_channel ~file_name:(FileRes.stem_to_red stem) stdin in
     Runner.execute ~persistent_env_opt ~mlconf ~mlcmd
 
   let import ~persistent_env ~mlconf ~selector =
-    let base_dir = Filename.dirname mlconf.red_path in
-    let f = FileRes.selector_to_red ~base_dir selector in
-    let mlconf = {red_path = f; indent = " " ^ mlconf.indent} in
-    load_file ~persistent_env_opt:(Some persistent_env) ~mlconf f
+    let base_dir = Filename.dirname mlconf.stem in
+    let stem = FileRes.selector_to_stem ~base_dir selector in
+    let mlconf = {stem; indent = " " ^ mlconf.indent} in
+    load_file ~persistent_env_opt:(Some persistent_env) ~mlconf stem
 end
 and Runner :
 sig
