@@ -15,6 +15,7 @@ type error =
   | ExpectedTermInFace
   | ExpectedVType
   | ExpectedPositiveCommand
+  | KindError
 
 exception E of error
 exception PleaseRaiseProperError
@@ -393,6 +394,9 @@ struct
       lvl
 
     | Tm.Restrict (tr, tr', otm) ->
+      (* these aren't kan, are they? *)
+      if Kind.lte kind `Kan then
+        raise @@ E KindError;
       begin
         let r = eval_dim cx tr in
         let r' = eval_dim cx tr' in
