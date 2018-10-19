@@ -184,6 +184,29 @@ struct
       ConSys.plug (Cx.rel cx) D.RestrictForce sys
   end
 
+  module V =
+  struct
+    type t = {r : Tm.tm; tm0 : Tm.tm; tm1 : Tm.tm}
+    let split cx ~r ~ty0 ~ty1 ~equiv tm =
+      match Tm.unleash tm with
+      | Tm.VIn vin ->
+        `CheckImage, {r = vin.r; tm0 = vin.tm0; tm1 = vin.tm1}
+      | Tm.Up cmd ->
+        let cx_r0 = Cx.restrict_ cx r `Dim0 in
+        let func = D.Val.plug (Cx.rel cx_r0) D.Fst equiv in
+        let func_ty = D.Con.make_arr (Cx.rel cx_r0) (D.Val.make ty0) (D.Val.make ty1) in
+        let ty0 = Q.equate_tycon (Cx.qenv cx_r0) (Cx.rel cx_r0) ty0 ty0 in
+        let ty1 = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty1 ty1 in
+        let tfunc = Q.equate_val (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty func func in
+        let tr = Q.quote_dim (Cx.qenv cx) r in
+        let frm = Tm.VProj {r = tr; ty0; ty1; func = tfunc} in
+        let vproj = cmd @< frm in
+        `NoCheck, {r = tr; tm0 = tm; tm1 = Tm.up vproj}
+      | _ ->
+        raise PleaseRaiseProperError
+
+  end
+
 
   module Cofibration :
   sig
@@ -385,7 +408,28 @@ struct
       let cod, cod_sys = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun r -> D.Dim r) rs in
       check_of_ty cx cod (cod_sys @ bdy_sys) bdy
 
-    | D.V _ ->
+    | D.V v ->
+      let ty0 = D.Val.unleash v.ty0 in
+      let ty1 = D.Val.unleash v.ty1 in
+      let mode, vin = V.split cx ~r:v.r ~ty0 ~ty1 ~equiv:v.equiv tm in
+      check cx (`Pos `Dim) vin.r;
+      let r = eval_dim cx vin.r in
+      let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) v.r r in
+      let cx_r0 = Cx.restrict_ cx r `Dim0 in
+
+      let vproj_sys = raise CanJonHelpMe in
+
+      check_of_ty cx_r0 (D.Val.unleash v.ty0) vproj_sys vin.tm0;
+      let boundary1 =
+        match mode with
+        | `CheckImage ->
+          let func = D.Val.plug (Cx.rel cx_r0) D.Fst v.equiv in
+          let el0 = D.Val.make @@ eval cx_r0 vin.tm0 in
+          let app = D.Val.plug (Cx.rel cx_r0) (D.FunApp (D.TypedVal.make el0)) func in
+          [r, `Dim0, D.LazyVal.make_from_delayed app]
+        | `NoCheck -> []
+      in
+      check_of_ty cx (D.Val.unleash v.ty1) boundary1 vin.tm1;
       (* This will be interesting in the new Thought... *)
       raise CanJonHelpMe
     | _ ->
