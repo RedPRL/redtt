@@ -417,21 +417,20 @@ struct
       let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) v.r r in
       let cx_r0 = Cx.restrict_ cx r `Dim0 in
 
-      let vproj_sys = raise CanJonHelpMe in
+      let vproj_sys0, vproj_sys1 = raise CanJonHelpMe in
 
-      check_of_ty cx_r0 (D.Val.unleash v.ty0) vproj_sys vin.tm0;
+      (* A very powerful Thought is coming here... Carlo and I checked it. *)
+      check_of_ty cx_r0 (D.Val.unleash v.ty0) vproj_sys0 vin.tm0;
       let boundary1 =
         match mode with
         | `CheckImage ->
           let func = D.Val.plug (Cx.rel cx_r0) D.Fst v.equiv in
           let el0 = D.Val.make @@ eval cx_r0 vin.tm0 in
           let app = D.Val.plug (Cx.rel cx_r0) (D.FunApp (D.TypedVal.make el0)) func in
-          [r, `Dim0, D.LazyVal.make_from_delayed app]
-        | `NoCheck -> []
+          (r, `Dim0, D.LazyVal.make_from_delayed app) :: vproj_sys1
+        | `NoCheck -> vproj_sys1
       in
-      check_of_ty cx (D.Val.unleash v.ty1) boundary1 vin.tm1;
-      (* This will be interesting in the new Thought... *)
-      raise CanJonHelpMe
+      check_of_ty cx (D.Val.unleash v.ty1) boundary1 vin.tm1
     | _ ->
       raise CanJonHelpMe
 
