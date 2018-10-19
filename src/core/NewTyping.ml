@@ -508,9 +508,11 @@ struct
       let Tm.B (name, ty) = coe.ty in
       let cxx, x = Cx.extend_dim cx ~name in
       let _ = check_ty cxx `Kan ty in
-      let rel = Cx.rel cx in
-      let env = Cx.venv cx in
-      let ty_at s = D.Syn.eval rel (D.Env.extend_cell env @@ D.Dim s) ty in
+      let ty_at s =
+        let rel = Cx.rel cx in
+        let env = Cx.venv cx in
+        D.Syn.eval rel (D.Env.extend_cell env @@ D.Dim s) ty
+      in
       check_of_ty cx (ty_at r) [] coe.tm;
       `El (ty_at r')
 
