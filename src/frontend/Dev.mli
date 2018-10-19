@@ -17,8 +17,8 @@ type 'a decl =
      tm : 'a}
     (** this is a definition given by the user and has been type-checked *)
   | Guess of {ty : 'a; tm : 'a}
-    (** this means the Unify is guessing some term [tm] of type [ty],
-        but it is not type-checked yet. *)
+    (** we have a term [tm] of type [ty], which is not yet the same as
+        the hole we are trying to fill *)
 
 type status =
   | Blocked
@@ -34,12 +34,12 @@ type ('a, 'b) equation =
    Right now we're going through such stupid contortions to make it a last. For instance, not every cell
    should be binding a variable, lmao! *)
 type 'a param =
-  [ `I (* a local binder for a dimension variable. *)
-  | `NullaryExt (* a local binder that binds nothing but imposes a system. *)
-  | `P of 'a (* a local binder for an expression variable. the argument is the type *)
-  | `Def of 'a * 'a (* a local binder for user definitions. the first argument is the type and the second is the term. *)
-  | `Tw of 'a * 'a (* a local binder that binds two should-be-unified variables. *)
-  | `R of 'a * 'a (* a local binder that binds nothing but restricts the context. *)
+  [ `I (** a local binder for a dimension variable. *)
+  | `NullaryExt (** a local binder that binds nothing but imposes a system. *)
+  | `P of 'a (** a local binder for an expression variable. the argument is the type *)
+  | `Def of 'a * 'a (** a local binder for user definitions. the first argument is the type and the second is the term. *)
+  | `Tw of 'a * 'a (** a local binder which binds a twin variable, with a type for each side of a unification problem *)
+  | `R of 'a * 'a (** a local binder that binds nothing but restricts the context. *)
   ]
 
 type params = (Name.t * ty param) bwd
