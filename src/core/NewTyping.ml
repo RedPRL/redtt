@@ -9,6 +9,8 @@ type error =
   | PolarityMismatch
   | UniverseError
   | ExpectedType
+  | DimensionOutOfScope
+  | InvalidCofibration
 
 exception E of error
 exception PleaseRaiseProperError
@@ -201,13 +203,14 @@ struct
               (go[@tailcall]) eqns (x :: atoms_to_check)
             end
       in
-      if go cofib [] then () else failwith "Cofibration.check_valid"
+      if not @@ go cofib [] then
+        raise @@ E InvalidCofibration
 
     let check_dim_scope xs =
       function
-      | `Dim0 -> ()
-      | `Dim1 -> ()
-      | `Atom x -> if List.mem x xs then () else failwith "Bad dimension scope"
+      | `Atom x when not @@ List.mem x xs ->
+        raise @@ E DimensionOutOfScope
+      | _ -> ()
 
     let check_extension xs =
       function
