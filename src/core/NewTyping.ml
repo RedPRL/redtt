@@ -260,7 +260,7 @@ struct
 
   let polarity =
     function
-    | D.Pi _ | D.Sg _ | D.Ext _ | D.Restrict _ ->
+    | D.Pi _ | D.Sg _ | D.Ext _ | D.Restrict _ | D.V _ ->
       `Neg
     | D.Univ _ | D.Data _ | D.Neu _ ->
       `Pos
@@ -344,6 +344,10 @@ struct
       let cod, cod_sys = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun r -> D.Dim r) rs in
       check_of_ty cx cod (cod_sys @ bdy_sys) bdy
 
+    | `Neg (D.V _, sys), _ ->
+      (* This will be interesting in the new Thought... *)
+      raise CanJonHelpMe
+
     | _ ->
       raise @@ E UnexpectedState
 
@@ -395,6 +399,9 @@ struct
         | _ ->
           raise @@ E ExpectedTermInFace
       end
+
+    | Tm.V _ ->
+      raise CanJonHelpMe
 
     | Tm.Data _ ->
       raise CanJonHelpMe
