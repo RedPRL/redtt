@@ -36,6 +36,8 @@ and mlcmd =
   | MlBind of mlcmd * mlname * mlcmd
   | MlUnleash of mlval
   | MlNormalize of mlval
+  | MlIncludeFile of FileRes.filepath
+  | MlIncludeStdin of {filename : FileRes.filepath}
   | MlImport of ResEnv.visibility * FileRes.selector
   | MlPrint of mlval info
   | MlDebug of [`All | `Constraints | `Unsolved]

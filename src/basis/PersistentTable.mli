@@ -12,6 +12,8 @@ sig
   val set_opt : 'k -> 'a option -> ('k, 'a) t -> ('k, 'a) t
   val find : 'k -> ('k, 'a) t -> 'a option
   val fold : ('k -> 'a -> 'b -> 'b) -> ('k, 'a) t -> 'b -> 'b
+
+  (** entries from the first argument overwrite the ones from the second. *)
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
 end
 

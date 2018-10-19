@@ -16,23 +16,27 @@ let set_options options =
   Format.set_margin options.line_width;
   Name.set_debug_mode options.debug_mode
 
+module Elab = Elaborator.Make (Importer.M)
+
+let execute_ml ~mlconf cmd =
+  ignore @@ Contextual.run ~mlconf @@ Elab.eval_cmd cmd
+
 let load options source =
   try
     set_options options;
-    let stem = FileRes.red_to_stem @@ SysUtil.normalize options.file_name in
+    let red = SysUtil.normalize options.file_name in
+    let stem = FileRes.red_to_stem red in
     let mlconf : ML.mlconf = {stem; indent = ""} in
+    execute_ml ~mlconf @@
     match source with
-    | `Stdin ->
-      ignore @@ Importer.M.load_stdin ~persistent_env_opt:None ~mlconf ~stem
-    | `File ->
-      ignore @@ Importer.M.load_file ~persistent_env_opt:None ~mlconf stem
+    | `Stdin -> ML.MlIncludeStdin {filename = red}
+    | `File -> ML.MlIncludeFile red
   with
   | ParseError.E (posl, posr) ->
     let loc = Some (posl, posr) in
     let pp fmt () = Format.fprintf fmt "Parse error" in
     Log.pp_message ~loc ~lvl:`Error pp Format.err_formatter ();
     exit 1
-
 
 let load_file options =
   load options `File

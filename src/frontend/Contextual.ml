@@ -3,15 +3,35 @@ open RedTT_Core
 open RedBasis
 open Bwd open BwdNotation
 
-type lcx = entry bwd
-type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 
+module PathMap = Map.Make (String)
 module Map = Map.Make (Name)
 
-type env = GlobalEnv.t
-type persistent_env = {env : env; info : [`Flex | `Rigid] Map.t; sources : FileRes.filepath Map.t}
-type cx = {mlenv : ML.mlenv; resenv : ResEnv.t; persistent_env : persistent_env; lcx : lcx; rcx : rcx}
+(** this is the environment that will stay there for the entire thread *)
+type thread_env =
+  {env : GlobalEnv.t; (** the mapping from names to associated definitions (if any). *)
+   info : [`Flex | `Rigid] Map.t; (** whether a particular name is rigid. *)
+   sources : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
+   resolver_cache : (FileRes.filepath, ResEnv.t) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
+  }
 
+(** this is the environment that only makes sense in a particular module. *)
+type module_env =
+  {mlenv : ML.mlenv; (** the environment for *)
+   resenv : ResEnv.t (** the map from strings to names within a particular *)
+  }
+
+(** the local environmeth that only makes sense in a particular region of a module. *)
+type local_env =
+  {lcx : entry bwd;
+   rcx : [`Entry of entry | `Update of Occurs.Set.t] list
+  }
+
+type cx = {
+  th : thread_env;
+  mo : module_env;
+  lo : local_env
+}
 
 let rec pp_lcx fmt =
   function
@@ -62,7 +82,7 @@ let filter_entry filter entry =
       | _ -> false
     end
 
-let pp_cx filter fmt {lcx; rcx} =
+let pp_cx filter fmt {lo = {lcx; rcx}; _} =
   Format.fprintf fmt "@[<v>%a@]@ %a@ @[<v>%a@]"
     pp_lcx (Bwd.filter (filter_entry filter) lcx)
     Uuseg_string.pp_utf_8 "❚"
@@ -105,18 +125,26 @@ let get _ cx = cx, cx
 
 let modify f _ cx = f cx, ()
 
-let getl = get <<@> fun x -> x.lcx
-let getr = get <<@> fun x -> x.rcx
-let modifyl f = modify @@ fun st -> {st with lcx = f st.lcx}
-let modifyr f = modify @@ fun st -> {st with rcx = f st.rcx}
+let getth = get <<@> fun x -> x.th
+let getlo = get <<@> fun x -> x.lo
+let getmo = get <<@> fun x -> x.mo
+
+let modifyth f = modify @@ fun st -> {st with th = f st.th}
+let modifymo f = modify @@ fun st -> {st with mo = f st.mo}
+let modifylo f = modify @@ fun st -> {st with lo = f st.lo}
+
+let getl = getlo <<@> fun x -> x.lcx
+let getr = getlo <<@> fun x -> x.rcx
+let modifyl f = modifylo @@ fun st -> {st with lcx = f st.lcx}
+let modifyr f = modifylo @@ fun st -> {st with rcx = f st.rcx}
 let setl l = modifyl @@ fun _ -> l
 let setr r = modifyr @@ fun _ -> r
 
 let modify_mlenv f =
-  modify @@ fun st ->
+  modifymo @@ fun st ->
   {st with mlenv = f st.mlenv}
 
-let get_mlenv = get <<@> fun st -> st.mlenv
+let get_mlenv = getmo <<@> fun st -> st.mlenv
 
 
 let assert_top_level =
@@ -124,66 +152,54 @@ let assert_top_level =
   | Emp -> ret ()
   | _ -> failwith "Invalid operations outside of the top-level."
 
-let init_persistent_env () =
-  {env = GlobalEnv.emp (); info = Map.empty; sources = Map.empty}
-
-let get_persistent_env =
-  assert_top_level >>
-  get <<@> fun st -> st.persistent_env
-
-let set_persistent_env persistent_env =
-  assert_top_level >>
-  modify @@ fun st -> {st with persistent_env}
-
 let update_env e =
-  modify @@ fun st ->
   match e with
   | E (nm, ty, Hole info) ->
-    {st with
-     persistent_env =
-       {st.persistent_env with
-        env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty;
-        info = Map.add nm info st.persistent_env.info}}
+    modifyth @@ fun th ->
+    {th with
+     env = GlobalEnv.ext_meta th.env nm @@ `P ty;
+     info = Map.add nm info th.info}
   | E (nm, ty, Guess _) ->
-    {st with
-     persistent_env =
-       {st.persistent_env with
-        env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty;
-        info = Map.add nm `Rigid st.persistent_env.info}}
+    modifyth @@ fun th ->
+    {th with
+     env = GlobalEnv.ext_meta th.env nm @@ `P ty;
+     info = Map.add nm `Rigid th.info}
   | E (nm, ty, Macro tm) ->
-    {st with
-     persistent_env =
-       {st.persistent_env with
-        env = GlobalEnv.define st.persistent_env.env nm ty tm;
-        info = Map.add nm `Rigid st.persistent_env.info}}
+    modifyth @@ fun th ->
+    {th with
+     env = GlobalEnv.define th.env nm ty tm;
+     info = Map.add nm `Rigid th.info}
   | E (nm, ty, UserDefn {source; visibility; opacity; tm}) ->
-    {st with
-     persistent_env =
-       {env =
-         begin
-           match opacity with
-           | `Transparent -> GlobalEnv.define st.persistent_env.env nm ty tm
-           | `Opaque -> GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty
-         end;
-        info = Map.add nm `Rigid st.persistent_env.info;
-        sources = Map.add nm source st.persistent_env.sources};
-     resenv = ResEnv.register_metavar ~visibility nm st.resenv}
-  | Q _ -> st
+    modifyth begin fun th ->
+      {th with
+       env =
+       begin
+         match opacity with
+         | `Transparent -> GlobalEnv.define th.env nm ty tm
+         | `Opaque -> GlobalEnv.ext_meta th.env nm @@ `P ty
+       end;
+       info = Map.add nm `Rigid th.info;
+       sources = Map.add nm source th.sources}
+    end >>
+    modifymo @@ fun mo ->
+    {mo with resenv = ResEnv.register_metavar ~visibility nm mo.resenv}
+  | Q _ -> ret ()
 
 let declare_datatype ~src visibility dlbl desc =
   modify @@ fun st ->
   {st with
-   persistent_env =
-     {st.persistent_env with
-      env = GlobalEnv.declare_datatype dlbl desc st.persistent_env.env;
-      sources = Map.add dlbl src st.persistent_env.sources};
-   resenv = ResEnv.register_datatype visibility dlbl st.resenv}
+   th =
+     {st.th with
+      env = GlobalEnv.declare_datatype dlbl desc st.th.env;
+      sources = Map.add dlbl src st.th.sources};
+   mo = {st.mo with resenv = ResEnv.register_datatype visibility dlbl st.mo.resenv}}
 
 let replace_datatype dlbl desc =
-  modify @@ fun st ->
-  {st with
-   persistent_env =
-     {st.persistent_env with env = GlobalEnv.replace_datatype dlbl desc st.persistent_env.env}}
+  modifyth @@ fun th ->
+  {th with env = GlobalEnv.replace_datatype dlbl desc th.env}
+
+let get_resolver_cache =
+  getth <<@> fun {resolver_cache; _} -> resolver_cache
 
 
 
@@ -196,16 +212,35 @@ let pushr e =
   modifyr (fun es -> `Entry e :: es) >>
   update_env e
 
-let run ~persistent_env_opt ~mlconf (m : 'a m) : persistent_env * 'a  =
-  let persistent_env = match persistent_env_opt with Some mem -> mem | None -> init_persistent_env () in
-  let {persistent_env; _}, r = m Emp {persistent_env; lcx = Emp; resenv = ResEnv.init (); mlenv = ML.Env.init ~mlconf; rcx = []} in
-  persistent_env, r
+let init_th () =
+  {env = GlobalEnv.emp (); info = Map.empty; sources = Map.empty; resolver_cache = Hashtbl.create 100}
+let init_mo ~mlconf =
+  {resenv = ResEnv.init (); mlenv = ML.Env.init ~mlconf}
+let init_lo () =
+  {lcx = Emp; rcx = []}
 
+let run ~mlconf (m : 'a m) : 'a  =
+  let th = init_th () in
+  let mo = init_mo ~mlconf in
+  let lo = init_lo () in
+  let _, r = m Emp {th; mo; lo} in
+  r
 
-let isolate (m : 'a m) : 'a m =
+let isolate_local (m : 'a m) : 'a m =
   fun ps st ->
-    let st', a = m ps {st with lcx = Emp; rcx = []} in
-    {persistent_env = st'.persistent_env; mlenv = st'.mlenv; resenv = st'.resenv; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx}, a
+    let st', a = m ps {st with lo = init_lo ()} in
+    {st' with lo = {lcx = st.lo.lcx <.> st'.lo.lcx; rcx = st'.lo.rcx @ st.lo.rcx}}, a
+
+let independent_local (m : 'a m) : 'a m =
+  fun ps st ->
+    let st', a = m ps {st with lo = init_lo ()} in
+    {st' with lo = st.lo}, a
+
+let isolate_module ~mlconf (m : 'a m) : 'a m =
+  assert_top_level >>
+  fun ps st ->
+    let st', a = m ps {st with mo = init_mo ~mlconf; lo = init_lo ()} in
+    {st' with mo = st.mo; lo = st.lo}, a
 
 let rec pushls es =
   match es with
@@ -230,7 +265,7 @@ let get_global_env =
   get >>= fun st ->
   let rec go_params =
     function
-    | Emp -> st.persistent_env.env
+    | Emp -> st.th.env
     | Snoc (psi, (x, `I)) ->
       GlobalEnv.ext_dim (go_params psi) x
     | Snoc (psi, (x, `P ty)) ->
@@ -259,12 +294,12 @@ let resolver =
 
   get >>= fun st ->
   ask >>= fun psi ->
-  M.ret @@ go_locals st.resenv psi
+  M.ret @@ go_locals st.mo.resenv psi
 
 let modify_top_resolver f =
   assert_top_level >>
-  modify @@ fun st ->
-  {st with resenv = f st.resenv}
+  modifymo @@ fun mo ->
+  {mo with resenv = f mo.resenv}
 
 let popr_opt =
   let rec go theta =
@@ -275,7 +310,7 @@ let popr_opt =
         ret @@ Some e
       else
         get >>= fun st ->
-        ret @@ Some (Entry.subst st.persistent_env.env e)
+        ret @@ Some (Entry.subst st.th.env e)
     | `Update theta' :: rcx ->
       setr rcx >>
       go @@ Occurs.Set.union theta theta'
@@ -298,7 +333,7 @@ let go_left =
 
 
 let go_to_top =
-  get >>= fun {lcx; rcx} ->
+  getlo >>= fun {lcx; rcx} ->
   setl Emp >>
   setr (Bwd.map (fun e -> `Entry e) lcx <>> rcx)
 
@@ -331,8 +366,8 @@ let lookup_var x w =
 
 let lookup_meta x =
   get >>= fun st ->
-  let ty = GlobalEnv.lookup_ty st.persistent_env.env x `Only in
-  let info = Map.find x st.persistent_env.info in
+  let ty = GlobalEnv.lookup_ty st.th.env x `Only in
+  let info = Map.find x st.th.info in
   ret (ty, info)
 
 

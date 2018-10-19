@@ -4,16 +4,11 @@ open Dev
 
 include Monad.S
 
-type persistent_env
-
 val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
 val assert_top_level : unit m
-val init_persistent_env : unit -> persistent_env
-val get_persistent_env : persistent_env m
-val set_persistent_env : persistent_env -> unit m
 
 val modify_mlenv : (ML.mlenv -> ML.mlenv) -> unit m
 val get_mlenv : ML.mlenv m
@@ -22,8 +17,12 @@ val resolver : ResEnv.t m
 val modify_top_resolver : (ResEnv.t -> ResEnv.t) -> unit m
 val declare_datatype : src:string -> ResEnv.visibility -> Name.t -> Desc.desc -> unit m
 val replace_datatype : Name.t -> Desc.desc -> unit m
+val get_resolver_cache : (FileRes.filepath, ResEnv.t) Hashtbl.t m
 
-val isolate : 'a m -> 'a m
+val isolate_local : 'a m -> 'a m
+val independent_local : 'a m -> 'a m
+val isolate_module : mlconf : ML.mlconf -> 'a m -> 'a m
+val run : mlconf : ML.mlconf -> 'a m -> 'a
 
 val popl : entry m
 val popr : entry m
@@ -62,8 +61,5 @@ val get_global_env : Subst.t m
 val base_cx : Cx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
-
-val run : persistent_env_opt : persistent_env option -> mlconf : ML.mlconf -> 'a m -> persistent_env * 'a
-
 
 val report_unsolved : loc:Log.location -> unit m

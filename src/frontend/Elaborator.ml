@@ -6,8 +6,9 @@ open Combinators
 
 module type Import =
 sig
-  val import : persistent_env : Contextual.persistent_env -> mlconf : ML.mlconf -> selector : FileRes.selector
-    -> [`New of Contextual.persistent_env * ResEnv.t | `Cached of ResEnv.t]
+  val include_file : FileRes.filepath -> unit Contextual.m
+  val include_stdin : filename : FileRes.filepath -> unit Contextual.m
+  val import : selector : FileRes.selector -> ResEnv.t Contextual.m
 end
 
 module type S =
@@ -165,15 +166,18 @@ struct
       C.replace_datatype alpha desc >>
       M.ret @@ E.SemRet (E.SemDataDesc desc)
 
+    | E.MlIncludeFile filename ->
+      C.assert_top_level >>
+      I.include_file filename >>
+      M.ret @@ E.SemRet (E.SemTuple [])
+
+    | E.MlIncludeStdin {filename} ->
+      C.assert_top_level >>
+      I.include_stdin ~filename >>
+      M.ret @@ E.SemRet (E.SemTuple [])
+
     | E.MlImport (visibility, selector) ->
-      C.get_persistent_env >>= fun persistent_env ->
-      C.get_mlenv <<@> E.Env.get_mlconf >>= fun mlconf ->
-      begin
-        match I.import ~persistent_env ~mlconf ~selector with
-        | `Cached res -> C.ret res
-        | `New (persistent_env, res) ->
-          C.set_persistent_env persistent_env >> C.ret res
-      end >>= fun res ->
+      I.import ~selector >>= fun res ->
       C.modify_top_resolver (ResEnv.import_globals ~visibility res) >>
       M.ret @@ E.SemRet (E.SemTuple [])
 

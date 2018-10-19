@@ -2,14 +2,11 @@ open RedTT_Core
 
 let version : string = "Where do correct ideas come from?"
 
-type selector = FileRes.selector
-type visibility = ResEnv.visibility
-
 type dep =
   | True
   | False
   | Redsum of {hash : Digest.t}
-  | Rotsum of {sel : selector; hash : Digest.t}
+  | Rotsum of {sel : FileRes.selector; hash : Digest.t}
   | Shell of {cmd : string}
 
 type datum =
@@ -18,11 +15,11 @@ type datum =
 
 type entry =
   {name : string;
-   visibility : visibility;
+   visibility : ResEnv.visibility;
    id : int}
 
 type rot =
   {deps : dep list;
-   imports : selector list;
+   imports : FileRes.filepath list;
    data : datum list;
    resolver : entry list}

@@ -1,20 +1,15 @@
+open Contextual
+
 module M :
 sig
-  val load_file
-    : persistent_env_opt : Contextual.persistent_env option
-    -> mlconf : ML.mlconf
-    -> string
-    -> [`New of Contextual.persistent_env * ResEnv.t | `Cached of ResEnv.t]
+  (** include a file as if its content is copy-pasted into the current module,
+      followed by a report on unresolved meta variables. *)
+  val include_file : FileRes.filepath -> unit m
 
-  val load_stdin
-    : persistent_env_opt : Contextual.persistent_env option
-    -> mlconf : ML.mlconf
-    -> stem : string
-    -> Contextual.persistent_env * ResEnv.t
+  (** include the content from the standard input as if it is copy-pasted
+      into the current module, followed by a report on unresolved meta variables. *)
+  val include_stdin : filename : FileRes.filepath -> unit m
 
-  val import
-    : persistent_env : Contextual.persistent_env
-    -> mlconf : ML.mlconf
-    -> selector : FileRes.selector
-    -> [`New of Contextual.persistent_env * ResEnv.t | `Cached of ResEnv.t]
+  (** import some module. *)
+  val import : selector : FileRes.selector -> ResEnv.t m
 end
