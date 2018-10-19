@@ -101,16 +101,8 @@ def bisimulation : path^1 nat-impl nat/nat-impl list/nat-impl =
   λ i →
   (ua/path i,
    coe 0 i zero in ua/path,
-   let p : ua/path i → ua/path i =
-     coe 0 i (λ n → suc n) in λ i → ua/path i → ua/path i in
-   comp 0 1 p [
-   | i=0 → refl
-   | i=1 j →
-     λ xs →
-     cons
-       triv
-       (coe j 1 (list→nat→list (coe 1 j xs in λ _ → list unit) j) in λ _ → list unit)
-   ]
+   -- MORTAL
+   λ v → let v' : ua/path i = (suc v, cons triv (v .vproj)) in v'
   )
 -/
 
