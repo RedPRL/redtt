@@ -31,6 +31,7 @@ sig
   val extend : t -> ?name:string option -> D.con -> t * D.con
   val extend_dims : t -> ?names:string option list -> t * Name.t list
   val lookup : t -> ?tw:Tm.twin -> int -> [`Dim | `El of D.con]
+  val lookup_const : t -> ?tw:Tm.twin -> ?ushift:int -> Name.t -> [`Dim | `El of D.con]
 
   val restrict : t -> D.dim -> D.dim -> t D.Rel.m
   val restrict_ : t -> D.dim -> D.dim -> t
@@ -50,6 +51,9 @@ struct
   let qenv cx = cx.qenv
 
   let lookup cx ?(tw = `Only) ix =
+    raise CanJonHelpMe
+
+  let lookup_const cx ?(tw = `Only) ?(ushift = 0) x =
     raise CanJonHelpMe
 
   let extend _ ?name _ =
@@ -458,10 +462,10 @@ struct
       Cx.lookup cx ~tw ix
 
     | Tm.Var var ->
-      raise CanJonHelpMe
+      Cx.lookup_const cx ~tw:var.twin ~ushift:var.ushift var.name
 
     | Tm.Meta meta ->
-      raise CanJonHelpMe
+      Cx.lookup_const cx ~ushift:meta.ushift meta.name
 
     | Tm.HCom _ ->
       raise CanJonHelpMe
