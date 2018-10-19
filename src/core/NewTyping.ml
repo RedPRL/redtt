@@ -297,6 +297,9 @@ struct
       if Lvl.greater lvl univ.lvl then
         raise @@ E UniverseError
 
+    | `Pos (`El (D.Data _)), Tm.Intro _ ->
+      raise CanJonHelpMe
+
     | `Neg (D.Sg q, sys), _ ->
       let tm0, tm1 = Sigma.split tm in
       let sys0, sys1 = Sigma.split_sys cx sys in
@@ -387,6 +390,9 @@ struct
         | _ ->
           raise @@ E ExpectedTermInFace
       end
+
+    | Tm.Data _ ->
+      raise CanJonHelpMe
 
     | _ ->
       raise CanJonHelpMe
@@ -513,6 +519,15 @@ struct
       let frm = D.FunApp (D.TypedVal.make (D.Val.make arg)) in
       let vhd = D.Val.plug (Cx.rel cx) frm vhd in
       synth_stack cx vhd cod stk
+
+    | D.Restrict tyface, Tm.RestrictForce :: stk ->
+      raise CanJonHelpMe
+
+    | D.Ext eclo, Tm.ExtApp rs :: stk ->
+      raise CanJonHelpMe
+
+    | D.Data _, Tm.Elim _ :: stk ->
+      raise CanJonHelpMe
 
     | _ ->
       raise CanJonHelpMe
