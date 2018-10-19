@@ -836,6 +836,8 @@ sig
 
   (** invariant: [args] is [rel]-value, but [sys] might not be rigid *)
   val make_intro : rel -> dlbl:Name.t -> clbl:string -> args:constr_cell list -> sys:con sys -> con
+
+  val make_arr : rel -> value -> value -> con
 end =
 struct
   module ConFace = Face (Con)
@@ -846,6 +848,15 @@ struct
   module ValAbs = AbsPlug (Val)
 
   type t = con
+
+  let make_arr rel ty0 ty1 =
+    let env =
+      Env.init_isolated
+        [Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty0 end);
+         Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty1 end)]
+    in
+    Syn.eval rel env @@
+    Tm.arr (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
 
   let swap pi =
     function
@@ -1470,15 +1481,8 @@ struct
       frm, LazyVal.unleash ty, [(r, r', LazyVal.make hd)]
 
     | V {ty0; ty1; _}, VProj info ->
-      let arr_ty = Val.make @@
-        let env = Env.init_isolated
-            [Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty0 end);
-             Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty1 end)]
-        in
-        Syn.eval rel env @@
-        Tm.arr (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
-      in
-      VProj {info with func = {info.func with ty = Some arr_ty}}, Val.unleash ty1, []
+      let arr_ty = make_arr rel ty0 ty1 in
+      VProj {info with func = {info.func with ty = Some (Val.make arr_ty)}}, Val.unleash ty1, []
 
     | HCom {ty = `Pos; cap; _}, Cap _ ->
       frm, Val.unleash cap, []

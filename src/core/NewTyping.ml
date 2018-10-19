@@ -13,6 +13,7 @@ type error =
   | InvalidCofibration
   | RestrictionTypeCofibrationMismatch
   | ExpectedTermInFace
+  | ExpectedVType
 
 exception E of error
 exception PleaseRaiseProperError
@@ -425,7 +426,58 @@ struct
       check cx (`Neg (ty, sys)) tm
 
   and synth cx cmd : positive =
+    let hd, stk = cmd in
     raise CanJonHelpMe
+
+  and synth_head cx hd =
+    raise CanJonHelpMe
+
+  and synth_stack cx vhd ty stk  =
+    match ty, stk with
+    | _, [] ->
+      ty
+
+    | _, Tm.VProj vproj :: stk ->
+      begin
+        check cx (`Pos `Dim) vproj.r;
+        let r = eval_dim cx vproj.r in
+        match D.Rel.compare r `Dim0 (Cx.rel cx) with
+        | `Same ->
+          let _ = check_ty cx `Pre vproj.ty0 in
+          let _ = check_ty cx `Pre vproj.ty1 in
+          let ty0 = eval cx vproj.ty0 in
+          let ty1 = eval cx vproj.ty1 in
+          let func_ty = D.Con.make_arr (Cx.rel cx) (D.Val.make ty0) (D.Val.make ty1) in
+          check_of_ty cx func_ty [] vproj.func;
+          let vfunc = eval cx vproj.func in
+          let vhd =
+            D.Val.make_from_lazy @@ lazy begin
+              D.Con.plug (Cx.rel cx) (D.FunApp (D.TypedVal.make vhd)) vfunc
+            end
+          in
+          (* r must be equal to 0 *)
+          synth_stack cx vhd ty1 stk
+
+        | `Apart ->
+          (* r must be equal to 1 *)
+          synth_stack cx vhd ty stk
+
+        | `Indet ->
+          (* must be in V type *)
+          match ty with
+          | D.V v ->
+            raise CanJonHelpMe
+          | _ ->
+            raise @@ E ExpectedVType
+      end
+
+    | D.Sg q, Tm.Fst :: stk ->
+      let vhd = D.Val.plug (Cx.rel cx) D.Fst vhd in
+      let ty = D.Val.unleash q.dom in
+      synth_stack cx vhd ty stk
+
+    | _ ->
+      raise CanJonHelpMe
 
   and approx cx ty0 ty1 =
     match polarity ty0, polarity ty1 with

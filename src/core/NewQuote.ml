@@ -320,9 +320,21 @@ and equate_frame qenv rel frm0 frm1 =
   | VProj {r = r0; func = {ty = Some func_ty0; value = func0}},
     VProj {r = r1; func = {ty = Some func_ty1; value = func1}} ->
     let r = equate_dim qenv rel r0 r1 in
-    let _ = equate_tyval qenv rel func_ty0 func_ty1 in
-    let func = equate_val qenv rel (Val.unleash func_ty0) func0 func1 in
-    Tm.VProj {r; func}
+    let func_ty0 = Val.unleash func_ty0 in
+    let func_ty1 = Val.unleash func_ty1 in
+    begin
+      match func_ty0, func_ty1 with
+      | Pi qu0, Pi qu1 ->
+        let ty0 = equate_tyval qenv rel qu0.dom qu1.dom in
+        let dummy = LazyVal.make FortyTwo in
+        let cod0 = Val.make @@ Clo.inst rel qu0.cod @@ Val dummy in
+        let cod1 = Val.make @@ Clo.inst rel qu1.cod @@ Val dummy in
+        let ty1 = equate_tyval qenv rel cod0 cod1 in
+        let func = equate_val qenv rel func_ty0 func0 func1 in
+        Tm.VProj {r; ty0; ty1; func}
+      | _ ->
+        raise PleaseRaiseProperError
+    end
 
   | Cap info0, Cap info1 ->
     let r = equate_dim qenv rel info0.r info1.r in

@@ -1078,7 +1078,7 @@ struct
             | _ -> failwith "V is not rigid when applying vproj frame."
           in
           let func = Tm.up @@ Tm.ann ~ty:(Tm.equiv ty0 ty1) ~tm:equiv @< Tm.Fst in
-          M.ret (ty1, cmd @< Tm.VProj {r; func})
+          M.ret (ty1, cmd @< Tm.VProj {r; func; ty0; ty1})
         | _ ->
           raise ChkMatch
       end

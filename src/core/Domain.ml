@@ -75,6 +75,8 @@ and pp_con fmt : con -> unit =
     Format.fprintf fmt "@[<hv1>(%a %a)@]"
       Uuseg_string.pp_utf_8 info.clbl
       pp_env_cells info.args
+  | FortyTwo ->
+    Format.fprintf fmt "DUMMY"
 
 
 and pp_value fmt value =
