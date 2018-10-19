@@ -68,24 +68,54 @@ and yaml_of_twin =
   | `TwinL -> `String "twinl"
   | `TwinR -> `String "twinr"
 
-let yaml_of_name nm =
+let yaml_of_ostring nm =
   `String (Option.default "" nm)
 
-let name_of_yaml =
+let ostring_of_yaml =
   function
   | `String "" -> None
   | `String str -> Some str
   | _ -> failwith "unexpected name!"
 
-let yaml_of_name_bwd nms =
-  `A (List.map yaml_of_name @@ Bwd.to_list nms)
+let yaml_of_ostring_bwd nms =
+  `A (List.map yaml_of_ostring @@ Bwd.to_list nms)
 
-let name_bwd_of_yaml =
+let ostring_bwd_of_yaml =
   function
-  | `A arr -> Bwd.from_list @@ List.map name_of_yaml arr
+  | `A arr -> Bwd.from_list @@ List.map ostring_of_yaml arr
   | _ -> failwith "unexpected name!"
 
-let rec yaml_of_tm tm =
+let rec yaml_of_name name kont_notfound kont_found =
+  resolver >>= fun res ->
+  match ResEnv.id_of_name_opt name res with
+  | Some id -> kont_found @@ yaml_of_int id
+  | None ->
+    source_stem name >>= function
+    | None -> kont_notfound ()
+    | Some stem ->
+      get_resolver stem >>= function
+      | None ->
+        Format.eprintf "Module at %s spread names around without leaving a trace in the cache.@." stem;
+        raise @@ Impossible "impossible cache miss"
+      | Some res ->
+        match ResEnv.id_of_name_opt name res with
+        | None -> kont_notfound ()
+        | Some id -> kont_found @@ `A [`String stem; yaml_of_int id]
+
+and yaml_of_meta ~name ~ushift =
+  yaml_of_name name
+    (fun () -> expand_meta ~name ~ushift >>= yaml_of_tm)
+    (fun name -> ret @@ `A [`String "meta"; name; yaml_of_int ushift])
+
+and yaml_of_var ~name ~twin ~ushift =
+  yaml_of_name name
+    (fun () -> expand_var ~name ~twin ~ushift >>= yaml_of_tm)
+    (fun name -> ret @@ `A [`String "var"; name; yaml_of_twin twin; yaml_of_int ushift])
+
+and yaml_of_dlbl dlbl =
+  yaml_of_name dlbl (fun () -> raise @@ Impossible "datatype name escaped the serialization context.") ret
+
+and yaml_of_tm tm =
   match Tm.unleash tm with
   | Tm.FHCom {r; r'; cap; sys} ->
     yaml_of_tm r >>= fun r ->
@@ -100,12 +130,12 @@ let rec yaml_of_tm tm =
   | Tm.Pi (dom, B (nm, cod)) ->
     yaml_of_tm dom >>= fun dom ->
     yaml_of_tm cod >>= fun cod ->
-    ret @@ `A [`String "pi"; dom; yaml_of_name nm; cod]
+    ret @@ `A [`String "pi"; dom; yaml_of_ostring nm; cod]
 
   | Tm.Ext (NB (nms, (tm, sys))) ->
     yaml_of_tm tm >>= fun tm ->
     yaml_of_tm_sys sys >>= fun sys ->
-    ret @@ `A [`String "ext"; yaml_of_name_bwd nms; tm; sys]
+    ret @@ `A [`String "ext"; yaml_of_ostring_bwd nms; tm; sys]
 
   | Tm.Restrict face ->
     yaml_of_tm_face face >>= fun face ->
@@ -114,7 +144,7 @@ let rec yaml_of_tm tm =
   | Tm.Sg (dom, B (nm, cod)) ->
     yaml_of_tm dom >>= fun dom ->
     yaml_of_tm cod >>= fun cod ->
-    ret @@ `A [`String "sg"; dom; yaml_of_name nm; cod]
+    ret @@ `A [`String "sg"; dom; yaml_of_ostring nm; cod]
 
   | Tm.V {r; ty0; ty1; equiv} ->
     yaml_of_tm r >>= fun r ->
@@ -131,11 +161,11 @@ let rec yaml_of_tm tm =
   
   | Tm.Lam (B (nm, tm)) ->
     yaml_of_tm tm >>= fun tm ->
-    ret @@ `A [`String "lam"; yaml_of_name nm; tm]
+    ret @@ `A [`String "lam"; yaml_of_ostring nm; tm]
   
   | Tm.ExtLam (NB (nms, tm)) ->
     yaml_of_tm tm >>= fun tm ->
-    ret @@ `A [`String "ext"; yaml_of_name_bwd nms; tm]
+    ret @@ `A [`String "ext"; yaml_of_ostring_bwd nms; tm]
   
   | Tm.RestrictThunk face ->
     yaml_of_tm_face face >>= fun face ->
@@ -164,45 +194,18 @@ let rec yaml_of_tm tm =
   | Tm.Let (cmd, B (nm, tm)) ->
     yaml_of_cmd cmd >>= fun cmd ->
     yaml_of_tm tm >>= fun tm ->
-    ret @@ `A [`String "let"; cmd; yaml_of_name nm; tm]
+    ret @@ `A [`String "let"; cmd; yaml_of_ostring nm; tm]
 
-  | Tm.Data _ -> raise CanFavoniaHelpMe
+  | Tm.Data {lbl; params} ->
+    yaml_of_dlbl lbl >>= fun lbl ->
+    MU.traverse yaml_of_tm params >>= fun params ->
+    ret @@ `A [`String "data"; lbl; `A params]
   
-  | Tm.Intro _ -> raise CanFavoniaHelpMe
-
-and yaml_of_meta ~name ~ushift =
-  resolver >>= fun res ->
-  match ResEnv.id_of_name_opt name res with
-  | Some id -> ret @@ `A [`String "meta-self"; yaml_of_int id; yaml_of_int ushift]
-  | None ->
-    source_stem name >>= function
-    | None -> expand_meta ~name ~ushift >>= yaml_of_tm
-    | Some stem ->
-      get_resolver stem >>= function
-      | None ->
-        Format.eprintf "Module at %s spreads variables without leaving a trace in the cache.@." stem;
-        raise @@ Impossible "Impossible cache miss"
-      | Some res ->
-        match ResEnv.id_of_name_opt name res with
-        | None -> expand_meta ~name ~ushift >>= yaml_of_tm
-        | Some id -> ret @@ `A [`String "meta-other"; `String stem; yaml_of_int id; yaml_of_int ushift]
-
-and yaml_of_var ~name ~twin ~ushift =
-  resolver >>= fun res ->
-  match ResEnv.id_of_name_opt name res with
-  | Some id -> ret @@ `A [`String "var-self"; yaml_of_int id; yaml_of_twin twin; yaml_of_int ushift]
-  | None ->
-    source_stem name >>= function
-    | None -> expand_var ~name ~twin ~ushift >>= yaml_of_tm
-    | Some stem ->
-      get_resolver stem >>= function
-      | None ->
-        Format.eprintf "Module at %s spreads variables without leaving a trace in the cache.@." stem;
-        raise @@ Impossible "Impossible cache miss"
-      | Some res ->
-        match ResEnv.id_of_name_opt name res with
-        | None -> expand_var ~name ~twin ~ushift >>= yaml_of_tm
-        | Some id -> ret @@ `A [`String "var-other"; `String stem; yaml_of_int id; yaml_of_twin twin; yaml_of_int ushift]
+  | Tm.Intro (dlbl, clbl, params, args) ->
+    yaml_of_dlbl dlbl >>= fun dlbl ->
+    MU.traverse yaml_of_tm params >>= fun params ->
+    MU.traverse yaml_of_tm args >>= fun args ->
+    ret @@ `A [`String "intro"; dlbl; `String clbl; `A params; `A args]
 
 and yaml_of_head =
   function
@@ -229,7 +232,7 @@ and yaml_of_head =
     yaml_of_tm r' >>= fun r' ->
     yaml_of_tm ty >>= fun ty ->
     yaml_of_tm tm >>= fun tm ->
-    ret @@ `A [`String "coe"; r; r'; yaml_of_name nm; ty; tm]
+    ret @@ `A [`String "coe"; r; r'; yaml_of_ostring nm; ty; tm]
 
   | Tm.HCom {r; r'; ty; cap; sys} ->
     yaml_of_tm r >>= fun r ->
@@ -245,7 +248,7 @@ and yaml_of_head =
     yaml_of_tm ty >>= fun ty ->
     yaml_of_tm cap >>= fun cap ->
     yaml_of_bnd_sys sys >>= fun sys ->
-    ret @@ `A [`String "com"; r; r'; yaml_of_name nm; ty; cap; sys]
+    ret @@ `A [`String "com"; r; r'; yaml_of_ostring nm; ty; cap; sys]
   
   | Tm.GHCom {r; r'; ty; cap; sys} ->
     yaml_of_tm r >>= fun r ->
@@ -261,7 +264,7 @@ and yaml_of_head =
     yaml_of_tm ty >>= fun ty ->
     yaml_of_tm cap >>= fun cap ->
     yaml_of_bnd_sys sys >>= fun sys ->
-    ret @@ `A [`String "gcom"; r; r'; yaml_of_name nm; ty; cap; sys]
+    ret @@ `A [`String "gcom"; r; r'; yaml_of_ostring nm; ty; cap; sys]
 
 and yaml_of_frame : Tm.tm Tm.frame -> Yaml.value m =
   function
@@ -291,7 +294,16 @@ and yaml_of_frame : Tm.tm Tm.frame -> Yaml.value m =
 
   | Tm.RestrictForce -> ret @@ `String "restrictforce"
 
-  | Tm.Elim _ -> raise CanFavoniaHelpMe
+  | Tm.Elim {dlbl; params; mot = Tm.B (nm, mot); clauses} ->
+    let yaml_of_clause (clbl, Tm.NB (nms, tm)) =
+      yaml_of_tm tm >>= fun tm ->
+      ret @@ `A [`String clbl; yaml_of_ostring_bwd nms; tm]
+    in
+    yaml_of_dlbl dlbl >>= fun dlbl ->
+    MU.traverse yaml_of_tm params >>= fun params ->
+    yaml_of_tm mot >>= fun mot ->
+    MU.traverse yaml_of_clause clauses >>= fun clauses ->
+    ret @@ `A [`String "elim"; dlbl; `A params; yaml_of_ostring nm; mot; `A clauses]
 
 and yaml_of_cmd (hd, sp) =
   yaml_of_head hd >>= fun hd ->
@@ -317,7 +329,7 @@ and yaml_of_bnd_face (r, r', obnd) =
   match obnd with
   | Some (Tm.B (nm, tm)) ->
     yaml_of_tm tm >>= fun tm ->
-    ret @@ `A [r; r'; yaml_of_name nm; tm]
+    ret @@ `A [r; r'; yaml_of_ostring nm; tm]
   | None ->
     ret @@ `A [r; r']
 
