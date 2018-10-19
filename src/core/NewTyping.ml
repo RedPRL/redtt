@@ -295,25 +295,58 @@ struct
 
   let rec check cx (phase : phase) tm =
     match phase, Tm.unleash tm with
-    | `Pos pos, Tm.Up cmd ->
+    | _, Tm.VIn vin ->
+      check cx (`Pos `Dim) vin.r;
+      let r = eval_dim cx vin.r in
+      begin
+        match Cx.restrict cx r `Dim0 with
+        | `Same ->
+          (* r = 0 *)
+          check cx phase vin.tm0
+        | exception I.Inconsistent ->
+          (* r = 1 *)
+          check cx phase vin.tm1
+        | `Changed cx_r0 ->
+          (* r = x, ty must be V... *)
+          match phase with
+          | `Neg (ty, sys) ->
+            check_neg cx ty sys tm
+          | _ ->
+            raise @@ E UnexpectedState
+      end
+
+    | `Neg (ty, sys), _ ->
+      check_neg cx ty sys tm
+
+    | `Pos pos, _ ->
+      check_pos cx pos tm
+
+  and check_pos cx pos tm =
+    match pos, Tm.unleash tm with
+    | _, Tm.Up cmd ->
       let pos' = synth cx cmd in
       approx_pos cx pos' pos
 
-    | `Pos `Dim, (Tm.Dim0 | Tm.Dim1) ->
+    | `Dim, (Tm.Dim0 | Tm.Dim1) ->
       ()
 
-    | `Pos (`El (D.Univ univ)), _->
+    | `El (D.Univ univ), _->
       let lvl = check_ty cx univ.kind tm in
       if Lvl.greater lvl univ.lvl then
         raise @@ E UniverseError
 
-    | `Pos (`El (D.Data _)), Tm.Intro _ ->
+    | `El (D.Data _), Tm.Intro _ ->
       raise CanJonHelpMe
 
-    | `Pos (`El (D.Data _)), Tm.FHCom _ ->
+    | `El (D.Data _), Tm.FHCom _ ->
       raise CanJonHelpMe
 
-    | `Neg (D.Sg q, sys), _ ->
+    | _ ->
+      raise CanJonHelpMe
+
+  and check_neg cx ty sys tm =
+    match ty with
+    | D.Sg q ->
       let tm0, tm1 = Sigma.split tm in
       let sys0, sys1 = Sigma.split_sys cx sys in
       let dom = D.Val.unleash q.dom in
@@ -322,14 +355,14 @@ struct
       let cod = inst_clo cx q.cod el0 in
       check_of_ty cx cod sys1 tm1
 
-    | `Neg (D.Pi q, sys), _ ->
+    | D.Pi q ->
       let cx', x = Cx.extend cx @@ D.Val.unleash q.dom in
       let bdy = Pi.body tm in
       let bdy_sys = Pi.sys_body cx x sys in
       let cod = inst_clo cx q.cod x in
       check_of_ty cx cod bdy_sys bdy
 
-    | `Neg (D.Restrict face, sys), _ ->
+    | D.Restrict face ->
       let r, r', ty_rr' = face in
       begin
         match Cx.restrict cx r r', Rst.body cx r r' tm with
@@ -343,7 +376,7 @@ struct
         | _ -> raise @@ E ExpectedTermInFace
       end
 
-    | `Neg (D.Ext eclo, sys), _ ->
+    | D.Ext eclo ->
       let names = Bwd.to_list @@ D.ExtClo.names eclo in
       let cx', xs = Cx.extend_dims cx ~names in
       let rs = List.map (fun x -> `Atom x) xs in
@@ -352,12 +385,11 @@ struct
       let cod, cod_sys = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun r -> D.Dim r) rs in
       check_of_ty cx cod (cod_sys @ bdy_sys) bdy
 
-    | `Neg (D.V _, sys), _ ->
+    | D.V _ ->
       (* This will be interesting in the new Thought... *)
       raise CanJonHelpMe
-
     | _ ->
-      raise @@ E UnexpectedState
+      raise CanJonHelpMe
 
   (* TODO: we can take from RedPRL the fine-grained subtraction of kinds. Let Favonia do it! *)
   and check_ty cx kind tm : Lvl.t =
@@ -649,6 +681,5 @@ struct
       ignore @@ Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty0 ty1
     | _ ->
       raise @@ E UnexpectedState
-
 
 end
