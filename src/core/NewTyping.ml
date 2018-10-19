@@ -324,6 +324,21 @@ struct
         Cofibration.from_sys cx' sys;
       lvl
 
+    | Tm.Restrict (tr, tr', otm) ->
+      begin
+        let r = eval_dim cx tr in
+        let r' = eval_dim cx tr' in
+        match Cx.restrict cx r r', otm with
+        | `Changed cx_rr', Some tm ->
+          check_ty cx_rr' kind tm
+        | `Same, Some tm ->
+          check_ty cx kind tm
+        | exception I.Inconsistent ->
+          `Const 0 (* power move *)
+        | _ ->
+          raise PleaseRaiseProperError
+      end
+
     | _ ->
       raise CanJonHelpMe
 
