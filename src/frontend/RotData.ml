@@ -1,6 +1,6 @@
 open RedTT_Core
 
-let version : string = "where do Thoughts come from?"
+let version : string = "Where do correct ideas come from?"
 
 type selector = FileRes.selector
 type visibility = ResEnv.visibility
