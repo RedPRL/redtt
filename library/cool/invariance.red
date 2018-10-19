@@ -56,13 +56,7 @@ def nat→list : nat → list unit =
   | suc (_ → xs) → cons triv xs
   ]
 
-def length (A : type) : list A → nat =
-  elim [
-  | nil → zero
-  | cons _ (_ → n) → suc n
-  ]
-
--- TODO ??
+-- do we need this outside of the iso?
 def list→nat→list (xs : list unit) :
   path (list unit) (nat→list (length unit xs)) xs =
   elim xs [
@@ -70,7 +64,7 @@ def list→nat→list (xs : list unit) :
   | cons * (_ → ih) → λ i → cons triv (ih i)
   ]
 
--- TODO ??
+-- do we need this outside of the iso?
 def nat→list→nat (n : nat) : path nat (length unit (nat→list n)) n =
   elim n [
   | zero → refl
@@ -95,7 +89,6 @@ def nat-impl : type^1 = (A : type) × A × (A → A)
 def nat/nat-impl : nat-impl = (nat, zero, λ n → suc n)
 def list/nat-impl : nat-impl = (list unit, nil, λ xs → cons triv xs)
 
-/-
 def bisimulation : path^1 nat-impl nat/nat-impl list/nat-impl =
   let ua/path = ua _ _ nat→list/equiv in
   λ i →
@@ -104,7 +97,6 @@ def bisimulation : path^1 nat-impl nat/nat-impl list/nat-impl =
    -- MORTAL
    λ v → let v' : ua/path i = (suc v, cons triv (v .vproj)) in v'
   )
--/
 
 def cool-lemma
   : (n' n : nat)
@@ -114,14 +106,13 @@ def cool-lemma
   elim [
   | zero → λ _ p → elim (list/encode unit _ _ p) []
   | suc m → λ n p →
-    let α = list/decode unit (nat→list m) (nat→list n) (list/encode unit _ _ p .snd) in
-    let β (i : 𝕀) : nat =
-      comp 0 1 (length unit (α i)) [
+    let α (i : 𝕀) : nat =
+      comp 0 1 (length unit (tail unit (p i))) [
       | i=0 → nat→list→nat m
       | i=1 → nat→list→nat n
       ]
     in
-    λ i → suc (β i)
+    λ i → suc (α i)
   ]
 
 def unit-list/set : is-set (list unit) = list/hlevel contr _ (prop→set _ unit/prop)
