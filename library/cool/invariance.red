@@ -41,3 +41,93 @@ def swap-fun/path (A : type) : (f : bool → A) → path _ (swap-fun A (swap-fun
     fun→pair/path A j → fun→pair/path A j
   in
   (f : fun→pair/path A i) → path (fun→pair/path A i) (swapcoe (swapcoe f)) f
+
+-- A cooler example?
+
+import data.list
+import data.nat
+import data.unit
+import paths.list
+import basics.isotoequiv
+
+def nat→list : nat → list unit =
+  elim [
+  | zero → nil
+  | suc (_ → xs) → cons triv xs
+  ]
+
+def length (A : type) : list A → nat =
+  elim [
+  | nil → zero
+  | cons _ (_ → n) → suc n
+  ]
+
+-- TODO ??
+def list→nat→list (xs : list unit) :
+  path (list unit) (nat→list (length unit xs)) xs =
+  elim xs [
+  | nil → refl
+  | cons * (_ → ih) → λ i → cons triv (ih i)
+  ]
+
+-- TODO ??
+def nat→list→nat (n : nat) : path nat (length unit (nat→list n)) n =
+  elim n [
+  | zero → refl
+  | suc (_ → ih) → λ i → suc (ih i)
+  ]
+
+def nat→list/iso : iso nat (list unit) =
+  (nat→list,
+   length unit,
+   elim [
+   | nil → refl
+   | cons * (_ → ih) → λ i → cons triv (ih i)
+   ],
+   elim [
+   | zero → refl
+   | suc (_ → ih) → λ i → suc (ih i)
+   ])
+
+def nat→list/equiv : equiv^1 nat (list unit) = iso→equiv _ _ nat→list/iso
+
+def nat-impl : type^1 = (A : type) × A × (A → A)
+def nat/nat-impl : nat-impl = (nat, zero, λ n → suc n)
+def list/nat-impl : nat-impl = (list unit, nil, λ xs → cons triv xs)
+
+def bisimulation : path^1 nat-impl nat/nat-impl list/nat-impl =
+  let ua/path = ua _ _ nat→list/equiv in
+  λ i →
+  (ua/path i,
+   coe 0 i zero in ua/path,
+   let p : ua/path i → ua/path i =
+     coe 0 i (λ n → suc n) in λ i → ua/path i → ua/path i in
+   comp 0 1 p [
+   | i=0 → refl
+   | i=1 j →
+     λ xs →
+     cons
+       triv
+       (coe j 1 (list→nat→list (coe 1 j xs in λ _ → list unit) j) in λ _ → list unit)
+   ]
+  )
+
+/-
+def nat→list/is-equiv' : is-equiv^1 _ _ nat→list =
+  elim [
+  | nil →
+    ((zero, refl),
+     λ[,] →
+     elim [
+     | zero → λ p i →
+       (zero,
+        let unit-list/set = list/hlevel contr _ (prop→set _ unit/prop) in
+        unit-list/set _ _ p refl i)
+     | suc _ → λ p → elim (list/encode unit _ _ p) []
+     ]
+    )
+  | cons * (xs → ih) →
+    let ((n,p),ih1) = ih in
+    ((suc n, λ i → cons triv (p i)), λ (n',p') i → (?,?_))
+  ]
+-/
