@@ -30,7 +30,7 @@ sig
 
   val extend : t -> ?name:string option -> D.con -> t * D.con
   val extend_dims : t -> ?names:string option list -> t * Name.t list
-  val lookup : t -> ?tw:Tm.twin -> int -> D.con
+  val lookup : t -> ?tw:Tm.twin -> int -> [`Dim | `El of D.con]
 
   val restrict : t -> D.dim -> D.dim -> t D.Rel.m
   val restrict_ : t -> D.dim -> D.dim -> t
@@ -444,11 +444,7 @@ struct
     | `Dim, _ ->
       raise @@ E ExpectedDimension
     | `El ty_in, _ ->
-      let vhd =
-        D.LazyVal.make_from_lazy @@ lazy begin
-          eval cx @@ Tm.up (hd, [])
-        end
-      in
+      let vhd = D.Val.make @@ eval cx @@ Tm.up (hd, []) in
       let ty_out = synth_stack cx vhd ty_in stk in
       match polarity ty_out with
       | `Pos ->
@@ -459,23 +455,32 @@ struct
   and synth_head cx hd =
     match hd with
     | Tm.Ix (ix, tw) ->
-      raise CanJonHelpMe
+      Cx.lookup cx ~tw ix
+
     | Tm.Var var ->
       raise CanJonHelpMe
+
     | Tm.Meta meta ->
       raise CanJonHelpMe
+
     | Tm.HCom _ ->
       raise CanJonHelpMe
+
     | Tm.Com _ ->
       raise CanJonHelpMe
+
     | Tm.GHCom _ ->
       raise CanJonHelpMe
+
     | Tm.GCom _ ->
       raise CanJonHelpMe
+
     | Tm.Coe _ ->
       raise CanJonHelpMe
+
     | Tm.Down _ ->
       raise CanJonHelpMe
+
     | Tm.DownX _ ->
       raise CanJonHelpMe
 
