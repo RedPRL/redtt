@@ -47,7 +47,7 @@ type problem =
   | All of ty param * problem bind
 
 type entry =
-  | E of Name.t * ty * tm decl
+  | E of string option * Name.t * ty * tm decl
   | Q of status * problem
 
 val bind : Name.t -> 'a param -> problem -> problem bind

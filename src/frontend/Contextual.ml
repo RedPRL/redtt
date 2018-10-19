@@ -9,7 +9,7 @@ type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 module Map = Map.Make (Name)
 
 type env = GlobalEnv.t
-type persistent_env = {env : env; info : [`Flex | `Rigid] Map.t}
+type persistent_env = {env : env; info : [`Flex | `Rigid] Map.t; sources : string Map.t}
 type cx = {mlenv : ML.mlenv; resenv : ResEnv.t; persistent_env : persistent_env; lcx : lcx; rcx : rcx}
 
 
@@ -57,8 +57,8 @@ let filter_entry filter entry =
     begin
       match entry with
       | Q _ -> true
-      | E (_, _, Hole _) -> true
-      | E (_, _, Guess _) -> true
+      | E (_, _, _, Hole _) -> true
+      | E (_, _, _, Guess _) -> true
       | _ -> false
     end
 
@@ -125,7 +125,7 @@ let assert_top_level =
   | _ -> failwith "Invalid operations outside of the top-level."
 
 let init_persistent_env () =
-  {env = GlobalEnv.emp (); info = Map.empty}
+  {env = GlobalEnv.emp (); info = Map.empty; sources = Map.empty}
 
 let get_persistent_env =
   assert_top_level >>
@@ -138,32 +138,42 @@ let set_persistent_env persistent_env =
 let update_env e =
   modify @@ fun st ->
   match e with
-  | E (nm, ty, Hole info) ->
-    {st with persistent_env =
-               {env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty; info = Map.add nm info st.persistent_env.info}}
-  | E (nm, ty, Guess _) ->
-    {st with persistent_env =
-               {env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty; info = Map.add nm `Rigid st.persistent_env.info}}
-  | E (nm, ty, Defn (visibility, `Transparent, t)) ->
+  | E (_, nm, ty, Hole info) ->
+    {st with
+     persistent_env =
+       {st.persistent_env with
+        env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty;
+        info = Map.add nm info st.persistent_env.info}}
+  | E (_, nm, ty, Guess _) ->
+    {st with
+     persistent_env =
+       {st.persistent_env with
+        env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty;
+        info = Map.add nm `Rigid st.persistent_env.info}}
+  | E (Some src, nm, ty, Defn (visibility, `Transparent, t)) ->
     {st with
      persistent_env =
        {env = GlobalEnv.define st.persistent_env.env nm ty t;
-        info = Map.add nm `Rigid st.persistent_env.info};
+        info = Map.add nm `Rigid st.persistent_env.info;
+        sources = Map.add nm src st.persistent_env.sources};
      resenv = ResEnv.register_metavar ~visibility nm st.resenv}
-  | E (nm, ty, Defn (visibility, `Opaque, _)) ->
+  | E (Some src, nm, ty, Defn (visibility, `Opaque, _)) ->
     {st with
      persistent_env =
        {env = GlobalEnv.ext_meta st.persistent_env.env nm @@ `P ty;
-        info = Map.add nm `Rigid st.persistent_env.info};
+        info = Map.add nm `Rigid st.persistent_env.info;
+        sources = Map.add nm src st.persistent_env.sources};
      resenv = ResEnv.register_metavar ~visibility nm st.resenv}
   | _ ->
     st
 
-let declare_datatype visibility dlbl desc =
+let declare_datatype ~src visibility dlbl desc =
   modify @@ fun st ->
   {st with
    persistent_env =
-     {st.persistent_env with env = GlobalEnv.declare_datatype dlbl desc st.persistent_env.env};
+     {st.persistent_env with
+      env = GlobalEnv.declare_datatype dlbl desc st.persistent_env.env;
+      sources = Map.add dlbl src st.persistent_env.sources};
    resenv = ResEnv.register_datatype visibility dlbl st.resenv}
 
 let replace_datatype dlbl desc =

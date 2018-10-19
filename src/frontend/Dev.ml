@@ -41,7 +41,7 @@ type problem =
   | All of ty param * problem bind
 
 type entry =
-  | E of Name.t * ty * tm decl
+  | E of string option * Name.t * ty * tm decl
   | Q of status * problem
 
 let eqn_open_var k x tw q =
@@ -271,23 +271,23 @@ let rec pp_problem fmt prob =
 
 let pp_entry fmt =
   function
-  | E (x, ty, Hole _) ->
+  | E (_src, x, ty, Hole _) ->
     Format.fprintf fmt "?%a@ :@ %a"
       Name.pp x
       Tm.pp0 ty
 
-  | E (x, ty, Defn (_, `Transparent, tm)) ->
+  | E (_src, x, ty, Defn (_, `Transparent, tm)) ->
     Format.fprintf fmt "!%a@ : %a@ = %a"
       Name.pp x
       Tm.pp0 ty
       Tm.pp0 tm
 
-  | E (x, ty, Defn (_, `Opaque, _)) ->
+  | E (_src, x, ty, Defn (_, `Opaque, _)) ->
     Format.fprintf fmt "!%a@ : %a@ = <opaque>"
       Name.pp x
       Tm.pp0 ty
 
-  | E (x, ty, Guess {tm; ty = ty'}) ->
+  | E (_src, x, ty, Guess {tm; ty = ty'}) ->
     Format.fprintf fmt "@[<hv1>?%a@ :@ %a =?@ %a@ :@ %a@]"
       Name.pp x
       Tm.pp0 ty
@@ -388,9 +388,9 @@ let rec subst_problem sub =
 
 let subst_entry sub =
   function
-  | E (x, ty, decl) ->
+  | E (src, x, ty, decl) ->
     let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
-    E (x, subst_tm sub ~ty:univ ty, subst_decl sub ~ty decl)
+    E (src, x, subst_tm sub ~ty:univ ty, subst_decl sub ~ty decl)
   | Q (s, p) ->
     let p' = subst_problem sub p in
     let s' = if p = p' then s else Active in
@@ -495,12 +495,12 @@ struct
 
   let is_incomplete =
     function
-    | E (_, _, d) -> Decl.is_incomplete d
+    | E (_, _, _, d) -> Decl.is_incomplete d
     | Q (_, _) -> true
 
   let free fl =
     function
-    | E (_, _, d) ->
+    | E (_, _, _, d) ->
       Decl.free fl d
     | Q (_, p) ->
       Problem.free fl p

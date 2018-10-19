@@ -107,7 +107,7 @@ let telescope_to_spine (tele : telescope) : tm Tm.spine =
 
 let push_hole tag gm ty =
   let alpha = Name.fresh () in
-  pushl @@ E (alpha, abstract_ty gm ty, Hole tag) >>
+  pushl @@ E (None, alpha, abstract_ty gm ty, Hole tag) >>
   let hd = Tm.Meta {name = alpha; ushift = 0} in
   let sp = telescope_to_spine gm in
   ret (hd, sp)
@@ -118,7 +118,7 @@ let hole tag gm ty f =
   go_left >>
   ret r
 
-let define gm alpha visibility opacity ~ty tm =
+let define gm source alpha visibility opacity ~ty tm =
   let ty' = abstract_ty gm ty in
   let tm' = abstract_tm gm tm in
   check ~ty:ty' tm' >>= function
@@ -128,7 +128,7 @@ let define gm alpha visibility opacity ~ty tm =
     begin
       if opacity = `Transparent then push_update alpha else ret ()
     end >>
-    pushr @@ E (alpha, ty', Defn (visibility, opacity, tm'))
+    pushr @@ E (source, alpha, ty', Defn (visibility, opacity, tm'))
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)
@@ -228,7 +228,7 @@ let try_invert q ty =
         ret false
       | Some t ->
         active (Unify q) >>
-        define Emp alpha `Private `Transparent ~ty t >>
+        define Emp None alpha `Private `Transparent ~ty t >>
         ret true
     end
   | _ ->
@@ -240,20 +240,20 @@ let rec flex_term ~deps q =
     ask <<@> Bwd.map snd >>= fun gm ->
     begin
       popl >>= function
-      | E (beta, _, Hole `Rigid) as e when alpha = beta ->
+      | E (_, beta, _, Hole `Rigid) as e when alpha = beta ->
         pushls (e :: deps) >>
         block @@ Unify q
 
-      | E (beta, _, Guess _) as e when alpha = beta ->
+      | E (_, beta, _, Guess _) as e when alpha = beta ->
         pushls (e :: deps) >>
         block @@ Unify q
 
-      | E (beta, _, Hole _) as e when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
+      | E (_, beta, _, Hole _) as e when alpha = beta && Occurs.Set.mem alpha @@ Entries.free `Metas deps ->
         (* Format.eprintf "flex_term/alpha=beta: @[<1>%a@]@." Equation.pp q; *)
         pushls (e :: deps) >>
         block @@ Unify q
 
-      | E (beta, ty, Hole _) as e when alpha = beta ->
+      | E (_, beta, ty, Hole _) as e when alpha = beta ->
         (* Format.eprintf "flex_term/alpha=beta/2: @[<1>%a@]@." Equation.pp q; *)
         pushls deps >>
         try_invert q ty <||
@@ -263,7 +263,7 @@ let rec flex_term ~deps q =
           pushl e
         end
 
-      | (E (beta, _, Hole _) | E (beta, _, Guess _)) as e
+      | (E (_, beta, _, Hole _) | E (_, beta, _, Guess _)) as e
         when
           Occurs.Set.mem beta (Params.free `Metas gm)
           || Occurs.Set.mem beta (Entries.free `Metas deps)
@@ -286,15 +286,15 @@ let rec flex_flex_diff ~deps q =
     ask <<@> Bwd.map snd >>= fun gm ->
     begin
       popl >>= function
-      | E (gamma, _, Hole `Rigid) as e when (alpha0 = gamma || alpha1 = gamma) ->
+      | E (_, gamma, _, Hole `Rigid) as e when (alpha0 = gamma || alpha1 = gamma) ->
         pushls @@ e :: deps >>
         block @@ Unify q
 
-      | E (gamma, _, Guess _) as e when (alpha0 = gamma || alpha1 = gamma) ->
+      | E (_, gamma, _, Guess _) as e when (alpha0 = gamma || alpha1 = gamma) ->
         pushls @@ e :: deps >>
         block @@ Unify q
 
-      | E (gamma, _, Hole `Flex) as e
+      | E (_, gamma, _, Hole `Flex) as e
         when
           (alpha0 = gamma || alpha1 = gamma)
           && Occurs.Set.mem gamma @@ Entries.free `Metas deps
@@ -303,13 +303,13 @@ let rec flex_flex_diff ~deps q =
         pushls @@ e :: deps >>
         block @@ Unify q
 
-      | (E (gamma, ty, Hole _) | E (gamma, ty, Guess _)) as e when gamma = alpha0 ->
+      | (E (_, gamma, ty, Hole _) | E (_, gamma, ty, Guess _)) as e when gamma = alpha0 ->
         (* Format.eprintf "flex_flex_diff / popl / 2: %a %a at %a@." Name.pp alpha0 Name.pp alpha1 Name.pp gamma; *)
         pushls deps >>
         try_invert q ty <||
         flex_term [e] (Equation.sym q)
 
-      | (E (gamma, _, Hole _) | E (gamma, _, Guess _)) as e
+      | (E (_, gamma, _, Hole _) | E (_, gamma, _, Guess _)) as e
         when
           Occurs.Set.mem gamma @@ Params.free `Metas gm
           || Occurs.Set.mem gamma @@ Entries.free `Metas deps
@@ -346,9 +346,9 @@ type instantiation = Name.t * ty * (tm Tm.cmd -> tm)
 let rec instantiate (inst : instantiation) =
   let alpha, ty, f = inst in
   popl >>= function
-  | E (beta, ty', Hole `Flex) when alpha = beta ->
+  | E (_, beta, ty', Hole `Flex) when alpha = beta ->
     hole `Flex Emp ty @@ fun cmd ->
-    define Emp beta `Private `Transparent ~ty:ty' @@ f cmd
+    define Emp None beta `Private `Transparent ~ty:ty' @@ f cmd
   | e ->
     pushr e >>
     instantiate inst
@@ -400,7 +400,7 @@ let push_guess gm ~ty0 ~ty1 tm  =
   let tm' = abstract_tm gm tm in
   let hd = Tm.Meta {name = alpha; ushift = 0} in
   let sp = telescope_to_spine gm in
-  pushl @@ E (alpha, ty0', Guess {ty = ty1'; tm = tm'}) >>
+  pushl @@ E (None, alpha, ty0', Guess {ty = ty1'; tm = tm'}) >>
   ret @@ Tm.up (hd, sp)
 
 
@@ -756,7 +756,7 @@ let rec lower tele alpha ty =
     hole `Flex tele dom @@ fun t0 ->
     let cod' = Tm.let_ nm t0 cod in
     hole `Flex tele cod' @@ fun t1 ->
-    define tele alpha `Private `Transparent ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
+    define tele None alpha `Private `Transparent ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
 
 
@@ -774,7 +774,7 @@ let rec lower tele alpha ty =
         let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod' in
         hole `Flex tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp @ [Tm.FunApp u; Tm.FunApp v]) in
-        define tele alpha `Private `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
+        define tele None alpha `Private `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
         ret true
     end
 
@@ -889,23 +889,23 @@ let ambulando =
 
   | Some e ->
     match e with
-    | E (alpha, ty, Hole `Flex) ->
+    | E (_, alpha, ty, Hole `Flex) ->
       begin
         lower Emp alpha ty <||
         pushl e
       end >>
       loop
 
-    | E (_, _, Hole `Rigid) ->
+    | E (_, _, _, Hole `Rigid) ->
       pushl e >>
       loop
 
-    | E (alpha, ty, Guess info) ->
+    | E (_, alpha, ty, Guess info) ->
       begin
         check ~ty info.tm >>= function
         | `Ok ->
           (* Format.eprintf "solved guess %a??@." Name.pp alpha; *)
-          pushl @@ E (alpha, ty, Defn (`Private, `Transparent, info.tm)) >>
+          pushl @@ E (None, alpha, ty, Defn (`Private, `Transparent, info.tm)) >>
           push_update alpha >>
           loop
         | _ ->

@@ -151,17 +151,17 @@ struct
       end
 
     | E.MlDefine info ->
-      begin
-        eval_val info.tm <<@> E.unleash_term >>= fun tm ->
-        eval_val info.ty <<@> E.unleash_term >>= fun ty ->
-        eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
-        U.define Emp alpha info.visibility info.opacity ty tm >>= fun _ ->
-        M.ret @@ E.SemRet (E.SemTuple [])
-      end
+      C.get_mlenv <<@> E.Env.get_mlconf >>= fun mlconf ->
+      eval_val info.tm <<@> E.unleash_term >>= fun tm ->
+      eval_val info.ty <<@> E.unleash_term >>= fun ty ->
+      eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
+      U.define Emp (Some mlconf.stem) alpha info.visibility info.opacity ty tm >>= fun _ ->
+      M.ret @@ E.SemRet (E.SemTuple [])
 
     | E.MlDeclData info ->
+      C.get_mlenv <<@> E.Env.get_mlconf >>= fun mlconf ->
       eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
-      elab_datatype info.visibility alpha info.desc >>= fun desc ->
+      elab_datatype mlconf.stem info.visibility alpha info.desc >>= fun desc ->
       C.replace_datatype alpha desc >>
       M.ret @@ E.SemRet (E.SemDataDesc desc)
 
@@ -240,7 +240,7 @@ struct
     | E.MlFloat x -> M.ret @@ E.SemFloat x
     | E.MlConf x -> M.ret @@ E.SemConf x
 
-  and elab_datatype visibility dlbl (E.EDesc edesc) =
+  and elab_datatype src visibility dlbl (E.EDesc edesc) =
     let rec elab_params : _ -> (_ * Desc.body) M.m =
       function
       | [] ->
@@ -270,7 +270,7 @@ struct
     elab_params edesc.params >>= fun (psi, tbody) ->
     M.in_scopes psi @@
     let tdesc = Desc.{body = tbody; status = `Partial; kind = edesc.kind; lvl = edesc.lvl} in
-    C.declare_datatype visibility dlbl tdesc >>= fun _ ->
+    C.declare_datatype ~src visibility dlbl tdesc >>= fun _ ->
     match edesc.kind with
     | `Reg ->
       failwith "elab_datatype: Not yet sure what conditions need to be checked for `Reg kind"
