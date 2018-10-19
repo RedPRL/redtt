@@ -29,6 +29,7 @@ sig
   val qenv : t -> Q.QEnv.t
 
   val extend : t -> ?name:string option -> D.con -> t * D.con
+  val extend_dim : t -> ?name:string option -> t * Name.t
   val extend_dims : t -> ?names:string option list -> t * Name.t list
   val lookup : t -> ?tw:Tm.twin -> int -> [`Dim | `El of D.con]
   val lookup_const : t -> ?tw:Tm.twin -> ?ushift:int -> Name.t -> [`Dim | `El of D.con]
@@ -57,6 +58,9 @@ struct
     raise CanJonHelpMe
 
   let extend _ ?name _ =
+    raise CanJonHelpMe
+
+  let extend_dim _ ?name =
     raise CanJonHelpMe
 
   let extend_dims _ ?names =
@@ -492,14 +496,29 @@ struct
     | Tm.GCom _ ->
       raise CanJonHelpMe
 
-    | Tm.Coe _ ->
-      raise CanJonHelpMe
+    | Tm.Coe coe ->
+      check cx (`Pos `Dim) coe.r;
+      check cx (`Pos `Dim) coe.r';
+      let r = eval_dim cx coe.r in
+      let r' = eval_dim cx coe.r' in
+      let Tm.B (name, ty) = coe.ty in
+      let cxx, x = Cx.extend_dim cx ~name in
+      let _ = check_ty cxx `Kan ty in
+      let rel = Cx.rel cx in
+      let env = Cx.venv cx in
+      let ty_at s = D.Syn.eval rel (D.Env.extend_cell env @@ D.Dim s) ty in
+      check_of_ty cx (ty_at r) [] coe.tm;
+      `El (ty_at r')
 
-    | Tm.Down _ ->
-      raise CanJonHelpMe
+    | Tm.Down {ty; tm} ->
+      let _ = check_ty cx `Pre ty in
+      let vty = eval cx ty in
+      check_of_ty cx vty [] tm;
+      `El vty
 
-    | Tm.DownX _ ->
-      raise CanJonHelpMe
+    | Tm.DownX tm ->
+      check cx (`Pos `Dim) tm;
+      `Dim
 
   and synth_stack cx vhd ty stk  =
     match ty, stk with
