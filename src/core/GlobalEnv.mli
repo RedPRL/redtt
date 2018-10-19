@@ -21,7 +21,7 @@ val restrict : Tm.tm -> Tm.tm -> t -> t
 
 val declare_datatype : Name.t -> Desc.desc -> t -> t
 val replace_datatype : Name.t -> Desc.desc -> t -> t (* [Not_found] if the datatype is not there *)
-val lookup_datatype : Name.t -> t -> Desc.desc
+val lookup_datatype : t -> Name.t -> Desc.desc
 
 module T : module type of (Map.Make (Name))
 
@@ -30,6 +30,7 @@ val global_dims : t -> I.t T.t
 
 val lookup_ty : t -> Name.t -> Tm.twin -> Tm.tm
 val lookup : t -> Name.t -> entry
+val lookup_with_twin : t -> Name.t -> Tm.twin -> Tm.tm * Tm.tm option
 
 val restriction : t -> Restriction.t
 

@@ -32,7 +32,7 @@ let replace_datatype dlbl desc (sg : t) : t =
   {sg with
    table = T.update dlbl (function Some (`Data _) -> Some (`Data desc) | _ -> raise Not_found) sg.table}
 
-let lookup_datatype dlbl sg =
+let lookup_datatype sg dlbl =
   match T.find dlbl sg.table with
   | `Data desc -> desc
   | _ ->
@@ -81,6 +81,29 @@ let lookup_ty sg nm tw =
 
 let lookup sg nm =
   T.find nm sg.table
+
+let lookup_with_twin sg nm tw =
+  let param =
+    try
+      lookup sg nm
+    with
+    | _ ->
+      Format.eprintf "Failed to find: %a@." Name.pp nm;
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
+      failwith "GlobalEnv.M.lookup: not found"
+  in
+  match param, tw with
+  | `P ty, _ ->
+    ty, None
+  | `Def (ty, tm), _ ->
+    ty, Some tm
+  | `Tw (ty, _), `TwinL ->
+    ty, None
+  | `Tw (_, ty), `TwinR ->
+    ty, None
+  | _ ->
+    failwith "GlobalEnv.lookup_with_twin: twin mismatch"
 
 let restriction sg =
   sg.rel
@@ -138,29 +161,9 @@ struct
 
   let global_dims = global_dims Sig.globals
 
-  let lookup_datatype lbl =
-    lookup_datatype lbl Sig.globals
+  let lookup_datatype =
+    lookup_datatype Sig.globals
 
-  let lookup nm tw =
-    let param =
-      try
-        T.find nm Sig.globals.table
-      with
-      | _ ->
-        Format.eprintf "Failed to find: %a@." Name.pp nm;
-        Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-        Format.eprintf "@.";
-        failwith "GlobalEnv.M.lookup: not found"
-    in
-    match param, tw with
-    | `P ty, _ ->
-      ty, None
-    | `Def (ty, tm), _ ->
-      ty, Some tm
-    | `Tw (ty, _), `TwinL ->
-      ty, None
-    | `Tw (_, ty), `TwinR ->
-      ty, None
-    | _ ->
-      failwith "GlobalEnv.M.lookup: twin mismatch"
+  let lookup_with_twin =
+    lookup_with_twin Sig.globals
 end

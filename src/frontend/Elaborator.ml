@@ -869,7 +869,7 @@ struct
           C.base_cx >>= fun cx ->
           let sign = Cx.globals cx in
           begin
-            match GlobalEnv.lookup_datatype dlbl sign with
+            match GlobalEnv.lookup_datatype sign dlbl with
             | desc ->
               let constrs = Desc.Body.instance data.params desc.body in
               begin
@@ -906,7 +906,7 @@ struct
   and elab_data dlbl frms =
     C.base_cx >>= fun cx ->
     let sign = Cx.globals cx in
-    let desc = GlobalEnv.lookup_datatype dlbl sign in
+    let desc = GlobalEnv.lookup_datatype sign dlbl in
 
     let rec go acc tele frms =
       match tele, frms with
