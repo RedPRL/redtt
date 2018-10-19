@@ -138,7 +138,7 @@ let macro gm alpha ~ty tm =
     raise exn
   | `Ok ->
     push_update alpha >>
-    pushr @@ E (alpha, ty, Macro tm)
+    pushr @@ E (alpha, ty, Auxiliary tm)
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)
@@ -915,7 +915,7 @@ let ambulando =
         check ~ty info.tm >>= function
         | `Ok ->
           (* Format.eprintf "solved guess %a??@." Name.pp alpha; *)
-          pushl @@ E (alpha, ty, Macro info.tm) >>
+          pushl @@ E (alpha, ty, Auxiliary info.tm) >>
           push_update alpha >>
           loop
         | _ ->

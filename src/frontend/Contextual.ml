@@ -164,7 +164,7 @@ let update_env e =
     {th with
      env = GlobalEnv.ext_meta th.env nm @@ `P ty;
      info = Map.add nm `Rigid th.info}
-  | E (nm, ty, Macro tm) ->
+  | E (nm, ty, Auxiliary tm) ->
     modifyth @@ fun th ->
     {th with
      env = GlobalEnv.define th.env nm ty tm;

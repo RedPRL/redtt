@@ -9,7 +9,7 @@ type twin = [`Only | `TwinL | `TwinR]
 
 type 'a decl =
   | Hole of [`Rigid | `Flex]
-  | Macro of 'a
+  | Auxiliary of 'a
   | UserDefn of
     {source : FileRes.filepath;
      visibility : ResEnv.visibility;
@@ -281,7 +281,7 @@ let pp_entry fmt =
       Name.pp x
       Tm.pp0 ty
 
-  | E (x, ty, Macro tm) ->
+  | E (x, ty, Auxiliary tm) ->
     Format.fprintf fmt "~%a@ : %a@ = %a"
       Name.pp x
       Tm.pp0 ty
@@ -328,8 +328,8 @@ let subst_decl sub ~ty =
   function
   | Hole x ->
     Hole x
-  | Macro tm ->
-    Macro (subst_tm sub ~ty tm)
+  | Auxiliary tm ->
+    Auxiliary (subst_tm sub ~ty tm)
   | UserDefn info ->
     UserDefn {info with tm = subst_tm sub ~ty info.tm}
   | Guess info ->
@@ -437,7 +437,7 @@ struct
   let free fl =
     function
     | Hole _ -> Occurs.Set.empty
-    | Macro tm -> Tm.free fl tm
+    | Auxiliary tm -> Tm.free fl tm
     | UserDefn {opacity = `Transparent; tm; _} -> Tm.free fl tm
     | UserDefn {opacity = `Opaque; _} -> Occurs.Set.empty
     | Guess {tm; _} -> Tm.free fl tm
@@ -445,7 +445,7 @@ struct
   let is_incomplete =
     function
     | Hole _ | Guess _ -> true
-    | Macro _ | UserDefn _ -> false
+    | Auxiliary _ | UserDefn _ -> false
 end
 
 
