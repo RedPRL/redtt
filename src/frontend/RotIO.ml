@@ -1,39 +1,43 @@
 open RedBasis
 open Bwd
 open RedTT_Core
-
-type cache = (string, ResEnv.t) Hashtbl.t
+open Contextual
 
 exception CanFavoniaHelpMe
 
-type cx = {cache : cache; env : GlobalEnv.t; res : ResEnv.t}
-
-module M =
-struct
-  type 'a m = cx -> cx * 'a
-
-  let ret a cx = cx, a
-
-  let bind m k cx =
-    let cx', a = m cx  in
-    k a cx'
-end
-include M
-module MN = Monad.Notation (M)
-module MU = Monad.Util (M)
-open MN
+module M = Monad.Notation (Contextual)
+open M
+module MU = Monad.Util (Contextual)
 
 let read_rot_file _ = raise CanFavoniaHelpMe
 let write_rot_file _ = raise CanFavoniaHelpMe
-let run cache env res cmd =
-  let cx = {cache; env; res} in
-  let cx, a = cmd cx in
-  cx.env, a
-let get cx = cx, cx
-let set cx _ = cx, ()
 
-let yaml_of_meta _ = raise CanFavoniaHelpMe
+exception Impossible of string
 
+let expand_meta ~name ~ushift =
+  global_env >>= fun genv ->
+  match GlobalEnv.lookup_with_twin genv name `Only with
+  | _, None ->
+    Format.eprintf "Meta variable %a is not expandable.@." Name.pp name;
+    raise @@ Impossible "Some meta variable escapes the serialization context."
+  | _, Some def ->
+    ret @@ Tm.shift_univ ushift def
+
+let expand_var ~name ~ushift ~twin =
+  global_env >>= fun genv ->
+  match GlobalEnv.lookup_with_twin genv name twin with
+  | _, None ->
+    Format.eprintf "Variable %a is not expandable.@." Name.pp name;
+    raise @@ Impossible "Some variable escapes the serialization context."
+  | _, Some def ->
+    ret @@ Tm.shift_univ ushift def
+
+let yaml_of_int i = `String (string_of_int i)
+
+let int_of_yaml =
+  function
+  | `String s -> int_of_string s
+  | _ -> failwith "failed to parse an int"
 
 let yaml_of_kind =
   function
@@ -51,12 +55,12 @@ let kind_of_yaml =
 let yaml_of_lvl =
   function
   | `Omega -> `String "omega"
-  | `Const i -> `String (string_of_int i)
+  | `Const i -> yaml_of_int i
 
 let lvl_of_yaml =
   function
   | `String "omega" -> `Omega
-  | `String i -> `Const (int_of_string i)
+  | s -> `Const (int_of_yaml s)
 
 and yaml_of_twin =
   function
@@ -166,11 +170,47 @@ let rec yaml_of_tm tm =
   
   | Tm.Intro _ -> raise CanFavoniaHelpMe
 
+and yaml_of_meta ~name ~ushift =
+  resolver >>= fun res ->
+  match ResEnv.id_of_name_opt name res with
+  | Some id -> ret @@ `A [`String "meta-self"; yaml_of_int id; yaml_of_int ushift]
+  | None ->
+    source_stem name >>= function
+    | None -> expand_meta ~name ~ushift >>= yaml_of_tm
+    | Some stem ->
+      get_resolver stem >>= function
+      | None ->
+        Format.eprintf "Module at %s spreads variables without leaving a trace in the cache.@." stem;
+        raise @@ Impossible "Impossible cache miss"
+      | Some res ->
+        match ResEnv.id_of_name_opt name res with
+        | None -> expand_meta ~name ~ushift >>= yaml_of_tm
+        | Some id -> ret @@ `A [`String "meta-other"; `String stem; yaml_of_int id; yaml_of_int ushift]
+
+and yaml_of_var ~name ~twin ~ushift =
+  resolver >>= fun res ->
+  match ResEnv.id_of_name_opt name res with
+  | Some id -> ret @@ `A [`String "var-self"; yaml_of_int id; yaml_of_twin twin; yaml_of_int ushift]
+  | None ->
+    source_stem name >>= function
+    | None -> expand_var ~name ~twin ~ushift >>= yaml_of_tm
+    | Some stem ->
+      get_resolver stem >>= function
+      | None ->
+        Format.eprintf "Module at %s spreads variables without leaving a trace in the cache.@." stem;
+        raise @@ Impossible "Impossible cache miss"
+      | Some res ->
+        match ResEnv.id_of_name_opt name res with
+        | None -> expand_var ~name ~twin ~ushift >>= yaml_of_tm
+        | Some id -> ret @@ `A [`String "var-other"; `String stem; yaml_of_int id; yaml_of_twin twin; yaml_of_int ushift]
+
 and yaml_of_head =
   function
-  | Tm.Meta {name; ushift} -> raise CanFavoniaHelpMe
+  | Tm.Meta {name; ushift} ->
+    yaml_of_meta ~name ~ushift
 
-  | Tm.Var {name; twin; ushift} -> raise CanFavoniaHelpMe
+  | Tm.Var {name; twin; ushift} ->
+    yaml_of_var ~name ~twin ~ushift
 
   | Tm.Ix (ix, twin) ->
     ret @@ `A [`String "ix"; `String (string_of_int ix); yaml_of_twin twin]
