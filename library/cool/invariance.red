@@ -95,6 +95,7 @@ def nat-impl : type^1 = (A : type) × A × (A → A)
 def nat/nat-impl : nat-impl = (nat, zero, λ n → suc n)
 def list/nat-impl : nat-impl = (list unit, nil, λ xs → cons triv xs)
 
+/-
 def bisimulation : path^1 nat-impl nat/nat-impl list/nat-impl =
   let ua/path = ua _ _ nat→list/equiv in
   λ i →
@@ -111,23 +112,46 @@ def bisimulation : path^1 nat-impl nat/nat-impl list/nat-impl =
        (coe j 1 (list→nat→list (coe 1 j xs in λ _ → list unit) j) in λ _ → list unit)
    ]
   )
+-/
+
+def cool-lemma
+  : (n' n : nat)
+  → path (list unit) (nat→list n') (cons triv (nat→list n))
+  → path nat n' (suc n)
+  =
+  elim [
+  | zero → λ _ p → elim (list/encode unit _ _ p) []
+  | suc m → λ n p →
+    let α = list/decode unit (nat→list m) (nat→list n) (list/encode unit _ _ p .snd) in
+    let β (i : 𝕀) : nat =
+      comp 0 1 (length unit (α i)) [
+      | i=0 → nat→list→nat m
+      | i=1 → nat→list→nat n
+      ]
+    in
+    λ i → suc (β i)
+  ]
+
+def unit-list/set : is-set (list unit) = list/hlevel contr _ (prop→set _ unit/prop)
 
 /-
 def nat→list/is-equiv' : is-equiv^1 _ _ nat→list =
   elim [
   | nil →
     ((zero, refl),
-     λ[,] →
+     λ [,] →
      elim [
      | zero → λ p i →
-       (zero,
-        let unit-list/set = list/hlevel contr _ (prop→set _ unit/prop) in
-        unit-list/set _ _ p refl i)
+       (zero, unit-list/set _ _ p refl i)
      | suc _ → λ p → elim (list/encode unit _ _ p) []
      ]
     )
   | cons * (xs → ih) →
-    let ((n,p),ih1) = ih in
-    ((suc n, λ i → cons triv (p i)), λ (n',p') i → (?,?_))
+    let ((n,p),_) = ih in
+    ((suc n, λ i → cons triv (p i)),
+     λ (n',p') i →
+     let α (j : 𝕀) : list unit = comp 1 0 (p' j) [j=0 → refl | j=1 k → cons triv (p k)] in
+     (cool-lemma n' n α i, ?cfhm)
+    )
   ]
 -/
