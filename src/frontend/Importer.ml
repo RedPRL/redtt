@@ -52,7 +52,6 @@ struct
 
   let import ~selector =
     assert_top_level >>
-    resolver_cache >>= fun cache ->
     mlenv <<@> Env.mlconf >>= fun {stem; indent} ->
     let base_dir = Filename.dirname stem in
 
@@ -61,13 +60,13 @@ struct
     let new_indent = " " ^ indent in
     let new_mlconf = {stem = new_stem; indent = new_indent} in
 
-    match Hashtbl.find_opt cache new_stem with
+    get_resolver new_stem >>= function
     | None ->
       Format.eprintf "@[%sChecking %s.@]@." indent new_red;
       isolate_module ~mlconf:new_mlconf begin
         try_run (read_file new_red) >> resolver
       end >>= fun res ->
-      Hashtbl.add cache new_stem res;
+      save_resolver new_stem res >>= fun () ->
       Format.eprintf "@[%sChecked %s.@]@." indent new_red;
       ret res
     | Some res ->

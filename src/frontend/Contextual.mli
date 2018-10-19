@@ -17,7 +17,10 @@ val resolver : ResEnv.t m
 val modify_top_resolver : (ResEnv.t -> ResEnv.t) -> unit m
 val declare_datatype : src:string -> ResEnv.visibility -> Name.t -> Desc.desc -> unit m
 val replace_datatype : Name.t -> Desc.desc -> unit m
-val resolver_cache : (FileRes.filepath, ResEnv.t) Hashtbl.t m
+
+val source_stem : Name.t -> FileRes.filepath option m
+val get_resolver : FileRes.filepath -> ResEnv.t option m
+val save_resolver : FileRes.filepath -> ResEnv.t -> unit m
 
 val isolate_local : 'a m -> 'a m
 val ignore_local : 'a m -> 'a m

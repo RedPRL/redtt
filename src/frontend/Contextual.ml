@@ -4,14 +4,13 @@ open RedBasis
 open Bwd open BwdNotation
 
 
-module PathMap = Map.Make (String)
 module Map = Map.Make (Name)
 
 (** this is the environment that will stay there for the entire thread *)
 type thread_env =
   {env : GlobalEnv.t; (** the mapping from names to associated definitions (if any). *)
    info : [`Flex | `Rigid] Map.t; (** whether a particular name is rigid. *)
-   sources : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
+   source_stems : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
    resolver_cache : (FileRes.filepath, ResEnv.t) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
   }
 
@@ -179,7 +178,7 @@ let update_env e =
          | `Opaque -> GlobalEnv.ext_meta th.env nm @@ `P ty
        end;
        info = Map.add nm `Rigid th.info;
-       sources = Map.add nm source th.sources}
+       source_stems = Map.add nm source th.source_stems}
     end >>
     modifymo @@ fun mo ->
     {mo with resenv = ResEnv.register_metavar ~visibility nm mo.resenv}
@@ -191,15 +190,21 @@ let declare_datatype ~src visibility dlbl desc =
    th =
      {st.th with
       env = GlobalEnv.declare_datatype dlbl desc st.th.env;
-      sources = Map.add dlbl src st.th.sources};
+      source_stems = Map.add dlbl src st.th.source_stems};
    mo = {st.mo with resenv = ResEnv.register_datatype visibility dlbl st.mo.resenv}}
 
 let replace_datatype dlbl desc =
   modifyth @@ fun th ->
   {th with env = GlobalEnv.replace_datatype dlbl desc th.env}
 
-let resolver_cache =
-  getth <<@> fun {resolver_cache; _} -> resolver_cache
+let source_stem name =
+  getth <<@> fun {source_stems; _} -> Map.find_opt name source_stems
+
+let get_resolver path =
+  getth <<@> fun {resolver_cache; _} -> Hashtbl.find_opt resolver_cache path
+
+let save_resolver path res =
+  getth <<@> fun {resolver_cache; _} -> Hashtbl.replace resolver_cache path res
 
 
 
@@ -213,7 +218,7 @@ let pushr e =
   update_env e
 
 let init_th () =
-  {env = GlobalEnv.emp (); info = Map.empty; sources = Map.empty; resolver_cache = Hashtbl.create 100}
+  {env = GlobalEnv.emp (); info = Map.empty; source_stems = Map.empty; resolver_cache = Hashtbl.create 100}
 let init_mo ~mlconf =
   {resenv = ResEnv.init (); mlenv = ML.Env.init ~mlconf}
 let init_lo () =
