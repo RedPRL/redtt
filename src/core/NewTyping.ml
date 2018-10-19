@@ -411,8 +411,20 @@ struct
           raise @@ E ExpectedTermInFace
       end
 
-    | Tm.V _ ->
-      raise CanJonHelpMe
+    | Tm.V v ->
+      check cx (`Pos `Dim) v.r;
+      let lvl1 = check_ty cx kind v.ty1 in
+      let r = eval_dim cx v.r in
+      begin
+        match Cx.restrict_ cx r `Dim0 with
+        | cx_r0 ->
+          let lvl0 = check_ty cx_r0 kind v.ty0 in
+          let equiv_ty = eval cx_r0 @@ Tm.equiv v.ty0 v.ty1 in
+          check_of_ty cx_r0 equiv_ty [] v.equiv;
+          Lvl.max lvl0 lvl1
+        | exception I.Inconsistent ->
+          lvl1
+      end
 
     | Tm.Data _ ->
       raise CanJonHelpMe
