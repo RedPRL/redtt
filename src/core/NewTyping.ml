@@ -14,6 +14,7 @@ type error =
   | RestrictionTypeCofibrationMismatch
   | ExpectedTermInFace
   | ExpectedVType
+  | ExpectedPositiveCommand
 
 exception E of error
 exception PleaseRaiseProperError
@@ -437,10 +438,46 @@ struct
 
   and synth cx cmd : positive =
     let hd, stk = cmd in
-    raise CanJonHelpMe
+    match synth_head cx hd, stk with
+    | `Dim, [] ->
+      `Dim
+    | `Dim, _ ->
+      raise @@ E ExpectedDimension
+    | `El ty_in, _ ->
+      let vhd =
+        D.LazyVal.make_from_lazy @@ lazy begin
+          eval cx @@ Tm.up (hd, [])
+        end
+      in
+      let ty_out = synth_stack cx vhd ty_in stk in
+      match polarity ty_out with
+      | `Pos ->
+        `El ty_out
+      | _ ->
+        raise @@ E ExpectedPositiveCommand
 
   and synth_head cx hd =
-    raise CanJonHelpMe
+    match hd with
+    | Tm.Ix (ix, tw) ->
+      raise CanJonHelpMe
+    | Tm.Var var ->
+      raise CanJonHelpMe
+    | Tm.Meta meta ->
+      raise CanJonHelpMe
+    | Tm.HCom _ ->
+      raise CanJonHelpMe
+    | Tm.Com _ ->
+      raise CanJonHelpMe
+    | Tm.GHCom _ ->
+      raise CanJonHelpMe
+    | Tm.GCom _ ->
+      raise CanJonHelpMe
+    | Tm.Coe _ ->
+      raise CanJonHelpMe
+    | Tm.Down _ ->
+      raise CanJonHelpMe
+    | Tm.DownX _ ->
+      raise CanJonHelpMe
 
   and synth_stack cx vhd ty stk  =
     match ty, stk with
