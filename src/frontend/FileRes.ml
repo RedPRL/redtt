@@ -7,6 +7,8 @@ let redlib_name = "redlib"
 let red_extention = ".red"
 let rot_extention = ".red"
 
+type filepath = string
+type dirpath = string
 type selector = string list
 
 let pp_selector =

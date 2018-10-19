@@ -9,7 +9,12 @@ type twin = [`Only | `TwinL | `TwinR]
 
 type 'a decl =
   | Hole of [`Rigid | `Flex]
-  | Defn of ResEnv.visibility * [`Transparent | `Opaque] * 'a
+  | Macro of 'a
+  | UserDefn of
+    {source : FileRes.filepath;
+     visibility : ResEnv.visibility;
+     opacity : [`Transparent | `Opaque];
+     tm : 'a}
   | Guess of {ty : 'a; tm : 'a}
 
 type status =
@@ -41,7 +46,7 @@ type problem =
   | All of ty param * problem bind
 
 type entry =
-  | E of string option * Name.t * ty * tm decl
+  | E of Name.t * ty * tm decl
   | Q of status * problem
 
 let eqn_open_var k x tw q =
@@ -271,23 +276,29 @@ let rec pp_problem fmt prob =
 
 let pp_entry fmt =
   function
-  | E (_src, x, ty, Hole _) ->
+  | E (x, ty, Hole _) ->
     Format.fprintf fmt "?%a@ :@ %a"
       Name.pp x
       Tm.pp0 ty
 
-  | E (_src, x, ty, Defn (_, `Transparent, tm)) ->
+  | E (x, ty, Macro tm) ->
+    Format.fprintf fmt "~%a@ : %a@ = %a"
+      Name.pp x
+      Tm.pp0 ty
+      Tm.pp0 tm
+
+  | E (x, ty, UserDefn {opacity = `Transparent; tm; _}) ->
     Format.fprintf fmt "!%a@ : %a@ = %a"
       Name.pp x
       Tm.pp0 ty
       Tm.pp0 tm
 
-  | E (_src, x, ty, Defn (_, `Opaque, _)) ->
+  | E (x, ty, UserDefn {opacity = `Opaque; _}) ->
     Format.fprintf fmt "!%a@ : %a@ = <opaque>"
       Name.pp x
       Tm.pp0 ty
 
-  | E (_src, x, ty, Guess {tm; ty = ty'}) ->
+  | E (x, ty, Guess {tm; ty = ty'}) ->
     Format.fprintf fmt "@[<hv1>?%a@ :@ %a =?@ %a@ :@ %a@]"
       Name.pp x
       Tm.pp0 ty
@@ -317,8 +328,10 @@ let subst_decl sub ~ty =
   function
   | Hole x ->
     Hole x
-  | Defn (visibility, opacity, t) ->
-    Defn (visibility, opacity, subst_tm sub ~ty t)
+  | Macro tm ->
+    Macro (subst_tm sub ~ty tm)
+  | UserDefn info ->
+    UserDefn {info with tm = subst_tm sub ~ty info.tm}
   | Guess info ->
     let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
     let ty' = subst_tm sub ~ty:univ info.ty in
@@ -388,9 +401,9 @@ let rec subst_problem sub =
 
 let subst_entry sub =
   function
-  | E (src, x, ty, decl) ->
+  | E (x, ty, decl) ->
     let univ = Tm.univ ~kind:`Pre ~lvl:`Omega in
-    E (src, x, subst_tm sub ~ty:univ ty, subst_decl sub ~ty decl)
+    E (x, subst_tm sub ~ty:univ ty, subst_decl sub ~ty decl)
   | Q (s, p) ->
     let p' = subst_problem sub p in
     let s' = if p = p' then s else Active in
@@ -424,14 +437,15 @@ struct
   let free fl =
     function
     | Hole _ -> Occurs.Set.empty
-    | Defn (_, `Transparent, t) -> Tm.free fl t
-    | Defn (_, `Opaque, _) -> Occurs.Set.empty
+    | Macro tm -> Tm.free fl tm
+    | UserDefn {opacity = `Transparent; tm; _} -> Tm.free fl tm
+    | UserDefn {opacity = `Opaque; _} -> Occurs.Set.empty
     | Guess {tm; _} -> Tm.free fl tm
 
   let is_incomplete =
     function
     | Hole _ | Guess _ -> true
-    | Defn _ -> false
+    | Macro _ | UserDefn _ -> false
 end
 
 
@@ -495,12 +509,12 @@ struct
 
   let is_incomplete =
     function
-    | E (_, _, _, d) -> Decl.is_incomplete d
+    | E (_, _, d) -> Decl.is_incomplete d
     | Q (_, _) -> true
 
   let free fl =
     function
-    | E (_, _, _, d) ->
+    | E (_, _, d) ->
       Decl.free fl d
     | Q (_, p) ->
       Problem.free fl p

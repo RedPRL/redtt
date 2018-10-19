@@ -155,7 +155,7 @@ struct
       eval_val info.tm <<@> E.unleash_term >>= fun tm ->
       eval_val info.ty <<@> E.unleash_term >>= fun ty ->
       eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
-      U.define Emp (Some mlconf.stem) alpha info.visibility info.opacity ty tm >>= fun _ ->
+      U.user_define Emp alpha mlconf.stem info.visibility info.opacity ~ty tm >>= fun _ ->
       M.ret @@ E.SemRet (E.SemTuple [])
 
     | E.MlDeclData info ->

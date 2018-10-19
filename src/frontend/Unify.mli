@@ -12,7 +12,7 @@ val push_guess : telescope -> ty0:ty -> ty1:ty -> tm -> tm m
 val push_hole : rigidity -> telescope -> ty -> tm Tm.cmd m
 val hole : rigidity -> telescope -> ty -> (tm Tm.cmd -> 'a m) -> 'a m
 
-val define : telescope -> string option -> Name.t -> ResEnv.visibility -> [ `Transparent | `Opaque ] -> ty:ty -> tm -> unit m
+val user_define : telescope -> Name.t -> FileRes.filepath -> ResEnv.visibility -> [ `Transparent | `Opaque ] -> ty:ty -> tm -> unit m
 
 
 
