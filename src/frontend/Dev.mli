@@ -6,8 +6,14 @@ type ty = Tm.tm
 
 type 'a decl =
   | Hole of [`Rigid | `Flex]
+    (** a hole during the development *)
   | Defn of ResEnv.visibility * [`Transparent | `Opaque] * 'a
+    (** this means a variable can be expanded into a term,
+        and it is well-typed, but such a definition may come
+        directly from the user or [Unify]. *)
   | Guess of {ty : 'a; tm : 'a}
+    (** this means the Unify is guessing some term [tm] of type [ty],
+        but it is not type-checked yet. *)
 
 type status =
   | Blocked
@@ -23,12 +29,12 @@ type ('a, 'b) equation =
    Right now we're going through such stupid contortions to make it a last. For instance, not every cell
    should be binding a variable, lmao! *)
 type 'a param =
-  [ `I
-  | `NullaryExt
-  | `P of 'a
-  | `Def of 'a * 'a
-  | `Tw of 'a * 'a
-  | `R of 'a * 'a
+  [ `I (* a local binder for a dimension variable. *)
+  | `NullaryExt (* a local binder that binds nothing but imposes a system. *)
+  | `P of 'a (* a local binder for an expression variable. the argument is the type *)
+  | `Def of 'a * 'a (* a local binder for user definitions. the first argument is the type and the second is the term. *)
+  | `Tw of 'a * 'a (* a local binder that binds two should-be-unified variables. *)
+  | `R of 'a * 'a (* a local binder that binds nothing but restricts the context. *)
   ]
 
 type params = (Name.t * ty param) bwd
