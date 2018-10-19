@@ -334,7 +334,6 @@ struct
       | (tr, tr', otm) :: sys ->
         check cx (`Pos `Dim) tr;
         check cx (`Pos `Dim) tr';
-        let env = Cx.venv cx in
         let r = eval_dim cx tr in
         let r' = eval_dim cx tr' in
         match Cx.restrict cx r r', otm with
