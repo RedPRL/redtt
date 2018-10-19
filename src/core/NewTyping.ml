@@ -32,6 +32,7 @@ sig
   val lookup : t -> ?tw:Tm.twin -> int -> D.con
 
   val restrict : t -> D.dim -> D.dim -> t D.Rel.m
+  val restrict_ : t -> D.dim -> D.dim -> t
 end
 
 module Cx : Cx  =
@@ -57,6 +58,9 @@ struct
     raise CanJonHelpMe
 
   let restrict _ _ _ =
+    raise CanJonHelpMe
+
+  let restrict_ _ _ _ =
     raise CanJonHelpMe
 
 end
@@ -438,9 +442,9 @@ struct
       ty
 
     | _, Tm.VProj vproj :: stk ->
+      let r = eval_dim cx vproj.r in
       begin
         check cx (`Pos `Dim) vproj.r;
-        let r = eval_dim cx vproj.r in
         match D.Rel.compare r `Dim0 (Cx.rel cx) with
         | `Same ->
           let _ = check_ty cx `Pre vproj.ty0 in
@@ -466,7 +470,22 @@ struct
           (* must be in V type *)
           match ty with
           | D.V v ->
-            raise CanJonHelpMe
+            let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) v.r r in
+            let cx_r0 = Cx.restrict_ cx r `Dim0 in
+            let _ = check_ty cx_r0 `Pre vproj.ty0 in
+            let _ = check_ty cx_r0 `Pre vproj.ty1 in
+            let ty0 = eval cx_r0 vproj.ty0 in
+            let ty1 = eval cx_r0 vproj.ty1 in
+            let func_ty0 = D.Con.make_arr (Cx.rel cx_r0) (D.Val.make ty0) (D.Val.make ty1) in
+            let func_ty1 = D.Con.make_arr (Cx.rel cx_r0) v.ty0 v.ty1 in
+            let _ = Q.equate_tycon (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty0 func_ty1 in
+            check_of_ty cx func_ty0 [] vproj.func;
+            let vfunc0 = eval cx_r0 vproj.func in
+            let vfunc1 = D.Val.plug_then_unleash (Cx.rel cx_r0) D.Fst v.equiv in
+            let _ = Q.equate_con (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty0 vfunc0 vfunc1 in
+            let vhd = D.Val.plug (Cx.rel cx) @@ D.VProj {r; func = {ty = raise CanJonHelpMe; value = raise CanJonHelpMe}} in
+            synth_stack cx vhd (D.Val.unleash v.ty1) stk
+
           | _ ->
             raise @@ E ExpectedVType
       end
@@ -475,6 +494,13 @@ struct
       let vhd = D.Val.plug (Cx.rel cx) D.Fst vhd in
       let ty = D.Val.unleash q.dom in
       synth_stack cx vhd ty stk
+
+    | D.Sg q, Tm.Snd :: stk ->
+      let rel = Cx.rel cx in
+      let vhd0 = D.Val.plug rel D.Fst vhd in
+      let vhd1 = D.Val.plug rel D.Snd vhd in
+      let ty = inst_clo cx q.cod @@ D.Val.unleash vhd0 in
+      synth_stack cx vhd1 ty stk
 
     | _ ->
       raise CanJonHelpMe
