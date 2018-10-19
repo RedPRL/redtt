@@ -505,6 +505,15 @@ struct
       let ty = inst_clo cx q.cod @@ D.Val.unleash vhd0 in
       synth_stack cx vhd1 ty stk
 
+    | D.Pi q, Tm.FunApp tm :: stk ->
+      let dom = D.Val.unleash q.dom in
+      check_of_ty cx dom [] tm;
+      let arg = eval cx tm in
+      let cod = inst_clo cx q.cod arg in
+      let frm = D.FunApp (D.TypedVal.make (D.Val.make arg)) in
+      let vhd = D.Val.plug (Cx.rel cx) frm vhd in
+      synth_stack cx vhd cod stk
+
     | _ ->
       raise CanJonHelpMe
 
