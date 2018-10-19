@@ -57,7 +57,7 @@ struct
           begin
             match ResEnv.get nm renv with
             | `Var alpha ->
-              C.get_global_env >>= fun env ->
+              C.global_env >>= fun env ->
               begin
                 match GlobalEnv.lookup env alpha with
                 | (`P _ | `Tw _ | `Def _ | `Data _) -> M.ret @@ `FunApp e
@@ -80,7 +80,7 @@ struct
       M.ret `Open
 
   let with_mlenv f k =
-    C.get_mlenv >>= fun env0 ->
+    C.mlenv >>= fun env0 ->
     C.modify_mlenv f >>
     k >>= fun x ->
     C.modify_mlenv (fun _ -> env0) >>
@@ -106,7 +106,7 @@ struct
       end
 
     | E.MlLam (x, c) ->
-      C.get_mlenv <<@> fun env ->
+      C.mlenv <<@> fun env ->
         E.SemClo (env, x, c)
 
     | E.MlApp (c, v) ->
@@ -130,7 +130,7 @@ struct
       end
 
     | E.MlElab e ->
-      C.get_mlenv >>= fun env ->
+      C.mlenv >>= fun env ->
       M.ret @@ E.SemElabClo (env, e)
 
     | E.MlElabWithScheme (scheme, e) ->
@@ -152,7 +152,7 @@ struct
       end
 
     | E.MlDefine info ->
-      C.get_mlenv <<@> E.Env.get_mlconf >>= fun mlconf ->
+      C.mlenv <<@> E.Env.mlconf >>= fun mlconf ->
       eval_val info.tm <<@> E.unleash_term >>= fun tm ->
       eval_val info.ty <<@> E.unleash_term >>= fun ty ->
       eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
@@ -160,7 +160,7 @@ struct
       M.ret @@ E.SemRet (E.SemTuple [])
 
     | E.MlDeclData info ->
-      C.get_mlenv <<@> E.Env.get_mlconf >>= fun mlconf ->
+      C.mlenv <<@> E.Env.mlconf >>= fun mlconf ->
       eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
       elab_datatype mlconf.stem info.visibility alpha info.desc >>= fun desc ->
       C.replace_datatype alpha desc >>
@@ -224,7 +224,7 @@ struct
       M.ret @@ E.SemRet (E.SemTuple [])
 
     | E.MlGetConf ->
-      C.get_mlenv <<@> E.Env.get_mlconf <<@> fun mlconf -> E.SemRet (E.SemConf mlconf)
+      C.mlenv <<@> E.Env.mlconf <<@> fun mlconf -> E.SemRet (E.SemConf mlconf)
 
   and unleash_ret =
     function
@@ -236,9 +236,9 @@ struct
     | E.MlDataDesc desc -> M.ret @@ E.SemDataDesc desc
     | E.MlTerm tm -> M.ret @@ E.SemTerm tm
     | E.MlSys tm -> M.ret @@ E.SemSys tm
-    | E.MlVar x -> C.get_mlenv <<@> fun env -> Option.get_exn @@ E.Env.find x env
+    | E.MlVar x -> C.mlenv <<@> fun env -> Option.get_exn @@ E.Env.find x env
     | E.MlTuple vs -> traverse eval_val vs <<@> fun rs -> E.SemTuple rs
-    | E.MlThunk mlcmd -> C.get_mlenv <<@> fun env -> E.SemThunk (env, mlcmd)
+    | E.MlThunk mlcmd -> C.mlenv <<@> fun env -> E.SemThunk (env, mlcmd)
     | E.MlRef nm -> M.ret @@ E.SemRef nm
     | E.MlString str -> M.ret @@ E.SemString str
     | E.MlFloat x -> M.ret @@ E.SemFloat x

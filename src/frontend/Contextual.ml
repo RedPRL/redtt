@@ -144,7 +144,7 @@ let modify_mlenv f =
   modifymo @@ fun st ->
   {st with mlenv = f st.mlenv}
 
-let get_mlenv = getmo <<@> fun st -> st.mlenv
+let mlenv = getmo <<@> fun st -> st.mlenv
 
 
 let assert_top_level =
@@ -198,7 +198,7 @@ let replace_datatype dlbl desc =
   modifyth @@ fun th ->
   {th with env = GlobalEnv.replace_datatype dlbl desc th.env}
 
-let get_resolver_cache =
+let resolver_cache =
   getth <<@> fun {resolver_cache; _} -> resolver_cache
 
 
@@ -231,7 +231,7 @@ let isolate_local (m : 'a m) : 'a m =
     let st', a = m ps {st with lo = init_lo ()} in
     {st' with lo = {lcx = st.lo.lcx <.> st'.lo.lcx; rcx = st'.lo.rcx @ st.lo.rcx}}, a
 
-let independent_local (m : 'a m) : 'a m =
+let ignore_local (m : 'a m) : 'a m =
   fun ps st ->
     let st', a = m ps {st with lo = init_lo ()} in
     {st' with lo = st.lo}, a
@@ -261,7 +261,7 @@ let popl =
     dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
 
-let get_global_env =
+let global_env =
   get >>= fun st ->
   let rec go_params =
     function
@@ -390,7 +390,7 @@ let block = postpone Blocked
 
 
 let base_cx =
-  get_global_env >>= fun env ->
+  global_env >>= fun env ->
   ret @@ Cx.init env
 
 
@@ -450,7 +450,7 @@ let under_restriction r0 r1 m =
   | `Apart ->
     ret None
   | _ ->
-    get_global_env >>= fun env ->
+    global_env >>= fun env ->
     try
       (* TODO: hack, fix please *)
       let _ = GlobalEnv.restrict r0 r1 env in

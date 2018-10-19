@@ -11,16 +11,16 @@ val fix : ('a m -> 'a m) -> 'a m
 val assert_top_level : unit m
 
 val modify_mlenv : (ML.mlenv -> ML.mlenv) -> unit m
-val get_mlenv : ML.mlenv m
+val mlenv : ML.mlenv m
 
 val resolver : ResEnv.t m
 val modify_top_resolver : (ResEnv.t -> ResEnv.t) -> unit m
 val declare_datatype : src:string -> ResEnv.visibility -> Name.t -> Desc.desc -> unit m
 val replace_datatype : Name.t -> Desc.desc -> unit m
-val get_resolver_cache : (FileRes.filepath, ResEnv.t) Hashtbl.t m
+val resolver_cache : (FileRes.filepath, ResEnv.t) Hashtbl.t m
 
 val isolate_local : 'a m -> 'a m
-val independent_local : 'a m -> 'a m
+val ignore_local : 'a m -> 'a m
 val isolate_module : mlconf : ML.mlconf -> 'a m -> 'a m
 val run : mlconf : ML.mlconf -> 'a m -> 'a
 
@@ -57,7 +57,7 @@ val check_eq : ty:ty -> tm -> tm -> [`Ok | `Exn of exn] m
 val check_eq_dim : tm -> tm -> bool m
 
 
-val get_global_env : Subst.t m
+val global_env : Subst.t m
 val base_cx : Cx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m

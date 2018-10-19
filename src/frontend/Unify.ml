@@ -839,7 +839,7 @@ let rec solver prob =
           begin
             match split_sigma Emp x ty with
             | Some (y, ty0, z, ty1, s, _) ->
-              (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
+              (in_scopes [(y, `P ty0); (z, `P ty1)] global_env) >>= fun env ->
               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
             | None ->
@@ -851,7 +851,7 @@ let rec solver prob =
           begin
             match split_sigma Emp x ty with
             | Some (y, ty0, z, ty1, s, _) ->
-              (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
+              (in_scopes [(y, `P ty0); (z, `P ty1)] global_env) >>= fun env ->
               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
             | None ->
@@ -864,7 +864,7 @@ let rec solver prob =
           begin
             check_eq ~ty:univ ty0 ty1 >>= function
             | `Ok ->
-              get_global_env >>= fun sub ->
+              global_env >>= fun sub ->
               let y = Name.named (Name.name x) in
               (*  This weird crap is needed to avoid creating a cycle in the environment.
                   What we should really do is kill 'twin variables' altogether and switch to

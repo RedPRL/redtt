@@ -38,22 +38,22 @@ struct
       exit 1
 
   let include_file red =
-    get_mlenv <<@> Env.get_mlconf >>= fun {indent; _} ->
+    mlenv <<@> Env.mlconf >>= fun {indent; _} ->
     Format.eprintf "@[%sStarted %s.@]@." indent red;
     let mlcmd = read_file red in
-    independent_local @@ try_run ~mlcmd >>= fun () ->
+    ignore_local @@ try_run ~mlcmd >>= fun () ->
     Format.eprintf "@[%sFinished %s.@]@." indent red;
     ret ()
 
   let include_stdin ~filename =
-    get_mlenv <<@> Env.get_mlconf >>= fun {indent; _} ->
+    mlenv <<@> Env.mlconf >>= fun {indent; _} ->
     let mlcmd = read_from_channel ~filename stdin in
-    independent_local @@ try_run ~mlcmd
+    ignore_local @@ try_run ~mlcmd
 
   let import ~selector =
     assert_top_level >>
-    get_resolver_cache >>= fun cache ->
-    get_mlenv <<@> Env.get_mlconf >>= fun {stem; indent} ->
+    resolver_cache >>= fun cache ->
+    mlenv <<@> Env.mlconf >>= fun {stem; indent} ->
     let base_dir = Filename.dirname stem in
 
     let new_stem = FileRes.selector_to_stem ~base_dir selector in

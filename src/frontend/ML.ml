@@ -154,7 +154,7 @@ module Env :
 sig
   type t = mlenv
   val init : mlconf : mlconf -> t
-  val get_mlconf : t -> mlconf
+  val mlconf : t -> mlconf
   val set : mlname -> semval -> t -> t
   val find : mlname -> t -> semval option
 end =
@@ -163,7 +163,7 @@ struct
 
   let init ~mlconf = {values = T.init ~size:100; mlconf}
 
-  let get_mlconf {mlconf; _} = mlconf
+  let mlconf {mlconf; _} = mlconf
 
   let set k v e = {e with values = T.set k v e.values}
   let find k e = T.find k e.values

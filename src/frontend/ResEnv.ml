@@ -68,8 +68,8 @@ let get x renv =
       failwith @@ "Could not resolve variable: " ^ x
 
 exception CanFavoniaHelpMe
-let get_from_idx idx = raise CanFavoniaHelpMe
-let idx_of_name_opt idx = raise CanFavoniaHelpMe
+let get_from_id idx = raise CanFavoniaHelpMe
+let id_of_name_opt idx = raise CanFavoniaHelpMe
 
 let set_global_ s x renv =
   {renv with
