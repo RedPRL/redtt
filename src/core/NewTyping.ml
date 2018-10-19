@@ -483,7 +483,10 @@ struct
             let vfunc0 = eval cx_r0 vproj.func in
             let vfunc1 = D.Val.plug_then_unleash (Cx.rel cx_r0) D.Fst v.equiv in
             let _ = Q.equate_con (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty0 vfunc0 vfunc1 in
-            let vhd = D.Val.plug (Cx.rel cx) @@ D.VProj {r; func = {ty = raise CanJonHelpMe; value = raise CanJonHelpMe}} in
+            let vhd =
+              let frm = D.VProj {r; func = {ty = raise CanJonHelpMe; value = raise CanJonHelpMe}} in
+              D.Val.plug (Cx.rel cx) frm vhd
+            in
             synth_stack cx vhd (D.Val.unleash v.ty1) stk
 
           | _ ->
