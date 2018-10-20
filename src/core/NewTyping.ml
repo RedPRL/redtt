@@ -22,65 +22,10 @@ exception PleaseRaiseProperError
 exception CanJonHelpMe
 exception PleaseFillIn
 
-module type Cx =
-sig
-  type t
-  val rel : t -> NewRestriction.t
-  val genv : t -> GlobalEnv.t
-  val venv : t -> D.Env.t
-  val qenv : t -> Q.QEnv.t
-
-  val extend : t -> ?name:string option -> D.con -> t * D.con
-  val extend_dim : t -> ?name:string option -> t * Name.t
-  val extend_dims : t -> ?names:string option list -> t * Name.t list
-  val lookup : t -> ?tw:Tm.twin -> int -> [`Dim | `El of D.con]
-  val lookup_const : t -> ?tw:Tm.twin -> ?ushift:int -> Name.t -> [`Dim | `El of D.con]
-
-  val restrict : t -> D.dim -> D.dim -> t D.Rel.m
-  val restrict_ : t -> D.dim -> D.dim -> t
-end
-
-module Cx : Cx  =
-struct
-  type t =
-    {rel : NewRestriction.t;
-     venv : D.Env.t;
-     qenv : Q.QEnv.t;
-     hyps : [`Dim | `Ty of D.con] bwd}
-
-  let rel cx = cx.rel
-  let genv cx = cx.venv.globals
-  let venv cx = cx.venv
-  let qenv cx = cx.qenv
-
-  let lookup cx ?(tw = `Only) ix =
-    raise PleaseFillIn
-
-  (* make sure to unleash the [ushift] *)
-  let lookup_const cx ?(tw = `Only) ?(ushift = 0) x =
-    raise PleaseFillIn
-
-  let extend _ ?name _ =
-    raise PleaseFillIn
-
-  let extend_dim _ ?name =
-    raise PleaseFillIn
-
-  let extend_dims _ ?names =
-    raise PleaseFillIn
-
-  let restrict _ _ _ =
-    raise PleaseFillIn
-
-  let restrict_ _ _ _ =
-    raise PleaseFillIn
-
-end
-
+module Cx = NewCx
 
 type positive = [`El of D.con | `Dim]
 type phase = [`Pos of positive | `Neg of D.con * D.con D.sys]
-
 
 let eval cx = D.Syn.eval (Cx.rel cx) (Cx.venv cx)
 let eval_dim cx = D.Syn.eval_dim (Cx.venv cx)
