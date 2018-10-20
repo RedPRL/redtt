@@ -20,4 +20,4 @@
   uuseg.string
   uutf
   menhirLib
-  yaml))
+  ezjsonm))

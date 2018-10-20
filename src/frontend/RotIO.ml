@@ -3,8 +3,6 @@ open Bwd
 open RedTT_Core
 open Contextual
 
-exception CanFavoniaHelpMe
-
 module M = Monad.Notation (Contextual)
 open M
 module MU = Monad.Util (Contextual)
@@ -18,7 +16,7 @@ exception Impossible of string
 let unsafe_mode = ref false
 let set_unsafe_mode b = unsafe_mode := b
 
-module BasicYaml =
+module BasicJson =
 struct
 
   let yaml_of_int i = `String (string_of_int i)
@@ -82,9 +80,9 @@ struct
     MU.traverse (fun (lbl, a) -> yaml_of_a a <<@> fun a -> (Option.default "" lbl, a)) l <<@> fun l -> `O l
 end
 
-module TmYaml =
+module TmJson =
 struct
-  open BasicYaml
+  open BasicJson
   open Tm
 
   let expand_meta ~name ~ushift =
@@ -377,10 +375,10 @@ struct
   and yaml_of_tm_bnd_sys s = yaml_of_list yaml_of_tm_bnd_face s
 end
 
-module DescYaml =
+module DescJson =
 struct
-  open BasicYaml
-  open TmYaml
+  open BasicJson
+  open TmJson
   open Desc
 
   let yaml_of_rec_spec =
@@ -428,11 +426,11 @@ struct
       raise PartialDatatype
 end
 
-module RotYaml =
+module RotJson =
 struct
-  open BasicYaml
-  open TmYaml
-  open DescYaml
+  open BasicJson
+  open TmJson
+  open DescJson
   open RotData
 
   let yaml_of_dep =
@@ -469,5 +467,39 @@ struct
     ret @@ `A [yaml_of_ver ver; `A (List.map yaml_of_dep deps); res]
 end
 
-let read_rot_file _ = raise CanFavoniaHelpMe
-let write_rot_file _ = raise CanFavoniaHelpMe
+open RotData
+
+let prepare_rot_resource : RotData.rot_resource m =
+  assert_top_level >>
+  global_env >>= fun global_env ->
+  resolver <<@> ResEnv.export_native_globals >>= fun name_table ->
+  ret @@ ListUtil.foreach name_table @@ fun (ostr, name) ->
+  ostr,
+  match GlobalEnv.lookup global_env name with
+  | `P ty -> P {ty}
+  | `Def (ty, tm) -> Def {ty; tm}
+  | `Desc desc -> Desc desc
+  | `Tw _ ->
+    Format.eprintf "Unexpected entry when preparing the rot structure: `Tw.@.";
+    invalid_arg "prepare_rot"
+  | `I ->
+    Format.eprintf "Unexpected entry when preparing the rot structure: `I@.";
+    invalid_arg "prepare_rot"
+
+let write_rot ~scalar_style ~layout_style rot =
+  mlconf >>=
+  function
+  | TopModule _ -> failwith "No rot writing allowed at top module."
+  | InFile {stem; indent; _} ->
+    let rotpath = FileRes.stem_to_rot stem in
+    RotJson.yaml_of_rot rot >>= fun rot ->
+    Format.eprintf "@[%sWriting rot file at %s.@]@." indent rotpath;
+    let channel = open_out_bin rotpath in
+    Ezjsonm.to_channel ~minify:true channel rot;
+    close_out channel;
+    Format.eprintf "@[%sWritten %s.@]@." indent rotpath;
+    ret ()
+
+let write =
+  prepare_rot_resource >>= fun res ->
+  write_rot ~scalar_style:`Any ~layout_style:`Flow @@ Rot {ver = version; deps = []; res}

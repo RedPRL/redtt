@@ -466,6 +466,9 @@ let get_unsolved_holes =
   getl <<@> fun lcx ->
     Bwd.filter Entry.is_incomplete lcx
 
+let all_solved =
+  getl <<@> fun lcx ->
+    Bwd.filter Entry.is_incomplete lcx = Emp
 
 let report_unsolved ~loc =
   get_unsolved_holes <<@> Bwd.length <<@> fun n ->

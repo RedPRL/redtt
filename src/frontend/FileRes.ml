@@ -1,11 +1,10 @@
 open RedBasis
 
 exception Not_found = Not_found
-exception Invalid_argument = Invalid_argument
 
 let redlib_name = "redlib"
 let red_extention = ".red"
-let rot_extention = ".red"
+let rot_extention = ".rot"
 
 type filepath = string
 type dirpath = string
@@ -51,5 +50,5 @@ let selector_to_rot ~base_dir selector =
 let red_to_stem red =
   match String.sub red (String.length red - 4) 4 with
   | str when str = red_extention -> String.sub red 0 @@ String.length red - 4
-  | _ -> raise @@ Invalid_argument "red_to_stem"
-  | exception Invalid_argument _ -> raise @@ Invalid_argument "red_to_stem"
+  | _ -> invalid_arg "red_to_stem"
+  | exception Invalid_argument _ -> invalid_arg "red_to_stem"

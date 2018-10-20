@@ -31,7 +31,10 @@ struct
 
   let try_run ~mlcmd:{con; span} =
     try
-      Elab.eval_cmd con >> report_unsolved span
+      Elab.eval_cmd con >> report_unsolved span >>
+      all_solved >>= function
+      | true -> RotIO.write
+      | false -> ret ()
     with
     | exn ->
       Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
