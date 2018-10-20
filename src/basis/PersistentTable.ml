@@ -3,6 +3,7 @@ sig
   type ('k, 'a) t
 
   val init : size:int -> ('k, 'a) t
+  val size : ('k, 'a) t -> int
   val get : 'k -> ('k, 'a) t -> 'a
   val set : 'k -> 'a -> ('k, 'a) t -> ('k, 'a) t
   val mem : 'k -> ('k, 'a) t -> bool
@@ -43,6 +44,20 @@ struct
           raw_set_opt a k ov;
           t := n;
           t' := Diff (k, ov', t)
+        | _ ->
+          raise Fatal
+      end
+  
+  let size t =
+    match !t with
+    | Tbl a ->
+      Hashtbl.length a
+    | Diff _ ->
+      reroot t;
+      begin
+        match !t with
+        | Tbl a ->
+          Hashtbl.length a
         | _ ->
           raise Fatal
       end

@@ -5,6 +5,7 @@ sig
   type ('k, 'a) t
 
   val init : size:int -> ('k, 'a) t
+  val size : ('k, 'a) t -> int
   val get : 'k -> ('k, 'a) t -> 'a
   val set : 'k -> 'a -> ('k, 'a) t -> ('k, 'a) t
   val mem : 'k -> ('k, 'a) t -> bool
