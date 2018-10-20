@@ -14,9 +14,7 @@ exception PartialDatatype
 exception Impossible of string
 
 let unsafe_mode = ref false
-let minify_mode = ref false
 let set_unsafe_mode b = unsafe_mode := b
-let set_debug_mode b = minify_mode := not b
 
 module BasicJson =
 struct
@@ -497,7 +495,7 @@ let write_rot ~scalar_style ~layout_style rot =
     RotJson.yaml_of_rot rot >>= fun rot ->
     Format.eprintf "@[%sWriting rot file at %s.@]@." indent rotpath;
     let channel = open_out_bin rotpath in
-    Ezjsonm.to_channel ~minify:(!minify_mode) channel rot;
+    Ezjsonm.to_channel ~minify:true channel rot;
     close_out channel;
     Format.eprintf "@[%sWritten %s.@]@." indent rotpath;
     ret ()
