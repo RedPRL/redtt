@@ -18,10 +18,14 @@ let opt_debug =
   let doc = "Execute in debug mode." in
   Arg.(value & flag & info ["d"; "debug"] ~doc)
 
+let opt_unsafe =
+  let doc = "Allow custom scripts for dependency checking." in
+  Arg.(value & flag & info ["unsafe"] ~doc)
+
 let opts_config =
   let open Term  in
-  let make file_name line_width debug_mode = Frontend.{file_name; line_width; debug_mode } in
-  pure make $ opt_file_name $ opt_margin $ opt_debug
+  let make file_name line_width debug_mode unsafe_mode = Frontend.{file_name; line_width; debug_mode; unsafe_mode} in
+  pure make $ opt_file_name $ opt_margin $ opt_debug $ opt_unsafe
 
 let cmd_default =
   Term.
