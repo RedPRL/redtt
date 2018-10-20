@@ -8,7 +8,7 @@ type entry =
   | `Def of ty * tm
   | `Tw of ty * ty
   | `I
-  | `Data of Desc.desc
+  | `Desc of Desc.desc
   ]
 
 val emp : unit -> t

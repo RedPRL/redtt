@@ -60,7 +60,7 @@ struct
               C.global_env >>= fun env ->
               begin
                 match GlobalEnv.lookup env alpha with
-                | (`P _ | `Tw _ | `Def _ | `Data _) -> M.ret @@ `FunApp e
+                | (`P _ | `Tw _ | `Def _ | `Desc _) -> M.ret @@ `FunApp e
                 | `I -> M.ret @@ `ExtApp e
               end
             | _ ->
