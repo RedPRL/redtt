@@ -12,11 +12,14 @@ type dep =
   | Shell of {cmd : string; exit: int}
 
 type datum =
-  | Down of {ty : Tm.tm; tm : Tm.tm}
+  | P of {ty : Tm.tm}
+  | Def of {ty : Tm.tm; tm : Tm.tm}
   | Desc of Desc.desc
+
+type rot_resource = (string option * datum) list
 
 type rot =
   Rot of
     {ver : string;
      deps : dep list;
-     res : (string option * datum) list}
+     res : rot_resource}

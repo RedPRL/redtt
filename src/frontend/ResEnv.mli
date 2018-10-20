@@ -31,5 +31,6 @@ val import_globals : visibility:visibility -> t -> t -> t
 val get : string -> t -> resolution
 
 val id_of_name : Name.t -> t -> int option
+val export_native_globals : t -> (string option * Name.t) list
 
 val pp_visibility : visibility Pp.t0

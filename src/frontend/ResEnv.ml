@@ -23,6 +23,8 @@ module T = PersistentTable.M
 
 type global_info = global * visibility
 
+(** the [id] here is only assigned to natives. it is important not to
+    assign anything to the imported stuff. *)
 type globals =
   {info_of_string : (string, [`Id of int | `Imported of global_info]) T.t;
    string_of_id : (int, string) T.t;
@@ -61,6 +63,9 @@ let bind_opt x renv =
 
 let info_of_string_ s renv =
   T.find s renv.globals.info_of_string
+
+let string_of_id id renv =
+  T.find id renv.globals.string_of_id
 
 let id_of_name name renv =
   T.find name renv.globals.id_of_name
@@ -173,6 +178,17 @@ let import_globals ~visibility imported renv =
       import_global s (global, visibility) renv
   in
   T.fold merger imported.globals.info_of_string renv
+
+let name_of_global =
+  function
+  | `Var nm | `Metavar nm | `Datatype nm -> nm
+
+let export_native_globals renv : (string option * Name.t) list =
+  let f (id, (global, vis)) =
+    let ostr = match vis with `Private -> None | `Public -> string_of_id id renv in
+    ostr, name_of_global global
+  in
+  List.sort compare @@ List.of_seq @@ Seq.map f @@ T.to_seq renv.globals.info_of_id
 
 let pp_visibility fmt =
   function

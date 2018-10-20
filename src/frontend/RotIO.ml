@@ -451,10 +451,14 @@ struct
 
   let yaml_of_datum =
     function
-    | Down {ty; tm} ->
+    | P {ty} ->
+      yaml_of_tm ty >>= fun ty ->
+      ret @@ `A [`String "p"; ty]
+
+    | Def {ty; tm} ->
       yaml_of_tm ty >>= fun ty ->
       yaml_of_tm tm >>= fun tm ->
-      ret @@ `A [`String "down"; ty; tm]
+      ret @@ `A [`String "def"; ty; tm]
 
     | Desc desc ->
       yaml_of_desc desc >>= fun desc ->
