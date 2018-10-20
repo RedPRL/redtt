@@ -205,6 +205,12 @@ struct
       | _ ->
         raise PleaseRaiseProperError
 
+    let split_sys cx ~r ~ty0 ~ty1 ~equiv sys =
+      let rel = Cx.rel cx in
+      let func = D.Val.plug rel D.Fst equiv in
+      let frm = D.VProj {r; func = {ty = Some (D.Val.make @@ D.Con.make_arr rel ty0 ty1); value = func}} in
+      sys, ConSys.plug rel frm sys
+
   end
 
 
@@ -417,7 +423,7 @@ struct
       let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) v.r r in
       let cx_r0 = Cx.restrict_ cx r `Dim0 in
 
-      let vproj_sys0, vproj_sys1 = raise CanJonHelpMe in
+      let vproj_sys0, vproj_sys1 = V.split_sys cx ~r ~ty0:v.ty0 ~ty1:v.ty1 ~equiv:v.equiv sys in
 
       (* A very powerful Thought is coming here... Carlo and I checked it. *)
       check_of_ty cx_r0 (D.Val.unleash v.ty0) vproj_sys0 vin.tm0;
