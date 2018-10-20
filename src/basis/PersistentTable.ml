@@ -12,6 +12,7 @@ sig
   val find : 'k -> ('k, 'a) t -> 'a option
   val fold : ('k -> 'a -> 'b -> 'b) -> ('k, 'a) t -> 'b -> 'b
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
+  val to_seq : ('k, 'a) t -> ('k * 'a) Seq.t
 end
 
 module M : S =
@@ -37,58 +38,38 @@ struct
       ()
     | Diff (k, ov, t') ->
       reroot t';
-      begin
-        match !t' with
-        | Tbl a as n ->
-          let ov' = Hashtbl.find_opt a k in
-          raw_set_opt a k ov;
-          t := n;
-          t' := Diff (k, ov', t)
-        | _ ->
-          raise Fatal
-      end
+      match !t' with
+      | Tbl a as n ->
+        let ov' = Hashtbl.find_opt a k in
+        raw_set_opt a k ov;
+        t := n;
+        t' := Diff (k, ov', t)
+      | _ ->
+        raise Fatal
   
   let size t =
+    reroot t;
     match !t with
     | Tbl a ->
       Hashtbl.length a
-    | Diff _ ->
-      reroot t;
-      begin
-        match !t with
-        | Tbl a ->
-          Hashtbl.length a
-        | _ ->
-          raise Fatal
-      end
+    | _ ->
+      raise Fatal
 
   let get k t =
+    reroot t;
     match !t with
     | Tbl a ->
       Hashtbl.find a k
-    | Diff _ ->
-      reroot t;
-      begin
-        match !t with
-        | Tbl a ->
-          Hashtbl.find a k
-        | _ ->
-          raise Fatal
-      end
+    | _ ->
+      raise Fatal
 
   let mem k t =
+    reroot t;
     match !t with
     | Tbl a ->
       Hashtbl.mem a k
-    | Diff _ ->
-      reroot t;
-      begin
-        match !t with
-        | Tbl a ->
-          Hashtbl.mem a k
-        | _ ->
-          raise Fatal
-      end
+    | _ ->
+      raise Fatal
 
   let find k t =
     try
@@ -134,5 +115,13 @@ struct
       raise Fatal
 
   let merge t0 t1 = fold set t0 t1
+
+  let to_seq t =
+    reroot t;
+    match !t with
+    | Tbl a ->
+      Hashtbl.to_seq a
+    | _ ->
+      raise Fatal
 
 end

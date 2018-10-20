@@ -16,6 +16,8 @@ sig
 
   (** entries from the first argument overwrite the ones from the second. *)
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
+
+  val to_seq : ('k, 'a) t -> ('k * 'a) Seq.t
 end
 
 module M : S
