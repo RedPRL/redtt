@@ -437,6 +437,10 @@ struct
         | `NoCheck -> vproj_sys1
       in
       check_of_ty cx (D.Val.unleash v.ty1) boundary1 vin.tm1
+
+    | D.HCom ({ty = `Pos; _} as fhcom) ->
+      raise CanJonHelpMe
+
     | _ ->
       raise CanJonHelpMe
 
