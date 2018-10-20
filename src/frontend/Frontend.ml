@@ -26,12 +26,11 @@ let load options source =
   try
     set_options options;
     let red = SysUtil.normalize options.file_name in
-    let stem = FileRes.red_to_stem red in
-    let mlconf : ML.mlconf = {stem; indent = ""} in
+    let mlconf : ML.mlconf = ML.TopModule {indent = ""} in
     execute_ml ~mlconf @@
     match source with
-    | `Stdin -> ML.MlIncludeStdin {filename = red}
-    | `File -> ML.MlIncludeFile red
+    | `Stdin -> ML.MlTopLoadStdin {red}
+    | `File -> ML.MlTopLoadFile red
   with
   | ParseError.E (posl, posr) ->
     let loc = Some (posl, posr) in

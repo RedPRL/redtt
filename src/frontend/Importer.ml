@@ -2,16 +2,16 @@ open RedBasis
 open RedTT_Core
 open Contextual
 
-let read_from_channel ~filename channel =
+let read_from_channel ~filepath channel =
   let lexbuf = Lexing.from_channel channel in
   let open Lexing in
-  lexbuf.lex_curr_p <- {lexbuf.lex_curr_p with pos_fname = filename};
+  lexbuf.lex_curr_p <- {lexbuf.lex_curr_p with pos_fname = filepath};
   Grammar.mltoplevel Lex.token lexbuf
 
-let read_file filename =
-  let channel = open_in filename in
+let read_file filepath =
+  let channel = open_in filepath in
   try
-    let cmd = read_from_channel ~filename channel in
+    let cmd = read_from_channel ~filepath channel in
     close_in channel;
     cmd
   with
@@ -21,8 +21,8 @@ let read_file filename =
 
 module rec M :
 sig
-  val include_file : FileRes.filepath -> unit m
-  val include_stdin : filename : FileRes.filepath -> unit m
+  val top_load_file : FileRes.filepath -> unit m
+  val top_load_stdin : red : FileRes.filepath -> unit m
   val import : selector : FileRes.selector -> ResEnv.t m
 end =
 struct
@@ -37,40 +37,56 @@ struct
       Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
       exit 1
 
-  let include_file red =
-    mlenv <<@> Env.mlconf >>= fun {indent; _} ->
-    Format.eprintf "@[%sStarted %s.@]@." indent red;
-    let mlcmd = read_file red in
-    ignore_local @@ try_run ~mlcmd >>= fun () ->
-    Format.eprintf "@[%sFinished %s.@]@." indent red;
-    ret ()
+  let top_load_file red =
+    mlconf >>=
+    function
+    | InFile _ -> raise ML.WrongMode
+    | TopModule {indent} ->
+      let stem = FileRes.red_to_stem red in
+      let mlconf = ML.InFile {stem; indent} in
+      Format.eprintf "@[%sStarted %s.@]@." indent red;
+      isolate_module ~mlconf @@ try_run ~mlcmd:(read_file red) >>
+      begin
+        Format.eprintf "@[%sFinished %s.@]@." indent red;
+        ret ()
+      end
 
-  let include_stdin ~filename =
-    mlenv <<@> Env.mlconf >>= fun {indent; _} ->
-    let mlcmd = read_from_channel ~filename stdin in
-    ignore_local @@ try_run ~mlcmd
+  let top_load_stdin ~red =
+    mlconf >>=
+    function
+    | InFile _ -> raise ML.WrongMode
+    | TopModule {indent} ->
+      let stem = FileRes.red_to_stem red in
+      let mlconf = ML.InFile {stem; indent} in
+      isolate_module ~mlconf @@ try_run ~mlcmd:(read_from_channel ~filepath:red stdin)
 
   let import ~selector =
-    assert_top_level >>
-    mlenv <<@> Env.mlconf >>= fun {stem; indent} ->
-    let base_dir = Filename.dirname stem in
+    mlconf >>=
+    function
+    | TopModule _ -> raise ML.WrongMode
+    | InFile {stem; indent} ->
+      assert_top_level >>
+      let base_dir = Filename.dirname stem in
 
-    let new_stem = FileRes.selector_to_stem ~base_dir selector in
-    let new_red = FileRes.stem_to_red new_stem in
-    let new_indent = " " ^ indent in
-    let new_mlconf = {stem = new_stem; indent = new_indent} in
+      let stem = FileRes.selector_to_stem ~base_dir selector in
+      let indent = " " ^ indent in
+      let mlconf = ML.InFile {stem; indent} in
 
-    get_resolver new_stem >>= function
-    | None ->
-      Format.eprintf "@[%sChecking %s.@]@." indent new_red;
-      isolate_module ~mlconf:new_mlconf begin
-        try_run (read_file new_red) >> resolver
-      end >>= fun res ->
-      save_resolver new_stem res >>= fun () ->
-      Format.eprintf "@[%sChecked %s.@]@." indent new_red;
-      ret res
-    | Some res ->
-      Format.eprintf "@[%sLoaded %s.[red|rot].@]@." indent new_stem;
-      ret res
+      let red = FileRes.stem_to_red stem in
+
+      get_resolver stem >>= function
+      | None ->
+        Format.eprintf "@[%sChecking %s.@]@." indent red;
+        isolate_module ~mlconf begin
+          try_run (read_file red) >> resolver
+        end >>= fun res ->
+        save_resolver stem res >>
+        begin
+          Format.eprintf "@[%sChecked %s.@]@." indent red;
+          ret res
+        end
+      | Some res ->
+        Format.eprintf "@[%sLoaded %s.[red|rot].@]@." indent stem;
+        ret res
 end
 and Elab : Elaborator.S = Elaborator.Make (M)

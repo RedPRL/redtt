@@ -145,6 +145,8 @@ let modify_mlenv f =
 
 let mlenv = getmo <<@> fun st -> st.mlenv
 
+let mlconf = mlenv <<@> ML.Env.mlconf
+
 
 let assert_top_level =
   ask >>= function
@@ -235,11 +237,6 @@ let isolate_local (m : 'a m) : 'a m =
   fun ps st ->
     let st', a = m ps {st with lo = init_lo ()} in
     {st' with lo = {lcx = st.lo.lcx <.> st'.lo.lcx; rcx = st'.lo.rcx @ st.lo.rcx}}, a
-
-let ignore_local (m : 'a m) : 'a m =
-  fun ps st ->
-    let st', a = m ps {st with lo = init_lo ()} in
-    {st' with lo = st.lo}, a
 
 let isolate_module ~mlconf (m : 'a m) : 'a m =
   assert_top_level >>

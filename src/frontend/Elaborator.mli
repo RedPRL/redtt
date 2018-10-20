@@ -1,7 +1,7 @@
 module type Import =
 sig
-  val include_file : FileRes.filepath -> unit Contextual.m
-  val include_stdin : filename : FileRes.filepath -> unit Contextual.m
+  val top_load_file : FileRes.filepath -> unit Contextual.m
+  val top_load_stdin : red : FileRes.filepath -> unit Contextual.m
   val import : selector : FileRes.selector -> ResEnv.t Contextual.m
 end
 

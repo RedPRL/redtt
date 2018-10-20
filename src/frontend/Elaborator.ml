@@ -6,8 +6,8 @@ open Combinators
 
 module type Import =
 sig
-  val include_file : FileRes.filepath -> unit Contextual.m
-  val include_stdin : filename : FileRes.filepath -> unit Contextual.m
+  val top_load_file : FileRes.filepath -> unit Contextual.m
+  val top_load_stdin : red : FileRes.filepath -> unit Contextual.m
   val import : selector : FileRes.selector -> ResEnv.t Contextual.m
 end
 
@@ -87,144 +87,149 @@ struct
     M.ret x
 
 
-  let rec eval_cmd =
+  let rec eval_cmd cmd =
+    C.mlconf >>=
     function
-    | E.MlRet v -> eval_val v <<@> fun v -> E.SemRet v
+    | TopModule _mlconf ->
+      begin match cmd with
+      | E.MlTopLoadFile red ->
+        I.top_load_file red >>
+        M.ret @@ E.SemRet (E.SemTuple [])
 
-    | E.MlBind (cmd0, x, cmd1) ->
-      eval_cmd cmd0 <<@> unleash_ret >>= fun v0 ->
-      C.modify_mlenv (E.Env.set x v0) >>
-      eval_cmd cmd1
+      | E.MlTopLoadStdin {red} ->
+        I.top_load_stdin ~red >>
+        M.ret @@ E.SemRet (E.SemTuple [])
 
-    | E.MlUnleash v ->
-      begin
-        eval_val v >>= function
-        | E.SemThunk (env, cmd) ->
-          with_mlenv (fun _ -> env) @@ eval_cmd cmd
-        | _ ->
-          failwith "eval_cmd: expected thunk"
+      | _ -> raise ML.WrongMode
       end
+    | InFile mlconf ->
+      match cmd with
+      | E.MlRet v -> eval_val v <<@> fun v -> E.SemRet v
 
-    | E.MlLam (x, c) ->
-      C.mlenv <<@> fun env ->
-        E.SemClo (env, x, c)
+      | E.MlBind (cmd0, x, cmd1) ->
+        eval_cmd cmd0 <<@> unleash_ret >>= fun v0 ->
+        C.modify_mlenv (E.Env.set x v0) >>
+        eval_cmd cmd1
 
-    | E.MlApp (c, v) ->
-      begin
+      | E.MlUnleash v ->
+        begin
+          eval_val v >>= function
+          | E.SemThunk (env, cmd) ->
+            with_mlenv (fun _ -> env) @@ eval_cmd cmd
+          | _ ->
+            failwith "eval_cmd: expected thunk"
+        end
+
+      | E.MlLam (x, c) ->
+        C.mlenv <<@> fun env ->
+          E.SemClo (env, x, c)
+
+      | E.MlApp (c, v) ->
+        begin
+          eval_val v >>= fun v ->
+          eval_cmd c >>= function
+          | E.SemClo (env, x, c) ->
+            with_mlenv (fun _ -> E.Env.set x v env) @@ eval_cmd c
+          | E.SemElabClo (env, e) ->
+            begin
+              match v with
+              | E.SemTuple [E.SemTerm ty; E.SemSys sys] ->
+                with_mlenv (fun _ -> env) @@
+                elab_chk e {ty; sys} >>= fun tm ->
+                M.ret @@ E.SemRet (E.SemTerm tm)
+              | _ ->
+                failwith "MlApp of ElabClo: calling convention violated"
+            end
+          | _ ->
+            failwith "expected ml closure"
+        end
+
+      | E.MlElab e ->
+        C.mlenv >>= fun env ->
+        M.ret @@ E.SemElabClo (env, e)
+
+      | E.MlElabWithScheme (scheme, e) ->
+        elab_scheme scheme >>= fun (names, ty) ->
+        let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
+        let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
+        bdy_tac {ty; sys = []} >>= fun tm ->
+        M.ret @@ E.SemRet (E.SemTuple [E.SemTerm ty; E.SemTerm tm])
+
+      | MlCheck {ty; tm} ->
+        eval_val ty <<@> E.unleash_term >>= fun ty ->
+        eval_val tm <<@> E.unleash_term >>= fun tm ->
+        begin
+          C.check ~ty tm >>= function
+          | `Ok ->
+            M.ret @@ E.SemRet (E.SemTerm (Tm.up @@ Tm.ann ~ty ~tm))
+          | `Exn exn ->
+            raise exn
+        end
+
+      | E.MlDefine info ->
+        eval_val info.tm <<@> E.unleash_term >>= fun tm ->
+        eval_val info.ty <<@> E.unleash_term >>= fun ty ->
+        eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
+        U.user_define Emp alpha mlconf.stem info.visibility info.opacity ~ty tm >>= fun _ ->
+        M.ret @@ E.SemRet (E.SemTuple [])
+
+      | E.MlDeclData info ->
+        eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
+        elab_datatype mlconf.stem info.visibility alpha info.desc >>= fun desc ->
+        C.replace_datatype alpha desc >>
+        M.ret @@ E.SemRet (E.SemDataDesc desc)
+
+      | E.MlImport (visibility, selector) ->
+        I.import ~selector >>= fun res ->
+        C.modify_top_resolver (ResEnv.import_globals ~visibility res) >>
+        M.ret @@ E.SemRet (E.SemTuple [])
+
+      | E.MlUnify ->
+        C.go_to_top >>
+        Refiner.unify >>
+        M.ret @@ E.SemRet (E.SemTuple [])
+
+      | E.MlNormalize v ->
         eval_val v >>= fun v ->
-        eval_cmd c >>= function
-        | E.SemClo (env, x, c) ->
-          with_mlenv (fun _ -> E.Env.set x v env) @@ eval_cmd c
-        | E.SemElabClo (env, e) ->
-          begin
-            match v with
-            | E.SemTuple [E.SemTerm ty; E.SemSys sys] ->
-              with_mlenv (fun _ -> env) @@
-              elab_chk e {ty; sys} >>= fun tm ->
-              M.ret @@ E.SemRet (E.SemTerm tm)
-            | _ ->
-              failwith "MlApp of ElabClo: calling convention violated"
-          end
-        | _ ->
-          failwith "expected ml closure"
-      end
+        begin
+          match v with
+          | E.SemTuple [E.SemTerm ty; E.SemTerm tm] ->
+            C.base_cx >>= fun cx ->
+            let vty = Cx.eval cx ty in
+            let el = Cx.eval cx tm in
+            let tm = Cx.quote cx ~ty:vty el in
+            M.ret @@ E.SemRet (E.SemTerm tm)
+          | _ ->
+            failwith "normalize: expected synthesizable term"
+        end
 
-    | E.MlElab e ->
-      C.mlenv >>= fun env ->
-      M.ret @@ E.SemElabClo (env, e)
+      | E.MlSplit (tuple, xs, cmd) ->
+        begin
+          eval_val tuple >>= function
+          | E.SemTuple vs ->
+            C.modify_mlenv (List.fold_right2 E.Env.set xs vs) >>
+            eval_cmd cmd
+          | _ ->
+            failwith "expected tuple"
+        end
 
-    | E.MlElabWithScheme (scheme, e) ->
-      elab_scheme scheme >>= fun (names, ty) ->
-      let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
-      let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
-      bdy_tac {ty; sys = []} >>= fun tm ->
-      M.ret @@ E.SemRet (E.SemTuple [E.SemTerm ty; E.SemTerm tm])
+      | E.MlPrint info ->
+        eval_val info.con >>= fun v ->
+        let pp fmt () = ML.pp_semval fmt v in
+        Log.pp_message ~loc:info.span ~lvl:`Info pp Format.std_formatter ();
+        M.ret @@ E.SemRet (E.SemTuple [])
 
-    | MlCheck {ty; tm} ->
-      eval_val ty <<@> E.unleash_term >>= fun ty ->
-      eval_val tm <<@> E.unleash_term >>= fun tm ->
-      begin
-        C.check ~ty tm >>= function
-        | `Ok ->
-          M.ret @@ E.SemRet (E.SemTerm (Tm.up @@ Tm.ann ~ty ~tm))
-        | `Exn exn ->
-          raise exn
-      end
+      | E.MlForeign (foreign, input) ->
+        eval_val input <<@> foreign >>= eval_cmd
 
-    | E.MlDefine info ->
-      C.mlenv <<@> E.Env.mlconf >>= fun mlconf ->
-      eval_val info.tm <<@> E.unleash_term >>= fun tm ->
-      eval_val info.ty <<@> E.unleash_term >>= fun ty ->
-      eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
-      U.user_define Emp alpha mlconf.stem info.visibility info.opacity ~ty tm >>= fun _ ->
-      M.ret @@ E.SemRet (E.SemTuple [])
+      | E.MlDebug filter ->
+        M.dump_state Format.std_formatter "Debug" filter >>
+        M.ret @@ E.SemRet (E.SemTuple [])
 
-    | E.MlDeclData info ->
-      C.mlenv <<@> E.Env.mlconf >>= fun mlconf ->
-      eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
-      elab_datatype mlconf.stem info.visibility alpha info.desc >>= fun desc ->
-      C.replace_datatype alpha desc >>
-      M.ret @@ E.SemRet (E.SemDataDesc desc)
+      | E.MlGetConf ->
+        C.mlconf <<@> fun mlconf -> E.SemRet (E.SemConf mlconf)
 
-    | E.MlIncludeFile filename ->
-      C.assert_top_level >>
-      I.include_file filename >>
-      M.ret @@ E.SemRet (E.SemTuple [])
-
-    | E.MlIncludeStdin {filename} ->
-      C.assert_top_level >>
-      I.include_stdin ~filename >>
-      M.ret @@ E.SemRet (E.SemTuple [])
-
-    | E.MlImport (visibility, selector) ->
-      I.import ~selector >>= fun res ->
-      C.modify_top_resolver (ResEnv.import_globals ~visibility res) >>
-      M.ret @@ E.SemRet (E.SemTuple [])
-
-    | E.MlUnify ->
-      C.go_to_top >>
-      Refiner.unify >>
-      M.ret @@ E.SemRet (E.SemTuple [])
-
-    | E.MlNormalize v ->
-      eval_val v >>= fun v ->
-      begin
-        match v with
-        | E.SemTuple [E.SemTerm ty; E.SemTerm tm] ->
-          C.base_cx >>= fun cx ->
-          let vty = Cx.eval cx ty in
-          let el = Cx.eval cx tm in
-          let tm = Cx.quote cx ~ty:vty el in
-          M.ret @@ E.SemRet (E.SemTerm tm)
-        | _ ->
-          failwith "normalize: expected synthesizable term"
-      end
-
-    | E.MlSplit (tuple, xs, cmd) ->
-      begin
-        eval_val tuple >>= function
-        | E.SemTuple vs ->
-          C.modify_mlenv (List.fold_right2 E.Env.set xs vs) >>
-          eval_cmd cmd
-        | _ ->
-          failwith "expected tuple"
-      end
-
-    | E.MlPrint info ->
-      eval_val info.con >>= fun v ->
-      let pp fmt () = ML.pp_semval fmt v in
-      Log.pp_message ~loc:info.span ~lvl:`Info pp Format.std_formatter ();
-      M.ret @@ E.SemRet (E.SemTuple [])
-
-    | E.MlForeign (foreign, input) ->
-      eval_val input <<@> foreign >>= eval_cmd
-
-    | E.MlDebug filter ->
-      M.dump_state Format.std_formatter "Debug" filter >>
-      M.ret @@ E.SemRet (E.SemTuple [])
-
-    | E.MlGetConf ->
-      C.mlenv <<@> E.Env.mlconf <<@> fun mlconf -> E.SemRet (E.SemConf mlconf)
+      | E.MlTopLoadFile _ | E.MlTopLoadStdin _ -> raise ML.WrongMode
 
   and unleash_ret =
     function
@@ -1089,6 +1094,4 @@ struct
 
     | _ ->
       failwith "elab_cut"
-
-
 end

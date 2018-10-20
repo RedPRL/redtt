@@ -6,7 +6,11 @@ type 'a info =
    span : Log.location}
 
 module T = PersistentTable.M
-type mlconf = {stem : string; indent : string}
+type mlconf =
+  | TopModule of {indent : string}
+  | InFile of {stem : FileRes.filepath; indent : string}
+exception WrongMode (** executing a top command in a file scope or vice versa. *)
+
 type mlname = [`Gen of Name.t | `User of string]
 
 
@@ -23,6 +27,9 @@ type mlval =
   | MlConf of mlconf
 
 and mlcmd =
+  | MlTopLoadFile of FileRes.filepath
+  | MlTopLoadStdin of {red : FileRes.filepath}
+
   | MlRet of mlval
   | MlLam of mlname * mlcmd
   | MlApp of mlcmd * mlval
@@ -36,8 +43,6 @@ and mlcmd =
   | MlBind of mlcmd * mlname * mlcmd
   | MlUnleash of mlval
   | MlNormalize of mlval
-  | MlIncludeFile of FileRes.filepath
-  | MlIncludeStdin of {filename : FileRes.filepath}
   | MlImport of ResEnv.visibility * FileRes.selector
   | MlPrint of mlval info
   | MlDebug of [`All | `Constraints | `Unsolved]
@@ -155,6 +160,7 @@ sig
   type t = mlenv
   val init : mlconf : mlconf -> t
   val mlconf : t -> mlconf
+  val indent : mlconf -> string
   val set : mlname -> semval -> t -> t
   val find : mlname -> t -> semval option
 end =
@@ -164,6 +170,11 @@ struct
   let init ~mlconf = {values = T.init ~size:100; mlconf}
 
   let mlconf {mlconf; _} = mlconf
+
+  let indent =
+    function
+    | TopModule {indent} -> indent
+    | InFile {indent; _} -> indent
 
   let set k v e = {e with values = T.set k v e.values}
   let find k e = T.find k e.values
@@ -211,8 +222,8 @@ let ml_get_time =
 
 let ml_print_bench conf name now0 now1 =
   let f = function
-    | SemTuple [SemConf {indent; _}; SemRef name; SemFloat now0; SemFloat now1] ->
-      Format.printf "@[%sDefined %a (%fs).@]@." indent Name.pp name (now1 -. now0);
+    | SemTuple [SemConf mlconf; SemRef name; SemFloat now0; SemFloat now1] ->
+      Format.printf "@[%sDefined %a (%fs).@]@." (Env.indent mlconf) Name.pp name (now1 -. now0);
       MlRet (MlTuple [])
     | _ ->
       failwith "ml_print_bench"

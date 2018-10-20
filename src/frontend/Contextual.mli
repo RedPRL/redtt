@@ -12,6 +12,7 @@ val assert_top_level : unit m
 
 val modify_mlenv : (ML.mlenv -> ML.mlenv) -> unit m
 val mlenv : ML.mlenv m
+val mlconf : ML.mlconf m
 
 val resolver : ResEnv.t m
 val modify_top_resolver : (ResEnv.t -> ResEnv.t) -> unit m
@@ -23,7 +24,6 @@ val get_resolver : FileRes.filepath -> ResEnv.t option m
 val save_resolver : FileRes.filepath -> ResEnv.t -> unit m
 
 val isolate_local : 'a m -> 'a m
-val ignore_local : 'a m -> 'a m
 val isolate_module : mlconf : ML.mlconf -> 'a m -> 'a m
 val run : mlconf : ML.mlconf -> 'a m -> 'a
 
