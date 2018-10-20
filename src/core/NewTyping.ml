@@ -20,6 +20,7 @@ type error =
 exception E of error
 exception PleaseRaiseProperError
 exception CanJonHelpMe
+exception PleaseFillIn
 
 module type Cx =
 sig
@@ -53,25 +54,26 @@ struct
   let qenv cx = cx.qenv
 
   let lookup cx ?(tw = `Only) ix =
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
+  (* make sure to unleash the [ushift] *)
   let lookup_const cx ?(tw = `Only) ?(ushift = 0) x =
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
   let extend _ ?name _ =
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
   let extend_dim _ ?name =
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
   let extend_dims _ ?names =
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
   let restrict _ _ _ =
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
   let restrict_ _ _ _ =
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
 end
 
@@ -294,7 +296,7 @@ struct
 
   let polarity =
     function
-    | D.Pi _ | D.Sg _ | D.Ext _ | D.Restrict _ | D.V _ ->
+    | D.Pi _ | D.Sg _ | D.Ext _ | D.Restrict _ | D.V _ | D.HCom _ ->
       `Neg
     | D.Univ _ | D.Data _ | D.Neu _ ->
       `Pos
@@ -343,6 +345,10 @@ struct
           | _ ->
             raise @@ E UnexpectedState
       end
+
+    | _, Tm.Box _ ->
+      (* Similar power moves as Tm.Vin *)
+      raise CanJonHelpMe
 
     | `Neg (ty, sys), _ ->
       check_neg cx ty sys tm
@@ -586,16 +592,16 @@ struct
       Cx.lookup_const cx ~ushift:meta.ushift meta.name
 
     | Tm.HCom _ ->
-      raise CanJonHelpMe
+      raise PleaseFillIn
 
     | Tm.Com _ ->
-      raise CanJonHelpMe
+      raise PleaseFillIn
 
     | Tm.GHCom _ ->
-      raise CanJonHelpMe
+      raise PleaseFillIn
 
     | Tm.GCom _ ->
-      raise CanJonHelpMe
+      raise PleaseFillIn
 
     | Tm.Coe coe ->
       check cx (`Pos `Dim) coe.r;
@@ -702,10 +708,10 @@ struct
       synth_stack cx vhd cod stk
 
     | D.Restrict tyface, Tm.RestrictForce :: stk ->
-      raise CanJonHelpMe
+      raise PleaseFillIn
 
     | D.Ext eclo, Tm.ExtApp rs :: stk ->
-      raise CanJonHelpMe
+      raise PleaseFillIn
 
     | D.Data _, Tm.Elim _ :: stk ->
       raise CanJonHelpMe
