@@ -16,6 +16,7 @@ let print_position outx lexbuf =
 let set_options options =
   Format.set_margin options.line_width;
   Name.set_debug_mode options.debug_mode;
+  RotIO.set_debug_mode options.debug_mode;
   RotIO.set_unsafe_mode options.unsafe_mode
 
 (* MORTAL there's actually already a copy of [Elab] in [Importer]. *)
