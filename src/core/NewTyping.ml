@@ -416,7 +416,7 @@ and check_ty cx kind tm : Lvl.t =
     let cx', xs = Cx.extend_dims cx ~names:(Bwd.to_list names) in
     let lvl = check_ty cx' kind cod in
     let vcod = eval cx' cod in
-    check_tm_sys cx' vcod sys;
+    let _ = check_tm_sys cx' vcod sys in
     if Kind.lte kind `Kan then
       Cofibration.check_extension xs @@
       Cofibration.from_sys cx' sys;
@@ -464,34 +464,31 @@ and check_ty cx kind tm : Lvl.t =
   | _ ->
     raise CanJonHelpMe
 
-and check_tm_sys cx ty sys =
-  let rec loop boundary sys =
-    match sys with
-    | [] -> ()
-    | (tr, tr', otm) :: sys ->
-      check cx (`Pos `Dim) tr;
-      check cx (`Pos `Dim) tr';
-      let r = eval_dim cx tr in
-      let r' = eval_dim cx tr' in
-      match Cx.restrict cx r r', otm with
-      | `Changed cx_rr', Some tm ->
-        let rel_rr' = Cx.rel cx_rr' in
-        let ty_rr' = D.Con.run rel_rr' ty in
-        let boundary_rr' = ConSys.run rel_rr' boundary in
-        check_of_ty cx_rr' ty_rr' boundary_rr' tm;
-        let el = eval cx_rr' tm in
-        loop ((r, r', D.LazyVal.make el) :: boundary) sys
-      | `Same, Some tm ->
-        check_of_ty cx ty boundary tm;
-        let el = eval cx tm in
-        loop ((r, r', D.LazyVal.make el) :: boundary) sys
-      | exception I.Inconsistent ->
-        loop boundary sys
-      | _ ->
-        raise @@ E ExpectedTermInFace
-  in
-  loop [] sys
+and check_tm_face cx ty sys face =
+  let tr, tr', otm = face in
+  check cx (`Pos `Dim) tr;
+  check cx (`Pos `Dim) tr';
+  let r = eval_dim cx tr in
+  let r' = eval_dim cx tr' in
+  match Cx.restrict cx r r', otm with
+  | `Changed cx_rr', Some tm ->
+    let rel_rr' = Cx.rel cx_rr' in
+    let ty_rr' = D.Con.run rel_rr' ty in
+    let boundary_rr' = ConSys.run rel_rr' sys in
+    check_of_ty cx_rr' ty_rr' boundary_rr' tm;
+    let el = eval cx_rr' tm in
+    (r, r', D.LazyVal.make el) :: sys
+  | `Same, Some tm ->
+    check_of_ty cx ty sys tm;
+    let el = eval cx tm in
+    (r, r', D.LazyVal.make el) :: sys
+  | exception I.Inconsistent ->
+    sys
+  | _ ->
+    raise @@ E ExpectedTermInFace
 
+and check_tm_sys cx ty sys =
+  List.fold_left (check_tm_face cx ty) [] sys
 
 and check_of_ty cx ty sys tm =
   match polarity ty with
