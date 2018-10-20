@@ -621,6 +621,9 @@ and synth_stack cx vhd ty stk  =
           raise @@ E ExpectedVType
     end
 
+  | _, Tm.Cap _ :: stk ->
+    raise CanJonHelpMe
+
   | D.Sg q, Tm.Fst :: stk ->
     let vhd = D.Val.plug (Cx.rel cx) D.Fst vhd in
     let ty = D.Val.unleash q.dom in
