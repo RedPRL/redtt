@@ -21,10 +21,12 @@ type visibility =
 
 module T = PersistentTable.M
 
+type global_info = global * visibility
+
 type globals =
-  {info_of_string : (string, [`Id of int | `Imported of global * visibility]) T.t;
+  {info_of_string : (string, [`Id of int | `Imported of global_info]) T.t;
    string_of_id : (int, string) T.t;
-   info_of_id : (int, global * visibility) T.t;
+   info_of_id : (int, global_info) T.t;
    id_of_name : (Name.t, int) T.t}
 
 type t =
