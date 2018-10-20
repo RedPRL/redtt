@@ -16,6 +16,7 @@ let set_options options =
   Format.set_margin options.line_width;
   Name.set_debug_mode options.debug_mode
 
+(* MORTAL there's actually already a copy of [Elab] in [Importer]. *)
 module Elab = Elaborator.Make (Importer.M)
 
 let execute_ml ~mlconf cmd =
