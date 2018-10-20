@@ -421,6 +421,9 @@ let report_unsolved ~loc =
   get_unsolved_holes <<@> Bwd.length <<@> fun n ->
     if n > 0 then
       begin
-        let pp fmt () = Format.fprintf fmt "%i unsolved holes" n in
+        let pp fmt () =
+          if n = 1
+          then Format.fprintf fmt "1 unsolved hole"
+          else Format.fprintf fmt "%i unsolved holes" n in
         Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
       end
