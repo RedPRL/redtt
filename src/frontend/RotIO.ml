@@ -9,9 +9,10 @@ module M = Monad.Notation (Contextual)
 open M
 module MU = Monad.Util (Contextual)
 
-let read_rot_file _ = raise CanFavoniaHelpMe
-let write_rot_file _ = raise CanFavoniaHelpMe
+(* Tm *)
 
+exception IllFormed
+exception PartialDatatype
 exception Impossible of string
 
 let expand_meta ~name ~ushift =
@@ -37,7 +38,14 @@ let yaml_of_int i = `String (string_of_int i)
 let int_of_yaml =
   function
   | `String s -> int_of_string s
-  | _ -> failwith "failed to parse an int"
+  | _ -> raise IllFormed
+
+let yaml_of_string s = `String s
+
+let string_of_yaml =
+  function
+  | `String s -> s
+  | _ -> raise IllFormed
 
 let yaml_of_kind =
   function
@@ -50,7 +58,7 @@ let kind_of_yaml =
   | "reg" -> `Reg
   | "kan" -> `Kan
   | "pre" -> `Pre
-  | _ -> failwith "unexpected kind!"
+  | _ -> raise IllFormed
 
 let yaml_of_lvl =
   function
@@ -68,14 +76,16 @@ and yaml_of_twin =
   | `TwinL -> `String "twinl"
   | `TwinR -> `String "twinr"
 
-let yaml_of_ostring nm =
-  `String (Option.default "" nm)
+let yaml_of_ostring =
+  function
+  | None -> `Null
+  | Some str -> `String str
 
 let ostring_of_yaml =
   function
-  | `String "" -> None
+  | `Null -> None
   | `String str -> Some str
-  | _ -> failwith "unexpected name!"
+  | _ -> raise IllFormed
 
 let yaml_of_ostring_bwd nms =
   `A (List.map yaml_of_ostring @@ Bwd.to_list nms)
@@ -83,7 +93,49 @@ let yaml_of_ostring_bwd nms =
 let ostring_bwd_of_yaml =
   function
   | `A arr -> Bwd.from_list @@ List.map ostring_of_yaml arr
-  | _ -> failwith "unexpected name!"
+  | _ -> raise IllFormed
+
+let yaml_of_list yaml_of_item l =
+  MU.traverse yaml_of_item l <<@> fun l -> `A l
+
+let list_of_yaml item_of_yaml =
+  function
+  | `A l -> MU.traverse item_of_yaml l
+  | _ -> raise IllFormed
+
+let yaml_of_pair (yaml_of_a, yaml_of_b) (a, b) =
+  yaml_of_a a >>= fun a ->
+  yaml_of_b b >>= fun b ->
+  ret @@ `A [a; b]
+
+let pair_of_yaml (a_of_yaml, b_of_yaml) =
+  function
+  | `A [a, b] ->
+    a_of_yaml a >>= fun a ->
+    b_of_yaml b >>= fun b ->
+    ret @@ (a, b)
+  | _ -> raise IllFormed
+
+let yaml_of_labeled yaml_of_label yaml_of_a (lbl, a) =
+  yaml_of_a a <<@> fun a -> `A [yaml_of_label lbl; a]
+
+let yaml_of_bnd yaml_of_bdy (Tm.B (nm, bdy)) =
+  yaml_of_bdy bdy >>= fun bdy ->
+  ret @@ `A [yaml_of_ostring nm; bdy]
+
+let yaml_of_nbnd yaml_of_bdy (Tm.NB (nms, bdy)) =
+  yaml_of_bdy bdy >>= fun bdy ->
+  ret @@ `A [yaml_of_ostring_bwd nms; bdy]
+
+let yaml_of_face yaml_of_r yaml_of_bdy (r, r', obdy) =
+  yaml_of_r r >>= fun r ->
+  yaml_of_r r' >>= fun r' ->
+  match obdy with
+  | Some bdy ->
+    yaml_of_bdy bdy >>= fun bdy ->
+    ret @@ `A [r; r'; bdy]
+  | None ->
+    ret @@ `A [r; r']
 
 let rec yaml_of_name name kont_notfound kont_found =
   resolver >>= fun res ->
@@ -121,30 +173,29 @@ and yaml_of_tm tm =
     yaml_of_tm r >>= fun r ->
     yaml_of_tm r' >>= fun r' ->
     yaml_of_tm cap >>= fun cap ->
-    yaml_of_bnd_sys sys >>= fun sys ->
+    yaml_of_tm_bnd_sys sys >>= fun sys ->
     ret @@ `A [`String "fhcom"; r; r'; cap; sys]
 
   | Tm.Univ {kind; lvl} ->
     ret @@ `A [`String "univ"; yaml_of_kind kind; yaml_of_lvl lvl]
 
-  | Tm.Pi (dom, B (nm, cod)) ->
+  | Tm.Pi (dom, cod) ->
     yaml_of_tm dom >>= fun dom ->
-    yaml_of_tm cod >>= fun cod ->
-    ret @@ `A [`String "pi"; dom; yaml_of_ostring nm; cod]
+    yaml_of_bnd yaml_of_tm cod >>= fun cod ->
+    ret @@ `A [`String "pi"; dom; cod]
 
-  | Tm.Ext (NB (nms, (tm, sys))) ->
-    yaml_of_tm tm >>= fun tm ->
-    yaml_of_tm_sys sys >>= fun sys ->
-    ret @@ `A [`String "ext"; yaml_of_ostring_bwd nms; tm; sys]
+  | Tm.Ext ext ->
+    yaml_of_nbnd (yaml_of_pair (yaml_of_tm, yaml_of_tm_sys)) ext >>= fun ext ->
+    ret @@ `A [`String "ext"; ext]
 
   | Tm.Restrict face ->
     yaml_of_tm_face face >>= fun face ->
     ret @@ `A [`String "restrict"; face]
 
-  | Tm.Sg (dom, B (nm, cod)) ->
+  | Tm.Sg (dom, cod) ->
     yaml_of_tm dom >>= fun dom ->
-    yaml_of_tm cod >>= fun cod ->
-    ret @@ `A [`String "sg"; dom; yaml_of_ostring nm; cod]
+    yaml_of_bnd yaml_of_tm cod >>= fun cod ->
+    ret @@ `A [`String "sg"; dom; cod]
 
   | Tm.V {r; ty0; ty1; equiv} ->
     yaml_of_tm r >>= fun r ->
@@ -163,9 +214,9 @@ and yaml_of_tm tm =
     yaml_of_tm tm >>= fun tm ->
     ret @@ `A [`String "lam"; yaml_of_ostring nm; tm]
   
-  | Tm.ExtLam (NB (nms, tm)) ->
-    yaml_of_tm tm >>= fun tm ->
-    ret @@ `A [`String "ext"; yaml_of_ostring_bwd nms; tm]
+  | Tm.ExtLam extlam ->
+    yaml_of_nbnd yaml_of_tm extlam >>= fun extlam ->
+    ret @@ `A [`String "extlam"; extlam]
   
   | Tm.RestrictThunk face ->
     yaml_of_tm_face face >>= fun face ->
@@ -198,14 +249,14 @@ and yaml_of_tm tm =
 
   | Tm.Data {lbl; params} ->
     yaml_of_dlbl lbl >>= fun lbl ->
-    MU.traverse yaml_of_tm params >>= fun params ->
-    ret @@ `A [`String "data"; lbl; `A params]
+    yaml_of_list yaml_of_tm params >>= fun params ->
+    ret @@ `A [`String "data"; lbl; params]
   
   | Tm.Intro (dlbl, clbl, params, args) ->
     yaml_of_dlbl dlbl >>= fun dlbl ->
-    MU.traverse yaml_of_tm params >>= fun params ->
-    MU.traverse yaml_of_tm args >>= fun args ->
-    ret @@ `A [`String "intro"; dlbl; `String clbl; `A params; `A args]
+    yaml_of_list yaml_of_tm params >>= fun params ->
+    yaml_of_list yaml_of_tm args >>= fun args ->
+    ret @@ `A [`String "intro"; dlbl; yaml_of_string clbl; params; args]
 
 and yaml_of_head =
   function
@@ -216,7 +267,7 @@ and yaml_of_head =
     yaml_of_var ~name ~twin ~ushift
 
   | Tm.Ix (ix, twin) ->
-    ret @@ `A [`String "ix"; `String (string_of_int ix); yaml_of_twin twin]
+    ret @@ `A [`String "ix"; yaml_of_int ix; yaml_of_twin twin]
 
   | Tm.Down {ty; tm} ->
     yaml_of_tm ty >>= fun ty ->
@@ -239,7 +290,7 @@ and yaml_of_head =
     yaml_of_tm r' >>= fun r' ->
     yaml_of_tm ty >>= fun ty ->
     yaml_of_tm cap >>= fun cap ->
-    yaml_of_bnd_sys sys >>= fun sys ->
+    yaml_of_tm_bnd_sys sys >>= fun sys ->
     ret @@ `A [`String "hcom"; r; r'; ty; cap; sys]
   
   | Tm.Com {r; r'; ty = B (nm, ty); cap; sys} ->
@@ -247,7 +298,7 @@ and yaml_of_head =
     yaml_of_tm r' >>= fun r' ->
     yaml_of_tm ty >>= fun ty ->
     yaml_of_tm cap >>= fun cap ->
-    yaml_of_bnd_sys sys >>= fun sys ->
+    yaml_of_tm_bnd_sys sys >>= fun sys ->
     ret @@ `A [`String "com"; r; r'; yaml_of_ostring nm; ty; cap; sys]
   
   | Tm.GHCom {r; r'; ty; cap; sys} ->
@@ -255,7 +306,7 @@ and yaml_of_head =
     yaml_of_tm r' >>= fun r' ->
     yaml_of_tm ty >>= fun ty ->
     yaml_of_tm cap >>= fun cap ->
-    yaml_of_bnd_sys sys >>= fun sys ->
+    yaml_of_tm_bnd_sys sys >>= fun sys ->
     ret @@ `A [`String "ghcom"; r; r'; ty; cap; sys]
   
   | Tm.GCom {r; r'; ty = B (nm, ty); cap; sys} ->
@@ -263,10 +314,10 @@ and yaml_of_head =
     yaml_of_tm r' >>= fun r' ->
     yaml_of_tm ty >>= fun ty ->
     yaml_of_tm cap >>= fun cap ->
-    yaml_of_bnd_sys sys >>= fun sys ->
+    yaml_of_tm_bnd_sys sys >>= fun sys ->
     ret @@ `A [`String "gcom"; r; r'; yaml_of_ostring nm; ty; cap; sys]
 
-and yaml_of_frame : Tm.tm Tm.frame -> Yaml.value m =
+and yaml_of_frame =
   function
   | Tm.Fst -> ret @@ `String "fst"
 
@@ -277,8 +328,8 @@ and yaml_of_frame : Tm.tm Tm.frame -> Yaml.value m =
     ret @@ `A [`String "funapp"; arg]
 
   | Tm.ExtApp rs ->
-    MU.traverse yaml_of_tm rs >>= fun rs ->
-    ret @@ `A (`String "extapp" :: rs)
+    yaml_of_list yaml_of_tm rs >>= fun rs ->
+    ret @@ `A [`String "extapp"; rs]
 
   | Tm.VProj {r; func} ->
     yaml_of_tm r >>= fun r ->
@@ -289,49 +340,76 @@ and yaml_of_frame : Tm.tm Tm.frame -> Yaml.value m =
     yaml_of_tm r >>= fun r ->
     yaml_of_tm r' >>= fun r' ->
     yaml_of_tm ty >>= fun ty ->
-    yaml_of_bnd_sys sys >>= fun sys ->
+    yaml_of_tm_bnd_sys sys >>= fun sys ->
     ret @@ `A [`String "cap"; r; r'; ty; sys]
 
   | Tm.RestrictForce -> ret @@ `String "restrictforce"
 
-  | Tm.Elim {dlbl; params; mot = Tm.B (nm, mot); clauses} ->
-    let yaml_of_clause (clbl, Tm.NB (nms, tm)) =
-      yaml_of_tm tm >>= fun tm ->
-      ret @@ `A [`String clbl; yaml_of_ostring_bwd nms; tm]
-    in
+  | Tm.Elim {dlbl; params; mot; clauses} ->
+    let yaml_of_clause = yaml_of_labeled yaml_of_string @@ yaml_of_nbnd yaml_of_tm in
     yaml_of_dlbl dlbl >>= fun dlbl ->
-    MU.traverse yaml_of_tm params >>= fun params ->
-    yaml_of_tm mot >>= fun mot ->
-    MU.traverse yaml_of_clause clauses >>= fun clauses ->
-    ret @@ `A [`String "elim"; dlbl; `A params; yaml_of_ostring nm; mot; `A clauses]
+    yaml_of_list yaml_of_tm params >>= fun params ->
+    yaml_of_bnd yaml_of_tm mot >>= fun mot ->
+    yaml_of_list yaml_of_clause clauses >>= fun clauses ->
+    ret @@ `A [`String "elim"; dlbl; params; mot; clauses]
 
-and yaml_of_cmd (hd, sp) =
-  yaml_of_head hd >>= fun hd ->
-  MU.traverse yaml_of_frame sp >>= fun sp ->
-  ret @@ `A (hd :: sp)
+and yaml_of_cmd cmd =
+  yaml_of_pair (yaml_of_head, yaml_of_list yaml_of_frame) cmd
 
-and yaml_of_tm_face (r, r', otm) =
-  yaml_of_tm r >>= fun r ->
-  yaml_of_tm r' >>= fun r' ->
-  match otm with
-  | Some tm ->
+and yaml_of_tm_face f = yaml_of_face yaml_of_tm yaml_of_tm f
+and yaml_of_tm_sys s = yaml_of_list yaml_of_tm_face s
+
+and yaml_of_tm_bnd_face f = yaml_of_face yaml_of_tm (yaml_of_bnd yaml_of_tm) f
+and yaml_of_tm_bnd_sys s = yaml_of_list yaml_of_tm_bnd_face s
+
+(* Desc *)
+
+let yaml_of_rec_spec =
+  function
+  | Desc.Self -> ret @@ `String "self"
+
+let rec_spec_of_yaml =
+  function
+  | `String "self" -> ret Desc.Self
+  | _ -> raise IllFormed
+
+let yaml_of_arg_spec =
+  function
+  | `Const tm ->
     yaml_of_tm tm >>= fun tm ->
-    ret @@ `A [r; r'; tm]
-  | None ->
-    ret @@ `A [r; r']
+    ret @@ `A [`String "const"; tm]
 
-and yaml_of_tm_sys sys =
-  MU.traverse yaml_of_tm_face sys <<@> fun x -> `A x
+  | `Rec rec_spec ->
+    yaml_of_rec_spec rec_spec >>= fun rec_spec ->
+    ret @@ `A [`String "rec"; rec_spec]
 
-and yaml_of_bnd_face (r, r', obnd) =
-  yaml_of_tm r >>= fun r ->
-  yaml_of_tm r' >>= fun r' ->
-  match obnd with
-  | Some (Tm.B (nm, tm)) ->
-    yaml_of_tm tm >>= fun tm ->
-    ret @@ `A [r; r'; yaml_of_ostring nm; tm]
-  | None ->
-    ret @@ `A [r; r']
+  | `Dim -> ret @@ `String "dim"
 
-and yaml_of_bnd_sys sys =
-  MU.traverse yaml_of_bnd_face sys <<@> fun x -> `A x
+(* MORTALITY there's a better encoding *)
+let rec yaml_of_telescope yaml_of_a yaml_of_e =
+  function
+  | Desc.TNil e -> yaml_of_e e
+  | Desc.TCons (a, tel) ->
+    yaml_of_a a >>= fun a ->
+    yaml_of_bnd (yaml_of_telescope yaml_of_a yaml_of_e) tel >>= fun tel ->
+    ret @@ `A [a; tel]
+
+let yaml_of_constr : Desc.constr -> Yaml.value m =
+  yaml_of_telescope yaml_of_arg_spec yaml_of_tm_sys
+
+let yaml_of_constrs : Desc.constrs -> Yaml.value m =
+  yaml_of_list @@ yaml_of_labeled yaml_of_string yaml_of_constr
+
+let yaml_of_body : Desc.body -> Yaml.value m =
+  yaml_of_telescope yaml_of_tm yaml_of_constrs
+
+let yaml_of_desc : Desc.desc -> Yaml.value m =
+  function
+  | {kind; lvl; body; status = `Complete} ->
+    yaml_of_body body >>= fun body ->
+    ret @@ `A [yaml_of_kind kind; yaml_of_lvl lvl; body]
+  | {status = `Partial; _} ->
+    raise PartialDatatype
+
+let read_rot_file _ = raise CanFavoniaHelpMe
+let write_rot_file _ = raise CanFavoniaHelpMe
