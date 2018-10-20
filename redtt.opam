@@ -2,10 +2,10 @@ opam-version: "2.0"
 name: "redtt"
 version: "0.0"
 maintainer: "jmsterli@cs.cmu.edu"
-authors: ["Jon Sterling" "Favonia (Kuen-Bang Hou)"]
-homepage: "https://github.com/jonsterling/tt"
-bug-reports: "https://github.com/jonsterling/redtt/issues"
-dev-repo: "git://github.com/jonsterling/redtt.git"
+authors: ["The RedPRL Development Team"]
+homepage: "https://github.com/RedPRL/redtt"
+bug-reports: "https://github.com/RedPRL/redtt/issues"
+dev-repo: "git://github.com/RedPRL/redtt.git"
 license: "Apache-2.0"
 depends: [
   "cmdliner" {>= "1.0.2"}
