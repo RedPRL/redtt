@@ -9,6 +9,7 @@ before_install:
   - sh <(curl -sL https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-ocaml.sh)
   - opam --version
   - eval $(opam config env)
+  - ocaml --version
 install:
   - opam pin add -y redtt .
 script:
