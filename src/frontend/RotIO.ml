@@ -154,7 +154,7 @@ struct
 
   let rec yaml_of_name name kont_notfound kont_found =
     resolver >>= fun res ->
-    match ResEnv.id_of_name_opt name res with
+    match ResEnv.id_of_name name res with
     | Some id -> kont_found @@ yaml_of_int id
     | None ->
       source_stem name >>= function
@@ -165,7 +165,7 @@ struct
           Format.eprintf "Module at %s spread names around without leaving a trace in the cache.@." stem;
           raise @@ Impossible "impossible cache miss"
         | Some res ->
-          match ResEnv.id_of_name_opt name res with
+          match ResEnv.id_of_name name res with
           | None -> kont_notfound ()
           | Some id -> kont_found @@ `A [`String stem; yaml_of_int id]
 
