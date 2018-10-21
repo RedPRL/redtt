@@ -1,5 +1,6 @@
 open RedBasis.Bwd
 open RedBasis.Combinators
+open BwdNotation
 
 module D = NewDomain
 module Q = NewQuote
@@ -46,11 +47,19 @@ let extend cx ?name ty =
   let hyps = Snoc (cx.hyps, `El ty) in
   {cx with venv; qenv; hyps}, v
 
-let extend_dim _ ?name =
-  failwith "extend_dim"
+let extend_dim cx ~name =
+  let x = Name.named name in
+  let qenv = Q.QEnv.abs1 x cx.qenv in
+  let venv = D.Env.extend_cell cx.venv @@ D.Dim (`Atom x) in
+  let hyps = Snoc (cx.hyps, `Dim) in
+  {cx with venv; qenv; hyps}, x
 
-let extend_dims _ ?names =
-  failwith "extend_dims"
+let extend_dims cx ~names =
+  let xs = List.map Name.named names in
+  let qenv = Q.QEnv.abs (Bwd.from_list xs) cx.qenv in
+  let venv = D.Env.extend_cells cx.venv @@ List.map (fun x -> D.Dim (`Atom x)) xs in
+  let hyps = cx.hyps <>< List.map (fun _ -> `Dim) xs in
+  {cx with venv; qenv; hyps}, xs
 
 let restrict cx r r' =
   match NewRestriction.equate r r' cx.rel with
