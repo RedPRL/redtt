@@ -152,7 +152,7 @@ let import_global s info renv =
   in
   {globals with info_of_string; string_of_id}
 
-let register_var ~visibility nm =
+let register_name ~visibility nm =
   register_global nm (`Name nm, visibility)
 
 let register_datatype ~visibility nm =

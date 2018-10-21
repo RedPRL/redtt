@@ -185,7 +185,7 @@ let update_env e =
        source_stems = Map.add nm source th.source_stems}
     end >>
     modifymo @@ fun mo ->
-    {mo with resenv = ResEnv.register_var ~visibility nm mo.resenv}
+    {mo with resenv = ResEnv.register_name ~visibility nm mo.resenv}
   | Q _ -> ret ()
 
 let declare_datatype ~src visibility dlbl desc =
@@ -293,7 +293,7 @@ let resolver =
     | Emp -> renv
     | Snoc (psi, (x, _)) ->
       let renv = go_locals renv psi in
-      ResEnv.register_var `Private x renv
+      ResEnv.register_name `Private x renv
   in
 
   get >>= fun st ->
