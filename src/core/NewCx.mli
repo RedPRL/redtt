@@ -2,6 +2,9 @@ module D = NewDomain
 module Q = NewQuote
 
 type t
+
+val init : GlobalEnv.t -> t
+
 val rel : t -> NewRestriction.t
 val genv : t -> GlobalEnv.t
 val venv : t -> D.Env.t

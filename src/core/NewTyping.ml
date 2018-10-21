@@ -678,3 +678,6 @@ and approx_pos cx (pos0 : positive) (pos1 : positive) =
     ignore @@ Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty0 ty1
   | _ ->
     raise @@ E UnexpectedState
+
+
+let check_subtype = approx

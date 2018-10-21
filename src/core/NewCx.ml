@@ -16,6 +16,12 @@ let genv cx = cx.venv.globals
 let venv cx = cx.venv
 let qenv cx = cx.qenv
 
+let init genv =
+  {rel = NewRestriction.emp ();
+   venv = D.Env.init genv;
+   qenv = Q.QEnv.emp ();
+   hyps = Emp}
+
 let lookup cx ?(tw = `Only) ix =
   raise PleaseFillIn
 
