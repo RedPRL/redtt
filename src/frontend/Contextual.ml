@@ -195,7 +195,7 @@ let declare_datatype ~src visibility dlbl desc =
      {st.th with
       env = GlobalEnv.declare_datatype dlbl desc st.th.env;
       source_stems = Map.add dlbl src st.th.source_stems};
-   mo = {st.mo with resenv = ResEnv.register_datatype visibility dlbl st.mo.resenv}}
+   mo = {st.mo with resenv = ResEnv.register_name visibility dlbl st.mo.resenv}}
 
 let replace_datatype dlbl desc =
   modifyth @@ fun th ->

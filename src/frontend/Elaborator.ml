@@ -306,7 +306,7 @@ struct
         C.resolver >>= fun renv ->
         begin
           match E.(ety.con) with
-          | E.Var var when ResEnv.get var.name renv = `Datatype dlbl ->
+          | E.Var var when ResEnv.get_name var.name renv = dlbl ->
             let x = Name.named @@ Some nm in
             M.in_scope x (`P data_ty) (go args) <<@> fun constr ->
               Desc.TCons (`Rec Desc.Self, Desc.Constr.bind x constr)
@@ -885,11 +885,13 @@ struct
     | _ ->
       match exp.con with
       | E.Var {name; _} ->
+        C.global_env >>= fun genv ->
         C.resolver >>= fun renv ->
+        let alpha = ResEnv.get_name name renv in
         begin
-          match ResEnv.get name renv with
-          | `Datatype dlbl ->
-            elab_data dlbl frms
+          match GlobalEnv.lookup genv alpha with
+          | `Desc _ ->
+            elab_data alpha frms
           | _ ->
             elab_mode_switch_cut exp frms ty
         end

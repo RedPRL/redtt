@@ -4,13 +4,11 @@ open RedTT_Core
 
 type global =
   [ `Name of Name.t
-  | `Datatype of Name.t
   ]
 
 type resolution =
   [ `Ix of int
   | `Name of Name.t
-  | `Datatype of Name.t
   ]
 
 type visibility =
@@ -101,8 +99,6 @@ let get x renv =
     match info_of_string x renv with
     | Some (`Name x, _) ->
       `Name x
-    | Some (`Datatype x, _) ->
-      `Datatype x
     | None ->
       failwith @@ "Could not resolve variable: " ^ x
 
@@ -155,9 +151,6 @@ let import_global s info renv =
 let register_name ~visibility nm =
   register_global nm (`Name nm, visibility)
 
-let register_datatype ~visibility nm =
-  register_global nm (`Datatype nm, visibility)
-
 let import_globals ~visibility imported renv =
   let merger s id_or_imported renv =
     let info =
@@ -179,7 +172,7 @@ let import_globals ~visibility imported renv =
 
 let name_of_global =
   function
-  | `Name nm | `Datatype nm -> nm
+  | `Name nm -> nm
 
 let export_native_globals renv : (string option * Name.t) list =
   let f (id, (global, vis)) =
