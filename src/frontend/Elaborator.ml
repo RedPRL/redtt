@@ -711,16 +711,6 @@ struct
       | `Exn exn ->
         raise exn
 
-  and elab_var name ushift =
-    C.resolver <<@> fun renv ->
-      begin
-        match ResEnv.get name renv with
-        | `Name a ->
-          a, (Tm.Var {name = a; twin = `Only; ushift}, [])
-        | _ ->
-          failwith "elab_var: expected locally closed"
-      end
-
 
   and elab_inf e : (ty * tm Tm.cmd) M.m =
     match e.con with
