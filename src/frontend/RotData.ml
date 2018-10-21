@@ -10,10 +10,11 @@ type dep =
   | Import of {sel : FileRes.selector; stem : FileRes.filepath; rotsum : Digest.t}
   | Shell of {cmd : string; exit: int}
 
-type datum =
-  | P of {ty : Tm.tm}
-  | Def of {ty : Tm.tm; tm : Tm.tm}
-  | Desc of Desc.desc
+type datum = (* a subset of GlobalEnv.entry *)
+  [ `P of Tm.tm
+  | `Def of Tm.tm * Tm.tm
+  | `Desc of Desc.desc
+  ]
 
 type repo = (string option * datum) list
 

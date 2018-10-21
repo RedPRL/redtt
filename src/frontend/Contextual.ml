@@ -160,12 +160,12 @@ let update_env e =
   | E (nm, ty, Hole info) ->
     modifyth @@ fun th ->
     {th with
-     env = GlobalEnv.ext_meta th.env nm @@ `P ty;
+     env = GlobalEnv.ext_meta th.env nm ty;
      info = Map.add nm info th.info}
   | E (nm, ty, Guess _) ->
     modifyth @@ fun th ->
     {th with
-     env = GlobalEnv.ext_meta th.env nm @@ `P ty;
+     env = GlobalEnv.ext_meta th.env nm ty;
      info = Map.add nm `Rigid th.info}
   | E (nm, ty, Auxiliary tm) ->
     modifyth @@ fun th ->
@@ -179,7 +179,7 @@ let update_env e =
          begin
            match opacity with
            | `Transparent -> GlobalEnv.define th.env nm ty tm
-           | `Opaque -> GlobalEnv.ext th.env nm @@ `P ty
+           | `Opaque -> GlobalEnv.ext_meta th.env nm ty
          end;
        info = Map.add nm `Rigid th.info;
        source_stems = Map.add nm source th.source_stems}
@@ -270,14 +270,8 @@ let global_env =
   let rec go_params =
     function
     | Emp -> st.th.env
-    | Snoc (psi, (x, `I)) ->
-      GlobalEnv.ext_dim (go_params psi) x
-    | Snoc (psi, (x, `P ty)) ->
-      GlobalEnv.ext (go_params psi) x @@ `P ty
-    | Snoc (psi, (x, `Def (ty, tm))) ->
-      GlobalEnv.define (go_params psi) x ~ty ~tm
-    | Snoc (psi, (x, `Tw (ty0, ty1))) ->
-      GlobalEnv.ext (go_params psi) x @@ `Tw (ty0, ty1)
+    | Snoc (psi, (x, (`I | `P _ | `Def _ | `Tw _ as entry))) ->
+      GlobalEnv.ext (go_params psi) x entry
     | Snoc (psi, (_, `R (r0, r1))) ->
       GlobalEnv.restrict r0 r1 (go_params psi)
     | Snoc (psi, (_, `NullaryExt)) ->
@@ -286,6 +280,9 @@ let global_env =
   ask >>= fun psi ->
   ret @@ go_params psi
 
+let ext_global_env x entry =
+  assert_top_level >>
+  modifyth @@ fun th -> {th with env = GlobalEnv.ext th.env x entry}
 
 let resolver =
   let rec go_locals renv =
