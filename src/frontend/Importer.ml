@@ -34,7 +34,7 @@ struct
       Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
       exit 1
 
-  let run_and_get_rot_resolver ~mlconf ~mlcmd:{con; span} =
+  let run_and_rot ~mlconf ~mlcmd:{con; span} =
     try
       isolate_module ~mlconf begin
         Elab.eval_cmd con >> abort_unsolved span >> RotIO.write
@@ -53,11 +53,9 @@ struct
       let redsum = Digest.file red in
       let mlconf = ML.InFile {stem; redsum; indent} in
       Format.eprintf "@[%sStarted %s.@]@." indent red;
-      run ~mlconf ~mlcmd:(read_file red) >>
-      begin
-        Format.eprintf "@[%sFinished %s.@]@." indent red;
-        ret ()
-      end
+      run_and_rot ~mlconf ~mlcmd:(read_file red) >>= fun _res ->
+      Format.eprintf "@[%sFinished %s.@]@." indent red;
+      ret ()
 
   let top_load_stdin ~red =
     mlconf >>=
@@ -84,7 +82,7 @@ struct
       cached_resolver stem >>= function
       | None ->
         Format.eprintf "@[%sChecking %s.@]@." indent red;
-        run_and_get_rot_resolver ~mlconf ~mlcmd:(read_file red) >>= fun (res, _ as rot) ->
+        run_and_rot ~mlconf ~mlcmd:(read_file red) >>= fun (res, _ as rot) ->
         cache_resolver stem rot >>
         begin
           Format.eprintf "@[%sChecked %s.@]@." indent red;
