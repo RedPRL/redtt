@@ -405,7 +405,7 @@ and check_neg cx ty sys tm =
     let bdy = Ext.body cx rs tm in
     let bdy_sys = Ext.sys_body cx rs sys in
     let cod, cod_sys = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun r -> D.Dim r) rs in
-    check_of_ty cx cod (cod_sys @ bdy_sys) bdy
+    check_of_ty cx' cod (cod_sys @ bdy_sys) bdy
 
   | D.V v ->
     let ty0 = D.Val.unleash v.ty0 in
