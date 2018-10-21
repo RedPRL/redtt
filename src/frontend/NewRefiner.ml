@@ -560,14 +560,14 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           M.in_scope x `I @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
 
-        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, Desc.TCons (`Rec rspec, Tm.B (_, specs)) ->
+        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, Desc.TCons (`Rec Desc.Self, Tm.B (_, specs)) ->
           let x = name_of nm in
           let x_ih = name_of nm_ih in
-          let vty = raise CanJonHelpMe (* V.realize_rec_spec ~dlbl ~params:vparams rspec *) in
+          let vty = Ty.eval cx data_ty in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = raise CanJonHelpMe (* V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] *) in
           let tty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
-          let ih_vty = raise CanJonHelpMe (* V.realize_rec_spec_ih ~dlbl ~params:vparams ~mot:mot_clo rspec x_el  *) in
+          let ih_vty = D.Clo.inst rel mot_clo @@ D.Val (D.LazyVal.make x_el) in
           let ih_ty = Q.equate_tycon (Q.QEnv.emp ()) rel ih_vty ih_vty in
 
           M.in_scope x (`P data_ty) begin
