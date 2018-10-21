@@ -223,13 +223,19 @@ let pushr e =
   update_env e
 
 let init_th () =
-  {env = GlobalEnv.emp (); info = Map.empty; source_stems = Map.empty; resolver_cache = Hashtbl.create 100}
+  {env = GlobalEnv.emp ();
+   info = Map.empty;
+   source_stems = Map.empty;
+   resolver_cache = Hashtbl.create 100}
+
 let init_mo ~mlconf =
-  {resenv = ResEnv.init (); mlenv = ML.Env.init ~mlconf}
+  {resenv = ResEnv.init ();
+   mlenv = ML.Env.init ~mlconf}
+
 let init_lo () =
   {lcx = Emp; rcx = []}
 
-let run ~mlconf (m : 'a m) : 'a  =
+let run ~mlconf (m : 'a m) : 'a =
   let th = init_th () in
   let mo = init_mo ~mlconf in
   let lo = init_lo () in
