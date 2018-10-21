@@ -20,8 +20,10 @@ val declare_datatype : src:string -> ResEnv.visibility -> Name.t -> Desc.desc ->
 val replace_datatype : Name.t -> Desc.desc -> unit m
 
 val source_stem : Name.t -> FileRes.filepath option m
-val get_resolver : FileRes.filepath -> ResEnv.t option m
-val save_resolver : FileRes.filepath -> ResEnv.t -> unit m
+
+type rot_resolver = ResEnv.t * Digest.t
+val cached_resolver : stem:FileRes.filepath -> rot_resolver option m
+val cache_resolver : stem:FileRes.filepath -> rot_resolver -> unit m
 
 val isolate_local : 'a m -> 'a m
 val isolate_module : mlconf : ML.mlconf -> 'a m -> 'a m
@@ -65,5 +67,4 @@ val base_cx : Cx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 
-val all_solved : bool m
-val report_unsolved : loc:Log.location -> unit m
+val abort_unsolved : loc:Log.location -> unit m

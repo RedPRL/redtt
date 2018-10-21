@@ -6,12 +6,14 @@ open Bwd open BwdNotation
 
 module Map = Map.Make (Name)
 
+type rot_resolver = ResEnv.t * Digest.t
+
 (** this is the environment that will stay there for the entire thread *)
 type thread_env =
   {env : GlobalEnv.t; (** the mapping from names to associated definitions (if any). *)
    info : [`Flex | `Rigid] Map.t; (** whether a particular name is rigid. *)
    source_stems : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
-   resolver_cache : (FileRes.filepath, ResEnv.t) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
+   resolver_cache : (FileRes.filepath, rot_resolver) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
   }
 
 (** this is the environment that only makes sense in a particular module. *)
@@ -202,11 +204,11 @@ let replace_datatype dlbl desc =
 let source_stem name =
   getth <<@> fun {source_stems; _} -> Map.find_opt name source_stems
 
-let get_resolver path =
-  getth <<@> fun {resolver_cache; _} -> Hashtbl.find_opt resolver_cache path
+let cached_resolver ~stem =
+  getth <<@> fun {resolver_cache; _} -> Hashtbl.find_opt resolver_cache stem
 
-let save_resolver path res =
-  getth <<@> fun {resolver_cache; _} -> Hashtbl.replace resolver_cache path res
+let cache_resolver ~stem res =
+  getth <<@> fun {resolver_cache; _} -> Hashtbl.replace resolver_cache stem res
 
 
 
@@ -466,14 +468,11 @@ let get_unsolved_holes =
   getl <<@> fun lcx ->
     Bwd.filter Entry.is_incomplete lcx
 
-let all_solved =
-  getl <<@> fun lcx ->
-    Bwd.filter Entry.is_incomplete lcx = Emp
-
-let report_unsolved ~loc =
+let abort_unsolved ~loc =
   get_unsolved_holes <<@> Bwd.length <<@> fun n ->
     if n > 0 then
       begin
         let pp fmt () = Format.fprintf fmt "%i unsolved holes" n in
         Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
+        exit 1
       end

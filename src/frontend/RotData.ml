@@ -5,10 +5,9 @@ let version : string = "Where do correct ideas come from?"
 type dep =
   | True
   | False
-  | SelfAt of {stem : FileRes.filepath}
-  | Redsum of {hash : Digest.t}
-  | Libsum of {hash : Digest.t}
-  | Rotsum of {stem : FileRes.filepath; hash : Digest.t}
+  | Libsum (* always true, for now *)
+  | Self of {stem : FileRes.filepath; redsum : Digest.t}
+  | Import of {sel : FileRes.selector; stem : FileRes.filepath; rotsum : Digest.t}
   | Shell of {cmd : string; exit: int}
 
 type datum =
@@ -16,10 +15,13 @@ type datum =
   | Def of {ty : Tm.tm; tm : Tm.tm}
   | Desc of Desc.desc
 
-type rot_resource = (string option * datum) list
+type repo = (string option * datum) list
+
+(* this is not really used, but is useful as an overview
 
 type rot =
   Rot of
     {ver : string;
      deps : dep list;
      res : rot_resource}
+*)

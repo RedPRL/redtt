@@ -158,11 +158,11 @@ struct
       source_stem name >>= function
       | None -> kont_notfound ()
       | Some stem ->
-        get_resolver stem >>= function
+        cached_resolver stem >>= function
         | None ->
           Format.eprintf "Module at %s spread names around without leaving a trace in the cache.@." stem;
           raise @@ Impossible "impossible cache miss"
-        | Some res ->
+        | Some (res, _) ->
           match ResEnv.id_of_name name res with
           | None -> kont_notfound ()
           | Some id -> kont_found @@ `A [`String stem; json_of_int id]
@@ -433,17 +433,17 @@ struct
   open DescJson
   open RotData
 
+  let json_of_selector sel =
+    `A (List.map json_of_string sel)
+
   let json_of_dep =
     function
     | True -> `String "true"
     | False -> `String "false"
-    | SelfAt {stem} -> `A [`String "selfat"; json_of_string stem]
-    | Redsum {hash} -> `A [`String "redsum"; json_of_string hash]
-    | Libsum {hash} -> `A [`String "libsum"; json_of_string hash]
-    | Rotsum {stem; hash} ->
-      `A [`String "rotsum"; json_of_string stem; json_of_string hash]
-    | Shell {cmd; exit} ->
-      `A [`String "shell"]
+    | Libsum -> `A [`String "libsum"]
+    | Self {stem; redsum} -> `A [`String "selfloc"; json_of_string stem; json_of_string redsum]
+    | Import {sel; stem; rotsum} -> `A [`String "moduleloc"; json_of_selector sel; json_of_string stem; json_of_string rotsum]
+    | Shell {cmd; exit} -> `A [`String "shell"]
 
   let json_of_ver = json_of_string
 
@@ -462,44 +462,72 @@ struct
       json_of_desc desc >>= fun desc ->
       ret @@ `A [`String "desc"; desc]
 
-  let json_of_rot (Rot {ver; deps; res}) =
-    json_of_olabeled_list json_of_datum res >>= fun res ->
-    ret @@ `A [json_of_ver ver; `A (List.map json_of_dep deps); res]
+  let json_of_deps l =
+    `A (List.map json_of_dep l)
+
+  let json_of_repo =
+    json_of_olabeled_list json_of_datum
+
+  let compose_rot ~deps ~repo =
+    `A [`String version; deps; repo]
 end
 
 open RotData
+open RotJson
 
-let prepare_rot_resource : RotData.rot_resource m =
-  assert_top_level >>
-  global_env >>= fun global_env ->
-  resolver <<@> ResEnv.export_native_globals >>= fun name_table ->
-  ret @@ ListUtil.foreach name_table @@ fun (ostr, name) ->
-  ostr,
+let datum_of_name global_env name =
   match GlobalEnv.lookup global_env name with
   | `P ty -> P {ty}
   | `Def (ty, tm) -> Def {ty; tm}
   | `Desc desc -> Desc desc
-  | `Tw _ ->
-    Format.eprintf "Unexpected entry when preparing the rot structure: `Tw.@.";
-    invalid_arg "prepare_rot"
-  | `I ->
-    Format.eprintf "Unexpected entry when preparing the rot structure: `I@.";
-    invalid_arg "prepare_rot"
+  | `Tw _ | `I ->
+    Format.eprintf "Unexpected entry associated with %a.@." Name.pp name;
+    invalid_arg "RotIO.repo"
+
+let repo : RotData.repo m =
+  assert_top_level >>
+  global_env >>= fun global_env ->
+  resolver <<@> ResEnv.export_native_globals >>= fun name_table ->
+  ret @@ ListUtil.foreach name_table @@
+  fun (ostr, name) -> (ostr, datum_of_name global_env name)
+
+let deps : RotData.dep list m =
+  mlconf >>=
+  function
+  | TopModule _ | InStdin _ -> raise ML.WrongMode
+  | InFile {stem; redsum; _} ->
+    let lib_dep = Libsum in
+    let self_dep = Self {stem; redsum} in
+    mlenv <<@> ML.Env.imports >>= fun imports ->
+    Combinators.flip MU.traverse imports begin fun sel ->
+      let stem = FileRes.selector_to_stem stem sel in
+      cached_resolver stem >>=
+      function
+      | Some (_, rotsum) -> ret @@ Import {sel; stem; rotsum}
+      | None ->
+        Format.eprintf "Module at %s was imported but not in the cache." stem;
+        raise Not_found
+    end >>= fun import_deps ->
+    ret @@ [lib_dep; self_dep] @ import_deps
 
 let write_rot ~scalar_style ~layout_style rot =
   mlconf >>=
   function
-  | TopModule _ -> failwith "No rot writing allowed at top module."
+  | TopModule _ | InStdin _ -> raise ML.WrongMode
   | InFile {stem; indent; _} ->
     let rotpath = FileRes.stem_to_rot stem in
-    RotJson.json_of_rot rot >>= fun rot ->
+    let rotstr = Ezjsonm.to_string ~minify:true rot in
+
     Format.eprintf "@[%sWriting %s.@]@." indent rotpath;
     let channel = open_out_bin rotpath in
-    Ezjsonm.to_channel ~minify:true channel rot;
+    output_string channel rotstr;
     close_out channel;
     Format.eprintf "@[%sWritten %s.@]@." indent rotpath;
-    ret ()
+
+    resolver <<@> fun resolver -> resolver, Digest.string rotstr
 
 let write =
-  prepare_rot_resource >>= fun res ->
-  write_rot ~scalar_style:`Any ~layout_style:`Flow @@ Rot {ver = version; deps = []; res}
+  repo >>= json_of_repo >>= fun repo ->
+  deps <<@> json_of_deps >>= fun deps ->
+  let rot = RotJson.compose_rot deps repo in
+  write_rot ~scalar_style:`Any ~layout_style:`Flow rot

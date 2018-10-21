@@ -102,7 +102,7 @@ struct
 
       | _ -> raise ML.WrongMode
       end
-    | InFile mlconf ->
+    | InFile {stem; _} | InStdin {stem; _} ->
       match cmd with
       | E.MlRet v -> eval_val v <<@> fun v -> E.SemRet v
 
@@ -155,7 +155,7 @@ struct
         bdy_tac {ty; sys = []} >>= fun tm ->
         M.ret @@ E.SemRet (E.SemTuple [E.SemTerm ty; E.SemTerm tm])
 
-      | MlCheck {ty; tm} ->
+      | E.MlCheck {ty; tm} ->
         eval_val ty <<@> E.unleash_term >>= fun ty ->
         eval_val tm <<@> E.unleash_term >>= fun tm ->
         begin
@@ -170,18 +170,19 @@ struct
         eval_val info.tm <<@> E.unleash_term >>= fun tm ->
         eval_val info.ty <<@> E.unleash_term >>= fun ty ->
         eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
-        U.user_define Emp alpha mlconf.stem info.visibility info.opacity ~ty tm >>= fun _ ->
+        U.user_define Emp alpha stem info.visibility info.opacity ~ty tm >>= fun _ ->
         M.ret @@ E.SemRet (E.SemTuple [])
 
       | E.MlDeclData info ->
         eval_val info.name <<@> E.unleash_ref >>= fun alpha ->
-        elab_datatype mlconf.stem info.visibility alpha info.desc >>= fun desc ->
+        elab_datatype stem info.visibility alpha info.desc >>= fun desc ->
         C.replace_datatype alpha desc >>
         M.ret @@ E.SemRet (E.SemDataDesc desc)
 
       | E.MlImport (visibility, selector) ->
         I.import ~selector >>= fun res ->
         C.modify_top_resolver (ResEnv.import_globals ~visibility res) >>
+        C.modify_mlenv (E.Env.record_import selector) >>
         M.ret @@ E.SemRet (E.SemTuple [])
 
       | E.MlUnify ->

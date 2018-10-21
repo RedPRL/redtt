@@ -9,15 +9,10 @@ let read_from_channel ~filepath channel =
   Grammar.mltoplevel Lex.token lexbuf
 
 let read_file filepath =
-  let channel = open_in filepath in
-  try
-    let cmd = read_from_channel ~filepath channel in
-    close_in channel;
-    cmd
-  with
-  | exn ->
-    close_in channel;
-    raise exn
+  let channel = open_in_bin filepath in
+  match read_from_channel ~filepath channel with
+  | cmd -> close_in channel; cmd
+  | exception exn -> close_in channel; raise exn
 
 module rec M :
 sig
@@ -29,26 +24,26 @@ struct
   module MN = Monad.Notation (Contextual)
   open ML open MN open Contextual
 
-  let try_run ~mlcmd:{con; span} =
+  let run_and_get_rot_resolver ~mlcmd:{con; span} =
     try
-      Elab.eval_cmd con >> report_unsolved span >>
-      all_solved >>= function
-      | true -> RotIO.write
-      | false -> ret ()
+      Elab.eval_cmd con >> abort_unsolved span >> RotIO.write
     with
     | exn ->
       Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
       exit 1
 
+  let run ~mlcmd = ignore <@>> run_and_get_rot_resolver ~mlcmd
+
   let top_load_file red =
     mlconf >>=
     function
-    | InFile _ -> raise ML.WrongMode
+    | InFile _ | InStdin _ -> raise ML.WrongMode
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
-      let mlconf = ML.InFile {stem; indent} in
+      let redsum = Digest.file red in
+      let mlconf = ML.InFile {stem; redsum; indent} in
       Format.eprintf "@[%sStarted %s.@]@." indent red;
-      isolate_module ~mlconf @@ try_run ~mlcmd:(read_file red) >>
+      isolate_module ~mlconf @@ run ~mlcmd:(read_file red) >>
       begin
         Format.eprintf "@[%sFinished %s.@]@." indent red;
         ret ()
@@ -57,38 +52,38 @@ struct
   let top_load_stdin ~red =
     mlconf >>=
     function
-    | InFile _ -> raise ML.WrongMode
+    | InFile _ | InStdin _ -> raise ML.WrongMode
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
-      let mlconf = ML.InFile {stem; indent} in
-      isolate_module ~mlconf @@ try_run ~mlcmd:(read_from_channel ~filepath:red stdin)
+      let mlconf = ML.InStdin {stem; indent} in
+      isolate_module ~mlconf @@ run ~mlcmd:(read_from_channel ~filepath:red stdin)
 
   let import ~selector =
     mlconf >>=
     function
-    | TopModule _ -> raise ML.WrongMode
+    | TopModule _ | InStdin _ -> raise ML.WrongMode
     | InFile {stem; indent} ->
       assert_top_level >>
-      let base_dir = Filename.dirname stem in
 
-      let stem = FileRes.selector_to_stem ~base_dir selector in
-      let indent = " " ^ indent in
-      let mlconf = ML.InFile {stem; indent} in
-
+      let stem = FileRes.selector_to_stem ~stem selector in
       let red = FileRes.stem_to_red stem in
+      let redsum = Digest.file red in
+      let indent = " " ^ indent in
+      let mlconf = ML.InFile {stem; redsum; indent} in
 
-      get_resolver stem >>= function
+
+      cached_resolver stem >>= function
       | None ->
         Format.eprintf "@[%sChecking %s.@]@." indent red;
         isolate_module ~mlconf begin
-          try_run (read_file red) >> resolver
-        end >>= fun res ->
-        save_resolver stem res >>
+          run_and_get_rot_resolver (read_file red)
+        end >>= fun (res, _ as rot) ->
+        cache_resolver stem rot >>
         begin
           Format.eprintf "@[%sChecked %s.@]@." indent red;
           ret res
         end
-      | Some res ->
+      | Some (res, _) ->
         Format.eprintf "@[%sLoaded %s.[red|rot].@]@." indent stem;
         ret res
 end

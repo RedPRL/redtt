@@ -1,5 +1,6 @@
 open RedBasis
 open RedTT_Core
+open Bwd
 
 type 'a info =
   {con : 'a;
@@ -8,7 +9,8 @@ type 'a info =
 module T = PersistentTable.M
 type mlconf =
   | TopModule of {indent : string}
-  | InFile of {stem : FileRes.filepath; indent : string}
+  | InStdin of {stem : FileRes.filepath; indent : string}
+  | InFile of {stem : FileRes.filepath; redsum : Digest.t; indent : string}
 exception WrongMode (** executing a top command in a file scope or vice versa. *)
 
 type mlname = [`Gen of Name.t | `User of string]
@@ -67,6 +69,7 @@ and semval =
 
 and mlenv =
   {values : (mlname, semval) T.t;
+   imported_modules : FileRes.selector bwd;
    mlconf : mlconf}
 
 and edesc =
@@ -163,11 +166,13 @@ sig
   val indent : mlconf -> string
   val set : mlname -> semval -> t -> t
   val find : mlname -> t -> semval option
+  val record_import : FileRes.selector -> t -> t
+  val imports : t -> FileRes.selector list
 end =
 struct
   type t = mlenv
 
-  let init ~mlconf = {values = T.init ~size:100; mlconf}
+  let init ~mlconf = {values = T.init ~size:100; imported_modules = Emp; mlconf}
 
   let mlconf {mlconf; _} = mlconf
 
@@ -175,9 +180,13 @@ struct
     function
     | TopModule {indent} -> indent
     | InFile {indent; _} -> indent
+    | InStdin {indent; _} -> indent
 
   let set k v e = {e with values = T.set k v e.values}
   let find k e = T.find k e.values
+
+  let record_import sel env = {env with imported_modules = Snoc (env.imported_modules, sel)}
+  let imports env = Bwd.to_list env.imported_modules
 end
 
 (* Please fill this in. I'm just using it for debugging. *)
@@ -196,9 +205,8 @@ let pp fmt =
 
 let pp_edecl fmt =
   function
-  | MlImport (vis, local_selector) ->
-    let pp_sep fmt () = Format.fprintf fmt "." in
-    Format.fprintf fmt "%a import %a" ResEnv.pp_visibility vis (Format.pp_print_list ~pp_sep Format.pp_print_string) local_selector
+  | MlImport (vis, sel) ->
+    Format.fprintf fmt "%a import %a" ResEnv.pp_visibility vis FileRes.pp_selector sel
   | _ ->
     Format.fprintf fmt "<other>"
 
