@@ -68,17 +68,17 @@ let union_cls (x : cls) (y : cls) (h : t) =
   | `Dim0, `Dim1 | `Dim1, `Dim0 -> raise I.Inconsistent
   | `Atom clsx, `Atom clsy ->
     if clsx == clsy then `Same else
-    let rx = rank_index clsx h in
-    let ry = rank_index clsy h in
-    if rx > ry then
-      `Changed {h with parent = T.set clsy (`Atom clsx) h.parent}
-    else if rx < ry then
-      `Changed {h with parent = T.set clsx (`Atom clsy) h.parent}
-    else
-      `Changed
-      {h with
-       rank = T.set clsx (rx + 1) h.rank;
-       parent = T.set clsy (`Atom clsx) h.parent}
+      let rx = rank_index clsx h in
+      let ry = rank_index clsy h in
+      if rx > ry then
+        `Changed {h with parent = T.set clsy (`Atom clsx) h.parent}
+      else if rx < ry then
+        `Changed {h with parent = T.set clsx (`Atom clsy) h.parent}
+      else
+        `Changed
+          {h with
+           rank = T.set clsx (rx + 1) h.rank;
+           parent = T.set clsy (`Atom clsx) h.parent}
   | `Atom clsx, clsy ->
     `Changed {h with parent = T.set clsx clsy h.parent}
   | clsx, `Atom clsy ->
@@ -106,7 +106,7 @@ let query_atom (x : atom) (index : (atom, int) T.t) : [`Ok of cls | `Owned of at
   try
     `Ok (`Atom (T.get x index))
   with
-  _ ->
+    _ ->
     `Owned x
 
 let query (x : dim) (index : (atom, int) T.t) : [`Ok of cls | `Owned of atom] =
@@ -203,3 +203,11 @@ let _ =
   let x = `Atom (Name.named (Some "i")) in
   let rst = equate' x `Dim0 @@ emp () in
   assert (compare x `Dim0 rst == `Same)
+
+
+
+
+
+let from_old_restriction rst =
+  let eqns = Restriction.chronicle rst in
+  List.fold_left (fun rel (r, r') -> equate' r r' rel) (emp ()) eqns

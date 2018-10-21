@@ -590,11 +590,21 @@ struct
     | Some tm ->
       let r = eval_dim env tr in
       let r' = eval_dim env tr' in
-      let rel = Rel.equate' r r' rel in
-      let env = Env.run rel env in
-      let v = lazy begin eval rel env tm end in
-      (r, r', LazyVal.make_from_lazy v)
-    | None -> raise PleaseRaiseProperError
+      begin
+        match Rel.equate r r' rel with
+        | `Changed rel ->
+          let env = Env.run rel env in
+          let v = lazy begin eval rel env tm end in
+          (r, r', LazyVal.make_from_lazy v)
+        | `Same ->
+          let v = lazy begin eval rel env tm end in
+          (r, r', LazyVal.make_from_lazy v)
+        | exception I.Inconsistent ->
+          (r, r', LazyVal.make FortyTwo)
+      end
+    | None ->
+      (* TODO, looks weird ?? *)
+      raise PleaseRaiseProperError
 
   and eval_tm_sys rel env =
     List.map (eval_tm_face rel env)

@@ -20,3 +20,7 @@ val subst' : dim -> atom -> t -> t
 
 (* pretty printer *)
 val pp : Format.formatter -> t -> unit
+
+
+(* to be deleted *)
+val from_old_restriction : Restriction.t -> t

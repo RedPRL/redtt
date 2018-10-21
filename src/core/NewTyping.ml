@@ -18,7 +18,48 @@ type error =
   | KindError
   | UnexpectedDimensionTerm
 
+
+let pp_error fmt =
+  function
+  | ExpectedDimension ->
+    Format.fprintf fmt "Expected dimension"
+  | UnexpectedState ->
+    Format.fprintf fmt "Unexpected state"
+  | PolarityMismatch ->
+    Format.fprintf fmt "Polarity mismatch"
+  | UniverseError ->
+    Format.fprintf fmt "Universe error"
+  | ExpectedType ->
+    Format.fprintf fmt "Expected type"
+  | DimensionOutOfScope ->
+    Format.fprintf fmt "Dimension out of scope"
+  | InvalidCofibration ->
+    Format.fprintf fmt "Invalid cofibration"
+  | RestrictionTypeCofibrationMismatch ->
+    Format.fprintf fmt "Restriction type cofibration mismatch"
+  | ExpectedTermInFace ->
+    Format.fprintf fmt "Expected term in face"
+  | ExpectedVType ->
+    Format.fprintf fmt "Expected V type"
+  | ExpectedPositiveCommand ->
+    Format.fprintf fmt "Expected inferrable term of positive type"
+  | KindError ->
+    Format.fprintf fmt "Universe kind error"
+  | UnexpectedDimensionTerm ->
+    Format.fprintf fmt "Unexpected dimension term"
+
 exception E of error
+
+let _ =
+  PpExn.install_printer @@ fun fmt ->
+  function
+  | E err ->
+    Format.fprintf fmt "@[<1>%a@]" pp_error err
+  | _ ->
+    raise PpExn.Unrecognized
+
+
+
 exception PleaseRaiseProperError
 exception CanJonHelpMe
 exception PleaseFillIn

@@ -72,7 +72,13 @@ let quote_dim qenv =
 let equate_dim qenv rel r0 r1 =
   match Rel.compare r0 r1 rel with
   | `Same -> quote_dim qenv r0
-  | _ -> raise PleaseRaiseProperError
+  | _ ->
+    Format.eprintf "Tried to equate: %a != %a ~ %a@." Rel.pp rel I.pp r0 I.pp r1;
+    Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+    Format.eprintf "@.";
+
+    raise PleaseRaiseProperError
+
 
 let rec equate_con qenv rel ty el0 el1 =
   match el0, el1 with
