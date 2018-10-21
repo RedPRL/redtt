@@ -3,16 +3,12 @@ open Bwd open BwdNotation
 open RedTT_Core
 
 type global =
-  [ `Var of Name.t
-  | `Metavar of Name.t
-  | `Datatype of Name.t
+  [ `Name of Name.t
   ]
 
 type resolution =
   [ `Ix of int
-  | `Var of Name.t
-  | `Metavar of Name.t
-  | `Datatype of Name.t
+  | `Name of Name.t
   ]
 
 type visibility =
@@ -101,14 +97,15 @@ let get x renv =
   with
   | Not_found ->
     match info_of_string x renv with
-    | Some (`Var x, _) ->
-      `Var x
-    | Some (`Metavar x, _) ->
-      `Metavar x
-    | Some (`Datatype x, _) ->
-      `Datatype x
+    | Some (`Name x, _) ->
+      `Name x
     | None ->
       failwith @@ "Could not resolve variable: " ^ x
+
+let get_name x renv =
+  match get x renv with
+  | `Name x -> x
+  | _ -> failwith "ResEnv.get_name: expected to find name"
 
 let register_global name info renv =
   renv |> modify_globals @@ fun globals ->
@@ -151,14 +148,8 @@ let import_global s info renv =
   in
   {globals with info_of_string; string_of_id}
 
-let register_var ~visibility nm =
-  register_global nm (`Var nm, visibility)
-
-let register_metavar ~visibility nm =
-  register_global nm (`Metavar nm, visibility)
-
-let register_datatype ~visibility nm =
-  register_global nm (`Datatype nm, visibility)
+let register_name ~visibility nm =
+  register_global nm (`Name nm, visibility)
 
 let import_globals ~visibility imported renv =
   let merger s id_or_imported renv =
@@ -181,7 +172,7 @@ let import_globals ~visibility imported renv =
 
 let name_of_global =
   function
-  | `Var nm | `Metavar nm | `Datatype nm -> nm
+  | `Name nm -> nm
 
 let export_native_globals renv : (string option * Name.t) list =
   let f (id, (global, vis)) =

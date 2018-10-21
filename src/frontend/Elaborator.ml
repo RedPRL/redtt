@@ -56,7 +56,7 @@ struct
         try
           begin
             match ResEnv.get nm renv with
-            | `Var alpha ->
+            | `Name alpha ->
               C.global_env >>= fun env ->
               begin
                 match GlobalEnv.lookup env alpha with
@@ -307,7 +307,7 @@ struct
         C.resolver >>= fun renv ->
         begin
           match E.(ety.con) with
-          | E.Var var when ResEnv.get var.name renv = `Datatype dlbl ->
+          | E.Var var when ResEnv.get_name var.name renv = dlbl ->
             let x = Name.named @@ Some nm in
             M.in_scope x (`P data_ty) (go args) <<@> fun constr ->
               Desc.TCons (`Rec Desc.Self, Desc.Constr.bind x constr)
@@ -716,7 +716,7 @@ struct
     C.resolver <<@> fun renv ->
       begin
         match ResEnv.get name renv with
-        | `Var a ->
+        | `Name a ->
           a, (Tm.Var {name = a; twin = `Only; ushift}, [])
         | _ ->
           failwith "elab_var: expected locally closed"
@@ -729,14 +729,9 @@ struct
       C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
-        | `Var x ->
+        | `Name x ->
           C.lookup_var x `Only <<@> fun ty ->
             Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, [])
-
-        | `Metavar x ->
-          C.lookup_meta x <<@> fun (ty, _) ->
-            Tm.shift_univ ushift ty, (Tm.Meta {name = x; ushift}, [])
-
         | _ ->
           failwith "elab_inf: impossible"
       end
@@ -811,14 +806,7 @@ struct
   and elab_dim_con =
     function
     | E.Var {name; ushift = 0} ->
-      C.resolver >>= fun renv ->
-      begin
-        match ResEnv.get name renv with
-        | `Var a ->
-          M.ret @@ Tm.up @@ Tm.var a
-        | _ ->
-          failwith "elab_dim: expected locally closed"
-      end
+      C.resolver <<@> ResEnv.get_name name <<@> Tm.var <<@> Tm.up
     | E.Num 0 ->
       M.ret @@ Tm.make Tm.Dim0
     | E.Num 1 ->
@@ -898,11 +886,13 @@ struct
     | _ ->
       match exp.con with
       | E.Var {name; _} ->
+        C.global_env >>= fun genv ->
         C.resolver >>= fun renv ->
+        let alpha = ResEnv.get_name name renv in
         begin
-          match ResEnv.get name renv with
-          | `Datatype dlbl ->
-            elab_data dlbl frms
+          match GlobalEnv.lookup genv alpha with
+          | `Desc _ ->
+            elab_data alpha frms
           | _ ->
             elab_mode_switch_cut exp frms ty
         end
