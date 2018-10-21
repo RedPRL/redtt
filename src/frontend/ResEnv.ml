@@ -109,8 +109,7 @@ let add_native_global ~visibility name renv =
   let native, info_of_native, native_of_name =
     match native_of_name name renv with
     | Some native ->
-      Format.eprintf "Name %a is registered twice.@." Name.pp name;
-      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      (* should be idempotent *)
       native, globals.info_of_native, globals.native_of_name
     | None ->
       let native = T.size globals.info_of_native in
