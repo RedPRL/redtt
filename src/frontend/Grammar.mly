@@ -611,9 +611,8 @@ tm:
 head:
   | a = ATOM; CARET; k = NUMERAL
     { fun env ->
-      match R.get a env with
-      | `Ix _ -> failwith "Cannot shift bound variable"
-      | `Name x -> Tm.Var {name = x; twin = `Only; ushift = k} }
+      let x = R.get_name a env in
+      Tm.Var {name = x; twin = `Only; ushift = k} }
 
   | a = ATOM
     { fun env ->

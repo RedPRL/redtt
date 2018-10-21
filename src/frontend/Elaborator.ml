@@ -55,16 +55,11 @@ struct
       begin
         try
           begin
-            match ResEnv.get nm renv with
-            | `Name alpha ->
-              C.global_env >>= fun env ->
-              begin
-                match GlobalEnv.lookup env alpha with
-                | (`P _ | `Tw _ | `Def _ | `Desc _) -> M.ret @@ `FunApp e
-                | `I -> M.ret @@ `ExtApp e
-              end
-            | _ ->
-              failwith "kind_of_frame"
+            let alpha = ResEnv.get_name nm renv in
+            C.global_env >>= fun env ->
+            match GlobalEnv.lookup env alpha with
+            | (`P _ | `Tw _ | `Def _ | `Desc _) -> M.ret @@ `FunApp e
+            | `I -> M.ret @@ `ExtApp e
           end
         with _ -> M.ret @@ `FunApp e
       end
@@ -712,28 +707,15 @@ struct
       | `Exn exn ->
         raise exn
 
-  and elab_var name ushift =
-    C.resolver <<@> fun renv ->
-      begin
-        match ResEnv.get name renv with
-        | `Name a ->
-          a, (Tm.Var {name = a; twin = `Only; ushift}, [])
-        | _ ->
-          failwith "elab_var: expected locally closed"
-      end
-
 
   and elab_inf e : (ty * tm Tm.cmd) M.m =
     match e.con with
     | E.Var {name; ushift} ->
       C.resolver >>= fun renv ->
       begin
-        match ResEnv.get name renv with
-        | `Name x ->
-          C.lookup_var x `Only <<@> fun ty ->
-            Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, [])
-        | _ ->
-          failwith "elab_inf: impossible"
+        let x = ResEnv.get_name name renv in
+        C.lookup_var x `Only <<@> fun ty ->
+          Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, [])
       end
 
     | E.Quo tmfam ->
