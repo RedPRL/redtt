@@ -16,6 +16,7 @@ type error =
   | ExpectedVType
   | ExpectedPositiveCommand
   | KindError
+  | UnexpectedDimensionTerm
 
 exception E of error
 exception PleaseRaiseProperError
@@ -498,6 +499,15 @@ and check_of_ty cx ty sys tm =
     eval cx tm
   | `Neg ->
     check cx (`Neg (ty, sys)) tm
+
+and infer_ty cx cmd =
+  let hd, stk = cmd in
+  match synth_head cx hd with
+  | `El ty_in ->
+    let vhd = D.Val.make @@ eval cx @@ Tm.up (hd, []) in
+    synth_stack cx vhd ty_in stk
+  | `Dim ->
+    raise @@ E UnexpectedDimensionTerm
 
 and synth cx cmd : positive =
   let hd, stk = cmd in

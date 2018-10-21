@@ -4,6 +4,7 @@ module Cx = NewCx
 
 val check_ty : Cx.t -> Kind.t -> Tm.tm -> Lvl.t
 val check_of_ty : Cx.t -> D.con -> D.con D.sys -> Tm.tm -> unit
+val infer_ty : Cx.t -> Tm.tm Tm.cmd -> D.con
 
 val check_subtype : Cx.t -> D.con -> D.con -> unit
 
