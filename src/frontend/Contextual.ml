@@ -280,6 +280,9 @@ let global_env =
   ask >>= fun psi ->
   ret @@ go_params psi
 
+let ext_global_env x entry =
+  assert_top_level >>
+  modifyth @@ fun th -> {th with env = GlobalEnv.ext th.env x entry}
 
 let resolver =
   let rec go_locals renv =
