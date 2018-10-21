@@ -850,62 +850,66 @@ struct
     | _ -> raise IllFormed
 end
 
-open RotData
-open RotJson
+module Writer =
+struct
+  open RotData
+  open RotJson
 
-let datum_of_name global_env name =
-  match GlobalEnv.lookup global_env name with
-  | `P ty -> P {ty}
-  | `Def (ty, tm) -> Def {ty; tm}
-  | `Desc desc -> Desc desc
-  | `Tw _ | `I ->
-    Format.eprintf "Unexpected entry associated with %a.@." Name.pp name;
-    invalid_arg "RotIO.repo"
+  let lookup global_env name =
+    match GlobalEnv.lookup global_env name with
+    | `P ty -> P {ty}
+    | `Def (ty, tm) -> Def {ty; tm}
+    | `Desc desc -> Desc desc
+    | `Tw _ | `I ->
+      Format.eprintf "Unexpected entry associated with %a.@." Name.pp name;
+      invalid_arg "RotIO.repo"
 
-let repo : RotData.repo m =
-  assert_top_level >>
-  global_env >>= fun global_env ->
-  resolver <<@> ResEnv.export_native_globals >>= fun name_table ->
-  ret @@ ListUtil.foreach name_table @@
-  fun (ostr, name) -> (ostr, datum_of_name global_env name)
+  let repo : RotData.repo m =
+    assert_top_level >>
+    global_env >>= fun global_env ->
+    resolver <<@> ResEnv.export_native_globals >>= fun name_table ->
+    ret @@ ListUtil.foreach name_table @@
+    fun (ostr, name) -> (ostr, lookup global_env name)
 
-let deps : RotData.dep list m =
-  mlconf >>=
-  function
-  | TopModule _ | InStdin _ -> raise ML.WrongMode
-  | InFile {stem; redsum; _} ->
-    let lib_dep = Libsum in
-    let self_dep = Self {stem; redsum} in
-    mlenv <<@> ML.Env.imports >>= fun imports ->
-    Combinators.flip MU.traverse imports begin fun sel ->
-      let stem = FileRes.selector_to_stem stem sel in
-      cached_resolver stem >>=
-      function
-      | Some (_, rotsum) -> ret @@ Import {sel; stem; rotsum}
-      | None ->
-        Format.eprintf "Module at %s was imported but not in the cache." stem;
-        raise Not_found
-    end >>= fun import_deps ->
-    ret @@ [lib_dep; self_dep] @ import_deps
+  let deps : RotData.dep list m =
+    mlconf >>=
+    function
+    | TopModule _ | InStdin _ -> raise ML.WrongMode
+    | InFile {stem; redsum; _} ->
+      let lib_dep = Libsum in
+      let self_dep = Self {stem; redsum} in
+      mlenv <<@> ML.Env.imports >>= fun imports ->
+      Combinators.flip MU.traverse imports begin fun sel ->
+        let stem = FileRes.selector_to_stem stem sel in
+        cached_resolver stem >>=
+        function
+        | Some (_, rotsum) -> ret @@ Import {sel; stem; rotsum}
+        | None ->
+          Format.eprintf "Module at %s was imported but not in the cache." stem;
+          raise Not_found
+      end >>= fun import_deps ->
+      ret @@ [lib_dep; self_dep] @ import_deps
 
-let write_rot ~scalar_style ~layout_style rot =
-  mlconf >>=
-  function
-  | TopModule _ | InStdin _ -> raise ML.WrongMode
-  | InFile {stem; indent; _} ->
-    let rotpath = FileRes.stem_to_rot stem in
-    let rotstr = Ezjsonm.to_string ~minify:true rot in
+  let write_rot rot =
+    mlconf >>=
+    function
+    | TopModule _ | InStdin _ -> raise ML.WrongMode
+    | InFile {stem; indent; _} ->
+      let rotpath = FileRes.stem_to_rot stem in
+      let rotstr = Ezjsonm.to_string ~minify:true rot in
 
-    Format.eprintf "@[%sWriting %s.@]@." indent rotpath;
-    let channel = open_out_bin rotpath in
-    output_string channel rotstr;
-    close_out channel;
-    Format.eprintf "@[%sWritten %s.@]@." indent rotpath;
+      Format.eprintf "@[%sWriting %s.@]@." indent rotpath;
+      let channel = open_out_bin rotpath in
+      output_string channel rotstr;
+      close_out channel;
+      Format.eprintf "@[%sWritten %s.@]@." indent rotpath;
 
-    resolver <<@> fun resolver -> resolver, Digest.string rotstr
+      resolver <<@> fun resolver -> resolver, Digest.string rotstr
 
-let write =
-  repo >>= json_of_repo >>= fun repo ->
-  deps <<@> json_of_deps >>= fun deps ->
-  let rot = RotJson.compose_rot deps repo in
-  write_rot ~scalar_style:`Any ~layout_style:`Flow rot
+  let write =
+    repo >>= json_of_repo >>= fun repo ->
+    deps <<@> json_of_deps >>= fun deps ->
+    write_rot @@ RotJson.compose_rot deps repo
+end
+
+let write = Writer.write
