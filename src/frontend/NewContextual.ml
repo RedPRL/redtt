@@ -7,14 +7,14 @@ module D = NewDomain
 
 module Map = Map.Make (Name)
 
-type rot_resolver = ResEnv.t * Digest.t
+type rotted_resolver = ResEnv.t * Digest.t
 
 (** this is the environment that will stay there for the entire thread *)
 type thread_env =
   {env : GlobalEnv.t; (** the mapping from names to associated definitions (if any). *)
    info : [`Flex | `Rigid] Map.t; (** whether a particular name is rigid. *)
    source_stems : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
-   resolver_cache : (FileRes.filepath, rot_resolver) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
+   resolver_cache : (FileRes.filepath, rotted_resolver) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
   }
 
 (** this is the environment that only makes sense in a particular module. *)
@@ -186,7 +186,7 @@ let update_env e =
        source_stems = Map.add nm source th.source_stems}
     end >>
     modifymo @@ fun mo ->
-    {mo with resenv = ResEnv.register_name ~visibility nm mo.resenv}
+    {mo with resenv = ResEnv.add_native_global ~visibility nm mo.resenv}
   | Q _ -> ret ()
 
 let declare_datatype ~src visibility dlbl desc =
@@ -196,7 +196,7 @@ let declare_datatype ~src visibility dlbl desc =
      {st.th with
       env = GlobalEnv.declare_datatype dlbl desc st.th.env;
       source_stems = Map.add dlbl src st.th.source_stems};
-   mo = {st.mo with resenv = ResEnv.register_name visibility dlbl st.mo.resenv}}
+   mo = {st.mo with resenv = ResEnv.add_native_global visibility dlbl st.mo.resenv}}
 
 let replace_datatype dlbl desc =
   modifyth @@ fun th ->
@@ -300,7 +300,7 @@ let resolver =
     | Emp -> renv
     | Snoc (psi, (x, _)) ->
       let renv = go_locals renv psi in
-      ResEnv.register_name `Private x renv
+      ResEnv.add_native_global `Private x renv
   in
 
   get >>= fun st ->
