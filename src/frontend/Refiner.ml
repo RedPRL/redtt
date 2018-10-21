@@ -137,8 +137,13 @@ let tac_pair tac0 tac1 : chk_tac =
         | Tm.Up (Tm.Var _, []) -> ()
         | _ -> failwith "V is not rigid when applying the tac_pair tactic."
       in
-      M.under_restriction r (Tm.make Tm.Dim0) @@ tac0 {ty = ty0; sys = goal.sys} <<@>
-                                                 begin function Some tm0 -> tm0 | None -> failwith "V is not rigid when applying the tac_pair tactic." end
+      M.under_restriction r (Tm.make Tm.Dim0) @@
+      tac0 {ty = ty0; sys = goal.sys} <<@>
+      begin
+        function
+        | Some tm0 -> tm0
+        | None -> failwith "V is not rigid when applying the tac_pair tactic."
+      end
       >>= fun tm0 ->
       tac1 {ty = ty1; sys = goal.sys} >>= fun tm1 ->
       M.ret @@ Tm.make @@ Tm.VIn {r; tm0; tm1}
@@ -150,7 +155,6 @@ let unleash_data ty =
   match Tm.unleash ty with
   | Tm.Data info -> info.lbl, info.params
   | _ ->
-    Format.eprintf "Dang: %a@." Tm.pp0 ty;
     failwith "Expected datatype"
 
 let normalize_param p =
