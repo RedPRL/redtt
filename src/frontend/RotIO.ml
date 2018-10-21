@@ -784,31 +784,16 @@ struct
 
   let json_of_datum =
     function
-    | P {ty} ->
+    | `P ty ->
       json_of_tm ty >>= fun ty ->
       ret @@ `A [`String "P"; ty]
 
-    | Def {ty; tm} ->
+    | `Def (ty, tm) ->
       json_of_tm ty >>= fun ty ->
       json_of_tm tm >>= fun tm ->
       ret @@ `A [`String "Def"; ty; tm]
 
-    | Desc desc ->
-      json_of_desc desc >>= fun desc ->
-      ret @@ `A [`String "Desc"; desc]
-
-  let json_of_datum =
-    function
-    | P {ty} ->
-      json_of_tm ty >>= fun ty ->
-      ret @@ `A [`String "P"; ty]
-
-    | Def {ty; tm} ->
-      json_of_tm ty >>= fun ty ->
-      json_of_tm tm >>= fun tm ->
-      ret @@ `A [`String "Def"; ty; tm]
-
-    | Desc desc ->
+    | `Desc desc ->
       json_of_desc desc >>= fun desc ->
       ret @@ `A [`String "Desc"; desc]
 
@@ -816,16 +801,16 @@ struct
     function
     | `A [`String "P"; ty] ->
       tm_of_json ty >>= fun ty ->
-      ret @@ P {ty}
+      ret @@ `P ty
 
     | `A [`String "Def"; ty; tm] ->
       tm_of_json ty >>= fun ty ->
       tm_of_json tm >>= fun tm ->
-      ret @@ Def {ty; tm}
+      ret @@ `Def (ty, tm)
 
     | `A [`String "Desc"; desc] ->
       desc_of_json desc >>= fun desc ->
-      ret @@ Desc desc
+      ret @@ `Desc desc
 
     | _ -> raise IllFormed
 
@@ -857,9 +842,7 @@ struct
 
   let lookup global_env name =
     match GlobalEnv.lookup global_env name with
-    | `P ty -> P {ty}
-    | `Def (ty, tm) -> Def {ty; tm}
-    | `Desc desc -> Desc desc
+    | `P _ | `Def _ | `Desc _ as entry -> entry
     | `Tw _ | `I ->
       Format.eprintf "Unexpected entry associated with %a.@." Name.pp name;
       invalid_arg "RotIO.repo"
