@@ -182,7 +182,7 @@ let rec equate_con qenv rel ty el0 el1 =
           let tyenv = Env.extend_cells tyenv0 data.params in
           let args = go Emp tyenv constr intro0.args intro1.args in
           let params =
-            let desc = GlobalEnv.lookup_datatype data.lbl genv in
+            let desc = GlobalEnv.lookup_datatype genv data.lbl in
             equate_data_params qenv rel tyenv0 desc.body data.params data.params
           in
 
@@ -420,7 +420,7 @@ and equate_tycon qenv rel ty0 ty1 =
 
   | Data data0, Data data1 when data0.lbl = data1.lbl ->
     let genv, _ = data0.constrs in
-    let desc = GlobalEnv.lookup_datatype data0.lbl genv in
+    let desc = GlobalEnv.lookup_datatype genv data0.lbl in
     let tyenv = Env.init genv in
     let params = equate_data_params qenv rel tyenv desc.body data0.params data1.params in
     Tm.make @@ Tm.Data {lbl = data0.lbl; params}

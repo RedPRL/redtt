@@ -385,7 +385,7 @@ struct
       Con.make_box rel r r' ~cap ~sys
 
     | Tm.Data info ->
-      let desc = GlobalEnv.lookup_datatype info.lbl env.globals in
+      let desc = GlobalEnv.lookup_datatype env.globals info.lbl in
       let strict = Desc.is_strict_set desc in
       let params =
         flip List.map info.params @@ fun t ->
@@ -394,7 +394,7 @@ struct
       Data {lbl = info.lbl; strict; params; constrs = env.globals, Desc.constrs desc}
 
     | Tm.Intro (dlbl, clbl, params, args) ->
-      let desc = GlobalEnv.lookup_datatype dlbl env.globals in
+      let desc = GlobalEnv.lookup_datatype env.globals dlbl in
       let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
       let eval_as_cell t = Val (LazyVal.make_from_lazy @@ lazy (eval rel env t)) in
       let params = List.map eval_as_cell params in
