@@ -176,16 +176,16 @@ let update_env e =
     modifyth begin fun th ->
       {th with
        env =
-       begin
-         match opacity with
-         | `Transparent -> GlobalEnv.define th.env nm ty tm
-         | `Opaque -> GlobalEnv.ext_meta th.env nm @@ `P ty
-       end;
+         begin
+           match opacity with
+           | `Transparent -> GlobalEnv.define th.env nm ty tm
+           | `Opaque -> GlobalEnv.ext th.env nm @@ `P ty
+         end;
        info = Map.add nm `Rigid th.info;
        source_stems = Map.add nm source th.source_stems}
     end >>
     modifymo @@ fun mo ->
-    {mo with resenv = ResEnv.register_metavar ~visibility nm mo.resenv}
+    {mo with resenv = ResEnv.register_name ~visibility nm mo.resenv}
   | Q _ -> ret ()
 
 let declare_datatype ~src visibility dlbl desc =
@@ -195,7 +195,7 @@ let declare_datatype ~src visibility dlbl desc =
      {st.th with
       env = GlobalEnv.declare_datatype dlbl desc st.th.env;
       source_stems = Map.add dlbl src st.th.source_stems};
-   mo = {st.mo with resenv = ResEnv.register_datatype visibility dlbl st.mo.resenv}}
+   mo = {st.mo with resenv = ResEnv.register_name visibility dlbl st.mo.resenv}}
 
 let replace_datatype dlbl desc =
   modifyth @@ fun th ->
@@ -243,8 +243,8 @@ let isolate_local (m : 'a m) : 'a m =
 let isolate_module ~mlconf (m : 'a m) : 'a m =
   assert_top_level >>
   fun ps st ->
-    let st', a = m ps {st with mo = init_mo ~mlconf; lo = init_lo ()} in
-    {st' with mo = st.mo; lo = st.lo}, a
+  let st', a = m ps {st with mo = init_mo ~mlconf; lo = init_lo ()} in
+  {st' with mo = st.mo; lo = st.lo}, a
 
 let rec pushls es =
   match es with
@@ -293,7 +293,7 @@ let resolver =
     | Emp -> renv
     | Snoc (psi, (x, _)) ->
       let renv = go_locals renv psi in
-      ResEnv.register_var `Private x renv
+      ResEnv.register_name `Private x renv
   in
 
   get >>= fun st ->
@@ -350,6 +350,12 @@ let in_scopes ps =
   ps' <>< ps
 
 
+let lookup_meta x =
+  get >>= fun st ->
+  let ty = GlobalEnv.lookup_ty st.th.env x `Only in
+  let info = Map.find x st.th.info in
+  ret (ty, info)
+
 let lookup_var x w =
   let rec go gm =
     match w, gm with
@@ -363,16 +369,13 @@ let lookup_var x w =
       if x = y then M.ret ty1 else go gm
     | _, Snoc (gm, _) ->
       go gm
-    | _ ->
-      failwith "lookup_var: not found"
+    | _, Emp ->
+      get >>= fun st ->
+      let ty = GlobalEnv.lookup_ty st.th.env x w in
+      let info = Map.find x st.th.info in
+      ret ty
   in
   ask >>= go
-
-let lookup_meta x =
-  get >>= fun st ->
-  let ty = GlobalEnv.lookup_ty st.th.env x `Only in
-  let info = Map.find x st.th.info in
-  ret (ty, info)
 
 
 let postpone s p =
