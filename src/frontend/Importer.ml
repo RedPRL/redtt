@@ -71,8 +71,8 @@ struct
   let import ~selector =
     mlconf >>=
     function
-    | TopModule _ | InStdin _ -> raise ML.WrongMode
-    | InFile {stem; indent} ->
+    | TopModule _ -> raise ML.WrongMode
+    | InFile {stem; indent; _} | InStdin {stem; indent} ->
       assert_top_level >>
 
       let stem = FileRes.selector_to_stem ~stem selector in
