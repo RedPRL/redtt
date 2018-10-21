@@ -185,7 +185,7 @@ let update_env e =
        source_stems = Map.add nm source th.source_stems}
     end >>
     modifymo @@ fun mo ->
-    {mo with resenv = ResEnv.register_name ~visibility nm mo.resenv}
+    {mo with resenv = ResEnv.add_native_global ~visibility nm mo.resenv}
   | Q _ -> ret ()
 
 let declare_datatype ~src visibility dlbl desc =
@@ -195,7 +195,7 @@ let declare_datatype ~src visibility dlbl desc =
      {st.th with
       env = GlobalEnv.declare_datatype dlbl desc st.th.env;
       source_stems = Map.add dlbl src st.th.source_stems};
-   mo = {st.mo with resenv = ResEnv.register_name visibility dlbl st.mo.resenv}}
+   mo = {st.mo with resenv = ResEnv.add_native_global visibility dlbl st.mo.resenv}}
 
 let replace_datatype dlbl desc =
   modifyth @@ fun th ->
@@ -293,7 +293,7 @@ let resolver =
     | Emp -> renv
     | Snoc (psi, (x, _)) ->
       let renv = go_locals renv psi in
-      ResEnv.register_name `Private x renv
+      ResEnv.add_native_global `Private x renv
   in
 
   get >>= fun st ->

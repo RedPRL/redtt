@@ -173,8 +173,8 @@ struct
 
   let rec json_of_name name kont_notfound kont_found =
     resolver >>= fun res ->
-    match ResEnv.id_of_name name res with
-    | Some id -> kont_found @@ json_of_int id
+    match ResEnv.native_of_name name res with
+    | Some native -> kont_found @@ json_of_int native
     | None ->
       source_stem name >>= function
       | None -> kont_notfound ()
@@ -184,9 +184,9 @@ struct
           Format.eprintf "Module at %s spread names around without leaving a trace in the cache.@." stem;
           raise @@ Impossible "impossible cache miss"
         | Some (res, _) ->
-          match ResEnv.id_of_name name res with
+          match ResEnv.native_of_name name res with
           | None -> kont_notfound ()
-          | Some id -> kont_found @@ `A [`String stem; json_of_int id]
+          | Some native -> kont_found @@ `A [`String stem; json_of_int native]
 
   and json_of_dlbl dlbl =
     json_of_name dlbl (fun () -> raise @@ Impossible "datatype name escaped the serialization context.") ret
@@ -395,17 +395,17 @@ struct
 
   let rec name_of_json : Ezjsonm.value -> Name.t m =
     function
-    | `String id ->
+    | `String native ->
       resolver >>= fun res ->
-      begin match ResEnv.name_of_id (int_of_json (`String id)) res with
+      begin match ResEnv.name_of_native (int_of_json (`String native)) res with
       | None -> raise IllFormed
       | Some name -> ret name
       end
-    | `A [`String stem; id] ->
+    | `A [`String stem; native] ->
       cached_resolver stem >>= begin function
       | None -> raise IllFormed
       | Some (res, _) ->
-        match ResEnv.name_of_id (int_of_json id) res with
+        match ResEnv.name_of_native (int_of_json native) res with
         | None -> raise IllFormed
         | Some name -> ret name
       end

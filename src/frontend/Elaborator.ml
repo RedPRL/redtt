@@ -55,16 +55,11 @@ struct
       begin
         try
           begin
-            match ResEnv.get nm renv with
-            | `Name alpha ->
-              C.global_env >>= fun env ->
-              begin
-                match GlobalEnv.lookup env alpha with
-                | (`P _ | `Tw _ | `Def _ | `Desc _) -> M.ret @@ `FunApp e
-                | `I -> M.ret @@ `ExtApp e
-              end
-            | _ ->
-              failwith "kind_of_frame"
+            let alpha = ResEnv.get_name nm renv in
+            C.global_env >>= fun env ->
+            match GlobalEnv.lookup env alpha with
+            | (`P _ | `Tw _ | `Def _ | `Desc _) -> M.ret @@ `FunApp e
+            | `I -> M.ret @@ `ExtApp e
           end
         with _ -> M.ret @@ `FunApp e
       end
@@ -717,12 +712,9 @@ struct
     | E.Var {name; ushift} ->
       C.resolver >>= fun renv ->
       begin
-        match ResEnv.get name renv with
-        | `Name x ->
-          C.lookup_var x `Only <<@> fun ty ->
-            Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, [])
-        | _ ->
-          failwith "elab_inf: impossible"
+        let x = ResEnv.get_name name renv in
+        C.lookup_var x `Only <<@> fun ty ->
+          Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, [])
       end
 
     | E.Quo tmfam ->
