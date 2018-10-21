@@ -56,7 +56,7 @@ struct
         try
           begin
             match ResEnv.get nm renv with
-            | `Var alpha ->
+            | `Name alpha ->
               C.global_env >>= fun env ->
               begin
                 match GlobalEnv.lookup env alpha with
@@ -715,7 +715,7 @@ struct
     C.resolver <<@> fun renv ->
       begin
         match ResEnv.get name renv with
-        | `Var a ->
+        | `Name a ->
           a, (Tm.Var {name = a; twin = `Only; ushift}, [])
         | _ ->
           failwith "elab_var: expected locally closed"
@@ -728,7 +728,7 @@ struct
       C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
-        | `Var x ->
+        | `Name x ->
           C.lookup_var x `Only <<@> fun ty ->
             Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, [])
         | _ ->
@@ -808,7 +808,7 @@ struct
       C.resolver >>= fun renv ->
       begin
         match ResEnv.get name renv with
-        | `Var a ->
+        | `Name a ->
           M.ret @@ Tm.up @@ Tm.var a
         | _ ->
           failwith "elab_dim: expected locally closed"

@@ -3,13 +3,13 @@ open Bwd open BwdNotation
 open RedTT_Core
 
 type global =
-  [ `Var of Name.t
+  [ `Name of Name.t
   | `Datatype of Name.t
   ]
 
 type resolution =
   [ `Ix of int
-  | `Var of Name.t
+  | `Name of Name.t
   | `Datatype of Name.t
   ]
 
@@ -99,8 +99,8 @@ let get x renv =
   with
   | Not_found ->
     match info_of_string x renv with
-    | Some (`Var x, _) ->
-      `Var x
+    | Some (`Name x, _) ->
+      `Name x
     | Some (`Datatype x, _) ->
       `Datatype x
     | None ->
@@ -148,7 +148,7 @@ let import_global s info renv =
   {globals with info_of_string; string_of_id}
 
 let register_var ~visibility nm =
-  register_global nm (`Var nm, visibility)
+  register_global nm (`Name nm, visibility)
 
 let register_datatype ~visibility nm =
   register_global nm (`Datatype nm, visibility)
@@ -174,7 +174,7 @@ let import_globals ~visibility imported renv =
 
 let name_of_global =
   function
-  | `Var nm | `Datatype nm -> nm
+  | `Name nm | `Datatype nm -> nm
 
 let export_native_globals renv : (string option * Name.t) list =
   let f (id, (global, vis)) =

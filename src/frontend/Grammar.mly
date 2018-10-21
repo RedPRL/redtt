@@ -621,14 +621,14 @@ head:
     { fun env ->
       match R.get a env with
       | `Ix _ -> failwith "Cannot shift bound variable"
-      | `Var x -> Tm.Var {name = x; twin = `Only; ushift = k}
+      | `Name x -> Tm.Var {name = x; twin = `Only; ushift = k}
       | _ -> failwith "Expected variable name" }
 
   | a = ATOM
     { fun env ->
       match R.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
-      | `Var x -> Tm.Var {name = x; twin = `Only; ushift = 0}
+      | `Name x -> Tm.Var {name = x; twin = `Only; ushift = 0}
       | _ -> failwith "Expected variable name" }
 
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR

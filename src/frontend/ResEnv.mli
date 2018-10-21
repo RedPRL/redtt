@@ -7,7 +7,7 @@ open RedTT_Core
 
 type resolution =
   [ `Ix of int
-  | `Var of Name.t
+  | `Name of Name.t
   | `Datatype of Name.t
   ]
 
