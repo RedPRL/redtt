@@ -667,8 +667,15 @@ and synth_stack cx vhd ty stk  =
     raise PleaseFillIn
 
   | D.Ext eclo, Tm.ExtApp rs :: stk ->
-    Format.eprintf "extapp@.";
-    raise PleaseFillIn
+    let rs =
+      flip List.map rs @@ fun r ->
+      check cx (`Pos `Dim) r;
+      eval_dim cx r
+    in
+    let ty, _ = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun r -> D.Dim r) rs in
+    let frm = D.ExtApp rs in
+    let vhd = D.Val.plug (Cx.rel cx) frm vhd in
+    synth_stack cx vhd ty stk
 
   | D.Data _, Tm.Elim _ :: stk ->
     raise CanJonHelpMe
