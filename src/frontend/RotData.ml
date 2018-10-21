@@ -10,13 +10,15 @@ type dep =
   | Import of {sel : FileRes.selector; stem : FileRes.filepath; rotsum : Digest.t}
   | Shell of {cmd : string; exit: int}
 
-type datum = (* a subset of GlobalEnv.entry *)
+type entry = (* a subset of GlobalEnv.entry *)
   [ `P of Tm.tm
   | `Def of Tm.tm * Tm.tm
   | `Desc of Desc.desc
   ]
 
-type repo = (string option * datum) list
+type reexported = (string * Name.t) list
+
+type repo = (string option * entry) list
 
 (* this is not really used, but is useful as an overview
 
@@ -24,5 +26,6 @@ type rot =
   Rot of
     {ver : string;
      deps : dep list;
-     res : rot_resource}
+     reexported : reexported;
+     repo : repo}
 *)

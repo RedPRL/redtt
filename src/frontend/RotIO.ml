@@ -44,14 +44,6 @@ struct
     | `String str -> Some str
     | _ -> raise IllFormed
 
-  let json_of_ostring_bwd nms =
-    `A (List.map json_of_ostring @@ Bwd.to_list nms)
-
-  let ostring_bwd_of_json =
-    function
-    | `A arr -> Bwd.from_list @@ List.map ostring_of_json arr
-    | _ -> raise IllFormed
-
   let json_of_list json_of_item l =
     MU.traverse json_of_item l <<@> fun l -> `A l
 
@@ -69,6 +61,12 @@ struct
     function
     | `A l -> List.map item_of_json l
     | _ -> raise IllFormed
+
+  let json_of_ostring_bwd nms =
+    json_of_list_ json_of_ostring @@ Bwd.to_list nms
+
+  let ostring_bwd_of_json l =
+    Bwd.from_list @@ list_of_json_ ostring_of_json l
 
   let json_of_pair (json_of_a, json_of_b) (a, b) =
     json_of_a a >>= fun a ->
@@ -207,22 +205,24 @@ struct
       end
     | _ -> raise IllFormed
 
-  let rec json_of_name name kont_notfound kont_found =
+  let rec json_of_foreign_name name kont_notfound kont_found =
+    source_stem name >>= function
+    | None -> kont_notfound ()
+    | Some stem ->
+      cached_resolver stem >>= function
+      | None ->
+        Format.eprintf "Module at %s spread names around without leaving a trace in the cache.@." stem;
+        raise @@ Impossible "impossible cache miss"
+      | Some (res, _) ->
+        match ResEnv.native_of_name name res with
+        | None -> kont_notfound ()
+        | Some native -> kont_found @@ `A [`String stem; json_of_int native]
+
+  and json_of_name name kont_notfound kont_found =
     resolver >>= fun res ->
     match ResEnv.native_of_name name res with
     | Some native -> kont_found @@ json_of_int native
-    | None ->
-      source_stem name >>= function
-      | None -> kont_notfound ()
-      | Some stem ->
-        cached_resolver stem >>= function
-        | None ->
-          Format.eprintf "Module at %s spread names around without leaving a trace in the cache.@." stem;
-          raise @@ Impossible "impossible cache miss"
-        | Some (res, _) ->
-          match ResEnv.native_of_name name res with
-          | None -> kont_notfound ()
-          | Some native -> kont_found @@ `A [`String stem; json_of_int native]
+    | None -> json_of_foreign_name name kont_notfound kont_found
 
   and json_of_dlbl dlbl =
     json_of_name dlbl (fun () -> raise @@ Impossible "datatype name escaped the serialization context.") ret
@@ -427,14 +427,8 @@ struct
   and json_of_tm_bnd_face face = json_of_face json_of_tm json_of_tm_bnd face
   and json_of_tm_bnd_sys sys = json_of_list json_of_tm_bnd_face sys
 
-  let rec name_of_json : Ezjsonm.value -> Name.t m =
+  let rec foreign_name_of_json : Ezjsonm.value -> Name.t m =
     function
-    | `String native ->
-      resolver >>= fun res ->
-      begin match ResEnv.name_of_native (int_of_json (`String native)) res with
-      | None -> raise IllFormed
-      | Some name -> ret name
-      end
     | `A [`String stem; native] ->
       cached_resolver stem >>= begin function
       | None -> raise IllFormed
@@ -444,6 +438,16 @@ struct
         | Some name -> ret name
       end
     | _ -> raise IllFormed
+
+  let rec name_of_json : Ezjsonm.value -> Name.t m =
+    function
+    | `String native ->
+      resolver >>= fun res ->
+      begin match ResEnv.name_of_native (int_of_json (`String native)) res with
+      | None -> raise IllFormed
+      | Some name -> ret name
+      end
+    | x -> foreign_name_of_json x
 
   and dlbl_of_json json = name_of_json json
 
@@ -782,7 +786,7 @@ struct
 
   let ver_of_json = string_of_json
 
-  let json_of_datum =
+  let json_of_entry : entry -> Ezjsonm.value m =
     function
     | `P ty ->
       json_of_tm ty >>= fun ty ->
@@ -797,7 +801,7 @@ struct
       json_of_desc desc >>= fun desc ->
       ret @@ `A [`String "Desc"; desc]
 
-  let datum_of_json =
+  let entry_of_json : Ezjsonm.value -> entry m =
     function
     | `A [`String "P"; ty] ->
       tm_of_json ty >>= fun ty ->
@@ -821,17 +825,29 @@ struct
     list_of_json_ dep_of_json
 
   let json_of_repo =
-    json_of_olabeled_list json_of_datum
+    json_of_olabeled_list json_of_entry
 
   let repo_of_json =
-    olabeled_list_of_json datum_of_json
+    olabeled_list_of_json entry_of_json
 
-  let compose_rot ~deps ~repo =
-    `A [`String version; deps; repo]
+  let json_of_foreign name =
+    json_of_foreign_name name (fun () -> invalid_arg "json_of_foreign") ret
+
+  let foreign_of_json =
+    foreign_name_of_json
+
+  let json_of_reexported : reexported -> Ezjsonm.value m =
+    json_of_labeled_list json_of_foreign
+
+  let reexported_of_json : Ezjsonm.value -> reexported m =
+    labeled_list_of_json foreign_of_json
+
+  let compose_rot ~deps ~reexported ~repo =
+    `A [`String version; deps; reexported; repo]
 
   let decompose_rot =
     function
-    | `A [`String v; deps; repo] when v = version -> deps, repo
+    | `A [`String v; deps; reexported; repo] when v = version -> deps, reexported, repo
     | _ -> raise IllFormed
 end
 
@@ -839,20 +855,6 @@ module Writer =
 struct
   open RotData
   open RotJson
-
-  let lookup global_env name =
-    match GlobalEnv.lookup global_env name with
-    | `P _ | `Def _ | `Desc _ as entry -> entry
-    | `Tw _ | `I ->
-      Format.eprintf "Unexpected entry associated with %a.@." Name.pp name;
-      invalid_arg "RotIO.repo"
-
-  let repo : RotData.repo m =
-    assert_top_level >>
-    global_env >>= fun global_env ->
-    resolver <<@> ResEnv.export_native_globals >>= fun name_table ->
-    ret @@ ListUtil.foreach name_table @@
-    fun (ostr, name) -> (ostr, lookup global_env name)
 
   let deps : RotData.dep list m =
     mlconf >>=
@@ -873,6 +875,24 @@ struct
       end >>= fun import_deps ->
       ret @@ [lib_dep; self_dep] @ import_deps
 
+  let lookup global_env name =
+    match GlobalEnv.lookup global_env name with
+    | `P _ | `Def _ | `Desc _ as entry -> entry
+    | `Tw _ | `I ->
+      Format.eprintf "Unexpected entry associated with %a.@." Name.pp name;
+      invalid_arg "RotIO.repo"
+
+  let repo : RotData.repo m =
+    assert_top_level >>
+    global_env >>= fun global_env ->
+    resolver <<@> ResEnv.export_native_globals >>= fun name_table ->
+    ret @@ ListUtil.foreach name_table @@
+    fun (ostr, name) -> (ostr, lookup global_env name)
+
+  let reexported : RotData.reexported m =
+    assert_top_level >>
+    resolver <<@> ResEnv.export_foreign_globals
+
   let write_rot rot =
     mlconf >>=
     function
@@ -890,9 +910,15 @@ struct
       resolver <<@> fun resolver -> resolver, Digest.string rotstr
 
   let write =
-    repo >>= json_of_repo >>= fun repo ->
     deps <<@> json_of_deps >>= fun deps ->
-    write_rot @@ RotJson.compose_rot deps repo
+    reexported >>= json_of_reexported >>= fun reexported ->
+    repo >>= json_of_repo >>= fun repo ->
+    write_rot @@ RotJson.compose_rot deps reexported repo
 end
 
 let write = Writer.write
+
+module Reader =
+struct
+
+end
