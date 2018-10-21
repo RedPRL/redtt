@@ -6,14 +6,14 @@ open Bwd open BwdNotation
 
 module Map = Map.Make (Name)
 
-type rot_resolver = ResEnv.t * Digest.t
+type rotted_resolver = ResEnv.t * Digest.t
 
 (** this is the environment that will stay there for the entire thread *)
 type thread_env =
   {env : GlobalEnv.t; (** the mapping from names to associated definitions (if any). *)
    info : [`Flex | `Rigid] Map.t; (** whether a particular name is rigid. *)
    source_stems : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
-   resolver_cache : (FileRes.filepath, rot_resolver) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
+   resolver_cache : (FileRes.filepath, rotted_resolver) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
   }
 
 (** this is the environment that only makes sense in a particular module. *)

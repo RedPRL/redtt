@@ -2,10 +2,6 @@ open RedBasis
 open Bwd open BwdNotation
 open RedTT_Core
 
-type global =
-  [ `Name of Name.t
-  ]
-
 type resolution =
   [ `Ix of int
   | `Name of Name.t
@@ -17,7 +13,7 @@ type visibility =
 
 module T = PersistentTable.M
 
-type global_info = global * visibility
+type global_info = Name.t * visibility
 
 (** the [id] here is only assigned to natives. it is important not to
     assign anything to the imported stuff. *)
@@ -97,7 +93,7 @@ let get x renv =
   with
   | Not_found ->
     match info_of_string x renv with
-    | Some (`Name x, _) ->
+    | Some (x, _) ->
       `Name x
     | None ->
       failwith @@ "Could not resolve variable: " ^ x
@@ -149,7 +145,7 @@ let import_global s info renv =
   {globals with info_of_string; string_of_id}
 
 let register_name ~visibility nm =
-  register_global nm (`Name nm, visibility)
+  register_global nm (nm, visibility)
 
 let import_globals ~visibility imported renv =
   let merger s id_or_imported renv =
@@ -170,14 +166,14 @@ let import_globals ~visibility imported renv =
   in
   T.fold merger imported.globals.info_of_string renv
 
-let name_of_global =
-  function
-  | `Name nm -> nm
+let name_of_id i renv =
+  Option.map (fun (name, _) -> name) @@
+  info_of_id i renv
 
 let export_native_globals renv : (string option * Name.t) list =
-  let f (id, (global, vis)) =
+  let f (id, (name, vis)) =
     let ostr = match vis with `Private -> None | `Public -> string_of_id id renv in
-    ostr, name_of_global global
+    ostr, name
   in
   List.sort compare @@ List.of_seq @@ Seq.map f @@ T.to_seq renv.globals.info_of_id
 
