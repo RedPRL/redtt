@@ -1254,7 +1254,7 @@ struct
         | neu ->
           let ty = Val.run rel info.ty in
           Neu {ty; neu}
-        | exception ConSys.Triv v ->
+        | exception Neutroid.Triv v ->
           v
       end
 
@@ -2488,7 +2488,7 @@ struct
   type t = neutroid
 
   module ConSys = Sys (Con)
-  exception Triv = ConSys.Triv
+  exception Triv of con
 
   let swap pi {neu; sys} =
     {neu = DelayedNeu.swap pi neu;
@@ -2501,8 +2501,8 @@ struct
       try
         ConSys.run_then_force rel sys
       with
-      | ConSys.Triv _ ->
-        failwith "Internal error: neutroid rigidity invariant has been violated."
+      | ConSys.Triv con ->
+        raise @@ Triv con
     in
     let neu = DelayedNeu.run rel neu in
     {neu; sys}
