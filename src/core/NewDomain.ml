@@ -1437,8 +1437,14 @@ struct
 
     | _, Neu info ->
       let frm, ty, sys = rigid_plug_ty rel frm info.ty hd in
-      let neu = Neutroid.plug rel ~rigid:true frm info.neu in
-      Neu {ty = Val.make ty; neu = {neu with sys = sys @ neu.sys}}
+      begin
+        match ConSys.force rel sys with
+        | sys ->
+          let neu = Neutroid.plug rel ~rigid:true frm info.neu in
+          Neu {ty = Val.make ty; neu = {neu with sys = sys @ neu.sys}}
+        | exception ConSys.Triv con ->
+          con
+      end
 
     | FunApp _, _ -> raise PleaseRaiseProperError
     | Fst, _ -> raise PleaseRaiseProperError
@@ -2491,7 +2497,13 @@ struct
   let run rel {neu; sys} =
     (* The system needs to be forced first. The invariant is that
      * if [sys] is rigid, it is safe to run neu *)
-    let sys = ConSys.run_then_force rel sys in
+    let sys =
+      try
+        ConSys.run_then_force rel sys
+      with
+      | ConSys.Triv _ ->
+        failwith "Internal error: neutroid rigidity invariant has been violated."
+    in
     let neu = DelayedNeu.run rel neu in
     {neu; sys}
 
