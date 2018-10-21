@@ -145,7 +145,7 @@ type body = (param, constrs) telescope
 type desc =
   {kind : Kind.t;
    lvl : Lvl.t;
-   body : (param, constrs) telescope;
+   body : body;
    status : [`Complete | `Partial]}
 
 module Param : LocallyNameless.S with type t = tm =

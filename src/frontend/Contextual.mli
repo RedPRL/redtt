@@ -4,26 +4,30 @@ open Dev
 
 include Monad.S
 
-type per_process
-
 val ask : params m
 val local : (params -> params) -> 'a m -> 'a m
 val fix : ('a m -> 'a m) -> 'a m
 
 val assert_top_level : unit m
-val init_per_process : unit -> per_process
-val get_per_process : per_process m
-val set_per_process : per_process -> unit m
 
 val modify_mlenv : (ML.mlenv -> ML.mlenv) -> unit m
-val get_mlenv : ML.mlenv m
+val mlenv : ML.mlenv m
+val mlconf : ML.mlconf m
 
 val resolver : ResEnv.t m
 val modify_top_resolver : (ResEnv.t -> ResEnv.t) -> unit m
-val declare_datatype : ResEnv.visibility -> Name.t -> Desc.desc -> unit m
+val declare_datatype : src:string -> ResEnv.visibility -> Name.t -> Desc.desc -> unit m
 val replace_datatype : Name.t -> Desc.desc -> unit m
 
-val isolate : 'a m -> 'a m
+val source_stem : Name.t -> FileRes.filepath option m
+
+type rot_resolver = ResEnv.t * Digest.t
+val cached_resolver : stem:FileRes.filepath -> rot_resolver option m
+val cache_resolver : stem:FileRes.filepath -> rot_resolver -> unit m
+
+val isolate_local : 'a m -> 'a m
+val isolate_module : mlconf : ML.mlconf -> 'a m -> 'a m
+val run : mlconf : ML.mlconf -> 'a m -> 'a
 
 val popl : entry m
 val popr : entry m
@@ -58,12 +62,9 @@ val check_eq : ty:ty -> tm -> tm -> [`Ok | `Exn of exn] m
 val check_eq_dim : tm -> tm -> bool m
 
 
-val get_global_env : Subst.t m
+val global_env : Subst.t m
 val base_cx : Cx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 
-val run : per_process_opt : per_process option -> mlconf : ML.mlconf -> 'a m -> 'a
-
-
-val report_unsolved : loc:Log.location -> unit m
+val abort_unsolved : loc:Log.location -> unit m

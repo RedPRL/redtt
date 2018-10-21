@@ -3,15 +3,36 @@ open RedTT_Core
 open RedBasis
 open Bwd open BwdNotation
 
-type lcx = entry bwd
-type rcx = [`Entry of entry | `Update of Occurs.Set.t] list
 
 module Map = Map.Make (Name)
 
-type env = GlobalEnv.t
-type per_process = {env : env; info : [`Flex | `Rigid] Map.t}
-type cx = {mlenv : ML.mlenv; resenv : ResEnv.t; per_process : per_process; lcx : lcx; rcx : rcx}
+type rot_resolver = ResEnv.t * Digest.t
 
+(** this is the environment that will stay there for the entire thread *)
+type thread_env =
+  {env : GlobalEnv.t; (** the mapping from names to associated definitions (if any). *)
+   info : [`Flex | `Rigid] Map.t; (** whether a particular name is rigid. *)
+   source_stems : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
+   resolver_cache : (FileRes.filepath, rot_resolver) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
+  }
+
+(** this is the environment that only makes sense in a particular module. *)
+type module_env =
+  {mlenv : ML.mlenv; (** the environment for *)
+   resenv : ResEnv.t (** the map from strings to names within a particular *)
+  }
+
+(** the local environmeth that only makes sense in a particular region of a module. *)
+type local_env =
+  {lcx : entry bwd;
+   rcx : [`Entry of entry | `Update of Occurs.Set.t] list
+  }
+
+type cx = {
+  th : thread_env;
+  mo : module_env;
+  lo : local_env
+}
 
 let rec pp_lcx fmt =
   function
@@ -62,7 +83,7 @@ let filter_entry filter entry =
       | _ -> false
     end
 
-let pp_cx filter fmt {lcx; rcx} =
+let pp_cx filter fmt {lo = {lcx; rcx}; _} =
   Format.fprintf fmt "@[<v>%a@]@ %a@ @[<v>%a@]"
     pp_lcx (Bwd.filter (filter_entry filter) lcx)
     Uuseg_string.pp_utf_8 "❚"
@@ -105,18 +126,28 @@ let get _ cx = cx, cx
 
 let modify f _ cx = f cx, ()
 
-let getl = get <<@> fun x -> x.lcx
-let getr = get <<@> fun x -> x.rcx
-let modifyl f = modify @@ fun st -> {st with lcx = f st.lcx}
-let modifyr f = modify @@ fun st -> {st with rcx = f st.rcx}
+let getth = get <<@> fun x -> x.th
+let getlo = get <<@> fun x -> x.lo
+let getmo = get <<@> fun x -> x.mo
+
+let modifyth f = modify @@ fun st -> {st with th = f st.th}
+let modifymo f = modify @@ fun st -> {st with mo = f st.mo}
+let modifylo f = modify @@ fun st -> {st with lo = f st.lo}
+
+let getl = getlo <<@> fun x -> x.lcx
+let getr = getlo <<@> fun x -> x.rcx
+let modifyl f = modifylo @@ fun st -> {st with lcx = f st.lcx}
+let modifyr f = modifylo @@ fun st -> {st with rcx = f st.rcx}
 let setl l = modifyl @@ fun _ -> l
 let setr r = modifyr @@ fun _ -> r
 
 let modify_mlenv f =
-  modify @@ fun st ->
+  modifymo @@ fun st ->
   {st with mlenv = f st.mlenv}
 
-let get_mlenv = get <<@> fun st -> st.mlenv
+let mlenv = getmo <<@> fun st -> st.mlenv
+
+let mlconf = mlenv <<@> ML.Env.mlconf
 
 
 let assert_top_level =
@@ -124,53 +155,60 @@ let assert_top_level =
   | Emp -> ret ()
   | _ -> failwith "Invalid operations outside of the top-level."
 
-let init_per_process () =
-  {env = GlobalEnv.emp (); info = Map.empty}
-
-let get_per_process =
-  assert_top_level >>
-  get <<@> fun st -> st.per_process
-
-let set_per_process per_process =
-  assert_top_level >>
-  modify @@ fun st -> {st with per_process}
-
 let update_env e =
-  modify @@ fun st ->
   match e with
   | E (nm, ty, Hole info) ->
-    {st with per_process =
-               {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty; info = Map.add nm info st.per_process.info}}
+    modifyth @@ fun th ->
+    {th with
+     env = GlobalEnv.ext_meta th.env nm @@ `P ty;
+     info = Map.add nm info th.info}
   | E (nm, ty, Guess _) ->
-    {st with per_process =
-               {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty; info = Map.add nm `Rigid st.per_process.info}}
-  | E (nm, ty, Defn (visibility, `Transparent, t)) ->
-    {st with
-     per_process =
-       {env = GlobalEnv.define st.per_process.env nm ty t;
-        info = Map.add nm `Rigid st.per_process.info};
-     resenv = ResEnv.register_metavar ~visibility nm st.resenv}
-  | E (nm, ty, Defn (visibility, `Opaque, _)) ->
-    {st with
-     per_process =
-       {env = GlobalEnv.ext_meta st.per_process.env nm @@ `P ty;
-        info = Map.add nm `Rigid st.per_process.info};
-     resenv = ResEnv.register_metavar ~visibility nm st.resenv}
-  | _ ->
-    st
+    modifyth @@ fun th ->
+    {th with
+     env = GlobalEnv.ext_meta th.env nm @@ `P ty;
+     info = Map.add nm `Rigid th.info}
+  | E (nm, ty, Auxiliary tm) ->
+    modifyth @@ fun th ->
+    {th with
+     env = GlobalEnv.define th.env nm ty tm;
+     info = Map.add nm `Rigid th.info}
+  | E (nm, ty, UserDefn {source; visibility; opacity; tm}) ->
+    modifyth begin fun th ->
+      {th with
+       env =
+       begin
+         match opacity with
+         | `Transparent -> GlobalEnv.define th.env nm ty tm
+         | `Opaque -> GlobalEnv.ext_meta th.env nm @@ `P ty
+       end;
+       info = Map.add nm `Rigid th.info;
+       source_stems = Map.add nm source th.source_stems}
+    end >>
+    modifymo @@ fun mo ->
+    {mo with resenv = ResEnv.register_metavar ~visibility nm mo.resenv}
+  | Q _ -> ret ()
 
-let declare_datatype visibility dlbl desc =
+let declare_datatype ~src visibility dlbl desc =
   modify @@ fun st ->
   {st with
-   per_process =
-     {st.per_process with env = GlobalEnv.declare_datatype dlbl desc st.per_process.env};
-   resenv = ResEnv.register_datatype visibility dlbl st.resenv}
+   th =
+     {st.th with
+      env = GlobalEnv.declare_datatype dlbl desc st.th.env;
+      source_stems = Map.add dlbl src st.th.source_stems};
+   mo = {st.mo with resenv = ResEnv.register_datatype visibility dlbl st.mo.resenv}}
 
 let replace_datatype dlbl desc =
-  modify @@ fun st ->
-  {st with
-   per_process =
-     {st.per_process with env = GlobalEnv.replace_datatype dlbl desc st.per_process.env}}
+  modifyth @@ fun th ->
+  {th with env = GlobalEnv.replace_datatype dlbl desc th.env}
+
+let source_stem name =
+  getth <<@> fun {source_stems; _} -> Map.find_opt name source_stems
+
+let cached_resolver ~stem =
+  getth <<@> fun {resolver_cache; _} -> Hashtbl.find_opt resolver_cache stem
+
+let cache_resolver ~stem res =
+  getth <<@> fun {resolver_cache; _} -> Hashtbl.replace resolver_cache stem res
 
 
 
@@ -183,16 +221,30 @@ let pushr e =
   modifyr (fun es -> `Entry e :: es) >>
   update_env e
 
-let run ~per_process_opt ~mlconf (m : 'a m) : 'a  =
-  let per_process = match per_process_opt with Some mem -> mem | None -> init_per_process () in
-  let _, r = m Emp {per_process; lcx = Emp; resenv = ResEnv.init (); mlenv = ML.Env.init ~mlconf; rcx = []} in
+let init_th () =
+  {env = GlobalEnv.emp (); info = Map.empty; source_stems = Map.empty; resolver_cache = Hashtbl.create 100}
+let init_mo ~mlconf =
+  {resenv = ResEnv.init (); mlenv = ML.Env.init ~mlconf}
+let init_lo () =
+  {lcx = Emp; rcx = []}
+
+let run ~mlconf (m : 'a m) : 'a  =
+  let th = init_th () in
+  let mo = init_mo ~mlconf in
+  let lo = init_lo () in
+  let _, r = m Emp {th; mo; lo} in
   r
 
-
-let isolate (m : 'a m) : 'a m =
+let isolate_local (m : 'a m) : 'a m =
   fun ps st ->
-    let st', a = m ps {st with lcx = Emp; rcx = []} in
-    {per_process = st'.per_process; mlenv = st'.mlenv; resenv = st'.resenv; lcx = st.lcx <.> st'.lcx; rcx = st'.rcx @ st.rcx}, a
+    let st', a = m ps {st with lo = init_lo ()} in
+    {st' with lo = {lcx = st.lo.lcx <.> st'.lo.lcx; rcx = st'.lo.rcx @ st.lo.rcx}}, a
+
+let isolate_module ~mlconf (m : 'a m) : 'a m =
+  assert_top_level >>
+  fun ps st ->
+    let st', a = m ps {st with mo = init_mo ~mlconf; lo = init_lo ()} in
+    {st' with mo = st.mo; lo = st.lo}, a
 
 let rec pushls es =
   match es with
@@ -213,11 +265,11 @@ let popl =
     dump_state Format.err_formatter "Tried to pop-left" `All >>= fun _ ->
     failwith "popl: empty"
 
-let get_global_env =
+let global_env =
   get >>= fun st ->
   let rec go_params =
     function
-    | Emp -> st.per_process.env
+    | Emp -> st.th.env
     | Snoc (psi, (x, `I)) ->
       GlobalEnv.ext_dim (go_params psi) x
     | Snoc (psi, (x, `P ty)) ->
@@ -246,12 +298,12 @@ let resolver =
 
   get >>= fun st ->
   ask >>= fun psi ->
-  M.ret @@ go_locals st.resenv psi
+  M.ret @@ go_locals st.mo.resenv psi
 
 let modify_top_resolver f =
   assert_top_level >>
-  modify @@ fun st ->
-  {st with resenv = f st.resenv}
+  modifymo @@ fun mo ->
+  {mo with resenv = f mo.resenv}
 
 let popr_opt =
   let rec go theta =
@@ -262,7 +314,7 @@ let popr_opt =
         ret @@ Some e
       else
         get >>= fun st ->
-        ret @@ Some (Entry.subst st.per_process.env e)
+        ret @@ Some (Entry.subst st.th.env e)
     | `Update theta' :: rcx ->
       setr rcx >>
       go @@ Occurs.Set.union theta theta'
@@ -285,7 +337,7 @@ let go_left =
 
 
 let go_to_top =
-  get >>= fun {lcx; rcx} ->
+  getlo >>= fun {lcx; rcx} ->
   setl Emp >>
   setr (Bwd.map (fun e -> `Entry e) lcx <>> rcx)
 
@@ -318,8 +370,8 @@ let lookup_var x w =
 
 let lookup_meta x =
   get >>= fun st ->
-  let ty = GlobalEnv.lookup_ty st.per_process.env x `Only in
-  let info = Map.find x st.per_process.info in
+  let ty = GlobalEnv.lookup_ty st.th.env x `Only in
+  let info = Map.find x st.th.info in
   ret (ty, info)
 
 
@@ -342,7 +394,7 @@ let block = postpone Blocked
 
 
 let base_cx =
-  get_global_env >>= fun env ->
+  global_env >>= fun env ->
   ret @@ Cx.init env
 
 
@@ -402,7 +454,7 @@ let under_restriction r0 r1 m =
   | `Apart ->
     ret None
   | _ ->
-    get_global_env >>= fun env ->
+    global_env >>= fun env ->
     try
       (* TODO: hack, fix please *)
       let _ = GlobalEnv.restrict r0 r1 env in
@@ -416,8 +468,7 @@ let get_unsolved_holes =
   getl <<@> fun lcx ->
     Bwd.filter Entry.is_incomplete lcx
 
-
-let report_unsolved ~loc =
+let abort_unsolved ~loc =
   get_unsolved_holes <<@> Bwd.length <<@> fun n ->
     if n > 0 then
       begin
@@ -426,4 +477,5 @@ let report_unsolved ~loc =
           then Format.fprintf fmt "1 unsolved hole"
           else Format.fprintf fmt "%i unsolved holes" n in
         Log.pp_message ~loc ~lvl:`Info pp Format.std_formatter ();
+        exit 1
       end

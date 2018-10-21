@@ -1350,7 +1350,7 @@ struct
       end
 
     | Tm.Var info ->
-      let tty, odef = Sig.lookup info.name info.twin in
+      let tty, odef = Sig.lookup_with_twin info.name info.twin in
       let rho' = Env.clear_locals rho in
       begin
         match odef with
@@ -1362,7 +1362,7 @@ struct
       end
 
     | Tm.Meta {name; ushift} ->
-      let tty, odef = Sig.lookup name `Only in
+      let tty, odef = Sig.lookup_with_twin name `Only in
       let rho' = Env.clear_locals rho in
       begin
         match odef with

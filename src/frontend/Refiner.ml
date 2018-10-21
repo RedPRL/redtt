@@ -261,7 +261,7 @@ let guess_motive scrut ty =
 
 let lookup_datatype dlbl =
   C.base_cx <<@> fun cx ->
-    GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx
+    GlobalEnv.lookup_datatype (Cx.globals cx) dlbl
 
 let make_motive ~data_ty ~tac_mot ~scrut ~ty =
   match tac_mot, ty with

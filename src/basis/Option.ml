@@ -1,11 +1,16 @@
 type 'a t = 'a option
 
-let map f m =
-  match m with
+let map f =
+  function
   | Some a -> Some (f a)
   | None -> None
 
 let foreach m f = map f m
+
+let iter f =
+  function
+  | Some a -> f a
+  | None -> ()
 
 let rec filter_map f =
   function
@@ -14,6 +19,11 @@ let rec filter_map f =
     match f x with
     | Some y -> y :: filter_map f xs
     | None -> filter_map f xs
+
+let default a =
+  function
+  | None -> a
+  | Some a -> a
 
 exception WasNone
 

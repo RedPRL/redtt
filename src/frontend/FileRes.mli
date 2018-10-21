@@ -1,4 +1,13 @@
+open RedTT_Core
+
+exception Not_found
+
+type filepath = string
 type selector = string list
 
-(** might raise [Not_found] *)
-val find_module : string -> ?extension : string option -> selector -> string
+val selector_to_stem : stem : filepath -> selector -> filepath
+val red_to_stem : filepath -> filepath
+val stem_to_red : filepath -> filepath
+val stem_to_rot : filepath -> filepath
+
+val pp_selector : selector Pp.t0
