@@ -60,6 +60,16 @@ struct
     | `A l -> MU.traverse item_of_json l
     | _ -> raise IllFormed
 
+  (* pure version *)
+  let json_of_list_ json_of_item l =
+    `A (List.map json_of_item l)
+
+  (* pure version *)
+  let list_of_json_ item_of_json =
+    function
+    | `A l -> List.map item_of_json l
+    | _ -> raise IllFormed
+
   let json_of_pair (json_of_a, json_of_b) (a, b) =
     json_of_a a >>= fun a ->
     json_of_b b >>= fun b ->
@@ -78,11 +88,16 @@ struct
 
   let labeled_list_of_json a_of_json : Ezjsonm.value -> (string * 'a) list m =
     function
-    | `O l -> MU.traverse (fun (lbl, a) -> a_of_json a <<@> fun a -> (lbl, a)) l
+    | `O l -> MU.traverse (fun (lbl, a) -> a_of_json a <<@> fun a -> lbl, a) l
     | _ -> raise IllFormed
 
   let json_of_olabeled_list json_of_a (l : (string option * 'a) list) =
     MU.traverse (fun (lbl, a) -> json_of_a a <<@> fun a -> (Option.default "" lbl, a)) l <<@> fun l -> `O l
+
+  let olabeled_list_of_json a_of_json : Ezjsonm.value -> (string option * 'a) list m =
+    function
+    | `O l -> MU.traverse (fun (lbl, a) -> a_of_json a <<@> fun a -> begin match lbl with "" -> None | s -> Some s end, a) l
+    | _ -> raise IllFormed
 end
 
 module TmJson =
@@ -226,7 +241,7 @@ struct
 
     | Pi (dom, cod) ->
       json_of_tm dom >>= fun dom ->
-      json_of_bnd json_of_tm cod >>= fun cod ->
+      json_of_tm_bnd cod >>= fun cod ->
       ret @@ `A [`String "Pi"; dom; cod]
 
     | Ext ext ->
@@ -239,7 +254,7 @@ struct
 
     | Sg (dom, cod) ->
       json_of_tm dom >>= fun dom ->
-      json_of_bnd json_of_tm cod >>= fun cod ->
+      json_of_tm_bnd cod >>= fun cod ->
       ret @@ `A [`String "Sg"; dom; cod]
 
     | V {r; ty0; ty1; equiv} ->
@@ -256,7 +271,7 @@ struct
       ret @@ `A [`String "VIn"; r; tm0; tm1]
 
     | Lam lam ->
-      json_of_bnd json_of_tm lam >>= fun lam ->
+      json_of_tm_bnd lam >>= fun lam ->
       ret @@ `A [`String "Lam"; lam]
 
     | ExtLam extlam ->
@@ -289,7 +304,7 @@ struct
 
     | Let (cmd, bnd) ->
       json_of_cmd cmd >>= fun cmd ->
-      json_of_bnd json_of_tm bnd >>= fun bnd ->
+      json_of_tm_bnd bnd >>= fun bnd ->
       ret @@ `A [`String "Let"; cmd; bnd]
 
     | Data {lbl; params} ->
@@ -302,6 +317,8 @@ struct
       json_of_list json_of_tm params >>= fun params ->
       json_of_list json_of_tm args >>= fun args ->
       ret @@ `A [`String "Intro"; dlbl; json_of_string clbl; params; args]
+
+  and json_of_tm_bnd bnd = json_of_bnd json_of_tm bnd
 
   and json_of_head =
     function
@@ -330,7 +347,7 @@ struct
     | Coe {r; r'; ty; tm} ->
       json_of_tm r >>= fun r ->
       json_of_tm r' >>= fun r' ->
-      json_of_bnd json_of_tm ty >>= fun ty ->
+      json_of_tm_bnd ty >>= fun ty ->
       json_of_tm tm >>= fun tm ->
       ret @@ `A [`String "Coe"; r; r'; ty; tm]
 
@@ -345,7 +362,7 @@ struct
     | Com {r; r'; ty; cap; sys} ->
       json_of_tm r >>= fun r ->
       json_of_tm r' >>= fun r' ->
-      json_of_bnd json_of_tm ty >>= fun ty ->
+      json_of_tm_bnd ty >>= fun ty ->
       json_of_tm cap >>= fun cap ->
       json_of_tm_bnd_sys sys >>= fun sys ->
       ret @@ `A [`String "Com"; r; r'; ty; cap; sys]
@@ -361,7 +378,7 @@ struct
     | GCom {r; r'; ty; cap; sys} ->
       json_of_tm r >>= fun r ->
       json_of_tm r' >>= fun r' ->
-      json_of_bnd json_of_tm ty >>= fun ty ->
+      json_of_tm_bnd ty >>= fun ty ->
       json_of_tm cap >>= fun cap ->
       json_of_tm_bnd_sys sys >>= fun sys ->
       ret @@ `A [`String "GCom"; r; r'; ty; cap; sys]
@@ -397,7 +414,7 @@ struct
     | Elim {dlbl; params; mot; clauses} ->
       json_of_dlbl dlbl >>= fun dlbl ->
       json_of_list json_of_tm params >>= fun params ->
-      json_of_bnd json_of_tm mot >>= fun mot ->
+      json_of_tm_bnd mot >>= fun mot ->
       json_of_labeled_list (json_of_nbnd json_of_tm) clauses >>= fun clauses ->
       ret @@ `A [`String "Elim"; dlbl; params; mot; clauses]
 
@@ -407,7 +424,7 @@ struct
   and json_of_tm_face face = json_of_face json_of_tm json_of_tm face
   and json_of_tm_sys sys = json_of_list json_of_tm_face sys
 
-  and json_of_tm_bnd_face face = json_of_face json_of_tm (json_of_bnd json_of_tm) face
+  and json_of_tm_bnd_face face = json_of_face json_of_tm json_of_tm_bnd face
   and json_of_tm_bnd_sys sys = json_of_list json_of_tm_bnd_face sys
 
   let rec name_of_json : Ezjsonm.value -> Name.t m =
@@ -430,7 +447,7 @@ struct
 
   and dlbl_of_json json = name_of_json json
 
-  and tm_of_json (json : Ezjsonm.value) : tm m =
+  and tm_of_json json : tm m =
     make <@>> tm_of_json_ json
 
   and tm_of_json_ =
@@ -447,7 +464,7 @@ struct
 
     | `A [`String "Pi"; dom; cod] ->
       tm_of_json dom >>= fun dom ->
-      bnd_of_json tm_of_json cod >>= fun cod ->
+      tm_bnd_of_json cod >>= fun cod ->
       ret @@ Pi (dom, cod)
 
     | `A [`String "Ext"; ext] ->
@@ -460,7 +477,7 @@ struct
 
     | `A [`String "Sg"; dom; cod] ->
       tm_of_json dom >>= fun dom ->
-      bnd_of_json tm_of_json cod >>= fun cod ->
+      tm_bnd_of_json cod >>= fun cod ->
       ret @@ Sg (dom, cod)
 
     | `A [`String "V"; r; ty0; ty1; equiv] ->
@@ -477,7 +494,7 @@ struct
       ret @@ VIn {r; tm0; tm1}
 
     | `A [`String "Lam"; lam] ->
-      bnd_of_json tm_of_json lam >>= fun lam ->
+      tm_bnd_of_json lam >>= fun lam ->
       ret @@ Lam lam
 
     | `A [`String "ExtLam"; extlam] ->
@@ -510,7 +527,7 @@ struct
 
     | `A [`String "Let"; cmd; bnd] ->
       cmd_of_json cmd >>= fun cmd ->
-      bnd_of_json tm_of_json bnd >>= fun bnd ->
+      tm_bnd_of_json bnd >>= fun bnd ->
       ret @@ Let (cmd, bnd)
 
     | `A [`String "Data"; lbl; params] ->
@@ -526,7 +543,9 @@ struct
 
     | _ -> raise IllFormed
 
-  and head_of_json : Ezjsonm.value -> tm head m =
+  and tm_bnd_of_json bnd = bnd_of_json tm_of_json bnd
+
+  and head_of_json =
     function
     | `A [`String "Meta"; name; ushift] ->
       name_of_json name >>= fun name ->
@@ -551,7 +570,7 @@ struct
     | `A [`String "Coe"; r; r'; ty; tm] ->
       tm_of_json r >>= fun r ->
       tm_of_json r' >>= fun r' ->
-      bnd_of_json tm_of_json ty >>= fun ty ->
+      tm_bnd_of_json ty >>= fun ty ->
       tm_of_json tm >>= fun tm ->
       ret @@ Coe {r; r'; ty; tm}
 
@@ -566,7 +585,7 @@ struct
     | `A [`String "Com"; r; r'; ty; cap; sys] ->
       tm_of_json r >>= fun r ->
       tm_of_json r' >>= fun r' ->
-      bnd_of_json tm_of_json ty >>= fun ty ->
+      tm_bnd_of_json ty >>= fun ty ->
       tm_of_json cap >>= fun cap ->
       tm_bnd_sys_of_json sys >>= fun sys ->
       ret @@ Com {r; r'; ty; cap; sys}
@@ -582,14 +601,14 @@ struct
     | `A [`String "GCom"; r; r'; ty; cap; sys] ->
       tm_of_json r >>= fun r ->
       tm_of_json r' >>= fun r' ->
-      bnd_of_json tm_of_json ty >>= fun ty ->
+      tm_bnd_of_json ty >>= fun ty ->
       tm_of_json cap >>= fun cap ->
       tm_bnd_sys_of_json sys >>= fun sys ->
       ret @@ GCom {r; r'; ty; cap; sys}
 
     | _ -> raise IllFormed
 
-  and frame_of_json : Ezjsonm.value -> tm frame m =
+  and frame_of_json =
     function
     | `String "Fst" -> ret Fst
 
@@ -620,7 +639,7 @@ struct
     | `A [`String "Elim"; dlbl; params; mot; clauses] ->
       dlbl_of_json dlbl >>= fun dlbl ->
       list_of_json tm_of_json params >>= fun params ->
-      bnd_of_json tm_of_json mot >>= fun mot ->
+      tm_bnd_of_json mot >>= fun mot ->
       labeled_list_of_json (nbnd_of_json tm_of_json) clauses >>= fun clauses ->
       ret @@ Elim {dlbl; params; mot; clauses}
 
@@ -632,7 +651,7 @@ struct
   and tm_face_of_json face = face_of_json tm_of_json tm_of_json face
   and tm_sys_of_json sys = list_of_json tm_face_of_json sys
 
-  and tm_bnd_face_of_json face = face_of_json tm_of_json (bnd_of_json tm_of_json) face
+  and tm_bnd_face_of_json face = face_of_json tm_of_json tm_bnd_of_json face
   and tm_bnd_sys_of_json sys = list_of_json tm_bnd_face_of_json sys
 end
 
@@ -644,39 +663,72 @@ struct
 
   let json_of_rec_spec =
     function
-    | Self -> ret @@ `String "self"
+    | Self -> ret @@ `String "Self"
 
   let rec_spec_of_json =
     function
-    | `String "self" -> ret Self
+    | `String "Self" -> ret Self
     | _ -> raise IllFormed
 
   let json_of_arg_spec =
     function
     | `Const tm ->
       json_of_tm tm >>= fun tm ->
-      ret @@ `A [`String "const"; tm]
+      ret @@ `A [`String "Const"; tm]
 
     | `Rec rec_spec ->
       json_of_rec_spec rec_spec >>= fun rec_spec ->
-      ret @@ `A [`String "rec"; rec_spec]
+      ret @@ `A [`String "Rec"; rec_spec]
 
-    | `Dim -> ret @@ `String "dim"
+    | `Dim -> ret @@ `String "Dim"
+
+  let arg_spec_of_json =
+    function
+    | `A [`String "Const"; tm] ->
+      tm_of_json tm >>= fun tm ->
+      ret @@ `Const tm
+
+    | `A [`String "Rec"; rec_spec] ->
+      rec_spec_of_json rec_spec >>= fun rec_spec ->
+      ret @@ `Rec rec_spec
+
+    | `String "Dim" -> ret `Dim
+
+    | _ -> raise IllFormed
 
   (* MORTALITY there's a better encoding *)
   let rec json_of_telescope json_of_a json_of_e =
     function
-    | TNil e -> json_of_e e
+    | TNil e ->
+      json_of_e e >>= fun e ->
+      ret @@ `A [e]
     | TCons (a, tel) ->
       json_of_a a >>= fun a ->
       json_of_bnd (json_of_telescope json_of_a json_of_e) tel >>= fun tel ->
       ret @@ `A [a; tel]
 
+  let rec telescope_of_json a_of_json e_of_json =
+    function
+    | `A [e] ->
+      e_of_json e >>= fun e ->
+      ret @@ TNil e
+    | `A [a; tel] ->
+      a_of_json a >>= fun a ->
+      bnd_of_json (telescope_of_json a_of_json e_of_json) tel >>= fun tel ->
+      ret @@ TCons (a, tel)
+    | _ -> raise IllFormed
+
   let json_of_constr =
     json_of_telescope json_of_arg_spec json_of_tm_sys
 
+  let constr_of_json =
+    telescope_of_json arg_spec_of_json tm_sys_of_json
+
   let json_of_body =
     json_of_telescope json_of_tm (json_of_labeled_list json_of_constr)
+
+  let body_of_json =
+    telescope_of_json tm_of_json (labeled_list_of_json constr_of_json)
 
   let json_of_desc =
     function
@@ -685,6 +737,13 @@ struct
       ret @@ `A [json_of_kind kind; json_of_lvl lvl; body]
     | {status = `Partial; _} ->
       raise PartialDatatype
+
+  let desc_of_json : _ -> desc m =
+    function
+    | `A [kind; lvl; body] ->
+      body_of_json body >>= fun body ->
+      ret @@ {kind = kind_of_json kind; lvl = lvl_of_json lvl; body; status = `Complete}
+    | _ -> raise IllFormed
 end
 
 module RotJson =
@@ -694,8 +753,11 @@ struct
   open DescJson
   open RotData
 
-  let json_of_selector sel =
-    `A (List.map json_of_string sel)
+  let json_of_selector =
+    json_of_list_ json_of_string
+
+  let selector_to_json =
+    list_of_json_ string_of_json
 
   let json_of_dep =
     function
@@ -704,33 +766,88 @@ struct
     | Libsum -> `A [`String "Libsum"]
     | Self {stem; redsum} -> `A [`String "Self"; json_of_string stem; json_of_string redsum]
     | Import {sel; stem; rotsum} -> `A [`String "Import"; json_of_selector sel; json_of_string stem; json_of_string rotsum]
-    | Shell {cmd; exit} -> `A [`String "Shell"]
+    | Shell {cmd; exit} -> `A [`String "Shell"; json_of_string cmd; json_of_int exit]
+
+  let dep_of_json =
+    function
+    | `String "True" -> True
+    | `String "False" -> False
+    | `A [`String "Libsum"] -> Libsum
+    | `A [`String "Self"; stem; redsum] -> Self {stem = string_of_json stem; redsum = string_of_json redsum}
+    | `A [`String "Import"; sel; stem; rotsum] -> Import {sel = selector_to_json sel; stem = string_of_json stem; rotsum = string_of_json rotsum}
+    | `A [`String "Shell"; cmd; exit] -> Shell {cmd =string_of_json cmd; exit = int_of_json exit}
+    | _ -> raise IllFormed
 
   let json_of_ver = json_of_string
+
+  let ver_of_json = string_of_json
 
   let json_of_datum =
     function
     | P {ty} ->
       json_of_tm ty >>= fun ty ->
-      ret @@ `A [`String "p"; ty]
+      ret @@ `A [`String "P"; ty]
 
     | Def {ty; tm} ->
       json_of_tm ty >>= fun ty ->
       json_of_tm tm >>= fun tm ->
-      ret @@ `A [`String "def"; ty; tm]
+      ret @@ `A [`String "Def"; ty; tm]
 
     | Desc desc ->
       json_of_desc desc >>= fun desc ->
-      ret @@ `A [`String "desc"; desc]
+      ret @@ `A [`String "Desc"; desc]
 
-  let json_of_deps l =
-    `A (List.map json_of_dep l)
+  let json_of_datum =
+    function
+    | P {ty} ->
+      json_of_tm ty >>= fun ty ->
+      ret @@ `A [`String "P"; ty]
+
+    | Def {ty; tm} ->
+      json_of_tm ty >>= fun ty ->
+      json_of_tm tm >>= fun tm ->
+      ret @@ `A [`String "Def"; ty; tm]
+
+    | Desc desc ->
+      json_of_desc desc >>= fun desc ->
+      ret @@ `A [`String "Desc"; desc]
+
+  let datum_of_json =
+    function
+    | `A [`String "P"; ty] ->
+      tm_of_json ty >>= fun ty ->
+      ret @@ P {ty}
+
+    | `A [`String "Def"; ty; tm] ->
+      tm_of_json ty >>= fun ty ->
+      tm_of_json tm >>= fun tm ->
+      ret @@ Def {ty; tm}
+
+    | `A [`String "Desc"; desc] ->
+      desc_of_json desc >>= fun desc ->
+      ret @@ Desc desc
+
+    | _ -> raise IllFormed
+
+  let json_of_deps =
+    json_of_list_ json_of_dep
+
+  let deps_of_json =
+    list_of_json_ dep_of_json
 
   let json_of_repo =
     json_of_olabeled_list json_of_datum
 
+  let repo_of_json =
+    olabeled_list_of_json datum_of_json
+
   let compose_rot ~deps ~repo =
     `A [`String version; deps; repo]
+
+  let decompose_rot =
+    function
+    | `A [`String v; deps; repo] when v = version -> deps, repo
+    | _ -> raise IllFormed
 end
 
 open RotData
