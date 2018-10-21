@@ -56,21 +56,6 @@ def nat→list : nat → list unit =
   | suc (_ → xs) → cons triv xs
   ]
 
--- do we need this outside of the iso?
-def list→nat→list (xs : list unit) :
-  path (list unit) (nat→list (length unit xs)) xs =
-  elim xs [
-  | nil → refl
-  | cons * (_ → ih) → λ i → cons triv (ih i)
-  ]
-
--- do we need this outside of the iso?
-def nat→list→nat (n : nat) : path nat (length unit (nat→list n)) n =
-  elim n [
-  | zero → refl
-  | suc (_ → ih) → λ i → suc (ih i)
-  ]
-
 def nat→list/iso : iso nat (list unit) =
   (nat→list,
    length unit,
@@ -84,12 +69,49 @@ def nat→list/iso : iso nat (list unit) =
    ])
 
 def nat→list/equiv : equiv^1 nat (list unit) = iso→equiv _ _ nat→list/iso
+def nat→list/path : path^1 type nat (list unit) = ua _ _ nat→list/equiv
+
+-- We can transport functions between these two implementations, and run them!
+--   from nat → nat to list → list...
+
+def double/nat : nat → nat =
+  elim [
+  | zero → zero
+  | suc (_ → ih) → suc (suc ih)
+  ]
+
+def double/list : list unit → list unit =
+  coe 0 1 double/nat in λ i → nat→list/path i → nat→list/path i
+
+def double/list/one : list unit = double/list (cons triv nil)
+meta ⦉ print normalize double/list/one ⦊
+
+--   from list → list to nat → nat...
+
+def pred/nat : nat → nat =
+  coe 1 0 (tail unit) in λ i → nat→list/path i → nat→list/path i
+
+def pred/nat/two : nat = pred/nat (suc (suc zero))
+meta ⦉ print normalize pred/nat/two ⦊
+
+--   from (list (list unit) → nat) to (list nat → list unit)...?
+
+def mystery (f : list (list unit) → nat) : list nat → list unit =
+  coe 0 1 f in λ i → list (symm^1 type nat→list/path i) → nat→list/path i
+
+def mystery/concat : list unit =
+  let sum (ls : list (list unit)) : nat = length unit (concatenate unit ls) in
+  let ls : list nat = cons (suc zero) (cons zero nil) in -- [1,0]
+  mystery sum ls
+meta ⦉ print normalize mystery/concat ⦊
+
+-- These two implementations of natural numbers are equal!
 
 def nat-impl : type^1 = (A : type) × A × (A → A)
-def nat/nat-impl : nat-impl = (nat, zero, λ n → suc n)
-def list/nat-impl : nat-impl = (list unit, nil, λ xs → cons triv xs)
+def nat-impl/nat : nat-impl = (nat, zero, λ n → suc n)
+def nat-impl/list : nat-impl = (list unit, nil, λ xs → cons triv xs)
 
-def bisimulation : path^1 nat-impl nat/nat-impl list/nat-impl =
+def nat-impl/equal : path^1 nat-impl nat-impl/nat nat-impl/list =
   let ua/path = ua _ _ nat→list/equiv in
   λ i →
   (ua/path i,
@@ -97,44 +119,3 @@ def bisimulation : path^1 nat-impl nat/nat-impl list/nat-impl =
    -- MORTAL
    λ v → let v' : ua/path i = (suc v, cons triv (v .vproj)) in v'
   )
-
-def cool-lemma
-  : (n' n : nat)
-  → path (list unit) (nat→list n') (cons triv (nat→list n))
-  → path nat n' (suc n)
-  =
-  elim [
-  | zero → λ _ p → elim (list/encode unit _ _ p) []
-  | suc m → λ n p →
-    let α (i : 𝕀) : nat =
-      comp 0 1 (length unit (tail unit (p i))) [
-      | i=0 → nat→list→nat m
-      | i=1 → nat→list→nat n
-      ]
-    in
-    λ i → suc (α i)
-  ]
-
-def unit-list/set : is-set (list unit) = list/hlevel contr _ (prop→set _ unit/prop)
-
-/-
-def nat→list/is-equiv' : is-equiv^1 _ _ nat→list =
-  elim [
-  | nil →
-    ((zero, refl),
-     λ [,] →
-     elim [
-     | zero → λ p i →
-       (zero, unit-list/set _ _ p refl i)
-     | suc _ → λ p → elim (list/encode unit _ _ p) []
-     ]
-    )
-  | cons * (xs → ih) →
-    let ((n,p),_) = ih in
-    ((suc n, λ i → cons triv (p i)),
-     λ (n',p') i →
-     let α (j : 𝕀) : list unit = comp 1 0 (p' j) [j=0 → refl | j=1 k → cons triv (p k)] in
-     (cool-lemma n' n α i, ?cfhm)
-    )
-  ]
--/

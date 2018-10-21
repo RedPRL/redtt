@@ -38,3 +38,9 @@ def append/ass (A : type)
   | cons x (xs → xs/ih) →
     λ ys zs i → cons x (xs/ih ys zs i)
   ]
+
+def concatenate (A : type) : list (list A) → list A =
+  elim [
+  | nil → nil
+  | cons xs (_ → ih) → append A xs ih
+  ]
