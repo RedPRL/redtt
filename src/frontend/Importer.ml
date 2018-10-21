@@ -24,15 +24,25 @@ struct
   module MN = Monad.Notation (Contextual)
   open ML open MN open Contextual
 
-  let run_and_get_rot_resolver ~mlcmd:{con; span} =
+  let run ~mlconf ~mlcmd:{con; span} =
     try
-      Elab.eval_cmd con >> abort_unsolved span >> RotIO.write
+      isolate_module ~mlconf begin
+        Elab.eval_cmd con >> abort_unsolved span
+      end
     with
     | exn ->
       Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
       exit 1
 
-  let run ~mlcmd = ignore <@>> run_and_get_rot_resolver ~mlcmd
+  let run_and_get_rot_resolver ~mlconf ~mlcmd:{con; span} =
+    try
+      isolate_module ~mlconf begin
+        Elab.eval_cmd con >> abort_unsolved span >> RotIO.write
+      end
+    with
+    | exn ->
+      Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
+      exit 1
 
   let top_load_file red =
     mlconf >>=
@@ -43,7 +53,7 @@ struct
       let redsum = Digest.file red in
       let mlconf = ML.InFile {stem; redsum; indent} in
       Format.eprintf "@[%sStarted %s.@]@." indent red;
-      isolate_module ~mlconf @@ run ~mlcmd:(read_file red) >>
+      run ~mlconf ~mlcmd:(read_file red) >>
       begin
         Format.eprintf "@[%sFinished %s.@]@." indent red;
         ret ()
@@ -56,13 +66,13 @@ struct
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
       let mlconf = ML.InStdin {stem; indent} in
-      isolate_module ~mlconf @@ run ~mlcmd:(read_from_channel ~filepath:red stdin)
+      run ~mlconf ~mlcmd:(read_from_channel ~filepath:red stdin)
 
   let import ~selector =
     mlconf >>=
     function
-    | TopModule _ | InStdin _ -> raise ML.WrongMode
-    | InFile {stem; indent} ->
+    | TopModule _ -> raise ML.WrongMode
+    | InFile {stem; indent; _} | InStdin {stem; indent} ->
       assert_top_level >>
 
       let stem = FileRes.selector_to_stem ~stem selector in
@@ -71,13 +81,10 @@ struct
       let indent = " " ^ indent in
       let mlconf = ML.InFile {stem; redsum; indent} in
 
-
       cached_resolver stem >>= function
       | None ->
         Format.eprintf "@[%sChecking %s.@]@." indent red;
-        isolate_module ~mlconf begin
-          run_and_get_rot_resolver (read_file red)
-        end >>= fun (res, _ as rot) ->
+        run_and_get_rot_resolver ~mlconf ~mlcmd:(read_file red) >>= fun (res, _ as rot) ->
         cache_resolver stem rot >>
         begin
           Format.eprintf "@[%sChecked %s.@]@." indent red;
