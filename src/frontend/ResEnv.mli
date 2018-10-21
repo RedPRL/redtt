@@ -8,7 +8,6 @@ open RedTT_Core
 type resolution =
   [ `Ix of int
   | `Var of Name.t
-  | `Metavar of Name.t
   | `Datatype of Name.t
   ]
 
@@ -23,7 +22,6 @@ val bindn : string list -> t -> t
 val bind_opt : string option -> t -> t
 
 val register_var : visibility:visibility -> Name.t -> t -> t
-val register_metavar : visibility:visibility -> Name.t -> t -> t
 val register_datatype : visibility:visibility -> Name.t -> t -> t
 
 val import_globals : visibility:visibility -> t -> t -> t

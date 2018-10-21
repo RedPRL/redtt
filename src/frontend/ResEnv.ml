@@ -4,14 +4,12 @@ open RedTT_Core
 
 type global =
   [ `Var of Name.t
-  | `Metavar of Name.t
   | `Datatype of Name.t
   ]
 
 type resolution =
   [ `Ix of int
   | `Var of Name.t
-  | `Metavar of Name.t
   | `Datatype of Name.t
   ]
 
@@ -103,8 +101,6 @@ let get x renv =
     match info_of_string x renv with
     | Some (`Var x, _) ->
       `Var x
-    | Some (`Metavar x, _) ->
-      `Metavar x
     | Some (`Datatype x, _) ->
       `Datatype x
     | None ->
@@ -154,9 +150,6 @@ let import_global s info renv =
 let register_var ~visibility nm =
   register_global nm (`Var nm, visibility)
 
-let register_metavar ~visibility nm =
-  register_global nm (`Metavar nm, visibility)
-
 let register_datatype ~visibility nm =
   register_global nm (`Datatype nm, visibility)
 
@@ -181,7 +174,7 @@ let import_globals ~visibility imported renv =
 
 let name_of_global =
   function
-  | `Var nm | `Metavar nm | `Datatype nm -> nm
+  | `Var nm | `Datatype nm -> nm
 
 let export_native_globals renv : (string option * Name.t) list =
   let f (id, (global, vis)) =

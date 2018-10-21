@@ -622,7 +622,6 @@ head:
       match R.get a env with
       | `Ix _ -> failwith "Cannot shift bound variable"
       | `Var x -> Tm.Var {name = x; twin = `Only; ushift = k}
-      | `Metavar x -> Tm.Meta {name = x; ushift = k}
       | _ -> failwith "Expected variable name" }
 
   | a = ATOM
@@ -630,7 +629,6 @@ head:
       match R.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
       | `Var x -> Tm.Var {name = x; twin = `Only; ushift = 0}
-      | `Metavar x -> Tm.Meta {name = x; ushift = 0}
       | _ -> failwith "Expected variable name" }
 
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR

@@ -92,15 +92,15 @@ struct
     function
     | TopModule _mlconf ->
       begin match cmd with
-      | E.MlTopLoadFile red ->
-        I.top_load_file red >>
-        M.ret @@ E.SemRet (E.SemTuple [])
+        | E.MlTopLoadFile red ->
+          I.top_load_file red >>
+          M.ret @@ E.SemRet (E.SemTuple [])
 
-      | E.MlTopLoadStdin {red} ->
-        I.top_load_stdin ~red >>
-        M.ret @@ E.SemRet (E.SemTuple [])
+        | E.MlTopLoadStdin {red} ->
+          I.top_load_stdin ~red >>
+          M.ret @@ E.SemRet (E.SemTuple [])
 
-      | _ -> raise ML.WrongMode
+        | _ -> raise ML.WrongMode
       end
     | InFile {stem; _} | InStdin {stem; _} ->
       match cmd with
@@ -731,11 +731,6 @@ struct
         | `Var x ->
           C.lookup_var x `Only <<@> fun ty ->
             Tm.shift_univ ushift ty, (Tm.Var {name = x; twin = `Only; ushift}, [])
-
-        | `Metavar x ->
-          C.lookup_meta x <<@> fun (ty, _) ->
-            Tm.shift_univ ushift ty, (Tm.Meta {name = x; ushift}, [])
-
         | _ ->
           failwith "elab_inf: impossible"
       end
