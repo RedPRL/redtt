@@ -103,8 +103,7 @@ let get_name x renv =
   | `Name x -> x
   | _ -> failwith "ResEnv.get_name: expected to find name"
 
-let add_native_global ~visibility name renv =
-  let info = (name, visibility) in
+let add_native_global_ os ((name, visibility) as info) renv =
   renv |> modify_globals @@ fun globals ->
   let native, info_of_native, native_of_name =
     match native_of_name name renv with
@@ -114,11 +113,11 @@ let add_native_global ~visibility name renv =
     | None ->
       let native = T.size globals.info_of_native in
       native,
-      T.set native info globals.info_of_native,
+      T.set native (name, visibility) globals.info_of_native,
       T.set name native globals.native_of_name
   in
   let info_of_string, string_of_native =
-    match Name.name name with
+    match os with
     | None -> globals.info_of_string, globals.string_of_native
     | Some s ->
       match info_of_string_ s renv with
@@ -133,6 +132,9 @@ let add_native_global ~visibility name renv =
         T.set native s @@ T.remove old_native globals.string_of_native
   in
   {info_of_native; native_of_name; info_of_string; string_of_native}
+
+let add_native_global ~visibility name =
+  add_native_global_ (Name.name name) (name, visibility)
 
 let import_global s info renv =
   renv |> modify_globals @@ fun globals ->
@@ -161,8 +163,8 @@ let import_globals ~visibility imported renv =
     in
     match info with
     | _, `Private -> renv
-    | global, `Public ->
-      import_global s (global, visibility) renv
+    | name, `Public ->
+      import_global s (name, visibility) renv
   in
   T.fold merger imported.globals.info_of_string renv
 
@@ -187,6 +189,12 @@ let export_foreign_globals renv : (string * Name.t) list =
     | _ -> None
   in
   List.sort compare @@ List.of_seq @@ Seq.filter_map f @@ T.to_seq renv.globals.info_of_string
+
+let reconstruct natives foreigners =
+  let renv = init () in
+  let renv = List.fold_left (fun renv (s, n) -> import_global s (n, `Public) renv) renv foreigners in
+  let renv = List.fold_left (fun renv (os, n) -> add_native_global_ os (n, `Public) renv) renv natives in
+  renv
 
 let pp_visibility fmt =
   function
