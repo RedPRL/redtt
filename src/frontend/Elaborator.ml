@@ -805,14 +805,7 @@ struct
   and elab_dim_con =
     function
     | E.Var {name; ushift = 0} ->
-      C.resolver >>= fun renv ->
-      begin
-        match ResEnv.get name renv with
-        | `Name a ->
-          M.ret @@ Tm.up @@ Tm.var a
-        | _ ->
-          failwith "elab_dim: expected locally closed"
-      end
+      C.resolver <<@> ResEnv.get_name name <<@> Tm.var <<@> Tm.up
     | E.Num 0 ->
       M.ret @@ Tm.make Tm.Dim0
     | E.Num 1 ->

@@ -106,6 +106,11 @@ let get x renv =
     | None ->
       failwith @@ "Could not resolve variable: " ^ x
 
+let get_name x renv =
+  match get x renv with
+  | `Name x -> x
+  | _ -> failwith "ResEnv.get_name: expected to find name"
+
 let register_global name info renv =
   renv |> modify_globals @@ fun globals ->
   let id, info_of_id, id_of_name =
