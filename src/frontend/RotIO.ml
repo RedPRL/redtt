@@ -76,6 +76,11 @@ struct
   let json_of_labeled_list json_of_a (l : (string * 'a) list) =
     MU.traverse (fun (lbl, a) -> json_of_a a <<@> fun a -> (lbl, a)) l <<@> fun l -> `O l
 
+  let labeled_list_of_json a_of_json : Ezjsonm.value -> (string * 'a) list m =
+    function
+    | `O l -> MU.traverse (fun (lbl, a) -> a_of_json a <<@> fun a -> (lbl, a)) l
+    | _ -> raise IllFormed
+
   let json_of_olabeled_list json_of_a (l : (string option * 'a) list) =
     MU.traverse (fun (lbl, a) -> json_of_a a <<@> fun a -> (Option.default "" lbl, a)) l <<@> fun l -> `O l
 end
@@ -170,6 +175,22 @@ struct
       ret @@ `A [r; r'; bdy]
     | None ->
       ret @@ `A [r; r']
+
+  let face_of_json r_of_json bdy_of_json =
+    function
+    | `A (r :: r' :: obdy) ->
+      r_of_json r >>= fun r ->
+      r_of_json r' >>= fun r' ->
+      begin
+        match obdy with
+        | [bdy] ->
+          bdy_of_json bdy >>= fun bdy ->
+          ret (r, r', Some bdy)
+        | [] ->
+          ret (r, r', None)
+        | _ -> raise IllFormed
+      end
+    | _ -> raise IllFormed
 
   let rec json_of_name name kont_notfound kont_found =
     resolver >>= fun res ->
@@ -389,10 +410,6 @@ struct
   and json_of_tm_bnd_face face = json_of_face json_of_tm (json_of_bnd json_of_tm) face
   and json_of_tm_bnd_sys sys = json_of_list json_of_tm_bnd_face sys
 
-
-
-  exception PleaseFillIn
-
   let rec name_of_json : Ezjsonm.value -> Name.t m =
     function
     | `String native ->
@@ -509,7 +526,7 @@ struct
 
     | _ -> raise IllFormed
 
-  and json_of_head : Ezjsonm.value -> tm head m =
+  and head_of_json : Ezjsonm.value -> tm head m =
     function
     | `A [`String "Meta"; name; ushift] ->
       name_of_json name >>= fun name ->
@@ -572,11 +589,51 @@ struct
 
     | _ -> raise IllFormed
 
-  and cmd_of_json sys = raise PleaseFillIn
-  and tm_face_of_json sys = raise PleaseFillIn
-  and tm_sys_of_json sys = raise PleaseFillIn
-  and tm_bnd_sys_of_json sys = raise PleaseFillIn
+  and frame_of_json : Ezjsonm.value -> tm frame m =
+    function
+    | `String "Fst" -> ret Fst
 
+    | `String "Snd" -> ret Snd
+
+    | `A [`String "FunApp"; arg] ->
+      tm_of_json arg >>= fun arg ->
+      ret @@ FunApp arg
+
+    | `A [`String "ExtApp"; rs] ->
+      list_of_json tm_of_json rs >>= fun rs ->
+      ret @@ ExtApp rs
+
+    | `A [`String "VProj"; r; func] ->
+      tm_of_json r >>= fun r ->
+      tm_of_json func >>= fun func ->
+      ret @@ VProj {r; func}
+
+    | `A [`String "Cap"; r; r'; ty; sys] ->
+      tm_of_json r >>= fun r ->
+      tm_of_json r' >>= fun r' ->
+      tm_of_json ty >>= fun ty ->
+      tm_bnd_sys_of_json sys >>= fun sys ->
+      ret @@ Cap {r; r'; ty; sys}
+
+    | `String "RestrictForce" -> ret RestrictForce
+
+    | `A [`String "Elim"; dlbl; params; mot; clauses] ->
+      dlbl_of_json dlbl >>= fun dlbl ->
+      list_of_json tm_of_json params >>= fun params ->
+      bnd_of_json tm_of_json mot >>= fun mot ->
+      labeled_list_of_json (nbnd_of_json tm_of_json) clauses >>= fun clauses ->
+      ret @@ Elim {dlbl; params; mot; clauses}
+
+    | _ -> raise IllFormed
+
+  and cmd_of_json cmd =
+    pair_of_json (head_of_json, list_of_json frame_of_json) cmd
+
+  and tm_face_of_json face = face_of_json tm_of_json tm_of_json face
+  and tm_sys_of_json sys = list_of_json tm_face_of_json sys
+
+  and tm_bnd_face_of_json face = face_of_json tm_of_json (bnd_of_json tm_of_json) face
+  and tm_bnd_sys_of_json sys = list_of_json tm_bnd_face_of_json sys
 end
 
 module DescJson =
