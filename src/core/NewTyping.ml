@@ -534,8 +534,8 @@ and synth cx cmd : positive =
 
 and synth_head cx hd =
   match hd with
-  | Tm.Ix (ix, tw) ->
-    Cx.lookup cx ~tw ix
+  | Tm.Ix (ix, _) ->
+    Cx.lookup cx ix
 
   | Tm.Var var ->
     Cx.lookup_const cx ~tw:var.twin ~ushift:var.ushift var.name
@@ -663,9 +663,11 @@ and synth_stack cx vhd ty stk  =
     synth_stack cx vhd cod stk
 
   | D.Restrict tyface, Tm.RestrictForce :: stk ->
+    Format.eprintf "restrict@.";
     raise PleaseFillIn
 
   | D.Ext eclo, Tm.ExtApp rs :: stk ->
+    Format.eprintf "extapp@.";
     raise PleaseFillIn
 
   | D.Data _, Tm.Elim _ :: stk ->
