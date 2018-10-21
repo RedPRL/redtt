@@ -39,6 +39,13 @@ open Tm.Notation
 module ConSys = D.Sys (D.Con)
 
 
+let quote_ty cx vty =
+  Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vty vty
+
+let quote cx vty el =
+  Q.equate_con (Cx.qenv cx) (Cx.rel cx) vty el el
+
+
 module Sigma =
 struct
   let split tm =
