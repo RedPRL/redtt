@@ -341,7 +341,7 @@ and check_neg cx ty sys tm =
     let bdy = Pi.body tm in
     let bdy_sys = Pi.sys_body cx x sys in
     let cod = inst_clo cx q.cod x in
-    check_of_ty cx cod bdy_sys bdy
+    check_of_ty cx' cod bdy_sys bdy
 
   | D.Restrict face ->
     let r, r', ty_rr' = face in
