@@ -213,6 +213,7 @@ let rec equate_con qenv rel ty el0 el1 =
           Tm.make @@ Tm.FHCom {r; r'; cap; sys}
 
         | _ ->
+          Format.eprintf "quote con ??@.";
           raise PleaseRaiseProperError
       end
 
@@ -245,6 +246,7 @@ and equate_in_neutral_ty qenv rel el0 el1 =
   | Neu neu0, Neu neu1 ->
     equate_neutroid qenv rel neu0.neu neu1.neu
   | _ ->
+    Format.eprintf "equate_in_neutral_ty??@.";
     raise PleaseRaiseProperError
 
 and equate_val qenv rel ty val0 val1 =
@@ -277,11 +279,13 @@ and equate_hd qenv rel hd0 hd1 =
       Tm.Ix (QEnv.ix_of_lvl l0 qenv, `Only)
     else
       raise PleaseRaiseProperError
+
   | Var info0, Var info1 ->
     if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
       Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift}
     else
       raise PleaseRaiseProperError
+
   | Meta info0, Meta info1 ->
     if info0.name = info1.name && info0.ushift = info1.ushift then
       Tm.Meta {name = info0.name; ushift = info0.ushift}
@@ -300,6 +304,10 @@ and equate_hd qenv rel hd0 hd1 =
     in
     Tm.Coe {r; r'; ty; tm}
 
+  | NCoeData _, NCoeData _ ->
+    Format.eprintf "equate_hd ncoedata??@.";
+    raise PleaseFillIn
+
   | NHCom info0, NHCom info1 ->
     let r = equate_dim qenv rel info0.r info1.r in
     let r' = equate_dim qenv rel info0.r' info1.r' in
@@ -312,7 +320,9 @@ and equate_hd qenv rel hd0 hd1 =
     let sys = equate_con_abs_sys qenv rel ty_val info0.sys info1.sys in
     Tm.HCom {r; r'; ty; cap; sys}
 
-  | _ -> raise PleaseRaiseProperError
+  | _ ->
+    Format.eprintf "equate head: %a ~ %a@." Head.pp hd0 Head.pp hd1;
+    raise PleaseRaiseProperError
 
 and equate_frame qenv rel frm0 frm1 =
   match frm0, frm1 with
