@@ -2291,7 +2291,7 @@ struct
           let z, pi = Perm.freshen_name y in
           z, rel, Con.swap pi bdy_y
       in
-      Abs (z, make_coe rel_z r' (`Atom z) ~abs @@ Val.make bdy_z)
+      Abs (z, make_coe rel_z (`Atom z) r' ~abs @@ Val.make bdy_z)
     in
     rigid_hcom rel r r' ~ty ~cap ~sys
 
