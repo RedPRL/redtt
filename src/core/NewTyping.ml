@@ -442,6 +442,7 @@ and check_neg cx ty sys tm =
     check_of_ty cx (D.Val.unleash v.ty1) boundary1 vin.tm1
 
   | D.HCom ({ty = `Pos; _} as fhcom) ->
+    Format.eprintf "typechecker/check element of fhcom@.";
     raise CanJonHelpMe
 
   | _ ->
@@ -522,8 +523,18 @@ and check_ty cx kind tm : Lvl.t =
   | Tm.Data _ ->
     raise CanJonHelpMe
 
-  | Tm.FHCom _ ->
-    raise CanJonHelpMe
+  | Tm.FHCom hcom ->
+    check cx (`Pos `Dim) hcom.r;
+    check cx (`Pos `Dim) hcom.r';
+    let r = eval_dim cx hcom.r in
+    let r' = eval_dim cx hcom.r' in
+    Cofibration.check_valid @@ Cofibration.from_sys cx hcom.sys;
+    let lvl = check_ty cx `Kan hcom.cap in
+    let vcap = eval cx hcom.cap in
+    let cxx, x = Cx.extend_dim cx ~name:None in
+    (* TODO: have a sepcific check_bnd_sys for types *)
+    let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:(D.Univ {kind = `Kan; lvl}) ~cap:vcap hcom.sys in
+    lvl
 
   | _ ->
     raise CanJonHelpMe
@@ -754,6 +765,7 @@ and synth_stack cx vhd ty stk  =
     end
 
   | _, Tm.Cap _ :: stk ->
+    Format.eprintf "typechecker/cap frame@.";
     raise CanJonHelpMe
 
   | D.Sg q, Tm.Fst :: stk ->
