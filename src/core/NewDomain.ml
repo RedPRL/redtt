@@ -199,7 +199,8 @@ struct
   let freshen_name x =
     let x' = mimic x in x', [(x, x')]
 
-  let rec freshen_names = function
+  let rec freshen_names =
+    function
     | Emp -> Emp, []
     | Snoc (xs, x) ->
       let xs', perm = freshen_names xs in

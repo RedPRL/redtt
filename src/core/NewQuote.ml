@@ -23,6 +23,8 @@ sig
 
   val ix_of_lvl : int -> t -> int
   val ix_of_atom : Name.t -> t -> int (* might throw Not_found *)
+
+  val pp : t Pp.t0
 end =
 struct
   module M = Map.Make (Name)
@@ -47,6 +49,13 @@ struct
   let ix_of_atom x qenv =
     let lvl = M.find x qenv.atoms in
     ix_of_lvl lvl qenv
+
+  let pp fmt qenv =
+    let bindings = M.bindings qenv.atoms in
+    let pp_cell fmt (x, i) =
+      Format.fprintf fmt "%a ~ %i" Name.pp x i
+    in
+    Pp.pp_list pp_cell fmt bindings
 end
 
 type qenv = QEnv.t
@@ -67,7 +76,9 @@ let quote_dim qenv =
   | `Atom x ->
     match QEnv.ix_of_atom x qenv with
     | ix -> Tm.up @@ Tm.ix ix
-    | exception Not_found -> Tm.up @@ Tm.var x
+    | exception Not_found ->
+      Format.eprintf "quote_dim: %a in %a@." Name.pp x QEnv.pp qenv;
+      Tm.up @@ Tm.var x
 
 let equate_dim qenv rel r0 r1 =
   match Rel.compare r0 r1 rel with

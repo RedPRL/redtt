@@ -9,17 +9,20 @@ type t =
   {rel : NewRestriction.t;
    venv : D.Env.t;
    qenv : Q.QEnv.t;
+   ppenv : Pp.Env.t;
    hyps : [`Dim | `El of D.con] bwd}
 
 let rel cx = cx.rel
 let genv cx = cx.venv.globals
 let venv cx = cx.venv
 let qenv cx = cx.qenv
+let ppenv cx = cx.ppenv
 
 let init genv =
   {rel = NewRestriction.from_old_restriction @@ GlobalEnv.restriction genv;
    venv = D.Env.init genv;
    qenv = Q.QEnv.emp ();
+   ppenv = Pp.Env.emp;
    hyps = Emp}
 
 let lookup cx ix =
@@ -38,28 +41,34 @@ let lookup_const cx ?(tw = `Only) ?(ushift = 0) x =
   | `Tw (ty, _), `TwinL -> return_ty ty
   | `Tw (_, ty), `TwinR -> return_ty ty
   | `I, `Only -> `Dim
+  | exception Not_found ->
+    Format.eprintf "Failed to find: %a in %a@." Name.pp x GlobalEnv.pp (genv cx);
+    raise Not_found
   | _ -> failwith "lookup_const"
 
 
-let extend cx ?name ty =
+let extend cx ~name ty =
   let v, qenv = Q.extend cx.qenv (D.Val.make ty) in
   let venv = D.Env.extend_cell cx.venv @@ D.Val (D.LazyVal.make v) in
   let hyps = Snoc (cx.hyps, `El ty) in
-  {cx with venv; qenv; hyps}, v
+  let ppenv = snd @@ Pp.Env.bind cx.ppenv name in
+  {cx with venv; qenv; hyps; ppenv}, v
 
 let extend_dim cx ~name =
   let x = Name.named name in
   let qenv = Q.QEnv.abs1 x cx.qenv in
   let venv = D.Env.extend_cell cx.venv @@ D.Dim (`Atom x) in
   let hyps = Snoc (cx.hyps, `Dim) in
-  {cx with venv; qenv; hyps}, x
+  let ppenv = snd @@ Pp.Env.bind cx.ppenv name in
+  {cx with venv; qenv; hyps; ppenv}, x
 
 let extend_dims cx ~names =
   let xs = List.map Name.named names in
   let qenv = Q.QEnv.abs (Bwd.from_list xs) cx.qenv in
   let venv = D.Env.extend_cells cx.venv @@ List.map (fun x -> D.Dim (`Atom x)) xs in
   let hyps = cx.hyps <>< List.map (fun _ -> `Dim) xs in
-  {cx with venv; qenv; hyps}, xs
+  let ppenv = snd @@ Pp.Env.bindn cx.ppenv names in
+  {cx with venv; qenv; hyps; ppenv}, xs
 
 let restrict cx r r' =
   match NewRestriction.equate r r' cx.rel with

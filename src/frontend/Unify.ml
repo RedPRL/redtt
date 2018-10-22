@@ -123,6 +123,7 @@ let user_define gm alpha source visibility opacity ~ty tm =
   let tm = abstract_tm gm tm in
   check ~ty tm >>= function
   | `Exn exn ->
+    Format.eprintf "Failed to check: %a@." Tm.pp0 tm;
     raise exn
   | `Ok ->
     begin

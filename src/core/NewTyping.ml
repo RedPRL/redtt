@@ -372,17 +372,17 @@ and check_neg cx ty sys tm =
     let tm0, tm1 = Sigma.split tm in
     let sys0, sys1 = Sigma.split_sys cx sys in
     let dom = D.Val.unleash q.dom in
-    check_of_ty cx dom sys0 tm0;
+    check_of_ty_ "sg0" cx dom sys0 tm0;
     let el0 = eval cx tm0 in
     let cod = inst_clo cx q.cod el0 in
-    check_of_ty cx cod sys1 tm1
+    check_of_ty_ "sg1" cx cod sys1 tm1
 
   | D.Pi q ->
-    let cx', x = Cx.extend cx @@ D.Val.unleash q.dom in
+    let cx', x = Cx.extend cx ~name:None @@ D.Val.unleash q.dom in
     let bdy = Pi.body tm in
     let bdy_sys = Pi.sys_body cx x sys in
     let cod = inst_clo cx q.cod x in
-    check_of_ty cx' cod bdy_sys bdy
+    check_of_ty_ "pi" cx' cod bdy_sys bdy
 
   | D.Restrict face ->
     let r, r', ty_rr' = face in
@@ -390,10 +390,10 @@ and check_neg cx ty sys tm =
       match Cx.restrict cx r r', Rst.body cx r r' tm with
       | `Changed cx_rr', Some bdy ->
         let sys_bdy = Rst.sys_body cx_rr' sys in
-        check_of_ty cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
+        check_of_ty_ "rst" cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
       | `Same, Some bdy ->
         let sys_bdy = Rst.sys_body cx sys in
-        check_of_ty cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
+        check_of_ty_ "rst" cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
       | exception I.Inconsistent -> ()
       | _ -> raise @@ E ExpectedTermInFace
     end
@@ -402,10 +402,10 @@ and check_neg cx ty sys tm =
     let names = Bwd.to_list @@ D.ExtClo.names eclo in
     let cx', xs = Cx.extend_dims cx ~names in
     let rs = List.map (fun x -> `Atom x) xs in
-    let bdy = Ext.body cx rs tm in
-    let bdy_sys = Ext.sys_body cx rs sys in
-    let cod, cod_sys = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun r -> D.Dim r) rs in
-    check_of_ty cx' cod (cod_sys @ bdy_sys) bdy
+    let bdy = Ext.body cx' rs tm in
+    let bdy_sys = Ext.sys_body cx' rs sys in
+    let cod, cod_sys = D.ExtClo.inst (Cx.rel cx') eclo @@ List.map (fun r -> D.Dim r) rs in
+    check_of_ty_ "ext" cx' cod (cod_sys @ bdy_sys) bdy
 
   | D.V v ->
     let ty0 = D.Val.unleash v.ty0 in
@@ -539,14 +539,23 @@ and check_tm_face cx ty sys face =
 and check_tm_sys cx ty sys =
   List.fold_left (check_tm_face cx ty) [] sys
 
-and check_of_ty cx ty sys tm =
-  match polarity ty with
-  | `Pos ->
-    check cx (`Pos (`El ty)) tm;
-    check_boundary cx ty sys @@
-    eval cx tm
-  | `Neg ->
-    check cx (`Neg (ty, sys)) tm
+and check_of_ty cx = check_of_ty_ "Checking" cx
+
+and check_of_ty_ debug cx ty sys tm =
+  (*   Format.eprintf "%s: %a@." debug (Tm.pp (Cx.ppenv cx)) tm; *)
+  try
+    begin
+      match polarity ty with
+      | `Pos ->
+        check cx (`Pos (`El ty)) tm;
+        check_boundary cx ty sys @@
+        eval cx tm
+      | `Neg ->
+        check cx (`Neg (ty, sys)) tm
+    end
+  with
+  | _ ->
+    Format.eprintf "Failed to check: %a@." Tm.pp0 tm;
 
 and infer_ty cx cmd =
   let hd, stk = cmd in
@@ -609,13 +618,13 @@ and synth_head cx hd =
       let env = Cx.venv cx in
       D.Syn.eval rel (D.Env.extend_cell env @@ D.Dim s) ty
     in
-    check_of_ty cx (ty_at r) [] coe.tm;
+    check_of_ty_ "coe" cx (ty_at r) [] coe.tm;
     `El (ty_at r')
 
   | Tm.Down {ty; tm} ->
     let _ = check_ty cx `Pre ty in
     let vty = eval cx ty in
-    check_of_ty cx vty [] tm;
+    check_of_ty_ "down" cx vty [] tm;
     `El vty
 
   | Tm.DownX tm ->
@@ -638,7 +647,7 @@ and synth_stack cx vhd ty stk  =
         let ty0 = eval cx vproj.ty0 in
         let ty1 = eval cx vproj.ty1 in
         let func_ty = D.Con.make_arr (Cx.rel cx) (D.Val.make ty0) (D.Val.make ty1) in
-        check_of_ty cx func_ty [] vproj.func;
+        check_of_ty_ "vproj" cx func_ty [] vproj.func;
         let vfunc = eval cx vproj.func in
         let vhd =
           D.Val.make_from_lazy @@ lazy begin
@@ -665,7 +674,7 @@ and synth_stack cx vhd ty stk  =
           let func_ty0 = D.Con.make_arr (Cx.rel cx_r0) (D.Val.make ty0) (D.Val.make ty1) in
           let func_ty1 = D.Con.make_arr (Cx.rel cx_r0) v.ty0 v.ty1 in
           let _ = Q.equate_tycon (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty0 func_ty1 in
-          check_of_ty cx func_ty0 [] vproj.func;
+          check_of_ty_ "vproj" cx func_ty0 [] vproj.func;
           let vfunc0 = eval cx_r0 vproj.func in
           let vfunc1 = D.Val.plug_then_unleash (Cx.rel cx_r0) D.Fst v.equiv in
           let _ = Q.equate_con (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty0 vfunc0 vfunc1 in
@@ -696,7 +705,7 @@ and synth_stack cx vhd ty stk  =
 
   | D.Pi q, Tm.FunApp tm :: stk ->
     let dom = D.Val.unleash q.dom in
-    check_of_ty cx dom [] tm;
+    check_of_ty_ "funapp" cx dom [] tm;
     let arg = eval cx tm in
     let cod = inst_clo cx q.cod arg in
     let frm = D.FunApp (D.TypedVal.make (D.Val.make arg)) in
@@ -729,7 +738,7 @@ and approx cx ty0 ty1 =
   | `Pos, `Pos ->
     approx_pos cx (`El ty0) (`El ty1)
   | `Neg, `Neg ->
-    let cx', _ = Cx.extend cx ty0 in
+    let cx', _ = Cx.extend cx ~name:None ty0 in
     let tm = Tm.up @@ Tm.ix 0 in
     check cx (`Neg (ty1, [])) tm
   | _ ->
