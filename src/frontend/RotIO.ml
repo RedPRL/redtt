@@ -1035,15 +1035,8 @@ struct
   let try_read ~loader ~stem =
     try_ (try_read_ ~loader ~stem) @@
     function
-    | J.Parse_error (v, s) ->
-      Format.eprintf "Encountered errors when parsing %s: %s@." (Ezjsonm.to_string (`A [v])) s;
-      ret None
-    | Sys_error _ ->
-      Format.eprintf "system error.@.";
-      ret None
-    | exn ->
-      Format.eprintf "???.@.";
-        raise exn
+    | J.Parse_error _ | Sys_error _ -> ret None
+    | exn -> raise exn
 end
 
 let try_read = Reader.try_read
