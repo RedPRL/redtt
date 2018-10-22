@@ -13,7 +13,7 @@ type entry =
 
 val emp : unit -> t
 
-val ext : t -> Name.t -> entry -> t
+val ext : t -> Name.t -> [< entry] -> t
 val define : t -> Name.t -> ty:Tm.tm -> tm:Tm.tm -> t
 val ext_meta : t -> Name.t -> ty:Tm.tm -> t
 val ext_dim : t -> Name.t -> t

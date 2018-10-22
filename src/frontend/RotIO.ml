@@ -847,7 +847,7 @@ struct
 
   let decompose_rot =
     function
-    | `A [`String v; deps; reexported; repo] when v = version -> deps, reexported, repo
+    | `A [`String v; deps; reexported; repo] when String.equal v version -> deps, reexported, repo
     | _ -> raise IllFormed
 end
 
@@ -903,8 +903,11 @@ struct
 
       Format.eprintf "@[%sWriting %s.@]@." indent rotpath;
       let channel = open_out_bin rotpath in
-      output_string channel rotstr;
-      close_out channel;
+      begin
+        match output_string channel rotstr with
+        | () -> close_out channel
+        | exception exn -> close_out channel; raise exn
+      end;
       Format.eprintf "@[%sWritten %s.@]@." indent rotpath;
 
       resolver <<@> fun resolver -> resolver, Digest.string rotstr
@@ -920,5 +923,92 @@ let write = Writer.write
 
 module Reader =
 struct
+  open RotData
+  open RotJson
 
+  let check_dep =
+    function
+    | True -> ret true
+    | False -> ret false
+    | Libsum -> ret true
+    | Self {stem; redsum} ->
+      begin
+        mlconf >>= function
+        | TopModule _ -> raise ML.WrongMode
+        | InStdin {stem = cur_stem; _} | InFile {stem = cur_stem; _} ->
+          ret begin String.equal stem cur_stem && Digest.equal (Digest.file (FileRes.stem_to_red stem)) redsum end
+      end
+    | Import {sel; stem; rotsum} ->
+      begin
+        mlconf >>= function
+        | TopModule _ -> raise ML.WrongMode
+        | InStdin {stem = cur_stem; _} | InFile {stem = cur_stem; _} ->
+          if String.equal (FileRes.selector_to_stem ~stem:cur_stem sel) stem then
+            cached_resolver stem >>=
+            function
+            | Some (_, digest) -> ret @@ Digest.equal rotsum digest
+            | _ -> ret false
+          else
+            ret false
+      end
+    | Shell {cmd; exit} ->
+      match !unsafe_mode with
+      | true -> ret begin Sys.command cmd = exit end
+      | false ->
+        Log.pp_message ~loc:None ~lvl:`Error Format.pp_print_string Format.std_formatter
+          "The rot file wishes to run a commend but the request was rejected.";
+        ret false
+
+  (* MORTAL where is the monadic version of [for_all]? *)
+  let check_deps =
+    let step prefix dep = if prefix then check_dep dep else ret false in
+    MU.fold_left step true
+
+  (* MORTAL this is assuming that earlier natives will not depend on later natives *)
+  let reconstruct_resolver reexported repo =
+    assert_top_level >>
+    MU.traverse
+      (fun (ostr, entry) -> let name = Name.named ostr in ext_global_env name entry >> ret (ostr, name))
+      repo
+    >>= fun repo -> ret @@ ResEnv.reconstruct reexported repo
+
+  let read_rot ~stem =
+    let rotpath = FileRes.stem_to_rot stem in
+    mlconf <<@> ML.Env.indent >>= fun indent ->
+
+    Format.eprintf "@[%sReading %s.@]@." indent rotpath;
+    let channel = open_in_bin rotpath in
+    let rot =
+      match Ezjsonm.from_channel channel with
+      | rot -> close_in channel; rot
+      | exception exn -> close_in channel; raise exn
+    in
+
+    ret rot
+
+  let try_read_ ~stem =
+    mlconf <<@> ML.Env.indent >>= fun indent ->
+    read_rot ~stem >>= function
+    | rot ->
+      let deps, reexported, repo = decompose_rot rot in
+      (deps_of_json deps |> check_deps) >>= function
+      | false -> raise IllFormed
+      | true ->
+        reexported_of_json reexported >>= fun reexported ->
+        repo_of_json repo >>= fun repo ->
+        reconstruct_resolver reexported repo >>= fun resolver ->
+        Format.eprintf "@[%sRestored %s.@]@." indent stem;
+        ret (Some (resolver, Digest.string (Ezjsonm.to_string rot)))
+
+  let try_read ~stem =
+    try_ (try_read_ ~stem) @@
+    function
+    | Ezjsonm.Parse_error _ | IllFormed ->
+      let rotpath = FileRes.stem_to_rot stem in
+      mlconf <<@> ML.Env.indent >>= fun indent ->
+      Format.eprintf "@[%sOutdated %s.@]@." indent rotpath;
+      ret None
+    | exn -> raise exn
 end
+
+let try_read = Reader.try_read

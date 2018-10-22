@@ -190,7 +190,7 @@ let export_foreign_globals renv : (string * Name.t) list =
   in
   List.sort compare @@ List.of_seq @@ Seq.filter_map f @@ T.to_seq renv.globals.info_of_string
 
-let reconstruct natives foreigners =
+let reconstruct foreigners natives =
   let renv = init () in
   let renv = List.fold_left (fun renv (s, n) -> import_global s (n, `Public) renv) renv foreigners in
   let renv = List.fold_left (fun renv (os, n) -> add_native_global_ os (n, `Public) renv) renv natives in

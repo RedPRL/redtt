@@ -63,7 +63,7 @@ val check_eq_dim : tm -> tm -> bool m
 
 
 val global_env : Subst.t m
-val ext_global_env : Name.t -> Subst.entry -> unit m
+val ext_global_env : Name.t -> [< Subst.entry] -> unit m
 val base_cx : Cx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m

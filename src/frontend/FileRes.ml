@@ -22,8 +22,10 @@ let find_redlib_root (base_dir : string) : string option =
       let () = Sys.chdir Filename.parent_dir_name in
       let up = Sys.getcwd () in
       if up = cur then begin
-        Format.eprintf "%a@." (Log.pp_message ~loc:None ~lvl:`Warn Format.pp_print_string)
-          "You are using the special local import mode";
+        Log.pp_message ~loc:None ~lvl:`Warn
+          Format.pp_print_string
+          Format.std_formatter
+          "You are using the special local import mode.@ This is not recommended.@ You have been warned.@.";
         None
       end else
         go up
