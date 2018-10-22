@@ -2,6 +2,7 @@ module type S =
 sig
   type 'a m
   val bind : 'a m -> ('a -> 'b m) -> 'b m
+  val try_ : 'a m -> (exn -> 'a m) -> 'a m
   val ret : 'a -> 'a m
 end
 
@@ -24,5 +25,6 @@ module Util (M : S) :
 sig
   val traverse : ('a -> 'b M.m) -> 'a list -> 'b list M.m
   val fold_left : ('a -> 'b -> 'a M.m) -> 'a -> 'b list -> 'a M.m
+  val iter : ('a -> unit M.m) -> 'a list -> unit M.m
 end
 

@@ -9,7 +9,7 @@ type 'a info =
 module T = PersistentTable.M
 type mlconf =
   | TopModule of {indent : string}
-  | InStdin of {stem : FileRes.filepath; indent : string}
+  | InMem of {stem : FileRes.filepath; indent : string}
   | InFile of {stem : FileRes.filepath; redsum : Digest.t; indent : string}
 exception WrongMode (** executing a top command in a file scope or vice versa. *)
 
@@ -180,7 +180,7 @@ struct
     function
     | TopModule {indent} -> indent
     | InFile {indent; _} -> indent
-    | InStdin {indent; _} -> indent
+    | InMem {indent; _} -> indent
 
   let set k v e = {e with values = T.set k v e.values}
   let find k e = T.find k e.values

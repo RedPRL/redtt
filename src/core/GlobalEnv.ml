@@ -13,54 +13,35 @@ module T = Map.Make (Name)
 
 type t =
   {rel : Restriction.t;
-   table : entry T.t;
-   len : int}
+   table : entry T.t}
 
 
 let emp () =
   {table = T.empty;
-   rel = Restriction.emp ();
-   len = 0}
+   rel = Restriction.emp ()}
 
+
+
+let ext (sg : t) nm param : t =
+  {sg with
+   table = T.add nm param sg.table}
+
+let define (sg : t) nm ~ty ~tm =
+  ext sg nm @@ `Def (ty, tm)
+
+let ext_meta (sg : t) nm ~ty =
+  ext sg nm @@ `P ty
+
+let ext_dim (sg : t) nm : t =
+  ext sg nm `I
 
 let declare_datatype dlbl desc (sg : t) : t =
-  {sg with
-   table = T.add dlbl (`Desc desc) sg.table;
-   len = sg.len + 1}
+  ext sg dlbl @@ `Desc desc
 
 let replace_datatype dlbl desc (sg : t) : t =
   {sg with
    table = T.update dlbl (function Some (`Desc _) -> Some (`Desc desc) | _ -> raise Not_found) sg.table}
 
-let lookup_datatype sg dlbl =
-  match T.find dlbl sg.table with
-  | `Desc desc -> desc
-  | _ ->
-    Format.eprintf "The name %a does not refer to a datatype.@." Name.pp dlbl;
-    raise Not_found
-  | exception Not_found ->
-    Format.eprintf "Datatype not found: %a.@." Name.pp dlbl;
-    raise Not_found
-
-let ext_ (sg : t) nm param : t =
-  {sg with
-   table = T.add nm param sg.table;
-   len = sg.len + 1}
-
-
-let define (sg : t) nm ~ty ~tm =
-  {sg with
-   table = T.add nm (`Def (ty, tm)) sg.table;
-   len = sg.len + 1}
-
-let ext (sg : t) =
-  ext_ sg
-
-let ext_meta (sg : t) =
-  ext_ sg
-
-let ext_dim (sg : t) nm : t =
-  ext_ sg nm `I
 
 
 let rec index_of pred xs =
@@ -104,6 +85,16 @@ let lookup_with_twin sg nm tw =
     ty, None
   | _ ->
     failwith "GlobalEnv.lookup_with_twin: twin mismatch"
+
+let lookup_datatype sg dlbl =
+  match T.find dlbl sg.table with
+  | `Desc desc -> desc
+  | _ ->
+    Format.eprintf "The name %a does not refer to a datatype.@." Name.pp dlbl;
+    raise Not_found
+  | exception Not_found ->
+    Format.eprintf "Datatype not found: %a.@." Name.pp dlbl;
+    raise Not_found
 
 let restriction sg =
   sg.rel

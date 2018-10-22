@@ -10,6 +10,11 @@ type resolution =
 type visibility =
   [ `Private | `Public ]
 
+let pp_visibility fmt =
+  function
+  | `Public -> Format.fprintf fmt "public"
+  | `Private -> Format.fprintf fmt "private"
+
 
 module T = PersistentTable.M
 
@@ -104,8 +109,8 @@ let get_name x renv =
   | _ -> failwith "ResEnv.get_name: expected to find name"
 
 let add_native_global ~visibility name renv =
-  let info = (name, visibility) in
-  renv |> modify_globals @@ fun globals ->
+  let info = name, visibility in
+  Combinators.flip modify_globals renv @@ fun globals ->
   let native, info_of_native, native_of_name =
     match native_of_name name renv with
     | Some native ->
@@ -114,7 +119,7 @@ let add_native_global ~visibility name renv =
     | None ->
       let native = T.size globals.info_of_native in
       native,
-      T.set native info globals.info_of_native,
+      T.set native (name, visibility) globals.info_of_native,
       T.set name native globals.native_of_name
   in
   let info_of_string, string_of_native =
@@ -134,61 +139,52 @@ let add_native_global ~visibility name renv =
   in
   {info_of_native; native_of_name; info_of_string; string_of_native}
 
-let import_global s info renv =
-  renv |> modify_globals @@ fun globals ->
-  let info_of_string, string_of_native =
-    match info_of_string_ s renv with
-    | None | Some (`Imported _) ->
-      T.set s (`Imported info) globals.info_of_string,
-      globals.string_of_native
-    | Some (`Native native) ->
-      T.set s (`Imported info) globals.info_of_string,
-      T.remove native globals.string_of_native
-  in
-  {globals with info_of_string; string_of_native}
-
-let import_globals ~visibility imported renv =
-  let merger s native_or_imported renv =
-    let info =
-      match native_or_imported with
-      | `Imported info -> info
-      | `Native native ->
-        match info_of_native native imported with
-        | None ->
-          Format.eprintf "Invariant in ResEnv is broken; native %i escapes the info context." native;
-          raise Not_found
-        | Some info -> info
+let import_global ~visibility name renv =
+  match Name.name name with
+  | None -> invalid_arg "import_global"
+  | Some s ->
+    let info = name, visibility in
+    Combinators.flip modify_globals renv @@ fun globals ->
+    let info_of_string, string_of_native =
+      match info_of_string_ s renv with
+      | None | Some (`Imported _) ->
+        T.set s (`Imported info) globals.info_of_string,
+        globals.string_of_native
+      | Some (`Native native) ->
+        T.set s (`Imported info) globals.info_of_string,
+        T.remove native globals.string_of_native
     in
-    match info with
-    | _, `Private -> renv
-    | global, `Public ->
-      import_global s (global, visibility) renv
+    {globals with info_of_string; string_of_native}
+
+let import_public ~visibility imported renv =
+  let f s =
+    match info_of_string s imported with
+    | Some (name, `Public) -> Some name
+    | _ -> None
   in
-  T.fold merger imported.globals.info_of_string renv
+  let names = Seq.filter_map f (T.to_seq_keys imported.globals.info_of_string) in
+  Seq.fold_left (fun renv name -> import_global ~visibility name renv) renv names
 
 let name_of_native i renv =
   Option.map (fun (name, _) -> name) @@
   info_of_native i renv
 
 type exported_natives = (string option * Name.t) list
-type exported_foreigners = (string * Name.t) list
+type exported_foreigners = Name.t list
 
-let export_native_globals renv : (string option * Name.t) list =
+let export_native_globals renv : exported_natives =
   let f (native, (name, vis)) =
     let ostr = match vis with `Private -> None | `Public -> string_of_native native renv in
-    ostr, name
+    (native, (ostr, name))
   in
-  List.sort compare @@ List.of_seq @@ Seq.map f @@ T.to_seq renv.globals.info_of_native
+  let mycompare (i0, _) (i1, _) = compare i0 i1 in
+  List.map (function _, datum -> datum) @@ List.sort mycompare @@ List.of_seq @@ Seq.map f @@ T.to_seq renv.globals.info_of_native
 
-let export_foreign_globals renv : (string * Name.t) list =
+let export_foreign_globals renv : exported_foreigners =
   let f (s, native_or_imported) =
     match native_or_imported with
-    | `Imported (name, `Public) -> Some (s, name)
+    | `Imported (name, `Public) -> Some name
     | _ -> None
   in
-  List.sort compare @@ List.of_seq @@ Seq.filter_map f @@ T.to_seq renv.globals.info_of_string
-
-let pp_visibility fmt =
-  function
-  | `Public -> Format.fprintf fmt "public"
-  | `Private -> Format.fprintf fmt "private"
+  let compare_name n0 n1 = compare (Name.name n0) (Name.name n1) in
+  List.sort compare_name @@ List.of_seq @@ Seq.filter_map f @@ T.to_seq renv.globals.info_of_string

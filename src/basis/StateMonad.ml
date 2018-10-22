@@ -22,6 +22,12 @@ struct
     let a, st' = m st in
     k a st'
 
+  let try_ m kerr st =
+    try
+      m st
+    with exn ->
+      kerr exn st
+
   let get st =
     st, st
 
