@@ -1397,8 +1397,9 @@ struct
         match ConSys.force rel ext_sys with
         | ext_sys ->
           let cap = Val.plug rel ~rigid:true frm cap in
-          let ext_sys = ConAbsSys.foreach_gen ext_sys @@
-            fun r r' bdy -> Abs (Name.fresh (), LazyVal.unleash bdy)
+          let ext_sys =
+            ConAbsSys.foreach_gen ext_sys @@ fun r r' bdy ->
+            Abs (Name.fresh (), LazyVal.unleash bdy)
           in
           let comp_sys = ConAbsSys.plug rel ~rigid:true frm sys in
           let sys = ext_sys @ comp_sys in
@@ -1425,8 +1426,9 @@ struct
         | sys_y ->
           let abs = Abs (y, ty_y) in
           let cap = Val.plug rel ~rigid:true frm cap in
-          let sys = ConAbsSys.foreach_gen sys_y @@
-            fun r r' bdy_y -> Abs (y, LazyVal.unleash bdy_y)
+          let sys =
+            ConAbsSys.foreach_gen sys_y @@ fun r r' bdy_y ->
+            Abs (y, LazyVal.unleash bdy_y)
           in
           rigid_com rel r r' ~abs ~cap ~sys
         | exception ConSys.Triv c_y ->
@@ -1738,7 +1740,16 @@ struct
            frames = Emp}
       in
       let neu_sys =
-        let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
+        let cap_face =
+          r, r',
+          try
+            let rel' = Rel.equate' r r' rel in
+            LazyVal.make_from_lazy @@ lazy begin
+              Val.run_then_unleash rel' cap
+            end
+          with
+          | I.Inconsistent -> LazyVal.make @@ FortyTwo
+        in
         let tube_faces =
           ConSys.foreach_gen sys @@ fun s s' abs ->
           let rel' = Rel.equate' s s' rel in
@@ -2256,7 +2267,16 @@ struct
       in
       let ty = Val.make_then_run rel (Con.subst r' x tyx) in
       let sys =
-        let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
+        let cap_face =
+          r, r',
+          try
+            let rel' = Rel.equate' r r' rel in
+            LazyVal.make_from_lazy @@ lazy begin
+              Val.run_then_unleash rel' cap
+            end
+          with
+          | I.Inconsistent -> LazyVal.make @@ FortyTwo
+        in
         let old_faces =
           ConSys.foreach_gen (ConSys.forall x info.neu.sys) @@ fun s s' bdy ->
           try
