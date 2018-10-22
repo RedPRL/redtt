@@ -298,17 +298,13 @@ let rec check_boundary cx ty sys el =
   match sys with
   | [] -> ()
   | (r, r', el') :: sys ->
-    match Cx.restrict cx r r' with
-    | `Changed cx_rr' ->
+    match Cx.restrict_ cx r r' with
+    | cx_rr' ->
       let rel_rr' = Cx.rel cx_rr' in
       let ty_rr' = D.Con.run rel_rr' ty in
       let el_rr' = D.Con.run rel_rr' el in
       let _ = Q.equate_con (Cx.qenv cx_rr') rel_rr' ty_rr' el_rr' @@ D.LazyVal.unleash el' in
       check_boundary cx ty sys el
-
-    | `Same ->
-      (* Because the adjacency conditions of the system are presupposed, we only need to check this one face. *)
-      ignore @@ Q.equate_con (Cx.qenv cx) (Cx.rel cx) ty el @@ D.LazyVal.unleash el'
 
     | exception I.Inconsistent ->
       check_boundary cx ty sys el
@@ -665,8 +661,7 @@ and synth_head cx hd =
     let vty_r' = D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty in
     check_of_ty_ "hcom/cap" cx vty_r [] com.cap;
     let vcap = eval cx com.cap in
-    let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:vty ~cap:vcap com.sys in
-    (* Favonia: is this the right way? *)
+    let _ = check_bnd_sys ~cx ~cxx ~x ~r:r ~ty:vty ~cap:vcap com.sys in
     `El vty_r'
 
   | Tm.GHCom _ ->
