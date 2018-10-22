@@ -48,11 +48,18 @@ let lookup_const cx ?(tw = `Only) ?(ushift = 0) x =
 
 
 let extend cx ~name ty =
-  let v, qenv = Q.extend cx.qenv (D.Val.make ty) in
+  let v, qenv = Q.extend cx.qenv @@ D.Val.make ty in
   let venv = D.Env.extend_cell cx.venv @@ D.Val (D.LazyVal.make v) in
   let hyps = Snoc (cx.hyps, `El ty) in
   let ppenv = snd @@ Pp.Env.bind cx.ppenv name in
   {cx with venv; qenv; hyps; ppenv}, v
+
+let extend_def cx ~name ~ty el =
+  let _, qenv = Q.extend cx.qenv @@ D.Val.make ty in
+  let venv = D.Env.extend_cell cx.venv @@ D.Val (D.LazyVal.make el) in
+  let hyps = Snoc (cx.hyps, `El ty) in
+  let ppenv = snd @@ Pp.Env.bind cx.ppenv name in
+  {cx with venv; qenv; hyps; ppenv}
 
 let extend_dim cx ~name =
   let x = Name.named name in

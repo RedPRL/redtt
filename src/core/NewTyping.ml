@@ -291,6 +291,7 @@ let polarity =
   | D.Univ _ | D.Data _ | D.Neu _ ->
     `Pos
   | _ ->
+    Format.eprintf "typechecker / polarity ??@.";
     raise CanJonHelpMe
 
 let rec check_boundary cx ty sys el =
@@ -316,6 +317,12 @@ let rec check_boundary cx ty sys el =
 
 let rec check cx (phase : phase) tm =
   match phase, Tm.unleash tm with
+  | _, Tm.Let (cmd, Tm.B (name, body)) ->
+    let ty = infer_ty cx cmd in
+    let el = eval cx @@ Tm.up cmd in
+    let cx' = Cx.extend_def cx ~name ~ty el in
+    check cx' phase body
+
   | _, Tm.VIn vin ->
     check cx (`Pos `Dim) vin.r;
     let r = eval_dim cx vin.r in
@@ -337,6 +344,7 @@ let rec check cx (phase : phase) tm =
     end
 
   | _, Tm.Box _ ->
+    Format.eprintf "typechecker / box@.";
     (* Similar power moves as Tm.Vin *)
     raise CanJonHelpMe
 
@@ -361,12 +369,15 @@ and check_pos cx pos tm =
       raise @@ E UniverseError
 
   | `El (D.Data _), Tm.Intro _ ->
+    Format.eprintf "typechecker/data/intro@.";
     raise CanJonHelpMe
 
   | `El (D.Data _), Tm.FHCom _ ->
+    Format.eprintf "typechecker/data/fhcom@.";
     raise CanJonHelpMe
 
   | _ ->
+    Format.eprintf "typechecker/data/check_pos@.";
     raise CanJonHelpMe
 
 and check_neg cx ty sys tm =
@@ -438,6 +449,7 @@ and check_neg cx ty sys tm =
     raise CanJonHelpMe
 
   | _ ->
+    Format.eprintf "typechecker/ty/unhandled@.";
     raise CanJonHelpMe
 
 and check_ty_ str (cx : Cx.t) kind tm =
@@ -639,8 +651,22 @@ and synth_head cx hd =
     let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:vty ~cap:vcap hcom.sys in
     `El vty
 
-  | Tm.Com _ ->
-    raise PleaseFillIn
+  | Tm.Com com ->
+    check cx (`Pos `Dim) com.r;
+    check cx (`Pos `Dim) com.r';
+    let r = eval_dim cx com.r in
+    let r' = eval_dim cx com.r' in
+    let cxx, x = Cx.extend_dim cx ~name:None in
+    let Tm.B (_, ty) = com.ty in
+    let _ = check_ty_ "com" cxx `Kan ty in
+    let vty = eval cxx ty in
+    Cofibration.check_valid @@ Cofibration.from_sys cx com.sys;
+    let cx_rx = Cx.restrict_ cx (`Atom x) r in
+    check_of_ty_ "hcom/cap" cx_rx vty [] com.cap;
+    let vcap = eval cx_rx com.cap in
+    let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:vty ~cap:vcap com.sys in
+    (* Favonia: is this the right way? *)
+    `El (D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty)
 
   | Tm.GHCom _ ->
     raise PleaseFillIn
@@ -771,9 +797,11 @@ and synth_stack cx vhd ty stk  =
     synth_stack cx vhd ty stk
 
   | D.Data _, Tm.Elim _ :: stk ->
+    Format.eprintf "typechecker / data / elim@.";
     raise CanJonHelpMe
 
   | _ ->
+    Format.eprintf "typechecker encountered unimplemented frame@.";
     raise CanJonHelpMe
 
 and approx cx ty0 ty1 =
