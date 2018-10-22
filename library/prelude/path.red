@@ -35,7 +35,6 @@ def funext
   λ i x →
   p _ i
 
-quit
 
 def symm/filler (A : type) (p : 𝕀 → A) (j i : 𝕀) : A =
   comp 0 j (p 0) [
@@ -100,14 +99,6 @@ def trans/sym/l (A : type) (p : 𝕀 → A) : path (path _ (p 1) (p 1)) refl (tr
   -- | k=1 j → trans/filler A (symm A p) p j i
   ]
 
--- Perhaps we could parallelize this proof? ;)
-def symmd (A : 𝕀 → type) (p : (i : 𝕀) → A i) : pathd (symm^1 _ A) (p 1) (p 0) =
-  λ i →
-  comp 0 1 (p 0) in λ j → symm/filler^1 _ A j i [
-  | i=0 → p
-  | i=1 → refl
-  ]
-
 def J (A : type) (p : 𝕀 → A) (C : [i] A [i=0 → p 0] → type) (d : C refl) : C p =
   coe 0 1 d in λ i →
   C (λ j → comp 0 j (p 0) [i=0 → refl | i=1 → p])
@@ -125,3 +116,12 @@ def J/eq
   | k=1 → refl
   ]
 
+quit
+
+-- Perhaps we could parallelize this proof? ;)
+def symmd (A : 𝕀 → type) (p : (i : 𝕀) → A i) : pathd (symm^1 _ A) (p 1) (p 0) =
+  λ i →
+  comp 0 1 (p 0) in λ j → symm/filler^1 _ A j i [
+  | i=0 → p
+  | i=1 → refl
+  ]
