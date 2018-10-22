@@ -321,7 +321,6 @@ and equate_hd qenv rel hd0 hd1 =
     Tm.HCom {r; r'; ty; cap; sys}
 
   | _ ->
-    Format.eprintf "equate head: %a ~ %a@." Head.pp hd0 Head.pp hd1;
     raise PleaseRaiseProperError
 
 and equate_frame qenv rel frm0 frm1 =
