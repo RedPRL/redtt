@@ -136,7 +136,7 @@ struct
       let wk = Tm.shift n in
       let trs =
         flip List.map xs @@ fun x ->
-        Q.equate_dim (Cx.qenv cx) (Cx.rel cx) x x
+        Q.quote_dim (Cx.qenv cx) x
       in
       let cmd' = Tm.subst_cmd wk cmd in
       let frm = Tm.ExtApp trs in
@@ -353,7 +353,7 @@ and check_pos cx pos tm =
     ()
 
   | `El (D.Univ univ), _->
-    let lvl = check_ty cx univ.kind tm in
+    let lvl = check_ty_ "univ" cx univ.kind tm in
     if Lvl.greater lvl univ.lvl then
       raise @@ E UniverseError
 
@@ -381,7 +381,7 @@ and check_neg cx ty sys tm =
     let cx', x = Cx.extend cx ~name:None @@ D.Val.unleash q.dom in
     let bdy = Pi.body tm in
     let bdy_sys = Pi.sys_body cx x sys in
-    let cod = inst_clo cx q.cod x in
+    let cod = inst_clo cx' q.cod x in
     check_of_ty_ "pi" cx' cod bdy_sys bdy
 
   | D.Restrict face ->
@@ -390,7 +390,7 @@ and check_neg cx ty sys tm =
       match Cx.restrict cx r r', Rst.body cx r r' tm with
       | `Changed cx_rr', Some bdy ->
         let sys_bdy = Rst.sys_body cx_rr' sys in
-        check_of_ty_ "rst" cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
+        check_of_ty_ "rst" cx_rr' (D.LazyVal.unleash ty_rr') sys_bdy bdy
       | `Same, Some bdy ->
         let sys_bdy = Rst.sys_body cx sys in
         check_of_ty_ "rst" cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
@@ -437,6 +437,10 @@ and check_neg cx ty sys tm =
   | _ ->
     raise CanJonHelpMe
 
+and check_ty_ str (cx : Cx.t) kind tm =
+  Format.eprintf "ty [%s]: %a@." str (Tm.pp (Cx.ppenv cx)) tm;
+  check_ty cx kind tm
+
 (* TODO: we can take from RedPRL the fine-grained subtraction of kinds. Let Favonia do it! *)
 and check_ty cx kind tm : Lvl.t =
   match Tm.unleash tm with
@@ -455,7 +459,7 @@ and check_ty cx kind tm : Lvl.t =
     Lvl.shift 1 univ.lvl
 
   | Tm.Pi (dom, Tm.B (name, cod)) | Tm.Sg (dom, Tm.B (name, cod)) ->
-    let lvl0 = check_ty cx kind dom in
+    let lvl0 = check_ty_ "pi/sg" cx kind dom in
     let vdom = eval cx dom in
     let cx', _ = Cx.extend cx ~name vdom in
     check_ty cx' kind cod
@@ -524,11 +528,11 @@ and check_tm_face cx ty sys face =
     let rel_rr' = Cx.rel cx_rr' in
     let ty_rr' = D.Con.run rel_rr' ty in
     let boundary_rr' = ConSys.run rel_rr' sys in
-    check_of_ty cx_rr' ty_rr' boundary_rr' tm;
+    check_of_ty_ "face" cx_rr' ty_rr' boundary_rr' tm;
     let el = eval cx_rr' tm in
     (r, r', D.LazyVal.make el) :: sys
   | `Same, Some tm ->
-    check_of_ty cx ty sys tm;
+    check_of_ty_ "face" cx ty sys tm;
     let el = eval cx tm in
     (r, r', D.LazyVal.make el) :: sys
   | exception I.Inconsistent ->
@@ -539,23 +543,20 @@ and check_tm_face cx ty sys face =
 and check_tm_sys cx ty sys =
   List.fold_left (check_tm_face cx ty) [] sys
 
-and check_of_ty cx = check_of_ty_ "Checking" cx
+and check_of_ty cx ty sys tm =
+  match polarity ty with
+  | `Pos ->
+    check cx (`Pos (`El ty)) tm;
+    check_boundary cx ty sys @@
+    eval cx tm
+  | `Neg ->
+    check cx (`Neg (ty, sys)) tm
+
 
 and check_of_ty_ debug cx ty sys tm =
   (*   Format.eprintf "%s: %a@." debug (Tm.pp (Cx.ppenv cx)) tm; *)
-  try
-    begin
-      match polarity ty with
-      | `Pos ->
-        check cx (`Pos (`El ty)) tm;
-        check_boundary cx ty sys @@
-        eval cx tm
-      | `Neg ->
-        check cx (`Neg (ty, sys)) tm
-    end
-  with
-  | _ ->
-    Format.eprintf "Failed to check: %a@." Tm.pp0 tm;
+  check_of_ty cx ty sys tm
+
 
 and infer_ty cx cmd =
   let hd, stk = cmd in

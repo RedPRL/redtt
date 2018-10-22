@@ -12,6 +12,7 @@ module QEnv :
 sig
   type t
 
+  (* Change this to val init : GlobalEnv.t -> t *)
   val emp : unit -> t (* maybe just [emp : t]? *)
 
   (** [extend] gives you a new variable (in its level)
@@ -77,7 +78,6 @@ let quote_dim qenv =
     match QEnv.ix_of_atom x qenv with
     | ix -> Tm.up @@ Tm.ix ix
     | exception Not_found ->
-      Format.eprintf "quote_dim: %a in %a@." Name.pp x QEnv.pp qenv;
       Tm.up @@ Tm.var x
 
 let equate_dim qenv rel r0 r1 =
