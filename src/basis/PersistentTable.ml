@@ -13,6 +13,8 @@ sig
   val fold : ('k -> 'a -> 'b -> 'b) -> ('k, 'a) t -> 'b -> 'b
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
   val to_seq : ('k, 'a) t -> ('k * 'a) Seq.t
+  val to_seq_keys : ('k, 'a) t -> 'k Seq.t
+  val to_seq_values : ('k, 'a) t -> 'a Seq.t
 end
 
 module M : S =
@@ -121,6 +123,22 @@ struct
     match !t with
     | Tbl a ->
       Hashtbl.to_seq a
+    | _ ->
+      raise Fatal
+
+  let to_seq_keys t =
+    reroot t;
+    match !t with
+    | Tbl a ->
+      Hashtbl.to_seq_keys a
+    | _ ->
+      raise Fatal
+
+  let to_seq_values t =
+    reroot t;
+    match !t with
+    | Tbl a ->
+      Hashtbl.to_seq_values a
     | _ ->
       raise Fatal
 

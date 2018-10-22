@@ -1,7 +1,5 @@
 open RedTT_Core
 
-exception Not_found
-
 type filepath = string
 type selector = string list
 

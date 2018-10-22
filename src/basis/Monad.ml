@@ -2,6 +2,7 @@ module type S =
 sig
   type 'a m
   val bind : 'a m -> ('a -> 'b m) -> 'b m
+  val try_ : 'a m -> (exn -> 'a m) -> 'a m
   val ret : 'a -> 'a m
 end
 
@@ -64,5 +65,12 @@ struct
     | x :: xs ->
       f acc x >>= fun a ->
       fold_left f a xs
+
+  let rec iter f xs =
+    match xs with
+    | [] ->
+      M.ret ()
+    | x :: xs ->
+      f x >> iter f xs
 
 end

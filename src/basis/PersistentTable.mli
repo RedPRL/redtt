@@ -18,6 +18,8 @@ sig
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
 
   val to_seq : ('k, 'a) t -> ('k * 'a) Seq.t
+  val to_seq_keys : ('k, 'a) t -> 'k Seq.t
+  val to_seq_values : ('k, 'a) t -> 'a Seq.t
 end
 
 module M : S
