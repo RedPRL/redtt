@@ -311,6 +311,9 @@ struct
     | Tm.Up (Tm.DownX r, []) -> eval_dim env r
     | _ -> raise PleaseRaiseProperError
 
+
+  module ConAbs = Abs(Con)
+
   let rec eval rel env t =
     match Tm.unleash t with
     | Tm.Up cmd ->
@@ -573,38 +576,38 @@ struct
       end
 
   and eval_bnd_face rel env (tr, tr', bnd_opt) =
-    match bnd_opt with
-    | Some bnd ->
-      let r = eval_dim env tr in
-      let r' = eval_dim env tr' in
-      let rel = Rel.equate' r r' rel in
+    let r = eval_dim env tr in
+    let r' = eval_dim env tr' in
+    match Rel.equate r r' rel, bnd_opt with
+    | `Changed rel, Some bnd ->
       let env = Env.run rel env in
       let abs = lazy begin eval_bnd rel env bnd end in
       (r, r', LazyValAbs.make_from_lazy abs)
-    | None -> raise PleaseRaiseProperError
+    | `Same, Some bnd ->
+      let abs = lazy begin eval_bnd rel env bnd end in
+      (r, r', LazyValAbs.make_from_lazy abs)
+    | exception I.Inconsistent ->
+      (r, r', LazyValAbs.make @@ ConAbs.bind @@ fun _ -> FortyTwo)
+    | _ ->
+      raise PleaseRaiseProperError
 
   and eval_bnd_sys rel env =
     List.map (eval_bnd_face rel env)
 
   and eval_tm_face rel env (tr, tr', tm_opt) =
-    match tm_opt with
-    | Some tm ->
-      let r = eval_dim env tr in
-      let r' = eval_dim env tr' in
-      begin
-        match Rel.equate r r' rel with
-        | `Changed rel ->
-          let env = Env.run rel env in
-          let v = lazy begin eval rel env tm end in
-          (r, r', LazyVal.make_from_lazy v)
-        | `Same ->
-          let v = lazy begin eval rel env tm end in
-          (r, r', LazyVal.make_from_lazy v)
-        | exception I.Inconsistent ->
-          (r, r', LazyVal.make FortyTwo)
-      end
-    | None ->
-      (* TODO, looks weird ?? *)
+    let r = eval_dim env tr in
+    let r' = eval_dim env tr' in
+    match Rel.equate r r' rel, tm_opt with
+    | `Changed rel , Some tm ->
+      let env = Env.run rel env in
+      let v = lazy begin eval rel env tm end in
+      (r, r', LazyVal.make_from_lazy v)
+    | `Same, Some tm ->
+      let v = lazy begin eval rel env tm end in
+      (r, r', LazyVal.make_from_lazy v)
+    | exception I.Inconsistent ->
+      (r, r', LazyVal.make FortyTwo)
+    | _ ->
       raise PleaseRaiseProperError
 
   and eval_tm_sys rel env =
