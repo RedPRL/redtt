@@ -16,7 +16,7 @@ type entry = (* a subset of GlobalEnv.entry *)
   | `Desc of Desc.desc
   ]
 
-type reexported = (string * Name.t) list
+type reexported = Name.t list
 
 type repo = (string option * entry) list
 

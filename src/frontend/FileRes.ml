@@ -1,7 +1,5 @@
 open RedBasis
 
-exception Not_found = Not_found
-
 let redlib_name = "redlib"
 let red_extention = ".red"
 let rot_extention = ".rot"

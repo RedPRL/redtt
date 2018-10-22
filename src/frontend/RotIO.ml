@@ -6,10 +6,10 @@ open Contextual
 module M = Monad.Notation (Contextual)
 open M
 module MU = Monad.Util (Contextual)
+module J = Ezjsonm
 
 (* Tm *)
 
-exception IllFormed
 exception PartialDatatype
 exception Impossible of string
 
@@ -24,14 +24,14 @@ struct
   let int_of_json =
     function
     | `String s -> int_of_string s
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "int_of_json"
 
   let json_of_string s = `String s
 
   let string_of_json =
     function
     | `String s -> s
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "string_of_json"
 
   let json_of_ostring =
     function
@@ -42,7 +42,7 @@ struct
     function
     | `Null -> None
     | `String str -> Some str
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "ostring_of_json"
 
   let json_of_list json_of_item l =
     MU.traverse json_of_item l <<@> fun l -> `A l
@@ -50,7 +50,7 @@ struct
   let list_of_json item_of_json =
     function
     | `A l -> MU.traverse item_of_json l
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "list_of_json"
 
   (* pure version *)
   let json_of_list_ json_of_item l =
@@ -60,7 +60,7 @@ struct
   let list_of_json_ item_of_json =
     function
     | `A l -> List.map item_of_json l
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "list_of_json_"
 
   let json_of_ostring_bwd nms =
     json_of_list_ json_of_ostring @@ Bwd.to_list nms
@@ -79,23 +79,19 @@ struct
       a_of_json a >>= fun a ->
       b_of_json b >>= fun b ->
       ret @@ (a, b)
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "pair_of_json"
 
-  let json_of_labeled_list json_of_a (l : (string * 'a) list) =
-    MU.traverse (fun (lbl, a) -> json_of_a a <<@> fun a -> (lbl, a)) l <<@> fun l -> `O l
+  let json_of_labeled (json_of_a, json_of_b) (a, b) =
+    json_of_b b >>= fun b ->
+    ret @@ `A [json_of_a a; b]
 
-  let labeled_list_of_json a_of_json : Ezjsonm.value -> (string * 'a) list m =
+  let labeled_of_json (a_of_json, b_of_json) =
     function
-    | `O l -> MU.traverse (fun (lbl, a) -> a_of_json a <<@> fun a -> lbl, a) l
-    | _ -> raise IllFormed
+    | `A [a; b] ->
+      b_of_json b >>= fun b ->
+      ret @@ (a_of_json a, b)
+    | j -> J.parse_error j "pair_of_json"
 
-  let json_of_olabeled_list json_of_a (l : (string option * 'a) list) =
-    MU.traverse (fun (lbl, a) -> json_of_a a <<@> fun a -> (Option.default "" lbl, a)) l <<@> fun l -> `O l
-
-  let olabeled_list_of_json a_of_json : Ezjsonm.value -> (string option * 'a) list m =
-    function
-    | `O l -> MU.traverse (fun (lbl, a) -> a_of_json a <<@> fun a -> begin match lbl with "" -> None | s -> Some s end, a) l
-    | _ -> raise IllFormed
 end
 
 module TmJson =
@@ -109,8 +105,8 @@ struct
     | _, None ->
       Format.eprintf "Meta variable %a is not expandable.@." Name.pp name;
       raise @@ Impossible "Some meta variable escapes the serialization context."
-    | _, Some def ->
-      ret @@ shift_univ ushift def
+    | ty, Some def ->
+      ret @@ Down {ty = shift_univ ushift ty; tm = shift_univ ushift def}
 
   let expand_var ~name ~ushift ~twin =
     global_env >>= fun genv ->
@@ -118,8 +114,8 @@ struct
     | _, None ->
       Format.eprintf "Variable %a is not expandable.@." Name.pp name;
       raise @@ Impossible "Some variable escapes the serialization context."
-    | _, Some def ->
-      ret @@ shift_univ ushift def
+    | ty, Some def ->
+      ret @@ Down {ty = shift_univ ushift ty; tm = shift_univ ushift def}
 
   let json_of_kind =
     function
@@ -132,7 +128,7 @@ struct
     | `String "Reg" -> `Reg
     | `String "Kan" -> `Kan
     | `String "Pre" -> `Pre
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "kind_of_json"
 
   let json_of_lvl =
     function
@@ -155,7 +151,7 @@ struct
     | `String "Only" -> `Only
     | `String "TwinL" -> `TwinL
     | `String "TwinR" -> `TwinR
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "twin_of_json"
 
   let json_of_bnd json_of_bdy (B (nm, bdy)) =
     json_of_bdy bdy >>= fun bdy ->
@@ -166,7 +162,7 @@ struct
     | `A [nm; bdy] ->
       bdy_of_json bdy >>= fun bdy ->
       ret @@ (B (ostring_of_json nm, bdy))
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "bnd_of_json"
 
   let json_of_nbnd json_of_bdy (NB (nms, bdy)) =
     json_of_bdy bdy >>= fun bdy ->
@@ -177,7 +173,7 @@ struct
     | `A [nms; bdy] ->
       bdy_of_json bdy >>= fun bdy ->
       ret @@ (NB (ostring_bwd_of_json nms, bdy))
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "nbnd_of_json"
 
   let json_of_face json_of_r json_of_bdy (r, r', obdy) =
     json_of_r r >>= fun r ->
@@ -191,7 +187,7 @@ struct
 
   let face_of_json r_of_json bdy_of_json =
     function
-    | `A (r :: r' :: obdy) ->
+    | `A (r :: r' :: obdy) as j ->
       r_of_json r >>= fun r ->
       r_of_json r' >>= fun r' ->
       begin
@@ -201,9 +197,9 @@ struct
           ret (r, r', Some bdy)
         | [] ->
           ret (r, r', None)
-        | _ -> raise IllFormed
+        | _ -> J.parse_error j "face_of_json"
       end
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "face_of_json"
 
   let rec json_of_foreign_name name kont_notfound kont_found =
     source_stem name >>= function
@@ -324,12 +320,12 @@ struct
     function
     | Meta {name; ushift} ->
       json_of_name name
-        (fun () -> expand_meta ~name ~ushift >>= json_of_tm)
+        (fun () -> expand_meta ~name ~ushift >>= json_of_head)
         (fun name -> ret @@ `A [`String "Meta"; name; json_of_int ushift])
 
     | Var {name; twin; ushift} ->
       json_of_name name
-        (fun () -> expand_var ~name ~twin ~ushift >>= json_of_tm)
+        (fun () -> expand_var ~name ~twin ~ushift >>= json_of_head)
         (fun name -> ret @@ `A [`String "Var"; name; json_of_twin twin; json_of_int ushift])
 
     | Ix (ix, twin) ->
@@ -412,10 +408,11 @@ struct
     | RestrictForce -> ret @@ `String "RestrictForce"
 
     | Elim {dlbl; params; mot; clauses} ->
+      let json_of_clause = json_of_labeled (json_of_string, json_of_nbnd json_of_tm) in
       json_of_dlbl dlbl >>= fun dlbl ->
       json_of_list json_of_tm params >>= fun params ->
       json_of_tm_bnd mot >>= fun mot ->
-      json_of_labeled_list (json_of_nbnd json_of_tm) clauses >>= fun clauses ->
+      json_of_list json_of_clause clauses >>= fun clauses ->
       ret @@ `A [`String "Elim"; dlbl; params; mot; clauses]
 
   and json_of_cmd cmd =
@@ -427,24 +424,25 @@ struct
   and json_of_tm_bnd_face face = json_of_face json_of_tm json_of_tm_bnd face
   and json_of_tm_bnd_sys sys = json_of_list json_of_tm_bnd_face sys
 
-  let rec foreign_name_of_json : Ezjsonm.value -> Name.t m =
+  let rec foreign_name_of_json : J.value -> Name.t m =
     function
-    | `A [`String stem; native] ->
+    | `A [`String stem; native] as j ->
       cached_resolver stem >>= begin function
-      | None -> raise IllFormed
+      | None -> J.parse_error j "foreign_name_of_json"
       | Some (res, _) ->
         match ResEnv.name_of_native (int_of_json native) res with
-        | None -> raise IllFormed
+        | None -> J.parse_error j "foreign_name_of_json"
         | Some name -> ret name
       end
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "foreign_name_of_json"
 
-  let rec name_of_json : Ezjsonm.value -> Name.t m =
+  let rec name_of_json : J.value -> Name.t m =
     function
-    | `String native ->
+    | `String native as j ->
       resolver >>= fun res ->
-      begin match ResEnv.name_of_native (int_of_json (`String native)) res with
-      | None -> raise IllFormed
+      let native = int_of_json (`String native) in
+      begin match ResEnv.name_of_native native res with
+      | None -> J.parse_error j "name_of_json (native = %i)" native
       | Some name -> ret name
       end
     | x -> foreign_name_of_json x
@@ -545,7 +543,7 @@ struct
       list_of_json tm_of_json args >>= fun args ->
       ret @@ Intro (dlbl, string_of_json clbl, params, args)
 
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "tm_of_json"
 
   and tm_bnd_of_json bnd = bnd_of_json tm_of_json bnd
 
@@ -610,7 +608,7 @@ struct
       tm_bnd_sys_of_json sys >>= fun sys ->
       ret @@ GCom {r; r'; ty; cap; sys}
 
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "head_of_json"
 
   and frame_of_json =
     function
@@ -641,13 +639,14 @@ struct
     | `String "RestrictForce" -> ret RestrictForce
 
     | `A [`String "Elim"; dlbl; params; mot; clauses] ->
+      let clause_of_json = labeled_of_json (string_of_json, nbnd_of_json tm_of_json) in
       dlbl_of_json dlbl >>= fun dlbl ->
       list_of_json tm_of_json params >>= fun params ->
       tm_bnd_of_json mot >>= fun mot ->
-      labeled_list_of_json (nbnd_of_json tm_of_json) clauses >>= fun clauses ->
+      list_of_json clause_of_json clauses >>= fun clauses ->
       ret @@ Elim {dlbl; params; mot; clauses}
 
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "frame_of_json"
 
   and cmd_of_json cmd =
     pair_of_json (head_of_json, list_of_json frame_of_json) cmd
@@ -672,7 +671,7 @@ struct
   let rec_spec_of_json =
     function
     | `String "Self" -> ret Self
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "rec_spec_of_json"
 
   let json_of_arg_spec =
     function
@@ -698,7 +697,7 @@ struct
 
     | `String "Dim" -> ret `Dim
 
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "arg_spec_of_json"
 
   (* MORTALITY there's a better encoding *)
   let rec json_of_telescope json_of_a json_of_e =
@@ -720,7 +719,7 @@ struct
       a_of_json a >>= fun a ->
       bnd_of_json (telescope_of_json a_of_json e_of_json) tel >>= fun tel ->
       ret @@ TCons (a, tel)
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "telescope_of_json"
 
   let json_of_constr =
     json_of_telescope json_of_arg_spec json_of_tm_sys
@@ -728,11 +727,17 @@ struct
   let constr_of_json =
     telescope_of_json arg_spec_of_json tm_sys_of_json
 
+  let json_of_constrs =
+    json_of_list @@ json_of_labeled (json_of_string, json_of_constr)
+
+  let constrs_of_json =
+    list_of_json @@ labeled_of_json (string_of_json, constr_of_json)
+
   let json_of_body =
-    json_of_telescope json_of_tm (json_of_labeled_list json_of_constr)
+    json_of_telescope json_of_tm json_of_constrs
 
   let body_of_json =
-    telescope_of_json tm_of_json (labeled_list_of_json constr_of_json)
+    telescope_of_json tm_of_json constrs_of_json
 
   let json_of_desc =
     function
@@ -747,7 +752,7 @@ struct
     | `A [kind; lvl; body] ->
       body_of_json body >>= fun body ->
       ret @@ {kind = kind_of_json kind; lvl = lvl_of_json lvl; body; status = `Complete}
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "desc_of_json"
 end
 
 module RotJson =
@@ -763,13 +768,21 @@ struct
   let selector_to_json =
     list_of_json_ string_of_json
 
+  let json_of_digest d =
+    `String (Digest.to_hex d)
+
+  let digest_of_json =
+    function
+    | `String h as j -> begin try Digest.from_hex h with Invalid_argument _ -> J.parse_error j "digest_of_json" end
+    | j -> J.parse_error j "digest_of_json"
+
   let json_of_dep =
     function
     | True -> `String "True"
     | False -> `String "False"
     | Libsum -> `A [`String "Libsum"]
-    | Self {stem; redsum} -> `A [`String "Self"; json_of_string stem; json_of_string redsum]
-    | Import {sel; stem; rotsum} -> `A [`String "Import"; json_of_selector sel; json_of_string stem; json_of_string rotsum]
+    | Self {stem; redsum} -> `A [`String "Self"; json_of_string stem; json_of_digest redsum]
+    | Import {sel; stem; rotsum} -> `A [`String "Import"; json_of_selector sel; json_of_string stem; json_of_digest rotsum]
     | Shell {cmd; exit} -> `A [`String "Shell"; json_of_string cmd; json_of_int exit]
 
   let dep_of_json =
@@ -777,16 +790,19 @@ struct
     | `String "True" -> True
     | `String "False" -> False
     | `A [`String "Libsum"] -> Libsum
-    | `A [`String "Self"; stem; redsum] -> Self {stem = string_of_json stem; redsum = string_of_json redsum}
-    | `A [`String "Import"; sel; stem; rotsum] -> Import {sel = selector_to_json sel; stem = string_of_json stem; rotsum = string_of_json rotsum}
+    | `A [`String "Self"; stem; redsum] ->
+      Self {stem = string_of_json stem; redsum = digest_of_json redsum}
+    | `A [`String "Import"; sel; stem; rotsum] ->
+      Import {sel = selector_to_json sel; stem = string_of_json stem; rotsum = digest_of_json rotsum}
     | `A [`String "Shell"; cmd; exit] -> Shell {cmd =string_of_json cmd; exit = int_of_json exit}
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "dep_of_json"
+
 
   let json_of_ver = json_of_string
 
   let ver_of_json = string_of_json
 
-  let json_of_entry : entry -> Ezjsonm.value m =
+  let json_of_entry : entry -> J.value m =
     function
     | `P ty ->
       json_of_tm ty >>= fun ty ->
@@ -801,7 +817,7 @@ struct
       json_of_desc desc >>= fun desc ->
       ret @@ `A [`String "Desc"; desc]
 
-  let entry_of_json : Ezjsonm.value -> entry m =
+  let entry_of_json : J.value -> entry m =
     function
     | `A [`String "P"; ty] ->
       tm_of_json ty >>= fun ty ->
@@ -816,7 +832,7 @@ struct
       desc_of_json desc >>= fun desc ->
       ret @@ `Desc desc
 
-    | _ -> raise IllFormed
+    | j -> J.parse_error j "entry_of_json"
 
   let json_of_deps =
     json_of_list_ json_of_dep
@@ -825,10 +841,16 @@ struct
     list_of_json_ dep_of_json
 
   let json_of_repo =
-    json_of_olabeled_list json_of_entry
+    json_of_list @@ json_of_labeled (json_of_ostring, json_of_entry)
 
+  (*
+  let repo_of_json =
+    olabeled_list_o
   let repo_of_json =
     olabeled_list_of_json entry_of_json
+  *)
+  let raw_repo_of_json =
+    list_of_json @@ labeled_of_json (ostring_of_json, ret)
 
   let json_of_foreign name =
     json_of_foreign_name name (fun () -> invalid_arg "json_of_foreign") ret
@@ -836,25 +858,30 @@ struct
   let foreign_of_json =
     foreign_name_of_json
 
-  let json_of_reexported : reexported -> Ezjsonm.value m =
-    json_of_labeled_list json_of_foreign
+  let json_of_reexported : reexported -> J.value m =
+    json_of_list json_of_foreign
 
-  let reexported_of_json : Ezjsonm.value -> reexported m =
-    labeled_list_of_json foreign_of_json
+  let raw_reexported_of_json =
+    list_of_json ret
 
-  let compose_rot ~deps ~reexported ~repo =
-    `A [`String version; deps; reexported; repo]
+  let json_of_rot ~deps ~reexported ~repo =
+    json_of_reexported reexported >>= fun reexported ->
+    json_of_repo repo >>= fun repo ->
+    ret @@ `A [`String version; json_of_deps deps; reexported; repo]
 
+  (* everything decoded except repo *)
   let decompose_rot =
     function
-    | `A [`String v; deps; reexported; repo] when String.equal v version -> deps, reexported, repo
-    | _ -> raise IllFormed
+    | `A [`String v; deps; reexported; repo] when String.equal v version ->
+      raw_reexported_of_json reexported >>= fun reexported ->
+      raw_repo_of_json repo >>= fun raw_repo ->
+      ret (deps_of_json deps, reexported, raw_repo)
+    | j -> J.parse_error (J.unwrap j) "decompose_rot"
 end
 
 module Writer =
 struct
   open RotData
-  open RotJson
 
   let deps : RotData.dep list m =
     mlconf >>=
@@ -899,7 +926,7 @@ struct
     | TopModule _ | InStdin _ -> raise ML.WrongMode
     | InFile {stem; indent; _} ->
       let rotpath = FileRes.stem_to_rot stem in
-      let rotstr = Ezjsonm.to_string ~minify:true rot in
+      let rotstr = J.to_string ~minify:true rot in
 
       Format.eprintf "@[%sWriting %s.@]@." indent rotpath;
       let channel = open_out_bin rotpath in
@@ -913,10 +940,10 @@ struct
       resolver <<@> fun resolver -> resolver, Digest.string rotstr
 
   let write =
-    deps <<@> json_of_deps >>= fun deps ->
-    reexported >>= json_of_reexported >>= fun reexported ->
-    repo >>= json_of_repo >>= fun repo ->
-    write_rot @@ RotJson.compose_rot deps reexported repo
+    deps >>= fun deps ->
+    reexported >>= fun reexported ->
+    repo >>= fun repo ->
+    RotJson.json_of_rot deps reexported repo >>= write_rot
 end
 
 let write = Writer.write
@@ -926,31 +953,22 @@ struct
   open RotData
   open RotJson
 
-  let check_dep =
+  let check_dep ~loader ~stem:target_stem =
     function
     | True -> ret true
     | False -> ret false
     | Libsum -> ret true
     | Self {stem; redsum} ->
-      begin
-        mlconf >>= function
-        | TopModule _ -> raise ML.WrongMode
-        | InStdin {stem = cur_stem; _} | InFile {stem = cur_stem; _} ->
-          ret begin String.equal stem cur_stem && Digest.equal (Digest.file (FileRes.stem_to_red stem)) redsum end
-      end
+      ret begin String.equal stem target_stem && Digest.equal (Digest.file (FileRes.stem_to_red stem)) redsum end
     | Import {sel; stem; rotsum} ->
-      begin
-        mlconf >>= function
-        | TopModule _ -> raise ML.WrongMode
-        | InStdin {stem = cur_stem; _} | InFile {stem = cur_stem; _} ->
-          if String.equal (FileRes.selector_to_stem ~stem:cur_stem sel) stem then
-            cached_resolver stem >>=
-            function
-            | Some (_, digest) -> ret @@ Digest.equal rotsum digest
-            | _ -> ret false
-          else
-            ret false
-      end
+      let lib_stem = FileRes.selector_to_stem ~stem:target_stem sel in
+      if String.equal lib_stem stem then
+        loader ~selector:sel >> cached_resolver stem >>=
+        function
+        | Some (_, lib_digest) -> ret @@ Digest.equal rotsum lib_digest
+        | None -> ret false
+      else
+        ret false
     | Shell {cmd; exit} ->
       match !unsafe_mode with
       | true -> ret begin Sys.command cmd = exit end
@@ -960,55 +978,74 @@ struct
         ret false
 
   (* MORTAL where is the monadic version of [for_all]? *)
-  let check_deps =
-    let step prefix dep = if prefix then check_dep dep else ret false in
+  let check_deps ~loader ~stem =
+    let step prefix dep = if prefix then check_dep ~loader ~stem dep else ret false in
     MU.fold_left step true
 
   (* MORTAL this is assuming that earlier natives will not depend on later natives *)
-  let reconstruct_resolver reexported repo =
+  let restore_repo raw_repo =
     assert_top_level >>
-    MU.traverse
-      (fun (ostr, entry) -> let name = Name.named ostr in ext_global_env name entry >> ret (ostr, name))
-      repo
-    >>= fun repo -> ret @@ ResEnv.reconstruct reexported repo
+    Combinators.flip MU.iter raw_repo begin
+      fun (ostr, raw_entry) ->
+      let name = Name.named ostr in
+      entry_of_json raw_entry >>= fun entry ->
+      ext_global_env name entry >>
+      modify_top_resolver @@ fun res ->
+      ResEnv.add_native_global ~visibility:`Public name res
+    end
 
-  let read_rot ~stem =
+  let restore_reexport raw_reexport =
+    assert_top_level >>
+    Combinators.flip MU.iter raw_reexport begin
+      fun raw_name ->
+      foreign_of_json raw_name >>= function name ->
+      modify_top_resolver (ResEnv.import_global ~visibility:`Public name)
+    end
+
+  let read_rot ~stem : J.t m =
     let rotpath = FileRes.stem_to_rot stem in
     mlconf <<@> ML.Env.indent >>= fun indent ->
 
-    Format.eprintf "@[%sReading %s.@]@." indent rotpath;
     let channel = open_in_bin rotpath in
     let rot =
-      match Ezjsonm.from_channel channel with
+      match J.from_channel channel with
       | rot -> close_in channel; rot
       | exception exn -> close_in channel; raise exn
     in
 
     ret rot
 
-  let try_read_ ~stem =
+  let try_read_ ~loader ~stem =
     mlconf <<@> ML.Env.indent >>= fun indent ->
     read_rot ~stem >>= function
     | rot ->
-      let deps, reexported, repo = decompose_rot rot in
-      (deps_of_json deps |> check_deps) >>= function
-      | false -> raise IllFormed
-      | true ->
-        reexported_of_json reexported >>= fun reexported ->
-        repo_of_json repo >>= fun repo ->
-        reconstruct_resolver reexported repo >>= fun resolver ->
-        Format.eprintf "@[%sRestored %s.@]@." indent stem;
-        ret (Some (resolver, Digest.string (Ezjsonm.to_string rot)))
+      decompose_rot rot >>= function deps, reexported, repo ->
+      let mlconf = ML.InStdin {stem; indent} in
+      isolate_module ~mlconf begin
+        check_deps ~loader ~stem deps >>= function
+        | false ->
+          ret None
+        | true ->
+          restore_reexport reexported >>
+          restore_repo repo >>
+          resolver >>= fun resolver ->
+          ret (Some (resolver, Digest.string (J.to_string rot)))
+      end
 
-  let try_read ~stem =
-    try_ (try_read_ ~stem) @@
+  let try_read ~loader ~stem =
+    try_ (try_read_ ~loader ~stem) @@
     function
-    | Ezjsonm.Parse_error _ | IllFormed ->
-      let rotpath = FileRes.stem_to_rot stem in
-      mlconf <<@> ML.Env.indent >>= fun indent ->
-      Format.eprintf "@[%sOutdated %s.@]@." indent rotpath;
+    | J.Parse_error (v, s) ->
+      Format.eprintf "Encountered errors when parsing %s: %s@." (Ezjsonm.to_string (`A [v])) s;
       ret None
-    | exn -> raise exn
+    | Sys_error _ ->
+      Format.eprintf "system error.@.";
+      ret None
+    | exn ->
+      Format.eprintf "???.@.";
+        raise exn
 end
 
 let try_read = Reader.try_read
+
+let try_read ~loader ~stem = ret None

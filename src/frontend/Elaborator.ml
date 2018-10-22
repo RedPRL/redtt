@@ -176,7 +176,7 @@ struct
 
       | E.MlImport (visibility, selector) ->
         I.import ~selector >>= fun res ->
-        C.modify_top_resolver (ResEnv.import_globals ~visibility res) >>
+        C.modify_top_resolver (ResEnv.import_public ~visibility res) >>
         C.modify_mlenv (E.Env.record_import selector) >>
         M.ret @@ E.SemRet (E.SemTuple [])
 

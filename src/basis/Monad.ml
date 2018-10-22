@@ -66,4 +66,11 @@ struct
       f acc x >>= fun a ->
       fold_left f a xs
 
+  let rec iter f xs =
+    match xs with
+    | [] ->
+      M.ret ()
+    | x :: xs ->
+      f x >> iter f xs
+
 end
