@@ -19,10 +19,10 @@ let set_options options =
   RotIO.set_unsafe_mode options.unsafe_mode
 
 (* MORTAL there's actually already a copy of [Elab] in [Importer]. *)
-module Elab = Elaborator.Make (Importer.M)
+module Elab = NewElaborator.Make (Importer.M)
 
 let execute_ml ~mlconf cmd =
-  ignore @@ Contextual.run ~mlconf @@ Elab.eval_cmd cmd
+  ignore @@ NewContextual.run ~mlconf @@ Elab.eval_cmd cmd
 
 let load options source =
   try

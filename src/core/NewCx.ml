@@ -38,6 +38,10 @@ let lookup_const cx ?(tw = `Only) ?(ushift = 0) x =
   | `Tw (ty, _), `TwinL -> return_ty ty
   | `Tw (_, ty), `TwinR -> return_ty ty
   | `I, `Only -> `Dim
+  | exception _ ->
+    Format.eprintf "globals: %a@." GlobalEnv.pp (genv cx);
+    Format.eprintf "Failed to find: %a@." Name.pp x;
+    failwith "lookup_const/lookup"
   | _ -> failwith "lookup_const"
 
 

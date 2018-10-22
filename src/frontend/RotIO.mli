@@ -1,4 +1,4 @@
-open Contextual
+open NewContextual
 
 val set_unsafe_mode : bool -> unit
 

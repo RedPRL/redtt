@@ -1,6 +1,6 @@
 open RedBasis
 open RedTT_Core
-open Contextual
+open NewContextual
 
 let read_from_channel ~filepath channel =
   let lexbuf = Lexing.from_channel channel in
@@ -21,8 +21,8 @@ sig
   val import : selector : FileRes.selector -> ResEnv.t m
 end =
 struct
-  module MN = Monad.Notation (Contextual)
-  open ML open MN open Contextual
+  module MN = Monad.Notation (NewContextual)
+  open ML open MN open NewContextual
 
   let run ~mlconf ~mlcmd:{con; span} =
     try
@@ -94,4 +94,4 @@ struct
         Format.eprintf "@[%sLoaded %s.[red|rot].@]@." indent stem;
         ret res
 end
-and Elab : Elaborator.S = Elaborator.Make (M)
+and Elab : NewElaborator.S = NewElaborator.Make (M)

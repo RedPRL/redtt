@@ -1,11 +1,11 @@
 open RedBasis
 open Bwd
 open RedTT_Core
-open Contextual
+open NewContextual
 
-module M = Monad.Notation (Contextual)
+module M = Monad.Notation (NewContextual)
 open M
-module MU = Monad.Util (Contextual)
+module MU = Monad.Util (NewContextual)
 
 (* Tm *)
 
@@ -398,16 +398,16 @@ struct
     | `String native ->
       resolver >>= fun res ->
       begin match ResEnv.name_of_native (int_of_json (`String native)) res with
-      | None -> raise IllFormed
-      | Some name -> ret name
+        | None -> raise IllFormed
+        | Some name -> ret name
       end
     | `A [`String stem; native] ->
       cached_resolver stem >>= begin function
-      | None -> raise IllFormed
-      | Some (res, _) ->
-        match ResEnv.name_of_native (int_of_json native) res with
         | None -> raise IllFormed
-        | Some name -> ret name
+        | Some (res, _) ->
+          match ResEnv.name_of_native (int_of_json native) res with
+          | None -> raise IllFormed
+          | Some name -> ret name
       end
     | _ -> raise IllFormed
 

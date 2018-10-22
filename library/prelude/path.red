@@ -4,6 +4,7 @@ def pathd (A : 𝕀 → type) (M : A 0) (N : A 1) : type =
   | i=1 → N
   ]
 
+
 def path (A : type) (M N : A) : type =
   [i] A [
   | i=0 → M
@@ -33,6 +34,8 @@ def funext
   =
   λ i x →
   p _ i
+
+quit
 
 def symm/filler (A : type) (p : 𝕀 → A) (j i : 𝕀) : A =
   comp 0 j (p 0) [

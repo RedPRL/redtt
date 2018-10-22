@@ -960,6 +960,7 @@ struct
       | `Ok ->
         M.ret @@ Tm.up cmd
       | `Exn exn ->
+        Format.eprintf "Failed to check: %a@." Tm.pp0 (Tm.up cmd);
         C.dump_state Format.err_formatter "foo" `All >>= fun _ ->
         Format.eprintf "raising exn@.";
         raise exn

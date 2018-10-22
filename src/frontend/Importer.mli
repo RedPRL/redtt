@@ -1,4 +1,4 @@
-open Contextual
+open NewContextual
 
 module M :
 sig
