@@ -2298,20 +2298,9 @@ struct
     let ty = ConAbs.inst rel abs r' in
     let cap = Val.make @@ make_coe rel r r' ~abs cap in
     let sys =
-      let Abs (bound_var_of_abs, _) = abs in
-      ConAbsSys.foreach_gen sys @@ fun r r' face ->
-      let rel' = Rel.equate r r' in
-      let Abs (y, bdy_y) = LazyValAbs.unleash face in
-      let z, rel_z, bdy_z =
-        (* it might sound weird that y could be the same as bound_var_of_abs,
-         * but this happens a lot in the coe of the extension types. *)
-        if y = bound_var_of_abs && I.absent y r' then
-          y, Rel.hide' y rel, bdy_y
-        else
-          let z, pi = Perm.freshen_name y in
-          z, rel, Con.swap pi bdy_y
-      in
-      Abs (z, make_coe rel_z (`Atom z) r' ~abs @@ Val.make bdy_z)
+      ConAbsSys.foreach_gen sys @@ fun s s' face ->
+      let (y, bdy_y) = ConAbs.unbind @@ LazyValAbs.unleash face in
+      Abs (y, make_coe rel (`Atom y) r' ~abs @@ Val.make bdy_y)
     in
     rigid_hcom rel r r' ~ty ~cap ~sys
 
@@ -2394,20 +2383,9 @@ struct
     let ty = ConAbs.inst rel abs r' in
     let cap = Val.make @@ make_coe rel r r' ~abs cap in
     let sys =
-      let Abs (bound_var_of_abs, _) = abs in
-      ConAbsSys.foreach_gen sys @@ fun r r' face ->
-      let rel' = Rel.equate r r' in
-      let Abs (y, bdy_y) = LazyValAbs.unleash face in
-      let z, rel_z, bdy_z =
-        (* it might sound weird that y could be the same as bound_var_of_abs,
-         * but this happens a lot in the coe of the extension types. *)
-        if y = bound_var_of_abs && I.absent y r' then
-          y, Rel.hide' y rel, bdy_y
-        else
-          let z, pi = Perm.freshen_name y in
-          z, rel, Con.swap pi bdy_y
-      in
-      Abs (z, make_coe rel_z (`Atom z) r' ~abs @@ Val.make bdy_z)
+      ConAbsSys.foreach_gen sys @@ fun s s' face ->
+      let y, bdy_y = ConAbs.unbind @@ LazyValAbs.unleash face in
+      Abs (y, make_coe rel (`Atom y) r' ~abs @@ Val.make bdy_y)
     in
     rigid_ghcom rel r r' ~ty ~cap ~sys
 
