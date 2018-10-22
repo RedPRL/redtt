@@ -71,4 +71,8 @@ val abort_unsolved : loc:Log.location -> unit m
 
 (* these two are for rot files *)
 val lookup_top : Name.t -> (Subst.entry * [`Rigid | `Flex] option) m
-val ext_top : Name.t -> Subst.entry * [`Rigid | `Flex] option -> unit m
+val restore_top :
+  Name.t
+  -> stem : FileRes.filepath
+  -> Subst.entry * [`Rigid | `Flex] option
+  -> unit m

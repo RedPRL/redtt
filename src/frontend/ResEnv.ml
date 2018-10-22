@@ -10,6 +10,11 @@ type resolution =
 type visibility =
   [ `Private | `Public ]
 
+let pp_visibility fmt =
+  function
+  | `Public -> Format.fprintf fmt "public"
+  | `Private -> Format.fprintf fmt "private"
+
 
 module T = PersistentTable.M
 
@@ -183,8 +188,3 @@ let export_foreign_globals renv : exported_foreigners =
   in
   let compare_name n0 n1 = compare (Name.name n0) (Name.name n1) in
   List.sort compare_name @@ List.of_seq @@ Seq.filter_map f @@ T.to_seq renv.globals.info_of_string
-
-let pp_visibility fmt =
-  function
-  | `Public -> Format.fprintf fmt "public"
-  | `Private -> Format.fprintf fmt "private"

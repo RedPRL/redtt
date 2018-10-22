@@ -25,12 +25,10 @@ struct
   open ML open MN open Contextual
 
   let cool_error_printer exn =
-    Printexc.print_backtrace stderr;
     Format.eprintf "@[<v3>Encountered error:@;@[<hov>%a@]@]@." PpExn.pp exn;
     exit 1
 
   let run ~mlconf ~mlcmd:{con; span} =
-    Printexc.record_backtrace true;
     isolate_module ~mlconf begin
       try_ begin
         Elab.eval_cmd con >> abort_unsolved span
@@ -52,9 +50,7 @@ struct
       assert_top_level >>
       let stem = FileRes.selector_to_stem ~stem selector in
       cached_resolver stem >>= function
-      | Some (res, _) ->
-        Format.eprintf "@[%sSkipped %s.{red|rot}.@]@." indent stem;
-        ret res
+      | Some (res, _) -> ret res
       | None ->
         let rotpath = FileRes.stem_to_rot stem in
         RotIO.try_read ~loader:load ~stem >>= function

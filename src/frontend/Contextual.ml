@@ -12,7 +12,7 @@ type rotted_resolver = ResEnv.t * Digest.t
 type thread_env =
   {env : GlobalEnv.t; (** the mapping from names to associated definitions (if any). *)
    rigidity : [`Flex | `Rigid] Map.t; (** whether a particular name is rigid. *)
-   source_stems : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
+   source : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
    resolver_cache : (FileRes.filepath, rotted_resolver) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
   }
 
@@ -104,7 +104,6 @@ struct
     try
       m ps cx
     with exn ->
-      Printexc.print_backtrace stderr;
       kerr exn ps cx
 end
 
@@ -189,7 +188,7 @@ let update_env e =
            | `Opaque -> GlobalEnv.ext_meta th.env nm ty
          end;
        rigidity = Map.add nm `Rigid th.rigidity;
-       source_stems = Map.add nm source th.source_stems}
+       source = Map.add nm source th.source}
     end >>
     modifymo @@ fun mo ->
     {mo with resenv = ResEnv.add_native_global ~visibility nm mo.resenv}
@@ -201,7 +200,7 @@ let declare_datatype ~src visibility dlbl desc =
    th =
      {st.th with
       env = GlobalEnv.declare_datatype dlbl desc st.th.env;
-      source_stems = Map.add dlbl src st.th.source_stems};
+      source = Map.add dlbl src st.th.source};
    mo = {st.mo with resenv = ResEnv.add_native_global visibility dlbl st.mo.resenv}}
 
 let replace_datatype dlbl desc =
@@ -209,7 +208,7 @@ let replace_datatype dlbl desc =
   {th with env = GlobalEnv.replace_datatype dlbl desc th.env}
 
 let source_stem name =
-  getth <<@> fun {source_stems; _} -> Map.find_opt name source_stems
+  getth <<@> fun {source; _} -> Map.find_opt name source
 
 let cached_resolver ~stem =
   getth <<@> fun {resolver_cache; _} -> Hashtbl.find_opt resolver_cache stem
@@ -229,7 +228,7 @@ let pushr e =
   update_env e
 
 let init_th () =
-  {env = GlobalEnv.emp (); rigidity = Map.empty; source_stems = Map.empty; resolver_cache = Hashtbl.create 100}
+  {env = GlobalEnv.emp (); rigidity = Map.empty; source = Map.empty; resolver_cache = Hashtbl.create 100}
 let init_mo ~mlconf =
   {resenv = ResEnv.init (); mlenv = ML.Env.init ~mlconf}
 let init_lo () =
@@ -239,12 +238,8 @@ let run ~mlconf (m : 'a m) : 'a  =
   let th = init_th () in
   let mo = init_mo ~mlconf in
   let lo = init_lo () in
-  try
   let _, r = m Emp {th; mo; lo} in
   r
-  with exn ->
-    Printexc.print_backtrace stderr;
-    raise exn
 
 let isolate_local (m : 'a m) : 'a m =
   fun ps st ->
@@ -301,12 +296,13 @@ let lookup_top x =
   assert_top_level >>
   lookup_top_ x
 
-let ext_top x (entry, rigidity) =
+let restore_top x ~stem (entry, rigidity) =
   assert_top_level >>
   modifyth @@ fun th ->
     {th with
      env = GlobalEnv.ext th.env x entry;
-     rigidity = Map.update x (fun _ -> rigidity) th.rigidity}
+     rigidity = Map.update x (fun _ -> rigidity) th.rigidity;
+     source = Map.add x stem th.source}
 
 let resolver =
   let rec go_locals renv =

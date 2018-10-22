@@ -1023,7 +1023,7 @@ struct
     MU.fold_left step true
 
   (* MORTAL this is assuming that earlier natives will not depend on later natives *)
-  let restore_repo raw_repo =
+  let restore_repo ~stem raw_repo =
     assert_top_level >>
     Combinators.flip MU.iter raw_repo begin
       fun (ostr, raw_info) ->
@@ -1031,7 +1031,7 @@ struct
       (* we need to put in the name first for recursive stuff (ex: datatypes) *)
       modify_top_resolver @@
       ResEnv.add_native_global ~visibility:`Public name >>
-      info_of_json raw_info >>= ext_top name
+      info_of_json raw_info >>= restore_top name ~stem
     end
 
   let restore_reexport raw_reexport =
@@ -1067,7 +1067,7 @@ struct
           ret None
         | true ->
           restore_reexport reexported >>
-          restore_repo repo >>
+          restore_repo ~stem repo >>
           resolver >>= fun resolver ->
           ret (Some (resolver, Digest.string (J.to_string rot)))
       end
