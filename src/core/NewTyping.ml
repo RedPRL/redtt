@@ -78,6 +78,7 @@ let inst_clo cx clo v = D.Clo.inst (Cx.rel cx) clo (D.Val (D.LazyVal.make v))
 open Tm.Notation
 
 module ConSys = D.Sys (D.Con)
+module ConAbsSys = D.Sys (D.AbsPlug (D.Con))
 
 
 let quote_ty cx vty =
@@ -208,6 +209,8 @@ sig
   type t = (D.dim * D.dim) list
 
   val from_sys : Cx.t -> (Tm.tm, 'a) Tm.system -> t
+
+  val check_valid : t -> unit
 
   (** check that an extension type's cofibration is valid *)
   val check_extension : Name.t list -> t -> unit
@@ -540,8 +543,36 @@ and check_tm_face cx ty sys face =
   | _ ->
     raise @@ E ExpectedTermInFace
 
+(* TODO: check this *)
+and check_bnd_face ~cx ~cxx ~x ~r ~ty sys face =
+  let ts, ts', obnd = face in
+  check cx (`Pos `Dim) ts;
+  check cx (`Pos `Dim) ts';
+  let s = eval_dim cx ts in
+  let s' = eval_dim cx ts' in
+  match Cx.restrict cxx s s', obnd with
+  | `Changed cxx_ss', Some (Tm.B (_, tm)) ->
+    let rel_ss' = Cx.rel cxx_ss' in
+    let ty_ss' = D.Con.run rel_ss' ty in
+    let boundary_ss' = ConSys.run rel_ss' sys in
+    check_of_ty_ "bface" cxx_ss' ty_ss' boundary_ss' tm;
+    let el = eval cxx_ss' tm in
+    (s, s', D.LazyVal.make el) :: sys
+  | `Same, Some (Tm.B (_, tm)) ->
+    check_of_ty_ "bface" cxx ty sys tm;
+    let el = eval cxx tm in
+    (s, s', D.LazyVal.make el) :: sys
+  | exception I.Inconsistent ->
+    sys
+  | _ ->
+    raise @@ E ExpectedTermInFace
+
 and check_tm_sys cx ty sys =
   List.fold_left (check_tm_face cx ty) [] sys
+
+and check_bnd_sys ~cx ~cxx ~x ~r ~ty ~cap sys =
+  let init = [ `Atom x, r, D.LazyVal.make cap ] in
+  List.fold_left (check_bnd_face ~cx ~cxx ~x ~r ~ty) init sys
 
 and check_of_ty cx ty sys tm =
   match polarity ty with
@@ -594,8 +625,19 @@ and synth_head cx hd =
   | Tm.Meta meta ->
     Cx.lookup_const cx ~ushift:meta.ushift meta.name
 
-  | Tm.HCom _ ->
-    raise PleaseFillIn
+  | Tm.HCom hcom ->
+    check cx (`Pos `Dim) hcom.r;
+    check cx (`Pos `Dim) hcom.r';
+    let r = eval_dim cx hcom.r in
+    let r' = eval_dim cx hcom.r' in
+    let _ = check_ty_ "hcom" cx `Kan hcom.ty in
+    let vty = eval cx hcom.ty in
+    Cofibration.check_valid @@ Cofibration.from_sys cx hcom.sys;
+    check_of_ty_ "hcom/cap" cx vty [] hcom.cap;
+    let vcap = eval cx hcom.cap in
+    let cxx, x = Cx.extend_dim cx ~name:None in
+    let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:vty ~cap:vcap hcom.sys in
+    `El vty
 
   | Tm.Com _ ->
     raise PleaseFillIn
