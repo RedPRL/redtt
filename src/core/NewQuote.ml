@@ -469,36 +469,49 @@ and equate_tycon_abs qenv rel abs0 abs1 =
 and equate_tycon_abs_face qenv rel (r0, r'0, abs0) (r1, r'1, abs1) =
   let r = equate_dim qenv rel r0 r1 in
   let r' = equate_dim qenv rel r'0 r'1 in
-  let rel = Rel.equate' r0 r'0 rel in
-  let abs0 = LazyValAbs.unleash abs0 in
-  let abs1 = LazyValAbs.unleash abs1 in
-  r, r', Some (equate_tycon_abs qenv rel abs0 abs1)
+  match Rel.equate' r0 r'0 rel with
+  | rel ->
+    let rel = Rel.equate' r0 r'0 rel in
+    let abs0 = LazyValAbs.unleash abs0 in
+    let abs1 = LazyValAbs.unleash abs1 in
+    r, r', Some (equate_tycon_abs qenv rel abs0 abs1)
+  | exception I.Inconsistent ->
+    r, r', None
 
 and equate_con_abs_face qenv rel ty (r0, r'0, abs0) (r1, r'1, abs1) =
   let r = equate_dim qenv rel r0 r1 in
   let r' = equate_dim qenv rel r'0 r'1 in
-  let rel = Rel.equate' r0 r'0 rel in
-  let ty_rr' = Con.run rel ty in
-  let abs0 = LazyValAbs.unleash abs0 in
-  let abs1 = LazyValAbs.unleash abs1 in
-  r, r', Some (equate_con_abs qenv rel ty_rr' abs0 abs1)
+  match Rel.equate' r0 r'0 rel with
+  | rel ->
+    let ty_rr' = Con.run rel ty in
+    let abs0 = LazyValAbs.unleash abs0 in
+    let abs1 = LazyValAbs.unleash abs1 in
+    r, r', Some (equate_con_abs qenv rel ty_rr' abs0 abs1)
+  | exception I.Inconsistent ->
+    r, r', None
 
 and equate_con_face qenv rel ty (r0, r'0, bdy0) (r1, r'1, bdy1) =
   let r = equate_dim qenv rel r0 r1 in
   let r' = equate_dim qenv rel r'0 r'1 in
-  let rel = Rel.equate' r0 r'0 rel in
-  let ty_rr' = Con.run rel ty in
-  let bdy0 = LazyVal.unleash bdy0 in
-  let bdy1 = LazyVal.unleash bdy1 in
-  r, r', Some (equate_con qenv rel ty_rr' bdy0 bdy1)
+  match Rel.equate' r0 r'0 rel with
+  | rel ->
+    let ty_rr' = Con.run rel ty in
+    let bdy0 = LazyVal.unleash bdy0 in
+    let bdy1 = LazyVal.unleash bdy1 in
+    r, r', Some (equate_con qenv rel ty_rr' bdy0 bdy1)
+  | exception I.Inconsistent ->
+    r, r', None
 
 and equate_tycon_face qenv rel (r0, r'0, bdy0) (r1, r'1, bdy1) =
   let r = equate_dim qenv rel r0 r1 in
   let r' = equate_dim qenv rel r'0 r'1 in
-  let rel = Rel.equate' r0 r'0 rel in
-  let bdy0 = LazyVal.unleash bdy0 in
-  let bdy1 = LazyVal.unleash bdy1 in
-  r, r', Some (equate_tycon qenv rel bdy0 bdy1)
+  match Rel.equate' r0 r'0 rel with
+  | rel ->
+    let bdy0 = LazyVal.unleash bdy0 in
+    let bdy1 = LazyVal.unleash bdy1 in
+    r, r', Some (equate_tycon qenv rel bdy0 bdy1)
+  | exception I.Inconsistent ->
+    r, r', None
 
 and equate_sys_wrapper : 'a 'b. ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b list =
   fun face_equater sys0 sys1 ->
