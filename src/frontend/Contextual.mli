@@ -63,7 +63,7 @@ val check_eq_dim : tm -> tm -> bool m
 
 
 val global_env : Subst.t m
-val base_cx : Cx.t m
+val base_cx : NewCx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 

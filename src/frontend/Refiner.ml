@@ -2,7 +2,9 @@ open RedBasis
 open RedTT_Core
 open Dev open Bwd open BwdNotation
 
-module D = Domain
+exception CanJonHelpMe
+
+module D = NewDomain
 
 module M =
 struct
@@ -11,7 +13,11 @@ struct
 end
 
 module C = Contextual
+module Cx = NewCx
 module U = Unify
+module Ty = NewTyping
+module Q = NewQuote
+
 module Notation = Monad.Notation (M)
 open Notation
 
@@ -32,11 +38,12 @@ let _ =
 let unify =
   M.go_to_top >>
   M.local (fun _ -> Emp) U.ambulando
+
 let normalize_ty ty =
   let now0 = Unix.gettimeofday () in
   C.base_cx >>= fun cx ->
-  let vty = Cx.eval cx ty in
-  let ty = Cx.quote_ty cx vty in
+  let vty = Ty.eval cx ty in
+  let ty = Ty.quote_ty cx vty in
   let now1 = Unix.gettimeofday () in
   normalization_clock := !normalization_clock +. (now1 -. now0);
   M.ret ty
@@ -96,8 +103,8 @@ let tac_wrap_nf tac goal =
 
 let tac_of_cmd cmd =
   C.base_cx >>= fun cx ->
-  let vty = Typing.infer cx cmd in
-  let ty = Cx.quote_ty cx vty in
+  let vty = Ty.infer_ty cx cmd in
+  let ty = Ty.quote_ty cx vty in
   M.ret (ty, Tm.up cmd)
 
 
@@ -163,17 +170,17 @@ let normalize_param p =
 
   C.base_cx >>= fun cx ->
   let normalize_ty ty =
-    let vty = Cx.eval cx ty in
-    Cx.quote_ty cx vty
+    let vty = Ty.eval cx ty in
+    Ty.quote_ty cx vty
   in
   match p with
   | `P ty ->
     C.ret @@ `P (normalize_ty ty)
   | `Def (ty, tm) ->
-    let vty = Cx.eval cx ty in
-    let ty' = Cx.quote_ty cx vty in
-    let el = Cx.eval cx tm in
-    let tm' = Cx.quote cx ~ty:vty el in
+    let vty = Ty.eval cx ty in
+    let ty' = Ty.quote_ty cx vty in
+    let el = Ty.eval cx tm in
+    let tm' = Ty.quote cx vty el in
     C.ret @@ `Def (ty', tm')
   | `Tw (ty0, ty1) ->
     C.ret @@ `Tw (normalize_ty ty0, normalize_ty ty1)
@@ -201,8 +208,8 @@ let inspect_goal ~loc ~name : goal -> unit M.m =
       if name = Some "_" then M.ret () else
         C.bind C.base_cx @@ fun cx ->
         C.bind (normalize_tele @@ Bwd.to_list tele) @@ fun tele ->
-        let vty = Cx.eval cx ty in
-        let ty = Cx.quote_ty cx vty in
+        let vty = Ty.eval cx ty in
+        let ty = Ty.quote_ty cx vty in
 
         let pp_restriction fmt =
           let pp_bdy fmt =
@@ -265,7 +272,7 @@ let guess_motive scrut ty =
 
 let lookup_datatype dlbl =
   C.base_cx <<@> fun cx ->
-    GlobalEnv.lookup_datatype (Cx.globals cx) dlbl
+    GlobalEnv.lookup_datatype (Cx.genv cx) dlbl
 
 let make_motive ~data_ty ~tac_mot ~scrut ~ty =
   match tac_mot, ty with
@@ -482,8 +489,8 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
     let dlbl, params = unleash_data data_ty in
     begin
       C.base_cx >>= fun cx ->
-      let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) params in
-      M.ret (Cx.eval cx data_ty, vparams)
+      let vparams = List.map (fun tm -> D.Val (D.LazyVal.make @@ Ty.eval cx tm)) params in
+      M.ret (Ty.eval cx data_ty, vparams)
     end
     >>= fun (data_vty, vparams) ->
 
@@ -518,28 +525,26 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
 
       let constr = Desc.lookup_constr clbl constrs in
 
-      begin
-        C.base_cx <<@> fun cx ->
-          let (module V) = Cx.evaluator cx in
-          V.empty_env
-      end >>= fun empty_env ->
-      let mot_clo = D.(Clo {rho = empty_env; bnd = bmot}) in
+
+      C.global_env >>= fun genv ->
+      let empty_env = D.Env.init genv in
+      let mot_clo = D.(Clo {env = empty_env; bnd = bmot}) in
 
       let rec prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs =
-        begin
-          C.base_cx <<@> fun cx ->
-            cx, Cx.evaluator cx, Cx.quoter cx
-        end >>= fun (cx, (module V), (module Q)) ->
+        C.base_cx >>= fun cx ->
+        let rel = Cx.rel cx in
         match pbinds, specs with
         | `Bind (`Var nm) :: pbinds, Desc.TCons (`Const ty, Tm.B (_, specs)) ->
           let x = name_of nm in
-          let vty = V.eval tyenv ty in
+          let vty = D.Syn.eval rel tyenv ty in
           let x_tm = Tm.up @@ Tm.var x in
-          let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
-          let tty = Q.quote_ty Quote.Env.emp vty in
+          let x_el = raise CanJonHelpMe
+          (* V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) []
+          *) in
+          let tty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
           let psi = psi #< (x, `P tty) in
-          let tyenv = D.Env.snoc tyenv @@ `Val x_el in
-          let env_only_ihs = D.Env.snoc env_only_ihs @@ `Val x_el in
+          let tyenv = D.Env.extend_cell tyenv @@ D.Val x_el in
+          let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Val x_el in
           let intro_args = intro_args #< x_tm in
           M.in_scope x (`P tty) @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
@@ -549,28 +554,28 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = `Atom x in
           let psi = psi #< (x, `I) in
-          let tyenv = D.Env.snoc tyenv @@ `Dim x_el in
-          let env_only_ihs = D.Env.snoc env_only_ihs @@ `Dim x_el in
+          let tyenv = D.Env.extend_cell tyenv @@ D.Dim x_el in
+          let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Dim x_el in
           let intro_args = intro_args #< x_tm in
           M.in_scope x `I @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
 
-        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, Desc.TCons (`Rec rspec, Tm.B (_, specs)) ->
+        | `BindIH (`Var nm, `Var nm_ih) :: pbinds, Desc.TCons (`Rec Desc.Self, Tm.B (_, specs)) ->
           let x = name_of nm in
           let x_ih = name_of nm_ih in
-          let vty = V.realize_rec_spec ~dlbl ~params:vparams rspec in
+          let vty = Ty.eval cx data_ty in
           let x_tm = Tm.up @@ Tm.var x in
-          let x_el = V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] in
-          let tty = Q.quote_ty Quote.Env.emp vty in
-          let ih_vty = V.realize_rec_spec_ih ~dlbl ~params:vparams ~mot:mot_clo rspec x_el in
-          let ih_ty = Q.quote_ty Quote.Env.emp ih_vty in
+          let x_el = raise CanJonHelpMe (* V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] *) in
+          let tty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
+          let ih_vty = D.Clo.inst rel mot_clo @@ D.Val (D.LazyVal.make x_el) in
+          let ih_ty = Q.equate_tycon (Q.QEnv.emp ()) rel ih_vty ih_vty in
 
           M.in_scope x (`P data_ty) begin
             C.base_cx >>= fun cx ->
-            let ih_el = V.reflect ih_vty (D.Var {name = x_ih; twin = `Only; ushift = 0}) [] in
+            let ih_el = raise CanJonHelpMe (* V.reflect ih_vty (D.Var {name = x_ih; twin = `Only; ushift = 0}) [] *) in
             let psi = psi <>< [x, `P tty; x_ih, `P ih_ty] in
-            let tyenv = D.Env.snoc tyenv @@ `Val x_el in
-            let env_only_ihs = D.Env.snoc env_only_ihs @@ `Val ih_el in
+            let tyenv = D.Env.extend_cell tyenv @@ D.Val x_el in
+            let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Val ih_el in
             let intro_args = intro_args #< x_tm in
             M.in_scope x_ih (`P ih_ty) @@
             prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
@@ -585,12 +590,12 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
             kont_tac @@
             let vty =
               match spec with
-              | `Const ty -> V.eval tyenv ty
+              | `Const ty -> D.Syn.eval rel tyenv ty
               | `Rec Desc.Self -> data_vty
               | _ -> failwith "unexpected wildcard pattern"
             in
 
-            let ty = Q.quote_ty Quote.Env.emp vty in
+            let ty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
             let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x) in
             tac_inversion ~loc ~tac_scrut inv tac
           in
@@ -623,7 +628,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           failwith "prepare_clause: mismatch"
       in
 
-      let tyenv = D.Env.append empty_env vparams in
+      let tyenv = D.Env.extend_cells empty_env vparams in
       prepare_clause (Emp, tyenv, Emp, empty_env, fun tac -> tac) pbinds constr >>= fun (psi, env, intro_args, env_only_ihs, kont_tac) ->
 
       let intro = Tm.make @@ Tm.Intro (dlbl, clbl, params, intro_args) in
@@ -632,50 +637,46 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
       C.base_cx >>= fun outer_cx ->
 
       M.in_scopes psi begin
-        begin
-          C.base_cx <<@> fun cx ->
-            cx, Cx.evaluator cx, Cx.quoter cx
-        end >>= fun (cx, (module V), (module Q)) ->
+        C.base_cx >>= fun cx ->
 
-        let rec image_of_bterm phi tm =
+        let rec image_of_bterm rel tm =
           let benv = env in
           match Tm.unleash tm with
           | Tm.Intro (_, clbl, _, args) ->
             let constr = Desc.lookup_constr clbl constrs in
-            let nbnd = snd @@ List.find (fun (clbl', _) -> clbl = clbl') earlier_clauses in
-            let nclo : D.nclo = D.NClo.act phi @@ D.NClo {rho = Cx.env outer_cx; nbnd} in
+            let bnd = snd @@ List.find (fun (clbl', _) -> clbl = clbl') earlier_clauses in
+            let nclo : D.nclo = D.NClo {env = Cx.venv outer_cx; bnd} in
             let rec go specs tms =
               match specs, tms with
               | Desc.TCons (`Const _, Tm.B (_, specs)), tm :: tms ->
-                `Val (D.Value.act phi @@ V.eval benv tm) :: go specs tms
+                D.Val (D.LazyVal.make @@ D.Syn.eval rel benv tm) :: go specs tms
               | Desc.TCons (`Rec Desc.Self, Tm.B (_, specs)), tm :: tms ->
-                `Val (D.Value.act phi @@ V.eval benv tm) :: `Val (image_of_bterm phi tm) :: go specs tms
+                D.Val (D.LazyVal.make @@ D.Syn.eval rel benv tm) :: D.Val (D.LazyVal.make @@ image_of_bterm rel tm) :: go specs tms
               | Desc.TCons (`Dim, Tm.B (_, specs)), tm :: tms ->
-                `Dim (I.act phi @@ V.eval_dim benv tm) :: go specs tms
+                D.Dim (D.Syn.eval_dim benv tm) :: go specs tms
               | Desc.TNil _, [] ->
                 []
               | _ ->
                 failwith "image_of_bterm"
             in
-            V.inst_nclo nclo @@ go constr args
+            D.NClo.inst rel nclo @@ go constr args
           | _ ->
-            D.Value.act phi @@ V.eval env_only_ihs tm
+            D.Syn.eval rel env_only_ihs tm
 
         in
 
         let image_of_bface (tr, tr', otm) =
-          let r = V.eval_dim env tr in
-          let r' = V.eval_dim env tr' in
-          D.ValFace.make I.idn r r' @@ fun phi ->
-          let tm = Option.get_exn otm in
-          image_of_bterm phi tm
+          let r = D.Syn.eval_dim env tr in
+          let r' = D.Syn.eval_dim env tr' in
+          let rel_rr' = NewRestriction.equate' r r' (Cx.rel cx) in
+          r, r', D.LazyVal.make @@ image_of_bterm rel_rr' @@ Option.get_exn otm
         in
 
         (* What is the image of the boundary in the current fiber of the motive? *)
         let tsys =
           let val_sys = List.map image_of_bface @@ Desc.Constr.boundary constr in
-          let vty = Cx.eval cx clause_ty in
-          Q.quote_val_sys (Cx.qenv cx) vty val_sys
+          let vty = Ty.eval cx clause_ty in
+          Q.equate_con_sys (Cx.qenv cx) (Cx.rel cx) vty val_sys val_sys
         in
 
 

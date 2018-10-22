@@ -3,6 +3,7 @@ open RedTT_Core
 open RedBasis
 open Bwd open BwdNotation
 
+module D = NewDomain
 
 module Map = Map.Make (Name)
 
@@ -299,10 +300,10 @@ let lookup_top x =
 let restore_top x ~stem (entry, rigidity) =
   assert_top_level >>
   modifyth @@ fun th ->
-    {th with
-     env = GlobalEnv.ext th.env x entry;
-     rigidity = Map.update x (fun _ -> rigidity) th.rigidity;
-     source = Map.add x stem th.source}
+  {th with
+   env = GlobalEnv.ext th.env x entry;
+   rigidity = Map.update x (fun _ -> rigidity) th.rigidity;
+   source = Map.add x stem th.source}
 
 let resolver =
   let rec go_locals renv =
@@ -413,15 +414,18 @@ let block = postpone Blocked
 
 let base_cx =
   global_env >>= fun env ->
-  ret @@ Cx.init env
+  ret @@ NewCx.init env
 
+
+module Cx = NewCx
+module Ty = NewTyping
 
 let check ~ty ?sys:(sys = []) tm =
   base_cx >>= fun lcx ->
-  let vty = Cx.eval lcx ty in
-  let vsys = Cx.eval_tm_sys lcx sys in
+  let vty = Ty.eval lcx ty in
+  let vsys = D.Syn.eval_tm_sys (Cx.rel lcx) (Cx.venv lcx) sys in
   try
-    Typing.check_ lcx vty vsys tm;
+    NewTyping.check_of_ty lcx vty vsys tm;
     ret `Ok
   with
   | exn ->
@@ -430,11 +434,11 @@ let check ~ty ?sys:(sys = []) tm =
 let check_eq ~ty tm0 tm1 =
   if tm0 = tm1 then ret `Ok else
     base_cx >>= fun lcx ->
-    let vty = Cx.eval lcx ty in
-    let el0 = Cx.eval lcx tm0 in
-    let el1 = Cx.eval lcx tm1 in
+    let vty = Ty.eval lcx ty in
+    let el0 = Ty.eval lcx tm0 in
+    let el1 = Ty.eval lcx tm1 in
     try
-      Cx.check_eq lcx ~ty:vty el0 el1;
+      let _ = NewQuote.equate_con (Cx.qenv lcx) (Cx.rel lcx) vty el0 el1 in
       ret `Ok
     with
     | exn ->
@@ -442,10 +446,10 @@ let check_eq ~ty tm0 tm1 =
 
 let check_subtype ty0 ty1 =
   base_cx >>= fun lcx ->
-  let vty0 = Cx.eval lcx ty0 in
-  let vty1 = Cx.eval lcx ty1 in
+  let vty0 = Ty.eval lcx ty0 in
+  let vty1 = Ty.eval lcx ty1 in
   try
-    Cx.check_subtype lcx vty0 vty1;
+    Ty.check_subtype lcx vty0 vty1;
     ret `Ok
   with
   | exn ->
@@ -453,14 +457,14 @@ let check_subtype ty0 ty1 =
 
 let compare_dim tr0 tr1 =
   base_cx >>= fun cx ->
-  let r0 = Cx.eval_dim cx tr0 in
-  let r1 = Cx.eval_dim cx tr1 in
+  let r0 = Ty.eval_dim cx tr0 in
+  let r1 = Ty.eval_dim cx tr1 in
   ret @@ I.compare r0 r1
 
 let check_eq_dim tr0 tr1 =
   base_cx >>= fun cx ->
-  let r0 = Cx.eval_dim cx tr0 in
-  let r1 = Cx.eval_dim cx tr1 in
+  let r0 = Ty.eval_dim cx tr0 in
+  let r1 = Ty.eval_dim cx tr1 in
   match I.compare r0 r1 with
   | `Same ->
     ret true

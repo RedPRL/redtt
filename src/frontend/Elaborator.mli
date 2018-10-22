@@ -7,7 +7,7 @@ end
 
 module type S =
 sig
-  val eval_cmd : ML.mlcmd -> ML.semcmd Contextual.m 
+  val eval_cmd : ML.mlcmd -> ML.semcmd Contextual.m
 end
 
 module Make (I : Import) : S

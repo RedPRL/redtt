@@ -24,4 +24,4 @@ val abstract_tm : telescope -> tm -> tm
 (** Run this in a proof state to solve unification problems. *)
 val ambulando : unit m
 
-val eval : tm -> Domain.value m
+val eval : tm -> NewDomain.con m
