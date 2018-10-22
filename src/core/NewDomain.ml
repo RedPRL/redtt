@@ -2259,10 +2259,13 @@ struct
         let cap_face = r, r', LazyVal.make_from_lazy @@ lazy begin Val.unleash cap end in
         let old_faces =
           ConSys.foreach_gen (ConSys.forall x info.neu.sys) @@ fun s s' bdy ->
-          let rel' = Rel.equate' s s' rel in
-          let abs = ConAbs.run rel' @@ Abs (x, LazyVal.unleash bdy) in
-          let cap = Val.run rel' cap in
-          make_coe rel' r r' ~abs cap
+          try
+            let rel' = Rel.equate' s s' rel in
+            let abs = ConAbs.run rel' @@ Abs (x, LazyVal.unleash bdy) in
+            let cap = Val.run rel' cap in
+            make_coe rel' r r' ~abs cap
+          with
+          | I.Inconsistent -> FortyTwo
         in
         cap_face :: old_faces
       in
@@ -2538,9 +2541,12 @@ struct
   exception Triv of con
 
   let pp fmt {neu; sys} =
-    Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
-      DelayedNeu.pp neu
-      ConSys.pp sys
+    match sys with
+    | [] -> DelayedNeu.pp fmt neu
+    | _ ->
+      Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
+        DelayedNeu.pp neu
+        ConSys.pp sys
 
   let swap pi {neu; sys} =
     {neu = DelayedNeu.swap pi neu;
@@ -2579,10 +2585,12 @@ struct
   type t = neu
 
   let pp fmt {head; frames} =
-    let frames = Bwd.to_list frames in
-    Format.fprintf fmt "@[<hv1>(%a %a)@]"
-      Head.pp head
-      (Pp.pp_list Frame.pp) frames
+    match Bwd.to_list frames with
+    | [] -> Head.pp fmt head
+    | frames ->
+      Format.fprintf fmt "@[<hv1>(%a %a)@]"
+        Head.pp head
+        (Pp.pp_list Frame.pp) frames
 
   let swap pi neu =
     {head = Head.swap pi neu.head;
@@ -2920,8 +2928,8 @@ and Sys :
 
     exception Triv = Face.Triv
 
-    let pp fmt _ =
-      Format.fprintf fmt "<sys>"
+    let pp fmt =
+      Pp.pp_list Face.pp fmt
 
     let swap pi = List.map @@ Face.swap pi
 
@@ -2994,8 +3002,11 @@ and Face :
     exception Triv of X.t
     exception Dead
 
-    let pp fmt _ =
-      Format.fprintf fmt "<face>"
+    let pp fmt (r, r', u) =
+      Format.fprintf fmt "%a=%a -> %a"
+        Dim.pp r
+        Dim.pp r'
+        DelayedLazyX.pp u
 
     let swap pi (r, r', bdy) =
       Dim.swap pi r, Dim.swap pi r',
