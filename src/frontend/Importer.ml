@@ -25,24 +25,22 @@ struct
   open ML open MN open Contextual
 
   let run ~mlconf ~mlcmd:{con; span} =
-    try
-      isolate_module ~mlconf begin
+    isolate_module ~mlconf begin
+      try_ begin
         Elab.eval_cmd con >> abort_unsolved span
-      end
-    with
-    | exn ->
-      Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
-      exit 1
+      end @@ fun exn ->
+        Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
+        exit 1
+    end
 
   let run_and_rot ~mlconf ~mlcmd:{con; span} =
-    try
-      isolate_module ~mlconf begin
+    isolate_module ~mlconf begin
+      try_ begin
         Elab.eval_cmd con >> abort_unsolved span >> RotIO.write
-      end
-    with
-    | exn ->
-      Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
-      exit 1
+      end @@ fun exn ->
+        Format.eprintf "@[<v3>Encountered error:@; @[<hov>%a@]@]@." PpExn.pp exn;
+        exit 1
+    end
 
   let top_load_file red =
     mlconf >>=

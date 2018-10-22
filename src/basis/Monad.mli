@@ -2,6 +2,7 @@ module type S =
 sig
   type 'a m
   val bind : 'a m -> ('a -> 'b m) -> 'b m
+  val try_ : 'a m -> (exn -> 'a m) -> 'a m
   val ret : 'a -> 'a m
 end
 
