@@ -342,7 +342,7 @@ let rec check cx (phase : phase) tm =
   | _, Tm.Box _ ->
     Format.eprintf "typechecker / box@.";
     (* Similar power moves as Tm.Vin *)
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
   | `Neg (ty, sys), _ ->
     check_neg cx ty sys tm
@@ -370,11 +370,11 @@ and check_pos cx pos tm =
 
   | `El (D.Data _), Tm.FHCom _ ->
     Format.eprintf "typechecker/data/fhcom@.";
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
   | _ ->
     Format.eprintf "typechecker/data/check_pos@.";
-    raise CanJonHelpMe
+    raise PleaseRaiseProperError
 
 and check_neg cx ty sys tm =
   match ty with
