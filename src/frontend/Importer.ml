@@ -25,10 +25,12 @@ struct
   open ML open MN open Contextual
 
   let cool_error_printer exn =
+    Printexc.print_backtrace stderr;
     Format.eprintf "@[<v3>Encountered error:@;@[<hov>%a@]@]@." PpExn.pp exn;
     exit 1
 
   let run ~mlconf ~mlcmd:{con; span} =
+    Printexc.record_backtrace true;
     isolate_module ~mlconf begin
       try_ begin
         Elab.eval_cmd con >> abort_unsolved span
@@ -66,11 +68,9 @@ struct
           let mlconf = ML.InFile {stem; redsum; indent = " " ^ indent} in
           Format.eprintf "@[%sChecking %s.@]@." indent red;
           run_and_rot ~mlconf ~mlcmd:(read_file red) >>= fun (res, _ as rot) ->
-          cache_resolver stem rot >>
-          begin
-            Format.eprintf "@[%sChecked %s.@]@." indent red;
-            ret res
-          end
+          cache_resolver stem rot >>= fun () ->
+          Format.eprintf "@[%sChecked %s.@]@." indent red;
+          ret res
   and load ~selector = ignore <@>> import ~selector
 
   let top_load_file red =

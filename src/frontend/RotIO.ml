@@ -90,7 +90,20 @@ struct
     | `A [a; b] ->
       b_of_json b >>= fun b ->
       ret @@ (a_of_json a, b)
-    | j -> J.parse_error j "pair_of_json"
+    | j -> J.parse_error j "labeled_of_json"
+
+  (* labeled in reverse *)
+  let json_of_delebal (json_of_a, json_of_b) (a, b) =
+    json_of_a a >>= fun a ->
+    ret @@ `A [a; json_of_b b]
+
+  (* labeled in reverse *)
+  let delebal_of_json (a_of_json, b_of_json) =
+    function
+    | `A [a; b] ->
+      a_of_json a >>= fun a ->
+      ret @@ (a, b_of_json b)
+    | j -> J.parse_error j "delebal_of_json"
 
 end
 
@@ -817,6 +830,14 @@ struct
       json_of_desc desc >>= fun desc ->
       ret @@ `A [`String "Desc"; desc]
 
+    | `Tw (ty0, ty1) ->
+      json_of_tm ty0 >>= fun ty0 ->
+      json_of_tm ty1 >>= fun ty1 ->
+      ret @@ `A [`String "Tw"; ty0; ty1]
+
+    | `I ->
+      ret @@ `String "I"
+
   let entry_of_json : J.value -> entry m =
     function
     | `A [`String "P"; ty] ->
@@ -832,7 +853,33 @@ struct
       desc_of_json desc >>= fun desc ->
       ret @@ `Desc desc
 
+    | `A [`String "Tw"; ty0; ty1] ->
+      tm_of_json ty0 >>= fun ty0 ->
+      tm_of_json ty1 >>= fun ty1 ->
+      ret @@ `Tw (ty0, ty1)
+
+    | `String "I" -> ret `I
+
     | j -> J.parse_error j "entry_of_json"
+
+  let json_of_rigidity =
+    function
+    | None -> `Null
+    | Some `Rigid -> `String "Rigid"
+    | Some `Flex -> `String "Flex"
+
+  let rigidity_of_json =
+    function
+    | `Null -> None
+    | `String "Rigid" -> Some `Rigid
+    | `String "Flex" -> Some `Flex
+    | j -> J.parse_error j "rigidity_of_json"
+
+  let json_of_info =
+    json_of_delebal (json_of_entry, json_of_rigidity)
+
+  let info_of_json =
+    delebal_of_json (entry_of_json, rigidity_of_json)
 
   let json_of_deps =
     json_of_list_ json_of_dep
@@ -841,7 +888,7 @@ struct
     list_of_json_ dep_of_json
 
   let json_of_repo =
-    json_of_list @@ json_of_labeled (json_of_ostring, json_of_entry)
+    json_of_list @@ json_of_labeled (json_of_ostring, json_of_info)
 
   (*
   let repo_of_json =
@@ -902,19 +949,11 @@ struct
       end >>= fun import_deps ->
       ret @@ [lib_dep; self_dep] @ import_deps
 
-  let lookup global_env name =
-    match GlobalEnv.lookup global_env name with
-    | `P _ | `Def _ | `Desc _ as entry -> entry
-    | `Tw _ | `I ->
-      Format.eprintf "Unexpected entry associated with %a.@." Name.pp name;
-      invalid_arg "RotIO.repo"
-
   let repo : RotData.repo m =
     assert_top_level >>
-    global_env >>= fun global_env ->
     resolver <<@> ResEnv.export_native_globals >>= fun name_table ->
-    ret @@ ListUtil.foreach name_table @@
-    fun (ostr, name) -> (ostr, lookup global_env name)
+    Combinators.flip MU.traverse name_table @@
+    fun (ostr, name) -> lookup_top name <<@> fun info -> (ostr, info)
 
   let reexported : RotData.reexported m =
     assert_top_level >>
@@ -963,7 +1002,8 @@ struct
     | Import {sel; stem; rotsum} ->
       let lib_stem = FileRes.selector_to_stem ~stem:target_stem sel in
       if String.equal lib_stem stem then
-        loader ~selector:sel >> cached_resolver stem >>=
+        loader ~selector:sel >>
+        cached_resolver stem >>=
         function
         | Some (_, lib_digest) -> ret @@ Digest.equal rotsum lib_digest
         | None -> ret false
@@ -986,12 +1026,12 @@ struct
   let restore_repo raw_repo =
     assert_top_level >>
     Combinators.flip MU.iter raw_repo begin
-      fun (ostr, raw_entry) ->
+      fun (ostr, raw_info) ->
       let name = Name.named ostr in
-      entry_of_json raw_entry >>= fun entry ->
-      ext_global_env name entry >>
-      modify_top_resolver @@ fun res ->
-      ResEnv.add_native_global ~visibility:`Public name res
+      (* we need to put in the name first for recursive stuff (ex: datatypes) *)
+      modify_top_resolver @@
+      ResEnv.add_native_global ~visibility:`Public name >>
+      info_of_json raw_info >>= ext_top name
     end
 
   let restore_reexport raw_reexport =
@@ -1040,5 +1080,3 @@ struct
 end
 
 let try_read = Reader.try_read
-
-let try_read ~loader ~stem = ret None

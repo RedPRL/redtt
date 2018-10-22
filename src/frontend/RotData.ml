@@ -10,15 +10,13 @@ type dep =
   | Import of {sel : FileRes.selector; stem : FileRes.filepath; rotsum : Digest.t}
   | Shell of {cmd : string; exit: int}
 
-type entry = (* a subset of GlobalEnv.entry *)
-  [ `P of Tm.tm
-  | `Def of Tm.tm * Tm.tm
-  | `Desc of Desc.desc
-  ]
+type entry = GlobalEnv.entry
+type rigidity = Unify.rigidity option
+type info = entry * rigidity
 
 type reexported = Name.t list
 
-type repo = (string option * entry) list
+type repo = (string option * info) list
 
 (* this is not really used, but is useful as an overview
 

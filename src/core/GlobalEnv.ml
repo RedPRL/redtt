@@ -22,13 +22,9 @@ let emp () =
 
 
 
-let ext_ (sg : t) nm param : t =
+let ext (sg : t) nm param : t =
   {sg with
    table = T.add nm param sg.table}
-
-let ext (sg : t) nm param : t =
-  match param with
-  | `P _ | `Def _ | `Tw _ | `I | `Desc _ as param -> ext_ sg nm param
 
 let define (sg : t) nm ~ty ~tm =
   ext sg nm @@ `Def (ty, tm)

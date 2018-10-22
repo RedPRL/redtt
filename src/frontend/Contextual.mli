@@ -63,9 +63,12 @@ val check_eq_dim : tm -> tm -> bool m
 
 
 val global_env : Subst.t m
-val ext_global_env : Name.t -> [< Subst.entry] -> unit m
 val base_cx : Cx.t m
 
 val dump_state : Format.formatter -> string -> [`All | `Constraints | `Unsolved] -> unit m
 
 val abort_unsolved : loc:Log.location -> unit m
+
+(* these two are for rot files *)
+val lookup_top : Name.t -> (Subst.entry * [`Rigid | `Flex] option) m
+val ext_top : Name.t -> Subst.entry * [`Rigid | `Flex] option -> unit m
