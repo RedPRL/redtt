@@ -2639,7 +2639,7 @@ struct
     | NCoeData _ ->
       Format.fprintf fmt "<ncoe-data>"
     | NHCom _ ->
-      Format.fprintf fmt "<ncoe-nhcom>"
+      Format.fprintf fmt "<nhcom>"
 
   let swap pi =
     function
