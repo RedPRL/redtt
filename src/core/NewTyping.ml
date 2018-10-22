@@ -661,12 +661,13 @@ and synth_head cx hd =
     let _ = check_ty_ "com" cxx `Kan ty in
     let vty = eval cxx ty in
     Cofibration.check_valid @@ Cofibration.from_sys cx com.sys;
-    let cx_rx = Cx.restrict_ cx (`Atom x) r in
-    check_of_ty_ "hcom/cap" cx_rx vty [] com.cap;
-    let vcap = eval cx_rx com.cap in
+    let vty_r = D.Con.run (Cx.rel cx) @@ D.Con.subst r x vty in
+    let vty_r' = D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty in
+    check_of_ty_ "hcom/cap" cx vty_r [] com.cap;
+    let vcap = eval cx com.cap in
     let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:vty ~cap:vcap com.sys in
     (* Favonia: is this the right way? *)
-    `El (D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty)
+    `El vty_r'
 
   | Tm.GHCom _ ->
     raise PleaseFillIn
