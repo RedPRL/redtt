@@ -55,9 +55,7 @@ struct
         let rotpath = FileRes.stem_to_rot stem in
         RotIO.try_read ~loader:load ~stem >>= function
         | Some (res, _ as rot) ->
-          cache_resolver stem rot >>= fun () ->
-          Format.eprintf "@[%sRestored %s.@]@." indent rotpath;
-          ret res
+          cache_resolver stem rot >> ret res
         | None ->
           let red = FileRes.stem_to_red stem in
           let redsum = Digest.file red in
@@ -79,7 +77,6 @@ struct
       RotIO.try_read ~loader:load ~stem >>= function
       | Some rot ->
         let rotpath = FileRes.stem_to_rot stem in
-        Format.eprintf "@[%sRestored %s.@]@." indent rotpath;
         cache_resolver stem rot
       | None ->
         let redsum = Digest.file red in
