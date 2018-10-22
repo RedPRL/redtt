@@ -97,7 +97,7 @@ struct
 
         | _ -> raise ML.WrongMode
       end
-    | InFile {stem; _} | InStdin {stem; _} ->
+    | InFile {stem; _} | InMem {stem; _} ->
       match cmd with
       | E.MlRet v -> eval_val v <<@> fun v -> E.SemRet v
 

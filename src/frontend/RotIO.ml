@@ -886,7 +886,7 @@ struct
   let deps : RotData.dep list m =
     mlconf >>=
     function
-    | TopModule _ | InStdin _ -> raise ML.WrongMode
+    | TopModule _ | InMem _ -> raise ML.WrongMode
     | InFile {stem; redsum; _} ->
       let lib_dep = Libsum in
       let self_dep = Self {stem; redsum} in
@@ -923,7 +923,7 @@ struct
   let write_rot rot =
     mlconf >>=
     function
-    | TopModule _ | InStdin _ -> raise ML.WrongMode
+    | TopModule _ | InMem _ -> raise ML.WrongMode
     | InFile {stem; indent; _} ->
       let rotpath = FileRes.stem_to_rot stem in
       let rotstr = J.to_string ~minify:true rot in
@@ -1020,7 +1020,7 @@ struct
     read_rot ~stem >>= function
     | rot ->
       decompose_rot rot >>= function deps, reexported, repo ->
-      let mlconf = ML.InStdin {stem; indent} in
+      let mlconf = ML.InMem {stem; indent} in
       isolate_module ~mlconf begin
         check_deps ~loader ~stem deps >>= function
         | false ->

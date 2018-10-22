@@ -46,7 +46,7 @@ struct
     mlconf >>=
     function
     | TopModule _ -> raise ML.WrongMode
-    | InFile {stem; indent; _} | InStdin {stem; indent} ->
+    | InFile {stem; indent; _} | InMem {stem; indent} ->
       assert_top_level >>
       let stem = FileRes.selector_to_stem ~stem selector in
       cached_resolver stem >>= function
@@ -76,7 +76,7 @@ struct
   let top_load_file red =
     mlconf >>=
     function
-    | InFile _ | InStdin _ -> raise ML.WrongMode
+    | InFile _ | InMem _ -> raise ML.WrongMode
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
       let rotpath = FileRes.stem_to_rot stem in
@@ -97,10 +97,10 @@ struct
   let top_load_stdin ~red =
     mlconf >>=
     function
-    | InFile _ | InStdin _ -> raise ML.WrongMode
+    | InFile _ | InMem _ -> raise ML.WrongMode
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
-      let mlconf = ML.InStdin {stem; indent} in
+      let mlconf = ML.InMem {stem; indent} in
       run ~mlconf ~mlcmd:(read_from_channel ~filepath:red stdin)
 end
 and Elab : Elaborator.S = Elaborator.Make (M)
