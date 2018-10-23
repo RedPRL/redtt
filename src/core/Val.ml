@@ -289,6 +289,8 @@ struct
           v
       end
 
+    | FortyTwo -> make FortyTwo
+
   and unleash : value -> con =
     fun (Node info) ->
       match info.action = I.idn with

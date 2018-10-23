@@ -58,7 +58,10 @@ let lookup_ty sg nm tw =
   | `Tw (a, _), `TwinL -> a
   | `Tw (_, a), `TwinR -> a
   | `Desc info, _ -> Tm.univ ~kind:info.kind ~lvl:info.lvl
-  | _ -> failwith "GlobalEnv.lookup_entry"
+  | exception Not_found ->
+    failwith "GlobalEnv.lookup_ty: entry not found"
+  | _ ->
+    failwith "GlobalEnv.lookup_entry: wrong kind of entry"
 
 let lookup sg nm =
   T.find nm sg.table

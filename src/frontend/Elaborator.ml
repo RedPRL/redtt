@@ -86,7 +86,8 @@ struct
     C.mlconf >>=
     function
     | TopModule _mlconf ->
-      begin match cmd with
+      begin
+        match cmd with
         | E.MlTopLoadFile red ->
           I.top_load_file red >>
           M.ret @@ E.SemRet (E.SemTuple [])
@@ -830,11 +831,6 @@ struct
     go spine []
 
 
-  and evaluator =
-    C.base_cx <<@> fun cx ->
-      cx, Cx.evaluator cx
-
-
   and elab_chk_cut exp frms ty =
     match Tm.unleash ty with
     | Tm.Data data ->
@@ -1060,7 +1056,7 @@ struct
             | _ -> failwith "V is not rigid when applying vproj frame."
           in
           let func = Tm.up @@ Tm.ann ~ty:(Tm.equiv ty0 ty1) ~tm:equiv @< Tm.Fst in
-          M.ret (ty1, cmd @< Tm.VProj {r; func})
+          M.ret (ty1, cmd @< Tm.VProj {r; func; ty0; ty1})
         | _ ->
           raise ChkMatch
       end

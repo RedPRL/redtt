@@ -12,3 +12,6 @@ val compare : dim -> dim -> t -> I.compare
 
 val as_action : t -> I.action
 val pp : Format.formatter -> t -> unit
+
+
+val chronicle : t -> (dim * dim) list
