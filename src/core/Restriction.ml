@@ -22,6 +22,8 @@ let pp_chronicle fmt chr =
 let pp fmt rst =
   pp_chronicle fmt rst.chronicle
 
+let chronicle rst = rst.chronicle
+
 
 let emp () =
   {classes = UF.init ~size:100;

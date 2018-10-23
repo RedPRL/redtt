@@ -40,6 +40,8 @@ type con =
        args : env_el list;
        sys : rigid_val_sys}
 
+  | FortyTwo
+
 and neu =
   | Lvl of string option * int
   | Var of {name : Name.t; twin : Tm.twin; ushift : int}

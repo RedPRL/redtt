@@ -406,10 +406,12 @@ struct
       json_of_list json_of_tm rs >>= fun rs ->
       ret @@ `A [`String "ExtApp"; rs]
 
-    | VProj {r; func} ->
+    | VProj {r; ty0; ty1; func} ->
       json_of_tm r >>= fun r ->
+      json_of_tm ty0 >>= fun ty0 ->
+      json_of_tm ty1 >>= fun ty1 ->
       json_of_tm func >>= fun func ->
-      ret @@ `A [`String "VProj"; r; func]
+      ret @@ `A [`String "VProj"; r; ty0; ty1; func]
 
     | Cap {r; r'; ty; sys} ->
       json_of_tm r >>= fun r ->
@@ -440,12 +442,13 @@ struct
   let rec foreign_name_of_json : J.value -> Name.t m =
     function
     | `A [`String stem; native] as j ->
-      cached_resolver stem >>= begin function
-      | None -> J.parse_error j "foreign_name_of_json"
-      | Some (res, _) ->
-        match ResEnv.name_of_native (int_of_json native) res with
+      cached_resolver stem >>= begin
+        function
         | None -> J.parse_error j "foreign_name_of_json"
-        | Some name -> ret name
+        | Some (res, _) ->
+          match ResEnv.name_of_native (int_of_json native) res with
+          | None -> J.parse_error j "foreign_name_of_json"
+          | Some name -> ret name
       end
     | j -> J.parse_error j "foreign_name_of_json"
 
@@ -455,8 +458,8 @@ struct
       resolver >>= fun res ->
       let native = int_of_json (`String native) in
       begin match ResEnv.name_of_native native res with
-      | None -> J.parse_error j "name_of_json (native = %i)" native
-      | Some name -> ret name
+        | None -> J.parse_error j "name_of_json (native = %i)" native
+        | Some name -> ret name
       end
     | x -> foreign_name_of_json x
 
@@ -637,10 +640,12 @@ struct
       list_of_json tm_of_json rs >>= fun rs ->
       ret @@ ExtApp rs
 
-    | `A [`String "VProj"; r; func] ->
+    | `A [`String "VProj"; r; ty0; ty1; func] ->
       tm_of_json r >>= fun r ->
+      tm_of_json ty0 >>= fun ty0 ->
+      tm_of_json ty1 >>= fun ty1 ->
       tm_of_json func >>= fun func ->
-      ret @@ VProj {r; func}
+      ret @@ VProj {r; ty0; ty1; func}
 
     | `A [`String "Cap"; r; r'; ty; sys] ->
       tm_of_json r >>= fun r ->
@@ -1027,19 +1032,19 @@ struct
     assert_top_level >>
     Combinators.flip MU.iter raw_repo begin
       fun (ostr, raw_info) ->
-      let name = Name.named ostr in
-      (* we need to put in the name first for recursive stuff (ex: datatypes) *)
-      modify_top_resolver @@
-      ResEnv.add_native_global ~visibility:`Public name >>
-      info_of_json raw_info >>= restore_top name ~stem
+        let name = Name.named ostr in
+        (* we need to put in the name first for recursive stuff (ex: datatypes) *)
+        modify_top_resolver @@
+        ResEnv.add_native_global ~visibility:`Public name >>
+        info_of_json raw_info >>= restore_top name ~stem
     end
 
   let restore_reexport raw_reexport =
     assert_top_level >>
     Combinators.flip MU.iter raw_reexport begin
       fun raw_name ->
-      foreign_of_json raw_name >>= function name ->
-      modify_top_resolver (ResEnv.import_global ~visibility:`Public name)
+        foreign_of_json raw_name >>= function name ->
+          modify_top_resolver @@ ResEnv.import_global ~visibility:`Public name
     end
 
   let read_rot ~stem : J.t m =
@@ -1059,7 +1064,7 @@ struct
     mlconf <<@> ML.Env.indent >>= fun indent ->
     read_rot ~stem >>= function
     | rot ->
-      decompose_rot rot >>= function deps, reexported, repo ->
+      decompose_rot rot >>= fun (deps, reexported, repo) ->
       let mlconf = ML.InMem {stem; indent} in
       isolate_module ~mlconf begin
         check_deps ~loader ~stem deps >>= function

@@ -26,20 +26,22 @@ struct
 
   let cool_error_printer exn =
     Format.eprintf "@[<v3>Encountered error:@;@[<hov>%a@]@]@." PpExn.pp exn;
+    Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+    Format.eprintf "@.";
     exit 1
 
   let run ~mlconf ~mlcmd:{con; span} =
     isolate_module ~mlconf begin
-      try_ begin
+      begin
         Elab.eval_cmd con >> abort_unsolved span
-      end cool_error_printer
+      end
     end
 
   let run_and_rot ~mlconf ~mlcmd:{con; span} =
     isolate_module ~mlconf begin
-      try_ begin
+      begin
         Elab.eval_cmd con >> abort_unsolved span >> RotIO.write
-      end cool_error_printer
+      end
     end
 
   let rec import ~selector =
