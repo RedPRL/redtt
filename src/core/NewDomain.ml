@@ -162,8 +162,9 @@ and neu =
    frames : frame bwd}
 
 and cell =
-  | Val of con Lazy.t Delayed.t
-  | Dim of dim
+  [ `Val of con Lazy.t Delayed.t
+  | `Dim of dim
+  ]
 
 and constr_cell =
   [ `Const of value
@@ -306,7 +307,7 @@ struct
     | Tm.Up (Tm.Ix (i, _), []) ->
       begin
         match Env.lookup_cell_by_index i env with
-        | Dim r -> r
+        | `Dim r -> r
         | _ -> raise PleaseRaiseProperError
       end
     | Tm.Up (Tm.Var {name; _}, []) -> `Atom name
@@ -323,7 +324,7 @@ struct
 
     | Tm.Let (c, Tm.B (_, t)) ->
       let v = lazy begin eval_cmd rel env c end in
-      eval rel (Env.extend_cell env @@ Val (LazyVal.make_from_lazy v)) t
+      eval rel (Env.extend_cell env @@ Cell.lazy_con v) t
 
     | Tm.Pi (dom, cod) ->
       let dom = Val.make @@ eval rel env dom in
@@ -395,14 +396,14 @@ struct
       let strict = Desc.is_strict_set desc in
       let params =
         flip List.map info.params @@ fun t ->
-        Val (LazyVal.make_from_lazy @@ lazy (eval rel env t))
+        Cell.lazy_con @@ lazy begin eval rel env t end
       in
       Data {lbl = info.lbl; strict; params; constrs = env.globals, Desc.constrs desc}
 
     | Tm.Intro (dlbl, clbl, params, args) ->
       let desc = GlobalEnv.lookup_datatype env.globals dlbl in
       let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
-      let eval_as_cell t = Val (LazyVal.make_from_lazy @@ lazy (eval rel env t)) in
+      let eval_as_cell t = Cell.lazy_con @@ lazy (eval rel env t) in
       let params = List.map eval_as_cell params in
       let tyenv = Env.extend_cells (Env.init env.globals) params in
       let benv, args = eval_constr_args rel ~env ~tyenv ~constr ~args in
@@ -418,16 +419,16 @@ struct
         let vty = lazy begin eval rel tyenv ty end in
         let el = lazy begin eval rel env tm end in
         let acc = acc #< (`Const (Val.make_from_lazy el)) in
-        let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_lazy el) in
+        let tyenv = Env.extend_cell tyenv @@ Cell.lazy_con el in
         go acc tyenv tele tms
       | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), tm :: tms ->
         let el = lazy begin eval rel env tm end in
-        let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_lazy el) in
+        let tyenv = Env.extend_cell tyenv @@ Cell.lazy_con el in
         let acc = acc #< (`Rec (`Self, Val.make_from_lazy el)) in
         go acc tyenv tele tms
       | Desc.TCons (`Dim, Tm.B (_, tele)), tm :: tms ->
         let r = eval_dim env tm in
-        let tyenv = Env.extend_cell tyenv @@ Dim r in
+        let tyenv = Env.extend_cell tyenv @@ `Dim r in
         let acc = acc #< (`Dim r) in
         go acc tyenv tele tms
       | _ ->
@@ -477,7 +478,7 @@ struct
     function
     | Tm.B (nm, tm) ->
       let x = Name.named nm in
-      let env = Env.extend_cell env @@ Dim (`Atom x) in
+      let env = Env.extend_cell env @@ `Dim (`Atom x) in
       Abs (x, eval rel env tm)
 
   and eval_head rel env =
@@ -529,7 +530,7 @@ struct
     | Tm.Ix (i, _) ->
       begin
         match Env.lookup_cell_by_index i env with
-        | Val v -> LazyVal.unleash v
+        | `Val v -> LazyVal.unleash v
         | _ -> raise PleaseRaiseProperError
       end
 
@@ -747,27 +748,39 @@ struct
 end
 
 (** A cell is a value if it is [Dim r] or [Val v] for some value [v]. *)
-and Cell : Domain with type t = cell =
+and Cell : sig
+  include Domain with type t = cell
+
+  val dim : dim -> cell
+  val con : con -> cell
+  val value : value -> cell
+  val lazy_con : con Lazy.t -> cell
+end=
 struct
   type t = cell
+
+  let dim r = `Dim r
+  let con el = `Val (LazyVal.make el)
+  let lazy_con el = `Val (LazyVal.make_from_lazy el)
+  let value v = `Val (LazyVal.make_from_delayed v)
 
   let pp fmt _ =
     Format.fprintf fmt "<cell>"
 
   let swap pi =
     function
-    | Dim d -> Dim (Dim.swap pi d)
-    | Val v -> Val (LazyVal.swap pi v)
+    | `Dim d -> `Dim (Dim.swap pi d)
+    | `Val v -> `Val (LazyVal.swap pi v)
 
   let subst r x =
     function
-    | Dim d -> Dim (Dim.subst r x d)
-    | Val v -> Val (LazyVal.subst r x v)
+    | `Dim d -> `Dim (Dim.subst r x d)
+    | `Val v -> `Val (LazyVal.subst r x v)
 
   let run rel =
     function
-    | Dim _ as c -> c
-    | Val v -> Val (LazyVal.run rel v)
+    | `Dim _ as c -> c
+    | `Val v -> `Val (LazyVal.run rel v)
 end
 
 and ConstrCell : Domain with type t = constr_cell =
@@ -898,11 +911,7 @@ struct
       Format.fprintf fmt "<con>"
 
   let make_arr rel ty0 ty1 =
-    let env =
-      Env.init_isolated
-        [Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty0 end);
-         Val (LazyVal.make_from_lazy @@ lazy begin Val.unleash ty1 end)]
-    in
+    let env = Env.init_isolated [Cell.value ty0; Cell.value ty1] in
     Syn.eval rel env @@
     Tm.arr (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
 
@@ -1322,10 +1331,10 @@ struct
   and rigid_plug rel frm hd =
     match frm, hd with
     | FunApp arg, Lam clo ->
-      Clo.inst rel clo @@ Val (LazyVal.make_from_delayed @@ TypedVal.drop_ty arg)
+      Clo.inst rel clo @@ Cell.value @@ TypedVal.drop_ty arg
 
     | FunApp arg, HCom {r; r'; ty = `Pi quant; cap; sys} ->
-      let ty = Clo.inst rel quant.cod @@ Val (LazyVal.make_from_delayed @@ TypedVal.drop_ty arg) in
+      let ty = Clo.inst rel quant.cod @@ Cell.value @@ TypedVal.drop_ty arg in
       let cap = Val.plug rel ~rigid:true frm cap in
       let sys = ConAbsSys.plug rel ~rigid:true frm sys in
       rigid_hcom rel r r' ~ty ~cap ~sys
@@ -1337,8 +1346,8 @@ struct
       let coe_arg s = make_coe rel r' s ~abs:dom @@ TypedVal.drop_ty arg in
       let abs =
         let cod_y = Clo.swap pi quantx.cod in
-        let coe_r'y = LazyVal.make_from_lazy @@ lazy begin coe_arg @@ `Atom y end in
-        Abs (y, Clo.inst rel cod_y @@ Val coe_r'y)
+        let coe_r'y = lazy begin coe_arg @@ `Atom y end in
+        Abs (y, Clo.inst rel cod_y @@ Cell.lazy_con coe_r'y)
       in
       let cap = Val.plug rel ~rigid:true (FunApp (TypedVal.make @@ Val.make @@ coe_arg r)) cap in
       rigid_coe rel r r' ~abs cap
@@ -1365,10 +1374,12 @@ struct
 
     | Snd, HCom ({r; r'; ty = `Sg {dom; cod}; cap; sys} as hcom) ->
       let abs = ConAbs.bind @@ fun y ->
-        let hcom_ry_fst = LazyVal.make_from_lazy @@
-          lazy begin plug rel ~rigid:true Fst (HCom {hcom with r' = y}) end
+        let hcom_ry_fst =
+          lazy begin
+            plug rel ~rigid:true Fst (HCom {hcom with r' = y})
+          end
         in
-        Clo.inst rel cod @@ Val hcom_ry_fst
+        Clo.inst rel cod @@ Cell.lazy_con hcom_ry_fst
       in
       let cap = Val.plug rel ~rigid:true Snd cap in
       let sys = ConAbsSys.plug rel ~rigid:true Snd sys in
@@ -1377,20 +1388,20 @@ struct
     | Snd, Coe ({r; r'; ty = `Sg (Abs (x, {dom = dom_x; cod = cod_x})); cap} as coe) ->
       let abs =
         let y, pi = Perm.freshen_name x in
-        let coe_ry_fst = LazyVal.make_from_lazy @@ lazy begin plug rel ~rigid:true Fst (Coe {coe with r' = `Atom y}) end in
+        let coe_ry_fst = lazy begin plug rel ~rigid:true Fst (Coe {coe with r' = `Atom y}) end in
         let cod_y = Clo.swap pi cod_x in
-        let cod_y_coe_ry_fst = Clo.inst rel cod_y @@ Val coe_ry_fst in
+        let cod_y_coe_ry_fst = Clo.inst rel cod_y @@ Cell.lazy_con coe_ry_fst in
         Abs (y, cod_y_coe_ry_fst)
       in
       let cap = Val.plug rel ~rigid:true Snd cap in
       rigid_coe rel r r' ~abs cap
 
     | ExtApp rs, ExtLam nclo ->
-      NClo.inst rel nclo @@ List.map (fun r -> Dim r) rs
+      NClo.inst rel nclo @@ List.map Cell.dim rs
 
     | ExtApp rs as frm, HCom {r; r'; ty = `Ext extclo; cap; sys} ->
       let ty, ext_sys =
-        let dim_cells = List.map (fun x -> Dim x) rs in
+        let dim_cells = List.map Cell.dim rs in
         ExtClo.inst rel extclo dim_cells
       in
       begin
@@ -1418,7 +1429,7 @@ struct
           y, rel, extclo_y
       in
       let ty_y, sys_y =
-        let dim_cells = List.map (fun x -> Dim x) rs in
+        let dim_cells = List.map Cell.dim rs in
         ExtClo.inst rel_y extclo_y dim_cells
       in
       begin
@@ -1452,13 +1463,12 @@ struct
       let act_on_constr_cell : constr_cell -> _ =
         function
         | `Const v ->
-          [Val (LazyVal.make_from_delayed v)]
+          [Cell.value v]
         | `Rec (`Self, v) ->
           let v_ih = Val.plug rel ~rigid:true frm v in
-          [Val (LazyVal.make_from_delayed v);
-           Val (LazyVal.make_from_delayed v_ih)]
+          [Cell.value v; Cell.value v_ih]
         | `Dim r ->
-          [Dim r]
+          [Cell.dim r]
       in
       let cells = ListUtil.flat_map act_on_constr_cell intro.args in
       let nclo = find_elim_clause intro.clbl elim.clauses in
@@ -1468,8 +1478,9 @@ struct
       let abs =
         ConAbs.bind @@ fun y ->
         Clo.inst rel elim.mot @@
-        let fhcom = lazy begin make_fhcom rel hcom.r y ~cap:hcom.cap ~sys:hcom.sys end in
-        Val (LazyVal.make_from_lazy fhcom)
+        Cell.lazy_con @@ lazy begin
+          make_fhcom rel hcom.r y ~cap:hcom.cap ~sys:hcom.sys
+        end
       in
       let cap = Val.plug rel ~rigid:true frm hcom.cap in
       let sys = ConAbsSys.plug rel ~rigid:true frm hcom.sys in
@@ -1510,8 +1521,7 @@ struct
   and rigid_plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
     | Pi {dom; cod}, FunApp arg ->
-      let lazy_arg = lazy begin Val.unleash (TypedVal.drop_ty arg) end in
-      FunApp {arg with ty = Some dom}, Clo.inst rel cod @@ Val (LazyVal.make_from_lazy lazy_arg), []
+      FunApp {arg with ty = Some dom}, Clo.inst rel cod @@ Cell.value @@ TypedVal.drop_ty arg, []
 
     | Pi _, _ ->
       raise PleaseRaiseProperError
@@ -1521,13 +1531,13 @@ struct
 
     | Sg {cod; _}, Snd ->
       let fst = lazy begin plug rel ~rigid:true Fst hd end in
-      frm, Clo.inst rel cod @@ Val (LazyVal.make_from_lazy fst), []
+      frm, Clo.inst rel cod @@ Cell.lazy_con fst, []
 
     | Sg _, _ ->
       raise PleaseRaiseProperError
 
     | Ext extclo, ExtApp rs ->
-      let ty, sys = ExtClo.inst rel extclo @@ List.map (fun r -> Dim r) rs in
+      let ty, sys = ExtClo.inst rel extclo @@ List.map Cell.dim rs in
       frm, ty, sys
 
     | Ext _, _ ->
@@ -1544,7 +1554,7 @@ struct
       frm, Val.unleash cap, []
 
     | Data _, Elim elim ->
-      frm, Clo.inst rel elim.mot (Val (LazyVal.make hd)), []
+      frm, Clo.inst rel elim.mot (Cell.con hd), []
 
     | Data _, _ ->
       raise PleaseRaiseProperError
@@ -1788,17 +1798,17 @@ struct
           in
           let coe_tl =
             let coe_hd_x = coe_hd @@ `Atom x in
-            let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make coe_hd_x) in
+            let tyenv = Env.extend_cell tyenv @@ Cell.con coe_hd_x in
             go tyenv tele args
           in
           `Const (Val.make @@ coe_hd r') :: coe_tl
         | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), `Rec (`Self, v) :: args ->
           let coe_hd = rigid_coe rel r r' ~abs:data_abs v in
-          let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make coe_hd) in
+          let tyenv = Env.extend_cell tyenv @@ Cell.con coe_hd in
           let coe_tl = go tyenv tele args in
           `Rec (`Self, Val.make coe_hd) :: coe_tl
         | Desc.TCons (`Dim, Tm.B (_, tele)), `Dim s :: args ->
-          let tyenv = Env.extend_cell tyenv @@ Dim s in
+          let tyenv = Env.extend_cell tyenv @@ Cell.dim s in
           `Dim s :: go tyenv tele args
         | _ ->
           raise PleaseRaiseProperError
@@ -1822,9 +1832,9 @@ struct
 
   and constr_cell_to_cell : constr_cell -> cell =
     function
-    | `Const v -> Val (LazyVal.make_from_delayed v)
-    | `Rec (_, v) -> Val (LazyVal.make_from_delayed v)
-    | `Dim r -> Dim r
+    | `Const v -> Cell.value v
+    | `Rec (_, v) -> Cell.value v
+    | `Dim r -> Cell.dim r
 
   (* TODO: pass the data-info pre-extracted *)
   (** invariant: the binder in [abs] {b must} be fresh so that we do not have to
@@ -1994,12 +2004,7 @@ struct
             (* the type of the fiber at r'=0. *)
             let fiber0_ty =
               let func_x0 = Val.plug_then_unleash rel ~rigid:true Fst equiv_x0 in
-              let env = Env.init_isolated
-                  [Val (LazyVal.make base);
-                   Val (LazyVal.make func_x0);
-                   Val (LazyVal.make ty1_x0);
-                   Val (LazyVal.make ty0_x0)]
-              in
+              let env = Env.init_isolated [Cell.con base; Cell.con func_x0; Cell.con ty1_x0; Cell.con ty0_x0] in
               let var i = Tm.up @@ Tm.ix i in
               Syn.eval rel env @@ Tm.fiber ~ty0:(var 0) ~ty1:(var 1) ~f:(var 2) ~x:(var 3)
             in
@@ -2011,7 +2016,7 @@ struct
               let fib =
                 Val.make @@
                 let lazy_fa = lazy begin Con.run rel base end in
-                let env = Env.init_isolated [Val (LazyVal.make b)] in
+                let env = Env.init_isolated [Cell.con b] in
                 let var i = Tm.up @@ Tm.ix i in
                 Cons (Val.run rel cap, Val.make @@ Syn.eval rel env (Tm.refl (var 0)))
               in

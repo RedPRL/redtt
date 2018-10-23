@@ -99,7 +99,7 @@ let rec equate_con qenv rel ty el0 el1 =
     match ty with
     | Pi {dom; cod}  ->
       let x, qenv_x = extend qenv dom in
-      let cod_x = Clo.inst rel cod (Val (LazyVal.make x)) in
+      let cod_x = Clo.inst rel cod @@ Cell.con x in
       let bdy0_x = Con.run rel @@ Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el0 in
       let bdy1_x = Con.run rel @@ Con.plug rel (FunApp (TypedVal.make @@ Val.make x)) el1 in
       let bdy_x = equate_con qenv_x rel cod_x bdy0_x bdy1_x in
@@ -109,7 +109,7 @@ let rec equate_con qenv rel ty el0 el1 =
       let fst0 = Con.run rel @@ Con.plug rel Fst el0 in
       let fst1 = Con.run rel @@ Con.plug rel Fst el1 in
       let fst = equate_con qenv rel (Val.unleash dom) fst0 fst1 in
-      let cod = Clo.inst rel cod (Val (LazyVal.make fst0)) in
+      let cod = Clo.inst rel cod @@ Cell.con fst0 in
       let snd0 = Con.run rel @@ Con.plug rel Snd el0 in
       let snd1 = Con.run rel @@ Con.plug rel Snd el1 in
       let snd = equate_con qenv rel cod snd0 snd1 in
@@ -120,7 +120,7 @@ let rec equate_con qenv rel ty el0 el1 =
       let xs = Bwd.map Name.named nms in
       let qenv_xs = QEnv.abs xs qenv in
       let rs = Bwd.fold_right (fun x rs -> `Atom x :: rs) xs [] in
-      let ty_xs = ExtClo.inst_then_fst rel extclo (List.map (fun r -> Dim r) rs) in
+      let ty_xs = ExtClo.inst_then_fst rel extclo @@ List.map Cell.dim rs in
       let bdy0_xs = Con.run rel @@ Con.plug rel (ExtApp rs) el0 in
       let bdy1_xs = Con.run rel @@ Con.plug rel (ExtApp rs) el1 in
       let bdy_xs = equate_con qenv_xs rel ty_xs bdy0_xs bdy1_xs in
@@ -173,18 +173,18 @@ let rec equate_con qenv rel ty el0 el1 =
             | Desc.TCons (`Const ty, Tm.B (_, tele)), `Const v0 :: args0, `Const v1 :: args1 ->
               let vty = Syn.eval rel tyenv ty in
               let tm = equate_val qenv rel vty v0 v1 in
-              let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_delayed v0) in
+              let tyenv = Env.extend_cell tyenv @@ Cell.value v0 in
               go (acc #< tm) tyenv tele args0 args1
 
             | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), `Rec (_, v0) :: args0, `Rec (_, v1) :: args1 ->
               let vty = Data data in
               let tm = equate_val qenv rel vty v0 v1 in
-              let tyenv = Env.extend_cell tyenv @@ Val (LazyVal.make_from_delayed v0) in
+              let tyenv = Env.extend_cell tyenv @@ Cell.value v0 in
               go (acc #< tm) tyenv tele args0 args1
 
             | Desc.TCons (`Dim, Tm.B (_, tele)), `Dim r0 :: args0, `Dim r1 :: args1 ->
               let tr = equate_dim qenv rel r0 r1 in
-              let tyenv = Env.extend_cell tyenv @@ Dim r0 in
+              let tyenv = Env.extend_cell tyenv @@ Cell.dim r0 in
               go (acc #< tr) tyenv tele args0 args1
 
             | _ ->
@@ -230,10 +230,10 @@ and equate_data_params qenv rel tyenv tele params0 params1 =
     | Desc.TNil _, [], [] ->
       Bwd.to_list acc
 
-    | Desc.TCons (ty, Tm.B (_, tele)), Val v0 :: prms0, Val v1 :: prms1 ->
+    | Desc.TCons (ty, Tm.B (_, tele)), `Val v0 :: prms0, `Val v1 :: prms1 ->
       let vty = Syn.eval rel tyenv ty in
       let tm = equate_con qenv rel vty (LazyVal.unleash v0) (LazyVal.unleash v1) in
-      let tyenv = Env.extend_cell tyenv @@ Val v0 in
+      let tyenv = Env.extend_cell tyenv @@ `Val v0 in
       go (acc #< tm) tyenv tele prms0 prms1
 
     | _ ->
@@ -352,9 +352,9 @@ and equate_frame qenv rel frm0 frm1 =
       match func_ty0, func_ty1 with
       | Pi qu0, Pi qu1 ->
         let ty0 = equate_tyval qenv rel qu0.dom qu1.dom in
-        let dummy = LazyVal.make FortyTwo in
-        let cod0 = Val.make @@ Clo.inst rel qu0.cod @@ Val dummy in
-        let cod1 = Val.make @@ Clo.inst rel qu1.cod @@ Val dummy in
+        let dummy = FortyTwo in
+        let cod0 = Val.make @@ Clo.inst rel qu0.cod @@ Cell.con dummy in
+        let cod1 = Val.make @@ Clo.inst rel qu1.cod @@ Cell.con dummy in
         let ty1 = equate_tyval qenv rel cod0 cod1 in
         let func = equate_val qenv rel func_ty0 func0 func1 in
         Tm.VProj {r; ty0; ty1; func}
@@ -377,9 +377,8 @@ and equate_frame qenv rel frm0 frm1 =
 
 and equate_tycon_clo qenv rel dom clo0 clo1 =
   let x, qenv_x = extend qenv dom in
-  let lazyx = LazyVal.make x in
-  let clo0_x = Clo.inst rel clo0 (Val lazyx) in
-  let clo1_x = Clo.inst rel clo1 (Val lazyx) in
+  let clo0_x = Clo.inst rel clo0 @@ Cell.con x in
+  let clo1_x = Clo.inst rel clo1 @@ Cell.con x in
   equate_tycon qenv_x rel clo0_x clo1_x
 
 and equate_tycon_quantifier qenv rel quant0 quant1 =
@@ -404,7 +403,7 @@ and equate_tycon qenv rel ty0 ty1 =
     let nms = ExtClo.names extclo0 in
     let xs = Bwd.map Name.named nms in
     let qenv_xs = QEnv.abs xs qenv in
-    let cells = Bwd.fold_right (fun x rs -> Dim (`Atom x) :: rs) xs [] in
+    let cells = Bwd.fold_right (fun x rs -> Cell.dim (`Atom x) :: rs) xs [] in
     let ty0_xs, sys0_xs = ExtClo.inst rel extclo0 cells in
     let ty1_xs, sys1_xs = ExtClo.inst rel extclo1 cells in
     let ty_xs = equate_tycon qenv_xs rel ty0_xs ty1_xs in
@@ -421,11 +420,7 @@ and equate_tycon qenv rel ty0 ty1 =
     let ty0 = equate_tyval qenv rel_r0 info0.ty0 info0.ty1 in
     let ty1 = equate_tyval qenv rel info0.ty1 info1.ty1 in
     let equiv_ty =
-      let env =
-        Env.init_isolated
-          [Val (LazyVal.make @@ Val.unleash info0.ty1);
-           Val (LazyVal.make @@ Val.unleash info0.ty0)]
-      in
+      let env = Env.init_isolated [Cell.value info0.ty1; Cell.value info0.ty0] in
       Syn.eval rel_r0 env @@ Tm.equiv (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
     in
     let equiv = equate_val qenv rel_r0 equiv_ty info0.equiv info0.equiv in

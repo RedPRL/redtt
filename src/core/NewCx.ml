@@ -49,14 +49,14 @@ let lookup_const cx ?(tw = `Only) ?(ushift = 0) x =
 
 let extend cx ~name ty =
   let v, qenv = Q.extend cx.qenv @@ D.Val.make ty in
-  let venv = D.Env.extend_cell cx.venv @@ D.Val (D.LazyVal.make v) in
+  let venv = D.Env.extend_cell cx.venv @@ D.Cell.con v in
   let hyps = Snoc (cx.hyps, `El ty) in
   let ppenv = snd @@ Pp.Env.bind cx.ppenv name in
   {cx with venv; qenv; hyps; ppenv}, v
 
 let extend_def cx ~name ~ty el =
   let _, qenv = Q.extend cx.qenv @@ D.Val.make ty in
-  let venv = D.Env.extend_cell cx.venv @@ D.Val (D.LazyVal.make el) in
+  let venv = D.Env.extend_cell cx.venv @@ D.Cell.con el in
   let hyps = Snoc (cx.hyps, `El ty) in
   let ppenv = snd @@ Pp.Env.bind cx.ppenv name in
   {cx with venv; qenv; hyps; ppenv}
@@ -64,7 +64,7 @@ let extend_def cx ~name ~ty el =
 let extend_dim cx ~name =
   let x = Name.named name in
   let qenv = Q.QEnv.abs1 x cx.qenv in
-  let venv = D.Env.extend_cell cx.venv @@ D.Dim (`Atom x) in
+  let venv = D.Env.extend_cell cx.venv @@ D.Cell.dim @@ `Atom x in
   let hyps = Snoc (cx.hyps, `Dim) in
   let ppenv = snd @@ Pp.Env.bind cx.ppenv name in
   {cx with venv; qenv; hyps; ppenv}, x
@@ -72,7 +72,7 @@ let extend_dim cx ~name =
 let extend_dims cx ~names =
   let xs = List.map Name.named names in
   let qenv = Q.QEnv.abs (Bwd.from_list xs) cx.qenv in
-  let venv = D.Env.extend_cells cx.venv @@ List.map (fun x -> D.Dim (`Atom x)) xs in
+  let venv = D.Env.extend_cells cx.venv @@ List.map (fun x -> D.Cell.dim @@ `Atom x) xs in
   let hyps = cx.hyps <>< List.map (fun _ -> `Dim) xs in
   let ppenv = snd @@ Pp.Env.bindn cx.ppenv names in
   {cx with venv; qenv; hyps; ppenv}, xs

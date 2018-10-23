@@ -481,7 +481,7 @@ struct
 
   let unleash_ext_with cx ty rs =
     match ty with
-    | D.Ext eclo -> D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun x -> D.Dim x) rs
+    | D.Ext eclo -> D.ExtClo.inst (Cx.rel cx) eclo @@ List.map D.Cell.dim rs
     | _ -> raise Unleash
 
   let quote_ty cx ty =
@@ -491,7 +491,7 @@ struct
     Q.equate_con (Cx.qenv cx) (Cx.rel cx) ty tm tm
 
   let inst_clo cx clo (el : D.con) =
-    D.Clo.inst (Cx.rel cx) clo @@ D.Val (D.LazyVal.make el)
+    D.Clo.inst (Cx.rel cx) clo @@ D.Cell.con el
 end
 
 let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =

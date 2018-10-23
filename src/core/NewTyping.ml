@@ -78,7 +78,7 @@ type phase = [`Pos of positive | `Neg of D.con * D.con D.sys]
 let eval cx = D.Syn.eval (Cx.rel cx) (Cx.venv cx)
 let eval_dim cx = D.Syn.eval_dim (Cx.venv cx)
 
-let inst_clo cx clo v = D.Clo.inst (Cx.rel cx) clo (D.Val (D.LazyVal.make v))
+let inst_clo cx clo v = D.Clo.inst (Cx.rel cx) clo @@ D.Cell.con v
 
 
 open Tm.Notation
@@ -373,7 +373,7 @@ and check_pos cx pos tm =
   | `El (D.Data data), Tm.Intro (dlbl, clbl, params, args) when data.lbl = dlbl->
     let desc = GlobalEnv.lookup_datatype (Cx.genv cx) dlbl in
     check_data_params cx desc.body params;
-    let vparams = List.map (fun tm -> D.Val (D.LazyVal.make @@ eval cx tm)) params in
+    let vparams = List.map (fun tm -> D.Cell.con @@ eval cx tm) params in
     Format.eprintf "typechecker/data/intro@.";
     raise CanJonHelpMe
 
@@ -423,7 +423,7 @@ and check_neg cx ty sys tm =
     let rs = List.map (fun x -> `Atom x) xs in
     let bdy = Ext.body cx' rs tm in
     let bdy_sys = Ext.sys_body cx' rs sys in
-    let cod, cod_sys = D.ExtClo.inst (Cx.rel cx') eclo @@ List.map (fun r -> D.Dim r) rs in
+    let cod, cod_sys = D.ExtClo.inst (Cx.rel cx') eclo @@ List.map D.Cell.dim rs in
     check_of_ty_ "ext" cx' cod (cod_sys @ bdy_sys) bdy
 
   | D.V v ->
@@ -586,7 +586,7 @@ and check_data_params cx tele params =
       let vty = D.Syn.eval rel tyenv ty in
       check_of_ty cx vty [] tm;
       let el = eval cx tm in
-      let tyenv = D.Env.extend_cell tyenv @@ D.Val (D.LazyVal.make el) in
+      let tyenv = D.Env.extend_cell tyenv @@ D.Cell.con el in
       loop tyenv tele params
     | _ ->
       raise @@ E DataParamsLengthMismatch
@@ -601,15 +601,15 @@ and check_intro cx data_ty params constr tms =
       let vty = D.Syn.eval rel tyenv ty in
       check_of_ty cx vty [] tm;
       let el = eval cx tm in
-      D.Env.extend_cell tyenv @@ D.Val (D.LazyVal.make el)
+      D.Env.extend_cell tyenv @@ D.Cell.con el
     | `Rec Desc.Self ->
       check_of_ty cx data_ty [] tm;
       let el = eval cx tm in
-      D.Env.extend_cell tyenv @@ D.Val (D.LazyVal.make el)
+      D.Env.extend_cell tyenv @@ D.Cell.con el
     | `Dim ->
       check cx (`Pos `Dim) tm;
       let r = eval_dim cx tm in
-      D.Env.extend_cell tyenv @@ D.Dim r
+      D.Env.extend_cell tyenv @@ D.Cell.dim r
   in
 
   let _ : D.env =
@@ -753,7 +753,7 @@ and synth_head cx hd =
     let ty_at s =
       let rel = Cx.rel cx in
       let env = Cx.venv cx in
-      D.Syn.eval rel (D.Env.extend_cell env @@ D.Dim s) ty
+      D.Syn.eval rel (D.Env.extend_cell env @@ D.Cell.dim s) ty
     in
     check_of_ty_ "coe" cx (ty_at r) [] coe.tm;
     `El (ty_at r')
@@ -860,7 +860,7 @@ and synth_stack cx vhd ty stk  =
       check cx (`Pos `Dim) r;
       eval_dim cx r
     in
-    let ty, _ = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map (fun r -> D.Dim r) rs in
+    let ty, _ = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map D.Cell.dim rs in
     let frm = D.ExtApp rs in
     let vhd = D.Val.plug (Cx.rel cx) frm vhd in
     synth_stack cx vhd ty stk

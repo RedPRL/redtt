@@ -489,7 +489,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
     let dlbl, params = unleash_data data_ty in
     begin
       C.base_cx >>= fun cx ->
-      let vparams = List.map (fun tm -> D.Val (D.LazyVal.make @@ Ty.eval cx tm)) params in
+      let vparams = List.map (fun tm -> D.Cell.con @@ Ty.eval cx tm) params in
       M.ret (Ty.eval cx data_ty, vparams)
     end
     >>= fun (data_vty, vparams) ->
@@ -543,8 +543,8 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           *) in
           let tty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
           let psi = psi #< (x, `P tty) in
-          let tyenv = D.Env.extend_cell tyenv @@ D.Val x_el in
-          let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Val x_el in
+          let tyenv = D.Env.extend_cell tyenv @@ D.Cell.con x_el in
+          let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Cell.con x_el in
           let intro_args = intro_args #< x_tm in
           M.in_scope x (`P tty) @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
@@ -554,8 +554,8 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = `Atom x in
           let psi = psi #< (x, `I) in
-          let tyenv = D.Env.extend_cell tyenv @@ D.Dim x_el in
-          let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Dim x_el in
+          let tyenv = D.Env.extend_cell tyenv @@ D.Cell.dim x_el in
+          let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Cell.dim x_el in
           let intro_args = intro_args #< x_tm in
           M.in_scope x `I @@
           prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
@@ -567,15 +567,15 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = raise CanJonHelpMe (* V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] *) in
           let tty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
-          let ih_vty = D.Clo.inst rel mot_clo @@ D.Val (D.LazyVal.make x_el) in
+          let ih_vty = D.Clo.inst rel mot_clo @@ D.Cell.con x_el in
           let ih_ty = Q.equate_tycon (Q.QEnv.emp ()) rel ih_vty ih_vty in
 
           M.in_scope x (`P data_ty) begin
             C.base_cx >>= fun cx ->
             let ih_el = raise CanJonHelpMe (* V.reflect ih_vty (D.Var {name = x_ih; twin = `Only; ushift = 0}) [] *) in
             let psi = psi <>< [x, `P tty; x_ih, `P ih_ty] in
-            let tyenv = D.Env.extend_cell tyenv @@ D.Val x_el in
-            let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Val ih_el in
+            let tyenv = D.Env.extend_cell tyenv @@ D.Cell.con x_el in
+            let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Cell.con ih_el in
             let intro_args = intro_args #< x_tm in
             M.in_scope x_ih (`P ih_ty) @@
             prepare_clause (psi, tyenv, intro_args, env_only_ihs, kont_tac) pbinds specs
@@ -649,11 +649,11 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
             let rec go specs tms =
               match specs, tms with
               | Desc.TCons (`Const _, Tm.B (_, specs)), tm :: tms ->
-                D.Val (D.LazyVal.make @@ D.Syn.eval rel benv tm) :: go specs tms
+                D.Cell.con (D.Syn.eval rel benv tm) :: go specs tms
               | Desc.TCons (`Rec Desc.Self, Tm.B (_, specs)), tm :: tms ->
-                D.Val (D.LazyVal.make @@ D.Syn.eval rel benv tm) :: D.Val (D.LazyVal.make @@ image_of_bterm rel tm) :: go specs tms
+                D.Cell.con (D.Syn.eval rel benv tm) :: D.Cell.con (image_of_bterm rel tm) :: go specs tms
               | Desc.TCons (`Dim, Tm.B (_, specs)), tm :: tms ->
-                D.Dim (D.Syn.eval_dim benv tm) :: go specs tms
+                D.Cell.dim (D.Syn.eval_dim benv tm) :: go specs tms
               | Desc.TNil _, [] ->
                 []
               | _ ->
