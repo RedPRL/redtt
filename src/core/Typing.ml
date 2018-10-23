@@ -202,7 +202,6 @@ let rec check_ cx ty rst tm =
     let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) params in
     let (module Q) = Cx.quoter cx in
     Q.equiv_data_params (Cx.qenv cx) dlbl desc.body vparams data.params;
-    let data_ty = Cx.quote_ty cx ty in
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
     check_intro cx dlbl data.params constr args;
 
