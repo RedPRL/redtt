@@ -370,7 +370,10 @@ and check_pos cx pos tm =
     if Lvl.greater lvl univ.lvl then
       raise @@ E UniverseError
 
-  | `El (D.Data _), Tm.Intro _ ->
+  | `El (D.Data data), Tm.Intro (dlbl, clbl, params, args) when data.lbl = dlbl->
+    let desc = GlobalEnv.lookup_datatype (Cx.genv cx) dlbl in
+    check_data_params cx desc.body params;
+    let vparams = List.map (fun tm -> D.Val (D.LazyVal.make @@ eval cx tm)) params in
     Format.eprintf "typechecker/data/intro@.";
     raise CanJonHelpMe
 
@@ -589,6 +592,36 @@ and check_data_params cx tele params =
       raise @@ E DataParamsLengthMismatch
   in
   loop (Cx.venv cx) tele params
+
+and check_intro cx data_ty params constr tms =
+  let rel = Cx.rel cx in
+  let check_argument tyenv _lbl spec tm =
+    match spec with
+    | `Const ty ->
+      let vty = D.Syn.eval rel tyenv ty in
+      check_of_ty cx vty [] tm;
+      let el = eval cx tm in
+      D.Env.extend_cell tyenv @@ D.Val (D.LazyVal.make el)
+    | `Rec Desc.Self ->
+      check_of_ty cx data_ty [] tm;
+      let el = eval cx tm in
+      D.Env.extend_cell tyenv @@ D.Val (D.LazyVal.make el)
+    | `Dim ->
+      check cx (`Pos `Dim) tm;
+      let r = eval_dim cx tm in
+      D.Env.extend_cell tyenv @@ D.Dim r
+  in
+
+  let _ : D.env =
+    List.fold_left2
+      (fun tyenv (lbl, spec) tm -> check_argument tyenv lbl spec tm)
+      (D.Env.extend_cells (D.Env.clear_locals (Cx.venv cx)) params)
+      (Desc.Constr.specs constr)
+      tms
+  in
+  ()
+
+
 
 (* TODO: check this *)
 and check_bnd_face ~cx ~cxx ~x ~r ~ty sys face =
