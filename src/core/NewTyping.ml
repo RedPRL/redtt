@@ -17,6 +17,8 @@ type error =
   | ExpectedPositiveCommand
   | KindError
   | UnexpectedDimensionTerm
+  | DataParamsLengthMismatch
+  | PartialDatatypeDeclaration
 
 
 let pp_error fmt =
@@ -47,6 +49,10 @@ let pp_error fmt =
     Format.fprintf fmt "Universe kind error"
   | UnexpectedDimensionTerm ->
     Format.fprintf fmt "Unexpected dimension term"
+  | DataParamsLengthMismatch ->
+    Format.fprintf fmt "Datatype parameters were of incorrect length"
+  | PartialDatatypeDeclaration ->
+    Format.fprintf fmt "Partially declared datatpye cannot be treated as type"
 
 exception E of error
 
@@ -520,8 +526,14 @@ and check_ty cx kind tm : Lvl.t =
         lvl1
     end
 
-  | Tm.Data _ ->
-    raise CanJonHelpMe
+  | Tm.Data {lbl; params} ->
+    let desc = GlobalEnv.lookup_datatype (Cx.genv cx) lbl in
+    check_data_params cx desc.body params;
+    if not @@ Kind.lte desc.kind kind then
+      raise @@ E KindError;
+    if desc.status = `Partial then
+      raise @@ E PartialDatatypeDeclaration;
+    desc.lvl
 
   | Tm.FHCom hcom ->
     check cx (`Pos `Dim) hcom.r;
@@ -561,6 +573,22 @@ and check_tm_face cx ty sys face =
     sys
   | _ ->
     raise @@ E ExpectedTermInFace
+
+and check_data_params cx tele params =
+  let rel = Cx.rel cx in
+  let rec loop tyenv tele params =
+    match tele, params with
+    | Desc.TNil _, [] -> ()
+    | Desc.TCons (ty, Tm.B (name, tele)), tm :: params ->
+      let vty = D.Syn.eval rel tyenv ty in
+      check_of_ty cx vty [] tm;
+      let el = eval cx tm in
+      let tyenv = D.Env.extend_cell tyenv @@ D.Val (D.LazyVal.make el) in
+      loop tyenv tele params
+    | _ ->
+      raise @@ E DataParamsLengthMismatch
+  in
+  loop (Cx.venv cx) tele params
 
 (* TODO: check this *)
 and check_bnd_face ~cx ~cxx ~x ~r ~ty sys face =
@@ -835,4 +863,5 @@ and approx_pos cx (pos0 : positive) (pos1 : positive) =
     raise @@ E UnexpectedState
 
 
+let check_subtype = approx
 let check_subtype = approx
