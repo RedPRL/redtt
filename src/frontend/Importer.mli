@@ -9,5 +9,5 @@ sig
   val top_load_stdin : red : FileRes.filepath -> unit m
 
   (** import some module. *)
-  val import : selector : FileRes.selector -> ResEnv.t m
+  val import : selector : FileRes.selector -> rotted_resolver m
 end

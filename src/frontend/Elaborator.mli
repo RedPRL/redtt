@@ -2,7 +2,7 @@ module type Import =
 sig
   val top_load_file : FileRes.filepath -> unit Contextual.m
   val top_load_stdin : red : FileRes.filepath -> unit Contextual.m
-  val import : selector : FileRes.selector -> ResEnv.t Contextual.m
+  val import : selector : FileRes.selector -> Contextual.rotted_resolver Contextual.m
 end
 
 module type S =

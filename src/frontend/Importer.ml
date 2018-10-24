@@ -18,7 +18,7 @@ module rec M :
 sig
   val top_load_file : FileRes.filepath -> unit m
   val top_load_stdin : red : FileRes.filepath -> unit m
-  val import : selector : FileRes.selector -> ResEnv.t m
+  val import : selector : FileRes.selector -> rotted_resolver m
 end =
 struct
   module MN = Monad.Notation (Contextual)
@@ -52,12 +52,12 @@ struct
       assert_top_level >>
       let stem = FileRes.selector_to_stem ~stem selector in
       cached_resolver stem >>= function
-      | Some (res, _) -> ret res
+      | Some rot -> ret rot
       | None ->
         let rotpath = FileRes.stem_to_rot stem in
-        RotIO.try_read ~loader:load ~stem >>= function
-        | Some (res, _ as rot) ->
-          cache_resolver stem rot >> ret res
+        RotIO.try_read ~importer:import ~stem >>= function
+        | Some rot ->
+          cache_resolver stem rot >> ret rot
         | None ->
           let red = FileRes.stem_to_red stem in
           let redsum = Digest.file red in
@@ -66,8 +66,7 @@ struct
           run_and_rot ~mlconf ~mlcmd:(read_file red) >>= fun (res, _ as rot) ->
           cache_resolver stem rot >>= fun () ->
           Format.eprintf "@[%sChecked %s.@]@." indent red;
-          ret res
-  and load ~selector = ignore <@>> import ~selector
+          ret rot
 
   let top_load_file red =
     mlconf >>=
@@ -76,7 +75,7 @@ struct
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
       let rotpath = FileRes.stem_to_rot stem in
-      RotIO.try_read ~loader:load ~stem >>= function
+      RotIO.try_read ~importer:import ~stem >>= function
       | Some rot ->
         let rotpath = FileRes.stem_to_rot stem in
         cache_resolver stem rot

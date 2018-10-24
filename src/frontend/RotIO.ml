@@ -997,7 +997,7 @@ struct
   open RotData
   open RotJson
 
-  let check_dep ~loader ~stem:target_stem =
+  let check_dep ~importer ~stem:target_stem =
     function
     | True -> ret true
     | False -> ret false
@@ -1007,11 +1007,9 @@ struct
     | Import {sel; stem; rotsum} ->
       let lib_stem = FileRes.selector_to_stem ~stem:target_stem sel in
       if String.equal lib_stem stem then
-        loader ~selector:sel >>
-        cached_resolver stem >>=
+        importer ~selector:sel >>=
         function
-        | Some (_, lib_digest) -> ret @@ Digest.equal rotsum lib_digest
-        | None -> ret false
+        | _, lib_digest -> ret @@ Digest.equal rotsum lib_digest
       else
         ret false
     | Shell {cmd; exit} ->
@@ -1023,8 +1021,8 @@ struct
         ret false
 
   (* MORTAL where is the monadic version of [for_all]? *)
-  let check_deps ~loader ~stem =
-    let step prefix dep = if prefix then check_dep ~loader ~stem dep else ret false in
+  let check_deps ~importer ~stem =
+    let step prefix dep = if prefix then check_dep ~importer ~stem dep else ret false in
     MU.fold_left step true
 
   (* MORTAL this is assuming that earlier natives will not depend on later natives *)
@@ -1060,14 +1058,14 @@ struct
 
     ret rot
 
-  let try_read_ ~loader ~stem =
+  let try_read_ ~importer ~stem =
     mlconf <<@> ML.Env.indent >>= fun indent ->
     read_rot ~stem >>= function
     | rot ->
       decompose_rot rot >>= fun (deps, reexported, repo) ->
       let mlconf = ML.InMem {stem; indent} in
       isolate_module ~mlconf begin
-        check_deps ~loader ~stem deps >>= function
+        check_deps ~importer ~stem deps >>= function
         | false ->
           ret None
         | true ->
@@ -1077,8 +1075,8 @@ struct
           ret (Some (resolver, Digest.string (J.to_string rot)))
       end
 
-  let try_read ~loader ~stem =
-    try_ (try_read_ ~loader ~stem) @@
+  let try_read ~importer ~stem =
+    try_ (try_read_ ~importer ~stem) @@
     function
     | J.Parse_error _ | Sys_error _ -> ret None
     | exn -> raise exn

@@ -8,7 +8,7 @@ module type Import =
 sig
   val top_load_file : FileRes.filepath -> unit Contextual.m
   val top_load_stdin : red : FileRes.filepath -> unit Contextual.m
-  val import : selector : FileRes.selector -> ResEnv.t Contextual.m
+  val import : selector : FileRes.selector -> Contextual.rotted_resolver Contextual.m
 end
 
 module type S =
@@ -176,7 +176,7 @@ struct
         M.ret @@ E.SemRet (E.SemDataDesc desc)
 
       | E.MlImport (visibility, selector) ->
-        I.import ~selector >>= fun res ->
+        I.import ~selector >>= fun (res, _) ->
         C.modify_top_resolver (ResEnv.import_public ~visibility res) >>
         C.modify_mlenv (E.Env.record_import selector) >>
         M.ret @@ E.SemRet (E.SemTuple [])
