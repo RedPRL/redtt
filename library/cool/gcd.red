@@ -49,13 +49,13 @@ def mod : (n : nat) → mod/prop n =
       ]
     )
 
-def const/zero : nat → nat =
+def id/nat : nat → nat =
   elim [
   | zero → zero
   | suc (n' → f) → suc f
   ]
 
-def eta : (n : nat) → path nat (const/zero n) n =
+def eta : (n : nat) → path nat (id/nat n) n =
   elim [
   | zero → refl
   | suc (n' → p) → λ i → suc (p i)
@@ -132,8 +132,8 @@ def gcd' : (m : nat) → gcd/prop m =
               elim [
               | zero → λ _ → x
               | suc k' → λ eq →
-                let x/le/x+y' : le (suc x') (plus x' (suc y')) =
-                  coe 0 1 (plus/le (suc x') y') in λ i → le (suc x') (suc/right/path x' y' i)
+                let x/le/x+y' = coe 0 1 (plus/le (suc x') y') in 
+                  λ i → le (suc x') (suc/right/path x' y' i)
                 in
                 let x/le/m = le/trans (suc x') (plus x' (suc y')) m x/le/x+y' x+y'/le/m in
                 let g = sub/le/implies/le x' y' k' eq  in
@@ -149,8 +149,8 @@ def gcd' : (m : nat) → gcd/prop m =
               elim [
               | zero → λ _ → x
               | suc k' → λ eq →
-                let y/le/x'+y =
-                  coe 0 1 (plus/le (suc y') x') in λ i → le (suc y') (plus/comm x' (suc y') i)
+                let y/le/x'+y = coe 0 1 (plus/le (suc y') x') in 
+                  λ i → le (suc y') (plus/comm x' (suc y') i)
                 in
                 let y/le/m = le/trans (suc y') (plus x' (suc y')) m y/le/x'+y x'+y/le/m in
                 let g = sub/le/implies/le y' x' k' eq in
