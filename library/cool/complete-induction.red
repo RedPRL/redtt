@@ -69,10 +69,10 @@ def weak/induction (P : nat → type) : type =
   → (n : nat)
   → P n
 
-def realize/weak/induction (P : nat → type) : weak/induction P = 
+def realize/weak/induction (P : nat → type) : weak/induction P =
   λ p0 ps → elim [
     | zero → p0
-    | suc (n' → pn') → ps n' pn' 
+    | suc (n' → pn') → ps n' pn'
   ]
 
 def complete/induction (P : nat → type) : type =
