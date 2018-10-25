@@ -43,17 +43,4 @@ def and : bool → bool → bool =
 def is-prime (n : nat) = and (is-prime-from (nat-pred (nat-pred n)) n n2)
   (not (le/bool n n1))
 
-def check' = is-prime n8
-
-def nth-prime : nat → nat = 
-  elim [
-    | zero → n2
-    | suc (n' → f) → 
-      
-  ]
-
-meta <: print normalize check' :>
-
-quit
-
-def nat/equiv/nat' : equiv nat' nat = ?
+def check' : path bool (is-prime n8) ff = refl

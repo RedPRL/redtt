@@ -29,7 +29,7 @@ def le/suc : (n m : nat) → le n m → le (suc n) (suc m) =
   | suc _ → λ _ l → l
   ]
 
-def eq/implies/le : (n : nat) → le n n =
+def le/refl : (n : nat) → le n n =
   elim [
   | zero → triv
   | suc (_ → f) → f
@@ -87,7 +87,7 @@ def complete/implies/weak
   : weak/induction P
   =
   λ p0 ps →
-  complete p0 (λ n f → ps n (f n (eq/implies/le n)))
+  complete p0 (λ n f → ps n (f n (le/refl n)))
 
 def weak/implies/complete
   (P : nat → type)
@@ -109,7 +109,7 @@ def weak/implies/complete
       ]
     in
     let P'n : (n : nat) → P' n = weak P' P'0 f in
-    λ n → P'n n n (eq/implies/le n)
+    λ n → P'n n n (le/refl n)
 
 -- prove that a gcd exists for any m, n using complete induction
 -- examine the running code for its time complexity
