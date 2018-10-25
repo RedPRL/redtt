@@ -3,8 +3,8 @@ import cool.complete-induction
 import data.nat
 import data.void
 
-def double : nat → nat = λ n →
-  elim n [
+def double : nat → nat =
+  elim [
   | zero → zero
   | suc (n' → f) → suc (suc f)
   ]
@@ -19,8 +19,8 @@ def sub : nat → nat → nat =
     ]
   ]
 
-def sub/le (n : nat) : (m : nat) → le (sub n m) n =
-  elim n [
+def sub/le : (n m : nat) → le (sub n m) n =
+  elim [
   | zero → λ _ → triv
   | suc (n' → f) → λ m → elim m [
     | zero → le/refl n'
@@ -61,8 +61,8 @@ def eta : (n : nat) → path nat (const/zero n) n =
   | suc (n' → p) → λ i → suc (p i)
   ]
 
-def sub/plus/path (m : nat) : (n : nat) → le n m → path nat (plus n (sub m n)) m =
-  elim m [
+def sub/plus/path : (m n : nat) → le n m → path nat (plus n (sub m n)) m =
+  elim [
   | zero → λ n p →
     let path/n/0 = symm nat (le/zero/implies/zero n p) in
     trans nat (eta n) path/n/0
@@ -72,16 +72,16 @@ def sub/plus/path (m : nat) : (n : nat) → le n m → path nat (plus n (sub m n
     ]
   ]
 
-def plus/le (m : nat) : (n : nat) → le m (plus m n) =
-  elim m [
+def plus/le : (m n : nat) → le m (plus m n) =
+  elim [
   | zero → λ _ → triv
   | suc (m' → f) → f
   ]
 
-def le/trans (m : nat) : (n : nat) → (l : nat) → (le m n) → (le n l) → (le m l) =
-  elim m [
+def le/trans : (m n l : nat) → le m n → le n l → le m l =
+  elim [
   | zero → λ _ _ _ _ → triv
-  | suc (m' → f) → λ n → elim n [
+  | suc (m' → f) → elim [
     | zero → λ l m'/le/n n/le/l → elim m'/le/n []
     | suc n' → elim [
       | zero → λ _ n/le/l → elim n/le/l []
@@ -90,8 +90,8 @@ def le/trans (m : nat) : (n : nat) → (l : nat) → (le m n) → (le n l) → (
     ]
   ]
 
-def sub/le/implies/le (m : nat) : (n k : nat) → path nat (suc k) (sub m n) → le n m =
-  elim m [
+def sub/le/implies/le : (m n k : nat) → path nat (suc k) (sub m n) → le n m =
+  elim [
   | zero →
     elim [
     | zero → λ _ _ → triv
@@ -104,8 +104,8 @@ def sub/le/implies/le (m : nat) : (n k : nat) → path nat (suc k) (sub m n) →
     ]
   ]
 
-def suc/right/path (m : nat) : (n : nat) → path nat (plus (suc m) n) (plus m (suc n)) =
-  elim m [
+def suc/right/path : (m n : nat) → path nat (plus (suc m) n) (plus m (suc n)) =
+  elim [
   | zero → refl
   | suc (m' → f) → λ n i → suc (f n i)
   ]
