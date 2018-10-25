@@ -111,8 +111,8 @@ def suc/right/path (m : nat) : (n : nat) → path nat (plus (suc m) n) (plus m (
     | suc (m' → f) → λ n i → suc (f n i)
   ]
 
-def path/implies/le (m n : nat) : path nat m n → le m n =
-  λ p → coe 0 1 (le/refl m) in (λ i → le (p 0) (p i))
+def path/implies/le (p : dim → nat) : le (p 0) (p 1) =
+  coe 0 1 (le/refl (p 0)) in (λ i → le (p 0) (p i))
 
 def gcd/prop : nat → type = λ m → (x y : nat) → le (plus x y) m → nat
 
@@ -139,7 +139,7 @@ def gcd' : (m : nat) → gcd/prop m =
                   let x/le/m = le/trans (suc x') (plus x' (suc y')) m x/le/x+y' x+y'/le/m in
                   let g = sub/le/implies/le x' y' k' eq  in
                   let h = sub/plus/path x' y' g in
-                  let i : le (plus (suc y') (sub x' y')) (suc x') = path/implies/le _ _ h in
+                  let i : le (plus (suc y') (sub x' y')) (suc x') = path/implies/le h in
                   let b = f (suc x') x/le/m (suc y') (sub x' y') i  in
                   b
                 ] in convoy (sub x' y') refl
@@ -154,7 +154,7 @@ def gcd' : (m : nat) → gcd/prop m =
                   let y/le/m = le/trans (suc y') (plus x' (suc y')) m y/le/x'+y x'+y/le/m in
                   let g = sub/le/implies/le y' x' k' eq in
                   let h = sub/plus/path y' x' g in
-                  let i : le (plus (suc x') (sub y' x')) (suc y') = path/implies/le _ _ h in
+                  let i : le (plus (suc x') (sub y' x')) (suc y') = path/implies/le h in
                   let b = f (suc y') y/le/m (suc x') (sub y' x') i  in
                   b
                 ] in convoy (sub y' x') refl
