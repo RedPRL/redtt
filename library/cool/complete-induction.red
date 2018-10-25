@@ -14,6 +14,15 @@ def le : nat → nat → type =
     ]
   ]
 
+def le/suc/right : (n m : nat) → le n m → le n (suc m) =
+  elim [
+    | zero → λ _ _ →  triv
+    | suc (n' → f) → λ m → elim m [
+      | zero → λ l → elim l []
+      | suc m' → λ l → f m' l
+      ]
+    ]
+
 def le/suc : (n m : nat) → le n m → le (suc n) (suc m) =
   elim [
   | zero → λ _ _ →  triv
@@ -59,6 +68,12 @@ def weak/induction (P : nat → type) : type =
   → ((n : nat) → P n → P (suc n))
   → (n : nat)
   → P n
+
+def realize/weak/induction (P : nat → type) : weak/induction P = 
+  λ p0 ps → elim [
+    | zero → p0
+    | suc (n' → pn') → ps n' pn' 
+  ]
 
 def complete/induction (P : nat → type) : type =
   P zero
