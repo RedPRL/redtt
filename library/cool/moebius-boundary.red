@@ -1,13 +1,7 @@
 import prelude
 import data.bool
 import data.s1
-import basics.isotoequiv
-
-def not/equiv : equiv bool bool =
-  iso→equiv _ _ (not, (not, (not∘not/id/pt, not∘not/id/pt)))
-
-def not/path : path^1 type bool bool =
-  ua _ _ not/equiv
+import paths.bool
 
 def moebius-boundary/fiber : s1 → type =
   elim [
