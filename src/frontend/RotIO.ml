@@ -1025,21 +1025,23 @@ struct
     let step prefix dep = if prefix then check_dep ~importer ~stem dep else ret false in
     MU.fold_left step true
 
-  (* MORTAL this is assuming that earlier natives will not depend on later natives *)
   let restore_repo ~stem raw_repo =
-    assert_top_level >>
-    Combinators.flip MU.iter raw_repo begin
+    ret raw_repo >>=
+    (* we need to put the names into the resolver first in order to
+       reconstruct recursive stuff (ex: datatypes) *)
+    MU.traverse begin
       fun (ostr, raw_info) ->
         let name = Name.named ostr in
-        (* we need to put in the name first for recursive stuff (ex: datatypes) *)
-        modify_top_resolver @@
-        ResEnv.add_native_global ~visibility:`Public name >>
+        modify_top_resolver @@ ResEnv.add_native_global ~visibility:`Public name >>
+        ret (name, raw_info)
+    end >>=
+    MU.iter begin
+      fun (name, raw_info) ->
         info_of_json raw_info >>= restore_top name ~stem
     end
 
-  let restore_reexport raw_reexport =
-    assert_top_level >>
-    Combinators.flip MU.iter raw_reexport begin
+  let restore_reexport =
+    MU.iter begin
       fun raw_name ->
         foreign_of_json raw_name >>= function name ->
           modify_top_resolver @@ ResEnv.import_global ~visibility:`Public name
@@ -1059,6 +1061,7 @@ struct
     ret rot
 
   let try_read_ ~importer ~stem =
+    assert_top_level >>
     mlconf <<@> ML.Env.indent >>= fun indent ->
     read_rot ~stem >>= function
     | rot ->
