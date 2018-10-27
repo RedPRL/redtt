@@ -5,7 +5,8 @@ type options =
   {file_name : string;
    line_width : int;
    debug_mode : bool;
-   unsafe_mode : bool}
+   shell_mode : bool;
+   recheck : bool}
 
 let print_position outx lexbuf =
   let open Lexing in
@@ -16,7 +17,8 @@ let print_position outx lexbuf =
 let set_options options =
   Format.set_margin options.line_width;
   Name.set_debug_mode options.debug_mode;
-  RotIO.set_unsafe_mode options.unsafe_mode
+  RotIO.set_unsafe_mode options.shell_mode;
+  Importer.set_ignore_rot options.recheck
 
 (* MORTAL there's actually already a copy of [Elab] in [Importer]. *)
 module Elab = Elaborator.Make (Importer.M)

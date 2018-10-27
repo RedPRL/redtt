@@ -2,6 +2,9 @@ open RedBasis
 open RedTT_Core
 open Contextual
 
+let ignore_rot = ref false
+let set_ignore_rot b = ignore_rot := b
+
 let read_from_channel ~filepath channel =
   let lexbuf = Lexing.from_channel channel in
   let open Lexing in
@@ -54,8 +57,12 @@ struct
       cached_resolver stem >>= function
       | Some rot -> ret rot
       | None ->
-        let rotpath = FileRes.stem_to_rot stem in
-        RotIO.try_read ~importer:import ~stem >>= function
+        begin
+          if !ignore_rot then ret None else begin
+            let rotpath = FileRes.stem_to_rot stem in
+            RotIO.try_read ~importer:import ~stem
+          end
+        end >>= function
         | Some rot ->
           cache_resolver stem rot >> ret rot
         | None ->
@@ -74,8 +81,12 @@ struct
     | InFile _ | InMem _ -> raise ML.WrongMode
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
-      let rotpath = FileRes.stem_to_rot stem in
-      RotIO.try_read ~importer:import ~stem >>= function
+      begin
+        if !ignore_rot then ret None else begin
+          let rotpath = FileRes.stem_to_rot stem in
+          RotIO.try_read ~importer:import ~stem
+        end
+      end >>= function
       | Some rot ->
         let rotpath = FileRes.stem_to_rot stem in
         cache_resolver stem rot

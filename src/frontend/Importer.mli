@@ -1,5 +1,7 @@
 open Contextual
 
+val set_ignore_rot : bool -> unit
+
 module M :
 sig
   (** load the content of file at the top module. *)
