@@ -11,8 +11,8 @@ def no-double-neg-elim (f : (A : type) → stable A) : void =
   let tf2 = coe 0 1 f2 in λ i → stable (not/path i) in
 
   -- transporting a dependent function produces a path to the original
-  let apdf : path _ tf2 f2 = apd^1 _ stable f _ _ not/path in
-
+  let apdf : path _ tf2 f2 = λ i → coe i 1 (f (not/path i)) in λ j → stable (not/path j) in
+  
   -- tf2 is equal to a composition of transporting the argument backwards along `neg (neg (symm not/path))`...
   let inner(u : neg (neg bool)) : neg (neg bool) = coe 0 1 u in λ i → neg (neg (symm^1 type not/path i)) in
 
