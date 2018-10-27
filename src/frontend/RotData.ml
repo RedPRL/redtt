@@ -1,6 +1,6 @@
 open RedTT_Core
 
-let version : string = "Where do correct ideas come from?"
+let version : string = "It is a person's social being that determines their thinking."
 
 type dep =
   | True
