@@ -974,14 +974,12 @@ struct
       let rotpath = FileRes.stem_to_rot stem in
       let rotstr = encode rot in
 
-      Format.eprintf "@[%sWriting %s.@]@." indent rotpath;
       let channel = open_out_bin rotpath in
       begin
         match output_string channel rotstr with
         | () -> close_out channel
         | exception exn -> close_out channel; raise exn
       end;
-      Format.eprintf "@[%sWritten %s.@]@." indent rotpath;
 
       resolver <<@> fun resolver -> resolver, Digest.string rotstr
 
