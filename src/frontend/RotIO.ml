@@ -997,13 +997,17 @@ struct
   open RotData
   open RotJson
 
-  let check_dep ~importer ~stem:target_stem =
+  let check_dep ~redsum ~importer ~stem:target_stem =
     function
     | True -> ret true
     | False -> ret false
     | Libsum -> ret true
-    | Self {stem; redsum} ->
-      ret begin String.equal stem target_stem && Digest.equal (Digest.file (FileRes.stem_to_red stem)) redsum end
+    | Self {stem; redsum = redsum_in_rot} ->
+      if String.equal stem target_stem then
+        let redsum = match redsum with None -> Digest.file (FileRes.stem_to_red stem) | Some rs -> rs in
+        ret @@ Digest.equal redsum_in_rot redsum
+      else
+        ret false
     | Import {sel; stem; rotsum} ->
       let lib_stem = FileRes.selector_to_stem ~stem:target_stem sel in
       if String.equal lib_stem stem then
@@ -1021,8 +1025,8 @@ struct
         ret false
 
   (* MORTAL where is the monadic version of [for_all]? *)
-  let check_deps ~importer ~stem =
-    let step prefix dep = if prefix then check_dep ~importer ~stem dep else ret false in
+  let check_deps ~redsum ~importer ~stem =
+    let step prefix dep = if prefix then check_dep ~redsum ~importer ~stem dep else ret false in
     MU.fold_left step true
 
   let restore_repo ~stem raw_repo =
@@ -1074,7 +1078,7 @@ struct
     | Ok rot -> ret (J.from_string rot)
     | Error (`Gzip err) -> raise @@ Gzip err
 
-  let try_read_ ~importer ~stem =
+  let try_read_ ~redsum ~importer ~stem =
     assert_top_level >>
     mlconf <<@> ML.Env.indent >>= fun indent ->
     read_rot ~stem >>= function
@@ -1082,7 +1086,7 @@ struct
       decompose_rot rot >>= fun (deps, reexported, repo) ->
       let mlconf = ML.InMem {stem; indent} in
       isolate_module ~mlconf begin
-        check_deps ~importer ~stem deps >>= function
+        check_deps ~redsum ~importer ~stem deps >>= function
         | false ->
           ret None
         | true ->
@@ -1092,8 +1096,8 @@ struct
           ret (Some (resolver, Digest.string (Writer.encode rot)))
       end
 
-  let try_read ~importer ~stem =
-    try_ (try_read_ ~importer ~stem) @@
+  let try_read ~redsum ~importer ~stem =
+    try_ (try_read_ ~redsum ~importer ~stem) @@
     function
     | Sys_error _ | Gzip _ | J.Parse_error _ -> ret None
     | exn -> raise exn

@@ -59,7 +59,7 @@ struct
         begin
           if !ignore_rot then ret None else begin
             let rotpath = FileRes.stem_to_rot stem in
-            RotIO.try_read ~importer:import ~stem
+            RotIO.try_read ~redsum:None ~importer:import ~stem
           end
         end >>= function
         | Some rot ->
@@ -83,7 +83,7 @@ struct
       begin
         if !ignore_rot then ret None else begin
           let rotpath = FileRes.stem_to_rot stem in
-          RotIO.try_read ~importer:import ~stem
+          RotIO.try_read ~redsum:None ~importer:import ~stem
         end
       end >>= function
       | Some rot ->
@@ -105,8 +105,15 @@ struct
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
       let mlcmd, redsum = read_from_channel ~filepath:red stdin in
-      let mlconf = ML.InFile {stem; redsum; indent} in
-      run_and_rot ~mlconf ~mlcmd >>= fun rot ->
-      cache_resolver stem rot
+      RotIO.try_read ~redsum:(Some redsum) ~importer:import ~stem >>=
+      begin
+        function
+        | Some rot ->
+          Format.eprintf "@[%sNothing has changed since the last run.@]@." indent;
+          ret rot
+        | None ->
+          let mlconf = ML.InFile {stem; redsum; indent} in
+          run_and_rot ~mlconf ~mlcmd
+      end >>= fun rot -> cache_resolver stem rot
 end
 and Elab : Elaborator.S = Elaborator.Make (M)
