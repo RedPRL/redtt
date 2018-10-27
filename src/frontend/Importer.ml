@@ -6,10 +6,16 @@ let ignore_rot = ref false
 let set_ignore_rot b = ignore_rot := b
 
 let read_from_channel ~filepath channel =
-  let lexbuf = Lexing.from_channel channel in
+  let wiretap_buffer = Buffer.create 0 in
+  let wiretapped_input bytes size =
+    let n = input channel bytes 0 size in
+    Buffer.add_subbytes wiretap_buffer bytes 0 n; n
+  in
+  let lexbuf = Lexing.from_function wiretapped_input in
   let open Lexing in
   lexbuf.lex_curr_p <- {lexbuf.lex_curr_p with pos_fname = filepath};
-  Grammar.mltoplevel Lex.token lexbuf
+  let tree = Grammar.mltoplevel Lex.token lexbuf in
+  tree, Digest.string (Buffer.contents wiretap_buffer)
 
 let read_file filepath =
   let channel = open_in_bin filepath in
@@ -32,13 +38,6 @@ struct
     Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
     Format.eprintf "@.";
     exit 1
-
-  let run ~mlconf ~mlcmd:{con; span} =
-    isolate_module ~mlconf begin
-      begin
-        Elab.eval_cmd con >> abort_unsolved span
-      end
-    end
 
   let run_and_rot ~mlconf ~mlcmd:{con; span} =
     isolate_module ~mlconf begin
@@ -67,10 +66,10 @@ struct
           cache_resolver stem rot >> ret rot
         | None ->
           let red = FileRes.stem_to_red stem in
-          let redsum = Digest.file red in
+          let mlcmd, redsum = read_file red in
           let mlconf = ML.InFile {stem; redsum; indent = " " ^ indent} in
           Format.eprintf "@[%sChecking %s.@]@." indent red;
-          run_and_rot ~mlconf ~mlcmd:(read_file red) >>= fun (res, _ as rot) ->
+          run_and_rot ~mlconf ~mlcmd >>= fun (res, _ as rot) ->
           cache_resolver stem rot >>= fun () ->
           Format.eprintf "@[%sChecked %s.@]@." indent red;
           ret rot
@@ -91,10 +90,10 @@ struct
         let rotpath = FileRes.stem_to_rot stem in
         cache_resolver stem rot
       | None ->
-        let redsum = Digest.file red in
+        let mlcmd, redsum = read_file red in
         let mlconf = ML.InFile {stem; redsum; indent = " " ^ indent} in
         Format.eprintf "@[%sChecking %s.@]@." indent red;
-        run_and_rot ~mlconf ~mlcmd:(read_file red) >>= fun rot ->
+        run_and_rot ~mlconf ~mlcmd >>= fun rot ->
         cache_resolver stem rot >>= fun () ->
         Format.eprintf "@[%sChecked %s.@]@." indent red;
         ret ()
@@ -105,7 +104,9 @@ struct
     | InFile _ | InMem _ -> raise ML.WrongMode
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
-      let mlconf = ML.InMem {stem; indent} in
-      run ~mlconf ~mlcmd:(read_from_channel ~filepath:red stdin)
+      let mlcmd, redsum = read_from_channel ~filepath:red stdin in
+      let mlconf = ML.InFile {stem; redsum; indent} in
+      run_and_rot ~mlconf ~mlcmd >>= fun rot ->
+      cache_resolver stem rot
 end
 and Elab : Elaborator.S = Elaborator.Make (M)
