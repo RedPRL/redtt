@@ -13,6 +13,8 @@ type telescope = params
 
 open Tm.Notation
 
+type rigidity = [`Rigid | `Flex]
+
 type error =
   | SpineMismatch of Tm.tm Tm.spine * Tm.tm Tm.spine
 
@@ -116,17 +118,27 @@ let hole tag gm ty f =
   go_left >>
   ret r
 
-let define gm alpha visibility opacity ~ty tm =
-  let ty' = abstract_ty gm ty in
-  let tm' = abstract_tm gm tm in
-  check ~ty:ty' tm' >>= function
+let user_define gm alpha source visibility opacity ~ty tm =
+  let ty = abstract_ty gm ty in
+  let tm = abstract_tm gm tm in
+  check ~ty tm >>= function
   | `Exn exn ->
     raise exn
   | `Ok ->
     begin
       if opacity = `Transparent then push_update alpha else ret ()
     end >>
-    pushr @@ E (alpha, ty', Defn (visibility, opacity, tm'))
+    pushr @@ E (alpha, ty, UserDefn {source; visibility; opacity; tm})
+
+let macro gm alpha ~ty tm =
+  let ty = abstract_ty gm ty in
+  let tm = abstract_tm gm tm in
+  check ~ty tm >>= function
+  | `Exn exn ->
+    raise exn
+  | `Ok ->
+    push_update alpha >>
+    pushr @@ E (alpha, ty, Auxiliary tm)
 
 (* This is a crappy version of occurs check, not distingiushing between strong rigid and weak rigid contexts.
    Later on, we can improve it. *)
@@ -226,7 +238,7 @@ let try_invert q ty =
         ret false
       | Some t ->
         active (Unify q) >>
-        define Emp alpha `Private `Transparent ~ty t >>
+        macro Emp alpha ~ty t >>
         ret true
     end
   | _ ->
@@ -346,7 +358,7 @@ let rec instantiate (inst : instantiation) =
   popl >>= function
   | E (beta, ty', Hole `Flex) when alpha = beta ->
     hole `Flex Emp ty @@ fun cmd ->
-    define Emp beta `Private `Transparent ~ty:ty' @@ f cmd
+    macro Emp beta ~ty:ty' @@ f cmd
   | e ->
     pushr e >>
     instantiate inst
@@ -523,20 +535,6 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 
   in
   go (Bwd.from_list sp0) (Bwd.from_list sp1)
-
-let approx_sys ty0 sys0 ty1 sys1 =
-  base_cx >>= fun cx ->
-  let (module Q) = Cx.quoter cx in
-  let vty0 = Cx.eval cx ty0 in
-  let vty1 = Cx.eval cx ty1 in
-  let vsys0 = Cx.eval_tm_sys cx sys0 in
-  let vsys1 = Cx.eval_tm_sys cx sys1 in
-  ret @@ Q.approx_restriction (Cx.qenv cx) vty0 vty1 vsys0 vsys1
-
-let restriction_subtype ty0 sys0 ty1 sys1 =
-  active @@ Subtype {ty0; ty1} >>
-  approx_sys ty0 sys0 ty1 sys1
-
 
 
 (* invariant: will not be called on inequations which are already reflexive *)
@@ -754,7 +752,7 @@ let rec lower tele alpha ty =
     hole `Flex tele dom @@ fun t0 ->
     let cod' = Tm.let_ nm t0 cod in
     hole `Flex tele cod' @@ fun t1 ->
-    define tele alpha `Private `Transparent ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
+    macro tele alpha ~ty @@ Tm.cons (Tm.up t0) (Tm.up t1) >>
     ret true
 
 
@@ -772,7 +770,7 @@ let rec lower tele alpha ty =
         let pi_ty = abstract_ty (Emp #< (y, `P ty0) #< (z, `P ty1)) cod' in
         hole `Flex tele pi_ty @@ fun (whd, wsp) ->
         let bdy = Tm.up (whd, wsp @ [Tm.FunApp u; Tm.FunApp v]) in
-        define tele alpha `Private `Transparent ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
+        macro tele alpha ~ty @@ Tm.make @@ Tm.Lam (Tm.bind x bdy) >>
         ret true
     end
 
@@ -827,7 +825,7 @@ let rec solver prob =
           begin
             match split_sigma Emp x ty with
             | Some (y, ty0, z, ty1, s, _) ->
-              (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
+              (in_scopes [(y, `P ty0); (z, `P ty1)] global_env) >>= fun env ->
               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
             | None ->
@@ -839,7 +837,7 @@ let rec solver prob =
           begin
             match split_sigma Emp x ty with
             | Some (y, ty0, z, ty1, s, _) ->
-              (in_scopes [(y, `P ty0); (z, `P ty1)] get_global_env) >>= fun env ->
+              (in_scopes [(y, `P ty0); (z, `P ty1)] global_env) >>= fun env ->
               solver @@ Problem.all y ty0 @@ Problem.all z ty1 @@
               Problem.subst (GlobalEnv.define env x ~ty ~tm:s) probx
             | None ->
@@ -852,7 +850,7 @@ let rec solver prob =
           begin
             check_eq ~ty:univ ty0 ty1 >>= function
             | `Ok ->
-              get_global_env >>= fun sub ->
+              global_env >>= fun sub ->
               let y = Name.named (Name.name x) in
               (*  This weird crap is needed to avoid creating a cycle in the environment.
                   What we should really do is kill 'twin variables' altogether and switch to
@@ -903,7 +901,7 @@ let ambulando =
         check ~ty info.tm >>= function
         | `Ok ->
           (* Format.eprintf "solved guess %a??@." Name.pp alpha; *)
-          pushl @@ E (alpha, ty, Defn (`Private, `Transparent, info.tm)) >>
+          pushl @@ E (alpha, ty, Auxiliary info.tm) >>
           push_update alpha >>
           loop
         | _ ->

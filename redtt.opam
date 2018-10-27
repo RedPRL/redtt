@@ -7,6 +7,7 @@ homepage: "https://github.com/jonsterling/tt"
 bug-reports: "https://github.com/jonsterling/redtt/issues"
 dev-repo: "git://github.com/jonsterling/redtt.git"
 license: "Apache-2.0"
+synopsis: "The redtt proof assistant"
 depends: [
   "cmdliner" {= "1.0.2"}
   "uuseg" {= "11.0.0"}
@@ -14,6 +15,7 @@ depends: [
   "dune" {build & = "1.1.1"}
   "lwt" {= "4.1.0"}
   "menhir" {>= "20180703"}
+  "ezjsonm" {= "0.6.0"}
 ]
 build: [
   ["dune" "build" "-p" name "@install" "-j" jobs]

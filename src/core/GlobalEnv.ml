@@ -6,61 +6,42 @@ type entry =
   | `Def of ty * tm
   | `Tw of ty * ty
   | `I
-  | `Data of Desc.desc
+  | `Desc of Desc.desc
   ]
 
 module T = Map.Make (Name)
 
 type t =
   {rel : Restriction.t;
-   table : entry T.t;
-   len : int}
+   table : entry T.t}
 
 
 let emp () =
   {table = T.empty;
-   rel = Restriction.emp ();
-   len = 0}
+   rel = Restriction.emp ()}
 
+
+
+let ext (sg : t) nm param : t =
+  {sg with
+   table = T.add nm param sg.table}
+
+let define (sg : t) nm ~ty ~tm =
+  ext sg nm @@ `Def (ty, tm)
+
+let ext_meta (sg : t) nm ~ty =
+  ext sg nm @@ `P ty
+
+let ext_dim (sg : t) nm : t =
+  ext sg nm `I
 
 let declare_datatype dlbl desc (sg : t) : t =
-  {sg with
-   table = T.add dlbl (`Data desc) sg.table;
-   len = sg.len + 1}
+  ext sg dlbl @@ `Desc desc
 
 let replace_datatype dlbl desc (sg : t) : t =
   {sg with
-   table = T.update dlbl (function Some (`Data _) -> Some (`Data desc) | _ -> raise Not_found) sg.table}
+   table = T.update dlbl (function Some (`Desc _) -> Some (`Desc desc) | _ -> raise Not_found) sg.table}
 
-let lookup_datatype dlbl sg =
-  match T.find dlbl sg.table with
-  | `Data desc -> desc
-  | _ ->
-    Format.eprintf "The name %a does not refer to a datatype.@." Name.pp dlbl;
-    raise Not_found
-  | exception Not_found ->
-    Format.eprintf "Datatype not found: %a.@." Name.pp dlbl;
-    raise Not_found
-
-let ext_ (sg : t) nm param : t =
-  {sg with
-   table = T.add nm param sg.table;
-   len = sg.len + 1}
-
-
-let define (sg : t) nm ~ty ~tm =
-  {sg with
-   table = T.add nm (`Def (ty, tm)) sg.table;
-   len = sg.len + 1}
-
-let ext (sg : t) =
-  ext_ sg
-
-let ext_meta (sg : t) =
-  ext_ sg
-
-let ext_dim (sg : t) nm : t =
-  ext_ sg nm `I
 
 
 let rec index_of pred xs =
@@ -76,11 +57,47 @@ let lookup_ty sg nm tw =
   | `Def (a, _), _ -> a
   | `Tw (a, _), `TwinL -> a
   | `Tw (_, a), `TwinR -> a
-  | `Data info, _ -> Tm.univ ~kind:info.kind ~lvl:info.lvl
-  | _ -> failwith "GlobalEnv.lookup_entry"
+  | `Desc info, _ -> Tm.univ ~kind:info.kind ~lvl:info.lvl
+  | exception Not_found ->
+    failwith "GlobalEnv.lookup_ty: entry not found"
+  | _ ->
+    failwith "GlobalEnv.lookup_entry: wrong kind of entry"
 
 let lookup sg nm =
   T.find nm sg.table
+
+let lookup_with_twin sg nm tw =
+  let param =
+    try
+      lookup sg nm
+    with
+    | _ ->
+      Format.eprintf "Failed to find: %a@." Name.pp nm;
+      Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
+      Format.eprintf "@.";
+      failwith "GlobalEnv.M.lookup: not found"
+  in
+  match param, tw with
+  | `P ty, _ ->
+    ty, None
+  | `Def (ty, tm), _ ->
+    ty, Some tm
+  | `Tw (ty, _), `TwinL ->
+    ty, None
+  | `Tw (_, ty), `TwinR ->
+    ty, None
+  | _ ->
+    failwith "GlobalEnv.lookup_with_twin: twin mismatch"
+
+let lookup_datatype sg dlbl =
+  match T.find dlbl sg.table with
+  | `Desc desc -> desc
+  | _ ->
+    Format.eprintf "The name %a does not refer to a datatype.@." Name.pp dlbl;
+    raise Not_found
+  | exception Not_found ->
+    Format.eprintf "Datatype not found: %a.@." Name.pp dlbl;
+    raise Not_found
 
 let restriction sg =
   sg.rel
@@ -106,7 +123,7 @@ let pp fmt sg =
     | `Tw _ ->
       Format.fprintf fmt "%a[twin]"
         Name.pp nm
-    | (`I | `P _ | `Def _ | `Data _) ->
+    | (`I | `P _ | `Def _ | `Desc _) ->
       Format.fprintf fmt "%a"
         Name.pp nm
   in
@@ -138,29 +155,9 @@ struct
 
   let global_dims = global_dims Sig.globals
 
-  let lookup_datatype lbl =
-    lookup_datatype lbl Sig.globals
+  let lookup_datatype =
+    lookup_datatype Sig.globals
 
-  let lookup nm tw =
-    let param =
-      try
-        T.find nm Sig.globals.table
-      with
-      | _ ->
-        Format.eprintf "Failed to find: %a@." Name.pp nm;
-        Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
-        Format.eprintf "@.";
-        failwith "GlobalEnv.M.lookup: not found"
-    in
-    match param, tw with
-    | `P ty, _ ->
-      ty, None
-    | `Def (ty, tm), _ ->
-      ty, Some tm
-    | `Tw (ty, _), `TwinL ->
-      ty, None
-    | `Tw (_, ty), `TwinR ->
-      ty, None
-    | _ ->
-      failwith "GlobalEnv.M.lookup: twin mismatch"
+  let lookup_with_twin =
+    lookup_with_twin Sig.globals
 end

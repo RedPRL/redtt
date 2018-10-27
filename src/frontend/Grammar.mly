@@ -589,22 +589,14 @@ tm:
   | LPR; DATA; dlbl = ATOM; RPR
     { fun env ->
       make_node $startpos $endpos @@
-      match R.get dlbl env with
-      | `Datatype alpha ->
-        Tm.Data {lbl = alpha; params = []}
-      | _ ->
-        Format.eprintf "The name %s does not refer to a datatype.@." dlbl;
-        raise Not_found }
+      let alpha = R.get_name dlbl env in
+      Tm.Data {lbl = alpha; params = []} }
 
   | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      match R.get dlbl env with
-      | `Datatype alpha ->
-        Tm.Intro (alpha, clbl, [], es env)
-      | _ ->
-        Format.eprintf "The name %s does not refer to a datatype.@." dlbl;
-        raise Not_found }
+      let alpha = R.get_name dlbl env in
+      Tm.Intro (alpha, clbl, [], es env) }
 
   | e = cmd
     { fun env ->
@@ -619,19 +611,14 @@ tm:
 head:
   | a = ATOM; CARET; k = NUMERAL
     { fun env ->
-      match R.get a env with
-      | `Ix _ -> failwith "Cannot shift bound variable"
-      | `Var x -> Tm.Var {name = x; twin = `Only; ushift = k}
-      | `Metavar x -> Tm.Meta {name = x; ushift = k}
-      | _ -> failwith "Expected variable name" }
+      let x = R.get_name a env in
+      Tm.Var {name = x; twin = `Only; ushift = k} }
 
   | a = ATOM
     { fun env ->
       match R.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
-      | `Var x -> Tm.Var {name = x; twin = `Only; ushift = 0}
-      | `Metavar x -> Tm.Meta {name = x; ushift = 0}
-      | _ -> failwith "Expected variable name" }
+      | `Name x -> Tm.Var {name = x; twin = `Only; ushift = 0} }
 
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->
@@ -681,7 +668,7 @@ cut:
       let hd, fs = e env in
       hd, fs #< (Tm.ExtApp (args env)) }
 
-  | LPR; VPROJ; r = tm; e = cut; func = tm; RPR
+  | LPR; VPROJ; r = tm; e = cut; ty0 = tm; ty1 = tm; func = tm; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< (Tm.VProj {r = r env; func = func env})}
+      hd, fs #< (Tm.VProj {r = r env; ty0 = ty0 env; ty1 = ty1 env; func = func env})}

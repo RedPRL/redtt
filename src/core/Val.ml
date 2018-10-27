@@ -289,6 +289,8 @@ struct
           v
       end
 
+    | FortyTwo -> make FortyTwo
+
   and unleash : value -> con =
     fun (Node info) ->
       match info.action = I.idn with
@@ -1058,9 +1060,6 @@ struct
               let ghcom01 =
                 AbsFace.make phi r'i dim1 @@ fun phi ->
                 Abs.make1 @@ fun y ->
-                (* TODO this can be optimized further by expanding
-                 * `make_ghcom` because `ty` is not changed and
-                 * in degenerate cases there is redundant renaming. *)
                 make_ghcom (Dir.make (I.act phi r) (`Atom y)) (Value.act phi ty) (Value.act phi cap) @@
                 (* XXX this would stop the expansion early, but is
                  * unfortunately duplicate under `AbsFace.make` *)
@@ -1350,7 +1349,7 @@ struct
       end
 
     | Tm.Var info ->
-      let tty, odef = Sig.lookup info.name info.twin in
+      let tty, odef = Sig.lookup_with_twin info.name info.twin in
       let rho' = Env.clear_locals rho in
       begin
         match odef with
@@ -1362,7 +1361,7 @@ struct
       end
 
     | Tm.Meta {name; ushift} ->
-      let tty, odef = Sig.lookup name `Only in
+      let tty, odef = Sig.lookup_with_twin name `Only in
       let rho' = Env.clear_locals rho in
       begin
         match odef with

@@ -151,8 +151,8 @@ and frame_info =
     Info.mergen @@ List.map tm_info ts
   | Cap {r; r'; ty; sys} ->
     Info.mergen [tm_info r; tm_info r'; tm_info ty; sys_info (bnd_info tm_info) sys]
-  | VProj {r; func} ->
-    Info.mergen [tm_info r; tm_info func]
+  | VProj {r; ty0; ty1; func} ->
+    Info.mergen [tm_info r; tm_info ty0; tm_info ty1; tm_info func]
   | Elim {dlbl; params; mot; clauses} ->
     let clause_info (_, nbnd) = nbnd_info tm_info nbnd in
     Info.mergen @@ bnd_info tm_info mot :: List.map clause_info clauses @ List.map tm_info params
@@ -480,7 +480,9 @@ struct
     | VProj info ->
       let r = traverse_tm info.r in
       let func = traverse_tm info.func in
-      VProj {r; func}
+      let ty0 = traverse_tm info.ty0 in
+      let ty1 = traverse_tm info.ty1 in
+      VProj {r; ty0; ty1; func}
 
     | Cap info ->
       let r = traverse_tm info.r in
@@ -956,7 +958,7 @@ and pp_cmd env fmt (hd, sp) =
           (go `Elim) sp
           (pp_elim_clauses env) info.clauses
 
-      | VProj {r; func} ->
+      | VProj {r; func; _} ->
         Format.fprintf fmt "@[<hv1>(vproj %a@ %a@ %a)@]" (pp env) r (go `VProj) sp (pp env) func
       | Cap _ ->
         (* FIXME *)
@@ -1302,7 +1304,9 @@ let map_frame f =
   | VProj info ->
     let r = f info.r in
     let func = f info.func in
-    VProj {r; func}
+    let ty0 = f info.ty0 in
+    let ty1 = f info.ty1 in
+    VProj {r; ty0; ty1; func}
   | Cap info ->
     let r = f info.r in
     let r' = f info.r' in

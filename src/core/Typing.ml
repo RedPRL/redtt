@@ -187,7 +187,7 @@ let rec check_ cx ty rst tm =
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
   | [], D.Univ univ, T.Data {lbl; params} ->
-    let desc = GlobalEnv.lookup_datatype lbl @@ Cx.globals cx in
+    let desc = GlobalEnv.lookup_datatype (Cx.globals cx) lbl in
     check_data_params cx lbl desc.body params;
     begin
       if not @@ Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
@@ -197,12 +197,11 @@ let rec check_ cx ty rst tm =
     end
 
   | [], D.Data data, T.Intro (dlbl, clbl, params, args) when data.lbl = dlbl ->
-    let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+    let desc = GlobalEnv.lookup_datatype (Cx.globals cx) dlbl in
     check_data_params cx dlbl desc.body params;
     let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) params in
     let (module Q) = Cx.quoter cx in
     Q.equiv_data_params (Cx.qenv cx) dlbl desc.body vparams data.params;
-    let data_ty = Cx.quote_ty cx ty in
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
     check_intro cx dlbl data.params constr args;
 

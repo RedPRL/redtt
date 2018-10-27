@@ -534,7 +534,12 @@ struct
       let tr = equate_atom env x0 x1 in
       let phi = I.subst `Dim0 x0 in
       let func = equate env vproj0.func.ty vproj0.func.el vproj1.func.el in
-      let frame = Tm.VProj {r = tr; func} in
+      let dom0, cod0 = unleash_pi vproj0.func.ty in
+      let dom1, cod1 = unleash_pi vproj1.func.ty in
+      let ty0 = equate_ty env dom0 dom1 in
+      let dummy = D.make D.FortyTwo in
+      let ty1 = equate_ty env (inst_clo cod0 dummy) (inst_clo cod1 dummy) in
+      let frame = Tm.VProj {r = tr; ty0; ty1; func} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
 
     | Cap cap0, Cap cap1 ->

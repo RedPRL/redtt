@@ -17,6 +17,13 @@ struct
     fun st ->
       f (m st) st
 
+  let try_ (m : 'a m) (ferr : exn -> 'a m) : 'a m =
+    fun st ->
+      try
+        m st
+      with exn ->
+        ferr exn st
+
   let get st =
     st
 
