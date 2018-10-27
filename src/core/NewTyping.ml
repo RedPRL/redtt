@@ -15,6 +15,7 @@ type error =
   | ExpectedTermInFace
   | ExpectedVType
   | ExpectedPositiveCommand
+  | ExpectedTrueRestrictType
   | KindError
   | UnexpectedDimensionTerm
   | DataParamsLengthMismatch
@@ -45,6 +46,8 @@ let pp_error fmt =
     Format.fprintf fmt "Expected V type"
   | ExpectedPositiveCommand ->
     Format.fprintf fmt "Expected inferrable term of positive type"
+  | ExpectedTrueRestrictType ->
+    Format.fprintf fmt "Expected restriction type with true (satisfied) restriction"
   | KindError ->
     Format.fprintf fmt "Universe kind error"
   | UnexpectedDimensionTerm ->
@@ -774,11 +777,12 @@ and synth_stack cx vhd ty stk  =
     ty
 
   | _, Tm.VProj vproj :: stk ->
+    check cx (`Pos `Dim) vproj.r;
     let r = eval_dim cx vproj.r in
     begin
-      check cx (`Pos `Dim) vproj.r;
       match D.Rel.compare r `Dim0 (Cx.rel cx) with
       | `Same ->
+        (* r must be equal to 0 *)
         let _ = check_ty cx `Pre vproj.ty0 in
         let _ = check_ty cx `Pre vproj.ty1 in
         let ty0 = eval cx vproj.ty0 in
@@ -791,7 +795,6 @@ and synth_stack cx vhd ty stk  =
             D.Con.plug (Cx.rel cx) (D.FunApp (D.TypedVal.make vhd)) vfunc
           end
         in
-        (* r must be equal to 0 *)
         synth_stack cx vhd ty1 stk
 
       | `Apart ->
@@ -850,9 +853,12 @@ and synth_stack cx vhd ty stk  =
     let vhd = D.Val.plug (Cx.rel cx) frm vhd in
     synth_stack cx vhd cod stk
 
-  | D.Restrict tyface, Tm.RestrictForce :: stk ->
-    Format.eprintf "restrict@.";
-    raise PleaseFillIn
+  | D.Restrict (r, r', ty), Tm.RestrictForce :: stk ->
+    begin
+      match D.Rel.compare r r' (Cx.rel cx) with
+      | `Same -> synth_stack cx vhd (D.LazyVal.unleash ty) stk
+      | _ -> raise @@ E ExpectedTrueRestrictType
+    end
 
   | D.Ext eclo, Tm.ExtApp rs :: stk ->
     let rs =
@@ -871,7 +877,7 @@ and synth_stack cx vhd ty stk  =
 
   | _ ->
     Format.eprintf "typechecker encountered unimplemented frame@.";
-    raise CanJonHelpMe
+    raise PleaseFillIn
 
 and approx cx ty0 ty1 =
   match polarity ty0, polarity ty1 with
@@ -896,5 +902,4 @@ and approx_pos cx (pos0 : positive) (pos1 : positive) =
     raise @@ E UnexpectedState
 
 
-let check_subtype = approx
 let check_subtype = approx
