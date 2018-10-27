@@ -64,7 +64,7 @@ struct
       | `Apart _ ->
         False (r, r')
       | `Same _ ->
-        True (r, r', lazy begin a (I.cmp (I.equate r r') phi) end)
+        True (r, r', lazy begin a phi end)
 
   let make_from_dir : I.action -> Dir.t -> (I.action -> X.t) -> [`Any] t =
     fun phi dir a ->

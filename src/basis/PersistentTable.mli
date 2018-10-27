@@ -17,9 +17,9 @@ sig
   (** entries from the first argument overwrite the ones from the second. *)
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
 
-  val to_seq : ('k, 'a) t -> ('k * 'a) Seq.t
-  val to_seq_keys : ('k, 'a) t -> 'k Seq.t
-  val to_seq_values : ('k, 'a) t -> 'a Seq.t
+  val to_list : ('k, 'a) t -> ('k * 'a) list
+  val to_list_keys : ('k, 'a) t -> 'k list
+  val to_list_values : ('k, 'a) t -> 'a list
 end
 
 module M : S
