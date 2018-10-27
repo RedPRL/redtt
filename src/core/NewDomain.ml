@@ -2536,6 +2536,9 @@ sig
   include DomainPlug with type t = neutroid
 
   exception Triv of con
+
+  (** sys might not be rigid, but ty must be a value *)
+  val reflect_head : rel -> ty:value -> head -> con sys -> con
 end =
 struct
   type t = neutroid
@@ -2580,6 +2583,11 @@ struct
       (* even though we can check whether [frm] is really non-rigid,
        * it should be an invariant that the argument [rigid] is always [true]. *)
       raise PleaseRaiseProperError
+
+  let reflect_head rel ~ty head sys =
+    match ConSys.run_then_force rel sys with
+    | sys -> Neu {ty; neu = {neu = DelayedNeu.make {head; frames = Emp}; sys}}
+    | exception (ConSys.Triv con) -> con
 end
 
 (** A [neu] is a value if its head and frames are rigid values. *)

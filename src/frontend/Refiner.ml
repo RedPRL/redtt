@@ -2,8 +2,6 @@ open RedBasis
 open RedTT_Core
 open Dev open Bwd open BwdNotation
 
-exception CanJonHelpMe
-
 module D = NewDomain
 
 module M =
@@ -538,9 +536,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let x = name_of nm in
           let vty = D.Syn.eval rel tyenv ty in
           let x_tm = Tm.up @@ Tm.var x in
-          let x_el = raise CanJonHelpMe
-          (* V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) []
-          *) in
+          let x_el = D.Neutroid.reflect_head rel (D.Val.make vty) (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let tty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
           let psi = psi #< (x, `P tty) in
           let tyenv = D.Env.extend_cell tyenv @@ D.Cell.con x_el in
@@ -565,14 +561,14 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let x_ih = name_of nm_ih in
           let vty = Ty.eval cx data_ty in
           let x_tm = Tm.up @@ Tm.var x in
-          let x_el = raise CanJonHelpMe (* V.reflect vty (D.Var {name = x; twin = `Only; ushift = 0}) [] *) in
+          let x_el = D.Neutroid.reflect_head rel (D.Val.make vty) (D.Var {name = x; twin = `Only; ushift = 0}) [] in
           let tty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
           let ih_vty = D.Clo.inst rel mot_clo @@ D.Cell.con x_el in
           let ih_ty = Q.equate_tycon (Q.QEnv.emp ()) rel ih_vty ih_vty in
 
           M.in_scope x (`P data_ty) begin
             C.base_cx >>= fun cx ->
-            let ih_el = raise CanJonHelpMe (* V.reflect ih_vty (D.Var {name = x_ih; twin = `Only; ushift = 0}) [] *) in
+            let ih_el = D.Neutroid.reflect_head rel (D.Val.make ih_vty) (D.Var {name = x_ih; twin = `Only; ushift = 0}) [] in
             let psi = psi <>< [x, `P tty; x_ih, `P ih_ty] in
             let tyenv = D.Env.extend_cell tyenv @@ D.Cell.con x_el in
             let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Cell.con ih_el in
