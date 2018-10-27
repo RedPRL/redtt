@@ -997,20 +997,20 @@ struct
   open RotData
   open RotJson
 
-  let check_dep ~redsum ~importer ~stem:target_stem =
+  let check_dep ~redsum:true_redsum ~importer ~stem:true_stem =
     function
     | True -> ret true
     | False -> ret false
     | Libsum -> ret true
-    | Self {stem; redsum = redsum_in_rot} ->
-      if String.equal stem target_stem then
-        let redsum = match redsum with None -> Digest.file (FileRes.stem_to_red stem) | Some rs -> rs in
-        ret @@ Digest.equal redsum_in_rot redsum
+    | Self {stem; redsum} ->
+      if String.equal stem true_stem then
+        let true_redsum = match true_redsum with None -> Digest.file (FileRes.stem_to_red stem) | Some rs -> rs in
+        ret @@ Digest.equal redsum true_redsum
       else
         ret false
     | Import {sel; stem; rotsum} ->
-      let lib_stem = FileRes.selector_to_stem ~stem:target_stem sel in
-      if String.equal lib_stem stem then
+      let true_stem = FileRes.selector_to_stem ~stem:true_stem sel in
+      if String.equal true_stem stem then
         importer ~selector:sel >>=
         function
         | _, lib_digest -> ret @@ Digest.equal rotsum lib_digest
