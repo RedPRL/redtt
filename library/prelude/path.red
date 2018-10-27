@@ -34,14 +34,6 @@ def funext
   λ i x →
   p _ i
 
-def happly 
-  (A : type) 
-  (B : A → type) 
-  (f g : (x : A) → B x) 
-  (p : path ((x : A) → B x) f g) 
-  : (x : A) → path (B x) (f x) (g x) = 
-  λ x i → p i x  
-
 def apd 
   (A : type) (P : A → type) 
   (f : (x : A) → P x) (x y : A) (p : path A x y) 
