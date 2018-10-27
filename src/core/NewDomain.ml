@@ -472,7 +472,7 @@ struct
          ty = Val.make @@ eval rel env info.ty;
          sys = eval_bnd_sys rel env info.sys}
 
-    | _ -> raise PleaseFillIn
+    | Tm.Elim _ -> raise CanJonHelpMe
 
   and eval_bnd rel env =
     function
