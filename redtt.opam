@@ -16,6 +16,7 @@ depends: [
   "lwt" {= "4.1.0"}
   "menhir" {>= "20180703"}
   "ezjsonm" {= "0.6.0"}
+  "ezgzip" {= "0.2.1"}
 ]
 build: [
   ["dune" "build" "-p" name "@install" "-j" jobs]

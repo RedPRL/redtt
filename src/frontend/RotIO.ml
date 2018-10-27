@@ -964,22 +964,22 @@ struct
     assert_top_level >>
     resolver <<@> ResEnv.export_foreign_globals
 
+  let encode rot = Ezgzip.compress (J.to_string ~minify:true rot)
+
   let write_rot rot =
     mlconf >>=
     function
     | TopModule _ | InMem _ -> raise ML.WrongMode
     | InFile {stem; indent; _} ->
       let rotpath = FileRes.stem_to_rot stem in
-      let rotstr = J.to_string ~minify:true rot in
+      let rotstr = encode rot in
 
-      Format.eprintf "@[%sWriting %s.@]@." indent rotpath;
       let channel = open_out_bin rotpath in
       begin
         match output_string channel rotstr with
         | () -> close_out channel
         | exception exn -> close_out channel; raise exn
       end;
-      Format.eprintf "@[%sWritten %s.@]@." indent rotpath;
 
       resolver <<@> fun resolver -> resolver, Digest.string rotstr
 
@@ -997,21 +997,23 @@ struct
   open RotData
   open RotJson
 
-  let check_dep ~loader ~stem:target_stem =
+  let check_dep ~redsum:true_redsum ~importer ~stem:true_stem =
     function
     | True -> ret true
     | False -> ret false
     | Libsum -> ret true
     | Self {stem; redsum} ->
-      ret begin String.equal stem target_stem && Digest.equal (Digest.file (FileRes.stem_to_red stem)) redsum end
+      if String.equal stem true_stem then
+        let true_redsum = match true_redsum with None -> Digest.file (FileRes.stem_to_red stem) | Some rs -> rs in
+        ret @@ Digest.equal redsum true_redsum
+      else
+        ret false
     | Import {sel; stem; rotsum} ->
-      let lib_stem = FileRes.selector_to_stem ~stem:target_stem sel in
-      if String.equal lib_stem stem then
-        loader ~selector:sel >>
-        cached_resolver stem >>=
+      let true_stem = FileRes.selector_to_stem ~stem:true_stem sel in
+      if String.equal true_stem stem then
+        importer ~selector:sel >>=
         function
-        | Some (_, lib_digest) -> ret @@ Digest.equal rotsum lib_digest
-        | None -> ret false
+        | _, lib_digest -> ret @@ Digest.equal rotsum lib_digest
       else
         ret false
     | Shell {cmd; exit} ->
@@ -1023,64 +1025,81 @@ struct
         ret false
 
   (* MORTAL where is the monadic version of [for_all]? *)
-  let check_deps ~loader ~stem =
-    let step prefix dep = if prefix then check_dep ~loader ~stem dep else ret false in
+  let check_deps ~redsum ~importer ~stem =
+    let step prefix dep = if prefix then check_dep ~redsum ~importer ~stem dep else ret false in
     MU.fold_left step true
 
-  (* MORTAL this is assuming that earlier natives will not depend on later natives *)
   let restore_repo ~stem raw_repo =
-    assert_top_level >>
-    Combinators.flip MU.iter raw_repo begin
+    ret raw_repo >>=
+    (* we need to put the names into the resolver first in order to
+       reconstruct recursive stuff (ex: datatypes) *)
+    MU.traverse begin
       fun (ostr, raw_info) ->
         let name = Name.named ostr in
-        (* we need to put in the name first for recursive stuff (ex: datatypes) *)
-        modify_top_resolver @@
-        ResEnv.add_native_global ~visibility:`Public name >>
+        modify_top_resolver @@ ResEnv.add_native_global ~visibility:`Public name >>
+        ret (name, raw_info)
+    end >>=
+    MU.iter begin
+      fun (name, raw_info) ->
         info_of_json raw_info >>= restore_top name ~stem
     end
 
-  let restore_reexport raw_reexport =
-    assert_top_level >>
-    Combinators.flip MU.iter raw_reexport begin
+  let restore_reexport =
+    MU.iter begin
       fun raw_name ->
         foreign_of_json raw_name >>= function name ->
           modify_top_resolver @@ ResEnv.import_global ~visibility:`Public name
     end
+
+  exception Gzip of Ezgzip.error
 
   let read_rot ~stem : J.t m =
     let rotpath = FileRes.stem_to_rot stem in
     mlconf <<@> ML.Env.indent >>= fun indent ->
 
     let channel = open_in_bin rotpath in
-    let rot =
-      match J.from_channel channel with
-      | rot -> close_in channel; rot
-      | exception exn -> close_in channel; raise exn
+    let zipped_rot =
+      let bytes_size = 4096 in
+      let bytes = Bytes.create bytes_size in
+      let raw_rot = Buffer.create (16 * bytes_size) in
+      let rec read () =
+        let n = input channel bytes 0 (Bytes.length bytes) in
+        if n = 0 then
+          Buffer.contents raw_rot
+        else begin
+          Buffer.add_subbytes raw_rot bytes 0 n;
+          read ()
+        end
+      in
+      read ()
     in
 
-    ret rot
+    match Ezgzip.decompress zipped_rot with
+    | Ok rot -> ret (J.from_string rot)
+    | Error (`Gzip err) -> raise @@ Gzip err
 
-  let try_read_ ~loader ~stem =
+  let try_read_ ~redsum ~importer ~stem =
+    assert_top_level >>
     mlconf <<@> ML.Env.indent >>= fun indent ->
     read_rot ~stem >>= function
     | rot ->
       decompose_rot rot >>= fun (deps, reexported, repo) ->
       let mlconf = ML.InMem {stem; indent} in
       isolate_module ~mlconf begin
-        check_deps ~loader ~stem deps >>= function
+        check_deps ~redsum ~importer ~stem deps >>= function
         | false ->
           ret None
         | true ->
           restore_reexport reexported >>
           restore_repo ~stem repo >>
           resolver >>= fun resolver ->
-          ret (Some (resolver, Digest.string (J.to_string rot)))
+          ret (Some (resolver, Digest.string (Writer.encode rot)))
       end
 
-  let try_read ~loader ~stem =
-    try_ (try_read_ ~loader ~stem) @@
+  let try_read ~redsum ~importer ~stem =
+    try_ (try_read_ ~redsum ~importer ~stem) @@
     function
-    | J.Parse_error _ | Sys_error _ -> ret None
+    | Sys_error _ | Gzip _ | J.Parse_error _ -> ret None
     | exn -> raise exn
 end
 
