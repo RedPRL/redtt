@@ -20,4 +20,5 @@
   uuseg.string
   uutf
   menhirLib
-  ezjsonm))
+  ezjsonm
+  ezgzip))

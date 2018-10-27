@@ -964,13 +964,15 @@ struct
     assert_top_level >>
     resolver <<@> ResEnv.export_foreign_globals
 
+  let encode rot = Ezgzip.compress (J.to_string ~minify:true rot)
+
   let write_rot rot =
     mlconf >>=
     function
     | TopModule _ | InMem _ -> raise ML.WrongMode
     | InFile {stem; indent; _} ->
       let rotpath = FileRes.stem_to_rot stem in
-      let rotstr = J.to_string ~minify:true rot in
+      let rotstr = encode rot in
 
       Format.eprintf "@[%sWriting %s.@]@." indent rotpath;
       let channel = open_out_bin rotpath in
@@ -1047,18 +1049,32 @@ struct
           modify_top_resolver @@ ResEnv.import_global ~visibility:`Public name
     end
 
+  exception Gzip of Ezgzip.error
+
   let read_rot ~stem : J.t m =
     let rotpath = FileRes.stem_to_rot stem in
     mlconf <<@> ML.Env.indent >>= fun indent ->
 
     let channel = open_in_bin rotpath in
-    let rot =
-      match J.from_channel channel with
-      | rot -> close_in channel; rot
-      | exception exn -> close_in channel; raise exn
+    let zipped_rot =
+      let bytes_size = 4096 in
+      let bytes = Bytes.create bytes_size in
+      let raw_rot = Buffer.create (16 * bytes_size) in
+      let rec read () =
+        let n = input channel bytes 0 (Bytes.length bytes) in
+        if n = 0 then
+          Buffer.contents raw_rot
+        else begin
+          Buffer.add_subbytes raw_rot bytes 0 n;
+          read ()
+        end
+      in
+      read ()
     in
 
-    ret rot
+    match Ezgzip.decompress zipped_rot with
+    | Ok rot -> ret (J.from_string rot)
+    | Error (`Gzip err) -> raise @@ Gzip err
 
   let try_read_ ~importer ~stem =
     assert_top_level >>
@@ -1075,13 +1091,13 @@ struct
           restore_reexport reexported >>
           restore_repo ~stem repo >>
           resolver >>= fun resolver ->
-          ret (Some (resolver, Digest.string (J.to_string rot)))
+          ret (Some (resolver, Digest.string (Writer.encode rot)))
       end
 
   let try_read ~importer ~stem =
     try_ (try_read_ ~importer ~stem) @@
     function
-    | J.Parse_error _ | Sys_error _ -> ret None
+    | Sys_error _ | Gzip _ | J.Parse_error _ -> ret None
     | exn -> raise exn
 end
 
