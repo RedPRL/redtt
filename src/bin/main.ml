@@ -29,7 +29,8 @@ let opt_recheck =
 let opts_config =
   let open Term  in
   let make file_name line_width debug_mode shell_mode recheck =
-    Frontend.{file_name; line_width; debug_mode; shell_mode; recheck} in
+    Frontend.{file_name; line_width; debug_mode; shell_mode; recheck}
+  in
   pure make $ opt_file_name $ opt_margin $ opt_debug $ opt_shell $ opt_recheck
 
 let cmd_default =
