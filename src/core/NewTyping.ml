@@ -734,16 +734,39 @@ and synth_head cx hd =
     Cofibration.check_valid @@ Cofibration.from_sys cx com.sys;
     let vty_r = D.Con.run (Cx.rel cx) @@ D.Con.subst r x vty in
     let vty_r' = D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty in
-    check_of_ty_ "hcom/cap" cx vty_r [] com.cap;
+    check_of_ty_ "com/cap" cx vty_r [] com.cap;
     let vcap = eval cx com.cap in
     let _ = check_bnd_sys ~cx ~cxx ~x ~r:r ~ty:vty ~cap:vcap com.sys in
     `El vty_r'
 
-  | Tm.GHCom _ ->
-    raise PleaseFillIn
+  | Tm.GHCom ghcom ->
+    check cx (`Pos `Dim) ghcom.r;
+    check cx (`Pos `Dim) ghcom.r';
+    let r = eval_dim cx ghcom.r in
+    let r' = eval_dim cx ghcom.r' in
+    let _ = check_ty_ "ghcom" cx `Kan ghcom.ty in
+    let vty = eval cx ghcom.ty in
+    check_of_ty_ "ghcom/cap" cx vty [] ghcom.cap;
+    let vcap = eval cx ghcom.cap in
+    let cxx, x = Cx.extend_dim cx ~name:None in
+    let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:vty ~cap:vcap ghcom.sys in
+    `El vty
 
-  | Tm.GCom _ ->
-    raise PleaseFillIn
+  | Tm.GCom gcom ->
+    check cx (`Pos `Dim) gcom.r;
+    check cx (`Pos `Dim) gcom.r';
+    let r = eval_dim cx gcom.r in
+    let r' = eval_dim cx gcom.r' in
+    let cxx, x = Cx.extend_dim cx ~name:None in
+    let Tm.B (_, ty) = gcom.ty in
+    let _ = check_ty_ "gcom" cxx `Kan ty in
+    let vty = eval cxx ty in
+    let vty_r = D.Con.run (Cx.rel cx) @@ D.Con.subst r x vty in
+    let vty_r' = D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty in
+    check_of_ty_ "gcom/cap" cx vty_r [] gcom.cap;
+    let vcap = eval cx gcom.cap in
+    let _ = check_bnd_sys ~cx ~cxx ~x ~r:r ~ty:vty ~cap:vcap gcom.sys in
+    `El vty_r'
 
   | Tm.Coe coe ->
     check cx (`Pos `Dim) coe.r;
@@ -875,8 +898,8 @@ and synth_stack cx vhd ty stk  =
     Format.eprintf "typechecker / data / elim@.";
     raise CanJonHelpMe
 
-  | _ ->
-    Format.eprintf "typechecker encountered unimplemented frame@.";
+  | _, frm :: _ ->
+    Format.eprintf "typechecker encountered unimplemented frame: %a@." (Tm.pp_frame Pp.Env.emp) frm;
     raise PleaseFillIn
 
 and approx cx ty0 ty1 =
