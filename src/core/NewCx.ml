@@ -21,7 +21,7 @@ let ppenv cx = cx.ppenv
 let init genv =
   {rel = NewRestriction.from_old_restriction @@ GlobalEnv.restriction genv;
    venv = D.Env.init genv;
-   qenv = Q.QEnv.emp ();
+   qenv = Q.QEnv.init genv;
    ppenv = Pp.Env.emp;
    hyps = Emp}
 

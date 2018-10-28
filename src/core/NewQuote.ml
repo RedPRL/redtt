@@ -12,8 +12,7 @@ module QEnv :
 sig
   type t
 
-  (* Change this to val init : GlobalEnv.t -> t *)
-  val emp : unit -> t (* maybe just [emp : t]? *)
+  val init : GlobalEnv.t -> t
 
   (** [extend] gives you a new variable (in its level)
       and the new environment extended with that variable. *)
@@ -25,13 +24,17 @@ sig
   val ix_of_lvl : int -> t -> int
   val ix_of_atom : Name.t -> t -> int (* might throw Not_found *)
 
+  val genv : t -> GlobalEnv.t
+
   val pp : t Pp.t0
 end =
 struct
   module M = Map.Make (Name)
-  type t = {n_minus_one : int; atoms : int M.t}
+  type t = {genv : GlobalEnv.t; n_minus_one : int; atoms : int M.t}
 
-  let emp () = {n_minus_one = -1; atoms = M.empty}
+  let init genv = {genv; n_minus_one = -1; atoms = M.empty}
+
+  let genv qenv = qenv.genv
 
   let extend qenv =
     let n = qenv.n_minus_one + 1 in
@@ -254,7 +257,8 @@ and equate_val qenv rel ty val0 val1 =
 
 and equate_neu qenv rel neu0 neu1 =
   let hd = equate_hd qenv rel neu0.head neu1.head in
-  let stk = Bwd.fold_right2
+  let stk =
+    Bwd.fold_right2
       (fun f0 f1 stk -> equate_frame qenv rel f0 f1 :: stk)
       neu0.frames neu1.frames []
   in
@@ -370,6 +374,14 @@ and equate_frame qenv rel frm0 frm1 =
     Tm.Cap {r; r'; ty; sys}
 
   | Elim elim0, Elim elim1 ->
+    let lbl = elim0.lbl in
+    let genv = QEnv.genv qenv in
+    let desc = GlobalEnv.lookup_datatype genv lbl in
+    let data_ty =
+      let strict = Desc.is_strict_set desc in
+      Data {lbl; params = elim0.params; strict; constrs = genv, Desc.constrs desc}
+    in
+    let mot = equate_tycon_clo qenv rel (Val.make data_ty) elim0.mot elim1.mot in
     raise CanJonHelpMe
 
   | _ ->

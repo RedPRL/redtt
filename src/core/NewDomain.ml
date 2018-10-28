@@ -898,6 +898,9 @@ sig
   val make_intro : rel -> dlbl:Name.t -> clbl:string -> args:constr_cell list -> sys:con sys -> con
 
   val make_arr : rel -> value -> value -> con
+
+  (* TODO: move to some other module *)
+  val find_elim_clause : string -> (string * nclo) list -> nclo
 end =
 struct
   module ConFace = Face (Con)

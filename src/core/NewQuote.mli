@@ -5,7 +5,7 @@ module QEnv :
 sig
   type t
 
-  val emp : unit -> t (* maybe just [emp : t]? *)
+  val init : GlobalEnv.t -> t
 
   (** [extend] gives you a new variable (in its level)
       and the new environment extended with that variable. *)

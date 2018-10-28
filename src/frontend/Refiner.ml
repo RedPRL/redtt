@@ -527,7 +527,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let vty = D.Syn.eval rel tyenv ty in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = D.Neutroid.reflect_head rel (D.Val.make vty) (D.Var {name = x; twin = `Only; ushift = 0}) [] in
-          let tty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
+          let tty = Q.equate_tycon (Q.QEnv.init genv) rel vty vty in
           let psi = psi #< (x, `P tty) in
           let tyenv = D.Env.extend_cell tyenv @@ D.Cell.con x_el in
           let env_only_ihs = D.Env.extend_cell env_only_ihs @@ D.Cell.con x_el in
@@ -552,9 +552,9 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let vty = Ty.eval cx data_ty in
           let x_tm = Tm.up @@ Tm.var x in
           let x_el = D.Neutroid.reflect_head rel (D.Val.make vty) (D.Var {name = x; twin = `Only; ushift = 0}) [] in
-          let tty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
+          let tty = Q.equate_tycon (Q.QEnv.init genv) rel vty vty in
           let ih_vty = D.Clo.inst rel mot_clo @@ D.Cell.con x_el in
-          let ih_ty = Q.equate_tycon (Q.QEnv.emp ()) rel ih_vty ih_vty in
+          let ih_ty = Q.equate_tycon (Q.QEnv.init genv) rel ih_vty ih_vty in
 
           M.in_scope x (`P data_ty) begin
             C.base_cx >>= fun cx ->
@@ -581,7 +581,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
               | _ -> failwith "unexpected wildcard pattern"
             in
 
-            let ty = Q.equate_tycon (Q.QEnv.emp ()) rel vty vty in
+            let ty = Q.equate_tycon (Q.QEnv.init genv) rel vty vty in
             let tac_scrut = M.ret (ty, Tm.up @@ Tm.var x) in
             tac_inversion ~loc ~tac_scrut inv tac
           in
