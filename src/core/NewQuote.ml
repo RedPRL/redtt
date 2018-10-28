@@ -198,15 +198,14 @@ let rec equate_con qenv rel ty el0 el1 =
           let clbl = intro0.clbl in
           let genv, constrs = data.constrs in
           let constr = Desc.lookup_constr clbl constrs in
-          let tyenv0 = Env.init genv in
-          let tyenv = Env.extend_cells tyenv0 data.params in
+          let tyenv = Env.extend_cells (Env.init genv) data.params in
           let args = go Emp tyenv constr intro0.args intro1.args in
           let params =
             let desc = GlobalEnv.lookup_datatype genv data.lbl in
-            equate_data_params qenv rel tyenv0 desc.body data.params data.params
+            equate_data_params qenv rel desc.body data.params data.params
           in
 
-          Tm.make @@ Tm.Intro (data.lbl, clbl, failwith "params", args)
+          Tm.make @@ Tm.Intro (data.lbl, clbl, params, args)
 
         | HCom ({ty = `Pos; _} as hcom0), HCom ({ty = `Pos; _} as hcom1) ->
           let r = equate_dim qenv rel hcom0.r hcom1.r in
@@ -227,7 +226,7 @@ let rec equate_con qenv rel ty el0 el1 =
       (* This might be done? *)
       raise PleaseFillIn
 
-and equate_data_params qenv rel tyenv tele params0 params1 =
+and equate_data_params qenv rel tele params0 params1 =
   let rec go acc tyenv tele prms0 prms1 =
     match tele, prms0, prms1 with
     | Desc.TNil _, [], [] ->
@@ -242,7 +241,7 @@ and equate_data_params qenv rel tyenv tele params0 params1 =
     | _ ->
       raise PleaseRaiseProperError
   in
-  go Emp tyenv tele params0 params1
+  go Emp (Env.init (QEnv.genv qenv)) tele params0 params1
 
 and equate_in_neutral_ty qenv rel el0 el1 =
   match el0, el1 with
@@ -382,10 +381,14 @@ and equate_frame qenv rel frm0 frm1 =
       Data {lbl; params = elim0.params; strict; constrs = genv, Desc.constrs desc}
     in
     let mot = equate_tycon_clo qenv rel (Val.make data_ty) elim0.mot elim1.mot in
+    let params = equate_data_params qenv rel desc.body elim0.params elim1.params in
     raise CanJonHelpMe
 
   | _ ->
     raise PleaseRaiseProperError
+
+and equate_elim_clause constr nclo0 nclo1 =
+  raise CanJonHelpMe
 
 and equate_tycon_clo qenv rel dom clo0 clo1 =
   let x, qenv_x = extend qenv dom in
@@ -454,8 +457,7 @@ and equate_tycon qenv rel ty0 ty1 =
   | Data data0, Data data1 when data0.lbl = data1.lbl ->
     let genv, _ = data0.constrs in
     let desc = GlobalEnv.lookup_datatype genv data0.lbl in
-    let tyenv = Env.init genv in
-    let params = equate_data_params qenv rel tyenv desc.body data0.params data1.params in
+    let params = equate_data_params qenv rel desc.body data0.params data1.params in
     Tm.make @@ Tm.Data {lbl = data0.lbl; params}
 
   | _ ->
