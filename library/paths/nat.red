@@ -20,7 +20,7 @@ def nat/path/code : nat → nat → type =
 
 def nat-refl : (m : nat) → nat/path/code m m =
   elim [
-  | zero → triv
+  | zero → ★
   | suc (m' → nat-refl/m') → nat-refl/m'
   ]
 

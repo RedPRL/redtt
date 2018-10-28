@@ -21,7 +21,7 @@ def list/code (A : type) : list A → list A → type =
 
 def list/refl (A : type) : (xs : list A) → list/code A xs xs =
   elim [
-  | nil → triv
+  | nil → ★
   | cons x (xs → refl/xs) → (refl, refl/xs)
   ]
 
@@ -87,11 +87,7 @@ def list/encode-decode (A : type)
     → path (list/code A xs ys) (list/encode A xs ys (list/decode A xs ys c)) c
   =
   elim [
-  | nil →
-    elim [
-    | nil → elim [triv → refl]
-    | cons _ _ → elim []
-    ]
+  | nil → λ * * → refl
   | cons x (xs → encode-decode/xs) →
     elim [
     | nil → elim []
@@ -108,11 +104,13 @@ def list/code/hlevel (l : hlevel) (A : type) (A/level : has-hlevel (hsuc (hsuc l
   : (xs ys : list A) → has-hlevel (hsuc l) (list/code A xs ys)
   =
   elim [
-  | nil → elim [
+  | nil →
+    elim [
     | nil → prop→hlevel l unit unit/prop
     | cons y ys → prop→hlevel l void void/prop
     ]
-  | cons x (xs → xs/ih) → elim [
+  | cons x (xs → xs/ih) →
+    elim [
     | nil → prop→hlevel l void void/prop
     | cons y ys →
       sigma/hlevel (hsuc l) (path A x y) (λ _ → list/code A xs ys)
