@@ -1,4 +1,3 @@
-open RedBasis
 open Tm
 
 type rec_spec =
@@ -98,13 +97,13 @@ struct
   type t = (tm, tm) face
 
   let open_var i a (t0, t1, ot) =
-    Tm.open_var i a t0, Tm.open_var i a t1, Option.map (Tm.open_var i a) ot
+    Tm.open_var i a t0, Tm.open_var i a t1, Tm.open_var i a ot
 
   let close_var a i (t0, t1, ot) =
-    Tm.close_var a i t0, Tm.close_var a i t1, Option.map (Tm.close_var a i) ot
+    Tm.close_var a i t0, Tm.close_var a i t1, Tm.close_var a i ot
 
   let subst sub (t0, t1, ot) =
-    Tm.subst sub t0, Tm.subst sub t1, Option.map (Tm.subst sub) ot
+    Tm.subst sub t0, Tm.subst sub t1, Tm.subst sub ot
 end
 
 module Boundary = LocallyNameless.List (Face)
