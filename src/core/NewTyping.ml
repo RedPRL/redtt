@@ -408,8 +408,9 @@ and check_pos cx pos tm =
     let desc = GlobalEnv.lookup_datatype (Cx.genv cx) dlbl in
     check_data_params cx desc.body params;
     let vparams = List.map (fun tm -> D.Cell.con @@ eval cx tm) params in
-    Format.eprintf "typechecker/data/intro@.";
-    raise CanJonHelpMe
+    let data_ty = eval cx @@ Tm.make @@ Tm.Data {lbl = dlbl; params} in (* this can be optimized *)
+    let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
+    check_intro cx data_ty vparams constr args
 
   | `El (D.Data _), Tm.FHCom _ ->
     Format.eprintf "typechecker/data/fhcom@.";
