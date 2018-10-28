@@ -484,6 +484,7 @@ and check_neg cx ty sys tm =
     check_of_ty cx (D.Val.unleash v.ty1) boundary1 vin.tm1
 
   | D.HCom ({ty = `Pos; _} as fhcom) ->
+    (* TODO: unleash a power move like V above *)
     Format.eprintf "typechecker/check element of fhcom@.";
     raise CanJonHelpMe
 
