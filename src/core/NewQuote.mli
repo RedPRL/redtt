@@ -29,6 +29,7 @@ val equate_val : qenv -> rel -> con -> value -> value -> Tm.tm
 val equate_neu : qenv -> rel -> neu -> neu -> Tm.tm
 val equate_tycon : qenv -> rel -> con -> con -> Tm.tm
 val equate_con_sys : qenv -> rel -> con -> con sys -> con sys -> (Tm.tm, Tm.tm) Tm.system
+val equate_tycon_abs_sys : qenv -> rel -> con abs sys -> con abs sys -> (Tm.tm, Tm.tm Tm.bnd) Tm.system
 
 (* TODO: move to QEnv? *)
 val extend : qenv -> value -> con * qenv

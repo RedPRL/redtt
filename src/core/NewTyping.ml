@@ -220,6 +220,38 @@ struct
 
 end
 
+module FHCom =
+struct
+  type t = {r : Tm.tm; r' : Tm.tm; cap : Tm.tm; sys : (Tm.tm, Tm.tm) Tm.system}
+
+  (* For now, we'll do the version that is ok with permutations, but not with
+     extra or duplicate faces. *)
+
+  let split cx ~r ~r' ~ty_cap ~ty_sys tm =
+    match Tm.unleash tm with
+    | Tm.Box box ->
+      raise CanJonHelpMe
+
+    | Tm.Up cmd ->
+      let tr = Q.quote_dim (Cx.qenv cx) r in
+      let tr' = Q.quote_dim (Cx.qenv cx) r' in
+      let cap_frm =
+        let tty_cap = quote_ty cx ty_cap in
+        let tty_sys = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) ty_sys ty_sys in
+        Tm.Cap {r = tr; r' = tr'; ty = tty_cap; sys = tty_sys}
+      in
+      let cap = Tm.up @@ cmd @< cap_frm in
+      let sys =
+        flip List.map ty_sys @@ fun (s, s', _) ->
+        Q.quote_dim (Cx.qenv cx) s, Q.quote_dim (Cx.qenv cx) s', Tm.up cmd
+      in
+      `NoCheck, {r = tr; r' = tr'; cap; sys}
+
+    | _ ->
+      raise PleaseRaiseProperError
+
+end
+
 
 module Cofibration :
 sig
