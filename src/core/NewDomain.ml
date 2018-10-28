@@ -151,7 +151,7 @@ and frame =
   | RestrictForce
   | VProj of {r : dim; func : typed_value} (* rigid when r is an atom *)
   | Cap of {r : dim; r' : dim; ty : value; sys : con abs sys} (* rigid when (r,r') and sys are rigid *)
-  | Elim of {dlbl : string; params : cell list; mot : clo; clauses : (string * nclo) list}
+  | Elim of {lbl : Name.t; params : cell list; mot : clo; clauses : (string * nclo) list}
 
 and typed_value =
   {ty : value option;
@@ -474,7 +474,17 @@ struct
          ty = Val.make @@ eval rel env info.ty;
          sys = eval_bnd_sys rel env info.sys}
 
-    | Tm.Elim _ -> raise CanJonHelpMe
+    | Tm.Elim info ->
+      let mot = Clo {env; bnd = info.mot} in
+      let params =
+        flip List.map info.params @@ fun t ->
+        Cell.lazy_con @@ lazy begin eval rel env t end
+      in
+      let clauses =
+        flip List.map info.clauses @@ fun (lbl, bnd) ->
+        lbl, NClo {env; bnd}
+      in
+      Elim {lbl = info.dlbl; mot; params; clauses}
 
   and eval_bnd rel env =
     function
@@ -2805,7 +2815,7 @@ struct
          sys = ConAbsSys.swap pi info.sys}
     | Elim info ->
       Elim
-        {dlbl = info.dlbl;
+        {lbl = info.lbl;
          params = List.map (Cell.swap pi) info.params;
          mot = Clo.swap pi info.mot;
          clauses = flip List.map info.clauses @@ fun (lbl, nclo) -> lbl, NClo.swap pi nclo}
@@ -2834,7 +2844,7 @@ struct
          sys = ConAbsSys.subst r x info.sys}
     | Elim info ->
       Elim
-        {dlbl = info.dlbl;
+        {lbl = info.lbl;
          params = List.map (Cell.subst r x) info.params;
          mot = Clo.subst r x info.mot;
          clauses = flip List.map info.clauses @@ fun (lbl, nclo) -> lbl, NClo.subst r x nclo}
@@ -2862,7 +2872,7 @@ struct
          sys = ConAbsSys.run rel info.sys}
     | Elim info ->
       Elim
-        {dlbl = info.dlbl;
+        {lbl = info.lbl;
          params = List.map (Cell.run rel) info.params;
          mot = Clo.run rel info.mot;
          clauses = flip List.map info.clauses @@ fun (lbl, nclo) -> lbl, NClo.run rel nclo}

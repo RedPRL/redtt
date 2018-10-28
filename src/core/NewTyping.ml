@@ -939,11 +939,19 @@ and synth_stack cx vhd ty stk  =
     if desc.status = `Partial then raise @@ E PartialDatatypeDeclaration;
     check_data_params cx ~tele:desc.body ~expected:(List.map Option.some data.params) ~params:elim.params;
     Format.eprintf "typechecker / data / elim@.";
-    raise CanJonHelpMe
+
+    let mot_clo = D.Clo {env = Cx.venv cx; bnd = elim.mot} in
+
+    inst_clo cx mot_clo @@
+    let frm = D.Elim {lbl = data.lbl; params = data.params; mot = mot_clo; clauses = raise CanJonHelpMe} in
+    D.Val.plug_then_unleash (Cx.rel cx) frm vhd
 
   | _, frm :: _ ->
     Format.eprintf "typechecker encountered unimplemented frame: %a@." (Tm.pp_frame Pp.Env.emp) frm;
     raise PleaseFillIn
+
+and check_elim_clause ~dlbl ~clbl ~constr =
+  raise CanJonHelpMe
 
 and approx cx ty0 ty1 =
   match polarity ty0, polarity ty1 with
