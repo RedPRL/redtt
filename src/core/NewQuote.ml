@@ -382,7 +382,7 @@ and equate_frame qenv rel frm0 frm1 =
     in
     let mot = equate_tycon_clo qenv rel (Val.make data_ty) elim0.mot elim1.mot in
     let params = equate_data_params qenv rel desc.body elim0.params elim1.params in
-    raise CanJonHelpMe
+    Tm.Elim {dlbl = lbl; params; mot; clauses = raise CanJonHelpMe}
 
   | _ ->
     raise PleaseRaiseProperError
@@ -394,12 +394,12 @@ and equate_tycon_clo qenv rel dom clo0 clo1 =
   let x, qenv_x = extend qenv dom in
   let clo0_x = Clo.inst rel clo0 @@ Cell.con x in
   let clo1_x = Clo.inst rel clo1 @@ Cell.con x in
-  equate_tycon qenv_x rel clo0_x clo1_x
+  Tm.B (Clo.name clo0, equate_tycon qenv_x rel clo0_x clo1_x)
 
 and equate_tycon_quantifier qenv rel quant0 quant1 =
   let dom = equate_tycon qenv rel (Val.unleash quant0.dom) (Val.unleash quant1.dom) in
   let cod = equate_tycon_clo qenv rel quant0.dom quant0.cod quant1.cod in
-  dom, (Clo.name quant0.cod, cod)
+  dom, cod
 
 and equate_tycon qenv rel ty0 ty1 =
   match ty0, ty1 with
@@ -407,12 +407,12 @@ and equate_tycon qenv rel ty0 ty1 =
     equate_neutroid qenv rel neu0.neu neu1.neu
 
   | Pi pi0, Pi pi1 ->
-    let dom, (nm, cod) = equate_tycon_quantifier qenv rel pi0 pi1 in
-    Tm.pi nm dom cod
+    let dom, cod = equate_tycon_quantifier qenv rel pi0 pi1 in
+    Tm.make @@ Pi (dom, cod)
 
   | Sg sg0, Sg sg1 ->
-    let dom, (nm, cod) = equate_tycon_quantifier qenv rel sg0 sg1 in
-    Tm.sg nm dom cod
+    let dom, cod = equate_tycon_quantifier qenv rel sg0 sg1 in
+    Tm.make @@ Tm.Sg (dom, cod)
 
   | Ext extclo0, Ext extclo1 ->
     let nms = ExtClo.names extclo0 in
