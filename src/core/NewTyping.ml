@@ -78,6 +78,14 @@ module Cx = NewCx
 type positive = [`El of D.con | `Dim]
 type phase = [`Pos of positive | `Neg of D.con * D.con D.sys]
 
+
+let pp_positive fmt =
+  function
+  | `El con -> D.Con.pp fmt con
+  | `Dim -> Format.fprintf fmt "dim"
+
+
+
 let eval cx = D.Syn.eval (Cx.rel cx) (Cx.venv cx)
 let eval_dim cx = D.Syn.eval_dim (Cx.venv cx)
 

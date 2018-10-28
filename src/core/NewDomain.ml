@@ -933,6 +933,16 @@ struct
       Neutroid.pp fmt neu
     | ExtLam nclo ->
       Format.fprintf fmt "@[<hv1>(ext-lam@ %a)@]" NClo.pp nclo
+    | Pi quant ->
+      Format.fprintf fmt "@[<hv1>(pi@ %a)@]" Quantifier.pp quant
+    | Sg quant ->
+      Format.fprintf fmt "@[<hv1>(pi@ %a)@]" Quantifier.pp quant
+    | Data _ ->
+      Format.fprintf fmt "<data>"
+    | Univ _ ->
+      Format.fprintf fmt "<univ>"
+    | Ext _ ->
+      Format.fprintf fmt "<ext>"
     | _ ->
       Format.fprintf fmt "<con>"
 
@@ -2525,8 +2535,8 @@ and Quantifier : Domain with type t = quantifier =
 struct
   type t = quantifier
 
-  let pp fmt _ =
-    Format.fprintf fmt "<quantifier>"
+  let pp fmt {dom; cod} =
+    Format.fprintf fmt "%a@ %a" Val.pp dom Clo.pp cod
 
   let swap pi {dom; cod} =
     let dom = Val.swap pi dom in
