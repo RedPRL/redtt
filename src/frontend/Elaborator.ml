@@ -4,6 +4,10 @@ open RedBasis
 open Bwd open BwdNotation
 open Combinators
 
+module C = Contextual
+module U = Unify
+module R = Refiner
+
 module type Import =
 sig
   val top_load_file : FileRes.filepath -> unit Contextual.m
@@ -18,10 +22,6 @@ end
 
 module Make (I : Import) : S =
 struct
-
-  module C = Contextual
-  module U = Unify
-
   open Dev
 
   module M = C
@@ -35,8 +35,6 @@ struct
   let traverse = MonadUtil.traverse
 
   module E = ML
-
-  open Refiner
 
   let univ = Tm.univ ~lvl:`Omega ~kind:`Pre
 
@@ -131,7 +129,7 @@ struct
               match v with
               | E.SemTuple [E.SemTerm ty; E.SemSys sys] ->
                 with_mlenv (fun _ -> env) @@
-                elab_chk e {ty; sys} >>= fun tm ->
+                elab_chk e R.{ty; sys} >>= fun tm ->
                 M.ret @@ E.SemRet (E.SemTerm tm)
               | _ ->
                 failwith "MlApp of ElabClo: calling convention violated"
@@ -147,8 +145,8 @@ struct
       | E.MlElabWithScheme (scheme, e) ->
         elab_scheme scheme >>= fun (names, ty) ->
         let xs = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
-        let bdy_tac = tac_wrap_nf @@ tac_lambda xs @@ elab_chk e in
-        bdy_tac {ty; sys = []} >>= fun tm ->
+        let bdy_tac = R.tac_wrap_nf @@ R.tac_lambda xs @@ elab_chk e in
+        bdy_tac R.{ty; sys = []} >>= fun tm ->
         M.ret @@ E.SemRet (E.SemTuple [E.SemTerm ty; E.SemTerm tm])
 
       | E.MlCheck {ty; tm} ->
@@ -183,7 +181,7 @@ struct
 
       | E.MlUnify ->
         C.go_to_top >>
-        Refiner.unify >>
+        R.unify >>
         M.ret @@ E.SemRet (E.SemTuple [])
 
       | E.MlNormalize v ->
@@ -252,7 +250,7 @@ struct
       | [] ->
         M.ret ([], Desc.TNil [])
       | `Ty (name, edom) :: cells ->
-        elab_chk edom {ty = univ; sys = []} >>= normalize_ty >>= fun ty ->
+        elab_chk edom {ty = univ; sys = []} >>= R.normalize_ty >>= fun ty ->
         let x = Name.named @@ Some name in
         M.in_scope x (`P ty) (elab_params cells) <<@> fun (psi, rest) ->
           (x, `P ty) :: psi, Desc.TCons (ty, Desc.Body.bind x rest)
@@ -344,7 +342,7 @@ struct
       | [] ->
         elab_chk ecod {ty = univ; sys = []}
       | `Ty (name, edom) :: cells ->
-        elab_chk edom {ty = univ; sys = []} >>= normalize_ty >>= fun dom ->
+        elab_chk edom {ty = univ; sys = []} >>= R.normalize_ty >>= fun dom ->
         let x = Name.named @@ Some name in
         M.in_scope x (`P dom) (go cells) <<@> fun codx ->
           Tm.make @@ Tm.Pi (dom, Tm.bind x codx)
@@ -363,11 +361,11 @@ struct
 
   (* TODO: we will be disentangling all the elaboration of concrete expressions from tactics which produce redtt proofs.
      As an example, see what we have done with tac_lambda, tac_if, etc. *)
-  and elab_chk e : chk_tac =
+  and elab_chk e : R.chk_tac =
     fun goal ->
       (* TODO speed up elaboration by not normalizing, but raising ChkMatch if we don't know what to do.
          Then wrap the whole thing in tac_wrap_nf. *)
-      normalize_ty goal.ty >>= fun ty ->
+      R.normalize_ty goal.ty >>= fun ty ->
       let goal = {goal with ty} in
       match goal.sys, Tm.unleash ty, e.con with
       | _, _, E.RunML c ->
@@ -380,41 +378,41 @@ struct
         end
 
       | _, _, E.Guess e ->
-        tac_guess (elab_chk e) goal
+        R.tac_guess (elab_chk e) goal
 
       | _, _, E.Hole (name, None) ->
-        tac_hole ~loc:e.span ~name goal
+        R.tac_hole ~loc:e.span ~name goal
 
       | _, _, E.Hole (name, Some e') ->
-        inspect_goal ~loc:e.span ~name goal >>
+        R.inspect_goal ~loc:e.span ~name goal >>
         elab_chk e' goal
 
       | _, _, E.Hope ->
-        tac_hope goal
+        R.tac_hope goal
 
       | _, _, E.Refl ->
-        tac_refl goal
+        R.tac_refl goal
 
       | _, _, E.Let info ->
         elab_scheme info.sch >>= fun (names, pity) ->
         let ctac goal = elab_chk info.tm goal in
         let ps = List.map (fun nm -> `Var (`Gen (Name.named @@ Some nm))) names in
-        let lambdas = tac_wrap_nf (tac_lambda ps ctac) in
-        let inf_tac = lambdas {ty = pity; sys = []} <<@> fun ltm -> pity, ltm in
+        let lambdas = R.tac_wrap_nf (R.tac_lambda ps ctac) in
+        let inf_tac = lambdas R.{ty = pity; sys = []} <<@> fun ltm -> pity, ltm in
         let body_tac = elab_chk info.body in
         begin
           match info.pat, names with
           | `Var nm, _ ->
-            tac_let (name_of nm) inf_tac body_tac goal
+            R.tac_let (R.name_of nm) inf_tac body_tac goal
           | pat, [] ->
-            tac_inv_let pat inf_tac body_tac goal
+            R.tac_inv_let pat inf_tac body_tac goal
           | _ ->
             failwith "Unsupported destructuring let-binding"
         end
 
       | _, _, E.Lam (ps, e) ->
         let tac = elab_chk e in
-        tac_wrap_nf (tac_lambda ps tac) goal
+        R.tac_wrap_nf (R.tac_lambda ps tac) goal
 
       | [], _, E.Quo tmfam ->
         C.resolver >>= fun renv ->
@@ -432,7 +430,7 @@ struct
         let tac_mot = Option.map elab_chk mot in
         let tac_scrut = elab_inf scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
         let clauses, default = elab_elim_clauses clauses in
-        tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses ~default goal
+        R.tac_elim ~loc:e.span ~tac_mot ~tac_scrut ~clauses ~default goal
 
       | [], Tm.Pi (dom, _), E.ElimFun {clauses} ->
         let x = Name.fresh () in
@@ -440,8 +438,8 @@ struct
         let tac_scrut = M.ret (dom, Tm.up @@ Tm.var x) in
         let clauses, default = elab_elim_clauses clauses in
         let tac_fun =
-          tac_lambda [`Var (`Gen x)] @@
-          tac_elim ~loc:e.span ~tac_mot:None ~tac_scrut ~clauses ~default
+          R.tac_lambda [`Var (`Gen x)] @@
+          R.tac_elim ~loc:e.span ~tac_mot:None ~tac_scrut ~clauses ~default
         in
         tac_fun goal
 
@@ -514,12 +512,12 @@ struct
       | _, Tm.Sg _, Tuple (e0 :: es) ->
         let tac0 = elab_chk e0 in
         let tac1 = elab_chk @@ {e with con = Tuple es} in
-        tac_pair tac0 tac1 goal
+        R.tac_pair tac0 tac1 goal
 
       | _, Tm.V _, Tuple (e0 :: es) ->
         let tac0 = elab_chk e0 in
         let tac1 = elab_chk @@ {e with con = Tuple es} in
-        tac_pair tac0 tac1 goal
+        R.tac_pair tac0 tac1 goal
 
       | [], Tm.Univ info, Type (kind, lvl) ->
         begin
@@ -560,7 +558,7 @@ struct
 
       | _, _, _ ->
         elab_chk e {goal with sys = []} >>= fun tm ->
-        guess_restricted tm goal
+        R.guess_restricted tm goal
 
 
   and elab_tm_sys ty =
@@ -698,7 +696,7 @@ struct
     | `Ok -> M.ret @@ Tm.up cmd
     | `Exn exn ->
       C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-      unify >>
+      R.unify >>
       C.check ~ty @@ Tm.up cmd >>= function
       | `Ok ->
         M.ret @@ Tm.up cmd
@@ -774,7 +772,7 @@ struct
       let tac_mot = elab_chk mot in
       let tac_scrut = elab_inf scrut <<@> fun (ty, cmd) -> ty, Tm.up cmd in
       let clauses, default = elab_elim_clauses clauses in
-      tac_elim_inf ~loc:e.span ~tac_mot ~tac_scrut ~clauses ~default <<@> fun (ty, tm) ->
+      R.tac_elim_inf ~loc:e.span ~tac_mot ~tac_scrut ~clauses ~default <<@> fun (ty, tm) ->
         ty, Tm.ann ~ty ~tm
 
     | _ ->
@@ -951,7 +949,7 @@ struct
       M.ret @@ Tm.up cmd
     | `Exn exn ->
       C.active @@ Dev.Subtype {ty0 = ty'; ty1 = ty} >>
-      Refiner.unify >>
+      R.unify >>
       C.check ~ty @@ Tm.up cmd >>= function
       | `Ok ->
         M.ret @@ Tm.up cmd
@@ -965,7 +963,7 @@ struct
 
   and elab_cut_bwd exp frms =
     elab_cut_bwd_ exp frms >>= fun (ty, cmd) ->
-    normalize_ty ty >>= fun ty ->
+    R.normalize_ty ty >>= fun ty ->
     M.ret (ty, cmd)
 
   and elab_cut_bwd_ exp frms =
@@ -977,7 +975,7 @@ struct
     let try_nf ty kont =
       try kont ty with
       | Refiner.ChkMatch ->
-        normalize_ty ty >>= kont
+        R.normalize_ty ty >>= kont
     in
 
 
@@ -1001,7 +999,7 @@ struct
             let ty, _ = Tm.unbind_ext_with (List.map (fun tr -> Tm.DownX tr, []) trs0) ebnd in
             go dims1 (ty, cmd @< (Tm.ExtApp trs0))
           | _ ->
-            raise ChkMatch
+            raise R.ChkMatch
       in
       elab_cut_bwd exp spine >>= go dims
 
@@ -1014,7 +1012,7 @@ struct
           elab_chk e {ty = dom; sys = []} <<@> fun arg ->
             Tm.unbind_with (Tm.ann ~ty:dom ~tm:arg) cod, cmd @< Tm.FunApp arg
         | _ ->
-          raise ChkMatch
+          raise R.ChkMatch
       end
 
     | spine, `Fst ->
@@ -1025,7 +1023,7 @@ struct
         | Tm.Sg (dom, _) ->
           M.ret (dom, cmd @< Tm.Fst)
         | _ ->
-          raise ChkMatch
+          raise R.ChkMatch
       end
 
     | spine, `Snd ->
@@ -1037,7 +1035,7 @@ struct
           let cod' = Tm.unbind_with (cmd @< Tm.Fst) cod in
           M.ret (cod', cmd @< Tm.Snd)
         | _ ->
-          raise ChkMatch
+          raise R.ChkMatch
       end
 
     | spine, `VProj ->
@@ -1056,7 +1054,7 @@ struct
           let func = Tm.up @@ Tm.ann ~ty:(Tm.equiv ty0 ty1) ~tm:equiv @< Tm.Fst in
           M.ret (ty1, cmd @< Tm.VProj {r; func; ty0; ty1})
         | _ ->
-          raise ChkMatch
+          raise R.ChkMatch
       end
 
     | _ ->

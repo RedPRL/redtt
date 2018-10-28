@@ -123,6 +123,7 @@ let user_define gm alpha source visibility opacity ~ty tm =
   let tm = abstract_tm gm tm in
   check ~ty tm >>= function
   | `Exn exn ->
+    Format.eprintf "Failed to check: %a@." Tm.pp0 tm;
     raise exn
   | `Ok ->
     begin
@@ -535,6 +536,7 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
 
   in
   go (Bwd.from_list sp0) (Bwd.from_list sp1)
+
 
 
 (* invariant: will not be called on inequations which are already reflexive *)

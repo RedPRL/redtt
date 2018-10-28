@@ -299,10 +299,10 @@ let lookup_top x =
 let restore_top x ~stem (entry, rigidity) =
   assert_top_level >>
   modifyth @@ fun th ->
-    {th with
-     env = GlobalEnv.ext th.env x entry;
-     rigidity = Map.update x (fun _ -> rigidity) th.rigidity;
-     source = Map.add x stem th.source}
+  {th with
+   env = GlobalEnv.ext th.env x entry;
+   rigidity = Map.update x (fun _ -> rigidity) th.rigidity;
+   source = Map.add x stem th.source}
 
 let resolver =
   let rec go_locals renv =
