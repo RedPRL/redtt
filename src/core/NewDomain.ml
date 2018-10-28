@@ -607,15 +607,15 @@ struct
   and eval_bnd_sys rel env =
     List.map (eval_bnd_face rel env)
 
-  and eval_tm_face rel env (tr, tr', tm_opt) =
+  and eval_tm_face rel env (tr, tr', tm) =
     let r = eval_dim env tr in
     let r' = eval_dim env tr' in
-    match Rel.equate r r' rel, tm_opt with
-    | `Changed rel, tm ->
+    match Rel.equate r r' rel with
+    | `Changed rel ->
       let env = Env.run rel env in
       let v = lazy begin eval rel env tm end in
       (r, r', LazyVal.make_from_lazy v)
-    | `Same, tm ->
+    | `Same ->
       let v = lazy begin eval rel env tm end in
       (r, r', LazyVal.make_from_lazy v)
     | exception I.Inconsistent ->
