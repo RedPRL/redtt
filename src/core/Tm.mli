@@ -52,6 +52,8 @@ val shift_univ : int -> tm -> tm
 val eta_contract : tm -> tm
 
 
+val forty_two : tm
+
 val up : tm cmd -> tm
 val ann : ty:tm -> tm:tm -> tm cmd
 

@@ -9,6 +9,11 @@ let greater l0 l1 =
   | `Const i0, `Const i1 -> i0 > i1
   | _ -> false
 
+let max l0 l1 =
+  match l0, l1 with
+  | `Const i0, `Const i1 -> `Const (max i0 i1)
+  | _ -> `Omega
+
 let lte l0 l1 = l0 = l1 || greater l1 l0
 
 let shift k =

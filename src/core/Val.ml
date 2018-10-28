@@ -1230,6 +1230,8 @@ struct
       in
       make_intro ~dlbl ~params:vparams ~clbl @@ go args @@ Desc.Constr.specs constr
 
+    | Tm.FortyTwo -> make FortyTwo
+
   and make_intro ~dlbl ~params ~clbl (args : env_el list) : value =
     let desc = Sig.lookup_datatype dlbl in
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
@@ -1378,19 +1380,17 @@ struct
     | `Ok sys ->
       make @@ Up {ty; neu; sys}
 
-  and eval_bnd_face rho (tr, tr', obnd) =
+  and eval_bnd_face rho (tr, tr', bnd) =
     let sr = eval_dim rho tr in
     let sr' = eval_dim rho tr' in
     match Eq.make sr sr' with
     | `Ok xi ->
-      let bnd = Option.get_exn obnd in
       let rho' = Env.act (I.equate sr sr') rho in
       let abs = lazy begin eval_bnd rho' bnd end in
       Face.Indet (xi, abs)
     | `Apart _ ->
       Face.False (sr, sr')
     | `Same _ ->
-      let bnd = Option.get_exn obnd in
       let abs = lazy begin eval_bnd rho bnd end in
       Face.True (sr, sr', abs)
 
@@ -1405,12 +1405,11 @@ struct
     | ProjAbs abs ->
       `Proj abs
 
-  and eval_tm_face rho (tr, tr', otm) : val_face =
+  and eval_tm_face rho (tr, tr', tm) : val_face =
     let r = eval_dim rho tr in
     let r' = eval_dim rho tr' in
     match Eq.make r r' with
     | `Ok xi ->
-      let tm = Option.get_exn otm in
       let rho' = Env.act (I.equate r r') rho in
       (* The problem here is that the this is not affecting GLOBALS! *)
       let el = lazy begin eval rho' tm end in
@@ -1418,7 +1417,6 @@ struct
     | `Apart _ ->
       Face.False (r, r')
     | `Same _ ->
-      let tm = Option.get_exn otm in
       let el = lazy begin eval rho tm end in
       Face.True (r, r', el)
 
