@@ -950,9 +950,18 @@ and synth_stack cx vhd ty stk  =
 
     let mot_clo = D.Clo {env = Cx.venv cx; bnd = elim.mot} in
 
-    inst_clo cx mot_clo @@
-    let frm = D.Elim {lbl = data.lbl; params = data.params; mot = mot_clo; clauses = raise CanJonHelpMe} in
-    D.Val.plug_then_unleash (Cx.rel cx) frm vhd
+    (* TODO: check clauses *)
+
+    let vhd =
+      let clauses =
+        flip List.map elim.clauses @@ fun (clbl, bnd) ->
+        clbl, D.NClo {env = Cx.venv cx; bnd}
+      in
+      let frm = D.Elim {lbl = data.lbl; params = data.params; mot = mot_clo; clauses} in
+      D.Val.plug (Cx.rel cx) frm vhd
+    in
+    let ty = inst_clo cx mot_clo @@ D.Val.unleash vhd in
+    synth_stack cx vhd ty stk
 
   | _, frm :: _ ->
     Format.eprintf "typechecker encountered unimplemented frame: %a@." (Tm.pp_frame Pp.Env.emp) frm;
