@@ -421,7 +421,8 @@ and check_pos cx pos tm =
     check_of_ty_ "data/fhcom/cap" cx ty [] hcom.cap;
     let vcap = eval cx hcom.cap in
     let cxx, x = Cx.extend_dim cx ~name:None in
-    check_bnd_sys ~cx ~cxx ~x ~r ~ty ~cap:vcap hcom.sys
+    let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty ~cap:vcap hcom.sys in
+    ()
 
   | _ ->
     Format.eprintf "typechecker/data/check_pos@.";
