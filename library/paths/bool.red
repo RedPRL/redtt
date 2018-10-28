@@ -6,16 +6,8 @@ import basics.isotoequiv
 
 def bool-path/code : bool → bool → type =
   elim [
-  | tt →
-    elim [
-    | tt → unit
-    | ff → void
-    ]
-  | ff →
-    elim [
-    | tt → void
-    | ff → unit
-    ]
+  | tt → elim [tt → unit | ff → void]
+  | ff → elim [tt → void | ff → unit]
   ]
 
 def bool-refl : (x : bool) → bool-path/code x x =
