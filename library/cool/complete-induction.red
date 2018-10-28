@@ -16,8 +16,9 @@ def le : nat → nat → type =
 
 def le/suc/right : (n m : nat) → le n m → le n (suc m) =
   elim [
-  | zero → λ _ _ →  triv
-  | suc (n' → f) → elim [
+  | zero → λ _ _ → ★
+  | suc (n' → f) →
+    elim [
     | zero → elim []
     | suc m' → λ l → f m' l
     ]
@@ -25,13 +26,13 @@ def le/suc/right : (n m : nat) → le n m → le n (suc m) =
 
 def le/suc : (n m : nat) → le n m → le (suc n) (suc m) =
   elim [
-  | zero → λ _ _ →  triv
+  | zero → λ _ _ → ★
   | suc _ → λ _ l → l
   ]
 
 def le/refl : (n : nat) → le n n =
   elim [
-  | zero → triv
+  | zero → ★
   | suc (_ → f) → f
   ]
 
@@ -45,7 +46,7 @@ def le/case : (m n : nat) → (le n (suc m)) → or (path nat n (suc m)) (le n m
   elim [
   | zero →
     elim [
-    | zero → λ _ → inr triv
+    | zero → λ _ → inr ★
     | suc n' →
       elim n' [
       | zero → λ _ → inl refl
@@ -54,7 +55,7 @@ def le/case : (m n : nat) → (le n (suc m)) → or (path nat n (suc m)) (le n m
     ]
   | suc (m' → c) →
     elim [
-    | zero → λ _ → inr triv
+    | zero → λ _ → inr ★
     | suc n' → λ p →
       elim (c n' p) [
       | inl p → inl (λ i → suc (p i))
