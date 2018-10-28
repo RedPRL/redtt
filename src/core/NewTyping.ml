@@ -332,14 +332,14 @@ let rec check cx (phase : phase) tm =
     check cx (`Pos `Dim) vin.r;
     let r = eval_dim cx vin.r in
     begin
-      match Cx.restrict cx r `Dim0 with
+      match D.Rel.compare r `Dim0 (Cx.rel cx) with
       | `Same ->
         (* r = 0 *)
         check cx phase vin.tm0
-      | exception I.Inconsistent ->
+      | `Apart ->
         (* r = 1 *)
         check cx phase vin.tm1
-      | `Changed cx_r0 ->
+      | `Indet ->
         (* r = x, ty must be V... *)
         match phase with
         | `Neg (ty, sys) ->
