@@ -412,9 +412,16 @@ and check_pos cx pos tm =
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
     check_intro cx data_ty vparams constr args
 
-  | `El (D.Data _), Tm.FHCom _ ->
-    Format.eprintf "typechecker/data/fhcom@.";
-    raise PleaseFillIn
+  | `El (D.Data _ as ty ), Tm.FHCom hcom ->
+    check cx (`Pos `Dim) hcom.r;
+    check cx (`Pos `Dim) hcom.r';
+    let r = eval_dim cx hcom.r in
+    let r' = eval_dim cx hcom.r' in
+    Cofibration.check_valid @@ Cofibration.from_sys cx hcom.sys;
+    check_of_ty_ "data/fhcom/cap" cx ty [] hcom.cap;
+    let vcap = eval cx hcom.cap in
+    let cxx, x = Cx.extend_dim cx ~name:None in
+    check_bnd_sys ~cx ~cxx ~x ~r ~ty ~cap:vcap hcom.sys
 
   | _ ->
     Format.eprintf "typechecker/data/check_pos@.";
