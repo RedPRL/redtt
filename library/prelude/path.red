@@ -34,11 +34,11 @@ def funext
   λ i x →
   p _ i
 
-def apd 
-  (A : type) (P : A → type) 
-  (f : (x : A) → P x) (x y : A) (p : path A x y) 
-  : path (P y) (coe 0 1 (f x) in λ i → P (p i)) (f y) = 
-  λ i → coe i 1 (f (p i)) in λ j → P (p j) 
+def apd
+  (A : type) (P : A → type)
+  (f : (x : A) → P x) (x y : A) (p : path A x y)
+  : path (P y) (coe 0 1 (f x) in λ i → P (p i)) (f y) =
+  λ i → coe i 1 (f (p i)) in λ j → P (p j)
 
 def symm/filler (A : type) (p : 𝕀 → A) (j i : 𝕀) : A =
   comp 0 j (p 0) [
@@ -112,16 +112,16 @@ def symmd (A : 𝕀 → type) (p : (i : 𝕀) → A i) : pathd (symm^1 _ A) (p 1
   ]
 
 -- transporting backwards is transporting forwards along inverted path (up to composition)
-def coe/symm/d (A : type) (P : A → type) (x y : A) (p : path A x y) (py : P y) :  
-  pathd (trans^1 _ (λ k → P (p k)) (λ k → P (symm _ p k))) 
-        (coe 1 0 py in λ k → P (p k)) 
-        (coe 0 1 py in λ k → P (symm _ p k)) = 
-  λ i →        
-  comp 0 1 (coe 1 i py in λ k → P (p k)) in 
+def coe/symm/d (A : type) (P : A → type) (x y : A) (p : path A x y) (py : P y) :
+  pathd (trans^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)))
+        (coe 1 0 py in λ k → P (p k))
+        (coe 0 1 py in λ k → P (symm _ p k)) =
+  λ i →
+  comp 0 1 (coe 1 i py in λ k → P (p k)) in
   λ j → trans/filler^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)) j i [
   | i=0 → refl
   | i=1 → λ k → coe 0 k py in λ l → P (symm A p l)
-  ]  
+  ]
 
 def J (A : type) (p : 𝕀 → A) (C : [i] A [i=0 → p 0] → type) (d : C refl) : C p =
   coe 0 1 d in λ i →
