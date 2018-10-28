@@ -1230,7 +1230,7 @@ struct
       in
       make_intro ~dlbl ~params:vparams ~clbl @@ go args @@ Desc.Constr.specs constr
 
-    | Tm.FortyTwo -> make FortyTwo 
+    | Tm.FortyTwo -> make FortyTwo
 
   and make_intro ~dlbl ~params ~clbl (args : env_el list) : value =
     let desc = Sig.lookup_datatype dlbl in

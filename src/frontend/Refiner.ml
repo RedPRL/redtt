@@ -655,7 +655,7 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
           let r = D.Syn.eval_dim env tr in
           let r' = D.Syn.eval_dim env tr' in
           let rel_rr' = NewRestriction.equate' r r' (Cx.rel cx) in
-          r, r', D.LazyVal.make @@ image_of_bterm rel_rr' @@ tm
+          r, r', D.LazyVal.make @@ image_of_bterm rel_rr' tm
         in
 
         (* What is the image of the boundary in the current fiber of the motive? *)
