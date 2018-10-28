@@ -5,8 +5,6 @@ module Rel = NewRestriction
 
 exception PleaseFillIn
 exception PleaseRaiseProperError
-exception CanJonHelpMe
-(* exception CanFavoniaHelpMe *)
 
 module QEnv :
 sig
@@ -382,13 +380,61 @@ and equate_frame qenv rel frm0 frm1 =
     in
     let mot = equate_tycon_clo qenv rel (Val.make data_ty) elim0.mot elim1.mot in
     let params = equate_data_params qenv rel desc.body elim0.params elim1.params in
-    Tm.Elim {dlbl = lbl; params; mot; clauses = raise CanJonHelpMe}
+    let equate_clauses_for_constr (clbl, constr) =
+      let nclo0 = Frame.find_elim_clause clbl elim0.clauses in
+      let nclo1 = Frame.find_elim_clause clbl elim1.clauses in
+      equate_elim_clause qenv rel ~data_ty ~mot:elim0.mot ~dlbl:elim0.lbl ~clbl ~constr ~params:elim0.params nclo0 nclo1
+    in
+    let clauses = List.map equate_clauses_for_constr @@ Desc.constrs desc in
+    Tm.Elim {dlbl = lbl; params; mot; clauses}
 
   | _ ->
     raise PleaseRaiseProperError
 
-and equate_elim_clause constr nclo0 nclo1 =
-  raise CanJonHelpMe
+and equate_elim_clause qenv rel ~data_ty ~mot ~dlbl ~clbl ~constr ~params nclo0 nclo1 =
+  let rec loop qenv tyenv out_cells (out_args : constr_cell bwd) specs =
+    match specs with
+    | (_, `Const ty) :: specs ->
+      let vty = Syn.eval rel tyenv ty in
+      let x, qenvx = extend qenv @@ Val.make vty in
+      let tyenvx = Env.extend_cell tyenv @@ Cell.con x in
+      let out_cellsx = out_cells #< (Cell.con x) in
+      let out_argsx = out_args #< (ConstrCell.const x) in
+      loop qenvx tyenvx out_cellsx out_argsx specs
+
+    | (_, `Rec Desc.Self) :: specs ->
+      let x, qenvx = extend qenv @@ Val.make data_ty in
+      let ih, qenvxih = extend qenvx @@ Val.make @@ Clo.inst rel mot @@ Cell.con x in
+      let tyenvx = Env.extend_cell tyenv @@ Cell.con x in
+      let out_cellsxih = out_cells <>< [Cell.con x; Cell.con ih] in
+      let out_argsx = out_args #< (ConstrCell.rec_ `Self x) in
+      loop qenvxih tyenvx out_cellsxih out_argsx specs
+
+    | (nm, `Dim) :: specs ->
+      let x = Name.named nm in
+      let qenvx = QEnv.abs1 x qenv in
+      let r = `Atom x in
+      let tyenvr = Env.extend_cell tyenv @@ Cell.dim r in
+      let out_cellsr = out_cells #< (Cell.dim r) in
+      let out_argsr = out_args #< (ConstrCell.dim r) in
+      loop qenvx tyenvr out_cellsr out_argsr specs
+
+    | [] ->
+      qenv, Bwd.to_list out_cells, Bwd.to_list out_args
+  in
+
+  let tyenv = Env.extend_cells (Env.init (QEnv.genv qenv)) params in
+  let qenv_clause, clause_cells, args = loop qenv tyenv Emp Emp @@ Desc.Constr.specs constr in
+  let bdy0 = NClo.inst rel nclo0 clause_cells in
+  let bdy1 = NClo.inst rel nclo1 clause_cells in
+  let intro =
+    let benv = Env.extend_cells tyenv @@ List.map ConstrCell.to_cell args in
+    let sys = Syn.eval_tm_sys rel benv @@ Desc.Constr.boundary constr in
+    Con.make_intro rel ~dlbl ~clbl ~args ~sys
+  in
+  let mot_intro = Clo.inst rel mot @@ Cell.con intro in
+  let bdy = equate_con qenv_clause rel mot_intro bdy0 bdy1 in
+  clbl, Tm.NB (NClo.names nclo0, bdy)
 
 and equate_tycon_clo qenv rel dom clo0 clo1 =
   let x, qenv_x = extend qenv dom in

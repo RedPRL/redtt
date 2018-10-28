@@ -791,9 +791,27 @@ struct
     | `Val v -> `Val (LazyVal.run rel v)
 end
 
-and ConstrCell : Domain with type t = constr_cell =
+and ConstrCell :
+sig
+  include Domain with type t = constr_cell
+  val dim : dim -> t
+  val const : con -> t
+  val rec_ : constr_rec_spec -> con -> t
+
+  val to_cell : t -> cell
+end =
 struct
   type t = constr_cell
+
+  let dim r = `Dim r
+  let const el = `Const (Val.make el)
+  let rec_ rspec el = `Rec (rspec, Val.make el)
+
+  let to_cell : t -> cell =
+    function
+    | `Dim r -> Cell.dim r
+    | `Rec (_, el) -> Cell.value el
+    | `Const el -> Cell.value el
 
   let pp fmt _ =
     Format.fprintf fmt "<constr-cell>"
@@ -898,9 +916,6 @@ sig
   val make_intro : rel -> dlbl:Name.t -> clbl:string -> args:constr_cell list -> sys:con sys -> con
 
   val make_arr : rel -> value -> value -> con
-
-  (* TODO: move to some other module *)
-  val find_elim_clause : string -> (string * nclo) list -> nclo
 end =
 struct
   module ConFace = Face (Con)
@@ -1482,7 +1497,7 @@ struct
           [Cell.dim r]
       in
       let cells = ListUtil.flat_map act_on_constr_cell intro.args in
-      let nclo = find_elim_clause intro.clbl elim.clauses in
+      let nclo = Frame.find_elim_clause intro.clbl elim.clauses in
       NClo.inst rel nclo cells
 
     | Elim elim, HCom ({ty = `Pos; _} as hcom) ->
@@ -1516,18 +1531,6 @@ struct
     | VProj _, _ -> raise PleaseRaiseProperError
     | Cap _, _ -> raise PleaseRaiseProperError
     | Elim _, _ -> raise PleaseRaiseProperError
-
-  and find_elim_clause lbl clauses =
-    let f =
-      function
-      | (lbl', nclo) when lbl' = lbl -> Some nclo
-      | _ -> None
-    in
-    match ListUtil.find_map_opt f clauses with
-    | Some nclo -> nclo
-    | None -> raise PleaseRaiseProperError
-
-
 
   and rigid_plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
@@ -2776,12 +2779,25 @@ sig
    * Frame -> Sys -> Face -> Frame. Therefore we were using
    * {[[`Rigid of t | `Triv of con]]} below. *)
   val force : rel -> t -> hd:con -> [`Rigid of t | `Triv of con]
+
+  val find_elim_clause : string -> (string * nclo) list -> nclo
 end =
 struct
   type t = frame
 
   module ConAbs = AbsPlug (Con)
   module ConAbsSys = Sys (AbsPlug (Con))
+
+  let find_elim_clause lbl clauses =
+    let f =
+      function
+      | (lbl', nclo) when lbl' = lbl -> Some nclo
+      | _ -> None
+    in
+    match ListUtil.find_map_opt f clauses with
+    | Some nclo -> nclo
+    | None -> raise PleaseRaiseProperError
+
 
   let pp fmt =
     function
