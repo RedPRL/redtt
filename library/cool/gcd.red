@@ -44,7 +44,7 @@ def mod : (n : nat) → mod/prop n =
           | zero → zero
           | suc _ → suc n
           ]
-        | suc _ → (f (sub (suc n) (suc m')) (sub/le n m')) (suc m')
+        | suc _ → f (sub (suc n) (suc m')) (sub/le n m') (suc m')
         ]
       ]
     )
@@ -52,13 +52,13 @@ def mod : (n : nat) → mod/prop n =
 def id/nat : nat → nat =
   elim [
   | zero → zero
-  | suc (n' → f) → suc f
+  | suc (_ → f) → suc f
   ]
 
 def eta : (n : nat) → path nat (id/nat n) n =
   elim [
   | zero → refl
-  | suc (n' → p) → λ i → suc (p i)
+  | suc (_ → p) → λ i → suc (p i)
   ]
 
 def sub/plus/path : (m n : nat) → le n m → path nat (plus n (sub m n)) m =
@@ -68,7 +68,7 @@ def sub/plus/path : (m n : nat) → le n m → path nat (plus n (sub m n)) m =
     trans nat (eta n) path/n/0
   | suc (m' → f) → elim [
     | zero → refl
-    | suc n' → λ p → λ i → suc ((f n' p) i)
+    | suc n' → λ p i → suc ((f n' p) i)
     ]
   ]
 
@@ -81,10 +81,12 @@ def plus/le : (m n : nat) → le m (plus m n) =
 def le/trans : (m n l : nat) → le m n → le n l → le m l =
   elim [
   | zero → λ _ _ _ _ → ★
-  | suc (m' → f) → elim [
-    | zero → λ l m'/le/n n/le/l → elim m'/le/n []
-    | suc n' → elim [
-      | zero → λ _ n/le/l → elim n/le/l []
+  | suc (m' → f) →
+    elim [
+    | zero → λ _ → elim []
+    | suc n' →
+      elim [
+      | zero → λ _ → elim []
       | suc l' → f n' l'
       ]
     ]
@@ -107,16 +109,17 @@ def sub/le/implies/le : (m n k : nat) → path nat (suc k) (sub m n) → le n m 
 def suc/right/path : (m n : nat) → path nat (plus (suc m) n) (plus m (suc n)) =
   elim [
   | zero → refl
-  | suc (m' → f) → λ n i → suc (f n i)
+  | suc (_ → f) → λ n i → suc (f n i)
   ]
 
 def path/implies/le (p : dim → nat) : le (p 0) (p 1) =
   coe 0 1 (le/refl (p 0)) in (λ i → le (p 0) (p i))
 
-def gcd/prop : nat → type = λ m → (x y : nat) → le (plus x y) m → nat
+def gcd/prop (m : nat) : type =
+  (x y : nat) → le (plus x y) m → nat
 
 def gcd' : (m : nat) → gcd/prop m =
-  let complete = weak/implies/complete gcd/prop (λ P → realize/weak/induction P) in
+  let complete = weak/implies/complete gcd/prop realize/weak/induction in
   complete
     (λ _ _ _ → zero)
     (λ m f → λ x y →
