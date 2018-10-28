@@ -337,8 +337,7 @@ let rec check cx (phase : phase) tm =
     check cx' phase body
 
   | _, Tm.VIn vin ->
-    check cx (`Pos `Dim) vin.r;
-    let r = eval_dim cx vin.r in
+    let r = check_eval_dim cx vin.r in
     begin
       match D.Rel.compare r `Dim0 (Cx.rel cx) with
       | `Same ->
@@ -357,10 +356,8 @@ let rec check cx (phase : phase) tm =
     end
 
   | _, Tm.Box box ->
-    check cx (`Pos `Dim) box.r;
-    check cx (`Pos `Dim) box.r';
-    let r = eval_dim cx box.r in
-    let r' = eval_dim cx box.r' in
+    let r = check_eval_dim cx box.r in
+    let r' = check_eval_dim cx box.r' in
     begin
       match D.Rel.compare r r' (Cx.rel cx) with
       | `Same ->
@@ -378,10 +375,8 @@ let rec check cx (phase : phase) tm =
             end
           | (r, r', tm) :: sys ->
             begin
-              check cx (`Pos `Dim) box.r;
-              check cx (`Pos `Dim) box.r';
-              let r = eval_dim cx box.r in
-              let r' = eval_dim cx box.r' in
+              let r = check_eval_dim cx box.r in
+              let r' = check_eval_dim cx box.r' in
               match D.Rel.compare r r' (Cx.rel cx) with
               | `Same ->
                 check cx phase tm
@@ -420,10 +415,8 @@ and check_pos cx pos tm =
     check_intro cx data_ty vparams constr args
 
   | `El (D.Data _ as ty ), Tm.FHCom hcom ->
-    check cx (`Pos `Dim) hcom.r;
-    check cx (`Pos `Dim) hcom.r';
-    let r = eval_dim cx hcom.r in
-    let r' = eval_dim cx hcom.r' in
+    let r = check_eval_dim cx hcom.r in
+    let r' = check_eval_dim cx hcom.r' in
     Cofibration.check_valid @@ Cofibration.from_sys cx hcom.sys;
     check_of_ty_ "data/fhcom/cap" cx ty [] hcom.cap;
     let vcap = eval cx hcom.cap in
@@ -434,6 +427,13 @@ and check_pos cx pos tm =
   | _ ->
     Format.eprintf "typechecker/data/check_pos@.";
     raise PleaseRaiseProperError
+
+and check_dim cx r =
+  check cx (`Pos `Dim) r
+
+and check_eval_dim cx r =
+  check_dim cx r;
+  eval_dim cx r
 
 and check_neg cx ty sys tm =
   match ty with
@@ -479,8 +479,7 @@ and check_neg cx ty sys tm =
     let ty0 = D.Val.unleash v.ty0 in
     let ty1 = D.Val.unleash v.ty1 in
     let mode, vin = V.split cx ~r:v.r ~ty0 ~ty1 ~equiv:v.equiv tm in
-    check cx (`Pos `Dim) vin.r;
-    let r = eval_dim cx vin.r in
+    let r = check_eval_dim cx vin.r in
     let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) v.r r in
     let cx_r0 = Cx.restrict_ cx r `Dim0 in
 
@@ -551,8 +550,8 @@ and check_ty cx kind tm : Lvl.t =
     if Kind.lte kind `Kan then
       raise @@ E KindError;
     begin
-      let r = eval_dim cx tr in
-      let r' = eval_dim cx tr' in
+      let r = check_eval_dim cx tr in
+      let r' = check_eval_dim cx tr' in
       match Cx.restrict cx r r', otm with
       | `Changed cx_rr', tm ->
         check_ty cx_rr' kind tm
@@ -563,9 +562,8 @@ and check_ty cx kind tm : Lvl.t =
     end
 
   | Tm.V v ->
-    check cx (`Pos `Dim) v.r;
+    let r = check_eval_dim cx v.r in
     let lvl1 = check_ty cx kind v.ty1 in
-    let r = eval_dim cx v.r in
     begin
       match Cx.restrict_ cx r `Dim0 with
       | cx_r0 ->
@@ -587,10 +585,8 @@ and check_ty cx kind tm : Lvl.t =
     desc.lvl
 
   | Tm.FHCom hcom ->
-    check cx (`Pos `Dim) hcom.r;
-    check cx (`Pos `Dim) hcom.r';
-    let r = eval_dim cx hcom.r in
-    let r' = eval_dim cx hcom.r' in
+    let r = check_eval_dim cx hcom.r in
+    let r' = check_eval_dim cx hcom.r' in
     Cofibration.check_valid @@ Cofibration.from_sys cx hcom.sys;
     let lvl = check_ty cx `Kan hcom.cap in
     let vcap = eval cx hcom.cap in
@@ -604,10 +600,8 @@ and check_ty cx kind tm : Lvl.t =
 
 and check_tm_face cx ty sys face =
   let tr, tr', tm = face in
-  check cx (`Pos `Dim) tr;
-  check cx (`Pos `Dim) tr';
-  let r = eval_dim cx tr in
-  let r' = eval_dim cx tr' in
+  let r = check_eval_dim cx tr in
+  let r' = check_eval_dim cx tr' in
   match Cx.restrict cx r r' with
   | `Changed cx_rr' ->
     let rel_rr' = Cx.rel cx_rr' in
@@ -660,8 +654,7 @@ and check_intro cx data_ty params constr tms =
       let el = eval cx tm in
       D.Env.extend_cell tyenv @@ D.Cell.con el
     | `Dim ->
-      check cx (`Pos `Dim) tm;
-      let r = eval_dim cx tm in
+      let r = check_eval_dim cx tm in
       D.Env.extend_cell tyenv @@ D.Cell.dim r
   in
 
@@ -679,10 +672,8 @@ and check_intro cx data_ty params constr tms =
 (* TODO: check this *)
 and check_bnd_face ~cx ~cxx ~x ~r ~ty sys face =
   let ts, ts', (Tm.B (_, tm)) = face in
-  check cx (`Pos `Dim) ts;
-  check cx (`Pos `Dim) ts';
-  let s = eval_dim cx ts in
-  let s' = eval_dim cx ts' in
+  let s = check_eval_dim cx ts in
+  let s' = check_eval_dim cx ts' in
   match Cx.restrict cxx s s' with
   | `Changed cxx_ss' ->
     let rel_ss' = Cx.rel cxx_ss' in
@@ -757,10 +748,8 @@ and synth_head cx hd =
     Cx.lookup_const cx ~ushift:meta.ushift meta.name
 
   | Tm.HCom hcom ->
-    check cx (`Pos `Dim) hcom.r;
-    check cx (`Pos `Dim) hcom.r';
-    let r = eval_dim cx hcom.r in
-    let r' = eval_dim cx hcom.r' in
+    let r = check_eval_dim cx hcom.r in
+    let r' = check_eval_dim cx hcom.r' in
     let _ = check_ty_ "hcom" cx `Kan hcom.ty in
     let vty = eval cx hcom.ty in
     Cofibration.check_valid @@ Cofibration.from_sys cx hcom.sys;
@@ -771,10 +760,8 @@ and synth_head cx hd =
     `El vty
 
   | Tm.Com com ->
-    check cx (`Pos `Dim) com.r;
-    check cx (`Pos `Dim) com.r';
-    let r = eval_dim cx com.r in
-    let r' = eval_dim cx com.r' in
+    let r = check_eval_dim cx com.r in
+    let r' = check_eval_dim cx com.r' in
     let cxx, x = Cx.extend_dim cx ~name:None in
     let Tm.B (_, ty) = com.ty in
     let _ = check_ty_ "com" cxx `Kan ty in
@@ -788,10 +775,8 @@ and synth_head cx hd =
     `El vty_r'
 
   | Tm.GHCom ghcom ->
-    check cx (`Pos `Dim) ghcom.r;
-    check cx (`Pos `Dim) ghcom.r';
-    let r = eval_dim cx ghcom.r in
-    let r' = eval_dim cx ghcom.r' in
+    let r = check_eval_dim cx ghcom.r in
+    let r' = check_eval_dim cx ghcom.r' in
     let _ = check_ty_ "ghcom" cx `Kan ghcom.ty in
     let vty = eval cx ghcom.ty in
     check_of_ty_ "ghcom/cap" cx vty [] ghcom.cap;
@@ -801,10 +786,8 @@ and synth_head cx hd =
     `El vty
 
   | Tm.GCom gcom ->
-    check cx (`Pos `Dim) gcom.r;
-    check cx (`Pos `Dim) gcom.r';
-    let r = eval_dim cx gcom.r in
-    let r' = eval_dim cx gcom.r' in
+    let r = check_eval_dim cx gcom.r in
+    let r' = check_eval_dim cx gcom.r' in
     let cxx, x = Cx.extend_dim cx ~name:None in
     let Tm.B (_, ty) = gcom.ty in
     let _ = check_ty_ "gcom" cxx `Kan ty in
@@ -817,10 +800,8 @@ and synth_head cx hd =
     `El vty_r'
 
   | Tm.Coe coe ->
-    check cx (`Pos `Dim) coe.r;
-    check cx (`Pos `Dim) coe.r';
-    let r = eval_dim cx coe.r in
-    let r' = eval_dim cx coe.r' in
+    let r = check_eval_dim cx coe.r in
+    let r' = check_eval_dim cx coe.r' in
     let Tm.B (name, ty) = coe.ty in
     let cxx, x = Cx.extend_dim cx ~name in
     let _ = check_ty cxx `Kan ty in
@@ -839,7 +820,7 @@ and synth_head cx hd =
     `El vty
 
   | Tm.DownX tm ->
-    check cx (`Pos `Dim) tm;
+    check_dim cx tm;
     `Dim
 
 and synth_stack cx vhd ty stk  =
@@ -848,8 +829,7 @@ and synth_stack cx vhd ty stk  =
     ty
 
   | _, Tm.VProj vproj :: stk ->
-    check cx (`Pos `Dim) vproj.r;
-    let r = eval_dim cx vproj.r in
+    let r = check_eval_dim cx vproj.r in
     begin
       match D.Rel.compare r `Dim0 (Cx.rel cx) with
       | `Same ->
@@ -932,11 +912,7 @@ and synth_stack cx vhd ty stk  =
     end
 
   | D.Ext eclo, Tm.ExtApp rs :: stk ->
-    let rs =
-      flip List.map rs @@ fun r ->
-      check cx (`Pos `Dim) r;
-      eval_dim cx r
-    in
+    let rs = flip List.map rs @@ check_eval_dim cx in
     let ty, _ = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map D.Cell.dim rs in
     let frm = D.ExtApp rs in
     let vhd = D.Val.plug (Cx.rel cx) frm vhd in
