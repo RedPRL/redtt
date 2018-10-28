@@ -772,8 +772,10 @@ struct
   let lazy_con el = `Val (LazyVal.make_from_lazy el)
   let value v = `Val (LazyVal.make_from_delayed v)
 
-  let pp fmt _ =
-    Format.fprintf fmt "<cell>"
+  let pp fmt =
+    function
+    | `Dim r -> Format.fprintf fmt "@[<hov1>(dim@ %a)@]" I.pp r
+    | `Val v -> Format.fprintf fmt "@[<hov1>(val@ %a)@]" LazyVal.pp v
 
   let swap pi =
     function
