@@ -230,7 +230,11 @@ struct
   let split cx ~r ~r' ~ty_cap ~ty_sys tm =
     match Tm.unleash tm with
     | Tm.Box box ->
-      raise CanJonHelpMe
+      let sys =
+        flip List.map ty_sys @@ fun (s, s', _) ->
+        failwith ""
+      in
+      `Check, {r = box.r; r' = box.r'; cap = box.cap; sys}
 
     | Tm.Up cmd ->
       let tr = Q.quote_dim (Cx.qenv cx) r in
@@ -531,9 +535,36 @@ and check_neg cx ty sys tm =
     check_of_ty cx (D.Val.unleash v.ty1) boundary1 vin.tm1
 
   | D.HCom ({ty = `Pos; _} as fhcom) ->
-    (* TODO: unleash a power move like V above *)
-    Format.eprintf "typechecker/check element of fhcom@.";
-    raise CanJonHelpMe
+    begin
+      match Tm.unleash tm with
+      | Tm.Box box ->
+        let sys =
+          flip List.map fhcom.sys @@ fun (s, s', _) ->
+          raise CanJonHelpMe
+        in
+        raise CanJonHelpMe
+
+      | Tm.Up cmd ->
+        let tr = Q.quote_dim (Cx.qenv cx) fhcom.r in
+        let tr' = Q.quote_dim (Cx.qenv cx) fhcom.r' in
+        let cap_frm =
+          let tty_cap = quote_ty cx @@ D.Val.unleash fhcom.cap in
+          let tty_sys = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) fhcom.sys fhcom.sys in
+          Tm.Cap {r = tr; r' = tr'; ty = tty_cap; sys = tty_sys}
+        in
+        let cap = Tm.up @@ cmd @< cap_frm in
+        check_of_ty cx (D.Val.unleash fhcom.cap) [] cap;
+        let sys =
+          flip List.map fhcom.sys @@ fun (s, s', _) ->
+          Q.quote_dim (Cx.qenv cx) s, Q.quote_dim (Cx.qenv cx) s', Tm.up cmd
+        in
+        let tys = flip List.map fhcom.sys @@ fun (_, _, abs) -> abs in
+        let _ = check_box_sys ~cx ~r':fhcom.r' tys sys in
+        ()
+
+      |  _->
+        raise PleaseRaiseProperError
+    end
 
   | _ ->
     Format.eprintf "typechecker/ty/unhandled@.";
@@ -702,7 +733,7 @@ and check_intro cx data_ty params constr tms =
 
 
 (* TODO: check this *)
-and check_bnd_face ~cx ~cxx ~x ~r ~ty sys face =
+and check_bnd_face ~cx ~cxx ~ty sys face =
   let ts, ts', (Tm.B (_, tm)) = face in
   let s = check_eval_dim cx ts in
   let s' = check_eval_dim cx ts' in
@@ -721,12 +752,23 @@ and check_bnd_face ~cx ~cxx ~x ~r ~ty sys face =
   | exception I.Inconsistent ->
     sys
 
+and check_box_face ~cx ~r' ~abs sys face =
+  let D.Abs (x, tyx) = D.LazyValAbs.unleash abs in
+  let ty_r =
+    D.Con.run (Cx.rel cx) @@
+    D.Con.subst r' x tyx
+  in
+  check_tm_face cx ty_r sys face
+
 and check_tm_sys cx ty sys =
   List.fold_left (check_tm_face cx ty) [] sys
 
+and check_box_sys ~cx ~r' tys (sys : (Tm.tm, Tm.tm) Tm.system) =
+  List.fold_left2 (fun sys abs -> check_box_face ~cx ~r' ~abs sys) [] tys sys
+
 and check_bnd_sys ~cx ~cxx ~x ~r ~ty ~cap sys =
   let init = [ `Atom x, r, D.LazyVal.make cap ] in
-  List.fold_left (check_bnd_face ~cx ~cxx ~x ~r ~ty) init sys
+  List.fold_left (check_bnd_face ~cx ~cxx ~ty) init sys
 
 and check_of_ty cx ty sys tm =
   match polarity ty with
