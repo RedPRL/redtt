@@ -1,4 +1,5 @@
 type 'a t = 'a option
+val some : 'a -> 'a option
 val map : ('a -> 'b) -> 'a t -> 'b t
 val foreach : 'a t -> ('a -> 'b) -> 'b t
 val iter : ('a -> unit) -> 'a option -> unit

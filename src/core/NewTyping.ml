@@ -406,7 +406,7 @@ and check_pos cx pos tm =
 
   | `El (D.Data data as data_ty), Tm.Intro (dlbl, clbl, params, args) when data.lbl = dlbl->
     let desc = GlobalEnv.lookup_datatype (Cx.genv cx) dlbl in
-    check_data_params cx desc.body params;
+    check_data_params cx ~tele:desc.body ~expected:(List.map Option.some data.params) ~params;
     let vparams = List.map (fun tm -> D.Cell.con @@ eval cx tm) params in
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
     check_intro cx data_ty vparams constr args
@@ -571,7 +571,7 @@ and check_ty cx kind tm : Lvl.t =
 
   | Tm.Data {lbl; params} ->
     let desc = GlobalEnv.lookup_datatype (Cx.genv cx) lbl in
-    check_data_params cx desc.body params;
+    check_data_params cx ~tele:desc.body ~expected:(List.map (const None) params) ~params;
     if not @@ Kind.lte desc.kind kind then
       raise @@ E KindError;
     if desc.status = `Partial then
@@ -615,21 +615,28 @@ and check_tm_face cx ty sys face =
   | exception I.Inconsistent ->
     sys
 
-and check_data_params cx tele params =
+and check_data_params cx ~tele ~expected ~params =
   let rel = Cx.rel cx in
-  let rec loop tyenv tele params =
-    match tele, params with
-    | Desc.TNil _, [] -> ()
-    | Desc.TCons (ty, Tm.B (name, tele)), tm :: params ->
+  let rec loop tyenv tele expected params =
+    match tele, expected, params with
+    | Desc.TNil _, [], [] -> ()
+    | Desc.TCons (ty, Tm.B (name, tele)), exp :: expected, tm :: params ->
       let vty = D.Syn.eval rel tyenv ty in
+      let bdry =
+        match exp with
+        | None -> []
+        | Some (`Val v) ->
+          [`Dim0, `Dim0, v]
+        | _ -> raise PleaseRaiseProperError
+      in
       check_of_ty cx vty [] tm;
       let el = eval cx tm in
       let tyenv = D.Env.extend_cell tyenv @@ D.Cell.con el in
-      loop tyenv tele params
+      loop tyenv tele expected params
     | _ ->
       raise @@ E DataParamsLengthMismatch
   in
-  loop (Cx.venv cx) tele params
+  loop (Cx.venv cx) tele expected params
 
 and check_intro cx data_ty params constr tms =
   let rel = Cx.rel cx in
@@ -927,7 +934,10 @@ and synth_stack cx vhd ty stk  =
     let vhd = D.Val.plug (Cx.rel cx) frm vhd in
     synth_stack cx vhd ty stk
 
-  | D.Data _, Tm.Elim _ :: stk ->
+  | D.Data data, Tm.Elim elim :: stk ->
+    let desc = GlobalEnv.lookup_datatype (Cx.genv cx) data.lbl in
+    if desc.status = `Partial then raise @@ E PartialDatatypeDeclaration;
+    check_data_params cx ~tele:desc.body ~expected:(List.map Option.some data.params) ~params:elim.params;
     Format.eprintf "typechecker / data / elim@.";
     raise CanJonHelpMe
 

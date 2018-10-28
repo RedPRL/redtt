@@ -1,5 +1,7 @@
 type 'a t = 'a option
 
+let some x = Some x
+
 let map f =
   function
   | Some a -> Some (f a)
