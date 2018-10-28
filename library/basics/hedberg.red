@@ -19,13 +19,7 @@ def dec→stable (A : type) : dec A → stable A =
 
 def neg/is-prop-over (A : 𝕀 → type)
   : is-prop-over (λ i → neg (A i))
-  =
-  λ c c' i a →
-   let f : [j] (A j → void) [ j=0 → c | j=1 → c' ] =
-     elim (c (coe i 0 a in A)) []
-   in
-   f i a
-
+  = prop→prop-over (λ i → neg (A i)) (neg/prop (A 1))
 
 -- Hedberg's theorem for stable path types
 def paths-stable→set (A : type) (st : (x y : A) → stable (path A x y)) : is-set A =
