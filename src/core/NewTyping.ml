@@ -404,11 +404,10 @@ and check_pos cx pos tm =
     if Lvl.greater lvl univ.lvl then
       raise @@ E UniverseError
 
-  | `El (D.Data data), Tm.Intro (dlbl, clbl, params, args) when data.lbl = dlbl->
+  | `El (D.Data data as data_ty), Tm.Intro (dlbl, clbl, params, args) when data.lbl = dlbl->
     let desc = GlobalEnv.lookup_datatype (Cx.genv cx) dlbl in
     check_data_params cx desc.body params;
     let vparams = List.map (fun tm -> D.Cell.con @@ eval cx tm) params in
-    let data_ty = eval cx @@ Tm.make @@ Tm.Data {lbl = dlbl; params} in (* this can be optimized *)
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
     check_intro cx data_ty vparams constr args
 
