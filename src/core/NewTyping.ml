@@ -348,10 +348,41 @@ let rec check cx (phase : phase) tm =
           raise @@ E UnexpectedState
     end
 
-  | _, Tm.Box _ ->
-    Format.eprintf "typechecker / box@.";
-    (* Similar power moves as Tm.Vin *)
-    raise PleaseFillIn
+  | _, Tm.Box box ->
+    check cx (`Pos `Dim) box.r;
+    check cx (`Pos `Dim) box.r';
+    let r = eval_dim cx box.r in
+    let r' = eval_dim cx box.r' in
+    begin
+      match D.Rel.compare r r' (Cx.rel cx) with
+      | `Same ->
+        check cx phase box.cap
+      | _ ->
+        let rec go =
+          function
+          | [] ->
+            begin
+              match phase with
+              | `Neg (ty, sys) ->
+                check_neg cx ty sys tm
+              | _ ->
+                raise @@ E UnexpectedState
+            end
+          | (r, r', tm) :: sys ->
+            begin
+              check cx (`Pos `Dim) box.r;
+              check cx (`Pos `Dim) box.r';
+              let r = eval_dim cx box.r in
+              let r' = eval_dim cx box.r' in
+              match D.Rel.compare r r' (Cx.rel cx) with
+              | `Same ->
+                check cx phase tm
+              | _ ->
+                go sys
+            end
+        in
+        go box.sys
+    end
 
   | `Neg (ty, sys), _ ->
     check_neg cx ty sys tm
