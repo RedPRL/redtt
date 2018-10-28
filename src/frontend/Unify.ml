@@ -45,7 +45,7 @@ let rec telescope ty : telescope * ty =
     let x, codx = Tm.unbind cod in
     let tel, ty = telescope codx in
     (Emp #< (x, `P dom)) <.> tel, ty
-  | Tm.Restrict (r, r', Some ty) ->
+  | Tm.Restrict (r, r', ty) ->
     let x = Name.fresh () in
     let tel, ty = telescope ty in
     (Emp #< (x, `R (r, r'))) <.> tel, ty
@@ -66,7 +66,7 @@ let rec abstract_tm xs tm =
     let bnd = Tm.NB (Emp, tm) in
     abstract_tm xs @@ Tm.make @@ Tm.ExtLam bnd
   | Snoc (xs, (_, `R (r, r'))) ->
-    abstract_tm xs @@ Tm.make @@ Tm.RestrictThunk (r, r', Some tm)
+    abstract_tm xs @@ Tm.make @@ Tm.RestrictThunk (r, r', tm)
   | _ ->
     failwith "abstract_tm"
 
@@ -78,7 +78,7 @@ let rec abstract_ty (gm : telescope) cod =
   | Snoc (gm, (x, `Def (dom, def))) ->
     abstract_ty gm @@ Tm.unbind_with (Tm.ann ~ty:dom ~tm:def) @@ Tm.bind x cod
   | Snoc (gm, (_, `R (r, r'))) ->
-    abstract_ty gm @@ Tm.make @@ Tm.Restrict (r, r', Some cod)
+    abstract_ty gm @@ Tm.make @@ Tm.Restrict (r, r', cod)
   | Snoc (gm, (x, `I)) ->
     abstract_ty gm @@ Tm.make @@ Tm.Ext (Tm.bind_ext (Emp #< x) cod [])
   | Snoc (gm, (_, `NullaryExt)) ->
@@ -595,11 +595,7 @@ let rec subtype ty0 ty1 =
       let rec go sys0 sys1 =
         match sys0, sys1 with
         | _, [] -> ret ()
-        | (_, _, None) :: sys0, sys1 ->
-          go sys0 sys1
-        | sys0, (_, _, None) :: sys1 ->
-          go sys0 sys1
-        | (r0, r0', Some tm0) :: sys0, (r1, r1', Some tm1) :: sys1 when r0 = r1 && r0' = r1' ->
+        | (r0, r0', tm0) :: sys0, (r1, r1', tm1) :: sys1 when r0 = r1 && r0' = r1' ->
           under_restriction r0 r0' begin
             active @@ Problem.eqn ~ty0 ~ty1 ~tm0 ~tm1
           end >>

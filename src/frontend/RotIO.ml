@@ -188,30 +188,19 @@ struct
       ret @@ (NB (ostring_bwd_of_json nms, bdy))
     | j -> J.parse_error j "nbnd_of_json"
 
-  let json_of_face json_of_r json_of_bdy (r, r', obdy) =
+  let json_of_face json_of_r json_of_bdy (r, r', bdy) =
     json_of_r r >>= fun r ->
     json_of_r r' >>= fun r' ->
-    match obdy with
-    | Some bdy ->
-      json_of_bdy bdy >>= fun bdy ->
-      ret @@ `A [r; r'; bdy]
-    | None ->
-      ret @@ `A [r; r']
+    json_of_bdy bdy >>= fun bdy ->
+    ret @@ `A [r; r'; bdy]
 
   let face_of_json r_of_json bdy_of_json =
     function
-    | `A (r :: r' :: obdy) as j ->
+    | `A [r; r'; bdy] ->
       r_of_json r >>= fun r ->
       r_of_json r' >>= fun r' ->
-      begin
-        match obdy with
-        | [bdy] ->
-          bdy_of_json bdy >>= fun bdy ->
-          ret (r, r', Some bdy)
-        | [] ->
-          ret (r, r', None)
-        | _ -> J.parse_error j "face_of_json"
-      end
+      bdy_of_json bdy >>= fun bdy ->
+      ret (r, r', bdy)
     | j -> J.parse_error j "face_of_json"
 
   let rec json_of_foreign_name name kont_notfound kont_found =
@@ -326,6 +315,8 @@ struct
       json_of_list json_of_tm params >>= fun params ->
       json_of_list json_of_tm args >>= fun args ->
       ret @@ `A [`String "Intro"; dlbl; json_of_string clbl; params; args]
+
+    | FortyTwo -> ret @@ `String "FortyTwo"
 
   and json_of_tm_bnd bnd = json_of_bnd json_of_tm bnd
 
@@ -558,6 +549,8 @@ struct
       list_of_json tm_of_json params >>= fun params ->
       list_of_json tm_of_json args >>= fun args ->
       ret @@ Intro (dlbl, string_of_json clbl, params, args)
+
+    | `String "FortyTwo" -> ret FortyTwo
 
     | j -> J.parse_error j "tm_of_json"
 

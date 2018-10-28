@@ -410,6 +410,8 @@ struct
       let sys = eval_tm_sys rel benv @@ Desc.Constr.boundary constr in
       Con.make_intro rel ~dlbl ~clbl ~args ~sys
 
+    | Tm.FortyTwo -> FortyTwo
+
   and eval_constr_args rel ~env ~tyenv ~constr ~args =
     let rec go acc tyenv (tele : Desc.constr) tms =
       match tele, tms with
@@ -578,21 +580,19 @@ struct
           Neu {ty = Val.make vty; neu}
       end
 
-  and eval_bnd_face rel env (tr, tr', bnd_opt) =
+  and eval_bnd_face rel env (tr, tr', bnd) =
     let r = eval_dim env tr in
     let r' = eval_dim env tr' in
-    match Rel.equate r r' rel, bnd_opt with
-    | `Changed rel, Some bnd ->
+    match Rel.equate r r' rel with
+    | `Changed rel ->
       let env = Env.run rel env in
       let abs = lazy begin eval_bnd rel env bnd end in
       (r, r', LazyValAbs.make_from_lazy abs)
-    | `Same, Some bnd ->
+    | `Same ->
       let abs = lazy begin eval_bnd rel env bnd end in
       (r, r', LazyValAbs.make_from_lazy abs)
     | exception I.Inconsistent ->
       (r, r', LazyValAbs.make @@ ConAbs.bind @@ fun _ -> FortyTwo)
-    | _ ->
-      raise PleaseRaiseProperError
 
   and eval_bnd_sys rel env =
     List.map (eval_bnd_face rel env)
@@ -601,17 +601,15 @@ struct
     let r = eval_dim env tr in
     let r' = eval_dim env tr' in
     match Rel.equate r r' rel, tm_opt with
-    | `Changed rel , Some tm ->
+    | `Changed rel, tm ->
       let env = Env.run rel env in
       let v = lazy begin eval rel env tm end in
       (r, r', LazyVal.make_from_lazy v)
-    | `Same, Some tm ->
+    | `Same, tm ->
       let v = lazy begin eval rel env tm end in
       (r, r', LazyVal.make_from_lazy v)
     | exception I.Inconsistent ->
       (r, r', LazyVal.make FortyTwo)
-    | _ ->
-      raise PleaseRaiseProperError
 
   and eval_tm_sys rel env =
     List.map (eval_tm_face rel env)

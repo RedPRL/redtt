@@ -119,6 +119,8 @@ let rec con_info =
     Info.mergen [cmd_info cmd; bnd_info tm_info bnd]
   | Intro (_, _, params, args) ->
     Info.mergen @@ List.map tm_info @@ params @ args
+  | FortyTwo ->
+    Info.init
 
 and cmd_info cmd =
   pair_info head_info (list_info frame_info) cmd
@@ -180,12 +182,8 @@ and sys_info : type x. (x -> Info.t) -> (tm, x) system -> Info.t =
     Info.mergen @@ List.map (face_info f) sys
 
 and face_info : type x. (x -> Info.t) -> (tm, x) face -> Info.t =
-  fun f (r, r', o) ->
-    match o with
-    | None ->
-      Info.mergen [tm_info r; tm_info r']
-    | Some x ->
-      Info.mergen [tm_info r; tm_info r'; f x]
+  fun f (r, r', x) ->
+    Info.mergen [tm_info r; tm_info r'; f x]
 
 
 and tm_info (Tm node) =
@@ -334,6 +332,8 @@ struct
       let args' = traverse_list traverse_tm args in
       Intro (dlbl, clbl, params', args')
 
+    | FortyTwo ->
+      FortyTwo
 
   and traverse_cmd (hd, sp) =
     let hd', sp' = traverse_head hd in
@@ -422,17 +422,17 @@ struct
       let tm' = A.with_bindings (Bwd.length nms) (fun _ -> f tm) in
       NB (nms, tm')
 
-  and traverse_bface (r, r', obnd) =
+  and traverse_bface (r, r', bnd) =
     let s = traverse_tm r in
     let s' = traverse_tm r' in
-    let obnd' = traverse_opt (traverse_bnd traverse_tm) obnd in
-    s, s', obnd'
+    let bnd' = traverse_bnd traverse_tm bnd in
+    s, s', bnd'
 
-  and traverse_face (r, r', otm) =
+  and traverse_face (r, r', tm) =
     let s = traverse_tm r in
     let s' = traverse_tm r' in
-    let otm' = traverse_opt traverse_tm otm in
-    s, s', otm'
+    let tm' = traverse_tm tm in
+    s, s', tm'
 
   and traverse_pair : 'a 'b 'c 'd. ('a -> 'c) -> ('b -> 'd) -> 'a * 'b -> ('c * 'd) =
     fun f g (a, b) ->
@@ -702,8 +702,8 @@ let unbindn (NB (nms, t)) =
   go 0 nms [] t
 
 
-let map_tm_face f (r, r', otm) =
-  f r, f r', Option.map f otm
+let map_tm_face f (r, r', tm) =
+  f r, f r', f tm
 
 let map_tm_sys f =
   List.map @@ map_tm_face f
@@ -877,6 +877,9 @@ let rec pp env fmt =
             Uuseg_string.pp_utf_8 clbl
             (pp_terms env) args
       end
+    
+    | FortyTwo ->
+      Format.fprintf fmt "@[(forty-two)@]"
 
   in
   go env `Start fmt
@@ -1061,24 +1064,18 @@ and pp_bsys env fmt sys =
     Format.fprintf fmt "%a@ %a" (pp_bface env) face (pp_bsys env) sys
 
 and pp_face env fmt face =
-  let r, r', otm = face in
-  match otm with
-  | None ->
-    Format.fprintf fmt "@[<hv1>[%a=%a@ -]@]" (pp env) r (pp env) r'
-
-  | Some tm ->
-    Format.fprintf fmt "@[<hv1>[%a=%a@ %a]@]" (pp env) r (pp env) r' (pp env) tm
+  let r, r', tm = face in
+  Format.fprintf fmt "@[<hv1>[%a=%a@ %a]@]" (pp env) r (pp env) r' (pp env) tm
 
 and pp_bface env fmt face =
-  let r, r', obnd = face in
-  match obnd with
-  | None ->
-    Format.fprintf fmt "@[<hv1>[%a=%a@ -]@]" (pp env) r (pp env) r'
-
-  | Some (B (nm, tm)) ->
+  let r, r', bnd = face in
+  match bnd with
+  | B (nm, tm) ->
     let x, env' = Pp.Env.bind env nm in
     Format.fprintf fmt "@[<hv1>[%a=%a@ <%a> %a]@]" (pp env) r (pp env) r' Uuseg_string.pp_utf_8 x (pp env') tm
 
+
+let forty_two = make FortyTwo
 
 let up cmd = make @@ Up cmd
 
@@ -1104,8 +1101,8 @@ let times ty0 ty1 =
 
 let path ty tm0 tm1 =
   let ty' = subst (Shift 1) ty in
-  let face0 = up (ix 0), make Dim0, Some (subst (Shift 1) tm0) in
-  let face1 = up (ix 0), make Dim1, Some (subst (Shift 1) tm1) in
+  let face0 = up (ix 0), make Dim0, subst (Shift 1) tm0 in
+  let face1 = up (ix 0), make Dim1, subst (Shift 1) tm1 in
   let sys = [face0; face1] in
   make @@ Ext (NB (Emp #< None, (ty', sys)))
 
@@ -1236,8 +1233,8 @@ let map_nbnd (f : tm -> tm) (nbnd : tm nbnd) : tm nbnd =
   bindn xs @@ f txs
 
 
-let map_comp_face f (r, r', obnd) =
-  f r, f r', Option.map (map_bnd f) obnd
+let map_comp_face f (r, r', bnd) =
+  f r, f r', map_bnd f bnd
 
 let map_comp_sys f =
   List.map @@ map_comp_face f
@@ -1386,6 +1383,8 @@ let map_tmf f =
     Let (map_cmd f cmd, map_bnd f bnd)
   | Intro (dlbl, clbl, params, args) ->
     Intro (dlbl, clbl, List.map f params, List.map f args)
+  | FortyTwo ->
+    FortyTwo
 
 
 

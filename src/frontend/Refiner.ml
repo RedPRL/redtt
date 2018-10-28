@@ -74,13 +74,11 @@ let guess_restricted tm goal =
       function
       | [] ->
         M.ret ()
-      | (r, r', Some tm') :: sys ->
+      | (r, r', tm') :: sys ->
         begin
           M.under_restriction r r' @@
           C.active @@ Unify {ty0 = ty; ty1 = ty; tm0 = tm; tm1 = tm'}
         end >>
-        go sys
-      | _ :: sys ->
         go sys
     in
     go sys >>
@@ -119,14 +117,12 @@ let tac_pair tac0 tac1 : chk_tac =
     match Tm.unleash goal.ty with
     | Tm.Sg (dom, cod) ->
       let sys0 =
-        ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
-        r, r', Option.foreach otm @@ fun tm ->
-        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Fst
+        ListUtil.foreach goal.sys @@ fun (r, r', tm) ->
+        r, r', Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Fst
       in
       let sys1 =
-        ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
-        r, r', Option.foreach otm @@ fun tm ->
-        Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Snd
+        ListUtil.foreach goal.sys @@ fun (r, r', tm) ->
+        r, r', Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.Snd
       in
       tac0 {ty = dom; sys = sys0} >>= fun tm0 ->
       let cmd0 = Tm.ann ~ty:dom ~tm:tm0 in
@@ -210,17 +206,13 @@ let inspect_goal ~loc ~name : goal -> unit M.m =
         let ty = Ty.quote_ty cx vty in
 
         let pp_restriction fmt =
-          let pp_bdy fmt =
-            function
-            | None -> Format.fprintf fmt "-"
-            | Some tm -> Tm.pp0 fmt tm
-          in
-          let pp_face fmt (r, r', otm) =
+          let pp_bdy fmt tm = Tm.pp0 fmt tm in
+          let pp_face fmt (r, r', tm) =
             Format.fprintf fmt "%a = %a %a @[%a@]"
               Tm.pp0 r
               Tm.pp0 r'
               Uuseg_string.pp_utf_8 "⇒"
-              pp_bdy otm
+              pp_bdy tm
           in
           Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_face fmt
         in
@@ -303,9 +295,8 @@ let rec tac_lambda (ps : ML.einvpat list) tac goal =
 
         let codx = Tm.unbind_with (Tm.var x) cod in
         let sysx =
-          ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
-          r, r', Option.foreach otm @@ fun tm ->
-          Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.FunApp (Tm.up @@ Tm.var x)
+          ListUtil.foreach goal.sys @@ fun (r, r', tm) ->
+          r, r', Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.FunApp (Tm.up @@ Tm.var x)
         in
         M.in_scope x (`P dom) begin
           let tac : chk_tac =
@@ -341,9 +332,8 @@ let rec tac_lambda (ps : ML.einvpat list) tac goal =
             List.map (fun x -> (x, `I)) xs_fwd
         in
         let sys'xs =
-          ListUtil.foreach goal.sys @@ fun (r, r', otm) ->
-          r, r', Option.foreach otm @@ fun tm ->
-          Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.ExtApp (List.map Tm.up xs_tms)
+          ListUtil.foreach goal.sys @@ fun (r, r', tm) ->
+          r, r', Tm.up @@ Tm.ann ~ty:goal.ty ~tm @< Tm.ExtApp (List.map Tm.up xs_tms)
         in
         M.in_scopes ps begin
           tac' {ty = tyxs; sys = sysxs @ sys'xs}
@@ -661,11 +651,11 @@ and tac_elim ~loc ~tac_mot ~tac_scrut ~clauses ~default : chk_tac =
 
         in
 
-        let image_of_bface (tr, tr', otm) =
+        let image_of_bface (tr, tr', tm) =
           let r = D.Syn.eval_dim env tr in
           let r' = D.Syn.eval_dim env tr' in
           let rel_rr' = NewRestriction.equate' r r' (Cx.rel cx) in
-          r, r', D.LazyVal.make @@ image_of_bterm rel_rr' @@ Option.get_exn otm
+          r, r', D.LazyVal.make @@ image_of_bterm rel_rr' @@ tm
         in
 
         (* What is the image of the boundary in the current fiber of the motive? *)
@@ -692,7 +682,7 @@ let rec tac_hope goal =
       C.ask >>= fun psi ->
       let rty = Tm.refine_ty goal.ty goal.sys in
       U.push_hole `Flex psi rty <<@> fun cmd -> Tm.up @@ Tm.refine_force cmd
-    | (r, r', Some tm) :: sys ->
+    | (r, r', tm) :: sys ->
       begin
         C.check ~ty:goal.ty ~sys:goal.sys tm >>=
         function
@@ -701,8 +691,6 @@ let rec tac_hope goal =
         | _ ->
           try_system sys
       end
-    | _ :: sys ->
-      try_system sys
   in
   try_system goal.sys
 

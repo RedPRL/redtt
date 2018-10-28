@@ -586,7 +586,7 @@ struct
             elab_chk e {ty; sys = Bwd.to_list acc}
           end
         end >>= fun obnd ->
-        let face = r, r', obnd in
+        let face = r, r', Option.default Tm.forty_two obnd in
         go_face (acc #< face) esys e xis
     in
     go Emp
@@ -630,11 +630,10 @@ struct
         let x = Name.fresh () in
         let varx = Tm.up @@ Tm.var x in
         let ext_ty =
-          let face_cap = varx, s, Some cap in
-          let face_adj (r, r', obnd) =
-            let bnd = Option.get_exn obnd in
+          let face_cap = varx, s, cap in
+          let face_adj (r, r', bnd) =
             let tmx = Tm.unbind_with (Tm.var x) bnd in
-            r, r', Some tmx
+            r, r', tmx
           in
           let faces_adj = List.map face_adj @@ Bwd.to_list acc in
           let faces = face_cap :: faces_adj in
@@ -649,7 +648,7 @@ struct
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
-        let face = r, r', obnd in
+        let face = r, r', Option.default (Tm.bind x Tm.forty_two) obnd in
         go_face (acc #< face) esys e xis
 
     in go Emp
@@ -672,11 +671,10 @@ struct
         let varx = Tm.up @@ Tm.var x in
         let tyx = Tm.unbind_with (Tm.var x) ty_bnd in
         let ext_ty =
-          let face_cap = varx, s, Some cap in
-          let face_adj (r, r', obnd) =
-            let bnd = Option.get_exn obnd in
+          let face_cap = varx, s, cap in
+          let face_adj (r, r', bnd) =
             let tmx = Tm.unbind_with (Tm.var x) bnd in
-            r, r', Some tmx
+            r, r', tmx
           in
           let faces_adj = List.map face_adj @@ Bwd.to_list acc in
           let faces = face_cap :: faces_adj in
@@ -691,7 +689,7 @@ struct
             M.ret @@ Tm.bind x tmx
           end
         end >>= fun obnd ->
-        let face = r, r', obnd in
+        let face = r, r', Option.default (Tm.bind x Tm.forty_two) obnd in
         go_face (acc #< face) esys e xis
 
     in go Emp

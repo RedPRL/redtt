@@ -174,7 +174,7 @@ struct
 
 
     | Tm.Up cmd ->
-      Some (Tm.up @@ cmd @< Tm.RestrictForce)
+      Tm.up @@ cmd @< Tm.RestrictForce
 
     | _ ->
       raise PleaseRaiseProperError
@@ -410,14 +410,13 @@ and check_neg cx ty sys tm =
     let r, r', ty_rr' = face in
     begin
       match Cx.restrict cx r r', Rst.body cx r r' tm with
-      | `Changed cx_rr', Some bdy ->
+      | `Changed cx_rr', bdy ->
         let sys_bdy = Rst.sys_body cx_rr' sys in
         check_of_ty_ "rst" cx_rr' (D.LazyVal.unleash ty_rr') sys_bdy bdy
-      | `Same, Some bdy ->
+      | `Same, bdy ->
         let sys_bdy = Rst.sys_body cx sys in
         check_of_ty_ "rst" cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
       | exception I.Inconsistent -> ()
-      | _ -> raise @@ E ExpectedTermInFace
     end
 
   | D.Ext eclo ->
@@ -507,14 +506,12 @@ and check_ty cx kind tm : Lvl.t =
       let r = eval_dim cx tr in
       let r' = eval_dim cx tr' in
       match Cx.restrict cx r r', otm with
-      | `Changed cx_rr', Some tm ->
+      | `Changed cx_rr', tm ->
         check_ty cx_rr' kind tm
-      | `Same, Some tm ->
+      | `Same, tm ->
         check_ty cx kind tm
       | exception I.Inconsistent ->
-        `Const 0 (* power move *)
-      | _ ->
-        raise @@ E ExpectedTermInFace
+        `Const 42 (* power move *)
     end
 
   | Tm.V v ->
@@ -558,27 +555,25 @@ and check_ty cx kind tm : Lvl.t =
     raise CanJonHelpMe
 
 and check_tm_face cx ty sys face =
-  let tr, tr', otm = face in
+  let tr, tr', tm = face in
   check cx (`Pos `Dim) tr;
   check cx (`Pos `Dim) tr';
   let r = eval_dim cx tr in
   let r' = eval_dim cx tr' in
-  match Cx.restrict cx r r', otm with
-  | `Changed cx_rr', Some tm ->
+  match Cx.restrict cx r r' with
+  | `Changed cx_rr' ->
     let rel_rr' = Cx.rel cx_rr' in
     let ty_rr' = D.Con.run rel_rr' ty in
     let boundary_rr' = ConSys.run rel_rr' sys in
     check_of_ty_ "face" cx_rr' ty_rr' boundary_rr' tm;
     let el = eval cx_rr' tm in
     (r, r', D.LazyVal.make el) :: sys
-  | `Same, Some tm ->
+  | `Same ->
     check_of_ty_ "face" cx ty sys tm;
     let el = eval cx tm in
     (r, r', D.LazyVal.make el) :: sys
   | exception I.Inconsistent ->
     sys
-  | _ ->
-    raise @@ E ExpectedTermInFace
 
 and check_data_params cx tele params =
   let rel = Cx.rel cx in
@@ -628,27 +623,25 @@ and check_intro cx data_ty params constr tms =
 
 (* TODO: check this *)
 and check_bnd_face ~cx ~cxx ~x ~r ~ty sys face =
-  let ts, ts', obnd = face in
+  let ts, ts', (Tm.B (_, tm)) = face in
   check cx (`Pos `Dim) ts;
   check cx (`Pos `Dim) ts';
   let s = eval_dim cx ts in
   let s' = eval_dim cx ts' in
-  match Cx.restrict cxx s s', obnd with
-  | `Changed cxx_ss', Some (Tm.B (_, tm)) ->
+  match Cx.restrict cxx s s' with
+  | `Changed cxx_ss' ->
     let rel_ss' = Cx.rel cxx_ss' in
     let ty_ss' = D.Con.run rel_ss' ty in
     let boundary_ss' = ConSys.run rel_ss' sys in
     check_of_ty_ "bface" cxx_ss' ty_ss' boundary_ss' tm;
     let el = eval cxx_ss' tm in
     (s, s', D.LazyVal.make el) :: sys
-  | `Same, Some (Tm.B (_, tm)) ->
+  | `Same ->
     check_of_ty_ "bface" cxx ty sys tm;
     let el = eval cxx tm in
     (s, s', D.LazyVal.make el) :: sys
   | exception I.Inconsistent ->
     sys
-  | _ ->
-    raise @@ E ExpectedTermInFace
 
 and check_tm_sys cx ty sys =
   List.fold_left (check_tm_face cx ty) [] sys
