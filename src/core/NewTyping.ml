@@ -70,6 +70,7 @@ let _ =
 
 
 exception PleaseRaiseProperError
+exception CanFavoniaHelpMe
 exception CanJonHelpMe
 exception PleaseFillIn
 
@@ -230,7 +231,11 @@ struct
   let split cx ~r ~r' ~ty_cap ~ty_sys tm =
     match Tm.unleash tm with
     | Tm.Box box ->
-      raise CanJonHelpMe
+      let sys =
+        flip List.map ty_sys @@ fun (s, s', _) ->
+        failwith ""
+      in
+      `Check, {r = box.r; r' = box.r'; cap = box.cap; sys}
 
     | Tm.Up cmd ->
       let tr = Q.quote_dim (Cx.qenv cx) r in
@@ -531,9 +536,65 @@ and check_neg cx ty sys tm =
     check_of_ty cx (D.Val.unleash v.ty1) boundary1 vin.tm1
 
   | D.HCom ({ty = `Pos; _} as fhcom) ->
-    (* TODO: unleash a power move like V above *)
-    Format.eprintf "typechecker/check element of fhcom@.";
-    raise CanJonHelpMe
+    begin
+      match Tm.unleash tm with
+      | Tm.Box box ->
+        let r = check_eval_dim cx box.r in
+        let r' = check_eval_dim cx box.r' in
+        let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) fhcom.r r in
+        let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) fhcom.r' r' in
+        let sys =
+          (* This code sucks. We should implement this as some kind of fold, which actually is consuming
+             elements from the system; for now, I want to have a one-to-one account of faces, which means
+             that we must not use a face twice, and also not have any left over. *)
+          flip List.map fhcom.sys @@ fun (s, s', _) ->
+          let face =
+            flip ListUtil.find_map_opt box.sys @@ fun (r, r', tm) ->
+            let r = check_eval_dim cx r in
+            let r' = check_eval_dim cx r' in
+            match D.Rel.compare s r (Cx.rel cx), D.Rel.compare s' r' (Cx.rel cx) with
+            | `Same, `Same -> Some tm
+            | _ -> None
+            | exception _ -> None
+          in
+          match face with
+          | Some face -> face
+          | None -> raise PleaseRaiseProperError
+        in
+
+        (* Check box.cap *)
+
+        (* Next: check that 'sys' is compatible with
+           box.cap, and that under each restriction, box.cap becomes the right
+           coe *)
+
+
+        (* I'm just putting this here because I'm fed up with this code;
+           if you don't do it, I'll get around to it soon. - Jon *)
+        raise CanFavoniaHelpMe
+
+      | Tm.Up cmd ->
+        let tr = Q.quote_dim (Cx.qenv cx) fhcom.r in
+        let tr' = Q.quote_dim (Cx.qenv cx) fhcom.r' in
+        let cap =
+          let tty_cap = quote_ty cx @@ D.Val.unleash fhcom.cap in
+          let tty_sys = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) fhcom.sys fhcom.sys in
+          let cap_frm = Tm.Cap {r = tr; r' = tr'; ty = tty_cap; sys = tty_sys} in
+          Tm.up @@ cmd @< cap_frm
+        in
+        check_of_ty cx (D.Val.unleash fhcom.cap) [] cap;
+
+        let sys =
+          flip List.map fhcom.sys @@ fun (s, s', _) ->
+          Q.quote_dim (Cx.qenv cx) s, Q.quote_dim (Cx.qenv cx) s', Tm.up cmd
+        in
+        let tys = flip List.map fhcom.sys @@ fun (_, _, abs) -> abs in
+        let _ = check_box_sys ~cx ~r':fhcom.r' tys sys in
+        ()
+
+      |  _->
+        raise PleaseRaiseProperError
+    end
 
   | _ ->
     Format.eprintf "typechecker/ty/unhandled@.";
@@ -702,7 +763,7 @@ and check_intro cx data_ty params constr tms =
 
 
 (* TODO: check this *)
-and check_bnd_face ~cx ~cxx ~x ~r ~ty sys face =
+and check_bnd_face ~cx ~cxx ~ty sys face =
   let ts, ts', (Tm.B (_, tm)) = face in
   let s = check_eval_dim cx ts in
   let s' = check_eval_dim cx ts' in
@@ -721,12 +782,23 @@ and check_bnd_face ~cx ~cxx ~x ~r ~ty sys face =
   | exception I.Inconsistent ->
     sys
 
+and check_box_face ~cx ~r' ~abs sys face =
+  let D.Abs (x, tyx) = D.LazyValAbs.unleash abs in
+  let ty_r =
+    D.Con.run (Cx.rel cx) @@
+    D.Con.subst r' x tyx
+  in
+  check_tm_face cx ty_r sys face
+
 and check_tm_sys cx ty sys =
   List.fold_left (check_tm_face cx ty) [] sys
 
+and check_box_sys ~cx ~r' tys (sys : (Tm.tm, Tm.tm) Tm.system) =
+  List.fold_left2 (fun sys abs -> check_box_face ~cx ~r' ~abs sys) [] tys sys
+
 and check_bnd_sys ~cx ~cxx ~x ~r ~ty ~cap sys =
   let init = [ `Atom x, r, D.LazyVal.make cap ] in
-  List.fold_left (check_bnd_face ~cx ~cxx ~x ~r ~ty) init sys
+  List.fold_left (check_bnd_face ~cx ~cxx ~ty) init sys
 
 and check_of_ty cx ty sys tm =
   match polarity ty with
@@ -999,6 +1071,5 @@ and approx_pos cx (pos0 : positive) (pos1 : positive) =
     ignore @@ Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty0 ty1
   | _ ->
     raise @@ E UnexpectedState
-
 
 let check_subtype = approx
