@@ -70,6 +70,7 @@ let _ =
 
 
 exception PleaseRaiseProperError
+exception CanFavoniaHelpMe
 exception CanJonHelpMe
 exception PleaseFillIn
 
@@ -538,22 +539,51 @@ and check_neg cx ty sys tm =
     begin
       match Tm.unleash tm with
       | Tm.Box box ->
+        let r = check_eval_dim cx box.r in
+        let r' = check_eval_dim cx box.r' in
+        let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) fhcom.r r in
+        let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) fhcom.r' r' in
         let sys =
+          (* This code sucks. We should implement this as some kind of fold, which actually is consuming
+             elements from the system; for now, I want to have a one-to-one account of faces, which means
+             that we must not use a face twice, and also not have any left over. *)
           flip List.map fhcom.sys @@ fun (s, s', _) ->
-          raise CanJonHelpMe
+          let face =
+            flip ListUtil.find_map_opt box.sys @@ fun (r, r', tm) ->
+            let r = check_eval_dim cx r in
+            let r' = check_eval_dim cx r' in
+            match D.Rel.compare s r (Cx.rel cx), D.Rel.compare s' r' (Cx.rel cx) with
+            | `Same, `Same -> Some tm
+            | _ -> None
+            | exception _ -> None
+          in
+          match face with
+          | Some face -> face
+          | None -> raise PleaseRaiseProperError
         in
-        raise CanJonHelpMe
+
+        (* Check box.cap *)
+
+        (* Next: check that 'sys' is compatible with
+           box.cap, and that under each restriction, box.cap becomes the right
+           coe *)
+
+
+        (* I'm just putting this here because I'm fed up with this code;
+           if you don't do it, I'll get around to it soon. - Jon *)
+        raise CanFavoniaHelpMe
 
       | Tm.Up cmd ->
         let tr = Q.quote_dim (Cx.qenv cx) fhcom.r in
         let tr' = Q.quote_dim (Cx.qenv cx) fhcom.r' in
-        let cap_frm =
+        let cap =
           let tty_cap = quote_ty cx @@ D.Val.unleash fhcom.cap in
           let tty_sys = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) fhcom.sys fhcom.sys in
-          Tm.Cap {r = tr; r' = tr'; ty = tty_cap; sys = tty_sys}
+          let cap_frm = Tm.Cap {r = tr; r' = tr'; ty = tty_cap; sys = tty_sys} in
+          Tm.up @@ cmd @< cap_frm
         in
-        let cap = Tm.up @@ cmd @< cap_frm in
         check_of_ty cx (D.Val.unleash fhcom.cap) [] cap;
+
         let sys =
           flip List.map fhcom.sys @@ fun (s, s', _) ->
           Q.quote_dim (Cx.qenv cx) s, Q.quote_dim (Cx.qenv cx) s', Tm.up cmd
@@ -1041,6 +1071,5 @@ and approx_pos cx (pos0 : positive) (pos1 : positive) =
     ignore @@ Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty0 ty1
   | _ ->
     raise @@ E UnexpectedState
-
 
 let check_subtype = approx
