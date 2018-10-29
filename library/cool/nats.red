@@ -10,8 +10,8 @@ data nat where
 
 data binnat where
 | nil
-| cons0 (x : binnat)
 | cons1 (x : binnat)
+| cons2 (x : binnat)
 
 def double/nat : nat → nat =
   elim [
@@ -22,15 +22,15 @@ def double/nat : nat → nat =
 def binnat→nat : binnat → nat =
   elim [
   | nil → zero
-  | cons0 (_ → ih) → double/nat ih
   | cons1 (_ → ih) → suc (double/nat ih)
+  | cons2 (_ → ih) → suc (suc (double/nat ih))
   ]
 
 def suc/binnat : binnat → binnat =
   elim [
   | nil → cons1 nil
-  | cons0 n → cons1 n
-  | cons1 (_ → ih) → cons0 ih
+  | cons1 n → cons2 n
+  | cons2 (_ → ih) → cons1 ih
   ]
 
 def nat→binnat : nat → binnat =
@@ -39,6 +39,7 @@ def nat→binnat : nat → binnat =
   | suc (_ → ih) → suc/binnat ih
   ]
 
+/-
 -- ?-
 def nat≃binnat : equiv nat binnat =
   iso→equiv _ _
@@ -51,3 +52,4 @@ def nat≃binnat : equiv nat binnat =
      ]
      ,
      ?_)
+-/
