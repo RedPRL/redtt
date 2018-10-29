@@ -39,6 +39,21 @@ def nat→binnat : nat → binnat =
   | suc (_ → ih) → suc/binnat ih
   ]
 
+def binnat→nat/suc (n : binnat)
+  : path _ (binnat→nat (suc/binnat n)) (suc (binnat→nat n)) =
+  elim n [
+  | nil → refl
+  | cons1 _ → refl
+  | cons2 (_ → ih) → λ i → suc (double/nat (ih i))
+  ]
+
+def nat→binnat→nat (n : nat)
+  : path _ (binnat→nat (nat→binnat n)) n =
+  elim n [
+  | zero → refl
+  | suc (n → ih) → trans nat (binnat→nat/suc (nat→binnat n)) (λ i → suc (ih i))
+  ]
+
 /-
 -- ?-
 def nat≃binnat : equiv nat binnat =
