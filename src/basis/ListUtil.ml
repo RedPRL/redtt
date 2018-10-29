@@ -61,3 +61,7 @@ let rec find_map_opt f xs =
 
 let foreach l f = List.map f l
 let foreach2 l0 l1 f = List.map2 f l0 l1
+
+let pp sep pp_elem fmt l =
+  let pp_sep fmt () = Format.fprintf fmt "%s@," sep in
+  Format.pp_print_list ~pp_sep pp_elem fmt l

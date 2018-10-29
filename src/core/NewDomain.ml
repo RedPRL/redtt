@@ -934,11 +934,11 @@ struct
     | Neu {neu; _} ->
       Neutroid.pp fmt neu
     | ExtLam nclo ->
-      Format.fprintf fmt "@[<hv1>(ext-lam@ %a)@]" NClo.pp nclo
+      Format.fprintf fmt "@[<hov1>(ext-lam@ %a)@]" NClo.pp nclo
     | Pi quant ->
-      Format.fprintf fmt "@[<hv1>(pi@ %a)@]" Quantifier.pp quant
+      Format.fprintf fmt "@[<hov1>(pi@ %a)@]" Quantifier.pp quant
     | Sg quant ->
-      Format.fprintf fmt "@[<hv1>(pi@ %a)@]" Quantifier.pp quant
+      Format.fprintf fmt "@[<hov1>(pi@ %a)@]" Quantifier.pp quant
     | Data _ ->
       Format.fprintf fmt "<data>"
     | Univ _ ->
@@ -2672,7 +2672,7 @@ struct
     | Meta var ->
       Name.pp fmt var.name
     | NCoe ncoe ->
-      Format.fprintf fmt "@[<1>(ncoe %a %a@ %a %a)@]" I.pp ncoe.r I.pp ncoe.r' NeutroidAbs.pp ncoe.ty Val.pp ncoe.cap
+      Format.fprintf fmt "@[<hov1>(ncoe@ %a %a@ %a@ %a)@]" I.pp ncoe.r I.pp ncoe.r' NeutroidAbs.pp ncoe.ty Val.pp ncoe.cap
     | NCoeData _ ->
       Format.fprintf fmt "<ncoe-data>"
     | NHCom _ ->
@@ -2819,8 +2819,16 @@ struct
       Format.fprintf fmt "fst"
     | Snd ->
       Format.fprintf fmt "snd"
-    | _ ->
-      Format.fprintf fmt "<frame>"
+    | ExtApp rs ->
+      Format.fprintf fmt "@[<hov1>(extapp@ [%a])@]" (ListUtil.pp "," I.pp) rs
+    | RestrictForce ->
+      Format.fprintf fmt "restrict-force"
+    | VProj _ ->
+      Format.fprintf fmt "<vproj-frame>"
+    | Cap _ ->
+      Format.fprintf fmt "<cap-frame>"
+    | Elim _ ->
+      Format.fprintf fmt "<elim>"
 
   let swap pi =
     function
