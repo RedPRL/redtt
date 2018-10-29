@@ -984,6 +984,8 @@ and synth_stack cx vhd ty stk  =
     end
 
   | _, Tm.Cap _ :: stk ->
+    (* if the cap frame is not rigid, just pass through in the appropriate way.
+       If it is rigid, check that the system is equivalent. *)
     Format.eprintf "typechecker/cap frame@.";
     raise CanJonHelpMe
 
