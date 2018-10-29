@@ -2,12 +2,6 @@ import prelude
 import data.nat
 import basics.isotoequiv
 
-/-
-data nat where
-| zero
-| suc (x : nat)
--/
-
 data binnat where
 | nil
 | cons1 (x : binnat)
