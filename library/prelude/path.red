@@ -112,17 +112,17 @@ def symmd (A : 𝕀 → type) (p : (i : 𝕀) → A i) : pathd (symm^1 _ A) (p 1
   ]
 
 -- transporting backwards is transporting forwards along inverted path (up to composition)
-def coe/symm/d (A : type) (P : A → type) (x y : A) (p : path A x y) (py : P y)
+def coe/symm/d (A : type) (P : A → type) (p : 𝕀 → A) (p1 : P (p 1))
   : pathd
       (trans^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)))
-      (coe 1 0 py in λ k → P (p k))
-      (coe 0 1 py in λ k → P (symm _ p k))
+      (coe 1 0 p1 in λ k → P (p k))
+      (coe 0 1 p1 in λ k → P (symm _ p k))
   =
   λ i →
-  comp 0 1 (coe 1 i py in λ k → P (p k)) in
+  comp 0 1 (coe 1 i p1 in λ k → P (p k)) in
   λ j → trans/filler^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)) j i [
   | i=0 → refl
-  | i=1 → λ k → coe 0 k py in λ l → P (symm A p l)
+  | i=1 → λ k → coe 0 k p1 in λ l → P (symm A p l)
   ]
 
 def J (A : type) (p : 𝕀 → A) (C : [i] A [i=0 → p 0] → type) (d : C refl) : C p =
