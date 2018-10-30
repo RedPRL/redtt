@@ -12,9 +12,9 @@ sig
   val find : 'k -> ('k, 'a) t -> 'a option
   val fold : ('k -> 'a -> 'b -> 'b) -> ('k, 'a) t -> 'b -> 'b
   val merge : ('k, 'a) t -> ('k, 'a) t -> ('k, 'a) t
-  val to_seq : ('k, 'a) t -> ('k * 'a) Seq.t
-  val to_seq_keys : ('k, 'a) t -> 'k Seq.t
-  val to_seq_values : ('k, 'a) t -> 'a Seq.t
+  val to_list : ('k, 'a) t -> ('k * 'a) list
+  val to_list_keys : ('k, 'a) t -> 'k list
+  val to_list_values : ('k, 'a) t -> 'a list
 end
 
 module M : S =
@@ -118,27 +118,27 @@ struct
 
   let merge t0 t1 = fold set t0 t1
 
-  let to_seq t =
+  let to_list t =
     reroot t;
     match !t with
     | Tbl a ->
-      Hashtbl.to_seq a
+      List.of_seq (Hashtbl.to_seq a)
     | _ ->
       raise Fatal
 
-  let to_seq_keys t =
+  let to_list_keys t =
     reroot t;
     match !t with
     | Tbl a ->
-      Hashtbl.to_seq_keys a
+      List.of_seq (Hashtbl.to_seq_keys a)
     | _ ->
       raise Fatal
 
-  let to_seq_values t =
+  let to_list_values t =
     reroot t;
     match !t with
     | Tbl a ->
-      Hashtbl.to_seq_values a
+      List.of_seq (Hashtbl.to_seq_values a)
     | _ ->
       raise Fatal
 

@@ -500,7 +500,7 @@ tele:
 face(X):
   | LSQ; r0 = tm; EQUALS; r1 = tm; e = X; RSQ
     { fun env ->
-      r0 env, r1 env, Some (e env) }
+      r0 env, r1 env, e env }
 
 bind(X):
   | LSQ; x = ATOM; RSQ; e = X

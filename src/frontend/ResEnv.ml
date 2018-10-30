@@ -162,8 +162,8 @@ let import_public ~visibility imported renv =
     | Some (name, `Public) -> Some name
     | _ -> None
   in
-  let names = Seq.filter_map f (T.to_seq_keys imported.globals.info_of_string) in
-  Seq.fold_left (fun renv name -> import_global ~visibility name renv) renv names
+  let names = ListUtil.filter_map f (T.to_list_keys imported.globals.info_of_string) in
+  List.fold_left (fun renv name -> import_global ~visibility name renv) renv names
 
 let name_of_native i renv =
   Option.map (fun (name, _) -> name) @@
@@ -178,7 +178,7 @@ let export_native_globals renv : exported_natives =
     (native, (ostr, name))
   in
   let mycompare (i0, _) (i1, _) = compare i0 i1 in
-  List.map (function _, datum -> datum) @@ List.sort mycompare @@ List.of_seq @@ Seq.map f @@ T.to_seq renv.globals.info_of_native
+  List.map (function _, datum -> datum) @@ List.sort mycompare @@ List.map f @@ T.to_list renv.globals.info_of_native
 
 let export_foreign_globals renv : exported_foreigners =
   let f (s, native_or_imported) =
@@ -187,4 +187,4 @@ let export_foreign_globals renv : exported_foreigners =
     | _ -> None
   in
   let compare_name n0 n1 = compare (Name.name n0) (Name.name n1) in
-  List.sort compare_name @@ List.of_seq @@ Seq.filter_map f @@ T.to_seq renv.globals.info_of_string
+  List.sort compare_name @@ ListUtil.filter_map f @@ T.to_list renv.globals.info_of_string

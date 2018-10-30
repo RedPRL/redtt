@@ -3,7 +3,8 @@ open Contextual
 val set_unsafe_mode : bool -> unit
 
 val try_read :
-  loader : (selector : FileRes.selector -> unit Contextual.m) ->
+  redsum : Digest.t option -> (* if you already know the redsum *)
+  importer : (selector : FileRes.selector -> rotted_resolver Contextual.m) ->
   stem : FileRes.filepath ->
   rotted_resolver option m
 
