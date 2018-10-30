@@ -8,7 +8,7 @@ import basics.isotoequiv
 def nat→list : nat → list unit =
   elim [
   | zero → nil
-  | suc (_ → xs) → cons triv xs
+  | suc (_ → xs) → cons ★ xs
   ]
 
 def nat→list/iso : iso nat (list unit) =
@@ -16,7 +16,7 @@ def nat→list/iso : iso nat (list unit) =
    length unit,
    elim [
    | nil → refl
-   | cons * (_ → ih) → λ i → cons triv (ih i)
+   | cons * (_ → ih) → λ i → cons ★ (ih i)
    ],
    elim [
    | zero → refl
@@ -38,7 +38,7 @@ def double/nat : nat → nat =
 def double/list : list unit → list unit =
   coe 0 1 double/nat in λ i → nat→list/path i → nat→list/path i
 
-def double/list/one : list unit = double/list (cons triv nil)
+def double/list/one : list unit = double/list (cons ★ nil)
 meta ⦉ print normalize double/list/one ⦊
 
 --   from list unit → list unit to nat → nat...
@@ -58,27 +58,27 @@ def mystery (f : list (list unit) → nat) : list nat → list unit =
 
 def nat-impl : type^1 = (A : type) × A × (A → A)
 def nat-impl/nat : nat-impl = (nat, zero, λ n → suc n)
-def nat-impl/list : nat-impl = (list unit, nil, λ xs → cons triv xs)
+def nat-impl/list : nat-impl = (list unit, nil, λ xs → cons ★ xs)
 
 def nat-impl/equal : path^1 nat-impl nat-impl/nat nat-impl/list =
   λ i →
   (nat→list/path i,
    coe 0 i zero in nat→list/path,
    -- MORTAL
-   λ v → let v' : nat→list/path i = (suc v, cons triv (v .vproj)) in v'
+   λ v → let v' : nat→list/path i = (suc v, cons ★ (v .vproj)) in v'
   )
 
 -- We can also transport proofs *about* these implementations.
 -- pred was defined as the coercion of tail, so...
 
-def tail-cons (xs : list unit) : path (list unit) (tail unit (cons triv xs)) xs = refl
+def tail-cons (xs : list unit) : path (list unit) (tail unit (cons ★ xs)) xs = refl
 
 def pred-suc : (n : nat) → path nat (pred (suc n)) n =
   let pred-tail
     : pathd (λ i → nat→list/path i → nat→list/path i) pred (tail unit)
     = λ i → coe 1 i (tail unit) in λ i → nat→list/path i → nat→list/path i in
   let suc-cons
-    : pathd (λ i → nat→list/path i → nat→list/path i) (λ n → suc n) (λ xs → cons triv xs)
+    : pathd (λ i → nat→list/path i → nat→list/path i) (λ n → suc n) (λ xs → cons ★ xs)
     = λ i → (nat-impl/equal i) .snd .snd in
   coe 1 0 tail-cons in
     λ i → (x : nat→list/path i) → path (nat→list/path i) (pred-tail i (suc-cons i x)) x
@@ -103,7 +103,7 @@ def mystery'/concat : nat =
     | cons x (_ → ih) → append unit (nat→list x) ih
     ]
   in
-  let ls : list (list unit) = cons (cons triv nil) (cons nil nil) in -- [[*],[]]
+  let ls : list (list unit) = cons (cons ★ nil) (cons nil nil) in -- [[*],[]]
   mystery' flatten ls
 meta ⦉ print normalize mystery'/concat ⦊
 
@@ -112,7 +112,7 @@ def weird (A : type) (f : list nat → A) : list (list unit) → A =
 
 def weird/sum : nat =
   let sum : list nat → nat = elim [nil → zero | cons x (_ → ih) → plus x ih] in
-  let ls : list (list unit) = cons (cons triv nil) (cons (cons triv nil) nil) in
+  let ls : list (list unit) = cons (cons ★ nil) (cons (cons ★ nil) nil) in
   weird nat sum ls --[[*],[*]]
 -/
 
