@@ -4,6 +4,11 @@ import data.bool
 import paths.bool
 import basics.hedberg
 
+import basics.retract
+import data.susp
+import data.unit
+import paths.hlevel
+
 def no-double-neg-elim (f : (A : type) → stable A) : void =
   let f2 = f bool in
 
@@ -34,3 +39,63 @@ def no-double-neg-elim (f : (A : type) → stable A) : void =
 
 def no-excluded-middle (g : (A : type) → dec A) : void =
   no-double-neg-elim (λ A → dec→stable A (g A))
+
+-- 7.2.2
+def mere-relation/set-equiv 
+  (A : type) (R : A → A → type) 
+  (R/prop : (x y : A) → is-prop (R x y))
+  (R/refl : (x : A) → R x x) 
+  (R/id : (x y : A) → R x y → path A x y) 
+  : (is-set A) × ((x y : A) → equiv (R x y) (path A x y))
+  = 
+  let eq = path-retract/equiv A R (λ a b → 
+    ( R/id a b
+    , λ p → coe 0 1 (R/refl a) in λ j → R a (p j)
+    , λ rab → R/prop a b (coe 0 1 (R/refl a) in λ j → R a (R/id a b rab j)) rab
+    )) in
+  ( λ x y → coe 0 1 (R/prop x y) in λ j → is-prop (ua _ _ (eq x y) j)
+  , eq 
+  )
+
+-- Hedberg's theorem is a corollary
+def paths-stable→set/alt (A : type) (st : (x y : A) → stable (path A x y)) : is-set A =
+  (mere-relation/set-equiv A (λ x y → neg (neg (path A x y)))
+    (λ x y → neg/prop (neg (path A x y)))
+    (λ _ np → np refl)
+    st
+  ).fst
+
+-- 10.1.13
+def suspension-lemma (A : type) (A/prop : is-prop A) : (is-set (susp A)) × (equiv A (path (susp A) north south)) = 
+  let P : susp A → susp A → type = 
+    elim [
+    | north → 
+      elim [
+      | north → unit
+      | south → A
+      | merid b j → symm^1 _ (ua A unit (prop/unit A A/prop b)) j
+      ]
+    | south → 
+      elim [
+      | north → A
+      | south → unit
+      | merid b j → ua A unit (prop/unit A A/prop b) j
+      ]
+    | merid a i → 
+      elim [
+      | north → symm^1 _ (ua A unit (prop/unit A A/prop a)) i
+      | south → ua A unit (prop/unit A A/prop a) i
+      | merid b j → ?merid-hole 
+      ]
+    ] in 
+  ?suspension-hole
+
+def choice (X : type) (Y : X → type) : type = (X/set : is-set X) → (Y/set : (x : X) → is-set (Y x)) → ((x : X) → trunc (Y x)) → trunc ((x : X) → Y x)
+
+def choiceLEM (choice-ax : (X : type) → (Y : X → type) → choice X Y) : (A : type) → (A/prop : is-prop A) → dec A = 
+  λ A A/prop →
+  let f (b : bool) : susp A = elim b [ 
+   | tt → south
+   | ff → north
+   ] in
+  ?choice-hole
