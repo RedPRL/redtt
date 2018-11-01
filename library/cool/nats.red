@@ -69,3 +69,5 @@ def nat≃binnat : equiv nat binnat =
      binnat→nat,
      binnat→nat→binnat,
      nat→binnat→nat)
+
+def nat≈binnat : path^1 type nat binnat = ua _ _ nat≃binnat
