@@ -519,7 +519,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       ret (cod0, cod1)
 
 
-    (* TODO: Elim *)
+    | Snoc (_sp0, Tm.Elim _info0), Snoc (_sp1, Tm.Elim _info1) ->
+      failwith "TODO: match_spine/elim"
 
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
       failwith "TODO: match_spine/vproj"
