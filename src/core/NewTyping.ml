@@ -550,7 +550,7 @@ and check_neg cx ty sys tm =
           (* This code sucks. We should implement this as some kind of fold, which actually is consuming
              elements from the system; for now, I want to have a one-to-one account of faces, which means
              that we must not use a face twice, and also not have any left over. *)
-          flip List.map fhcom.sys @@ fun (s, s', _) ->
+          ListUtil.foreach fhcom.sys @@ fun (s, s', _) ->
           let face =
             flip ListUtil.find_map_opt box.sys @@ fun (r, r', tm) ->
             let r = check_eval_dim cx r in
