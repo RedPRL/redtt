@@ -207,7 +207,7 @@ struct
     source_stem name >>= function
     | None -> kont_notfound ()
     | Some stem ->
-      cached_resolver stem >>= function
+      retrieve_module stem >>= function
       | None ->
         Format.eprintf "Module at %s spread names around without leaving a trace in the cache.@." stem;
         raise @@ Impossible "impossible cache miss"
@@ -433,7 +433,7 @@ struct
   let rec foreign_name_of_json : J.value -> Name.t m =
     function
     | `A [`String stem; native] as j ->
-      cached_resolver stem >>= begin
+      retrieve_module stem >>= begin
         function
         | None -> J.parse_error j "foreign_name_of_json"
         | Some (res, _) ->
@@ -938,7 +938,7 @@ struct
       mlenv <<@> ML.Env.imports >>= fun imports ->
       Combinators.flip MU.traverse imports begin fun sel ->
         let stem = FileRes.selector_to_stem stem sel in
-        cached_resolver stem >>=
+        retrieve_module stem >>=
         function
         | Some (_, rotsum) -> ret @@ Import {sel; stem; rotsum}
         | None ->
