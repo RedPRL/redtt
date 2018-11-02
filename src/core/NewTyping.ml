@@ -993,30 +993,57 @@ and synth_stack cx vhd ty stk  =
        If it is rigid, check that the system is equivalent. *)
     let r = check_eval_dim cx cap.r in
     let r' = check_eval_dim cx cap.r' in
+    let _ = check_ty cx `Pre cap.ty in
+    let vcap = eval cx cap.ty in
     begin
       match D.Rel.compare r r' (Cx.rel cx) with
       | `Same ->
+        (* check the cap *)
+        let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vcap ty in
         synth_stack cx vhd ty stk
-        (* should we check that ty = cap.ty here? *)
 
       | _ ->
-        match ty with
-        | D.HCom ({ty = `Pos; _} as fhcom) ->
-          (* check the cap *)
-          let _ = check_ty cx `Pre cap.ty in
-          let vcap = eval cx cap.ty in
-          let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vcap (D.Val.unleash fhcom.cap) in
+        let check_rigid vsys =
+          match ty with
+          | D.HCom ({ty = `Pos; _} as fhcom) ->
+            (* check the cap *)
+            let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vcap (D.Val.unleash fhcom.cap) in
 
-          (* check the system *)
-          let cxx, x = Cx.extend_dim cx ~name:None in
-          (* favonia: a special version for types seems to be code duplicate? *)
-          let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:(D.Univ {kind = `Kan; lvl = `Omega}) ~cap:vcap cap.sys in
-          let vsys = D.Syn.eval_bnd_sys (Cx.rel cx) (Cx.venv cx) cap.sys in
-          let _ = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) vsys fhcom.sys in
-          synth_stack cx vhd vcap stk
+            (* check the system *)
+            let _ = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) vsys fhcom.sys in
+            synth_stack cx vhd vcap stk
 
-        | _ ->
-          raise @@ E ExpectedFHComType
+          | _ ->
+            raise @@ E ExpectedFHComType
+        in
+        let cxx, x = Cx.extend_dim cx ~name:None in
+        let rec go acc =
+          function
+          | [] -> check_rigid (Bwd.to_list acc)
+          | (s, s', (Tm.B (_, tm) as abs)) :: sys ->
+            let s = check_eval_dim cx s in
+            let s' = check_eval_dim cx s' in
+            match Cx.restrict cxx s s' with
+            | `Changed cxx_ss' ->
+              let _ = check_ty_ "cap" cxx_ss' `Pre tm in
+              let vabs =
+                D.LazyValAbs.make_from_lazy @@ lazy begin
+                  Abs (x, D.Syn.eval (Cx.rel cxx_ss') (Cx.venv cxx_ss') tm)
+                end
+              in
+              go (Snoc (acc, (s, s', vabs))) sys
+
+            | `Same ->
+              let _ = check_ty_ "cap" cxx `Pre tm in
+              let vty = D.Syn.eval (Cx.rel cxx) (Cx.venv cxx) tm in
+              let vabs = D.Abs (x, vty) in
+              let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty (D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty) in
+              synth_stack cx (D.Val.make @@ D.Con.make_coe (Cx.rel cx) r' r ~abs:vabs vhd) vcap stk
+
+            | exception I.Inconsistent ->
+              go acc sys
+        in
+        go Emp cap.sys
     end
 
   | D.Sg q, Tm.Fst :: stk ->

@@ -292,11 +292,6 @@ sig
       system value.
       Invariant: everything in [env] should already be [rel]-value. *)
   val eval_tm_sys : rel -> env -> (t, t) Tm.system -> con sys
-
-  (** [eval_bnd_sys] evaluates a system expression to a (possibly non-rigid)
-      system value.
-      Invariant: everything in [env] should already be [rel]-value. *)
-  val eval_bnd_sys : rel -> env -> (t, t Tm.bnd) Tm.system -> con abs sys
 end =
 struct
   type t = Tm.tm
