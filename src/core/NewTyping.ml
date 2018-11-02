@@ -1000,26 +1000,23 @@ and synth_stack cx vhd ty stk  =
         (* should we check that ty = cap.ty here? *)
 
       | _ ->
-        let check_rigid () =
-          match ty with
-          | D.HCom ({ty = `Pos; _} as fhcom) ->
-            (* check the cap *)
-            let _ = check_ty cx `Pre cap.ty in
-            let vcap = eval cx cap.ty in
-            let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vcap (D.Val.unleash fhcom.cap) in
+        match ty with
+        | D.HCom ({ty = `Pos; _} as fhcom) ->
+          (* check the cap *)
+          let _ = check_ty cx `Pre cap.ty in
+          let vcap = eval cx cap.ty in
+          let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vcap (D.Val.unleash fhcom.cap) in
 
-            (* check the system *)
-            let cxx, x = Cx.extend_dim cx ~name:None in
-            (* favonia: a special version for types seems to be code duplicate? *)
-            let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:(D.Univ {kind = `Kan; lvl = `Omega}) ~cap:vcap cap.sys in
-            let vsys = D.Syn.eval_bnd_sys (Cx.rel cx) (Cx.venv cx) cap.sys in
-            let _ = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) vsys fhcom.sys in
-            synth_stack cx vhd vcap stk
+          (* check the system *)
+          let cxx, x = Cx.extend_dim cx ~name:None in
+          (* favonia: a special version for types seems to be code duplicate? *)
+          let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:(D.Univ {kind = `Kan; lvl = `Omega}) ~cap:vcap cap.sys in
+          let vsys = D.Syn.eval_bnd_sys (Cx.rel cx) (Cx.venv cx) cap.sys in
+          let _ = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) vsys fhcom.sys in
+          synth_stack cx vhd vcap stk
 
-          | _ ->
-            raise @@ E ExpectedFHComType
-        in
-        raise PleaseFillIn
+        | _ ->
+          raise @@ E ExpectedFHComType
     end
 
   | D.Sg q, Tm.Fst :: stk ->
