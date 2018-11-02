@@ -989,8 +989,6 @@ and synth_stack cx vhd ty stk  =
     end
 
   | _, Tm.Cap cap :: stk ->
-    (* if the cap frame is not rigid, just pass through in the appropriate way.
-       If it is rigid, check that the system is equivalent. *)
     let r = check_eval_dim cx cap.r in
     let r' = check_eval_dim cx cap.r' in
     let _ = check_ty cx `Pre cap.ty in
@@ -1006,10 +1004,7 @@ and synth_stack cx vhd ty stk  =
         let check_rigid vsys =
           match ty with
           | D.HCom ({ty = `Pos; _} as fhcom) ->
-            (* check the cap *)
             let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vcap (D.Val.unleash fhcom.cap) in
-
-            (* check the system *)
             let _ = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) vsys fhcom.sys in
             synth_stack cx vhd vcap stk
 
@@ -1037,7 +1032,7 @@ and synth_stack cx vhd ty stk  =
               let _ = check_ty_ "cap" cxx `Pre tm in
               let vty = D.Syn.eval (Cx.rel cxx) (Cx.venv cxx) tm in
               let vabs = D.Abs (x, vty) in
-              let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty (D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty) in
+              let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) (D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty) ty in
               synth_stack cx (D.Val.make @@ D.Con.make_coe (Cx.rel cx) r' r ~abs:vabs vhd) vcap stk
 
             | exception I.Inconsistent ->
