@@ -14,6 +14,7 @@ type error =
   | RestrictionTypeCofibrationMismatch
   | ExpectedTermInFace
   | ExpectedVType
+  | ExpectedFHComType
   | ExpectedPositiveCommand
   | ExpectedTrueRestrictType
   | KindError
@@ -44,6 +45,8 @@ let pp_error fmt =
     Format.fprintf fmt "Expected term in face"
   | ExpectedVType ->
     Format.fprintf fmt "Expected V type"
+  | ExpectedFHComType ->
+    Format.fprintf fmt "Expected fhcom type"
   | ExpectedPositiveCommand ->
     Format.fprintf fmt "Expected inferrable term of positive type"
   | ExpectedTrueRestrictType ->
@@ -691,25 +694,6 @@ and check_ty cx kind tm : Lvl.t =
   | _ ->
     raise CanJonHelpMe
 
-and check_tm_face cx ty sys face =
-  let tr, tr', tm = face in
-  let r = check_eval_dim cx tr in
-  let r' = check_eval_dim cx tr' in
-  match Cx.restrict cx r r' with
-  | `Changed cx_rr' ->
-    let rel_rr' = Cx.rel cx_rr' in
-    let ty_rr' = D.Con.run rel_rr' ty in
-    let boundary_rr' = ConSys.run rel_rr' sys in
-    check_of_ty_ "face" cx_rr' ty_rr' boundary_rr' tm;
-    let el = eval cx_rr' tm in
-    (r, r', D.LazyVal.make el) :: sys
-  | `Same ->
-    check_of_ty_ "face" cx ty sys tm;
-    let el = eval cx tm in
-    (r, r', D.LazyVal.make el) :: sys
-  | exception I.Inconsistent ->
-    sys
-
 and check_data_params cx ~tele ~expected ~params =
   let rel = Cx.rel cx in
   let rec loop tyenv tele expected params =
@@ -761,6 +745,26 @@ and check_intro cx data_ty params constr tms =
   ()
 
 
+(* systems and faces *)
+
+and check_tm_face cx ty sys face =
+  let tr, tr', tm = face in
+  let r = check_eval_dim cx tr in
+  let r' = check_eval_dim cx tr' in
+  match Cx.restrict cx r r' with
+  | `Changed cx_rr' ->
+    let rel_rr' = Cx.rel cx_rr' in
+    let ty_rr' = D.Con.run rel_rr' ty in
+    let boundary_rr' = ConSys.run rel_rr' sys in
+    check_of_ty_ "face" cx_rr' ty_rr' boundary_rr' tm;
+    let el = eval cx_rr' tm in
+    (r, r', D.LazyVal.make el) :: sys
+  | `Same ->
+    check_of_ty_ "face" cx ty sys tm;
+    let el = eval cx tm in
+    (r, r', D.LazyVal.make el) :: sys
+  | exception I.Inconsistent ->
+    sys
 
 (* TODO: check this *)
 and check_bnd_face ~cx ~cxx ~ty sys face =
@@ -955,6 +959,7 @@ and synth_stack cx vhd ty stk  =
       | `Apart ->
         (* r must be equal to 1 *)
         synth_stack cx vhd ty stk
+        (* MORTAL should we check that ty = ty1 here? *)
 
       | `Indet ->
         (* must be in V type *)
@@ -963,7 +968,7 @@ and synth_stack cx vhd ty stk  =
           let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) v.r r in
           let cx_r0 = Cx.restrict_ cx r `Dim0 in
           let _ = check_ty cx_r0 `Pre vproj.ty0 in
-          let _ = check_ty cx_r0 `Pre vproj.ty1 in
+          let _ = check_ty cx_r0 `Pre vproj.ty1 in (* favonia: ty1 should make sense in the entire cx? *)
           let ty0 = eval cx_r0 vproj.ty0 in
           let ty1 = eval cx_r0 vproj.ty1 in
           let func_ty0 = D.Con.make_arr (Cx.rel cx_r0) (D.Val.make ty0) (D.Val.make ty1) in
@@ -983,11 +988,39 @@ and synth_stack cx vhd ty stk  =
           raise @@ E ExpectedVType
     end
 
-  | _, Tm.Cap _ :: stk ->
+  | _, Tm.Cap cap :: stk ->
     (* if the cap frame is not rigid, just pass through in the appropriate way.
        If it is rigid, check that the system is equivalent. *)
-    Format.eprintf "typechecker/cap frame@.";
-    raise CanJonHelpMe
+    let r = check_eval_dim cx cap.r in
+    let r' = check_eval_dim cx cap.r' in
+    begin
+      match D.Rel.compare r r' (Cx.rel cx) with
+      | `Same ->
+        synth_stack cx vhd ty stk
+        (* should we check that ty = cap.ty here? *)
+
+      | _ ->
+        let check_rigid () =
+          match ty with
+          | D.HCom ({ty = `Pos; _} as fhcom) ->
+            (* check the cap *)
+            let _ = check_ty cx `Pre cap.ty in
+            let vcap = eval cx cap.ty in
+            let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vcap (D.Val.unleash fhcom.cap) in
+
+            (* check the system *)
+            let cxx, x = Cx.extend_dim cx ~name:None in
+            (* favonia: a special version for types seems to be code duplicate? *)
+            let _ = check_bnd_sys ~cx ~cxx ~x ~r ~ty:(D.Univ {kind = `Kan; lvl = `Omega}) ~cap:vcap cap.sys in
+            let vsys = D.Syn.eval_bnd_sys (Cx.rel cx) (Cx.venv cx) cap.sys in
+            let _ = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) vsys fhcom.sys in
+            synth_stack cx vhd vcap stk
+
+          | _ ->
+            raise @@ E ExpectedFHComType
+        in
+        raise PleaseFillIn
+    end
 
   | D.Sg q, Tm.Fst :: stk ->
     let vhd = D.Val.plug (Cx.rel cx) D.Fst vhd in
