@@ -1,11 +1,12 @@
 import prelude
+import data.bool
 import data.nat
 import basics.isotoequiv
 
 data binnat where
-| nil
-| cons1 (x : binnat)
-| cons2 (x : binnat)
+| nil                -- 0
+| cons1 (x : binnat) -- 2n + 1
+| cons2 (x : binnat) -- 2n + 2
 
 def double/nat : nat → nat =
   elim [
@@ -70,4 +71,78 @@ def nat≃binnat : equiv nat binnat =
      binnat→nat→binnat,
      nat→binnat→nat)
 
-def nat≈binnat : path^1 type nat binnat = ua _ _ nat≃binnat
+def n≈bn : path^1 type nat binnat = ua _ _ nat≃binnat
+
+
+
+-- We can transport functions between these two types, and run them!
+-- From nat → nat → nat to binnat → binnat → binnat...
+
+def plus/binnat : binnat → binnat → binnat =
+  coe 0 1 plus in λ i → n≈bn i → n≈bn i → n≈bn i
+--                i=0:  nat    → nat    → nat
+--                i=1:  binnat → binnat → binnat
+
+-- plus and plus/binnat are equal, modulo n≈bn
+def plus/n≈bn : pathd^1 (λ i → n≈bn i → n≈bn i → n≈bn i) plus plus/binnat =
+  λ i → coe 0 i plus in λ i → n≈bn i → n≈bn i → n≈bn i
+
+def test : binnat = plus/binnat (cons1 nil) (cons1 nil)
+meta ⦉ print normalize test ⦊
+
+-- From binnat → bool to nat → bool...
+
+def oddq : binnat → bool =
+  elim [
+  | nil → ff
+  | cons1 _ → tt
+  | cons2 _ → ff
+  ]
+
+def oddq/n≈bn : (i : 𝕀) → (n≈bn i) → bool =
+  λ i → coe 1 i oddq in λ i → (n≈bn i) → bool
+
+def oddq/nat : nat → bool = oddq/n≈bn 0
+
+-- nat and binnat are equal implementations of the 'nat' interface.
+
+def impl : type^1 = (A : type) × A × (A → A)
+def impl/nat : impl = (nat, zero, λ n → suc n)
+def impl/binnat : impl = (binnat, nil, suc/binnat)
+
+def impl/n≈bn : path^1 impl impl/nat impl/binnat =
+  λ i →
+  (n≈bn i,
+   coe 0 i zero in n≈bn,
+   -- MORTAL
+   λ v → let v' : n≈bn i = (suc v, suc/binnat (v .vproj)) in v'
+  )
+
+-- We can also transport proofs *about* these functions.
+
+def oddq/suc : (n : binnat) → path bool (oddq n) (not (oddq (suc/binnat n))) =
+  elim [
+  | nil → refl
+  | cons1 _ → refl
+  | cons2 _ → refl
+  ]
+
+def oddq/nat/suc : (n : nat) → path bool (oddq/nat n) (not (oddq/nat (suc n))) =
+  coe 1 0 oddq/suc
+  in λ i → (n : n≈bn i) →
+    path bool (oddq/n≈bn i n) (not (oddq/n≈bn i (impl/n≈bn i .snd.snd n)))
+
+def oddq/nat/direct : nat → bool =
+  elim [
+  | zero → ff
+  | suc (_ → ih) → not ih
+  ]
+
+def oddq/n≈bn : (n : nat) → path bool (oddq/nat n) (oddq/nat/direct n) =
+  let pf : (n : nat) → path _ (suc/binnat (nat→binnat n)) (nat→binnat (suc n)) =
+    elim [ zero → refl | suc (_ → ih) → refl ]
+  in
+  elim [
+  | zero → refl
+  | suc (n → ih) → λ i → not (trans bool (λ i → oddq (pf n i)) ih i)
+  ]
