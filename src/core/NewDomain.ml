@@ -8,6 +8,8 @@ exception PleaseRaiseProperError
 exception CanJonHelpMe
 exception CanFavoniaHelpMe
 
+
+
 type dim = I.t
 
 (** The dimension equality oracle *)
@@ -182,6 +184,22 @@ and nclo = NClo of {bnd : Tm.tm Tm.nbnd; env : env}
 and ext_clo = ExtClo of {bnd : (Tm.tm * (Tm.tm, Tm.tm) Tm.system) Tm.nbnd; env : env}
 
 
+
+type error =
+  | ExpectedDimension
+  | UnexpectedDimension
+  | MalformedConstructorArguments
+  | ExpectedTypeAnnotation
+  | GlobalVariableWrongKind
+  | UnexpectedDeadFace
+  | InvalidRestrictionProjection
+  | PlugMismatch of {frm : frame; con : con}
+  | PlugTyMismatch of {frm : frame; tycon : con}
+
+exception E of error
+
+
+
 (** Permutations *)
 module Perm :
 sig
@@ -229,6 +247,7 @@ sig
   (** [run] brings the prevalue underneath the restriction Ξ. *)
   val run : rel -> t -> t
 
+  (* TODO: this should not take a 'rel'. [pp] is meant to be simple-minded. *)
   val pp : rel -> t Pp.t0
 end
 
@@ -276,7 +295,49 @@ sig
   val make_then_run : rel -> u -> t
 end
 
-module rec Syn :
+module rec Error :
+sig
+  type t = error
+  val pp : t Pp.t0
+end =
+struct
+
+  type t = error
+
+  let pp fmt =
+    function
+    | ExpectedDimension ->
+      Format.fprintf fmt "Expected dimension"
+    | UnexpectedDimension ->
+      Format.fprintf fmt "Unexpected dimension"
+    | MalformedConstructorArguments ->
+      Format.fprintf fmt "Constructor arguments did not match expected structure"
+    | ExpectedTypeAnnotation ->
+      Format.fprintf fmt "Expected type annotation"
+    | GlobalVariableWrongKind ->
+      Format.fprintf fmt "Global variable has wrong kind"
+    | UnexpectedDeadFace ->
+      Format.fprintf fmt "Encountered unexpected dead face"
+    | InvalidRestrictionProjection ->
+      Format.fprintf fmt "Tried to project from untrue restriction"
+    | PlugMismatch {frm; con} ->
+      Format.fprintf fmt "Frame %a does not operate on element %a" (Frame.pp (Rel.emp ())) frm (Con.pp (Rel.emp ())) con
+    | PlugTyMismatch {frm; tycon} ->
+      Format.fprintf fmt "Frame %a does not operate on type %a" (Frame.pp (Rel.emp ())) frm (Con.pp (Rel.emp ())) tycon
+
+
+  let _ =
+    PpExn.install_printer @@ fun fmt ->
+    function
+    | E err ->
+      Format.fprintf fmt "@[<1>%a@]" pp err
+    | _ ->
+      raise PpExn.Unrecognized
+
+end
+
+
+and Syn :
 sig
   type t = Tm.tm
   exception Triv of con
@@ -308,11 +369,11 @@ struct
       begin
         match Env.lookup_cell_by_index i env with
         | `Dim r -> r
-        | _ -> raise PleaseRaiseProperError
+        | _ -> raise @@ E ExpectedDimension
       end
     | Tm.Up (Tm.Var {name; _}, []) -> `Atom name
     | Tm.Up (Tm.DownX r, []) -> eval_dim env r
-    | _ -> raise PleaseRaiseProperError
+    | _ -> raise @@ E ExpectedDimension
 
 
   module ConAbs = Abs(Con)
@@ -351,7 +412,7 @@ struct
       ExtLam (NClo {bnd; env})
 
     | Tm.Dim0 | Tm.Dim1 ->
-      raise PleaseRaiseProperError
+      raise @@ E UnexpectedDimension
 
     | Tm.Restrict face ->
       let face = eval_tm_face_ rel env face in
@@ -434,7 +495,7 @@ struct
         let acc = acc #< (`Dim r) in
         go acc tyenv tele tms
       | _ ->
-        raise PleaseRaiseProperError
+        raise @@ E MalformedConstructorArguments
     in
     go Emp tyenv constr args
 
@@ -498,7 +559,8 @@ struct
     | Tm.Down info ->
       eval rel env info.tm
 
-    | Tm.DownX _ -> raise PleaseRaiseProperError
+    | Tm.DownX _ ->
+      raise @@ E ExpectedTypeAnnotation
 
     | Tm.Coe info ->
       let r = eval_dim env info.r in
@@ -543,7 +605,7 @@ struct
       begin
         match Env.lookup_cell_by_index i env with
         | `Val v -> LazyVal.unleash v
-        | _ -> raise PleaseRaiseProperError
+        | `Dim _ -> raise @@ E UnexpectedDimension
       end
 
     | Tm.Var info ->
@@ -556,7 +618,7 @@ struct
         | `P ty, _ -> ty, None
         | `Tw (ty, _), `TwinL -> ty, None
         | `Tw (_, ty), `TwinR -> ty, None
-        | _ -> raise PleaseRaiseProperError
+        | _ -> raise @@ E GlobalVariableWrongKind
       in
       begin
         match odef with
@@ -577,7 +639,7 @@ struct
         match entry with
         | `Def (ty, def) -> ty, Some def
         | `P ty -> ty, None
-        | _ -> raise PleaseRaiseProperError
+        | _ -> raise @@ E GlobalVariableWrongKind
       in
       begin
         match odef with
@@ -1224,7 +1286,8 @@ struct
       begin
         match ConFace.run rel face with
         | face -> Restrict face
-        | exception ConFace.Dead -> raise PleaseRaiseProperError
+        | exception ConFace.Dead ->
+          raise @@ E UnexpectedDeadFace
       end
 
     | Lam clo ->
@@ -1244,7 +1307,8 @@ struct
       begin
         match ConFace.run rel face with
         | face -> RestrictThunk face
-        | exception ConFace.Dead -> raise PleaseRaiseProperError
+        | exception ConFace.Dead ->
+          raise @@ E UnexpectedDeadFace
       end
 
     | Coe info ->
@@ -1504,7 +1568,8 @@ struct
       begin
         match Rel.compare r r' rel with
         | `Same -> LazyVal.unleash v
-        | _ -> raise PleaseRaiseProperError
+        | _ ->
+          raise @@ E InvalidRestrictionProjection
       end
 
     | VProj _, VIn {el1; _} ->
@@ -1551,22 +1616,16 @@ struct
           con
       end
 
-    | FunApp _, _ -> raise PleaseRaiseProperError
-    | Fst, _ -> raise PleaseRaiseProperError
-    | Snd, _ -> raise PleaseRaiseProperError
-    | ExtApp _, _ -> raise PleaseRaiseProperError
-    | RestrictForce, _ -> raise PleaseRaiseProperError
-    | VProj _, _ -> raise PleaseRaiseProperError
-    | Cap _, _ -> raise PleaseRaiseProperError
-    | Elim _, _ -> raise PleaseRaiseProperError
+    | FunApp _, con | Fst, con | Snd, con | ExtApp _, con | RestrictForce, con | VProj _, con | Cap _, con | Elim _, con ->
+      raise @@ E (PlugMismatch {frm; con})
 
   and rigid_plug_ty rel frm ty hd =
     match Val.unleash ty, frm with
     | Pi {dom; cod}, FunApp arg ->
       FunApp {arg with ty = Some dom}, Clo.inst rel cod @@ Cell.value @@ TypedVal.drop_ty arg, []
 
-    | Pi _, _ ->
-      raise PleaseRaiseProperError
+    | Pi _ as tycon, _ ->
+      raise @@ E (PlugTyMismatch {frm; tycon})
 
     | Sg {dom; _}, Fst ->
       frm, Val.unleash dom, []
@@ -1575,15 +1634,15 @@ struct
       let fst = lazy begin plug rel ~rigid:true Fst hd end in
       frm, Clo.inst rel cod @@ Cell.lazy_con fst, []
 
-    | Sg _, _ ->
-      raise PleaseRaiseProperError
+    | Sg _ as tycon, _ ->
+      raise @@ E (PlugTyMismatch {frm; tycon})
 
     | Ext extclo, ExtApp rs ->
       let ty, sys = ExtClo.inst rel extclo @@ List.map Cell.dim rs in
       frm, ty, sys
 
-    | Ext _, _ ->
-      raise PleaseRaiseProperError
+    | Ext _ as tycon, _ ->
+      raise @@ E (PlugTyMismatch {frm; tycon})
 
     | Restrict (r, r', ty), RestrictForce ->
       frm, LazyVal.unleash ty, [(r, r', LazyVal.make hd)]
@@ -1598,11 +1657,11 @@ struct
     | Data _, Elim elim ->
       frm, Clo.inst rel elim.mot (Cell.con hd), []
 
-    | Data _, _ ->
-      raise PleaseRaiseProperError
+    | Data _ as tycon, _ ->
+      raise @@ E (PlugTyMismatch {frm; tycon})
 
-    | _ ->
-      raise PleaseRaiseProperError
+    | tycon, _ ->
+      raise @@ E (PlugTyMismatch {frm; tycon})
 
   and make_coe rel r r' ~abs cap =
     match Rel.compare r r' rel with
