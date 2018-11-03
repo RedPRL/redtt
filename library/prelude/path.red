@@ -121,8 +121,6 @@ def J/eq
   | k=1 → refl
   ]
 
-quit
-
 def symmd (A : 𝕀 → type) (p : (i : 𝕀) → A i) : pathd (symm^1 _ A) (p 1) (p 0) =
   λ i →
   comp 0 1 (p 0) in λ j → symm/filler^1 _ A j i [
