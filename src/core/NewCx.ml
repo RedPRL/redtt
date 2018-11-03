@@ -88,8 +88,10 @@ let restrict cx r r' =
       | `El ty -> `El (D.Con.run rel ty)
     in
     `Changed {cx with rel; venv; hyps}
+  | `Inconsistent -> `Inconsistent
 
 let restrict_ cx r r' =
   match restrict cx r r' with
   | `Same -> cx
   | `Changed cx -> cx
+  | `Inconsistent -> raise I.Inconsistent

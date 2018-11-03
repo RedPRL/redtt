@@ -467,7 +467,7 @@ and check_neg cx ty sys tm =
       | `Same, bdy ->
         let sys_bdy = Rst.sys_body cx sys in
         check_of_ty_ "rst" cx (D.LazyVal.unleash ty_rr') sys_bdy bdy
-      | exception I.Inconsistent -> ()
+      | `Inconsistent, _ -> ()
     end
 
   | D.Ext eclo ->
@@ -605,19 +605,19 @@ and check_ty cx kind tm : Lvl.t =
       Cofibration.from_sys cx' sys;
     lvl
 
-  | Tm.Restrict (tr, tr', otm) ->
+  | Tm.Restrict (tr, tr', tm) ->
     (* these aren't kan, are they? *)
     if Kind.lte kind `Kan then
       raise @@ E KindError;
     begin
       let r = check_eval_dim cx tr in
       let r' = check_eval_dim cx tr' in
-      match Cx.restrict cx r r', otm with
-      | `Changed cx_rr', tm ->
+      match Cx.restrict cx r r' with
+      | `Changed cx_rr' ->
         check_ty cx_rr' kind tm
-      | `Same, tm ->
+      | `Same ->
         check_ty cx kind tm
-      | exception I.Inconsistent ->
+      | `Inconsistent ->
         `Const 42 (* power move *)
     end
 
@@ -727,7 +727,7 @@ and check_tm_face cx ty sys face =
     check_of_ty_ "face" cx ty sys tm;
     let el = eval cx tm in
     (r, r', D.LazyVal.make el) :: sys
-  | exception I.Inconsistent ->
+  | `Inconsistent ->
     sys
 
 (* TODO: check this *)
@@ -747,7 +747,7 @@ and check_bnd_face ~cx ~cxx ~ty sys face =
     check_of_ty_ "bface" cxx ty sys tm;
     let el = eval cxx tm in
     (s, s', D.LazyVal.make el) :: sys
-  | exception I.Inconsistent ->
+  | `Inconsistent ->
     sys
 
 and check_box_face ~cx ~r' ~abs sys face =
@@ -999,7 +999,7 @@ and synth_stack cx vhd ty stk  =
               let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) (D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty) ty in
               synth_stack cx (D.Val.make @@ D.Con.make_coe (Cx.rel cx) r' r ~abs:vabs vhd) vcap stk
 
-            | exception I.Inconsistent ->
+            | `Inconsistent ->
               go acc sys
         in
         go Emp cap.sys

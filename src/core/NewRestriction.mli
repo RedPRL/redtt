@@ -3,7 +3,7 @@ type dim = I.t
 
 type t
 
-type 'a m = [`Changed of 'a | `Same]
+type 'a m = [`Changed of 'a | `Same | `Inconsistent]
 
 (* core API *)
 val emp : unit -> t

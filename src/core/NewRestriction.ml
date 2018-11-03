@@ -12,11 +12,12 @@ type t =
    rank : (int, int) T.t;
    parent : (int, cls) T.t}
 
-type 'a m = [`Changed of 'a | `Same]
+type 'a m = [`Changed of 'a | `Same | `Inconsistent]
 
 let get_m h = function
   | `Changed h -> h
   | `Same -> h
+  | `Inconsistent -> raise I.Inconsistent
 
 let emp () =
   let size = 100 in
@@ -65,7 +66,7 @@ let union_cls (x : cls) (y : cls) (h : t) =
   let clsy = find_cls y h in
   match clsx, clsy with
   | `Dim0, `Dim0 | `Dim1, `Dim1 -> `Same
-  | `Dim0, `Dim1 | `Dim1, `Dim0 -> raise I.Inconsistent
+  | `Dim0, `Dim1 | `Dim1, `Dim0 -> `Inconsistent
   | `Atom clsx, `Atom clsy ->
     if clsx == clsy then `Same else
       let rx = rank_index clsx h in
