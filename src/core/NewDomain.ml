@@ -229,7 +229,7 @@ sig
   (** [run] brings the prevalue underneath the restriction Ξ. *)
   val run : rel -> t -> t
 
-  val pp : t Pp.t0
+  val pp : rel -> t Pp.t0
 end
 
 module type DomainPlug =
@@ -630,7 +630,7 @@ and Dim : Domain with type t = dim =
 struct
   type t = dim
 
-  let pp = I.pp
+  let pp _ = I.pp
 
   let swap pi =
     function
@@ -659,7 +659,7 @@ struct
   type t = clo
 
 
-  let pp fmt _ =
+  let pp _ fmt _ =
     Format.fprintf fmt "<clo>"
 
   let swap pi (Clo clo) =
@@ -691,7 +691,7 @@ end =
 struct
   type t = nclo
 
-  let pp fmt _ =
+  let pp _ fmt _ =
     Format.fprintf fmt "<nclo>"
 
   let swap pi (NClo nclo) =
@@ -726,7 +726,7 @@ end =
 struct
   type t = ext_clo
 
-  let pp fmt _ =
+  let pp _ fmt _ =
     Format.fprintf fmt "<ext-clo>"
 
   let swap pi (ExtClo clo) =
@@ -772,10 +772,10 @@ struct
   let lazy_con el = `Val (LazyVal.make_from_lazy el)
   let value v = `Val (LazyVal.make_from_delayed v)
 
-  let pp fmt =
+  let pp rel fmt =
     function
-    | `Dim r -> Format.fprintf fmt "@[<hov1>(dim@ %a)@]" I.pp r
-    | `Val v -> Format.fprintf fmt "@[<hov1>(val@ %a)@]" LazyVal.pp v
+    | `Dim r -> Format.fprintf fmt "@[<hov1>(dim@ %a)@]" (Dim.pp rel) r
+    | `Val v -> Format.fprintf fmt "@[<hov1>(val@ %a)@]" (LazyVal.pp rel) v
 
   let swap pi =
     function
@@ -815,7 +815,7 @@ struct
     | `Rec (_, el) -> Cell.value el
     | `Const el -> Cell.value el
 
-  let pp fmt _ =
+  let pp _ fmt _ =
     Format.fprintf fmt "<constr-cell>"
 
   let swap pi : t -> t =
@@ -855,7 +855,7 @@ struct
   type t = env
 
 
-  let pp fmt _ =
+  let pp _ fmt _ =
     Format.fprintf fmt "<env>"
 
   let swap pi env =
@@ -929,22 +929,24 @@ struct
 
   type t = con
 
-  let pp fmt =
+  let pp rel fmt =
     function
     | Neu {neu; _} ->
-      Neutroid.pp fmt neu
+      Neutroid.pp rel fmt neu
     | ExtLam nclo ->
-      Format.fprintf fmt "@[<hov1>(ext-lam@ %a)@]" NClo.pp nclo
+      Format.fprintf fmt "@[<hov1>(ext-lam@ %a)@]" (NClo.pp rel) nclo
     | Pi quant ->
-      Format.fprintf fmt "@[<hov1>(pi@ %a)@]" Quantifier.pp quant
+      Format.fprintf fmt "@[<hov1>(pi@ %a)@]" (Quantifier.pp rel) quant
     | Sg quant ->
-      Format.fprintf fmt "@[<hov1>(pi@ %a)@]" Quantifier.pp quant
+      Format.fprintf fmt "@[<hov1>(pi@ %a)@]" (Quantifier.pp rel) quant
     | Data _ ->
       Format.fprintf fmt "<data>"
     | Univ _ ->
       Format.fprintf fmt "<univ>"
     | Ext _ ->
       Format.fprintf fmt "<ext>"
+    | FortyTwo ->
+      Format.fprintf fmt "forty-two"
     | _ ->
       Format.fprintf fmt "<con>"
 
@@ -2474,7 +2476,7 @@ and CoeShape : Domain with type t = coe_shape =
 struct
   type t = coe_shape
 
-  let pp fmt _ =
+  let pp _ fmt _ =
     Format.fprintf fmt "<coe-shape>"
 
   module QAbs = Abs (Quantifier)
@@ -2505,7 +2507,7 @@ struct
   type t = hcom_shape
   module Q = Quantifier
 
-  let pp fmt _ =
+  let pp _ fmt _ =
     Format.fprintf fmt "<hcom-shape>"
 
   let swap pi =
@@ -2537,8 +2539,8 @@ and Quantifier : Domain with type t = quantifier =
 struct
   type t = quantifier
 
-  let pp fmt {dom; cod} =
-    Format.fprintf fmt "%a@ %a" Val.pp dom Clo.pp cod
+  let pp rel fmt {dom; cod} =
+    Format.fprintf fmt "%a@ %a" (Val.pp rel) dom (Clo.pp rel) cod
 
   let swap pi {dom; cod} =
     let dom = Val.swap pi dom in
@@ -2572,13 +2574,13 @@ struct
   module ConSys = Sys (Con)
   exception Triv of con
 
-  let pp fmt {neu; sys} =
+  let pp rel fmt {neu; sys} =
     match sys with
-    | [] -> DelayedNeu.pp fmt neu
+    | [] -> DelayedNeu.pp rel fmt neu
     | _ ->
       Format.fprintf fmt "@[<hv1>(%a@ %a)@]"
-        DelayedNeu.pp neu
-        ConSys.pp sys
+        (DelayedNeu.pp rel) neu
+        (ConSys.pp rel) sys
 
   let swap pi {neu; sys} =
     {neu = DelayedNeu.swap pi neu;
@@ -2621,13 +2623,13 @@ and Neu : DomainPlug with type t = neu =
 struct
   type t = neu
 
-  let pp fmt {head; frames} =
+  let pp rel fmt {head; frames} =
     match Bwd.to_list frames with
-    | [] -> Head.pp fmt head
+    | [] -> Head.pp rel fmt head
     | frames ->
       Format.fprintf fmt "@[<hv1>(%a %a)@]"
-        Head.pp head
-        (Pp.pp_list Frame.pp) frames
+        (Head.pp rel) head
+        (Pp.pp_list (Frame.pp rel)) frames
 
   let swap pi neu =
     {head = Head.swap pi neu.head;
@@ -2663,7 +2665,7 @@ struct
   module ConAbs = AbsPlug (Con)
   module ConAbsSys = Sys (ConAbs)
 
-  let pp fmt =
+  let pp rel fmt =
     function
     | Lvl i ->
       Format.fprintf fmt "#%i" i
@@ -2672,7 +2674,7 @@ struct
     | Meta var ->
       Name.pp fmt var.name
     | NCoe ncoe ->
-      Format.fprintf fmt "@[<hov1>(ncoe@ %a %a@ %a@ %a)@]" I.pp ncoe.r I.pp ncoe.r' NeutroidAbs.pp ncoe.ty Val.pp ncoe.cap
+      Format.fprintf fmt "@[<hov1>(ncoe@ %a %a@ %a@ %a)@]" I.pp ncoe.r I.pp ncoe.r' (NeutroidAbs.pp rel) ncoe.ty (Val.pp rel) ncoe.cap
     | NCoeData _ ->
       Format.fprintf fmt "<ncoe-data>"
     | NHCom _ ->
@@ -2759,8 +2761,8 @@ end
 struct
   type t = typed_value
 
-  let pp fmt {value; _} =
-    Val.pp fmt value
+  let pp rel fmt {value; _} =
+    Val.pp rel fmt value
 
   let swap pi {ty; value} =
     {ty = Option.map (Val.swap pi) ty;
@@ -2811,10 +2813,10 @@ struct
     | None -> raise PleaseRaiseProperError
 
 
-  let pp fmt =
+  let pp rel fmt =
     function
     | FunApp arg ->
-      TypedVal.pp fmt arg
+      TypedVal.pp rel fmt arg
     | Fst ->
       Format.fprintf fmt "fst"
     | Snd ->
@@ -2986,8 +2988,8 @@ and Sys :
 
     exception Triv = Face.Triv
 
-    let pp fmt =
-      Pp.pp_list Face.pp fmt
+    let pp rel fmt =
+      Pp.pp_list (Face.pp rel) fmt
 
     let swap pi = List.map @@ Face.swap pi
 
@@ -3060,11 +3062,17 @@ and Face :
     exception Triv of X.t
     exception Dead
 
-    let pp fmt (r, r', u) =
-      Format.fprintf fmt "%a=%a -> %a"
-        Dim.pp r
-        Dim.pp r'
-        DelayedLazyX.pp u
+    let pp rel fmt (r, r', u) =
+      match Rel.compare r r' rel with
+      | `Apart ->
+        Format.fprintf fmt "%a≠%a"
+          (Dim.pp rel) r
+          (Dim.pp rel) r'
+      | _ ->
+        Format.fprintf fmt "%a=%a -> %a"
+          (Dim.pp rel) r
+          (Dim.pp rel) r'
+          (DelayedLazyX.pp rel) u
 
     let swap pi (r, r', bdy) =
       Dim.swap pi r, Dim.swap pi r',
@@ -3129,8 +3137,8 @@ end
   struct
     type t = X.t abs
 
-    let pp fmt (Abs (x, u)) =
-      Format.fprintf fmt "@[<hv1>(<%a>@ %a)@]" Name.pp x X.pp u
+    let pp rel fmt (Abs (x, u)) =
+      Format.fprintf fmt "@[<hv1>(<%a>@ %a)@]" Name.pp x (X.pp rel) u
 
     let swap pi abs =
       let Abs (x, a) = abs in
@@ -3262,8 +3270,8 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let drop_rel = Delayed.drop_rel
 
-    let pp fmt d =
-      X.pp fmt @@ unleash d
+    let pp rel fmt d =
+      X.pp rel fmt @@ unleash d
 
 
     let swap pi =
@@ -3302,8 +3310,8 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
 
     let unleash v = Lazy.force @@ Delayed.unleash (fun rel v -> lazy begin X.run rel (Lazy.force v) end) v
 
-    let pp fmt v =
-      X.pp fmt @@ unleash v
+    let pp rel fmt v =
+      X.pp rel fmt @@ unleash v
 
     let drop_rel v = Lazy.force (Delayed.drop_rel v)
 

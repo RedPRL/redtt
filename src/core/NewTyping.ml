@@ -83,9 +83,9 @@ type positive = [`El of D.con | `Dim]
 type phase = [`Pos of positive | `Neg of D.con * D.con D.sys]
 
 
-let pp_positive fmt =
+let pp_positive rel fmt =
   function
-  | `El con -> D.Con.pp fmt con
+  | `El con -> D.Con.pp rel fmt con
   | `Dim -> Format.fprintf fmt "dim"
 
 
