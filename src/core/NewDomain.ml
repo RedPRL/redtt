@@ -3340,9 +3340,7 @@ and DelayedPlug : functor (X : DomainPlug) ->
       Delayed.fold @@ fun rel v ->
       Delayed.make' (Option.map (Perm.fold Rel.swap pi) rel) (X.swap pi v)
 
-    let subst r x =
-      Delayed.fold @@ fun rel v ->
-      Delayed.make' (Option.map (Rel.subst' r x) rel) (X.subst r x v)
+    let subst r x v = Delayed.make @@ X.subst r x (unleash v)
 
     let run rel v = Delayed.with_rel rel v
 
@@ -3381,12 +3379,7 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
       Delayed.fold @@ fun rel v ->
       Delayed.make' (Option.map (Perm.fold Rel.swap pi) rel) @@ lazy begin X.swap pi (Lazy.force v) end
 
-    let subst r x =
-      Delayed.fold @@ fun rel v ->
-      let con = lazy begin X.subst r x (Lazy.force v) end in
-      match Option.map (Rel.subst' r x) rel with
-      | orel -> Delayed.make' orel con
-      | exception I.Inconsistent -> Delayed.make' None con
+    let subst r x v = Delayed.make @@ lazy begin X.subst r x (unleash v) end
 
     let run rel v = Delayed.with_rel rel v
 
