@@ -354,11 +354,11 @@ struct
       raise PleaseRaiseProperError
 
     | Tm.Restrict face ->
-      let face = eval_tm_face rel env face in
+      let face = eval_tm_face_ rel env face in
       Restrict face
 
     | Tm.RestrictThunk face ->
-      let face = eval_tm_face rel env face in
+      let face = eval_tm_face_ rel env face in
       RestrictThunk face
 
     | Tm.Univ {kind; lvl} ->
@@ -597,17 +597,31 @@ struct
     | `Changed rel ->
       let env = Env.run rel env in
       let abs = lazy begin eval_bnd rel env bnd end in
-      (r, r', LazyValAbs.make_from_lazy abs)
+      Some (r, r', LazyValAbs.make_from_lazy abs)
     | `Same ->
       let abs = lazy begin eval_bnd rel env bnd end in
-      (r, r', LazyValAbs.make_from_lazy abs)
+      Some (r, r', LazyValAbs.make_from_lazy abs)
     | exception I.Inconsistent ->
-      (r, r', LazyValAbs.make @@ ConAbs.bind @@ fun _ -> FortyTwo)
+      None
 
   and eval_bnd_sys rel env =
-    List.map (eval_bnd_face rel env)
+    Option.filter_map (eval_bnd_face rel env)
 
   and eval_tm_face rel env (tr, tr', tm) =
+    let r = eval_dim env tr in
+    let r' = eval_dim env tr' in
+    match Rel.equate r r' rel with
+    | `Changed rel ->
+      let env = Env.run rel env in
+      let v = lazy begin eval rel env tm end in
+      Some (r, r', LazyVal.make_from_lazy v)
+    | `Same ->
+      let v = lazy begin eval rel env tm end in
+      Some (r, r', LazyVal.make_from_lazy v)
+    | exception I.Inconsistent ->
+      None
+
+  and eval_tm_face_ rel env (tr, tr', tm) =
     let r = eval_dim env tr in
     let r' = eval_dim env tr' in
     match Rel.equate r r' rel with
@@ -622,7 +636,7 @@ struct
       (r, r', LazyVal.make FortyTwo)
 
   and eval_tm_sys rel env =
-    List.map (eval_tm_face rel env)
+    Option.filter_map (eval_tm_face rel env)
 end
 
 (** Everything in dim is a value. *)
@@ -3321,7 +3335,10 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
 
     let subst r x =
       Delayed.fold @@ fun rel v ->
-      Delayed.make' (Option.map (Rel.subst' r x) rel) @@ lazy begin X.subst r x (Lazy.force v) end
+      let con = lazy begin X.subst r x (Lazy.force v) end in
+      match Option.map (Rel.subst' r x) rel with
+      | orel -> Delayed.make' orel con
+      | exception I.Inconsistent -> Delayed.make' None con
 
     let run rel v = Delayed.with_rel rel v
 
