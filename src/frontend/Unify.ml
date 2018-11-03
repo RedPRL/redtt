@@ -592,6 +592,17 @@ let rec subtype ty0 ty1 =
       let xs_fwd = Bwd.to_list xs in
       let ty1, sys1 = Tm.unbind_ext_with (List.map Tm.var xs_fwd) ebnd1 in
       let ps = List.map (fun x -> (x, `I)) xs_fwd in
+      base_cx >>= fun cx ->
+      let rel = Cx.rel cx in
+      let kill_false rel ((r, r', tm) as face) =
+        let r = Ty.eval_dim cx r in
+        let r' = Ty.eval_dim cx r' in
+        match D.Rel.compare r r' rel with
+        | `Apart -> None
+        | _ -> Some face
+      in
+      let sys0 = Option.filter_map (kill_false rel) sys0 in
+      let sys1 = Option.filter_map (kill_false rel) sys1 in
       let rec go sys0 sys1 =
         match sys0, sys1 with
         | _, [] -> ret ()
