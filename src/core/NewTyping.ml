@@ -562,7 +562,7 @@ and check_neg cx ty sys tm =
     raise CanJonHelpMe
 
 and check_ty_ str (cx : Cx.t) kind tm =
-  Format.eprintf "ty [%s]: %a@." str (Tm.pp (Cx.ppenv cx)) tm;
+  (* Format.eprintf "ty [%s]: %a@." str (Tm.pp (Cx.ppenv cx)) tm; *)
   check_ty cx kind tm
 
 (* TODO: we can take from RedPRL the fine-grained subtraction of kinds. Let Favonia do it! *)
