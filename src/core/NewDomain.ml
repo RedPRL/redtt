@@ -94,9 +94,9 @@ type con =
 
   | Coe of {r : dim; r' : dim; ty : coe_shape; cap : value} (* is a value when (r,r') is rigid *)
   | HCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
-  | Com of {r : dim; r' : dim; ty : coe_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
+  | Com of {r : dim; r' : dim; ty : com_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
   | GHCom of {r : dim; r' : dim; ty : hcom_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
-  | GCom of {r : dim; r' : dim; ty : coe_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
+  | GCom of {r : dim; r' : dim; ty : com_shape; cap : value; sys : con abs sys} (* is a value when (r,r') and sys are rigid *)
 
   | Univ of {kind : Kind.t; lvl : Lvl.t}
 
@@ -1468,6 +1468,18 @@ struct
       let cap = Val.plug rel ~rigid:true (FunApp (TypedVal.make @@ Val.make @@ coe_arg r)) cap in
       rigid_coe rel r r' ~abs cap
 
+    | FunApp _, Com {r; r'; ty; cap; sys} ->
+      rigid_plug rel frm @@ expand_rigid_com rel r r' ~abs:(ComShape.to_abs ty) ~cap ~sys
+
+    | FunApp arg, GHCom {r; r'; ty = `Pi quant; cap; sys} ->
+      let ty = Clo.inst rel quant.cod @@ Cell.value @@ TypedVal.drop_ty arg in
+      let cap = Val.plug rel ~rigid:true frm cap in
+      let sys = ConAbsSys.plug rel ~rigid:true frm sys in
+      rigid_ghcom rel r r' ~ty ~cap ~sys
+
+    | FunApp _, GCom {r; r'; ty; cap; sys} ->
+      rigid_plug rel frm @@ expand_rigid_gcom rel r r' ~abs:(ComShape.to_abs ty) ~cap ~sys
+
     | Fst, Cons (v0, _) ->
       Val.unleash v0
 
@@ -1484,6 +1496,18 @@ struct
         Abs (x, Val.unleash dom)
       in
       rigid_coe rel r r' ~abs cap
+
+    | Fst, Com {r; r'; ty; cap; sys} ->
+      rigid_plug rel frm @@ expand_rigid_com rel r r' ~abs:(ComShape.to_abs ty) ~cap ~sys
+
+    | Fst, GHCom {r; r'; ty = `Sg {dom; _}; cap; sys} ->
+      let ty = Val.unleash dom in
+      let cap = Val.plug rel ~rigid:true Fst cap in
+      let sys = ConAbsSys.plug rel ~rigid:true Fst sys in
+      rigid_ghcom rel r r' ~ty ~cap ~sys
+
+    | Fst, GCom {r; r'; ty; cap; sys} ->
+      rigid_plug rel frm @@ expand_rigid_gcom rel r r' ~abs:(ComShape.to_abs ty) ~cap ~sys
 
     | Snd, Cons (_, v1) ->
       Val.unleash v1
@@ -1512,6 +1536,25 @@ struct
       let cap = Val.plug rel ~rigid:true Snd cap in
       rigid_coe rel r r' ~abs cap
 
+    | Snd, Com {r; r'; ty; cap; sys} ->
+      rigid_plug rel frm @@ expand_rigid_com rel r r' ~abs:(ComShape.to_abs ty) ~cap ~sys
+
+    | Snd, GHCom ({r; r'; ty = `Sg {dom; cod}; cap; sys} as ghcom) ->
+      let abs = ConAbs.bind @@ fun y ->
+        let ghcom_ry_fst =
+          lazy begin
+            plug rel ~rigid:true Fst (GHCom {ghcom with r' = y})
+          end
+        in
+        Clo.inst rel cod @@ Cell.lazy_con ghcom_ry_fst
+      in
+      let cap = Val.plug rel ~rigid:true Snd cap in
+      let sys = ConAbsSys.plug rel ~rigid:true Snd sys in
+      rigid_gcom rel r r' ~abs ~cap ~sys
+
+    | Snd, GCom {r; r'; ty; cap; sys} ->
+      rigid_plug rel frm @@ expand_rigid_gcom rel r r' ~abs:(ComShape.to_abs ty) ~cap ~sys
+
     | ExtApp rs, ExtLam nclo ->
       NClo.inst rel nclo @@ List.map Cell.dim rs
 
@@ -1526,7 +1569,7 @@ struct
           let cap = Val.plug rel ~rigid:true frm cap in
           let ext_sys =
             ConAbsSys.foreach_make rel ext_sys @@ fun r r' bdy _ ->
-            Abs (Name.fresh (), LazyVal.unleash bdy)
+            ConAbs.bind @@ fun _ -> LazyVal.unleash bdy
           in
           let comp_sys = ConAbsSys.plug rel ~rigid:true frm sys in
           let sys = ext_sys @ comp_sys in
@@ -1561,6 +1604,31 @@ struct
         | exception ConSys.Triv c_y ->
           run rel @@ subst r' y c_y
       end
+
+    | ExtApp _, Com {r; r'; ty; cap; sys} ->
+      rigid_plug rel frm @@ expand_rigid_com rel r r' ~abs:(ComShape.to_abs ty) ~cap ~sys
+
+    | ExtApp rs as frm, GHCom {r; r'; ty = `Ext extclo; cap; sys} ->
+      let ty, ext_sys =
+        let dim_cells = List.map Cell.dim rs in
+        ExtClo.inst rel extclo dim_cells
+      in
+      begin
+        match ConSys.force rel ext_sys with
+        | ext_sys ->
+          let cap = Val.plug rel ~rigid:true frm cap in
+          let ext_sys =
+            ConAbsSys.foreach_make rel ext_sys @@ fun r r' bdy _ ->
+            ConAbs.bind @@ fun _ -> LazyVal.unleash bdy
+          in
+          let comp_sys = ConAbsSys.plug rel ~rigid:true frm sys in
+          let sys = ext_sys @ comp_sys in
+          rigid_hcom rel r r' ~ty ~cap ~sys
+        | exception ConSys.Triv c -> c
+      end
+
+    | ExtApp _, GCom {r; r'; ty; cap; sys} ->
+      rigid_plug rel frm @@ expand_rigid_gcom rel r r' ~abs:(ComShape.to_abs ty) ~cap ~sys
 
     | RestrictForce, RestrictThunk (r, r', v) ->
       begin
@@ -2505,7 +2573,12 @@ struct
 end
 
 (** A [coe_shape] is a value when its component is. *)
-and CoeShape : Domain with type t = coe_shape =
+and CoeShape :
+sig
+  include Domain with type t = coe_shape
+
+  val to_abs : t -> con abs
+end =
 struct
   type t = coe_shape
 
@@ -2532,6 +2605,12 @@ struct
     | `Pi abs -> `Pi (QAbs.run rel abs)
     | `Sg abs -> `Sg (QAbs.run rel abs)
     | `Ext abs -> `Ext (ECloAbs.run rel abs)
+
+  let to_abs =
+    function
+    | `Pi (Abs (x, quantx)) -> Abs (x, Pi quantx)
+    | `Sg (Abs (x, quantx)) -> Abs (x, Sg quantx)
+    | `Ext (Abs (x, extclox)) -> Abs (x, Ext extclox)
 end
 
 (** A [hcom_shape] is a value when its component is. *)
@@ -2565,7 +2644,12 @@ struct
     | `Pos -> `Pos
 end
 
-and ComShape : Domain with type t = com_shape = CoeShape
+and ComShape :
+sig
+  include Domain with type t = com_shape
+
+  val to_abs : t -> con abs
+end = CoeShape
 
 (** A [quantifier] is a value when both of its components are. *)
 and Quantifier : Domain with type t = quantifier =
