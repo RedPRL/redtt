@@ -121,8 +121,8 @@ struct
 
 
   let split_sys cx sys =
-    let sys0 = ConSys.plug (Cx.rel cx) D.Fst sys in
-    let sys1 = ConSys.plug (Cx.rel cx) D.Snd sys in
+    let sys0 = ConSys.plug (Cx.rel cx) ~rigid:true D.Fst sys in
+    let sys1 = ConSys.plug (Cx.rel cx) ~rigid:true D.Snd sys in
     sys0, sys1
 end
 
@@ -142,7 +142,7 @@ struct
       raise PleaseRaiseProperError
 
   let sys_body cx x sys =
-    ConSys.plug (Cx.rel cx) (D.FunApp (D.TypedVal.make (D.Val.make x))) sys
+    ConSys.plug (Cx.rel cx) ~rigid:true (D.FunApp (D.TypedVal.make (D.Val.make x))) sys
 
 end
 
@@ -166,7 +166,7 @@ struct
       raise PleaseRaiseProperError
 
   let sys_body cx xs sys =
-    ConSys.plug (Cx.rel cx) (D.ExtApp xs) sys
+    ConSys.plug (Cx.rel cx) ~rigid:true (D.ExtApp xs) sys
 end
 
 module Rst =
@@ -191,7 +191,7 @@ struct
       raise PleaseRaiseProperError
 
   let sys_body cx sys =
-    ConSys.plug (Cx.rel cx) D.RestrictForce sys
+    ConSys.plug (Cx.rel cx) ~rigid:true D.RestrictForce sys
 end
 
 module V =
@@ -203,7 +203,7 @@ struct
       `CheckImage, {r = vin.r; tm0 = vin.tm0; tm1 = vin.tm1}
     | Tm.Up cmd ->
       let cx_r0 = Cx.restrict_ cx r `Dim0 in
-      let func = D.Val.plug (Cx.rel cx_r0) D.Fst equiv in
+      let func = D.Val.plug (Cx.rel cx_r0) ~rigid:true D.Fst equiv in
       let func_ty = D.Con.make_arr (Cx.rel cx_r0) (D.Val.make ty0) (D.Val.make ty1) in
       let ty0 = Q.equate_tycon (Cx.qenv cx_r0) (Cx.rel cx_r0) ty0 ty0 in
       let ty1 = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty1 ty1 in
@@ -217,9 +217,9 @@ struct
 
   let split_sys cx ~r ~ty0 ~ty1 ~equiv sys =
     let cx_r0 = Cx.restrict_ cx r `Dim0 in
-    let func = D.Val.plug (Cx.rel cx_r0) D.Fst equiv in
+    let func = D.Val.plug (Cx.rel cx_r0) ~rigid:true D.Fst equiv in
     let frm = D.VProj {r; func = D.TypedVal.make func} in
-    ConSys.run (Cx.rel cx_r0) sys, ConSys.plug (Cx.rel cx) frm sys
+    ConSys.run (Cx.rel cx_r0) sys, ConSys.plug (Cx.rel cx) ~rigid:true frm sys
 
 end
 
@@ -493,9 +493,9 @@ and check_neg cx ty sys tm =
     let boundary1 =
       match mode with
       | `CheckImage ->
-        let func = D.Val.plug (Cx.rel cx_r0) D.Fst v.equiv in
+        let func = D.Val.plug (Cx.rel cx_r0) ~rigid:true D.Fst v.equiv in
         let el0 = D.Val.make @@ eval cx_r0 vin.tm0 in
-        let app = D.Val.plug (Cx.rel cx_r0) (D.FunApp (D.TypedVal.make el0)) func in
+        let app = D.Val.plug (Cx.rel cx_r0) ~rigid:true (D.FunApp (D.TypedVal.make el0)) func in
         (r, `Dim0, D.LazyVal.make_from_delayed app) :: vproj_sys1
       | `NoCheck -> vproj_sys1
     in
@@ -506,7 +506,7 @@ and check_neg cx ty sys tm =
 
       let cap_sys =
         let frm = D.Cap {r = fhcom.r; r' = fhcom.r'; ty = fhcom.cap; sys = fhcom.sys} in
-        ConSys.plug (Cx.rel cx) frm sys
+        ConSys.plug (Cx.rel cx) ~rigid:true frm sys
       in
 
       match Tm.unleash tm with
@@ -909,7 +909,7 @@ and synth_stack cx vhd ty stk  =
         let vfunc = eval cx vproj.func in
         let vhd =
           D.Val.make_from_lazy @@ lazy begin
-            D.Con.plug (Cx.rel cx) (D.FunApp (D.TypedVal.make vhd)) vfunc
+            D.Con.plug (Cx.rel cx) ~rigid:true (D.FunApp (D.TypedVal.make vhd)) vfunc
           end
         in
         synth_stack cx vhd ty1 stk
@@ -934,11 +934,11 @@ and synth_stack cx vhd ty stk  =
           let _ = Q.equate_tycon (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty0 func_ty1 in
           check_of_ty_ "vproj" cx_r0 func_ty0 [] vproj.func;
           let vfunc0 = eval cx_r0 vproj.func in
-          let vfunc1 = D.Val.plug_then_unleash (Cx.rel cx_r0) D.Fst v.equiv in
+          let vfunc1 = D.Val.plug_then_unleash (Cx.rel cx_r0) ~rigid:true D.Fst v.equiv in
           let _ = Q.equate_con (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty0 vfunc0 vfunc1 in
           let vhd =
             let frm = D.VProj {r; func = {ty = Some (D.Val.make func_ty0); value = D.Val.make vfunc0}} in
-            D.Val.plug (Cx.rel cx) frm vhd
+            D.Val.plug (Cx.rel cx) ~rigid:true frm vhd
           in
           synth_stack cx vhd (D.Val.unleash v.ty1) stk
 
@@ -1000,14 +1000,14 @@ and synth_stack cx vhd ty stk  =
     end
 
   | D.Sg q, Tm.Fst :: stk ->
-    let vhd = D.Val.plug (Cx.rel cx) D.Fst vhd in
+    let vhd = D.Val.plug (Cx.rel cx) ~rigid:true D.Fst vhd in
     let ty = D.Val.unleash q.dom in
     synth_stack cx vhd ty stk
 
   | D.Sg q, Tm.Snd :: stk ->
     let rel = Cx.rel cx in
-    let vhd0 = D.Val.plug rel D.Fst vhd in
-    let vhd1 = D.Val.plug rel D.Snd vhd in
+    let vhd0 = D.Val.plug rel ~rigid:true D.Fst vhd in
+    let vhd1 = D.Val.plug rel ~rigid:true D.Snd vhd in
     let ty = inst_clo cx q.cod @@ D.Val.unleash vhd0 in
     synth_stack cx vhd1 ty stk
 
@@ -1017,7 +1017,7 @@ and synth_stack cx vhd ty stk  =
     let arg = eval cx tm in
     let cod = inst_clo cx q.cod arg in
     let frm = D.FunApp (D.TypedVal.make (D.Val.make arg)) in
-    let vhd = D.Val.plug (Cx.rel cx) frm vhd in
+    let vhd = D.Val.plug (Cx.rel cx) ~rigid:true frm vhd in
     synth_stack cx vhd cod stk
 
   | D.Restrict (r, r', ty), Tm.RestrictForce :: stk ->
@@ -1031,7 +1031,7 @@ and synth_stack cx vhd ty stk  =
     let rs = flip List.map rs @@ check_eval_dim cx in
     let ty, _ = D.ExtClo.inst (Cx.rel cx) eclo @@ List.map D.Cell.dim rs in
     let frm = D.ExtApp rs in
-    let vhd = D.Val.plug (Cx.rel cx) frm vhd in
+    let vhd = D.Val.plug (Cx.rel cx) ~rigid:true frm vhd in
     synth_stack cx vhd ty stk
 
   | D.Data data, Tm.Elim elim :: stk ->
@@ -1051,7 +1051,7 @@ and synth_stack cx vhd ty stk  =
         clbl, D.NClo {env = Cx.venv cx; bnd}
       in
       let frm = D.Elim {lbl = data.lbl; params = data.params; mot = mot_clo; clauses} in
-      D.Val.plug (Cx.rel cx) frm vhd
+      D.Val.plug (Cx.rel cx) ~rigid:true frm vhd
     in
     synth_stack cx vhd ty stk
 
