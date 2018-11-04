@@ -46,4 +46,3 @@ def univalence (B : type) : is-contr^1 ((A : type) × equiv A B) =
       )
     )
   )
-

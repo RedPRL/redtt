@@ -1013,9 +1013,9 @@ and pp_frame env fmt =
   | ExtApp ts ->
     Format.fprintf fmt "@[<hv1>(ext-app %a)@]" (pp_terms env) ts
   | Fst ->
-    Format.fprintf fmt "car"
+    Format.fprintf fmt "fst"
   | Snd ->
-    Format.fprintf fmt "cdr"
+    Format.fprintf fmt "snd"
   | VProj info ->
     Format.fprintf fmt "@[<hov1>(vproj %a %a)@]" (pp env) info.r (pp env) info.func
   | Cap _ ->
