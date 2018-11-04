@@ -19,6 +19,13 @@ let rec flat_map f xs =
   | x :: xs ->
     f x @ flat_map f xs
 
+let rec flat_map2 f xs ys =
+  match xs, ys with
+  | [], [] -> []
+  | x :: xs, y :: ys ->
+    f x y @ flat_map2 f xs ys
+  | _ -> invalid_arg "flat_map2: unequal length"
+
 let rec index_of pred xs =
   match xs with
   | [] ->
@@ -61,6 +68,9 @@ let rec find_map_opt f xs =
 
 let foreach l f = List.map f l
 let foreach2 l0 l1 f = List.map2 f l0 l1
+
+let flat_foreach l f = flat_map f l
+let flat_foreach2 l0 l1 f = flat_map2 f l0 l1
 
 let pp sep pp_elem fmt l =
   let pp_sep fmt () = Format.fprintf fmt "%s@," sep in

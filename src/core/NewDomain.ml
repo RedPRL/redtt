@@ -1527,7 +1527,7 @@ struct
         | ext_sys ->
           let cap = Val.plug rel ~rigid:true frm cap in
           let ext_sys =
-            ConAbsSys.foreach_gen rel ext_sys @@ fun r r' bdy _ ->
+            ConAbsSys.foreach_make rel ext_sys @@ fun r r' bdy _ ->
             Abs (Name.fresh (), LazyVal.unleash bdy)
           in
           let comp_sys = ConAbsSys.plug rel ~rigid:true frm sys in
@@ -1556,7 +1556,7 @@ struct
           let abs = Abs (y, ty_y) in
           let cap = Val.plug rel ~rigid:true frm cap in
           let sys =
-            ConAbsSys.foreach_gen rel sys_y @@ fun r r' bdy_y _ ->
+            ConAbsSys.foreach_make rel sys_y @@ fun r r' bdy_y _ ->
             Abs (y, LazyVal.unleash bdy_y)
           in
           rigid_com rel r r' ~abs ~cap ~sys
@@ -1819,7 +1819,7 @@ struct
         let cap = Val.plug rel cap_frame cap in
         let sys =
           let ri_faces = ConAbsSys.plug rel cap_frame sys in
-          let si_faces = ConAbsSys.foreach_gen rel fhcom.sys @@ fun si s'i abs rel ->
+          let si_faces = ConAbsSys.foreach_make rel fhcom.sys @@ fun si s'i abs rel ->
             let cap_frame = Frame.run rel cap_frame in
             ConAbs.bind @@ fun y ->
             (* XXX FIXME This is not the most efficient code because we know what [cap_frame]
@@ -1827,17 +1827,16 @@ struct
             Con.plug rel cap_frame @@ hcom_template rel y (LazyValAbs.inst_then_unleash rel abs s')
           in
           let diag =
-            r, r',
-            LazyValAbs.bind @@ fun y ->
-            let rel = Rel.equate' r r' rel in
+            ConAbsFace.make rel r r' @@ fun rel ->
+            ConAbs.bind @@ fun y ->
             hcom_template rel y (Val.run_then_unleash rel fhcom.cap)
           in
-          ConAbsSys.force rel [diag] @ ri_faces @ si_faces
+          List.concat [diag; ri_faces; si_faces]
         in
-        rigid_hcom rel r r' ~ty ~cap ~sys
+        make_hcom rel r r' ~ty ~cap ~sys
       in
       let sys =
-        ConSys.foreach_gen rel fhcom.sys @@ fun si s'i abs rel ->
+        ConSys.foreach_make rel fhcom.sys @@ fun si s'i abs rel ->
         hcom_template rel r' (LazyValAbs.inst_then_unleash rel abs s')
       in
       Box {r; r'; cap; sys}
@@ -1850,27 +1849,21 @@ struct
       in
       let neu_sys =
         let cap_face =
-          r, r',
-          try
-            let rel' = Rel.equate' r r' rel in
-            LazyVal.make_from_lazy @@ lazy begin
-              Val.run_then_unleash rel' cap
-            end
-          with
-          | I.Inconsistent -> LazyVal.make @@ FortyTwo
+          ConFace.make rel r r' @@ fun rel' ->
+          Val.run_then_unleash rel' cap
         in
         let tube_faces =
-          ConSys.foreach_gen rel sys @@ fun s s' abs rel' ->
+          ConSys.foreach_make rel sys @@ fun s s' abs rel' ->
           LazyValAbs.inst_then_unleash rel' abs r'
         in
         let old_faces =
-          ConSys.foreach_gen rel info.neu.sys @@ fun s s' bdy rel' ->
+          ConSys.foreach_make rel info.neu.sys @@ fun s s' bdy rel' ->
           let ty = LazyVal.run_then_unleash rel' bdy in
           let cap = Val.run rel' cap in
           let sys = ConAbsSys.run rel' sys in
           make_hcom rel' r r' ~ty ~cap ~sys
         in
-        cap_face :: tube_faces @ old_faces
+        List.concat [cap_face; tube_faces; old_faces]
       in
       Neu {ty = Val.make ty; neu = {neu; sys = neu_sys}}
 
@@ -1961,14 +1954,13 @@ struct
             Syn.eval_tm_sys rel benv tboundary
           in
 
-          let fix_face =
-            ConAbsFace.gen rel @@ fun s s' (el : LazyVal.t) rel_ss' ->
+          let correction =
+            ConAbsSys.foreach_make rel faces @@ fun s s' (el : LazyVal.t) rel_ss' ->
             let elx = make_coe rel_ss' (`Atom x) r' ~abs:(ConAbs.run rel_ss' abs) @@ Val.make (LazyVal.unleash el) in
             let x', pi = Perm.freshen_name x in
             Abs (x', Con.swap pi elx)
           in
 
-          let correction = List.map fix_face faces in
           make_fhcom rel r' r ~cap:(Val.make intro) ~sys:correction
       end
 
@@ -1979,7 +1971,7 @@ struct
           DelayedNeu.make @@ {head; frames = Emp}
         in
         let sys =
-          ConSys.foreach_gen rel info.neu.sys @@ fun s s' el rel_ss' ->
+          ConSys.foreach_make rel info.neu.sys @@ fun s s' el rel_ss' ->
           make_coe rel_ss' r r' ~abs:(ConAbs.run rel_ss' abs) @@ Val.make (LazyVal.unleash el)
         in
         {neu; sys}
@@ -1989,7 +1981,7 @@ struct
     | Data _, HCom info ->
       let cap = Val.make @@ rigid_coe rel r r' ~abs info.cap in
       let sys =
-        ConAbsSys.foreach_gen rel info.sys @@ fun s s' abs' rel_ss' ->
+        ConAbsSys.foreach_make rel info.sys @@ fun s s' abs' rel_ss' ->
         ConAbs.bind @@ fun y ->
         make_coe rel_ss' r r' ~abs:(ConAbs.run rel_ss' abs) @@
         Val.make @@ LazyValAbs.inst_then_unleash rel_ss' abs' y
@@ -2064,16 +2056,14 @@ struct
 
           (* The diagonal face for r=r'. *)
           let face_diag =
-            r, r',
-            LazyValAbs.bind @@ fun _ ->
-            let rel = Rel.equate' r r' rel in Con.run rel base
+            ConAbsFace.make rel r r' @@ fun rel ->
+            ConAbs.bind @@ fun _ -> Con.run rel base
           in
 
           (* The face for r=0. *)
           let face0 =
-            r, `Dim0,
-            LazyValAbs.bind @@ fun _ ->
-            let rel = Rel.equate' r `Dim0 rel in Con.run rel base
+            ConAbsFace.make rel r `Dim0 @@ fun rel ->
+            ConAbs.bind @@ fun _ -> Con.run rel base
           in
 
           (* This is to generate the element in `ty0` and also the face for r'=0. *)
@@ -2122,18 +2112,16 @@ struct
 
             let sys =
               let face0 =
-                r, `Dim0,
-                LazyValAbs.bind @@ fun w ->
-                let rel = Rel.equate' r `Dim0 rel in
+                ConAbsFace.make rel r `Dim0 @@ fun rel ->
+                ConAbs.bind @@ fun w ->
                 Val.plug_then_unleash rel ~rigid:true (ExtApp [w]) (contr_path_at_r0 rel)
               in
               let face1 =
-                r, `Dim1,
-                LazyValAbs.bind @@ fun _ ->
-                let rel = Rel.equate' r `Dim1 rel in
+                ConAbsFace.make rel r `Dim1 @@ fun rel ->
+                ConAbs.bind @@ fun _ ->
                 Val.run_then_unleash rel fiber0
               in
-              [face0; face1]
+              face0 @ face1
             in
             (* hcom whore cap is (fiber0 base), r=0 face is contr0, and r=1 face is constant *)
             make_hcom rel `Dim1 `Dim0 ~ty:fiber0_ty ~cap:fiber0 ~sys
@@ -2142,9 +2130,8 @@ struct
           let el0 rel_r'0 = Val.plug rel_r'0 ~rigid:true Fst (fixer_fiber rel_r'0) in
 
           let face_front =
-            r', `Dim0,
-            LazyValAbs.bind @@ fun w ->
-            let rel = Rel.equate' r' `Dim0 rel in
+            ConAbsFace.make rel r' `Dim0 @@ fun rel ->
+            ConAbs.bind @@ fun w ->
             Val.plug_then_unleash rel ~rigid:true (ExtApp [w]) @@
             Val.plug rel ~rigid:true Snd (fixer_fiber rel)
           in
@@ -2152,7 +2139,7 @@ struct
           let el1 = Val.make @@
             make_hcom rel `Dim1 r'
               ~ty:(Val.run_then_unleash rel @@ Val.subst r' x info.ty1)
-              ~cap:(Val.make base) ~sys:[face0; face_diag; face_front]
+              ~cap:(Val.make base) ~sys:(List.concat [face0; face_diag; face_front])
           in
           make_vin rel r' ~el0 ~el1
       end
@@ -2205,7 +2192,7 @@ struct
         in
         let fhcom_sys_rx = ConAbsSys.run rel @@ ConAbsSys.subst r x fhcom.sys in
         let sys =
-          ConAbsSys.foreach_gen rel fhcom_sys_rx @@ fun sj_xr s'j_xr absj_xr rel ->
+          ConAbsSys.foreach_make rel fhcom_sys_rx @@ fun sj_xr s'j_xr absj_xr rel ->
           let absj_xr = LazyValAbs.unleash absj_xr in
           ConAbs.bind @@ fun y ->
           make_coe rel y s_xr ~abs:absj_xr @@ Val.make @@
@@ -2236,7 +2223,7 @@ struct
 
       (* This is the system of N for apart faces *)
       let recovery_apart_sys (r'' : dim) (s'' : dim) : con sys =
-        ConSys.foreach_gen rel (ConAbsSys.forall x fhcom.sys) @@ fun sj s'j absj_x rel ->
+        ConSys.foreach_make rel (ConAbsSys.forall x fhcom.sys) @@ fun sj s'j absj_x rel ->
         recovery_apart_core rel r'' s'' (LazyValAbs.unleash absj_x)
       in
 
@@ -2251,17 +2238,15 @@ struct
         let new_cap = Val.make @@ origin rel s_xr in
         let sys =
           let diag =
-            ConAbsSys.forall x [
-              s_x, s'_x,
-              LazyValAbs.bind @@ fun y ->
-              let rel = Rel.equate' s_x s'_x rel in
-              make_coe rel r y ~abs:(ConAbs.run rel capty_abs) (Val.run rel coe_cap)
-            ]
+            ConAbsSys.forall x @@
+            ConAbsFace.make rel s_x s'_x @@ fun rel ->
+            ConAbs.bind @@ fun y ->
+            make_coe rel r y ~abs:(ConAbs.run rel capty_abs) (Val.run rel coe_cap)
           in
           let apart_faces =
             let y = Name.fresh () in
             let s_y = Dim.subst (`Atom y) x s_x in
-            ConAbsSys.foreach_gen rel (recovery_apart_sys (`Atom y) s_y) @@ fun _ _ bdy _ -> Abs (y, LazyVal.unleash bdy)
+            ConAbsSys.foreach_make rel (recovery_apart_sys (`Atom y) s_y) @@ fun _ _ bdy _ -> Abs (y, LazyVal.unleash bdy)
           in
           diag @ apart_faces
         in
@@ -2284,38 +2269,33 @@ struct
         let sys =
           let y = Name.fresh () in
           let diag =
-            r, r',
-            LazyValAbs.make_from_lazy @@ lazy begin
-              let rel = Rel.equate' r r' rel in
-              Abs (y, recovery_apart_core rel r (`Atom y) abs_x)
-            end
+            ConAbsFace.make rel r r' @@ fun rel ->
+            Abs (y, recovery_apart_core rel r (`Atom y) abs_x)
           in
           let apart_faces =
-            ConAbsSys.foreach_gen rel (recovery_apart_sys r' (`Atom y)) @@
+            ConAbsSys.foreach_make rel (recovery_apart_sys r' (`Atom y)) @@
             fun _ _ bdy _ -> Abs (y, LazyVal.unleash bdy)
           in
-          diag :: apart_faces
+          diag @ apart_faces
         in
         make_gcom rel s_xr' s'' ~abs:abs_xr' ~cap ~sys
       in
 
       (* A system consisting of Q. *)
       let recovery_general_sys rel s'' =
-        ListUtil.foreach fhcom.sys @@ fun (sj_x, s'j_x, absj_x) ->
+        ListUtil.flat_foreach fhcom.sys @@ fun (sj_x, s'j_x, absj_x) ->
         (* some optimization for apart faces *)
         if I.absent x sj_x && I.absent x s'j_x then
-          sj_x, s'j_x,
-          LazyVal.make_from_lazy @@ lazy begin
-            let rel = Rel.equate' sj_x s'j_x rel in
+          begin
+            ConFace.make rel sj_x s'j_x @@ fun rel ->
             let absj_x = LazyValAbs.unleash absj_x in
             recovery_apart_core rel r' s'' absj_x
           end
         else
-          let sj_xr' = Dim.subst r' x sj_x in
-          let s'j_xr' = Dim.subst r' x s'j_x in
-          sj_xr', s'j_xr',
-          LazyVal.make_from_lazy @@ lazy begin
-            let rel = Rel.equate' sj_xr' s'j_xr' rel in
+          begin
+            let sj_xr' = Dim.subst r' x sj_x in
+            let s'j_xr' = Dim.subst r' x s'j_x in
+            ConFace.make rel sj_xr' s'j_xr' @@ fun rel ->
             let absj_x = LazyValAbs.unleash absj_x in
             recovery_general_core rel s'' absj_x
           end
@@ -2331,24 +2311,20 @@ struct
         let cap = naively_coerced_cap in
         let sys =
           let diag =
-            r, r',
-            LazyValAbs.bind @@ fun w ->
-            let rel = Rel.equate' r r' rel in
+            ConAbsFace.make rel r r' @@ fun rel ->
+            ConAbs.bind @@ fun w ->
             origin rel w
           in
           let fhcom_sys_xr' = ConAbsSys.run rel @@ ConAbsSys.subst r' x fhcom.sys in
           let recovery_faces =
             let y = Name.fresh () in
-            ListUtil.foreach2 fhcom_sys_xr' (recovery_general_sys rel (`Atom y)) @@
+            ListUtil.flat_foreach2 fhcom_sys_xr' (recovery_general_sys rel (`Atom y)) @@
             fun (sj_xr', s'j_xr', absj_xr') (_, _, bdy) ->
-            sj_xr', s'j_xr',
-            LazyValAbs.make_from_lazy @@ lazy begin
-              let rel = Rel.equate' sj_xr' s'j_xr' rel in
-              let absj_xr' = LazyValAbs.unleash absj_xr' in
-              Abs (y, make_coe rel (`Atom y) s_xr' ~abs:absj_xr' (Val.make @@ LazyVal.unleash bdy))
-            end
+            ConAbsFace.make rel sj_xr' s'j_xr' @@ fun rel ->
+            let absj_xr' = LazyValAbs.unleash absj_xr' in
+            Abs (y, make_coe rel (`Atom y) s_xr' ~abs:absj_xr' (Val.make @@ LazyVal.unleash bdy))
           in
-          diag :: recovery_faces
+          diag @ recovery_faces
         in
         make_hcom rel s_xr' s'_xr' ~ty ~cap ~sys
       in
@@ -2365,22 +2341,16 @@ struct
       let ty = Val.make_then_run rel (Con.subst r' x tyx) in
       let sys =
         let cap_face =
-          r, r',
-          try
-            let rel' = Rel.equate' r r' rel in
-            LazyVal.make_from_lazy @@ lazy begin
-              Val.run_then_unleash rel' cap
-            end
-          with
-          | I.Inconsistent -> LazyVal.make @@ FortyTwo
+          ConFace.make rel r r' @@ fun rel' ->
+          Val.run_then_unleash rel' cap
         in
         let old_faces =
-          ConSys.foreach_gen rel (ConSys.forall x info.neu.sys) @@ fun s s' bdy rel' ->
+          ConSys.foreach_make rel (ConSys.forall x info.neu.sys) @@ fun s s' bdy rel' ->
           let abs = ConAbs.run rel' @@ Abs (x, LazyVal.unleash bdy) in
           let cap = Val.run rel' cap in
           make_coe rel' r r' ~abs cap
         in
-        cap_face :: old_faces
+        cap_face @ old_faces
       in
       Neu {ty; neu = {neu; sys}}
 
@@ -2391,7 +2361,7 @@ struct
     let ty = ConAbs.inst rel abs r' in
     let cap = Val.make @@ make_coe rel r r' ~abs cap in
     let sys =
-      ConAbsSys.foreach_gen rel sys @@ fun s s' face rel ->
+      ConAbsSys.foreach_make rel sys @@ fun s s' face rel ->
       let (y, bdy_y) = ConAbs.unbind @@ LazyValAbs.unleash face in
       Abs (y, make_coe rel (`Atom y) r' ~abs @@ Val.make bdy_y)
     in
@@ -2476,7 +2446,7 @@ struct
     let ty = ConAbs.inst rel abs r' in
     let cap = Val.make @@ make_coe rel r r' ~abs cap in
     let sys =
-      ConAbsSys.foreach_gen rel sys @@ fun s s' face rel ->
+      ConAbsSys.foreach_make rel sys @@ fun s s' face rel ->
       let y, bdy_y = ConAbs.unbind @@ LazyValAbs.unleash face in
       Abs (y, make_coe rel (`Atom y) r' ~abs @@ Val.make bdy_y)
     in
@@ -3038,8 +3008,8 @@ and Sys :
     (** [run_then_force rel sys = force rel (run rel sys)] *)
     val run_then_force : rel -> t -> t
 
-    (** [foreach_gen sys f = ListUtil.foreach sys (Face.gen f)] *)
-    val foreach_gen : rel -> 'a sys -> (dim -> dim -> 'a Lazy.t Delayed.t -> rel -> X.t) -> t
+    (** [foreach_make rel sys f = ListUtil.flat_foreach sys (\ (r, r', bdy) -> Face.make rel r r' (f r r' bdy))] *)
+    val foreach_make : rel -> 'a sys -> (dim -> dim -> 'a Lazy.t Delayed.t -> rel -> X.t) -> t
   end =
   functor (X : DomainPlug) ->
   struct
@@ -3086,7 +3056,7 @@ and Sys :
       in
       ListUtil.filter_map run_then_force_face sys
 
-    let foreach_gen rel sys f = ListUtil.foreach sys (Face.gen rel f)
+    let foreach_make rel sys f = ListUtil.flat_foreach sys (fun (r, r', bdy) -> Face.make rel r r' (f r r' bdy))
   end
 
 (** A [face] is a value if equation is consistent and its element is a value.
@@ -3105,9 +3075,8 @@ and Face :
     (** this is to remove all faces depending on a particular variable *)
     val forall : Name.t -> t -> t option
 
-    (** [gen] uses the provided function to generate a face. It will not force the
-        face. *)
-    val gen : rel -> (dim -> dim -> 'a Lazy.t Delayed.t -> rel -> X.t) -> 'a face -> t
+    (** [make] makes a possibly non-rigid face value. *)
+    val make : rel -> dim -> dim -> (rel -> X.t) -> t list
 
     (** Some convenience functions which could be more efficient: *)
 
@@ -3171,14 +3140,12 @@ and Face :
       let sx = `Atom x in
       if r = sx || r' = sx then None else Some (r, r', bdy)
 
-    let gen rel f (r, r', bdy) =
-      match Rel.equate r r' rel with
-      | `Same ->
-        r, r', DelayedLazyX.make_from_lazy @@ lazy begin f r r' bdy rel end
-      | `Changed rel ->
-        r, r', DelayedLazyX.make_from_lazy @@ lazy begin f r r' bdy rel end
-      | `Inconsistent ->
-        raise Dead
+    let make rel r r' f =
+      match Rel.equate' r r' rel with
+      | rel ->
+        [r, r', DelayedLazyX.make_from_lazy @@ lazy begin f rel end]
+      | exception I.Inconsistent ->
+        []
 
     let run_then_force rel v = force rel (run rel v)
   end

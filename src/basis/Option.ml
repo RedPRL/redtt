@@ -22,6 +22,8 @@ let rec filter_map f =
     | Some y -> y :: filter_map f xs
     | None -> filter_map f xs
 
+let filter_foreach l f = filter_map f l
+
 let default a =
   function
   | None -> a
