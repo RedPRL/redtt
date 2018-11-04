@@ -221,6 +221,7 @@ let rec equate_con qenv rel ty el0 el1 =
       equate_tycon qenv rel el0 el1
 
     | _ ->
+      Format.eprintf "quote: %a / %a / %a @." Con.pp ty Con.pp el0 Con.pp el1;
       (* This might be done? *)
       raise PleaseFillIn
 
