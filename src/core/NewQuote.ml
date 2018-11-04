@@ -300,7 +300,7 @@ and equate_hd qenv rel hd0 hd1 =
     let tm =
       let univ = Val.make @@ Univ {kind = `Pre; lvl = `Omega} in
       let neu = NeutroidAbs.inst rel info0.ty info0.r in
-      let ty_r = Con.run rel @@ Neu {ty = univ; neu} in
+      let ty_r = Con.make_neu rel univ neu in
       equate_con qenv rel ty_r (Val.unleash info0.cap) (Val.unleash info1.cap)
     in
     Tm.Coe {r; r'; ty; tm}

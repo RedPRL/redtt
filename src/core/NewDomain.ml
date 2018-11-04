@@ -990,6 +990,9 @@ sig
   (** invariant: cap and sys are [rel]-values, but dir and sys might not be rigid *)
   val make_box : rel -> dim -> dim -> cap:value -> sys:con sys -> con
 
+  (* ty and neu are values, but neu might not be rigid *)
+  val make_neu : rel -> value -> neutroid -> con
+
   (** invariant: [args] is [rel]-value, but [sys] might not be rigid *)
   val make_intro : rel -> dlbl:Name.t -> clbl:string -> args:constr_cell list -> sys:con sys -> con
 
@@ -1414,14 +1417,9 @@ struct
       end
 
     | Neu info ->
-      begin
-        match Neutroid.run rel info.neu with
-        | neu ->
-          let ty = Val.run rel info.ty in
-          Neu {ty; neu}
-        | exception Neutroid.Triv v ->
-          v
-      end
+      let neu = Neutroid.run rel info.neu in
+      let ty = Val.run rel info.ty in
+      make_neu rel ty neu
 
     | Data info ->
       Data
@@ -1669,6 +1667,11 @@ struct
       Val.unleash cap
     | _ ->
       rigid_coe rel r r' ~abs cap
+
+  and make_neu rel ty neu =
+    match Neutroid.force rel neu with
+    | neu -> Neu {ty; neu}
+    | exception Neutroid.Triv v -> v
 
   and make_intro rel ~dlbl ~clbl ~args ~sys =
     match ConSys.force rel sys with
@@ -2588,12 +2591,15 @@ struct
     {dom; cod}
 end
 
-(* A [neutroid] is a value if everything is rigid. *)
+(* A [neutroid] is a value if the system is value. A [neutroid] is rigid
+ * if its system is. *)
 and Neutroid :
 sig
   include DomainPlug with type t = neutroid
 
   exception Triv of con
+
+  val force : rel -> t -> t
 
   (** sys might not be rigid, but ty must be a value *)
   val reflect_head : rel -> ty:value -> head -> con sys -> con
@@ -2619,14 +2625,17 @@ struct
   let run rel {neu; sys} =
     (* The system needs to be forced first. The invariant is that
      * if [sys] is rigid, it is safe to run neu *)
+    let sys = ConSys.run rel sys in
+    let neu = DelayedNeu.run rel neu in
+    {neu; sys}
+
+  let force rel {neu; sys} =
     let sys =
       try
-        ConSys.run_then_force rel sys
+        ConSys.force rel sys
       with
-      | ConSys.Triv con ->
-        raise @@ Triv con
+      | ConSys.Triv v -> raise @@ Triv v
     in
-    let neu = DelayedNeu.run rel neu in
     {neu; sys}
 
   let subst r x {neu; sys} =
