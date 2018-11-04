@@ -1029,8 +1029,8 @@ struct
       Format.fprintf fmt "<restrict-thunk>"
     | Coe _ ->
       Format.fprintf fmt "<coe>"
-    | HCom _ ->
-      Format.fprintf fmt "<hcom>"
+    | HCom {r; r'; ty; cap; sys} ->
+      Format.fprintf fmt "@[<hov1>(hcom %a %a@ %a@ %a@ %a)@]" Dim.pp r Dim.pp r' HComShape.pp ty Val.pp cap ConAbsSys.pp sys
     | Com _ ->
       Format.fprintf fmt "<com>"
     | GHCom _ ->
