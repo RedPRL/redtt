@@ -429,7 +429,7 @@ struct
       let r = eval_dim env info.r in
       let ty0 rel0 = Val.make @@ eval rel0 env info.ty0 in
       let ty1 = Val.make @@ eval rel env info.ty1 in
-      let equiv rel0 = Val.make @@ eval rel0 env info.ty1 in
+      let equiv rel0 = Val.make @@ eval rel0 env info.equiv in
       Con.make_v rel r ~ty0 ~ty1 ~equiv
 
     | Tm.VIn info ->
