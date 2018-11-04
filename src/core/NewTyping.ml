@@ -217,10 +217,10 @@ struct
       raise PleaseRaiseProperError
 
   let split_sys cx ~r ~ty0 ~ty1 ~equiv sys =
-    let rel = Cx.rel cx in
-    let func = D.Val.plug rel D.Fst equiv in
-    let frm = D.VProj {r; func = {ty = Some (D.Val.make @@ D.Con.make_arr rel ty0 ty1); value = func}} in
-    sys, ConSys.plug rel frm sys
+    let cx_r0 = Cx.restrict_ cx r `Dim0 in
+    let func = D.Val.plug (Cx.rel cx_r0) D.Fst equiv in
+    let frm = D.VProj {r; func = D.TypedVal.make func} in
+    ConSys.run (Cx.rel cx_r0) sys, ConSys.plug (Cx.rel cx) frm sys
 
 end
 
