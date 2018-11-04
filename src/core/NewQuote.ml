@@ -478,7 +478,7 @@ and equate_tycon qenv rel ty0 ty1 =
   | V info0, V info1 ->
     let rel_r0 = Rel.equate' info0.r `Dim0 rel in
     let r = equate_dim qenv rel info0.r info1.r in
-    let ty0 = equate_tyval qenv rel_r0 info0.ty0 info0.ty1 in
+    let ty0 = equate_tyval qenv rel_r0 info0.ty0 info0.ty0 in
     let ty1 = equate_tyval qenv rel info0.ty1 info1.ty1 in
     let equiv_ty =
       let env = Env.init_isolated [Cell.value info0.ty1; Cell.value info0.ty0] in
