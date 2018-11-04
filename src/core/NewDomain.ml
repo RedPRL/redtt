@@ -1735,11 +1735,16 @@ struct
       raise @@ E (PlugTyMismatch {frm; tycon})
 
     | Restrict (r, r', ty), RestrictForce ->
-      frm, LazyVal.unleash ty, [(r, r', LazyVal.make hd)]
+      frm, LazyVal.unleash ty, ConFace.make rel r r' (fun rel -> Con.run rel hd)
 
     | V {ty0; ty1; _}, VProj info ->
       let arr_ty = make_arr rel ty0 ty1 in
-      VProj {info with func = {info.func with ty = Some (Val.make arr_ty)}}, Val.unleash ty1, []
+      let face0 =
+        ConFace.make rel info.r `Dim0 @@ fun rel ->
+        Val.plug_then_unleash rel (FunApp (TypedVal.make @@ Val.make hd)) info.func.value
+      in
+      let face1 = ConFace.make rel info.r `Dim1 @@ fun rel -> Con.run rel hd in
+      VProj {info with func = {info.func with ty = Some (Val.make arr_ty)}}, Val.unleash ty1, face0 @ face1
 
     | HCom {ty = `Pos; cap; _}, Cap _ ->
       frm, Val.unleash cap, []
