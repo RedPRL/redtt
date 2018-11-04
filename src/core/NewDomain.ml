@@ -1045,8 +1045,8 @@ struct
       Format.fprintf fmt "<univ>"
     | V {r; ty0; ty1; equiv} ->
       Format.fprintf fmt "@[<hov1>(V %a@ %a@ %a@ %a)@]" Dim.pp r Val.pp ty0 Val.pp ty1 Val.pp equiv
-    | VIn _ ->
-      Format.fprintf fmt "<vin>"
+    | VIn {r; el0; el1} ->
+      Format.fprintf fmt "@[<hov1>(Vin %a@ %a@ %a)@]" Dim.pp r Val.pp el0 Val.pp el1
     | Box _ ->
       Format.fprintf fmt "<box>"
     | FortyTwo ->
@@ -1881,12 +1881,12 @@ struct
         let cap = Val.plug rel ~rigid:true vproj_frame cap in
         let sys =
           let face0 =
-            s, `Dim0,
-            LazyValAbs.bind @@ fun y ->
-            let arg0 = FunApp {ty = None; value = Val.make @@ hcom0 y} in
+            ConAbsFace.make rel s `Dim0 @@ fun rel0 ->
+            ConAbs.bind @@ fun y ->
+            let arg0 = FunApp (TypedVal.make @@ Val.make @@ hcom0 y) in
             Val.plug_then_unleash rel0 ~rigid:true arg0 func
           in
-          face0 :: ConAbsSys.plug rel ~rigid:true vproj_frame sys
+          face0 @ ConAbsSys.plug rel ~rigid:true vproj_frame sys
         in
         rigid_hcom rel r r' ~ty:(Val.unleash info.ty1) ~cap ~sys
       in
