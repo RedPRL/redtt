@@ -4,7 +4,6 @@ def pathd (A : 𝕀 → type) (M : A 0) (N : A 1) : type =
   | i=1 → N
   ]
 
-
 def path (A : type) (M N : A) : type =
   [i] A [
   | i=0 → M
@@ -104,6 +103,28 @@ def trans/sym/l (A : type) (p : 𝕀 → A) : path (path _ (p 1) (p 1)) refl (tr
   -- | k=1 j → trans/filler A (symm A p) p j i
   ]
 
+-- Perhaps we could parallelize this proof? ;)
+def symmd (A : 𝕀 → type) (p : (i : 𝕀) → A i) : pathd (symm^1 _ A) (p 1) (p 0) =
+  λ i →
+  comp 0 1 (p 0) in λ j → symm/filler^1 _ A j i [
+  | i=0 → p
+  | i=1 → refl
+  ]
+
+-- transporting backwards is transporting forwards along inverted path (up to composition)
+def coe/symm/d (A : type) (P : A → type) (p : 𝕀 → A) (p1 : P (p 1))
+  : pathd
+      (trans^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)))
+      (coe 1 0 p1 in λ k → P (p k))
+      (coe 0 1 p1 in λ k → P (symm _ p k))
+  =
+  λ i →
+  comp 0 1 (coe 1 i p1 in λ k → P (p k)) in
+  λ j → trans/filler^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)) j i [
+  | i=0 → refl
+  | i=1 → λ k → coe 0 k p1 in λ l → P (symm A p l)
+  ]
+
 def J (A : type) (p : 𝕀 → A) (C : [i] A [i=0 → p 0] → type) (d : C refl) : C p =
   coe 0 1 d in λ i →
   C (λ j → comp 0 j (p 0) [i=0 → refl | i=1 → p])
@@ -119,24 +140,5 @@ def J/eq
   comp 0 1 d in mot [
   | k=0 → λ i → coe 0 i d in λ j → C (square j)
   | k=1 → refl
-  ]
-
-def symmd (A : 𝕀 → type) (p : (i : 𝕀) → A i) : pathd (symm^1 _ A) (p 1) (p 0) =
-  λ i →
-  comp 0 1 (p 0) in λ j → symm/filler^1 _ A j i [
-  | i=0 → p
-  | i=1 → refl
-  ]
-
--- transporting backwards is transporting forwards along inverted path (up to composition)
-def coe/symm/d (A : type) (P : A → type) (x y : A) (p : path A x y) (py : P y) :
-  pathd (trans^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)))
-        (coe 1 0 py in λ k → P (p k))
-        (coe 0 1 py in λ k → P (symm _ p k)) =
-  λ i →
-  comp 0 1 (coe 1 i py in λ k → P (p k)) in
-  λ j → trans/filler^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)) j i [
-  | i=0 → refl
-  | i=1 → λ k → coe 0 k py in λ l → P (symm A p l)
   ]
 
