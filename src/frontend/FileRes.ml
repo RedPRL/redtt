@@ -23,7 +23,7 @@ let find_redlib_root (base_dir : string) : string option =
         Log.pp_message ~loc:None ~lvl:`Warn
           Format.pp_print_string
           Format.std_formatter
-          "You are using the special local import mode.@ This is not recommended.@ You have been warned.@.";
+          "You are using the special local import mode. This is not recommended. You have been warned.";
         None
       end else
         go up

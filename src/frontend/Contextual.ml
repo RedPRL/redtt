@@ -14,7 +14,7 @@ type thread_env =
   {env : GlobalEnv.t; (** the mapping from names to associated definitions (if any). *)
    rigidity : [`Flex | `Rigid] Map.t; (** whether a particular name is rigid. *)
    source : FileRes.filepath Map.t; (** the mapping from the name to the file path *)
-   resolver_cache : (FileRes.filepath, rotted_resolver) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
+   resolver_cache : (FileRes.filepath, [`Checked of rotted_resolver | `Checking]) Hashtbl.t (** the cache of all resolvers from fully elaborated modules *)
   }
 
 (** this is the environment that only makes sense in a particular module. *)
@@ -211,11 +211,20 @@ let replace_datatype dlbl desc =
 let source_stem name =
   getth <<@> fun {source; _} -> Map.find_opt name source
 
-let cached_resolver ~stem =
-  getth <<@> fun {resolver_cache; _} -> Hashtbl.find_opt resolver_cache stem
+exception CyclicDependency
 
-let cache_resolver ~stem res =
-  getth <<@> fun {resolver_cache; _} -> Hashtbl.replace resolver_cache stem res
+let retrieve_module ~stem =
+  getth <<@> fun {resolver_cache; _} ->
+  match Hashtbl.find_opt resolver_cache stem with
+  | Some (`Checked res) -> Some res
+  | Some `Checking -> raise CyclicDependency
+  | None -> None
+
+let store_module ~stem res =
+  getth <<@> fun {resolver_cache; _} -> Hashtbl.replace resolver_cache stem (`Checked res)
+
+let touch_module ~stem =
+  getth <<@> fun {resolver_cache; _} -> Hashtbl.replace resolver_cache stem `Checking
 
 
 

@@ -42,7 +42,7 @@ struct
   let run_and_rot ~mlconf ~mlcmd:{con; span} =
     isolate_module ~mlconf begin
       begin
-        Elab.eval_cmd con >> abort_unsolved span >> RotIO.write
+        touch_module (Env.stem mlconf) >> Elab.eval_cmd con >> abort_unsolved span >> RotIO.write
       end
     end
 
@@ -53,7 +53,7 @@ struct
     | InFile {stem; indent; _} | InMem {stem; indent} ->
       assert_top_level >>
       let stem = FileRes.selector_to_stem ~stem selector in
-      cached_resolver stem >>= function
+      retrieve_module stem >>= function
       | Some rot -> ret rot
       | None ->
         begin
@@ -63,14 +63,14 @@ struct
           end
         end >>= function
         | Some rot ->
-          cache_resolver stem rot >> ret rot
+          store_module stem rot >> ret rot
         | None ->
           let red = FileRes.stem_to_red stem in
           let mlcmd, redsum = read_file red in
           let mlconf = ML.InFile {stem; redsum; indent = " " ^ indent} in
           Format.eprintf "@[%sChecking %s.@]@." indent red;
           run_and_rot ~mlconf ~mlcmd >>= fun (res, _ as rot) ->
-          cache_resolver stem rot >>= fun () ->
+          store_module stem rot >>= fun () ->
           Format.eprintf "@[%sChecked %s.@]@." indent red;
           ret rot
 
@@ -88,13 +88,13 @@ struct
       end >>= function
       | Some rot ->
         let rotpath = FileRes.stem_to_rot stem in
-        cache_resolver stem rot
+        store_module stem rot
       | None ->
         let mlcmd, redsum = read_file red in
         let mlconf = ML.InFile {stem; redsum; indent = " " ^ indent} in
         Format.eprintf "@[%sChecking %s.@]@." indent red;
         run_and_rot ~mlconf ~mlcmd >>= fun rot ->
-        cache_resolver stem rot >>= fun () ->
+        store_module stem rot >>= fun () ->
         Format.eprintf "@[%sChecked %s.@]@." indent red;
         ret ()
 
@@ -114,6 +114,6 @@ struct
         | None ->
           let mlconf = ML.InFile {stem; redsum; indent} in
           run_and_rot ~mlconf ~mlcmd
-      end >>= fun rot -> cache_resolver stem rot
+      end >>= fun rot -> store_module stem rot
 end
 and Elab : Elaborator.S = Elaborator.Make (M)

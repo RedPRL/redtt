@@ -21,9 +21,11 @@ val replace_datatype : Name.t -> Desc.desc -> unit m
 
 val source_stem : Name.t -> FileRes.filepath option m
 
+exception CyclicDependency
 type rotted_resolver = ResEnv.t * Digest.t
-val cached_resolver : stem:FileRes.filepath -> rotted_resolver option m
-val cache_resolver : stem:FileRes.filepath -> rotted_resolver -> unit m
+val retrieve_module : stem:FileRes.filepath -> rotted_resolver option m
+val store_module : stem:FileRes.filepath -> rotted_resolver -> unit m
+val touch_module : stem:FileRes.filepath -> unit m
 
 val isolate_local : 'a m -> 'a m
 val isolate_module : mlconf : ML.mlconf -> 'a m -> 'a m
