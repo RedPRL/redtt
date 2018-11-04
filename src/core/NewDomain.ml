@@ -1747,8 +1747,10 @@ struct
       let face1 = ConFace.make rel info.r `Dim1 @@ fun rel -> Con.run rel hd in
       VProj {info with func = {info.func with ty = Some (Val.make arr_ty)}}, Val.unleash ty1, face0 @ face1
 
-    | HCom {ty = `Pos; cap; _}, Cap _ ->
-      frm, Val.unleash cap, []
+    | HCom {r; r'; ty = `Pos; cap; sys}, Cap _ ->
+      frm, Val.unleash cap,
+      ConSys.foreach_make rel sys @@ fun s s' abs rel ->
+      make_coe rel s' s ~abs:(LazyValAbs.unleash abs) (Val.make hd)
 
     | Data _, Elim elim ->
       frm, Clo.inst rel elim.mot (Cell.con hd), []
