@@ -1050,7 +1050,7 @@ struct
         (* FIXME this is totally wrong. we should consult the context to determine
          * whether r = 0/1 or not. Without really checking it, vproj could be given
          * the wrong parameters from a non-rigid V type. *)
-        | Tm.V {r; equiv; ty0; ty1; _} ->
+        | Tm.V {r; equiv; ty0; ty1} ->
           let () = match Tm.unleash r with
             | Tm.Up (Tm.Var _, []) -> ()
             | _ -> failwith "V is not rigid when applying vproj frame."

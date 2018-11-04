@@ -938,7 +938,7 @@ and synth_stack cx vhd ty stk  =
           let func_ty0 = D.Con.make_arr (Cx.rel cx_r0) (D.Val.make ty0) (D.Val.make ty1) in
           let func_ty1 = D.Con.make_arr (Cx.rel cx_r0) v.ty0 v.ty1 in
           let _ = Q.equate_tycon (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty0 func_ty1 in
-          check_of_ty_ "vproj" cx func_ty0 [] vproj.func;
+          check_of_ty_ "vproj" cx_r0 func_ty0 [] vproj.func;
           let vfunc0 = eval cx_r0 vproj.func in
           let vfunc1 = D.Val.plug_then_unleash (Cx.rel cx_r0) D.Fst v.equiv in
           let _ = Q.equate_con (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty0 vfunc0 vfunc1 in

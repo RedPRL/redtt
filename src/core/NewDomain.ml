@@ -1042,8 +1042,8 @@ struct
       Format.fprintf fmt "<data>"
     | Univ _ ->
       Format.fprintf fmt "<univ>"
-    | V _ ->
-      Format.fprintf fmt "<v>"
+    | V {r; ty0; ty1; equiv} ->
+      Format.fprintf fmt "@[<hov1>(V %a@ %a@ %a@ %a)@]" Dim.pp r Val.pp ty0 Val.pp ty1 Val.pp equiv
     | VIn _ ->
       Format.fprintf fmt "<vin>"
     | Box _ ->
@@ -1054,7 +1054,7 @@ struct
       Format.fprintf fmt "<con>"
 
   let make_arr rel ty0 ty1 =
-    let env = Env.init_isolated [Cell.value ty0; Cell.value ty1] in
+    let env = Env.init_isolated [Cell.value ty1; Cell.value ty0] in
     Syn.eval rel env @@
     Tm.arr (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
 
@@ -2972,8 +2972,8 @@ struct
       Format.fprintf fmt "@[<hov1>(extapp@ [%a])@]" (ListUtil.pp "," I.pp) rs
     | RestrictForce ->
       Format.fprintf fmt "restrict-force"
-    | VProj _ ->
-      Format.fprintf fmt "<vproj-frame>"
+    | VProj {r; func} ->
+      Format.fprintf fmt "@[<hov1>(vproj@ %a@ %a)@]" Dim.pp r TypedVal.pp func
     | Cap _ ->
       Format.fprintf fmt "<cap-frame>"
     | Elim _ ->
