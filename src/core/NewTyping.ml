@@ -1062,7 +1062,7 @@ and synth_stack cx vhd ty stk  =
     synth_stack cx vhd ty stk
 
   | _, frm :: _ ->
-    Format.eprintf "typechecker encountered unimplemented frame: %a@." (Tm.pp_frame Pp.Env.emp) frm;
+    Format.eprintf "typechecker@ encountered@ unimplemented@ frame %a@ applied@ to@ type %a@." (Tm.pp_frame Pp.Env.emp) frm D.Con.pp ty;
     raise PleaseFillIn
 
 and check_elim_clause ~dlbl ~clbl ~constr =

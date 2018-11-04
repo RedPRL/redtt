@@ -1010,20 +1010,44 @@ struct
 
   let pp fmt =
     function
-    | Neu {neu; _} ->
-      Neutroid.pp fmt neu
-    | ExtLam nclo ->
-      Format.fprintf fmt "@[<hov1>(ext-lam@ %a)@]" NClo.pp nclo
     | Pi quant ->
       Format.fprintf fmt "@[<hov1>(pi@ %a)@]" Quantifier.pp quant
     | Sg quant ->
       Format.fprintf fmt "@[<hov1>(pi@ %a)@]" Quantifier.pp quant
+    | Ext _ ->
+      Format.fprintf fmt "<ext>"
+    | Restrict _ ->
+      Format.fprintf fmt "<restrict>"
+    | Lam _ ->
+      Format.fprintf fmt "<lam>"
+    | Cons _ ->
+      Format.fprintf fmt "<ons>"
+    | ExtLam nclo ->
+      Format.fprintf fmt "@[<hov1>(ext-lam@ %a)@]" NClo.pp nclo
+    | RestrictThunk _ ->
+      Format.fprintf fmt "<restrict-thunk>"
+    | Coe _ ->
+      Format.fprintf fmt "<coe>"
+    | HCom _ ->
+      Format.fprintf fmt "<hcom>"
+    | Com _ ->
+      Format.fprintf fmt "<com>"
+    | GHCom _ ->
+      Format.fprintf fmt "<ghcom>"
+    | GCom _ ->
+      Format.fprintf fmt "<gcom>"
+    | Neu {neu; _} ->
+      Neutroid.pp fmt neu
     | Data _ ->
       Format.fprintf fmt "<data>"
     | Univ _ ->
       Format.fprintf fmt "<univ>"
-    | Ext _ ->
-      Format.fprintf fmt "<ext>"
+    | V _ ->
+      Format.fprintf fmt "<V>"
+    | VIn _ ->
+      Format.fprintf fmt "<VIn>"
+    | Box _ ->
+      Format.fprintf fmt "<box>"
     | FortyTwo ->
       Format.fprintf fmt "forty-two"
     | _ ->
