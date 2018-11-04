@@ -161,7 +161,7 @@ and typed_value =
 
 and neu =
   {head : head;
-   frames : frame bwd}
+   frames : frame bwd} (* the TypedVal in the frames here must be fully annotated. *)
 
 and cell =
   [ `Val of con Lazy.t Delayed.t
@@ -255,7 +255,8 @@ module type DomainPlug =
 sig
   include Domain
 
-  (** [plug] applies a possibly-non-rigid value frame to a value to obtain another value. *)
+  (** [plug] applies a possibly-non-rigid value frame to a value to obtain another value.
+      Annotations in TypedVal in the frame will be ignored and regenerated when needed. *)
   val plug : rel -> ?rigid:bool -> frame -> t -> t
 end
 
