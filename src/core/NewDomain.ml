@@ -3483,4 +3483,5 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
   end
 
 module ConAbs = AbsPlug (Con)
+module ConFace = Face (Con)
 module NeutroidAbs = Abs (Neutroid)

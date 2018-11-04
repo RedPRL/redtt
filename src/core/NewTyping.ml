@@ -73,7 +73,6 @@ let _ =
 
 
 exception PleaseRaiseProperError
-exception CanFavoniaHelpMe
 exception CanJonHelpMe
 exception PleaseFillIn
 
@@ -504,41 +503,36 @@ and check_neg cx ty sys tm =
 
   | D.HCom ({ty = `Pos; _} as fhcom) ->
     begin
+
+      let cap_sys =
+        let frm = D.Cap {r = fhcom.r; r' = fhcom.r'; ty = fhcom.cap; sys = fhcom.sys} in
+        ConSys.plug (Cx.rel cx) frm sys
+      in
+
       match Tm.unleash tm with
       | Tm.Box box ->
         let r = check_eval_dim cx box.r in
         let r' = check_eval_dim cx box.r' in
         let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) fhcom.r r in
         let _ = Q.equate_dim (Cx.qenv cx) (Cx.rel cx) fhcom.r' r' in
-        let sys =
-          (* This code sucks. We should implement this as some kind of fold, which actually is consuming
-             elements from the system; for now, I want to have a one-to-one account of faces, which means
-             that we must not use a face twice, and also not have any left over. *)
-          ListUtil.foreach fhcom.sys @@ fun (s, s', _) ->
-          let face =
-            flip ListUtil.find_map_opt box.sys @@ fun (r, r', tm) ->
-            let r = check_eval_dim cx r in
-            let r' = check_eval_dim cx r' in
-            match D.Rel.compare s r (Cx.rel cx), D.Rel.compare s' r' (Cx.rel cx) with
-            | `Same, `Same -> Some tm
-            | _ -> None
-            | exception _ -> None
-          in
-          match face with
-          | Some face -> face
-          | None -> raise PleaseRaiseProperError
+
+        let tys = ListUtil.foreach fhcom.sys @@ fun (_, _, abs) -> abs in
+
+        (* the boundary system *)
+        let bdry_sys =
+          let _ = check_box_sys ~cx ~r':fhcom.r' tys ~init:sys box.sys in
+          D.Syn.eval_tm_sys (Cx.rel cx) (Cx.venv cx) box.sys
         in
 
-        (* Check box.cap *)
+        (* the {e coerced} boundaries *)
+        let coe_bdry_sys =
+          ListUtil.flat_foreach2 tys bdry_sys @@ fun abs (s, s', bdy) ->
+          D.ConFace.make (Cx.rel cx) s s' @@ fun rel ->
+          D.Con.make_coe rel r' r ~abs:(D.LazyValAbs.unleash abs) (D.Val.make @@ D.LazyVal.unleash bdy)
+        in
 
-        (* Next: check that 'sys' is compatible with
-           box.cap, and that under each restriction, box.cap becomes the right
-           coe *)
-
-
-        (* I'm just putting this here because I'm fed up with this code;
-           if you don't do it, I'll get around to it soon. - Jon *)
-        raise CanFavoniaHelpMe
+        (* checking the cap *)
+        check_of_ty_ "box" cx (D.Val.unleash fhcom.cap) (cap_sys @ coe_bdry_sys) box.cap
 
       | Tm.Up cmd ->
         let tr = Q.quote_dim (Cx.qenv cx) fhcom.r in
@@ -549,14 +543,14 @@ and check_neg cx ty sys tm =
           let cap_frm = Tm.Cap {r = tr; r' = tr'; ty = tty_cap; sys = tty_sys} in
           Tm.up @@ cmd @< cap_frm
         in
-        check_of_ty cx (D.Val.unleash fhcom.cap) [] cap;
+        check_of_ty cx (D.Val.unleash fhcom.cap) cap_sys cap;
 
-        let sys =
-          flip List.map fhcom.sys @@ fun (s, s', _) ->
+        let box_sys =
+          ListUtil.foreach fhcom.sys @@ fun (s, s', _) ->
           Q.quote_dim (Cx.qenv cx) s, Q.quote_dim (Cx.qenv cx) s', Tm.up cmd
         in
-        let tys = flip List.map fhcom.sys @@ fun (_, _, abs) -> abs in
-        let _ = check_box_sys ~cx ~r':fhcom.r' tys sys in
+        let tys = ListUtil.foreach fhcom.sys @@ fun (_, _, abs) -> abs in
+        let _ = check_box_sys ~cx ~r':fhcom.r' tys ~init:sys box_sys in
         ()
 
       |  _->
@@ -761,8 +755,8 @@ and check_box_face ~cx ~r' ~abs sys face =
 and check_tm_sys cx ty sys =
   List.fold_left (check_tm_face cx ty) [] sys
 
-and check_box_sys ~cx ~r' tys (sys : (Tm.tm, Tm.tm) Tm.system) =
-  List.fold_left2 (fun sys abs -> check_box_face ~cx ~r' ~abs sys) [] tys sys
+and check_box_sys ~cx ~r' tys ~init (sys : (Tm.tm, Tm.tm) Tm.system) =
+  List.fold_left2 (fun sys abs -> check_box_face ~cx ~r' ~abs sys) init tys sys
 
 and check_bnd_sys ~cx ~cxx ~x ~r ~ty ~cap sys =
   let init = [ `Atom x, r, D.LazyVal.make cap ] in
