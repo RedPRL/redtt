@@ -1043,9 +1043,9 @@ struct
     | Univ _ ->
       Format.fprintf fmt "<univ>"
     | V _ ->
-      Format.fprintf fmt "<V>"
+      Format.fprintf fmt "<v>"
     | VIn _ ->
-      Format.fprintf fmt "<VIn>"
+      Format.fprintf fmt "<vin>"
     | Box _ ->
       Format.fprintf fmt "<box>"
     | FortyTwo ->
