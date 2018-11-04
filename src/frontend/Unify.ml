@@ -8,6 +8,7 @@ module D = NewDomain
 
 module Notation = Monad.Notation (Contextual)
 open Notation
+module MonadUtil = Monad.Util (Contextual)
 
 type telescope = params
 
@@ -492,6 +493,12 @@ struct
 
   let inst_clo cx clo (el : D.con) =
     D.Clo.inst (Cx.rel cx) clo @@ D.Cell.con el
+
+  let kill_false_face ((r, r', _) as face) =
+    compare_dim r r' <<@>
+    function
+    | `Apart -> None
+    | _ -> Some face
 end
 
 let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
@@ -592,17 +599,8 @@ let rec subtype ty0 ty1 =
       let xs_fwd = Bwd.to_list xs in
       let ty1, sys1 = Tm.unbind_ext_with (List.map Tm.var xs_fwd) ebnd1 in
       let ps = List.map (fun x -> (x, `I)) xs_fwd in
-      base_cx >>= fun cx ->
-      let rel = Cx.rel cx in
-      let kill_false rel ((r, r', tm) as face) =
-        let r = Ty.eval_dim cx r in
-        let r' = Ty.eval_dim cx r' in
-        match D.Rel.compare r r' rel with
-        | `Apart -> None
-        | _ -> Some face
-      in
-      let sys0 = Option.filter_map (kill_false rel) sys0 in
-      let sys1 = Option.filter_map (kill_false rel) sys1 in
+      MonadUtil.filter_traverse Util.kill_false_face sys0 >>= fun sys0 ->
+      MonadUtil.filter_traverse Util.kill_false_face sys1 >>= fun sys1 ->
       let rec go sys0 sys1 =
         match sys0, sys1 with
         | _, [] -> ret ()
