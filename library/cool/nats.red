@@ -99,8 +99,8 @@ def oddq : binnat → bool =
   | cons2 _ → ff
   ]
 
-def oddq/n≈bn : (i : 𝕀) → (n≈bn i) → bool =
-  λ i → coe 1 i oddq in λ i → (n≈bn i) → bool
+def oddq/n≈bn (i : 𝕀) : (n≈bn i) → bool =
+  coe 1 i oddq in λ i → (n≈bn i) → bool
 
 def oddq/nat : nat → bool = oddq/n≈bn 0
 
@@ -121,11 +121,7 @@ def impl/n≈bn : path^1 impl impl/nat impl/binnat =
 -- We can also transport proofs *about* these functions.
 
 def oddq/suc : (n : binnat) → path bool (oddq n) (not (oddq (suc/binnat n))) =
-  elim [
-  | nil → refl
-  | cons1 _ → refl
-  | cons2 _ → refl
-  ]
+  λ * → refl
 
 def oddq/nat/suc : (n : nat) → path bool (oddq/nat n) (not (oddq/nat (suc n))) =
   coe 1 0 oddq/suc
@@ -138,11 +134,13 @@ def oddq/nat/direct : nat → bool =
   | suc (_ → ih) → not ih
   ]
 
+/- MORTAL
 def oddq/n≈bn : (n : nat) → path bool (oddq/nat n) (oddq/nat/direct n) =
   let pf : (n : nat) → path _ (suc/binnat (nat→binnat n)) (nat→binnat (suc n)) =
-    elim [ zero → refl | suc (_ → ih) → refl ]
+    λ * → refl
   in
   elim [
   | zero → refl
   | suc (n → ih) → λ i → not (trans bool (λ i → oddq (pf n i)) ih i)
   ]
+-/
