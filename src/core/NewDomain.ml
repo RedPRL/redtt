@@ -247,6 +247,10 @@ sig
   (** [run] brings the prevalue underneath the restriction Ξ. *)
   val run : rel -> t -> t
 
+  (** the debugging interface *)
+  val is_value : t -> bool
+  val is_rigid : t -> bool
+
   (* TODO: this should not take a 'rel'. [pp] is meant to be simple-minded. *)
   val pp : t Pp.t0
 end
@@ -721,6 +725,9 @@ struct
     | r -> r
 
   let run _ r = r
+
+  let is_value _ = true
+  let is_rigid _ = true
 end
 
 (** A prevalue in [clo] is a value if its environment is a value. *)
@@ -747,6 +754,9 @@ struct
 
   let run rel (Clo clo) =
     Clo {clo with env = Env.run rel clo.env}
+
+  let is_value (Clo {env; _}) = Env.is_value env
+  let is_rigid = is_value
 
   let name (Clo {bnd = Tm.B (nm, _); _}) = nm
 
@@ -779,6 +789,9 @@ struct
 
   let run rel (NClo nclo) =
     NClo {nclo with env = Env.run rel nclo.env}
+
+  let is_value (NClo {env; _}) = Env.is_value env
+  let is_rigid = is_value
 
   let names (NClo {bnd = Tm.NB (nms, _); _}) = nms
 
@@ -814,6 +827,9 @@ struct
 
   let run rel (ExtClo clo) =
     ExtClo {clo with env = Env.run rel clo.env}
+
+  let is_value (ExtClo {env; _}) = Env.is_value env
+  let is_rigid = is_value
 
   let names (ExtClo {bnd = Tm.NB (nms, _); _}) = nms
 
@@ -868,6 +884,9 @@ struct
     function
     | `Dim _ as c -> c
     | `Val v -> `Val (LazyVal.run rel v)
+
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
 end
 
 and ConstrCell :
@@ -912,6 +931,9 @@ struct
     | `Const v -> `Const (Val.run rel v)
     | `Rec (`Self, v) -> `Rec (`Self, Val.run rel v)
     | `Dim _ as c -> c
+
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
 end
 
 (** An environment is a value if every cell of it is. *)
@@ -943,6 +965,9 @@ struct
 
   let run rel env =
     {env with cells = Bwd.map (Cell.run rel) env.cells}
+
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
 
   let init globals = {globals = globals; cells = Emp}
 
@@ -2575,6 +2600,9 @@ struct
 
     | _ ->
       raise PleaseRaiseProperError
+
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
 end
 
 and Val : DelayedDomainPlug
@@ -2638,6 +2666,9 @@ struct
     | `Sg abs -> `Sg (QAbs.run rel abs)
     | `Ext abs -> `Ext (ECloAbs.run rel abs)
 
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
+
   let to_abs =
     function
     | `Pi (Abs (x, quantx)) -> Abs (x, Pi quantx)
@@ -2674,6 +2705,9 @@ struct
     | `Sg abs -> `Sg (Q.run rel abs)
     | `Ext clo -> `Ext (ExtClo.run rel clo)
     | `Pos -> `Pos
+
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
 end
 
 and ComShape :
@@ -2705,6 +2739,9 @@ struct
     let dom = Val.run rel dom in
     let cod = Clo.run rel cod in
     {dom; cod}
+
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
 end
 
 (* A [neutroid] is a value if the system is value. A [neutroid] is rigid
@@ -2767,6 +2804,9 @@ struct
        * it should be an invariant that the argument [rigid] is always [true]. *)
       raise PleaseRaiseProperError
 
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
+
   let reflect_head rel ~ty head sys =
     match ConSys.run_then_force rel sys with
     | sys -> Neu {ty; neu = {neu = DelayedNeu.make {head; frames = Emp}; sys}}
@@ -2806,6 +2846,9 @@ struct
       (* even though we can check whether [frm] is really non-rigid,
        * it should be an invariant that the argument [rigid] is always [true]. *)
       raise PleaseRaiseProperError
+
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
 end
 
 and DelayedNeu : DelayedDomainPlug with type u = neu and type t = neu Delayed.t =
@@ -2904,6 +2947,9 @@ struct
          ty = Neutroid.subst r x info.ty;
          cap = Val.subst r x info.cap;
          sys = ConAbsSys.subst r x info.sys}
+
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
 end
 
 and TypedVal :
@@ -2930,6 +2976,9 @@ struct
   let subst r x {ty; value} =
     {ty = Option.map (Val.subst r x) ty;
      value = Val.subst r x value}
+
+  let is_value _ = raise PleaseFillIn
+  let is_rigid _ = raise PleaseFillIn
 
   let make v = {ty = None; value = v}
   let drop_ty {value = v; _} = v
@@ -3073,6 +3122,8 @@ struct
          mot = Clo.run rel info.mot;
          clauses = flip List.map info.clauses @@ fun (lbl, nclo) -> lbl, NClo.run rel nclo}
 
+  let is_value _ = raise PleaseFillIn
+
   let occur xs =
     function
     (* TODO *)
@@ -3111,6 +3162,7 @@ struct
             `Triv (Con.make_coe rel r' r ~abs @@ Val.make hd)
       end
 
+  let is_rigid _ = raise PleaseFillIn
 end
 
 (** A [sys] is a value if its elements are. It itself might not be rigid.
@@ -3163,6 +3215,8 @@ and Sys :
     let plug rel ~rigid frm sys =
       List.map (Face.plug rel ~rigid frm) sys
 
+    let is_value _ = raise PleaseFillIn
+
     let force rel sys =
       let force_face face =
         try Some (Face.force rel face)
@@ -3171,6 +3225,8 @@ and Sys :
         | Face.Triv bdy -> raise @@ Triv bdy
       in
       ListUtil.filter_map force_face sys
+
+    let is_rigid _ = raise PleaseFillIn
 
     let run_then_force rel sys =
       let run_then_force_face face =
@@ -3273,6 +3329,9 @@ and Face :
         []
 
     let run_then_force rel v = force rel (run rel v)
+
+    let is_value _ = raise PleaseFillIn
+    let is_rigid _ = raise PleaseFillIn
   end
 
 (** [Abs (x, a)] is a [rel]-value if [a] is a [(Rel.hide' x rel)]-value. *)
@@ -3317,6 +3376,9 @@ end
       let rel_x = Rel.hide' x rel in
       let a_x = X.run rel_x a_x in
       Abs (x, a_x)
+
+    let is_value _ = raise PleaseFillIn
+    let is_rigid _ = raise PleaseFillIn
 
     let bind gen =
       let y = Name.fresh () in
@@ -3436,6 +3498,9 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let run rel v = Delayed.with_rel rel v
 
+    let is_value _ = raise PleaseFillIn
+    let is_rigid _ = raise PleaseFillIn
+
     let make_then_run rel = Delayed.make' (Some rel)
 
     let plug rel ~rigid frm v = Delayed.make @@ X.plug rel ~rigid frm (unleash v)
@@ -3474,6 +3539,9 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
     let subst r x v = Delayed.make @@ lazy begin X.subst r x (unleash v) end
 
     let run rel v = Delayed.with_rel rel v
+
+    let is_value _ = raise PleaseFillIn
+    let is_rigid _ = raise PleaseFillIn
 
     let make_then_run rel v = Delayed.make' (Some rel) (lazy v)
 
