@@ -778,8 +778,8 @@ end =
 struct
   type t = nclo
 
-  let pp fmt _ =
-    Format.fprintf fmt "<nclo>"
+  let pp fmt (NClo {bnd; env}) =
+    Format.fprintf fmt "@[<hov1>(nclo %a %a)@]" Tm.pp0_nbnd bnd Env.pp env
 
   let swap pi (NClo nclo) =
     NClo {nclo with env = Env.swap pi nclo.env}
@@ -2682,8 +2682,12 @@ struct
   type t = hcom_shape
   module Q = Quantifier
 
-  let pp fmt _ =
-    Format.fprintf fmt "<hcom-shape>"
+  let pp fmt =
+    function
+    | `Pi qu -> Con.pp fmt (Pi qu)
+    | `Sg qu -> Con.pp fmt (Sg qu)
+    | `Ext clo -> Con.pp fmt (Ext clo)
+    | `Pos -> Format.fprintf fmt "pos"
 
   let swap pi =
     function
