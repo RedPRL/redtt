@@ -7,6 +7,7 @@ import basics.hedberg
 import basics.retract
 import data.susp
 import data.unit
+import data.truncation
 import paths.hlevel
 
 def no-double-neg-elim (f : (A : type) → stable A) : void =
@@ -67,26 +68,31 @@ def paths-stable→set/alt (A : type) (st : (x y : A) → stable (path A x y)) :
 
 -- 10.1.13
 def suspension-lemma (A : type) (A/prop : is-prop A) : (is-set (susp A)) × (equiv A (path (susp A) north south)) = 
-  let P : susp A → susp A → type = 
-    elim [
+  let Au (a : A) = ua A unit (prop/unit A A/prop a) in
+  let uA (a : A) = symm^1 _ (Au a) in
+  let P (s1 s2 : susp A) : type = 
+    elim s1 [
     | north → 
-      elim [
+      elim s2 [
       | north → unit
       | south → A
-      | merid b j → symm^1 _ (ua A unit (prop/unit A A/prop b)) j
+      | merid b j → uA b j
       ]
     | south → 
-      elim [
+      elim s2 [
       | north → A
       | south → unit
-      | merid b j → ua A unit (prop/unit A A/prop b) j
+      | merid b j → Au b j
       ]
     | merid a i → 
-      elim [
-      | north → symm^1 _ (ua A unit (prop/unit A A/prop a)) i
-      | south → ua A unit (prop/unit A A/prop a) i
-      | merid b j → ?merid-hole 
-      ]
+      let mot (s : susp A) : type^1 =
+        path^1 type (elim s [north → unit | south → A | merid b j → uA b j]) (elim s [ north → A | south → unit | merid b j → Au b j])
+      in
+      elim s2 in mot [ 
+      | north → uA a
+      | south → Au a
+      | merid b j → λ k → ?merid-hole
+      ] i
     ] in 
   ?suspension-hole
 
