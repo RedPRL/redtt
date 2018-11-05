@@ -164,6 +164,7 @@ sig
   val init : mlconf : mlconf -> t
   val mlconf : t -> mlconf
   val indent : mlconf -> string
+  val stem : mlconf -> FileRes.filepath
   val set : mlname -> semval -> t -> t
   val find : mlname -> t -> semval option
   val record_import : FileRes.selector -> t -> t
@@ -181,6 +182,11 @@ struct
     | TopModule {indent} -> indent
     | InFile {indent; _} -> indent
     | InMem {indent; _} -> indent
+  let stem =
+    function
+    | TopModule _ -> invalid_arg "Env.stem"
+    | InFile {stem; _} -> stem
+    | InMem {stem; _} -> stem
 
   let set k v e = {e with values = T.set k v e.values}
   let find k e = T.find k e.values

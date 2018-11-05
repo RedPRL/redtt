@@ -58,6 +58,16 @@ struct
       traverse f xs >>= fun ys ->
       M.ret @@ y :: ys
 
+  let rec filter_traverse f =
+    function
+    | [] -> M.ret []
+    | x::xs ->
+      f x >>= fun y ->
+      filter_traverse f xs >>= fun ys ->
+      match y with
+      | None -> M.ret ys
+      | Some y -> M.ret @@ y :: ys
+
   let rec fold_left f acc xs =
     match xs with
     | [] ->

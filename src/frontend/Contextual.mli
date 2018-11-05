@@ -21,9 +21,11 @@ val replace_datatype : Name.t -> Desc.desc -> unit m
 
 val source_stem : Name.t -> FileRes.filepath option m
 
+exception CyclicDependency
 type rotted_resolver = ResEnv.t * Digest.t
-val cached_resolver : stem:FileRes.filepath -> rotted_resolver option m
-val cache_resolver : stem:FileRes.filepath -> rotted_resolver -> unit m
+val retrieve_module : stem:FileRes.filepath -> rotted_resolver option m
+val store_module : stem:FileRes.filepath -> rotted_resolver -> unit m
+val touch_module : stem:FileRes.filepath -> unit m
 
 val isolate_local : 'a m -> 'a m
 val isolate_module : mlconf : ML.mlconf -> 'a m -> 'a m
@@ -59,6 +61,7 @@ val block : problem -> unit m
 val check : ty:ty -> ?sys:(tm, tm) Tm.system -> tm -> [`Ok | `Exn of exn] m
 val check_subtype : ty -> ty -> [`Ok | `Exn of exn] m
 val check_eq : ty:ty -> tm -> tm -> [`Ok | `Exn of exn] m
+val compare_dim : tm -> tm -> I.compare m
 val check_eq_dim : tm -> tm -> bool m
 
 

@@ -1,5 +1,7 @@
 type 'a t = 'a option
 
+let some x = Some x
+
 let map f =
   function
   | Some a -> Some (f a)
@@ -19,6 +21,8 @@ let rec filter_map f =
     match f x with
     | Some y -> y :: filter_map f xs
     | None -> filter_map f xs
+
+let filter_foreach l f = filter_map f l
 
 let default a =
   function
