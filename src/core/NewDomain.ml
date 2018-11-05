@@ -107,7 +107,7 @@ type con =
 
   | Neu of {ty : value; neu : neutroid} (* is a value when neu is rigid *)
 
-  | FortyTwo (* a dummy filler to signal that something might be terribly wrong *)
+  | FortyTwo (* a dummy filler which is not a pre-value or value! *)
 
   | Data of {lbl : Name.t; strict : bool; params : cell list; constrs : GlobalEnv.t * Desc.constrs}
   | Intro of {dlbl : Name.t; clbl : string; args : constr_cell list; sys : con sys}
@@ -248,8 +248,8 @@ sig
   val run : rel -> t -> t
 
   (** the debugging interface *)
-  val is_value : t -> bool
-  val is_rigid : t -> bool
+  val is_value : rel -> t -> bool
+  val is_rigid : rel -> t -> bool
 
   (* TODO: this should not take a 'rel'. [pp] is meant to be simple-minded. *)
   val pp : t Pp.t0
@@ -726,8 +726,8 @@ struct
 
   let run _ r = r
 
-  let is_value _ = true
-  let is_rigid _ = true
+  let is_value _ _ = true
+  let is_rigid _ _ = true
 end
 
 (** A prevalue in [clo] is a value if its environment is a value. *)
@@ -755,7 +755,7 @@ struct
   let run rel (Clo clo) =
     Clo {clo with env = Env.run rel clo.env}
 
-  let is_value (Clo {env; _}) = Env.is_value env
+  let is_value rel (Clo {env; _}) = Env.is_value rel env
   let is_rigid = is_value
 
   let name (Clo {bnd = Tm.B (nm, _); _}) = nm
@@ -790,7 +790,7 @@ struct
   let run rel (NClo nclo) =
     NClo {nclo with env = Env.run rel nclo.env}
 
-  let is_value (NClo {env; _}) = Env.is_value env
+  let is_value rel (NClo {env; _}) = Env.is_value rel env
   let is_rigid = is_value
 
   let names (NClo {bnd = Tm.NB (nms, _); _}) = nms
@@ -828,7 +828,7 @@ struct
   let run rel (ExtClo clo) =
     ExtClo {clo with env = Env.run rel clo.env}
 
-  let is_value (ExtClo {env; _}) = Env.is_value env
+  let is_value rel (ExtClo {env; _}) = Env.is_value rel env
   let is_rigid = is_value
 
   let names (ExtClo {bnd = Tm.NB (nms, _); _}) = nms
@@ -885,8 +885,11 @@ struct
     | `Dim _ as c -> c
     | `Val v -> `Val (LazyVal.run rel v)
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value rel =
+    function
+    | `Dim r -> Dim.is_value rel r
+    | `Val v -> LazyVal.is_value rel v
+  let is_rigid = is_value
 end
 
 and ConstrCell :
@@ -932,8 +935,8 @@ struct
     | `Rec (`Self, v) -> `Rec (`Self, Val.run rel v)
     | `Dim _ as c -> c
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value _ = raise CanJonHelpMe
+  let is_rigid _ = raise CanJonHelpMe
 end
 
 (** An environment is a value if every cell of it is. *)
@@ -966,8 +969,8 @@ struct
   let run rel env =
     {env with cells = Bwd.map (Cell.run rel) env.cells}
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value rel {cells; _} = Bwd.for_all (Cell.is_value rel) cells
+  let is_rigid rel {cells; _} = Bwd.for_all (Cell.is_rigid rel) cells
 
   let init globals = {globals = globals; cells = Emp}
 
@@ -2601,8 +2604,70 @@ struct
     | _ ->
       raise PleaseRaiseProperError
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value rel =
+    function
+    | Pi quant ->
+      Quantifier.is_value rel quant
+
+    | Sg quant ->
+      Quantifier.is_value rel quant
+
+    | Ext extclo ->
+      ExtClo.is_value rel extclo
+
+    | Restrict face ->
+      ConFace.is_value rel face (* can be a true face, but not an inconsistent one. *)
+
+    | Lam clo ->
+      Clo.is_value rel clo
+
+    | Cons (v0, v1) ->
+      Val.is_value rel v0 && Val.is_value rel v1
+
+    | ExtLam nclo ->
+      NClo.is_value rel nclo
+
+    | RestrictThunk face ->
+      ConFace.is_value rel face (* can be a true face, but not an inconsistent one. *)
+
+    | Coe info ->
+      raise PleaseFillIn
+
+    | HCom info ->
+      raise PleaseFillIn
+
+    | Com info ->
+      raise PleaseFillIn
+
+    | GHCom info ->
+      raise PleaseFillIn
+
+    | GCom info ->
+      raise PleaseFillIn
+
+    | Univ _ -> true
+
+    | V info ->
+      raise PleaseFillIn
+
+    | VIn info ->
+      raise PleaseFillIn
+
+    | Box info ->
+      raise PleaseFillIn
+
+    | Neu info ->
+      raise PleaseFillIn
+
+    | Data info ->
+      raise PleaseFillIn
+
+    | Intro info ->
+      raise PleaseFillIn
+
+    | FortyTwo -> false
+
+  let is_rigid = is_value
 end
 
 and Val : DelayedDomainPlug
@@ -2666,8 +2731,12 @@ struct
     | `Sg abs -> `Sg (QAbs.run rel abs)
     | `Ext abs -> `Ext (ECloAbs.run rel abs)
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value rel =
+    function
+    | `Pi abs -> QAbs.is_value rel abs
+    | `Sg abs -> QAbs.is_value rel abs
+    | `Ext abs -> ECloAbs.is_value rel abs
+  let is_rigid = is_value
 
   let to_abs =
     function
@@ -2710,8 +2779,13 @@ struct
     | `Ext clo -> `Ext (ExtClo.run rel clo)
     | `Pos -> `Pos
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value rel =
+    function
+    | `Pi abs -> Q.is_value rel abs
+    | `Sg abs -> Q.is_value rel abs
+    | `Ext clo -> ExtClo.is_value rel clo
+    | `Pos -> true
+  let is_rigid = is_value
 end
 
 and ComShape :
@@ -2744,8 +2818,10 @@ struct
     let cod = Clo.run rel cod in
     {dom; cod}
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value rel {dom; cod} =
+    Val.is_value rel dom && Clo.is_value rel cod
+
+  let is_rigid = is_value
 end
 
 (* A [neutroid] is a value if the system is value. A [neutroid] is rigid
@@ -2808,8 +2884,10 @@ struct
        * it should be an invariant that the argument [rigid] is always [true]. *)
       raise PleaseRaiseProperError
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value rel {neu; sys} =
+    DelayedNeu.is_rigid rel neu &&
+    ConSys.is_rigid rel sys
+  let is_rigid = is_value
 
   let reflect_head rel ~ty head sys =
     match ConSys.run_then_force rel sys with
@@ -2851,8 +2929,12 @@ struct
        * it should be an invariant that the argument [rigid] is always [true]. *)
       raise PleaseRaiseProperError
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value rel {head; frames} =
+    Head.is_value rel head &&
+    Bwd.for_all (Frame.is_value rel) frames
+  let is_rigid rel {head; frames} =
+    Head.is_rigid rel head &&
+    Bwd.for_all (Frame.is_rigid rel) frames
 end
 
 and DelayedNeu : DelayedDomainPlug with type u = neu and type t = neu Delayed.t =
@@ -2952,7 +3034,20 @@ struct
          cap = Val.subst r x info.cap;
          sys = ConAbsSys.subst r x info.sys}
 
-  let is_value _ = raise PleaseFillIn
+  let is_value rel =
+    function
+    | Lvl _ -> true
+    | Var _ -> true
+    | Meta _ -> true
+    | NCoe {r; r'; ty; cap} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      NeutroidAbs.is_value rel ty &&
+      Val.is_value rel cap
+    | NCoeData _ ->
+      raise PleaseFillIn
+    | NHCom _ ->
+      raise PleaseFillIn
   let is_rigid _ = raise PleaseFillIn
 end
 
