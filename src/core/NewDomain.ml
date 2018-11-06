@@ -2630,42 +2630,84 @@ struct
     | RestrictThunk face ->
       ConFace.is_value rel face (* can be a true face, but not an inconsistent one. *)
 
-    | Coe info ->
-      raise PleaseFillIn
+    | Coe {r; r'; ty; cap} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Rel.compare r r' rel <> `Same &&
+      CoeShape.is_value rel ty &&
+      Val.is_value rel cap
 
-    | HCom info ->
-      raise PleaseFillIn
+    | HCom {r; r'; ty; cap; sys} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Rel.compare r r' rel <> `Same &&
+      HComShape.is_value rel ty &&
+      Val.is_value rel cap &&
+      ConAbsSys.is_rigid rel sys
 
-    | Com info ->
-      raise PleaseFillIn
+    | Com {r; r'; ty; cap; sys} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Rel.compare r r' rel <> `Same &&
+      ComShape.is_value rel ty &&
+      Val.is_value rel cap &&
+      ConAbsSys.is_rigid rel sys
 
-    | GHCom info ->
-      raise PleaseFillIn
+    | GHCom {r; r'; ty; cap; sys} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Rel.compare r r' rel <> `Same &&
+      HComShape.is_value rel ty &&
+      Val.is_value rel cap &&
+      ConAbsSys.is_rigid rel sys
 
-    | GCom info ->
-      raise PleaseFillIn
+    | GCom {r; r'; ty; cap; sys} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Rel.compare r r' rel <> `Same &&
+      ComShape.is_value rel ty &&
+      Val.is_value rel cap &&
+      ConAbsSys.is_rigid rel sys
 
     | Univ _ -> true
 
-    | V info ->
-      raise PleaseFillIn
+    | V {r; ty0; ty1; equiv} ->
+      begin
+        match Rel.equate r `Dim0 rel with
+        | `Changed rel0 ->
+          Val.is_value rel0 ty0 &&
+          Val.is_value rel ty1 &&
+          Val.is_value rel0 equiv
+        | _ -> false
+      end
 
-    | VIn info ->
-      raise PleaseFillIn
+    | VIn {r; el0; el1} ->
+      begin
+        match Rel.equate r `Dim0 rel with
+        | `Changed rel0 ->
+          Val.is_value rel0 el0 &&
+          Val.is_value rel el1
+        | _ -> false
+      end
 
-    | Box info ->
-      raise PleaseFillIn
+    | Box {r; r'; cap; sys} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Rel.compare r r' rel <> `Same &&
+      Val.is_value rel cap &&
+      ConSys.is_rigid rel sys
 
-    | Neu info ->
-      raise PleaseFillIn
+    | Neu {ty; neu} ->
+      Val.is_value rel ty &&
+      Neutroid.is_value rel neu
 
     | Data info ->
-      raise PleaseFillIn
+      raise CanJonHelpMe
 
     | Intro info ->
-      raise PleaseFillIn
+      raise CanJonHelpMe
 
-    | FortyTwo -> false
+    | FortyTwo -> false (* FortyTwo is never a (pre)value! *)
 
   let is_rigid = is_value
 end
@@ -3045,10 +3087,34 @@ struct
       NeutroidAbs.is_value rel ty &&
       Val.is_value rel cap
     | NCoeData _ ->
-      raise PleaseFillIn
-    | NHCom _ ->
-      raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+      raise CanJonHelpMe
+    | NHCom {r; r'; ty; cap; sys} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Neutroid.is_value rel ty &&
+      Val.is_value rel cap &&
+      ConAbsSys.is_value rel sys
+
+  let is_rigid rel =
+    function
+    | Lvl _ -> true
+    | Var _ -> true
+    | Meta _ -> true
+    | NCoe {r; r'; ty; cap} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Rel.compare r r' rel <> `Same &&
+      NeutroidAbs.is_value rel ty &&
+      Val.is_value rel cap
+    | NCoeData _ ->
+      raise CanJonHelpMe
+    | NHCom {r; r'; ty; cap; sys} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Rel.compare r r' rel <> `Same &&
+      Neutroid.is_value rel ty &&
+      Val.is_value rel cap &&
+      ConAbsSys.is_value rel sys
 end
 
 and TypedVal :
@@ -3076,8 +3142,10 @@ struct
     {ty = Option.map (Val.subst r x) ty;
      value = Val.subst r x value}
 
-  let is_value _ = raise PleaseFillIn
-  let is_rigid _ = raise PleaseFillIn
+  let is_value rel {ty; value} =
+    Val.is_value rel value &&
+    match ty with Some ty -> Val.is_value rel ty | None -> true
+  let is_rigid = is_value
 
   let make v = {ty = None; value = v}
   let drop_ty {value = v; _} = v
@@ -3221,7 +3289,23 @@ struct
          mot = Clo.run rel info.mot;
          clauses = flip List.map info.clauses @@ fun (lbl, nclo) -> lbl, NClo.run rel nclo}
 
-  let is_value _ = raise PleaseFillIn
+  let is_value rel =
+    function
+    | FunApp arg -> TypedVal.is_value rel arg
+    | Fst | Snd | ExtApp _ | RestrictForce -> true
+    | VProj info ->
+      begin
+        match Rel.equate' info.r `Dim0 rel with
+        | rel -> TypedVal.is_value rel info.func
+        | exception I.Inconsistent -> true
+      end
+    | Cap {r; r'; ty; sys} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Val.is_value rel ty &&
+      ConAbsSys.is_value rel sys
+    | Elim info ->
+      raise CanJonHelpMe
 
   let occur xs =
     function
@@ -3261,7 +3345,23 @@ struct
             `Triv (Con.make_coe rel r' r ~abs @@ Val.make hd)
       end
 
-  let is_rigid _ = raise PleaseFillIn
+  let is_rigid rel =
+    function
+    | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce as frm -> is_value rel frm
+    | VProj info ->
+      begin
+        match Rel.equate info.r `Dim0 rel with
+        | `Changed rel -> TypedVal.is_value rel info.func
+        | _ -> false
+      end
+    | Cap {r; r'; ty; sys} ->
+      Dim.is_value rel r &&
+      Dim.is_value rel r' &&
+      Rel.compare r r' rel <> `Same &&
+      Val.is_value rel ty &&
+      ConAbsSys.is_value rel sys
+    | Elim info ->
+      raise CanJonHelpMe
 end
 
 (** A [sys] is a value if its elements are. It itself might not be rigid.
@@ -3314,7 +3414,7 @@ and Sys :
     let plug rel ~rigid frm sys =
       List.map (Face.plug rel ~rigid frm) sys
 
-    let is_value _ = raise PleaseFillIn
+    let is_value rel = List.for_all (Face.is_value rel)
 
     let force rel sys =
       let force_face face =
@@ -3325,7 +3425,7 @@ and Sys :
       in
       ListUtil.filter_map force_face sys
 
-    let is_rigid _ = raise PleaseFillIn
+    let is_rigid rel = List.for_all (Face.is_rigid rel)
 
     let run_then_force rel sys =
       let run_then_force_face face =
@@ -3429,8 +3529,20 @@ and Face :
 
     let run_then_force rel v = force rel (run rel v)
 
-    let is_value _ = raise PleaseFillIn
-    let is_rigid _ = raise PleaseFillIn
+    let is_value rel (r, r', bdy) =
+      match Rel.equate r r' rel with
+      | `Same ->
+        DelayedLazyX.is_value rel bdy
+      | `Changed rel' ->
+        DelayedLazyX.is_value rel' bdy
+      | `Inconsistent -> false
+
+    let is_rigid rel (r, r', bdy) =
+      match Rel.equate r r' rel with
+      | `Same -> false
+      | `Changed rel' ->
+        DelayedLazyX.is_value rel' bdy
+      | `Inconsistent -> false
   end
 
 (** [Abs (x, a)] is a [rel]-value if [a] is a [(Rel.hide' x rel)]-value. *)
@@ -3476,8 +3588,10 @@ end
       let a_x = X.run rel_x a_x in
       Abs (x, a_x)
 
-    let is_value _ = raise PleaseFillIn
-    let is_rigid _ = raise PleaseFillIn
+    let is_value rel (Abs (x, v)) =
+      X.is_value (Rel.hide' x rel) v
+    let is_rigid rel (Abs (x, v)) =
+      X.is_rigid (Rel.hide' x rel) v
 
     let bind gen =
       let y = Name.fresh () in
@@ -3597,8 +3711,10 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let run rel v = Delayed.with_rel rel v
 
-    let is_value _ = raise PleaseFillIn
-    let is_rigid _ = raise PleaseFillIn
+    let is_value rel v =
+      X.is_value rel (unleash v)
+    let is_rigid rel v =
+      X.is_rigid rel (unleash v)
 
     let make_then_run rel = Delayed.make' (Some rel)
 
@@ -3639,8 +3755,10 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
 
     let run rel v = Delayed.with_rel rel v
 
-    let is_value _ = raise PleaseFillIn
-    let is_rigid _ = raise PleaseFillIn
+    let is_value rel v =
+      X.is_value rel (unleash v)
+    let is_rigid rel v =
+      X.is_rigid rel (unleash v)
 
     let make_then_run rel v = Delayed.make' (Some rel) (lazy v)
 
