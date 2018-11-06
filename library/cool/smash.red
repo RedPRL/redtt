@@ -23,26 +23,25 @@ def flip (X Y : ptype) : smash X Y → smash Y X =
 def flip/involutive (X Y : ptype) : (s : smash X Y) → path (smash X Y) (flip Y X (flip X Y s)) s =
   elim [* → refl]
 
--- versions of glue* that treat (proj (X .snd) (Y .snd)) as the basepoint
-
-def proj/gluel (X Y : ptype) (b : Y .fst)
-  : path (smash X Y) (proj (X .snd) b) (proj (X .snd) (Y .snd)) =
+def pivotl (X Y : ptype) (b b' : Y .fst)
+  : path (smash X Y) (proj (X .snd) b) (proj (X .snd) b') =
   λ i →
-  comp 0 1 (gluel (Y .snd) i) [
+  comp 0 1 (gluel b' i) [
   | i=0 j → gluel b j
   | i=1 → refl
   ]
 
-def proj/gluer (X Y : ptype) (a : X .fst)
-  : path (smash X Y) (proj a (Y .snd)) (proj (X .snd) (Y .snd)) =
+def pivotr (X Y : ptype) (a a' : X .fst)
+  : path (smash X Y) (proj a (Y .snd)) (proj a' (Y .snd)) =
   λ i →
-  comp 0 1 (gluer (X .snd) i) [
+  comp 0 1 (gluer a' i) [
   | i=0 j → gluer a j
   | i=1 → refl
   ]
 
 def proj/coh (X Y : ptype)
-  : path (path (smash X Y) (proj (X .snd) (Y .snd)) (proj (X .snd) (Y .snd))) (proj/gluer X Y (X .snd)) (proj/gluel X Y (Y .snd))
+  : path (path (smash X Y) (proj (X .snd) (Y .snd)) (proj (X .snd) (Y .snd)))
+    (pivotr X Y (X .snd) (X .snd)) (pivotl X Y (Y .snd) (Y .snd))
   =
   let face (k m : dim) : smash X Y =
     comp 1 k (proj (X .snd) (Y .snd)) [
@@ -66,7 +65,6 @@ def proj/coh (X Y : ptype)
     ]
   ]
 
-
 def basel-baser (X Y : ptype) : path (smash X Y) basel baser =
   λ i →
   comp 1 0 (proj (X .snd) (Y .snd)) [
@@ -85,7 +83,7 @@ def rearrange/proj (X Y Z : ptype) (c : Z .fst) : smash X Y → smash (psmash Z 
   | gluer a i → 
     comp 1 0 (proj (proj (Z .snd) (Y .snd)) a) [
     | i=0 k → gluel a k
-    | i=1 k → proj (proj/gluer Z Y c k) a
+    | i=1 k → proj (pivotr Z Y c (Z .snd) k) a
     ]
   ]
 
@@ -98,7 +96,7 @@ def rearrange/gluer (X Y Z : ptype) : (s : smash X Y)
   | proj a b → λ i →
     comp 1 0 (proj (proj (Z .snd) (Y .snd)) a) [
     | i=0 k → gluel a k
-    | i=1 k → proj (proj/gluel Z Y b k) a
+    | i=1 k → proj (pivotl Z Y b (Y .snd) k) a
     ]
   | gluel b j → λ i →
     comp 1 0 (proj (proj (Z .snd) (Y .snd)) (X .snd)) [
@@ -136,4 +134,3 @@ def rearrange (X Y Z : ptype) : smash (psmash X Y) Z → smash (psmash Z Y) X =
   | gluel c i → gluer (proj c (Y .snd)) i
   | gluer s i → rearrange/gluer X Y Z s i
   ]
-
