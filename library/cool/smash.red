@@ -23,21 +23,29 @@ def flip (X Y : ptype) : smash X Y → smash Y X =
 def flip/involutive (X Y : ptype) : (s : smash X Y) → path (smash X Y) (flip Y X (flip X Y s)) s =
   elim [* → refl]
 
-def pivotl (X Y : ptype) (b b' : Y .fst)
-  : path (smash X Y) (proj (X .snd) b) (proj (X .snd) b') =
-  λ i →
-  comp 0 1 (gluel b' i) [
+-- pivot helper functions
+
+def pivotl/filler (X Y : ptype) (b b' : Y .fst) (j i : dim) : smash X Y =
+  comp 0 j (gluel b' i) [
   | i=0 j → gluel b j
   | i=1 → refl
   ]
 
-def pivotr (X Y : ptype) (a a' : X .fst)
-  : path (smash X Y) (proj a (Y .snd)) (proj a' (Y .snd)) =
-  λ i →
-  comp 0 1 (gluer a' i) [
+def pivotl (X Y : ptype) (b b' : Y .fst)
+  : path (smash X Y) (proj (X .snd) b) (proj (X .snd) b')
+  =
+  pivotl/filler X Y b b' 1
+
+def pivotr/filler (X Y : ptype) (a a' : X .fst) (j i : dim) : smash X Y =
+  comp 0 j (gluer a' i) [
   | i=0 j → gluer a j
   | i=1 → refl
   ]
+
+def pivotr (X Y : ptype) (a a' : X .fst)
+  : path (smash X Y) (proj a (Y .snd)) (proj a' (Y .snd))
+  =
+  pivotr/filler X Y a a' 1
 
 def pivot-coh (X Y : ptype)
   : path (path (smash X Y) (proj (X .snd) (Y .snd)) (proj (X .snd) (Y .snd)))
@@ -53,16 +61,8 @@ def pivot-coh (X Y : ptype)
   comp 0 1 (face i j) [
   | i=0 k → face k j
   | i=1 → refl
-  | j=0 k →
-    comp 0 k (gluer (X .snd) i) [
-    | i=0 k → gluer (X .snd) k
-    | i=1 → refl
-    ]
-  | j=1 k →
-    comp 0 k (gluel (Y .snd) i) [
-    | i=0 k → gluel (Y .snd) k
-    | i=1 → refl
-    ]
+  | j=0 k → pivotr/filler X Y (X .snd) (X .snd) k i
+  | j=1 k → pivotl/filler X Y (Y .snd) (Y .snd) k i
   ]
 
 def basel-baser (X Y : ptype) : path (smash X Y) basel baser =
@@ -80,7 +80,7 @@ def rearrange/proj (X Y Z : ptype) (c : Z .fst) : smash X Y → smash (psmash Z 
   | baser → basel
   | proj a b → proj (proj c b) a
   | gluel b i → gluer (proj c b) i
-  | gluer a i → 
+  | gluer a i →
     comp 1 0 (gluel a i) [
     | i=0 → refl
     | i=1 k → proj (pivotr Z Y c (Z .snd) k) a
@@ -104,13 +104,7 @@ def rearrange/gluer (X Y Z : ptype) : (s : smash X Y)
     | i=1 k →
       comp 0 1 (gluer (gluel (Y .snd) k) j) [
       | j=0 m → connection/and (smash (psmash Z Y) X) (λ n → gluer (proj (Z .snd) (Y .snd)) n) k m
-      | j=1 m →
-        proj
-          (comp 0 m (gluel (Y .snd) k) [
-           | k=0 m → gluel b m
-           | k=1 → refl
-           ])
-          (X .snd)
+      | j=1 m → proj (pivotl/filler Z Y b (Y .snd) m k) (X .snd)
       | k=0 m → gluer (gluel b m) j
       | k=1 m → connection/or (smash (psmash Z Y) X) (λ v → gluer (proj (Z .snd) (Y .snd)) v) j m
       ]
