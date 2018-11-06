@@ -67,8 +67,8 @@ def proj/coh (X Y : ptype)
 
 def basel-baser (X Y : ptype) : path (smash X Y) basel baser =
   λ i →
-  comp 1 0 (proj (X .snd) (Y .snd)) [
-  | i=0 j → gluel (Y .snd) j
+  comp 1 0 (gluel (Y .snd) i) [
+  | i=0 → refl
   | i=1 j → gluer (X .snd) j
   ]
 
@@ -81,8 +81,8 @@ def rearrange/proj (X Y Z : ptype) (c : Z .fst) : smash X Y → smash (psmash Z 
   | proj a b → proj (proj c b) a
   | gluel b i → gluer (proj c b) i
   | gluer a i → 
-    comp 1 0 (proj (proj (Z .snd) (Y .snd)) a) [
-    | i=0 k → gluel a k
+    comp 1 0 (gluel a i) [
+    | i=0 → refl
     | i=1 k → proj (pivotr Z Y c (Z .snd) k) a
     ]
   ]
@@ -94,13 +94,13 @@ def rearrange/gluer (X Y Z : ptype) : (s : smash X Y)
   | basel → λ i → basel-baser (psmash Z Y) X i
   | baser → refl
   | proj a b → λ i →
-    comp 1 0 (proj (proj (Z .snd) (Y .snd)) a) [
-    | i=0 k → gluel a k
+    comp 1 0 (gluel a i) [
+    | i=0 → refl
     | i=1 k → proj (pivotl Z Y b (Y .snd) k) a
     ]
   | gluel b j → λ i →
-    comp 1 0 (proj (proj (Z .snd) (Y .snd)) (X .snd)) [
-    | i=0 k → gluel (X .snd) k
+    comp 1 0 (gluel (X .snd) i) [
+    | i=0 k → refl
     | i=1 k →
       comp 0 1 (gluer (gluel (Y .snd) k) j) [
       | j=0 m → connection/and (smash (psmash Z Y) X) (λ n → gluer (proj (Z .snd) (Y .snd)) n) k m
@@ -119,8 +119,8 @@ def rearrange/gluer (X Y Z : ptype) : (s : smash X Y)
     comp 0 1 (connection/and (smash (psmash Z Y) X) (λ n → rearrange/proj X Y Z (Z .snd) (gluer a n)) i j) [
     | ∂[i] | j=0 → refl
     | j=1 k →
-      comp 1 0 (proj (proj (Z .snd) (Y .snd)) a) [
-      | i=0 m → gluel a m
+      comp 1 0 (gluel a i) [
+      | i=0 → refl
       | i=1 m → proj (proj/coh Z Y k m) a
       ]
     ]
