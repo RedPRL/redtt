@@ -67,7 +67,8 @@ def paths-stable→set/alt (A : type) (st : (x y : A) → stable (path A x y)) :
   ).fst
 
 -- 10.1.13
-def suspension-lemma (A : type) (A/prop : is-prop A) : (is-set (susp A)) × (equiv A (path (susp A) north south)) = 
+def suspension-lemma (A : type) (A/prop : is-prop A) : 
+  (is-set (susp A)) × (equiv A (path (susp A) north south)) = 
   let Au (a : A) = ua A unit (prop/unit A A/prop a) in
   let uA (a : A) = symm^1 _ (Au a) in
   let P (s1 s2 : susp A) : type = 
@@ -86,14 +87,22 @@ def suspension-lemma (A : type) (A/prop : is-prop A) : (is-set (susp A)) × (equ
       ]
     | merid a i → 
       let mot (s : susp A) : type^1 =
-        path^1 type (elim s [north → unit | south → A | merid b j → uA b j]) (elim s [ north → A | south → unit | merid b j → Au b j])
-      in
+        path^1 
+          type 
+          (elim s [north → unit | south → A | merid c n → uA c n]) 
+          (elim s [north → A | south → unit | merid c n → Au c n])
+      in 
       elim s2 in mot [ 
       | north → uA a
       | south → Au a
-      | merid b j → λ k → ?merid-hole
+      | merid b j → λ i → 
+        comp 0 1 (connection/both^1 type (uA a) (Au a) i j) [
+        | i=0 k → uA (A/prop a b k) j
+        | i=1 k → Au (A/prop a b k) j
+        | ∂[j] → refl
+        ]
       ] i
-    ] in 
+    ] in
   ?suspension-hole
 
 def choice (X : type) (Y : X → type) : type = (X/set : is-set X) → (Y/set : (x : X) → is-set (Y x)) → ((x : X) → trunc (Y x)) → trunc ((x : X) → Y x)
