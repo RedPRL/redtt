@@ -42,12 +42,12 @@ def proj/gluer (X Y : ptype) (a : X .fst)
   ]
 
 def proj/coh (X Y : ptype)
-  : path (path (smash X Y) (proj (X .snd) (Y .snd)) (proj (X .snd) (Y .snd))) (proj/gluel X Y (Y .snd)) (proj/gluer X Y (X .snd))
+  : path (path (smash X Y) (proj (X .snd) (Y .snd)) (proj (X .snd) (Y .snd))) (proj/gluer X Y (X .snd)) (proj/gluel X Y (Y .snd))
   =
   let face (k m : dim) : smash X Y =
     comp 1 k (proj (X .snd) (Y .snd)) [
-    | m=0 k → gluel (Y .snd) k
-    | m=1 k → gluer (X .snd) k
+    | m=0 k → gluer (X .snd) k
+    | m=1 k → gluel (Y .snd) k
     ]
   in
   λ j i →
@@ -55,82 +55,85 @@ def proj/coh (X Y : ptype)
   | i=0 k → face k j
   | i=1 → refl
   | j=0 k →
-    comp 0 k (gluel (Y .snd) i) [
-    | i=0 k → gluel (Y .snd) k
-    | i=1 → refl
-    ]
-  | j=1 k →
     comp 0 k (gluer (X .snd) i) [
     | i=0 k → gluer (X .snd) k
     | i=1 → refl
     ]
-  ]
-
--- definition of the associator
-
-def associate/proj (X Y Z : ptype) (c : Z .fst) : smash X Y → smash X (psmash Y Z) =
-  elim [
-  | basel → basel
-  | baser → baser
-  | proj a b → proj a (proj b c)
-  | gluel b i → gluel (proj b c) i
-  | gluer a i → 
-    comp 1 0 (proj a (proj (Y .snd) (Z .snd))) [
-    | i=0 k → gluer a k
-    | i=1 k → proj a (proj/gluel Y Z c k)
+  | j=1 k →
+    comp 0 k (gluel (Y .snd) i) [
+    | i=0 k → gluel (Y .snd) k
+    | i=1 → refl
     ]
   ]
 
-def baser-basel (X Y : ptype) : path (smash X Y) baser basel =
+
+def basel-baser (X Y : ptype) : path (smash X Y) basel baser =
   λ i →
   comp 1 0 (proj (X .snd) (Y .snd)) [
-  | i=0 j → gluer (X .snd) j
-  | i=1 j → gluel (Y .snd) j
+  | i=0 j → gluel (Y .snd) j
+  | i=1 j → gluer (X .snd) j
   ]
 
-def associate/gluer (X Y Z : ptype) : (s : smash X Y)
-  → path (smash X (psmash Y Z)) baser (associate/proj X Y Z (Z .snd) s)
+-- definition of rearrange
+
+def rearrange/proj (X Y Z : ptype) (c : Z .fst) : smash X Y → smash (psmash Z Y) X =
+  elim [
+  | basel → baser
+  | baser → basel
+  | proj a b → proj (proj c b) a
+  | gluel b i → gluer (proj c b) i
+  | gluer a i → 
+    comp 1 0 (proj (proj (Z .snd) (Y .snd)) a) [
+    | i=0 k → gluel a k
+    | i=1 k → proj (proj/gluer Z Y c k) a
+    ]
+  ]
+
+def rearrange/gluer (X Y Z : ptype) : (s : smash X Y)
+  → path (smash (psmash Z Y) X) basel (rearrange/proj X Y Z (Z .snd) s)
   =
   elim [
-  | basel → λ i → baser-basel X (psmash Y Z) i
+  | basel → λ i → basel-baser (psmash Z Y) X i
   | baser → refl
   | proj a b → λ i →
-    comp 1 0 (proj a (proj (Y .snd) (Z .snd))) [
-    | i=0 k → gluer a k
-    | i=1 k → proj a (proj/gluer Y Z b k)
+    comp 1 0 (proj (proj (Z .snd) (Y .snd)) a) [
+    | i=0 k → gluel a k
+    | i=1 k → proj (proj/gluel Z Y b k) a
     ]
   | gluel b j → λ i →
-    comp 1 0 (proj (X .snd) (proj (Y .snd) (Z .snd))) [
-    | i=0 k → gluer (X .snd) k
+    comp 1 0 (proj (proj (Z .snd) (Y .snd)) (X .snd)) [
+    | i=0 k → gluel (X .snd) k
     | i=1 k →
-      comp 0 1 (gluel (gluer (Y .snd) k) j) [
-      | j=0 m → connection/and (smash X (psmash Y Z)) (λ n → gluel (proj (Y .snd) (Z .snd)) n) k m
+      comp 0 1 (gluer (gluel (Y .snd) k) j) [
+      | j=0 m → connection/and (smash (psmash Z Y) X) (λ n → gluer (proj (Z .snd) (Y .snd)) n) k m
       | j=1 m →
-        proj (X .snd)
-          (comp 0 m (gluer (Y .snd) k) [
-           | k=0 m → gluer b m
+        proj
+          (comp 0 m (gluel (Y .snd) k) [
+           | k=0 m → gluel b m
            | k=1 → refl
            ])
-      | k=0 m → gluel (gluer b m) j
-      | k=1 m → connection/or (smash X (psmash Y Z)) (λ v → gluel (proj (Y .snd) (Z .snd)) v) j m
+          (X .snd)
+      | k=0 m → gluer (gluel b m) j
+      | k=1 m → connection/or (smash (psmash Z Y) X) (λ v → gluer (proj (Z .snd) (Y .snd)) v) j m
       ]
     ]
   | gluer a j → λ i →
-    comp 0 1 (connection/and (smash X (psmash Y Z)) (λ n → associate/proj X Y Z (Z .snd) (gluer a n)) i j) [
+    comp 0 1 (connection/and (smash (psmash Z Y) X) (λ n → rearrange/proj X Y Z (Z .snd) (gluer a n)) i j) [
     | ∂[i] | j=0 → refl
     | j=1 k →
-      comp 1 0 (proj a (proj (Y .snd) (Z .snd))) [
-      | i=0 m → gluer a m
-      | i=1 m → proj a (proj/coh Y Z k m)
+      comp 1 0 (proj (proj (Z .snd) (Y .snd)) a) [
+      | i=0 m → gluel a m
+      | i=1 m → proj (proj/coh Z Y k m) a
       ]
     ]
   ]
 
-def associate (X Y Z : ptype) : smash (psmash X Y) Z → smash X (psmash Y Z) =
+def rearrange (X Y Z : ptype) : smash (psmash X Y) Z → smash (psmash Z Y) X =
   elim [
-  | basel → basel
-  | baser → baser
-  | proj s c → associate/proj X Y Z c s
-  | gluel c i → gluel (proj (Y .snd) c) i
-  | gluer s i → associate/gluer X Y Z s i
+  | basel → baser
+  | baser → basel
+  | proj s c → rearrange/proj X Y Z c s
+  | gluel c i → gluer (proj c (Y .snd)) i
+  | gluer s i → rearrange/gluer X Y Z s i
   ]
+
