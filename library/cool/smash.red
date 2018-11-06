@@ -39,7 +39,7 @@ def pivotr (X Y : ptype) (a a' : X .fst)
   | i=1 → refl
   ]
 
-def proj/coh (X Y : ptype)
+def pivot-coh (X Y : ptype)
   : path (path (smash X Y) (proj (X .snd) (Y .snd)) (proj (X .snd) (Y .snd)))
     (pivotr X Y (X .snd) (X .snd)) (pivotl X Y (Y .snd) (Y .snd))
   =
@@ -121,7 +121,7 @@ def rearrange/gluer (X Y Z : ptype) : (s : smash X Y)
     | j=1 k →
       comp 1 0 (gluel a i) [
       | i=0 → refl
-      | i=1 m → proj (proj/coh Z Y k m) a
+      | i=1 m → proj (pivot-coh Z Y k m) a
       ]
     ]
   ]
