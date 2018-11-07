@@ -54,6 +54,12 @@ struct
     | Snoc (xs, x) ->
       p x && (for_all[@tailcall]) p xs
 
+  let rec iter p xs =
+    match xs with
+    | Emp -> ()
+    | Snoc (xs, x) ->
+      p x; (iter[@tailcall]) p xs
+
   let rec length =
     function
     | Emp -> 0

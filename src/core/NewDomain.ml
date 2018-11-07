@@ -248,8 +248,8 @@ sig
   val run : rel -> t -> t
 
   (** the debugging interface *)
-  val is_value : rel -> t -> bool
-  val is_rigid : rel -> t -> bool
+  val assert_value : string -> rel -> t -> unit
+  val assert_rigid : string -> rel -> t -> unit
 
   (* TODO: this should not take a 'rel'. [pp] is meant to be simple-minded. *)
   val pp : t Pp.t0
@@ -707,7 +707,12 @@ struct
 end
 
 (** Everything in dim is a value. *)
-and Dim : Domain with type t = dim =
+and Dim :
+sig
+  include Domain with type t = dim
+
+  val assert_unequal : string -> rel -> dim -> dim -> unit
+end =
 struct
   type t = dim
 
@@ -726,8 +731,15 @@ struct
 
   let run _ r = r
 
-  let is_value _ _ = true
-  let is_rigid _ _ = true
+  let assert_value _ _ _ = ()
+  let assert_rigid _ _ _ = ()
+
+  let assert_unequal msg rel r r' =
+    match Rel.compare r r' rel with
+    | `Same ->
+      Format.eprintf "[%s] the assertion %a≠%a fails.@." msg Dim.pp r Dim.pp r';
+      assert false
+    | _ -> ()
 end
 
 (** A prevalue in [clo] is a value if its environment is a value. *)
@@ -755,8 +767,8 @@ struct
   let run rel (Clo clo) =
     Clo {clo with env = Env.run rel clo.env}
 
-  let is_value rel (Clo {env; _}) = Env.is_value rel env
-  let is_rigid = is_value
+  let assert_value msg rel (Clo {env; _}) = Env.assert_value msg rel env
+  let assert_rigid = assert_value
 
   let name (Clo {bnd = Tm.B (nm, _); _}) = nm
 
@@ -790,8 +802,8 @@ struct
   let run rel (NClo nclo) =
     NClo {nclo with env = Env.run rel nclo.env}
 
-  let is_value rel (NClo {env; _}) = Env.is_value rel env
-  let is_rigid = is_value
+  let assert_value msg rel (NClo {env; _}) = Env.assert_value msg rel env
+  let assert_rigid = assert_value
 
   let names (NClo {bnd = Tm.NB (nms, _); _}) = nms
 
@@ -828,8 +840,8 @@ struct
   let run rel (ExtClo clo) =
     ExtClo {clo with env = Env.run rel clo.env}
 
-  let is_value rel (ExtClo {env; _}) = Env.is_value rel env
-  let is_rigid = is_value
+  let assert_value msg rel (ExtClo {env; _}) = Env.assert_value msg rel env
+  let assert_rigid = assert_value
 
   let names (ExtClo {bnd = Tm.NB (nms, _); _}) = nms
 
@@ -885,11 +897,11 @@ struct
     | `Dim _ as c -> c
     | `Val v -> `Val (LazyVal.run rel v)
 
-  let is_value rel =
+  let assert_value msg rel =
     function
-    | `Dim r -> Dim.is_value rel r
-    | `Val v -> LazyVal.is_value rel v
-  let is_rigid = is_value
+    | `Dim r -> Dim.assert_value msg rel r
+    | `Val v -> LazyVal.assert_value msg rel v
+  let assert_rigid = assert_value
 end
 
 and ConstrCell :
@@ -935,8 +947,8 @@ struct
     | `Rec (`Self, v) -> `Rec (`Self, Val.run rel v)
     | `Dim _ as c -> c
 
-  let is_value _ = raise CanJonHelpMe
-  let is_rigid _ = raise CanJonHelpMe
+  let assert_value _ = raise CanJonHelpMe
+  let assert_rigid _ = raise CanJonHelpMe
 end
 
 (** An environment is a value if every cell of it is. *)
@@ -969,8 +981,8 @@ struct
   let run rel env =
     {env with cells = Bwd.map (Cell.run rel) env.cells}
 
-  let is_value rel {cells; _} = Bwd.for_all (Cell.is_value rel) cells
-  let is_rigid rel {cells; _} = Bwd.for_all (Cell.is_rigid rel) cells
+  let assert_value msg rel {cells; _} = Bwd.iter (Cell.assert_value msg rel) cells
+  let assert_rigid msg rel {cells; _} = Bwd.iter (Cell.assert_rigid msg rel) cells
 
   let init globals = {globals = globals; cells = Emp}
 
@@ -1777,6 +1789,7 @@ struct
 
     | HCom {r; r'; ty = `Pos; cap; sys}, Cap _ ->
       frm, Val.unleash cap,
+      ConFace.make rel r r' (fun rel -> Val.run_then_unleash rel cap) @
       ConSys.foreach_make rel sys @@ fun s s' abs rel ->
       make_coe rel s' s ~abs:(LazyValAbs.unleash abs) (Val.make hd)
 
@@ -1955,7 +1968,7 @@ struct
             ConAbs.bind @@ fun y ->
             (* XXX FIXME This is not the most efficient code because we know what [cap_frame]
              * will reduce to, but maybe we can afford this? *)
-            Con.plug rel ~rigid:true cap_frame @@ hcom_template rel y (LazyValAbs.inst_then_unleash rel abs s')
+            Con.plug rel ~rigid:false cap_frame @@ hcom_template rel y (LazyValAbs.inst_then_unleash rel abs s')
           in
           let diag =
             ConAbsFace.make rel r r' @@ fun rel ->
@@ -2159,7 +2172,7 @@ struct
         | false ->
           let el0 = Val.make @@ make_coe rel0 r r' ~abs:abs0 @@ Val.run rel0 cap in
           let el1 = Val.make @@
-            let cap = Val.plug rel ~rigid:true (Frame.run rel @@ Frame.subst r x vproj_frame_x) cap in
+            let cap = Val.plug rel ~rigid:false (Frame.run rel @@ Frame.subst r x vproj_frame_x) cap in
             let sys =
               let face0 =
                 info.r, `Dim0,
@@ -2604,102 +2617,91 @@ struct
     | _ ->
       raise PleaseRaiseProperError
 
-  let is_value rel =
+  let assert_value msg rel =
     function
     | Pi quant ->
-      Quantifier.is_value rel quant
+      Quantifier.assert_value msg rel quant
 
     | Sg quant ->
-      Quantifier.is_value rel quant
+      Quantifier.assert_value msg rel quant
 
     | Ext extclo ->
-      ExtClo.is_value rel extclo
+      ExtClo.assert_value msg rel extclo
 
     | Restrict face ->
-      ConFace.is_value rel face (* can be a true face, but not an inconsistent one. *)
+      ConFace.assert_value msg rel face (* can be a true face, but not an inconsistent one. *)
 
     | Lam clo ->
-      Clo.is_value rel clo
+      Clo.assert_value msg rel clo
 
     | Cons (v0, v1) ->
-      Val.is_value rel v0 && Val.is_value rel v1
+      Val.assert_value msg rel v0;
+      Val.assert_value msg rel v1
 
     | ExtLam nclo ->
-      NClo.is_value rel nclo
+      NClo.assert_value msg rel nclo
 
     | RestrictThunk face ->
-      ConFace.is_value rel face (* can be a true face, but not an inconsistent one. *)
+      ConFace.assert_value msg rel face (* can be a true face, but not an inconsistent one. *)
 
     | Coe {r; r'; ty; cap} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Rel.compare r r' rel <> `Same &&
-      CoeShape.is_value rel ty &&
-      Val.is_value rel cap
+      Dim.assert_unequal msg rel r r';
+      CoeShape.assert_value msg rel ty;
+      Val.assert_value msg rel cap
 
     | HCom {r; r'; ty; cap; sys} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Rel.compare r r' rel <> `Same &&
-      HComShape.is_value rel ty &&
-      Val.is_value rel cap &&
-      ConAbsSys.is_rigid rel sys
+      Dim.assert_unequal msg rel r r';
+      HComShape.assert_value msg rel ty;
+      Val.assert_value msg rel cap;
+      ConAbsSys.assert_rigid msg rel sys
 
     | Com {r; r'; ty; cap; sys} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Rel.compare r r' rel <> `Same &&
-      ComShape.is_value rel ty &&
-      Val.is_value rel cap &&
-      ConAbsSys.is_rigid rel sys
+      Dim.assert_unequal msg rel r r';
+      ComShape.assert_value msg rel ty;
+      Val.assert_value msg rel cap;
+      ConAbsSys.assert_rigid msg rel sys
 
     | GHCom {r; r'; ty; cap; sys} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Rel.compare r r' rel <> `Same &&
-      HComShape.is_value rel ty &&
-      Val.is_value rel cap &&
-      ConAbsSys.is_rigid rel sys
+      Dim.assert_unequal msg rel r r';
+      HComShape.assert_value msg rel ty;
+      Val.assert_value msg rel cap;
+      ConAbsSys.assert_rigid msg rel sys
 
     | GCom {r; r'; ty; cap; sys} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Rel.compare r r' rel <> `Same &&
-      ComShape.is_value rel ty &&
-      Val.is_value rel cap &&
-      ConAbsSys.is_rigid rel sys
+      Dim.assert_unequal msg rel r r';
+      ComShape.assert_value msg rel ty;
+      Val.assert_value msg rel cap;
+      ConAbsSys.assert_rigid msg rel sys
 
-    | Univ _ -> true
+    | Univ _ -> ()
 
     | V {r; ty0; ty1; equiv} ->
       begin
         match Rel.equate r `Dim0 rel with
         | `Changed rel0 ->
-          Val.is_value rel0 ty0 &&
-          Val.is_value rel ty1 &&
-          Val.is_value rel0 equiv
-        | _ -> false
+          Val.assert_value msg rel0 ty0;
+          Val.assert_value msg rel ty1;
+          Val.assert_value msg rel0 equiv
+        | _ -> assert false
       end
 
     | VIn {r; el0; el1} ->
       begin
         match Rel.equate r `Dim0 rel with
         | `Changed rel0 ->
-          Val.is_value rel0 el0 &&
-          Val.is_value rel el1
-        | _ -> false
+          Val.assert_value msg rel0 el0;
+          Val.assert_value msg rel el1
+        | _ -> assert false
       end
 
     | Box {r; r'; cap; sys} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Rel.compare r r' rel <> `Same &&
-      Val.is_value rel cap &&
-      ConSys.is_rigid rel sys
+      Dim.assert_unequal msg rel r r';
+      Val.assert_value msg rel cap;
+      ConSys.assert_rigid msg rel sys
 
     | Neu {ty; neu} ->
-      Val.is_value rel ty &&
-      Neutroid.is_value rel neu
+      Val.assert_value msg rel ty;
+      Neutroid.assert_value msg rel neu
 
     | Data info ->
       raise CanJonHelpMe
@@ -2707,9 +2709,9 @@ struct
     | Intro info ->
       raise CanJonHelpMe
 
-    | FortyTwo -> false (* FortyTwo is never a (pre)value! *)
+    | FortyTwo -> assert false (* FortyTwo is never a (pre)value! *)
 
-  let is_rigid = is_value
+  let assert_rigid = assert_value
 end
 
 and Val : DelayedDomainPlug
@@ -2773,12 +2775,12 @@ struct
     | `Sg abs -> `Sg (QAbs.run rel abs)
     | `Ext abs -> `Ext (ECloAbs.run rel abs)
 
-  let is_value rel =
+  let assert_value msg rel =
     function
-    | `Pi abs -> QAbs.is_value rel abs
-    | `Sg abs -> QAbs.is_value rel abs
-    | `Ext abs -> ECloAbs.is_value rel abs
-  let is_rigid = is_value
+    | `Pi abs -> QAbs.assert_value msg rel abs
+    | `Sg abs -> QAbs.assert_value msg rel abs
+    | `Ext abs -> ECloAbs.assert_value msg rel abs
+  let assert_rigid = assert_value
 
   let to_abs =
     function
@@ -2821,13 +2823,13 @@ struct
     | `Ext clo -> `Ext (ExtClo.run rel clo)
     | `Pos -> `Pos
 
-  let is_value rel =
+  let assert_value msg rel =
     function
-    | `Pi abs -> Q.is_value rel abs
-    | `Sg abs -> Q.is_value rel abs
-    | `Ext clo -> ExtClo.is_value rel clo
-    | `Pos -> true
-  let is_rigid = is_value
+    | `Pi abs -> Q.assert_value msg rel abs
+    | `Sg abs -> Q.assert_value msg rel abs
+    | `Ext clo -> ExtClo.assert_value msg rel clo
+    | `Pos -> ()
+  let assert_rigid = assert_value
 end
 
 and ComShape :
@@ -2860,10 +2862,11 @@ struct
     let cod = Clo.run rel cod in
     {dom; cod}
 
-  let is_value rel {dom; cod} =
-    Val.is_value rel dom && Clo.is_value rel cod
+  let assert_value msg rel {dom; cod} =
+    Val.assert_value msg rel dom;
+    Clo.assert_value msg rel cod
 
-  let is_rigid = is_value
+  let assert_rigid = assert_value
 end
 
 (* A [neutroid] is a value if the system is value. A [neutroid] is rigid
@@ -2919,17 +2922,17 @@ struct
 
   let plug rel ~rigid frm {neu; sys} =
     if rigid then
-      {neu = DelayedNeu.plug ~rigid rel frm neu;
-       sys = ConSys.plug ~rigid rel frm sys}
+      {neu = DelayedNeu.plug rel ~rigid frm neu;
+       sys = ConSys.plug rel ~rigid frm sys}
     else
       (* even though we can check whether [frm] is really non-rigid,
        * it should be an invariant that the argument [rigid] is always [true]. *)
       raise PleaseRaiseProperError
 
-  let is_value rel {neu; sys} =
-    DelayedNeu.is_rigid rel neu &&
-    ConSys.is_rigid rel sys
-  let is_rigid = is_value
+  let assert_value msg rel {neu; sys} =
+    DelayedNeu.assert_rigid msg rel neu;
+    ConSys.assert_rigid msg rel sys
+  let assert_rigid = assert_value
 
   let reflect_head rel ~ty head sys =
     match ConSys.run_then_force rel sys with
@@ -2971,12 +2974,12 @@ struct
        * it should be an invariant that the argument [rigid] is always [true]. *)
       raise PleaseRaiseProperError
 
-  let is_value rel {head; frames} =
-    Head.is_value rel head &&
-    Bwd.for_all (Frame.is_value rel) frames
-  let is_rigid rel {head; frames} =
-    Head.is_rigid rel head &&
-    Bwd.for_all (Frame.is_rigid rel) frames
+  let assert_value msg rel {head; frames} =
+    Head.assert_value msg rel head;
+    Bwd.iter (Frame.assert_value msg rel) frames
+  let assert_rigid msg rel {head; frames} =
+    Head.assert_rigid msg rel head;
+    Bwd.iter (Frame.assert_rigid msg rel) frames
 end
 
 and DelayedNeu : DelayedDomainPlug with type u = neu and type t = neu Delayed.t =
@@ -3076,45 +3079,33 @@ struct
          cap = Val.subst r x info.cap;
          sys = ConAbsSys.subst r x info.sys}
 
-  let is_value rel =
+  let assert_value msg rel =
     function
-    | Lvl _ -> true
-    | Var _ -> true
-    | Meta _ -> true
+    | Lvl _ | Var _ | Meta _ -> ()
     | NCoe {r; r'; ty; cap} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      NeutroidAbs.is_value rel ty &&
-      Val.is_value rel cap
+      NeutroidAbs.assert_value msg rel ty;
+      Val.assert_value msg rel cap
     | NCoeData _ ->
       raise CanJonHelpMe
     | NHCom {r; r'; ty; cap; sys} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Neutroid.is_value rel ty &&
-      Val.is_value rel cap &&
-      ConAbsSys.is_value rel sys
+      Neutroid.assert_value msg rel ty;
+      Val.assert_value msg rel cap;
+      ConAbsSys.assert_value msg rel sys
 
-  let is_rigid rel =
+  let assert_rigid msg rel =
     function
-    | Lvl _ -> true
-    | Var _ -> true
-    | Meta _ -> true
+    | Lvl _ | Var _ | Meta _ -> ()
     | NCoe {r; r'; ty; cap} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Rel.compare r r' rel <> `Same &&
-      NeutroidAbs.is_value rel ty &&
-      Val.is_value rel cap
+      Dim.assert_unequal msg rel r r';
+      NeutroidAbs.assert_value msg rel ty;
+      Val.assert_value msg rel cap
     | NCoeData _ ->
       raise CanJonHelpMe
     | NHCom {r; r'; ty; cap; sys} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Rel.compare r r' rel <> `Same &&
-      Neutroid.is_value rel ty &&
-      Val.is_value rel cap &&
-      ConAbsSys.is_value rel sys
+      Dim.assert_unequal msg rel r r';
+      Neutroid.assert_value msg rel ty;
+      Val.assert_value msg rel cap;
+      ConAbsSys.assert_value msg rel sys
 end
 
 and TypedVal :
@@ -3142,10 +3133,10 @@ struct
     {ty = Option.map (Val.subst r x) ty;
      value = Val.subst r x value}
 
-  let is_value rel {ty; value} =
-    Val.is_value rel value &&
-    match ty with Some ty -> Val.is_value rel ty | None -> true
-  let is_rigid = is_value
+  let assert_value msg rel {ty; value} =
+    Val.assert_value msg rel value;
+    Option.iter (Val.assert_value msg rel) ty
+  let assert_rigid = assert_value
 
   let make v = {ty = None; value = v}
   let drop_ty {value = v; _} = v
@@ -3198,8 +3189,8 @@ struct
       Format.fprintf fmt "restrict-force"
     | VProj {r; func} ->
       Format.fprintf fmt "@[<hov1>(vproj@ %a@ %a)@]" Dim.pp r TypedVal.pp func
-    | Cap _ ->
-      Format.fprintf fmt "<cap-frame>"
+    | Cap {r; r'; ty; sys} ->
+      Format.fprintf fmt "@[<hov1>(cap %a %a@ %a@ %a)@]" Dim.pp r Dim.pp r' Val.pp ty ConAbsSys.pp sys
     | Elim _ ->
       Format.fprintf fmt "<elim>"
 
@@ -3289,21 +3280,19 @@ struct
          mot = Clo.run rel info.mot;
          clauses = flip List.map info.clauses @@ fun (lbl, nclo) -> lbl, NClo.run rel nclo}
 
-  let is_value rel =
+  let assert_value msg rel =
     function
-    | FunApp arg -> TypedVal.is_value rel arg
-    | Fst | Snd | ExtApp _ | RestrictForce -> true
+    | FunApp arg -> TypedVal.assert_value msg rel arg
+    | Fst | Snd | ExtApp _ | RestrictForce -> ()
     | VProj info ->
       begin
         match Rel.equate' info.r `Dim0 rel with
-        | rel -> TypedVal.is_value rel info.func
-        | exception I.Inconsistent -> true
+        | rel -> TypedVal.assert_value msg rel info.func
+        | exception I.Inconsistent -> ()
       end
     | Cap {r; r'; ty; sys} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Val.is_value rel ty &&
-      ConAbsSys.is_value rel sys
+      Val.assert_value msg rel ty;
+      ConAbsSys.assert_value msg rel sys
     | Elim info ->
       raise CanJonHelpMe
 
@@ -3345,21 +3334,19 @@ struct
             `Triv (Con.make_coe rel r' r ~abs @@ Val.make hd)
       end
 
-  let is_rigid rel =
+  let assert_rigid msg rel =
     function
-    | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce as frm -> is_value rel frm
+    | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce as frm -> assert_value msg rel frm
     | VProj info ->
       begin
         match Rel.equate info.r `Dim0 rel with
-        | `Changed rel -> TypedVal.is_value rel info.func
-        | _ -> false
+        | `Changed rel -> TypedVal.assert_value msg rel info.func
+        | _ -> assert false
       end
     | Cap {r; r'; ty; sys} ->
-      Dim.is_value rel r &&
-      Dim.is_value rel r' &&
-      Rel.compare r r' rel <> `Same &&
-      Val.is_value rel ty &&
-      ConAbsSys.is_value rel sys
+      Dim.assert_unequal msg rel r r';
+      Val.assert_value msg rel ty;
+      ConAbsSys.assert_value msg rel sys
     | Elim info ->
       raise CanJonHelpMe
 end
@@ -3414,7 +3401,7 @@ and Sys :
     let plug rel ~rigid frm sys =
       List.map (Face.plug rel ~rigid frm) sys
 
-    let is_value rel = List.for_all (Face.is_value rel)
+    let assert_value msg rel = List.iter (Face.assert_value msg rel)
 
     let force rel sys =
       let force_face face =
@@ -3425,7 +3412,7 @@ and Sys :
       in
       ListUtil.filter_map force_face sys
 
-    let is_rigid rel = List.for_all (Face.is_rigid rel)
+    let assert_rigid msg rel = List.iter (Face.assert_rigid msg rel)
 
     let run_then_force rel sys =
       let run_then_force_face face =
@@ -3529,20 +3516,21 @@ and Face :
 
     let run_then_force rel v = force rel (run rel v)
 
-    let is_value rel (r, r', bdy) =
+    let assert_value msg rel (r, r', bdy) =
       match Rel.equate r r' rel with
       | `Same ->
-        DelayedLazyX.is_value rel bdy
+        DelayedLazyX.assert_value msg rel bdy
       | `Changed rel' ->
-        DelayedLazyX.is_value rel' bdy
-      | `Inconsistent -> false
+        DelayedLazyX.assert_value msg rel' bdy
+      | `Inconsistent ->
+        Format.eprintf "[%s/Face] false %a %a %a.@." msg Dim.pp r Dim.pp r' DelayedLazyX.pp bdy;
+        assert false
 
-    let is_rigid rel (r, r', bdy) =
+    let assert_rigid msg rel (r, r', bdy) =
       match Rel.equate r r' rel with
-      | `Same -> false
       | `Changed rel' ->
-        DelayedLazyX.is_value rel' bdy
-      | `Inconsistent -> false
+        DelayedLazyX.assert_value msg rel' bdy
+      | `Same | `Inconsistent -> assert false
   end
 
 (** [Abs (x, a)] is a [rel]-value if [a] is a [(Rel.hide' x rel)]-value. *)
@@ -3588,10 +3576,10 @@ end
       let a_x = X.run rel_x a_x in
       Abs (x, a_x)
 
-    let is_value rel (Abs (x, v)) =
-      X.is_value (Rel.hide' x rel) v
-    let is_rigid rel (Abs (x, v)) =
-      X.is_rigid (Rel.hide' x rel) v
+    let assert_value msg rel (Abs (x, v)) =
+      X.assert_value msg (Rel.hide' x rel) v
+    let assert_rigid msg rel (Abs (x, v)) =
+      X.assert_rigid msg (Rel.hide' x rel) v
 
     let bind gen =
       let y = Name.fresh () in
@@ -3711,10 +3699,10 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let run rel v = Delayed.with_rel rel v
 
-    let is_value rel v =
-      X.is_value rel (unleash v)
-    let is_rigid rel v =
-      X.is_rigid rel (unleash v)
+    let assert_value msg rel v =
+      X.assert_value msg rel (unleash v)
+    let assert_rigid msg rel v =
+      X.assert_rigid msg rel (unleash v)
 
     let make_then_run rel = Delayed.make' (Some rel)
 
@@ -3755,10 +3743,10 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
 
     let run rel v = Delayed.with_rel rel v
 
-    let is_value rel v =
-      X.is_value rel (unleash v)
-    let is_rigid rel v =
-      X.is_rigid rel (unleash v)
+    let assert_value msg rel v =
+      X.assert_value msg rel (unleash v)
+    let assert_rigid msg rel v =
+      X.assert_rigid msg rel (unleash v)
 
     let make_then_run rel v = Delayed.make' (Some rel) (lazy v)
 
