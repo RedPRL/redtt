@@ -2,7 +2,6 @@ open Domain
 open RedBasis
 open Bwd
 open BwdNotation
-open Name
 
 module D = Domain
 
@@ -400,12 +399,12 @@ struct
       if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
         Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift}, stk
       else
-        failwith @@ "global variable name mismatch: " ^ to_string info0.name ^ " <> " ^ to_string info1.name
+        failwith @@ "global variable name mismatch: " ^ Name.to_string info0.name ^ " <> " ^ Name.to_string info1.name
     | Meta meta0, Meta meta1 ->
       if meta0.name = meta1.name && meta0.ushift = meta1.ushift then
         Tm.Meta {name = meta0.name; ushift = meta0.ushift}, stk
       else
-        failwith @@ "global variable name mismatch: " ^ to_string meta0.name ^ " <> " ^ to_string meta1.name
+        failwith @@ "global variable name mismatch: " ^ Name.to_string meta0.name ^ " <> " ^ Name.to_string meta1.name
 
     | NHComAtType info0, NHComAtType info1 ->
       let tr, tr' = equate_dir env info0.dir info1.dir in
