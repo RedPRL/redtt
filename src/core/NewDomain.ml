@@ -755,8 +755,10 @@ struct
   type t = clo
 
 
-  let pp fmt _ =
-    Format.fprintf fmt "<clo>"
+  let pp fmt (Clo {bnd; env}) =
+    match env.cells with
+    | Emp -> Format.fprintf fmt "%a" Tm.pp0_bnd bnd
+    | _ -> Format.fprintf fmt "(%a %a)" Tm.pp0_bnd bnd Env.pp env
 
   let swap pi (Clo clo) =
     Clo {clo with env = Env.swap pi clo.env}
@@ -1063,8 +1065,8 @@ struct
       Format.fprintf fmt "<ext>"
     | Restrict _ ->
       Format.fprintf fmt "<restrict>"
-    | Lam _ ->
-      Format.fprintf fmt "<lam>"
+    | Lam clo ->
+      Format.fprintf fmt "@[<hov1>(lam %a)@]" Clo.pp clo
     | Cons (el0, el1) ->
       Format.fprintf fmt "@[<hov1>(cons@ %a@ %a)@]" Val.pp el0 Val.pp el1
     | ExtLam nclo ->
@@ -1786,7 +1788,7 @@ struct
       let arr_ty = make_arr rel ty0 ty1 in
       let face0 =
         ConFace.make rel info.r `Dim0 @@ fun rel ->
-        Val.plug_then_unleash rel ~rigid:true (FunApp (TypedVal.make @@ Val.make hd)) info.func.value
+        Val.plug_then_unleash rel ~rigid:true (FunApp (TypedVal.make @@ Val.make_then_run rel hd)) info.func.value
       in
       let face1 = ConFace.make rel info.r `Dim1 @@ fun rel -> Con.run rel hd in
       VProj {info with func = {info.func with ty = Some (Val.make arr_ty)}}, Val.unleash ty1, face0 @ face1
@@ -2179,17 +2181,17 @@ struct
             let cap = Val.plug rel ~rigid:false (Frame.run rel @@ Frame.subst r x vproj_frame_x) cap in
             let sys =
               let face0 =
-                info.r, `Dim0,
-                LazyValAbs.bind @@ fun y ->
+                ConAbsFace.make rel info.r `Dim0 @@ fun rel0 ->
+                ConAbs.bind @@ fun y ->
                 let arg_y = Val.make @@ make_coe rel0 r y ~abs:(ConAbs.run rel0 abs0) @@ Val.run rel0 cap in
                 Val.plug_then_unleash rel0 ~rigid:true (FunApp (TypedVal.make arg_y)) info.equiv
               in
               let face1 =
-                info.r, `Dim1,
-                LazyValAbs.bind @@ fun y ->
+                ConAbsFace.make rel info.r `Dim1 @@ fun rel1 ->
+                ConAbs.bind @@ fun y ->
                 make_coe rel1 r y ~abs:(ConAbs.run rel1 abs1) @@ Val.run rel1 cap
               in
-              [face0; face1]
+              face0 @ face1
             in
             rigid_com rel r r' ~abs:abs1 ~cap ~sys
           in
@@ -2916,13 +2918,13 @@ struct
      sys = ConSys.swap pi sys}
 
   let run rel {neu; sys} =
-    (* The system needs to be forced first. The invariant is that
-     * if [sys] is rigid, it is safe to run neu *)
     let sys = ConSys.run rel sys in
     let neu = DelayedNeu.run rel neu in
     {neu; sys}
 
   let force rel {neu; sys} =
+    (* The system needs to be forced first. The invariant is that
+     * if [sys] is rigid, it is safe to run neu *)
     let sys =
       try
         ConSys.force rel sys
