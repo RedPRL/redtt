@@ -101,6 +101,13 @@ module ConSys = D.Sys (D.Con)
 module ConAbsSys = D.Sys (D.AbsPlug (D.Con))
 
 
+let equate_tycon cx = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx)
+let equiv_tycon cx ty0 ty1 = ignore @@ equate_tycon cx ty0 ty1
+
+let equate_val cx = Q.equate_val (Cx.qenv cx) (Cx.rel cx)
+
+let equate_tycon_abs_sys cx = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx)
+
 let quote_ty cx vty =
   Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vty vty
 
@@ -205,9 +212,9 @@ struct
       let cx_r0 = Cx.restrict_ cx r `Dim0 in
       let func = D.Val.plug (Cx.rel cx_r0) ~rigid:true D.Fst equiv in
       let func_ty = D.Con.make_arr (Cx.rel cx_r0) (D.Val.make ty0) (D.Val.make ty1) in
-      let ty0 = Q.equate_tycon (Cx.qenv cx_r0) (Cx.rel cx_r0) ty0 ty0 in
-      let ty1 = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty1 ty1 in
-      let tfunc = Q.equate_val (Cx.qenv cx_r0) (Cx.rel cx_r0) func_ty func func in
+      let ty0 = equate_tycon cx_r0 ty0 ty0 in
+      let ty1 = equate_tycon cx ty1 ty1 in
+      let tfunc = equate_val cx_r0 func_ty func func in
       let tr = Q.quote_dim (Cx.qenv cx) r in
       let frm = Tm.VProj {r = tr; ty0; ty1; func = tfunc} in
       let vproj = cmd @< frm in
@@ -539,7 +546,7 @@ and check_neg cx ty sys tm =
         let tr' = Q.quote_dim (Cx.qenv cx) fhcom.r' in
         let cap =
           let tty_cap = quote_ty cx @@ D.Val.unleash fhcom.cap in
-          let tty_sys = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) fhcom.sys fhcom.sys in
+          let tty_sys = equate_tycon_abs_sys cx fhcom.sys fhcom.sys in
           let cap_frm = Tm.Cap {r = tr; r' = tr'; ty = tty_cap; sys = tty_sys} in
           Tm.up @@ cmd @< cap_frm
         in
@@ -955,15 +962,15 @@ and synth_stack cx vhd ty stk  =
       match D.Rel.compare r r' (Cx.rel cx) with
       | `Same ->
         (* check the cap *)
-        let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vcap ty in
+        let _ = equate_tycon cx vcap ty in
         synth_stack cx vhd ty stk
 
       | _ ->
         let check_rigid vsys =
           match ty with
           | D.HCom ({ty = `Pos; _} as fhcom) ->
-            let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) vcap (D.Val.unleash fhcom.cap) in
-            let _ = Q.equate_tycon_abs_sys (Cx.qenv cx) (Cx.rel cx) vsys fhcom.sys in
+            let _ = equate_tycon cx vcap (D.Val.unleash fhcom.cap) in
+            let _ = equate_tycon_abs_sys cx vsys fhcom.sys in
             synth_stack cx vhd vcap stk
 
           | _ ->
@@ -990,7 +997,7 @@ and synth_stack cx vhd ty stk  =
               let _ = check_ty_ "cap" cxx `Pre tm in
               let vty = D.Syn.eval (Cx.rel cxx) (Cx.venv cxx) tm in
               let vabs = D.Abs (x, vty) in
-              let _ = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) (D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty) ty in
+              let _ = equate_tycon cx (D.Con.run (Cx.rel cx) @@ D.Con.subst r' x vty) ty in
               synth_stack cx (D.Val.make @@ D.Con.make_coe (Cx.rel cx) r' r ~abs:vabs vhd) vcap stk
 
             | `Inconsistent ->
@@ -1080,7 +1087,7 @@ and approx_pos cx (pos0 : positive) (pos1 : positive) =
     if not @@ Lvl.lte univ0.lvl univ1.lvl && Kind.lte univ0.kind univ1.kind then
       raise @@ E UniverseError
   | `El ty0, `El ty1 ->
-    ignore @@ Q.equate_tycon (Cx.qenv cx) (Cx.rel cx) ty0 ty1
+    ignore @@ equate_tycon cx ty0 ty1
   | _ ->
     raise @@ E UnexpectedState
 

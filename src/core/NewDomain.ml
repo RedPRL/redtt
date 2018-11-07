@@ -1065,8 +1065,8 @@ struct
       Format.fprintf fmt "<restrict>"
     | Lam _ ->
       Format.fprintf fmt "<lam>"
-    | Cons _ ->
-      Format.fprintf fmt "<ons>"
+    | Cons (el0, el1) ->
+      Format.fprintf fmt "@[<hov1>(cons@ %a@ %a)@]" Val.pp el0 Val.pp el1
     | ExtLam nclo ->
       Format.fprintf fmt "@[<hov1>(ext-lam@ %a)@]" NClo.pp nclo
     | RestrictThunk _ ->
@@ -2621,100 +2621,110 @@ struct
     | _ ->
       raise PleaseRaiseProperError
 
-  let assert_value msg rel =
-    function
-    | Pi quant ->
-      Quantifier.assert_value msg rel quant
+  let assert_value msg rel v =
+    try
+      match v with
+      | Pi quant ->
+        Quantifier.assert_value msg rel quant
 
-    | Sg quant ->
-      Quantifier.assert_value msg rel quant
+      | Sg quant ->
+        Quantifier.assert_value msg rel quant
 
-    | Ext extclo ->
-      ExtClo.assert_value msg rel extclo
+      | Ext extclo ->
+        ExtClo.assert_value msg rel extclo
 
-    | Restrict face ->
-      ConFace.assert_value msg rel face (* can be a true face, but not an inconsistent one. *)
+      | Restrict face ->
+        ConFace.assert_value msg rel face (* can be a true face, but not an inconsistent one. *)
 
-    | Lam clo ->
-      Clo.assert_value msg rel clo
+      | Lam clo ->
+        Clo.assert_value msg rel clo
 
-    | Cons (v0, v1) ->
-      Val.assert_value msg rel v0;
-      Val.assert_value msg rel v1
+      | Cons (v0, v1) ->
+        Val.assert_value msg rel v0;
+        Val.assert_value msg rel v1
 
-    | ExtLam nclo ->
-      NClo.assert_value msg rel nclo
+      | ExtLam nclo ->
+        NClo.assert_value msg rel nclo
 
-    | RestrictThunk face ->
-      ConFace.assert_value msg rel face (* can be a true face, but not an inconsistent one. *)
+      | RestrictThunk face ->
+        ConFace.assert_value msg rel face (* can be a true face, but not an inconsistent one. *)
 
-    | Coe {r; r'; ty; cap} ->
-      Dim.assert_unequal msg rel r r';
-      CoeShape.assert_value msg rel ty;
-      Val.assert_value msg rel cap
+      | Coe {r; r'; ty; cap} ->
+        Dim.assert_unequal msg rel r r';
+        CoeShape.assert_value msg rel ty;
+        Val.assert_value msg rel cap
 
-    | HCom {r; r'; ty; cap; sys} ->
-      Dim.assert_unequal msg rel r r';
-      HComShape.assert_value msg rel ty;
-      Val.assert_value msg rel cap;
-      ConAbsSys.assert_rigid msg rel sys
+      | HCom {r; r'; ty; cap; sys} ->
+        Dim.assert_unequal msg rel r r';
+        HComShape.assert_value msg rel ty;
+        Val.assert_value msg rel cap;
+        ConAbsSys.assert_rigid msg rel sys
 
-    | Com {r; r'; ty; cap; sys} ->
-      Dim.assert_unequal msg rel r r';
-      ComShape.assert_value msg rel ty;
-      Val.assert_value msg rel cap;
-      ConAbsSys.assert_rigid msg rel sys
+      | Com {r; r'; ty; cap; sys} ->
+        Dim.assert_unequal msg rel r r';
+        ComShape.assert_value msg rel ty;
+        Val.assert_value msg rel cap;
+        ConAbsSys.assert_rigid msg rel sys
 
-    | GHCom {r; r'; ty; cap; sys} ->
-      Dim.assert_unequal msg rel r r';
-      HComShape.assert_value msg rel ty;
-      Val.assert_value msg rel cap;
-      ConAbsSys.assert_rigid msg rel sys
+      | GHCom {r; r'; ty; cap; sys} ->
+        Dim.assert_unequal msg rel r r';
+        HComShape.assert_value msg rel ty;
+        Val.assert_value msg rel cap;
+        ConAbsSys.assert_rigid msg rel sys
 
-    | GCom {r; r'; ty; cap; sys} ->
-      Dim.assert_unequal msg rel r r';
-      ComShape.assert_value msg rel ty;
-      Val.assert_value msg rel cap;
-      ConAbsSys.assert_rigid msg rel sys
+      | GCom {r; r'; ty; cap; sys} ->
+        Dim.assert_unequal msg rel r r';
+        ComShape.assert_value msg rel ty;
+        Val.assert_value msg rel cap;
+        ConAbsSys.assert_rigid msg rel sys
 
-    | Univ _ -> ()
+      | Univ _ -> ()
 
-    | V {r; ty0; ty1; equiv} ->
-      begin
-        match Rel.equate r `Dim0 rel with
-        | `Changed rel0 ->
-          Val.assert_value msg rel0 ty0;
-          Val.assert_value msg rel ty1;
-          Val.assert_value msg rel0 equiv
-        | _ -> assert false
-      end
+      | V {r; ty0; ty1; equiv} ->
+        begin
+          match Rel.equate r `Dim0 rel with
+          | `Changed rel0 ->
+            Val.assert_value msg rel0 ty0;
+            Val.assert_value msg rel ty1;
+            Val.assert_value msg rel0 equiv
+          | `Same ->
+            Format.eprintf "[%s/Con.assert_value] assertion failed because %a = 0.@." msg Dim.pp r;
+            assert false
+          | `Inconsistent ->
+            Format.eprintf "[%s/Con.assert_value] assertion failed because %a = 1.@." msg Dim.pp r;
+            assert false
+        end
 
-    | VIn {r; el0; el1} ->
-      begin
-        match Rel.equate r `Dim0 rel with
-        | `Changed rel0 ->
-          Val.assert_value msg rel0 el0;
-          Val.assert_value msg rel el1
-        | _ -> assert false
-      end
+      | VIn {r; el0; el1} ->
+        begin
+          match Rel.equate r `Dim0 rel with
+          | `Changed rel0 ->
+            Val.assert_value msg rel0 el0;
+            Val.assert_value msg rel el1
+          | _ -> assert false
+        end
 
-    | Box {r; r'; cap; sys} ->
-      Dim.assert_unequal msg rel r r';
-      Val.assert_value msg rel cap;
-      ConSys.assert_rigid msg rel sys
+      | Box {r; r'; cap; sys} ->
+        Dim.assert_unequal msg rel r r';
+        Val.assert_value msg rel cap;
+        ConSys.assert_rigid msg rel sys
 
-    | Neu {ty; neu} ->
-      Val.assert_value msg rel ty;
-      Neutroid.assert_value msg rel neu
+      | Neu {ty; neu} ->
+        Val.assert_value msg rel ty;
+        Neutroid.assert_value msg rel neu
 
-    | Data info ->
-      List.iter (Cell.assert_value msg rel) info.params
+      | Data info ->
+        List.iter (Cell.assert_value msg rel) info.params
 
-    | Intro info ->
-      List.iter (ConstrCell.assert_value msg rel) info.args;
-      ConSys.assert_rigid msg rel info.sys
+      | Intro info ->
+        List.iter (ConstrCell.assert_value msg rel) info.args;
+        ConSys.assert_rigid msg rel info.sys
 
-    | FortyTwo -> assert false (* FortyTwo is never a (pre)value! *)
+      | FortyTwo -> assert false (* FortyTwo is never a (pre)value! *)
+    with
+    | Assert_failure _ as exn ->
+      Format.eprintf "[%s/Con.assert_value] assertion failed for %a.@." msg Con.pp v;
+      Printexc.raise_with_backtrace exn (Printexc.get_raw_backtrace ())
 
   let assert_rigid = assert_value
 end
