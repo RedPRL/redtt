@@ -947,8 +947,12 @@ struct
     | `Rec (`Self, v) -> `Rec (`Self, Val.run rel v)
     | `Dim _ as c -> c
 
-  let assert_value _ = raise CanJonHelpMe
-  let assert_rigid _ = raise CanJonHelpMe
+  let assert_value msg rel =
+    function
+    | `Const v -> Val.assert_value msg rel v
+    | `Rec (`Self, v) -> Val.assert_value msg rel v
+    | `Dim _ -> ()
+  let assert_rigid = assert_value
 end
 
 (** An environment is a value if every cell of it is. *)
@@ -2704,10 +2708,11 @@ struct
       Neutroid.assert_value msg rel neu
 
     | Data info ->
-      raise CanJonHelpMe
+      List.iter (Cell.assert_value msg rel) info.params
 
     | Intro info ->
-      raise CanJonHelpMe
+      List.iter (ConstrCell.assert_value msg rel) info.args;
+      ConSys.assert_rigid msg rel info.sys
 
     | FortyTwo -> assert false (* FortyTwo is never a (pre)value! *)
 
@@ -3294,7 +3299,9 @@ struct
       Val.assert_value msg rel ty;
       ConAbsSys.assert_value msg rel sys
     | Elim info ->
-      raise CanJonHelpMe
+      List.iter (Cell.assert_value msg rel) info.params;
+      Clo.assert_value msg rel info.mot;
+      List.iter (fun (_, nclo) -> NClo.assert_value msg rel nclo) info.clauses
 
   let occur xs =
     function
@@ -3336,7 +3343,7 @@ struct
 
   let assert_rigid msg rel =
     function
-    | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce as frm -> assert_value msg rel frm
+    | FunApp _ | Fst | Snd | ExtApp _ | RestrictForce | Elim _ as frm -> assert_value msg rel frm
     | VProj info ->
       begin
         match Rel.equate info.r `Dim0 rel with
@@ -3347,8 +3354,6 @@ struct
       Dim.assert_unequal msg rel r r';
       Val.assert_value msg rel ty;
       ConAbsSys.assert_value msg rel sys
-    | Elim info ->
-      raise CanJonHelpMe
 end
 
 (** A [sys] is a value if its elements are. It itself might not be rigid.
