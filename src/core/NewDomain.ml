@@ -1082,8 +1082,8 @@ struct
       Format.fprintf fmt "<ghcom>"
     | GCom _ ->
       Format.fprintf fmt "<gcom>"
-    | Neu {neu; ty} ->
-      Format.fprintf fmt "@[(:@ %a@ %a)@]" Neutroid.pp neu Val.pp ty
+    | Neu {neu; _} ->
+      Neutroid.pp fmt neu
     | Data _ ->
       Format.fprintf fmt "<data>"
     | Univ _ ->
@@ -3551,7 +3551,12 @@ and Face :
       match Rel.equate r r' rel with
       | `Changed rel' ->
         DelayedLazyX.assert_value msg rel' bdy
-      | `Same | `Inconsistent -> assert false
+      | `Same ->
+        Format.eprintf "[%s/Face.assert_value] assertion failed because %a = %a.@." msg Dim.pp r Dim.pp r';
+        assert false
+      | `Inconsistent ->
+        Format.eprintf "[%s/Face.assert_value] assertion failed because %a ≠ %a permanently.@." msg Dim.pp r Dim.pp r';
+        assert false
   end
 
 (** [Abs (x, a)] is a [rel]-value if [a] is a [(Rel.hide' x rel)]-value. *)
