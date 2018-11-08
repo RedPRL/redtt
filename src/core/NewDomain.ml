@@ -975,8 +975,7 @@ struct
   type t = env
 
 
-  let pp fmt _ =
-    Format.fprintf fmt "<env>"
+  let pp fmt {cells; _} = Pp.pp_bwd Cell.pp fmt cells
 
   let swap pi env =
     {env with cells = Bwd.map (Cell.swap pi) env.cells}
@@ -1083,8 +1082,8 @@ struct
       Format.fprintf fmt "<ghcom>"
     | GCom _ ->
       Format.fprintf fmt "<gcom>"
-    | Neu {neu; _} ->
-      Neutroid.pp fmt neu
+    | Neu {neu; ty} ->
+      Format.fprintf fmt "@[(:@ %a@ %a)@]" Neutroid.pp neu Val.pp ty
     | Data _ ->
       Format.fprintf fmt "<data>"
     | Univ _ ->

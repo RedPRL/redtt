@@ -62,3 +62,5 @@ let pp_list pp fmt xs =
   let pp_sep fmt () = Format.fprintf fmt ", " in
   Format.fprintf fmt "@[<hv1>[%a]@]"
     (Format.pp_print_list ~pp_sep pp) xs
+
+let pp_bwd pp fmt xs = pp_list pp fmt (Bwd.to_list xs)
