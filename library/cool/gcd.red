@@ -2,63 +2,15 @@ import prelude
 import cool.complete-induction
 import data.nat
 import data.void
+import data.unit
+import data.int
+import cool.nat-lemmas
+import cool.div-mod
 
 def double : nat → nat =
   elim [
   | zero → zero
   | suc (n' → f) → suc (suc f)
-  ]
-
-def sub : nat → nat → nat =
-  elim [
-  | zero → λ _ → zero
-  | suc (m' → sub/m') →
-    elim [
-    | zero → suc m'
-    | suc n' → sub/m' n'
-    ]
-  ]
-
-def sub/le : (n m : nat) → le (sub n m) n =
-  elim [
-  | zero → λ _ → ★
-  | suc (n' → f) → λ m → elim m [
-    | zero → le/refl n'
-    | suc m' → le/suc/right (sub n' m') n' (f m')
-    ]
-  ]
-
-def mod/prop : nat → type = λ _ → nat → nat
-
-def mod : (n : nat) → mod/prop n =
-  let complete = weak/implies/complete mod/prop (λ P → realize/weak/induction P) in
-  complete
-    (λ _ → zero)
-    (λ n f → λ m →
-      elim m [
-      | zero → zero
-      | suc m' →
-        elim (sub (suc n) m) [
-        | zero →
-          elim (sub m (suc n)) [
-          | zero → zero
-          | suc _ → suc n
-          ]
-        | suc _ → f (sub (suc n) (suc m')) (sub/le n m') (suc m')
-        ]
-      ]
-    )
-
-def id/nat : nat → nat =
-  elim [
-  | zero → zero
-  | suc (_ → f) → suc f
-  ]
-
-def eta : (n : nat) → path nat (id/nat n) n =
-  elim [
-  | zero → refl
-  | suc (_ → p) → λ i → suc (p i)
   ]
 
 def sub/plus/path : (m n : nat) → le n m → path nat (plus n (sub m n)) m =
@@ -92,28 +44,38 @@ def le/trans : (m n l : nat) → le m n → le n l → le m l =
     ]
   ]
 
-def sub/le/implies/le : (m n k : nat) → path nat (suc k) (sub m n) → le n m =
-  elim [
-  | zero →
-    elim [
-    | zero → λ _ _ → ★
-    | suc n' → λ _ p → coe 1 0 ★ in λ i → le (p i) zero
-    ]
-  | suc (m' → f) →
-    elim [
-    | zero → λ _ _ → ★
-    | suc n' → f n'
-    ]
-  ]
-
-def suc/right/path : (m n : nat) → path nat (plus (suc m) n) (plus m (suc n)) =
-  elim [
-  | zero → refl
-  | suc (_ → f) → λ n i → suc (f n i)
-  ]
-
 def path/implies/le (p : dim → nat) : le (p 0) (p 1) =
   coe 0 1 (le/refl (p 0)) in (λ i → le (p 0) (p i))
+
+def min (A : nat → type) : type = (n : nat) × A n × (n' : nat) → A n → le n n' 
+
+def positive (m : int) : type = 
+  elim m [
+  | pos m' → 
+    elim m' [
+    | zero → void
+    | suc _ → unit
+    ]
+  | negsuc _ → void
+  ]
+
+def lift (m : int) : positive m → nat = 
+  elim m [
+  | pos m' → λ p → m'
+  | negsuc _ → λ p → elim p []
+  ]
+  
+def coeff (x y : nat) : nat → type = 
+  λ n → 
+  (k l : int) × 
+  let d = iplus (imult k (pos x)) (imult l (pos y)) in (p : positive d) × path nat (lift d p) n 
+
+def gcd/certify (x y d : nat) : type = 
+  (s t : nat) 
+  × path nat (mult s d) x × path nat (mult t d) y
+  × (s' t' d' : nat) → path nat (mult s d) x × path nat (mult t d) y → le d d'
+
+-- def bezout (x y : nat) (m : min (coeff x y)) : gcd/certify x y (m .fst) =  
 
 def gcd/prop (m : nat) : type =
   (x y : nat) → le (plus x y) m → nat
@@ -137,7 +99,7 @@ def gcd' : (m : nat) → gcd/prop m =
               | suc k' → λ eq →
                 let x/le/x+y' =
                   coe 0 1 (plus/le (suc x') y') in
-                  λ i → le (suc x') (suc/right/path x' y' i)
+                  λ i → le (suc x') (symm _ (plus/suc/r x' y') i)
                 in
                 let x/le/m = le/trans (suc x') (plus x' (suc y')) m x/le/x+y' x+y'/le/m in
                 let g = sub/le/implies/le x' y' k' eq  in
@@ -176,8 +138,13 @@ def n3 : nat = suc n2
 def n4 : nat = double n2
 def n5 : nat = suc n4
 def n6 : nat = plus n2 n4
+def n7 : nat = suc n6
 def n8 : nat = double n4
-def ex1 : nat = gcd n6 n8
+def n16 : nat = double n8
+
+def ex1 = gcd n6 n8
+def ex2 = div-mod n8 n5
+def ex3 = div-mod n16 n7
 def check/ex1 : path nat ex1 n2 = refl
-def ex2 : nat = mod n8 n5
-def check/ex2 : path nat ex2 n3 = refl
+def check/ex2 : path (nat × nat) (ex2.fst,ex2.snd.fst) (n1,n3) = refl
+def check/ex3 : path (nat × nat) (ex3.fst,ex3.snd.fst) (n2,n2) = refl

@@ -51,6 +51,26 @@ def iplus (m n : int) : int =
     ]
   ]
 
+def negate (m : nat) : int = 
+	elim m [
+	| zero → pos zero 
+	| suc m' → negsuc m'
+	]
+
+def imult (m n : int) : int = 
+	elim m [
+	| pos m' → 
+		elim n [
+		| pos n' → pos (mult m' n')
+		| negsuc n' → negate (mult m' (suc n'))
+		]
+	| negsuc m' → 
+		elim n [
+		| pos n' → negate (mult n' (suc m'))
+		| negsuc n' → pos (plus (mult m' n') (plus (plus m' n') (suc (suc zero))))
+		]
+	]
+
 def izero : int = pos zero
 
 def iplus/unit-r : (n : int) → path int (iplus n izero) n =

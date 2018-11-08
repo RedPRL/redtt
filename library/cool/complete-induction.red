@@ -3,66 +3,7 @@ import data.nat
 import data.unit
 import data.void
 import data.or
-
-def le : nat → nat → type =
-  elim [
-  | zero → λ _ → unit
-  | suc (m → f) →
-    elim [
-    | zero → void
-    | suc n → f n
-    ]
-  ]
-
-def le/suc/right : (n m : nat) → le n m → le n (suc m) =
-  elim [
-  | zero → λ _ _ → ★
-  | suc (n' → f) →
-    elim [
-    | zero → elim []
-    | suc m' → λ l → f m' l
-    ]
-  ]
-
-def le/suc : (n m : nat) → le n m → le (suc n) (suc m) =
-  elim [
-  | zero → λ _ _ → ★
-  | suc _ → λ _ l → l
-  ]
-
-def le/refl : (n : nat) → le n n =
-  elim [
-  | zero → ★
-  | suc (_ → f) → f
-  ]
-
-def le/zero/implies/zero : (n : nat) → (le n zero) → path nat zero n =
-  elim [
-  | zero → λ _ → refl
-  | suc n' → elim []
-  ]
-
-def le/case : (m n : nat) → (le n (suc m)) → or (path nat n (suc m)) (le n m) =
-  elim [
-  | zero →
-    elim [
-    | zero → λ _ → inr ★
-    | suc n' →
-      elim n' [
-      | zero → λ _ → inl refl
-      | suc _ → λ p → inr p
-      ]
-    ]
-  | suc (m' → c) →
-    elim [
-    | zero → λ _ → inr ★
-    | suc n' → λ p →
-      elim (c n' p) [
-      | inl p → inl (λ i → suc (p i))
-      | inr l → inr (le/suc n' m' l)
-      ]
-    ]
-  ]
+import cool.nat-lemmas
 
 def weak/induction (P : nat → type) : type =
   P zero

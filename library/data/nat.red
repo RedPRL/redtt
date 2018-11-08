@@ -46,3 +46,33 @@ def plus/comm : (m n : nat) → path nat (plus n m) (plus m n) =
   | zero → plus/unit/r
   | suc (m → plus/comm/m) → λ n → trans _ (plus/suc/r n m) (λ i → suc (plus/comm/m n i))
   ]
+
+def id/nat : nat → nat =
+  elim [
+  | zero → zero
+  | suc (_ → f) → suc f
+  ]
+
+def eta : (n : nat) → path nat (id/nat n) n =
+  elim [
+  | zero → refl
+  | suc (_ → p) → λ i → suc (p i)
+  ]
+
+def sub : nat → nat → nat =
+  elim [
+  | zero → λ _ → zero
+  | suc (m' → sub/m') →
+    elim [
+    | zero → suc m'
+    | suc n' → sub/m' n'
+    ]
+  ]
+
+def mult (m n : nat) : nat = 
+	elim m [
+	| zero → zero 
+	| suc (m' → mult/m'/n) → plus n mult/m'/n
+	]
+
+def mult/unit/l (n : nat) : path nat (mult (suc zero) n) n = eta n
