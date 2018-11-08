@@ -1030,7 +1030,9 @@ and synth_stack cx vhd ty stk  =
   | D.Restrict (r, r', ty), Tm.RestrictForce :: stk ->
     begin
       match D.Rel.compare r r' (Cx.rel cx) with
-      | `Same -> synth_stack cx vhd (D.LazyVal.unleash ty) stk
+      | `Same ->
+        let vhd = D.Val.plug (Cx.rel cx) ~rigid:true D.RestrictForce vhd in
+        synth_stack cx vhd (D.LazyVal.unleash ty) stk
       | _ -> raise @@ E ExpectedTrueRestrictType
     end
 
