@@ -2585,6 +2585,9 @@ struct
     | Univ _ | HCom {ty = `Pos; _} | V _ ->
       expand_rigid_ghcom rel r r' ~ty ~cap ~sys
 
+    | Data _ ->
+      expand_rigid_ghcom rel r r' ~ty ~cap ~sys
+
     | Neu _ ->
       expand_rigid_ghcom rel r r' ~ty ~cap ~sys
 
@@ -2616,6 +2619,8 @@ struct
     | Univ _ as ty -> expand_rigid_ghcom rel r r' ~ty ~cap ~sys
 
     | V _ | HCom {ty = `Pos; _} -> expand_rigid_gcom rel r r' ~abs ~cap ~sys
+
+    | Data _ -> expand_rigid_gcom rel r r' ~abs ~cap ~sys
 
     | Neu _ -> expand_rigid_gcom rel r r' ~abs ~cap ~sys (* really too complicated *)
 
