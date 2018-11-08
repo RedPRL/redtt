@@ -15,3 +15,4 @@ type 'a t0 = Format.formatter -> 'a -> unit
 type 'a t = env -> 'a t0
 
 val pp_list : 'a t0 -> 'a list t0
+val pp_bwd : 'a t0 -> 'a RedBasis.Bwd.bwd t0

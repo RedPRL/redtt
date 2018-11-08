@@ -85,8 +85,8 @@ let guess_restricted tm goal =
     unify >>
     C.check ~ty ~sys tm >>= function
     | `Ok -> M.ret tm
-    | `Exn exn ->
-      raise exn
+    | `Exn (exn, bt) ->
+      Printexc.raise_with_backtrace exn bt
 
 exception ChkMatch
 
