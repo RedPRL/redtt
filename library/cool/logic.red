@@ -105,9 +105,23 @@ def suspension-lemma (A : type) (A/prop : is-prop A) :
     ] in
   ?suspension-hole
 
-def choice (X : type) (Y : X → type) : type = (X/set : is-set X) → (Y/set : (x : X) → is-set (Y x)) → ((x : X) → trunc (Y x)) → trunc ((x : X) → Y x)
+def is-surjective (A B : type) (f : A → B) : type = (b : B) → trunc (fiber A B f b)
 
-def choiceLEM (choice-ax : (X : type) → (Y : X → type) → choice X Y) : (A : type) → (A/prop : is-prop A) → dec A = 
+def is-embedding (A B : type) (f : A → B) : type = (x y : A) → equiv (path A x y) (path B (f x) (f y))
+
+def is-injective (A B : type) (A/set : is-set A) (B/set : is-set B) (f : A → B) : type = (x y : A) → path B (f x) (f y) → path A x y
+
+def injective→embedding (A B : type) (A/set : is-set A) (B/set : is-set B) (f : A → B) : injective A B A/set B/set f → embedding A B f = 
+  λ f/inj x y → 
+    prop/equiv (path A x y) (path B (f x) (f y)) 
+               (A/set x y) (B/set (f x) (f y)) 
+               (λ p i → f (p i)) (f/inj x y)
+
+def has-choice (X : type) (Y : X → type) : type = (X/set : is-set X) → (Y/set : (x : X) → is-set (Y x)) → ((x : X) → trunc (Y x)) → trunc ((x : X) → Y x)
+
+def LEM (A : type) : type = (A/prop : is-prop A) → dec A
+
+def choice→LEM (choice-ax : (X : type) → (Y : X → type) → has-choice X Y) : (A : type) → LEM A = 
   λ A A/prop →
   let f (b : bool) : susp A = elim b [ 
    | tt → south
