@@ -2,6 +2,7 @@ import data.list
 import prelude 
 import data.nat
 import data.bool
+import cool.div-mod
 import cool.gcd
 
 data factor where
@@ -14,7 +15,7 @@ def is-prime-from : nat → nat → nat → bool =
   elim [
     | zero → λ _ _ → tt
     | suc (n' → f) → λ n k → 
-      elim (mod n k) [
+      elim ((div-mod n k).snd.fst) [
         | zero → ff
         | suc _ → f n (suc k)
       ]
