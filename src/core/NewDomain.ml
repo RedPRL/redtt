@@ -3029,8 +3029,8 @@ struct
       Format.fprintf fmt "@[<hov1>(ncoe@ %a %a@ %a@ %a)@]" I.pp ncoe.r I.pp ncoe.r' NeutroidAbs.pp ncoe.ty Val.pp ncoe.cap
     | NCoeData _ ->
       Format.fprintf fmt "<ncoe-data>"
-    | NHCom _ ->
-      Format.fprintf fmt "<nhcom>"
+    | NHCom {r; r'; ty; cap; sys} ->
+      Format.fprintf fmt "@[<hov1>(nhcom %a %a@ %a@ %a@ %a)@]" Dim.pp r Dim.pp r' Neutroid.pp ty Val.pp cap ConAbsSys.pp sys
 
   let swap pi =
     function
