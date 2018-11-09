@@ -70,8 +70,6 @@ def pivot-coh (X Y : ptype)
   comp 0 1 (face i j) [
   | i=0 k → face k j
   | i=1 → refl
-  | j=0 k → pivotr/filler X Y (X .snd) (X .snd) k i
-  | j=1 k → pivotl/filler X Y (Y .snd) (Y .snd) k i
   ]
 
 def basel-baser (X Y : ptype) : path (smash X Y) basel baser =
