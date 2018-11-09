@@ -4,13 +4,21 @@ type atom = I.atom
 type dim = I.t
 type cls = int I.f
 
-module T = PersistentTable.M
+module AtomT = MapAsPersistentTable.M (Name)
+module IntT = MapAsPersistentTable.M (struct type t = int let compare = compare end)
 
 type t =
-  {index : (atom, int) T.t;
+  {index : int AtomT.t;
    next : int;
-   rank : (int, int) T.t;
-   parent : (int, cls) T.t}
+   rank : int IntT.t;
+   parent : cls IntT.t}
+
+let emp () =
+  let size = 100 in
+  {index = AtomT.init ~size;
+   next = 0;
+   rank = IntT.init ~size;
+   parent = IntT.init ~size}
 
 type 'a m = [`Changed of 'a | `Same | `Inconsistent]
 
@@ -19,20 +27,13 @@ let get_m h = function
   | `Same -> h
   | `Inconsistent -> raise I.Inconsistent
 
-let emp () =
-  let size = 100 in
-  {index = T.init ~size;
-   next = 0;
-   rank = T.init ~size;
-   parent = T.init ~size}
-
 (*
 let find_index_with_compression (x : int) (h : t) : cls =
-  let rec go x (parent : (int, cls) T.t) : cls * (int, cls) T.t =
-    match T.get x parent with
+  let rec go x (parent : (int, cls) IntT.t) : cls * (int, cls) IntT.t =
+    match IntT.get x parent with
     | `Atom x_parent as cur_cls ->
       let cls, parent = go x_parent parent in
-      cls, if cur_cls = cls then parent else T.set x cls parent
+      cls, if cur_cls = cls then parent else IntT.set x cls parent
     | cls -> cls, parent
     | exception Not_found ->
       `Atom x, parent
@@ -44,7 +45,7 @@ let find_index_with_compression (x : int) (h : t) : cls =
 
 (* the version without path compression *)
 let rec find_index (x : int) (h : t) : cls =
-  match T.get x h.parent with
+  match IntT.get x h.parent with
   | `Atom x_parent -> find_index x_parent h
   | cls -> cls
   | exception Not_found -> `Atom x
@@ -56,7 +57,7 @@ let find_cls (x : cls) (h : t) : cls =
 
 let rank_index (x : int) h =
   try
-    T.get x h.rank
+    IntT.get x h.rank
   with
   | _ ->
     0
@@ -72,25 +73,25 @@ let union_cls (x : cls) (y : cls) (h : t) =
       let rx = rank_index clsx h in
       let ry = rank_index clsy h in
       if rx > ry then
-        `Changed {h with parent = T.set clsy (`Atom clsx) h.parent}
+        `Changed {h with parent = IntT.set clsy (`Atom clsx) h.parent}
       else if rx < ry then
-        `Changed {h with parent = T.set clsx (`Atom clsy) h.parent}
+        `Changed {h with parent = IntT.set clsx (`Atom clsy) h.parent}
       else
         `Changed
           {h with
-           rank = T.set clsx (rx + 1) h.rank;
-           parent = T.set clsy (`Atom clsx) h.parent}
+           rank = IntT.set clsx (rx + 1) h.rank;
+           parent = IntT.set clsy (`Atom clsx) h.parent}
   | `Atom clsx, clsy ->
-    `Changed {h with parent = T.set clsx clsy h.parent}
+    `Changed {h with parent = IntT.set clsx clsy h.parent}
   | clsx, `Atom clsy ->
-    `Changed {h with parent = T.set clsy clsx h.parent}
+    `Changed {h with parent = IntT.set clsy clsx h.parent}
 
 let reserve_atom (x : atom) (h : t) : int * t =
   try
-    T.get x h.index, h
+    AtomT.get x h.index, h
   with
   | _ ->
-    h.next, {h with index = T.set x h.next h.index; next = h.next + 1}
+    h.next, {h with index = AtomT.set x h.next h.index; next = h.next + 1}
 
 let reserve (x : dim) (h : t) : cls * t =
   match x with
@@ -103,14 +104,14 @@ let union (x : dim) (y : dim) h =
   let y, h = reserve y h in
   union_cls x y h
 
-let query_atom (x : atom) (index : (atom, int) T.t) : [`Ok of cls | `Owned of atom] =
+let query_atom (x : atom) (index : int AtomT.t) : [`Ok of cls | `Owned of atom] =
   try
-    `Ok (`Atom (T.get x index))
+    `Ok (`Atom (AtomT.get x index))
   with
     _ ->
     `Owned x
 
-let query (x : dim) (index : (atom, int) T.t) : [`Ok of cls | `Owned of atom] =
+let query (x : dim) (index : int AtomT.t) : [`Ok of cls | `Owned of atom] =
   match x with
   | `Atom x -> query_atom x index
   | `Dim0 -> `Ok `Dim0
@@ -132,10 +133,10 @@ let compare x y (h : t) =
     | _, `Atom _ -> `Indet
 
 let mem_atom (x : atom) index =
-  T.mem x index
+  AtomT.mem x index
 
 let hide_aux (x : atom) (h : t) =
-  {h with index = T.remove x h.index}
+  {h with index = AtomT.remove x h.index}
 
 let hide (x : atom) (h : t) =
   if mem_atom x h.index then
@@ -167,10 +168,10 @@ let subst' r x h =
     h
 
 let swap (x : atom) (y : atom) (h : t) =
-  match T.find x h.index, T.find y h.index with
+  match AtomT.find x h.index, AtomT.find y h.index with
   | None, None -> h
   | Some idx, Some idy when idx = idy -> h
-  | oidx, oidy -> {h with index = T.set_opt y oidx (T.set_opt x oidy h.index)}
+  | oidx, oidy -> {h with index = AtomT.set_opt y oidx (AtomT.set_opt x oidy h.index)}
 
 
 let pp_cls fmt =
@@ -187,7 +188,7 @@ let pp_parent fmt (x, cls) =
 
 let pp fmt h =
   let comma fmt () = Format.fprintf fmt "," in
-  let l = T.fold (fun x i l -> (x, find_index i h) :: l) h.index [] in
+  let l = AtomT.fold (fun x i l -> (x, find_index i h) :: l) h.index [] in
   Format.pp_print_list ~pp_sep:comma pp_parent fmt l
 
 (* poor man's tests *)
