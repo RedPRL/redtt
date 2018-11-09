@@ -2512,6 +2512,7 @@ struct
     let sys =
       ConAbsSys.foreach_make rel sys @@ fun s s' face rel ->
       let (y, bdy_y) = ConAbs.unbind @@ LazyValAbs.unleash face in
+      let abs = ConAbs.run rel abs in
       Abs (y, make_coe rel (`Atom y) r' ~abs @@ Val.make bdy_y)
     in
     rigid_hcom rel r r' ~ty ~cap ~sys
@@ -2600,6 +2601,7 @@ struct
     let sys =
       ConAbsSys.foreach_make rel sys @@ fun s s' face rel ->
       let y, bdy_y = ConAbs.unbind @@ LazyValAbs.unleash face in
+      let abs = ConAbs.run rel abs in
       Abs (y, make_coe rel (`Atom y) r' ~abs @@ Val.make bdy_y)
     in
     rigid_ghcom rel r r' ~ty ~cap ~sys
