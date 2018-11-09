@@ -20,8 +20,6 @@ def smash/map (X Y Z W : ptype) (f : pmap X Z) (g : pmap Y W) : smash X Y → sm
   | gluer a i → comp 1 0 (gluer (f .fst a) i) [i=0 → refl | i=1 j → proj (f .fst a) (g .snd j) ]
   ]
 
--- commutator
-
 def commute (X Y : ptype) : smash X Y → smash Y X =
   elim [
   | basel → baser
