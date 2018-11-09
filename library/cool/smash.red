@@ -11,7 +11,18 @@ data (X Y : ptype) ⊢ smash where
 def psmash (X Y : ptype) : ptype =
   (smash X Y, proj (X .snd) (Y .snd))
 
-def flip (X Y : ptype) : smash X Y → smash Y X =
+def smash/map (X Y Z W : ptype) (f : pmap X Z) (g : pmap Y W) : smash X Y → smash Z W =
+  elim [
+  | basel → basel
+  | baser → baser
+  | proj a b → proj (f .fst a) (g .fst b)
+  | gluel b i → comp 1 0 (gluel (g .fst b) i) [i=0 → refl | i=1 j → proj (f .snd j) (g .fst b) ]
+  | gluer a i → comp 1 0 (gluer (f .fst a) i) [i=0 → refl | i=1 j → proj (f .fst a) (g .snd j) ]
+  ]
+
+-- commutator
+
+def commute (X Y : ptype) : smash X Y → smash Y X =
   elim [
   | basel → baser
   | baser → basel
@@ -20,7 +31,7 @@ def flip (X Y : ptype) : smash X Y → smash Y X =
   | gluer a i → gluel a i
   ]
 
-def flip/involutive (X Y : ptype) : (s : smash X Y) → path (smash X Y) (flip Y X (flip X Y s)) s =
+def commute/involutive (X Y : ptype) : (s : smash X Y) → path (smash X Y) (commute Y X (commute X Y s)) s =
   elim [* → refl]
 
 -- pivot helper functions
@@ -72,7 +83,10 @@ def basel-baser (X Y : ptype) : path (smash X Y) basel baser =
   | i=1 j → gluer (X .snd) j
   ]
 
--- definition of rearrange
+-- Definition of rearrange : (X ∧ Y) ∧ Z → (Z ∧ Y) ∧ X
+-- The associator can be derived from rearrange using the commutator:
+-- (X ∧ Y) ∧ Z → (Z ∧ Y) ∧ X → (Y ∧ Z) ∧ X → X ∧ (Y ∧ Z)
+-- If we can show rearrange is involutive, then the associator is an equivalence
 
 def rearrange/proj (X Y Z : ptype) (c : Z .fst) : smash X Y → smash (psmash Z Y) X =
   elim [
@@ -128,3 +142,8 @@ def rearrange (X Y Z : ptype) : smash (psmash X Y) Z → smash (psmash Z Y) X =
   | gluel c i → gluer (proj c (Y .snd)) i
   | gluer s i → rearrange/gluer X Y Z s i
   ]
+
+def associate (X Y Z : ptype) (t : smash (psmash X Y) Z) : smash X (psmash Y Z) =
+  commute (psmash Y Z) X
+    (smash/map (psmash Z Y) X (psmash Y Z) X (commute Z Y, refl) (λ x → x, refl)
+      (rearrange X Y Z t))
