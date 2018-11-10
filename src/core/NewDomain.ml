@@ -2114,18 +2114,22 @@ struct
       end
 
     | Data data, Neu info ->
+      let ty = Val.make @@ ConAbs.inst rel abs r' in
       let neutroid =
         let neu =
           let head = NCoeData {r; r'; ty = abs; cap = info.neu} in
           DelayedNeu.make @@ {head; frames = Emp}
         in
-        let sys =
+        let cap_face =
+          ConFace.make rel r r' @@ fun rel -> Val.run_then_unleash rel cap
+        in
+        let old_sys =
           ConSys.foreach_make rel info.neu.sys @@ fun s s' el rel_ss' ->
           make_coe rel_ss' r r' ~abs:(ConAbs.run rel_ss' abs) @@ Val.make (LazyVal.unleash el)
         in
-        {neu; sys}
+        {neu; sys = cap_face @ old_sys}
       in
-      Neu {ty = Val.make @@ ConAbs.inst rel abs r'; neu = neutroid}
+      Neu {ty; neu = neutroid}
 
     | Data _, HCom info ->
       let cap = Val.make @@ rigid_coe rel r r' ~abs info.cap in
@@ -3027,8 +3031,8 @@ struct
       Name.pp fmt var.name
     | NCoe ncoe ->
       Format.fprintf fmt "@[<hov1>(ncoe@ %a %a@ %a@ %a)@]" I.pp ncoe.r I.pp ncoe.r' NeutroidAbs.pp ncoe.ty Val.pp ncoe.cap
-    | NCoeData _ ->
-      Format.fprintf fmt "<ncoe-data>"
+    | NCoeData {r; r'; ty; cap} ->
+      Format.fprintf fmt "@[<hov1>(ncoe@ %a %a@ %a@ %a)@]" Dim.pp r Dim.pp r' ConAbs.pp ty Neutroid.pp cap
     | NHCom {r; r'; ty; cap; sys} ->
       Format.fprintf fmt "@[<hov1>(nhcom %a %a@ %a@ %a@ %a)@]" Dim.pp r Dim.pp r' Neutroid.pp ty Val.pp cap ConAbsSys.pp sys
 
@@ -3108,27 +3112,20 @@ struct
     | NCoe {r; r'; ty; cap} ->
       NeutroidAbs.assert_value msg rel ty;
       Val.assert_value msg rel cap
-    | NCoeData _ ->
-      raise CanJonHelpMe
+    | NCoeData {r; r'; ty; cap} ->
+      ConAbs.assert_value msg rel ty;
+      Neutroid.assert_value msg rel cap
     | NHCom {r; r'; ty; cap; sys} ->
       Neutroid.assert_value msg rel ty;
       Val.assert_value msg rel cap;
       ConAbsSys.assert_value msg rel sys
 
-  let assert_rigid msg rel =
-    function
+  let assert_rigid msg rel frm =
+    assert_value msg rel frm;
+    match frm with
     | Lvl _ | Var _ | Meta _ -> ()
-    | NCoe {r; r'; ty; cap} ->
+    | NCoe {r; r'; _} | NCoeData {r; r'; _} | NHCom {r; r'; _} ->
       Dim.assert_unequal msg rel r r';
-      NeutroidAbs.assert_value msg rel ty;
-      Val.assert_value msg rel cap
-    | NCoeData _ ->
-      raise CanJonHelpMe
-    | NHCom {r; r'; ty; cap; sys} ->
-      Dim.assert_unequal msg rel r r';
-      Neutroid.assert_value msg rel ty;
-      Val.assert_value msg rel cap;
-      ConAbsSys.assert_value msg rel sys
 end
 
 and TypedVal :
