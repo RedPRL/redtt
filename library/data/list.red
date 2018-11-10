@@ -1,8 +1,21 @@
 import prelude
+import data.nat
 
 data (A : type) ⊢ list where
 | nil
 | cons (x : A) (xs : list)
+
+def tail (A : type) : list A → list A =
+  elim [
+  | nil → nil
+  | cons _ xs → xs
+  ]
+
+def length (A : type) : list A → nat =
+  elim [
+  | nil → zero
+  | cons _ (_ → n) → suc n
+  ]
 
 def append (A : type) : list A → list A → list A =
   elim [
@@ -24,4 +37,10 @@ def append/ass (A : type)
   | nil → refl
   | cons x (xs → xs/ih) →
     λ ys zs i → cons x (xs/ih ys zs i)
+  ]
+
+def concatenate (A : type) : list (list A) → list A =
+  elim [
+  | nil → nil
+  | cons xs (_ → ih) → append A xs ih
   ]

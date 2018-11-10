@@ -8,6 +8,7 @@ module D = Domain
 
 module Notation = Monad.Notation (Contextual)
 open Notation
+module MonadUtil = Monad.Util (Contextual)
 
 type telescope = params
 
@@ -123,7 +124,7 @@ let user_define gm alpha source visibility opacity ~ty tm =
   let tm = abstract_tm gm tm in
   check ~ty tm >>= function
   | `Exn exn ->
-    Format.eprintf "Failed to check: %a@." Tm.pp0 tm;
+    Format.eprintf "Failed to check: %a <= %a@." Tm.pp0 tm Tm.pp0 ty;
     raise exn
   | `Ok ->
     begin
@@ -464,6 +465,15 @@ let is_orthogonal q =
 
   | _ -> false
 
+module Util =
+struct
+  let kill_false_face ((r, r', _) as face) =
+    compare_dim r r' <<@>
+    function
+    | `Apart -> None
+    | _ -> Some face
+end
+
 let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
   let rec go sp0 sp1 =
     match sp0, sp1 with
@@ -519,7 +529,8 @@ let rec match_spine x0 tw0 sp0 x1 tw1 sp1 =
       ret (cod0, cod1)
 
 
-    (* TODO: Elim *)
+    | Snoc (_sp0, Tm.Elim _info0), Snoc (_sp1, Tm.Elim _info1) ->
+      failwith "TODO: match_spine/elim"
 
     | Snoc (_sp0, Tm.VProj _info0), Snoc (_sp1, Tm.VProj _info1) ->
       failwith "TODO: match_spine/vproj"
@@ -563,6 +574,8 @@ let rec subtype ty0 ty1 =
       let xs_fwd = Bwd.to_list xs in
       let ty1, sys1 = Tm.unbind_ext_with (List.map Tm.var xs_fwd) ebnd1 in
       let ps = List.map (fun x -> (x, `I)) xs_fwd in
+      MonadUtil.filter_traverse Util.kill_false_face sys0 >>= fun sys0 ->
+      MonadUtil.filter_traverse Util.kill_false_face sys1 >>= fun sys1 ->
       let rec go sys0 sys1 =
         match sys0, sys1 with
         | _, [] -> ret ()
