@@ -3034,7 +3034,7 @@ struct
     | NCoe ncoe ->
       Format.fprintf fmt "@[<hov1>(ncoe@ %a %a@ %a@ %a)@]" I.pp ncoe.r I.pp ncoe.r' NeutroidAbs.pp ncoe.ty Val.pp ncoe.cap
     | NCoeData {r; r'; ty; cap} ->
-      Format.fprintf fmt "@[<hov1>(ncoe@ %a %a@ %a@ %a)@]" Dim.pp r Dim.pp r' ConAbs.pp ty Neutroid.pp cap
+      Format.fprintf fmt "@[<hov1>(ncoe-data@ %a %a@ %a@ %a)@]" Dim.pp r Dim.pp r' ConAbs.pp ty Neutroid.pp cap
     | NHCom {r; r'; ty; cap; sys} ->
       Format.fprintf fmt "@[<hov1>(nhcom %a %a@ %a@ %a@ %a)@]" Dim.pp r Dim.pp r' Neutroid.pp ty Val.pp cap ConAbsSys.pp sys
 
