@@ -131,10 +131,19 @@ let rec equate_con qenv rel ty el0 el1 =
       let r, r', ty_rr' = face in
       let tr = quote_dim qenv r in
       let tr' = quote_dim qenv r' in
-      let rel_rr' = Rel.equate' r r' rel in
-      let force0 = Con.plug rel_rr' ~rigid:true RestrictForce el0 in
-      let force1 = Con.plug rel_rr' ~rigid:true RestrictForce el1 in
-      let bdy = equate_con qenv rel_rr' (LazyVal.unleash ty_rr') force0 force1 in
+      let bdy =
+        match Rel.equate r r' rel with
+        | `Inconsistent ->
+          Tm.make Tm.FortyTwo
+        | `Same ->
+          let force0 = Con.plug rel ~rigid:true RestrictForce el0 in
+          let force1 = Con.plug rel ~rigid:true RestrictForce el1 in
+          equate_con qenv rel (LazyVal.unleash ty_rr') force0 force1
+        | `Changed rel_rr' ->
+          let force0 = Con.plug rel_rr' ~rigid:true RestrictForce @@ Con.run rel_rr' el0 in
+          let force1 = Con.plug rel_rr' ~rigid:true RestrictForce @@ Con.run rel_rr' el1 in
+          equate_con qenv rel_rr' (LazyVal.unleash ty_rr') force0 force1
+      in
       Tm.make @@ Tm.RestrictThunk (tr, tr', bdy)
 
     | V {r; ty0; ty1; equiv} ->
@@ -221,7 +230,9 @@ let rec equate_con qenv rel ty el0 el1 =
       equate_tycon qenv rel el0 el1
 
     | _ ->
-      Format.eprintf "quote: %a / %a / %a @." Con.pp ty Con.pp el0 Con.pp el1;
+      Format.eprintf "quote/rel: %a@.@." Rel.pp rel;
+      Format.eprintf "quote/ty: %a@.@." Con.pp ty;
+      Format.eprintf "quote/el: %a@.@." Con.pp el0;
       (* This might be done? *)
       raise PleaseFillIn
 
@@ -482,7 +493,7 @@ and equate_tycon qenv rel ty0 ty1 =
     let ty0 = equate_tyval qenv rel_r0 info0.ty0 info0.ty0 in
     let ty1 = equate_tyval qenv rel info0.ty1 info1.ty1 in
     let equiv_ty =
-      let env = Env.init_isolated [Cell.value info0.ty1; Cell.value info0.ty0] in
+      let env = Env.init_isolated [Cell.value (Val.run rel_r0 @@ info0.ty1); Cell.value info0.ty0] in
       Syn.eval rel_r0 env @@ Tm.equiv (Tm.up @@ Tm.ix 0) (Tm.up @@ Tm.ix 1)
     in
     let equiv = equate_val qenv rel_r0 equiv_ty info0.equiv info0.equiv in

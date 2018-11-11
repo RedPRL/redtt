@@ -2063,7 +2063,7 @@ struct
       raise PleaseRaiseProperError
 
   and multi_coe rel r r' data_abs clbl args =
-    match Rel.equate r r' rel with
+    match Rel.compare r r' rel with
     | `Same ->
       args
     | _ ->
@@ -2317,7 +2317,8 @@ struct
       let capty_abs = Abs (x, Val.unleash fhcom.cap) in
 
       (* this lives in G+x*)
-      let cap_frame_x = Cap
+      let cap_frame_x =
+        Cap
           {r = fhcom.r;
            r' = fhcom.r';
            ty = fhcom.cap;
@@ -2459,7 +2460,8 @@ struct
        * Using Q, the preimages, this is to calculate the final cap based on the naive cap.
        *
        * This lives in G. *)
-      let coerced_cap = Val.make @@
+      let coerced_cap =
+        Val.make @@
         let ty = Val.run_then_unleash rel @@ Val.subst r' x fhcom.cap in
         let cap = naively_coerced_cap in
         let sys =
