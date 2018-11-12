@@ -1,7 +1,7 @@
 " vim-redtt ftplugin
 " Language:     redtt
 " Author:       Carlo Angiuli
-" Last Change:  2018 October 8
+" Last Change:  2018 November 12
 
 if (exists("b:did_ftplugin") || !has('job'))
   finish
@@ -31,17 +31,20 @@ function! CheckBuffer(...)
     call job_stop(s:job, 'int')
   endif
 
+  let l:toCheck = bufname('%')
+
   if (!bufexists('redtt') || (winbufnr(bufwinnr('redtt')) != bufnr('redtt')))
     belowright vsplit redtt
     call s:InitBuffer()
   else
     execute bufwinnr('redtt') . 'wincmd w'
   endif
+  let b:active = l:toCheck
   silent %d _
   wincmd p
 
   let s:job = job_start(g:redtt_path .
-    \' from-stdin ' . bufname('%') .
+    \' from-stdin ' . l:toCheck .
     \' ' . g:redtt_options .
     \' --line-width ' . s:EditWidth(), {
     \'in_io': 'buffer', 'in_buf': bufnr('%'),
@@ -54,10 +57,19 @@ function! CheckBufferToCursor()
   call CheckBuffer(line('.'))
 endfunction
 
+" Call this only from redtt output buffer.
+function! g:CheckFromOutputBuffer()
+  if (bufexists(b:active) && (winbufnr(bufwinnr(b:active)) == bufnr(b:active)))
+    execute bufwinnr(b:active) . 'wincmd w'
+    call CheckBuffer()
+  endif
+endfunction
+
 function! s:InitBuffer()
   set buftype=nofile
   set syntax=redtt
   set noswapfile
+  nnoremap <buffer> <LocalLeader>l :call CheckFromOutputBuffer()<CR>
 endfunction
 
 function! s:EditWidth()
@@ -85,7 +97,9 @@ endfunction
 
 function! s:CloseBuffer()
   if (bufexists('redtt') && !getbufvar('redtt', '&modified'))
-    bdelete redtt
+    if (getbufvar('redtt', 'active') == bufname('%'))
+      bdelete redtt
+    endif
   endif
 endfunction
 
