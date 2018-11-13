@@ -15,7 +15,7 @@ def pequiv (pA pB : ptype) : type =
 
 def pbool : ptype = (bool, ff)
 
-def pf (pA : ptype) : pequiv (p→ pbool pA) pA =
+def from-pbool (pA : ptype) : pequiv (p→ pbool pA) pA =
   let fwd : pmap (p→ pbool pA) pA =
     (λ f → f.fst tt , refl)
   in

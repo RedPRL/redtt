@@ -1,7 +1,7 @@
 import prelude
 import data.bool
+import basics.pointed
 import basics.isotoequiv
-import cool.pointed
 
 data (X Y : ptype) ⊢ smash where
 | basel

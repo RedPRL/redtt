@@ -4,9 +4,9 @@ import data.s2
 import data.s3
 import data.join
 import data.int
+import basics.pointed
 import paths.s1
 import cool.s3-to-join
-import cool.pointed
 import cool.hopf
 
 -- from https://github.com/mortberg/cubicaltt/blob/pi4s3/examples/problem.ctt
