@@ -1,7 +1,9 @@
 import prelude
+import data.unit
 import data.bool
 import data.smash
 import basics.isotoequiv
+import pointed.unit
 import pointed.bool
 
 def psmash (X Y : ptype) : ptype =
@@ -78,6 +80,40 @@ def pivotlr (X Y : ptype) (b : Y .fst) (a : X .fst)
   | i=0 j → gluel b j
   | i=1 j → gluer a j
   ]
+
+-- absorption
+
+def smash-unit/contr (X : ptype) : is-contr (smash X punit) =
+  let contr/proj (a : X .fst) : (u : unit)
+    → path (smash X punit) (proj a u) (proj (X .snd) ★)
+    =
+    elim [★ → pivotr X punit a (X .snd)]
+  in
+  let contr/gluel : (u : unit) → [i j] smash X punit [
+    | i=0 → gluel ★ j
+    | i=1 → contr/proj (X .snd) u j
+    | j=0 → gluel u i
+    | j=1 → proj (X .snd) ★
+    ]
+    =
+    elim [
+    | ★ → λ i j →
+      comp 1 0 (pivotl/filler X punit ★ ★ i j) [
+      | i=0 → refl
+      | i=1 k → pivot-coh X punit k j
+      | ∂[j] → refl
+      ]
+    ]
+  in
+  ( proj (X .snd) ★
+  , elim [
+    | basel → λ j → gluel ★ j
+    | baser → λ j → gluer (X .snd) j
+    | proj a u → contr/proj a u
+    | gluel u i → λ j → contr/gluel u i j
+    | gluer a i → λ j → pivotr/filler X punit a (X .snd) i j
+    ]
+  )
 
 -- unit laws
 
