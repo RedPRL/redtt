@@ -6,9 +6,9 @@ This vim plugin requires Vim 8 (released September 2016).
 
 While editing a .red file, run `:Redtt` or `<LocalLeader>l` (`l` for `load`) in
 the command (normal) mode to check the current buffer and display the output in
-a separate buffer. Run `<LocalLeader>L` to check the current buffer with
-`--ignore-cache`. Run `<LocalLeader>p` (`p` for `partial`) to check the current
-buffer, ignoring lines below the cursor's current position.
+a separate buffer. Run `<LocalLeader>p` (`p` for `partial`) to check the current
+buffer, ignoring lines below the cursor's current position. The `<LocalLeader>L`
+and `<LocalLeader>P` commands are analogous but use the `--ignore-cache` option.
 
 ### Typing special characters
 

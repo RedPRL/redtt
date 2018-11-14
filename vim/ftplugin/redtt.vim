@@ -19,6 +19,7 @@ command! Redtt :call CheckBuffer('')
 nnoremap <buffer> <LocalLeader>l :call CheckBuffer('')<CR>
 nnoremap <buffer> <LocalLeader>L :call CheckBuffer('--ignore-cache')<CR>
 nnoremap <buffer> <LocalLeader>p :call CheckBufferToCursor('')<CR>
+nnoremap <buffer> <LocalLeader>P :call CheckBufferToCursor('--ignore-cache')<CR>
 autocmd QuitPre <buffer> call s:CloseBuffer()
 
 digraph !- 8866
