@@ -7,6 +7,9 @@ import pointed.bool
 def psmash (X Y : ptype) : ptype =
   (smash X Y, proj (X .snd) (Y .snd))
 
+def psmash/map (X Y Z W : ptype) (f : pmap X Z) (g : pmap Y W) : pmap (psmash X Y) (psmash Z W) =
+  (smash/map X Y Z W f g, λ i → proj (f .snd i) (g .snd i))
+
 def commute (X Y : ptype) : smash X Y → smash Y X =
   elim [
   | basel → baser
@@ -221,5 +224,5 @@ def rearrange (X Y Z : ptype) : smash (psmash X Y) Z → smash (psmash Z Y) X =
 
 def associate (X Y Z : ptype) (t : smash (psmash X Y) Z) : smash X (psmash Y Z) =
   commute (psmash Y Z) X
-    (smash/map (psmash Z Y) X (psmash Y Z) X (commute Z Y, refl) (λ x → x, refl)
+    (smash/map (psmash Z Y) X (psmash Y Z) X (commute Z Y, refl) (pidf X)
       (rearrange X Y Z t))
