@@ -4,8 +4,8 @@ import data.s2
 import data.s3
 import data.join
 import data.int
-import basics.pointed
 import paths.s1
+import pointed.loops
 import cool.s3-to-join
 import cool.hopf
 
