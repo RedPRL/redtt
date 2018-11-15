@@ -40,4 +40,4 @@ def has-hlevel/prop : (l : hlevel) (A : type) → is-prop (has-hlevel l A) =
     | hsuc (l → l/ih) → λ A A/level A/level' i a a' →
       l/ih (path A a a') (A/level a a') (A/level' a a') i
     ]
-]
+  ]

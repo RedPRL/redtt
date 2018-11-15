@@ -78,4 +78,4 @@ def subtype/path
   λ i →
   ( P i
   , prop→prop-over (λ i → B (P i)) (B/prop (P 1)) (u.snd) (v.snd) i
-)
+  )

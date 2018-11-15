@@ -41,4 +41,4 @@ def bool/discrete : discrete bool =
   ]
 
 def bool/set : is-set bool =
-discrete→set bool bool/discrete
+  discrete→set bool bool/discrete

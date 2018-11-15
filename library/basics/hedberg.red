@@ -70,4 +70,4 @@ def paths-stable→set/alt (A : type) (st : (x y : A) → stable (path A x y)) :
     (λ x y → neg/prop (neg (path A x y)))
     (λ _ np → np refl)
     st
-).fst
+  ).fst
