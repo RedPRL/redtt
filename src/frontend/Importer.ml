@@ -57,10 +57,10 @@ struct
       | Some rot -> ret rot
       | None ->
         begin
-          if !ignore_rot then ret None else begin
-            let rotpath = FileRes.stem_to_rot stem in
+          if !ignore_rot then
+            ret None
+          else
             RotIO.try_read ~redsum:None ~importer:import ~stem
-          end
         end >>= function
         | Some rot ->
           store_module stem rot >> ret rot
@@ -81,13 +81,12 @@ struct
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
       begin
-        if !ignore_rot then ret None else begin
-          let rotpath = FileRes.stem_to_rot stem in
+        if !ignore_rot then
+          ret None
+        else
           RotIO.try_read ~redsum:None ~importer:import ~stem
-        end
       end >>= function
       | Some rot ->
-        let rotpath = FileRes.stem_to_rot stem in
         store_module stem rot
       | None ->
         let mlcmd, redsum = read_file red in
@@ -105,7 +104,12 @@ struct
     | TopModule {indent} ->
       let stem = FileRes.red_to_stem red in
       let mlcmd, redsum = read_from_channel ~filepath:red stdin in
-      RotIO.try_read ~redsum:(Some redsum) ~importer:import ~stem >>=
+      begin
+        if !ignore_rot then
+          ret None
+        else
+          RotIO.try_read ~redsum:(Some redsum) ~importer:import ~stem
+      end >>=
       begin
         function
         | Some rot ->
