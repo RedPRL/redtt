@@ -45,3 +45,28 @@ def div-mod : (n : nat) → div-mod/prop n =
 	in convoy (sub (suc n) (suc m')) (sub (suc m') (suc n)) refl refl
       ]
   )
+
+def aux : nat → nat → nat → nat → (nat × nat) = 
+	elim [
+	| zero → λ _ _ q → (q,zero)
+	| suc (x' → f) → 
+		elim [
+		| zero → λ _ _ → (zero,suc x')
+		| suc y' → 
+			λ r → 
+			let d : nat = sub (suc x') r in
+			let k = sub (suc y') d in 
+			let l = sub d (suc y') in 
+				elim k [
+				| zero → 
+					elim l [
+					| zero → λ q → (suc q,zero)
+					| suc _ → λ q → f (suc y') (plus y' r) (suc q)
+					]
+				| suc _ → λ q → (q,d)
+				]
+		]
+	]
+
+def div-mod' : nat → nat → (nat × nat) = 
+	λ x y → aux x y zero zero 
