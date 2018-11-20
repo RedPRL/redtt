@@ -1504,6 +1504,8 @@ let rec shift_univ k tm =
       make @@ map_tmf (shift_univ k) tmf
 
 let pp0 fmt tm = pp Pp.Env.emp fmt @@ eta_contract tm
+let pp0_bnd = pp_bnd Pp.Env.emp
+let pp0_nbnd = pp_nbnd Pp.Env.emp
 
 
 module Notation =

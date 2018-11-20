@@ -20,6 +20,7 @@ sig
   val mem : 'a -> 'a bwd -> bool
   val exists : ('a -> bool) -> 'a bwd -> bool
   val for_all : ('a -> bool) -> 'a bwd -> bool
+  val iter : ('a -> unit) -> 'a bwd -> unit
   val map : ('a -> 'b) -> 'a bwd -> 'b bwd
   val mapi : (int -> 'a -> 'b) -> 'a bwd -> 'b bwd
   val flat_map : ('a -> 'b list) -> 'a bwd -> 'b bwd

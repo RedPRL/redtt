@@ -156,8 +156,8 @@ struct
           C.check ~ty tm >>= function
           | `Ok ->
             M.ret @@ E.SemRet (E.SemTerm (Tm.up @@ Tm.ann ~ty ~tm))
-          | `Exn exn ->
-            raise exn
+          | `Exn (exn, bt) ->
+            Printexc.raise_with_backtrace exn bt
         end
 
       | E.MlDefine info ->
@@ -312,8 +312,8 @@ struct
             | `Ok ->
               M.in_scope x (`P pty) (go args) <<@> fun constr ->
                 Desc.TCons (`Const pty, Desc.Constr.bind x constr)
-            | `Exn exn ->
-              raise exn
+            | `Exn (exn, bt) ->
+              Printexc.raise_with_backtrace exn bt
         end
 
       | `I nm :: args ->
@@ -546,8 +546,8 @@ struct
               let hcom = Tm.HCom {r; r'; ty; cap; sys} in
               Tm.up (hcom, [])
 
-          | `Exn exn ->
-            raise exn
+          | `Exn (exn, bt) ->
+            Printexc.raise_with_backtrace exn bt
         end
 
       | [], _, E.Var _ ->
@@ -700,8 +700,8 @@ struct
       C.check ~ty @@ Tm.up cmd >>= function
       | `Ok ->
         M.ret @@ Tm.up cmd
-      | `Exn exn ->
-        raise exn
+      | `Exn (exn, bt) ->
+        Printexc.raise_with_backtrace exn bt
 
 
   and elab_inf e : (ty * tm Tm.cmd) M.m =
@@ -953,10 +953,10 @@ struct
       C.check ~ty @@ Tm.up cmd >>= function
       | `Ok ->
         M.ret @@ Tm.up cmd
-      | `Exn exn ->
+      | `Exn (exn, bt) ->
         C.dump_state Format.err_formatter "foo" `All >>= fun _ ->
         Format.eprintf "raising exn@.";
-        raise exn
+        Printexc.raise_with_backtrace exn bt
 
   and elab_cut exp frms =
     elab_cut_bwd exp (Bwd.from_list frms)
@@ -1046,7 +1046,7 @@ struct
         (* FIXME this is totally wrong. we should consult the context to determine
          * whether r = 0/1 or not. Without really checking it, vproj could be given
          * the wrong parameters from a non-rigid V type. *)
-        | Tm.V {r; equiv; ty0; ty1; _} ->
+        | Tm.V {r; equiv; ty0; ty1} ->
           let () = match Tm.unleash r with
             | Tm.Up (Tm.Var _, []) -> ()
             | _ -> failwith "V is not rigid when applying vproj frame."
