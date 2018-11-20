@@ -800,9 +800,9 @@ let rec pp env fmt =
       begin
         match sys with
         | [] ->
-          Format.fprintf fmt "@[<hv1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
+          Format.fprintf fmt "@[<hov1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
         | _ ->
-          Format.fprintf fmt "@[<hv1>(# @[<hv1><%a>@ %a@ @[<hv>%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
+          Format.fprintf fmt "@[<hov1>(# <%a>@ %a@ @[<hv>%a@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
       end
 
     | Restrict face ->
