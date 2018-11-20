@@ -117,6 +117,8 @@ and econ =
 
   | V of {x : string; ty0 : eterm; ty1 : eterm; equiv : eterm}
 
+  | Box of {cap : eterm; sys : eterm list}
+
   | Cut of eterm * frame list
 
   | Refl
@@ -156,6 +158,7 @@ and frame =
   | Fst
   | Snd
   | VProj
+  | Cap
   | Open
 
 module Env :
