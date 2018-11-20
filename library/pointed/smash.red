@@ -262,3 +262,11 @@ def associate (X Y Z : ptype) (t : smash (psmash X Y) Z) : smash X (psmash Y Z) 
   commute (psmash Y Z) X
     (smash/map (psmash Z Y) X (psmash Y Z) X (commute Z Y, refl) (pidf X)
       (rearrange X Y Z t))
+
+def associate/inv (X Y Z : ptype) (t : smash X (psmash Y Z)) : smash (psmash X Y) Z =
+  rearrange Z Y X
+    (commute X (psmash Z Y)
+     (smash/map X (psmash Y Z) X (psmash Z Y)
+       (pidf X)
+       (commute Y Z, refl)
+       t))
