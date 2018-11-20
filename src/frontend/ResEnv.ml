@@ -15,6 +15,31 @@ let pp_visibility fmt =
   | `Public -> Format.fprintf fmt "public"
   | `Private -> Format.fprintf fmt "private"
 
+type error =
+  | UnresolvedVar of string
+  | ExpectedName
+
+exception E of error
+
+module Error =
+struct
+  let pp fmt =
+    function
+    | UnresolvedVar str ->
+      Format.fprintf fmt
+        "Could not resolve variable: %a"
+        Uuseg_string.pp_utf_8 str
+    | ExpectedName ->
+      Format.fprintf fmt "Resolver expected to find name"
+
+  let _ =
+    PpExn.install_printer @@ fun fmt ->
+    function
+    | E err ->
+      pp fmt err
+    | _ ->
+      raise PpExn.Unrecognized
+end
 
 module T = PersistentTable.M
 
@@ -101,12 +126,12 @@ let get x renv =
     | Some (x, _) ->
       `Name x
     | None ->
-      failwith @@ "Could not resolve variable: " ^ x
+      raise @@ E (UnresolvedVar x)
 
 let get_name x renv =
   match get x renv with
   | `Name x -> x
-  | _ -> failwith "ResEnv.get_name: expected to find name"
+  | _ -> raise @@ E ExpectedName
 
 let add_native_global ~visibility name renv =
   let info = name, visibility in
