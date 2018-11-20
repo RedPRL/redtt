@@ -199,18 +199,75 @@ struct
 end
 
 (* Please fill this in. I'm just using it for debugging. *)
-let pp fmt =
+let rec pp fmt =
   function
   | Hole _ ->
     Format.fprintf fmt "<hole>"
   | Hope ->
     Format.fprintf fmt "<hope>"
-  | Lam _ ->
-    Format.fprintf fmt "<lam>"
+  | Guess _ ->
+    Format.fprintf fmt "<guess>"
+
   | Var {name; _} ->
     Format.fprintf fmt "%s" name
-  | _ ->
-    Format.fprintf fmt "<eterm>"
+  | Num _ ->
+    Format.fprintf fmt "<num>"
+
+  | Pi _ ->
+    Format.fprintf fmt "<pi>"
+  | Sg _ ->
+    Format.fprintf fmt "<sg>"
+  | Ext _ ->
+    Format.fprintf fmt "<ext>"
+
+  | Lam _ ->
+    Format.fprintf fmt "<lam>"
+  | Tuple _ ->
+    Format.fprintf fmt "<tuple>"
+
+  | Coe _ ->
+    Format.fprintf fmt "<coe>"
+  | HCom _ ->
+    Format.fprintf fmt "<hcom>"
+  | Com _ ->
+    Format.fprintf fmt "<com>"
+
+  | Type _ ->
+    Format.fprintf fmt "<type>"
+
+  | Box {cap; sys} ->
+    Format.fprintf fmt "@[box@ %a@ [%a]@]" pp cap.con (ListUtil.pp "|" pp_eterm) sys
+
+  | V _ ->
+    Format.fprintf fmt "<V>"
+
+  | Elim _ ->
+    Format.fprintf fmt "<elim>"
+  | ElimFun _ ->
+    Format.fprintf fmt "<elim-fun>"
+
+  | Let _ ->
+    Format.fprintf fmt "<let>"
+  | Cut (hd, stk) ->
+    Format.fprintf fmt "@[<hov1>(cut@ %a@ %a)@]" pp_eterm hd (ListUtil.pp " " pp_frame) stk
+
+  | Refl ->
+    Format.fprintf fmt "refl"
+  | Quo _ ->
+    Format.fprintf fmt "<quo>"
+  | RunML _ ->
+    Format.fprintf fmt "<run-ml>"
+
+and pp_eterm fmt {con; _} = pp fmt con
+
+and pp_frame fmt =
+  function
+  | App e -> pp_eterm fmt e
+  | Fst -> Format.fprintf fmt "fst"
+  | Snd -> Format.fprintf fmt "snd"
+  | VProj -> Format.fprintf fmt "vproj"
+  | Cap -> Format.fprintf fmt "cap"
+  | Open -> Format.fprintf fmt "open"
 
 let pp_edecl fmt =
   function
