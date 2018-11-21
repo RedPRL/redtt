@@ -17,7 +17,7 @@ def is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv _ _ f) =
 
     ( c' (a , p) i
     , λ w →
-      let cap (j k : 𝕀) : fiber A B f y =
+      let mycap (j k : 𝕀) : fiber A B f y =
         comp 1 j (c' w k) [
         | k=0 → refl
         | k=1 → c' w
@@ -25,12 +25,12 @@ def is-equiv/prop/direct (A B : type) (f : A → B) : is-prop (is-equiv _ _ f) =
       in
       let face/i0 (j k : 𝕀) : fiber A B f y =
         comp 0 j w [
-        | k=0 → cap 0
+        | k=0 → mycap 0
         | k=1 → c w
         ]
       in
       λ j →
-      comp 0 1 (cap i j) [
+      comp 0 1 (mycap i j) [
       | i=0 → face/i0 j
       | i=1 | j=0 → refl
       | j=1 k → c' (face/i0 1 k) i
