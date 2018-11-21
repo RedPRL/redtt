@@ -73,6 +73,8 @@ struct
       M.ret `Snd
     | E.VProj ->
       M.ret `VProj
+    | E.Cap ->
+      M.ret `Cap
     | E.Open ->
       M.ret `Open
 
@@ -523,6 +525,14 @@ struct
         let tac1 = elab_chk @@ {e with con = Tuple es} in
         R.tac_pair tac0 tac1 goal
 
+      | [], Tm.FHCom fhcom, Box box ->
+        elab_box_sys fhcom.r fhcom.r' fhcom.sys box.sys >>= fun (sys, coe_sys) ->
+        elab_chk box.cap {ty = fhcom.cap; sys = coe_sys} >>= fun cap ->
+        M.ret @@ Tm.make @@ Tm.Box {r = fhcom.r; r' = fhcom.r'; cap; sys}
+
+      | _, Tm.FHCom fhcom, Box box ->
+        failwith "box tactic under constraints not implemented yet."
+
       | [], Tm.Univ info, Type (kind, lvl) ->
         begin
           if Lvl.greater info.lvl lvl then
@@ -694,6 +704,28 @@ struct
 
     in go Emp
 
+  and elab_box_sys s s' systy (bdrys : E.eterm list) =
+    let rec go acc coe_acc =
+      function
+      | [], [] ->
+        M.ret @@ (Bwd.to_list acc, Bwd.to_list coe_acc)
+
+      | ((r, r', ty_bnd) :: systy), (bdry :: bdrys) ->
+        let tys' = Tm.unbind_with (Tm.DownX s', []) ty_bnd in
+        begin
+          M.under_restriction r r' begin
+            elab_chk bdry {ty = tys'; sys = Bwd.to_list acc}
+          end
+        end >>= fun obdry ->
+        let bdry = Option.default Tm.forty_two obdry in
+        let face = r, r', bdry in
+        let coe_face = r, r', Tm.up (Tm.Coe {r = s'; r' = s; ty = ty_bnd; tm = bdry}, []) in
+        go (acc #< face) (coe_acc #< coe_face) (systy, bdrys)
+
+      | _ -> invalid_arg "elab_box_sys"
+
+    in go Emp Emp (systy, bdrys)
+
   and elab_up ty inf =
     elab_inf inf >>= fun (ty', cmd) ->
     C.check ~ty @@ Tm.up cmd >>= function
@@ -813,6 +845,8 @@ struct
         M.ret (spine, `Snd)
       | `VProj ->
         M.ret (spine, `VProj)
+      | `Cap ->
+        M.ret (spine, `Cap)
       | `Open ->
         M.ret (spine, `Open)
 
@@ -1057,6 +1091,19 @@ struct
           in
           let func = Tm.up @@ Tm.ann ~ty:(Tm.equiv ty0 ty1) ~tm:equiv @< Tm.Fst in
           M.ret (ty1, cmd @< Tm.VProj {r; func; ty0; ty1})
+        | _ ->
+          raise R.ChkMatch
+      end
+
+    | spine, `Cap ->
+      elab_cut_bwd exp spine >>= fun (ty, cmd) ->
+      try_nf ty @@ fun ty ->
+      begin
+        match unleash ty with
+        (* FIXME this does not check rigidity because we do not know how to do it
+         * correctly anyways *)
+        | Tm.FHCom {r; r'; cap; sys} ->
+          M.ret (cap, cmd @< Tm.Cap {r; r'; ty = cap; sys})
         | _ ->
           raise R.ChkMatch
       end

@@ -42,7 +42,7 @@
 %token RIGHT_ARROW RIGHT_TACK
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN V VPROJ VIN REFL
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN V VPROJ VIN CAP BOX REFL
 %token PUBLIC PRIVATE OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
 %token META
@@ -84,6 +84,8 @@ eproj:
     { E.Snd }
   | DOT VPROJ
     { E.VProj }
+  | DOT CAP
+    { E.Cap }
 
 atom_econ:
   | a = ATOM
@@ -179,6 +181,9 @@ spine_con:
 
   | V; x = ATOM; ty0 = located(atomic); ty1 = located(atomic); equiv = located(atomic)
     { E.V {x; ty0; ty1; equiv} }
+
+  | BOX; cap = located(atomic); sys = pipe_block(located(econ))
+    { E.Box {cap; sys}}
 
 %inline
 block(X):
