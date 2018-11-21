@@ -800,9 +800,9 @@ let rec pp env fmt =
       begin
         match sys with
         | [] ->
-          Format.fprintf fmt "@[<hv1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
+          Format.fprintf fmt "@[<hov1>(# <%a>@ %a)@]" pp_strings xs (pp env') cod
         | _ ->
-          Format.fprintf fmt "@[<hv1>(# @[<hv1><%a>@ %a@ @[<hv>%a@]@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
+          Format.fprintf fmt "@[<hov1>(# <%a>@ %a@ @[<hv>%a@])@]" pp_strings xs (pp env') cod (pp_sys env') sys
       end
 
     | Restrict face ->
@@ -1504,6 +1504,8 @@ let rec shift_univ k tm =
       make @@ map_tmf (shift_univ k) tmf
 
 let pp0 fmt tm = pp Pp.Env.emp fmt @@ eta_contract tm
+let pp0_bnd = pp_bnd Pp.Env.emp
+let pp0_nbnd = pp_nbnd Pp.Env.emp
 
 
 module Notation =

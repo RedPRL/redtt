@@ -31,7 +31,7 @@ syn region  redttImport matchgroup=redttDecl start="import" end="$\|\(/-\|--\)\@
 syn match   redttHole '?\k*'
 
 syn keyword redttKeyw V in with where begin end dim elim fst snd coe com pair
-syn keyword redttKeyw fun hcom comp vproj vin lam refl pre
+syn keyword redttKeyw fun hcom comp vproj vin cap box lam refl pre
 syn keyword redttKeyw kan U type
 
 syn keyword redttDecl meta def do let data debug print normalize public private quit opaque
