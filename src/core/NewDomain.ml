@@ -1969,12 +1969,13 @@ struct
         let cap = Val.plug rel ~rigid:true cap_frame cap in
         let sys =
           let ri_faces = ConAbsSys.plug rel ~rigid:true cap_frame sys in
-          let si_faces = ConAbsSys.foreach_make rel fhcom.sys @@ fun si s'i abs rel ->
-            let cap_frame = Frame.run rel cap_frame in
+          let si_faces =
+            ConAbsSys.foreach_make rel fhcom.sys @@ fun si s'i abs rel ->
             ConAbs.bind @@ fun y ->
             (* XXX FIXME This is not the most efficient code because we know what [cap_frame]
              * will reduce to, but maybe we can afford this? *)
-            Con.plug rel ~rigid:false cap_frame @@ hcom_template rel y (LazyValAbs.inst_then_unleash rel abs s')
+            Con.plug rel ~rigid:false (Frame.run rel cap_frame) @@
+            hcom_template rel y (LazyValAbs.inst_then_unleash rel abs s')
           in
           let diag =
             ConAbsFace.make rel r r' @@ fun rel ->
