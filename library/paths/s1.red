@@ -118,7 +118,7 @@ def loopn-winding (l : Ω1s1) : path _ (loopn (winding l)) l =
   J _ l (λ p → path (path s1 base (p 1)) (decode (p 1) (encode (p 1) p)) p) refl
 
 def winding/equiv : equiv Ω1s1 int =
-  iso→equiv _ _ (winding, (loopn, (winding-loopn, loopn-winding)))
+  iso→equiv Ω1s1 int (winding, loopn, winding-loopn, loopn-winding)
 
 def winding/path : path^1 _ Ω1s1 int =
   ua Ω1s1 int winding/equiv
