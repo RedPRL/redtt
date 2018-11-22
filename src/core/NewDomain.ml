@@ -2348,7 +2348,7 @@ struct
         in
         let fhcom_sys_rx = ConAbsSys.run rel @@ ConAbsSys.subst r x fhcom.sys in
         let sys =
-          ConAbsSys.foreach_make rel fhcom_sys_rx @@ fun sj_xr s'j_xr absj_xr rel ->
+          ConAbsSys.foreach_make rel fhcom_sys_rx @@ fun _sj_xr _s'j_xr absj_xr rel ->
           let absj_xr = LazyValAbs.unleash absj_xr in
           ConAbs.bind @@ fun y ->
           make_coe rel y s_xr ~abs:absj_xr @@ Val.make @@
