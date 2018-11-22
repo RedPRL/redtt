@@ -1989,7 +1989,7 @@ struct
         ConSys.foreach_make rel fhcom.sys @@ fun si s'i abs rel ->
         hcom_template rel r' (LazyValAbs.inst_then_unleash rel abs s')
       in
-      Box {r; r'; cap; sys}
+      Box {r = fhcom.r; r' = fhcom.r'; cap; sys}
 
     | Neu info ->
       let neu =
