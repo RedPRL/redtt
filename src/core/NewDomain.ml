@@ -2548,14 +2548,14 @@ struct
     match sys with
     | [] -> Val.unleash cap
     | (r, r', abs) :: rest ->
-      let face rel0 (dim0, dim1) r' = (* [dim0] and [dim1] will be swapped to generate the symmetric case. *)
-        let bdy00 rel00 r' = ConAbs.inst rel00 (LazyValAbs.drop_rel abs) r' in
-        let bdy01 rel01 r' =
-          make_ghcom rel01 r r' ~ty:(Con.run rel01 ty) ~cap:(Val.run rel01 cap) ~sys:(ConAbsSys.run rel01 rest)
+      let face rel0 (dim0, dim1) s' = (* [dim0] and [dim1] will be swapped to generate the symmetric case. *)
+        let bdy00 rel00 s' = ConAbs.inst rel00 (LazyValAbs.drop_rel abs) s' in
+        let bdy01 rel01 s' =
+          make_ghcom rel01 s s' ~ty:(Con.run rel01 ty) ~cap:(Val.run rel01 cap) ~sys:(ConAbsSys.run rel01 rest)
         in
         match Rel.equate r' dim0 rel0 with
-        | `Same -> bdy00 rel0 r'
-        | `Inconsistent -> bdy01 rel0 r'
+        | `Same -> bdy00 rel0 s'
+        | `Inconsistent -> bdy01 rel0 s'
         | `Changed rel00 ->
           let rel01 = Rel.equate' r' dim1 rel0 in
           let ty = Con.run rel0 ty in
@@ -2565,11 +2565,11 @@ struct
             (r', dim1, LazyValAbs.bind @@ bdy01 rel01) ::
             ConAbsSys.run rel0 rest
           in
-          make_hcom rel0 r r' ~ty ~cap ~sys
+          make_hcom rel0 s s' ~ty ~cap ~sys
       in
       match Rel.equate r `Dim0 rel with
-      | `Same -> face rel (`Dim0, `Dim1) r'
-      | `Inconsistent -> face rel (`Dim1, `Dim0) r'
+      | `Same -> face rel (`Dim0, `Dim1) s'
+      | `Inconsistent -> face rel (`Dim1, `Dim0) s'
       | `Changed rel0 ->
         let rel1 = Rel.equate' r `Dim1 rel in
         let sys =
