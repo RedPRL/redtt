@@ -1978,7 +1978,7 @@ struct
             hcom_template rel y (LazyValAbs.inst_then_unleash rel abs s')
           in
           let diag =
-            ConAbsFace.make rel r r' @@ fun rel ->
+            ConAbsFace.make rel fhcom.r fhcom.r' @@ fun rel ->
             ConAbs.bind @@ fun y ->
             hcom_template rel y (Val.run_then_unleash rel fhcom.cap)
           in
