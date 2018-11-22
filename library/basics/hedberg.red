@@ -30,8 +30,8 @@ def paths-stable→set (A : type) (st : (x y : A) → stable (path A x y)) : is-
     | m=1 → q
     ]
   in
-  let cap (k m : 𝕀) = st (p k) (q k) (λ c → c (square k)) m in
-  comp 0 1 (cap j i) [
+  let mycap (k m : 𝕀) = st (p k) (q k) (λ c → c (square k)) m in
+  comp 0 1 (mycap j i) [
   | i=0 k →
     st (p j) (p j)
        (neg/is-prop-over (λ j → neg (path A (p j) (p j)))
@@ -40,7 +40,7 @@ def paths-stable→set (A : type) (st : (x y : A) → stable (path A x y)) : is-
          j)
        k
   | i=1 → refl
-  | ∂[j] k → weak-connection/or A (cap j) i k
+  | ∂[j] k → weak-connection/or A (mycap j) i k
   ]
 
 -- Hedberg's theorem for decidable path types
