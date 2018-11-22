@@ -1963,7 +1963,8 @@ struct
       in
 
       (* This is `P` in [F]. *)
-      let cap = Val.make @@
+      let cap =
+        Val.make @@
         let ty = Val.unleash fhcom.cap in
         let cap = Val.plug rel ~rigid:true cap_frame cap in
         let sys =
