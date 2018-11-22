@@ -317,9 +317,12 @@ and equate_hd qenv rel hd0 hd1 =
     in
     Tm.Coe {r; r'; ty; tm}
 
-  | NCoeData _, NCoeData _ ->
-    Format.eprintf "equate_hd ncoedata??@.";
-    raise PleaseFillIn
+  | NCoeData info0, NCoeData info1 ->
+    let r = equate_dim qenv rel info0.r info1.r in
+    let r' = equate_dim qenv rel info0.r' info1.r' in
+    let ty = equate_tycon_abs qenv rel info0.ty info1.ty in
+    let tm = equate_neutroid qenv rel info0.cap info1.cap in
+    Tm.Coe {r; r'; ty; tm}
 
   | NHCom info0, NHCom info1 ->
     let r = equate_dim qenv rel info0.r info1.r in
