@@ -2576,7 +2576,7 @@ struct
           (r, `Dim0, LazyValAbs.bind @@ face rel0 @@ (`Dim0, `Dim1)) ::
           (r, `Dim1, LazyValAbs.bind @@ face rel1 @@ (`Dim1, `Dim0)) :: rest
         in
-        make_hcom rel r r' ~ty ~cap ~sys
+        make_hcom rel s s' ~ty ~cap ~sys
 
   and rigid_ghcom rel r r' ~ty ~cap ~sys =
     match ty with
