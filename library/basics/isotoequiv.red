@@ -23,29 +23,29 @@ def iso/fiber/prop-over
     ]
   in
   λ fib0 fib1 →
-    let sq2 (i k : 𝕀) : A =
-      comp 0 k (g (b i)) [
-      | i=0 → sq (b 0) fib0 1
-      | i=1 → sq (b 1) fib1 1
+  let sq2 (i k : 𝕀) : A =
+    comp 0 k (g (b i)) [
+    | i=0 → sq (b 0) fib0 1
+    | i=1 → sq (b 1) fib1 1
+    ]
+  in
+  λ i →
+  ( refl
+  , λ j →
+    let aux : A =
+      comp j 0 (β (sq2 i 1) j) [
+      | j=1 → sq2 i
+      | i=0 → sq (b 0) fib0 j
+      | i=1 → sq (b 1) fib1 j
       ]
     in
-    λ i →
-    ( refl
-    , λ j →
-       let aux : A =
-         comp j 0 (β (sq2 i 1) j) [
-         | j=1 → sq2 i
-         | i=0 → sq (b 0) fib0 j
-         | i=1 → sq (b 1) fib1 j
-         ]
-       in
-       comp 0 1 (f aux) [
-       | i=0 → α (fib0.snd j)
-       | i=1 → α (fib1.snd j)
-       | j=0 → α (f (sq2 i 1))
-       | j=1 → α (b i)
-       ]
-    )
+    comp 0 1 (f aux) [
+    | i=0 → α (fib0.snd j)
+    | i=1 → α (fib1.snd j)
+    | j=0 → α (f (sq2 i 1))
+    | j=1 → α (b i)
+    ]
+  )
 
 def iso→equiv (A B : type) (I : iso A B) : equiv A B =
   let (f, g, α, β) = I in
