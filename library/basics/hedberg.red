@@ -48,7 +48,7 @@ def paths-stable→set (A : type) (st : (x y : A) → stable (path A x y)) : is-
 def discrete→set (A : type) (d : discrete A) : is-set A =
   paths-stable→set A (λ x y → dec→stable (path A x y) (d x y))
 
-def mere-relation/set-equiv 
+def hrel/set-equiv 
   (A : type) (R : A → A → type) 
   (R/prop : (x y : A) → is-prop (R x y))
   (R/refl : (x : A) → R x x) 
@@ -66,7 +66,7 @@ def mere-relation/set-equiv
 
 -- Hedberg's theorem is a corollary of above
 def paths-stable→set/alt (A : type) (st : (x y : A) → stable (path A x y)) : is-set A =
-  (mere-relation/set-equiv A (λ x y → neg (neg (path A x y)))
+  (hrel/set-equiv A (λ x y → neg (neg (path A x y)))
     (λ x y → neg/prop (neg (path A x y)))
     (λ _ np → np refl)
     st
