@@ -1,19 +1,20 @@
 import prelude
-import basics.isotoequiv
+import basics.retract
 
 -- Half-adjoint equivalence
+
+def lcoh (A B : type) (f : A → B) (g : B → A) (f-g : (b : _) → path _ (f (g b)) b) : type =
+  (g-f : (a : _) → path _ (g (f a)) a)
+  × (a : A) → path (path _ (f (g (f a))) (f a)) (λ i → f (g-f a i)) (f-g (f a))
 
 def is-ha-equiv (A B : type) (f : A → B) : type =
   (g : B → A)
   × (f-g : (b : _) → path _ (f (g b)) b)
-  × (g-f : (a : _) → path _ (g (f a)) a)
-  × (a : A) → path (path _ (f (g (f a))) (f a)) (λ i → f (g-f a i)) (f-g (f a))
+  × lcoh A B f g f-g
 
 def ha-equiv (A B : type) : type = (f : A → B) × is-ha-equiv A B f
 
-
 -- this symmetry function is exactly involutive on all but the highest coherence
-
 def ha-equiv/symm (A B : type) (e : ha-equiv A B) : ha-equiv B A =
   let (f, g, f-g, g-f, adj) = e in
   let adj' (b : B) : path (path _ (g (f (g b))) (g b)) (λ i → g (f-g b i)) (g-f (g b)) =
