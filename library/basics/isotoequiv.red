@@ -10,6 +10,9 @@ def iso (A B : type) : type =
   × ((b : _) → path _ (f (g b)) b)
   × (a : _) → path _ (g (f a)) a
 
+def iso/symm (A B : type) (I : iso A B) : iso B A =
+  let (f,g,α,β) = I in (g,f,β,α)
+
 def iso/fiber/prop-over
   (A B : type)
   (I : iso A B) (b : 𝕀 → B)
@@ -56,3 +59,10 @@ def iso→equiv-over (A B : type) (I : iso A B) : equiv-over A B =
   let (f, g, α, β) = I in
   (f , (λ b → (g b, α b), λ b fib → iso/fiber/prop-over _ _ I b fib (g (b 1), α (b 1))))
 -/
+
+def equiv→iso (A B : type) (e : equiv A B) : iso A B =
+  ( e .fst
+  , λ b → e .snd b .fst .fst
+  , λ b → e .snd b .fst .snd
+  , λ a i → symm (fiber A B (e .fst) (e .fst a)) (e .snd (e .fst a) .snd (a, refl)) i .fst
+  )

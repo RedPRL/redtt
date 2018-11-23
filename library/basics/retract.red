@@ -103,7 +103,7 @@ def path-retract/equiv (A : type) (R : A → A → type)
     , λ p → J A p (λ q → path _ (ret a (q 1) .fst (ret a (q 1) .snd .fst q)) q) preserves-refl
     , ret a b .snd .snd
     )
-  
+
 def equiv-section/prop (A B : type) (f : A → B) (c : is-equiv A B f)
   : is-prop (section A B f) =
   λ (g0,p0) (g1,p1) i →
@@ -112,3 +112,21 @@ def equiv-section/prop (A B : type) (f : A → B) (c : is-equiv A B f)
   in
   (λ b → α b i .fst, λ b → α b i .snd)
 
+-- TODO this does not really belong in this file
+def precompose-equiv (A B C : type) (e : equiv A B) : equiv (B → C) (A → C) =
+  let (f,g,α,β) = equiv→iso _ _ e in
+  iso→equiv (B → C) (A → C)
+    ( λ h a → h (f a)
+    , λ k b → k (g b)
+    , λ k i a → k (β a i)
+    , λ h i b → h (α b i)
+    )
+
+def equiv-retraction/prop (A B : type) (f : A → B) (c : is-equiv A B f)
+  : is-prop (retraction A B f) =
+  λ (g0,q0) (g1,q1) i →
+  let p =
+    contr→prop _ (precompose-equiv A B A (f,c) .snd (λ a → a))
+      (g0, λ j b → q0 b j) (g1, λ j b → q1 b j)
+  in
+  (p i .fst, λ b j → p i .snd j b)
