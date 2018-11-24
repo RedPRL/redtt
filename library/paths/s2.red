@@ -15,14 +15,14 @@ data os2 where
 
 -- it would probably be more efficient to define this directly,
 -- but we don't need it
-def oloop-equiv : path (equiv os2 os2) (id-equiv/weak-connection os2) (id-equiv/weak-connection os2) =
+def oloop-equiv : path (equiv os2 os2) (id-equiv os2) (id-equiv os2) =
   λ i →
   ( λ o → oloop o i
   , prop→prop-over
     (λ j → is-equiv os2 os2 (λ o → oloop o j))
     (is-equiv/prop/direct os2 os2 (λ o → o))
-    (id-equiv/weak-connection os2 .snd)
-    (id-equiv/weak-connection os2 .snd)
+    (id-equiv os2 .snd)
+    (id-equiv os2 .snd)
     i
   )
 
@@ -39,7 +39,7 @@ def oloop-onegloop (o : os2)
 
 def s2/code/surf/filler (m i j : 𝕀) : type =
   comp 0 m os2 [
-  | ∂[i] | j=0 → ua os2 os2 (id-equiv/weak-connection os2)
+  | ∂[i] | j=0 → ua os2 os2 (id-equiv os2)
   | j=1 → ua os2 os2 (oloop-equiv i)
   ]
 
