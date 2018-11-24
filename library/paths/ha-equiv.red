@@ -4,19 +4,6 @@ import basics.retract
 import basics.ha-equiv
 import paths.pi
 
-def symm/filler' (A : type) (p : 𝕀 → A) : [j i] A [
-  | j=0 → symm A p i
-  | j=1 → p 1
-  | i=0 → p 1
-  | i=1 → p j
-  ]
-  =
-  λ j i →
-  comp 0 1 (p 0) [
-  | i=0 | j=1 → p
-  | i=1 k → connection/and A p j k
-  ]
-
 -- this is actually an equivalence, but we don't need that
 def lcoh/retract-of-fiber-path (A B : type) (f : A → B) (c : is-equiv A B f)
   (g : B → A) (f-g : (b : _) → path _ (f (g b)) b)
@@ -30,7 +17,7 @@ def lcoh/retract-of-fiber-path (A B : type) (f : A → B) (c : is-equiv A B f)
       comp 1 0 (adj a j i) [
       | i=0 k → symm/filler B (λ n → f-g (f a) n) j k
       | i=1 | j=0 → refl
-      | j=1 k → symm/filler' B (λ v → f-g (f a) v) i k
+      | j=1 k → weak-connection/or-not B (λ v → f-g (f a) v) i k
       ]
     )
   , λ p →
@@ -39,7 +26,7 @@ def lcoh/retract-of-fiber-path (A B : type) (f : A → B) (c : is-equiv A B f)
       comp 0 1 (p a i .snd j) [
       | i=0 k → symm/filler B (λ n → f-g (f a) n) j k
       | i=1 | j=0 → refl
-      | j=1 k → symm/filler' B (λ v → f-g (f a) v) i k
+      | j=1 k → weak-connection/or-not B (λ v → f-g (f a) v) i k
       ]
     )
   , λ (g-f,adj) k →
@@ -49,13 +36,13 @@ def lcoh/retract-of-fiber-path (A B : type) (f : A → B) (c : is-equiv A B f)
         comp 1 k (adj a j i) [
         | i=0 k → symm/filler B (λ n → f-g (f a) n) j k
         | i=1 | j=0 → refl
-        | j=1 k → symm/filler' B (λ v → f-g (f a) v) i k
+        | j=1 k → weak-connection/or-not B (λ v → f-g (f a) v) i k
         ]
       in
       comp k 1 capk [
       | i=0 k → symm/filler B (λ n → f-g (f a) n) j k
       | i=1 | j=0 → refl
-      | j=1 k → symm/filler' B (λ v → f-g (f a) v) i k
+      | j=1 k → weak-connection/or-not B (λ v → f-g (f a) v) i k
       ]
     )
   )
