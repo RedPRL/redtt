@@ -1,7 +1,8 @@
 import prelude
+import data.int
 import data.s2
 import basics.isotoequiv
-import paths.equivalence
+import paths.int
 
 -- a calculation of the loop space of the 2-sphere, based on
 -- https://egbertrijke.com/2016/09/28/the-loop-space-of-the-2-sphere/
@@ -145,3 +146,16 @@ def s2/decode-encode/base
 
 def Ω1s2/equiv : equiv (path s2 base base) os2 =
   iso→equiv _ _ (s2/encode base, s2/decode base, s2/encode-decode/base, s2/decode-encode/base)
+
+-- winding numbers for os2
+
+def os2/int-code/pair : os2 → (A : type) × path^1 type A A =
+  elim [
+  | obase → (int, λ i → ua _ _ isuc/equiv i)
+  | oloop (_ → o/ih) i → (o/ih .snd i, λ j → connection/both^1 type (o/ih .snd) (o/ih .snd) i j)
+  ]
+
+def os2/int-code (o : os2) : type = os2/int-code/pair o .fst
+
+def os2/winding (p : path os2 obase obase) : int =
+  coe 0 1 (pos zero) in λ i → os2/int-code (p i)
