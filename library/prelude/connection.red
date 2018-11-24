@@ -1,3 +1,5 @@
+import prelude.path
+
 def connection/or
   (A : type)
   (p : 𝕀 → A)
@@ -123,4 +125,20 @@ def weak-connection/and
   | i=1 → face j
   | j=1 → face i
   ]
+
+def weak-connection/or-not -- i \/ ~j
+  (A : type)
+  (p : 𝕀 → A)
+  : [i j] A [
+  | i=0 → symm A p j
+  | i=1 | j=0 → p 1
+  | j=1 → p i
+  ]
+  =
+  λ i j →
+  comp 0 1 (p 0) [
+  | j=0 | i=1 → p
+  | j=1 k → connection/and A p i k
+  ]
+
 
