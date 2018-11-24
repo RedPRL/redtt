@@ -72,7 +72,7 @@ def equiv-lcoh/prop (A B : type) (f : A → B) (c : is-equiv A B f)
          (contr→prop (fiber A B f (f a)) (c (f a)))
          (g (f a), f-g (f a)) (a, refl)))
 
-def ha-equiv/prop (A B : type) (f : A → B) : is-prop (is-ha-equiv A B f) =
+def is-ha-equiv/prop (A B : type) (f : A → B) : is-prop (is-ha-equiv A B f) =
   λ (g0,f-g0,g0-f,adj0) (g1,f-g1,g1-f,adj1) i →
   let c = iso→equiv _ _ (f,g0,f-g0,g0-f) .snd in
   let p = equiv-section/prop A B f c (g0,f-g0) (g1,f-g1) in
