@@ -13,33 +13,48 @@ data os2 where
 
 -- I. the loop of automorphisms of os2
 
--- it would probably be more efficient to define this directly,
--- but we don't need it
-def oloop-equiv : path (equiv os2 os2) (id-equiv os2) (id-equiv os2) =
-  λ i →
-  ( λ o → oloop o i
-  , prop→prop-over
-    (λ j → is-equiv os2 os2 (λ o → oloop o j))
-    (is-equiv/prop/direct os2 os2 (λ o → o))
-    (id-equiv os2 .snd)
-    (id-equiv os2 .snd)
-    i
-  )
-
--- incidentally, onegloop o is homotopic to symm (λ i → oloop o i)
 def onegloop (o : os2) : path os2 o o =
-  λ i → oloop-equiv i .snd o .fst .fst
+  symm os2 (λ i → oloop o i)
 
 def oloop-onegloop (o : os2)
   : pathd (λ i → path os2 (oloop (onegloop o i) i) o) refl refl
   =
-  λ i → oloop-equiv i .snd o .fst .snd
+  λ i j →
+  comp 0 1 (oloop o i) [
+  | i=0 k → oloop o k
+  | i=1 → refl
+  | j=0 k → oloop (symm/filler os2 (λ i → oloop o i) k i) i
+  | j=1 k → weak-connection/or os2 (λ i → oloop o i) i k
+  ]
+
+def onegloop-oloop (o : os2)
+  : pathd (λ i → path os2 (onegloop (oloop o i) i) o) refl refl
+  =
+  λ i j →
+  let filler (m : 𝕀) : os2 =
+    comp 1 m o [
+    | j=0 m → oloop o m
+    | j=1 → refl
+    ]
+  in
+  comp 0 1 (filler i) [
+  | i=0 → filler
+  | i=1 | j=1 → refl
+  ]
+
+def oloop-equiv (i : 𝕀) : equiv os2 os2 =
+  iso→equiv os2 os2
+    ( λ o → oloop o i
+    , λ o → onegloop o i
+    , λ o → oloop-onegloop o i
+    , λ o → onegloop-oloop o i
+    )
 
 -- II. universal cover over s2
 
 def s2/code/surf/filler (m i j : 𝕀) : type =
   comp 0 m os2 [
-  | ∂[i] | j=0 → ua os2 os2 (id-equiv os2)
+  | ∂[i] | j=0 → ua os2 os2 (oloop-equiv 0)
   | j=1 → ua os2 os2 (oloop-equiv i)
   ]
 
