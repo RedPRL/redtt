@@ -55,18 +55,6 @@ def s2/code/surf/filler (m i j : 𝕀) : type =
 def s2/code/surf : path^1 (path^1 type os2 os2) refl refl =
   s2/code/surf/filler 1
 
-def s2/code/proj :
-  [i j] (s2/code/surf i j → os2) [
-  | (∂[i] | j=1) o → o
-  | j=0 o → oloop o i
-  ]
-  =
-  λ i j →
-  comp 0 1 (λ o → oloop o i) in (λ m → s2/code/surf/filler m i j → os2) [
-  | (∂[i] | j=1) _ o → o .vproj
-  | j=0 _ o → oloop (o .vproj) i
-  ]
-
 def s2/code (a : s2) : type =
   elim a [
   | base → os2
@@ -96,14 +84,25 @@ def s2/decode (a : s2) : (s2/code a) → path s2 base a =
   elim a [
   | base → s2/decode/base
   | surf i j → λ code k →
-    comp 0 1 (extend-by-surf (s2/decode/base (onegloop (s2/code/proj i j code) i)) i j k) [
-    | ∂[i k] → refl
-    | j=0 m → s2/decode/base (onegloop-oloop code i m) k
+    comp 0 1 (extend-by-surf (s2/decode/base (code .cap)) i j k) [
+    | ∂[i k] | j=0 → refl
     | j=1 m → s2/decode/base (oloop-onegloop code i m) k
     ]
   ]
 
 -- V. encode base after decode base
+
+def s2/code/proj :
+  [i j] (s2/code/surf i j → os2) [
+  | (∂[i] | j=1) o → o
+  | j=0 o → oloop o i
+  ]
+  =
+  λ i j o →
+  comp 0 1 (oloop (o .cap) i) [
+  | (∂[i] | j=0) → refl
+  | j=1 → oloop-onegloop o i
+  ]
 
 def s2/encode-decode/base/step (o : os2) :
   [i j] os2 [
@@ -126,7 +125,6 @@ def s2/encode-decode/base : (o : os2) → path os2 (s2/encode base (s2/decode ba
     | m=0 j → s2/encode-decode/base/step o' i j
     ]
   ]
-
 
 -- VI. decode base after encode base
 
