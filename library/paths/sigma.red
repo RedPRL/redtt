@@ -2,6 +2,28 @@ import prelude
 import basics.isotoequiv
 import basics.retract
 
+def sigma/assoc (A : type) (B : A → type) (C : ((x : A) × B x) → type) 
+  : equiv ((x : A) × (y : B x) × C (x, y)) ((p : ((x : A) × B x)) × C p) 
+  = 
+  ( λ x → ((x.fst, x.snd.fst), x.snd.snd)
+  , λ b → ( ((b.fst.fst, b.fst.snd, b.snd), refl)
+          , λ c i → 
+            ( ((c.snd i).fst.fst, (c.snd i).fst.snd, (c.snd i).snd)
+            , λ j → weak-connection/or _ (c.snd) i j
+            )
+          )
+  )
+
+def sigma/contr/equiv/fst (A : type) (P : A → type) (P/contr : (x : A) → is-contr (P x)) 
+  : equiv ((x : A) × P x) A 
+  = 
+  iso→equiv ((x : A) × P x) A 
+    ( λ s → s.fst
+    , λ x → (x, (P/contr x).fst)
+    , refl
+    , λ s i → (s.fst, symm _ ((P/contr (s.fst)).snd (s.snd)) i)
+    )  
+
 def sigma/path (A : type) (B : A → type) (a : A) (b : B a) (a' : A) (b' : B a')
   : equiv ((p : path A a a') × pathd (λ i → B (p i)) b b') (path ((a : A) × B a) (a,b) (a',b'))
   =
