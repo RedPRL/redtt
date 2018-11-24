@@ -62,8 +62,8 @@ def s2/code/surf/filler (m i j : 𝕀) : type =
 def s2/code/surf : path^1 (path^1 type os2 os2) refl refl =
   s2/code/surf/filler 1
 
-def s2/code (a : s2) : type =
-  elim a [
+def s2/code : s2 → type =
+  elim [
   | base → os2
   | surf i j → s2/code/surf i j
   ]
@@ -81,14 +81,14 @@ def extend-by-surf (p : path s2 base base) (i j k : 𝕀) : s2 =
   | k=1 j → surf i j
   ]
 
-def s2/decode/base (o : os2) : path s2 base base =
-  elim o [
+def s2/decode/base : os2 → path s2 base base =
+  elim [
   | obase → refl
-  | oloop (o' → s2/decode/base/o') i → extend-by-surf s2/decode/base/o' i 1
+  | oloop (o → o/ih) i → extend-by-surf o/ih i 1
   ]
 
-def s2/decode (a : s2) : (s2/code a) → path s2 base a =
-  elim a [
+def s2/decode : (a : s2) → (s2/code a) → path s2 base a =
+  elim [
   | base → s2/decode/base
   | surf i j → λ code k →
     comp 0 1 (extend-by-surf (s2/decode/base (code .cap)) i j k) [
@@ -126,10 +126,10 @@ def s2/encode-decode/base/step (o : os2) :
 def s2/encode-decode/base : (o : os2) → path os2 (s2/encode base (s2/decode base o)) o =
   elim [
   | obase → refl
-  | oloop (o' → s2/encode-decode/base/o') i → λ m →
-    comp 0 1 (oloop (s2/encode-decode/base/o' m) i) [
+  | oloop (o → o/ih) i → λ m →
+    comp 0 1 (oloop (o/ih m) i) [
     | ∂[i] | m=1 → refl
-    | m=0 j → s2/encode-decode/base/step o' i j
+    | m=0 j → s2/encode-decode/base/step o i j
     ]
   ]
 
