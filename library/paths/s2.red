@@ -35,15 +35,6 @@ def oloop-onegloop (o : os2)
   =
   λ i → oloop-equiv i .snd o .fst .snd
 
-def onegloop-oloop (o : os2)
-  : pathd (λ i → path os2 (onegloop (oloop o i) i) o) refl refl
-  =
-  λ i j →
-  comp 0 1 o [
-  | ∂[i] | j=1 → refl
-  | j=0 k → oloop-equiv i .snd (oloop o i) .snd (o, refl) k .fst
-  ]
-
 -- II. universal cover over s2
 
 def s2/code/surf/filler (m i j : 𝕀) : type =
