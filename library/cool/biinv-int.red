@@ -218,3 +218,28 @@ def fwd-bwd : (z : biinv-int) → path _ (fwd (bwd z)) z =
 
 def int-equiv-biinv-int : equiv int biinv-int =
   iso→equiv _ _ (fwd,bwd,fwd-bwd,bwd-fwd)
+
+-- suggested by Anders: define a successor function on biinv-int which cancels pred* exactly
+
+def suc'/pair : (z : biinv-int) → (y : biinv-int) × path biinv-int (suc z) y =
+  elim [
+  | zero → (suc zero, refl)
+  | suc z → (suc (suc z), refl)
+  | predl z → (z, suc-predl z)
+  | predr z → (z, λ j → suc-predr z j)
+  | predl-suc (z → z/ih) i →
+    let filler (i j : 𝕀) : biinv-int =
+      comp 0 j (suc (predl-suc z i)) [i=0 → suc-predl (suc z) | i=1 → z/ih .snd]
+    in
+    (filler i 1, filler i)
+  | suc-predr (z → z/ih) i →
+    let filler (i j : 𝕀) : biinv-int =
+      comp 0 j (suc (suc-predr z i)) [i=0 → refl | i=1 → z/ih .snd]
+    in
+    (filler i 1, filler i)
+  ]
+
+def suc' (z : biinv-int) : biinv-int = suc'/pair z .fst
+
+def suc'-predl (z : biinv-int) : path _ (suc' (predl z)) z = refl
+def suc'-predr (z : biinv-int) : path _ (suc' (predr z)) z = refl
