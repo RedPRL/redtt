@@ -290,8 +290,6 @@ def split/half (A : type) : (n : nat) → (l : list A) → (le (length A l) (dou
 		]
 	]
 
-meta <: print normalize split/half :>
-
 quit
 def msort (A : type) (ord : total/order A) : (n : nat) → list A → list A =
 	elim [
