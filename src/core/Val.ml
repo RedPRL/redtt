@@ -420,6 +420,13 @@ struct
   and rigid_ncoe_up dir abs neu ~rst_sys =
     let ncoe = NCoe {dir; abs; neu} in
     let r, r' = Dir.unleash dir in
+    let validate : unit =
+      if I.compare r r' = `Same then 
+        begin
+          Format.printf "oh n0!!!!!%a == %a @.@." I.pp  r I.pp r';
+          failwith "bad!!!!!!!!!!!!!!!!!!"
+        end
+    in
     let ty = Abs.inst1 abs r' in
     let coe_face s s' el =
       let phi = I.equate s s' in

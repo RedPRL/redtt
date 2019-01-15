@@ -7,3 +7,5 @@ val gen_const : I.atom -> [`Dim0 | `Dim1] -> t
 val swap : t -> t
 val unleash : t -> I.t * I.t
 val act : I.action -> t -> t m
+
+val pp : t Pp.t0

@@ -16,3 +16,6 @@ let unleash p = p
 
 let act phi (r, r') : t m =
   make (I.act phi r) (I.act phi r')
+
+let pp fmt (r, r') =
+  Format.fprintf fmt "%a ~> %a" I.pp r I.pp r'

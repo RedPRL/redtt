@@ -76,3 +76,11 @@ def mult (m n : nat) : nat =
 	]
 
 def mult/unit/l (n : nat) : path nat (mult (suc zero) n) n = eta n
+
+def mult/unit/r (n : nat) : path nat (mult n (suc zero)) n = eta n
+
+def mult/zero/r (n : nat) : path nat zero (mult n zero) =
+	elim n [
+	| zero → refl
+	| suc (n → p) → p
+	]

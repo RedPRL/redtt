@@ -343,7 +343,7 @@ struct
           let neu = act phi info.neu in
           NCoe {dir; abs; neu}
         | _ ->
-          Format.eprintf "mortal: ncoe@.";
+          Format.eprintf "mortal: %a became trivial under %a @." Dir.pp info.dir I.pp_action phi;
           raise TooMortal
       end
 
