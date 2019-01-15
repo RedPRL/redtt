@@ -1,7 +1,8 @@
 import prelude
+import data.int
 import data.s2
 import basics.isotoequiv
-import paths.equivalence
+import paths.int
 
 -- a calculation of the loop space of the 2-sphere, based on
 -- https://egbertrijke.com/2016/09/28/the-loop-space-of-the-2-sphere/
@@ -13,62 +14,56 @@ data os2 where
 
 -- I. the loop of automorphisms of os2
 
--- it would probably be more efficient to define this directly,
--- but we don't need it
-def oloop-equiv : path (equiv os2 os2) (id-equiv/weak-connection os2) (id-equiv/weak-connection os2) =
-  λ i →
-  ( λ o → oloop o i
-  , prop→prop-over
-    (λ j → is-equiv os2 os2 (λ o → oloop o j))
-    (is-equiv/prop/direct os2 os2 (λ o → o))
-    (id-equiv/weak-connection os2 .snd)
-    (id-equiv/weak-connection os2 .snd)
-    i
-  )
-
--- incidentally, onegloop o is homotopic to symm (λ i → oloop o i)
 def onegloop (o : os2) : path os2 o o =
-  λ i → oloop-equiv i .snd o .fst .fst
+  symm os2 (λ i → oloop o i)
 
 def oloop-onegloop (o : os2)
   : pathd (λ i → path os2 (oloop (onegloop o i) i) o) refl refl
   =
-  λ i → oloop-equiv i .snd o .fst .snd
+  λ i j →
+  comp 0 1 (oloop o i) [
+  | i=0 k → oloop o k
+  | i=1 → refl
+  | j=0 k → oloop (symm/filler os2 (λ i → oloop o i) k i) i
+  | j=1 k → weak-connection/or os2 (λ i → oloop o i) i k
+  ]
 
 def onegloop-oloop (o : os2)
   : pathd (λ i → path os2 (onegloop (oloop o i) i) o) refl refl
   =
   λ i j →
-  comp 0 1 o [
-  | ∂[i] | j=1 → refl
-  | j=0 k → oloop-equiv i .snd (oloop o i) .snd (o, refl) k .fst
+  let filler (m : 𝕀) : os2 =
+    comp 1 m o [
+    | j=0 m → oloop o m
+    | j=1 → refl
+    ]
+  in
+  comp 0 1 (filler i) [
+  | i=0 → filler
+  | i=1 | j=1 → refl
   ]
+
+def oloop-equiv (i : 𝕀) : equiv os2 os2 =
+  iso→equiv os2 os2
+    ( λ o → oloop o i
+    , λ o → onegloop o i
+    , λ o → oloop-onegloop o i
+    , λ o → onegloop-oloop o i
+    )
 
 -- II. universal cover over s2
 
 def s2/code/surf/filler (m i j : 𝕀) : type =
   comp 0 m os2 [
-  | ∂[i] | j=0 → ua os2 os2 (id-equiv/weak-connection os2)
+  | ∂[i] | j=0 → ua os2 os2 (oloop-equiv 0)
   | j=1 → ua os2 os2 (oloop-equiv i)
   ]
 
 def s2/code/surf : path^1 (path^1 type os2 os2) refl refl =
   s2/code/surf/filler 1
 
-def s2/code/proj :
-  [i j] (s2/code/surf i j → os2) [
-  | (∂[i] | j=1) o → o
-  | j=0 o → oloop o i
-  ]
-  =
-  λ i j →
-  comp 0 1 (λ o → oloop o i) in (λ m → s2/code/surf/filler m i j → os2) [
-  | (∂[i] | j=1) _ o → o .vproj
-  | j=0 _ o → oloop (o .vproj) i
-  ]
-
-def s2/code (a : s2) : type =
-  elim a [
+def s2/code : s2 → type =
+  elim [
   | base → os2
   | surf i j → s2/code/surf i j
   ]
@@ -86,24 +81,35 @@ def extend-by-surf (p : path s2 base base) (i j k : 𝕀) : s2 =
   | k=1 j → surf i j
   ]
 
-def s2/decode/base (o : os2) : path s2 base base =
-  elim o [
+def s2/decode/base : os2 → path s2 base base =
+  elim [
   | obase → refl
-  | oloop (o' → s2/decode/base/o') i → extend-by-surf s2/decode/base/o' i 1
+  | oloop (o → o/ih) i → extend-by-surf o/ih i 1
   ]
 
-def s2/decode (a : s2) : (s2/code a) → path s2 base a =
-  elim a [
+def s2/decode : (a : s2) → (s2/code a) → path s2 base a =
+  elim [
   | base → s2/decode/base
   | surf i j → λ code k →
-    comp 0 1 (extend-by-surf (s2/decode/base (onegloop (s2/code/proj i j code) i)) i j k) [
-    | ∂[i k] → refl
-    | j=0 m → s2/decode/base (onegloop-oloop code i m) k
+    comp 0 1 (extend-by-surf (s2/decode/base (code .cap)) i j k) [
+    | ∂[i k] | j=0 → refl
     | j=1 m → s2/decode/base (oloop-onegloop code i m) k
     ]
   ]
 
 -- V. encode base after decode base
+
+def s2/code/proj :
+  [i j] (s2/code/surf i j → os2) [
+  | (∂[i] | j=1) o → o
+  | j=0 o → oloop o i
+  ]
+  =
+  λ i j o →
+  comp 0 1 (oloop (o .cap) i) [
+  | (∂[i] | j=0) → refl
+  | j=1 → oloop-onegloop o i
+  ]
 
 def s2/encode-decode/base/step (o : os2) :
   [i j] os2 [
@@ -120,13 +126,12 @@ def s2/encode-decode/base/step (o : os2) :
 def s2/encode-decode/base : (o : os2) → path os2 (s2/encode base (s2/decode base o)) o =
   elim [
   | obase → refl
-  | oloop (o' → s2/encode-decode/base/o') i → λ m →
-    comp 0 1 (oloop (s2/encode-decode/base/o' m) i) [
+  | oloop (o → o/ih) i → λ m →
+    comp 0 1 (oloop (o/ih m) i) [
     | ∂[i] | m=1 → refl
-    | m=0 j → s2/encode-decode/base/step o' i j
+    | m=0 j → s2/encode-decode/base/step o i j
     ]
   ]
-
 
 -- VI. decode base after encode base
 
@@ -141,3 +146,16 @@ def s2/decode-encode/base
 
 def Ω1s2/equiv : equiv (path s2 base base) os2 =
   iso→equiv _ _ (s2/encode base, s2/decode base, s2/encode-decode/base, s2/decode-encode/base)
+
+-- winding numbers for os2
+
+def os2/int-code/pair : os2 → (A : type) × path^1 type A A =
+  elim [
+  | obase → (int, λ i → ua _ _ isuc/equiv i)
+  | oloop (_ → o/ih) i → (o/ih .snd i, λ j → connection/both^1 type (o/ih .snd) (o/ih .snd) i j)
+  ]
+
+def os2/int-code (o : os2) : type = os2/int-code/pair o .fst
+
+def os2/winding (p : path os2 obase obase) : int =
+  coe 0 1 (pos zero) in λ i → os2/int-code (p i)

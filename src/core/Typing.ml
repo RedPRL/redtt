@@ -753,7 +753,7 @@ and infer_spine_ cx hd sp =
     | T.Cap info ->
       let fhcom_ty =
         check_eval_ty cx @@
-        T.make @@ T.FHCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
+        T.make @@ T.FHCom {r = info.r; r' = info.r'; cap = info.ty; sys = info.sys}
       in
       let ih = infer_spine_ cx hd sp in
       Cx.check_eq_ty cx fhcom_ty ih.ty;

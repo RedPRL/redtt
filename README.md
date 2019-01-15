@@ -115,6 +115,9 @@ $ make library
 ```
 
 
+### What's the relationship to RedPRL?
+The goal of the RedPRL Development Team is to study implementation techniques for higher dimensional type theory, and determine which ideas lead to the most convenient and ergonomic system for developing both higher dimensional mathematics and higher dimensional programming. To this end, our first experiment was the RedPRL Proof Assistant; our second experiment is the `redtt` proof assistant, which synthesizes what we learned from the experience of building RedPRL and using it to formalize mathematics.
+
 
 ### Acknowledgments
 

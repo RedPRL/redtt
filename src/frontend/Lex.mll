@@ -37,6 +37,8 @@ let keywords =
     ("∂", BOUNDARY);
     ("vproj", VPROJ);
     ("vin", VIN);
+    ("cap", CAP);
+    ("box", BOX);
     ("let", LET);
     ("fun", FUN);
     ("def", DEF);

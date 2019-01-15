@@ -123,9 +123,9 @@ let user_define gm alpha source visibility opacity ~ty tm =
   let ty = abstract_ty gm ty in
   let tm = abstract_tm gm tm in
   check ~ty tm >>= function
-  | `Exn exn ->
+  | `Exn (exn, bt) ->
     Format.eprintf "Failed to check: %a <= %a@." Tm.pp0 tm Tm.pp0 ty;
-    raise exn
+    Printexc.raise_with_backtrace exn bt
   | `Ok ->
     begin
       if opacity = `Transparent then push_update alpha else ret ()
@@ -136,8 +136,8 @@ let macro gm alpha ~ty tm =
   let ty = abstract_ty gm ty in
   let tm = abstract_tm gm tm in
   check ~ty tm >>= function
-  | `Exn exn ->
-    raise exn
+  | `Exn (exn, bt) ->
+    Printexc.raise_with_backtrace exn bt
   | `Ok ->
     push_update alpha >>
     pushr @@ E (alpha, ty, Auxiliary tm)

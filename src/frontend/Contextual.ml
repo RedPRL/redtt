@@ -434,7 +434,7 @@ let check ~ty ?sys:(sys = []) tm =
     ret `Ok
   with
   | exn ->
-    ret @@ `Exn exn
+    ret @@ `Exn (exn, Printexc.get_raw_backtrace ())
 
 let check_eq ~ty tm0 tm1 =
   if tm0 = tm1 then ret `Ok else
@@ -447,7 +447,7 @@ let check_eq ~ty tm0 tm1 =
       ret `Ok
     with
     | exn ->
-      ret @@ `Exn exn
+      ret @@ `Exn (exn, Printexc.get_raw_backtrace ())
 
 let check_subtype ty0 ty1 =
   base_cx >>= fun lcx ->
@@ -458,7 +458,7 @@ let check_subtype ty0 ty1 =
     ret `Ok
   with
   | exn ->
-    ret @@ `Exn exn
+    ret @@ `Exn (exn, Printexc.get_raw_backtrace ())
 
 let compare_dim tr0 tr1 =
   base_cx >>= fun cx ->
