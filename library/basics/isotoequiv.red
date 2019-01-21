@@ -10,8 +10,24 @@ def iso (A B : type) : type =
   × ((b : _) → path _ (f (g b)) b)
   × (a : _) → path _ (g (f a)) a
 
+def iso/refl (A : type) : iso A A = 
+  ( λ f → f
+  , λ g → g
+  , λ _ → refl
+  , λ _ → refl
+  )
+
 def iso/symm (A B : type) (I : iso A B) : iso B A =
   let (f,g,α,β) = I in (g,f,β,α)
+
+def iso/trans (A B C : type) (I1 : iso A B) (I2 : iso B C) : iso A C = 
+  let (f1,g1,α1,β1) = I1 in
+  let (f2,g2,α2,β2) = I2 in
+  ( λ a → f2 (f1 a)
+  , λ c → g1 (g2 c)
+  , λ c → trans _ (λ j → f2 (α1 (g2 c) j)) (α2 c)
+  , λ a → trans _ (λ j → g1 (β2 (f1 a) j)) (β1 a)
+  )  
 
 def iso/fiber/prop-over
   (A B : type)
