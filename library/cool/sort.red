@@ -7,12 +7,15 @@ import data.bool
 import data.void
 import data.or
 import paths.bool
+import cool.nats
+/-
 import cool.insert
 import cool.order
-import cool.nats
 import cool.sorted
 import cool.merge
+-/
 
+/-
 def le/bool/tt/ff : (x y : nat) → path _ (le/bool x y) ff → path _ (le/bool y x) tt =
   elim [
   | zero → λ y p → elim (tt/ne/ff p) []
@@ -136,6 +139,7 @@ def sort/nil (A : type) (ord : total/order A) : (l : list A) → path (list A) n
     elim (zero/ne/suc (length A xs) p3) []
   ]
 
+-/
 /-
 def perm/cons (A : type) (ord : total/order A) : (x : A) (s xs : list A) →
   perm A ord (cons x xs) s → (x' : A) × (xs' : list A) × path (list A) (cons x' xs') s =
