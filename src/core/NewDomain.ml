@@ -16,6 +16,51 @@ type dim = I.t
 module Rel = NewRestriction
 type rel = Rel.t
 
+
+(** Permutations *)
+module Perm :
+sig
+  type t
+  val emp : t
+  val compose : t -> t -> t
+  val freshen_name : Name.t -> Name.t * t
+  val freshen_names : Name.t bwd -> Name.t bwd * t
+  val swap_name : t -> Name.t -> Name.t
+  val fold : (Name.t -> Name.t -> 'a -> 'a) -> t -> 'a -> 'a
+end =
+struct
+  (* favonia: this is a demonstration of my laziness *)
+  type t = (Name.t * Name.t) list
+
+  let emp = []
+
+
+  let mimic x = Name.named (Name.name x)
+
+  let freshen_name x =
+    let x' = mimic x in x', [(x, x')]
+
+  let rec freshen_names =
+    function
+    | Emp -> Emp, []
+    | Snoc (xs, x) ->
+      let xs', perm = freshen_names xs in
+      let x' = mimic x in
+      Snoc (xs', x'), (x, x') :: perm
+
+  let swap_name perm x =
+    try List.assoc x perm with Not_found -> x
+
+  let fold f = List.fold_right (fun (x, x') a -> f x x' a)
+
+  (* TODO: probably wrong *)
+  let compose pi1 pi0 =
+    let pi0' = flip List.map pi0 @@ fun (x0,x1) -> swap_name pi1 x0, swap_name pi1 x1 in
+    pi1 @ pi0'
+end
+
+type perm = Perm.t
+
 (* this module provides the data type to hold an optional rel to
  * facilitate the dropping of `run phi1` in `run phi2 @@ run phi1 a`.
  *
@@ -30,7 +75,7 @@ sig
   val make : 'a -> 'a t
 
   (** [make v = make' None v] *)
-  val make' : rel option -> 'a -> 'a t
+  val make' : rel option -> perm -> 'a -> 'a t
 
   (** [drop_rel] is a brutal API to get the raw datum out. The caller has
       the responsibility to apply proper restrictions. *)
@@ -40,42 +85,56 @@ sig
      with a new rel. *)
   val with_rel : rel -> 'a t -> 'a t
 
+  val swap : perm -> 'a t -> 'a t
+
   (* [unleash] forces the result. The first argument is intended
      to be [X.run] where [X] is some structure implementing [Domain]. *)
-  val unleash : (rel -> 'a -> 'a) -> 'a t -> 'a
+  val unleash : (rel -> perm -> 'a -> 'a) -> 'a t -> 'a
 
   (* [fold] exposes the inner structure. The caller has
      the responsibility to apply proper restrictions.
 
      [drop_rel = fold (fun _ v -> v)] *)
-  val fold : (rel option -> 'a -> 'b) -> 'a t -> 'b
+  val fold : (rel option -> perm -> 'a -> 'b) -> 'a t -> 'b
 end =
 struct
   type 'a delayed_record =
     {rel : rel option;
+     perm : perm;
      data : 'a}
 
   type 'a t = 'a delayed_record ref
 
-  let make' r d = ref {data = d; rel = r}
+  let make' r pi d = ref {data = d; rel = r; perm = pi}
 
-  let make d = make' None d
+  let make d = make' None Perm.emp d
 
   let drop_rel v = !v.data
 
-  let with_rel r v = make' (Some r) (drop_rel v)
+  let with_rel r v = make' (Some r) (!v.perm) (drop_rel v)
+
+  let swap pi v =
+    let rel' = flip Option.map !v.rel @@ Perm.fold Rel.swap pi in
+    make' rel' (Perm.compose pi !v.perm) (drop_rel v)
 
   let unleash f v =
     match !v.rel with
-    | Some r -> let d = f r !v.data in v := {data = d; rel = None}; d
-    | None -> !v.data
+    | Some r ->
+      begin
+        let d = f r !v.perm !v.data in v := {data = d; rel = None; perm = Perm.emp};
+        d
+      end
+    | None ->
+      let d = f (Rel.emp ()) !v.perm !v.data in v := {data = d; rel = None; perm = Perm.emp};
+      !v.data
 
-  let fold f v = f !v.rel !v.data
+  let fold f v = f !v.rel !v.perm !v.data
 end
 
 type 'a face = dim * dim * 'a Lazy.t Delayed.t
 type 'a sys = 'a face list
 type 'a abs = Abs of Name.t * 'a
+
 
 (** This is the type of "prevalues", that is the domain from which values come.
     A prevalue can be judged to be a value with respect to a restriction / dimension
@@ -198,41 +257,6 @@ type error =
 
 exception E of error
 
-
-
-(** Permutations *)
-module Perm :
-sig
-  type t
-  val freshen_name : Name.t -> Name.t * t
-  val freshen_names : Name.t bwd -> Name.t bwd * t
-  val swap_name : t -> Name.t -> Name.t
-  val fold : (Name.t -> Name.t -> 'a -> 'a) -> t -> 'a -> 'a
-end =
-struct
-  (* favonia: this is a demonstration of my laziness *)
-  type t = (Name.t * Name.t) list
-
-  let mimic x = Name.named (Name.name x)
-
-  let freshen_name x =
-    let x' = mimic x in x', [(x, x')]
-
-  let rec freshen_names =
-    function
-    | Emp -> Emp, []
-    | Snoc (xs, x) ->
-      let xs', perm = freshen_names xs in
-      let x' = mimic x in
-      Snoc (xs', x'), (x, x') :: perm
-
-  let swap_name perm x =
-    try List.assoc x perm with Not_found -> x
-
-  let fold f = List.fold_right (fun (x, x') a -> f x x' a)
-end
-
-type perm = Perm.t
 
 module type Domain =
 sig
@@ -3516,7 +3540,9 @@ and Face :
         r, r',
         let frm' = Frame.run rel' frm in
         DelayedLazyX.plug rel' ~rigid:false frm' bdy
-      | `Inconsistent -> raise Dead (* should not happen by the invariant *)
+      | `Inconsistent ->
+        (* should not happen by the invariant *)
+        raise Dead
 
     let force rel ((r, r', bdy) as face) =
       match Rel.compare r r' rel with
@@ -3682,7 +3708,8 @@ end
     let make_from_lazy (lazy v) = make v
 
     let make_from_delayed : X.t abs Delayed.t -> DelayedX.t abs =
-      Delayed.fold @@ fun rel (Abs (x, c_x)) -> Abs (x, Delayed.make' (Option.map (Rel.hide' x) rel) c_x)
+      Delayed.fold @@ fun rel pi (Abs (x, c_x)) ->
+      Abs (Perm.swap_name pi x, Delayed.make' (Option.map (Rel.hide' x) rel) pi c_x)
 
     let unleash (Abs (x, a)) = Abs (x, DelayedX.unleash a)
 
@@ -3712,7 +3739,9 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
     let make_from_delayed v = v
 
-    let unleash = Delayed.unleash X.run
+    let unleash =
+      Delayed.unleash @@ fun rel pi v ->
+      X.run rel @@ X.swap pi v
 
     let drop_rel = Delayed.drop_rel
 
@@ -3721,8 +3750,7 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
 
     let swap pi =
-      Delayed.fold @@ fun rel v ->
-      Delayed.make' (Option.map (Perm.fold Rel.swap pi) rel) (X.swap pi v)
+      Delayed.swap pi
 
     let subst r x v = Delayed.make @@ X.subst r x (unleash v)
 
@@ -3733,7 +3761,7 @@ and DelayedPlug : functor (X : DomainPlug) ->
     let assert_rigid msg rel v =
       X.assert_rigid msg rel (unleash v)
 
-    let make_then_run rel = Delayed.make' (Some rel)
+    let make_then_run rel = Delayed.make' (Some rel) Perm.emp
 
     let plug rel ~rigid frm v = Delayed.make @@ X.plug rel ~rigid frm (unleash v)
 
@@ -3757,7 +3785,8 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
 
     let make_from_delayed v = Delayed.make @@ lazy begin DelayedX.unleash v end
 
-    let unleash v = Lazy.force @@ Delayed.unleash (fun rel v -> lazy begin X.run rel (Lazy.force v) end) v
+    let unleash v =
+      Lazy.force @@ Delayed.unleash (fun rel pi v -> lazy begin X.run rel (X.swap pi @@ Lazy.force v) end) v
 
     let pp fmt v =
       X.pp fmt @@ unleash v
@@ -3765,8 +3794,7 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
     let drop_rel v = Lazy.force (Delayed.drop_rel v)
 
     let swap pi =
-      Delayed.fold @@ fun rel v ->
-      Delayed.make' (Option.map (Perm.fold Rel.swap pi) rel) @@ lazy begin X.swap pi (Lazy.force v) end
+      Delayed.swap pi
 
     let subst r x v = Delayed.make @@ lazy begin X.subst r x (unleash v) end
 
@@ -3777,7 +3805,7 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
     let assert_rigid msg rel v =
       X.assert_rigid msg rel (unleash v)
 
-    let make_then_run rel v = Delayed.make' (Some rel) (lazy v)
+    let make_then_run rel v = Delayed.make' (Some rel) Perm.emp (lazy v)
 
     let plug rel ~rigid frm v = Delayed.make @@ lazy begin X.plug rel ~rigid frm (unleash v) end
 
