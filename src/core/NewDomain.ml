@@ -3709,7 +3709,8 @@ end
 
     let make_from_delayed : X.t abs Delayed.t -> DelayedX.t abs =
       Delayed.fold @@ fun rel pi (Abs (x, c_x)) ->
-      Abs (Perm.swap_name pi x, Delayed.make' (Option.map (Rel.hide' x) rel) pi c_x)
+      let x' = Perm.swap_name pi x in
+      Abs (x', Delayed.make' (Option.map (Rel.hide' x') rel) pi c_x)
 
     let unleash (Abs (x, a)) = Abs (x, DelayedX.unleash a)
 
