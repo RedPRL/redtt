@@ -331,6 +331,9 @@ let rec check_boundary cx ty sys el =
       let rel_rr' = Cx.rel cx_rr' in
       let ty_rr' = D.Con.run rel_rr' ty in
       let el_rr' = D.Con.run rel_rr' el in
+      Format.eprintf "Restricted %a :: %a => %a@."
+        NewRestriction.pp rel_rr' D.Con.pp el D.Con.pp el_rr'
+      ;
       let _ = Q.equate_con (Cx.qenv cx_rr') rel_rr' ty_rr' el_rr' @@ D.LazyVal.unleash el' in
       check_boundary cx ty sys el
 
@@ -601,10 +604,10 @@ and check_ty cx kind tm : Lvl.t =
     let cx', xs = Cx.extend_dims cx ~names:(Bwd.to_list names) in
     let lvl = check_ty cx' kind cod in
     let vcod = eval cx' cod in
-    let _ = check_tm_sys cx' vcod sys in
-    if Kind.lte kind `Kan then
-      Cofibration.check_extension xs @@
-      Cofibration.from_sys cx' sys;
+    (* let _ = check_tm_sys cx' vcod sys in *)
+    (* if Kind.lte kind `Kan then
+       Cofibration.check_extension xs @@
+       Cofibration.from_sys cx' sys; *)
     lvl
 
   | Tm.Restrict (tr, tr', tm) ->
@@ -771,6 +774,8 @@ and check_bnd_sys ~cx ~cxx ~x ~r ~ty ~cap sys =
   List.fold_left (check_bnd_face ~cx ~cxx ~ty) init sys
 
 and check_of_ty cx ty sys tm =
+  let ppenv = Cx.ppenv cx in
+  Format.eprintf "@.@.ty: %a@.sys: %a@.tm: %a@." D.Con.pp ty ConSys.pp sys (Tm.pp ppenv) tm;
   match polarity ty with
   | `Pos ->
     check cx (`Pos (`El ty)) tm;

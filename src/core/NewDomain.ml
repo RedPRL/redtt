@@ -9,7 +9,6 @@ exception CanJonHelpMe
 exception CanFavoniaHelpMe
 
 
-
 type dim = I.t
 
 (** The dimension equality oracle *)
@@ -111,7 +110,8 @@ struct
 
   let drop_rel v = !v.data
 
-  let with_rel r v = make' (Some r) (!v.perm) (drop_rel v)
+  let with_rel r v =
+    make' (Some r) (!v.perm) (drop_rel v)
 
   let swap pi v =
     let rel' = flip Option.map !v.rel @@ Perm.fold Rel.swap pi in
@@ -1511,9 +1511,14 @@ struct
       end
 
     | Neu info ->
-      let neu = Neutroid.run rel info.neu in
-      let ty = Val.run rel info.ty in
-      make_neu rel ty neu
+      begin
+        match Neutroid.run_then_force rel info.neu with
+        | `Rigid neu ->
+          (* Format.eprintf "rigid: %a != %a@.@." Rel.pp rel Neutroid.pp info.neu; *)
+          let ty = Val.run rel info.ty in
+          make_neu rel ty neu
+        | `Triv con -> con
+      end
 
     | Data info ->
       Data
@@ -2934,6 +2939,7 @@ sig
   include DomainPlug with type t = neutroid
 
   val force : rel -> t -> [`Rigid of t | `Triv of con]
+  val run_then_force : rel -> t -> [`Rigid of t | `Triv of con]
 
   (** sys might not be rigid, but ty must be a value *)
   val reflect_head : rel -> ty:value -> head -> con sys -> con
@@ -2968,6 +2974,9 @@ struct
     match ConSys.force rel sys with
     | `Rigid sys -> `Rigid {neu; sys}
     | `Triv v -> `Triv v
+
+  let run_then_force rel neutroid =
+    force rel @@ run rel neutroid
 
   let subst r x {neu; sys} =
     {neu = DelayedNeu.subst r x neu;
@@ -3423,6 +3432,7 @@ and Sys :
   struct
     type t = X.t sys
     module Face = Face (X) (D)
+    module DelayedLazyX = DelayedLazyPlug (X)
 
     let pp fmt =
       Pp.pp_list Face.pp fmt
@@ -3438,6 +3448,7 @@ and Sys :
       let run_face face =
         match Face.run_then_force rel face with
         | `Rigid face -> Some face
+        | `Triv v -> Some (`Dim0, `Dim0, DelayedLazyX.make v)
         | _ -> None
       in
       ListUtil.filter_map run_face sys
@@ -3448,6 +3459,7 @@ and Sys :
     let assert_value msg rel = List.iter (Face.assert_value msg rel)
 
     let force rel sys =
+      (* Format.eprintf "Forcing sys: %a != %a@." Rel.pp rel pp sys; *)
       let exception Triv of X.t in
       let force_face face =
         match Face.force rel face with
@@ -3458,7 +3470,9 @@ and Sys :
       try
         `Rigid (ListUtil.filter_map force_face sys)
       with
-        Triv x -> `Triv x
+        Triv x ->
+        (* Format.eprintf "TRIV!!!!@."; *)
+        `Triv x
 
     let assert_rigid msg rel = List.iter (Face.assert_rigid msg rel)
 
