@@ -88,7 +88,6 @@ let equate_dim qenv rel r0 r1 =
     Format.eprintf "Tried to equate: %a != %a ~ %a@." Rel.pp rel I.pp r0 I.pp r1;
     Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
     Format.eprintf "@.";
-
     raise PleaseRaiseProperError
 
 
@@ -594,11 +593,11 @@ and equate_tycon_face qenv rel (r0, r'0, bdy0) (r1, r'1, bdy1) =
 
 and equate_sys_wrapper : 'a 'b. ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b list =
   fun face_equater sys0 sys1 ->
-    try
-      List.map2 face_equater sys0 sys1
-    with
-    | Invalid_argument _ ->
-      raise PleaseRaiseProperError (* mismatched lengths *)
+  try
+    List.map2 face_equater sys0 sys1
+  with
+  | Invalid_argument _ ->
+    raise PleaseRaiseProperError (* mismatched lengths *)
 
 and equate_con_abs_sys qenv rel ty = equate_sys_wrapper (equate_con_abs_face qenv rel ty)
 and equate_tycon_abs_sys qenv rel = equate_sys_wrapper (equate_tycon_abs_face qenv rel)
