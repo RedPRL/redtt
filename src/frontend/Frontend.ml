@@ -15,7 +15,8 @@ let print_position outx lexbuf =
     pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
 
 let set_options options =
-  Format.set_margin options.line_width;
+  Format.pp_set_margin Format.std_formatter options.line_width;
+  Format.pp_set_margin Format.err_formatter options.line_width;
   Name.set_debug_mode options.debug_mode;
   RotIO.set_unsafe_mode options.shell_mode;
   Importer.set_ignore_rot options.recheck
