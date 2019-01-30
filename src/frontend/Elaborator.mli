@@ -1,12 +1,13 @@
 module type Import =
 sig
-  val import : per_process : Contextual.per_process -> mlconf : ML.mlconf -> selector : string list
-    -> [`New of ResEnv.t * Contextual.per_process | `Cached of ResEnv.t]
+  val top_load_file : FileRes.filepath -> unit Contextual.m
+  val top_load_stdin : red : FileRes.filepath -> unit Contextual.m
+  val import : selector : FileRes.selector -> Contextual.rotted_resolver Contextual.m
 end
 
 module type S =
 sig
-  val eval_cmd : ML.mlcmd -> ML.semcmd Contextual.m 
+  val eval_cmd : ML.mlcmd -> ML.semcmd Contextual.m
 end
 
 module Make (I : Import) : S

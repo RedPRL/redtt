@@ -7,9 +7,7 @@ open RedTT_Core
 
 type resolution =
   [ `Ix of int
-  | `Var of Name.t
-  | `Metavar of Name.t
-  | `Datatype of Name.t
+  | `Name of Name.t
   ]
 
 type visibility =
@@ -22,12 +20,18 @@ val bind : string -> t -> t
 val bindn : string list -> t -> t
 val bind_opt : string option -> t -> t
 
-val register_var : visibility:visibility -> Name.t -> t -> t
-val register_metavar : visibility:visibility -> Name.t -> t -> t
-val register_datatype : visibility:visibility -> Name.t -> t -> t
-
-val import_globals : visibility:visibility -> t -> t -> t
+val add_native_global : visibility:visibility -> Name.t -> t -> t
+val import_global : visibility:visibility -> Name.t -> t -> t
+val import_public : visibility:visibility -> t -> t -> t
 
 val get : string -> t -> resolution
+val get_name : string -> t -> Name.t
+
+val native_of_name : Name.t -> t -> int option
+val name_of_native : int -> t -> Name.t option
+type exported_natives = (string option * Name.t) list
+type exported_foreigners = Name.t list
+val export_native_globals : t -> exported_natives
+val export_foreign_globals : t -> exported_foreigners
 
 val pp_visibility : visibility Pp.t0

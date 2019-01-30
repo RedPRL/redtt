@@ -52,6 +52,8 @@ val shift_univ : int -> tm -> tm
 val eta_contract : tm -> tm
 
 
+val forty_two : tm
+
 val up : tm cmd -> tm
 val ann : ty:tm -> tm:tm -> tm cmd
 
@@ -91,7 +93,9 @@ val pp_frame : tm frame Pp.t
 val pp_spine : tm spine Pp.t
 val pp_sys : (tm, tm) system Pp.t
 val pp_bnd : tm bnd Pp.t
+val pp0_bnd : tm bnd Pp.t0
 val pp_nbnd : tm nbnd Pp.t
+val pp0_nbnd : tm nbnd Pp.t0
 
 include Occurs.S with type t := tm
 

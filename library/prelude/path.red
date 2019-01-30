@@ -34,6 +34,12 @@ def funext
   λ i x →
   p _ i
 
+def apd
+  (A : type) (P : A → type)
+  (f : (x : A) → P x) (x y : A) (p : path A x y)
+  : path (P y) (coe 0 1 (f x) in λ i → P (p i)) (f y) =
+  λ i → coe i 1 (f (p i)) in λ j → P (p j)
+
 def symm/filler (A : type) (p : 𝕀 → A) (j i : 𝕀) : A =
   comp 0 j (p 0) [
   | i=0 → p
@@ -46,6 +52,15 @@ def symm (A : type) (p : 𝕀 → A) : path A (p 1) (p 0) =
 def symm/unit (A : type) (a : A) : path (path _ a a) refl (symm _ (λ _ → a)) =
   symm/filler _ (λ _ → a)
 
+def symm'/filler (A : type) (p : 𝕀 → A) (j i : 𝕀) : A =
+  comp 1 j (p 1) [
+  | i=0 → refl
+  | i=1 → p
+  ]
+
+def symm' (A : type) (p : 𝕀 → A) : path A (p 1) (p 0) =
+  symm'/filler _ p 0
+
 def trans/filler (A : type) (p : 𝕀 → A) (q : [i] A [i=0 → p 1]) (j i : 𝕀) : A =
   comp 0 j (p i) [
   | i=0 → refl
@@ -54,7 +69,6 @@ def trans/filler (A : type) (p : 𝕀 → A) (q : [i] A [i=0 → p 1]) (j i : �
 
 def trans (A : type) (p : 𝕀 → A) (q : [i] A [i=0 → p 1]) : path _ (p 0) (q 1) =
   trans/filler _ p q 1
-
 
 def trans/unit/r (A : type) (p : 𝕀 → A) : path (path _ (p 0) (p 1)) p (trans _ p (λ _ → p 1)) =
   trans/filler _ p (λ _ → p 1)
@@ -71,7 +85,6 @@ def trans/unit/l (A : type) (p : 𝕀 → A) : path (path _ (p 0) (p 1)) p (tran
   | i=0 → refl
   | i=1 → p
   ]
-
 
 -- This proof gets simpler when dead tubes are deleted!
 def trans/sym/r (A : type) (p : 𝕀 → A) : path (path _ (p 0) (p 0)) refl (trans _ p (symm _ p)) =
@@ -103,6 +116,20 @@ def symmd (A : 𝕀 → type) (p : (i : 𝕀) → A i) : pathd (symm^1 _ A) (p 1
   comp 0 1 (p 0) in λ j → symm/filler^1 _ A j i [
   | i=0 → p
   | i=1 → refl
+  ]
+
+-- transporting backwards is transporting forwards along inverted path (up to composition)
+def coe/symm/d (A : type) (P : A → type) (p : 𝕀 → A) (p1 : P (p 1))
+  : pathd
+      (trans^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)))
+      (coe 1 0 p1 in λ k → P (p k))
+      (coe 0 1 p1 in λ k → P (symm _ p k))
+  =
+  λ i →
+  comp 0 1 (coe 1 i p1 in λ k → P (p k)) in
+  λ j → trans/filler^1 _ (λ k → P (p k)) (λ k → P (symm _ p k)) j i [
+  | i=0 → refl
+  | i=1 → λ k → coe 0 k p1 in λ l → P (symm A p l)
   ]
 
 def J (A : type) (p : 𝕀 → A) (C : [i] A [i=0 → p 0] → type) (d : C refl) : C p =

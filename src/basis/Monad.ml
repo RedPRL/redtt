@@ -2,6 +2,7 @@ module type S =
 sig
   type 'a m
   val bind : 'a m -> ('a -> 'b m) -> 'b m
+  val try_ : 'a m -> (exn -> 'a m) -> 'a m
   val ret : 'a -> 'a m
 end
 
@@ -57,6 +58,16 @@ struct
       traverse f xs >>= fun ys ->
       M.ret @@ y :: ys
 
+  let rec filter_traverse f =
+    function
+    | [] -> M.ret []
+    | x::xs ->
+      f x >>= fun y ->
+      filter_traverse f xs >>= fun ys ->
+      match y with
+      | None -> M.ret ys
+      | Some y -> M.ret @@ y :: ys
+
   let rec fold_left f acc xs =
     match xs with
     | [] ->
@@ -64,5 +75,12 @@ struct
     | x :: xs ->
       f acc x >>= fun a ->
       fold_left f a xs
+
+  let rec iter f xs =
+    match xs with
+    | [] ->
+      M.ret ()
+    | x :: xs ->
+      f x >> iter f xs
 
 end

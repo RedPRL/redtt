@@ -19,4 +19,6 @@
   uuseg
   uuseg.string
   uutf
-  menhirLib))
+  menhirLib
+  ezjsonm
+  ezgzip))

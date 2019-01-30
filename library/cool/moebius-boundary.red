@@ -1,13 +1,9 @@
 import prelude
 import data.bool
 import data.s1
-import basics.isotoequiv
-
-def not/equiv : equiv bool bool =
-  iso→equiv _ _ (not, (not, (not∘not/id/pt, not∘not/id/pt)))
-
-def not/path : path^1 type bool bool =
-  ua _ _ not/equiv
+import paths.bool
+import data.int
+import paths.s1
 
 def moebius-boundary/fiber : s1 → type =
   elim [
@@ -85,24 +81,14 @@ def s1→moebius-boundary→s1 :
   | loop i → λ j → s1→moebius-boundary→s1/loop i j
   ]
 
-quit
+def test (i : 𝕀) : moebius-boundary =
+  s1→moebius-boundary (loop i)
 
--- there is an invalid fhcom in the middle?!
--- ... (fhcom 0 1 (loop x) [x=0 <x1> base]) ...
-def test : 𝕀 → moebius-boundary =
-  λ i → s1→moebius-boundary (loop i)
---normalize test
+def test1 (i : 𝕀) : s1 =
+  moebius-boundary→s1 (s1→moebius-boundary (loop i))
 
--- there is an invalid fhcom in the middle?!
--- ... (fhcom 0 1 (loop x) [x=0 <x1> base]) ...
-def test1 : 𝕀 → s1 =
-  λ i → moebius-boundary→s1 (s1→moebius-boundary (loop i))
--- normalize test1
-
-/-
 def double : s1 → s1 = λ x → s1→moebius-boundary x .fst
 
-import omega1s1
+def test0 : path int (winding (λ i → double (loopn (pos (suc zero)) i))) (pos (suc (suc zero))) =
+  refl
 
-def test0 : path int (winding (λ i → double (loopn (pos (suc zero)) i))) (pos (suc (suc zero))) = refl
--/

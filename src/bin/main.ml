@@ -18,10 +18,20 @@ let opt_debug =
   let doc = "Execute in debug mode." in
   Arg.(value & flag & info ["d"; "debug"] ~doc)
 
+let opt_shell =
+  let doc = "Allow custom scripts for dependency checking." in
+  Arg.(value & flag & info ["allow-shell"] ~doc)
+
+let opt_recheck =
+  let doc = "Ignore the cache in the rot files (re-typecheck everything)." in
+  Arg.(value & flag & info ["ignore-cache"] ~doc)
+
 let opts_config =
   let open Term  in
-  let make file_name line_width debug_mode = Frontend.{file_name; line_width; debug_mode } in
-  pure make $ opt_file_name $ opt_margin $ opt_debug
+  let make file_name line_width debug_mode shell_mode recheck =
+    Frontend.{file_name; line_width; debug_mode; shell_mode; recheck}
+  in
+  pure make $ opt_file_name $ opt_margin $ opt_debug $ opt_shell $ opt_recheck
 
 let cmd_default =
   Term.

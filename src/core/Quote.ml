@@ -180,7 +180,7 @@ struct
         | Face.False (r, r') ->
           let tr = quote_dim env r in
           let tr' = quote_dim env r' in
-          Tm.make @@ Tm.RestrictThunk (tr, tr', None)
+          Tm.make @@ Tm.RestrictThunk (tr, tr', Tm.forty_two)
 
         | Face.True (r, r', ty) ->
           let tr = quote_dim env r in
@@ -188,7 +188,7 @@ struct
           let force0 = restriction_force el0 in
           let force1 = restriction_force el1 in
           let tm = equate env (Lazy.force ty) force0 force1 in
-          Tm.make @@ Tm.RestrictThunk (tr, tr', Some tm)
+          Tm.make @@ Tm.RestrictThunk (tr, tr', tm)
 
         | Face.Indet (p, ty) ->
           let r, r' = Eq.unleash p in
@@ -198,7 +198,7 @@ struct
           let force0 = restriction_force @@ Domain.Value.act phi el0 in
           let force1 = restriction_force @@ Domain.Value.act phi el1 in
           let tm = equate env (Lazy.force ty) force0 force1 in
-          Tm.make @@ Tm.RestrictThunk (tr, tr', Some tm)
+          Tm.make @@ Tm.RestrictThunk (tr, tr', tm)
       end
 
     | V info, _, _ ->
@@ -225,7 +225,7 @@ struct
           let phi = I.equate ri ri' in
           let tri, tri' = quote_dim env ri, quote_dim env ri' in
           let b = equate env (Abs.inst1 (Lazy.force abs) s') (Value.act phi el0) (Value.act phi el1) in
-          tri, tri', Some b
+          tri, tri', b
       in
       let tsys = List.map quote_boundary info.sys in
 
@@ -399,12 +399,12 @@ struct
       if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
         Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift}, stk
       else
-        failwith "global variable name mismatch"
+        failwith @@ "global variable name mismatch: " ^ Name.to_string info0.name ^ " <> " ^ Name.to_string info1.name
     | Meta meta0, Meta meta1 ->
       if meta0.name = meta1.name && meta0.ushift = meta1.ushift then
         Tm.Meta {name = meta0.name; ushift = meta0.ushift}, stk
       else
-        failwith "global variable name mismatch"
+        failwith @@ "global variable name mismatch: " ^ Name.to_string meta0.name ^ " <> " ^ Name.to_string meta1.name
 
     | NHComAtType info0, NHComAtType info1 ->
       let tr, tr' = equate_dir env info0.dir info1.dir in
@@ -534,7 +534,12 @@ struct
       let tr = equate_atom env x0 x1 in
       let phi = I.subst `Dim0 x0 in
       let func = equate env vproj0.func.ty vproj0.func.el vproj1.func.el in
-      let frame = Tm.VProj {r = tr; func} in
+      let dom0, cod0 = unleash_pi vproj0.func.ty in
+      let dom1, cod1 = unleash_pi vproj1.func.ty in
+      let ty0 = equate_ty env dom0 dom1 in
+      let dummy = D.make D.FortyTwo in
+      let ty1 = equate_ty env (inst_clo cod0 dummy) (inst_clo cod1 dummy) in
+      let frame = Tm.VProj {r = tr; ty0; ty1; func} in
       equate_neu_ env vproj0.neu vproj1.neu @@ frame :: stk
 
     | Cap cap0, Cap cap1 ->
@@ -584,19 +589,19 @@ struct
       let tr = equate_dim env r0 r1 in
       let tr' = equate_dim env r'0 r'1 in
       let t = equate env ty (Lazy.force v0) (Lazy.force v1) in
-      tr, tr', Some t
+      tr, tr', t
 
     | Face.False (r0, r'0), Face.False (r1, r'1) ->
       let tr = equate_dim env r0 r1 in
       let tr' = equate_dim env r'0 r'1 in
-      tr, tr', None
+      tr, tr', Tm.forty_two
 
     | Face.Indet (p0, v0), Face.Indet (p1, v1) ->
       let r, r' = Eq.unleash p0 in
       let phi = I.equate r r' in
       let tr, tr' = equate_eq env p0 p1 in
       let v = equate env (Value.act phi ty) (Lazy.force v0) (Lazy.force v1) in
-      tr, tr', Some v
+      tr, tr', v
 
     | _ -> failwith "equate_val_face"
 
@@ -607,7 +612,7 @@ struct
       let phi = I.equate r r' in
       let tr, tr' = equate_eq env p0 p1 in
       let bnd = equate_val_abs env (Value.act phi ty) (Lazy.force abs0) (Lazy.force abs1) in
-      tr, tr', Some bnd
+      tr, tr', bnd
 
   and equate_val_abs env ty abs0 abs1 =
     let x, v0x = Abs.unleash1 abs0 in

@@ -1,7 +1,7 @@
 " vim-redtt syntax
 " Language:     redtt
 " Author:       Carlo Angiuli, Favonia
-" Last Change:  2018 October 16
+" Last Change:  2018 October 31
 
 if exists("b:current_syntax")
   finish
@@ -31,7 +31,7 @@ syn region  redttImport matchgroup=redttDecl start="import" end="$\|\(/-\|--\)\@
 syn match   redttHole '?\k*'
 
 syn keyword redttKeyw V in with where begin end dim elim fst snd coe com pair
-syn keyword redttKeyw fun hcom comp vproj vin lam refl pre
+syn keyword redttKeyw fun hcom comp vproj vin cap box lam refl pre
 syn keyword redttKeyw kan U type
 
 syn keyword redttDecl meta def do let data debug print normalize public private quit opaque
@@ -46,6 +46,7 @@ hi def link redttGuillemetsErr Error
 hi def link redttTriangleErr Error
 hi def link redttParenErr Error
 hi def link redttBrackErr Error
+hi def link redttTodo Todo
 hi def link redttHole Special
 hi def link redttKeyw Identifier
 hi def link redttDecl Statement

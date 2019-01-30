@@ -9,7 +9,12 @@ type twin = [`Only | `TwinL | `TwinR]
 
 type 'a decl =
   | Hole of [`Rigid | `Flex]
-  | Defn of ResEnv.visibility * [`Transparent | `Opaque] * 'a
+  | Auxiliary of 'a
+  | UserDefn of
+    {source : FileRes.filepath;
+     visibility : ResEnv.visibility;
+     opacity : [`Transparent | `Opaque];
+     tm : 'a}
   | Guess of {ty : 'a; tm : 'a}
 
 type status =
@@ -276,13 +281,19 @@ let pp_entry fmt =
       Name.pp x
       Tm.pp0 ty
 
-  | E (x, ty, Defn (_, `Transparent, tm)) ->
+  | E (x, ty, Auxiliary tm) ->
+    Format.fprintf fmt "~%a@ : %a@ = %a"
+      Name.pp x
+      Tm.pp0 ty
+      Tm.pp0 tm
+
+  | E (x, ty, UserDefn {opacity = `Transparent; tm; _}) ->
     Format.fprintf fmt "!%a@ : %a@ = %a"
       Name.pp x
       Tm.pp0 ty
       Tm.pp0 tm
 
-  | E (x, ty, Defn (_, `Opaque, _)) ->
+  | E (x, ty, UserDefn {opacity = `Opaque; _}) ->
     Format.fprintf fmt "!%a@ : %a@ = <opaque>"
       Name.pp x
       Tm.pp0 ty
@@ -317,8 +328,10 @@ let subst_decl sub ~ty =
   function
   | Hole x ->
     Hole x
-  | Defn (visibility, opacity, t) ->
-    Defn (visibility, opacity, subst_tm sub ~ty t)
+  | Auxiliary tm ->
+    Auxiliary (subst_tm sub ~ty tm)
+  | UserDefn info ->
+    UserDefn {info with tm = subst_tm sub ~ty info.tm}
   | Guess info ->
     let univ = Tm.univ ~lvl:`Omega ~kind:`Pre in
     let ty' = subst_tm sub ~ty:univ info.ty in
@@ -424,14 +437,15 @@ struct
   let free fl =
     function
     | Hole _ -> Occurs.Set.empty
-    | Defn (_, `Transparent, t) -> Tm.free fl t
-    | Defn (_, `Opaque, _) -> Occurs.Set.empty
+    | Auxiliary tm -> Tm.free fl tm
+    | UserDefn {opacity = `Transparent; tm; _} -> Tm.free fl tm
+    | UserDefn {opacity = `Opaque; _} -> Occurs.Set.empty
     | Guess {tm; _} -> Tm.free fl tm
 
   let is_incomplete =
     function
     | Hole _ | Guess _ -> true
-    | Defn _ -> false
+    | Auxiliary _ | UserDefn _ -> false
 end
 
 

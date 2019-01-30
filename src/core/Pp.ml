@@ -7,10 +7,9 @@ struct
   let emp = Emp
 
   let var i xs =
-    try
+    if i < Bwd.length xs then
       Bwd.nth xs i
-    with
-    | _ ->
+    else
       "{" ^ string_of_int i ^ "}"
   (* failwith "Pp printer: tried to resolve bound variable out of range" *)
 
@@ -23,8 +22,8 @@ struct
     let formatted = string_of_int n in
     let lookup : int -> string = List.nth ["₀";"₁";"₂";"₃";"₄";"₅";"₆";"₇";"₈";"₉"] in
     String.concat "" @@
-      List.init (String.length formatted) @@
-      fun n -> lookup (Char.code (String.get formatted n) - Char.code '0')
+    List.init (String.length formatted) @@
+    fun n -> lookup (Char.code (String.get formatted n) - Char.code '0')
 
   let rec rename xs x i =
     let suffix = nat_to_suffix i in
@@ -63,3 +62,5 @@ let pp_list pp fmt xs =
   let pp_sep fmt () = Format.fprintf fmt ", " in
   Format.fprintf fmt "@[<hv1>[%a]@]"
     (Format.pp_print_list ~pp_sep pp) xs
+
+let pp_bwd pp fmt xs = pp_list pp fmt (Bwd.to_list xs)

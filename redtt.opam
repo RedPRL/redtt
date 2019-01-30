@@ -7,6 +7,7 @@ homepage: "https://github.com/RedPRL/redtt"
 bug-reports: "https://github.com/RedPRL/redtt/issues"
 dev-repo: "git://github.com/RedPRL/redtt.git"
 license: "Apache-2.0"
+synopsis: "The redtt proof assistant"
 depends: [
   "cmdliner" {>= "1.0.2"}
   "uuseg" {>= "11.0.0"}
@@ -14,6 +15,8 @@ depends: [
   "dune" {build & >= "1.4.0"}
   "lwt" {>= "4.1.0"}
   "menhir" {>= "20180703"}
+  "ezjsonm" {= "0.6.0"}
+  "ezgzip" {= "0.2.1"}
 ]
 build: [
   ["dune" "build" "-p" name "@install" "-j" jobs]

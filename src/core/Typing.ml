@@ -165,19 +165,17 @@ let rec check_ cx ty rst tm =
       ();
     check_tm_sys cxx vcod sys
 
-  | [], D.Univ univ, T.Restrict (tr, tr', oty) ->
+  | [], D.Univ univ, T.Restrict (tr, tr', ty') ->
     if univ.kind = `Pre then () else failwith "Co-restriction type is not known to be Kan";
     let r = check_eval_dim cx tr in
     let r' = check_eval_dim cx tr' in
     begin
-      match I.compare r r', oty with
-      | `Apart, None ->
+      match I.compare r r' with
+      | `Apart ->
         ()
-      | _, Some ty' ->
+      | _ ->
         let cxrr', _ = Cx.restrict cx r r' in
         check cxrr' ty ty'
-      | _ ->
-        failwith "co-restriction type malformed"
     end
 
   | [], D.Univ _, T.V info ->
@@ -187,7 +185,7 @@ let rec check_ cx ty rst tm =
     check_is_equivalence cx ~ty0 ~ty1 ~equiv:info.equiv
 
   | [], D.Univ univ, T.Data {lbl; params} ->
-    let desc = GlobalEnv.lookup_datatype lbl @@ Cx.globals cx in
+    let desc = GlobalEnv.lookup_datatype (Cx.globals cx) lbl in
     check_data_params cx lbl desc.body params;
     begin
       if not @@ Lvl.lte desc.lvl univ.lvl && Kind.lte desc.kind univ.kind then
@@ -197,12 +195,11 @@ let rec check_ cx ty rst tm =
     end
 
   | [], D.Data data, T.Intro (dlbl, clbl, params, args) when data.lbl = dlbl ->
-    let desc = GlobalEnv.lookup_datatype dlbl @@ Cx.globals cx in
+    let desc = GlobalEnv.lookup_datatype (Cx.globals cx) dlbl in
     check_data_params cx dlbl desc.body params;
     let vparams = List.map (fun tm -> `Val (Cx.eval cx tm)) params in
     let (module Q) = Cx.quoter cx in
     Q.equiv_data_params (Cx.qenv cx) dlbl desc.body vparams data.params;
-    let data_ty = Cx.quote_ty cx ty in
     let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
     check_intro cx dlbl data.params constr args;
 
@@ -243,14 +240,14 @@ let rec check_ cx ty rst tm =
     let rst' = List.map (Face.map (fun _ _ el -> V.ext_apply el rs)) rst in
     check_ cxx codx (rst' @ sysx) @@ Tm.up @@ cmd' @< Tm.ExtApp trs
 
-  | _, D.Restrict ty_face, T.RestrictThunk (tr0, tr1, otm) ->
+  | _, D.Restrict ty_face, T.RestrictThunk (tr0, tr1, tm) ->
     let r'0 = check_eval_dim cx tr0 in
     let r'1 = check_eval_dim cx tr1 in
     begin
-      match ty_face, otm with
-      | Face.False _, None ->
+      match ty_face with
+      | Face.False _ ->
         ()
-      | Face.True (r0, r1, ty), Some tm ->
+      | Face.True (r0, r1, ty) ->
         begin
           match I.compare r'0 r0, I.compare r'1 r1 with
           | `Same, `Same ->
@@ -259,7 +256,7 @@ let rec check_ cx ty rst tm =
           | _ ->
             failwith "co-restriction mismatch"
         end
-      | Face.Indet (p, ty), Some tm ->
+      | Face.Indet (p, ty) ->
         let r0, r1 = Eq.unleash p in
         begin
           match I.compare r'0 r0, I.compare r'1 r1 with
@@ -276,9 +273,6 @@ let rec check_ cx ty rst tm =
           | _ ->
             failwith "co-restriction mismatch"
         end
-      | _ ->
-        Format.eprintf "@.@.type restriction didn't match thunk@.@.";
-        failwith "Malformed element of co-restriction type"
     end
 
   | [], D.Univ _, T.FHCom info ->
@@ -394,18 +388,18 @@ and check_box cx tydir tycap tysys tr tr' tcap tsys =
   let rec go tysys tsys acc =
     match tsys with
     | [] -> if tysys = [] then () else raiseError ()
-    | (tri0, tri1, otm) :: tsys ->
+    | (tri0, tri1, tm) :: tsys ->
       let ri0 = check_eval_dim cx tri0 in
       let ri1 = check_eval_dim cx tri1 in
-      match tysys, I.compare ri0 ri1, otm with
-      | _, `Apart, _ ->
+      match tysys, I.compare ri0 ri1 with
+      | _, `Apart ->
         (* skipping false boundaries without consuming `tysys`. *)
         go tysys tsys acc
 
-      | _, `Same, _ ->
+      | _, `Same ->
         raiseError ()
 
-      | (Face.Indet (p, tyabs) :: tysys), `Indet, Some tm ->
+      | (Face.Indet (p, tyabs) :: tysys), `Indet ->
         let tyri0, tyri1 = Eq.unleash p in
         Cx.check_eq_dim cx tyri0 ri0;
         Cx.check_eq_dim cx tyri1 ri1;
@@ -496,15 +490,15 @@ and check_tm_sys cx ty sys =
     match sys with
     | [] ->
       ()
-    | (tr0, tr1, otm) :: sys ->
+    | (tr0, tr1, tm) :: sys ->
       let r0 = check_eval_dim cx tr0 in
       let r1 = check_eval_dim cx tr1 in
       begin
-        match I.compare r0 r1, otm with
-        | `Apart, _ ->
+        match I.compare r0 r1 with
+        | `Apart ->
           go sys acc
 
-        | (`Same | `Indet), Some tm ->
+        | `Same | `Indet ->
           begin
             try
               let cx', phi = Cx.restrict cx r0 r1 in
@@ -516,9 +510,6 @@ and check_tm_sys cx ty sys =
             | I.Inconsistent -> ()
           end;
           go sys @@ (r0, r1, tm) :: acc
-
-        | _, None ->
-          failwith "check_tm_sys"
       end
 
   and go_adj cx faces face =
@@ -546,15 +537,15 @@ and check_comp_sys cx r (cxx, x, tyx) cap sys =
     match sys with
     | [] ->
       ()
-    | (tr0, tr1, obnd) :: sys ->
+    | (tr0, tr1, bnd) :: sys ->
       let r0 = check_eval_dim cx tr0 in
       let r1 = check_eval_dim cx tr1 in
       begin
-        match I.compare r0 r1, obnd with
-        | `Apart, _ ->
+        match I.compare r0 r1 with
+        | `Apart ->
           go sys acc
 
-        | (`Same | `Indet), Some bnd ->
+        | `Same | `Indet ->
           begin
             try
               (* check that bnd is a section of tyx under r0=r1 *)
@@ -577,9 +568,6 @@ and check_comp_sys cx r (cxx, x, tyx) cap sys =
           end;
 
           go sys @@ (r0, r1, bnd) :: acc
-
-        | _, None ->
-          failwith "check_comp_sys"
       end
 
   and go_adj cxx faces face =
@@ -729,12 +717,11 @@ and infer_spine_ cx hd sp =
 
         in
 
-        let image_of_bface (tr, tr', otm) =
+        let image_of_bface (tr, tr', tm) =
           let benv = D.Env.append V.empty_env cells_only_ihs in
           let r = V.eval_dim benv tr in
           let r' = V.eval_dim benv tr' in
           D.ValFace.make I.idn r r' @@ fun phi ->
-          let tm = Option.get_exn otm in
           image_of_bterm phi Desc.Self tm
         in
 
@@ -766,7 +753,7 @@ and infer_spine_ cx hd sp =
     | T.Cap info ->
       let fhcom_ty =
         check_eval_ty cx @@
-        T.make @@ T.FHCom {r = info.r; r' = info.r; cap = info.ty; sys = info.sys}
+        T.make @@ T.FHCom {r = info.r; r' = info.r'; cap = info.ty; sys = info.sys}
       in
       let ih = infer_spine_ cx hd sp in
       Cx.check_eq_ty cx fhcom_ty ih.ty;

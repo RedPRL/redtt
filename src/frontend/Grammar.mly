@@ -42,7 +42,7 @@
 %token RIGHT_ARROW RIGHT_TACK
 %token TIMES AST HASH AT BACKTICK IN WITH WHERE BEGIN END DATA INTRO
 %token DIM
-%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN V VPROJ VIN REFL
+%token ELIM UNIV LAM PAIR FST SND COMP HCOM COM COE LET FUN V VPROJ VIN CAP BOX REFL
 %token PUBLIC PRIVATE OPAQUE QUIT DEBUG NORMALIZE DEF PRINT CHECK
 %token TYPE PRE KAN
 %token META
@@ -84,6 +84,8 @@ eproj:
     { E.Snd }
   | DOT VPROJ
     { E.VProj }
+  | DOT CAP
+    { E.Cap }
 
 atom_econ:
   | a = ATOM
@@ -179,6 +181,9 @@ spine_con:
 
   | V; x = ATOM; ty0 = located(atomic); ty1 = located(atomic); equiv = located(atomic)
     { E.V {x; ty0; ty1; equiv} }
+
+  | BOX; cap = located(atomic); sys = pipe_block(located(econ))
+    { E.Box {cap; sys}}
 
 %inline
 block(X):
@@ -500,7 +505,7 @@ tele:
 face(X):
   | LSQ; r0 = tm; EQUALS; r1 = tm; e = X; RSQ
     { fun env ->
-      r0 env, r1 env, Some (e env) }
+      r0 env, r1 env, e env }
 
 bind(X):
   | LSQ; x = ATOM; RSQ; e = X
@@ -589,22 +594,14 @@ tm:
   | LPR; DATA; dlbl = ATOM; RPR
     { fun env ->
       make_node $startpos $endpos @@
-      match R.get dlbl env with
-      | `Datatype alpha ->
-        Tm.Data {lbl = alpha; params = []}
-      | _ ->
-        Format.eprintf "The name %s does not refer to a datatype.@." dlbl;
-        raise Not_found }
+      let alpha = R.get_name dlbl env in
+      Tm.Data {lbl = alpha; params = []} }
 
   | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      match R.get dlbl env with
-      | `Datatype alpha ->
-        Tm.Intro (alpha, clbl, [], es env)
-      | _ ->
-        Format.eprintf "The name %s does not refer to a datatype.@." dlbl;
-        raise Not_found }
+      let alpha = R.get_name dlbl env in
+      Tm.Intro (alpha, clbl, [], es env) }
 
   | e = cmd
     { fun env ->
@@ -619,19 +616,14 @@ tm:
 head:
   | a = ATOM; CARET; k = NUMERAL
     { fun env ->
-      match R.get a env with
-      | `Ix _ -> failwith "Cannot shift bound variable"
-      | `Var x -> Tm.Var {name = x; twin = `Only; ushift = k}
-      | `Metavar x -> Tm.Meta {name = x; ushift = k}
-      | _ -> failwith "Expected variable name" }
+      let x = R.get_name a env in
+      Tm.Var {name = x; twin = `Only; ushift = k} }
 
   | a = ATOM
     { fun env ->
       match R.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
-      | `Var x -> Tm.Var {name = x; twin = `Only; ushift = 0}
-      | `Metavar x -> Tm.Meta {name = x; ushift = 0}
-      | _ -> failwith "Expected variable name" }
+      | `Name x -> Tm.Var {name = x; twin = `Only; ushift = 0} }
 
   | LPR; HCOM; r0 = tm; r1 = tm; ty = tm; cap = tm; sys = elist(face(dimbind(tm))); RPR
     { fun env ->
@@ -681,7 +673,7 @@ cut:
       let hd, fs = e env in
       hd, fs #< (Tm.ExtApp (args env)) }
 
-  | LPR; VPROJ; r = tm; e = cut; func = tm; RPR
+  | LPR; VPROJ; r = tm; e = cut; ty0 = tm; ty1 = tm; func = tm; RPR
     { fun env ->
       let hd, fs = e env in
-      hd, fs #< (Tm.VProj {r = r env; func = func env})}
+      hd, fs #< (Tm.VProj {r = r env; ty0 = ty0 env; ty1 = ty1 env; func = func env})}

@@ -1,7 +1,10 @@
 open RedBasis
 
 let redlib_name = "redlib"
+let red_extention = ".red"
+let rot_extention = ".rot"
 
+type filepath = string
 type selector = string list
 
 let pp_selector =
@@ -15,38 +18,31 @@ let find_redlib_root (base_dir : string) : string option =
       Some cur
     else
       let () = Sys.chdir Filename.parent_dir_name in
-      let next = Sys.getcwd () in
-      if next = cur then
+      let up = Sys.getcwd () in
+      if up = cur then begin
+        Log.pp_message ~loc:None ~lvl:`Warn
+          Format.pp_print_string
+          Format.std_formatter
+          "You are using the special local import mode. This is not recommended. You have been warned.";
         None
-      else
-        go next
+      end else
+        go up
   in
   Sys.chdir base_dir;
   go (Sys.getcwd ())
 
-let module_to_rel_path ?(extension=None) selector =
-  let without_ext = String.concat Filename.dir_sep selector in
-  match extension with
-  | None -> without_ext
-  | Some ext -> String.concat "." [without_ext; ext]
+let selector_to_stem ~stem selector =
+  let module_path = String.concat Filename.dir_sep selector in
+  let base_dir = Filename.dirname stem in
+  let base_dir = Option.default base_dir (find_redlib_root base_dir) in
+  Filename.concat base_dir module_path
 
-let find_module base_dir ?(extension=None) selector : string =
-  let module_path = module_to_rel_path ~extension selector in
-  let local_path = Filename.concat base_dir module_path in
-  if Sys.file_exists local_path then
-    local_path
-  else
-    match find_redlib_root base_dir with
-    | None ->
-      Format.eprintf "@[Could not find the module@ %a@ at@ %s.@]@."
-      pp_selector selector local_path;
-      raise Not_found
-    | Some new_base_dir ->
-      let abs_path = SysUtil.normalize_concat [new_base_dir] module_path in
-      if Sys.file_exists abs_path then
-        abs_path
-      else begin
-        Format.eprintf "@[Could not find the module@ %a@ at@ %s@ or@ %s.@]@."
-        pp_selector selector local_path abs_path;
-        raise Not_found
-      end
+let stem_to_red stem = stem ^ red_extention
+
+let stem_to_rot stem = stem ^ rot_extention
+
+let red_to_stem red =
+  match String.sub red (String.length red - 4) 4 with
+  | str when str = red_extention -> String.sub red 0 @@ String.length red - 4
+  | _ -> invalid_arg "red_to_stem"
+  | exception Invalid_argument _ -> invalid_arg "red_to_stem"

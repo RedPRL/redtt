@@ -1,17 +1,20 @@
 import prelude
-import isotoequiv
+import basics.isotoequiv
 
-def is-section (A B : type) (f : A → B) : type =
+def retraction (A B : type) (f : A → B) : type =
   (g : B → A) × (a : A) → path A (g (f a)) a
 
+def section (A B : type) (f : A → B) : type =
+  (g : B → A) × (b : B) → path B (f (g b)) b
+
 def retract (A B : type) : type =
-  (f : A → B) × is-section A B f
+  (f : A → B) × retraction A B f
 
 def retract/path-action (A B : type)
-  (f : A → B) (f/sec : is-section A B f) (a a' : A)
+  (f : A → B) (retr : retraction A B f) (a a' : A)
   : retract (path _ a a') (path B (f a) (f a'))
   =
-  let (g,α) = f/sec in
+  let (g,α) = retr in
   ( λ p i → f (p i)
   , λ q i → comp 0 1 (g (q i)) [i=0 → α a | i=1 → α a']
   , λ p j i → comp j 1 (α (p i) j) [i=0 → α a | i=1 → α a']
@@ -36,9 +39,9 @@ def retract/hlevel : (l : hlevel) (A B : type)
       | i=0 → α a
       | i=1 → α a'
       ]
-    | hsuc (l → l/ih) → λ A B (f,sec) B/level a a' →
+    | hsuc (l → l/ih) → λ A B (f,retr) B/level a a' →
       l/ih (path _ a a') (path B (f a) (f a'))
-        (retract/path-action A B f sec a a')
+        (retract/path-action A B f retr a a')
         (B/level (f a) (f a'))
     ]
   ]
@@ -100,5 +103,30 @@ def path-retract/equiv (A : type) (R : A → A → type)
     , λ p → J A p (λ q → path _ (ret a (q 1) .fst (ret a (q 1) .snd .fst q)) q) preserves-refl
     , ret a b .snd .snd
     )
-  
 
+def equiv-section/prop (A B : type) (f : A → B) (c : is-equiv A B f)
+  : is-prop (section A B f) =
+  λ (g0,p0) (g1,p1) i →
+  let α (b : B) : path (fiber A B f b) (g0 b, p0 b) (g1 b, p1 b) =
+    contr→prop (fiber A B f b) (c b) (g0 b, p0 b) (g1 b, p1 b)
+  in
+  (λ b → α b i .fst, λ b → α b i .snd)
+
+-- TODO this does not really belong in this file
+def precompose-equiv (A B C : type) (e : equiv A B) : equiv (B → C) (A → C) =
+  let (f,g,α,β) = equiv→iso _ _ e in
+  iso→equiv (B → C) (A → C)
+    ( λ h a → h (f a)
+    , λ k b → k (g b)
+    , λ k i a → k (β a i)
+    , λ h i b → h (α b i)
+    )
+
+def equiv-retraction/prop (A B : type) (f : A → B) (c : is-equiv A B f)
+  : is-prop (retraction A B f) =
+  λ (g0,q0) (g1,q1) i →
+  let p =
+    contr→prop _ (precompose-equiv A B A (f,c) .snd (λ a → a))
+      (g0, λ j b → q0 b j) (g1, λ j b → q1 b j)
+  in
+  (p i .fst, λ b j → p i .snd j b)

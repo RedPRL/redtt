@@ -5,7 +5,7 @@ type twin = [`Only | `TwinL | `TwinR]
 type 'a bnd = B of string option * 'a
 type 'a nbnd = NB of string option bwd * 'a
 
-type ('r, 'a) face = 'r * 'r * 'a option
+type ('r, 'a) face = 'r * 'r * 'a
 type ('r, 'a) system = ('r, 'a) face list
 
 
@@ -38,6 +38,7 @@ type 'a tmf =
   | Data of {lbl : Name.t; params : 'a list}
   | Intro of Name.t * string * 'a list * 'a list (* TODO: turn this into inline record *)
 
+  | FortyTwo
 
 and 'a head =
   | Meta of {name: Name.t; ushift : int}
@@ -57,7 +58,7 @@ and 'a frame =
   | Snd
   | FunApp of 'a
   | ExtApp of 'a list
-  | VProj of {r : 'a; func : 'a}
+  | VProj of {r : 'a; ty0 : 'a; ty1 : 'a; func : 'a}
   | Cap of {r : 'a; r' : 'a; ty : 'a; sys : ('a, 'a bnd) system}
   | RestrictForce
 
