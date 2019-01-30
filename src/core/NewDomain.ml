@@ -16,8 +16,6 @@ type dim = I.t
 module Rel = NewRestriction
 type rel = Rel.t
 
-exception Dead
-
 
 (** Permutations *)
 module Perm :
@@ -3518,7 +3516,7 @@ and Face :
         r, r',
         DelayedLazyX.run rel' bdy
       | `Inconsistent ->
-        r, r', DelayedLazyX.make D.dummy
+        `Dim0, `Dim1, DelayedLazyX.make D.dummy
 
     let subst r x (s, s', bdy) =
       Dim.subst r x s, Dim.subst r x s',
@@ -3535,7 +3533,7 @@ and Face :
         DelayedLazyX.plug rel' ~rigid:false frm' bdy
       | `Inconsistent ->
         (* should not happen by the invariant *)
-        r, r', DelayedLazyX.make D.dummy
+        `Dim0, `Dim1, DelayedLazyX.make D.dummy
 
     let force rel ((r, r', bdy) as face) =
       match Rel.compare r r' rel with
