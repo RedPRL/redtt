@@ -3,6 +3,7 @@ open Combinators
 
 module D = NewDomain
 module Q = NewQuote
+
 type error =
   | ExpectedDimension
   | UnexpectedState

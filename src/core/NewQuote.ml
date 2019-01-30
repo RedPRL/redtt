@@ -6,6 +6,26 @@ module Rel = NewRestriction
 exception PleaseFillIn
 exception PleaseRaiseProperError
 
+type error =
+  | VariableMismatch of Name.t * Name.t
+
+let pp_error fmt =
+  function
+  | VariableMismatch (x, y) ->
+    Format.fprintf fmt "Expected variable %a to match %a"
+      Name.pp x Name.pp y
+
+exception E of error
+
+let _ =
+  PpExn.install_printer @@ fun fmt ->
+  function
+  | E err ->
+    Format.fprintf fmt "@[<1>%a@]" pp_error err
+  | _ ->
+    raise PpExn.Unrecognized
+
+
 module QEnv :
 sig
   type t
@@ -296,7 +316,7 @@ and equate_hd qenv rel hd0 hd1 =
     if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
       Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift}
     else
-      raise PleaseRaiseProperError
+      raise @@ E (VariableMismatch (info0.name, info1.name))
 
   | Meta info0, Meta info1 ->
     if info0.name = info1.name && info0.ushift = info1.ushift then
