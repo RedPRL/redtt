@@ -126,7 +126,7 @@ struct
       end
     | None ->
       let d = f (Rel.emp ()) !v.perm !v.data in v := {data = d; rel = None; perm = Perm.emp};
-      !v.data
+      d
 
   let fold f v = f !v.rel !v.perm !v.data
 end
