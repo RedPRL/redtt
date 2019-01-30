@@ -94,6 +94,10 @@ $ opam pin add -y redtt . # the first time you build
 $ opam upgrade            # after packages change
 ```
 
+If you have previously built `redtt` but some of our dependencies have changed
+in the meanwhile, `opam upgrade` might fail. In this case, please first run
+`opam uninstall redtt` and then run `opam upgrade`.
+
 ### Building
 
 ```
