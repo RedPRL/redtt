@@ -16,6 +16,8 @@ type dim = I.t
 module Rel = NewRestriction
 type rel = Rel.t
 
+exception Dead
+
 
 (** Permutations *)
 module Perm :
@@ -1383,7 +1385,7 @@ struct
       begin
         match ConFace.run rel face with
         | face -> Restrict face
-        | exception ConFace.Dead ->
+        | exception Dead ->
           raise @@ E UnexpectedDeadFace
       end
 
@@ -1404,7 +1406,7 @@ struct
       begin
         match ConFace.run rel face with
         | face -> RestrictThunk face
-        | exception ConFace.Dead ->
+        | exception Dead ->
           raise @@ E UnexpectedDeadFace
       end
 
@@ -3442,7 +3444,7 @@ and Sys :
       let run_face face =
         try Some (Face.run rel face)
         with
-        | Face.Dead -> None
+        | Dead -> None
       in
       ListUtil.filter_map run_face sys
 
@@ -3455,8 +3457,8 @@ and Sys :
       let force_face face =
         try Some (Face.force rel face)
         with
-        | Face.Dead -> None
         | Face.Triv bdy -> raise @@ Triv bdy
+        | Dead -> None
       in
       ListUtil.filter_map force_face sys
 
@@ -3466,12 +3468,14 @@ and Sys :
       let run_then_force_face face =
         try Some (Face.run_then_force rel face)
         with
-        | Face.Dead -> None
+        | Dead -> None
         | Face.Triv bdy -> raise @@ Triv bdy
       in
       ListUtil.filter_map run_then_force_face sys
 
-    let foreach_make rel sys f = ListUtil.flat_foreach sys (fun (r, r', bdy) -> Face.make rel r r' (f r r' bdy))
+    let foreach_make rel sys f =
+      ListUtil.flat_foreach sys @@ fun (r, r', bdy) ->
+      Face.make rel r r' (f r r' bdy)
   end
 
 (** A [face] is a value if equation is consistent and its element is a value.
@@ -3482,7 +3486,6 @@ and Face :
     include DomainPlug with type t = X.t face
 
     exception Triv of X.t
-    exception Dead
 
     (** this is to force rigidity of a system *)
     val force : rel -> t -> t
@@ -3505,7 +3508,6 @@ and Face :
     type t = X.t face
 
     exception Triv of X.t
-    exception Dead
 
     let pp fmt (r, r', u) =
       Format.fprintf fmt "%a=%a -> %a"
