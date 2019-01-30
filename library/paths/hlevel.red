@@ -1,6 +1,14 @@
 import prelude
+import data.unit
+import basics.isotoequiv
 import paths.sigma
 import paths.pi
+
+def prop/unit (A : type) (A/prop : is-prop A) (x0 : A) : equiv A unit = 
+  iso→equiv A unit (λ _ → ★, λ _ → x0, unit/prop ★, A/prop x0)
+
+def prop/equiv (P Q : type) (P/prop : is-prop P) (Q/prop : is-prop Q) (f : P → Q) (g : Q → P) : equiv P Q = 
+  iso→equiv P Q (f, g, λ p → Q/prop (f (g p)) p, λ q → P/prop (g (f q)) q)
 
 def contr-equiv (A B : type) (A/contr : is-contr A) (B/contr : is-contr B)
   : equiv A B

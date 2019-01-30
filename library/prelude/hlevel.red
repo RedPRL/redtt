@@ -41,6 +41,9 @@ def type/groupoid = type/of-level groupoid
 
 -- lower hlevels imply higher hlevels
 
+def contr→prop (A : type) (A/contr : is-contr A) : is-prop A =
+  λ a a' → trans A (A/contr .snd a) (symm A (A/contr .snd a'))
+
 def prop→set (A : type) (A/prop : is-prop A) : is-set A =
   λ a b p q i j →
   comp 0 1 a [
@@ -51,8 +54,7 @@ def prop→set (A : type) (A/prop : is-prop A) : is-set A =
 
 def raise-hlevel : (l : hlevel) (A : type) → has-hlevel l A → has-hlevel (hsuc l) A =
   elim [
-  | contr → λ A A/level a a' →
-    trans A (A/level .snd a) (symm A (A/level .snd a'))
+  | contr → contr→prop
   | hsuc l →
     elim l [
     | contr → prop→set

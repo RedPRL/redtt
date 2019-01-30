@@ -3,6 +3,7 @@ import data.void
 import data.unit
 import data.bool
 import basics.isotoequiv
+import basics.hedberg
 
 def bool-path/code : bool → bool → type =
   elim [
@@ -24,3 +25,20 @@ def not/equiv : equiv bool bool =
 
 def not/path : path^1 type bool bool =
   ua _ _ not/equiv
+
+def bool/discrete : discrete bool = 
+  elim [
+  | tt →
+    elim [
+    | tt → inl refl
+    | ff → inr (not/neg ff)
+    ]
+  | ff →
+    elim [
+    | tt → inr (not/neg tt)
+    | ff → inl refl
+    ]
+  ]
+
+def bool/set : is-set bool =
+  discrete→set bool bool/discrete
