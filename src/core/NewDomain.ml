@@ -3534,9 +3534,8 @@ and Face :
         let frm' = Frame.run rel' frm in
         DelayedLazyX.plug rel' ~rigid:false frm' bdy
       | `Inconsistent ->
-        failwith "Fuck!!!"
-    (* should not happen by the invariant *)
-    (* r, r', DelayedLazyX.make D.dummy *)
+        (* should not happen by the invariant *)
+        r, r', DelayedLazyX.make D.dummy
 
     let force rel ((r, r', bdy) as face) =
       match Rel.compare r r' rel with
