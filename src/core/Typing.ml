@@ -365,12 +365,12 @@ and check_intro cx dlbl params constr tms =
 
 and cofibration_of_sys : type a. cx -> (Tm.tm, a) Tm.system -> cofibration =
   fun cx sys ->
-    let face (tr, tr', _) =
-      let r = Cx.eval_dim cx tr in
-      let r' = Cx.eval_dim cx tr' in
-      (r, r')
-    in
-    List.map face sys
+  let face (tr, tr', _) =
+    let r = Cx.eval_dim cx tr in
+    let r' = Cx.eval_dim cx tr' in
+    (r, r')
+  in
+  List.map face sys
 
 (* XXX the following code smells! *)
 and check_box cx tydir tycap tysys tr tr' tcap tsys =
