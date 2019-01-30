@@ -97,8 +97,8 @@ let inst_clo cx clo v = D.Clo.inst (Cx.rel cx) clo @@ D.Cell.con v
 
 open Tm.Notation
 
-module ConSys = D.Sys (D.Con)
-module ConAbsSys = D.Sys (D.AbsPlug (D.Con))
+module ConSys = D.Sys (D.Con) (D.ConDummy)
+module ConAbsSys = D.Sys (D.AbsPlug (D.Con)) (D.ConAbsDummy)
 
 
 let equate_tycon cx = Q.equate_tycon (Cx.qenv cx) (Cx.rel cx)

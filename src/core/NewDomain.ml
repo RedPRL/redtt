@@ -244,7 +244,8 @@ and clo = Clo of {bnd : Tm.tm Tm.bnd; env : env}
 and nclo = NClo of {bnd : Tm.tm Tm.nbnd; env : env}
 and ext_clo = ExtClo of {bnd : (Tm.tm * (Tm.tm, Tm.tm) Tm.system) Tm.nbnd; env : env}
 
-
+module ConDummy = struct let dummy = FortyTwo end
+module ConAbsDummy = struct let dummy = Abs (Name.fresh (), FortyTwo) end
 
 type error =
   | ExpectedDimension
@@ -279,6 +280,8 @@ sig
 
   (* TODO: this should not take a 'rel'. [pp] is meant to be simple-minded. *)
   val pp : t Pp.t0
+
+
 end
 
 module type DomainPlug =
@@ -371,7 +374,6 @@ end
 and Syn :
 sig
   type t = Tm.tm
-  exception Triv of con
 
   (** [eval_dim] evaluates a dimension expression. *)
   val eval_dim : env -> t -> dim
@@ -388,9 +390,7 @@ end =
 struct
   type t = Tm.tm
 
-  exception Triv of con
-
-  module ConSys = Sys (Con)
+  module ConSys = Sys (Con) (ConDummy)
 
   let rec eval_dim env t =
     match Tm.unleash t with
@@ -766,6 +766,7 @@ struct
       Format.eprintf "[%s] the assertion %a≠%a fails.@." msg Dim.pp r Dim.pp r';
       assert false
     | _ -> ()
+
 end
 
 (** A prevalue in [clo] is a value if its environment is a value. *)
@@ -804,6 +805,7 @@ struct
     let Clo {bnd; env} = clo in
     let Tm.B (_, tm) = bnd in
     Syn.eval rel (Env.extend_cell env cell) tm
+
 end
 
 (** A prevalue in [nclo] is a value if its environment is a value. *)
@@ -839,6 +841,7 @@ struct
     let NClo {bnd; env} = nclo in
     let Tm.NB (_, tm) = bnd in
     Syn.eval rel (Env.extend_cells env cells) tm
+
 end
 
 (** A prevalue in [ext_clo] is a value if its environment is a value. *)
@@ -886,6 +889,7 @@ struct
     let Tm.NB (_, (ty, _)) = bnd in
     let env' = Env.extend_cells env cells in
     Syn.eval rel env' ty
+
 end
 
 (** A cell is a value if it is [Dim r] or [Val v] for some value [v]. *)
@@ -930,6 +934,7 @@ struct
     | `Dim r -> Dim.assert_value msg rel r
     | `Val v -> LazyVal.assert_value msg rel v
   let assert_rigid = assert_value
+
 end
 
 and ConstrCell :
@@ -981,6 +986,7 @@ struct
     | `Rec (`Self, v) -> Val.assert_value msg rel v
     | `Dim _ -> ()
   let assert_rigid = assert_value
+
 end
 
 (** An environment is a value if every cell of it is. *)
@@ -1029,6 +1035,7 @@ struct
 
   let clear_locals env =
     {globals = env.globals; cells = Emp}
+
 end
 
 and Con :
@@ -1071,14 +1078,15 @@ sig
   val make_arr : rel -> value -> value -> con
 end =
 struct
-  module ConFace = Face (Con)
-  module ConSys = Sys (Con)
+  module ConFace = Face (Con) (ConDummy)
+  module ConSys = Sys (Con) (ConDummy)
   module ConAbs = AbsPlug (Con)
-  module ConAbsFace = Face (ConAbs)
-  module ConAbsSys = Sys (ConAbs)
+  module ConAbsFace = Face (ConAbs) (ConAbsDummy)
+  module ConAbsSys = Sys (ConAbs) (ConAbsDummy)
   module ValAbs = AbsPlug (Val)
 
   type t = con
+
 
   let pp fmt =
     function
@@ -1382,12 +1390,8 @@ struct
       Ext extclo
 
     | Restrict face ->
-      begin
-        match ConFace.run rel face with
-        | face -> Restrict face
-        | exception Dead ->
-          raise @@ E UnexpectedDeadFace
-      end
+      let face = ConFace.run rel face in
+      Restrict face
 
     | Lam clo ->
       let clo = Clo.run rel clo in
@@ -1403,12 +1407,8 @@ struct
       ExtLam nclo
 
     | RestrictThunk face ->
-      begin
-        match ConFace.run rel face with
-        | face -> RestrictThunk face
-        | exception Dead ->
-          raise @@ E UnexpectedDeadFace
-      end
+      let face = ConFace.run rel face in
+      RestrictThunk face
 
     | Coe info ->
       begin
@@ -1428,12 +1428,12 @@ struct
           Val.run_then_unleash rel info.cap
         | _ ->
           match ConAbsSys.run_then_force rel info.sys with
-          | sys ->
+          | `Rigid sys ->
             let cap = Val.run rel info.cap in
             let ty = HComShape.run rel info.ty in
             HCom {info with ty; cap; sys}
 
-          | exception ConAbsSys.Triv abs ->
+          | `Triv abs ->
             ConAbs.inst rel abs info.r'
       end
 
@@ -1444,12 +1444,12 @@ struct
           Val.run_then_unleash rel info.cap
         | _ ->
           match ConAbsSys.run_then_force rel info.sys with
-          | sys ->
+          | `Rigid sys ->
             let cap = Val.run rel info.cap in
             let ty = ComShape.run rel info.ty in
             Com {info with ty; cap; sys}
 
-          | exception ConAbsSys.Triv abs ->
+          | `Triv abs ->
             ConAbs.inst rel abs info.r'
       end
 
@@ -1460,12 +1460,12 @@ struct
           Val.run_then_unleash rel info.cap
         | _ ->
           match ConAbsSys.run_then_force rel info.sys with
-          | sys ->
+          | `Rigid sys ->
             let cap = Val.run rel info.cap in
             let ty = HComShape.run rel info.ty in
             GHCom {info with ty; cap; sys}
 
-          | exception ConAbsSys.Triv abs ->
+          | `Triv abs ->
             ConAbs.inst rel abs info.r'
       end
 
@@ -1476,12 +1476,12 @@ struct
           Val.run_then_unleash rel info.cap
         | _ ->
           match ConAbsSys.run_then_force rel info.sys with
-          | sys ->
+          | `Rigid sys ->
             let cap = Val.run rel info.cap in
             let ty = ComShape.run rel info.ty in
             GCom {info with ty; cap; sys}
 
-          | exception ConAbsSys.Triv abs ->
+          | `Triv abs ->
             ConAbs.inst rel abs info.r'
       end
 
@@ -1505,11 +1505,11 @@ struct
           Val.run_then_unleash rel info.cap
         | _ ->
           match ConSys.run_then_force rel info.sys with
-          | sys ->
+          | `Rigid sys ->
             let cap = Val.run rel info.cap in
             Box {info with cap; sys}
 
-          | exception ConSys.Triv c -> c
+          | `Triv c -> c
       end
 
     | Neu info ->
@@ -1661,7 +1661,7 @@ struct
       in
       begin
         match ConSys.force rel ext_sys with
-        | ext_sys ->
+        | `Rigid ext_sys ->
           let cap = Val.plug rel ~rigid:true frm cap in
           let ext_sys =
             ConAbsSys.foreach_make rel ext_sys @@ fun r r' bdy _ ->
@@ -1670,7 +1670,7 @@ struct
           let comp_sys = ConAbsSys.plug rel ~rigid:true frm sys in
           let sys = ext_sys @ comp_sys in
           rigid_hcom rel r r' ~ty ~cap ~sys
-        | exception ConSys.Triv c -> c
+        | `Triv c -> c
       end
 
     | ExtApp rs as frm, Coe {r; r'; ty = `Ext (Abs (x, extclo_x)); cap} ->
@@ -1689,7 +1689,7 @@ struct
       in
       begin
         match ConSys.force rel sys_y with
-        | sys_y ->
+        | `Rigid sys_y ->
           let abs = Abs (y, ty_y) in
           let cap = Val.plug rel ~rigid:true frm cap in
           let sys =
@@ -1697,7 +1697,7 @@ struct
             Abs (y, LazyVal.unleash bdy_y)
           in
           rigid_com rel r r' ~abs ~cap ~sys
-        | exception ConSys.Triv c_y ->
+        | `Triv c_y ->
           run rel @@ subst r' y c_y
       end
 
@@ -1711,7 +1711,7 @@ struct
       in
       begin
         match ConSys.force rel ext_sys with
-        | ext_sys ->
+        | `Rigid ext_sys ->
           let cap = Val.plug rel ~rigid:true frm cap in
           let ext_sys =
             ConAbsSys.foreach_make rel ext_sys @@ fun r r' bdy _ ->
@@ -1720,7 +1720,7 @@ struct
           let comp_sys = ConAbsSys.plug rel ~rigid:true frm sys in
           let sys = ext_sys @ comp_sys in
           rigid_hcom rel r r' ~ty ~cap ~sys
-        | exception ConSys.Triv c -> c
+        | `Triv c -> c
       end
 
     | ExtApp _, GCom {r; r'; ty; cap; sys} ->
@@ -1771,10 +1771,10 @@ struct
       let frm, ty, sys = rigid_plug_ty rel frm info.ty hd in
       begin
         match ConSys.force rel sys with
-        | sys ->
+        | `Rigid sys ->
           let neu = Neutroid.plug rel ~rigid:true frm info.neu in
           Neu {ty = Val.make ty; neu = {neu with sys = sys @ neu.sys}}
-        | exception ConSys.Triv con ->
+        | `Triv con ->
           con
       end
 
@@ -1842,14 +1842,14 @@ struct
 
   and make_neu rel ty neu =
     match Neutroid.force rel neu with
-    | neu -> Neu {ty; neu}
-    | exception Neutroid.Triv v -> v
+    | `Rigid neu -> Neu {ty; neu}
+    | `Triv v -> v
 
   and make_intro rel ~dlbl ~clbl ~args ~sys =
     match ConSys.force rel sys with
-    | sys ->
+    | `Rigid sys ->
       Intro {dlbl; clbl; args; sys}
-    | exception ConSys.Triv con ->
+    | `Triv con ->
       con
 
   and make_hcom rel r r' ~ty ~cap ~sys =
@@ -1858,9 +1858,9 @@ struct
       Val.unleash cap
     | _ ->
       match ConAbsSys.force rel sys with
-      | _ ->
+      | `Rigid _ ->
         rigid_hcom rel r r' ~ty ~cap ~sys
-      | exception ConAbsSys.Triv abs ->
+      | `Triv abs ->
         ConAbs.inst rel abs r'
 
   and make_com rel r r' ~abs ~cap ~sys =
@@ -1869,9 +1869,9 @@ struct
       Val.unleash cap
     | _ ->
       match ConAbsSys.force rel sys with
-      | _ ->
+      | `Rigid _ ->
         rigid_com rel r r' ~abs ~cap ~sys
-      | exception ConAbsSys.Triv abs ->
+      | `Triv abs ->
         ConAbs.inst rel abs r'
 
   and make_ghcom rel r r' ~ty ~cap ~sys =
@@ -1880,9 +1880,9 @@ struct
       Val.unleash cap
     | _ ->
       match ConAbsSys.force rel sys with
-      | _ ->
+      | `Rigid _ ->
         rigid_ghcom rel r r' ~ty ~cap ~sys
-      | exception ConAbsSys.Triv abs ->
+      | `Triv abs ->
         ConAbs.inst rel abs r'
 
   and make_gcom rel r r' ~abs ~cap ~sys =
@@ -1891,9 +1891,9 @@ struct
       Val.unleash cap
     | _ ->
       match ConAbsSys.force rel sys with
-      | _ ->
+      | `Rigid _ ->
         rigid_gcom rel r r' ~abs ~cap ~sys
-      | exception ConAbsSys.Triv abs ->
+      | `Triv abs ->
         ConAbs.inst rel abs r'
 
   and make_v rel r ~ty0 ~ty1 ~equiv =
@@ -1916,9 +1916,9 @@ struct
       Val.unleash cap
     | _ ->
       match ConAbsSys.force rel sys with
-      | _ ->
+      | `Rigid _ ->
         HCom {r; r'; ty = `Pos; cap; sys}
-      | exception ConAbsSys.Triv abs ->
+      | `Triv abs ->
         ConAbs.inst rel abs r'
 
   and make_box rel r r' ~cap ~sys =
@@ -1927,9 +1927,9 @@ struct
       Val.unleash cap
     | _ ->
       match ConSys.force rel sys with
-      | _ ->
+      | `Rigid _ ->
         Box {r; r'; cap; sys}
-      | exception ConSys.Triv c -> c
+      | `Triv c -> c
 
   and rigid_hcom rel r r' ~ty ~cap ~sys =
     match ty with
@@ -2808,6 +2808,7 @@ end =
 struct
   type t = coe_shape
 
+
   let pp fmt _ =
     Format.fprintf fmt "<coe-shape>"
 
@@ -2851,6 +2852,7 @@ and HComShape : Domain with type t = hcom_shape =
 struct
   type t = hcom_shape
   module Q = Quantifier
+
 
   let pp fmt =
     function
@@ -2901,6 +2903,7 @@ and Quantifier : Domain with type t = quantifier =
 struct
   type t = quantifier
 
+
   let pp fmt {dom; cod} =
     Format.fprintf fmt "%a@ %a" Val.pp dom Clo.pp cod
 
@@ -2932,9 +2935,7 @@ and Neutroid :
 sig
   include DomainPlug with type t = neutroid
 
-  exception Triv of con
-
-  val force : rel -> t -> t
+  val force : rel -> t -> [`Rigid of t | `Triv of con]
 
   (** sys might not be rigid, but ty must be a value *)
   val reflect_head : rel -> ty:value -> head -> con sys -> con
@@ -2942,8 +2943,9 @@ end =
 struct
   type t = neutroid
 
-  module ConSys = Sys (Con)
-  exception Triv of con
+
+  module ConSys = Sys (Con) (ConDummy)
+
 
   let pp fmt {neu; sys} =
     match sys with
@@ -2965,13 +2967,9 @@ struct
   let force rel {neu; sys} =
     (* The system needs to be forced first. The invariant is that
      * if [sys] is rigid, it is safe to run neu *)
-    let sys =
-      try
-        ConSys.force rel sys
-      with
-      | ConSys.Triv v -> raise @@ Triv v
-    in
-    {neu; sys}
+    match ConSys.force rel sys with
+    | `Rigid sys -> `Rigid {neu; sys}
+    | `Triv v -> `Triv v
 
   let subst r x {neu; sys} =
     {neu = DelayedNeu.subst r x neu;
@@ -2993,8 +2991,8 @@ struct
 
   let reflect_head rel ~ty head sys =
     match ConSys.run_then_force rel sys with
-    | sys -> Neu {ty; neu = {neu = DelayedNeu.make {head; frames = Emp}; sys}}
-    | exception (ConSys.Triv con) -> con
+    | `Rigid sys -> Neu {ty; neu = {neu = DelayedNeu.make {head; frames = Emp}; sys}}
+    | `Triv con -> con
 end
 
 (** A [neu] is a value if its head and frames are rigid values. *)
@@ -3049,7 +3047,7 @@ struct
 
   module NeutroidAbs = Abs (Neutroid)
   module ConAbs = AbsPlug (Con)
-  module ConAbsSys = Sys (ConAbs)
+  module ConAbsSys = Sys (ConAbs) (ConAbsDummy)
 
   let pp fmt =
     function
@@ -3212,7 +3210,7 @@ struct
   type t = frame
 
   module ConAbs = AbsPlug (Con)
-  module ConAbsSys = Sys (AbsPlug (Con))
+  module ConAbsSys = Sys (AbsPlug (Con)) (ConAbsDummy)
 
   let find_elim_clause lbl clauses =
     let f =
@@ -3381,8 +3379,8 @@ struct
           `Triv hd
         | _ ->
           match ConAbsSys.force rel sys with
-          | sys -> `Rigid frm
-          | exception ConAbsSys.Triv abs ->
+          | `Rigid _ -> `Rigid frm
+          | `Triv abs ->
             `Triv (Con.make_coe rel r' r ~abs @@ Val.make hd)
       end
 
@@ -3405,13 +3403,12 @@ end
 
     [Sys.plug] should send rigid systems to rigid systems. *)
 and Sys :
-  functor (X : DomainPlug) ->
+  functor (X : DomainPlug) (D : sig val dummy : X.t end) ->
   sig
     include DomainPlug with type t = X.t sys
-    exception Triv of X.t
 
     (** this is to force rigidity of a system *)
-    val force : rel -> t -> t
+    val force : rel -> t -> [`Rigid of t | `Triv of X.t]
 
     (** this is to remove all faces depending on a particular variable *)
     val forall : Name.t -> t -> t
@@ -3419,17 +3416,15 @@ and Sys :
     (** some convenience functions which could be more efficient *)
 
     (** [run_then_force rel sys = force rel (run rel sys)] *)
-    val run_then_force : rel -> t -> t
+    val run_then_force : rel -> t -> [`Rigid of t | `Triv of X.t]
 
     (** [foreach_make rel sys f = ListUtil.flat_foreach sys (\ (r, r', bdy) -> Face.make rel r r' (f r r' bdy))] *)
     val foreach_make : rel -> 'a sys -> (dim -> dim -> 'a Lazy.t Delayed.t -> rel -> X.t) -> t
   end =
-  functor (X : DomainPlug) ->
+  functor (X : DomainPlug) (D : sig val dummy : X.t end) ->
   struct
     type t = X.t sys
-    module Face = Face (X)
-
-    exception Triv = Face.Triv
+    module Face = Face (X) (D)
 
     let pp fmt =
       Pp.pp_list Face.pp fmt
@@ -3440,11 +3435,12 @@ and Sys :
 
     let forall x = ListUtil.filter_map (Face.forall x)
 
+    (* is this right?? why force? *)
     let run rel sys =
       let run_face face =
-        try Some (Face.run rel face)
-        with
-        | Dead -> None
+        match Face.run_then_force rel face with
+        | `Rigid face -> Some face
+        | _ -> None
       in
       ListUtil.filter_map run_face sys
 
@@ -3454,24 +3450,23 @@ and Sys :
     let assert_value msg rel = List.iter (Face.assert_value msg rel)
 
     let force rel sys =
+      let exception Triv of X.t in
       let force_face face =
-        try Some (Face.force rel face)
-        with
-        | Face.Triv bdy -> raise @@ Triv bdy
-        | Dead -> None
+        match Face.force rel face with
+        | `Rigid face -> Some face
+        | `Triv bdy -> raise @@ Triv bdy
+        | `Dead -> None
       in
-      ListUtil.filter_map force_face sys
+      try
+        `Rigid (ListUtil.filter_map force_face sys)
+      with
+        Triv x -> `Triv x
 
     let assert_rigid msg rel = List.iter (Face.assert_rigid msg rel)
 
+    (* TODO *)
     let run_then_force rel sys =
-      let run_then_force_face face =
-        try Some (Face.run_then_force rel face)
-        with
-        | Dead -> None
-        | Face.Triv bdy -> raise @@ Triv bdy
-      in
-      ListUtil.filter_map run_then_force_face sys
+      force rel @@ run rel sys
 
     let foreach_make rel sys f =
       ListUtil.flat_foreach sys @@ fun (r, r', bdy) ->
@@ -3481,14 +3476,12 @@ and Sys :
 (** A [face] is a value if equation is consistent and its element is a value.
   * A face value is rigid if the equation is not true. *)
 and Face :
-  functor (X : DomainPlug) ->
+  functor (X : DomainPlug) (D : sig val dummy : X.t end) ->
   sig
     include DomainPlug with type t = X.t face
 
-    exception Triv of X.t
-
     (** this is to force rigidity of a system *)
-    val force : rel -> t -> t
+    val force : rel -> t -> [`Rigid of t | `Triv of X.t | `Dead]
 
     (** this is to remove all faces depending on a particular variable *)
     val forall : Name.t -> t -> t option
@@ -3499,16 +3492,13 @@ and Face :
     (** Some convenience functions which could be more efficient: *)
 
     (** [run_then_force rel face = force (run rel face)] *)
-    val run_then_force : rel -> t -> t
+    val run_then_force : rel -> t -> [`Rigid of t | `Triv of X.t | `Dead]
   end =
-  functor (X : DomainPlug) ->
+  functor (X : DomainPlug) (D : sig val dummy : X.t end) ->
   struct
     module DelayedLazyX = DelayedLazyPlug (X)
 
     type t = X.t face
-
-    exception Triv of X.t
-
     let pp fmt (r, r', u) =
       Format.fprintf fmt "%a=%a -> %a"
         Dim.pp r
@@ -3527,7 +3517,8 @@ and Face :
       | `Changed rel' ->
         r, r',
         DelayedLazyX.run rel' bdy
-      | `Inconsistent -> raise Dead
+      | `Inconsistent ->
+        r, r', DelayedLazyX.make D.dummy
 
     let subst r x (s, s', bdy) =
       Dim.subst r x s, Dim.subst r x s',
@@ -3543,17 +3534,18 @@ and Face :
         let frm' = Frame.run rel' frm in
         DelayedLazyX.plug rel' ~rigid:false frm' bdy
       | `Inconsistent ->
-        (* should not happen by the invariant *)
-        raise Dead
+        failwith "Fuck!!!"
+    (* should not happen by the invariant *)
+    (* r, r', DelayedLazyX.make D.dummy *)
 
     let force rel ((r, r', bdy) as face) =
       match Rel.compare r r' rel with
       | `Same ->
-        raise @@ Triv (DelayedLazyX.unleash bdy)
+        `Triv (DelayedLazyX.unleash bdy)
       | `Apart ->
-        raise Dead
+        `Dead
       | `Indet ->
-        face
+        `Rigid face
 
     let forall x (r, r', bdy) =
       let sx = `Atom x in
@@ -3605,7 +3597,6 @@ end
   functor (X : Domain) ->
   struct
     type t = X.t abs
-
     let pp fmt (Abs (x, u)) =
       Format.fprintf fmt "@[<hv1>(<%a>@ %a)@]" Name.pp x X.pp u
 
@@ -3736,8 +3727,8 @@ and DelayedPlug : functor (X : DomainPlug) ->
     type u = X.t
     type t = X.t Delayed.t
 
-    let make = Delayed.make
 
+    let make = Delayed.make
     let make_from_lazy (lazy v) = Delayed.make v
 
     let make_from_delayed v = v
@@ -3783,7 +3774,6 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
     module DelayedX = DelayedPlug (X)
 
     let make v = Delayed.make @@ lazy v
-
     let make_from_lazy = Delayed.make
 
     let make_from_delayed v = Delayed.make @@ lazy begin DelayedX.unleash v end
@@ -3818,5 +3808,5 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
   end
 
 module ConAbs = AbsPlug (Con)
-module ConFace = Face (Con)
+module ConFace = Face (Con) (ConDummy)
 module NeutroidAbs = Abs (Neutroid)
