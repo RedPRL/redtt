@@ -3459,7 +3459,6 @@ and Sys :
     let assert_value msg rel = List.iter (Face.assert_value msg rel)
 
     let force rel sys =
-      (* Format.eprintf "Forcing sys: %a != %a@." Rel.pp rel pp sys; *)
       let exception Triv of X.t in
       let force_face face =
         match Face.force rel face with
@@ -3471,14 +3470,23 @@ and Sys :
         `Rigid (ListUtil.filter_map force_face sys)
       with
         Triv x ->
-        (* Format.eprintf "TRIV!!!!@."; *)
         `Triv x
 
     let assert_rigid msg rel = List.iter (Face.assert_rigid msg rel)
 
-    (* TODO *)
     let run_then_force rel sys =
-      force rel @@ run rel sys
+      let exception Triv of X.t in
+      let force_face face =
+        match Face.run_then_force rel face with
+        | `Rigid face -> Some face
+        | `Triv bdy -> raise @@ Triv bdy
+        | `Dead -> None
+      in
+      try
+        `Rigid (ListUtil.filter_map force_face sys)
+      with
+        Triv x ->
+        `Triv x
 
     let foreach_make rel sys f =
       ListUtil.flat_foreach sys @@ fun (r, r', bdy) ->
