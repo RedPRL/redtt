@@ -88,7 +88,7 @@ def loopn-winding (l : Ω1s1) : path _ (loopn (winding l)) l =
 
 opaque
 def winding/equiv : equiv Ω1s1 int =
-  iso→equiv Ω1s1 int (winding, loopn, winding-loopn, loopn-winding) -- (winding, loopn, winding-loopn, loopn-winding)
+  iso→equiv Ω1s1 int (winding, loopn, winding-loopn, loopn-winding)
 
 opaque
 def winding/path : path^1 _ Ω1s1 int =
