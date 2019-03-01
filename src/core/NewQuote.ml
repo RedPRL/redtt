@@ -12,6 +12,11 @@ type error =
   | DimensionMismatch of Dim.t * Dim.t
   | CanonicalElementOfNeutralType
   | DataLengthMismatch
+  | SystemLengthMismatch
+  | UniverseMismatch
+  | UnequalTypes of con * con
+  | UnequalFrames of frame * frame
+  | UnequalHeads of head * head
 
 let pp_error fmt =
   function
@@ -32,6 +37,21 @@ let pp_error fmt =
   | DataLengthMismatch ->
     (* please add better / more specific errors *)
     Format.fprintf fmt "Datatype length mismatch"
+
+  | SystemLengthMismatch ->
+    Format.fprintf fmt "System length mismatch"
+
+  | UniverseMismatch ->
+    Format.fprintf fmt "Universe mismatch"
+
+  | UnequalTypes (ty0, ty1) ->
+    Format.fprintf fmt "Types not equal: %a and %a" Con.pp ty0 Con.pp ty1
+
+  | UnequalFrames (f0, f1) ->
+    Format.fprintf fmt "Frames not equal: %a and %a" Frame.pp f0 Frame.pp f1
+
+  | UnequalHeads (h0, h1) ->
+    Format.fprintf fmt "Heads not equal: %a and %a" Head.pp h0 Head.pp h1
 
 exception E of error
 
@@ -373,8 +393,8 @@ and equate_hd qenv rel hd0 hd1 =
     let sys = equate_con_abs_sys qenv rel ty_val info0.sys info1.sys in
     Tm.HCom {r; r'; ty; cap; sys}
 
-  | _ ->
-    raise PleaseRaiseProperError
+  | hd0, hd1 ->
+    raise @@ E (UnequalHeads (hd0, hd1))
 
 and equate_frame qenv rel frm0 frm1 =
   match frm0, frm1 with
@@ -440,8 +460,8 @@ and equate_frame qenv rel frm0 frm1 =
     let clauses = List.map equate_clauses_for_constr @@ Desc.constrs desc in
     Tm.Elim {dlbl = lbl; params; mot; clauses}
 
-  | _ ->
-    raise PleaseRaiseProperError
+  | frm0, frm1 ->
+    raise @@ E (UnequalFrames (frm0, frm1))
 
 and equate_elim_clause qenv rel ~data_ty ~mot ~dlbl ~clbl ~constr ~params nclo0 nclo1 =
   let rec loop qenv tyenv out_cells (out_args : constr_cell bwd) specs =
@@ -550,7 +570,7 @@ and equate_tycon qenv rel ty0 ty1 =
     if univ0.kind = univ1.kind && univ0.lvl = univ1.lvl then
       Tm.univ ~kind:univ0.kind ~lvl:univ0.lvl
     else
-      raise PleaseRaiseProperError
+      raise @@ E UniverseMismatch
 
   | Data data0, Data data1 when data0.lbl = data1.lbl ->
     let genv, _ = data0.constrs in
@@ -558,8 +578,8 @@ and equate_tycon qenv rel ty0 ty1 =
     let params = equate_data_params qenv rel desc.body data0.params data1.params in
     Tm.make @@ Tm.Data {lbl = data0.lbl; params}
 
-  | _ ->
-    raise PleaseRaiseProperError
+  | ty0, ty1 ->
+    raise @@ E (UnequalTypes (ty0, ty1))
 
 and equate_tyval qenv rel ty0 ty1 =
   equate_tycon qenv rel (Val.unleash ty0) (Val.unleash ty1)
@@ -635,7 +655,7 @@ and equate_sys_wrapper : 'a 'b. ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b lis
     List.map2 face_equater sys0 sys1
   with
   | Invalid_argument _ ->
-    raise PleaseRaiseProperError (* mismatched lengths *)
+    raise @@ E SystemLengthMismatch
 
 and equate_con_abs_sys qenv rel ty = equate_sys_wrapper (equate_con_abs_face qenv rel ty)
 and equate_tycon_abs_sys qenv rel = equate_sys_wrapper (equate_tycon_abs_face qenv rel)
