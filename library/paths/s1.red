@@ -38,6 +38,7 @@ def encode (x : s1) (p : path s1 base x) : s1-univ-cover x =
 
 def winding (l : path s1 base base) : int = encode base l
 
+opaque
 def winding-loopn : (n : int) → path int (winding (loopn n)) n =
   elim [
   | pos n →
@@ -81,12 +82,15 @@ def decode : (x : s1) → s1-univ-cover x → path s1 base x =
     ]
   ]
 
+opaque
 def loopn-winding (l : Ω1s1) : path _ (loopn (winding l)) l =
   J _ l (λ p → path (path s1 base (p 1)) (decode (p 1) (encode (p 1) p)) p) refl
 
+opaque
 def winding/equiv : equiv Ω1s1 int =
-  iso→equiv Ω1s1 int (winding, loopn, winding-loopn, loopn-winding)
+  iso→equiv Ω1s1 int (winding, loopn, winding-loopn, loopn-winding) -- (winding, loopn, winding-loopn, loopn-winding)
 
+opaque
 def winding/path : path^1 _ Ω1s1 int =
   ua Ω1s1 int winding/equiv
 
