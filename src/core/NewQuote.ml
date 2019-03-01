@@ -112,19 +112,19 @@ end
 type qenv = QEnv.t
 
 
-exception E of error
+exception E of qenv * Rel.t * error
 
 let _ =
   PpExn.install_printer @@ fun fmt ->
   function
-  | E err ->
-    Format.fprintf fmt "@[<1>%a@]" pp_error err
+  | E (qenv, rel, err) ->
+    Format.fprintf fmt "@[<1>Quotation error with environment [%a | %a]:@, @[<1>%a@]@]" QEnv.pp qenv Rel.pp rel pp_error err
   | _ ->
     raise PpExn.Unrecognized
 
 
-let throw err =
-  let exn = E err in
+let throw ~qenv ~rel err =
+  let exn = E (qenv, rel, err) in
   Printexc.raise_with_backtrace exn @@
   Printexc.get_raw_backtrace ()
 
@@ -156,7 +156,7 @@ let equate_dim qenv rel r0 r1 =
     Format.eprintf "Tried to equate: %a != %a ~ %a@." Rel.pp rel I.pp r0 I.pp r1;
     Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
     Format.eprintf "@.";
-    throw @@ DimensionMismatch (r0, r1)
+    throw ~qenv ~rel @@ DimensionMismatch (r0, r1)
 
 
 let rec equate_con qenv rel ty el0 el1 =
@@ -267,7 +267,7 @@ let rec equate_con qenv rel ty el0 el1 =
 
             | _ ->
               (* unequal length *)
-              throw DataLengthMismatch
+              throw ~qenv ~rel DataLengthMismatch
           in
 
           let clbl = intro0.clbl in
@@ -317,7 +317,7 @@ and equate_data_params qenv rel tele params0 params1 =
       go (acc #< tm) tyenv tele prms0 prms1
 
     | _ ->
-      throw DataLengthMismatch
+      throw ~qenv ~rel DataLengthMismatch
   in
   go Emp (Env.init (QEnv.genv qenv)) tele params0 params1
 
@@ -326,7 +326,7 @@ and equate_in_neutral_ty qenv rel el0 el1 =
   | Neu neu0, Neu neu1 ->
     equate_neutroid qenv rel neu0.neu neu1.neu
   | _ ->
-    throw CanonicalElementOfNeutralType
+    throw ~qenv ~rel CanonicalElementOfNeutralType
 
 and equate_val qenv rel ty val0 val1 =
   equate_con qenv rel ty (Val.unleash val0) (Val.unleash val1)
@@ -358,19 +358,19 @@ and equate_hd qenv rel hd0 hd1 =
     if l0 = l1 then
       Tm.Ix (QEnv.ix_of_lvl l0 qenv, `Only)
     else
-      throw @@ DeBruijnLevelMismatch (l0, l1)
+      throw ~qenv ~rel @@ DeBruijnLevelMismatch (l0, l1)
 
   | Var info0, Var info1 ->
     if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
       Tm.Var {name = info0.name; twin = info0.twin; ushift = info0.ushift}
     else
-      throw @@ VariableMismatch (info0.name, info1.name)
+      throw ~qenv ~rel @@ VariableMismatch (info0.name, info1.name)
 
   | Meta info0, Meta info1 ->
     if info0.name = info1.name && info0.ushift = info1.ushift then
       Tm.Meta {name = info0.name; ushift = info0.ushift}
     else
-      throw @@ VariableMismatch (info0.name, info1.name)
+      throw ~qenv ~rel @@ VariableMismatch (info0.name, info1.name)
 
   | NCoe info0, NCoe info1 ->
     let r = equate_dim qenv rel info0.r info1.r in
@@ -404,7 +404,7 @@ and equate_hd qenv rel hd0 hd1 =
     Tm.HCom {r; r'; ty; cap; sys}
 
   | hd0, hd1 ->
-    throw @@ UnequalHeads (hd0, hd1)
+    throw ~qenv ~rel @@ UnequalHeads (hd0, hd1)
 
 and equate_frame qenv rel frm0 frm1 =
   match frm0, frm1 with
@@ -471,7 +471,7 @@ and equate_frame qenv rel frm0 frm1 =
     Tm.Elim {dlbl = lbl; params; mot; clauses}
 
   | frm0, frm1 ->
-    throw @@ UnequalFrames (frm0, frm1)
+    throw ~qenv ~rel @@ UnequalFrames (frm0, frm1)
 
 and equate_elim_clause qenv rel ~data_ty ~mot ~dlbl ~clbl ~constr ~params nclo0 nclo1 =
   let rec loop qenv tyenv out_cells (out_args : constr_cell bwd) specs =
@@ -580,7 +580,7 @@ and equate_tycon qenv rel ty0 ty1 =
     if univ0.kind = univ1.kind && univ0.lvl = univ1.lvl then
       Tm.univ ~kind:univ0.kind ~lvl:univ0.lvl
     else
-      throw @@ UniverseMismatch
+      throw ~qenv ~rel @@ UniverseMismatch
 
   | Data data0, Data data1 when data0.lbl = data1.lbl ->
     let genv, _ = data0.constrs in
@@ -589,7 +589,7 @@ and equate_tycon qenv rel ty0 ty1 =
     Tm.make @@ Tm.Data {lbl = data0.lbl; params}
 
   | ty0, ty1 ->
-    throw @@ UnequalTypes (ty0, ty1)
+    throw ~qenv ~rel @@ UnequalTypes (ty0, ty1)
 
 and equate_tyval qenv rel ty0 ty1 =
   equate_tycon qenv rel (Val.unleash ty0) (Val.unleash ty1)
@@ -659,14 +659,14 @@ and equate_tycon_face qenv rel (r0, r'0, bdy0) (r1, r'1, bdy1) =
   | exception I.Inconsistent ->
     r, r', Tm.forty_two
 
-and equate_sys_wrapper : 'a 'b. ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b list =
-  fun face_equater sys0 sys1 ->
+and equate_sys_wrapper : 'a 'b. qenv -> rel -> ('a -> 'a -> 'b) -> 'a list -> 'a list -> 'b list =
+  fun qenv rel face_equater sys0 sys1 ->
   try
     List.map2 face_equater sys0 sys1
   with
   | Invalid_argument _ ->
-    throw SystemLengthMismatch
+    throw ~qenv ~rel SystemLengthMismatch
 
-and equate_con_abs_sys qenv rel ty = equate_sys_wrapper (equate_con_abs_face qenv rel ty)
-and equate_tycon_abs_sys qenv rel = equate_sys_wrapper (equate_tycon_abs_face qenv rel)
-and equate_con_sys qenv rel ty = equate_sys_wrapper (equate_con_face qenv rel ty)
+and equate_con_abs_sys qenv rel ty = equate_sys_wrapper qenv rel (equate_con_abs_face qenv rel ty)
+and equate_tycon_abs_sys qenv rel = equate_sys_wrapper qenv rel (equate_tycon_abs_face qenv rel)
+and equate_con_sys qenv rel ty = equate_sys_wrapper qenv rel (equate_con_face qenv rel ty)
