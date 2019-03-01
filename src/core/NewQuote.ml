@@ -8,12 +8,30 @@ exception PleaseRaiseProperError
 
 type error =
   | VariableMismatch of Name.t * Name.t
+  | DeBruijnLevelMismatch of int * int
+  | DimensionMismatch of Dim.t * Dim.t
+  | CanonicalElementOfNeutralType
+  | DataLengthMismatch
 
 let pp_error fmt =
   function
   | VariableMismatch (x, y) ->
     Format.fprintf fmt "Expected variable %a to match %a"
       Name.pp x Name.pp y
+
+  | DeBruijnLevelMismatch (x, y) ->
+    Format.fprintf fmt "Expected De Bruijn levels %i to match %i" x y
+
+  | DimensionMismatch (r, r') ->
+    Format.fprintf fmt "Expected dimension %a to match %a"
+      I.pp r I.pp r'
+
+  | CanonicalElementOfNeutralType ->
+    Format.fprintf fmt "Unexpected non-neutral element of neutral type"
+
+  | DataLengthMismatch ->
+    (* please add better / more specific errors *)
+    Format.fprintf fmt "Datatype length mismatch"
 
 exception E of error
 
@@ -108,7 +126,7 @@ let equate_dim qenv rel r0 r1 =
     Format.eprintf "Tried to equate: %a != %a ~ %a@." Rel.pp rel I.pp r0 I.pp r1;
     Printexc.print_raw_backtrace stderr (Printexc.get_callstack 20);
     Format.eprintf "@.";
-    raise PleaseRaiseProperError
+    raise @@ E (DimensionMismatch (r0, r1))
 
 
 let rec equate_con qenv rel ty el0 el1 =
@@ -219,7 +237,7 @@ let rec equate_con qenv rel ty el0 el1 =
 
             | _ ->
               (* unequal length *)
-              raise PleaseRaiseProperError
+              raise @@ E DataLengthMismatch
           in
 
           let clbl = intro0.clbl in
@@ -269,7 +287,7 @@ and equate_data_params qenv rel tele params0 params1 =
       go (acc #< tm) tyenv tele prms0 prms1
 
     | _ ->
-      raise PleaseRaiseProperError
+      raise @@ E DataLengthMismatch
   in
   go Emp (Env.init (QEnv.genv qenv)) tele params0 params1
 
@@ -278,8 +296,7 @@ and equate_in_neutral_ty qenv rel el0 el1 =
   | Neu neu0, Neu neu1 ->
     equate_neutroid qenv rel neu0.neu neu1.neu
   | _ ->
-    Format.eprintf "equate_in_neutral_ty??@.";
-    raise PleaseRaiseProperError
+    raise @@ E CanonicalElementOfNeutralType
 
 and equate_val qenv rel ty val0 val1 =
   equate_con qenv rel ty (Val.unleash val0) (Val.unleash val1)
@@ -311,7 +328,7 @@ and equate_hd qenv rel hd0 hd1 =
     if l0 = l1 then
       Tm.Ix (QEnv.ix_of_lvl l0 qenv, `Only)
     else
-      raise PleaseRaiseProperError
+      raise @@ E (DeBruijnLevelMismatch (l0, l1))
 
   | Var info0, Var info1 ->
     if info0.name = info1.name && info0.twin = info1.twin && info0.ushift = info1.ushift then
@@ -323,7 +340,7 @@ and equate_hd qenv rel hd0 hd1 =
     if info0.name = info1.name && info0.ushift = info1.ushift then
       Tm.Meta {name = info0.name; ushift = info0.ushift}
     else
-      raise PleaseRaiseProperError
+      raise @@ E (VariableMismatch (info0.name, info1.name))
 
   | NCoe info0, NCoe info1 ->
     let r = equate_dim qenv rel info0.r info1.r in
