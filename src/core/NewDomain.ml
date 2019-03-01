@@ -9,7 +9,7 @@ exception CanJonHelpMe
 exception CanFavoniaHelpMe
 
 
-module Lazy : sig
+module NoLazy : sig
   type 'a t
   val make : (unit -> 'a) -> 'a t
   val force : 'a t -> 'a
@@ -21,6 +21,26 @@ struct
   let force x = x
   let pp f fmt x = f fmt x
 end
+
+module Lazy : sig
+  type 'a t
+  val make : (unit -> 'a) -> 'a t
+  val force : 'a t -> 'a
+  val pp : 'a Pp.t0 -> 'a t Pp.t0
+end =
+struct
+  type 'a t = 'a lazy_t
+  let make f = lazy begin f () end
+  let force x = Lazy.force x
+  let pp f fmt x = f fmt (Lazy.force x)
+end
+
+
+(* For debugging:
+
+   module Lazy = NoLazy
+*)
+
 
 type dim = I.t
 
