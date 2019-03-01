@@ -22,6 +22,12 @@ type error =
   | UnexpectedDimensionTerm
   | DataParamsLengthMismatch
   | PartialDatatypeDeclaration
+  | ExpectedTermOfSigmaType
+  | ExpectedTermOfPiType
+  | ExpectedTermOfExtType
+  | ExpectedTermOfRstType
+  | ExpectedTermOfVType
+  | ExpectedTermOfHComType
 
 
 let pp_error fmt =
@@ -60,6 +66,18 @@ let pp_error fmt =
     Format.fprintf fmt "Datatype parameters were of incorrect length"
   | PartialDatatypeDeclaration ->
     Format.fprintf fmt "Partially declared datatpye cannot be treated as type"
+  | ExpectedTermOfSigmaType ->
+    Format.fprintf fmt "Expected term of dependent pair type, but got wrong head constructor"
+  | ExpectedTermOfPiType ->
+    Format.fprintf fmt "Expected term of dependent function type, but got wrong head constructor"
+  | ExpectedTermOfExtType ->
+    Format.fprintf fmt "Expected term of extension type, but got wrong head constructor"
+  | ExpectedTermOfRstType ->
+    Format.fprintf fmt "Expected term of restriction type, but got wrong head constructor"
+  | ExpectedTermOfVType ->
+    Format.fprintf fmt "Expected term of V type, but got wrong head constructor"
+  | ExpectedTermOfHComType ->
+    Format.fprintf fmt "Expected term of composite type, but got wrong head constructor"
 
 exception E of error
 
@@ -125,7 +143,7 @@ struct
     | Tm.Up cmd ->
       Tm.up @@ cmd @< Tm.Fst, Tm.up @@ cmd @< Tm.Snd
     | _ ->
-      raise PleaseRaiseProperError
+      raise @@ E ExpectedTermOfSigmaType
 
 
   let split_sys cx sys =
@@ -147,7 +165,7 @@ struct
       let frm = Tm.FunApp var in
       Tm.up @@ cmd' @< frm
     | _ ->
-      raise PleaseRaiseProperError
+      raise @@ E ExpectedTermOfPiType
 
   let sys_body cx x sys =
     ConSys.plug (Cx.rel cx) ~rigid:true (D.FunApp (D.TypedVal.make (D.Val.make x))) sys
@@ -171,7 +189,7 @@ struct
       let frm = Tm.ExtApp trs in
       Tm.up @@ cmd' @< frm
     | _ ->
-      raise PleaseRaiseProperError
+      raise @@ E ExpectedTermOfExtType
 
   let sys_body cx xs sys =
     ConSys.plug (Cx.rel cx) ~rigid:true (D.ExtApp xs) sys
@@ -196,7 +214,7 @@ struct
       Tm.up @@ cmd @< Tm.RestrictForce
 
     | _ ->
-      raise PleaseRaiseProperError
+      raise @@ E ExpectedTermOfRstType
 
   let sys_body cx sys =
     ConSys.plug (Cx.rel cx) ~rigid:true D.RestrictForce sys
@@ -221,7 +239,7 @@ struct
       let vproj = cmd @< frm in
       `NoCheck, {r = tr; tm0 = tm; tm1 = Tm.up vproj}
     | _ ->
-      raise PleaseRaiseProperError
+      raise @@ E ExpectedTermOfVType
 
   let split_sys cx ~r ~ty0 ~ty1 ~equiv sys =
     let cx_r0 = Cx.restrict_ cx r `Dim0 in
@@ -564,7 +582,7 @@ and check_neg cx ty sys tm =
         ()
 
       |  _->
-        raise PleaseRaiseProperError
+        raise @@ E ExpectedTermOfHComType
     end
 
   | _ ->
