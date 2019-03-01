@@ -134,51 +134,30 @@ struct
      perm : perm;
      data : 'a}
 
-  type 'a t = 'a delayed_record
+  type 'a t = 'a delayed_record ref
 
-  let pp f fmt {rel; perm; data} =
+  let pp f fmt r =
+    let {rel; perm; data} = !r in
     match rel with
     | Some rel ->
       Format.fprintf fmt "{%a | %a}"
         f data Rel.pp rel
     | None -> f fmt data
 
-  let make' r pi d = {data = d; rel = r; perm = pi}
+  let make' r pi d = ref {data = d; rel = r; perm = pi}
 
   let make d = make' None Perm.emp d
 
-  let drop_rel v = v.data
+  let drop_rel v = !v.data
 
   let with_rel r v =
-    let pp_opt_rel fmt =
-      function
-      | None -> Format.fprintf fmt "none"
-      | Some rel -> Rel.pp fmt rel
-    in
-    (* begin
-       let str = Format.asprintf "replacing %a ====> %a@.@." pp_opt_rel v.rel Rel.pp r in
-       Printf.fprintf dump "%s" str
-       end; *)
-    make' (Some r) (v.perm) (drop_rel v)
+    make' (Some r) (!v.perm) (drop_rel v)
 
   let swap pi v =
-    let rel' = flip Option.map v.rel @@ Perm.fold Rel.swap pi in
-    make' rel' (Perm.compose pi v.perm) (drop_rel v)
+    let rel' = flip Option.map !v.rel @@ Perm.fold Rel.swap pi in
+    make' rel' (Perm.compose pi !v.perm) (drop_rel v)
 
-  let unleash f v =
-    match v.rel with
-    | Some r ->
-      begin
-        let d = f (Some r) v.perm v.data in
-        (* n v := {data = d; rel = None; perm = Perm.emp}; *)
-        d
-      end
-    | None ->
-      let d = f None v.perm v.data in
-      (* in v := {data = d; rel = None; perm = Perm.emp}; *)
-      d
-
-  let fold f v = f v.rel v.perm v.data
+  let fold f v = f !v.rel !v.perm !v.data
 end
 
 type 'a face = dim * dim * 'a Lazy.t Delayed.t
