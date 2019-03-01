@@ -331,9 +331,8 @@ let rec check_boundary cx ty sys el =
       let rel_rr' = Cx.rel cx_rr' in
       let ty_rr' = D.Con.run rel_rr' ty in
       let el_rr' = D.Con.run rel_rr' el in
-      Format.eprintf "Restricted %a :: %a => %a@."
-        NewRestriction.pp rel_rr' D.Con.pp el D.Con.pp el_rr'
-      ;
+      (* Format.eprintf "Restricted %a :: %a => %a@."
+         NewRestriction.pp rel_rr' D.Con.pp el D.Con.pp el_rr'; *)
       let _ = Q.equate_con (Cx.qenv cx_rr') rel_rr' ty_rr' el_rr' @@ D.LazyVal.unleash el' in
       check_boundary cx ty sys el
 
@@ -775,7 +774,7 @@ and check_bnd_sys ~cx ~cxx ~x ~r ~ty ~cap sys =
 
 and check_of_ty cx ty sys tm =
   let ppenv = Cx.ppenv cx in
-  Format.eprintf "@.@.ty: %a@.sys: %a@.tm: %a@." D.Con.pp ty ConSys.pp sys (Tm.pp ppenv) tm;
+  (* Format.eprintf "@.@.ty: %a@.sys: %a@.tm: %a@." D.Con.pp ty ConSys.pp sys (Tm.pp ppenv) tm; *)
   match polarity ty with
   | `Pos ->
     check cx (`Pos (`El ty)) tm;
@@ -921,9 +920,8 @@ and synth_stack cx vhd ty stk  =
         check_of_ty_ "vproj" cx func_ty [] vproj.func;
         let vfunc = eval cx vproj.func in
         let vhd =
-          D.Val.make_from_lazy @@ lazy begin
-            D.Con.plug (Cx.rel cx) ~rigid:true (D.FunApp (D.TypedVal.make vhd)) vfunc
-          end
+          D.Val.make_from_lazy @@ D.Lazy.make @@ fun _ ->
+          D.Con.plug (Cx.rel cx) ~rigid:true (D.FunApp (D.TypedVal.make vhd)) vfunc
         in
         synth_stack cx vhd ty1 stk
 
@@ -993,9 +991,8 @@ and synth_stack cx vhd ty stk  =
             | `Changed cxx_ss' ->
               let _ = check_ty_ "cap" cxx_ss' `Pre tm in
               let vabs =
-                D.LazyValAbs.make_from_lazy @@ lazy begin
-                  Abs (x, D.Syn.eval (Cx.rel cxx_ss') (Cx.venv cxx_ss') tm)
-                end
+                D.LazyValAbs.make_from_lazy @@ D.Lazy.make @@ fun _ ->
+                D.Abs (x, D.Syn.eval (Cx.rel cxx_ss') (Cx.venv cxx_ss') tm)
               in
               go (Snoc (acc, (s, s', vabs))) sys
 

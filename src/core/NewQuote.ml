@@ -112,6 +112,7 @@ let equate_dim qenv rel r0 r1 =
 
 
 let rec equate_con qenv rel ty el0 el1 =
+  (* Format.eprintf "equate_con: %a@.@." Rel.pp rel; *)
   match el0, el1 with
   | Neu neu0, Neu neu1 ->
     equate_neutroid qenv rel neu0.neu neu1.neu

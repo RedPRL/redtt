@@ -9,12 +9,26 @@ exception CanJonHelpMe
 exception CanFavoniaHelpMe
 
 
+module Lazy : sig
+  type 'a t
+  val make : (unit -> 'a) -> 'a t
+  val force : 'a t -> 'a
+  val pp : 'a Pp.t0 -> 'a t Pp.t0
+end =
+struct
+  type 'a t = 'a
+  let make f = f ()
+  let force x = x
+  let pp f fmt x = f fmt x
+end
+
 type dim = I.t
 
 (** The dimension equality oracle *)
 module Rel = NewRestriction
 type rel = Rel.t
 
+let dump = open_out "dump.txt"
 
 (** Permutations *)
 module Perm :
@@ -73,6 +87,8 @@ sig
 
   val make : 'a -> 'a t
 
+  val pp : 'a Pp.t0 -> 'a t Pp.t0
+
   (** [make v = make' None v] *)
   val make' : rel option -> perm -> 'a -> 'a t
 
@@ -86,10 +102,6 @@ sig
 
   val swap : perm -> 'a t -> 'a t
 
-  (* [unleash] forces the result. The first argument is intended
-     to be [X.run] where [X] is some structure implementing [Domain]. *)
-  val unleash : (rel -> perm -> 'a -> 'a) -> 'a t -> 'a
-
   (* [fold] exposes the inner structure. The caller has
      the responsibility to apply proper restrictions.
 
@@ -102,33 +114,51 @@ struct
      perm : perm;
      data : 'a}
 
-  type 'a t = 'a delayed_record ref
+  type 'a t = 'a delayed_record
 
-  let make' r pi d = ref {data = d; rel = r; perm = pi}
+  let pp f fmt {rel; perm; data} =
+    match rel with
+    | Some rel ->
+      Format.fprintf fmt "{%a | %a}"
+        f data Rel.pp rel
+    | None -> f fmt data
+
+  let make' r pi d = {data = d; rel = r; perm = pi}
 
   let make d = make' None Perm.emp d
 
-  let drop_rel v = !v.data
+  let drop_rel v = v.data
 
   let with_rel r v =
-    make' (Some r) (!v.perm) (drop_rel v)
+    let pp_opt_rel fmt =
+      function
+      | None -> Format.fprintf fmt "none"
+      | Some rel -> Rel.pp fmt rel
+    in
+    (* begin
+       let str = Format.asprintf "replacing %a ====> %a@.@." pp_opt_rel v.rel Rel.pp r in
+       Printf.fprintf dump "%s" str
+       end; *)
+    make' (Some r) (v.perm) (drop_rel v)
 
   let swap pi v =
-    let rel' = flip Option.map !v.rel @@ Perm.fold Rel.swap pi in
-    make' rel' (Perm.compose pi !v.perm) (drop_rel v)
+    let rel' = flip Option.map v.rel @@ Perm.fold Rel.swap pi in
+    make' rel' (Perm.compose pi v.perm) (drop_rel v)
 
   let unleash f v =
-    match !v.rel with
+    match v.rel with
     | Some r ->
       begin
-        let d = f r !v.perm !v.data in v := {data = d; rel = None; perm = Perm.emp};
+        let d = f (Some r) v.perm v.data in
+        (* n v := {data = d; rel = None; perm = Perm.emp}; *)
         d
       end
     | None ->
-      let d = f (Rel.emp ()) !v.perm !v.data in v := {data = d; rel = None; perm = Perm.emp};
+      let d = f None v.perm v.data in
+      (* in v := {data = d; rel = None; perm = Perm.emp}; *)
       d
 
-  let fold f v = f !v.rel !v.perm !v.data
+  let fold f v = f v.rel v.perm v.data
 end
 
 type 'a face = dim * dim * 'a Lazy.t Delayed.t
@@ -413,7 +443,7 @@ struct
       eval_cmd rel env cmd
 
     | Tm.Let (c, Tm.B (_, t)) ->
-      let v = lazy begin eval_cmd rel env c end in
+      let v = Lazy.make @@ fun _ -> eval_cmd rel env c in
       eval rel (Env.extend_cell env @@ Cell.lazy_con v) t
 
     | Tm.Pi (dom, cod) ->
@@ -486,14 +516,14 @@ struct
       let strict = Desc.is_strict_set desc in
       let params =
         flip List.map info.params @@ fun t ->
-        Cell.lazy_con @@ lazy begin eval rel env t end
+        Cell.lazy_con @@ Lazy.make @@ fun _ -> eval rel env t
       in
       Data {lbl = info.lbl; strict; params; constrs = env.globals, Desc.constrs desc}
 
     | Tm.Intro (dlbl, clbl, params, args) ->
       let desc = GlobalEnv.lookup_datatype env.globals dlbl in
       let constr = Desc.lookup_constr clbl @@ Desc.constrs desc in
-      let eval_as_cell t = Cell.lazy_con @@ lazy (eval rel env t) in
+      let eval_as_cell t = Cell.lazy_con @@ Lazy.make @@ fun _ -> eval rel env t in
       let params = List.map eval_as_cell params in
       let tyenv = Env.extend_cells (Env.init env.globals) params in
       let benv, args = eval_constr_args rel ~env ~tyenv ~constr ~args in
@@ -508,13 +538,13 @@ struct
       | Desc.TNil _, [] ->
         tyenv, Bwd.to_list acc
       | Desc.TCons (`Const ty, Tm.B (_, tele)), tm :: tms ->
-        let vty = lazy begin eval rel tyenv ty end in
-        let el = lazy begin eval rel env tm end in
+        let vty = Lazy.make @@ fun _ -> eval rel tyenv ty in
+        let el = Lazy.make @@ fun _ -> eval rel env tm in
         let acc = acc #< (`Const (Val.make_from_lazy el)) in
         let tyenv = Env.extend_cell tyenv @@ Cell.lazy_con el in
         go acc tyenv tele tms
       | Desc.TCons (`Rec Desc.Self, Tm.B (_, tele)), tm :: tms ->
-        let el = lazy begin eval rel env tm end in
+        let el = Lazy.make @@ fun _ -> eval rel env tm in
         let tyenv = Env.extend_cell tyenv @@ Cell.lazy_con el in
         let acc = acc #< (`Rec (`Self, Val.make_from_lazy el)) in
         go acc tyenv tele tms
@@ -568,7 +598,7 @@ struct
       let mot = Clo {env; bnd = info.mot} in
       let params =
         flip List.map info.params @@ fun t ->
-        Cell.lazy_con @@ lazy begin eval rel env t end
+        Cell.lazy_con @@ Lazy.make @@ fun _ -> eval rel env t
       in
       let clauses =
         flip List.map info.clauses @@ fun (lbl, bnd) ->
@@ -687,10 +717,10 @@ struct
     match Rel.equate r r' rel with
     | `Changed rel ->
       let env = Env.run rel env in
-      let abs = lazy begin eval_bnd rel env bnd end in
+      let abs = Lazy.make @@ fun _ -> eval_bnd rel env bnd in
       Some (r, r', LazyValAbs.make_from_lazy abs)
     | `Same ->
-      let abs = lazy begin eval_bnd rel env bnd end in
+      let abs = Lazy.make @@ fun _ -> eval_bnd rel env bnd in
       Some (r, r', LazyValAbs.make_from_lazy abs)
     | `Inconsistent ->
       None
@@ -704,10 +734,10 @@ struct
     match Rel.equate r r' rel with
     | `Changed rel ->
       let env = Env.run rel env in
-      let v = lazy begin eval rel env tm end in
+      let v = Lazy.make @@ fun _ -> begin eval rel env tm end in
       Some (r, r', LazyVal.make_from_lazy v)
     | `Same ->
-      let v = lazy begin eval rel env tm end in
+      let v = Lazy.make @@ fun _ -> begin eval rel env tm end in
       Some (r, r', LazyVal.make_from_lazy v)
     | `Inconsistent ->
       None
@@ -718,10 +748,10 @@ struct
     match Rel.equate r r' rel with
     | `Changed rel ->
       let env = Env.run rel env in
-      let v = lazy begin eval rel env tm end in
+      let v = Lazy.make @@ fun _ -> begin eval rel env tm end in
       (r, r', LazyVal.make_from_lazy v)
     | `Same ->
-      let v = lazy begin eval rel env tm end in
+      let v = Lazy.make @@ fun _ -> begin eval rel env tm end in
       (r, r', LazyVal.make_from_lazy v)
     | `Inconsistent ->
       (r, r', LazyVal.make FortyTwo)
@@ -1514,7 +1544,9 @@ struct
       begin
         match Neutroid.run_then_force rel info.neu with
         | `Rigid neu ->
-          (* Format.eprintf "rigid: %a != %a@.@." Rel.pp rel Neutroid.pp info.neu; *)
+          (* FOO:w *)
+          (* let str = Format.asprintf "rigid: %a != %a@.@." Rel.pp rel Neutroid.pp info.neu in
+             Printf.fprintf dump "%s" str; *)
           let ty = Val.run rel info.ty in
           make_neu rel ty neu
         | `Triv con -> con
@@ -1561,7 +1593,7 @@ struct
       let coe_arg s = make_coe rel r' s ~abs:dom @@ TypedVal.drop_ty arg in
       let abs =
         let cod_y = Clo.swap pi quantx.cod in
-        let coe_r'y = lazy begin coe_arg @@ `Atom y end in
+        let coe_r'y = Lazy.make @@ fun _ -> begin coe_arg @@ `Atom y end in
         Abs (y, Clo.inst rel cod_y @@ Cell.lazy_con coe_r'y)
       in
       let cap = Val.plug rel ~rigid:true (FunApp (TypedVal.make @@ Val.make @@ coe_arg r)) cap in
@@ -1614,7 +1646,8 @@ struct
     | Snd, HCom ({r; r'; ty = `Sg {dom; cod}; cap; sys} as hcom) ->
       let abs = ConAbs.bind @@ fun y ->
         let hcom_ry_fst =
-          lazy begin
+          Lazy.make @@ fun _ ->
+          begin
             plug rel ~rigid:true Fst (HCom {hcom with r' = y})
           end
         in
@@ -1627,7 +1660,7 @@ struct
     | Snd, Coe ({r; r'; ty = `Sg (Abs (x, {dom = dom_x; cod = cod_x})); cap} as coe) ->
       let abs =
         let y, pi = Perm.freshen_name x in
-        let coe_ry_fst = lazy begin plug rel ~rigid:true Fst (Coe {coe with r' = `Atom y}) end in
+        let coe_ry_fst = Lazy.make @@ fun _ -> begin plug rel ~rigid:true Fst (Coe {coe with r' = `Atom y}) end in
         let cod_y = Clo.swap pi cod_x in
         let cod_y_coe_ry_fst = Clo.inst rel cod_y @@ Cell.lazy_con coe_ry_fst in
         Abs (y, cod_y_coe_ry_fst)
@@ -1641,7 +1674,8 @@ struct
     | Snd, GHCom ({r; r'; ty = `Sg {dom; cod}; cap; sys} as ghcom) ->
       let abs = ConAbs.bind @@ fun y ->
         let ghcom_ry_fst =
-          lazy begin
+          Lazy.make @@ fun _ ->
+          begin
             plug rel ~rigid:true Fst (GHCom {ghcom with r' = y})
           end
         in
@@ -1762,9 +1796,8 @@ struct
       let abs =
         ConAbs.bind @@ fun y ->
         Clo.inst rel elim.mot @@
-        Cell.lazy_con @@ lazy begin
-          make_fhcom rel hcom.r y ~cap:hcom.cap ~sys:hcom.sys
-        end
+        Cell.lazy_con @@ Lazy.make @@ fun _ ->
+        make_fhcom rel hcom.r y ~cap:hcom.cap ~sys:hcom.sys
       in
       let cap = Val.plug rel ~rigid:true frm hcom.cap in
       let sys = ConAbsSys.plug rel ~rigid:true frm hcom.sys in
@@ -1796,7 +1829,7 @@ struct
       frm, Val.unleash dom, []
 
     | Sg {cod; _}, Snd ->
-      let fst = lazy begin plug rel ~rigid:true Fst hd end in
+      let fst = Lazy.make @@ fun _ -> plug rel ~rigid:true Fst hd in
       frm, Clo.inst rel cod @@ Cell.lazy_con fst, []
 
     | Sg _ as tycon, _ ->
@@ -2283,7 +2316,7 @@ struct
               let b = Con.run rel base in
               let fib =
                 Val.make @@
-                let lazy_fa = lazy begin Con.run rel base end in
+                let lazy_fa = Lazy.make @@ fun _ -> begin Con.run rel base end in
                 let env = Env.init_isolated [Cell.con b] in
                 let var i = Tm.up @@ Tm.ix i in
                 Cons (Val.run rel cap, Val.make @@ Syn.eval rel env (Tm.refl (var 0)))
@@ -2796,7 +2829,7 @@ struct
   module ConAbs = AbsPlug (Con)
   include DelayedLazyPlug (ConAbs)
 
-  let bind gen = make_from_lazy @@ lazy begin ConAbs.bind gen end
+  let bind gen = make_from_lazy @@ Lazy.make @@ fun _ -> ConAbs.bind gen
 
   let inst_then_unleash rel abs r = ConAbs.inst rel (drop_rel abs) r
 end
@@ -3573,7 +3606,7 @@ and Face :
     let make rel r r' f =
       match Rel.equate' r r' rel with
       | rel ->
-        [r, r', DelayedLazyX.make_from_lazy @@ lazy begin f rel end]
+        [r, r', DelayedLazyX.make_from_lazy @@ Lazy.make @@ fun _ -> f rel]
       | exception I.Inconsistent ->
         []
 
@@ -3717,7 +3750,7 @@ end
 
     let make (Abs (x, a)) = Abs (x, DelayedX.make a)
 
-    let make_from_lazy (lazy v) = make v
+    let make_from_lazy lv = make @@ Lazy.force lv
 
     let make_from_delayed : X.t abs Delayed.t -> DelayedX.t abs =
       Delayed.fold @@ fun rel pi (Abs (x, c_x)) ->
@@ -3748,18 +3781,20 @@ and DelayedPlug : functor (X : DomainPlug) ->
 
 
     let make = Delayed.make
-    let make_from_lazy (lazy v) = Delayed.make v
+    let make_from_lazy lv = Delayed.make @@ Lazy.force lv
 
     let make_from_delayed v = v
 
     let unleash =
-      Delayed.unleash @@ fun rel pi v ->
-      X.run rel @@ X.swap pi v
+      Delayed.fold @@ fun rel pi v ->
+      match rel with
+      | Some rel -> X.run rel @@ X.swap pi v
+      | None -> X.swap pi v
 
     let drop_rel = Delayed.drop_rel
 
     let pp fmt d =
-      X.pp fmt @@ unleash d
+      Delayed.pp X.pp fmt d
 
 
     let swap pi =
@@ -3792,23 +3827,28 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
 
     module DelayedX = DelayedPlug (X)
 
-    let make v = Delayed.make @@ lazy v
+    let make v = Delayed.make @@ Lazy.make @@ fun _ -> v
     let make_from_lazy = Delayed.make
 
-    let make_from_delayed v = Delayed.make @@ lazy begin DelayedX.unleash v end
+    let make_from_delayed v = Delayed.make @@ Lazy.make @@ fun _ -> begin DelayedX.unleash v end
 
     let unleash v =
-      Lazy.force @@ Delayed.unleash (fun rel pi v -> lazy begin X.run rel (X.swap pi @@ Lazy.force v) end) v
+      let alg rel pi v =
+        match rel with
+        | Some rel -> Lazy.make @@ fun _ -> X.run rel (X.swap pi @@ Lazy.force v)
+        | None -> Lazy.make @@ fun _ -> X.swap pi @@ Lazy.force v
+      in
+      Lazy.force @@ Delayed.fold alg v
 
     let pp fmt v =
-      X.pp fmt @@ unleash v
+      Delayed.pp (Lazy.pp X.pp) fmt v
 
     let drop_rel v = Lazy.force (Delayed.drop_rel v)
 
     let swap pi =
       Delayed.swap pi
 
-    let subst r x v = Delayed.make @@ lazy begin X.subst r x (unleash v) end
+    let subst r x v = Delayed.make @@ Lazy.make @@ fun _ -> begin X.subst r x (unleash v) end
 
     let run rel v = Delayed.with_rel rel v
 
@@ -3817,9 +3857,9 @@ and DelayedLazyPlug : functor (X : DomainPlug) ->
     let assert_rigid msg rel v =
       X.assert_rigid msg rel (unleash v)
 
-    let make_then_run rel v = Delayed.make' (Some rel) Perm.emp (lazy v)
+    let make_then_run rel v = Delayed.make' (Some rel) Perm.emp @@ Lazy.make @@ fun _ -> v
 
-    let plug rel ~rigid frm v = Delayed.make @@ lazy begin X.plug rel ~rigid frm (unleash v) end
+    let plug rel ~rigid frm v = Delayed.make @@ Lazy.make @@ fun _ -> begin X.plug rel ~rigid frm (unleash v) end
 
     let run_then_unleash rel v = X.run rel (drop_rel v)
 
