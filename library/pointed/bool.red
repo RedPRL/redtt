@@ -2,15 +2,15 @@ import prelude
 import data.bool
 import basics.isotoequiv
 
-def pbool : ptype = (bool, ff)
+def pbool : ptype = (bool, tt)
 
 def from-pbool (pA : ptype) : pequiv (p→ pbool pA) pA =
   let fwd : pmap (p→ pbool pA) pA =
-    (λ f → f.fst tt , refl)
+    (λ f → f.fst ff , refl)
   in
 
   let bwd (a : pA.fst) : pmap pbool pA =
-    ( elim [ tt → a | ff → pA.snd ]
+    ( elim [ tt → pA.snd | ff → a ]
     , refl
     )
   in
@@ -24,8 +24,8 @@ def from-pbool (pA : ptype) : pequiv (p→ pbool pA) pA =
     in
     let bwdfwd/map : (b : bool) → path _ (bwd (fwd.fst f) .fst b) (f.fst b) =
       elim [
-      | tt → refl
-      | ff → λ i → bwdfwd/pt i 0
+      | tt → λ i → bwdfwd/pt i 0
+      | ff → refl
       ]
     in
     λ i → (λ b → bwdfwd/map b i, bwdfwd/pt i)
