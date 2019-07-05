@@ -119,7 +119,7 @@ def smash-unit/contr (X : ptype) : is-contr (smash X punit) =
 
 def unitr (X : ptype) : smash X pbool → X .fst =
   let out/proj (a : X .fst) : bool → X .fst =
-    elim [tt → a | ff → X .snd]
+    elim [tt → X .snd | ff → a]
   in
   let out/gluel : (b : bool) → path (X .fst) (X .snd) (out/proj (X .snd) b) =
     elim [* → refl]
@@ -130,60 +130,60 @@ def unitr (X : ptype) : smash X pbool → X .fst =
   | * → X .snd
   ]
 
-def unitr/in-out (X : ptype) : (s : smash X pbool) → path (smash X pbool) (proj (unitr X s) tt) s =
-  let in-out/basel : path (smash X pbool) (proj (X .snd) tt) basel =
+def unitr/in-out (X : ptype) : (s : smash X pbool) → path (smash X pbool) (proj (unitr X s) ff) s =
+  let in-out/basel : path (smash X pbool) (proj (X .snd) ff) basel =
     λ j →
     comp 0 1 basel [
-    | j=0 k → gluel tt k
+    | j=0 k → gluel ff k
     | j=1 → refl
     ]
   in
-  let in-out/baser : path (smash X pbool) (proj (X .snd) tt) baser =
+  let in-out/baser : path (smash X pbool) (proj (X .snd) ff) baser =
     λ j →
     comp 0 1 (basel-baser X pbool j) [
-    | j=0 k → gluel tt k
+    | j=0 k → gluel ff k
     | j=1 → refl
     ]
   in
   let in-out/proj (a : X .fst)
-    : (b : bool) → path (smash X pbool) (proj (unitr X (proj a b)) tt) (proj a b)
+    : (b : bool) → path (smash X pbool) (proj (unitr X (proj a b)) ff) (proj a b)
     =
     elim [
-    | tt → refl
-    | ff → pivotlr X pbool tt a
+    | tt → pivotlr X pbool ff a
+    | ff → refl
     ]
   in
   let in-out/gluel : (b : bool) → [i j] smash X pbool [
     | i=0 → in-out/basel j
     | i=1 → in-out/proj (X .snd) b j
-    | j=0 → proj (unitr X (gluel b i)) tt
+    | j=0 → proj (unitr X (gluel b i)) ff
     | j=1 → gluel b i
     ]
     =
     elim [
     | tt → λ i j →
-      comp 0 1 (gluel tt i) [
-      | i=1 → refl
-      | j=0 k → weak-connection/or (smash X pbool) (λ v → gluel tt v) i k
-      | j=1 → refl
+      comp 0 1 (weak-connection/and (smash X pbool) (λ n → basel-baser X pbool n) i j) [
+      | j=0 k → gluel ff k
+      | j=1 k → basel-baser/filler X pbool k i
       ]
     | ff → λ i j →
-      comp 0 1 (weak-connection/and (smash X pbool) (λ n → basel-baser X pbool n) i j) [
-      | j=0 k → gluel tt k
-      | j=1 k → basel-baser/filler X pbool k i
+      comp 0 1 (gluel ff i) [
+      | i=1 → refl
+      | j=0 k → weak-connection/or (smash X pbool) (λ v → gluel ff v) i k
+      | j=1 → refl
       ]
     ]
   in
   let in-out/gluer (a : X .fst) : [i j] smash X pbool [
     | i=0 → in-out/baser j
-    | i=1 → in-out/proj a ff j
-    | j=0 → proj (X .snd) tt
+    | i=1 → in-out/proj a tt j
+    | j=0 → proj (X .snd) ff
     | j=1 → gluer a i
     ]
     =
     λ i j →
     comp 0 1 (basel-baser X pbool j) [
-    | j=0 k → gluel tt k
+    | j=0 k → gluel ff k
     | j=1 k → weak-connection/and (smash X pbool) (λ n → gluer a n) i k
     ]
   in
@@ -196,7 +196,7 @@ def unitr/in-out (X : ptype) : (s : smash X pbool) → path (smash X pbool) (pro
   ]
 
 def unitr/equiv (X : ptype) : equiv (X .fst) (smash X pbool) =
-  iso→equiv (X .fst) (smash X pbool) (λ a → proj a tt, unitr X, unitr/in-out X, λ _ → refl)
+  iso→equiv (X .fst) (smash X pbool) (λ a → proj a ff, unitr X, unitr/in-out X, λ _ → refl)
 
 -- Definition of rearrange : (X ∧ Y) ∧ Z → (Z ∧ Y) ∧ X
 -- The associator can be derived from rearrange using the commutator:
