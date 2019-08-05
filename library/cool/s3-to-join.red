@@ -16,8 +16,7 @@ def s3→join/cnx (b : s1) (i m : 𝕀) : join s1 s1 =
 
 def s3→join/k01 :
   [i j m] join s1 s1 [
-  | i=1 → s3→join/cnx base 1 m
-  | ∂[j] → s3→join/cnx base i m
+  | i=1 | ∂[j] → s3→join/cnx base i m
   | m=0 → inl base
   | m=1 → push (loop j) base i
   ]
@@ -79,7 +78,7 @@ def join-s3-join/push/loop
     ]
   =
   elim [
-  | base → λ i j m → s3→join/k01 i j m
+  | base → s3→join/k01
   | loop k → λ i j m → s3→join/cube/filler i j k m
   ]
 
@@ -99,8 +98,8 @@ def join-s3-join/push
 
 def join-s3-join : (c : join s1 s1) → path _ (s3→join (join→s3 c)) c =
   elim [
-  | inl a → λ m → join-s3-join/inl a m
-  | inr b → λ m → s3→join/cnx b 1 m
+  | inl a → join-s3-join/inl a
+  | inr b → s3→join/cnx b 1
   | push a b i → λ m → join-s3-join/push a b i m
   ]
 
