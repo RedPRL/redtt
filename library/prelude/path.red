@@ -105,8 +105,7 @@ def trans/sym/l (A : type) (p : 𝕀 → A) : path (path _ (p 1) (p 1)) refl (tr
     | k=0 l → comp 1 j (p 1) [ l=0 → refl | l=1 → p ]
     | j=1 | k=1 → refl
     ]
-  | i=1 → p
-  | k=0 → p
+  | i=1 | k=0 → p
   -- | k=1 j → trans/filler A (symm A p) p j i
   ]
 
