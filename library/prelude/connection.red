@@ -4,10 +4,9 @@ def connection/or
   (A : type)
   (p : 𝕀 → A)
   : [i j] A [
-    | j=0 → p i
-    | i=0 → p j
+    | j=0 | i=j → p i
     | j=1 | i=1 → p 1
-    | i=j → p i
+    | i=0 → p j
     ]
   =
   λ i j →
@@ -23,9 +22,8 @@ def connection/or
   in
   comp 1 0 (p 1) [
   | i=0 → face j
-  | j=0 → face i
+  | j=0 | i=j → face i
   | i=1 | j=1 → refl
-  | i=j → face i
   ]
 
 def connection/and
@@ -33,9 +31,8 @@ def connection/and
   (p : 𝕀 → A)
   : [i j] A [
     | j=0 | i=0 → p 0
-    | j=1 → p i
+    | j=1 | i=j → p i
     | i=1 → p j
-    | i=j → p i
     ]
   =
   λ i j →
@@ -48,8 +45,7 @@ def connection/and
   comp 0 1 (p 0) [
   | i=0 | j=0 → refl
   | i=1 → face j
-  | j=1 → face i
-  | i=j → face i
+  | j=1 | i=j → face i
   ]
 
 def connection/both

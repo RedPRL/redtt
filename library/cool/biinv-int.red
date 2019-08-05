@@ -138,8 +138,7 @@ def fwd/pred-isuc/negsuc : (n : nat) → [i k] biinv-int [
 
 def fwd/pred-isuc : (n : int) → [i k] biinv-int [
   | i=0 → trans biinv-int (fwd/pred (isuc n)) (λ k → predl (fwd/isuc n k)) k
-  | i=1 → fwd n
-  | k=0 → fwd (pred-isuc n i)
+  | i=1 | k=0 → fwd (pred-isuc n i)
   | k=1 → predl-suc (fwd n) i
   ]
   =
