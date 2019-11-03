@@ -15,7 +15,7 @@ let fresh () =
   named None
 
 let compare =
-  Pervasives.compare
+  Stdlib.compare
 
 let name i =
   match Hashtbl.find names i with
