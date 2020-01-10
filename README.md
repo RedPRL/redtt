@@ -69,11 +69,11 @@ end up using one of these for the lexer at one point.
 
 | prerequisite |      | version                                                                | how to install                  |
 | ------------ | ---- | :--------------------------------------------------------------------- | ------------------------------- |
-| Opam         | `>=` | [`2.0.1`](https://github.com/ocaml/opam/releases/tag/2.0.1)            | manually or via package manager |
+| OPAM         | `>=` | [`2.0.5`](https://github.com/ocaml/opam/releases/tag/2.0.5)            | manually or via package manager |
 
 If this is your first time configuring OPAM, please run `opam init`; this will
 automatically install OCaml. If you are using a version of OCaml other than
-4.07.0, you must run `opam switch 4.07.0`.
+4.09.0, you must run `opam switch 4.09.0`.
 
 ### Other recommended packages
 

@@ -3,7 +3,7 @@ cache:
   directories:
     - /home/travis/.opam/
 env:
-  - OCAML_VERSION=4.07 OPAM_VERSION=2.0.0
+  - OCAML_VERSION=4.09 OPAM_VERSION=2.0.5
 before_install:
   # Install OPAM and OCaml
   - sh <(curl -sL https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-ocaml.sh)
