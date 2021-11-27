@@ -4,31 +4,29 @@
   open RedBasis
   open Bwd
   open BwdNotation
-  module E = ML
-  module R = ResEnv
 
   let locate loc con =
-    E.{con; span = Some loc}
+    ML.{con; span = Some loc}
 
   let atom_to_econ a =
-    if a = "_" then E.Hope else E.Var {name = a; ushift = 0}
+    if a = "_" then ML.Hope else ML.Var {name = a; ushift = 0}
 
-  let lost_eterm e : E.eterm =
-    E.{con = e; span = None}
+  let lost_eterm e : ML.eterm =
+    ML.{con = e; span = None}
 
-  let atom_to_lost_eterm a : E.eterm =
+  let atom_to_lost_eterm a : ML.eterm =
     lost_eterm (atom_to_econ a)
 
-  let atom_to_lost_frame a : E.frame =
-    E.App (atom_to_lost_eterm a)
+  let atom_to_lost_frame a : ML.frame =
+    ML.App (atom_to_lost_eterm a)
 
-  let lost_frame e : E.frame =
-    E.App (lost_eterm e)
+  let lost_frame e : ML.frame =
+    ML.App (lost_eterm e)
 
   let spine_to_econ (e, es) =
     match es with
     | [] -> e
-    | _ -> E.Cut (lost_eterm e, es)
+    | _ -> ML.Cut (lost_eterm e, es)
 %}
 
 %token <int> NUMERAL
@@ -79,54 +77,54 @@ debug_filter:
 
 eproj:
   | DOT FST
-    { E.Fst }
+    { ML.Fst }
   | DOT SND
-    { E.Snd }
+    { ML.Snd }
   | DOT VPROJ
-    { E.VProj }
+    { ML.VProj }
   | DOT CAP
-    { E.Cap }
+    { ML.Cap }
 
 atom_econ:
   | a = ATOM
     { atom_to_econ a }
   | a = ATOM; CARET; k = NUMERAL
-    { E.Var {name = a; ushift = k} }
+    { ML.Var {name = a; ushift = k} }
 
 atomoid_econ:
   | BACKTICK; t = tm
-    { E.Quo t }
+    { ML.Quo t }
 
   | a = HOLE_NAME
-    { E.Hole (a, None) }
+    { ML.Hole (a, None) }
 
   | HOLE_NAME; LBR; e = located(econ); RBR
-    { E.Guess e }
+    { ML.Guess e }
 
   | ELIM; scrut = option(located(atomic)); mot = option(preceded(IN,located(econ))); clauses = pipe_block(eclause)
     { match scrut with
-    | Some scrut -> E.Elim {mot; scrut; clauses}
-    | None -> E.ElimFun {clauses} }
+    | Some scrut -> ML.Elim {mot; scrut; clauses}
+    | None -> ML.ElimFun {clauses} }
 
   | spec = univ_spec
-    { let k, l = spec in E.Type (k, l) }
+    { let k, l = spec in ML.Type (k, l) }
   (* in theory this rule can replace the following three, but it seems there's some bug.
   | LPR; es = separated_list(COMMA, located(econ)); RPR
-    { E.Tuple es }
+    { ML.Tuple es }
   *)
   | LPR; RPR
-    { E.Tuple [] }
+    { ML.Tuple [] }
   | LPR; e = econ; RPR
     { e }
   | LPR; e = located(econ); COMMA; es = separated_nonempty_list(COMMA, located(econ)); RPR
-    { E.Tuple (e :: es) }
+    { ML.Tuple (e :: es) }
   | REFL
-    { E.Refl }
+    { ML.Refl }
   | n = NUMERAL;
-    { E.Num n }
+    { ML.Num n }
 
   | LTR; c = mlcmd; RTR
-    { E.RunML c }
+    { ML.RunML c }
 
 
 atomic:
@@ -137,13 +135,13 @@ atomic:
 
 framoid:
   | e = located(atomoid_econ)
-    { E.App e }
+    { ML.App e }
   | p = eproj
     { p }
 
 framic:
   | e = located(atomic)
-    { E.App e }
+    { ML.App e }
   | p = eproj
     { p }
 
@@ -160,7 +158,7 @@ app_proj_spine:
   (* a b c^1 ... *)
   | atoms = nonempty_list(ATOM); CARET; k = NUMERAL; fs = list(framic)
     { let atoms, last_atom = ListUtil.split_last atoms in
-      let econs = List.append (List.map atom_to_econ atoms) [E.Var {name = last_atom; ushift = k}] in
+      let econs = List.append (List.map atom_to_econ atoms) [ML.Var {name = last_atom; ushift = k}] in
       let head_econ, middle_econs = ListUtil.split_head econs in
       head_econ, List.append (List.map lost_frame middle_econs) fs }
   | e = atomoid_econ; fs = list(framic)
@@ -171,19 +169,19 @@ spine_con:
     { spine_to_econ ap }
 
   | LSQ; dims = nonempty_list(ATOM); RSQ; ty = located(econ); sys = pipe_block(eface)
-    { E.Ext (dims, ty, sys)}
+    { ML.Ext (dims, ty, sys)}
 
   | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); sys = pipe_block(eface)
-    { E.HCom {r = r0; r' = r1; cap; sys}}
+    { ML.HCom {r = r0; r' = r1; cap; sys}}
 
   | COMP; r0 = located(atomic); r1 = located(atomic); cap = located(atomic); IN; fam = located(econ); sys = pipe_block(eface)
-    { E.Com {r = r0; r' = r1; fam; cap; sys}}
+    { ML.Com {r = r0; r' = r1; fam; cap; sys}}
 
   | V; x = ATOM; ty0 = located(atomic); ty1 = located(atomic); equiv = located(atomic)
-    { E.V {x; ty0; ty1; equiv} }
+    { ML.V {x; ty0; ty1; equiv} }
 
   | BOX; cap = located(atomic); sys = pipe_block(located(econ))
-    { E.Box {cap; sys}}
+    { ML.Box {cap; sys}}
 
 %inline
 block(X):
@@ -208,28 +206,28 @@ econ:
     { e }
 
   | a = HOLE_NAME; SEMI; e = located(econ)
-    { E.Hole (a, Some e) }
+    { ML.Hole (a, Some e) }
 
   | LAM; xs = list(einvpat); RIGHT_ARROW; e = located(econ)
-    { E.Lam (xs, e) }
+    { ML.Lam (xs, e) }
 
   | LET; pat = einvpat; sch = escheme; EQUALS; tm = located(econ); IN; body = located(econ)
-    { E.Let {pat; sch = sch; tm; body} }
+    { ML.Let {pat; sch = sch; tm; body} }
 
   | COE; r0 = located(atomic); r1 = located(atomic); tm = located(atomic); IN; fam = located(econ)
-    { E.Coe {r = r0; r' = r1; fam; tm} }
+    { ML.Coe {r = r0; r' = r1; fam; tm} }
 
   | tele = nonempty_list(etele_cell); RIGHT_ARROW; cod = located(econ)
-    { E.Pi (List.flatten tele, cod) }
+    { ML.Pi (List.flatten tele, cod) }
 
   | tele = nonempty_list(etele_cell); times_or_ast; cod = located(econ)
-    { E.Sg (List.flatten tele, cod) }
+    { ML.Sg (List.flatten tele, cod) }
 
   | dom = located(spine_con); RIGHT_ARROW; cod = located(econ)
-    { E.Pi ([`Ty ("_", dom)], cod) }
+    { ML.Pi ([`Ty ("_", dom)], cod) }
 
   | dom = located(spine_con); times_or_ast; cod = located(econ)
-    { E.Sg ([`Ty ("_", dom)], cod) }
+    { ML.Sg ([`Ty ("_", dom)], cod) }
 
 eclause:
   | lbl = ATOM; pbinds = list(epatbind); RIGHT_ARROW; bdy = located(econ)
@@ -258,7 +256,7 @@ einvpat:
 
 edimension:
   | n = NUMERAL;
-    { E.Num n }
+    { ML.Num n }
   | a = ATOM
     { atom_to_econ a }
   | LPR; d = edimension; RPR
@@ -275,9 +273,9 @@ ecofib0:
   | BOUNDARY; LSQ; xs = nonempty_list(ATOM); RSQ;
     { let xi x =
         let pos = $loc(xs) in
-        let r = locate pos @@ E.Var {name = x; ushift = 0} in
-        [r, locate pos (E.Num 0);
-         r, locate pos (E.Num 1)]
+        let r = locate pos @@ ML.Var {name = x; ushift = 0} in
+        [r, locate pos (ML.Num 0);
+         r, locate pos (ML.Num 1)]
       in
       List.flatten @@ List.map xi xs }
 
@@ -292,7 +290,7 @@ eface:
   | phi = ecofib; RIGHT_ARROW; e = located(econ)
     { phi, e }
   | phi = ecofib0; xs = nonempty_list(ATOM); RIGHT_ARROW; e = located(econ)
-    { phi, locate ($startpos(xs), $endpos(e)) (E.Lam (List.map (fun x -> `Var (`User x)) xs, e)) }
+    { phi, locate ($startpos(xs), $endpos(e)) (ML.Lam (List.map (fun x -> `Var (`User x)) xs, e)) }
 
 
 escheme:
@@ -300,7 +298,7 @@ escheme:
     { (List.flatten tele, cod) }
 
   | tele = list(etele_cell)
-    { (List.flatten tele, locate ($endpos(tele), $endpos(tele)) E.Hope) }
+    { (List.flatten tele, locate ($endpos(tele), $endpos(tele)) ML.Hope) }
 
 etele_cell:
   | LPR; xs = nonempty_list(ATOM); COLON; ty = located(econ); RPR
@@ -315,7 +313,7 @@ econstr:
 | clbl = ATOM;
   specs = list(etele_cell)
   boundary = loption(pipe_block(eface))
-  { clbl, E.EConstr {specs = List.flatten specs; boundary} }
+  { clbl, ML.EConstr {specs = List.flatten specs; boundary} }
 
 data_modifiers:
   | PRIVATE
@@ -347,62 +345,62 @@ data_decl:
         | None -> `Kan, `Const 0
       in
       let params = List.flatten params in
-      dlbl, E.EDesc {params; constrs; kind; lvl} }
+      dlbl, ML.EDesc {params; constrs; kind; lvl} }
 
 
 mltoplevel:
   | META; LTR; LET; a = ATOM; EQUALS; cmd = mlcmd; RTR; rest = mltoplevel
-    { {rest with con = E.MlBind (cmd, `User a, rest.con)} }
+    { {rest with con = ML.MlBind (cmd, `User a, rest.con)} }
 
   | META; LTR; c = mlcmd; RTR; rest = mltoplevel
-    { {rest with con = E.MlBind (c, `Gen (Name.fresh ()), rest.con)} }
+    { {rest with con = ML.MlBind (c, `Gen (Name.fresh ()), rest.con)} }
 
   | modifiers = def_modifiers; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); rest = mltoplevel
-    { let name = E.MlRef (Name.named (Some a)) in
+    { let name = ML.MlRef (Name.named (Some a)) in
       let visibility, opacity = modifiers in
-      {rest with con = MlBind (E.define ~visibility ~name ~opacity ~scheme:sch ~tm, `User a, rest.con)} }
+      {rest with con = MlBind (ML.define ~visibility ~name ~opacity ~scheme:sch ~tm, `User a, rest.con)} }
 
   | visibility = data_modifiers; decl = data_decl; rest = mltoplevel
     { let a, desc = decl in
-      let name = E.MlRef (Name.named (Some a)) in
-      {rest with con = MlBind (E.MlDeclData {visibility; name; desc}, `User a, rest.con)} }
+      let name = ML.MlRef (Name.named (Some a)) in
+      {rest with con = MlBind (ML.MlDeclData {visibility; name; desc}, `User a, rest.con)} }
 
   | path = IMPORT; rest = mltoplevel
-    { {rest with con = E.mlbind (E.MlImport (`Private, path)) @@ fun _ -> rest.con} }
+    { {rest with con = ML.mlbind (ML.MlImport (`Private, path)) @@ fun _ -> rest.con} }
 
   | PUBLIC; path = IMPORT; rest = mltoplevel
-    { {rest with con = E.mlbind (E.MlImport (`Public, path)) @@ fun _ -> rest.con} }
+    { {rest with con = ML.mlbind (ML.MlImport (`Public, path)) @@ fun _ -> rest.con} }
 
   | QUIT; rest = mltoplevel
-    { {rest with con = E.MlRet (E.MlTuple [])} }
+    { {rest with con = ML.MlRet (ML.MlTuple [])} }
 
   | x = located(EOF)
-    { {x with con = E.MlRet (E.MlTuple [])} }
+    { {x with con = ML.MlRet (ML.MlTuple [])} }
 
   | error
     { raise @@ ParseError.E ($startpos, $endpos) }
 
 mlcmd:
   | LET; a = ATOM; EQUALS; cmd = mlcmd; IN; rest = mlcmd
-    { E.MlBind (cmd, `User a, rest) }
+    { ML.MlBind (cmd, `User a, rest) }
 
   | c = atomic_mlcmd; SEMI; rest = mlcmd
-    { E.MlBind (c, `Gen (Name.fresh ()), rest) }
+    { ML.MlBind (c, `Gen (Name.fresh ()), rest) }
 
   | FUN; a = ATOM; RIGHT_ARROW; c = mlcmd
-    { E.MlLam (`User a, c) }
+    { ML.MlLam (`User a, c) }
 
   | CHECK; tm = mlval; COLON; ty = mlval
-    { E.MlCheck {ty; tm} }
+    { ML.MlCheck {ty; tm} }
 
   | c = atomic_mlcmd; v = mlval
-    { E.MlApp (c, v) }
+    { ML.MlApp (c, v) }
 
   | c = atomic_mlcmd
     { c }
 
   | DEBUG; f = debug_filter
-    { E.MlDebug f }
+    { ML.MlDebug f }
 
 
 atomic_mlcmd:
@@ -411,42 +409,42 @@ atomic_mlcmd:
   | BEGIN; c = mlcmd; END
     { c }
   | BANG; v = mlval
-    { E.MlUnleash v }
+    { ML.MlUnleash v }
 
   | PRINT; c = located(atomic_mlcmd)
-    { let open E in
+    { let open ML in
       mlbind c.con @@ fun x ->
       MlPrint {c with con = x} }
 
   | NORMALIZE; c = atomic_mlcmd
-    { E.mlbind c @@ fun x -> E.MlNormalize x }
+    { ML.mlbind c @@ fun x -> ML.MlNormalize x }
 
   | LLGL; visibility = data_modifiers; decl = data_decl; RRGL
     { let name, desc = decl in
-      let name = E.MlRef (Name.named (Some name)) in
-      E.MlDeclData {visibility; name; desc} }
+      let name = ML.MlRef (Name.named (Some name)) in
+      ML.MlDeclData {visibility; name; desc} }
 
   | LLGL; modifiers = def_modifiers; DEF; a = ATOM; sch = escheme; EQUALS; tm = located(econ); RRGL
-    { let name = E.MlRef (Name.named (Some a)) in
+    { let name = ML.MlRef (Name.named (Some a)) in
       let visibility, opacity = modifiers in
-      E.define ~name ~visibility ~opacity ~scheme:sch ~tm }
+      ML.define ~name ~visibility ~opacity ~scheme:sch ~tm }
 
   | LLGL; e = located(econ); RRGL
-    { E.MlElab e }
+    { ML.MlElab e }
 
   | v = mlval
-    { E.MlRet v }
+    { ML.MlRet v }
 
 
 mlval:
   | LGL; vs = separated_list(COMMA, mlval); RGL
-    { E.MlTuple vs }
+    { ML.MlTuple vs }
   | LBR; c = mlcmd; RBR
-    { E.MlThunk c }
+    { ML.MlThunk c }
   | s = STRING
-    { E.MlString s }
+    { ML.MlString s }
   | a = ATOM;
-    { E.MlVar (`User a) }
+    { ML.MlVar (`User a) }
 
 
 
@@ -454,22 +452,22 @@ mlval:
 (*
 edecl:
   | LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
-    { E.Define (a, `Transparent, sch, tm) }
+    { ML.Define (a, `Transparent, sch, tm) }
   | OPAQUE LET; a = ATOM; sch = escheme; EQUALS; tm = located(econ)
-    { E.Define (a, `Opaque, sch, tm) }
+    { ML.Define (a, `Opaque, sch, tm) }
   | NORMALIZE; e = located(econ)
-    { E.MlNormalize e }
+    { ML.MlNormalize e }
 
 (*
 
 *)
 
   | IMPORT; a = ATOM
-    { E.MlImport a }
+    { ML.MlImport a }
 
     (*
   | QUIT
-    { E.Quit }
+    { ML.Quit }
     *)
 
     *)
@@ -483,13 +481,13 @@ edecl:
 tele_with_env:
   | dom = tm; rest = tele_with_env
     { fun env ->
-      let env' = R.bind "_" env in
+      let env' = ResEnv.bind "_" env in
       let tele, env'' = rest env' in
       TCons (None, dom env, tele), env'' }
 
   | LSQ; x = ATOM; COLON; dom = tm; RSQ; rest = tele_with_env
     { fun env ->
-      let env' = R.bind x env in
+      let env' = ResEnv.bind x env in
       let tele, env'' = rest env' in
       TCons (Some x, dom env, tele), env'' }
 
@@ -510,12 +508,12 @@ face(X):
 bind(X):
   | LSQ; x = ATOM; RSQ; e = X
     { fun env ->
-      Tm.B (Some x, e @@ R.bind x env) }
+      Tm.B (Some x, e @@ ResEnv.bind x env) }
 
 dimbind(X):
   | LGL; x = ATOM; RGL; e = X
     { fun env ->
-      Tm.B (Some x, e @@ R.bind x env) }
+      Tm.B (Some x, e @@ ResEnv.bind x env) }
 
 multibind(X):
   | e = X
@@ -524,11 +522,11 @@ multibind(X):
 
   | LSQ; x = ATOM; RSQ; mb = multibind(X)
     { fun env ->
-      MBConsVar (Some x, mb @@ R.bind x env) }
+      MBConsVar (Some x, mb @@ ResEnv.bind x env) }
 
   | LGL; xs = list(ATOM); RGL; mb = multibind(X)
     { fun env ->
-      MBConsDims (List.map (fun x -> Some x) xs, mb @@ R.bindn xs env) }
+      MBConsDims (List.map (fun x -> Some x) xs, mb @@ ResEnv.bindn xs env) }
 
 
 elist(X):
@@ -594,13 +592,13 @@ tm:
   | LPR; DATA; dlbl = ATOM; RPR
     { fun env ->
       make_node $startpos $endpos @@
-      let alpha = R.get_name dlbl env in
+      let alpha = ResEnv.get_name dlbl env in
       Tm.Data {lbl = alpha; params = []} }
 
   | LPR; dlbl = ATOM; DOT; INTRO; clbl = ATOM; es = elist(tm); RPR
     { fun env ->
       make_node $startpos $endpos @@
-      let alpha = R.get_name dlbl env in
+      let alpha = ResEnv.get_name dlbl env in
       Tm.Intro (alpha, clbl, [], es env) }
 
   | e = cmd
@@ -611,17 +609,17 @@ tm:
   | LPR; LET; LSQ; x = ATOM; e0 = cmd; RSQ; e1 = tm; RPR
     { fun env ->
       make_node $startpos $endpos @@
-      Tm.Let (e0 env, Tm.B (Some x, e1 @@ R.bind x env))}
+      Tm.Let (e0 env, Tm.B (Some x, e1 @@ ResEnv.bind x env))}
 
 head:
   | a = ATOM; CARET; k = NUMERAL
     { fun env ->
-      let x = R.get_name a env in
+      let x = ResEnv.get_name a env in
       Tm.Var {name = x; twin = `Only; ushift = k} }
 
   | a = ATOM
     { fun env ->
-      match R.get a env with
+      match ResEnv.get a env with
       | `Ix i -> Tm.Ix (i, `Only)
       | `Name x -> Tm.Var {name = x; twin = `Only; ushift = 0} }
 
