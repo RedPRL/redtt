@@ -1,7 +1,7 @@
 open Cmdliner
 open RedTT
 
-type command = unit Term.t * Term.info
+type command = unit Cmd.t
 
 let opt_margin =
   let doc = "Set pretty-printing margin to $(docv) characters." in
@@ -31,34 +31,28 @@ let opts_config =
   let make file_name line_width debug_mode shell_mode recheck =
     Frontend.{file_name; line_width; debug_mode; shell_mode; recheck}
   in
-  pure make $ opt_file_name $ opt_margin $ opt_debug $ opt_shell $ opt_recheck
+  const make $ opt_file_name $ opt_margin $ opt_debug $ opt_shell $ opt_recheck
 
-let cmd_default =
-  Term.
-    ( ret @@ pure @@ `Help ( `Pager, None )
-    , info "redtt" ~version:"0.1.0"
-    )
+let term_default =
+  Term.(ret @@ const @@ `Help ( `Pager, None ))
+
+let info_default =
+  Cmd.(info "redtt" ~version:"0.1.0")
 
 let cmd_help =
   let doc = "show help" in
-  Term.
-    ( ret @@ pure @@ `Help ( `Pager, None )
-    , info "help" ~doc
-    )
+  Cmd.(v @@ info "help" ~doc)
+    Term.(ret @@ const @@ `Help ( `Pager, None ))
 
 let cmd_load_file =
   let doc = "load file" in
-  Term.
-    ( pure Frontend.load_file $ opts_config
-    , info "load-file" ~doc
-    )
+  Cmd.(v @@ info "load-file" ~doc)
+    Term.(const Frontend.load_file $ opts_config)
 
 let cmd_from_stdin =
   let doc = "read from stdin" in
-  Term.
-    ( pure Frontend.load_from_stdin $ opts_config
-    , info "from-stdin" ~doc
-    )
+  Cmd.(v @@ info "from-stdin" ~doc)
+    Term.(const Frontend.load_from_stdin $ opts_config)
 
 
 let cmds : command list = [
@@ -68,10 +62,7 @@ let cmds : command list = [
 ]
 
 let main () =
-  match Term.eval_choice cmd_default cmds with
-  | `Error _e -> exit 1
-  | `Ok expr -> expr
-  | _ -> exit 0
+  Stdlib.exit @@ Cmd.eval @@ Cmd.group ~default:term_default info_default cmds
 
 let () =
   if not !Sys.interactive then
